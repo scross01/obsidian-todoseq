@@ -33,3 +33,18 @@
   color: var(--text-muted);
   margin-left: 10px;
 }
+
+.todo-keyword {
+  color: var(--text-accent);
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.todo-keyword:hover {
+  background-color: var(--text-accent-hover);
+  color: var(--text-on-accent);
+}

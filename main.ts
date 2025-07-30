@@ -95,16 +95,24 @@ export default class TodoTracker extends Plugin {
     });
   }
 
-  handleFileChange(file: TAbstractFile) {
+  async handleFileChange(file: TAbstractFile) {
     if (file instanceof TFile && file.extension === 'md') {
       // Remove existing tasks for this file
       this.tasks = this.tasks.filter(task => task.path !== file.path);
       
       // Re-scan the file
-      this.scanFile(file);
+      await this.scanFile(file);
+      
+      // If there's an active TodoView, refresh it
+      const leaves = this.app.workspace.getLeavesOfType('todo-view');
+      if (leaves.length > 0) {
+        const view = leaves[0].view as TodoView;
+        view.tasks = this.tasks;
+        view.onOpen();
+      }
     }
   }
-
+  
   showTasks() {
     const { workspace } = this.app;
     
@@ -149,9 +157,25 @@ class TodoView extends MarkdownView {
       });
       checkbox.checked = task.completed;
       
-      // Task text
+      // Task text with clickable TODO
       const taskText = taskItem.createEl('span', { cls: 'todo-text' });
-      taskText.setText(task.text);
+      
+      // Check if task starts with TODO
+      if (task.text.startsWith('TODO')) {
+        // Create clickable TODO span
+        const todoSpan = taskText.createEl('span', { cls: 'todo-keyword' });
+        todoSpan.setText('TODO');
+        todoSpan.addEventListener('click', (evt) => {
+          evt.stopPropagation();
+          this.toggleTaskStatus(task);
+        });
+        
+        // Add the rest of the task text
+        const restOfText = task.text.substring(4); // Remove "TODO"
+        taskText.appendText(restOfText);
+      } else {
+        taskText.setText(task.text);
+      }
       
       // File info
       const fileInfo = taskItem.createEl('div', { cls: 'todo-file-info' });
@@ -164,11 +188,35 @@ class TodoView extends MarkdownView {
       });
       
       taskItem.addEventListener('click', (evt) => {
-        if (evt.target !== checkbox) {
+        if (evt.target !== checkbox && !(evt.target as HTMLElement).hasClass('todo-keyword')) {
           this.openTaskLocation(task);
         }
       });
     });
+  }
+
+  async toggleTaskStatus(task: Task) {
+    // Update the task text
+    const newText = 'DONE' + task.text.substring(4); // Replace "TODO" with "DONE"
+    
+    // Update the file
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file instanceof TFile) {
+      const content = await this.app.vault.read(file);
+      const lines = content.split('\n');
+      
+      if (task.line < lines.length) {
+        lines[task.line] = newText;
+        await this.app.vault.modify(file, lines.join('\n'));
+        
+        // Update the task in our list
+        task.text = newText;
+        task.completed = true;
+        
+        // Refresh the view
+        this.onOpen();
+      }
+    }
   }
 
   async openTaskLocation(task: Task) {
