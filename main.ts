@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownView, WorkspaceLeaf } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownView, WorkspaceLeaf, ItemView } from 'obsidian';
 
 interface Task {
   path: string;
@@ -30,6 +30,8 @@ const NEXT_STATE = new Map<string, string>([
   ['COMPLETED', 'TODO'],
 ]);
 
+const TASK_VIEW_TYPE = "todo-view";
+
 export default class TodoTracker extends Plugin {
   settings: TodoTrackerSettings;
   tasks: Task[] = [];
@@ -41,7 +43,17 @@ export default class TodoTracker extends Plugin {
   
   async onload() {
     await this.loadSettings();
-    
+
+    // Register the custom view type
+    this.registerView(
+      TASK_VIEW_TYPE,
+      (leaf) => new TodoView(leaf, this.tasks)
+    );
+
+    this.addRibbonIcon('list-todo', 'Open TODO list', () => {
+      this.showTasks();
+    });
+
     // Add settings tab
     this.addSettingTab(new TodoTrackerSettingTab(this.app, this));
 
@@ -124,7 +136,7 @@ export default class TodoTracker extends Plugin {
       await this.scanFile(file);
       
       // If there's an active TodoView, refresh it
-      const leaves = this.app.workspace.getLeavesOfType('todo-view');
+      const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
       if (leaves.length > 0) {
         const view = leaves[0].view as TodoView;
         view.tasks = this.tasks;
@@ -138,26 +150,32 @@ export default class TodoTracker extends Plugin {
     
     // Create new leaf or use existing
     let leaf: WorkspaceLeaf | null = null;
-    const leaves = workspace.getLeavesOfType('todo-view');
-    
+    const leaves = workspace.getLeavesOfType(TASK_VIEW_TYPE);
+
     if (leaves.length > 0) {
       leaf = leaves[0];
     } else {
       leaf = workspace.getLeaf(true);
+      leaf.setViewState({ type: TASK_VIEW_TYPE, active: true });
     }
-    
-    // Create view
-    const view = new TodoView(leaf, this.tasks);
-    leaf.open(view);
   }
 }
 
-class TodoView extends MarkdownView {
+class TodoView extends ItemView {
+  static viewType = TASK_VIEW_TYPE;
   tasks: Task[];
   
   constructor(leaf: WorkspaceLeaf, tasks: Task[]) {
     super(leaf);
     this.tasks = tasks;
+  }
+
+  getViewType() {
+    return TodoView.viewType;
+  }
+
+  getDisplayText() {
+    return "Todo Tracker";
   }
 
   async onOpen() {
