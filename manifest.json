@@ -1,0 +1,10 @@
+{
+  "id": "todoseq",
+  "name": "TODOseq",
+  "version": "0.1.0",
+  "minAppVersion": "0.15.0",
+  "description": "Task tracker for Obsidian using Logseq style TODO items",
+  "author": "Stephen Cross",
+  "authorUrl": "https://github.com/scross01/obsidian-todoseq",
+  "isDesktopOnly": false
+}
