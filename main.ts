@@ -212,7 +212,7 @@ class TodoView extends MarkdownView {
 
   async toggleTaskStatus(task: Task) {
     // Update the task text
-    const newText = NEXT_STATE.get(task.keyword) + task.text.substring(task.keyword.length); // Replace "TODO" with "DONE"
+    const newText = NEXT_STATE.get(task.keyword) ?? 'DONE' + task.text.substring(task.keyword.length); // Replace "TODO" with "DONE"
 
     // Update the file
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -226,7 +226,7 @@ class TodoView extends MarkdownView {
         
         // Update the task in our list
         task.text = newText;
-        task.keyword = NEXT_STATE.get(task.keyword);
+        task.keyword = NEXT_STATE.get(task.keyword) ?? 'DONE';
         task.completed = task.keyword == 'DONE'
         
         // Refresh the view
@@ -242,9 +242,12 @@ class TodoView extends MarkdownView {
       const leaf = this.app.workspace.getLeaf(true);
       await leaf.openFile(file);
       
-      const editor = leaf.view.editor;
-      editor.setCursor({ line: task.line, ch: 0 });
-      editor.scrollIntoView({ from: { line: task.line, ch: 0 }, to: { line: task.line, ch: 0 } });
+      const markdownView = leaf.view instanceof MarkdownView ? leaf.view : null;
+      if (markdownView) {
+        const editor = markdownView.editor;
+        editor.setCursor({ line: task.line, ch: 0 });
+        editor.scrollIntoView({ from: { line: task.line, ch: 0 }, to: { line: task.line, ch: 0 } });
+      }
     }
   }
 }
