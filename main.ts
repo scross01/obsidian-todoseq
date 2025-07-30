@@ -212,7 +212,10 @@ class TodoView extends MarkdownView {
 
   async toggleTaskStatus(task: Task) {
     // Update the task text
-    const newText = NEXT_STATE.get(task.keyword) ?? 'DONE' + task.text.substring(task.keyword.length); // Replace "TODO" with "DONE"
+    const oldState = task.keyword
+    const newState = NEXT_STATE.get(oldState) ?? 'DONE'
+    const oldText = task.text
+    const newText = newState + oldText.substring(oldState.length); // Replace "TODO" with "DONE"
 
     // Update the file
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -226,9 +229,8 @@ class TodoView extends MarkdownView {
         
         // Update the task in our list
         task.text = newText;
-        task.keyword = NEXT_STATE.get(task.keyword) ?? 'DONE';
-        task.completed = task.keyword == 'DONE'
-        
+        task.keyword = newState;
+        task.completed = newState == 'DONE'
         // Refresh the view
         this.onOpen();
       }
