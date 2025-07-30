@@ -4,22 +4,41 @@ interface Task {
   path: string;
   line: number;
   text: string;
+  keyword: string;
   completed: boolean;
 }
 
 interface TodoTrackerSettings {
   refreshInterval: number;
+  taskKeywords: string[];
 }
 
 const DEFAULT_SETTINGS: TodoTrackerSettings = {
-  refreshInterval: 60 // seconds
+  refreshInterval: 60, // seconds
+  taskKeywords: ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAIT', 'WAITING', 'COMPLETE', 'COMPLETED'],
 }
+
+const NEXT_STATE = new Map<string, string>([
+  ['TODO', 'DOING'],
+  ['DOING', 'DONE'],
+  ['DONE', 'TODO'],
+  ['LATER', 'NOW'],
+  ['NOW', 'DONE'],
+  ['WAIT', 'TODO'],
+  ['WAITING', 'TODO'],
+  ['COMPLETE', 'TODO'],
+  ['COMPLETED', 'TODO'],
+]);
 
 export default class TodoTracker extends Plugin {
   settings: TodoTrackerSettings;
   tasks: Task[] = [];
   refreshIntervalId: number;
 
+  isTask(text: string): boolean {
+    return this.settings.taskKeywords.some(keyword => text.startsWith(keyword + ' '));
+  }
+  
   async onload() {
     await this.loadSettings();
     
@@ -84,12 +103,13 @@ export default class TodoTracker extends Plugin {
     const lines = content.split('\n');
     
     lines.forEach((line, index) => {
-      if (line.startsWith('TODO')) {
+      if (this.isTask(line)) {
         this.tasks.push({
           path: file.path,
           line: index,
           text: line,
-          completed: false
+          keyword: line.split(' ')[0],
+          completed: true ? line.startsWith('DONE') : false
         });
       }
     });
@@ -160,22 +180,17 @@ class TodoView extends MarkdownView {
       // Task text with clickable TODO
       const taskText = taskItem.createEl('span', { cls: 'todo-text' });
       
-      // Check if task starts with TODO
-      if (task.text.startsWith('TODO')) {
-        // Create clickable TODO span
-        const todoSpan = taskText.createEl('span', { cls: 'todo-keyword' });
-        todoSpan.setText('TODO');
-        todoSpan.addEventListener('click', (evt) => {
-          evt.stopPropagation();
-          this.toggleTaskStatus(task);
-        });
-        
-        // Add the rest of the task text
-        const restOfText = task.text.substring(4); // Remove "TODO"
-        taskText.appendText(restOfText);
-      } else {
-        taskText.setText(task.text);
-      }
+      // Create clickable TODO span
+      const todoSpan = taskText.createEl('span', { cls: 'todo-keyword' });
+      todoSpan.setText(task.keyword);
+      todoSpan.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        this.toggleTaskStatus(task);
+      });
+      
+      // Add the rest of the task text
+      const restOfText = task.text.substring(task.keyword.length); // Remove "TODO"
+      taskText.appendText(restOfText);
       
       // File info
       const fileInfo = taskItem.createEl('div', { cls: 'todo-file-info' });
@@ -197,8 +212,8 @@ class TodoView extends MarkdownView {
 
   async toggleTaskStatus(task: Task) {
     // Update the task text
-    const newText = 'DONE' + task.text.substring(4); // Replace "TODO" with "DONE"
-    
+    const newText = NEXT_STATE.get(task.keyword) + task.text.substring(task.keyword.length); // Replace "TODO" with "DONE"
+
     // Update the file
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file instanceof TFile) {
@@ -211,7 +226,8 @@ class TodoView extends MarkdownView {
         
         // Update the task in our list
         task.text = newText;
-        task.completed = true;
+        task.keyword = NEXT_STATE.get(task.keyword);
+        task.completed = task.keyword == 'DONE'
         
         // Refresh the view
         this.onOpen();
@@ -256,6 +272,18 @@ class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.refreshInterval = value;
           await this.plugin.saveSettings();
           this.plugin.setupPeriodicRefresh();
+        }));
+    new Setting(containerEl)
+      .setName('Task Keywords')
+      .setDesc('Keywords to scan for (e.g. TODO, FIXME)')
+      .addText(text => text
+        .setValue(this.plugin.settings.taskKeywords.join(', '))
+        .onChange(async (value) => {
+          this.plugin.settings.taskKeywords = value
+            .split(',')
+            .map(k => k.trim())
+            .filter(k => k.length > 0);
+          await this.plugin.saveSettings();
         }));
   }
 }

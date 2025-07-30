@@ -10,4 +10,4 @@ Initial main.ts, style.css created using GLM-4.5
 
 
 
-TODO -> DONE
+Next State Sequence: TODO -> DOING -> DONE
