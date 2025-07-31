@@ -85,6 +85,16 @@ export default class TodoTracker extends Plugin {
     // Initial scan
     await this.scanVault();
 
+    // If the Task view tab is already open when the plugin reloads, refresh it
+    const existingLeaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
+    if (existingLeaves.length > 0) {
+      for (const leaf of existingLeaves) {
+        const view = leaf.view as TodoView;
+        view.tasks = this.tasks;
+        await view.onOpen();
+      }
+    }
+
     // Set up periodic refresh
     this.setupPeriodicRefresh();
 
@@ -375,17 +385,40 @@ class TodoView extends ItemView {
 
   async openTaskLocation(task: Task) {
     const file = this.app.vault.getAbstractFileByPath(task.path);
-    
-    if (file instanceof TFile) {
-      const leaf = this.app.workspace.getLeaf(true);
-      await leaf.openFile(file);
-      
-      const markdownView = leaf.view instanceof MarkdownView ? leaf.view : null;
-      if (markdownView) {
-        const editor = markdownView.editor;
-        editor.setCursor({ line: task.line, ch: 0 });
-        editor.scrollIntoView({ from: { line: task.line, ch: 0 }, to: { line: task.line, ch: 0 } });
+
+    if (!(file instanceof TFile)) return;
+
+    const { workspace } = this.app;
+
+    // 1) Try to find an existing leaf already showing this file
+    const allLeaves = workspace.getLeavesOfType('markdown');
+    let targetLeaf: WorkspaceLeaf | null = null;
+
+    for (const l of allLeaves) {
+      const v = l.view;
+      if (v instanceof MarkdownView && v.file?.path === file.path) {
+        targetLeaf = l;
+        break;
       }
+    }
+
+    // 2) If found, activate and reveal it; otherwise reuse the most relevant leaf without opening a new tab
+    if (targetLeaf) {
+      await workspace.revealLeaf(targetLeaf);
+      await targetLeaf.openFile(file);
+    } else {
+      // getLeaf(false) prefers reusing the active leaf/split rather than creating a new tab
+      targetLeaf = workspace.getLeaf(false);
+      await targetLeaf.openFile(file);
+    }
+
+    // 3) Position cursor and scroll
+    const markdownView = targetLeaf.view instanceof MarkdownView ? targetLeaf.view : null;
+    if (markdownView) {
+      const editor = markdownView.editor;
+      const pos = { line: task.line, ch: 0 };
+      editor.setCursor(pos);
+      editor.scrollIntoView({ from: pos, to: pos });
     }
   }
 }
