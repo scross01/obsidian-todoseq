@@ -242,7 +242,7 @@ export default class TodoTracker extends Plugin {
             indent,
             text,
             state,
-            completed: state === 'DONE',
+            completed: state === 'DONE' || state === 'CANCELED' || state === 'CANCELLED',
             priority
           });
         }
@@ -360,9 +360,37 @@ class TodoView extends ItemView {
       fileInfo.setAttribute('title', task.path);
       
       // Event listeners
-      checkbox.addEventListener('change', () => {
-        task.completed = checkbox.checked;
-        taskText.toggleClass('completed', task.completed);
+      checkbox.addEventListener('change', async () => {
+        // Toggle only DONE/TODO via checkbox
+        const targetState = checkbox.checked ? 'DONE' : 'TODO';
+
+        // Priority token reconstruction
+        const priToken = task.priority === 'high' ? '[#A]'
+          : task.priority === 'med' ? '[#B]'
+          : task.priority === 'low' ? '[#C]'
+          : null;
+
+        // Construct new line: indent + state + [#X]? + text
+        const newLine = `${task.indent}${targetState}` + (priToken ? ` ${priToken}` : '') + (task.text ? ` ${task.text}` : '');
+
+        const file = this.app.vault.getAbstractFileByPath(task.path);
+        if (file instanceof TFile) {
+          const content = await this.app.vault.read(file);
+          const lines = content.split('\n');
+          if (task.line < lines.length) {
+            lines[task.line] = newLine;
+            await this.app.vault.modify(file, lines.join('\n'));
+
+            // Update in-memory task
+            task.rawText = newLine;
+            task.state = targetState;
+            task.completed = targetState === 'DONE';
+
+            // Reflect UI state
+            taskText.toggleClass('completed', task.completed);
+            await this.onOpen();
+          }
+        }
       });
       
       taskItem.addEventListener('click', (evt) => {
