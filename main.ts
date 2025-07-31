@@ -3,19 +3,24 @@ import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownV
 interface Task {
   path: string;
   line: number;
-  text: string;
+  rawText: string; // original full line
+  indent: string;  // leading whitespace before the state keyword
+  text: string;    // content after the state keyword with priority token removed
   state: string;
   completed: boolean;
+  priority: 'high' | 'med' | 'low' | null;
 }
 
 interface TodoTrackerSettings {
   refreshInterval: number;
   taskKeywords: string[];
+  includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
 }
 
 const DEFAULT_SETTINGS: TodoTrackerSettings = {
   refreshInterval: 60, // seconds
   taskKeywords: ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAIT', 'WAITING', 'IN-PROGRESS', 'CANCELED', 'CANCELLED'],
+  includeCodeBlocks: false,
 }
 
 const NEXT_STATE = new Map<string, string>([
@@ -38,8 +43,20 @@ export default class TodoTracker extends Plugin {
   tasks: Task[] = [];
   refreshIntervalId: number;
 
+  // Compiled regex for task line recognition (optional indent + keyword + single space)
+  private taskLineRegex: RegExp | null = null;
+
+  buildTaskLineRegex() {
+    const escaped = this.settings.taskKeywords
+      .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    // ^[ \t]*(KEYWORD1|KEYWORD2|...)\s+
+    this.taskLineRegex = new RegExp(`^[ \\t]*(?:${escaped})\\s+`);
+  }
+
   isTask(text: string): boolean {
-    return this.settings.taskKeywords.some(keyword => text.startsWith(keyword + ' '));
+    if (!this.taskLineRegex) this.buildTaskLineRegex();
+    return !!this.taskLineRegex!.test(text);
   }
   
   async onload() {
@@ -87,6 +104,8 @@ export default class TodoTracker extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    // Rebuild regex whenever settings are loaded (keywords may have changed)
+    this.buildTaskLineRegex();
   }
 
   async saveSettings() {
@@ -114,18 +133,95 @@ export default class TodoTracker extends Plugin {
   async scanFile(file: TFile) {
     const content = await this.app.vault.read(file);
     const lines = content.split('\n');
-    
-    lines.forEach((line, index) => {
-      if (this.isTask(line)) {
-        this.tasks.push({
-          path: file.path,
-          line: index,
-          text: line,
-          state: line.split(' ')[0],
-          completed: true ? line.startsWith('DONE') : false
-        });
+
+    // Ensure regex is built
+    if (!this.taskLineRegex) this.buildTaskLineRegex();
+    const kwAlternation = this.settings.taskKeywords
+      .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    // capture groups:
+    // 1: indent (spaces/tabs)
+    // 2: state keyword
+    // match 0: full prefix up to and including trailing spaces after state
+    const stateCapture = new RegExp(`^([ \\t]*)(${kwAlternation})\\s+`);
+
+    // Track whether each line is inside a fenced code block.
+    // Supports ``` or ~~~ fences, with optional language, allowing leading spaces.
+    let inFence = false;
+    let fenceMarker: '`' | '~' | null = null;
+
+    for (let index = 0; index < lines.length; index++) {
+      const line = lines[index];
+
+      // Detect fence starts/ends. We count the number of backticks/tilde runs at line start.
+      // A fence open is a run of 3 or more of the same char; a fence close is another run
+      // of the same char while currently inside a fence.
+      const fenceMatch = /^[ \t]*(`{3,}|~{3,})/.exec(line);
+      if (fenceMatch) {
+        const markerRun = fenceMatch[1]; // e.g. "```" or "~~~~"
+        const currentMarker: '`' | '~' = markerRun[0] === '`' ? '`' : '~';
+        if (!inFence) {
+          inFence = true;
+          fenceMarker = currentMarker;
+        } else {
+          // Only close if marker matches the one used to open
+          if (fenceMarker === currentMarker) {
+            inFence = false;
+            fenceMarker = null;
+          }
+        }
+        // The fence delimiter line itself should not be considered a task.
+        // Continue to next line after toggling state.
+        continue;
       }
-    });
+
+      // Skip task detection if inside a fence and includeCodeBlocks is disabled
+      if (inFence && !this.settings.includeCodeBlocks) {
+        continue;
+      }
+
+      if (this.isTask(line)) {
+        const m = stateCapture.exec(line);
+        if (m) {
+          const indent = m[1] ?? '';
+          const state = m[2] ?? '';
+          const afterPrefix = line.slice(m[0].length);
+
+          // FEAT-A3: parse priority token [#A|#B|#C] and remove from display text
+          // We only consider the first occurrence and ignore others per "first occurrence wins".
+          // Match token boundaries exactly: [#A], [#B], [#C]
+          let priority: 'high' | 'med' | 'low' | null = null;
+
+          // Find the first priority token
+          const priMatch = /(\s*)\[#([ABC])\](\s*)/.exec(afterPrefix);
+          let cleanedText = afterPrefix;
+          if (priMatch) {
+            const letter = priMatch[2];
+            if (letter === 'A') priority = 'high';
+            else if (letter === 'B') priority = 'med';
+            else if (letter === 'C') priority = 'low';
+
+            // Remove just this first occurrence (including its adjacent spaces captured)
+            const before = cleanedText.slice(0, priMatch.index);
+            const after = cleanedText.slice(priMatch.index + priMatch[0].length);
+            cleanedText = (before + ' ' + after).replace(/[ \t]+/g, ' ').trimStart();
+          }
+
+          const text = cleanedText;
+
+          this.tasks.push({
+            path: file.path,
+            line: index,
+            rawText: line,
+            indent,
+            text,
+            state,
+            completed: state === 'DONE',
+            priority
+          });
+        }
+      }
+    }
   }
 
   async handleFileChange(file: TAbstractFile) {
@@ -206,10 +302,21 @@ class TodoView extends ItemView {
         evt.stopPropagation();
         this.toggleTaskStatus(task);
       });
+
+      // Priority badge (if any)
+      if (task.priority) {
+        const pri = task.priority; // 'high' | 'med' | 'low'
+        const badge = taskText.createEl('span', { cls: ['priority-badge', `priority-${pri}`] });
+        badge.setText(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C');
+        badge.setAttribute('aria-label', `Priority ${pri}`);
+        badge.setAttribute('title', `Priority ${pri}`);
+      }
       
-      // Add the rest of the task text
-      const restOfText = task.text.substring(task.state.length); // Remove "TODO"
-      taskText.appendText(restOfText);
+      // Add the rest of the task text (already only the text after the state keyword)
+      const restOfText = task.text;
+      if (restOfText) {
+        taskText.appendText(' ' + restOfText);
+      }
       taskText.toggleClass('completed', task.completed);
     
       // File info
@@ -231,11 +338,19 @@ class TodoView extends ItemView {
   }
 
   async toggleTaskStatus(task: Task) {
-    // Update the task text
-    const oldState = task.state
-    const newState = NEXT_STATE.get(oldState) ?? 'DONE'
-    const oldText = task.text
-    const newText = newState + oldText.substring(oldState.length); // Replace "TODO" with "DONE"
+    // Compute new state and rebuild the line as: indent + state + ' ' + [#X]? + ' ' + text
+    // Priority token must be placed immediately after the state keyword per requirements.
+    const oldState = task.state;
+    const newState = NEXT_STATE.get(oldState) ?? 'DONE';
+
+    // Map stored priority back to token
+    const priToken = task.priority === 'high' ? '[#A]'
+      : task.priority === 'med' ? '[#B]'
+      : task.priority === 'low' ? '[#C]'
+      : null;
+
+    // Build new line ensuring single spaces and priority immediately after state if present
+    const newLine = `${task.indent}${newState}` + (priToken ? ` ${priToken}` : '') + (task.text ? ` ${task.text}` : '');
 
     // Update the file
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -244,13 +359,14 @@ class TodoView extends ItemView {
       const lines = content.split('\n');
       
       if (task.line < lines.length) {
-        lines[task.line] = newText;
+        lines[task.line] = newLine;
         await this.app.vault.modify(file, lines.join('\n'));
         
         // Update the task in our list
-        task.text = newText;
+        task.rawText = newLine;
         task.state = newState;
-        task.completed = newState == 'DONE'
+        task.completed = newState == 'DONE';
+        // text and indent remain the same; priority unchanged
         // Refresh the view
         this.onOpen();
       }
@@ -298,6 +414,7 @@ class TodoTrackerSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
           this.plugin.setupPeriodicRefresh();
         }));
+  
     new Setting(containerEl)
       .setName('Task Keywords')
       .setDesc('Keywords to scan for (e.g. TODO, FIXME)')
@@ -309,6 +426,20 @@ class TodoTrackerSettingTab extends PluginSettingTab {
             .map(k => k.trim())
             .filter(k => k.length > 0);
           await this.plugin.saveSettings();
+          // Rebuild regex for keywords and rescan
+          this.plugin.buildTaskLineRegex();
+          await this.plugin.scanVault();
+        }));
+  
+    new Setting(containerEl)
+      .setName('Include tasks inside code blocks')
+      .setDesc('When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.includeCodeBlocks)
+        .onChange(async (value) => {
+          this.plugin.settings.includeCodeBlocks = value;
+          await this.plugin.saveSettings();
+          await this.plugin.scanVault();
         }));
   }
 }

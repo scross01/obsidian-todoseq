@@ -34,6 +34,41 @@
   margin-left: 10px;
 }
 
+/* Priority badge styles */
+.priority-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 0.75em;
+  font-weight: 700;
+  line-height: 1.6em;
+  vertical-align: baseline;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+/* High=A */
+.priority-high {
+  color: #b00020; /* deep red text for contrast in light and dark themes */
+  background-color: rgba(176, 0, 32, 0.12);
+  border-color: rgba(176, 0, 32, 0.25);
+}
+
+/* Medium=B */
+.priority-med {
+  color: #8a6500; /* amber/brown */
+  background-color: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.35);
+}
+
+/* Low=C */
+.priority-low {
+  color: #0b5c2b; /* green */
+  background-color: rgba(40, 167, 69, 0.12);
+  border-color: rgba(40, 167, 69, 0.25);
+}
+
 .todo-keyword {
   color: var(--text-accent);
   font-weight: bold;
