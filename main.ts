@@ -4,7 +4,7 @@ interface Task {
   path: string;
   line: number;
   text: string;
-  keyword: string;
+  state: string;
   completed: boolean;
 }
 
@@ -15,7 +15,7 @@ interface TodoTrackerSettings {
 
 const DEFAULT_SETTINGS: TodoTrackerSettings = {
   refreshInterval: 60, // seconds
-  taskKeywords: ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAIT', 'WAITING', 'COMPLETE', 'COMPLETED'],
+  taskKeywords: ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAIT', 'WAITING', 'IN-PROGRESS', 'CANCELED', 'CANCELLED'],
 }
 
 const NEXT_STATE = new Map<string, string>([
@@ -24,10 +24,11 @@ const NEXT_STATE = new Map<string, string>([
   ['DONE', 'TODO'],
   ['LATER', 'NOW'],
   ['NOW', 'DONE'],
-  ['WAIT', 'TODO'],
-  ['WAITING', 'TODO'],
-  ['COMPLETE', 'TODO'],
-  ['COMPLETED', 'TODO'],
+  ['WAIT', 'IN-PROGRESS'],
+  ['WAITING', 'IN-PROGRESS'],
+  ['IN-PROGRESS', 'DONE'],
+  ['CANCELED', 'TODO'],
+  ['CANCELLED', 'TODO'],
 ]);
 
 const TASK_VIEW_TYPE = "todo-view";
@@ -120,7 +121,7 @@ export default class TodoTracker extends Plugin {
           path: file.path,
           line: index,
           text: line,
-          keyword: line.split(' ')[0],
+          state: line.split(' ')[0],
           completed: true ? line.startsWith('DONE') : false
         });
       }
@@ -200,16 +201,17 @@ class TodoView extends ItemView {
       
       // Create clickable TODO span
       const todoSpan = taskText.createEl('span', { cls: 'todo-keyword' });
-      todoSpan.setText(task.keyword);
+      todoSpan.setText(task.state);
       todoSpan.addEventListener('click', (evt) => {
         evt.stopPropagation();
         this.toggleTaskStatus(task);
       });
       
       // Add the rest of the task text
-      const restOfText = task.text.substring(task.keyword.length); // Remove "TODO"
+      const restOfText = task.text.substring(task.state.length); // Remove "TODO"
       taskText.appendText(restOfText);
-      
+      taskText.toggleClass('completed', task.completed);
+    
       // File info
       const fileInfo = taskItem.createEl('div', { cls: 'todo-file-info' });
       fileInfo.setText(`${task.path}:${task.line + 1}`);
@@ -230,7 +232,7 @@ class TodoView extends ItemView {
 
   async toggleTaskStatus(task: Task) {
     // Update the task text
-    const oldState = task.keyword
+    const oldState = task.state
     const newState = NEXT_STATE.get(oldState) ?? 'DONE'
     const oldText = task.text
     const newText = newState + oldText.substring(oldState.length); // Replace "TODO" with "DONE"
@@ -247,7 +249,7 @@ class TodoView extends ItemView {
         
         // Update the task in our list
         task.text = newText;
-        task.keyword = newState;
+        task.state = newState;
         task.completed = newState == 'DONE'
         // Refresh the view
         this.onOpen();
