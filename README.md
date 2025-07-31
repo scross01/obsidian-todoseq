@@ -4,6 +4,10 @@ A lightweight task tracker for Obsidian that scans your vault for simple, keywor
 
 ## Features
 - Scans all Markdown files in your vault for lines that begin with a task keyword (e.g., TODO, DOING, DONE, NOW, LATER, WAIT, WAITING, IN-PROGRESS, CANCELED, CANCELLED).
+- Supports tasks inside bullet and numbered lists. Examples:
+  - "- TODO write docs", "* DOING refactor", "+ LATER experiment"
+  - "1. WAIT update deps", "23) NOW ship", "A. TODO outline", "(a) DONE draft"
+  The original list marker (e.g., "- ", "1. ", "(a) ") is preserved when updating.
 - Shows all detected tasks in a single Task View, sorted by file path and line number.
 - Update tasks in two ways:
   1) Click the state keyword to cycle it using a defined sequence (e.g., TODO -> DOING -> DONE -> TODO).
@@ -23,10 +27,17 @@ A lightweight task tracker for Obsidian that scans your vault for simple, keywor
    - In Obsidian, go to Settings → Community plugins and enable the plugin.
 
 ## How tasks are recognized
-- A task is a line that starts with optional indentation, followed by a keyword and at least one space, for example:
+- A task is a line that starts with optional indentation, an optional list marker, then a keyword and at least one space. Examples:
   - TODO Write documentation
   -   DOING Update sync script
   - DONE [#B] Triage customer feedback
+  - - TODO inside bullet
+  - * DOING inside bullet
+  - + LATER inside bullet
+  - 1. WAIT numbered list
+  - 23) NOW numbered list
+  - A. TODO lettered list
+  - (a) DONE parenthesized marker
 - Supported keywords by default: TODO, DOING, DONE, NOW, LATER, WAIT, WAITING, IN-PROGRESS, CANCELED, CANCELLED.
 - You can customize the list of keywords in settings. If you clear the list, the defaults are used at runtime.
 
@@ -44,14 +55,14 @@ A lightweight task tracker for Obsidian that scans your vault for simple, keywor
   - Clicking the checkbox:
     - If you check it, the task is changed to DONE in the source file.
     - If you uncheck it, the task is changed to TODO in the source file.
-  - The line is rewritten preserving indentation, the priority token (if present), and the remaining text.
+  - The line is rewritten preserving indentation, the original list marker (if any), the priority token (if present), and the remaining text.
 - Keyword click
   - Clicking the colored keyword cycles the state using this sequence:
     - TODO -> DOING -> DONE -> TODO
     - LATER -> NOW -> DONE
     - WAIT/WAITING -> IN-PROGRESS -> DONE
     - CANCELED/CANCELLED -> TODO
-  - The updated state is written back to the source file.
+  - The updated state is written back to the source file with the original list marker preserved.
 - Open source location
   - Click anywhere on the task row (except the checkbox or keyword) to jump to the exact file and line.
 

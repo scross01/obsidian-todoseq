@@ -4,7 +4,8 @@ interface Task {
   path: string;
   line: number;
   rawText: string; // original full line
-  indent: string;  // leading whitespace before the state keyword
+  indent: string;  // leading whitespace before any list marker/state
+  listMarker: string; // the exact list marker plus trailing space if present (e.g., "- ", "1. ", "(a) ")
   text: string;    // content after the state keyword with priority token removed
   state: string;
   completed: boolean;
@@ -43,7 +44,7 @@ export default class TodoTracker extends Plugin {
   tasks: Task[] = [];
   refreshIntervalId: number;
 
-  // Compiled regex for task line recognition (optional indent + keyword + single space)
+  // Compiled regex for task line recognition (optional indent + optional list marker + keyword + single space)
   private taskLineRegex: RegExp | null = null;
 
   buildTaskLineRegex() {
@@ -53,8 +54,13 @@ export default class TodoTracker extends Plugin {
     const escaped = list
       .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
       .join('|');
-    // ^[ \t]*(KEYWORD1|KEYWORD2|...)\s+
-    this.taskLineRegex = new RegExp(`^[ \\t]*(?:${escaped})\\s+`);
+    // Optional list marker after indent:
+    //  - bullets: -, *, +
+    //  - ordered: \d+[.)] | [A-Za-z][.)] | \([A-Za-z0-9]+\)
+    // We capture optional marker plus a single space as one group.
+    const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s+)?`;
+    // ^[ \t]*(listMarkerPart)(KEYWORD1|...)\s+
+    this.taskLineRegex = new RegExp(`^[ \\t]*${listMarkerPart}(?:${escaped})\\s+`);
   }
 
   isTask(text: string): boolean {
@@ -167,9 +173,11 @@ export default class TodoTracker extends Plugin {
       .join('|');
     // capture groups:
     // 1: indent (spaces/tabs)
-    // 2: state keyword
+    // 2: optional list marker (including trailing space), if present
+    // 3: state keyword
     // match 0: full prefix up to and including trailing spaces after state
-    const stateCapture = new RegExp(`^([ \\t]*)(${kwAlternation})\\s+`);
+    const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s+)?`;
+    const stateCapture = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${kwAlternation})\\s+`);
 
     // Track whether each line is inside a fenced code block.
     // Supports ``` or ~~~ fences, with optional language, allowing leading spaces.
@@ -210,7 +218,8 @@ export default class TodoTracker extends Plugin {
         const m = stateCapture.exec(line);
         if (m) {
           const indent = m[1] ?? '';
-          const state = m[2] ?? '';
+          const listMarker = (m[2] ?? '') as string;
+          const state = m[3] ?? '';
           const afterPrefix = line.slice(m[0].length);
 
           // FEAT-A3: parse priority token [#A|#B|#C] and remove from display text
@@ -240,6 +249,7 @@ export default class TodoTracker extends Plugin {
             line: index,
             rawText: line,
             indent,
+            listMarker,
             text,
             state,
             completed: state === 'DONE' || state === 'CANCELED' || state === 'CANCELLED',
@@ -370,8 +380,8 @@ class TodoView extends ItemView {
           : task.priority === 'low' ? '[#C]'
           : null;
 
-        // Construct new line: indent + state + [#X]? + text
-        const newLine = `${task.indent}${targetState}` + (priToken ? ` ${priToken}` : '') + (task.text ? ` ${task.text}` : '');
+        // Construct new line: indent + listMarker? + state + [#X]? + text
+        const newLine = `${task.indent}${task.listMarker || ''}${targetState}` + (priToken ? ` ${priToken}` : '') + (task.text ? ` ${task.text}` : '');
 
         const file = this.app.vault.getAbstractFileByPath(task.path);
         if (file instanceof TFile) {
@@ -414,7 +424,7 @@ class TodoView extends ItemView {
       : null;
 
     // Build new line ensuring single spaces and priority immediately after state if present
-    const newLine = `${task.indent}${newState}` + (priToken ? ` ${priToken}` : '') + (task.text ? ` ${task.text}` : '');
+    const newLine = `${task.indent}${task.listMarker || ''}${newState}` + (priToken ? ` ${priToken}` : '') + (task.text ? ` ${task.text}` : '');
 
     // Update the file
     const file = this.app.vault.getAbstractFileByPath(task.path);
