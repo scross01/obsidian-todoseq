@@ -47,7 +47,10 @@ export default class TodoTracker extends Plugin {
   private taskLineRegex: RegExp | null = null;
 
   buildTaskLineRegex() {
-    const escaped = this.settings.taskKeywords
+    const list = (this.settings.taskKeywords && this.settings.taskKeywords.length > 0)
+      ? this.settings.taskKeywords
+      : DEFAULT_SETTINGS.taskKeywords;
+    const escaped = list
       .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
       .join('|');
     // ^[ \t]*(KEYWORD1|KEYWORD2|...)\s+
@@ -114,6 +117,10 @@ export default class TodoTracker extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    // If user cleared keywords, use defaults at runtime
+    if (!this.settings.taskKeywords || this.settings.taskKeywords.length === 0) {
+      this.settings.taskKeywords = [...DEFAULT_SETTINGS.taskKeywords];
+    }
     // Rebuild regex whenever settings are loaded (keywords may have changed)
     this.buildTaskLineRegex();
   }
@@ -138,6 +145,12 @@ export default class TodoTracker extends Plugin {
         await this.scanFile(file);
       }
     }
+    // Default sort: by path asc, then line asc
+    const sortByPathThenLine = (a: Task, b: Task) => {
+      if (a.path === b.path) return a.line - b.line;
+      return a.path.localeCompare(b.path);
+    };
+    this.tasks.sort(sortByPathThenLine);
   }
 
   async scanFile(file: TFile) {
@@ -146,7 +159,10 @@ export default class TodoTracker extends Plugin {
 
     // Ensure regex is built
     if (!this.taskLineRegex) this.buildTaskLineRegex();
-    const kwAlternation = this.settings.taskKeywords
+    const list = (this.settings.taskKeywords && this.settings.taskKeywords.length > 0)
+      ? this.settings.taskKeywords
+      : DEFAULT_SETTINGS.taskKeywords;
+    const kwAlternation = list
       .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
       .join('|');
     // capture groups:
@@ -241,6 +257,12 @@ export default class TodoTracker extends Plugin {
       
       // Re-scan the file
       await this.scanFile(file);
+
+      // Maintain default sort after incremental updates
+      this.tasks.sort((a, b) => {
+        if (a.path === b.path) return a.line - b.line;
+        return a.path.localeCompare(b.path);
+      });
       
       // If there's an active TodoView, refresh it
       const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
@@ -331,7 +353,11 @@ class TodoView extends ItemView {
     
       // File info
       const fileInfo = taskItem.createEl('div', { cls: 'todo-file-info' });
-      fileInfo.setText(`${task.path}:${task.line + 1}`);
+      // Show only filename and line in the UI; keep full path as hover tooltip
+      const lastSlash = task.path.lastIndexOf('/');
+      const baseName = lastSlash >= 0 ? task.path.slice(lastSlash + 1) : task.path;
+      fileInfo.setText(`${baseName}:${task.line + 1}`);
+      fileInfo.setAttribute('title', task.path);
       
       // Event listeners
       checkbox.addEventListener('change', () => {
@@ -446,23 +472,44 @@ class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.refreshInterval = value;
           await this.plugin.saveSettings();
           this.plugin.setupPeriodicRefresh();
+          // Refresh existing task view tabs to reflect any timing-related updates
+          const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
+          for (const leaf of leaves) {
+            const view = leaf.view as TodoView;
+            view.tasks = this.plugin.tasks;
+            await view.onOpen();
+          }
         }));
   
     new Setting(containerEl)
       .setName('Task Keywords')
-      .setDesc('Keywords to scan for (e.g. TODO, FIXME)')
-      .addText(text => text
-        .setValue(this.plugin.settings.taskKeywords.join(', '))
-        .onChange(async (value) => {
-          this.plugin.settings.taskKeywords = value
-            .split(',')
-            .map(k => k.trim())
-            .filter(k => k.length > 0);
-          await this.plugin.saveSettings();
-          // Rebuild regex for keywords and rescan
-          this.plugin.buildTaskLineRegex();
-          await this.plugin.scanVault();
-        }));
+      .setDesc('Keywords to scan for (e.g. TODO, FIXME). Leave empty to use defaults.')
+      .addText(text => {
+        const effective = (this.plugin.settings.taskKeywords && this.plugin.settings.taskKeywords.length > 0)
+          ? this.plugin.settings.taskKeywords
+          : DEFAULT_SETTINGS.taskKeywords;
+        text
+          .setValue(effective.join(', '))
+          .onChange(async (value) => {
+            const parsed = value
+              .split(',')
+              .map(k => k.trim())
+              .filter(k => k.length > 0);
+            // Save exactly what the user typed (possibly empty)
+            this.plugin.settings.taskKeywords = parsed;
+            await this.plugin.saveSettings();
+            // Rebuild regex and rescan using defaults if empty
+            this.plugin.buildTaskLineRegex();
+            await this.plugin.scanVault();
+            // Refresh existing task view tabs to display updated results
+            const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
+            for (const leaf of leaves) {
+              const view = leaf.view as TodoView;
+              view.tasks = this.plugin.tasks;
+              await view.onOpen();
+            }
+          });
+        });
   
     new Setting(containerEl)
       .setName('Include tasks inside code blocks')
@@ -473,6 +520,13 @@ class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.includeCodeBlocks = value;
           await this.plugin.saveSettings();
           await this.plugin.scanVault();
+          // Refresh existing task view tabs to display updated results
+          const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
+          for (const leaf of leaves) {
+            const view = leaf.view as TodoView;
+            view.tasks = this.plugin.tasks;
+            await view.onOpen();
+          }
         }));
   }
 }
