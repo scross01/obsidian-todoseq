@@ -95,14 +95,7 @@ export default class TodoTracker extends Plugin {
     await this.scanVault();
 
     // If the Task view tab is already open when the plugin reloads, refresh it
-    const existingLeaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
-    if (existingLeaves.length > 0) {
-      for (const leaf of existingLeaves) {
-        const view = leaf.view as TodoView;
-        view.tasks = this.tasks;
-        await view.onOpen();
-      }
-    }
+    await this.refreshOpenTaskViews();
 
     // Set up periodic refresh
     this.setupPeriodicRefresh();
@@ -111,10 +104,27 @@ export default class TodoTracker extends Plugin {
     this.registerEvent(
       this.app.vault.on('modify', (file) => this.handleFileChange(file))
     );
-    
     this.registerEvent(
       this.app.vault.on('delete', (file) => this.handleFileChange(file))
     );
+    // Also handle create and rename for robustness
+    this.registerEvent(
+      this.app.vault.on('create', (file) => this.handleFileChange(file))
+    );
+    this.registerEvent(
+      // Obsidian passes (file, oldPath) for rename
+      this.app.vault.on('rename', (_file, oldPath) => this.handleFileRename(oldPath))
+    );
+  }
+
+  // Helper: refresh all open Todo views to reflect this.tasks
+  private async refreshOpenTaskViews(): Promise<void> {
+    const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
+    for (const leaf of leaves) {
+      const view = leaf.view as TodoView;
+      view.tasks = this.tasks;
+      await view.onOpen();
+    }
   }
 
   onunload() {
@@ -261,28 +271,51 @@ export default class TodoTracker extends Plugin {
   }
 
   async handleFileChange(file: TAbstractFile) {
-    if (file instanceof TFile && file.extension === 'md') {
-      // Remove existing tasks for this file
+    try {
+      // Only process Markdown files
+      if (!(file instanceof TFile) || file.extension !== 'md') return;
+
+      // Remove existing tasks for this file (path-safe even if file was deleted/renamed)
       this.tasks = this.tasks.filter(task => task.path !== file.path);
-      
-      // Re-scan the file
-      await this.scanFile(file);
+
+      // Check if the file still exists before attempting to read it (delete events)
+      const stillExists = this.app.vault.getAbstractFileByPath(file.path) instanceof TFile;
+      if (stillExists) {
+        // Re-scan the file
+        await this.scanFile(file);
+      }
 
       // Maintain default sort after incremental updates
       this.tasks.sort((a, b) => {
         if (a.path === b.path) return a.line - b.line;
         return a.path.localeCompare(b.path);
       });
-      
-      // If there's an active TodoView, refresh it
-      const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
-      if (leaves.length > 0) {
-        const view = leaves[0].view as TodoView;
-        view.tasks = this.tasks;
-        view.onOpen();
-      }
+
+      // Refresh all open TodoView leaves
+      await this.refreshOpenTaskViews();
+    } catch (err) {
+      console.error('TodoTracker handleFileChange error', err);
+      // Best-effort UI refresh so view doesn't get stuck
+      try { await this.refreshOpenTaskViews(); } catch (_) {}
     }
   }
+
+ // Handle rename: remove tasks for the old path, then refresh views.
+ // The new file path will trigger modify/create separately and be rescanned there.
+ private async handleFileRename(oldPath: string) {
+   try {
+     this.tasks = this.tasks.filter(t => t.path !== oldPath);
+     // Keep sorted state
+     this.tasks.sort((a, b) => {
+       if (a.path === b.path) return a.line - b.line;
+       return a.path.localeCompare(b.path);
+     });
+     await this.refreshOpenTaskViews();
+   } catch (err) {
+     console.error('TodoTracker handleFileRename error', err);
+     try { await this.refreshOpenTaskViews(); } catch (_) {}
+   }
+ }
   
   showTasks() {
     const { workspace } = this.app;
@@ -318,7 +351,7 @@ class TodoView extends ItemView {
   }
 
   async onOpen() {
-    const container = this.containerEl.children[1];
+    const container = this.contentEl;
     container.empty();
     
     // Create task list
