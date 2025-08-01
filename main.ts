@@ -44,8 +44,11 @@ export default class TodoTracker extends Plugin {
   tasks: Task[] = [];
   refreshIntervalId: number;
 
-  // Compiled regex for task line recognition (optional indent + optional list marker + keyword + single space)
-  private taskLineRegex: RegExp | null = null;
+  // Compiled regexes for task line recognition:
+  // - taskLineTestRegex: quick boolean test
+  // - taskLineCaptureRegex: captures indent, optional list marker, and state
+  private taskLineTestRegex: RegExp | null = null;
+  private taskLineCaptureRegex: RegExp | null = null;
 
   buildTaskLineRegex() {
     const list = (this.settings.taskKeywords && this.settings.taskKeywords.length > 0)
@@ -59,13 +62,18 @@ export default class TodoTracker extends Plugin {
     //  - ordered: \d+[.)] | [A-Za-z][.)] | \([A-Za-z0-9]+\)
     // We capture optional marker plus a single space as one group.
     const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s+)?`;
-    // ^[ \t]*(listMarkerPart)(KEYWORD1|...)\s+
-    this.taskLineRegex = new RegExp(`^[ \\t]*${listMarkerPart}(?:${escaped})\\s+`);
+    // Test regex: ^[ \t]*listMarkerPart(KEYWORD)\s+
+    this.taskLineTestRegex = new RegExp(`^[ \\t]*${listMarkerPart}(?:${escaped})\\s+`);
+    // Capture regex:
+    // 1: indent (spaces/tabs)
+    // 2: optional list marker (including trailing space), if present
+    // 3: state keyword
+    this.taskLineCaptureRegex = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${escaped})\\s+`);
   }
 
   isTask(text: string): boolean {
-    if (!this.taskLineRegex) this.buildTaskLineRegex();
-    return !!this.taskLineRegex!.test(text);
+    if (!this.taskLineTestRegex) this.buildTaskLineRegex();
+    return this.taskLineTestRegex!.test(text);
   }
   
   async onload() {
@@ -189,20 +197,8 @@ export default class TodoTracker extends Plugin {
     const lines = content.split('\n');
 
     // Ensure regex is built
-    if (!this.taskLineRegex) this.buildTaskLineRegex();
-    const list = (this.settings.taskKeywords && this.settings.taskKeywords.length > 0)
-      ? this.settings.taskKeywords
-      : DEFAULT_SETTINGS.taskKeywords;
-    const kwAlternation = list
-      .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-      .join('|');
-    // capture groups:
-    // 1: indent (spaces/tabs)
-    // 2: optional list marker (including trailing space), if present
-    // 3: state keyword
-    // match 0: full prefix up to and including trailing spaces after state
-    const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s+)?`;
-    const stateCapture = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${kwAlternation})\\s+`);
+    if (!this.taskLineCaptureRegex || !this.taskLineTestRegex) this.buildTaskLineRegex();
+    const capture = this.taskLineCaptureRegex!;
 
     // Track whether each line is inside a fenced code block.
     // Supports ``` or ~~~ fences, with optional language, allowing leading spaces.
@@ -240,7 +236,7 @@ export default class TodoTracker extends Plugin {
       }
 
       if (this.isTask(line)) {
-        const m = stateCapture.exec(line);
+        const m = capture.exec(line);
         if (m) {
           const indent = m[1] ?? '';
           const listMarker = (m[2] ?? '') as string;
