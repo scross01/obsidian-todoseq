@@ -145,10 +145,25 @@ export default class TodoTracker extends Plugin {
     await this.saveData(this.settings);
   }
 
+  // Serialize scans to avoid overlapping runs
+  private _isScanning = false;
+
   setupPeriodicRefresh() {
+    // Clear any previous interval
     clearInterval(this.refreshIntervalId);
-    this.refreshIntervalId = window.setInterval(() => {
-      this.scanVault();
+
+    // Use a serialized async tick to avoid overlap and unhandled rejections
+    this.refreshIntervalId = window.setInterval(async () => {
+      if (this._isScanning) return;
+      this._isScanning = true;
+      try {
+        await this.scanVault();
+        await this.refreshOpenTaskViews();
+      } catch (err) {
+        console.error('TodoTracker periodic scan error', err);
+      } finally {
+        this._isScanning = false;
+      }
     }, this.settings.refreshInterval * 1000);
   }
 
