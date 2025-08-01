@@ -1,20 +1,20 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownView, WorkspaceLeaf, ItemView } from 'obsidian';
 
 interface Task {
-  path: string;
-  line: number;
+  path: string;    // path to the page in the vault
+  line: number;    // line number of the task in the page 
   rawText: string; // original full line
   indent: string;  // leading whitespace before any list marker/state
   listMarker: string; // the exact list marker plus trailing space if present (e.g., "- ", "1. ", "(a) ")
   text: string;    // content after the state keyword with priority token removed
-  state: string;
-  completed: boolean;
+  state: string;   // state keyword, TODO, DOING, DONE etc.
+  completed: boolean; // is the task considered complete
   priority: 'high' | 'med' | 'low' | null;
 }
 
 interface TodoTrackerSettings {
-  refreshInterval: number;
-  taskKeywords: string[];
+  refreshInterval: number;    // refresh interval in seconds
+  taskKeywords: string[];     // supported task state keywords, used to limit or expand the default set
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
 }
 
@@ -39,6 +39,7 @@ const NEXT_STATE = new Map<string, string>([
 
 const TASK_VIEW_TYPE = "todo-view";
 
+
 export default class TodoTracker extends Plugin {
   settings: TodoTrackerSettings;
   tasks: Task[] = [];
@@ -50,6 +51,8 @@ export default class TodoTracker extends Plugin {
   private taskLineTestRegex: RegExp | null = null;
   private taskLineCaptureRegex: RegExp | null = null;
 
+  // Builds and assigns regular expressions for detecting and capturing task lines
+  // based on configured or default task keywords.
   buildTaskLineRegex() {
     const list = (this.settings.taskKeywords && this.settings.taskKeywords.length > 0)
       ? this.settings.taskKeywords
@@ -71,11 +74,13 @@ export default class TodoTracker extends Plugin {
     this.taskLineCaptureRegex = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${escaped})\\s+`);
   }
 
+  // Determine whether the provided text matches the task line pattern.
   isTask(text: string): boolean {
     if (!this.taskLineTestRegex) this.buildTaskLineRegex();
     return this.taskLineTestRegex!.test(text);
   }
   
+  // Obsidian lifecycle method called when the plugin is loaded.
   async onload() {
     await this.loadSettings();
 
@@ -115,7 +120,6 @@ export default class TodoTracker extends Plugin {
     this.registerEvent(
       this.app.vault.on('delete', (file) => this.handleFileChange(file))
     );
-    // Also handle create and rename for robustness
     this.registerEvent(
       this.app.vault.on('create', (file) => this.handleFileChange(file))
     );
@@ -135,10 +139,12 @@ export default class TodoTracker extends Plugin {
     }
   }
 
+  // Obsidian lifecycle method called when the plugin is unloaded
   onunload() {
     clearInterval(this.refreshIntervalId);
   }
 
+  // Obsidian lifecycle method called to settings are loaded
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     // If user cleared keywords, use defaults at runtime
@@ -149,6 +155,7 @@ export default class TodoTracker extends Plugin {
     this.buildTaskLineRegex();
   }
 
+  // Obsidian lifecycle method called to save settings
   async saveSettings() {
     await this.saveData(this.settings);
   }
@@ -156,6 +163,7 @@ export default class TodoTracker extends Plugin {
   // Serialize scans to avoid overlapping runs
   private _isScanning = false;
 
+  // Run a regular refresh of the vault based on the refresh inerval
   setupPeriodicRefresh() {
     // Clear any previous interval
     clearInterval(this.refreshIntervalId);
@@ -168,13 +176,14 @@ export default class TodoTracker extends Plugin {
         await this.scanVault();
         await this.refreshOpenTaskViews();
       } catch (err) {
-        console.error('TodoTracker periodic scan error', err);
+        console.error('TODOseq periodic scan error', err);
       } finally {
         this._isScanning = false;
       }
     }, this.settings.refreshInterval * 1000);
   }
 
+  // Scan the Obsidian Vault for tasks
   async scanVault() {
     if (this._isScanning) return;
     this._isScanning = true;
@@ -198,6 +207,7 @@ export default class TodoTracker extends Plugin {
     }
   }
 
+  // Scan a single file for tasks
   async scanFile(file: TFile) {
     const content = await this.app.vault.read(file);
     const lines = content.split('\n');
@@ -241,6 +251,7 @@ export default class TodoTracker extends Plugin {
         continue;
       }
 
+      // See if the line matched the task pattern
       if (this.isTask(line)) {
         const m = capture.exec(line);
         if (m) {
@@ -249,7 +260,7 @@ export default class TodoTracker extends Plugin {
           const state = m[3] ?? '';
           const afterPrefix = line.slice(m[0].length);
 
-          // FEAT-A3: parse priority token [#A|#B|#C] and remove from display text
+          // Parse priority token [#A|#B|#C] and remove from display text
           // We only consider the first occurrence and ignore others per "first occurrence wins".
           // Match token boundaries exactly: [#A], [#B], [#C]
           let priority: 'high' | 'med' | 'low' | null = null;
@@ -287,6 +298,7 @@ export default class TodoTracker extends Plugin {
     }
   }
 
+  // Handle file change, rescan for tasks
   async handleFileChange(file: TAbstractFile) {
     try {
       // Only process Markdown files
@@ -311,29 +323,30 @@ export default class TodoTracker extends Plugin {
       // Refresh all open TodoView leaves
       await this.refreshOpenTaskViews();
     } catch (err) {
-      console.error('TodoTracker handleFileChange error', err);
+      console.error('TODOseq handleFileChange error', err);
       // Best-effort UI refresh so view doesn't get stuck
       try { await this.refreshOpenTaskViews(); } catch (_) {}
     }
   }
 
- // Handle rename: remove tasks for the old path, then refresh views.
- // The new file path will trigger modify/create separately and be rescanned there.
- private async handleFileRename(oldPath: string) {
-   try {
-     this.tasks = this.tasks.filter(t => t.path !== oldPath);
-     // Keep sorted state
-     this.tasks.sort((a, b) => {
-       if (a.path === b.path) return a.line - b.line;
-       return a.path.localeCompare(b.path);
-     });
-     await this.refreshOpenTaskViews();
-   } catch (err) {
-     console.error('TodoTracker handleFileRename error', err);
-     try { await this.refreshOpenTaskViews(); } catch (_) {}
-   }
- }
+  // Handle rename: remove tasks for the old path, then refresh views.
+  // The new file path will trigger modify/create separately and be rescanned there.
+  private async handleFileRename(oldPath: string) {
+    try {
+      this.tasks = this.tasks.filter(t => t.path !== oldPath);
+      // Keep sorted state
+      this.tasks.sort((a, b) => {
+        if (a.path === b.path) return a.line - b.line;
+        return a.path.localeCompare(b.path);
+      });
+      await this.refreshOpenTaskViews();
+    } catch (err) {
+      console.error('TODOseq handleFileRename error', err);
+      try { await this.refreshOpenTaskViews(); } catch (_) {}
+    }
+  }
   
+  // Show tasks in the task view
   showTasks() {
     const { workspace } = this.app;
     
@@ -367,9 +380,10 @@ class TodoView extends ItemView {
   }
 
   getDisplayText() {
-    return "Todo Tracker";
+    return "TODOSeq";
   }
 
+  // Obsidian lifecycle mothods for view open
   async onOpen() {
     const container = this.contentEl;
     container.empty();
@@ -464,6 +478,7 @@ class TodoView extends ItemView {
     });
   }
 
+  // Change the task state when the state keywork is clicked  
   async toggleTaskStatus(task: Task) {
     // Compute new state and rebuild the line as: indent + state + ' ' + [#X]? + ' ' + text
     // Priority token must be placed immediately after the state keyword per requirements.
@@ -500,6 +515,7 @@ class TodoView extends ItemView {
     }
   }
 
+  // Open the source file in the vault the task is declared in
   async openTaskLocation(task: Task) {
     const file = this.app.vault.getAbstractFileByPath(task.path);
 
