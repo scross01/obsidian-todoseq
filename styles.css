@@ -1,11 +1,12 @@
 /* TodoView theme-aligned styles. Inherit fonts/colors from the active Obsidian theme. */
 .todo-view {
-  font: inherit;
   color: var(--text-normal);
 }
 
 /* List layout */
 .todo-view .todo-list {
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
   margin: 0;
   padding-left: var(--size-4-4, 24px);
   list-style-type: none;
@@ -30,7 +31,7 @@
 .todo-view .todo-keyword {
   color: var(--interactive-accent);
   cursor: pointer;
-  font-weight: var(--font-medium, 600);
+  font-weight: var(--font-weight-medium, var(--font-medium, 600));
 }
 .todo-view .todo-keyword:hover {
   text-decoration: underline;
@@ -56,8 +57,8 @@
   border-radius: var(--radius-s, 6px);
   background-color: var(--background-modifier-accent, var(--interactive-accent));
   color: var(--text-on-accent, #fff);
-  font-weight: var(--font-medium, 600);
-  font-size: var(--font-ui-smaller, 12px);
+  font-weight: var(--font-weight-medium, var(--font-medium, 600));
+  font-size: 70%;
   line-height: 1.6;
 }
 
@@ -84,6 +85,6 @@
 /* File info (path:line) */
 .todo-view .todo-file-info {
   color: var(--text-muted);
-  font-size: var(--font-ui-smaller, 12px);
+  font-size: 75%;
   margin-top: var(--size-2-2, 6px);
 }
