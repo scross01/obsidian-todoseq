@@ -432,7 +432,8 @@ class TodoView extends ItemView {
       // Add the rest of the task text (already only the text after the state keyword)
       const restOfText = task.text;
       if (restOfText) {
-        taskText.appendText(' ' + restOfText);
+        taskText.appendText(' ');
+        this.renderTaskTextWithLinks(restOfText, taskText);
       }
       taskText.toggleClass('completed', task.completed);
     
@@ -484,6 +485,70 @@ class TodoView extends ItemView {
         }
       });
     });
+  }
+
+  // Render Obsidian-style links as non-clickable, link-like spans inside task text.
+  // Supports:
+  //  - Wiki links: [[Note]] and [[Note|Alias]]
+  //  - Markdown links: [Alias](url-or-path)
+  //  - Bare URLs: http(s)://...
+  private renderTaskTextWithLinks(text: string, parent: HTMLElement) {
+    const patterns: { type: 'wiki' | 'md' | 'url'; regex: RegExp }[] = [
+      // [[Page]] or [[Page|Alias]]
+      { type: 'wiki', regex: /\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]/g },
+      // [Alias](target)
+      { type: 'md', regex: /\[([^\]]+)\]\(([^)]+)\)/g },
+      // bare URLs
+      { type: 'url', regex: /\bhttps?:\/\/[^\s)]+/g },
+    ];
+
+    let i = 0;
+    while (i < text.length) {
+      let nextMatch: { type: 'wiki' | 'md' | 'url'; match: RegExpExecArray } | null = null;
+
+      for (const p of patterns) {
+        p.regex.lastIndex = i;
+        const m = p.regex.exec(text);
+        if (m) {
+          if (!nextMatch || m.index < nextMatch.match.index) {
+            nextMatch = { type: p.type, match: m };
+          }
+        }
+      }
+
+      if (!nextMatch) {
+        // Append any remaining text
+        parent.appendText(text.slice(i));
+        break;
+      }
+
+      // Append plain text preceding the match
+      if (nextMatch.match.index > i) {
+        parent.appendText(text.slice(i, nextMatch.match.index));
+      }
+
+      // Create a non-interactive, link-like span
+      const span = parent.createEl('span', { cls: 'todo-link-like' });
+
+      if (nextMatch.type === 'wiki') {
+        const target = nextMatch.match[1];
+        const alias = nextMatch.match[2];
+        span.setText(alias ?? target);
+        span.setAttribute('title', target);
+      } else if (nextMatch.type === 'md') {
+        const label = nextMatch.match[1];
+        const url = nextMatch.match[2];
+        span.setText(label);
+        span.setAttribute('title', url);
+      } else {
+        const url = nextMatch.match[0];
+        span.setText(url);
+        span.setAttribute('title', url);
+      }
+
+      // Advance past the match
+      i = nextMatch.match.index + nextMatch.match[0].length;
+    }
   }
 
   // Change the task state when the state keywork is clicked  

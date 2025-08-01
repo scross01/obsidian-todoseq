@@ -39,7 +39,13 @@
 /* Checkbox alignment */
 .todo-view .todo-checkbox {
   margin-right: var(--size-2-2, 6px);
-  vertical-align: middle;
+}
+
+/* Non-clickable link-like styling for in-text links */
+.todo-view .todo-link-like {
+  color: var(--link-color);
+  text-decoration: underline dotted;
+  cursor: pointer; /* visually like a link, does not intercept clicks */
 }
 
 /* Priority badge */
