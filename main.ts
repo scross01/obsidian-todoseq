@@ -38,6 +38,7 @@ const NEXT_STATE = new Map<string, string>([
 ]);
 
 const TASK_VIEW_TYPE = "todo-view";
+const TASK_VIEW_ICON = "list-todo";
 
 
 export default class TodoTracker extends Plugin {
@@ -90,7 +91,7 @@ export default class TodoTracker extends Plugin {
       (leaf) => new TodoView(leaf, this.tasks)
     );
 
-    this.addRibbonIcon('list-todo', 'Open TODO list', () => {
+    this.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
       this.showTasks();
     });
 
@@ -380,7 +381,12 @@ class TodoView extends ItemView {
   }
 
   getDisplayText() {
-    return "TODOSeq";
+    return "TODOseq";
+  }
+
+  getIcon(): string {
+    // Use the same icon as the ribbon button
+    return TASK_VIEW_ICON;
   }
 
   // Obsidian lifecycle mothods for view open
