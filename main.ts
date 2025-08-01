@@ -176,6 +176,9 @@ export default class TodoTracker extends Plugin {
   }
 
   async scanVault() {
+    if (this._isScanning) return;
+    this._isScanning = true;
+    try {
     this.tasks = [];
     const files = this.app.vault.getFiles();
     
@@ -190,6 +193,9 @@ export default class TodoTracker extends Plugin {
       return a.path.localeCompare(b.path);
     };
     this.tasks.sort(sortByPathThenLine);
+    } finally {
+      this._isScanning = false;
+    }
   }
 
   async scanFile(file: TFile) {
@@ -340,6 +346,9 @@ export default class TodoTracker extends Plugin {
     } else {
       leaf = workspace.getLeaf(true);
       leaf.setViewState({ type: TASK_VIEW_TYPE, active: true });
+    }
+    if (leaf) {
+      this.app.workspace.revealLeaf(leaf);
     }
   }
 }
