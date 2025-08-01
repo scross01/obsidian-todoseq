@@ -393,6 +393,8 @@ class TodoView extends ItemView {
   async onOpen() {
     const container = this.contentEl;
     container.empty();
+    // Ensure this view inherits Obsidian theme fonts and variables via a scoped root class
+    container.addClass('todo-view');
     
     // Create task list
     const taskList = container.createEl('ul', { cls: 'todo-list' });

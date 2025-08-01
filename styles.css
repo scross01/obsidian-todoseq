@@ -1,85 +1,83 @@
-.todo-list {
-  list-style: none;
-  padding: 0;
+/* TodoView theme-aligned styles. Inherit fonts/colors from the active Obsidian theme. */
+.todo-view {
+  font: inherit;
+  color: var(--text-normal);
 }
 
-.todo-item {
-  display: flex;
-  align-items: center;
-  padding: 8px;
-  border-bottom: 1px solid var(--background-modifier-border);
-  cursor: pointer;
+/* List layout */
+.todo-view .todo-list {
+  margin: 0;
+  padding-left: var(--size-4-4, 24px);
+  list-style-type: none;
 }
 
-.todo-item:hover {
-  background-color: var(--background-secondary);
+/* List item */
+.todo-view .todo-item {
+  padding: var(--size-2-2, 6px) 0;
+  border-bottom: 1px solid var(--background-modifier-border, rgba(0,0,0,0.1));
 }
 
-.todo-checkbox {
-  margin-right: 10px;
+/* Task text and completion state */
+.todo-view .todo-text {
+  line-height: var(--line-height-tight, 1.4);
 }
-
-.todo-text {
-  flex-grow: 1;
-}
-
-.todo-text.completed {
+.todo-view .todo-text.completed {
+  color: var(--text-muted);
   text-decoration: line-through;
-  color: var(--text-muted);
 }
 
-.todo-file-info {
-  font-size: 0.8em;
-  color: var(--text-muted);
-  margin-left: 10px;
-}
-
-/* Priority badge styles */
-.priority-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 10px;
-  font-size: 0.75em;
-  font-weight: 700;
-  line-height: 1.6em;
-  vertical-align: baseline;
-  user-select: none;
-  border: 1px solid transparent;
-}
-
-/* High=A */
-.priority-high {
-  color: #b00020; /* deep red text for contrast in light and dark themes */
-  background-color: rgba(176, 0, 32, 0.12);
-  border-color: rgba(176, 0, 32, 0.25);
-}
-
-/* Medium=B */
-.priority-med {
-  color: #8a6500; /* amber/brown */
-  background-color: rgba(255, 193, 7, 0.15);
-  border-color: rgba(255, 193, 7, 0.35);
-}
-
-/* Low=C */
-.priority-low {
-  color: #0b5c2b; /* green */
-  background-color: rgba(40, 167, 69, 0.12);
-  border-color: rgba(40, 167, 69, 0.25);
-}
-
-.todo-keyword {
-  color: var(--text-accent);
-  font-weight: bold;
+/* Keyword toggle (TODO/DOING/DONE) */
+.todo-view .todo-keyword {
+  color: var(--interactive-accent);
   cursor: pointer;
+  font-weight: var(--font-medium, 600);
+}
+.todo-view .todo-keyword:hover {
   text-decoration: underline;
-  text-decoration-style: dotted;
-  padding: 0 2px;
-  border-radius: 3px;
 }
 
-.todo-keyword:hover {
-  background-color: var(--text-accent-hover);
-  color: var(--text-on-accent);
+/* Checkbox alignment */
+.todo-view .todo-checkbox {
+  margin-right: var(--size-2-2, 6px);
+  vertical-align: middle;
+}
+
+/* Priority badge */
+.todo-view .priority-badge {
+  display: inline-block;
+  margin-left: var(--size-2-2, 6px);
+  padding: 0 var(--size-2-2, 6px);
+  border-radius: var(--radius-s, 6px);
+  background-color: var(--background-modifier-accent, var(--interactive-accent));
+  color: var(--text-on-accent, #fff);
+  font-weight: var(--font-medium, 600);
+  font-size: var(--font-ui-smaller, 12px);
+  line-height: 1.6;
+}
+
+/* High priority (A): stronger, urgent tint */
+.todo-view .priority-badge.priority-high {
+  background-color: var(--color-red, #d12020);
+  color: var(--text-on-accent, #fff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-red, #d12020) 40%, transparent);
+}
+
+/* Medium priority (B): default accent */
+.todo-view .priority-badge.priority-med {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+}
+
+/* Low priority (C): muted tone */
+.todo-view .priority-badge.priority-low {
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+  box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+
+/* File info (path:line) */
+.todo-view .todo-file-info {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 12px);
+  margin-top: var(--size-2-2, 6px);
 }
