@@ -267,108 +267,131 @@ class TodoView extends ItemView {
     return TASK_VIEW_ICON;
   }
 
-  // Obsidian lifecycle mothods for view open
+  // Build helpers for a single task's subtree (idempotent, single responsibility)
+  private buildCheckbox(task: Task, container: HTMLElement): HTMLInputElement {
+    const checkbox = container.createEl('input', {
+      type: 'checkbox',
+      cls: 'todo-checkbox'
+    });
+    checkbox.checked = task.completed;
+
+    checkbox.addEventListener('change', async () => {
+      const targetState = checkbox.checked ? 'DONE' : 'TODO';
+      await this.updateTaskState(task, targetState);
+      this.refreshTaskElement(task);
+    });
+
+    return checkbox;
+  }
+
+  private buildKeyword(task: Task, parent: HTMLElement): HTMLSpanElement {
+    const todoSpan = parent.createEl('span', { cls: 'todo-keyword' });
+    todoSpan.setText(task.state);
+    todoSpan.setAttr('role', 'button');
+    todoSpan.setAttr('tabindex', '0');
+    todoSpan.setAttr('aria-checked', String(task.completed));
+
+    const activate = async (evt: Event) => {
+      evt.stopPropagation();
+      await this.updateTaskState(task, NEXT_STATE.get(task.state) ?? 'DONE');
+      this.refreshTaskElement(task);
+    };
+
+    todoSpan.addEventListener('click', (evt) => activate(evt));
+    todoSpan.addEventListener('keydown', (evt: KeyboardEvent) => {
+      const key = evt.key;
+      if (key === 'Enter' || key === ' ') {
+        evt.preventDefault();
+        evt.stopPropagation();
+        activate(evt);
+      }
+    });
+
+    return todoSpan;
+  }
+
+  private buildText(task: Task, container: HTMLElement): HTMLSpanElement {
+    const taskText = container.createEl('span', { cls: 'todo-text' });
+
+    // Keyword button
+    this.buildKeyword(task, taskText);
+
+    // Priority badge
+    if (task.priority) {
+      const pri = task.priority; // 'high' | 'med' | 'low'
+      const badge = taskText.createEl('span', { cls: ['priority-badge', `priority-${pri}`] });
+      badge.setText(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C');
+      badge.setAttribute('aria-label', `Priority ${pri}`);
+      badge.setAttribute('title', `Priority ${pri}`);
+    }
+
+    // Remaining text
+    const restOfText = task.text;
+    if (restOfText) {
+      taskText.appendText(' ');
+      this.renderTaskTextWithLinks(restOfText, taskText);
+    }
+
+    taskText.toggleClass('completed', task.completed);
+    return taskText;
+  }
+
+  // Build a complete LI for a task (used by initial render and refresh)
+  private buildTaskListItem(task: Task): HTMLLIElement {
+    const li = createEl('li', { cls: 'todo-item' });
+    li.setAttribute('data-path', task.path);
+    li.setAttribute('data-line', String(task.line));
+
+    const checkbox = this.buildCheckbox(task, li);
+    const taskText = this.buildText(task, li);
+
+    // File info
+    const fileInfo = li.createEl('div', { cls: 'todo-file-info' });
+    const lastSlash = task.path.lastIndexOf('/');
+    const baseName = lastSlash >= 0 ? task.path.slice(lastSlash + 1) : task.path;
+    fileInfo.setText(`${baseName}:${task.line + 1}`);
+    fileInfo.setAttribute('title', task.path);
+
+    // Click to open source (avoid checkbox and keyword)
+    li.addEventListener('click', (evt) => {
+      if (evt.target !== checkbox && !(evt.target as HTMLElement).hasClass('todo-keyword')) {
+        this.openTaskLocation(evt, task);
+      }
+    });
+
+    return li;
+  }
+
+  // Replace only the LI subtree for the given task (state-driven, idempotent)
+  private refreshTaskElement(task: Task): void {
+    const container = this.contentEl;
+    const list = container.querySelector('ul.todo-list');
+    if (!list) return;
+
+    const selector = `li.todo-item[data-path="${CSS.escape(task.path)}"][data-line="${task.line}"]`;
+    const existing = list.querySelector(selector);
+    const freshLi = this.buildTaskListItem(task);
+
+    if (existing && existing.parentElement === list) {
+      list.replaceChild(freshLi, existing);
+    } else {
+      // Fallback: append if not found (shouldn't normally happen)
+      list.appendChild(freshLi);
+    }
+  }
+
+  // Obsidian lifecycle methods for view open: keyed, minimal render
   async onOpen() {
     const container = this.contentEl;
     container.empty();
-    // Ensure this view inherits Obsidian theme fonts and variables via a scoped root class
     container.addClass('todo-view');
-    
-    // Create task list
+
     const taskList = container.createEl('ul', { cls: 'todo-list' });
-    
-    this.tasks.forEach(task => {
-      const taskItem = taskList.createEl('li', { cls: 'todo-item' });
-      taskItem.setAttribute('data-path', task.path);
-      taskItem.setAttribute('data-line', String(task.line));
-      
-      // Checkbox
-      const checkbox = taskItem.createEl('input', {
-        type: 'checkbox',
-        cls: 'todo-checkbox'
-      });
-      checkbox.checked = task.completed;
-      
-      // Task text with clickable TODO
-      const taskText = taskItem.createEl('span', { cls: 'todo-text' });
-      
-      // Create clickable TODO span
-      const todoSpan = taskText.createEl('span', { cls: 'todo-keyword' });
-      todoSpan.setText(task.state);
 
-      // Accessibility: make the keyword act like a button and be focusable
-      todoSpan.setAttr('role', 'button');
-      todoSpan.setAttr('tabindex', '0');
-      // Reflect current completion state for screen readers
-      todoSpan.setAttr('aria-checked', String(task.completed));
-
-      // Activate on click
-      todoSpan.addEventListener('click', (evt) => {
-        evt.stopPropagation();
-        this.updateTaskState(task, NEXT_STATE.get(task.state) ?? 'DONE').then(async () => {
-          // After state change, update UI to reflect new state/completion
-          todoSpan.setText(task.state);
-          todoSpan.setAttr('aria-checked', String(task.completed));
-          taskText.toggleClass('completed', task.completed);
-        });
-      });
-
-      // Activate on Enter/Space
-      todoSpan.addEventListener('keydown', (evt: KeyboardEvent) => {
-        const key = evt.key;
-        if (key === 'Enter' || key === ' ') {
-          evt.preventDefault();
-          evt.stopPropagation();
-          this.updateTaskState(task, NEXT_STATE.get(task.state) ?? 'DONE').then(async () => {
-            todoSpan.setText(task.state);
-            todoSpan.setAttr('aria-checked', String(task.completed));
-            taskText.toggleClass('completed', task.completed);
-          });
-        }
-      });
-
-      // Priority badge (if any)
-      if (task.priority) {
-        const pri = task.priority; // 'high' | 'med' | 'low'
-        const badge = taskText.createEl('span', { cls: ['priority-badge', `priority-${pri}`] });
-        badge.setText(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C');
-        badge.setAttribute('aria-label', `Priority ${pri}`);
-        badge.setAttribute('title', `Priority ${pri}`);
-      }
-      
-      // Add the rest of the task text (already only the text after the state keyword)
-      const restOfText = task.text;
-      if (restOfText) {
-        taskText.appendText(' ');
-        this.renderTaskTextWithLinks(restOfText, taskText);
-      }
-      taskText.toggleClass('completed', task.completed);
-    
-      // File info
-      const fileInfo = taskItem.createEl('div', { cls: 'todo-file-info' });
-      // Show only filename and line in the UI; keep full path as hover tooltip
-      const lastSlash = task.path.lastIndexOf('/');
-      const baseName = lastSlash >= 0 ? task.path.slice(lastSlash + 1) : task.path;
-      fileInfo.setText(`${baseName}:${task.line + 1}`);
-      fileInfo.setAttribute('title', task.path);
-      
-      // Event listeners
-      checkbox.addEventListener('change', async () => {
-        // Toggle only DONE/TODO via checkbox
-        const targetState = checkbox.checked ? 'DONE' : 'TODO';
-        this.updateTaskState(task, targetState).then(async () => {
-          todoSpan.setText(task.state);
-          todoSpan.setAttr('aria-checked', String(task.completed));
-          taskText.toggleClass('completed', task.completed);
-        });
-      });
-      
-      taskItem.addEventListener('click', (evt) => {
-        if (evt.target !== checkbox && !(evt.target as HTMLElement).hasClass('todo-keyword')) {
-          this.openTaskLocation(evt, task);
-        }
-      });
-    });
+    for (const task of this.tasks) {
+      const li = this.buildTaskListItem(task);
+      taskList.appendChild(li);
+    }
   }
 
   // Render Obsidian-style links as non-clickable, link-like spans inside task text.
