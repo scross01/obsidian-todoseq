@@ -1,5 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownView, WorkspaceLeaf, ItemView, Platform } from 'obsidian';
-import { Task, TodoTrackerSettings, DEFAULT_SETTINGS, COMPLETED_STATES, NEXT_STATE } from './types';
+import { Task, TodoTrackerSettings, DEFAULT_SETTINGS, COMPLETED_STATES, NEXT_STATE, TaskViewMode } from './types';
 import { TaskParser } from './task-parser';
 import { TaskEditor } from './task-editor';
 
@@ -27,9 +27,20 @@ export default class TodoTracker extends Plugin {
     // Register the custom view type
     this.registerView(
       TASK_VIEW_TYPE,
-      (leaf) => new TodoView(leaf, this.tasks)
+      (leaf) => new TodoView(leaf, this.tasks, this.settings.taskViewMode)
     );
-
+ 
+    // Persist view-mode changes coming from TodoView toolbars
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { mode: TaskViewMode };
+      if (!detail?.mode) return;
+      this.settings.taskViewMode = detail.mode;
+      await this.saveSettings();
+      await this.refreshOpenTaskViews();
+    };
+    window.addEventListener('todoseq:view-mode-change', handler);
+    this.register(() => window.removeEventListener('todoseq:view-mode-change', handler));
+ 
     this.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
       this.showTasks();
     });
@@ -237,11 +248,114 @@ class TodoView extends ItemView {
   static viewType = TASK_VIEW_TYPE;
   tasks: Task[];
   editor: TaskEditor;
+  private defaultViewMode: TaskViewMode;
 
-  constructor(leaf: WorkspaceLeaf, tasks: Task[]) {
+  constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode) {
     super(leaf);
     this.tasks = tasks;
     this.editor = new TaskEditor(this.app.vault);
+    this.defaultViewMode = defaultViewMode;
+  }
+
+  /** View-mode accessors persisted on the root element to avoid cross-class coupling */
+  private getViewMode(): TaskViewMode {
+    const attr = this.contentEl.getAttr('data-view-mode') as TaskViewMode | null;
+    if (attr === 'default' || attr === 'sortCompletedLast' || attr === 'hideCompleted') return attr;
+    // Fallback to current plugin setting from constructor if attribute not set
+    if (this.defaultViewMode === 'default' || this.defaultViewMode === 'sortCompletedLast' || this.defaultViewMode === 'hideCompleted') {
+      return this.defaultViewMode;
+    }
+    // Final safety fallback
+    return 'default';
+  }
+  private setViewMode(mode: TaskViewMode) {
+    this.contentEl.setAttr('data-view-mode', mode);
+  }
+
+  /** Non-mutating transform for rendering */
+  private transformForView(tasks: Task[], mode: TaskViewMode): Task[] {
+    if (mode === 'hideCompleted') {
+      return tasks.filter(t => !t.completed);
+    }
+    if (mode === 'sortCompletedLast') {
+      const pending: Task[] = [];
+      const done: Task[] = [];
+      for (const t of tasks) {
+        (t.completed ? done : pending).push(t);
+      }
+      return pending.concat(done);
+    }
+    return tasks.slice();
+  }
+
+  /** Build toolbar with icon-only mode buttons; dispatch event for persistence */
+  private buildToolbar(container: HTMLElement) {
+    const toolbar = container.createEl('div', { cls: 'todo-toolbar' });
+
+    // Icon-only pill buttons (Default, Sort completed last, Hide completed)
+    const current = this.getViewMode();
+
+    const group = toolbar.createEl('div', { cls: 'todo-mode-icons' });
+    group.setAttr('role', 'group');
+    group.setAttr('aria-label', 'Task view mode');
+
+    type ButtonSpec = {
+      mode: TaskViewMode;
+      title: string;
+      svg: string;
+    };
+
+    const buttons: ButtonSpec[] = [
+      {
+        mode: 'default',
+        title: 'Default view',
+        svg: `
+<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M4 6h16" />
+  <path d="M4 12h16" />
+  <path d="M4 18h16" />
+</svg>`.trim()
+      },
+      {
+        mode: 'sortCompletedLast',
+        title: 'Sort completed to end',
+        svg: `
+<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M4 6h12" />
+  <path d="M4 12h12" />
+  <path d="M4 18h8" />
+  <path d="M18 7v10" />
+  <path d="M15 14l3 3 3-3" />
+</svg>`.trim()
+      },
+      {
+        mode: 'hideCompleted',
+        title: 'Hide completed',
+        svg: `
+<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M1 12s4-7 11-7 11 7 11 7-2.5 4.375-7 6" />
+  <path d="M1 1l22 22" />
+</svg>`.trim()
+      },
+    ];
+
+    const makeHandler = (mode: TaskViewMode) => async () => {
+      this.setViewMode(mode);
+      const evt = new CustomEvent('todoseq:view-mode-change', { detail: { mode } });
+      window.dispatchEvent(evt);
+      await this.onOpen();
+    };
+
+    for (const spec of buttons) {
+      const btn = group.createEl('button', { cls: 'todo-mode-icon-btn' });
+      btn.setAttr('type', 'button');
+      btn.setAttr('data-mode', spec.mode);
+      btn.setAttr('title', spec.title);
+      btn.setAttr('aria-label', spec.title);
+      btn.setAttr('aria-pressed', String(spec.mode === current));
+      btn.innerHTML = spec.svg;
+      btn.addEventListener('click', makeHandler(spec.mode));
+    }
   }
 
   // Cycle state via NEXT_STATE using TaskEditor
@@ -278,7 +392,12 @@ class TodoView extends ItemView {
     checkbox.addEventListener('change', async () => {
       const targetState = checkbox.checked ? 'DONE' : 'TODO';
       await this.updateTaskState(task, targetState);
-      this.refreshTaskElement(task);
+      const mode = this.getViewMode();
+      if (mode !== 'default') {
+        await this.onOpen();
+      } else {
+        this.refreshTaskElement(task);
+      }
     });
 
     return checkbox;
@@ -386,9 +505,14 @@ class TodoView extends ItemView {
     container.empty();
     container.addClass('todo-view');
 
+    // Toolbar
+    this.buildToolbar(container);
+
+    const mode = this.getViewMode();
     const taskList = container.createEl('ul', { cls: 'todo-list' });
 
-    for (const task of this.tasks) {
+    const visible = this.transformForView(this.tasks, mode);
+    for (const task of visible) {
       const li = this.buildTaskListItem(task);
       taskList.appendChild(li);
     }
@@ -522,6 +646,9 @@ class TodoTrackerSettingTab extends PluginSettingTab {
     for (const leaf of leaves) {
       const view = leaf.view as TodoView;
       view.tasks = this.plugin.tasks;
+      // Sync each view's mode from settings before render
+      const mode = this.plugin.settings.taskViewMode;
+      (view as any).setViewMode?.(mode);
       await view.onOpen();
     }
   };
@@ -581,5 +708,21 @@ class TodoTrackerSettingTab extends PluginSettingTab {
           await this.plugin.scanVault();
           await this.refreshAllTaskViews();
         }));
+
+    new Setting(containerEl)
+      .setName('Task view mode')
+      .setDesc('Choose how completed items are shown in the task view.')
+      .addDropdown(drop => {
+        drop.addOption('default', 'Default');
+        drop.addOption('sortCompletedLast', 'Sort completed to end');
+        drop.addOption('hideCompleted', 'Hide completed');
+        drop.setValue(this.plugin.settings.taskViewMode);
+        drop.onChange(async (value: string) => {
+          const mode = (value as TaskViewMode);
+          this.plugin.settings.taskViewMode = mode;
+          await this.plugin.saveSettings();
+          await this.refreshAllTaskViews();
+        });
+      });
   }
 }
