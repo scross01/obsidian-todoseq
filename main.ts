@@ -87,7 +87,12 @@ export default class TodoTracker extends Plugin {
     return this.taskLineTestRegex!.test(text);
   }
   
-  // Obsidian lifecycle method called when the plugin is loaded.
+   // Helper to determine if a state is considered completed
+  isCompleted(state: string): boolean {
+    return state === 'DONE' || state === 'CANCELED' || state === 'CANCELLED';
+  }
+
+ // Obsidian lifecycle method called when the plugin is loaded.
   async onload() {
     await this.loadSettings();
 
@@ -308,7 +313,7 @@ export default class TodoTracker extends Plugin {
             listMarker,
             text,
             state,
-            completed: state === 'DONE' || state === 'CANCELED' || state === 'CANCELLED',
+            completed: this.isCompleted(state),
             priority
           });
         }
@@ -412,6 +417,8 @@ class TodoView extends ItemView {
     
     this.tasks.forEach(task => {
       const taskItem = taskList.createEl('li', { cls: 'todo-item' });
+      taskItem.setAttribute('data-path', task.path);
+      taskItem.setAttribute('data-line', String(task.line));
       
       // Checkbox
       const checkbox = taskItem.createEl('input', {
@@ -426,9 +433,27 @@ class TodoView extends ItemView {
       // Create clickable TODO span
       const todoSpan = taskText.createEl('span', { cls: 'todo-keyword' });
       todoSpan.setText(task.state);
+
+      // Accessibility: make the keyword act like a button and be focusable
+      todoSpan.setAttr('role', 'button');
+      todoSpan.setAttr('tabindex', '0');
+      // Reflect current completion state for screen readers
+      todoSpan.setAttr('aria-checked', String(task.completed));
+
+      // Activate on click
       todoSpan.addEventListener('click', (evt) => {
         evt.stopPropagation();
         this.toggleTaskStatus(task);
+      });
+
+      // Activate on Enter/Space
+      todoSpan.addEventListener('keydown', (evt: KeyboardEvent) => {
+        const key = evt.key;
+        if (key === 'Enter' || key === ' ') {
+          evt.preventDefault();
+          evt.stopPropagation();
+          this.toggleTaskStatus(task);
+        }
       });
 
       // Priority badge (if any)
@@ -480,11 +505,34 @@ class TodoView extends ItemView {
 
             // Update in-memory task
             task.rawText = newLine;
+            task.state = targetState as Task['state'];
+            task.completed = targetState === 'DONE';
+
+            // Patch DOM incrementally without re-rendering full view
+
+            // 1) Update the keyword span text and aria-checked
+            const keywordSpan = taskItem.querySelector('.todo-keyword') as HTMLSpanElement | null;
+            if (keywordSpan) {
+              keywordSpan.setText(task.state);
+              keywordSpan.setAttr('aria-checked', String(task.completed));
+            }
+
+            // 2) Toggle completed class on the text block
+            const textSpan = taskItem.querySelector('.todo-text') as HTMLSpanElement | null;
+            if (textSpan) {
+              textSpan.toggleClass('completed', task.completed);
+            }
+
+            // 3) Checkbox state already matches; nothing else required
+
+            // 4) File info line number remains unchanged for simple toggle; no update needed
             task.state = targetState;
             task.completed = targetState === 'DONE';
 
             // Reflect UI state
             taskText.toggleClass('completed', task.completed);
+            // Update accessibility state on keyword span
+            todoSpan.setAttr('aria-checked', String(task.completed));
             await this.onOpen();
           }
         }

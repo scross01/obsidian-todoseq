@@ -33,8 +33,19 @@
   cursor: pointer;
   font-weight: var(--font-weight-medium, var(--font-medium, 600));
 }
+
+/* Hover hint */
 .todo-view .todo-keyword:hover {
   text-decoration: underline;
+}
+
+/* Keyboard focus highlight for state keyword when tabbing elements */
+.todo-view .todo-keyword:focus,
+.todo-view .todo-keyword:focus-visible {
+  outline: 2px solid var(--interactive-accent, #7f6df2);
+  outline-offset: 2px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent, #7f6df2) 20%, transparent);
 }
 
 /* Checkbox alignment */
