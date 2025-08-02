@@ -1,5 +1,7 @@
 # Change Log
 
+- Added right click (long press on mobile) context menu on the task keyword change state
+
 ## v0.2.1
 
 - Use editor and vault.process to update task lines files

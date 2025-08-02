@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownView, WorkspaceLeaf, ItemView, Platform } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownView, WorkspaceLeaf, ItemView, Platform, Menu } from 'obsidian';
 import { Task, TodoTrackerSettings, DEFAULT_SETTINGS, COMPLETED_STATES, NEXT_STATE, TaskViewMode } from './types';
 import { TaskParser } from './task-parser';
 import { TaskEditor } from './task-editor';
@@ -372,6 +372,60 @@ class TodoView extends ItemView {
     return TodoView.viewType;
   }
 
+  /** Return full list of state keywords from settings or DEFAULT_SETTINGS */
+  private getAllTaskStates(): string[] {
+    // Prefer the plugin's current settings provided via the constructor defaultViewMode owner
+    // We can safely read DEFAULT_SETTINGS as a fallback
+    // Access settings by locating the running plugin instance of this class's owner:
+    const plugin = (this.app as any).plugins?.plugins?.['todoseq'] as TodoTracker | undefined;
+    const configured = plugin?.settings?.taskKeywords;
+    if (Array.isArray(configured) && configured.length > 0) {
+      return configured.slice();
+    }
+    return DEFAULT_SETTINGS.taskKeywords.slice();
+  }
+
+  /** Open Obsidian Menu at mouse event location listing states (excluding current) */
+  private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
+    evt.preventDefault();
+    evt.stopPropagation();
+    const menu = new Menu();
+    const allStates = this.getAllTaskStates();
+    for (const state of allStates) {
+      if (!state || state === task.state) continue;
+      menu.addItem((item) => {
+        item.setTitle(state);
+        item.onClick(async () => {
+          await this.updateTaskState(task, state);
+          this.refreshTaskElement(task);
+        });
+      });
+    }
+    // Prefer API helper when available; fallback to explicit coordinates
+    if ((menu as any).showAtMouseEvent) {
+      (menu as any).showAtMouseEvent(evt);
+    } else {
+      menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
+    }
+  }
+
+  /** Open Obsidian Menu at a specific screen position */
+  private openStateMenuAtPosition(task: Task, pos: { x: number; y: number }): void {
+    const menu = new Menu();
+    const allStates = this.getAllTaskStates();
+    for (const state of allStates) {
+      if (!state || state === task.state) continue;
+      menu.addItem((item) => {
+        item.setTitle(state);
+        item.onClick(async () => {
+          await this.updateTaskState(task, state);
+          this.refreshTaskElement(task);
+        });
+      });
+    }
+    menu.showAtPosition({ x: pos.x, y: pos.y });
+  }
+
   getDisplayText() {
     return "TODOseq";
   }
@@ -416,7 +470,10 @@ class TodoView extends ItemView {
       this.refreshTaskElement(task);
     };
 
+    // Click advances to next state (quick action)
     todoSpan.addEventListener('click', (evt) => activate(evt));
+
+    // Keyboard support: Enter/Space and menu keys
     todoSpan.addEventListener('keydown', (evt: KeyboardEvent) => {
       const key = evt.key;
       if (key === 'Enter' || key === ' ') {
@@ -424,7 +481,44 @@ class TodoView extends ItemView {
         evt.stopPropagation();
         activate(evt);
       }
+      if (key === 'F10' && evt.shiftKey) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const rect = todoSpan.getBoundingClientRect();
+        this.openStateMenuAtPosition(task, { x: rect.left, y: rect.bottom });
+      }
+      if (key === 'ContextMenu') {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const rect = todoSpan.getBoundingClientRect();
+        this.openStateMenuAtPosition(task, { x: rect.left, y: rect.bottom });
+      }
     });
+
+    // Right-click to open selection menu (Obsidian style)
+    todoSpan.addEventListener('contextmenu', (evt: MouseEvent) => {
+      this.openStateMenuAtMouseEvent(task, evt);
+    });
+
+    // Long-press for mobile
+    let touchTimer: number | null = null;
+    todoSpan.addEventListener('touchstart', (evt: TouchEvent) => {
+      if (evt.touches.length !== 1) return;
+      const touch = evt.touches[0];
+      touchTimer = window.setTimeout(() => {
+        const x = touch.clientX;
+        const y = touch.clientY;
+        this.openStateMenuAtPosition(task, { x, y });
+      }, 450);
+    }, { passive: true });
+    const clearTouch = () => {
+      if (touchTimer) {
+        window.clearTimeout(touchTimer);
+        touchTimer = null;
+      }
+    };
+    todoSpan.addEventListener('touchend', clearTouch);
+    todoSpan.addEventListener('touchcancel', clearTouch);
 
     return todoSpan;
   }
