@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownView, WorkspaceLeaf, ItemView } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownView, WorkspaceLeaf, ItemView, Platform } from 'obsidian';
 
 interface Task {
   path: string;    // path to the page in the vault
@@ -492,7 +492,7 @@ class TodoView extends ItemView {
       
       taskItem.addEventListener('click', (evt) => {
         if (evt.target !== checkbox && !(evt.target as HTMLElement).hasClass('todo-keyword')) {
-          this.openTaskLocation(task);
+          this.openTaskLocation(evt, task);
         }
       });
     });
@@ -599,44 +599,54 @@ class TodoView extends ItemView {
     }
   }
 
-  // Open the source file in the vault the task is declared in
-  async openTaskLocation(task: Task) {
+  // Open the source file in the vault where the task is declared, honoring Obsidian default-like modifiers.
+  // Behavior:
+  // - Default click (no modifiers): open in new tab.
+  // - Cmd (mac) / Ctrl (win/linux) click, or Middle-click: open in new tab.
+  // - Shift-click: open in split.
+  // - Alt-click: pin the target leaf after opening.
+  async openTaskLocation(evt: MouseEvent, task: Task) {
     const file = this.app.vault.getAbstractFileByPath(task.path);
-
     if (!(file instanceof TFile)) return;
 
     const { workspace } = this.app;
 
-    // 1) Try to find an existing leaf already showing this file
-    const allLeaves = workspace.getLeavesOfType('markdown');
-    let targetLeaf: WorkspaceLeaf | null = null;
+    const isMac = Platform.isMacOS;
+    const isMiddle = (evt.button === 1);
+    const metaOrCtrl = isMac ? evt.metaKey : evt.ctrlKey;
 
-    for (const l of allLeaves) {
-      const v = l.view;
-      if (v instanceof MarkdownView && v.file?.path === file.path) {
-        targetLeaf = l;
-        break;
-      }
+    // Determine open mode. Default is 'tab' (per user request).
+    let openMode: 'split' | 'tab' = 'tab';
+    if (evt.shiftKey) {
+      openMode = 'split';
+    } else if (isMiddle || metaOrCtrl) {
+      openMode = 'tab';
     }
 
-    // 2) If found, activate and reveal it; otherwise reuse the most relevant leaf without opening a new tab
-    if (targetLeaf) {
-      await workspace.revealLeaf(targetLeaf);
-      await targetLeaf.openFile(file);
+    let leaf: WorkspaceLeaf;
+    if (openMode === 'split') {
+      leaf = workspace.getLeaf('split');
     } else {
-      // getLeaf(false) prefers reusing the active leaf/split rather than creating a new tab
-      targetLeaf = workspace.getLeaf(false);
-      await targetLeaf.openFile(file);
+      leaf = workspace.getLeaf('tab');
     }
 
-    // 3) Position cursor and scroll
-    const markdownView = targetLeaf.view instanceof MarkdownView ? targetLeaf.view : null;
+    await leaf.openFile(file);
+
+    // Pin if Alt pressed
+    if (evt.altKey) {
+      try { (leaf as any).setPinned?.(true); } catch (_) {}
+    }
+
+    // Position cursor and scroll to line
+    const markdownView = leaf.view instanceof MarkdownView ? leaf.view : null;
     if (markdownView) {
       const editor = markdownView.editor;
       const pos = { line: task.line, ch: 0 };
       editor.setCursor(pos);
       editor.scrollIntoView({ from: pos, to: pos });
     }
+
+    await workspace.revealLeaf(leaf);
   }
 }
 
