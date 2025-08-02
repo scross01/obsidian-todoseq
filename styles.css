@@ -31,7 +31,8 @@
 .todo-view .todo-keyword {
   color: var(--interactive-accent);
   cursor: pointer;
-  font-weight: var(--font-weight-medium, var(--font-medium, 600));
+  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  font-size: 0.85em;
 }
 
 /* Hover hint */
@@ -51,6 +52,7 @@
 /* Checkbox alignment */
 .todo-view .todo-checkbox {
   margin-right: var(--size-2-2, 6px);
+  vertical-align: middle;
 }
 
 /* Non-clickable link-like styling for in-text links */
@@ -69,7 +71,7 @@
   background-color: var(--background-modifier-accent, var(--interactive-accent));
   color: var(--text-on-accent, #fff);
   font-weight: var(--font-weight-medium, var(--font-medium, 600));
-  font-size: 70%;
+  font-size: 0.7em;
   line-height: 1.6;
 }
 
@@ -96,6 +98,6 @@
 /* File info (path:line) */
 .todo-view .todo-file-info {
   color: var(--text-muted);
-  font-size: 75%;
+  font-size: 0.75em;
   margin-top: var(--size-2-2, 6px);
 }
