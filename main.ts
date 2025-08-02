@@ -37,6 +37,9 @@ const NEXT_STATE = new Map<string, string>([
   ['CANCELLED', 'TODO'],
 ]);
 
+// Source of truth for completed states (used by plugin and view)
+const COMPLETED_STATES = new Set<string>(['DONE', 'CANCELED', 'CANCELLED']);
+
 const TASK_VIEW_TYPE = "todo-view";
 const TASK_VIEW_ICON = "list-todo";
 
@@ -87,9 +90,9 @@ export default class TodoTracker extends Plugin {
     return this.taskLineTestRegex!.test(text);
   }
   
-   // Helper to determine if a state is considered completed
+  // Helper to determine if a state is considered completed (delegates to the set above)
   isCompleted(state: string): boolean {
-    return state === 'DONE' || state === 'CANCELED' || state === 'CANCELLED';
+    return COMPLETED_STATES.has(state);
   }
 
  // Obsidian lifecycle method called when the plugin is loaded.
@@ -386,10 +389,50 @@ export default class TodoTracker extends Plugin {
 class TodoView extends ItemView {
   static viewType = TASK_VIEW_TYPE;
   tasks: Task[];
-  
+
   constructor(leaf: WorkspaceLeaf, tasks: Task[]) {
     super(leaf);
     this.tasks = tasks;
+  }
+
+  // Build a new task line immutably from a Task and new state.
+  private generateTaskLine(task: Task, newState: string, keepPriority = true): { newLine: string; completed: boolean } {
+    const priToken =
+      keepPriority && task.priority
+        ? (task.priority === 'high' ? '[#A]' : task.priority === 'med' ? '[#B]' : '[#C]')
+        : null;
+
+    const priorityPart = priToken ? ` ${priToken}` : '';
+    const textPart = task.text ? ` ${task.text}` : '';
+    const newLine = `${task.indent}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
+    const completed = COMPLETED_STATES.has(newState);
+    return { newLine, completed };
+  }
+
+  // Apply the immutable update to disk and synchronize the in-memory task.
+  private async applyTaskLineUpdate(task: Task, newState: string, keepPriority = true): Promise<void> {
+    const { newLine, completed } = this.generateTaskLine(task, newState, keepPriority);
+
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file instanceof TFile) {
+      const content = await this.app.vault.read(file);
+      const lines = content.split('\n');
+      if (task.line < lines.length) {
+        lines[task.line] = newLine;
+        await this.app.vault.modify(file, lines.join('\n'));
+      }
+    }
+
+    // Sync in-memory task object
+    task.rawText = newLine;
+    task.state = newState as Task['state'];
+    task.completed = completed;
+  }
+
+  // Cycle state via NEXT_STATE
+  private async cycleTaskState(task: Task): Promise<void> {
+    const next = NEXT_STATE.get(task.state) || 'TODO';
+    await this.applyTaskLineUpdate(task, next, true);
   }
 
   getViewType() {
@@ -443,7 +486,12 @@ class TodoView extends ItemView {
       // Activate on click
       todoSpan.addEventListener('click', (evt) => {
         evt.stopPropagation();
-        this.toggleTaskStatus(task);
+        this.cycleTaskState(task).then(async () => {
+          // After state change, update UI to reflect new state/completion
+          todoSpan.setText(task.state);
+          todoSpan.setAttr('aria-checked', String(task.completed));
+          taskText.toggleClass('completed', task.completed);
+        });
       });
 
       // Activate on Enter/Space
@@ -452,7 +500,11 @@ class TodoView extends ItemView {
         if (key === 'Enter' || key === ' ') {
           evt.preventDefault();
           evt.stopPropagation();
-          this.toggleTaskStatus(task);
+          this.cycleTaskState(task).then(async () => {
+            todoSpan.setText(task.state);
+            todoSpan.setAttr('aria-checked', String(task.completed));
+            taskText.toggleClass('completed', task.completed);
+          });
         }
       });
 
@@ -486,55 +538,19 @@ class TodoView extends ItemView {
         // Toggle only DONE/TODO via checkbox
         const targetState = checkbox.checked ? 'DONE' : 'TODO';
 
-        // Priority token reconstruction
-        const priToken = task.priority === 'high' ? '[#A]'
-          : task.priority === 'med' ? '[#B]'
-          : task.priority === 'low' ? '[#C]'
-          : null;
+        await this.applyTaskLineUpdate(task, targetState, true);
 
-        // Construct new line: indent + listMarker? + state + [#X]? + text
-        const newLine = `${task.indent}${task.listMarker || ''}${targetState}` + (priToken ? ` ${priToken}` : '') + (task.text ? ` ${task.text}` : '');
+        // 1) Update the keyword span text and aria-checked
+        const keywordSpan = taskItem.querySelector('.todo-keyword') as HTMLSpanElement | null;
+        if (keywordSpan) {
+          keywordSpan.setText(task.state);
+          keywordSpan.setAttr('aria-checked', String(task.completed));
+        }
 
-        const file = this.app.vault.getAbstractFileByPath(task.path);
-        if (file instanceof TFile) {
-          const content = await this.app.vault.read(file);
-          const lines = content.split('\n');
-          if (task.line < lines.length) {
-            lines[task.line] = newLine;
-            await this.app.vault.modify(file, lines.join('\n'));
-
-            // Update in-memory task
-            task.rawText = newLine;
-            task.state = targetState as Task['state'];
-            task.completed = targetState === 'DONE';
-
-            // Patch DOM incrementally without re-rendering full view
-
-            // 1) Update the keyword span text and aria-checked
-            const keywordSpan = taskItem.querySelector('.todo-keyword') as HTMLSpanElement | null;
-            if (keywordSpan) {
-              keywordSpan.setText(task.state);
-              keywordSpan.setAttr('aria-checked', String(task.completed));
-            }
-
-            // 2) Toggle completed class on the text block
-            const textSpan = taskItem.querySelector('.todo-text') as HTMLSpanElement | null;
-            if (textSpan) {
-              textSpan.toggleClass('completed', task.completed);
-            }
-
-            // 3) Checkbox state already matches; nothing else required
-
-            // 4) File info line number remains unchanged for simple toggle; no update needed
-            task.state = targetState;
-            task.completed = targetState === 'DONE';
-
-            // Reflect UI state
-            taskText.toggleClass('completed', task.completed);
-            // Update accessibility state on keyword span
-            todoSpan.setAttr('aria-checked', String(task.completed));
-            await this.onOpen();
-          }
+        // 2) Toggle completed class on the text block
+        const textSpan = taskItem.querySelector('.todo-text') as HTMLSpanElement | null;
+        if (textSpan) {
+          textSpan.toggleClass('completed', task.completed);
         }
       });
       
@@ -610,41 +626,10 @@ class TodoView extends ItemView {
     }
   }
 
-  // Change the task state when the state keywork is clicked  
+  // Change the task state when the state keywork is clicked
   async toggleTaskStatus(task: Task) {
-    // Compute new state and rebuild the line as: indent + state + ' ' + [#X]? + ' ' + text
-    // Priority token must be placed immediately after the state keyword per requirements.
-    const oldState = task.state;
-    const newState = NEXT_STATE.get(oldState) ?? 'DONE';
-
-    // Map stored priority back to token
-    const priToken = task.priority === 'high' ? '[#A]'
-      : task.priority === 'med' ? '[#B]'
-      : task.priority === 'low' ? '[#C]'
-      : null;
-
-    // Build new line ensuring single spaces and priority immediately after state if present
-    const newLine = `${task.indent}${task.listMarker || ''}${newState}` + (priToken ? ` ${priToken}` : '') + (task.text ? ` ${task.text}` : '');
-
-    // Update the file
-    const file = this.app.vault.getAbstractFileByPath(task.path);
-    if (file instanceof TFile) {
-      const content = await this.app.vault.read(file);
-      const lines = content.split('\n');
-      
-      if (task.line < lines.length) {
-        lines[task.line] = newLine;
-        await this.app.vault.modify(file, lines.join('\n'));
-        
-        // Update the task in our list
-        task.rawText = newLine;
-        task.state = newState;
-        task.completed = newState == 'DONE';
-        // text and indent remain the same; priority unchanged
-        // Refresh the view
-        this.onOpen();
-      }
-    }
+    // Deprecated in favor of cycleTaskState; keep as wrapper for any existing calls
+    await this.cycleTaskState(task);
   }
 
   // Open the source file in the vault where the task is declared, honoring Obsidian default-like modifiers.
