@@ -75,6 +75,12 @@ export default class TodoTracker extends Plugin {
     this.taskLineCaptureRegex = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${escaped})\\s+`);
   }
 
+  // Shared comparator to avoid reallocation and ensure consistent ordering
+  private readonly taskComparator = (a: Task, b: Task): number => {
+    if (a.path === b.path) return a.line - b.line;
+    return a.path.localeCompare(b.path);
+  };
+
   // Determine whether the provided text matches the task line pattern.
   isTask(text: string): boolean {
     if (!this.taskLineTestRegex) this.buildTaskLineRegex();
@@ -212,12 +218,8 @@ export default class TodoTracker extends Plugin {
           }
         }
       }
-      // Default sort: by path asc, then line asc
-      const sortByPathThenLine = (a: Task, b: Task) => {
-        if (a.path === b.path) return a.line - b.line;
-        return a.path.localeCompare(b.path);
-      };
-      this.tasks.sort(sortByPathThenLine);
+      // Default sort
+      this.tasks.sort(this.taskComparator);
     } finally {
       this._isScanning = false;
     }
@@ -331,10 +333,7 @@ export default class TodoTracker extends Plugin {
       }
 
       // Maintain default sort after incremental updates
-      this.tasks.sort((a, b) => {
-        if (a.path === b.path) return a.line - b.line;
-        return a.path.localeCompare(b.path);
-      });
+      this.tasks.sort(this.taskComparator);
 
       // Refresh all open TodoView leaves
       await this.refreshOpenTaskViews();
@@ -351,10 +350,7 @@ export default class TodoTracker extends Plugin {
     try {
       this.tasks = this.tasks.filter(t => t.path !== oldPath);
       // Keep sorted state
-      this.tasks.sort((a, b) => {
-        if (a.path === b.path) return a.line - b.line;
-        return a.path.localeCompare(b.path);
-      });
+      this.tasks.sort(this.taskComparator);
       await this.refreshOpenTaskViews();
     } catch (err) {
       console.error('TODOseq handleFileRename error', err);
