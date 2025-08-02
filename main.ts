@@ -1,99 +1,24 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownView, WorkspaceLeaf, ItemView, Platform } from 'obsidian';
-
-interface Task {
-  path: string;    // path to the page in the vault
-  line: number;    // line number of the task in the page 
-  rawText: string; // original full line
-  indent: string;  // leading whitespace before any list marker/state
-  listMarker: string; // the exact list marker plus trailing space if present (e.g., "- ", "1. ", "(a) ")
-  text: string;    // content after the state keyword with priority token removed
-  state: string;   // state keyword, TODO, DOING, DONE etc.
-  completed: boolean; // is the task considered complete
-  priority: 'high' | 'med' | 'low' | null;
-}
-
-interface TodoTrackerSettings {
-  refreshInterval: number;    // refresh interval in seconds
-  taskKeywords: string[];     // supported task state keywords, used to limit or expand the default set
-  includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
-}
-
-const DEFAULT_SETTINGS: TodoTrackerSettings = {
-  refreshInterval: 60, // seconds
-  taskKeywords: ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAIT', 'WAITING', 'IN-PROGRESS', 'CANCELED', 'CANCELLED'],
-  includeCodeBlocks: false,
-}
-
-const NEXT_STATE = new Map<string, string>([
-  ['TODO', 'DOING'],
-  ['DOING', 'DONE'],
-  ['DONE', 'TODO'],
-  ['LATER', 'NOW'],
-  ['NOW', 'DONE'],
-  ['WAIT', 'IN-PROGRESS'],
-  ['WAITING', 'IN-PROGRESS'],
-  ['IN-PROGRESS', 'DONE'],
-  ['CANCELED', 'TODO'],
-  ['CANCELLED', 'TODO'],
-]);
-
-// Source of truth for completed states (used by plugin and view)
-const COMPLETED_STATES = new Set<string>(['DONE', 'CANCELED', 'CANCELLED']);
+import { Task, TodoTrackerSettings, DEFAULT_SETTINGS, COMPLETED_STATES, NEXT_STATE } from './types';
+import { TaskParser } from './task-parser';
+import { TaskEditor } from './task-editor';
 
 const TASK_VIEW_TYPE = "todo-view";
 const TASK_VIEW_ICON = "list-todo";
-
 
 export default class TodoTracker extends Plugin {
   settings: TodoTrackerSettings;
   tasks: Task[] = [];
   refreshIntervalId: number;
 
-  // Compiled regexes for task line recognition:
-  // - taskLineTestRegex: quick boolean test
-  // - taskLineCaptureRegex: captures indent, optional list marker, and state
-  private taskLineTestRegex: RegExp | null = null;
-  private taskLineCaptureRegex: RegExp | null = null;
-
-  // Builds and assigns regular expressions for detecting and capturing task lines
-  // based on configured or default task keywords.
-  buildTaskLineRegex() {
-    const list = (this.settings.taskKeywords && this.settings.taskKeywords.length > 0)
-      ? this.settings.taskKeywords
-      : DEFAULT_SETTINGS.taskKeywords;
-    const escaped = list
-      .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-      .join('|');
-    // Optional list marker after indent:
-    //  - bullets: -, *, +
-    //  - ordered: \d+[.)] | [A-Za-z][.)] | \([A-Za-z0-9]+\)
-    // We capture optional marker plus a single space as one group.
-    const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s+)?`;
-    // Test regex: ^[ \t]*listMarkerPart(KEYWORD)\s+
-    this.taskLineTestRegex = new RegExp(`^[ \\t]*${listMarkerPart}(?:${escaped})\\s+`);
-    // Capture regex:
-    // 1: indent (spaces/tabs)
-    // 2: optional list marker (including trailing space), if present
-    // 3: state keyword
-    this.taskLineCaptureRegex = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${escaped})\\s+`);
-  }
+  // Parser instance configured from current settings
+  private parser: TaskParser | null = null;
 
   // Shared comparator to avoid reallocation and ensure consistent ordering
   private readonly taskComparator = (a: Task, b: Task): number => {
     if (a.path === b.path) return a.line - b.line;
     return a.path.localeCompare(b.path);
   };
-
-  // Determine whether the provided text matches the task line pattern.
-  isTask(text: string): boolean {
-    if (!this.taskLineTestRegex) this.buildTaskLineRegex();
-    return this.taskLineTestRegex!.test(text);
-  }
-  
-  // Helper to determine if a state is considered completed (delegates to the set above)
-  isCompleted(state: string): boolean {
-    return COMPLETED_STATES.has(state);
-  }
 
  // Obsidian lifecycle method called when the plugin is loaded.
   async onload() {
@@ -166,8 +91,8 @@ export default class TodoTracker extends Plugin {
     if (!this.settings.taskKeywords || this.settings.taskKeywords.length === 0) {
       this.settings.taskKeywords = [...DEFAULT_SETTINGS.taskKeywords];
     }
-    // Rebuild regex whenever settings are loaded (keywords may have changed)
-    this.buildTaskLineRegex();
+    // Recreate parser whenever settings are loaded (keywords may have changed)
+    this.parser = TaskParser.create(this.settings);
   }
 
   // Obsidian lifecycle method called to save settings
@@ -236,92 +161,14 @@ export default class TodoTracker extends Plugin {
   // Scan a single file for tasks
   async scanFile(file: TFile) {
     const content = await this.app.vault.read(file);
-    const lines = content.split('\n');
 
-    // Ensure regex is built
-    if (!this.taskLineCaptureRegex || !this.taskLineTestRegex) this.buildTaskLineRegex();
-    const capture = this.taskLineCaptureRegex!;
-
-    // Track whether each line is inside a fenced code block.
-    // Supports ``` or ~~~ fences, with optional language, allowing leading spaces.
-    let inFence = false;
-    let fenceMarker: '`' | '~' | null = null;
-
-    for (let index = 0; index < lines.length; index++) {
-      const line = lines[index];
-
-      // Detect fence starts/ends. We count the number of backticks/tilde runs at line start.
-      // A fence open is a run of 3 or more of the same char; a fence close is another run
-      // of the same char while currently inside a fence.
-      const fenceMatch = /^[ \t]*(`{3,}|~{3,})/.exec(line);
-      if (fenceMatch) {
-        const markerRun = fenceMatch[1]; // e.g. "```" or "~~~~"
-        const currentMarker: '`' | '~' = markerRun[0] === '`' ? '`' : '~';
-        if (!inFence) {
-          inFence = true;
-          fenceMarker = currentMarker;
-        } else {
-          // Only close if marker matches the one used to open
-          if (fenceMarker === currentMarker) {
-            inFence = false;
-            fenceMarker = null;
-          }
-        }
-        // The fence delimiter line itself should not be considered a task.
-        // Continue to next line after toggling state.
-        continue;
-      }
-
-      // Skip task detection if inside a fence and includeCodeBlocks is disabled
-      if (inFence && !this.settings.includeCodeBlocks) {
-        continue;
-      }
-
-      // See if the line matched the task pattern
-      if (this.isTask(line)) {
-        const m = capture.exec(line);
-        if (m) {
-          const indent = m[1] ?? '';
-          const listMarker = (m[2] ?? '') as string;
-          const state = m[3] ?? '';
-          const afterPrefix = line.slice(m[0].length);
-
-          // Parse priority token [#A|#B|#C] and remove from display text
-          // We only consider the first occurrence and ignore others per "first occurrence wins".
-          // Match token boundaries exactly: [#A], [#B], [#C]
-          let priority: 'high' | 'med' | 'low' | null = null;
-
-          // Find the first priority token
-          const priMatch = /(\s*)\[#([ABC])\](\s*)/.exec(afterPrefix);
-          let cleanedText = afterPrefix;
-          if (priMatch) {
-            const letter = priMatch[2];
-            if (letter === 'A') priority = 'high';
-            else if (letter === 'B') priority = 'med';
-            else if (letter === 'C') priority = 'low';
-
-            // Remove just this first occurrence (including its adjacent spaces captured)
-            const before = cleanedText.slice(0, priMatch.index);
-            const after = cleanedText.slice(priMatch.index + priMatch[0].length);
-            cleanedText = (before + ' ' + after).replace(/[ \t]+/g, ' ').trimStart();
-          }
-
-          const text = cleanedText;
-
-          this.tasks.push({
-            path: file.path,
-            line: index,
-            rawText: line,
-            indent,
-            listMarker,
-            text,
-            state,
-            completed: this.isCompleted(state),
-            priority
-          });
-        }
-      }
+    if (!this.parser) {
+      // Lazily create if not already set (should be set by loadSettings)
+      this.parser = TaskParser.create(this.settings);
     }
+
+    const parsed = this.parser.parseFile(content, file.path);
+    this.tasks.push(...parsed);
   }
 
   // Handle file change, rescan for tasks
@@ -389,50 +236,22 @@ export default class TodoTracker extends Plugin {
 class TodoView extends ItemView {
   static viewType = TASK_VIEW_TYPE;
   tasks: Task[];
+  editor: TaskEditor;
 
   constructor(leaf: WorkspaceLeaf, tasks: Task[]) {
     super(leaf);
     this.tasks = tasks;
+    this.editor = new TaskEditor(this.app.vault);
   }
 
-  // Build a new task line immutably from a Task and new state.
-  private generateTaskLine(task: Task, newState: string, keepPriority = true): { newLine: string; completed: boolean } {
-    const priToken =
-      keepPriority && task.priority
-        ? (task.priority === 'high' ? '[#A]' : task.priority === 'med' ? '[#B]' : '[#C]')
-        : null;
-
-    const priorityPart = priToken ? ` ${priToken}` : '';
-    const textPart = task.text ? ` ${task.text}` : '';
-    const newLine = `${task.indent}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
-    const completed = COMPLETED_STATES.has(newState);
-    return { newLine, completed };
-  }
-
-  // Apply the immutable update to disk and synchronize the in-memory task.
-  private async applyTaskLineUpdate(task: Task, newState: string, keepPriority = true): Promise<void> {
-    const { newLine, completed } = this.generateTaskLine(task, newState, keepPriority);
-
-    const file = this.app.vault.getAbstractFileByPath(task.path);
-    if (file instanceof TFile) {
-      const content = await this.app.vault.read(file);
-      const lines = content.split('\n');
-      if (task.line < lines.length) {
-        lines[task.line] = newLine;
-        await this.app.vault.modify(file, lines.join('\n'));
-      }
-    }
-
-    // Sync in-memory task object
-    task.rawText = newLine;
-    task.state = newState as Task['state'];
-    task.completed = completed;
-  }
-
-  // Cycle state via NEXT_STATE
-  private async cycleTaskState(task: Task): Promise<void> {
-    const next = NEXT_STATE.get(task.state) || 'TODO';
-    await this.applyTaskLineUpdate(task, next, true);
+  // Cycle state via NEXT_STATE using TaskEditor
+  private async updateTaskState(task: Task, nextState): Promise<void> {
+    // Construct editor bound to this vault so methods don't need App
+    const updated = await this.editor.updateTaskState(task, nextState);
+    // Sync in-memory task from returned snapshot
+    task.rawText = updated.rawText;
+    task.state = updated.state as Task['state'];
+    task.completed = updated.completed;
   }
 
   getViewType() {
@@ -486,7 +305,7 @@ class TodoView extends ItemView {
       // Activate on click
       todoSpan.addEventListener('click', (evt) => {
         evt.stopPropagation();
-        this.cycleTaskState(task).then(async () => {
+        this.updateTaskState(task, NEXT_STATE.get(task.state) ?? 'DONE').then(async () => {
           // After state change, update UI to reflect new state/completion
           todoSpan.setText(task.state);
           todoSpan.setAttr('aria-checked', String(task.completed));
@@ -500,7 +319,7 @@ class TodoView extends ItemView {
         if (key === 'Enter' || key === ' ') {
           evt.preventDefault();
           evt.stopPropagation();
-          this.cycleTaskState(task).then(async () => {
+          this.updateTaskState(task, NEXT_STATE.get(task.state) ?? 'DONE').then(async () => {
             todoSpan.setText(task.state);
             todoSpan.setAttr('aria-checked', String(task.completed));
             taskText.toggleClass('completed', task.completed);
@@ -537,21 +356,11 @@ class TodoView extends ItemView {
       checkbox.addEventListener('change', async () => {
         // Toggle only DONE/TODO via checkbox
         const targetState = checkbox.checked ? 'DONE' : 'TODO';
-
-        await this.applyTaskLineUpdate(task, targetState, true);
-
-        // 1) Update the keyword span text and aria-checked
-        const keywordSpan = taskItem.querySelector('.todo-keyword') as HTMLSpanElement | null;
-        if (keywordSpan) {
-          keywordSpan.setText(task.state);
-          keywordSpan.setAttr('aria-checked', String(task.completed));
-        }
-
-        // 2) Toggle completed class on the text block
-        const textSpan = taskItem.querySelector('.todo-text') as HTMLSpanElement | null;
-        if (textSpan) {
-          textSpan.toggleClass('completed', task.completed);
-        }
+        this.updateTaskState(task, targetState).then(async () => {
+          todoSpan.setText(task.state);
+          todoSpan.setAttr('aria-checked', String(task.completed));
+          taskText.toggleClass('completed', task.completed);
+        });
       });
       
       taskItem.addEventListener('click', (evt) => {
@@ -626,12 +435,6 @@ class TodoView extends ItemView {
     }
   }
 
-  // Change the task state when the state keywork is clicked
-  async toggleTaskStatus(task: Task) {
-    // Deprecated in favor of cycleTaskState; keep as wrapper for any existing calls
-    await this.cycleTaskState(task);
-  }
-
   // Open the source file in the vault where the task is declared, honoring Obsidian default-like modifiers.
   // Behavior:
   // - Default click (no modifiers): open in new tab.
@@ -691,6 +494,15 @@ class TodoTrackerSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  private refreshAllTaskViews = async () => {
+    const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
+    for (const leaf of leaves) {
+      const view = leaf.view as TodoView;
+      view.tasks = this.plugin.tasks;
+      await view.onOpen();
+    }
+  };
+
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
@@ -706,13 +518,7 @@ class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.refreshInterval = value;
           await this.plugin.saveSettings();
           this.plugin.setupPeriodicRefresh();
-          // Refresh existing task view tabs to reflect any timing-related updates
-          const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
-          for (const leaf of leaves) {
-            const view = leaf.view as TodoView;
-            view.tasks = this.plugin.tasks;
-            await view.onOpen();
-          }
+          await this.refreshAllTaskViews();
         }));
   
     new Setting(containerEl)
@@ -732,16 +538,10 @@ class TodoTrackerSettingTab extends PluginSettingTab {
             // Save exactly what the user typed (possibly empty)
             this.plugin.settings.taskKeywords = parsed;
             await this.plugin.saveSettings();
-            // Rebuild regex and rescan using defaults if empty
-            this.plugin.buildTaskLineRegex();
+            // Recreate parser according to new settings and rescan
+            (this.plugin as any).parser = TaskParser.create(this.plugin.settings);
             await this.plugin.scanVault();
-            // Refresh existing task view tabs to display updated results
-            const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
-            for (const leaf of leaves) {
-              const view = leaf.view as TodoView;
-              view.tasks = this.plugin.tasks;
-              await view.onOpen();
-            }
+            await this.refreshAllTaskViews();
           });
         });
   
@@ -753,14 +553,10 @@ class TodoTrackerSettingTab extends PluginSettingTab {
         .onChange(async (value) => {
           this.plugin.settings.includeCodeBlocks = value;
           await this.plugin.saveSettings();
+          // Recreate parser to reflect includeCodeBlocks change and rescan
+          (this.plugin as any).parser = TaskParser.create(this.plugin.settings);
           await this.plugin.scanVault();
-          // Refresh existing task view tabs to display updated results
-          const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
-          for (const leaf of leaves) {
-            const view = leaf.view as TodoView;
-            view.tasks = this.plugin.tasks;
-            await view.onOpen();
-          }
+          await this.refreshAllTaskViews();
         }));
   }
 }
