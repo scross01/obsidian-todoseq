@@ -184,25 +184,40 @@ export default class TodoTracker extends Plugin {
     }, this.settings.refreshInterval * 1000);
   }
 
+  // Yield a frame to keep UI responsive during long operations
+  private async yieldToEventLoop(): Promise<void> {
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  }
+
   // Scan the Obsidian Vault for tasks
   async scanVault() {
     if (this._isScanning) return;
     this._isScanning = true;
     try {
-    this.tasks = [];
-    const files = this.app.vault.getFiles();
-    
-    for (const file of files) {
-      if (file.extension === 'md') {
-        await this.scanFile(file);
+      this.tasks = [];
+      const files = this.app.vault.getFiles();
+
+      // Yield configuration: how often to yield a frame while scanning
+      const YIELD_EVERY_FILES = 20;
+      let processedMd = 0;
+
+      for (const file of files) {
+        if (file.extension === 'md') {
+          await this.scanFile(file);
+          processedMd++;
+
+          if (processedMd % YIELD_EVERY_FILES === 0) {
+            // Yield to the event loop to keep UI responsive during large scans
+            await this.yieldToEventLoop();
+          }
+        }
       }
-    }
-    // Default sort: by path asc, then line asc
-    const sortByPathThenLine = (a: Task, b: Task) => {
-      if (a.path === b.path) return a.line - b.line;
-      return a.path.localeCompare(b.path);
-    };
-    this.tasks.sort(sortByPathThenLine);
+      // Default sort: by path asc, then line asc
+      const sortByPathThenLine = (a: Task, b: Task) => {
+        if (a.path === b.path) return a.line - b.line;
+        return a.path.localeCompare(b.path);
+      };
+      this.tasks.sort(sortByPathThenLine);
     } finally {
       this._isScanning = false;
     }
