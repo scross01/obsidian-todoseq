@@ -1,8 +1,12 @@
-import { App, TFile, Vault } from 'obsidian';
+import { App, TFile, Vault, MarkdownView, EditorPosition } from 'obsidian';
 import { Task, COMPLETED_STATES, NEXT_STATE } from './types';
 
 export class TaskEditor {
-  constructor(private readonly vault: Vault) {}
+  /**
+   * Prefer Editor API for the active file to preserve cursor/selection/folds and UX.
+   * Prefer Vault.process for background edits to perform atomic writes.
+   */
+  constructor(private readonly app: App) {}
 
   // Pure formatter of a task line given a new state and optional priority retention
   static generateTaskLine(task: Task, newState: string, keepPriority = true): { newLine: string; completed: boolean } {
@@ -18,17 +22,34 @@ export class TaskEditor {
     return { newLine, completed };
   }
 
-  // Applies the change to disk and returns an updated, immutable snapshot of the Task
+  // Applies the change and returns an updated, immutable snapshot of the Task
   async applyLineUpdate(task: Task, newState: string, keepPriority = true): Promise<Task> {
     const { newLine, completed } = TaskEditor.generateTaskLine(task, newState, keepPriority);
 
-    const file = this.vault.getAbstractFileByPath(task.path);
+    const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file instanceof TFile) {
-      const content = await this.vault.read(file);
-      const lines = content.split('\n');
-      if (task.line < lines.length) {
-        lines[task.line] = newLine;
-        await this.vault.modify(file, lines.join('\n'));
+      // Check if target is the active file in a MarkdownView
+      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const isActive = md?.file?.path === task.path;
+      const editor = md?.editor;
+
+      if (isActive && editor) {
+        // Replace only the specific line using Editor API to preserve editor state
+        const currentLine = editor.getLine(task.line);
+        if (typeof currentLine === 'string') {
+          const from: EditorPosition = { line: task.line, ch: 0 };
+          const to: EditorPosition = { line: task.line, ch: currentLine.length };
+          editor.replaceRange(newLine, from, to);
+        }
+      } else {
+        // Not active: use atomic background edit
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          if (task.line < lines.length) {
+            lines[task.line] = newLine;
+          }
+          return lines.join('\n');
+        });
       }
     }
 

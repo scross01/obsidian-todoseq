@@ -253,7 +253,7 @@ class TodoView extends ItemView {
   constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode) {
     super(leaf);
     this.tasks = tasks;
-    this.editor = new TaskEditor(this.app.vault);
+    this.editor = new TaskEditor(this.app);
     this.defaultViewMode = defaultViewMode;
   }
 
