@@ -1,0 +1,99 @@
+import { PluginSettingTab, App, Setting } from 'obsidian';
+import TodoTracker, { TASK_VIEW_TYPE } from './main';
+import { TodoView } from './task-view';
+import { TaskParser } from './task-parser';
+import { DEFAULT_SETTINGS, TaskViewMode } from './types';
+
+export class TodoTrackerSettingTab extends PluginSettingTab {
+  plugin: TodoTracker;
+
+  constructor(app: App, plugin: TodoTracker) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  private refreshAllTaskViews = async () => {
+    const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
+    for (const leaf of leaves) {
+      const view = leaf.view as TodoView;
+      view.tasks = this.plugin.tasks;
+      // Sync each view's mode from settings before render
+      const mode = this.plugin.settings.taskViewMode;
+      (view as any).setViewMode?.(mode);
+      await view.onOpen();
+    }
+  };
+
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+
+    new Setting(containerEl)
+      .setName('Refresh Interval')
+      .setDesc('How often to rescan the vault for TODOs (in seconds)')
+      .addSlider(slider => slider
+        .setLimits(10, 300, 10)
+        .setValue(this.plugin.settings.refreshInterval)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.refreshInterval = value;
+          await this.plugin.saveSettings();
+          this.plugin.setupPeriodicRefresh();
+          await this.refreshAllTaskViews();
+        }));
+
+    new Setting(containerEl)
+      .setName('Task Keywords')
+      .setDesc('Keywords to scan for (e.g. TODO, FIXME). Leave empty to use defaults.')
+      .addText(text => {
+        const effective = (this.plugin.settings.taskKeywords && this.plugin.settings.taskKeywords.length > 0)
+          ? this.plugin.settings.taskKeywords
+          : DEFAULT_SETTINGS.taskKeywords;
+        text
+          .setValue(effective.join(', '))
+          .onChange(async (value) => {
+            const parsed = value
+              .split(',')
+              .map(k => k.trim())
+              .filter(k => k.length > 0);
+            // Save exactly what the user typed (possibly empty)
+            this.plugin.settings.taskKeywords = parsed;
+            await this.plugin.saveSettings();
+            // Recreate parser according to new settings and rescan
+            (this.plugin as any).parser = TaskParser.create(this.plugin.settings);
+            await this.plugin.scanVault();
+            await this.refreshAllTaskViews();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('Include tasks inside code blocks')
+      .setDesc('When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.includeCodeBlocks)
+        .onChange(async (value) => {
+          this.plugin.settings.includeCodeBlocks = value;
+          await this.plugin.saveSettings();
+          // Recreate parser to reflect includeCodeBlocks change and rescan
+          (this.plugin as any).parser = TaskParser.create(this.plugin.settings);
+          await this.plugin.scanVault();
+          await this.refreshAllTaskViews();
+        }));
+
+    new Setting(containerEl)
+      .setName('Task view mode')
+      .setDesc('Choose how completed items are shown in the task view.')
+      .addDropdown(drop => {
+        drop.addOption('default', 'Default');
+        drop.addOption('sortCompletedLast', 'Sort completed to end');
+        drop.addOption('hideCompleted', 'Hide completed');
+        drop.setValue(this.plugin.settings.taskViewMode);
+        drop.onChange(async (value: string) => {
+          const mode = (value as TaskViewMode);
+          this.plugin.settings.taskViewMode = mode;
+          await this.plugin.saveSettings();
+          await this.refreshAllTaskViews();
+        });
+      });
+  }
+}
