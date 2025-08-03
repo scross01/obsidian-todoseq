@@ -52,7 +52,7 @@
 }
 
 .todo-view .todo-search-input:focus-visible {
-  outline: 2px solid var(--interactive-accent);
+  outline: 2px solid var(--interactive-normal);
   outline-offset: 2px;
 }
 
