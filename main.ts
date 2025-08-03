@@ -104,9 +104,9 @@ export default class TodoTracker extends Plugin {
   // Obsidian lifecycle method called to settings are loaded
   async loadSettings() {
     this.settings = Object.assign({}, DefaultSettings, await this.loadData());
-    // If user cleared keywords, use defaults at runtime
-    if (!this.settings.taskKeywords || this.settings.taskKeywords.length === 0) {
-      this.settings.taskKeywords = [...DefaultSettings.taskKeywords];
+    // Normalize settings shape after migration: ensure additionalTaskKeywords exists
+    if (!(this.settings as any).additionalTaskKeywords) {
+      (this.settings as any).additionalTaskKeywords = [];
     }
     // Recreate parser whenever settings are loaded (keywords may have changed)
     this.recreateParser();

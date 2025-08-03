@@ -5,7 +5,7 @@ import { TaskViewMode } from "./task-view";
 
 export interface TodoTrackerSettings {
   refreshInterval: number; // refresh interval in seconds
-  taskKeywords: string[]; // supported task state keywords, used to limit or expand the default set
+  additionalTaskKeywords: string[]; // capitalised keywords treated as NOT COMPLETED (e.g., FIXME, HACK)
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
   taskViewMode: TaskViewMode; // controls view transformation in the task view
 }
@@ -13,7 +13,8 @@ export interface TodoTrackerSettings {
 
 export const DefaultSettings: TodoTrackerSettings = {
   refreshInterval: 60,
-  taskKeywords: ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAIT', 'WAITING', 'IN-PROGRESS', 'CANCELED', 'CANCELLED'],
+  // No additional keywords by default; built-in defaults live in task.ts
+  additionalTaskKeywords: [],
   includeCodeBlocks: false,
   taskViewMode: 'default',
 };
@@ -57,21 +58,32 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Task Keywords')
-      .setDesc('Keywords to scan for (e.g. TODO, FIXME). Leave empty to use defaults.')
+      .setName('Additional Task Keywords')
+      .setDesc('Capitalised list of keywords for treat as tasks (e.g. FIXME, HACK). Leave empty for none.')
       .addText(text => {
-        const effective = (this.plugin.settings.taskKeywords && this.plugin.settings.taskKeywords.length > 0)
-          ? this.plugin.settings.taskKeywords
-          : DefaultSettings.taskKeywords;
+        const current = this.plugin.settings.additionalTaskKeywords ?? [];
         text
-          .setValue(effective.join(', '))
+          .setValue(current.join(', '))
           .onChange(async (value) => {
-            const parsed = value
+            // Force uppercase in the UI field immediately
+            const forced = value.toUpperCase();
+            if (forced !== value) {
+              // Update the input control to reflect forced uppercase
+              try {
+                // Obsidian's TextComponent exposes a setValue method via the same reference.
+                (text as any).setValue(forced);
+              } catch {
+                // no-op if API surface changes
+              }
+            }
+
+            // Parse CSV, trim, filter non-empty (already uppercased)
+            const parsed = forced
               .split(',')
               .map(k => k.trim())
               .filter(k => k.length > 0);
-            // Save exactly what the user typed (possibly empty)
-            this.plugin.settings.taskKeywords = parsed;
+
+            this.plugin.settings.additionalTaskKeywords = parsed;
             await this.plugin.saveSettings();
             // Recreate parser according to new settings and rescan
             this.plugin.recreateParser();

@@ -1,8 +1,7 @@
 import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView } from 'obsidian';
 import TodoTracker, { TASK_VIEW_ICON } from './main';
 import { TaskEditor } from './task-editor';
-import { Task, NEXT_STATE } from './task';
-import { DefaultSettings } from "./settings";
+import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from './task';
 
 
 export class TodoView extends ItemView {
@@ -177,35 +176,67 @@ export class TodoView extends ItemView {
     return TodoView.viewType;
   }
 
-  /** Return full list of state keywords from settings or DEFAULT_SETTINGS */
-  private getAllTaskStates(): string[] {
-    // Prefer the plugin's current settings provided via the constructor defaultViewMode owner
-    // We can safely read DEFAULT_SETTINGS as a fallback
-    // Access settings by locating the running plugin instance of this class's owner:
+  /** Return default keyword sets (non-completed and completed) and additional keywords using constants from task.ts */
+  private getKeywordSets(): { pendingActive: string[]; completed: string[]; additional: string[] } {
+    const pendingActiveDefaults = [
+      ...Array.from(DEFAULT_PENDING_STATES),
+      ...Array.from(DEFAULT_ACTIVE_STATES),
+    ];
+    const completedDefaults = Array.from(DEFAULT_COMPLETED_STATES);
+
     const plugin = (this.app as any).plugins?.plugins?.['todoseq'] as TodoTracker | undefined;
-    const configured = plugin?.settings?.taskKeywords;
-    if (Array.isArray(configured) && configured.length > 0) {
-      return configured.slice();
-    }
-    return DefaultSettings.taskKeywords.slice();
+    const configured = (plugin?.settings as any)?.additionalTaskKeywords as string[] | undefined;
+    const additional = Array.isArray(configured) ? configured.filter(Boolean) : [];
+
+    return {
+      pendingActive: pendingActiveDefaults,
+      completed: completedDefaults,
+      additional,
+    };
   }
 
-  /** Open Obsidian Menu at mouse event location listing states (excluding current) */
+  /** Build the list of selectable states for the context menu, excluding the current state */
+  private getSelectableStatesForMenu(current: string): { group: string; states: string[] }[] {
+    const { pendingActive, completed, additional } = this.getKeywordSets();
+
+    const dedupe = (arr: string[]) => Array.from(new Set(arr));
+    const nonCompleted = dedupe([...pendingActive, ...additional]);
+    const completedOnly = dedupe(completed);
+
+    // Present two groups: Non-completed and Completed
+    const groups: { group: string; states: string[] }[] = [
+      { group: 'Not Completed', states: nonCompleted.filter(s => s && s !== current) },
+      { group: 'Completed', states: completedOnly.filter(s => s && s !== current) },
+    ];
+    return groups.filter(g => g.states.length > 0);
+  }
+
+  /** Open Obsidian Menu at mouse event location listing default and additional keywords (excluding current) */
   private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
     evt.preventDefault();
     evt.stopPropagation();
     const menu = new Menu();
-    const allStates = this.getAllTaskStates();
-    for (const state of allStates) {
-      if (!state || state === task.state) continue;
+    const groups = this.getSelectableStatesForMenu(task.state);
+
+    for (const g of groups) {
+      // Section header (disabled item)
       menu.addItem((item) => {
-        item.setTitle(state);
-        item.onClick(async () => {
-          await this.updateTaskState(task, state);
-          this.refreshTaskElement(task);
-        });
+        item.setTitle(g.group);
+        (item as any).setDisabled?.(true);
       });
+      for (const state of g.states) {
+        menu.addItem((item) => {
+          item.setTitle(state);
+          item.onClick(async () => {
+            await this.updateTaskState(task, state);
+            this.refreshTaskElement(task);
+          });
+        });
+      }
+      // Divider between groups when both exist
+      menu.addSeparator();
     }
+
     // Prefer API helper when available; fallback to explicit coordinates
     if ((menu as any).showAtMouseEvent) {
       (menu as any).showAtMouseEvent(evt);
@@ -217,16 +248,23 @@ export class TodoView extends ItemView {
   /** Open Obsidian Menu at a specific screen position */
   private openStateMenuAtPosition(task: Task, pos: { x: number; y: number; }): void {
     const menu = new Menu();
-    const allStates = this.getAllTaskStates();
-    for (const state of allStates) {
-      if (!state || state === task.state) continue;
+    const groups = this.getSelectableStatesForMenu(task.state);
+
+    for (const g of groups) {
       menu.addItem((item) => {
-        item.setTitle(state);
-        item.onClick(async () => {
-          await this.updateTaskState(task, state);
-          this.refreshTaskElement(task);
-        });
+        item.setTitle(g.group);
+        (item as any).setDisabled?.(true);
       });
+      for (const state of g.states) {
+        menu.addItem((item) => {
+          item.setTitle(state);
+          item.onClick(async () => {
+            await this.updateTaskState(task, state);
+            this.refreshTaskElement(task);
+          });
+        });
+      }
+      menu.addSeparator();
     }
     menu.showAtPosition({ x: pos.x, y: pos.y });
   }

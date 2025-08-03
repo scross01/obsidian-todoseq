@@ -15,10 +15,30 @@ export class TaskParser {
   }
 
   static create(settings: TodoTrackerSettings): TaskParser {
-    const keywords = (settings.taskKeywords && settings.taskKeywords.length > 0)
-      ? settings.taskKeywords
-      : [...DEFAULT_PENDING_STATES, ...DEFAULT_ACTIVE_STATES, ...DEFAULT_COMPLETED_STATES];
-    const regex = TaskParser.buildRegex(keywords);
+    // Build union of non-completed states (defaults + user additional) and completed states (defaults only)
+    const additional: string[] = Array.isArray((settings as any).additionalTaskKeywords)
+      ? ((settings as any).additionalTaskKeywords as string[])
+      : [];
+
+    // Ensure values are strings and already capitalised by settings UI; filter out empties defensively
+    const normalizedAdditional: string[] = additional
+      .filter((k): k is string => typeof k === 'string')
+      .map(k => k.trim())
+      .filter(k => k.length > 0);
+
+    const nonCompletedArray: string[] = [
+      ...Array.from(DEFAULT_PENDING_STATES),
+      ...Array.from(DEFAULT_ACTIVE_STATES),
+      ...normalizedAdditional,
+    ];
+    const nonCompleted = new Set<string>(nonCompletedArray);
+
+    const allKeywordsArray: string[] = [
+      ...Array.from(nonCompleted),
+      ...Array.from(DEFAULT_COMPLETED_STATES),
+    ];
+
+    const regex = TaskParser.buildRegex(allKeywordsArray);
     return new TaskParser(regex, !!settings.includeCodeBlocks);
   }
 
@@ -27,6 +47,7 @@ export class TaskParser {
       .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
       .join('|');
     const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s+)?`;
+    // Intentionally case-sensitive (no flags). Matches capitalised keywords only.
     const test = new RegExp(`^[ \\t]*${listMarkerPart}(?:${escaped})\\s+`);
     const capture = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${escaped})\\s+`);
     return { test, capture };

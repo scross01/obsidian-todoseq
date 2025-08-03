@@ -52,7 +52,17 @@ Supported keywords by default:
 
 - TODO, DOING, DONE, NOW, LATER, WAIT, WAITING, IN-PROGRESS, CANCELED, CANCELLED.
 
-You can customize the list of keywords in settings. If you clear the list, the defaults are restored.
+### Additional Task Keywords
+
+You can add extra capitalised keywords that are treated as tasks. Enter a comma‑separated list under "Additional Task Keywords", for example:
+
+- `FIXME, HACK`
+
+Notes:
+
+- Matching is case-sensitive. Only capitalised forms match.
+- Additional Task Keywords are additive; they do not replace or disable default keywords.
+- Completion is determined only by the built-in completed states: `DONE`, `CANCELED`, `CANCELLED`.
 
 ## Priority Tokens
 
@@ -107,7 +117,7 @@ The view refreshes when files are changed or when settings are updated.
 
 **Refresh Interval**: How frequently the vault is scanned for tasks.
 
-**Task Keywords**: Customize which keywords are recognized. Leave empty to use defaults.
+**Additional Task Keywords**: Capitalised, comma-separated extra keywords to treat as tasks (not completed). Examples: `FIXME, HACK`. These are additive and do not replace built-in keywords.
 
 **Include tasks inside code blocks**: When enabled, tasks inside fenced code blocks are included. Disabled by default.
 
