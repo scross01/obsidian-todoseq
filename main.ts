@@ -56,9 +56,13 @@ export default class TodoTracker extends Plugin {
     });
 
     // Initial scan
-    await this.scanVault();
-
-    // If the Task view tab is already open when the plugin reloads, refresh it
+    {
+      const t0 = performance.now();
+      await this.scanVault();
+      const t1 = performance.now();
+      const ms = t1 - t0;
+      console.log(`TODOseq initial scan for tasks took ${ms} ms`);
+    }
     await this.refreshOpenTaskViews();
 
     // Set up periodic refresh
