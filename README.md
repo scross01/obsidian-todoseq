@@ -73,7 +73,7 @@ Add a single priority token immediately after the state keyword:
 - `[#C]` = low
 
 Only the first occurrence on the line is recognized for display.
-Example: 
+Example:
 
 - `TODO [#A] Ship v1`
 
@@ -88,6 +88,7 @@ Sorting is stable by path and then line number.
 The view refreshes when files are changed or when settings are updated.
 
 **Search**: Use the search field in the toolbar (top of the Task View) to filter tasks as you type.
+
 - Matches against the task’s raw text, the full file path, and the file name (case-insensitive).
 - Slash (/) focuses the search field unless you are already typing in another input.
 - Escape clears the current search and removes focus.

@@ -1,8 +1,12 @@
 # Change Log
 
-- Added right click (long press on mobile) context menu on the task keyword change state
+## v0.3.0
+
+- Added right click (long press on mobile) context menu on keyword to change task state
 - Added search field to fitler task list
 - Added empty list guidance
+- Changed settings behavior for adding additional task keywords
+- Refactoring and optimization
 
 ## v0.2.1
 
