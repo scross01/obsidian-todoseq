@@ -1,11 +1,12 @@
 import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView } from 'obsidian';
-import TodoTracker, { TASK_VIEW_TYPE, TASK_VIEW_ICON } from './main';
+import TodoTracker, { TASK_VIEW_ICON } from './main';
 import { TaskEditor } from './task-editor';
-import { Task, TaskViewMode, DEFAULT_SETTINGS, NEXT_STATE } from './types';
+import { Task, NEXT_STATE } from './task';
+import { DefaultSettings } from "./settings";
 
 
 export class TodoView extends ItemView {
-  static viewType = TASK_VIEW_TYPE;
+  static viewType = "todoseq-view";
   tasks: Task[];
   editor: TaskEditor;
   private defaultViewMode: TaskViewMode;
@@ -169,7 +170,7 @@ export class TodoView extends ItemView {
     if (Array.isArray(configured) && configured.length > 0) {
       return configured.slice();
     }
-    return DEFAULT_SETTINGS.taskKeywords.slice();
+    return DefaultSettings.taskKeywords.slice();
   }
 
   /** Open Obsidian Menu at mouse event location listing states (excluding current) */
@@ -582,3 +583,7 @@ export class TodoView extends ItemView {
    await super.onClose?.();
  }
 }
+/** Controls how tasks are displayed in the TodoView */
+
+export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';
+

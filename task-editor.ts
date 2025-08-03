@@ -1,5 +1,5 @@
 import { App, TFile, Vault, MarkdownView, EditorPosition } from 'obsidian';
-import { Task, COMPLETED_STATES, NEXT_STATE } from './types';
+import { Task, COMPLETED_STATES, NEXT_STATE } from './task';
 
 export class TaskEditor {
   /**

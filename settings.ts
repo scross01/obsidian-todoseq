@@ -1,8 +1,22 @@
 import { PluginSettingTab, App, Setting } from 'obsidian';
-import TodoTracker, { TASK_VIEW_TYPE } from './main';
+import TodoTracker from './main';
 import { TodoView } from './task-view';
-import { TaskParser } from './task-parser';
-import { DEFAULT_SETTINGS, TaskViewMode } from './types';
+import { TaskViewMode } from "./task-view";
+
+export interface TodoTrackerSettings {
+  refreshInterval: number; // refresh interval in seconds
+  taskKeywords: string[]; // supported task state keywords, used to limit or expand the default set
+  includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
+  taskViewMode: TaskViewMode; // controls view transformation in the task view
+}
+// Shared constants so modules don’t re-declare different sources of truth
+
+export const DefaultSettings: TodoTrackerSettings = {
+  refreshInterval: 60,
+  taskKeywords: ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAIT', 'WAITING', 'IN-PROGRESS', 'CANCELED', 'CANCELLED'],
+  includeCodeBlocks: false,
+  taskViewMode: 'default',
+};
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
   plugin: TodoTracker;
@@ -13,7 +27,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
   }
 
   private refreshAllTaskViews = async () => {
-    const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
+    const leaves = this.app.workspace.getLeavesOfType(TodoView.viewType);
     for (const leaf of leaves) {
       const view = leaf.view as TodoView;
       view.tasks = this.plugin.tasks;
@@ -48,7 +62,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       .addText(text => {
         const effective = (this.plugin.settings.taskKeywords && this.plugin.settings.taskKeywords.length > 0)
           ? this.plugin.settings.taskKeywords
-          : DEFAULT_SETTINGS.taskKeywords;
+          : DefaultSettings.taskKeywords;
         text
           .setValue(effective.join(', '))
           .onChange(async (value) => {
@@ -60,7 +74,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             this.plugin.settings.taskKeywords = parsed;
             await this.plugin.saveSettings();
             // Recreate parser according to new settings and rescan
-            (this.plugin as any).parser = TaskParser.create(this.plugin.settings);
+            this.plugin.recreateParser();
             await this.plugin.scanVault();
             await this.refreshAllTaskViews();
           });
@@ -75,7 +89,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.includeCodeBlocks = value;
           await this.plugin.saveSettings();
           // Recreate parser to reflect includeCodeBlocks change and rescan
-          (this.plugin as any).parser = TaskParser.create(this.plugin.settings);
+          this.plugin.recreateParser();
           await this.plugin.scanVault();
           await this.refreshAllTaskViews();
         }));
@@ -97,3 +111,4 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       });
   }
 }
+

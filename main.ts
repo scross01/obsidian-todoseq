@@ -1,10 +1,9 @@
 import { Plugin, TFile, TAbstractFile, WorkspaceLeaf } from 'obsidian';
-import { Task, TodoTrackerSettings, DEFAULT_SETTINGS, COMPLETED_STATES, TaskViewMode } from './types';
+import { Task } from './task';
+import { TodoView, TaskViewMode } from "./task-view";
+import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./settings";
 import { TaskParser } from './task-parser';
-import { TodoTrackerSettingTab } from './settings';
-import { TodoView } from './task-view';
 
-export const TASK_VIEW_TYPE = "todo-view";
 export const TASK_VIEW_ICON = "list-todo";
 
 export default class TodoTracker extends Plugin {
@@ -27,7 +26,7 @@ export default class TodoTracker extends Plugin {
 
     // Register the custom view type
     this.registerView(
-      TASK_VIEW_TYPE,
+      TodoView.viewType,
       (leaf) => new TodoView(leaf, this.tasks, this.settings.taskViewMode)
     );
  
@@ -83,7 +82,7 @@ export default class TodoTracker extends Plugin {
 
   // Helper: refresh all open Todo views to reflect this.tasks
   private async refreshOpenTaskViews(): Promise<void> {
-    const leaves = this.app.workspace.getLeavesOfType(TASK_VIEW_TYPE);
+    const leaves = this.app.workspace.getLeavesOfType(TodoView.viewType);
     for (const leaf of leaves) {
       const view = leaf.view as TodoView;
       view.tasks = this.tasks;
@@ -98,12 +97,17 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called to settings are loaded
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = Object.assign({}, DefaultSettings, await this.loadData());
     // If user cleared keywords, use defaults at runtime
     if (!this.settings.taskKeywords || this.settings.taskKeywords.length === 0) {
-      this.settings.taskKeywords = [...DEFAULT_SETTINGS.taskKeywords];
+      this.settings.taskKeywords = [...DefaultSettings.taskKeywords];
     }
     // Recreate parser whenever settings are loaded (keywords may have changed)
+    this.recreateParser();
+  }
+
+  // Public method to recreate the parser with current settings
+  public recreateParser(): void {
     this.parser = TaskParser.create(this.settings);
   }
 
@@ -231,13 +235,13 @@ export default class TodoTracker extends Plugin {
     
     // Create new leaf or use existing
     let leaf: WorkspaceLeaf | null = null;
-    const leaves = workspace.getLeavesOfType(TASK_VIEW_TYPE);
+    const leaves = workspace.getLeavesOfType(TodoView.viewType);
 
     if (leaves.length > 0) {
       leaf = leaves[0];
     } else {
       leaf = workspace.getLeaf(true);
-      leaf.setViewState({ type: TASK_VIEW_TYPE, active: true });
+      leaf.setViewState({ type: TodoView.viewType, active: true });
     }
     if (leaf) {
       this.app.workspace.revealLeaf(leaf);

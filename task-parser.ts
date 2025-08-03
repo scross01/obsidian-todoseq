@@ -1,4 +1,5 @@
-import { Task, TodoTrackerSettings, COMPLETED_STATES } from './types';
+import { Task, COMPLETED_STATES } from './task';
+import { TodoTrackerSettings } from "./settings";
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
