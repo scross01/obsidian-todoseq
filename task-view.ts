@@ -283,9 +283,40 @@ export class TodoView extends ItemView {
       }
     });
 
+    // Prevent duplicate context menu on Android: contextmenu + long-press both firing
+    let suppressNextContextMenu = false;
+    // Also guard re-entrancy so we never open two menus within a short window
+    let lastMenuOpenTs = 0;
+    const MENU_DEBOUNCE_MS = 350;
+
+    const openMenuAtMouseEventOnce = (evt: MouseEvent) => {
+      const now = Date.now();
+      if (now - lastMenuOpenTs < MENU_DEBOUNCE_MS) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        return;
+      }
+      lastMenuOpenTs = now;
+      this.openStateMenuAtMouseEvent(task, evt);
+    };
+
+    const openMenuAtPositionOnce = (x: number, y: number) => {
+      const now = Date.now();
+      if (now - lastMenuOpenTs < MENU_DEBOUNCE_MS) return;
+      lastMenuOpenTs = now;
+      this.openStateMenuAtPosition(task, { x, y });
+    };
+
     // Right-click to open selection menu (Obsidian style)
     todoSpan.addEventListener('contextmenu', (evt: MouseEvent) => {
-      this.openStateMenuAtMouseEvent(task, evt);
+      // If a long-press just opened the menu, ignore the subsequent contextmenu
+      if (suppressNextContextMenu) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        // do not immediately clear; allow a micro-window to absorb chained events
+        return;
+      }
+      openMenuAtMouseEventOnce(evt);
     });
 
     // Long-press for mobile
@@ -293,20 +324,40 @@ export class TodoView extends ItemView {
     todoSpan.addEventListener('touchstart', (evt: TouchEvent) => {
       if (evt.touches.length !== 1) return;
       const touch = evt.touches[0];
+      // Many Android browsers will still emit a contextmenu after long press.
+      // We mark suppression immediately on touchstart so the later contextmenu is eaten.
+      suppressNextContextMenu = true;
       touchTimer = window.setTimeout(() => {
+        // Re-read last known coordinates in case the user moved a bit during press
         const x = touch.clientX;
         const y = touch.clientY;
-        this.openStateMenuAtPosition(task, { x, y });
+        openMenuAtPositionOnce(x, y);
       }, 450);
     }, { passive: true });
+
     const clearTouch = () => {
       if (touchTimer) {
         window.clearTimeout(touchTimer);
         touchTimer = null;
       }
+      // Keep suppression for a short grace period to absorb the trailing native contextmenu
+      window.setTimeout(() => {
+        suppressNextContextMenu = false;
+      }, 250);
     };
-    todoSpan.addEventListener('touchend', clearTouch);
-    todoSpan.addEventListener('touchcancel', clearTouch);
+    todoSpan.addEventListener('touchend', clearTouch, { passive: true });
+    todoSpan.addEventListener('touchcancel', clearTouch, { passive: true });
+
+    // Additionally, ignore a click that may be synthesized after contextmenu on mobile
+    todoSpan.addEventListener('click', (evt) => {
+      const now = Date.now();
+      if (now - lastMenuOpenTs < MENU_DEBOUNCE_MS) {
+        // a menu was just opened; prevent accidental state toggle
+        evt.preventDefault();
+        evt.stopPropagation();
+        return;
+      }
+    }, true); // capture to intercept before activate handler
 
     return todoSpan;
   }
