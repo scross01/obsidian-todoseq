@@ -384,6 +384,8 @@ export class TodoView extends ItemView {
   /** Recalculate visible tasks for current mode + search and update only the list subtree */
   private refreshVisibleList(): void {
     const container = this.contentEl;
+
+    // Ensure list container exists and is the sole place for items
     let list = container.querySelector('ul.todo-list');
     if (!list) {
       list = container.createEl('ul', { cls: 'todo-list' });
@@ -391,8 +393,10 @@ export class TodoView extends ItemView {
     list.empty();
 
     const mode = this.getViewMode();
-    let visible = this.transformForView(this.tasks, mode);
+    const allTasks = this.tasks ?? [];
+    let visible = this.transformForView(allTasks, mode);
 
+    // Apply search filtering
     const q = this.getSearchQuery().toLowerCase().trim();
     if (q.length > 0) {
       visible = visible.filter(t => {
@@ -406,6 +410,46 @@ export class TodoView extends ItemView {
       });
     }
 
+    // Empty-state guidance UI
+    if (visible.length === 0) {
+      // Remove any previous empty-state
+      const prevEmpty = container.querySelector('.todo-empty');
+      if (prevEmpty) prevEmpty.detach?.();
+
+      // Determine scenario
+      const hasAnyTasks = allTasks.length > 0;
+      const hasAnyIncomplete = allTasks.some(t => !t.completed);
+      const isHideCompleted = mode === 'hideCompleted';
+
+      // Build empty message container (below toolbar, above list)
+      const empty = container.createEl('div', { cls: 'todo-empty' });
+
+      const title = empty.createEl('div', { cls: 'todo-empty-title' });
+      const subtitle = empty.createEl('div', { cls: 'todo-empty-subtitle' });
+
+      if (!hasAnyTasks) {
+        // a) No tasks found at all
+        title.setText('No tasks found');
+        subtitle.setText('Create tasks in your notes using "TODO Your task". They will appear here automatically.');
+      } else if (isHideCompleted && !hasAnyIncomplete) {
+        // b) Hide-completed enabled, but only completed tasks exist
+        title.setText('All tasks are completed');
+        subtitle.setText('You are hiding completed tasks. Switch view mode or add new tasks to see more.');
+      } else {
+        // General empty from search filter or other modes
+        title.setText('No matching tasks');
+        subtitle.setText('Try clearing the search or switching view modes.');
+      }
+
+      // Keep toolbar enabled: do not disable or overlay; list remains empty
+      return;
+    } else {
+      // Remove any empty-state if present
+      const prevEmpty = container.querySelector('.todo-empty');
+      if (prevEmpty) prevEmpty.detach?.();
+    }
+
+    // Render visible tasks
     for (const task of visible) {
       const li = this.buildTaskListItem(task);
       list.appendChild(li);

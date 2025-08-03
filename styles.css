@@ -200,3 +200,64 @@
   font-size: 0.75em;
   margin-top: var(--size-2-2, 6px);
 }
+
+/* Empty-state Guidance UI */
+.todo-view .todo-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 24px 16px;
+  margin: 12px 12px 0;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-secondary) 90%, transparent),
+      color-mix(in srgb, var(--background-secondary) 96%, transparent)
+    );
+}
+
+.todo-view .todo-empty-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.todo-view .todo-empty-subtitle {
+  max-width: 640px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.todo-view .todo-empty-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.todo-view .todo-empty-btn {
+  appearance: none;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 60ms ease;
+}
+
+.todo-view .todo-empty-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.todo-view .todo-empty-btn:active {
+  transform: translateY(1px);
+}
