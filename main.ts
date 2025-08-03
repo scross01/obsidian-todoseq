@@ -85,8 +85,10 @@ export default class TodoTracker extends Plugin {
     const leaves = this.app.workspace.getLeavesOfType(TodoView.viewType);
     for (const leaf of leaves) {
       const view = leaf.view as TodoView;
+      // Update data source
       view.tasks = this.tasks;
-      await view.onOpen();
+      // Lighter refresh: only update the visible list rather than full onOpen re-init
+      (view as any).refreshVisibleList?.();
     }
   }
 
@@ -130,7 +132,7 @@ export default class TodoTracker extends Plugin {
       this._isScanning = true;
       try {
         await this.scanVault();
-        await this.refreshOpenTaskViews();
+        await this.refreshOpenTaskViews(); // will now perform lighter refresh
       } catch (err) {
         console.error('TODOseq periodic scan error', err);
       } finally {
@@ -206,7 +208,7 @@ export default class TodoTracker extends Plugin {
       // Maintain default sort after incremental updates
       this.tasks.sort(this.taskComparator);
 
-      // Refresh all open TodoView leaves
+      // Refresh all open TodoView leaves (lighter refresh)
       await this.refreshOpenTaskViews();
     } catch (err) {
       console.error('TODOseq handleFileChange error', err);
@@ -222,7 +224,7 @@ export default class TodoTracker extends Plugin {
       this.tasks = this.tasks.filter(t => t.path !== oldPath);
       // Keep sorted state
       this.tasks.sort(this.taskComparator);
-      await this.refreshOpenTaskViews();
+      await this.refreshOpenTaskViews(); // lighter refresh
     } catch (err) {
       console.error('TODOseq handleFileRename error', err);
       try { await this.refreshOpenTaskViews(); } catch (_) {}

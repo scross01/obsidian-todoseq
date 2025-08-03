@@ -128,7 +128,8 @@ export class TodoView extends ItemView {
       this.setViewMode(mode);
       const evt = new CustomEvent('todoseq:view-mode-change', { detail: { mode } });
       window.dispatchEvent(evt);
-      await this.onOpen();
+      // Lighter refresh: only re-render the visible list instead of full onOpen
+      this.refreshVisibleList();
     };
 
     for (const spec of buttons) {
@@ -236,7 +237,8 @@ export class TodoView extends ItemView {
       await this.updateTaskState(task, targetState);
       const mode = this.getViewMode();
       if (mode !== 'default') {
-        await this.onOpen();
+        // Lighter refresh: recompute and redraw only the list
+        this.refreshVisibleList();
       } else {
         this.refreshTaskElement(task);
       }
