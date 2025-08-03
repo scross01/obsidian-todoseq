@@ -1,5 +1,5 @@
 import { App, TFile, Vault, MarkdownView, EditorPosition } from 'obsidian';
-import { Task, COMPLETED_STATES, NEXT_STATE } from './task';
+import { Task, DEFAULT_COMPLETED_STATES, NEXT_STATE } from './task';
 
 export class TaskEditor {
   /**
@@ -18,7 +18,7 @@ export class TaskEditor {
     const priorityPart = priToken ? ` ${priToken}` : '';
     const textPart = task.text ? ` ${task.text}` : '';
     const newLine = `${task.indent}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
-    const completed = COMPLETED_STATES.has(newState);
+    const completed = DEFAULT_COMPLETED_STATES.has(newState);
     return { newLine, completed };
   }
 

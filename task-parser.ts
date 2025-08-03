@@ -1,4 +1,4 @@
-import { Task, COMPLETED_STATES } from './task';
+import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES } from './task';
 import { TodoTrackerSettings } from "./settings";
 
 type RegexPair = { test: RegExp; capture: RegExp };
@@ -17,12 +17,11 @@ export class TaskParser {
   static create(settings: TodoTrackerSettings): TaskParser {
     const keywords = (settings.taskKeywords && settings.taskKeywords.length > 0)
       ? settings.taskKeywords
-      : ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAIT', 'WAITING', 'IN-PROGRESS', 'CANCELED', 'CANCELLED'];
+      : [...DEFAULT_PENDING_STATES, ...DEFAULT_ACTIVE_STATES, ...DEFAULT_COMPLETED_STATES];
     const regex = TaskParser.buildRegex(keywords);
     return new TaskParser(regex, !!settings.includeCodeBlocks);
   }
 
-  // Mirrors logic from [`TodoTracker.buildTaskLineRegex()`](main.ts:60) but pure and parameterized
   static buildRegex(keywords: string[]): RegexPair {
     const escaped = keywords
       .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
@@ -97,7 +96,7 @@ export class TaskParser {
         listMarker,
         text,
         state,
-        completed: COMPLETED_STATES.has(state),
+        completed: DEFAULT_COMPLETED_STATES.has(state),
         priority,
       });
     }

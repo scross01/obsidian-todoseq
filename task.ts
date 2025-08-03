@@ -11,9 +11,9 @@ export interface Task {
   priority: 'high' | 'med' | 'low' | null;
 }
 
-export const PENDING_STATES = new Set<string>(['TODO', 'LATER', 'WAIT', 'WAITING']);
-export const ACTIVE_STATES = new Set<string>(['DOING', 'NOW', 'IN-PROGRESS']); 
-export const COMPLETED_STATES = new Set<string>(['DONE', 'CANCELED', 'CANCELLED']);
+export const DEFAULT_PENDING_STATES = new Set<string>(['TODO', 'LATER', 'WAIT', 'WAITING']);
+export const DEFAULT_ACTIVE_STATES = new Set<string>(['DOING', 'NOW', 'IN-PROGRESS']); 
+export const DEFAULT_COMPLETED_STATES = new Set<string>(['DONE', 'CANCELED', 'CANCELLED']);
 
 export const NEXT_STATE = new Map<string, string>([
   ['TODO', 'DOING'],
