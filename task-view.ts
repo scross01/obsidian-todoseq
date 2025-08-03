@@ -555,12 +555,45 @@ export class TodoView extends ItemView {
     window.addEventListener('keydown', keyHandler);
   }
 
+  /** Strip Markdown formatting to produce display-only plain text */
+  private stripMarkdown(input: string): string {
+    if (!input) return '';
+    let out = input;
+
+    // HTML tags
+    out = out.replace(/<[^>]+>/g, '');
+
+    // Images: ![alt](url) -> alt
+    out = out.replace(/!\[([^\]]*)\]\([^\)]*\)/g, '$1');
+
+    // Inline code: `code` -> code
+    out = out.replace(/`([^`]+)`/g, '$1');
+
+    // Headings
+    out = out.replace(/^\s{0,3}#{1,6}\s+/gm, '');
+
+    // Emphasis/strong/strike
+    out = out.replace(/(\*\*|__)(.*?)\1/g, '$2');
+    out = out.replace(/(\*|_)(.*?)\1/g, '$2');
+    out = out.replace(/~~(.*?)~~/g, '$1');
+
+    // Normalize whitespace
+    out = out.replace(/\r/g, '');
+    out = out.replace(/[ \t]+\n/g, '\n');
+    out = out.replace(/\n{3,}/g, '\n\n');
+    out = out.trim();
+
+    return out;
+  }
+
   // Render Obsidian-style links as non-clickable, link-like spans inside task text.
   // Supports:
   //  - Wiki links: [[Note]] and [[Note|Alias]]
   //  - Markdown links: [Alias](url-or-path)
   //  - Bare URLs: http(s)://...
   private renderTaskTextWithLinks(text: string, parent: HTMLElement) {
+    // For display only, strip any markdown formatting first
+    const textToProcess = this.stripMarkdown(text) || '';
     const patterns: { type: 'wiki' | 'md' | 'url'; regex: RegExp; }[] = [
       // [[Page]] or [[Page|Alias]]
       { type: 'wiki', regex: /\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]/g },
@@ -571,12 +604,12 @@ export class TodoView extends ItemView {
     ];
 
     let i = 0;
-    while (i < text.length) {
+    while (i < textToProcess.length) {
       let nextMatch: { type: 'wiki' | 'md' | 'url'; match: RegExpExecArray; } | null = null;
 
       for (const p of patterns) {
         p.regex.lastIndex = i;
-        const m = p.regex.exec(text);
+        const m = p.regex.exec(textToProcess);
         if (m) {
           if (!nextMatch || m.index < nextMatch.match.index) {
             nextMatch = { type: p.type, match: m };
@@ -586,13 +619,13 @@ export class TodoView extends ItemView {
 
       if (!nextMatch) {
         // Append any remaining text
-        parent.appendText(text.slice(i));
+        parent.appendText(textToProcess.slice(i));
         break;
       }
 
       // Append plain text preceding the match
       if (nextMatch.match.index > i) {
-        parent.appendText(text.slice(i, nextMatch.match.index));
+        parent.appendText(textToProcess.slice(i, nextMatch.match.index));
       }
 
       // Create a non-interactive, link-like span
