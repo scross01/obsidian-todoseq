@@ -48,9 +48,33 @@ export class TodoView extends ItemView {
     return tasks.slice();
   }
 
-  /** Build toolbar with icon-only mode buttons; dispatch event for persistence */
+  /** Search query (persisted on root contentEl attribute to survive re-renders) */
+  private getSearchQuery(): string {
+    const q = this.contentEl.getAttr('data-search');
+    return typeof q === 'string' ? q : '';
+  }
+  private setSearchQuery(q: string) {
+    this.contentEl.setAttr('data-search', q);
+  }
+
+  /** Build toolbar with icon-only mode buttons plus right-aligned search; dispatch event for persistence */
   private buildToolbar(container: HTMLElement) {
     const toolbar = container.createEl('div', { cls: 'todo-toolbar' });
+
+    // Right-aligned search input
+    const searchWrap = toolbar.createEl('div', { cls: 'todo-toolbar-right' });
+    const searchId = `todoseq-search-${Math.random().toString(36).slice(2, 8)}`;
+    const label = searchWrap.createEl('label', { attr: { for: searchId } });
+    label.setText('Search');
+    label.addClass('sr-only');
+
+    const input = searchWrap.createEl('input', { cls: 'todo-search-input', attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } }) as HTMLInputElement;
+    input.value = this.getSearchQuery();
+    input.addEventListener('input', () => {
+      // Update attribute and re-render list only, preserving focus
+      this.setSearchQuery(input.value);
+      this.refreshVisibleList();
+    });
 
     // Icon-only pill buttons (Default, Sort completed last, Hide completed)
     const current = this.getViewMode();
@@ -116,6 +140,9 @@ export class TodoView extends ItemView {
       btn.innerHTML = spec.svg;
       btn.addEventListener('click', makeHandler(spec.mode));
     }
+
+    // Keep a reference for keyboard handlers to focus later
+    (this as any)._searchInputEl = input;
   }
 
   // Cycle state via NEXT_STATE using TaskEditor
@@ -353,6 +380,37 @@ export class TodoView extends ItemView {
     }
   }
 
+  /** Recalculate visible tasks for current mode + search and update only the list subtree */
+  private refreshVisibleList(): void {
+    const container = this.contentEl;
+    let list = container.querySelector('ul.todo-list');
+    if (!list) {
+      list = container.createEl('ul', { cls: 'todo-list' });
+    }
+    list.empty();
+
+    const mode = this.getViewMode();
+    let visible = this.transformForView(this.tasks, mode);
+
+    const q = this.getSearchQuery().toLowerCase().trim();
+    if (q.length > 0) {
+      visible = visible.filter(t => {
+        const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
+        return (
+          (t.rawText && t.rawText.toLowerCase().includes(q)) ||
+          (t.text && t.text.toLowerCase().includes(q)) ||
+          (t.path && t.path.toLowerCase().includes(q)) ||
+          (baseName && baseName.toLowerCase().includes(q))
+        );
+      });
+    }
+
+    for (const task of visible) {
+      const li = this.buildTaskListItem(task);
+      list.appendChild(li);
+    }
+  }
+
   // Obsidian lifecycle methods for view open: keyed, minimal render
   async onOpen() {
     const container = this.contentEl;
@@ -362,14 +420,41 @@ export class TodoView extends ItemView {
     // Toolbar
     this.buildToolbar(container);
 
-    const mode = this.getViewMode();
-    const taskList = container.createEl('ul', { cls: 'todo-list' });
+    // Initial list render (preserves focus since toolbar/input already exists)
+    this.refreshVisibleList();
 
-    const visible = this.transformForView(this.tasks, mode);
-    for (const task of visible) {
-      const li = this.buildTaskListItem(task);
-      taskList.appendChild(li);
-    }
+    // Keyboard shortcuts: Slash to focus search, Esc to clear
+    const input: HTMLInputElement | null = (this as any)._searchInputEl ?? null;
+    const keyHandler = (evt: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null;
+      const isTyping =
+        active &&
+        (active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          (active as any).isContentEditable);
+
+      if (evt.key === '/' && !evt.metaKey && !evt.ctrlKey && !evt.altKey) {
+        if (!isTyping && input) {
+          evt.preventDefault();
+          input.focus();
+          input.select();
+        }
+      }
+
+      if (evt.key === 'Escape') {
+        if (active === input && input) {
+          evt.preventDefault();
+          input.value = '';
+          this.setSearchQuery('');
+          this.refreshVisibleList(); // re-render cleared without losing focus context
+          queueMicrotask(() => input.blur());
+        }
+      }
+    };
+
+    // Save references for cleanup
+    (this as any)._searchKeyHandler = keyHandler;
+    window.addEventListener('keydown', keyHandler);
   }
 
   // Render Obsidian-style links as non-clickable, link-like spans inside task text.
@@ -485,4 +570,15 @@ export class TodoView extends ItemView {
 
     await workspace.revealLeaf(leaf);
   }
+
+ // Cleanup listeners
+ async onClose() {
+   const handler = (this as any)._searchKeyHandler as ((e: KeyboardEvent) => void) | undefined;
+   if (handler) {
+     window.removeEventListener('keydown', handler);
+     (this as any)._searchKeyHandler = undefined;
+   }
+   (this as any)._searchInputEl = undefined;
+   await super.onClose?.();
+ }
 }

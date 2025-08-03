@@ -5,12 +5,13 @@ TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian
 *Why use task keyworks instead of markdown checkboxes?*
 Personal preference. It can be easiler and quicker to type `TODO`, `DOING` or `DONE` when making notes or journaling than ackwardliy typing `- [ ]` to create a task checkbox.
 
-
 ## Features
 
 - Scans all Markdown files in your vault for lines beginning with a task keyword (e.g., TODO, DOING, DONE, NOW, LATER, WAIT, WAITING, IN-PROGRESS, CANCELED, CANCELLED).
 - Supports tasks inside bullet and numbered lists and preserves the original list marker (e.g., "- ", "1. ", "(a) ") on update.
 - Displays all detected tasks in a single Task View, sorted by file path and line number.
+- Toolbar search field filters tasks live by matching raw text and file path/filename (case-insensitive).
+- View modes: Default, Sort completed last, Hide completed (toggle via toolbar icons).
 - Update tasks in two ways:
   1. Click the state keyword to cycle it using defined sequences.
   2. Use the checkbox to toggle only between DONE and TODO, saving back to the source file.
@@ -73,6 +74,18 @@ The task view visually marks tasks as completed when state is DONE, CANCELED, or
 Sorting is stable by path and then line number.
 
 The view refreshes when files are changed or when settings are updated.
+
+**Search**: Use the search field in the toolbar (top of the Task View) to filter tasks as you type.
+- Matches against the task’s raw text, the full file path, and the file name (case-insensitive).
+- Slash (/) focuses the search field unless you are already typing in another input.
+- Escape clears the current search and removes focus.
+- The search field expands to fill available toolbar space.
+
+**View modes (toolbar icons)**: Adjust the sort and filter.
+
+- Default: Show all tasks in detected order.
+- Sort completed last: Completed tasks are moved to the end of the list; pending tasks remain on top.
+- Hide completed: Completed tasks are hidden from the list.
 
 **Checkbox**: Checked means the task is considered completed.
 

@@ -1,6 +1,7 @@
 # Change Log
 
 - Added right click (long press on mobile) context menu on the task keyword change state
+- Added search field to fitler task list
 
 ## v0.2.1
 
