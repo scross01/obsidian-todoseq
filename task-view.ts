@@ -124,8 +124,20 @@ export class TodoView extends ItemView {
       },
     ];
 
+    // Helper to sync aria-pressed on all mode buttons based on current view mode
+    const updateModeButtons = () => {
+      const activeMode = this.getViewMode();
+      const buttons = group.querySelectorAll<HTMLButtonElement>('button.todo-mode-icon-btn');
+      buttons.forEach((b) => {
+        const m = b.getAttr('data-mode') as TaskViewMode | null;
+        b.setAttr('aria-pressed', String(m === activeMode));
+      });
+    };
+
     const makeHandler = (mode: TaskViewMode) => async () => {
       this.setViewMode(mode);
+      // Update button pressed state to reflect newly selected mode
+      updateModeButtons();
       const evt = new CustomEvent('todoseq:view-mode-change', { detail: { mode } });
       window.dispatchEvent(evt);
       // Lighter refresh: only re-render the visible list instead of full onOpen
@@ -138,10 +150,14 @@ export class TodoView extends ItemView {
       btn.setAttr('data-mode', spec.mode);
       btn.setAttr('title', spec.title);
       btn.setAttr('aria-label', spec.title);
-      btn.setAttr('aria-pressed', String(spec.mode === current));
+      // aria-pressed will be set by updateModeButtons; initialize to false to avoid flicker
+      btn.setAttr('aria-pressed', String(false));
       btn.innerHTML = spec.svg;
       btn.addEventListener('click', makeHandler(spec.mode));
     }
+
+    // After creating buttons, ensure correct one is marked pressed for initial state
+    updateModeButtons();
 
     // Keep a reference for keyboard handlers to focus later
     (this as any)._searchInputEl = input;
