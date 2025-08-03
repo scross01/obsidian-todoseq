@@ -2,6 +2,8 @@
 
 TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian. It scans your vault for task lines that begin with simple state keywords (e.g., TODO, DOING, DONE) and presents them in a dedicated Task View. It preserves your original Markdown formatting and does not require checkbox syntax. Inspired by [Logseq Tasks](https://docs.logseq.com/#/page/tasks).
 
+![screenshot of obsidian showing the page editor and the TODOseq panel in a separate tab showing the list of tasks found in the vault.](screenshot.png)
+
 *Why use task keyworks instead of markdown checkboxes?*
 Personal preference. It can be easiler and quicker to type `TODO`, `DOING` or `DONE` when making notes or journaling than ackwardliy typing `- [ ]` to create a task checkbox.
 
