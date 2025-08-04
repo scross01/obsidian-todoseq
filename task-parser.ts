@@ -16,8 +16,8 @@ export class TaskParser {
 
   static create(settings: TodoTrackerSettings): TaskParser {
     // Build union of non-completed states (defaults + user additional) and completed states (defaults only)
-    const additional: string[] = Array.isArray((settings as any).additionalTaskKeywords)
-      ? ((settings as any).additionalTaskKeywords as string[])
+    const additional: string[] = Array.isArray(settings.additionalTaskKeywords)
+      ? (settings.additionalTaskKeywords as string[])
       : [];
 
     // Ensure values are strings and already capitalised by settings UI; filter out empties defensively

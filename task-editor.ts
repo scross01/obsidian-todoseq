@@ -1,4 +1,4 @@
-import { App, TFile, Vault, MarkdownView, EditorPosition } from 'obsidian';
+import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
 import { Task, DEFAULT_COMPLETED_STATES, NEXT_STATE } from './task';
 
 export class TaskEditor {

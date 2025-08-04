@@ -92,7 +92,7 @@ export default class TodoTracker extends Plugin {
       // Update data source
       view.tasks = this.tasks;
       // Lighter refresh: only update the visible list rather than full onOpen re-init
-      (view as any).refreshVisibleList?.();
+      view.refreshVisibleList();
     }
   }
 
@@ -105,8 +105,8 @@ export default class TodoTracker extends Plugin {
   async loadSettings() {
     this.settings = Object.assign({}, DefaultSettings, await this.loadData());
     // Normalize settings shape after migration: ensure additionalTaskKeywords exists
-    if (!(this.settings as any).additionalTaskKeywords) {
-      (this.settings as any).additionalTaskKeywords = [];
+    if (!this.settings.additionalTaskKeywords) {
+      this.settings.additionalTaskKeywords = [];
     }
     // Recreate parser whenever settings are loaded (keywords may have changed)
     this.recreateParser();

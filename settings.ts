@@ -34,7 +34,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       view.tasks = this.plugin.tasks;
       // Sync each view's mode from settings before render
       const mode = this.plugin.settings.taskViewMode;
-      (view as any).setViewMode?.(mode);
+      view.setViewMode(mode);
       await view.onOpen();
     }
   };
@@ -71,7 +71,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               // Update the input control to reflect forced uppercase
               try {
                 // Obsidian's TextComponent exposes a setValue method via the same reference.
-                (text as any).setValue(forced);
+                text.setValue(forced);
               } catch {
                 // no-op if API surface changes
               }

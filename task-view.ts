@@ -28,7 +28,7 @@ export class TodoView extends ItemView {
     // Final safety fallback
     return 'default';
   }
-  private setViewMode(mode: TaskViewMode) {
+  setViewMode(mode: TaskViewMode) {
     this.contentEl.setAttr('data-view-mode', mode);
   }
 
@@ -75,9 +75,6 @@ export class TodoView extends ItemView {
       this.setSearchQuery(input.value);
       this.refreshVisibleList();
     });
-
-    // Icon-only pill buttons (Default, Sort completed last, Hide completed)
-    const current = this.getViewMode();
 
     const group = toolbar.createEl('div', { cls: 'todo-mode-icons' });
     group.setAttr('role', 'group');
@@ -195,7 +192,7 @@ export class TodoView extends ItemView {
       // Section header (disabled item)
       menu.addItem((item) => {
         item.setTitle(g.group);
-        (item as any).setDisabled?.(true);
+        item.setDisabled(true);
       });
       for (const state of g.states) {
         menu.addItem((item) => {
@@ -226,7 +223,7 @@ export class TodoView extends ItemView {
     for (const g of groups) {
       menu.addItem((item) => {
         item.setTitle(g.group);
-        (item as any).setDisabled?.(true);
+        item.setDisabled(true);
       });
       for (const state of g.states) {
         menu.addItem((item) => {
@@ -462,7 +459,7 @@ export class TodoView extends ItemView {
   }
 
   /** Recalculate visible tasks for current mode + search and update only the list subtree */
-  private refreshVisibleList(): void {
+  refreshVisibleList(): void {
     const container = this.contentEl;
 
     // Ensure list container exists and is the sole place for items
