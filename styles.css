@@ -261,3 +261,35 @@
 .todo-view .todo-empty-btn:active {
   transform: translateY(1px);
 }
+
+/* Icon base for toolbar buttons rendered via CSS masks */
+.todo-view .todo-mode-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 16px 16px;
+  mask-size: 16px 16px;
+}
+
+/* List icon: three horizontal lines (paths: M4 6h16, M4 12h16, M4 18h16) */
+.todo-view .todo-icon-list {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='black' stroke-width='1.75'><path d='M4 6h16'/><path d='M4 12h16'/><path d='M4 18h16'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='black' stroke-width='1.75'><path d='M4 6h16'/><path d='M4 12h16'/><path d='M4 18h16'/></svg>");
+}
+
+/* Sort-end icon: shortened lines + vertical bar + chevron down (paths preserved) */
+.todo-view .todo-icon-sort-end {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='black' stroke-width='1.75'><path d='M4 6h12'/><path d='M4 12h12'/><path d='M4 18h8'/><path d='M18 7v10'/><path d='M15 14l3 3 3-3'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='black' stroke-width='1.75'><path d='M4 6h12'/><path d='M4 12h12'/><path d='M4 18h8'/><path d='M18 7v10'/><path d='M15 14l3 3 3-3'/></svg>");
+}
+
+/* Eye-off icon: eye outline + slash (paths preserved) */
+.todo-view .todo-icon-eye-off {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='black' stroke-width='1.75'><path d='M1 12s4-7 11-7 11 7 11 7-2.5 4.375-7 6'/><path d='M1 1l22 22'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='black' stroke-width='1.75'><path d='M1 12s4-7 11-7 11 7 11 7-2.5 4.375-7 6'/><path d='M1 1l22 22'/></svg>");
+}

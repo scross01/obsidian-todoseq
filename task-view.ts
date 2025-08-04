@@ -86,41 +86,13 @@ export class TodoView extends ItemView {
     type ButtonSpec = {
       mode: TaskViewMode;
       title: string;
-      svg: string;
+      iconCls: string;
     };
 
     const buttons: ButtonSpec[] = [
-      {
-        mode: 'default',
-        title: 'Default view',
-        svg: `
-<svg viewBox="0 0 24 24" aria-hidden="true">
-  <path d="M4 6h16" />
-  <path d="M4 12h16" />
-  <path d="M4 18h16" />
-</svg>`.trim()
-      },
-      {
-        mode: 'sortCompletedLast',
-        title: 'Sort completed to end',
-        svg: `
-<svg viewBox="0 0 24 24" aria-hidden="true">
-  <path d="M4 6h12" />
-  <path d="M4 12h12" />
-  <path d="M4 18h8" />
-  <path d="M18 7v10" />
-  <path d="M15 14l3 3 3-3" />
-</svg>`.trim()
-      },
-      {
-        mode: 'hideCompleted',
-        title: 'Hide completed',
-        svg: `
-<svg viewBox="0 0 24 24" aria-hidden="true">
-  <path d="M1 12s4-7 11-7 11 7 11 7-2.5 4.375-7 6" />
-  <path d="M1 1l22 22" />
-</svg>`.trim()
-      },
+      { mode: 'default',           title: 'Default view',          iconCls: 'todo-icon-list' },
+      { mode: 'sortCompletedLast', title: 'Sort completed to end', iconCls: 'todo-icon-sort-end' },
+      { mode: 'hideCompleted',     title: 'Hide completed',        iconCls: 'todo-icon-eye-off' },
     ];
 
     // Helper to sync aria-pressed on all mode buttons based on current view mode
@@ -151,7 +123,8 @@ export class TodoView extends ItemView {
       btn.setAttr('aria-label', spec.title);
       // aria-pressed will be set by updateModeButtons; initialize to false to avoid flicker
       btn.setAttr('aria-pressed', String(false));
-      btn.innerHTML = spec.svg;
+      const icon = btn.createSpan({ cls: ['todo-mode-icon', spec.iconCls] });
+      icon.setAttr('aria-hidden', 'true');
       btn.addEventListener('click', makeHandler(spec.mode));
     }
 
