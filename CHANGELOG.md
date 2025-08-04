@@ -1,5 +1,10 @@
 # Change Log
 
+## v0.3.1
+
+- Address ObsidianReviewBot review feedback
+- Highlight selected task on page
+
 ## v0.3.0
 
 - Added right click (long press on mobile) context menu on keyword to change task state
