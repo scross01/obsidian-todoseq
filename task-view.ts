@@ -421,7 +421,7 @@ export class TodoView extends ItemView {
     li.setAttribute('data-line', String(task.line));
 
     const checkbox = this.buildCheckbox(task, li);
-    const taskText = this.buildText(task, li);
+    this.buildText(task, li);
 
     // File info
     const fileInfo = li.createEl('div', { cls: 'todo-file-info' });
@@ -588,7 +588,7 @@ export class TodoView extends ItemView {
     out = out.replace(/<[^>]+>/g, '');
 
     // Images: ![alt](url) -> alt
-    out = out.replace(/!\[([^\]]*)\]\([^\)]*\)/g, '$1');
+    out = out.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
 
     // Inline code: `code` -> code
     out = out.replace(/`([^`]+)`/g, '$1');
@@ -620,7 +620,7 @@ export class TodoView extends ItemView {
     const textToProcess = this.stripMarkdown(text) || '';
     const patterns: { type: 'wiki' | 'md' | 'url'; regex: RegExp; }[] = [
       // [[Page]] or [[Page|Alias]]
-      { type: 'wiki', regex: /\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]/g },
+      { type: 'wiki', regex: /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g },
       // [Alias](target)
       { type: 'md', regex: /\[([^\]]+)\]\(([^)]+)\)/g },
       // bare URLs
