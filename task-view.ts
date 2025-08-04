@@ -133,7 +133,7 @@ export class TodoView extends ItemView {
   }
 
   // Cycle state via NEXT_STATE using TaskEditor
-  private async updateTaskState(task: Task, nextState): Promise<void> {
+  private async updateTaskState(task: Task, nextState: string): Promise<void> {
     // Construct editor bound to this vault so methods don't need App
     const updated = await this.editor.updateTaskState(task, nextState);
     // Sync in-memory task from returned snapshot
@@ -678,52 +678,103 @@ export class TodoView extends ItemView {
 
   // Open the source file in the vault where the task is declared, honoring Obsidian default-like modifiers.
   // Behavior:
-  // - Default click (no modifiers): open in new tab.
+  // - Default click (no modifiers): navigate to existing tab or open in new tab.
   // - Cmd (mac) / Ctrl (win/linux) click, or Middle-click: open in new tab.
   // - Shift-click: open in split.
   // - Alt-click: pin the target leaf after opening.
+  // Additionally: Never open pages in the TODOseq tab (ensure this on mobile too).
   async openTaskLocation(evt: MouseEvent, task: Task) {
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (!(file instanceof TFile)) return;
 
     const { workspace } = this.app;
-
     const isMac = Platform.isMacOS;
     const isMiddle = (evt.button === 1);
     const metaOrCtrl = isMac ? evt.metaKey : evt.ctrlKey;
 
-    // Determine open mode. Default is 'tab' (per user request).
-    let openMode: 'split' | 'tab' = 'tab';
-    if (evt.shiftKey) {
-      openMode = 'split';
-    } else if (isMiddle || metaOrCtrl) {
-      openMode = 'tab';
-    }
+    // Helpers
+    const isMarkdownLeaf = (leaf: WorkspaceLeaf | null | undefined): boolean => {
+      if (!leaf) return false;
+      const v: any = leaf.view;
+      if (v instanceof MarkdownView) return true;
+      return v?.getViewType?.() === 'markdown';
+    };
+    const isTodoSeqLeaf = (leaf: WorkspaceLeaf | null | undefined): boolean => {
+      if (!leaf) return false;
+      const v: any = leaf.view;
+      return v?.getViewType?.() === (TodoView as any).viewType;
+    };
+    const findExistingLeafForFile = (): WorkspaceLeaf | null => {
+      const leaves = workspace.getLeavesOfType('markdown');
+      for (const leaf of leaves) {
+        if (isTodoSeqLeaf(leaf)) continue;
+        const v: any = leaf.view;
+        const openFile = v?.file;
+        if (openFile && openFile.path === file.path) {
+          return leaf;
+        }
+      }
+      return null;
+    };
+    // Each page should own its tab. Only "reuse" when it's the same file.
+    const findReusableMarkdownLeaf = (): WorkspaceLeaf | null => {
+      // Only return a leaf if it's already showing this exact file.
+      return findExistingLeafForFile();
+    };
 
-    let leaf: WorkspaceLeaf;
-    if (openMode === 'split') {
-      leaf = workspace.getLeaf('split');
+    const forceNewTab = isMiddle || metaOrCtrl;
+    const doSplit = evt.shiftKey;
+
+    let targetLeaf: WorkspaceLeaf | null = null;
+
+    if (doSplit) {
+      // New behavior: if the file is already open, focus that existing tab instead of creating a split.
+      const existing = findExistingLeafForFile();
+      if (existing) {
+        targetLeaf = existing;
+      } else {
+        targetLeaf = workspace.getLeaf('split');
+        // Guard: ensure not TODOseq and is a markdown-capable leaf
+        if (isTodoSeqLeaf(targetLeaf) || !isMarkdownLeaf(targetLeaf)) {
+          targetLeaf = findReusableMarkdownLeaf() ?? workspace.getLeaf('tab');
+        }
+      }
+    } else if (forceNewTab) {
+      targetLeaf = workspace.getLeaf('tab');
+      if (isTodoSeqLeaf(targetLeaf) || !isMarkdownLeaf(targetLeaf)) {
+        targetLeaf = findReusableMarkdownLeaf() ?? workspace.getLeaf('tab');
+      }
     } else {
-      leaf = workspace.getLeaf('tab');
+      targetLeaf = findExistingLeafForFile();
+      if (!targetLeaf) {
+        targetLeaf = findReusableMarkdownLeaf();
+      }
+      if (!targetLeaf) {
+        targetLeaf = workspace.getLeaf('tab');
+      }
+      if (isTodoSeqLeaf(targetLeaf)) {
+        targetLeaf = findReusableMarkdownLeaf() ?? workspace.getLeaf('tab');
+      }
     }
 
-    await leaf.openFile(file);
+    await targetLeaf.openFile(file);
 
-    // Pin if Alt pressed
     if (evt.altKey) {
-      try { (leaf as any).setPinned?.(true); } catch (_) { }
+      try { (targetLeaf as any).setPinned?.(true); } catch (_) { /* ignore */ }
+      try { (targetLeaf as any).pinned = true; } catch (_) { /* ignore */ }
     }
 
-    // Position cursor and scroll to line
-    const markdownView = leaf.view instanceof MarkdownView ? leaf.view : null;
+    const v: any = targetLeaf.view;
+    const markdownView: MarkdownView | null = v instanceof MarkdownView ? v : null;
     if (markdownView) {
       const editor = markdownView.editor;
       const pos = { line: task.line, ch: 0 };
       editor.setCursor(pos);
+      try { (markdownView as any).setEphemeralState?.({ line: task.line, col: 0 }); } catch (_) {}
       editor.scrollIntoView({ from: pos, to: pos });
     }
 
-    await workspace.revealLeaf(leaf);
+    await workspace.revealLeaf(targetLeaf);
   }
 
  // Cleanup listeners
