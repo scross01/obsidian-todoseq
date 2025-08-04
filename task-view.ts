@@ -627,10 +627,11 @@ export class TodoView extends ItemView {
     // Headings
     out = out.replace(/^\s{0,3}#{1,6}\s+/gm, '');
 
-    // Emphasis/strong/strike
+    // Emphasis/strong/strike/highlight
     out = out.replace(/(\*\*|__)(.*?)\1/g, '$2');
     out = out.replace(/(\*|_)(.*?)\1/g, '$2');
     out = out.replace(/~~(.*?)~~/g, '$1');
+    out = out.replace(/==(.*?)==/g, '$1');
 
     // Normalize whitespace
     out = out.replace(/\r/g, '');
