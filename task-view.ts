@@ -1,5 +1,5 @@
 import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView } from 'obsidian';
-import TodoTracker, { TASK_VIEW_ICON } from './main';
+import { TASK_VIEW_ICON } from './main';
 import { TaskEditor } from './task-editor';
 import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from './task';
 
@@ -9,6 +9,8 @@ export class TodoView extends ItemView {
   tasks: Task[];
   editor: TaskEditor;
   private defaultViewMode: TaskViewMode;
+  private searchInputEl: HTMLInputElement | null = null;
+  private _searchKeyHandler: ((e: KeyboardEvent) => void) | undefined;
 
   constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode) {
     super(leaf);
@@ -19,8 +21,10 @@ export class TodoView extends ItemView {
 
   /** View-mode accessors persisted on the root element to avoid cross-class coupling */
   private getViewMode(): TaskViewMode {
-    const attr = this.contentEl.getAttr('data-view-mode') as TaskViewMode | null;
-    if (attr === 'default' || attr === 'sortCompletedLast' || attr === 'hideCompleted') return attr;
+    const attr = this.contentEl.getAttr('data-view-mode');
+    if (typeof attr === 'string') {
+      if (attr === 'default' || attr === 'sortCompletedLast' || attr === 'hideCompleted') return attr;
+    }
     // Fallback to current plugin setting from constructor if attribute not set
     if (this.defaultViewMode === 'default' || this.defaultViewMode === 'sortCompletedLast' || this.defaultViewMode === 'hideCompleted') {
       return this.defaultViewMode;
@@ -68,11 +72,15 @@ export class TodoView extends ItemView {
     label.setText('Search');
     label.addClass('sr-only');
 
-    const input = searchWrap.createEl('input', { cls: 'todo-search-input', attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } }) as HTMLInputElement;
-    input.value = this.getSearchQuery();
-    input.addEventListener('input', () => {
+    const inputEl = searchWrap.createEl('input', { cls: 'todo-search-input', attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } });
+    // Narrow to HTMLInputElement via runtime guard
+    if (!(inputEl instanceof HTMLInputElement)) {
+      throw new Error('Failed to create search input element');
+    }
+    inputEl.value = this.getSearchQuery();
+    inputEl.addEventListener('input', () => {
       // Update attribute and re-render list only, preserving focus
-      this.setSearchQuery(input.value);
+      this.setSearchQuery(inputEl.value);
       this.refreshVisibleList();
     });
 
@@ -97,8 +105,9 @@ export class TodoView extends ItemView {
       const activeMode = this.getViewMode();
       const buttons = group.querySelectorAll<HTMLButtonElement>('button.todo-mode-icon-btn');
       buttons.forEach((b) => {
-        const m = b.getAttr('data-mode') as TaskViewMode | null;
-        b.setAttr('aria-pressed', String(m === activeMode));
+        const m = b.getAttr('data-mode');
+        const isValid = m === 'default' || m === 'sortCompletedLast' || m === 'hideCompleted';
+        b.setAttr('aria-pressed', String(isValid && m === activeMode));
       });
     };
 
@@ -129,7 +138,7 @@ export class TodoView extends ItemView {
     updateModeButtons();
 
     // Keep a reference for keyboard handlers to focus later
-    (this as any)._searchInputEl = input;
+    this.searchInputEl = inputEl;
   }
 
   // Cycle state via NEXT_STATE using TaskEditor
@@ -138,8 +147,10 @@ export class TodoView extends ItemView {
     const updated = await this.editor.updateTaskState(task, nextState);
     // Sync in-memory task from returned snapshot
     task.rawText = updated.rawText;
-    task.state = updated.state as Task['state'];
-    task.completed = updated.completed;
+    if (typeof (updated as { state?: unknown }).state === 'string') {
+      task.state = (updated as { state: string }).state as Task['state'];
+    }
+    task.completed = !!(updated as { completed?: unknown }).completed;
   }
 
   getViewType() {
@@ -154,9 +165,23 @@ export class TodoView extends ItemView {
     ];
     const completedDefaults = Array.from(DEFAULT_COMPLETED_STATES);
 
-    const plugin = (this.app as any).plugins?.plugins?.['todoseq'] as TodoTracker | undefined;
-    const configured = (plugin?.settings as any)?.additionalTaskKeywords as string[] | undefined;
-    const additional = Array.isArray(configured) ? configured.filter(Boolean) : [];
+    type AppWithPlugins = {
+      plugins?: {
+        plugins?: Record<string, unknown>;
+      };
+    };
+    type HasSettingsWithKeywords = {
+      settings?: {
+        additionalTaskKeywords?: unknown;
+      };
+    };
+    const appWithPlugins = this.app as unknown as AppWithPlugins;
+    // Avoid importing TodoTracker type just to read settings; keep structural typing
+    const maybePlugin = appWithPlugins.plugins?.plugins?.['todoseq'] as unknown as HasSettingsWithKeywords | undefined;
+    const configured = maybePlugin?.settings?.additionalTaskKeywords;
+    const additional = Array.isArray(configured)
+      ? configured.filter((v): v is string => typeof v === 'string' && v.length > 0)
+      : [];
 
     return {
       pendingActive: pendingActiveDefaults,
@@ -208,8 +233,9 @@ export class TodoView extends ItemView {
     }
 
     // Prefer API helper when available; fallback to explicit coordinates
-    if ((menu as any).showAtMouseEvent) {
-      (menu as any).showAtMouseEvent(evt);
+    const maybeShowAtMouseEvent = (menu as unknown as { showAtMouseEvent?: (e: MouseEvent) => void }).showAtMouseEvent;
+    if (typeof maybeShowAtMouseEvent === 'function') {
+      maybeShowAtMouseEvent.call(menu, evt);
     } else {
       menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
     }
@@ -432,7 +458,12 @@ export class TodoView extends ItemView {
 
     // Click to open source (avoid checkbox and keyword)
     li.addEventListener('click', (evt) => {
-      if (evt.target !== checkbox && !(evt.target as HTMLElement).hasClass('todo-keyword')) {
+      const target = evt.target;
+      if (
+        target !== checkbox &&
+        target instanceof HTMLElement &&
+        !target.hasClass('todo-keyword')
+      ) {
         this.openTaskLocation(evt, task);
       }
     });
@@ -546,14 +577,14 @@ export class TodoView extends ItemView {
     this.refreshVisibleList();
 
     // Keyboard shortcuts: Slash to focus search, Esc to clear
-    const input: HTMLInputElement | null = (this as any)._searchInputEl ?? null;
+    const input: HTMLInputElement | null = this.searchInputEl ?? null;
     const keyHandler = (evt: KeyboardEvent) => {
       const active = document.activeElement as HTMLElement | null;
       const isTyping =
-        active &&
+        !!active &&
         (active.tagName === 'INPUT' ||
           active.tagName === 'TEXTAREA' ||
-          (active as any).isContentEditable);
+          (active as unknown as { isContentEditable?: boolean }).isContentEditable === true);
 
       if (evt.key === '/' && !evt.metaKey && !evt.ctrlKey && !evt.altKey) {
         if (!isTyping && input) {
@@ -575,7 +606,7 @@ export class TodoView extends ItemView {
     };
 
     // Save references for cleanup
-    (this as any)._searchKeyHandler = keyHandler;
+    this._searchKeyHandler = keyHandler;
     window.addEventListener('keydown', keyHandler);
   }
 
@@ -779,13 +810,13 @@ export class TodoView extends ItemView {
 
  // Cleanup listeners
  async onClose() {
-   const handler = (this as any)._searchKeyHandler as ((e: KeyboardEvent) => void) | undefined;
+   const handler = this._searchKeyHandler as ((e: KeyboardEvent) => void) | undefined;
    if (handler) {
      window.removeEventListener('keydown', handler);
-     (this as any)._searchKeyHandler = undefined;
+     this._searchKeyHandler = undefined;
    }
-   (this as any)._searchInputEl = undefined;
-   await super.onClose?.();
+   this.searchInputEl = null;
+   await (super.onClose?.());
  }
 }
 /** Controls how tasks are displayed in the TodoView */
