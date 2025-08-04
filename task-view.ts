@@ -726,21 +726,21 @@ export class TodoView extends ItemView {
     // Helpers
     const isMarkdownLeaf = (leaf: WorkspaceLeaf | null | undefined): boolean => {
       if (!leaf) return false;
-      const v: any = leaf.view;
+      const v = leaf.view as MarkdownView | ItemView | null;
       if (v instanceof MarkdownView) return true;
       return v?.getViewType?.() === 'markdown';
     };
     const isTodoSeqLeaf = (leaf: WorkspaceLeaf | null | undefined): boolean => {
       if (!leaf) return false;
-      const v: any = leaf.view;
-      return v?.getViewType?.() === (TodoView as any).viewType;
+      const v: MarkdownView | ItemView | null = leaf.view as MarkdownView | ItemView | null;
+      return v?.getViewType?.() === (TodoView as typeof TodoView).viewType;
     };
     const findExistingLeafForFile = (): WorkspaceLeaf | null => {
       const leaves = workspace.getLeavesOfType('markdown');
       for (const leaf of leaves) {
         if (isTodoSeqLeaf(leaf)) continue;
-        const v: any = leaf.view;
-        const openFile = v?.file;
+        const v: MarkdownView | ItemView | null = leaf.view as MarkdownView | ItemView | null;
+        const openFile = (v as MarkdownView)?.file;
         if (openFile && openFile.path === file.path) {
           return leaf;
         }
@@ -791,17 +791,17 @@ export class TodoView extends ItemView {
     await targetLeaf.openFile(file);
 
     if (evt.altKey) {
-      try { (targetLeaf as any).setPinned?.(true); } catch (_) { /* ignore */ }
-      try { (targetLeaf as any).pinned = true; } catch (_) { /* ignore */ }
+      try { (targetLeaf as WorkspaceLeaf & { setPinned?: (pinned: boolean) => void }).setPinned?.(true); } catch (_) { /* ignore */ }
+      try { ((targetLeaf as WorkspaceLeaf) as { pinned?: boolean }).pinned = true; } catch (_) { /* ignore */ }
     }
 
-    const v: any = targetLeaf.view;
+    const v: MarkdownView | ItemView | null = targetLeaf.view as MarkdownView | ItemView | null;
     const markdownView: MarkdownView | null = v instanceof MarkdownView ? v : null;
     if (markdownView) {
       const editor = markdownView.editor;
       const pos = { line: task.line, ch: 0 };
       editor.setCursor(pos);
-      try { (markdownView as any).setEphemeralState?.({ line: task.line, col: 0 }); } catch (_) {}
+      try { (markdownView as unknown as { setEphemeralState?: (state: { line: number; col: number }) => void }).setEphemeralState?.({ line: task.line, col: 0 }); } catch (_) {}
       editor.scrollIntoView({ from: pos, to: pos });
     }
 
