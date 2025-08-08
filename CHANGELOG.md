@@ -1,5 +1,9 @@
 # Change Log
 
+## v0.3.2
+
+- Removes markdown symbols for highlight and math blocks in task display
+
 ## v0.3.1
 
 - Address ObsidianReviewBot review feedback
