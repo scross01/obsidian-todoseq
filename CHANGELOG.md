@@ -3,6 +3,7 @@
 ## v0.3.2
 
 - Removes markdown symbols for highlight and math blocks in task display
+- Fixed Dependabot alert #1 Obsidian before 0.12.12 does not require user confirmation for non-http/https URLs.
 
 ## v0.3.1
 
