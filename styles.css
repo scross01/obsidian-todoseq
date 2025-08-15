@@ -194,6 +194,24 @@
   box-shadow: inset 0 0 0 1px var(--background-modifier-border);
 }
 
+/* Tag styling (#tag) */
+.todo-view .todo-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 2px;
+  border-radius: var(--tag-radius);
+  color: var(--tag-color);
+  background-color: var(--tag-background);
+  border: var(--tag-border-width) solid var(--tag-border-color);
+  font-size: var(--tag-size);
+  font-weight: var(--tag-weight);
+  vertical-align: baseline;
+  border-inline-start: none;
+  border-inline-end: none;
+  padding-top: var(--tag-padding-y);
+  padding-bottom: var(--tag-padding-y);
+}
+
 /* File info (path:line) */
 .todo-view .todo-file-info {
   color: var(--text-muted);

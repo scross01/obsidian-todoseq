@@ -649,26 +649,29 @@ export class TodoView extends ItemView {
     return out;
   }
 
-  // Render Obsidian-style links as non-clickable, link-like spans inside task text.
+  // Render Obsidian-style links and tags as non-clickable, styled spans inside task text.
   // Supports:
   //  - Wiki links: [[Note]] and [[Note|Alias]]
   //  - Markdown links: [Alias](url-or-path)
   //  - Bare URLs: http(s)://...
+  //  - Tags: #tag
   private renderTaskTextWithLinks(text: string, parent: HTMLElement) {
     // For display only, strip any markdown formatting first
     const textToProcess = this.stripMarkdown(text) || '';
-    const patterns: { type: 'wiki' | 'md' | 'url'; regex: RegExp; }[] = [
+    const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp; }[] = [
       // [[Page]] or [[Page|Alias]]
       { type: 'wiki', regex: /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g },
       // [Alias](target)
       { type: 'md', regex: /\[([^\]]+)\]\(([^)]+)\)/g },
       // bare URLs
       { type: 'url', regex: /\bhttps?:\/\/[^\s)]+/g },
+      // #tags (must come after URLs to avoid conflicts with URLs containing #)
+      { type: 'tag', regex: /#([^\s\]\)\[\}\{>]+)/g },
     ];
 
     let i = 0;
     while (i < textToProcess.length) {
-      let nextMatch: { type: 'wiki' | 'md' | 'url'; match: RegExpExecArray; } | null = null;
+      let nextMatch: { type: 'wiki' | 'md' | 'url' | 'tag'; match: RegExpExecArray; } | null = null;
 
       for (const p of patterns) {
         p.regex.lastIndex = i;
@@ -691,23 +694,32 @@ export class TodoView extends ItemView {
         parent.appendText(textToProcess.slice(i, nextMatch.match.index));
       }
 
-      // Create a non-interactive, link-like span
-      const span = parent.createEl('span', { cls: 'todo-link-like' });
-
-      if (nextMatch.type === 'wiki') {
-        const target = nextMatch.match[1];
-        const alias = nextMatch.match[2];
-        span.setText(alias ?? target);
-        span.setAttribute('title', target);
-      } else if (nextMatch.type === 'md') {
-        const label = nextMatch.match[1];
-        const url = nextMatch.match[2];
-        span.setText(label);
-        span.setAttribute('title', url);
+      // Create appropriate styled element based on type
+      if (nextMatch.type === 'tag') {
+        // Create a tag-like span
+        const span = parent.createEl('span', { cls: 'todo-tag' });
+        const tagName = nextMatch.match[0]; // Full #tag text including #
+        span.setText(tagName);
+        span.setAttribute('title', tagName);
       } else {
-        const url = nextMatch.match[0];
-        span.setText(url);
-        span.setAttribute('title', url);
+        // Create a non-interactive, link-like span for other types
+        const span = parent.createEl('span', { cls: 'todo-link-like' });
+
+        if (nextMatch.type === 'wiki') {
+          const target = nextMatch.match[1];
+          const alias = nextMatch.match[2];
+          span.setText(alias ?? target);
+          span.setAttribute('title', target);
+        } else if (nextMatch.type === 'md') {
+          const label = nextMatch.match[1];
+          const url = nextMatch.match[2];
+          span.setText(label);
+          span.setAttribute('title', url);
+        } else {
+          const url = nextMatch.match[0];
+          span.setText(url);
+          span.setAttribute('title', url);
+        }
       }
 
       // Advance past the match
