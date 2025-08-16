@@ -66,8 +66,11 @@ export class TodoView extends ItemView {
   private buildToolbar(container: HTMLElement) {
     const toolbar = container.createEl('div', { cls: 'todo-toolbar' });
 
+    // First row: search input with mode icons on the right
+    const firstRow = toolbar.createEl('div', { cls: 'todo-toolbar-first-row' });
+    
     // Right-aligned search input with icon
-    const searchWrap = toolbar.createEl('div', { cls: 'todo-toolbar-right' });
+    const searchWrap = firstRow.createEl('div', { cls: 'todo-toolbar-right' });
     const searchId = `todoseq-search-${Math.random().toString(36).slice(2, 8)}`;
     const label = searchWrap.createEl('label', { attr: { for: searchId } });
     label.setText('Search');
@@ -101,7 +104,8 @@ export class TodoView extends ItemView {
       this.refreshVisibleList();
     });
 
-    const group = toolbar.createEl('div', { cls: 'todo-mode-icons' });
+    // Add mode icons to the right side of the first row
+    const group = firstRow.createEl('div', { cls: 'todo-mode-icons' });
     group.setAttr('role', 'group');
     group.setAttr('aria-label', 'Task view mode');
 
@@ -121,7 +125,7 @@ export class TodoView extends ItemView {
     const updateModeButtons = () => {
       const activeMode = this.getViewMode();
       const buttons = group.querySelectorAll<HTMLButtonElement>('div.todo-mode-icon-btn');
-      buttons.forEach((b) => {
+      buttons.forEach((b: HTMLButtonElement) => {
         const m = b.getAttr('data-mode');
         const isValid = m === 'default' || m === 'sortCompletedLast' || m === 'hideCompleted';
         const isActive = isValid && m === activeMode
@@ -158,6 +162,11 @@ export class TodoView extends ItemView {
 
     // After creating buttons, ensure correct one is marked pressed for initial state
     updateModeButtons();
+
+    // Add search results info bar (second row)
+    const searchResultsInfo = toolbar.createEl('div', { cls: 'search-results-info search-results-result-count' });
+    const searchResultsCount = searchResultsInfo.createEl('span');
+    searchResultsCount.setText('0 of 0 tasks');
 
     // Keep a reference for keyboard handlers to focus later
     this.searchInputEl = inputEl;
@@ -541,6 +550,12 @@ export class TodoView extends ItemView {
           (baseName && searchText(baseName).includes(searchQuery))
         );
       });
+    }
+
+    // Update search results info
+    const searchResultsCount = container.querySelector('.search-results-result-count');
+    if (searchResultsCount) {
+      searchResultsCount.setText(`${visible.length} of ${allTasks.length} task` + (allTasks.length === 1 ? '' : 's'));
     }
 
     // Empty-state guidance UI

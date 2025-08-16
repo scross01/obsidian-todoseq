@@ -6,9 +6,16 @@
 /* Toolbar and mode icons */
 .todo-view .todo-toolbar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   padding: 6px 0;
+}
+
+/* First row of toolbar - contains search input and mode icons */
+.todo-view .todo-toolbar-first-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 /* Flexible container for search input: grows to fill available space */
