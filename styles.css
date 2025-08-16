@@ -34,17 +34,44 @@
   border: 0 !important;
 }
 
+/* Search input wrapper with icon */
+.todo-view .todo-search-input-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 160px;
+  max-width: 100%;
+}
+
+/* Search icon */
+.todo-view .todo-search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  background-color: var(--text-muted);
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'></circle><line x1='21' y1='21' x2='16.65' y2='16.65'></line></svg>");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 16px 16px;
+}
+
 /* Search input expands to fill remaining toolbar space while keeping sensible min width */
 .todo-view .todo-search-input {
   flex: 1 1 auto;
+  height: var(--input-height);
   width: auto;
   min-width: 160px;
   max-width: 100%;
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary, var(--background-secondary));
+  padding: 4px 8px 4px 32px;
+  border-radius: 4px;
+  border: var(--input-border-width) solid var(--background-modifier-border);
+  background: var(--background-modifier-form-field);
   color: var(--text-normal);
+  font-size: var(--font-ui-small);
 }
 
 .todo-view .todo-search-input::placeholder {
@@ -107,13 +134,13 @@
   font-family: var(--font-text);
   font-size: var(--font-text-size);
   margin: 0;
-  padding-left: var(--size-4-4, 24px);
+  padding-left: var(--size-2-2);
   list-style-type: none;
 }
 
 /* List item */
 .todo-view .todo-item {
-  padding: var(--size-2-2, 6px) 0;
+  padding: var(--size-2-2) 0;
   border-bottom: 1px solid var(--background-modifier-border, rgba(0,0,0,0.1));
 }
 
@@ -150,7 +177,7 @@
 
 /* Checkbox alignment */
 .todo-view .todo-checkbox {
-  margin-right: var(--size-2-2, 6px);
+  margin-right: var(--size-2-2);
   vertical-align: middle;
 }
 
@@ -164,12 +191,12 @@
 /* Priority badge */
 .todo-view .priority-badge {
   display: inline-block;
-  margin-left: var(--size-2-2, 6px);
-  padding: 0 var(--size-2-2, 6px);
-  border-radius: var(--radius-s, 6px);
+  margin-left: var(--size-2-2);
+  padding: 0 var(--size-2-2);
+  border-radius: var(--radius-s);
   background-color: var(--background-modifier-accent, var(--interactive-accent));
   color: var(--text-on-accent, #fff);
-  font-weight: var(--font-weight-medium, var(--font-medium, 600));
+  font-weight: var(--font-weight-medium, var(--font-medium));
   font-size: 0.7em;
   line-height: 1.6;
 }
@@ -216,7 +243,7 @@
 .todo-view .todo-file-info {
   color: var(--text-muted);
   font-size: 0.75em;
-  margin-top: var(--size-2-2, 6px);
+  margin-top: var(--size-2-2);
 }
 
 /* Empty-state Guidance UI */

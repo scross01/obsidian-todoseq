@@ -65,14 +65,15 @@ export class TodoView extends ItemView {
   private buildToolbar(container: HTMLElement) {
     const toolbar = container.createEl('div', { cls: 'todo-toolbar' });
 
-    // Right-aligned search input
+    // Right-aligned search input with icon
     const searchWrap = toolbar.createEl('div', { cls: 'todo-toolbar-right' });
     const searchId = `todoseq-search-${Math.random().toString(36).slice(2, 8)}`;
     const label = searchWrap.createEl('label', { attr: { for: searchId } });
     label.setText('Search');
     label.addClass('sr-only');
-
-    const inputEl = searchWrap.createEl('input', { cls: 'todo-search-input', attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } });
+    const searchInputWrap = searchWrap.createEl('div', { cls: 'todo-search-input-wrapper' });
+    const searchIcon = searchInputWrap.createEl('span', { cls: 'todo-search-icon' });
+    const inputEl = searchInputWrap.createEl('input', { cls: 'todo-search-input', attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } });
     // Narrow to HTMLInputElement via runtime guard
     if (!(inputEl instanceof HTMLInputElement)) {
       throw new Error('Failed to create search input element');
