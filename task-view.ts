@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView, setIcon } from 'obsidian';
 import { TASK_VIEW_ICON } from './main';
 import { TaskEditor } from './task-editor';
 import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from './task';
@@ -71,9 +71,11 @@ export class TodoView extends ItemView {
     const label = searchWrap.createEl('label', { attr: { for: searchId } });
     label.setText('Search');
     label.addClass('sr-only');
-    const searchInputWrap = searchWrap.createEl('div', { cls: 'todo-search-input-wrapper' });
-    const searchIcon = searchInputWrap.createEl('span', { cls: 'todo-search-icon' });
-    const inputEl = searchInputWrap.createEl('input', { cls: 'todo-search-input', attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } });
+    const searchInputWrap = searchWrap.createEl('div', { cls: 'search-input-container global-search-input-container' });
+    const inputEl = searchInputWrap.createEl('input', { attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } });
+    const clearSearch = searchInputWrap.createEl('div', { cls: 'search-input-clear-button', attr: { 'aria-label': 'Clear search' } });
+    const matchCase = searchInputWrap.createEl('div', { cls: 'input-right-decorator clickable-icon', attr: { 'aria-label': 'Match case' } });
+    setIcon(matchCase, 'uppercase-lowercase-a');
     // Narrow to HTMLInputElement via runtime guard
     if (!(inputEl instanceof HTMLInputElement)) {
       throw new Error('Failed to create search input element');
@@ -92,23 +94,30 @@ export class TodoView extends ItemView {
     type ButtonSpec = {
       mode: TaskViewMode;
       title: string;
-      iconCls: string;
+      icon: string;
     };
 
     const buttons: ButtonSpec[] = [
-      { mode: 'default',           title: 'Default view',          iconCls: 'todo-icon-list' },
-      { mode: 'sortCompletedLast', title: 'Sort completed to end', iconCls: 'todo-icon-sort-end' },
-      { mode: 'hideCompleted',     title: 'Hide completed',        iconCls: 'todo-icon-eye-off' },
+      { mode: 'default',           title: 'Default view',          icon: 'lucide-list' },
+      { mode: 'sortCompletedLast', title: 'Sort completed to end', icon: 'lucide-sort-desc' },
+      { mode: 'hideCompleted',     title: 'Hide completed',        icon: 'lucide-eye-off' },
     ];
 
     // Helper to sync aria-pressed on all mode buttons based on current view mode
     const updateModeButtons = () => {
       const activeMode = this.getViewMode();
-      const buttons = group.querySelectorAll<HTMLButtonElement>('button.todo-mode-icon-btn');
+      const buttons = group.querySelectorAll<HTMLButtonElement>('div.todo-mode-icon-btn');
       buttons.forEach((b) => {
         const m = b.getAttr('data-mode');
         const isValid = m === 'default' || m === 'sortCompletedLast' || m === 'hideCompleted';
-        b.setAttr('aria-pressed', String(isValid && m === activeMode));
+        const isActive = isValid && m === activeMode
+        b.setAttr('aria-pressed', String(isActive));
+        // Add or remove is-active class
+        if (isActive) {
+          b.addClass('is-active');
+        } else {
+          b.removeClass('is-active');
+        }
       });
     };
 
@@ -123,15 +132,13 @@ export class TodoView extends ItemView {
     };
 
     for (const spec of buttons) {
-      const btn = group.createEl('button', { cls: 'todo-mode-icon-btn' });
-      btn.setAttr('type', 'button');
+      const btn = group.createEl('div', { cls: 'clickable-icon todo-mode-icon-btn' });
       btn.setAttr('data-mode', spec.mode);
       btn.setAttr('title', spec.title);
       btn.setAttr('aria-label', spec.title);
       // aria-pressed will be set by updateModeButtons; initialize to false to avoid flicker
       btn.setAttr('aria-pressed', String(false));
-      const icon = btn.createSpan({ cls: ['todo-mode-icon', spec.iconCls] });
-      icon.setAttr('aria-hidden', 'true');
+      setIcon(btn, spec.icon);
       btn.addEventListener('click', makeHandler(spec.mode));
     }
 
