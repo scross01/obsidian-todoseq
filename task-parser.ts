@@ -231,7 +231,6 @@ export class TaskParser {
           if (date) {
             task.scheduledDate = date;
             scheduledFound = true;
-            console.log(`Parsed scheduled date for task at ${path}:${index}: ${date.toLocaleString()} (local time)`);
           } else {
             console.warn(`Invalid scheduled date format at ${path}:${i + 1}: "${nextLine.trim()}"`);
           }
@@ -240,7 +239,6 @@ export class TaskParser {
           if (date) {
             task.deadlineDate = date;
             deadlineFound = true;
-            console.log(`Parsed deadline date for task at ${path}:${index}: ${date.toLocaleString()} (local time)`);
           } else {
             console.warn(`Invalid deadline date format at ${path}:${i + 1}: "${nextLine.trim()}"`);
           }

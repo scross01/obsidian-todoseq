@@ -234,3 +234,76 @@
   /* mask-position: center; */
   /* mask-size: var(--icon-size) var(--icon-size); */
 }
+
+/* Date display styling */
+.todo-view .todo-date-container {
+  margin-top: var(--size-2-2);
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.todo-view .todo-date {
+  padding: 2px 6px;
+  margin: 2px 0;
+  border-radius: var(--radius-s);
+  border-left: 3px solid;
+  background-color: color-mix(in srgb, var(--background-modifier-hover) 90%, transparent);
+}
+
+.todo-view .todo-date .date-label {
+  font-weight: var(--font-weight-medium, var(--font-medium));
+  opacity: 0.8;
+}
+
+.todo-view .todo-date .date-value {
+  font-weight: var(--font-weight-normal);
+  margin-left: 4px;
+}
+
+/* Scheduled date styling */
+.todo-view .todo-scheduled {
+  border-left-color: var(--color-blue, #0066cc);
+}
+
+.todo-view .todo-scheduled .date-value {
+  color: var(--color-blue, #0066cc);
+}
+
+/* Deadline date styling */
+.todo-view .todo-deadline {
+  border-left-color: var(--color-orange, #ff8800);
+}
+
+.todo-view .todo-deadline .date-value {
+  color: var(--color-orange, #ff8800);
+}
+
+/* Deadline status indicators */
+.todo-view .todo-deadline-overdue {
+  background-color: color-mix(in srgb, var(--color-red, #d12020) 10%, transparent);
+  border-left-color: var(--color-red, #d12020);
+}
+
+.todo-view .todo-deadline-overdue .date-value {
+  color: var(--color-red, #d12020);
+  font-weight: var(--font-weight-semibold);
+}
+
+.todo-view .todo-deadline-today {
+  background-color: color-mix(in srgb, var(--color-orange, #ff8800) 15%, transparent);
+  border-left-color: var(--color-orange, #ff8800);
+}
+
+.todo-view .todo-deadline-today .date-value {
+  color: var(--color-orange, #ff8800);
+  font-weight: var(--font-weight-semibold);
+}
+
+.todo-view .todo-deadline-soon {
+  background-color: color-mix(in srgb, var(--color-yellow, #ffaa00) 10%, transparent);
+  border-left-color: var(--color-yellow, #ffaa00);
+}
+
+.todo-view .todo-deadline-soon .date-value {
+  color: var(--color-yellow, #ffaa00);
+}

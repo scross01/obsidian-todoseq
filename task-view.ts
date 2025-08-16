@@ -1,14 +1,18 @@
-import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView, setIcon, moment } from 'obsidian';
 import { TASK_VIEW_ICON } from './main';
 import { TaskEditor } from './task-editor';
 import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from './task';
 
+
+export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';
+export type SortMethod = 'default' | 'sortByScheduled' | 'sortByDeadline';
 
 export class TodoView extends ItemView {
   static viewType = "todoseq-view";
   tasks: Task[];
   editor: TaskEditor;
   private defaultViewMode: TaskViewMode;
+  private defaultSortMethod: SortMethod;
   private searchInputEl: HTMLInputElement | null = null;
   private _searchKeyHandler: ((e: KeyboardEvent) => void) | undefined;
   private isCaseSensitive: boolean = false;
@@ -37,20 +41,87 @@ export class TodoView extends ItemView {
     this.contentEl.setAttr('data-view-mode', mode);
   }
 
+  private getSortMethod(): SortMethod {
+    const attr = this.contentEl.getAttr('data-sort-method');
+    if (typeof attr === 'string') {
+      if (attr === 'default' || attr === 'sortByScheduled' || attr === 'sortByDeadline') return attr;
+    }
+    // Fallback to current plugin setting from constructor if attribute not set
+    if (this.defaultSortMethod === 'default' || this.defaultSortMethod === 'sortByScheduled' || this.defaultSortMethod === 'sortByDeadline') {
+      return this.defaultSortMethod;
+    }
+    // Final safety fallback
+    return 'default';
+  }
+  setSortMethod(method: SortMethod) {
+    this.contentEl.setAttr('data-sort-method', method);
+  }
+
   /** Non-mutating transform for rendering */
   private transformForView(tasks: Task[], mode: TaskViewMode): Task[] {
+    let transformed = tasks.slice();
+
+    // First, handle view mode filtering
     if (mode === 'hideCompleted') {
-      return tasks.filter(t => !t.completed);
+      // Filter out completed tasks and then apply sorting
+      transformed = transformed.filter(t => !t.completed);
+      this.applySortToTasks(transformed);
+      return transformed;
     }
+
+    // Then apply sorting based on the current sort method
     if (mode === 'sortCompletedLast') {
+      // Sort completed tasks to the end, but keep them sorted by the current sort selection
       const pending: Task[] = [];
       const done: Task[] = [];
-      for (const t of tasks) {
+      for (const t of transformed) {
         (t.completed ? done : pending).push(t);
       }
-      return pending.concat(done);
+      
+      // Apply the same sorting to both pending and done groups
+      this.applySortToTasks(pending);
+      this.applySortToTasks(done);
+      
+      transformed = pending.concat(done);
+    } else {
+      // For other modes, apply sorting directly
+      this.applySortToTasks(transformed);
     }
-    return tasks.slice();
+
+    return transformed;
+  }
+
+  /**
+   * Apply sorting to tasks based on the current sort method
+   * @param tasks Array of tasks to sort
+   */
+  private applySortToTasks(tasks: Task[]): void {
+    const sortMethod = this.getSortMethod();
+    
+    if (sortMethod === 'default') {
+      // Sort by file path, then by line number within each file
+      tasks.sort((a, b) => {
+        const pathCompare = a.path.localeCompare(b.path);
+        if (pathCompare !== 0) return pathCompare;
+        return a.line - b.line;
+      });
+    } else if (sortMethod === 'sortByScheduled') {
+      tasks.sort((a, b) => {
+        // Tasks without scheduled dates go to the end
+        if (!a.scheduledDate && !b.scheduledDate) return 0;
+        if (!a.scheduledDate) return 1;
+        if (!b.scheduledDate) return -1;
+        return a.scheduledDate.getTime() - b.scheduledDate.getTime();
+      });
+    } else if (sortMethod === 'sortByDeadline') {
+      tasks.sort((a, b) => {
+        // Tasks without deadline dates go to the end
+        if (!a.deadlineDate && !b.deadlineDate) return 0;
+        if (!a.deadlineDate) return 1;
+        if (!b.deadlineDate) return -1;
+        return a.deadlineDate.getTime() - b.deadlineDate.getTime();
+      });
+    }
   }
 
   /** Search query (persisted on root contentEl attribute to survive re-renders) */
@@ -164,9 +235,64 @@ export class TodoView extends ItemView {
     updateModeButtons();
 
     // Add search results info bar (second row)
-    const searchResultsInfo = toolbar.createEl('div', { cls: 'search-results-info search-results-result-count' });
-    const searchResultsCount = searchResultsInfo.createEl('span');
+    const searchResultsInfo = toolbar.createEl('div', { cls: 'search-results-info' });
+    
+    // Left side: task count
+    const searchResultsWarp = searchResultsInfo.createEl('div', { cls: 'search-results-result-count' });
+    const searchResultsCount = searchResultsWarp.createEl('span');
     searchResultsCount.setText('0 of 0 tasks');
+    
+    // Right side: sort dropdown
+    // const sortDropdown = searchResultsInfo.createEl('div');
+    const select = searchResultsInfo.createEl('select', {
+      cls: 'dropdown',
+      attr: {
+        'aria-label': 'Sort tasks by',
+        'data-sort-mode': 'default'
+      }
+    });
+    
+    const sortOptions = [
+      { value: 'default', label: 'Default (File Path)' },
+      { value: 'sortByScheduled', label: 'Scheduled Date' },
+      { value: 'sortByDeadline', label: 'Deadline Date' }
+    ];
+    
+    for (const option of sortOptions) {
+      const optionEl = select.createEl('option', {
+        attr: { value: option.value }
+      });
+      optionEl.setText(option.label);
+    }
+    
+    // Set current sort mode
+    const currentSortMethod = this.getSortMethod();
+    select.value = currentSortMethod;
+    
+    // Add change handler for dropdown
+    select.addEventListener('change', () => {
+      const selectedValue = select.value;
+      let sortMethod: SortMethod = 'default';
+      
+      if (selectedValue === 'sortByScheduled') {
+        sortMethod = 'sortByScheduled';
+      } else if (selectedValue === 'sortByDeadline') {
+        sortMethod = 'sortByDeadline';
+      }
+      
+      // Update the sort method (keep the current view mode)
+      this.setSortMethod(sortMethod);
+      
+      // Update the dropdown to reflect the current sort method
+      select.value = sortMethod;
+      
+      // Dispatch event for persistence
+      const evt = new CustomEvent('todoseq:sort-method-change', { detail: { sortMethod } });
+      window.dispatchEvent(evt);
+      
+      // Refresh the visible list (transformForView will handle the sorting)
+      this.refreshVisibleList();
+    });
 
     // Keep a reference for keyboard handlers to focus later
     this.searchInputEl = inputEl;
@@ -480,6 +606,11 @@ export class TodoView extends ItemView {
     const checkbox = this.buildCheckbox(task, li);
     this.buildText(task, li);
 
+    // Add date display if scheduled or deadline dates exist
+    if (task.scheduledDate || task.deadlineDate) {
+      this.buildDateDisplay(task, li);
+    }
+
     // File info
     const fileInfo = li.createEl('div', { cls: 'todo-file-info' });
     const lastSlash = task.path.lastIndexOf('/');
@@ -523,6 +654,13 @@ export class TodoView extends ItemView {
   /** Recalculate visible tasks for current mode + search and update only the list subtree */
   refreshVisibleList(): void {
     const container = this.contentEl;
+
+    // Sync dropdown with current sort method
+    const sortDropdown = container.querySelector('.sort-dropdown select') as HTMLSelectElement;
+    if (sortDropdown) {
+      const currentSortMethod = this.getSortMethod();
+      sortDropdown.value = currentSortMethod;
+    }
 
     // Ensure list container exists and is the sole place for items
     let list = container.querySelector('ul.todo-list');
@@ -648,6 +786,117 @@ export class TodoView extends ItemView {
     // Save references for cleanup
     this._searchKeyHandler = keyHandler;
     window.addEventListener('keydown', keyHandler);
+  }
+
+  /**
+   * Format a date for display with relative time indicators
+   * @param date The date to format
+   * @param includeTime Whether to include time if available
+   * @returns Formatted date string
+   */
+  private formatDateForDisplay(date: Date | null, includeTime: boolean = false): string {
+    if (!date) return '';
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const taskDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
+    const diffTime = taskDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Use moment for consistent formatting with Obsidian
+    const momentDate = moment(date);
+    
+    if (diffDays === 0) {
+      return includeTime && date.getHours() !== 0 || date.getMinutes() !== 0
+        ? `Today ${momentDate.format('HH:mm')}`
+        : 'Today';
+    } else if (diffDays === 1) {
+      return includeTime && date.getHours() !== 0 || date.getMinutes() !== 0
+        ? `Tomorrow ${momentDate.format('HH:mm')}`
+        : 'Tomorrow';
+    } else if (diffDays === -1) {
+      return 'Yesterday';
+    } else if (diffDays > 0 && diffDays <= 7) {
+      return `${diffDays} days from now`;
+    } else if (diffDays < 0) {
+      return `${Math.abs(diffDays)} days ago`;
+    } else {
+      // For dates beyond a week, use absolute formatting
+      return includeTime
+        ? momentDate.format('MMM D, YYYY HH:mm')
+        : momentDate.format('MMM D, YYYY');
+    }
+  }
+
+  /**
+   * Get CSS classes for date display based on deadline status
+   * @param date The date to check
+   * @param isDeadline Whether this is a deadline date
+   * @returns Array of CSS classes
+   */
+  private getDateStatusClasses(date: Date | null, isDeadline: boolean = false): string[] {
+    if (!date) return [];
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const taskDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
+    const diffTime = taskDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    const classes = ['todo-date'];
+    
+    if (isDeadline) {
+      classes.push('todo-deadline');
+      
+      if (diffDays < 0) {
+        classes.push('todo-deadline-overdue');
+      } else if (diffDays === 0) {
+        classes.push('todo-deadline-today');
+      } else if (diffDays <= 3) {
+        classes.push('todo-deadline-soon');
+      }
+    } else {
+      classes.push('todo-scheduled');
+    }
+    
+    return classes;
+  }
+
+  /**
+   * Build date display element for a task
+   * @param task The task to display dates for
+   * @param parent The parent element to append to
+   */
+  private buildDateDisplay(task: Task, parent: HTMLElement): void {
+    const dateContainer = parent.createEl('div', { cls: 'todo-date-container' });
+    
+    // Display scheduled date
+    if (task.scheduledDate) {
+      const scheduledDiv = dateContainer.createEl('div', {
+        cls: this.getDateStatusClasses(task.scheduledDate, false)
+      });
+      
+      const scheduledLabel = scheduledDiv.createEl('span', { cls: 'date-label' });
+      scheduledLabel.setText('Scheduled: ');
+      
+      const scheduledValue = scheduledDiv.createEl('span', { cls: 'date-value' });
+      scheduledValue.setText(this.formatDateForDisplay(task.scheduledDate));
+    }
+    
+    // Display deadline date
+    if (task.deadlineDate) {
+      const deadlineDiv = dateContainer.createEl('div', {
+        cls: this.getDateStatusClasses(task.deadlineDate, true)
+      });
+      
+      const deadlineLabel = deadlineDiv.createEl('span', { cls: 'date-label' });
+      deadlineLabel.setText('Deadline: ');
+      
+      const deadlineValue = deadlineDiv.createEl('span', { cls: 'date-value' });
+      deadlineValue.setText(this.formatDateForDisplay(task.deadlineDate));
+    }
   }
 
   /** Strip Markdown formatting to produce display-only plain text */
@@ -881,5 +1130,4 @@ export class TodoView extends ItemView {
 }
 /** Controls how tasks are displayed in the TodoView */
 
-export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';
 
