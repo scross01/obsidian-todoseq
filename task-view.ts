@@ -11,6 +11,7 @@ export class TodoView extends ItemView {
   private defaultViewMode: TaskViewMode;
   private searchInputEl: HTMLInputElement | null = null;
   private _searchKeyHandler: ((e: KeyboardEvent) => void) | undefined;
+  private isCaseSensitive: boolean = false;
 
   constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode) {
     super(leaf);
@@ -74,8 +75,21 @@ export class TodoView extends ItemView {
     const searchInputWrap = searchWrap.createEl('div', { cls: 'search-input-container global-search-input-container' });
     const inputEl = searchInputWrap.createEl('input', { attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } });
     const clearSearch = searchInputWrap.createEl('div', { cls: 'search-input-clear-button', attr: { 'aria-label': 'Clear search' } });
+    clearSearch.addEventListener('click', () => {
+      inputEl.value = '';
+      this.setSearchQuery('');
+      this.refreshVisibleList();
+    });
     const matchCase = searchInputWrap.createEl('div', { cls: 'input-right-decorator clickable-icon', attr: { 'aria-label': 'Match case' } });
     setIcon(matchCase, 'uppercase-lowercase-a');
+    
+    // Toggle case sensitivity
+    let isCaseSensitive = false;
+    matchCase.addEventListener('click', () => {
+      this.isCaseSensitive = !this.isCaseSensitive;
+      matchCase.toggleClass('is-active', this.isCaseSensitive);
+      this.refreshVisibleList();
+    });
     // Narrow to HTMLInputElement via runtime guard
     if (!(inputEl instanceof HTMLInputElement)) {
       throw new Error('Failed to create search input element');
@@ -513,15 +527,18 @@ export class TodoView extends ItemView {
     let visible = this.transformForView(allTasks, mode);
 
     // Apply search filtering
-    const q = this.getSearchQuery().toLowerCase().trim();
+    const q = this.getSearchQuery().trim();
     if (q.length > 0) {
+      const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
+      const searchText = this.isCaseSensitive ? (text: string) => text : (text: string) => text.toLowerCase();
+      
       visible = visible.filter(t => {
         const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
         return (
-          (t.rawText && t.rawText.toLowerCase().includes(q)) ||
-          (t.text && t.text.toLowerCase().includes(q)) ||
-          (t.path && t.path.toLowerCase().includes(q)) ||
-          (baseName && baseName.toLowerCase().includes(q))
+          (t.rawText && searchText(t.rawText).includes(searchQuery)) ||
+          (t.text && searchText(t.text).includes(searchQuery)) ||
+          (t.path && searchText(t.path).includes(searchQuery)) ||
+          (baseName && searchText(baseName).includes(searchQuery))
         );
       });
     }
