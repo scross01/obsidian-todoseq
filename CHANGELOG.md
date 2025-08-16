@@ -1,5 +1,11 @@
 # Change Log
 
+## v0.4.0
+
+- Updated search to follow Obsidian styles and theaming
+- Added Match Case and Clear Search options
+- Added result count showing total and filtered task count
+
 ## v0.3.2
 
 - Removes markdown symbols for highlight and math blocks in task display

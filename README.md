@@ -22,7 +22,7 @@ or journaling than ackwardliy typing `- [ ]` to create a task checkbox.
 - Displays all detected tasks in a single Task View, sorted by file path and
   line number.
 - Toolbar search field filters tasks live by matching raw text and file
-  path/filename (case-insensitive).
+  path/filename
 - View modes: Default, Sort completed last, Hide completed (toggle via toolbar
   icons).
 - Update tasks in two ways:
@@ -116,8 +116,7 @@ The view refreshes when files are changed or when settings are updated.
 **Search**: Use the search field in the toolbar (top of the Task View) to filter
 tasks as you type.
 
-- Matches against the task’s raw text, the full file path, and the file name
-  (case-insensitive).
+- Matches against the task’s raw text, the full file path, and the file name.
 - Slash (/) focuses the search field unless you are already typing in another
   input.
 - Escape clears the current search and removes focus.
