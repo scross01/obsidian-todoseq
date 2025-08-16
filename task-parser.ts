@@ -3,6 +3,15 @@ import { TodoTrackerSettings } from "./settings";
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
+// Regex patterns for supported date formats
+const DATE_ONLY = /^<(\d{4}-\d{2}-\d{2})>/;
+const DATE_WITH_DOW = /^<(\d{4}-\d{2}-\d{2})\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{2}:\d{2})>/;
+const DATE_WITH_TIME = /^<(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})>/;
+
+// Date keyword patterns
+const SCHEDULED_PATTERN = /^SCHEDULED:\s*/;
+const DEADLINE_PATTERN = /^DEADLINE:\s*/;
+
 export class TaskParser {
   private readonly testRegex: RegExp;
   private readonly captureRegex: RegExp;
@@ -51,6 +60,84 @@ export class TaskParser {
     const test = new RegExp(`^[ \\t]*${listMarkerPart}(?:${escaped})\\s+`);
     const capture = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${escaped})\\s+`);
     return { test, capture };
+  }
+
+  /**
+   * Parse a date from a line containing SCHEDULED: or DEADLINE: prefix
+   * @param line The line to parse
+   * @returns Parsed Date object or null if parsing fails
+   */
+  parseDateFromLine(line: string): Date | null {
+    // Remove the SCHEDULED: or DEADLINE: prefix and trim
+    const content = line.replace(/^(SCHEDULED|DEADLINE):\s*/, '').trim();
+    
+    // Try to match date patterns
+    let match = DATE_WITH_DOW.exec(content);
+    if (match) {
+      const [, dateStr, , timeStr] = match;
+      return this.parseDateTimeString(dateStr, timeStr);
+    }
+
+    match = DATE_WITH_TIME.exec(content);
+    if (match) {
+      const [, dateStr, timeStr] = match;
+      return this.parseDateTimeString(dateStr, timeStr);
+    }
+
+    match = DATE_ONLY.exec(content);
+    if (match) {
+      const [, dateStr] = match;
+      return this.parseDateString(dateStr);
+    }
+
+    return null;
+  }
+
+  /**
+   * Parse a date string with optional time
+   * @param dateStr Date string in YYYY-MM-DD format
+   * @param timeStr Optional time string in HH:mm format
+   * @returns Date object in local time (timezone independent)
+   */
+  private parseDateTimeString(dateStr: string, timeStr: string): Date {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    
+    // Create date in local time to preserve the intended time
+    return new Date(year, month - 1, day, hours, minutes);
+  }
+
+  /**
+   * Parse a date string (date only)
+   * @param dateStr Date string in YYYY-MM-DD format
+   * @returns Date object at midnight local time (timezone independent)
+   */
+  private parseDateString(dateStr: string): Date {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    
+    // Create date at midnight local time
+    return new Date(year, month - 1, day, 0, 0, 0, 0);
+  }
+
+  /**
+   * Check if a line contains SCHEDULED: or DEADLINE: at the same indent level
+   * @param line The line to check
+   * @param indent The expected indent level
+   * @returns The type of date line found or null
+   */
+  getDateLineType(line: string, indent: string): 'scheduled' | 'deadline' | null {
+    const trimmedLine = line.trim();
+    if (!trimmedLine.startsWith('SCHEDULED:') && !trimmedLine.startsWith('DEADLINE:')) {
+      return null;
+    }
+
+    // Check if the indent matches
+    const lineIndent = line.substring(0, line.length - trimmedLine.length);
+    if (lineIndent !== indent) {
+      return null;
+    }
+
+    return trimmedLine.startsWith('SCHEDULED:') ? 'scheduled' : 'deadline';
   }
 
   isTask(line: string): boolean {
@@ -109,7 +196,8 @@ export class TaskParser {
 
       const text = cleanedText;
 
-      tasks.push({
+      // Initialize task with date fields
+      const task: Task = {
         path,
         line: index,
         rawText: line,
@@ -119,7 +207,53 @@ export class TaskParser {
         state,
         completed: DEFAULT_COMPLETED_STATES.has(state),
         priority,
-      });
+        scheduledDate: null,
+        deadlineDate: null,
+      };
+
+      // Look for SCHEDULED: and DEADLINE: lines immediately after the task line
+      let scheduledFound = false;
+      let deadlineFound = false;
+
+      for (let i = index + 1; i < lines.length; i++) {
+        const nextLine = lines[i];
+        
+        // Check if we've moved to a different indent level or non-empty line that's not a date line
+        const nextLineTrimmed = nextLine.trim();
+        if (nextLineTrimmed === '') {
+          continue; // Skip empty lines
+        }
+
+        const dateLineType = this.getDateLineType(nextLine, indent);
+        
+        if (dateLineType === 'scheduled' && !scheduledFound) {
+          const date = this.parseDateFromLine(nextLine);
+          if (date) {
+            task.scheduledDate = date;
+            scheduledFound = true;
+            console.log(`Parsed scheduled date for task at ${path}:${index}: ${date.toLocaleString()} (local time)`);
+          } else {
+            console.warn(`Invalid scheduled date format at ${path}:${i + 1}: "${nextLine.trim()}"`);
+          }
+        } else if (dateLineType === 'deadline' && !deadlineFound) {
+          const date = this.parseDateFromLine(nextLine);
+          if (date) {
+            task.deadlineDate = date;
+            deadlineFound = true;
+            console.log(`Parsed deadline date for task at ${path}:${index}: ${date.toLocaleString()} (local time)`);
+          } else {
+            console.warn(`Invalid deadline date format at ${path}:${i + 1}: "${nextLine.trim()}"`);
+          }
+        } else {
+          // Stop looking for date lines if we encounter a non-empty line that's not a date line
+          // or if we've already found both scheduled and deadline dates
+          if (dateLineType === null || (scheduledFound && deadlineFound)) {
+            break;
+          }
+        }
+      }
+
+      tasks.push(task);
     }
 
     return tasks;

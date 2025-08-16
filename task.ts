@@ -9,6 +9,8 @@ export interface Task {
   state: string;   // state keyword, TODO, DOING, DONE etc.
   completed: boolean; // is the task considered complete
   priority: 'high' | 'med' | 'low' | null;
+  scheduledDate: Date | null; // scheduled date from SCHEDULED: line
+  deadlineDate: Date | null;  // deadline date from DEADLINE: line
 }
 
 export const DEFAULT_PENDING_STATES = new Set<string>(['TODO', 'LATER', 'WAIT', 'WAITING']);
