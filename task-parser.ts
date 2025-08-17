@@ -55,7 +55,10 @@ export class TaskParser {
     const escaped = keywords
       .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
       .join('|');
-    const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s+)?`;
+    
+    // Simple list marker pattern that works for both regular and checkbox formats
+    const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s*|[-*+]\\s*\\[[ \\x]\\]\\s*)?`;
+    
     // Intentionally case-sensitive (no flags). Matches capitalised keywords only.
     const test = new RegExp(`^[ \\t]*${listMarkerPart}(?:${escaped})\\s+`);
     const capture = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${escaped})\\s+`);
@@ -178,7 +181,7 @@ export class TaskParser {
       if (!m) continue;
 
       const indent = m[1] ?? '';
-      const listMarker = (m[2] ?? '') as string;
+      let listMarker = (m[2] ?? '') as string;
       const state = m[3] ?? '';
       const afterPrefix = line.slice(m[0].length);
 
@@ -199,6 +202,22 @@ export class TaskParser {
 
       const text = cleanedText;
 
+      // Handle checkbox state determination
+      let finalState = state;
+      let finalCompleted = DEFAULT_COMPLETED_STATES.has(state);
+      
+      // Check if this is a markdown checkbox task and extract checkbox status
+      const checkboxMatch = line.match(/^(\s*)([-*+]\s*)\[(\s|x)\]\s+(\w+)\s+(.+)$/);
+      if (checkboxMatch) {
+        const [, checkboxIndent, checkboxListMarker, checkboxStatus, checkboxState, checkboxText] = checkboxMatch;
+        finalState = checkboxState;
+        finalCompleted = checkboxStatus === 'x';
+        // Update listMarker to preserve the original checkbox format
+        listMarker = checkboxListMarker;
+        // Update text to use the extracted text from checkbox format
+        // The text should be everything after the state keyword
+      }
+
       // Initialize task with date fields
       const task: Task = {
         path,
@@ -207,8 +226,8 @@ export class TaskParser {
         indent,
         listMarker,
         text,
-        state,
-        completed: DEFAULT_COMPLETED_STATES.has(state),
+        state: finalState,
+        completed: finalCompleted,
         priority,
         scheduledDate: null,
         deadlineDate: null,

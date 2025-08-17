@@ -17,7 +17,20 @@ export class TaskEditor {
 
     const priorityPart = priToken ? ` ${priToken}` : '';
     const textPart = task.text ? ` ${task.text}` : '';
-    const newLine = `${task.indent}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
+    
+    // Check if the original task was a markdown checkbox
+    const isCheckbox = task.rawText.trim().match(/^(\s*[-*+]\s+)\[(\s|x)\]\s+(\w+)\s+/);
+    let newLine: string;
+    
+    if (isCheckbox) {
+      // Generate markdown checkbox format with proper spacing
+      const checkboxStatus = DEFAULT_COMPLETED_STATES.has(newState) ? 'x' : ' ';
+      newLine = `${task.indent}- [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
+    } else {
+      // Generate original format
+      newLine = `${task.indent}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
+    }
+    
     const completed = DEFAULT_COMPLETED_STATES.has(newState);
     return { newLine, completed };
   }
