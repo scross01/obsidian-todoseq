@@ -606,8 +606,8 @@ export class TodoView extends ItemView {
     const checkbox = this.buildCheckbox(task, li);
     this.buildText(task, li);
 
-    // Add date display if scheduled or deadline dates exist
-    if (task.scheduledDate || task.deadlineDate) {
+    // Add date display if scheduled or deadline dates exist and task is not completed
+    if ((task.scheduledDate || task.deadlineDate) && !task.completed) {
       this.buildDateDisplay(task, li);
     }
 
