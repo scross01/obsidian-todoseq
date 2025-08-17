@@ -1,7 +1,7 @@
 {
 	"id": "todoseq",
 	"name": "TODOseq",
-	"version": "0.3.1",
+	"version": "0.4.0",
 	"minAppVersion": "0.16.0",
 	"description": "TODOseq (\"to-do-seek\") is a lightweight, keyword-based task tracker for Obsidian",
 	"author": "Stephen Cross",
