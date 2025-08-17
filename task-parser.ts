@@ -69,7 +69,8 @@ export class TaskParser {
    */
   parseDateFromLine(line: string): Date | null {
     // Remove the SCHEDULED: or DEADLINE: prefix and trim
-    const content = line.replace(/^(SCHEDULED|DEADLINE):\s*/, '').trim();
+    // The regex needs to account for leading whitespace
+    const content = line.replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '').trim();
     
     // Try to match date patterns
     let match = DATE_WITH_DOW.exec(content);
@@ -125,15 +126,17 @@ export class TaskParser {
    * @param indent The expected indent level
    * @returns The type of date line found or null
    */
-  getDateLineType(line: string, indent: string): 'scheduled' | 'deadline' | null {
+  getDateLineType(line: string, taskIndent: string): 'scheduled' | 'deadline' | null {
     const trimmedLine = line.trim();
     if (!trimmedLine.startsWith('SCHEDULED:') && !trimmedLine.startsWith('DEADLINE:')) {
       return null;
     }
 
-    // Check if the indent matches
+    // Check if the indent matches (same level) OR is indented (more spaces/tabs than task)
     const lineIndent = line.substring(0, line.length - trimmedLine.length);
-    if (lineIndent !== indent) {
+    
+    // Allow same indent OR more indent (Logseq style)
+    if (lineIndent !== taskIndent && !lineIndent.startsWith(taskIndent)) {
       return null;
     }
 

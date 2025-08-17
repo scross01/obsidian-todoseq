@@ -847,18 +847,14 @@ export class TodoView extends ItemView {
     
     const classes = ['todo-date'];
     
-    if (isDeadline) {
-      classes.push('todo-deadline');
+    classes.push('todo-date');
       
-      if (diffDays < 0) {
-        classes.push('todo-deadline-overdue');
-      } else if (diffDays === 0) {
-        classes.push('todo-deadline-today');
-      } else if (diffDays <= 3) {
-        classes.push('todo-deadline-soon');
-      }
-    } else {
-      classes.push('todo-scheduled');
+    if (diffDays < 0) {
+      classes.push('todo-date-overdue');
+    } else if (diffDays === 0) {
+      classes.push('todo-date-today');
+    } else if (diffDays <= 3) {
+      classes.push('todo-date-soon');
     }
     
     return classes;
