@@ -2,9 +2,13 @@
 
 ## v0.4.0
 
-- Updated search to follow Obsidian styles and theaming
+- Added collection of tasks where the keyword follows a markdown checkbox, e.g. `- [ ] TODO example task`
+- Added support for SCHEDULED: and DEADLINE: dates for tasks following Logseq style
+- Updated search input to follow Obsidian styles and theaming
 - Added Match Case and Clear Search options
 - Added result count showing total and filtered task count
+- Added sort options to sort by scheduled/deadline date or priority
+- Added styling for tags within the task descriptions
 
 ## v0.3.2
 
