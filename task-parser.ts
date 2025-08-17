@@ -5,6 +5,7 @@ type RegexPair = { test: RegExp; capture: RegExp };
 
 // Regex patterns for supported date formats
 const DATE_ONLY = /^<(\d{4}-\d{2}-\d{2})>/;
+const DATE_WITH_DOW_ONLY = /^<(\d{4}-\d{2}-\d{2})\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)>/;
 const DATE_WITH_DOW = /^<(\d{4}-\d{2}-\d{2})\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{2}:\d{2})>/;
 const DATE_WITH_TIME = /^<(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})>/;
 
@@ -80,6 +81,12 @@ export class TaskParser {
     if (match) {
       const [, dateStr, , timeStr] = match;
       return this.parseDateTimeString(dateStr, timeStr);
+    }
+
+    match = DATE_WITH_DOW_ONLY.exec(content);
+    if (match) {
+      const [, dateStr] = match;
+      return this.parseDateString(dateStr);
     }
 
     match = DATE_WITH_TIME.exec(content);
