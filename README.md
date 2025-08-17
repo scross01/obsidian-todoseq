@@ -6,6 +6,10 @@ keywords (e.g., TODO, DOING, DONE) and presents them in a dedicated Task View.
 It preserves your original Markdown formatting and does not require checkbox
 syntax. Inspired by [Logseq Tasks](https://docs.logseq.com/#/page/tasks).
 
+TODOseq is designed to be compatible with Logseq's task format, allowing for
+dual use or migratation of your task management workflow between Logseq and
+Obsidian.
+
 ![screenshot of obsidian showing the page editor and the TODOseq panel in a separate tab showing the list of tasks found in the vault.](screenshot.png)
 
 *Why use task keyworks instead of markdown checkboxes?* Personal preference. It
@@ -33,6 +37,8 @@ or journaling than ackwardliy typing `- [ ]` to create a task checkbox.
   [#A] high, [#B] medium, [#C] low. Displayed as badges in the Task View.
 - Ignores tasks inside fenced code blocks by default to avoid false positives
   (configurable in the settings).
+- Supports Logseq-style SCHEDULED and DEADLINE dates for task organization and
+  sorting.
 
 ## Installation
 
@@ -60,13 +66,36 @@ or journaling than ackwardliy typing `- [ ]` to create a task checkbox.
 ## How Tasks Are Recognized
 
 A task is a line that starts with optional indentation, an optional list marker,
-then a keyword and at least one space. Examples:
+then a keyword and at least one space. TODOseq supports both traditional keyword
+format and markdown checkbox format.
+
+### Traditional Keyword Format
+
+Examples:
 
 - `TODO Write documentation`
 - `DOING Update sync script`
 - `DONE Triage customer feedback`
 - `- TODO inside bullet`
 - `(a) TODO in parenthesized marker`
+
+### Markdown Checkbox Format
+
+TODOseq also supports tasks that use markdown checkboxes combined with state
+keywords:
+
+- `- [ ] TODO this is a task`
+- `- [ ] DOING this is an in progress task`
+- `- [x] DONE this is a completed task`
+
+The checkbox state is automatically synchronized with the task's completion
+state:
+
+- Empty checkbox `[ ]` = incomplete task
+- Checked checkbox `[x]` = completed task
+
+When you toggle a task's state in the TODOseq view, the checkbox will be updated
+accordingly, maintaining proper spacing (e.g., `- [x] DONE`).
 
 Supported keywords by default:
 
@@ -100,6 +129,59 @@ Only the first occurrence on the line is recognized for display. Example:
 
 - `TODO [#A] Ship v1`
 
+## SCHEDULED and DEADLINE dates
+
+TODOseq supports Logseq-style SCHEDULED and DEADLINE date formats, allowing you
+to organize tasks by their scheduled dates and deadlines.
+
+### Date Format
+
+Dates can be specified in several formats after the `SCHEDULED:` or `DEADLINE:`
+prefix:
+
+**Date only:**
+
+```
+SCHEDULED: <2025-01-15>
+DEADLINE: <2025-01-20>
+```
+
+**Date with time:**
+
+```
+SCHEDULED: <2025-01-15 14:30>
+DEADLINE: <2025-01-20 17:00>
+```
+
+**Date with day of week and time:**
+
+```
+SCHEDULED: <2025-01-15 Wed 14:30>
+DEADLINE: <2025-01-20 Mon 17:00>
+```
+
+### Usage
+
+Place the SCHEDULED or DEADLINE lines immediately after your task line, with
+matching indentation:
+
+```markdown
+TODO Write documentation
+SCHEDULED: <2025-01-15>
+
+- DOING Review pull requests
+  DEADLINE: <2025-01-20 17:00>
+```
+
+### Date Parsing
+
+- Dates are parsed in local time (timezone independent)
+- Only the first occurrence of each type (SCHEDULED/DEADLINE) is recognized per
+  task
+- Dates must be at the same indent level or more indented than the task (Logseq
+  style)
+- Invalid date formats are ignored and logged to console
+
 ## Task View Interactions
 
 The state of a task can be modified directly in the task view. The line is
@@ -109,25 +191,37 @@ rewritten in the source page preserving indentation, the original list marker
 The task view visually marks tasks as completed when state is DONE, CANCELED, or
 CANCELLED.
 
-Sorting is stable by path and then line number.
-
 The view refreshes when files are changed or when settings are updated.
+
+**Context Menu**: Right-click any task keyword to see all available state options in a popup menu.
 
 **Search**: Use the search field in the toolbar (top of the Task View) to filter
 tasks as you type.
 
-- Matches against the task’s raw text, the full file path, and the file name.
+- Matches against the task's raw text, the full file path, and the file name.
+- Toggle case sensitivity using the case icon (A/a) next to the search field.
 - Slash (/) focuses the search field unless you are already typing in another
   input.
 - Escape clears the current search and removes focus.
 - The search field expands to fill available toolbar space.
+- Search results are displayed as "X of Y tasks" in the toolbar.
 
 **View modes (toolbar icons)**: Adjust the sort and filter.
 
-- Default: Show all tasks in detected order.
+- Default: Show all tasks in detected order (sorted by file path and line
+  number).
 - Sort completed last: Completed tasks are moved to the end of the list; pending
-  tasks remain on top.
-- Hide completed: Completed tasks are hidden from the list.
+  tasks remain on top, with both groups sorted by the selected sort method.
+- Hide completed: Completed tasks are completely hidden from the list.
+
+**Sort methods (dropdown in toolbar)**: Choose how tasks are ordered.
+
+- Default: Sort by file path, then by line number within each file.
+- Scheduled Date: Sort by scheduled date (tasks without dates appear at the
+  end).
+- Deadline Date: Sort by deadline date (tasks without dates appear at the end).
+- Priority: Sort by priority (high > medium > low > no priority), then by file
+  path and line number for ties.
 
 **Checkbox**: Checked means the task is considered completed.
 
@@ -145,16 +239,47 @@ sequences:
 **Open source location**: Click anywhere on the task row (except the checkbox or
 keyword) to jump to the exact file and line.
 
+## Logseq Task Format Compatibility
+
+TODOseq is designed to be compatible with Logseq's task format, ensuring a
+seamless experience for users migrating from Logseq or using both platforms.
+
+### Complete Feature Parity
+
+All Logseq task features work exactly as expected:
+
+- **Priority tokens**: `[#A]` high, `[#B]` medium, `[#C]` low
+- **List markers**: Preserves original markers (`- `, `1.`, `(a)`, etc.)
+- **State cycling**: Automatic progression through defined state sequences
+- **Date handling**: Support for SCHEDULED and DEADLINE date formats
+
+### Migration from Logseq
+
+If you're migrating from Logseq, your existing task files will work immediately
+without any modifications. TODOseq recognizes and processes all the same
+patterns:
+
+```markdown
+- TODO [#A] Write documentation
+  SCHEDULED: <2025-01-15>
+- DOING Review pull requests
+  DEADLINE: <2025-01-20>
+- DONE Fix critical bug
+```
+
 ## Settings
 
-**Refresh Interval**: How frequently the vault is scanned for tasks.
+**Refresh Interval**: How frequently the vault is scanned for tasks (10-300 seconds, default: 60).
 
-**Additional Task Keywords**: Capitalised, comma-separated extra keywords to
-treat as tasks (not completed). Examples: `FIXME, HACK`. These are additive and
-do not replace built-in keywords.
+**Additional Task Keywords**: Capitalised, comma-separated extra keywords to treat as tasks (not completed). Examples: `FIXME, HACK`. These are additive and do not replace built-in keywords.
 
-**Include tasks inside code blocks**: When enabled, tasks inside fenced code
-blocks are included. Disabled by default.
+**Include tasks inside code blocks**: When enabled, tasks inside fenced code blocks (``` or ~~~) are included. Disabled by default.
+
+**Task view mode**: Choose how completed items are shown by default:
+
+- Default: Show all tasks in detected order
+- Sort completed to end: Move completed tasks to the end
+- Hide completed: Completely hide completed tasks
 
 ## Commands and Ribbon
 
