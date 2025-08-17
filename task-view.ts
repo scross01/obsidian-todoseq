@@ -5,7 +5,7 @@ import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAUL
 
 
 export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';
-export type SortMethod = 'default' | 'sortByScheduled' | 'sortByDeadline';
+export type SortMethod = 'default' | 'sortByScheduled' | 'sortByDeadline' | 'sortByPriority';
 
 export class TodoView extends ItemView {
   static viewType = "todoseq-view";
@@ -44,10 +44,10 @@ export class TodoView extends ItemView {
   private getSortMethod(): SortMethod {
     const attr = this.contentEl.getAttr('data-sort-method');
     if (typeof attr === 'string') {
-      if (attr === 'default' || attr === 'sortByScheduled' || attr === 'sortByDeadline') return attr;
+      if (attr === 'default' || attr === 'sortByScheduled' || attr === 'sortByDeadline' || attr === 'sortByPriority') return attr;
     }
     // Fallback to current plugin setting from constructor if attribute not set
-    if (this.defaultSortMethod === 'default' || this.defaultSortMethod === 'sortByScheduled' || this.defaultSortMethod === 'sortByDeadline') {
+    if (this.defaultSortMethod === 'default' || this.defaultSortMethod === 'sortByScheduled' || this.defaultSortMethod === 'sortByDeadline' || this.defaultSortMethod === 'sortByPriority') {
       return this.defaultSortMethod;
     }
     // Final safety fallback
@@ -120,6 +120,22 @@ export class TodoView extends ItemView {
         if (!a.deadlineDate) return 1;
         if (!b.deadlineDate) return -1;
         return a.deadlineDate.getTime() - b.deadlineDate.getTime();
+      });
+    } else if (sortMethod === 'sortByPriority') {
+      tasks.sort((a, b) => {
+        // Priority order: high > med > low > null (no priority)
+        const priorityOrder = { 'high': 3, 'med': 2, 'low': 1, 'null': 0 };
+        const aPriority = a.priority ? priorityOrder[a.priority] : 0;
+        const bPriority = b.priority ? priorityOrder[b.priority] : 0;
+        
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority; // Higher priority first (descending)
+        }
+        
+        // If priorities are equal, fall back to default sorting
+        const pathCompare = a.path.localeCompare(b.path);
+        if (pathCompare !== 0) return pathCompare;
+        return a.line - b.line;
       });
     }
   }
@@ -255,7 +271,8 @@ export class TodoView extends ItemView {
     const sortOptions = [
       { value: 'default', label: 'Default (File Path)' },
       { value: 'sortByScheduled', label: 'Scheduled Date' },
-      { value: 'sortByDeadline', label: 'Deadline Date' }
+      { value: 'sortByDeadline', label: 'Deadline Date' },
+      { value: 'sortByPriority', label: 'Priority' }
     ];
     
     for (const option of sortOptions) {
@@ -278,6 +295,8 @@ export class TodoView extends ItemView {
         sortMethod = 'sortByScheduled';
       } else if (selectedValue === 'sortByDeadline') {
         sortMethod = 'sortByDeadline';
+      } else if (selectedValue === 'sortByPriority') {
+        sortMethod = 'sortByPriority';
       }
       
       // Update the sort method (keep the current view mode)
