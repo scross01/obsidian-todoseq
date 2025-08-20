@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.4.1
+
+- Fixed issue with date parser missing dates with day of week value after the date
+- Fixed issue with tasks getting removed when a page renamed or moved
+
 ## v0.4.0
 
 - Added collection of tasks where the keyword follows a markdown checkbox, e.g. `- [ ] TODO example task`
