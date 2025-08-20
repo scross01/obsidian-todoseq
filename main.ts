@@ -80,7 +80,7 @@ export default class TodoTracker extends Plugin {
     );
     this.registerEvent(
       // Obsidian passes (file, oldPath) for rename
-      this.app.vault.on('rename', (_file, oldPath) => this.handleFileRename(oldPath))
+      this.app.vault.on('rename', (file, oldPath) => this.handleFileRename(file, oldPath))
     );
   }
 
@@ -222,11 +222,17 @@ export default class TodoTracker extends Plugin {
     }
   }
 
-  // Handle rename: remove tasks for the old path, then refresh views.
-  // The new file path will trigger modify/create separately and be rescanned there.
-  private async handleFileRename(oldPath: string) {
+  // Handle rename: remove tasks for the old path, then scan the new file location and refresh views.
+  private async handleFileRename(file: TAbstractFile, oldPath: string) {
     try {
+      // Remove existing tasks for the old path
       this.tasks = this.tasks.filter(t => t.path !== oldPath);
+      
+      // If the file still exists (it should after rename), scan it at its new location
+      if (file instanceof TFile) {
+        await this.scanFile(file);
+      }
+      
       // Keep sorted state
       this.tasks.sort(this.taskComparator);
       await this.refreshOpenTaskViews(); // lighter refresh
