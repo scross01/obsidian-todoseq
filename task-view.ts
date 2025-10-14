@@ -269,9 +269,9 @@ export class TodoView extends ItemView {
     });
     
     const sortOptions = [
-      { value: 'default', label: 'Default (File Path)' },
-      { value: 'sortByScheduled', label: 'Scheduled Date' },
-      { value: 'sortByDeadline', label: 'Deadline Date' },
+      { value: 'default', label: 'Default (file path)' },
+      { value: 'sortByScheduled', label: 'Scheduled date' },
+      { value: 'sortByDeadline', label: 'Deadline date' },
       { value: 'sortByPriority', label: 'Priority' }
     ];
     
@@ -376,7 +376,7 @@ export class TodoView extends ItemView {
 
     // Present two groups: Non-completed and Completed
     const groups: { group: string; states: string[] }[] = [
-      { group: 'Not Completed', states: nonCompleted.filter(s => s && s !== current) },
+      { group: 'Not completed', states: nonCompleted.filter(s => s && s !== current) },
       { group: 'Completed', states: completedOnly.filter(s => s && s !== current) },
     ];
     return groups.filter(g => g.states.length > 0);

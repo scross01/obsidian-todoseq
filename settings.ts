@@ -44,7 +44,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName('Refresh Interval')
+      .setName('Refresh interval')
       .setDesc('How often to rescan the vault for TODOs (in seconds)')
       .addSlider(slider => slider
         .setLimits(10, 300, 10)
@@ -58,7 +58,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Additional Task Keywords')
+      .setName('Additional task Keywords')
       .setDesc('Capitalised list of keywords for treat as tasks (e.g. FIXME, HACK). Leave empty for none.')
       .addText(text => {
         const current = this.plugin.settings.additionalTaskKeywords ?? [];
