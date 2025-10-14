@@ -56,13 +56,7 @@ export default class TodoTracker extends Plugin {
     });
 
     // Initial scan
-    {
-      const t0 = performance.now();
-      await this.scanVault();
-      const t1 = performance.now();
-      const ms = t1 - t0;
-      console.log(`TODOseq initial scan for tasks took ${ms} ms`);
-    }
+    await this.scanVault();
     await this.refreshOpenTaskViews();
 
     // Set up periodic refresh
