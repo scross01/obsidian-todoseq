@@ -1050,23 +1050,22 @@ export class TodoView extends ItemView {
     // Helpers
     const isMarkdownLeaf = (leaf: WorkspaceLeaf | null | undefined): boolean => {
       if (!leaf) return false;
-      const v = leaf.view as MarkdownView | ItemView | null;
-      if (v instanceof MarkdownView) return true;
-      return v?.getViewType?.() === 'markdown';
+      if (leaf.view instanceof MarkdownView) return true;
+      return leaf.view?.getViewType?.() === 'markdown';
     };
     const isTodoSeqLeaf = (leaf: WorkspaceLeaf | null | undefined): boolean => {
       if (!leaf) return false;
-      const v: MarkdownView | ItemView | null = leaf.view as MarkdownView | ItemView | null;
-      return v?.getViewType?.() === (TodoView as typeof TodoView).viewType;
+      return leaf.view instanceof TodoView;
     };
     const findExistingLeafForFile = (): WorkspaceLeaf | null => {
       const leaves = workspace.getLeavesOfType('markdown');
       for (const leaf of leaves) {
         if (isTodoSeqLeaf(leaf)) continue;
-        const v: MarkdownView | ItemView | null = leaf.view as MarkdownView | ItemView | null;
-        const openFile = (v as MarkdownView)?.file;
-        if (openFile && openFile.path === file.path) {
-          return leaf;
+        if (leaf.view instanceof MarkdownView) {
+          const openFile = leaf.view.file;
+          if (openFile && openFile.path === file.path) {
+            return leaf;
+          }
         }
       }
       return null;
@@ -1119,9 +1118,8 @@ export class TodoView extends ItemView {
       try { ((targetLeaf as WorkspaceLeaf) as { pinned?: boolean }).pinned = true; } catch (_) { /* ignore */ }
     }
 
-    const v: MarkdownView | ItemView | null = targetLeaf.view as MarkdownView | ItemView | null;
-    const markdownView: MarkdownView | null = v instanceof MarkdownView ? v : null;
-    if (markdownView) {
+    if (targetLeaf.view instanceof MarkdownView) {
+      const markdownView = targetLeaf.view;
       const editor = markdownView.editor;
       const pos = { line: task.line, ch: 0 };
       editor.setCursor(pos);
