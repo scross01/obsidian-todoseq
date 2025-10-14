@@ -98,7 +98,7 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called when the plugin is unloaded
   onunload() {
-    clearInterval(this.refreshIntervalId);
+    window.clearInterval(this.refreshIntervalId);
   }
 
   // Obsidian lifecycle method called to settings are loaded
@@ -129,7 +129,7 @@ export default class TodoTracker extends Plugin {
   // Run a regular refresh of the vault based on the refresh inerval
   setupPeriodicRefresh() {
     // Clear any previous interval
-    clearInterval(this.refreshIntervalId);
+    window.clearInterval(this.refreshIntervalId);
 
     // Use a serialized async tick to avoid overlap and unhandled rejections
     this.refreshIntervalId = window.setInterval(async () => {
