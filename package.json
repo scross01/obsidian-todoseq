@@ -1,6 +1,6 @@
 {
   "name": "todoseq",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "TODOseq lightweight, keyword-based task tracker for Obsidian",
   "license": "MIT",
   "author": "Stephen Cross",

@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.4.2
+
+- Addresses community plugin review feedback
+
 ## 0.4.1
 
 - Fixed issue with date parser missing dates with day of week value after the date
