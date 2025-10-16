@@ -3,7 +3,7 @@
 	"name": "TODOseq",
 	"version": "0.4.2",
 	"minAppVersion": "0.16.0",
-	"description": "TODOseq (\"to-do-seek\") is a lightweight, keyword-based task tracker.",
+	"description": "Lightweight keyword-based task tracker using Logseq style keywords.",
 	"author": "Stephen Cross",
 	"authorUrl": "https://stephencross.site/",
 	"isDesktopOnly": false
