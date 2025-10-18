@@ -1,5 +1,7 @@
 # Change Log
 
+- Added support for collecting tasks with language specific comments in code blocks
+
 ## 0.4.3
 
 - Fixed regression causing the TODOseq panel to steal focus during periodic refresh

@@ -2,14 +2,15 @@ import { PluginSettingTab, App, Setting } from 'obsidian';
 import TodoTracker from './main';
 import { TodoView } from './task-view';
 import { TaskViewMode } from "./task-view";
+import { LanguageRegistry, LanguageCommentSupportSettings, LanguageDefinition } from "./language-aware-comment-tasks";
 
 export interface TodoTrackerSettings {
   refreshInterval: number; // refresh interval in seconds
   additionalTaskKeywords: string[]; // capitalised keywords treated as NOT COMPLETED (e.g., FIXME, HACK)
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
   taskViewMode: TaskViewMode; // controls view transformation in the task view
+  languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
 }
-// Shared constants so modules don’t re-declare different sources of truth
 
 export const DefaultSettings: TodoTrackerSettings = {
   refreshInterval: 60,
@@ -17,6 +18,10 @@ export const DefaultSettings: TodoTrackerSettings = {
   additionalTaskKeywords: [],
   includeCodeBlocks: false,
   taskViewMode: 'default',
+  languageCommentSupport: {
+    enabled: true,
+    languages: ['sql', 'python', 'java'],
+  },
 };
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
@@ -102,6 +107,21 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.includeCodeBlocks = value;
           await this.plugin.saveSettings();
           // Recreate parser to reflect includeCodeBlocks change and rescan
+          this.plugin.recreateParser();
+          await this.plugin.scanVault();
+          await this.refreshAllTaskViews();
+        }));
+
+    // Language comment support settings
+    const languageSettingContainer = containerEl.createDiv();
+    const languageSetting = new Setting(languageSettingContainer)
+      .setName('Enable language comment support')
+      .setDesc('When enabled, tasks inside code blocks will be detected using language-specific comment patterns.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.languageCommentSupport.enabled)
+        .onChange(async (value) => {
+          this.plugin.settings.languageCommentSupport.enabled = value;
+          await this.plugin.saveSettings();
           this.plugin.recreateParser();
           await this.plugin.scanVault();
           await this.refreshAllTaskViews();

@@ -5,6 +5,7 @@ export interface Task {
   rawText: string; // original full line
   indent: string;  // leading whitespace before any list marker/state
   listMarker: string; // the exact list marker plus trailing space if present (e.g., "- ", "1. ", "(a) ")
+  commentPrefix: string; // comment prefix if task is in code block (e.g., "--", "#", "//", "/*")
   text: string;    // content after the state keyword with priority token removed
   state: string;   // state keyword, TODO, DOING, DONE etc.
   completed: boolean; // is the task considered complete

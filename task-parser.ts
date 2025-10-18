@@ -1,5 +1,6 @@
 import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES } from './task';
 import { TodoTrackerSettings } from "./settings";
+import { LanguageAwareRegexBuilder, LanguageRegistry, LanguageDefinition, LanguageCommentSupportSettings } from "./language-aware-comment-tasks";
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
@@ -17,11 +18,33 @@ export class TaskParser {
   private readonly testRegex: RegExp;
   private readonly captureRegex: RegExp;
   private readonly includeCodeBlocks: boolean;
+  private readonly languageCommentSupport: LanguageCommentSupportSettings;
+  private readonly customKeywords: string[];
+  
+  // Language support components
+  private readonly languageRegistry: LanguageRegistry;
+  private readonly languageAwareRegex: LanguageAwareRegexBuilder;
+  
+  // Language state tracking
+  private currentLanguage: LanguageDefinition | null = null;
+  private inMultilineComment: boolean = false;
+  private multilineCommentIndent: string = '';
 
-  private constructor(regex: RegexPair, includeCodeBlocks: boolean) {
+  private constructor(
+    regex: RegexPair,
+    includeCodeBlocks: boolean,
+    languageCommentSupport: LanguageCommentSupportSettings,
+    customKeywords: string[]
+  ) {
     this.testRegex = regex.test;
     this.captureRegex = regex.capture;
     this.includeCodeBlocks = includeCodeBlocks;
+    this.languageCommentSupport = languageCommentSupport;
+    this.customKeywords = customKeywords;
+    
+    // Initialize language support components
+    this.languageRegistry = new LanguageRegistry();
+    this.languageAwareRegex = new LanguageAwareRegexBuilder();
   }
 
   static create(settings: TodoTrackerSettings): TaskParser {
@@ -49,7 +72,12 @@ export class TaskParser {
     ];
 
     const regex = TaskParser.buildRegex(allKeywordsArray);
-    return new TaskParser(regex, !!settings.includeCodeBlocks);
+    return new TaskParser(
+      regex,
+      !!settings.includeCodeBlocks,
+      settings.languageCommentSupport,
+      normalizedAdditional
+    );
   }
 
   static buildRegex(keywords: string[]): RegexPair {
@@ -153,8 +181,70 @@ export class TaskParser {
     return trimmedLine.startsWith('SCHEDULED:') ? 'scheduled' : 'deadline';
   }
 
-  isTask(line: string): boolean {
+  isTask(line: string, inMultilineComment: boolean = false): boolean {
+    // Check if language comment support is enabled
+    if (!this.languageCommentSupport.enabled) {
+      return this.testRegex.test(line);
+    }
+    
+    // Check if we're inside a code block and language detection is active
+    if (this.currentLanguage && this.includeCodeBlocks) {
+      // Check if language is enabled
+      if (!this.languageRegistry.isLanguageEnabled(
+        this.currentLanguage.name,
+        this.languageCommentSupport.languages
+      )) {
+        return this.testRegex.test(line);
+      }
+      
+      // Use language-aware regex when inside a code block
+      const languageRegex = this.languageAwareRegex.buildRegexWithAllKeywords(
+        this.currentLanguage,
+        []
+      );
+      return languageRegex.test.test(line);
+    }
+    
+    // Fallback to default regex
     return this.testRegex.test(line);
+  }
+
+  /**
+   * Handle multi-line comment state tracking
+   * @param line The current line being processed
+   * @param inMultilineComment Current multiline comment state
+   * @param multilineCommentIndent Current multiline comment indent
+   * @returns Updated multiline comment state and indent
+   */
+  private handleMultilineCommentState(line: string, inMultilineComment: boolean, multilineCommentIndent: string): { inMultilineComment: boolean; multilineCommentIndent: string } {
+    if (!this.currentLanguage || !this.languageCommentSupport.enabled) {
+      return { inMultilineComment, multilineCommentIndent };
+    }
+    
+    const patterns = this.currentLanguage.patterns;
+    
+    if (!inMultilineComment) {
+      // Check if we're entering a multi-line comment
+      if (patterns.multiLineStart) {
+        const match = patterns.multiLineStart.exec(line);
+        if (match) {
+          return {
+            inMultilineComment: true,
+            multilineCommentIndent: line.substring(0, line.length - line.trimStart().length)
+          };
+        }
+      }
+    } else {
+      // Check if we're exiting a multi-line comment
+      if (patterns.multiLineEnd) {
+        const match = patterns.multiLineEnd.exec(line);
+        if (match) {
+          return { inMultilineComment: false, multilineCommentIndent: '' };
+        }
+      }
+    }
+    
+    return { inMultilineComment, multilineCommentIndent };
   }
 
   // Parse a single file content into Task[], pure and stateless w.r.t. external app
@@ -164,6 +254,10 @@ export class TaskParser {
     // Fence state
     let inFence = false;
     let fenceMarker: '`' | '~' | null = null;
+    
+    // Multiline comment state
+    let inMultilineComment = false;
+    let multilineCommentIndent = '';
 
     const tasks: Task[] = [];
 
@@ -178,19 +272,51 @@ export class TaskParser {
         continue;
       }
 
+      // Handle multi-line comment state
+      if (this.currentLanguage && inFence) {
+        const result = this.handleMultilineCommentState(line, inMultilineComment, multilineCommentIndent);
+        inMultilineComment = result.inMultilineComment;
+        multilineCommentIndent = result.multilineCommentIndent;
+      }
+
       if (inFence && !this.includeCodeBlocks) {
         continue;
       }
 
-      if (!this.isTask(line)) continue;
+      if (!this.isTask(line, inMultilineComment)) continue;
 
-      const m = this.captureRegex.exec(line);
+      // Use language-aware regex if applicable
+      let regex = this.captureRegex;
+      if (this.currentLanguage && this.languageCommentSupport.enabled) {
+        // Check if language is enabled
+        if (this.languageRegistry.isLanguageEnabled(
+          this.currentLanguage.name,
+          this.languageCommentSupport.languages
+        )) {
+          regex = this.languageAwareRegex.buildRegexWithAllKeywords(
+            this.currentLanguage,
+            this.customKeywords
+          ).capture;
+        }
+      }
+
+      const m = regex.exec(line);
       if (!m) continue;
 
       const indent = m[1] ?? '';
-      let listMarker = (m[2] ?? '') as string;
-      const state = m[3] ?? '';
+      let listMarker = '';
+      const state = this.currentLanguage && this.languageCommentSupport.enabled ? (m[4] ?? '') : (m[3] ?? '');
       const afterPrefix = line.slice(m[0].length);
+      
+      // For language-aware regex, the list marker is in m[3], for default regex it's in m[2]
+      if (this.currentLanguage && this.languageCommentSupport.enabled) {
+        listMarker = (m[3] ?? '') as string;
+      } else {
+        listMarker = (m[2] ?? '') as string;
+      }
+      
+      // Capture comment prefix for language-aware tasks
+      const commentPrefix = this.currentLanguage && this.languageCommentSupport.enabled ? (m[2] ?? '') : '';
 
       // Priority parsing: first occurrence wins, then remove it preserving spacing semantics
       let priority: 'high' | 'med' | 'low' | null = null;
@@ -232,6 +358,7 @@ export class TaskParser {
         rawText: line,
         indent,
         listMarker,
+        commentPrefix,
         text,
         state: finalState,
         completed: finalCompleted,
@@ -286,22 +413,42 @@ export class TaskParser {
     return tasks;
   }
 
-  // Pure fence delimiter tracker: detects ``` or ~~~ at start (with indent), toggles when matching opener char.
+  // Enhanced fence delimiter tracker: detects ```lang or ~~~lang at start (with indent), toggles when matching opener char.
   private toggleFenceIfDelimiter(
     line: string,
     inFence: boolean,
     fenceMarker: '`' | '~' | null
-  ): { didToggle: boolean; inFence: boolean; fenceMarker: '`' | '~' | null } {
-    const fenceMatch = /^[ \t]*(`{3,}|~{3,})/.exec(line);
+  ): { didToggle: boolean; inFence: boolean; fenceMarker: '`' | '~' | null; language?: string } {
+    // Enhanced regex to capture language identifier
+    const fenceMatch = /^[ \t]*(`{3,}|~{3,})(\w*)/.exec(line);
     if (!fenceMatch) {
       return { didToggle: false, inFence, fenceMarker };
     }
+    
     const markerRun = fenceMatch[1];
     const currentMarker: '`' | '~' = markerRun[0] === '`' ? '`' : '~';
+    const language = fenceMatch[2].toLowerCase();
+    
     if (!inFence) {
-      return { didToggle: true, inFence: true, fenceMarker: currentMarker };
+      // Detect language when entering a code block
+      this.currentLanguage = this.languageRegistry.getLanguage(language);
+      
+      // Reset multi-line comment state
+      this.inMultilineComment = false;
+      this.multilineCommentIndent = '';
+      
+      return {
+        didToggle: true,
+        inFence: true,
+        fenceMarker: currentMarker,
+        language
+      };
     } else {
       if (fenceMarker === currentMarker) {
+        // Reset language when exiting a code block
+        this.currentLanguage = null;
+        this.inMultilineComment = false;
+        this.multilineCommentIndent = '';
         return { didToggle: true, inFence: false, fenceMarker: null };
       }
       // Different fence char while inside: ignore as plain text

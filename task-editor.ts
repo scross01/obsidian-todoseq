@@ -27,8 +27,28 @@ export class TaskEditor {
       const checkboxStatus = DEFAULT_COMPLETED_STATES.has(newState) ? 'x' : ' ';
       newLine = `${task.indent}- [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
     } else {
-      // Generate original format
-      newLine = `${task.indent}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
+      // Generate original format, preserving comment prefix if present
+      // Extract the exact spacing between comment marker and state keyword from raw text
+      let commentWithSpacing = '';
+      if (task.commentPrefix) {
+        // Find the comment marker in the raw text and extract the exact spacing
+        const commentMarker = task.commentPrefix.trim();
+        const commentMarkerIndex = task.rawText.indexOf(commentMarker);
+        if (commentMarkerIndex !== -1) {
+          // Extract everything from the comment marker to the state keyword
+          const afterCommentMarker = task.rawText.substring(commentMarkerIndex + commentMarker.length);
+          const stateKeywordIndex = afterCommentMarker.search(/\b(TODO|FIXME|HACK|LATER|DOING|DONE|WAIT|WAITING|NOW|IN-PROGRESS|CANCELED|CANCELLED)\b/);
+          if (stateKeywordIndex !== -1) {
+            commentWithSpacing = commentMarker + afterCommentMarker.substring(0, stateKeywordIndex);
+          } else {
+            commentWithSpacing = task.commentPrefix;
+          }
+        } else {
+          commentWithSpacing = task.commentPrefix;
+        }
+      }
+      
+      newLine = `${task.indent}${commentWithSpacing}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
     }
     
     const completed = DEFAULT_COMPLETED_STATES.has(newState);
