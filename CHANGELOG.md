@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.4.3
+
+- Fixed regression causing the TODOseq panel to steal focus during periodic refresh
+
 ## 0.4.2
 
 - Addresses community plugin review feedback

@@ -78,12 +78,10 @@ export default class TodoTracker extends Plugin {
     );
   }
 
-  // Helper: refresh all open Todo views to reflect this.tasks
+  // Helper: refresh all open Todo views to reflect this.tasks without stealing focus
   private async refreshOpenTaskViews(): Promise<void> {
     const leaves = this.app.workspace.getLeavesOfType(TodoView.viewType);
     for (const leaf of leaves) {
-      // Ensure the view is visible and loaded before accessing
-      await this.app.workspace.revealLeaf(leaf);
       if (leaf.view instanceof TodoView) {
         // Update data source
         leaf.view.tasks = this.tasks;
@@ -249,12 +247,19 @@ export default class TodoTracker extends Plugin {
 
     if (leaves.length > 0) {
       leaf = leaves[0];
-      // Ensure the view is visible and loaded before accessing
-      await workspace.revealLeaf(leaf);
+      // Only reveal if the leaf is not already active to avoid focus stealing
+      const activeLeaf = workspace.activeLeaf;
+      if (activeLeaf !== leaf) {
+        await workspace.revealLeaf(leaf);
+      }
     } else {
       leaf = workspace.getLeaf(true);
       leaf.setViewState({ type: TodoView.viewType, active: true });
-      await workspace.revealLeaf(leaf);
+      // Only reveal if the leaf is not already active to avoid focus stealing
+      const activeLeaf = workspace.activeLeaf;
+      if (activeLeaf !== leaf) {
+        await workspace.revealLeaf(leaf);
+      }
     }
   }
 }
