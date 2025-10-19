@@ -98,6 +98,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           });
       });
 
+
+    // Include tasks inside code blocks (parent setting)
+    let languageToggleComponent: any = null;
+    
     new Setting(containerEl)
       .setName('Include tasks inside code blocks')
       .setDesc('When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.')
@@ -105,27 +109,55 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.includeCodeBlocks)
         .onChange(async (value) => {
           this.plugin.settings.includeCodeBlocks = value;
+          // If disabling code blocks, also disable language comment support
+          if (!value) {
+            this.plugin.settings.languageCommentSupport.enabled = false;
+          }
           await this.plugin.saveSettings();
+          // Update language toggle visual state by recreating it
+          if (languageToggleComponent) {
+            languageToggleComponent.setValue(this.plugin.settings.languageCommentSupport.enabled);
+          }
+          languageSetting.setDisabled(!value);
           // Recreate parser to reflect includeCodeBlocks change and rescan
           this.plugin.recreateParser();
           await this.plugin.scanVault();
           await this.refreshAllTaskViews();
         }));
 
-    // Language comment support settings
+    // Language comment support settings (dependent on includeCodeBlocks)
     const languageSettingContainer = containerEl.createDiv();
     const languageSetting = new Setting(languageSettingContainer)
       .setName('Enable language comment support')
       .setDesc('When enabled, tasks inside code blocks will be detected using language-specific comment patterns.')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.languageCommentSupport.enabled)
-        .onChange(async (value) => {
-          this.plugin.settings.languageCommentSupport.enabled = value;
-          await this.plugin.saveSettings();
-          this.plugin.recreateParser();
-          await this.plugin.scanVault();
-          await this.refreshAllTaskViews();
-        }));
+      .addToggle(toggle => {
+        languageToggleComponent = toggle;
+        return toggle
+          .setValue(this.plugin.settings.languageCommentSupport.enabled)
+          .onChange(async (value) => {
+            this.plugin.settings.languageCommentSupport.enabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.recreateParser();
+            await this.plugin.scanVault();
+            await this.refreshAllTaskViews();
+          });
+      });
+
+    // Set initial disabled state based on includeCodeBlocks setting
+    languageSetting.setDisabled(!this.plugin.settings.includeCodeBlocks);
+
+    // Update language toggle when includeCodeBlocks changes
+    const updateLanguageToggle = (enabled: boolean) => {
+      const languageToggle = languageSetting.settingEl.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      if (languageToggle) {
+        languageToggle.checked = enabled;
+      }
+      languageSetting.setDisabled(!enabled);
+    };
+
+    // Listen for includeCodeBlocks changes and update language toggle accordingly
+    this.plugin.settings.includeCodeBlocks = this.plugin.settings.includeCodeBlocks; // Force reactivity
+    updateLanguageToggle(this.plugin.settings.includeCodeBlocks);
 
     new Setting(containerEl)
       .setName('Task view mode')
