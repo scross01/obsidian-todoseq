@@ -20,7 +20,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   taskViewMode: 'default',
   languageCommentSupport: {
     enabled: true,
-    languages: ['sql', 'python', 'java'],
+    languages: ["c", "cpp", "csharp", "dockerfile", "go", "ini", "java", "javascript", "kotlin", "powershell", "python", "r", "ruby", "rust", "shell", "sql", "swift", "toml", "typescript", "yaml"],
   },
 };
 

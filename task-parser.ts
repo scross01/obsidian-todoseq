@@ -189,14 +189,6 @@ export class TaskParser {
     
     // Check if we're inside a code block and language detection is active
     if (this.currentLanguage && this.includeCodeBlocks) {
-      // Check if language is enabled
-      if (!this.languageRegistry.isLanguageEnabled(
-        this.currentLanguage.name,
-        this.languageCommentSupport.languages
-      )) {
-        return this.testRegex.test(line);
-      }
-      
       // Use language-aware regex when inside a code block
       const languageRegex = this.languageAwareRegex.buildRegexWithAllKeywords(
         this.currentLanguage,
@@ -288,16 +280,10 @@ export class TaskParser {
       // Use language-aware regex if applicable
       let regex = this.captureRegex;
       if (this.currentLanguage && this.languageCommentSupport.enabled) {
-        // Check if language is enabled
-        if (this.languageRegistry.isLanguageEnabled(
-          this.currentLanguage.name,
-          this.languageCommentSupport.languages
-        )) {
           regex = this.languageAwareRegex.buildRegexWithAllKeywords(
             this.currentLanguage,
             this.customKeywords
           ).capture;
-        }
       }
 
       const m = regex.exec(line);
@@ -431,7 +417,8 @@ export class TaskParser {
     
     if (!inFence) {
       // Detect language when entering a code block
-      this.currentLanguage = this.languageRegistry.getLanguage(language);
+      // Use getLanguageByIdentifier to support both language names and keywords
+      this.currentLanguage = this.languageRegistry.getLanguageByIdentifier(language);
       
       // Reset multi-line comment state
       this.inMultilineComment = false;

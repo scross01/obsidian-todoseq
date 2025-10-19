@@ -23,6 +23,9 @@ export interface LanguageDefinition {
   /** Unique language identifier */
   name: string;
   
+  /** Alternative keywords for this language */
+  keywords?: string[];
+  
   /** Comment patterns for this language */
   patterns: LanguageCommentPatterns;
   }
@@ -58,6 +61,7 @@ const SQL_LANGUAGE: LanguageDefinition = {
 // Python language definition
 const PYTHON_LANGUAGE: LanguageDefinition = {
   name: 'python',
+  keywords: ['python', 'py'],
   patterns: {
     singleLine: /^\s*#\s+/,            // starts with #
     multiLineStart: /^\s*['"]{3}\s+/,  // starts with ''' or """
@@ -79,23 +83,237 @@ const JAVA_LANGUAGE: LanguageDefinition = {
   },
 };
 
+// JavaScript language definition (reuses Java patterns)
+const JAVASCRIPT_LANGUAGE: LanguageDefinition = {
+  name: 'javascript',
+  keywords: ['javascript', 'js'],
+  patterns: JAVA_LANGUAGE.patterns,
+};
+
+// TypeScript language definition (reuses Java patterns)
+const TYPESCRIPT_LANGUAGE: LanguageDefinition = {
+  name: 'typescript',
+  keywords: ['typescript', 'ts'],
+  patterns: JAVA_LANGUAGE.patterns,
+};
+
+// Go language definition
+const GOLANG_LANGUAGE: LanguageDefinition = {
+  name: 'go',
+  patterns: {
+    singleLine: /^\s*\/\/\s+/,         // starts with //
+    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineEnd: /\s*\*\/\s*$/,       // ends with */
+    multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
+    inline: /.*\s+\/\/\s+/
+  },
+};
+
+// Ruby language definition
+const RUBY_LANGUAGE: LanguageDefinition = {
+  name: 'ruby',
+  patterns: {
+    singleLine: /^\s*#\s+/,            // starts with #
+    multiLineStart: /^\s*=begin\s+/,   // starts with =begin
+    multiLineEnd: /\s*=end\s*$/,       // ends with =end
+    multiLineAdditional: /^\s*/,       // optional preceding spaces
+    inline: /.*\s+#\s+/
+  },
+};
+
+// Shell language definition (Bash/Zsh/Fish)
+const SHELL_LANGUAGE: LanguageDefinition = {
+  name: 'shell',
+  keywords: ['shell', 'sh', 'bash'],
+  patterns: {
+    singleLine: /^\s*#\s+/,            // starts with #
+    multiLineStart: undefined,
+    multiLineEnd: undefined,
+    multiLineAdditional: undefined,
+    inline: /.*\s+#\s+/
+  },
+};
+
+// YAML language definition
+const YAML_LANGUAGE: LanguageDefinition = {
+  name: 'yaml',
+  keywords: ['yaml', 'yml'],
+  patterns: {
+    singleLine: /^\s*#\s+/,            // starts with #
+    multiLineStart: undefined,
+    multiLineEnd: undefined,
+    multiLineAdditional: undefined,
+    inline: /.*\s+#\s+/
+  },
+};
+
+// C language definition
+const C_LANGUAGE: LanguageDefinition = {
+  name: 'c',
+  keywords: ['c'],
+  patterns: {
+    singleLine: /^\s*\/\/\s+/,         // starts with //
+    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineEnd: /\s*\*\/\s*$/,       // ends with */
+    multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
+    inline: /.*\s+\/\/\s+/
+  },
+};
+
+// C++ language definition (reuses C patterns)
+const CPP_LANGUAGE: LanguageDefinition = {
+  name: 'cpp',
+  keywords: ['cpp', 'c++'],
+  patterns: C_LANGUAGE.patterns,
+};
+
+// C# language definition
+const CSHARP_LANGUAGE: LanguageDefinition = {
+  name: 'csharp',
+  keywords: ['csharp', 'cs'],
+  patterns: {
+    singleLine: /^\s*\/\/\s+/,         // starts with // or ///
+    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineEnd: /\s*\*\/\s*$/,       // ends with */
+    multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
+    inline: /.*\s+\/\/\s+/
+  },
+};
+
+// Rust language definition
+const RUST_LANGUAGE: LanguageDefinition = {
+  name: 'rust',
+  keywords: ['rust'],
+  patterns: {
+    singleLine: /^\s*\/\/\s+!?/,       // starts with //, ///, or //! 
+    multiLineStart: /^\s*\/\*+\s+!?/,  // starts with /* /** or /*!
+    multiLineEnd: /\s*\*\/\s*$/,       // ends with */
+    multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
+    inline: /.*\s+\/\/\s+/
+  },
+};
+
+// Swift language definition
+const SWIFT_LANGUAGE: LanguageDefinition = {
+  name: 'swift',
+  keywords: ['swift'],
+  patterns: {
+    singleLine: /^\s*\/\/\s+/,         // starts with // or ///
+    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineEnd: /\s*\*\/\s*$/,       // ends with */
+    multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
+    inline: /.*\s+\/\/\s+/
+  },
+};
+
+// Kotlin language definition
+const KOTLIN_LANGUAGE: LanguageDefinition = {
+  name: 'kotlin',
+  keywords: ['kotlin'],
+  patterns: JAVA_LANGUAGE.patterns,
+};
+
+// R language definition
+const R_LANGUAGE: LanguageDefinition = {
+  name: 'r',
+  keywords: ['r'],
+  patterns: {
+    singleLine: /^\s*#\s+/,            // starts with #
+    multiLineStart: undefined,
+    multiLineEnd: undefined,
+    multiLineAdditional: undefined,
+    inline: /.*\s+#\s+/
+  },
+};
+
+// INI language definition
+const INI_LANGUAGE: LanguageDefinition = {
+  name: 'ini',
+  keywords: ['ini'],
+  patterns: {
+    singleLine: /^\s*;\s+/,            // starts with ;
+    multiLineStart: undefined,
+    multiLineEnd: undefined,
+    multiLineAdditional: undefined,
+    inline: /.*\s+;\s+/
+  },
+};
+
+// TOML language definition
+const TOML_LANGUAGE: LanguageDefinition = {
+  name: 'toml',
+  keywords: ['toml'],
+  patterns: {
+    singleLine: /^\s*#\s+/,            // starts with #
+    multiLineStart: undefined,
+    multiLineEnd: undefined,
+    multiLineAdditional: undefined,
+    inline: /.*\s+#\s+/
+  },
+};
+
+// Dockerfile language definition
+const DOCKERFILE_LANGUAGE: LanguageDefinition = {
+  name: 'dockerfile',
+  keywords: ['dockerfile'],
+  patterns: {
+    singleLine: /^\s*#\s+/,            // starts with #
+    multiLineStart: undefined,
+    multiLineEnd: undefined,
+    multiLineAdditional: undefined,
+    inline: /.*\s+#\s+/
+  },
+};
+
+// PowerShell language definition
+const POWERSHELL_LANGUAGE: LanguageDefinition = {
+  name: 'powershell',
+  keywords: ['powershell'],
+  patterns: {
+    singleLine: /^\s*#\s+/,            // starts with #
+    multiLineStart: /^\s*<#\s+/,       // starts with <#
+    multiLineEnd: /\s*#\s*$/,          // ends with #>
+    multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
+    inline: /.*\s+#\s+/
+  },
+};
+
 /**
  * Language registry for managing programming language comment patterns
  */
 export class LanguageRegistry {
   private languages: Map<string, LanguageDefinition> = new Map();
+  private keywordToLanguage: Map<string, LanguageDefinition> = new Map();
 
   constructor() {
     this.registerDefaultLanguages();
   }
 
   /**
-   * Register default languages (SQL, Python, Java)
+   * Register supported languages 
+   * Some languages support multiple keywords for identification
    */
   private registerDefaultLanguages(): void {
-    this.registerLanguage(SQL_LANGUAGE);
-    this.registerLanguage(PYTHON_LANGUAGE);
+    this.registerLanguage(C_LANGUAGE);
+    this.registerLanguage(CPP_LANGUAGE);
+    this.registerLanguage(CSHARP_LANGUAGE);
+    this.registerLanguage(DOCKERFILE_LANGUAGE);
+    this.registerLanguage(GOLANG_LANGUAGE);
+    this.registerLanguage(INI_LANGUAGE);
     this.registerLanguage(JAVA_LANGUAGE);
+    this.registerLanguage(JAVASCRIPT_LANGUAGE);
+    this.registerLanguage(KOTLIN_LANGUAGE);
+    this.registerLanguage(POWERSHELL_LANGUAGE);
+    this.registerLanguage(PYTHON_LANGUAGE);
+    this.registerLanguage(R_LANGUAGE);
+    this.registerLanguage(RUBY_LANGUAGE);
+    this.registerLanguage(RUST_LANGUAGE);
+    this.registerLanguage(SHELL_LANGUAGE);
+    this.registerLanguage(SQL_LANGUAGE);
+    this.registerLanguage(SWIFT_LANGUAGE);
+    this.registerLanguage(TOML_LANGUAGE);
+    this.registerLanguage(TYPESCRIPT_LANGUAGE);
+    this.registerLanguage(YAML_LANGUAGE);
   }
 
   /**
@@ -104,6 +322,13 @@ export class LanguageRegistry {
    */
   registerLanguage(language: LanguageDefinition): void {
     this.languages.set(language.name.toLowerCase(), language);
+    
+    // Register additional keywords if they exist
+    if (language.keywords) {
+      language.keywords.forEach(keyword => {
+        this.keywordToLanguage.set(keyword.toLowerCase(), language);
+      });
+    }
   }
 
   /**
@@ -113,6 +338,24 @@ export class LanguageRegistry {
    */
   getLanguage(name: string): LanguageDefinition | null {
     return this.languages.get(name.toLowerCase()) || null;
+  }
+
+  /**
+   * Get language by keyword (case-insensitive)
+   * @param keyword The language keyword
+   * @returns The language definition or null if not found
+   */
+  getLanguageByKeyword(keyword: string): LanguageDefinition | null {
+    return this.keywordToLanguage.get(keyword.toLowerCase()) || null;
+  }
+
+  /**
+   * Get language by name or keyword (case-insensitive)
+   * @param identifier The language name or keyword
+   * @returns The language definition or null if not found
+   */
+  getLanguageByIdentifier(identifier: string): LanguageDefinition | null {
+    return this.getLanguage(identifier) || this.getLanguageByKeyword(identifier);
   }
 
   /**
