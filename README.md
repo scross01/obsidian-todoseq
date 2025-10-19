@@ -35,8 +35,7 @@ or journaling than ackwardliy typing `- [ ]` to create a task checkbox.
      source file.
 - Optional Logseq style priority tokens immediately after the state keyword:
   [#A] high, [#B] medium, [#C] low. Displayed as badges in the Task View.
-- Ignores tasks inside fenced code blocks by default to avoid false positives
-  (configurable in the settings).
+- Optional code block task extraction with language-aware (e.g., Python, JavaScript, Java, etc.) tasks detection from within comments using proper comment syntax for each language.
 - Supports Logseq-style SCHEDULED and DEADLINE dates for task organization and
   sorting.
 
@@ -182,6 +181,41 @@ SCHEDULED: <2025-01-15>
   style)
 - Invalid date formats are ignored and logged to console
 
+### In Code Blocks
+
+When "Include tasks inside code blocks" is enabled, TODOseq can also detect tasks
+within language-specific code blocks using the appropriate comment syntax for
+each programming language.
+
+#### Language-Aware Comment Tasks
+
+TODOseq supports extracting tasks from comments in over 20 programming languages.
+When it encounters a fenced code block (e.g., ```python, ```javascript), it
+automatically detects the language and uses the appropriate comment syntax:
+
+- **Python, Ruby, Shell, YAML, TOML, Dockerfile**: `# TODO Write documentation`
+- **JavaScript, Java, C++, C#, Go, Swift, Kotlin, Rust, PowerShell**: `// TODO Fix this bug`
+- **SQL**: `-- TODO Add index to this query`
+- **INI**: `; TODO Configure this setting`
+
+Examples:
+```python
+# TODO Write unit tests
+# FIXME Handle edge cases
+# HACK Temporary workaround
+```
+
+```javascript
+// TODO Implement error handling
+// DOING Refactor authentication logic
+// DONE Fix memory leak issue
+```
+
+```sql
+-- TODO Add proper indexing
+-- DOING Optimize slow queries
+```
+
 ## Task View Interactions
 
 The state of a task can be modified directly in the task view. The line is
@@ -274,6 +308,13 @@ patterns:
 **Additional Task Keywords**: Capitalised, comma-separated extra keywords to treat as tasks (not completed). Examples: `FIXME, HACK`. These are additive and do not replace built-in keywords.
 
 **Include tasks inside code blocks**: When enabled, tasks inside fenced code blocks (``` or ~~~) are included. Disabled by default.
+
+**Language comment support**: When enabled and "Include tasks inside code blocks" is active, TODOseq automatically detects the programming language and uses appropriate comment syntax to find tasks. Supports 20+ programming languages including:
+
+- **C-style languages**: C, C++, C#, Java, JavaScript, TypeScript, Go, Swift, Kotlin
+- **Scripting languages**: Python, Ruby, Shell/Bash, PowerShell, R
+- **Configuration languages**: YAML, TOML, INI
+- **Other**: SQL, Dockerfile, Rust
 
 **Task view mode**: Choose how completed items are shown by default:
 
