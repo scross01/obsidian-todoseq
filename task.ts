@@ -12,6 +12,7 @@ export interface Task {
   priority: 'high' | 'med' | 'low' | null;
   scheduledDate: Date | null; // scheduled date from SCHEDULED: line
   deadlineDate: Date | null;  // deadline date from DEADLINE: line
+  trailingCommentEnd?: string; // trailing comment end characters (e.g., " */") for multiline comments
 }
 
 export const DEFAULT_PENDING_STATES = new Set<string>(['TODO', 'LATER', 'WAIT', 'WAITING']);

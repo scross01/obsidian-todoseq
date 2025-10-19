@@ -51,7 +51,7 @@ const SQL_LANGUAGE: LanguageDefinition = {
   name: 'sql',
   patterns: {
     singleLine: /^\s*--\s+/,           // starts with --
-    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineStart: /^\s*\/\*+\s*/,    // starts with /* or /** (optional space after)
     multiLineEnd: /\s*\*\/\s*$/,       // ends with */
     multiLineAdditional: /^\s*\*?\s*/, // optional preceesing spaces, may include a * 
     inline: /.*\s+--\s+/
@@ -76,7 +76,7 @@ const JAVA_LANGUAGE: LanguageDefinition = {
   name: 'java',
   patterns: {
     singleLine: /^\s*\/\/\s+/,         // starts with //
-    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineStart: /^\s*\/\*+\s*/,    // starts with /* or /** (optional space after)
     multiLineEnd: /\s*\*\/\s*$/,       // ends with */
     multiLineAdditional: /^\s*\*?\s*/, // optional preceesing spaces, may include a * 
     inline: /.*\s+\/\/\s+/
@@ -102,7 +102,7 @@ const GOLANG_LANGUAGE: LanguageDefinition = {
   name: 'go',
   patterns: {
     singleLine: /^\s*\/\/\s+/,         // starts with //
-    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineStart: /^\s*\/\*+\s*/,    // starts with /* or /** (optional space after)
     multiLineEnd: /\s*\*\/\s*$/,       // ends with */
     multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
     inline: /.*\s+\/\/\s+/
@@ -153,7 +153,7 @@ const C_LANGUAGE: LanguageDefinition = {
   keywords: ['c'],
   patterns: {
     singleLine: /^\s*\/\/\s+/,         // starts with //
-    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineStart: /^\s*\/\*+\s*/,    // starts with /* or /** (optional space after)
     multiLineEnd: /\s*\*\/\s*$/,       // ends with */
     multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
     inline: /.*\s+\/\/\s+/
@@ -173,7 +173,7 @@ const CSHARP_LANGUAGE: LanguageDefinition = {
   keywords: ['csharp', 'cs'],
   patterns: {
     singleLine: /^\s*\/\/\s+/,         // starts with // or ///
-    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineStart: /^\s*\/\*+\s*/,    // starts with /* or /** (optional space after)
     multiLineEnd: /\s*\*\/\s*$/,       // ends with */
     multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
     inline: /.*\s+\/\/\s+/
@@ -186,7 +186,7 @@ const RUST_LANGUAGE: LanguageDefinition = {
   keywords: ['rust'],
   patterns: {
     singleLine: /^\s*\/\/\s+!?/,       // starts with //, ///, or //! 
-    multiLineStart: /^\s*\/\*+\s+!?/,  // starts with /* /** or /*!
+    multiLineStart: /^\s*\/\*+\s*!?/,  // starts with /* /** or /*! (optional space after)
     multiLineEnd: /\s*\*\/\s*$/,       // ends with */
     multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
     inline: /.*\s+\/\/\s+/
@@ -199,7 +199,7 @@ const SWIFT_LANGUAGE: LanguageDefinition = {
   keywords: ['swift'],
   patterns: {
     singleLine: /^\s*\/\/\s+/,         // starts with // or ///
-    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
+    multiLineStart: /^\s*\/\*+\s*/,    // starts with /* or /** (optional space after)
     multiLineEnd: /\s*\*\/\s*$/,       // ends with */
     multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
     inline: /.*\s+\/\/\s+/
@@ -271,7 +271,7 @@ const POWERSHELL_LANGUAGE: LanguageDefinition = {
   keywords: ['powershell'],
   patterns: {
     singleLine: /^\s*#\s+/,            // starts with #
-    multiLineStart: /^\s*<#\s+/,       // starts with <#
+    multiLineStart: /^\s*<#\s*/,       // starts with <# (optional space after)
     multiLineEnd: /\s*#\s*$/,          // ends with #>
     multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
     inline: /.*\s+#\s+/
@@ -406,17 +406,31 @@ export class LanguageAwareRegexBuilder {
       .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
       .join('|');
     
-    const commentPatterns = this.buildCommentPatterns(patterns);
+    // Build separate patterns for different comment types to handle capture groups correctly
+    const singleLinePattern = patterns.singleLine?.source || '';
+    const multiLineStartPattern = patterns.multiLineStart?.source || '';
+    const multiLineAdditionalPattern = patterns.multiLineAdditional?.source || '';
+    const inlinePattern = patterns.inline?.source || '';
+    
     const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s*|[-*+]\\s*\\[[ \\x]\\]\\s*)?`;
     
     // Test regex: matches any comment style followed by task keyword
-    const test = new RegExp(`^[ \\t]*${commentPatterns}(?:${escaped})\\s+`);
+    const testPattern = `^[ \\t]*(?:${singleLinePattern}|${multiLineStartPattern}|${multiLineAdditionalPattern}|${inlinePattern})(?:${escaped})\\s+`;
+    const test = new RegExp(testPattern);
     
     // Capture regex: captures indent, comment, list marker, keyword, and text
-    const capture = new RegExp(
-      `^([ \\t]*)(${commentPatterns})?(${listMarkerPart})?(${escaped})\\s+`,
-      'm' // multiline flag for better matching
-    );
+    // Handle trailing comment characters separately in the parsing logic
+    // For single-line comments, remove the ^\s* part to avoid double-matching whitespace
+    const modifiedSingleLinePattern = singleLinePattern.replace(/^\^\\s\*/, '');
+    const modifiedMultiLineStartPattern = multiLineStartPattern.replace(/^\^\\s\*/, '');
+    // For multi-line additional comments, remove the ^\s* part to avoid double-matching whitespace
+    const modifiedMultiLineAdditionalPattern = multiLineAdditionalPattern.replace(/^\^\\s\*/, '');
+    // For inline comments, keep the original pattern since it needs to match the content before the comment
+    const modifiedInlinePattern = inlinePattern;
+    
+    const commentPattern = `(?:${modifiedSingleLinePattern}|${modifiedMultiLineStartPattern}|${modifiedMultiLineAdditionalPattern}|${modifiedInlinePattern})`;
+    const capturePattern = `^([ \\t]*)(${commentPattern})?(${listMarkerPart})?(${escaped})\\s+([^\\n]*?)(\\s*\\*\\/\\s*)?$`;
+    const capture = new RegExp(capturePattern, 'm'); // multiline flag for better matching
     
     return { test, capture };
   }

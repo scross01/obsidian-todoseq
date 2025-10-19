@@ -197,7 +197,8 @@ export class TaskParser {
       return languageRegex.test.test(line);
     }
     
-    // Fallback to default regex
+    // For tasks outside code blocks, always use the default regex
+    // regardless of language comment support settings
     return this.testRegex.test(line);
   }
 
@@ -292,7 +293,6 @@ export class TaskParser {
       const indent = m[1] ?? '';
       let listMarker = '';
       const state = this.currentLanguage && this.languageCommentSupport.enabled ? (m[4] ?? '') : (m[3] ?? '');
-      const afterPrefix = line.slice(m[0].length);
       
       // For language-aware regex, the list marker is in m[3], for default regex it's in m[2]
       if (this.currentLanguage && this.languageCommentSupport.enabled) {
@@ -303,11 +303,28 @@ export class TaskParser {
       
       // Capture comment prefix for language-aware tasks
       const commentPrefix = this.currentLanguage && this.languageCommentSupport.enabled ? (m[2] ?? '') : '';
+      
+      // Handle the text content and trailing comment characters
+      // For language-aware regex, m[5] is the text, m[6] is trailing comment end
+      let taskText = '';
+      let trailingCommentEnd = '';
+      
+      if (this.currentLanguage && this.languageCommentSupport.enabled) {
+        taskText = (m[5] ?? '') as string;
+        trailingCommentEnd = (m[6] ?? '') as string;
+      } else {
+        // For default regex, the task text is everything after the captured keyword
+        // m[0] is the full match, m[1] is indent, m[2] is list marker, m[3] is keyword
+        // So we need to get the text after m[0]
+        const fullMatch = m[0] || '';
+        const originalLine = line;
+        taskText = originalLine.substring(fullMatch.length).trim();
+      }
 
       // Priority parsing: first occurrence wins, then remove it preserving spacing semantics
       let priority: 'high' | 'med' | 'low' | null = null;
-      const priMatch = /(\s*)\[#([ABC])\](\s*)/.exec(afterPrefix);
-      let cleanedText = afterPrefix;
+      const priMatch = /(\s*)\[#([ABC])\](\s*)/.exec(taskText);
+      let cleanedText = taskText;
       if (priMatch) {
         const letter = priMatch[2];
         if (letter === 'A') priority = 'high';
@@ -351,6 +368,7 @@ export class TaskParser {
         priority,
         scheduledDate: null,
         deadlineDate: null,
+        trailingCommentEnd, // Include trailing comment end characters for multiline comments
       };
 
       // Look for SCHEDULED: and DEADLINE: lines immediately after the task line

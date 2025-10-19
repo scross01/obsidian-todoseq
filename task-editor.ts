@@ -49,6 +49,11 @@ export class TaskEditor {
       }
       
       newLine = `${task.indent}${commentWithSpacing}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
+      
+      // Add trailing comment end characters if they were present in the original task
+      if (task.trailingCommentEnd) {
+        newLine += task.trailingCommentEnd;
+      }
     }
     
     const completed = DEFAULT_COMPLETED_STATES.has(newState);
