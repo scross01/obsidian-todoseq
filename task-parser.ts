@@ -343,7 +343,7 @@ export class TaskParser {
       let finalCompleted = DEFAULT_COMPLETED_STATES.has(state);
       
       // Check if this is a markdown checkbox task and extract checkbox status
-      const checkboxMatch = line.match(/^(\s*)([-*+]\s*)\[(\s|x)\]\s+(\w+)\s+(.+)$/);
+      const checkboxMatch = line.match(/^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/);
       if (checkboxMatch) {
         const [, checkboxIndent, checkboxListMarker, checkboxStatus, checkboxState, checkboxText] = checkboxMatch;
         finalState = checkboxState;
