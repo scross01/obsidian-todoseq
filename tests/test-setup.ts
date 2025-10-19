@@ -1,5 +1,5 @@
 // Test setup file for Jest
-import { LanguageRegistry, LanguageAwareRegexBuilder } from '../language-aware-comment-tasks';
+import { LanguageRegistry, LanguageAwareRegexBuilder } from '../code-block-tasks';
 import { DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES, DEFAULT_COMPLETED_STATES } from '../task';
 
 // Create a global registry instance for all tests

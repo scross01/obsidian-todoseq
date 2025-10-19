@@ -1,6 +1,6 @@
 import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES } from './task';
 import { TodoTrackerSettings } from "./settings";
-import { LanguageAwareRegexBuilder, LanguageRegistry, LanguageDefinition, LanguageCommentSupportSettings } from "./language-aware-comment-tasks";
+import { LanguageAwareRegexBuilder, LanguageRegistry, LanguageDefinition, LanguageCommentSupportSettings } from "./code-block-tasks";
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
