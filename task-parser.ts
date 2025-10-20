@@ -2,14 +2,9 @@ import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_
 import { TodoTrackerSettings } from "./settings";
 import { LanguageAwareRegexBuilder, LanguageRegistry, LanguageDefinition, LanguageCommentSupportSettings } from "./code-block-tasks";
 import { MultilineCommentState } from "./multiline-comment-state";
+import { DateUtils } from "./date-utils";
 
 type RegexPair = { test: RegExp; capture: RegExp };
-
-// Regex patterns for supported date formats
-const DATE_ONLY = /^<(\d{4}-\d{2}-\d{2})>/;
-const DATE_WITH_DOW_ONLY = /^<(\d{4}-\d{2}-\d{2})\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)>/;
-const DATE_WITH_DOW = /^<(\d{4}-\d{2}-\d{2})\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{2}:\d{2})>/;
-const DATE_WITH_TIME = /^<(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})>/;
 
 // Date keyword patterns
 const SCHEDULED_PATTERN = /^SCHEDULED:\s*/;
@@ -171,58 +166,8 @@ export class TaskParser {
     // The regex needs to account for leading whitespace and callout blocks (>)
     const content = line.replace(/^\s*>\s*(SCHEDULED|DEADLINE):\s*/, '').replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '').trim();
     
-    // Try to match date patterns
-    let match = DATE_WITH_DOW.exec(content);
-    if (match) {
-      const [, dateStr, , timeStr] = match;
-      return this.parseDateTimeString(dateStr, timeStr);
-    }
-
-    match = DATE_WITH_DOW_ONLY.exec(content);
-    if (match) {
-      const [, dateStr] = match;
-      return this.parseDateString(dateStr);
-    }
-
-    match = DATE_WITH_TIME.exec(content);
-    if (match) {
-      const [, dateStr, timeStr] = match;
-      return this.parseDateTimeString(dateStr, timeStr);
-    }
-
-    match = DATE_ONLY.exec(content);
-    if (match) {
-      const [, dateStr] = match;
-      return this.parseDateString(dateStr);
-    }
-
-    return null;
-  }
-
-  /**
-   * Parse a date string with optional time
-   * @param dateStr Date string in YYYY-MM-DD format
-   * @param timeStr Optional time string in HH:mm format
-   * @returns Date object in local time (timezone independent)
-   */
-  private parseDateTimeString(dateStr: string, timeStr: string): Date {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    
-    // Create date in local time to preserve the intended time
-    return new Date(year, month - 1, day, hours, minutes);
-  }
-
-  /**
-   * Parse a date string (date only)
-   * @param dateStr Date string in YYYY-MM-DD format
-   * @returns Date object at midnight local time (timezone independent)
-   */
-  private parseDateString(dateStr: string): Date {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    
-    // Create date at midnight local time
-    return new Date(year, month - 1, day, 0, 0, 0, 0);
+    // Use the DateUtils to parse the date content
+    return DateUtils.parseDate(content);
   }
 
   /**
