@@ -426,4 +426,137 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
       expect(task.deadlineDate?.getDate()).toBe(20);
     });
   });
+
+  describe('Math Block Tasks ($$ delimiters)', () => {
+    let parser: TaskParser;
+    let settings: TodoTrackerSettings;
+
+    beforeEach(() => {
+      settings = {
+        refreshInterval: 60,
+        includeCodeBlocks: false,
+        languageCommentSupport: {
+          enabled: false,
+          languages: []
+        },
+        additionalTaskKeywords: [],
+        taskViewMode: 'default'
+      };
+      parser = TaskParser.create(settings);
+    });
+
+    test('should ignore task items inside math blocks', () => {
+      const content = `$$
+TODO = x + y / z
+$$`;
+      const tasks = parser.parseFile(content, 'test.md');
+      
+      expect(tasks).toHaveLength(0);
+    });
+
+    test('should ignore task items inside multi-line math blocks', () => {
+      const content = `$$
+TODO = x + y / z
+DOING = a + b * c
+DONE = result
+$$`;
+      const tasks = parser.parseFile(content, 'test.md');
+      
+      expect(tasks).toHaveLength(0);
+    });
+
+    test('should ignore task items inside math blocks with surrounding text', () => {
+      const content = `Some text before
+
+$$
+TODO = x + y / z
+$$
+
+Some text after`;
+      const tasks = parser.parseFile(content, 'test.md');
+      
+      expect(tasks).toHaveLength(0);
+    });
+
+    test('should parse tasks outside math blocks', () => {
+      const content = `$$
+TODO = x + y / z
+$$
+
+- TODO real task`;
+      const tasks = parser.parseFile(content, 'test.md');
+      
+      expect(tasks).toHaveLength(1);
+      const task = tasks[0];
+      expect(task.state).toBe('TODO');
+      expect(task.completed).toBe(false);
+      expect(task.text).toBe('real task');
+    });
+
+    test('should parse tasks before and after math blocks', () => {
+      const content = `- TODO first task
+
+$$
+TODO = x + y / z
+$$
+
+- TODO second task`;
+      const tasks = parser.parseFile(content, 'test.md');
+      
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('first task');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('second task');
+    });
+
+    test('should handle nested math blocks correctly', () => {
+      const content = `$$
+TODO = x + y / z
+$$
+
+Some text
+
+$$
+DOING = a + b * c
+$$
+
+More text`;
+      const tasks = parser.parseFile(content, 'test.md');
+      
+      expect(tasks).toHaveLength(0);
+    });
+
+    test('should handle incomplete math blocks (no closing $$)', () => {
+      const content = `$$
+TODO = x + y / z
+- TODO this should be ignored since we're still in math block`;
+      const tasks = parser.parseFile(content, 'test.md');
+      
+      expect(tasks).toHaveLength(0);
+    });
+
+    test('should handle math blocks with indentation', () => {
+      const content = `    $$
+    TODO = x + y / z
+    $$`;
+      const tasks = parser.parseFile(content, 'test.md');
+      
+      expect(tasks).toHaveLength(0);
+    });
+
+    test('should not confuse $$ with code block fences', () => {
+      const content = `$$
+TODO = x + y / z
+$$
+
+\`\`\`python
+# This is a code block, not a math block
+TODO = some code
+\`\`\``;
+      const tasks = parser.parseFile(content, 'test.md');
+      
+      expect(tasks).toHaveLength(0);
+    });
+  });
 });

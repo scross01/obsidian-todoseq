@@ -246,7 +246,7 @@ export class TaskParser {
 
     // Fence state
     let inFence = false;
-    let fenceMarker: '`' | '~' | null = null;
+    let fenceMarker: '`' | '~' | '$' | null = null;
     
     // Multiline comment state
     let inMultilineComment = false;
@@ -266,16 +266,19 @@ export class TaskParser {
       }
 
       // Handle multi-line comment state
-      if (this.currentLanguage && inFence) {
+      if (this.currentLanguage && inFence && fenceMarker !== '$') {
         const result = this.handleMultilineCommentState(line, inMultilineComment, multilineCommentIndent);
         inMultilineComment = result.inMultilineComment;
         multilineCommentIndent = result.multilineCommentIndent;
       }
 
-      if (inFence && !this.includeCodeBlocks) {
+      if (inFence && !this.includeCodeBlocks && fenceMarker !== '$') {
         continue;
       }
 
+      if (inFence && fenceMarker === '$') {
+        continue; // Skip lines inside math blocks
+      }
       if (!this.isTask(line, inMultilineComment)) continue;
 
       // Use language-aware regex if applicable
@@ -424,28 +427,34 @@ export class TaskParser {
     this.multilineCommentIndent = '';
   }
 
-  // Enhanced fence delimiter tracker: detects ```lang or ~~~lang at start (with indent), toggles when matching opener char.
+  // Enhanced fence delimiter tracker: detects ```lang or ~~~lang or $$ at start (with indent), toggles when matching opener char.
   private toggleFenceIfDelimiter(
     line: string,
     inFence: boolean,
-    fenceMarker: '`' | '~' | null
-  ): { didToggle: boolean; inFence: boolean; fenceMarker: '`' | '~' | null } {
-    // Enhanced regex to capture language identifier
-    const fenceMatch = /^[ \t]*(`{3,}|~{3,})(\w*)/.exec(line);
+    fenceMarker: '`' | '~' | '$' | null
+  ): { didToggle: boolean; inFence: boolean; fenceMarker: '`' | '~' | '$' | null } {
+    // Enhanced regex to capture language identifier for code blocks and $$ for math blocks
+    const fenceMatch = /^[ \t]*(`{3,}|~{3,}|\$\$)(\w*)/.exec(line);
     if (!fenceMatch) {
       return { didToggle: false, inFence, fenceMarker };
     }
 
     const markerRun = fenceMatch[1];
-    const currentMarker: '`' | '~' = markerRun[0] === '`' ? '`' : '~';
+    const currentMarker: '`' | '~' | '$' = markerRun[0] === '`' ? '`' : markerRun[0] === '~' ? '~' : '$';
     const language = fenceMatch[2].toLowerCase();
 
     if (!inFence) {
-    // Detect language when entering a code block
-      this.detectLanguage(language);
-      return { didToggle: true, inFence: true, fenceMarker: currentMarker };
+      // Detect language when entering a code block, or mark as math block for $$
+      if (currentMarker === '$') {
+        // Math block - no language detection needed
+        return { didToggle: true, inFence: true, fenceMarker: currentMarker };
+      } else {
+        // Code block - detect language
+        this.detectLanguage(language);
+        return { didToggle: true, inFence: true, fenceMarker: currentMarker };
+      }
     } else if (fenceMarker === currentMarker) {
-      // Reset language when exiting a code block
+      // Reset language when exiting a code block or math block
       this.currentLanguage = null;
       this.inMultilineComment = false;
       this.multilineCommentIndent = '';
