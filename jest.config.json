@@ -1,15 +1,22 @@
 {
   "preset": "ts-jest",
   "testEnvironment": "node",
-  "roots": ["<rootDir>/tests"],
-  "testMatch": ["**/*.test.ts"],
-  "transform": {
-    "^.+\\.ts$": "ts-jest"
-  },
-  "moduleFileExtensions": ["ts", "js", "json"],
+  "roots": [
+    "<rootDir>/tests"
+  ],
+  "testMatch": [
+    "**/*.test.ts"
+  ],
+  "moduleFileExtensions": [
+    "ts",
+    "js",
+    "json"
+  ],
+  "collectCoverage": true,
+  "coverageDirectory": "coverage",
   "collectCoverageFrom": [
-    "language-aware-comment-tasks.ts",
-    "!**/node_modules/**",
-    "!**/tests/**"
+    "*.ts",
+    "!main.ts",
+    "!tests/**"
   ]
 }
