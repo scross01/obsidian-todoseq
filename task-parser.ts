@@ -417,47 +417,42 @@ export class TaskParser {
     return tasks;
   }
 
+  private detectLanguage(lang: string): void {
+    // Use getLanguageByIdentifier to support both language names and keywords
+    this.currentLanguage = this.languageRegistry.getLanguageByIdentifier(lang);
+    this.inMultilineComment = false;
+    this.multilineCommentIndent = '';
+  }
+
   // Enhanced fence delimiter tracker: detects ```lang or ~~~lang at start (with indent), toggles when matching opener char.
   private toggleFenceIfDelimiter(
     line: string,
     inFence: boolean,
     fenceMarker: '`' | '~' | null
-  ): { didToggle: boolean; inFence: boolean; fenceMarker: '`' | '~' | null; language?: string } {
+  ): { didToggle: boolean; inFence: boolean; fenceMarker: '`' | '~' | null } {
     // Enhanced regex to capture language identifier
     const fenceMatch = /^[ \t]*(`{3,}|~{3,})(\w*)/.exec(line);
     if (!fenceMatch) {
       return { didToggle: false, inFence, fenceMarker };
     }
-    
+
     const markerRun = fenceMatch[1];
     const currentMarker: '`' | '~' = markerRun[0] === '`' ? '`' : '~';
     const language = fenceMatch[2].toLowerCase();
-    
+
     if (!inFence) {
-      // Detect language when entering a code block
-      // Use getLanguageByIdentifier to support both language names and keywords
-      this.currentLanguage = this.languageRegistry.getLanguageByIdentifier(language);
-      
-      // Reset multi-line comment state
+    // Detect language when entering a code block
+      this.detectLanguage(language);
+      return { didToggle: true, inFence: true, fenceMarker: currentMarker };
+    } else if (fenceMarker === currentMarker) {
+      // Reset language when exiting a code block
+      this.currentLanguage = null;
       this.inMultilineComment = false;
       this.multilineCommentIndent = '';
-      
-      return {
-        didToggle: true,
-        inFence: true,
-        fenceMarker: currentMarker,
-        language
-      };
-    } else {
-      if (fenceMarker === currentMarker) {
-        // Reset language when exiting a code block
-        this.currentLanguage = null;
-        this.inMultilineComment = false;
-        this.multilineCommentIndent = '';
-        return { didToggle: true, inFence: false, fenceMarker: null };
-      }
-      // Different fence char while inside: ignore as plain text
-      return { didToggle: false, inFence, fenceMarker };
+      return { didToggle: true, inFence: false, fenceMarker: null };
     }
+
+    // Different fence char while inside: ignore as plain text
+    return { didToggle: false, inFence, fenceMarker };
   }
 }

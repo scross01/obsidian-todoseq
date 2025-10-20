@@ -46,24 +46,36 @@ export interface RegexPair {
   capture: RegExp;
 }
 
+// Base comment patterns for C-style languages
+const C_STYLE_COMMENTS: LanguageCommentPatterns = {
+  singleLine: /^\s*\/\/\s+/,            // starts with //
+  multiLineStart: /^\s*\/\*+\s*/,       // starts with /* or /**
+  multiLineEnd: /\s*\*\/\s*$/,          // ends with */
+  multiLineAdditional: /^\s*\*?\s*/,    // optional preceding spaces, may include a *
+  inline: /.*\s+\/\/\s+|.*\s+\/\*\s+/,  // support both // and /* */ inline comments
+};
+
+// Base comment patterns for hash-style languages
+const HASH_STYLE_COMMENTS: LanguageCommentPatterns = {
+  singleLine: /^\s*#\s+/, // starts with #
+  multiLineStart: undefined,
+  multiLineEnd: undefined,
+  multiLineAdditional: undefined,
+  inline: /.*\s+#\s+/, // starts with # after code
+};
+
 // C language definition
 const C_LANGUAGE: LanguageDefinition = {
   name: 'c',
   keywords: ['c'],
-  patterns: {
-    singleLine: /^\s*\/\/\s+/,          // starts with //
-    multiLineStart: /^\s*\/\*+\s*/,     // starts with /* or /**
-    multiLineEnd: /\s*\*\/\s*$/,        // ends with */
-    multiLineAdditional: /^\s*\*?\s*/,  // optional preceding spaces, may include a *
-    inline: /.*\s+\/\/\s+|.*\s+\/\*\s+/ // Support both // and /* */ inline comments
-  },
+  patterns: C_STYLE_COMMENTS,
 };
 
 // C++ language definition
 const CPP_LANGUAGE: LanguageDefinition = {
   name: 'cpp',
   keywords: ['cpp', 'c++'],
-  patterns: C_LANGUAGE.patterns,
+  patterns: C_STYLE_COMMENTS,
 };
 
 // C# language definition
@@ -71,28 +83,22 @@ const CSHARP_LANGUAGE: LanguageDefinition = {
   name: 'csharp',
   keywords: ['csharp', 'cs'],
   patterns: {
-    ...C_LANGUAGE.patterns,
-    singleLine: /^\s*\/\/\/?\s+/,          // starts with // or ///
-  }
+    ...C_STYLE_COMMENTS,
+    singleLine: /^\s*\/\/\/?\s+/, // starts with // or ///
+  },
 };
 
 // Dockerfile language definition
 const DOCKERFILE_LANGUAGE: LanguageDefinition = {
   name: 'dockerfile',
   keywords: ['dockerfile'],
-  patterns: {
-    singleLine: /^\s*#\s+/,           // starts with #
-    multiLineStart: undefined,
-    multiLineEnd: undefined,
-    multiLineAdditional: undefined,
-    inline: /.*\s+#\s+/               // starts with # after code
-  },
+  patterns: HASH_STYLE_COMMENTS,
 };
 
 // Go language definition
 const GOLANG_LANGUAGE: LanguageDefinition = {
   name: 'go',
-  patterns: C_LANGUAGE.patterns,
+  patterns: C_STYLE_COMMENTS,
 };
 
 // INI language definition
@@ -100,32 +106,32 @@ const INI_LANGUAGE: LanguageDefinition = {
   name: 'ini',
   keywords: ['ini'],
   patterns: {
-    singleLine: /^\s*[;#]\s+/,       // starts with ; or #
+    singleLine: /^\s*[;#]\s+/, // starts with ; or #
     multiLineStart: undefined,
     multiLineEnd: undefined,
     multiLineAdditional: undefined,
-    inline: /.*\s+[;#]\s+/           // starts with ; or # after code
+    inline: /.*\s+[;#]\s+/, // starts with ; or # after code
   },
 };
 
 // Java language definition
 const JAVA_LANGUAGE: LanguageDefinition = {
   name: 'java',
-  patterns: C_LANGUAGE.patterns,
+  patterns: C_STYLE_COMMENTS,
 };
 
-// JavaScript language definition (reuses Java patterns)
+// JavaScript language definition
 const JAVASCRIPT_LANGUAGE: LanguageDefinition = {
   name: 'javascript',
   keywords: ['javascript', 'js'],
-  patterns: JAVA_LANGUAGE.patterns,
+  patterns: C_STYLE_COMMENTS,
 };
 
 // Kotlin language definition
 const KOTLIN_LANGUAGE: LanguageDefinition = {
   name: 'kotlin',
   keywords: ['kotlin'],
-  patterns: JAVA_LANGUAGE.patterns,
+  patterns: C_STYLE_COMMENTS,
 };
 
 // PowerShell language definition
@@ -133,11 +139,11 @@ const POWERSHELL_LANGUAGE: LanguageDefinition = {
   name: 'powershell',
   keywords: ['powershell'],
   patterns: {
-    singleLine: /^\s*#\s+/,            // starts with #
-    multiLineStart: /^\s*<#\s*/,       // starts with <#
-    multiLineEnd: /\s*#\s*$/,          // ends with #>
-    multiLineAdditional: /^\s*\*?\s*/, // optional preceding spaces, may include a *
-    inline: /.*\s+#\s+|.*\s+<#\s+/
+    singleLine: /^\s*#\s+/,             // starts with #
+    multiLineStart: /^\s*<#\s*/,        // starts with <#
+    multiLineEnd: /\s*#\s*$/,           // ends with #>
+    multiLineAdditional: /^\s*\*?\s*/,  // optional preceding spaces, may include a *
+    inline: /.*\s+#\s+|.*\s+<#\s+/,     // support both # and <# #> inline comments
   },
 };
 
@@ -146,11 +152,11 @@ const PYTHON_LANGUAGE: LanguageDefinition = {
   name: 'python',
   keywords: ['python', 'py'],
   patterns: {
-    singleLine: /^\s*#\s+/,            // starts with #
-    multiLineStart: /^\s*['"]{3}\s+/,  // starts with ''' or """
-    multiLineEnd: /\s*['"]{3}\s*$/,    // ends with ''' or """
-    multiLineAdditional: /^\s*/,       // optional preceeding spaces
-    inline: /.*\s+#\s+/
+    singleLine: /^\s*#\s+/,             // starts with #
+    multiLineStart: /^\s*['"]{3}\s+/,   // starts with ''' or """
+    multiLineEnd: /\s*['"]{3}\s*$/,     // ends with ''' or """
+    multiLineAdditional: /^\s*/,        // optional preceeding spaces
+    inline: /.*\s+#\s+/,                // starts with #
   },
 };
 
@@ -158,24 +164,18 @@ const PYTHON_LANGUAGE: LanguageDefinition = {
 const R_LANGUAGE: LanguageDefinition = {
   name: 'r',
   keywords: ['r'],
-  patterns: {
-    singleLine: /^\s*#\s+/,            // starts with #
-    multiLineStart: undefined,
-    multiLineEnd: undefined,
-    multiLineAdditional: undefined,
-    inline: /.*\s+#\s+/                // starts with # afetr code
-  },
+  patterns: HASH_STYLE_COMMENTS,
 };
 
 // Ruby language definition
 const RUBY_LANGUAGE: LanguageDefinition = {
   name: 'ruby',
   patterns: {
-    singleLine: /^\s*#\s+/,            // starts with #
-    multiLineStart: /^\s*=begin\s+/,   // starts with =begin
-    multiLineEnd: /\s*=end\s*$/,       // ends with =end
-    multiLineAdditional: /^\s*/,       // optional preceding spaces
-    inline: /.*\s+#\s+/
+    singleLine: /^\s*#\s+/,           // starts with #
+    multiLineStart: /^\s*=begin\s+/,  // starts with =begin
+    multiLineEnd: /\s*=end\s*$/,      // ends with =end
+    multiLineAdditional: /^\s*/,      // optional preceding spaces
+    inline: /.*\s+#\s+/,              // starts with #
   },
 };
 
@@ -184,11 +184,11 @@ const RUST_LANGUAGE: LanguageDefinition = {
   name: 'rust',
   keywords: ['rust'],
   patterns: {
-    singleLine: /^\s*\/\/[\/!]?\s+/,     // starts with //, /// or //!
-    multiLineStart: /^\s*\/\*\*?\s+/,    // starts with /* or /**
-    multiLineEnd: /\s*\*\/\s*$/,         // ends with */
-    multiLineAdditional: /^\s*\*?\s*/,   // optional preceding spaces, may include a *
-    inline: /.*\s+\/\/\s+|.*\s+\/\*\s+/  // Support both // and /* */ inline comments
+    singleLine: /^\s*\/\/[\/!]?\s+/,      // starts with //, /// or //!
+    multiLineStart: /^\s*\/\*\*?\s+/,     // starts with /* or /**
+    multiLineEnd: /\s*\*\/\s*$/,          // ends with */
+    multiLineAdditional: /^\s*\*?\s*/,    // optional preceding spaces, may include a *
+    inline: /.*\s+\/\/\s+|.*\s+\/\*\s+/,  // support both // and /* */ inline comments
   },
 };
 
@@ -196,25 +196,19 @@ const RUST_LANGUAGE: LanguageDefinition = {
 const SHELL_LANGUAGE: LanguageDefinition = {
   name: 'shell',
   keywords: ['shell', 'sh', 'bash'],
-  patterns: {
-    singleLine: /^\s*#\s+/,            // starts with #
-    multiLineStart: undefined,
-    multiLineEnd: undefined,
-    multiLineAdditional: undefined,
-    inline: /.*\s+#\s+/
-  },
+  patterns: HASH_STYLE_COMMENTS,
 };
 
 // SQL language definition
 const SQL_LANGUAGE: LanguageDefinition = {
   name: 'sql',
   patterns: {
-    singleLine: /^\s*--\s+|\s*#\s+/,   // starts with -- or # (MySQL style)
-    multiLineStart: /^\s*\/\*+\s+/,    // starts with /* or /**
-    multiLineEnd: /\s*\*\/\s*$/,       // ends with */
-    multiLineAdditional: /^\s*\*?\s*/, // optional preceesing spaces, may include a * 
-    inline: /.*\s+--\s+|.*\s+\/\*\s+/,
-  }
+    singleLine: /^\s*--\s+|\s*#\s+/,    // starts with -- or # (MySQL style)
+    multiLineStart: /^\s*\/\*+\s+/,     // starts with /* or /**
+    multiLineEnd: /\s*\*\/\s*$/,        // ends with */
+    multiLineAdditional: /^\s*\*?\s*/,  // optional preceesing spaces, may include a *
+    inline: /.*\s+--\s+|.*\s+\/\*\s+/,  // support both -- and /* */ inline comments
+  },
 };
 
 // Swift language definition
@@ -222,42 +216,30 @@ const SWIFT_LANGUAGE: LanguageDefinition = {
   name: 'swift',
   keywords: ['swift'],
   patterns: {
-    ...C_LANGUAGE.patterns,
-    singleLine: /^\s*\/\/\/?\s+/,     // starts with //, ///
-  }
+    ...C_STYLE_COMMENTS,
+    singleLine: /^\s*\/\/\/?\s+/, // starts with //, ///
+  },
 };
 
 // TOML language definition
 const TOML_LANGUAGE: LanguageDefinition = {
   name: 'toml',
   keywords: ['toml'],
-  patterns: {
-    singleLine: /^\s*#\s+/,            // starts with #
-    multiLineStart: undefined,
-    multiLineEnd: undefined,
-    multiLineAdditional: undefined,
-    inline: /.*\s+#\s+/
-  },
+  patterns: HASH_STYLE_COMMENTS,
 };
 
-// TypeScript language definition (reuses Java patterns)
+// TypeScript language definition
 const TYPESCRIPT_LANGUAGE: LanguageDefinition = {
   name: 'typescript',
   keywords: ['typescript', 'ts'],
-  patterns: JAVASCRIPT_LANGUAGE.patterns,
+  patterns: C_STYLE_COMMENTS,
 };
 
 // YAML language definition
 const YAML_LANGUAGE: LanguageDefinition = {
   name: 'yaml',
   keywords: ['yaml', 'yml'],
-  patterns: {
-    singleLine: /^\s*#\s+/,            // starts with #
-    multiLineStart: undefined,
-    multiLineEnd: undefined,
-    multiLineAdditional: undefined,
-    inline: /.*\s+#\s+/
-  },
+  patterns: HASH_STYLE_COMMENTS,
 };
 
 /**
@@ -417,36 +399,6 @@ export class LanguageAwareRegexBuilder {
     return { test, capture };
   }
 
-  /**
-   * Build comment pattern regex from language patterns
-   * @param patterns Language comment patterns
-   * @returns Combined regex pattern string
-   */
-  private buildCommentPatterns(patterns: LanguageCommentPatterns): string {
-    const patternParts: string[] = [];
-    
-    // Single-line comments
-    if (patterns.singleLine) {
-      patternParts.push(`(?:${patterns.singleLine.source})`);
-    }
-    
-    // Multi-line comments (start)
-    if (patterns.multiLineStart) {
-      patternParts.push(`(?:${patterns.multiLineStart.source})`);
-    }
-    
-    // Additional lines within multi-line comments
-    if (patterns.multiLineAdditional) {
-      patternParts.push(`(?:${patterns.multiLineAdditional.source})`);
-    }
-    
-    // Inline comments
-    if (patterns.inline) {
-      patternParts.push(`(?:${patterns.inline.source})`);
-    }
-    
-    return patternParts.join('|');
-  }
 
   /**
    * Build default regex (fallback when no language is specified)
