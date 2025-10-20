@@ -1,8 +1,8 @@
 import { PluginSettingTab, App, Setting } from 'obsidian';
-import TodoTracker from './main';
-import { TodoView } from './task-view';
-import { TaskViewMode } from "./task-view";
-import { LanguageRegistry, LanguageCommentSupportSettings, LanguageDefinition } from "./code-block-tasks";
+import TodoTracker from '../main';
+import { TodoView } from '../view/task-view';
+import { TaskViewMode } from "../view/task-view";
+import { LanguageRegistry, LanguageCommentSupportSettings, LanguageDefinition } from "../parser/code-block-tasks";
 
 export interface TodoTrackerSettings {
   refreshInterval: number; // refresh interval in seconds

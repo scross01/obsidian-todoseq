@@ -1,8 +1,8 @@
 import { Plugin, TFile, TAbstractFile, WorkspaceLeaf } from 'obsidian';
 import { Task } from './task';
-import { TodoView, TaskViewMode } from "./task-view";
-import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./settings";
-import { TaskParser } from './task-parser';
+import { TodoView, TaskViewMode } from "./view/task-view";
+import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./settings/settings";
+import { TaskParser } from './parser/task-parser';
 
 export const TASK_VIEW_ICON = "list-todo";
 

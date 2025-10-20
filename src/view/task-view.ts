@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView, setIcon, moment } from 'obsidian';
-import { TASK_VIEW_ICON } from './main';
+import { TASK_VIEW_ICON } from '../main';
 import { TaskEditor } from './task-editor';
-import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from './task';
+import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from '../task';
 
 
 export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';

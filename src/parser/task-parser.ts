@@ -1,8 +1,8 @@
-import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES } from './task';
-import { TodoTrackerSettings } from "./settings";
+import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES } from '../task';
+import { TodoTrackerSettings } from "../settings/settings";
 import { LanguageAwareRegexBuilder, LanguageRegistry, LanguageDefinition, LanguageCommentSupportSettings } from "./code-block-tasks";
 import { MultilineCommentState } from "./multiline-comment-state";
-import { DateUtils } from "./date-utils";
+import { DateUtils } from "../date-utils";
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
