@@ -21,7 +21,7 @@
   },
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc --noEmit main.ts --skipLibCheck && node esbuild.config.mjs production",
+    "build": "tsc --noEmit src/main.ts --skipLibCheck && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
     "test": "jest"
   }

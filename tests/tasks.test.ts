@@ -1,6 +1,6 @@
-import { TaskParser } from '../task-parser';
-import { TodoTrackerSettings } from '../settings';
-import { Task, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES, DEFAULT_COMPLETED_STATES } from '../task';
+import { TaskParser } from '../src/task-parser';
+import { TodoTrackerSettings } from '../src/settings';
+import { Task, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES, DEFAULT_COMPLETED_STATES } from '../src/task';
 
 describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
   let parser: TaskParser;

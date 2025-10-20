@@ -15,8 +15,8 @@
   "collectCoverage": true,
   "coverageDirectory": "coverage",
   "collectCoverageFrom": [
-    "*.ts",
-    "!main.ts",
+    "src/**/*.ts",
+    "!src/main.ts",
     "!tests/**"
   ]
 }
