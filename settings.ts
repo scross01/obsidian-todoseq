@@ -8,6 +8,7 @@ export interface TodoTrackerSettings {
   refreshInterval: number; // refresh interval in seconds
   additionalTaskKeywords: string[]; // capitalised keywords treated as NOT COMPLETED (e.g., FIXME, HACK)
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
+  includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
   taskViewMode: TaskViewMode; // controls view transformation in the task view
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
 }
@@ -17,6 +18,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   // No additional keywords by default; built-in defaults live in task.ts
   additionalTaskKeywords: [],
   includeCodeBlocks: false,
+  includeCalloutBlocks: true, // Enabled by default
   taskViewMode: 'default',
   languageCommentSupport: {
     enabled: true,
@@ -129,7 +131,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     const languageSettingContainer = containerEl.createDiv();
     const languageSetting = new Setting(languageSettingContainer)
       .setName('Enable language comment support')
-      .setDesc('When enabled, tasks inside code blocks will be detected using language-specific comment patterns.')
+      .setDesc('When enabled, tasks inside code blocks will be detected using language-specific comment patterns e.g. `// TODO`')
       .addToggle(toggle => {
         languageToggleComponent = toggle;
         return toggle
@@ -158,6 +160,21 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     // Listen for includeCodeBlocks changes and update language toggle accordingly
     this.plugin.settings.includeCodeBlocks = this.plugin.settings.includeCodeBlocks; // Force reactivity
     updateLanguageToggle(this.plugin.settings.includeCodeBlocks);
+
+    // Include tasks inside callout blocks
+    new Setting(containerEl)
+      .setName('Include tasks inside quote and callout blocks')
+      .setDesc('When enabled, include tasks inside quote and callout blocks (>, >[!info], >[!todo], etc.)')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.includeCalloutBlocks)
+        .onChange(async (value) => {
+          this.plugin.settings.includeCalloutBlocks = value;
+          await this.plugin.saveSettings();
+          // Recreate parser to reflect includeCalloutBlocks change and rescan
+          this.plugin.recreateParser();
+          await this.plugin.scanVault();
+          await this.refreshAllTaskViews();
+        }));
 
     new Setting(containerEl)
       .setName('Task view mode')

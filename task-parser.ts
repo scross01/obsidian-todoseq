@@ -17,6 +17,9 @@ const DEADLINE_PATTERN = /^DEADLINE:\s*/;
 export class TaskParser {
   private readonly testRegex: RegExp;
   private readonly captureRegex: RegExp;
+  private readonly calloutTestRegex: RegExp;
+  private readonly calloutCaptureRegex: RegExp;
+  private readonly includeCalloutBlocks: boolean;
   private readonly includeCodeBlocks: boolean;
   private readonly languageCommentSupport: LanguageCommentSupportSettings;
   private readonly customKeywords: string[];
@@ -32,12 +35,25 @@ export class TaskParser {
 
   private constructor(
     regex: RegexPair,
+    includeCalloutBlocks: boolean,
     includeCodeBlocks: boolean,
     languageCommentSupport: LanguageCommentSupportSettings,
     customKeywords: string[]
   ) {
     this.testRegex = regex.test;
     this.captureRegex = regex.capture;
+    
+    // Initialize callout block regexes
+    const calloutRegex = TaskParser.buildCalloutRegex([
+      ...Array.from(DEFAULT_PENDING_STATES),
+      ...Array.from(DEFAULT_ACTIVE_STATES),
+      ...customKeywords,
+      ...Array.from(DEFAULT_COMPLETED_STATES),
+    ]);
+    this.calloutTestRegex = calloutRegex.test;
+    this.calloutCaptureRegex = calloutRegex.capture;
+    
+    this.includeCalloutBlocks = includeCalloutBlocks;
     this.includeCodeBlocks = includeCodeBlocks;
     this.languageCommentSupport = languageCommentSupport;
     this.customKeywords = customKeywords;
@@ -74,6 +90,7 @@ export class TaskParser {
     const regex = TaskParser.buildRegex(allKeywordsArray);
     return new TaskParser(
       regex,
+      !!settings.includeCalloutBlocks,
       !!settings.includeCodeBlocks,
       settings.languageCommentSupport,
       normalizedAdditional
@@ -89,8 +106,27 @@ export class TaskParser {
     const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s*|[-*+]\\s*\\[[ \\x]\\]\\s*)?`;
     
     // Intentionally case-sensitive (no flags). Matches capitalised keywords only.
-    const test = new RegExp(`^[ \\t]*${listMarkerPart}(?:${escaped})\\s+`);
-    const capture = new RegExp(`^([ \\t]*)(${listMarkerPart})?(${escaped})\\s+`);
+    const test = new RegExp(`^[ \\t>]*(?:\\[\\![^\\]]+\\]\\s*)?${listMarkerPart}(?:${escaped})\\s+`);
+    const capture = new RegExp(`^([ \\t>]*)?(?:\\[\\![^\\]]+\\]\\s*)?(${listMarkerPart})?(${escaped})\\s+`);
+    return { test, capture };
+  }
+
+  /**
+   * Build regex specifically for callout block tasks
+   * @param keywords Array of task keywords
+   * @returns RegexPair for testing and capturing callout block tasks
+   */
+  static buildCalloutRegex(keywords: string[]): RegexPair {
+    const escaped = keywords
+      .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    
+    // Simple list marker pattern that works for both regular and checkbox formats
+    const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s*|[-*+]\\s*\\[[ \\x]\\]\\s*)?`;
+    
+    // Regex for callout blocks: > followed by optional callout type, then optional list marker, then keyword
+    const test = new RegExp(`^[ \\t]*>\\s*(?:\\[!\\s*[^\\]]+\\s*\\]\\s*)?(?:-)?\\s*${listMarkerPart}(?:${escaped})\\s+`);
+    const capture = new RegExp(`^[ \\t]*>(\\s*)(?:\\[!\\s*([^\\]]+)\\s*\\]\\s*)?(?:-)?\\s*(${listMarkerPart})?(${escaped})\\s+`);
     return { test, capture };
   }
 
@@ -101,8 +137,8 @@ export class TaskParser {
    */
   parseDateFromLine(line: string): Date | null {
     // Remove the SCHEDULED: or DEADLINE: prefix and trim
-    // The regex needs to account for leading whitespace
-    const content = line.replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '').trim();
+    // The regex needs to account for leading whitespace and callout blocks (>)
+    const content = line.replace(/^\s*>\s*(SCHEDULED|DEADLINE):\s*/, '').replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '').trim();
     
     // Try to match date patterns
     let match = DATE_WITH_DOW.exec(content);
@@ -166,14 +202,22 @@ export class TaskParser {
    */
   getDateLineType(line: string, taskIndent: string): 'scheduled' | 'deadline' | null {
     const trimmedLine = line.trim();
+    
+    // For callout blocks, check if the line starts with > and the rest starts with SCHEDULED: or DEADLINE:
+    if (line.startsWith('>')) {
+      const contentAfterArrow = trimmedLine.substring(1).trim();
+      if (contentAfterArrow.startsWith('SCHEDULED:') || contentAfterArrow.startsWith('DEADLINE:')) {
+        return contentAfterArrow.startsWith('SCHEDULED:') ? 'scheduled' : 'deadline';
+      }
+    }
+    
+    // For regular tasks, check if the trimmed line starts with SCHEDULED: or DEADLINE:
     if (!trimmedLine.startsWith('SCHEDULED:') && !trimmedLine.startsWith('DEADLINE:')) {
       return null;
     }
 
-    // Check if the indent matches (same level) OR is indented (more spaces/tabs than task)
+    // For regular tasks, check indent matching
     const lineIndent = line.substring(0, line.length - trimmedLine.length);
-    
-    // Allow same indent OR more indent (Logseq style)
     if (lineIndent !== taskIndent && !lineIndent.startsWith(taskIndent)) {
       return null;
     }
@@ -200,6 +244,15 @@ export class TaskParser {
     // For tasks outside code blocks, always use the default regex
     // regardless of language comment support settings
     return this.testRegex.test(line);
+  }
+
+  /**
+   * Check if a line is a task within a callout block
+   * @param line The line to check
+   * @returns True if the line is a task in a callout block
+   */
+  private isCalloutTask(line: string): boolean {
+    return this.calloutTestRegex.test(line);
   }
 
   /**
@@ -252,6 +305,14 @@ export class TaskParser {
     let inMultilineComment = false;
     let multilineCommentIndent = '';
 
+    // Callout block state
+    let inCalloutBlock = false;
+    let calloutBlockType: string | null = null;
+    let calloutBlockCollapsible = false;
+    
+    // Callout block detection regex
+    const calloutBlockRegex = /^[ \t]*>\s*(?:\[!\s*([^\]]+)\s*\]\s*)?(?:-)?\s*$/;
+
     const tasks: Task[] = [];
 
     for (let index = 0; index < lines.length; index++) {
@@ -272,18 +333,62 @@ export class TaskParser {
         multilineCommentIndent = result.multilineCommentIndent;
       }
 
+      // Detect callout blocks
+      const calloutMatch = calloutBlockRegex.exec(line);
+      
+      if (calloutMatch) {
+        // This is a callout block declaration line
+        if (calloutMatch[1]) {
+          // This is a structured callout like >[!info]
+          const calloutType = calloutMatch[1].trim();
+          calloutBlockType = calloutType;
+          calloutBlockCollapsible = line.includes('-');
+        } else {
+          // This is a simple quote block
+          calloutBlockType = 'quote';
+          calloutBlockCollapsible = false;
+        }
+        inCalloutBlock = true;
+        // Don't continue here - we still need to process the line for task parsing
+      } else if (this.calloutTestRegex.test(line)) {
+        // This is a callout task line (for simple quote blocks)
+        calloutBlockType = 'quote';
+        calloutBlockCollapsible = false;
+        inCalloutBlock = true;
+      }
+      
+      // Check if we're exiting a callout block
+      if (inCalloutBlock && !line.trim().startsWith('>')) {
+        inCalloutBlock = false;
+        calloutBlockType = null;
+        calloutBlockCollapsible = false;
+      }
+      
+      // Skip lines inside callout blocks if disabled
+      if (inCalloutBlock && !this.includeCalloutBlocks) {
+        continue;
+      }
+
+      // Skip lines inside code blocks if disabled
       if (inFence && !this.includeCodeBlocks && fenceMarker !== '$') {
         continue;
       }
 
+      // Skip lines inside math blocks
       if (inFence && fenceMarker === '$') {
-        continue; // Skip lines inside math blocks
+        continue;
       }
-      if (!this.isTask(line, inMultilineComment)) continue;
 
-      // Use language-aware regex if applicable
+      if (!this.isTask(line, inMultilineComment) && !this.isCalloutTask(line)) continue;
+
+      // Use language-aware regex if applicable or callout regex for callout tasks
       let regex = this.captureRegex;
-      if (this.currentLanguage && this.languageCommentSupport.enabled) {
+      let isCalloutTask = false;
+      
+      if (this.isCalloutTask(line)) {
+        regex = this.calloutCaptureRegex;
+        isCalloutTask = true;
+      } else if (this.currentLanguage && this.languageCommentSupport.enabled) {
           regex = this.languageAwareRegex.buildRegexWithAllKeywords(
             this.currentLanguage,
             this.customKeywords
@@ -295,33 +400,35 @@ export class TaskParser {
 
       const indent = m[1] ?? '';
       let listMarker = '';
-      const state = this.currentLanguage && this.languageCommentSupport.enabled ? (m[4] ?? '') : (m[3] ?? '');
-      
-      // For language-aware regex, the list marker is in m[3], for default regex it's in m[2]
-      if (this.currentLanguage && this.languageCommentSupport.enabled) {
-        listMarker = (m[3] ?? '') as string;
-      } else {
-        listMarker = (m[2] ?? '') as string;
-      }
-      
-      // Capture comment prefix for language-aware tasks
-      const commentPrefix = this.currentLanguage && this.languageCommentSupport.enabled ? (m[2] ?? '') : '';
-      
-      // Handle the text content and trailing comment characters
-      // For language-aware regex, m[5] is the text, m[6] is trailing comment end
       let taskText = '';
+      let commentPrefix = '';
       let trailingCommentEnd = '';
+      let state = '';
       
-      if (this.currentLanguage && this.languageCommentSupport.enabled) {
+      // Handle different regex patterns for different task types
+      if (isCalloutTask) {
+        // For callout tasks: m[1] is whitespace after >, m[2] is callout type, m[3] is list marker, m[4] is state
+        listMarker = (m[3] ?? '') as string;
+        state = (m[4] ?? '') as string;
+        const fullMatch = m[0] || '';
+        taskText = line.substring(fullMatch.length).trim();
+      } else if (this.currentLanguage && this.languageCommentSupport.enabled) {
+        // For language-aware regex, the list marker is in m[3], for default regex it's in m[2]
+        listMarker = (m[3] ?? '') as string;
+        commentPrefix = (m[2] ?? '') as string;
+        state = (m[4] ?? '') as string;
+        
+        // Handle the text content and trailing comment characters
+        // For language-aware regex, m[5] is the text, m[6] is trailing comment end
         taskText = (m[5] ?? '') as string;
         trailingCommentEnd = (m[6] ?? '') as string;
       } else {
         // For default regex, the task text is everything after the captured keyword
         // m[0] is the full match, m[1] is indent, m[2] is list marker, m[3] is keyword
-        // So we need to get the text after m[0]
+        listMarker = (m[2] ?? '') as string;
+        state = (m[3] ?? '') as string;
         const fullMatch = m[0] || '';
-        const originalLine = line;
-        taskText = originalLine.substring(fullMatch.length).trim();
+        taskText = line.substring(fullMatch.length).trim();
       }
 
       // Priority parsing: first occurrence wins, then remove it preserving spacing semantics
@@ -346,13 +453,19 @@ export class TaskParser {
       let finalCompleted = DEFAULT_COMPLETED_STATES.has(state);
       
       // Check if this is a markdown checkbox task and extract checkbox status
-      const checkboxMatch = line.match(/^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/);
+      // For callout blocks, we need to handle the > prefix
+      let checkboxMatch = line.match(/^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/);
+      if (!checkboxMatch && line.startsWith('>')) {
+        // Try again without the > prefix for callout blocks
+        checkboxMatch = line.substring(1).match(/^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/);
+      }
+      
       if (checkboxMatch) {
         const [, checkboxIndent, checkboxListMarker, checkboxStatus, checkboxState, checkboxText] = checkboxMatch;
         finalState = checkboxState;
         finalCompleted = checkboxStatus === 'x';
-        // Update listMarker to preserve the original checkbox format
-        listMarker = checkboxListMarker;
+        // Update listMarker to preserve the original checkbox format, but trim trailing spaces
+        listMarker = checkboxListMarker.trimEnd();
         // Update text to use the extracted text from checkbox format
         // The text should be everything after the state keyword
       }
@@ -385,6 +498,11 @@ export class TaskParser {
         const nextLineTrimmed = nextLine.trim();
         if (nextLineTrimmed === '') {
           continue; // Skip empty lines
+        }
+
+        // For callout blocks, stop looking for date lines when we exit the callout block
+        if (inCalloutBlock && !nextLine.startsWith('>')) {
+          break;
         }
 
         const dateLineType = this.getDateLineType(nextLine, indent);
