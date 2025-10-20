@@ -76,22 +76,76 @@ export class DateUtils {
    * @param content The string content to parse
    * @returns Parsed Date object or null if parsing fails
    */
-  static parseDate(content: string): Date | null {
-    // Try each pattern in order
-    for (const pattern of DATE_PATTERNS) {
-      const match = pattern.regex.exec(content);
-      if (match) {
-        const dateStr = match[1];
-        
-        if (pattern.hasTime) {
-          const timeStr = pattern.type === 'DATE_WITH_DOW' ? match[3] : match[2];
-          return this.parseDateTimeString(dateStr, timeStr);
+    static parseDate(content: string): Date | null {
+      // Try each pattern in order
+      for (const pattern of DATE_PATTERNS) {
+        const match = pattern.regex.exec(content);
+        if (match) {
+          const dateStr = match[1];
+          
+          if (pattern.hasTime) {
+            const timeStr = pattern.type === 'DATE_WITH_DOW' ? match[3] : match[2];
+            return this.parseDateTimeString(dateStr, timeStr);
+          } else {
+            return this.parseDateString(dateStr);
+          }
+        }
+      }
+      
+      return null;
+    }
+  
+    /**
+     * Format a date for display with relative time indicators
+     * @param date The date to format
+     * @param includeTime Whether to include time if available
+     * @returns Formatted date string
+     */
+    static formatDateForDisplay(date: Date | null, includeTime: boolean = false): string {
+      if (!date) return '';
+      
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const taskDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      
+      const diffTime = taskDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const formatTime = (d: Date) => {
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`;
+      };
+  
+      const formatFullDate = (d: Date) => {
+          const month = d.toLocaleString('default', { month: 'short' });
+          const day = d.getDate();
+          const year = d.getFullYear();
+          return `${month} ${day}, ${year}`;
+      }
+      
+      if (diffDays === 0) {
+        return includeTime && (date.getHours() !== 0 || date.getMinutes() !== 0)
+          ? `Today ${formatTime(date)}`
+          : 'Today';
+      } else if (diffDays === 1) {
+        return includeTime && (date.getHours() !== 0 || date.getMinutes() !== 0)
+          ? `Tomorrow ${formatTime(date)}`
+          : 'Tomorrow';
+      } else if (diffDays === -1) {
+        return 'Yesterday';
+      } else if (diffDays > 0 && diffDays <= 7) {
+        return `${diffDays} days from now`;
+      } else if (diffDays < 0) {
+        return `${Math.abs(diffDays)} days ago`;
+      } else {
+        // For dates beyond a week, use absolute formatting
+        if (includeTime && (date.getHours() !== 0 || date.getMinutes() !== 0)) {
+          return `${formatFullDate(date)} ${formatTime(date)}`;
         } else {
-          return this.parseDateString(dateStr);
+          return formatFullDate(date);
         }
       }
     }
-    
-    return null;
   }
-}
+  

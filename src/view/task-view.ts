@@ -1,7 +1,8 @@
-import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView, setIcon, moment } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView, setIcon } from 'obsidian';
 import { TASK_VIEW_ICON } from '../main';
 import { TaskEditor } from './task-editor';
 import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from '../task';
+import { DateUtils } from '../date-utils';
 
 
 export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';
@@ -815,37 +816,7 @@ export class TodoView extends ItemView {
    */
   private formatDateForDisplay(date: Date | null, includeTime: boolean = false): string {
     if (!date) return '';
-    
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const taskDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    
-    const diffTime = taskDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    // Use moment for consistent formatting with Obsidian
-    const momentDate = moment(date);
-    
-    if (diffDays === 0) {
-      return includeTime && date.getHours() !== 0 || date.getMinutes() !== 0
-        ? `Today ${momentDate.format('HH:mm')}`
-        : 'Today';
-    } else if (diffDays === 1) {
-      return includeTime && date.getHours() !== 0 || date.getMinutes() !== 0
-        ? `Tomorrow ${momentDate.format('HH:mm')}`
-        : 'Tomorrow';
-    } else if (diffDays === -1) {
-      return 'Yesterday';
-    } else if (diffDays > 0 && diffDays <= 7) {
-      return `${diffDays} days from now`;
-    } else if (diffDays < 0) {
-      return `${Math.abs(diffDays)} days ago`;
-    } else {
-      // For dates beyond a week, use absolute formatting
-      return includeTime
-        ? momentDate.format('MMM D, YYYY HH:mm')
-        : momentDate.format('MMM D, YYYY');
-    }
+    return DateUtils.formatDateForDisplay(date, includeTime);
   }
 
   /**
