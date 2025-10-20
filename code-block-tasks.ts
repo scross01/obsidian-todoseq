@@ -399,7 +399,6 @@ export class LanguageAwareRegexBuilder {
     return { test, capture };
   }
 
-
   /**
    * Build default regex (fallback when no language is specified)
    * @param keywords Array of task keywords to search for

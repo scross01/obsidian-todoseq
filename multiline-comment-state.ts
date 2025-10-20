@@ -61,18 +61,4 @@ export class MultilineCommentState {
     
     return { inMultilineComment: this.inMultilineComment, multilineCommentIndent: this.multilineCommentIndent };
   }
-
-  /**
-   * Check if we're currently inside a multiline comment
-   */
-  get isInMultilineComment(): boolean {
-    return this.inMultilineComment;
-  }
-
-  /**
-   * Get the current multiline comment indent
-   */
-  get getMultilineCommentIndent(): string {
-    return this.multilineCommentIndent;
-  }
 }
