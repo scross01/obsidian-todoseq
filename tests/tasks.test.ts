@@ -850,7 +850,53 @@ TODO = some code
       });
     });
 
-    describe('Complex scenarios', () => {
+    describe('Complex scenarios with tasks in code block comments', () => {
+      beforeEach(() => {
+        settings.includeCodeBlocks = true;
+        settings.languageCommentSupport.enabled = true;
+        parser = TaskParser.create(settings);
+      });
+
+      test('should parse mixed content in code block language comments', () => {
+        const content = `
+\`\`\`java
+/**
+ * Javadoc style comment block
+ * TODO add javadoc content
+ */
+public static void myFunc() {
+  // DOING implement this function
+  int x = 1;  // TODO get default x from settings
+  iny y = 2;  /* TODO get default y from settings */ 
+}
+\`\`\`
+
+\`\`\`ini
+; set defaults
+; TODO validate defaults are appropriate
+x = 1 ; TODO x should be bigger
+y = 2
+\`\`\`
+`;
+        const tasks = parser.parseFile(content, 'test.md');
+
+        expect(tasks).toHaveLength(6)
+        expect(tasks[0].state).toBe('TODO');
+        expect(tasks[0].text).toBe('add javadoc content');
+        expect(tasks[1].state).toBe('DOING');
+        expect(tasks[1].text).toBe('implement this function');
+        expect(tasks[2].state).toBe('TODO');
+        expect(tasks[2].text).toBe('get default x from settings');
+        expect(tasks[3].state).toBe('TODO');
+        expect(tasks[3].text).toBe('get default y from settings');
+        expect(tasks[4].state).toBe('TODO');
+        expect(tasks[4].text).toBe('validate defaults are appropriate');
+        expect(tasks[5].state).toBe('TODO');
+        expect(tasks[5].text).toBe('x should be bigger');
+      });
+    });
+
+    describe('Complex scenarios with callouts', () => {
       test('should parse mixed content with various callout blocks', () => {
         const content = `
 - TODO regular task

@@ -1,6 +1,7 @@
 import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES } from './task';
 import { TodoTrackerSettings } from "./settings";
 import { LanguageAwareRegexBuilder, LanguageRegistry, LanguageDefinition, LanguageCommentSupportSettings } from "./code-block-tasks";
+import { MultilineCommentState } from "./multiline-comment-state";
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
@@ -14,6 +15,9 @@ const DATE_WITH_TIME = /^<(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})>/;
 const SCHEDULED_PATTERN = /^SCHEDULED:\s*/;
 const DEADLINE_PATTERN = /^DEADLINE:\s*/;
 
+// List marker pattern that works for both regular and checkbox formats
+const LIST_MARKER_PART = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s*|[-*+]\\s*\\[[ \\x]\\]\\s*)?`;
+
 export class TaskParser {
   private readonly testRegex: RegExp;
   private readonly captureRegex: RegExp;
@@ -24,14 +28,13 @@ export class TaskParser {
   private readonly languageCommentSupport: LanguageCommentSupportSettings;
   private readonly customKeywords: string[];
   
-  // Language support components
-  private readonly languageRegistry: LanguageRegistry;
-  private readonly languageAwareRegex: LanguageAwareRegexBuilder;
+  // Language support components (lazy-loaded)
+  private languageRegistry: LanguageRegistry | null = null;
+  private languageAwareRegex: LanguageAwareRegexBuilder | null = null;
   
   // Language state tracking
   private currentLanguage: LanguageDefinition | null = null;
-  private inMultilineComment: boolean = false;
-  private multilineCommentIndent: string = '';
+  private multilineCommentState: MultilineCommentState;
 
   private constructor(
     regex: RegexPair,
@@ -58,9 +61,8 @@ export class TaskParser {
     this.languageCommentSupport = languageCommentSupport;
     this.customKeywords = customKeywords;
     
-    // Initialize language support components
-    this.languageRegistry = new LanguageRegistry();
-    this.languageAwareRegex = new LanguageAwareRegexBuilder();
+    // Initialize multiline comment state
+    this.multilineCommentState = new MultilineCommentState();
   }
 
   static create(settings: TodoTrackerSettings): TaskParser {
@@ -97,18 +99,52 @@ export class TaskParser {
     );
   }
 
-  static buildRegex(keywords: string[]): RegexPair {
-    const escaped = keywords
+  /**
+   * Escape keywords for use in regex patterns
+   * @param keywords Array of keywords to escape
+   * @returns Escaped keywords joined with OR operator
+   */
+  private static escapeKeywords(keywords: string[]): string {
+    return keywords
       .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
       .join('|');
-    
-    // Simple list marker pattern that works for both regular and checkbox formats
-    const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s*|[-*+]\\s*\\[[ \\x]\\]\\s*)?`;
+  }
+
+  /**
+   * Build regex patterns with customizable components
+   * @param keywords Array of task keywords
+   * @param prefixPattern Pattern for the prefix before the list marker
+   * @param listMarkerPattern Pattern for the list marker (defaults to LIST_MARKER_PART)
+   * @param additionalCaptureGroups Additional capture groups to include before the main groups
+   * @returns RegexPair for testing and capturing tasks
+   */
+  private static buildRegexBase(
+    keywords: string[],
+    prefixPattern: string,
+    listMarkerPattern: string = LIST_MARKER_PART,
+    additionalCaptureGroups: string = ''
+  ): RegexPair {
+    const escaped = TaskParser.escapeKeywords(keywords);
     
     // Intentionally case-sensitive (no flags). Matches capitalised keywords only.
-    const test = new RegExp(`^[ \\t>]*(?:\\[\\![^\\]]+\\]\\s*)?${listMarkerPart}(?:${escaped})\\s+`);
-    const capture = new RegExp(`^([ \\t>]*)?(?:\\[\\![^\\]]+\\]\\s*)?(${listMarkerPart})?(${escaped})\\s+`);
+    const test = new RegExp(`^${prefixPattern}${listMarkerPattern}(?:${escaped})\\s+`);
+    
+    // For capture regex, we need to handle different patterns:
+    // - For regular tasks: capture indent, list marker, keyword
+    // - For callout tasks: capture whitespace after >, callout type, list marker, keyword
+    const capture = new RegExp(
+      `^${additionalCaptureGroups ? `(${additionalCaptureGroups})` : ''}${prefixPattern}(${listMarkerPattern})?(${escaped})\\s+`
+    );
     return { test, capture };
+  }
+
+  static buildRegex(keywords: string[]): RegexPair {
+    return TaskParser.buildRegexBase(
+      keywords,
+      `[ \\t>]*(?:\\[\\![^\\]]+\\]\\s*)?`,
+      LIST_MARKER_PART,
+      '[ \\t>]*'
+    );
   }
 
   /**
@@ -117,17 +153,12 @@ export class TaskParser {
    * @returns RegexPair for testing and capturing callout block tasks
    */
   static buildCalloutRegex(keywords: string[]): RegexPair {
-    const escaped = keywords
-      .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-      .join('|');
-    
-    // Simple list marker pattern that works for both regular and checkbox formats
-    const listMarkerPart = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s*|[-*+]\\s*\\[[ \\x]\\]\\s*)?`;
-    
-    // Regex for callout blocks: > followed by optional callout type, then optional list marker, then keyword
-    const test = new RegExp(`^[ \\t]*>\\s*(?:\\[!\\s*[^\\]]+\\s*\\]\\s*)?(?:-)?\\s*${listMarkerPart}(?:${escaped})\\s+`);
-    const capture = new RegExp(`^[ \\t]*>(\\s*)(?:\\[!\\s*([^\\]]+)\\s*\\]\\s*)?(?:-)?\\s*(${listMarkerPart})?(${escaped})\\s+`);
-    return { test, capture };
+    return TaskParser.buildRegexBase(
+      keywords,
+      `[ \\t]*>\\s*(?:\\[!\\s*([^\\]]+)\\s*\\]\\s*)?(?:-)?\\s*`,
+      LIST_MARKER_PART,
+      '\\s*'
+    );
   }
 
   /**
@@ -234,7 +265,7 @@ export class TaskParser {
     // Check if we're inside a code block and language detection is active
     if (this.currentLanguage && this.includeCodeBlocks) {
       // Use language-aware regex when inside a code block
-      const languageRegex = this.languageAwareRegex.buildRegexWithAllKeywords(
+      const languageRegex = this.getLanguageAwareRegex().buildRegexWithAllKeywords(
         this.currentLanguage,
         []
       );
@@ -262,35 +293,12 @@ export class TaskParser {
    * @param multilineCommentIndent Current multiline comment indent
    * @returns Updated multiline comment state and indent
    */
-  private handleMultilineCommentState(line: string, inMultilineComment: boolean, multilineCommentIndent: string): { inMultilineComment: boolean; multilineCommentIndent: string } {
-    if (!this.currentLanguage || !this.languageCommentSupport.enabled) {
-      return { inMultilineComment, multilineCommentIndent };
+  private handleMultilineCommentState(line: string): { inMultilineComment: boolean; multilineCommentIndent: string } {
+    if (!this.languageCommentSupport.enabled) {
+      return { inMultilineComment: false, multilineCommentIndent: '' };
     }
     
-    const patterns = this.currentLanguage.patterns;
-    
-    if (!inMultilineComment) {
-      // Check if we're entering a multi-line comment
-      if (patterns.multiLineStart) {
-        const match = patterns.multiLineStart.exec(line);
-        if (match) {
-          return {
-            inMultilineComment: true,
-            multilineCommentIndent: line.substring(0, line.length - line.trimStart().length)
-          };
-        }
-      }
-    } else {
-      // Check if we're exiting a multi-line comment
-      if (patterns.multiLineEnd) {
-        const match = patterns.multiLineEnd.exec(line);
-        if (match) {
-          return { inMultilineComment: false, multilineCommentIndent: '' };
-        }
-      }
-    }
-    
-    return { inMultilineComment, multilineCommentIndent };
+    return this.multilineCommentState.handleLine(line);
   }
 
   // Parse a single file content into Task[], pure and stateless w.r.t. external app
@@ -328,7 +336,7 @@ export class TaskParser {
 
       // Handle multi-line comment state
       if (this.currentLanguage && inFence && fenceMarker !== '$') {
-        const result = this.handleMultilineCommentState(line, inMultilineComment, multilineCommentIndent);
+        const result = this.handleMultilineCommentState(line);
         inMultilineComment = result.inMultilineComment;
         multilineCommentIndent = result.multilineCommentIndent;
       }
@@ -389,7 +397,7 @@ export class TaskParser {
         regex = this.calloutCaptureRegex;
         isCalloutTask = true;
       } else if (this.currentLanguage && this.languageCommentSupport.enabled) {
-          regex = this.languageAwareRegex.buildRegexWithAllKeywords(
+          regex = this.getLanguageAwareRegex().buildRegexWithAllKeywords(
             this.currentLanguage,
             this.customKeywords
           ).capture;
@@ -540,9 +548,8 @@ export class TaskParser {
 
   private detectLanguage(lang: string): void {
     // Use getLanguageByIdentifier to support both language names and keywords
-    this.currentLanguage = this.languageRegistry.getLanguageByIdentifier(lang);
-    this.inMultilineComment = false;
-    this.multilineCommentIndent = '';
+    this.currentLanguage = this.getLanguageRegistry().getLanguageByIdentifier(lang);
+    this.multilineCommentState.setLanguage(this.currentLanguage);
   }
 
   // Enhanced fence delimiter tracker: detects ```lang or ~~~lang or $$ at start (with indent), toggles when matching opener char.
@@ -574,12 +581,31 @@ export class TaskParser {
     } else if (fenceMarker === currentMarker) {
       // Reset language when exiting a code block or math block
       this.currentLanguage = null;
-      this.inMultilineComment = false;
-      this.multilineCommentIndent = '';
+      this.multilineCommentState.setLanguage(null);
       return { didToggle: true, inFence: false, fenceMarker: null };
     }
 
     // Different fence char while inside: ignore as plain text
     return { didToggle: false, inFence, fenceMarker };
+  }
+
+  /**
+   * Lazy-load and return the LanguageRegistry instance
+   */
+  private getLanguageRegistry(): LanguageRegistry {
+    if (!this.languageRegistry) {
+      this.languageRegistry = new LanguageRegistry();
+    }
+    return this.languageRegistry;
+  }
+
+  /**
+   * Lazy-load and return the LanguageAwareRegexBuilder instance
+   */
+  private getLanguageAwareRegex(): LanguageAwareRegexBuilder {
+    if (!this.languageAwareRegex) {
+      this.languageAwareRegex = new LanguageAwareRegexBuilder();
+    }
+    return this.languageAwareRegex;
   }
 }
