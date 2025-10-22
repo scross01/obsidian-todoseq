@@ -1,5 +1,5 @@
-import { MultilineCommentState } from '../src/parser/multiline-comment-state';
-import { LanguageDefinition } from '../src/parser/code-block-tasks';
+import { MultilineCommentState } from '../src/parser/code-block-tasks';
+import { LanguageDefinition } from '../src/parser/language-registry';
 
 // Mock language definition for testing
 const mockLanguageDefinition: LanguageDefinition = {

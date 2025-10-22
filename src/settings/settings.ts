@@ -2,7 +2,7 @@ import { PluginSettingTab, App, Setting } from 'obsidian';
 import TodoTracker from '../main';
 import { TodoView } from '../view/task-view';
 import { TaskViewMode } from "../view/task-view";
-import { LanguageRegistry, LanguageCommentSupportSettings, LanguageDefinition } from "../parser/code-block-tasks";
+import { LanguageCommentSupportSettings } from "../parser/language-registry";
 
 export interface TodoTrackerSettings {
   refreshInterval: number; // refresh interval in seconds
@@ -22,7 +22,6 @@ export const DefaultSettings: TodoTrackerSettings = {
   taskViewMode: 'default',
   languageCommentSupport: {
     enabled: true,
-    languages: ["c", "cpp", "csharp", "dockerfile", "go", "ini", "java", "javascript", "kotlin", "powershell", "python", "r", "ruby", "rust", "shell", "sql", "swift", "toml", "typescript", "yaml"],
   },
 };
 
