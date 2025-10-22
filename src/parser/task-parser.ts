@@ -2,7 +2,7 @@ import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_
 import { TodoTrackerSettings } from "../settings/settings";
 import { LanguageAwareRegexBuilder, LanguageRegistry, LanguageDefinition, LanguageCommentSupportSettings } from "./code-block-tasks";
 import { MultilineCommentState } from "./multiline-comment-state";
-import { DateUtils } from "../date-utils";
+import { DateParser } from "./date-parser";
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
@@ -169,8 +169,8 @@ export class TaskParser {
     // The regex needs to account for leading whitespace and callout blocks (>)
     const content = line.replace(/^\s*>\s*(SCHEDULED|DEADLINE):\s*/, '').replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '').trim();
     
-    // Use the DateUtils to parse the date content
-    return DateUtils.parseDate(content);
+    // Use the DateParser to parse the date content
+    return DateParser.parseDate(content);
   }
 
   /**
