@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView, setIcon }
 import { TASK_VIEW_ICON } from '../main';
 import { TaskEditor } from './task-editor';
 import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from '../task';
-import { DateUtils } from '../date-utils';
+import { DateUtils } from './date-utils';
 
 
 export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';
