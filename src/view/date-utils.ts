@@ -20,16 +20,15 @@ export class DateUtils {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
       const formatTime = (d: Date) => {
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        return `${hours}:${minutes}`;
+        // Format time showing hours and minutes (no leading zero for hour).
+        // Keep locale behavior (12/24h) but normalize AM/PM to lowercase when present.
+        const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        return time.replace(/AM|PM/i, (m) => m.toLowerCase());
       };
   
       const formatFullDate = (d: Date) => {
-          const month = d.toLocaleString('default', { month: 'short' });
-          const day = d.getDate();
-          const year = d.getFullYear();
-          return `${month} ${day}, ${year}`;
+        // Use locale-aware formatting so month/day/year order and separators follow the user's locale
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
       }
       
       if (diffDays === 0) {

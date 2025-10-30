@@ -868,7 +868,7 @@ export class TodoView extends ItemView {
       scheduledLabel.setText('Scheduled: ');
       
       const scheduledValue = scheduledDiv.createEl('span', { cls: 'date-value' });
-      scheduledValue.setText(this.formatDateForDisplay(task.scheduledDate));
+      scheduledValue.setText(this.formatDateForDisplay(task.scheduledDate, true));
     }
     
     // Display deadline date
@@ -881,7 +881,7 @@ export class TodoView extends ItemView {
       deadlineLabel.setText('Deadline: ');
       
       const deadlineValue = deadlineDiv.createEl('span', { cls: 'date-value' });
-      deadlineValue.setText(this.formatDateForDisplay(task.deadlineDate));
+      deadlineValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
     }
   }
 

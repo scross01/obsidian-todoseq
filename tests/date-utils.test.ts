@@ -1,6 +1,24 @@
 import { DateUtils } from '../src/view/date-utils';
 
 describe('DateUtils', () => {
+  // Force a deterministic locale for all toLocale* calls in tests
+  const originalToLocaleDateString = Date.prototype.toLocaleDateString;
+  const originalToLocaleTimeString = Date.prototype.toLocaleTimeString;
+
+  beforeAll(() => {
+    Date.prototype.toLocaleDateString = function (locales?: any, options?: any) {
+      return originalToLocaleDateString.call(this, 'en-US', options);
+    };
+    Date.prototype.toLocaleTimeString = function (locales?: any, options?: any) {
+      return originalToLocaleTimeString.call(this, 'en-US', options);
+    };
+  });
+
+  afterAll(() => {
+    Date.prototype.toLocaleDateString = originalToLocaleDateString;
+    Date.prototype.toLocaleTimeString = originalToLocaleTimeString;
+  });
+
   describe('formatDateForDisplay', () => {
     // Mock the current date to ensure consistent test results
     beforeEach(() => {
@@ -26,7 +44,7 @@ describe('DateUtils', () => {
     test('should return "Today with time" for today\'s date with time', () => {
       const todayWithTime = new Date('2025-10-15T14:30:00');
       const result = DateUtils.formatDateForDisplay(todayWithTime, true);
-      expect(result).toBe('Today 14:30');
+      expect(result).toBe('Today 2:30 pm');
     });
 
     test('should return "Today" for today\'s date with time when includeTime is false', () => {
@@ -44,7 +62,7 @@ describe('DateUtils', () => {
     test('should return "Tomorrow with time" for tomorrow\'s date with time', () => {
       const tomorrowWithTime = new Date('2025-10-16T09:15:00');
       const result = DateUtils.formatDateForDisplay(tomorrowWithTime, true);
-      expect(result).toBe('Tomorrow 09:15');
+      expect(result).toBe('Tomorrow 9:15 am');
     });
 
     test('should return "Yesterday" for yesterday\'s date', () => {
@@ -78,7 +96,7 @@ describe('DateUtils', () => {
     test('should return formatted date with time for dates beyond a week with time', () => {
       const futureDate = new Date('2025-11-20T15:45:00');
       const result = DateUtils.formatDateForDisplay(futureDate, true);
-      expect(result).toBe('Nov 20, 2025 15:45');
+      expect(result).toBe('Nov 20, 2025 3:45 pm');
     });
 
     test('should return formatted date without time for dates beyond a week without time', () => {
@@ -102,7 +120,7 @@ describe('DateUtils', () => {
     test('should handle year boundaries correctly', () => {
       const endOfYear = new Date('2025-12-31T23:59:59');
       const result = DateUtils.formatDateForDisplay(endOfYear, true);
-      expect(result).toBe('Dec 31, 2025 23:59');
+      expect(result).toBe('Dec 31, 2025 11:59 pm');
     });
 
     test('should handle midnight time correctly', () => {
@@ -114,7 +132,7 @@ describe('DateUtils', () => {
     test('should handle non-midnight time correctly', () => {
       const nonMidnight = new Date('2025-10-16T01:30:00');
       const result = DateUtils.formatDateForDisplay(nonMidnight, true);
-      expect(result).toBe('Tomorrow 01:30');
+      expect(result).toBe('Tomorrow 1:30 am');
     });
   });
 });
