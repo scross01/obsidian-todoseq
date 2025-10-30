@@ -1,8 +1,10 @@
 # Change Log
 
+## 0.5.0
+
 - Added support for collecting tasks with language specific comments in code blocks
-- Added support to optionally collect tasks from quotes and callouts
-- Fixed issue with tasks with a scheduled or deadline date and time the time was not shown.
+- Added support to optionally collect tasks in quotes and callouts blocks
+- Fixed issue with scheduled or deadline time was not shown.
 - Reworked and refactored task parser logic for improved maintainability.
 
 ## 0.4.3
