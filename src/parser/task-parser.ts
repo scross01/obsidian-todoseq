@@ -1,67 +1,83 @@
 import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES } from '../task';
 import { TodoTrackerSettings } from "../settings/settings";
 import { LanguageRegistry, LanguageDefinition, LanguageCommentSupportSettings } from "./language-registry";
-import { LanguageAwareRegexBuilder, MultilineCommentState } from "./code-block-tasks";
 import { DateParser } from "./date-parser";
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
 // Date keyword patterns
-const SCHEDULED_PATTERN = /^SCHEDULED:\s*/;
-const DEADLINE_PATTERN = /^DEADLINE:\s*/;
+const SCHEDULED_PATTERN = /SCHEDULED:\s*/.source;
+const DEADLINE_PATTERN = /DEADLINE:\s*/.source;
 
-// List marker pattern that works for both regular and checkbox formats
-const LIST_MARKER_PART = `(?:(?:[-*+]|\\d+[.)]|[A-Za-z][.)]|\\([A-Za-z0-9]+\\))\\s*|[-*+]\\s*\\[[ \\x]\\]\\s*)?`;
+// List marker patterns
+// Bullet points: matches -, *, or + characters
+const BULLET_LIST_PATTERN = /[-*+]\s+/.source;
+// Numbered lists: matches digits followed by . or ) (e.g., "1.", "2)", "12.")
+const NUMBERED_LIST_PATTERN = /\d+[\.\)]\s+/.source; 
+// Letter lists: matches letters followed by . or ) (e.g., "a.", "B)")
+const LETTER_LIST_PATTERN = /[A-Za-z][\.\)]\s+/.source; 
+// Custom lists: matches parentheses-enclosed alphanumeric identifiers (e.g., "(A1)", "(A2)")
+const CUSTOM_LIST_PATTERN = /\([A-Za-z0-9]+\)\s+/.source;
 
-// Callout block detection regex
-const CALLOUT_BLOCK_REGEX = /^[ \t]*>\s*(?:\[!\s*([^\]]+)\s*\]\s*)?(?:-)?\s*$/;
+// Checkboxes: [ ] (unchecked), [x] (checked) or [*] (other checkbox states)
+const CHECKBOX = /\[[ x\S]\]\s+/.source;
+
+// Leading spaces only
+const STANDARD_PREFIX = /\s*/.source;
+// Quoted lines with leading ">"
+const QUOTED_PREFIX = /\s*>\s*/.source;
+// Callout block declaration, e.g. "> [!info]"
+const CALLOUT_PREFIX = /\s*>\s*\[\!\w+\]\-?\s+/.source
+
+// Code block marker ``` or ~~~ with language
+const CODE_BLOCK_REGEX = /^\s*(```|~~~)\s*(\S+)?$/
+// Math block marker %%
+const MATH_BLOCK_REGEX = /^\s*%%(?!.*%%).*/ // ignores open and close on same line
+// Comment block marker $$
+const COMMENT_BLOCK_REGEX = /^\s*\$\$(?!.*\$\$).*/ // ignores open and close on same line
+// Callout block marker >
+const CALLOUT_BLOCK_REGEX = /^\s*>.*/
+
+// Language code before comment - non greedy
+const CODE_PREFIX = /\s*[\s\S]*?/.source
+
+const TASK_TEXT = /[\w\[].+?/.source;  // at least one word
+
 
 export class TaskParser {
   private readonly testRegex: RegExp;
   private readonly captureRegex: RegExp;
-  private readonly calloutTestRegex: RegExp;
-  private readonly calloutCaptureRegex: RegExp;
   private readonly includeCalloutBlocks: boolean;
   private readonly includeCodeBlocks: boolean;
   private readonly languageCommentSupport: LanguageCommentSupportSettings;
   private readonly customKeywords: string[];
+  private allKeywords: string[];
   
   // Language support components (lazy-loaded)
   private languageRegistry: LanguageRegistry | null = null;
-  private languageAwareRegex: LanguageAwareRegexBuilder | null = null;
   
   // Language state tracking
   private currentLanguage: LanguageDefinition | null = null;
-  private multilineCommentState: MultilineCommentState;
 
   private constructor(
     regex: RegexPair,
     includeCalloutBlocks: boolean,
     includeCodeBlocks: boolean,
     languageCommentSupport: LanguageCommentSupportSettings,
-    customKeywords: string[]
+    customKeywords: string[],
+    allKeywords: string[]
   ) {
+    this.customKeywords = customKeywords;
+    this.allKeywords = allKeywords;
+
     this.testRegex = regex.test;
     this.captureRegex = regex.capture;
-    
-    // Initialize callout block regexes
-    const calloutRegex = TaskParser.buildCalloutRegex([
-      ...Array.from(DEFAULT_PENDING_STATES),
-      ...Array.from(DEFAULT_ACTIVE_STATES),
-      ...customKeywords,
-      ...Array.from(DEFAULT_COMPLETED_STATES),
-    ]);
-    this.calloutTestRegex = calloutRegex.test;
-    this.calloutCaptureRegex = calloutRegex.capture;
-    
+        
     this.includeCalloutBlocks = includeCalloutBlocks;
     this.includeCodeBlocks = includeCodeBlocks;
     this.languageCommentSupport = languageCommentSupport;
-    this.customKeywords = customKeywords;
-    
-    // Initialize multiline comment state
-    this.multilineCommentState = new MultilineCommentState();
   }
+
 
   static create(settings: TodoTrackerSettings): TaskParser {
     // Build union of non-completed states (defaults + user additional) and completed states (defaults only)
@@ -90,10 +106,11 @@ export class TaskParser {
     const regex = TaskParser.buildRegex(allKeywordsArray);
     return new TaskParser(
       regex,
-      !!settings.includeCalloutBlocks,
-      !!settings.includeCodeBlocks,
+      settings.includeCalloutBlocks,
+      settings.includeCodeBlocks,
       settings.languageCommentSupport,
-      normalizedAdditional
+      normalizedAdditional,
+      allKeywordsArray,
     );
   }
 
@@ -111,200 +128,56 @@ export class TaskParser {
   /**
    * Build regex patterns with customizable components
    * @param keywords Array of task keywords
-   * @param prefixPattern Pattern for the prefix before the list marker
-   * @param listMarkerPattern Pattern for the list marker (defaults to LIST_MARKER_PART)
-   * @param additionalCaptureGroups Additional capture groups to include before the main groups
    * @returns RegexPair for testing and capturing tasks
    */
-  private static buildRegexBase(
+  private static buildRegex(
     keywords: string[],
-    prefixPattern: string,
-    listMarkerPattern: string = LIST_MARKER_PART,
-    additionalCaptureGroups: string = ''
-  ): RegexPair {
-    const escaped = TaskParser.escapeKeywords(keywords);
-    
-    // Intentionally case-sensitive (no flags). Matches capitalised keywords only.
-    const test = new RegExp(`^${prefixPattern}${listMarkerPattern}(?:${escaped})\\s+`);
-    
-    // For capture regex, we need to handle different patterns:
-    // - For regular tasks: capture indent, list marker, keyword
-    // - For callout tasks: capture whitespace after >, callout type, list marker, keyword
-    const capture = new RegExp(
-      `^${additionalCaptureGroups ? `(${additionalCaptureGroups})` : ''}${prefixPattern}(${listMarkerPattern})?(${escaped})\\s+`
+  ): RegexPair {    
+
+    const escaped_keywords = TaskParser.escapeKeywords(keywords);
+
+    const test = new RegExp(
+      `^(${STANDARD_PREFIX}|${QUOTED_PREFIX}|${CALLOUT_PREFIX})?`
+      + `(${BULLET_LIST_PATTERN}|${NUMBERED_LIST_PATTERN}|${LETTER_LIST_PATTERN}|${CUSTOM_LIST_PATTERN})??`
+      + `(${CHECKBOX})?`
+      + `(${escaped_keywords})\\s+`
+      + `(${TASK_TEXT})$`
     );
+    const capture = test;
     return { test, capture };
   }
 
-  static buildRegex(keywords: string[]): RegexPair {
-    return TaskParser.buildRegexBase(
-      keywords,
-      `[ \\t>]*(?:\\[\\![^\\]]+\\]\\s*)?`,
-      LIST_MARKER_PART,
-      '[ \\t>]*'
-    );
-  }
-
   /**
-   * Build regex specifically for callout block tasks
+   * Build code language regex patterns with customizable components
    * @param keywords Array of task keywords
-   * @returns RegexPair for testing and capturing callout block tasks
+   * @param languageDefinition Language specific config
+   * @returns RegexPair for testing and capturing tasks
    */
-  static buildCalloutRegex(keywords: string[]): RegexPair {
-    return TaskParser.buildRegexBase(
-      keywords,
-      `[ \\t]*>\\s*(?:\\[!\\s*([^\\]]+)\\s*\\]\\s*)?(?:-)?\\s*`,
-      LIST_MARKER_PART,
-      '\\s*'
+  private static buildCodeRegex(
+    keywords: string[],
+    languageDefinition: LanguageDefinition,
+  ): RegexPair {    
+
+    const escapedKeywords = TaskParser.escapeKeywords(keywords);
+    
+    // starts with mutliline or singleline
+    const startComment = [
+      languageDefinition.patterns.singleLine?.source,
+      languageDefinition.patterns.multiLineStart?.source
+    ].filter(Boolean).join('|');
+    const midComment = languageDefinition.patterns.multilineMid?.source || '.*?';
+    const endComment = `\\s+${languageDefinition.patterns.multiLineEnd?.source}\\s*` || '';
+
+    const test = new RegExp(
+      `^((?:(?:${CODE_PREFIX})?(?:(?:${startComment})\\s+))|(?:${midComment}\\s*))`
+      + `(${BULLET_LIST_PATTERN}|${NUMBERED_LIST_PATTERN}|${LETTER_LIST_PATTERN}|${CUSTOM_LIST_PATTERN})??`
+      + `(${CHECKBOX})?`
+      + `(${escapedKeywords})\\s+`
+      + `(${TASK_TEXT})`
+      + `(?=${endComment}$|$)?(${endComment})?$`
     );
-  }
-
-  /**
-   * Parse a date from a line containing SCHEDULED: or DEADLINE: prefix
-   * @param line The line to parse
-   * @returns Parsed Date object or null if parsing fails
-   */
-  parseDateFromLine(line: string): Date | null {
-    // Remove the SCHEDULED: or DEADLINE: prefix and trim
-    // The regex needs to account for leading whitespace and callout blocks (>)
-    const content = line.replace(/^\s*>\s*(SCHEDULED|DEADLINE):\s*/, '').replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '').trim();
-    
-    // Use the DateParser to parse the date content
-    return DateParser.parseDate(content);
-  }
-
-  /**
-   * Check if a line contains SCHEDULED: or DEADLINE: at the same indent level
-   * @param line The line to check
-   * @param indent The expected indent level
-   * @returns The type of date line found or null
-   */
-  getDateLineType(line: string, taskIndent: string): 'scheduled' | 'deadline' | null {
-    const trimmedLine = line.trim();
-    
-    // For callout blocks, check if the line starts with > and the rest starts with SCHEDULED: or DEADLINE:
-    if (line.startsWith('>')) {
-      const contentAfterArrow = trimmedLine.substring(1).trim();
-      if (contentAfterArrow.startsWith('SCHEDULED:') || contentAfterArrow.startsWith('DEADLINE:')) {
-        return contentAfterArrow.startsWith('SCHEDULED:') ? 'scheduled' : 'deadline';
-      }
-    }
-    
-    // For regular tasks, check if the trimmed line starts with SCHEDULED: or DEADLINE:
-    if (!trimmedLine.startsWith('SCHEDULED:') && !trimmedLine.startsWith('DEADLINE:')) {
-      return null;
-    }
-
-    // For regular tasks, check indent matching
-    const lineIndent = line.substring(0, line.length - trimmedLine.length);
-    if (lineIndent !== taskIndent && !lineIndent.startsWith(taskIndent)) {
-      return null;
-    }
-
-    return trimmedLine.startsWith('SCHEDULED:') ? 'scheduled' : 'deadline';
-  }
-
-  isTask(line: string, inMultilineComment: boolean = false): boolean {
-    // Check if language comment support is enabled
-    if (!this.languageCommentSupport.enabled) {
-      return this.testRegex.test(line);
-    }
-    
-    // Check if we're inside a code block and language detection is active
-    if (this.currentLanguage && this.includeCodeBlocks) {
-      // Use language-aware regex when inside a code block
-      const languageRegex = this.getLanguageAwareRegex().buildRegexWithAllKeywords(
-        this.currentLanguage,
-        []
-      );
-      return languageRegex.test.test(line);
-    }
-    
-    // For tasks outside code blocks, always use the default regex
-    // regardless of language comment support settings
-    return this.testRegex.test(line);
-  }
-
-  /**
-   * Check if a line is a task within a callout block
-   * @param line The line to check
-   * @returns True if the line is a task in a callout block
-   */
-  private isCalloutTask(line: string): boolean {
-    return this.calloutTestRegex.test(line);
-  }
-
-  /**
-   * Handle multi-line comment state tracking
-   * @param line The current line being processed
-   * @param inMultilineComment Current multiline comment state
-   * @param multilineCommentIndent Current multiline comment indent
-   * @returns Updated multiline comment state and indent
-   */
-  private handleMultilineCommentState(line: string): { inMultilineComment: boolean; multilineCommentIndent: string } {
-    if (!this.languageCommentSupport.enabled) {
-      return { inMultilineComment: false, multilineCommentIndent: '' };
-    }
-    
-    return this.multilineCommentState.handleLine(line);
-  }
-
-  /**
-   * Detect and update callout block state
-   * @param line The current line being processed
-   * @param inCalloutBlock Current callout block state
-   * @param calloutBlockType Current callout block type
-   * @param calloutBlockCollapsible Current callout block collapsible state
-   * @returns Updated callout block state
-   */
-  private detectCalloutBlockState(
-    line: string,
-    inCalloutBlock: boolean,
-    calloutBlockType: string | null,
-    calloutBlockCollapsible: boolean
-  ): { inCalloutBlock: boolean; calloutBlockType: string | null; calloutBlockCollapsible: boolean } {
-    // Callout block detection regex
-    const calloutBlockRegex = /^[ \t]*>\s*(?:\[!\s*([^\]]+)\s*\]\s*)?(?:-)?\s*$/;
-    
-    let newInCalloutBlock = inCalloutBlock;
-    let newCalloutBlockType = calloutBlockType;
-    let newCalloutBlockCollapsible = calloutBlockCollapsible;
-    
-    const calloutMatch = calloutBlockRegex.exec(line);
-    
-    if (calloutMatch) {
-      // This is a callout block declaration line
-      if (calloutMatch[1]) {
-        // This is a structured callout like >[!info]
-        const calloutType = calloutMatch[1].trim();
-        newCalloutBlockType = calloutType;
-        newCalloutBlockCollapsible = line.includes('-');
-      } else {
-        // This is a simple quote block
-        newCalloutBlockType = 'quote';
-        newCalloutBlockCollapsible = false;
-      }
-      newInCalloutBlock = true;
-      // Don't continue here - we still need to process the line for task parsing
-    } else if (this.calloutTestRegex.test(line)) {
-      // This is a callout task line (for simple quote blocks)
-      newCalloutBlockType = 'quote';
-      newCalloutBlockCollapsible = false;
-      newInCalloutBlock = true;
-    }
-    
-    // Check if we're exiting a callout block
-    if (newInCalloutBlock && !line.trim().startsWith('>')) {
-      newInCalloutBlock = false;
-      newCalloutBlockType = null;
-      newCalloutBlockCollapsible = false;
-    }
-    
-    return {
-      inCalloutBlock: newInCalloutBlock,
-      calloutBlockType: newCalloutBlockType,
-      calloutBlockCollapsible: newCalloutBlockCollapsible
-    };
+    const capture = test;
+    return { test, capture };
   }
 
   /**
@@ -312,75 +185,40 @@ export class TaskParser {
    * @param line The line containing the task
    * @returns Parsed task details
    */
-  private extractTaskDetails(line: string): {
+  private extractTaskDetails(line: string, regex: RegExp): {
     indent: string;
     listMarker: string;
     taskText: string;
-    commentPrefix: string;
-    trailingCommentEnd: string;
+    tail: string;
     state: string;
-    isCalloutTask: boolean;
   } {
-    // Use language-aware regex if applicable or callout regex for callout tasks
-    let regex = this.captureRegex;
-    let isCalloutTask = false;
-    
-    if (this.isCalloutTask(line)) {
-      regex = this.calloutCaptureRegex;
-      isCalloutTask = true;
-    } else if (this.currentLanguage && this.languageCommentSupport.enabled) {
-        regex = this.getLanguageAwareRegex().buildRegexWithAllKeywords(
-          this.currentLanguage,
-          this.customKeywords
-        ).capture;
-    }
-
+    // Use language-aware regex if applicable or callout regex for callout tasks   
     const m = regex.exec(line);
     if (!m) {
       throw new Error(`Failed to parse task line: ${line}`);
     }
 
-    const indent = m[1] ?? '';
-    let listMarker = '';
-    let taskText = '';
-    let commentPrefix = '';
-    let trailingCommentEnd = '';
-    let state = '';
-    
-    // Handle different regex patterns for different task types
-    if (isCalloutTask) {
-      // For callout tasks: m[1] is whitespace after >, m[2] is callout type, m[3] is list marker, m[4] is state
-      listMarker = (m[3] ?? '') as string;
-      state = (m[4] ?? '') as string;
-      const fullMatch = m[0] || '';
-      taskText = line.substring(fullMatch.length).trim();
-    } else if (this.currentLanguage && this.languageCommentSupport.enabled) {
-      // For language-aware regex, the list marker is in m[3], for default regex it's in m[2]
-      listMarker = (m[3] ?? '') as string;
-      commentPrefix = (m[2] ?? '') as string;
-      state = (m[4] ?? '') as string;
-      
-      // Handle the text content and trailing comment characters
-      // For language-aware regex, m[5] is the text, m[6] is trailing comment end
-      taskText = (m[5] ?? '') as string;
-      trailingCommentEnd = (m[6] ?? '') as string;
-    } else {
-      // For default regex, the task text is everything after the captured keyword
-      // m[0] is the full match, m[1] is indent, m[2] is list marker, m[3] is keyword
-      listMarker = (m[2] ?? '') as string;
-      state = (m[3] ?? '') as string;
-      const fullMatch = m[0] || '';
-      taskText = line.substring(fullMatch.length).trim();
-    }
+    // For default regex, the task text is everything after the captured keyword
+    // m[0] is the full match
+    // m[1] is the indent (spacing, prefix text, comment characters )
+    // m[2] is the list marker
+    // m[3] is the checkbox
+    // m[4] is the state keyword
+    // m[5] is the task text
+    // m[6] is the closing comment characters
+    const fullMatch = m[0];
+    const indent = m[1] || "";
+    const listMarker = (m[2] || "") + (m[3] || "");
+    const state = m[4]
+    const taskText = m[5];
+    const tail = m[6]
 
     return {
       indent,
       listMarker,
       taskText,
-      commentPrefix,
-      trailingCommentEnd,
+      tail,
       state,
-      isCalloutTask
     };
   }
 
@@ -393,6 +231,7 @@ export class TaskParser {
     let priority: 'high' | 'med' | 'low' | null = null;
     let cleanedText = taskText;
     
+    // look for [#A] [#B] or [#C]
     const priMatch = /(\s*)\[#([ABC])\](\s*)/.exec(cleanedText);
     if (priMatch) {
       const letter = priMatch[2];
@@ -444,6 +283,51 @@ export class TaskParser {
   }
 
   /**
+   * Check if a line contains SCHEDULED: or DEADLINE: at the same indent level
+   * @param line The line to check
+   * @param indent The expected indent level
+   * @returns The type of date line found or null
+   */
+  getDateLineType(line: string, taskIndent: string): 'scheduled' | 'deadline' | null {
+    const trimmedLine = line.trim();
+    
+    // For quoted lines, check if the line starts with > and the rest starts with SCHEDULED: or DEADLINE:
+    if (line.startsWith('>')) {
+      const contentAfterArrow = trimmedLine.substring(1).trim();
+      if (contentAfterArrow.startsWith('SCHEDULED:') || contentAfterArrow.startsWith('DEADLINE:')) {
+        return contentAfterArrow.startsWith('SCHEDULED:') ? 'scheduled' : 'deadline';
+      }
+    }
+    
+    // For regular tasks, check if the trimmed line starts with SCHEDULED: or DEADLINE:
+    if (!trimmedLine.startsWith('SCHEDULED:') && !trimmedLine.startsWith('DEADLINE:')) {
+      return null;
+    }
+
+    // For regular tasks, check indent matching
+    const lineIndent = line.substring(0, line.length - trimmedLine.length);
+    if (lineIndent !== taskIndent && !lineIndent.startsWith(taskIndent)) {
+      return null;
+    }
+
+    return trimmedLine.startsWith('SCHEDULED:') ? 'scheduled' : 'deadline';
+  }
+
+  /**
+   * Parse a date from a line containing SCHEDULED: or DEADLINE: prefix
+   * @param line The line to parse
+   * @returns Parsed Date object or null if parsing fails
+   */
+  parseDateFromLine(line: string): Date | null {
+    // Remove the SCHEDULED: or DEADLINE: prefix and trim
+    // The regex needs to account for leading whitespace and callout blocks (>)
+    const content = line.replace(/^\s*>\s*(SCHEDULED|DEADLINE):\s*/, '').replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '').trim();
+    
+    // Use the DateParser to parse the date content
+    return DateParser.parseDate(content);
+  }
+
+  /**
    * Extract scheduled and deadline dates from lines following a task
    * @param lines Array of lines in the file
    * @param startIndex Index to start searching from
@@ -455,7 +339,6 @@ export class TaskParser {
     lines: string[],
     startIndex: number,
     indent: string,
-    inCalloutBlock: boolean
   ): { scheduledDate: Date | null; deadlineDate: Date | null } {
     let scheduledDate: Date | null = null;
     let deadlineDate: Date | null = null;
@@ -469,11 +352,6 @@ export class TaskParser {
       const nextLineTrimmed = nextLine.trim();
       if (nextLineTrimmed === '') {
         continue; // Skip empty lines
-      }
-
-      // For callout blocks, stop looking for date lines when we exit the callout block
-      if (inCalloutBlock && !nextLine.startsWith('>')) {
-        break;
       }
 
       const dateLineType = this.getDateLineType(nextLine, indent);
@@ -511,64 +389,84 @@ export class TaskParser {
     const lines = content.split('\n');
 
     // Initialize state machine
-    let inFence = false;
-    let fenceMarker: '`' | '~' | '$' | null = null;
+    let inBlock = false;
+    let blockMarker: 'code' | 'math' | 'comment' | null = null;
+    let codeRegex = null
     
-    // Multiline comment state
-    let inMultilineComment = false;
-    let multilineCommentIndent = '';
-
-    // Callout block state
-    let inCalloutBlock = false;
-    let calloutBlockType: string | null = null;
-    let calloutBlockCollapsible = false;
-
     const tasks: Task[] = [];
 
     for (let index = 0; index < lines.length; index++) {
       const line = lines[index];
 
-      // Update fence state and skip delimiter lines
-      const toggled = this.toggleFenceIfDelimiter(line, inFence, fenceMarker);
-      if (toggled.didToggle) {
-        inFence = toggled.inFence;
-        fenceMarker = toggled.fenceMarker;
+      // skip blank lines
+      if (line.trim() == '') {
         continue;
       }
-
-      // Handle multi-line comment state
-      if (this.currentLanguage && inFence && fenceMarker !== '$') {
-        const result = this.handleMultilineCommentState(line);
-        inMultilineComment = result.inMultilineComment;
-        multilineCommentIndent = result.multilineCommentIndent;
+      // check for change of context
+      if (CODE_BLOCK_REGEX.test(line)) {
+        if (!inBlock) {
+          if (this.includeCodeBlocks) {
+            // starting a new code block, detect the coding language
+            if (this.languageCommentSupport.enabled) {
+              const m = CODE_BLOCK_REGEX.exec(line)
+              // m[0] is the full match
+              // m[1] is block marker
+              // m[2] is the language
+              // get the language from the registry
+              this.detectLanguage(m ? m[2] : "")
+              if(this.currentLanguage) {
+                codeRegex = TaskParser.buildCodeRegex(this.allKeywords, this.currentLanguage)
+              } else {
+                codeRegex = null
+              }
+            }
+          }
+        }
+        inBlock = !inBlock
+        blockMarker = inBlock ? 'code' : null  
+        continue;
+      } else if (MATH_BLOCK_REGEX.test(line)) {
+        inBlock = !inBlock
+        blockMarker = inBlock ? 'math' : null  
+      } else if (COMMENT_BLOCK_REGEX.test(line)) {
+        inBlock = !inBlock
+        blockMarker = inBlock ? 'comment' : null  
       }
 
-      // Update callout block state
-      const calloutBlockState = this.detectCalloutBlockState(line, inCalloutBlock, calloutBlockType, calloutBlockCollapsible);
-      inCalloutBlock = calloutBlockState.inCalloutBlock;
-      calloutBlockType = calloutBlockState.calloutBlockType;
-      calloutBlockCollapsible = calloutBlockState.calloutBlockCollapsible;
-      
-      // Skip lines inside callout blocks if disabled
-      if (inCalloutBlock && !this.includeCalloutBlocks) {
+      // Skip lines in quotes and callout blocks if disabled 
+      if (!this.includeCalloutBlocks && CALLOUT_BLOCK_REGEX.test(line)) {
         continue;
       }
-
+  
       // Skip lines inside code blocks if disabled
-      if (inFence && !this.includeCodeBlocks && fenceMarker !== '$') {
+      if (inBlock && !this.includeCodeBlocks && blockMarker === 'code' ) {
         continue;
       }
 
       // Skip lines inside math blocks
-      if (inFence && fenceMarker === '$') {
+      if (inBlock && blockMarker === 'math') {
         continue;
       }
 
-      if (!this.isTask(line, inMultilineComment) && !this.isCalloutTask(line)) continue;
+      // Skip lines inside comment blocks
+      if (inBlock && blockMarker === 'comment') {
+        continue;
+      }
 
-      // Extract task details
-      const taskDetails = this.extractTaskDetails(line);
-      
+      // first use the test regex to see if this line has a task
+      const useCodeRegex = inBlock && this.includeCodeBlocks && blockMarker == 'code' && this.currentLanguage 
+      if (useCodeRegex && codeRegex) {
+        if (!codeRegex.test.test(line)) {
+          continue;
+        }
+      }
+      else if (!this.testRegex.test(line)) {
+        continue;
+      }
+
+      // Extract task details using the regular are langauge speciifc code regex
+      const taskDetails = this.extractTaskDetails(line, (useCodeRegex && codeRegex) ? codeRegex.capture : this.captureRegex);
+
       // Extract priority
       const { priority, cleanedText } = this.extractPriority(taskDetails.taskText);
       
@@ -583,14 +481,13 @@ export class TaskParser {
         rawText: line,
         indent: taskDetails.indent,
         listMarker: finalListMarker,
-        commentPrefix: taskDetails.commentPrefix,
         text: cleanedText,
         state: finalState,
         completed: finalCompleted,
         priority,
         scheduledDate: null,
         deadlineDate: null,
-        trailingCommentEnd: taskDetails.trailingCommentEnd, // Include trailing comment end characters for multiline comments
+        tail: taskDetails.tail,
       };
 
       // Extract dates from following lines
@@ -598,7 +495,6 @@ export class TaskParser {
         lines,
         index + 1,
         taskDetails.indent,
-        inCalloutBlock
       );
       
       task.scheduledDate = scheduledDate;
@@ -613,44 +509,6 @@ export class TaskParser {
   private detectLanguage(lang: string): void {
     // Use getLanguageByIdentifier to support both language names and keywords
     this.currentLanguage = this.getLanguageRegistry().getLanguageByIdentifier(lang);
-    this.multilineCommentState.setLanguage(this.currentLanguage);
-  }
-
-  // Enhanced fence delimiter tracker: detects ```lang or ~~~lang or $$ at start (with indent), toggles when matching opener char.
-  private toggleFenceIfDelimiter(
-    line: string,
-    inFence: boolean,
-    fenceMarker: '`' | '~' | '$' | null
-  ): { didToggle: boolean; inFence: boolean; fenceMarker: '`' | '~' | '$' | null } {
-    // Enhanced regex to capture language identifier for code blocks and $$ for math blocks
-    const fenceMatch = /^[ \t]*(`{3,}|~{3,}|\$\$)(\w*)/.exec(line);
-    if (!fenceMatch) {
-      return { didToggle: false, inFence, fenceMarker };
-    }
-
-    const markerRun = fenceMatch[1];
-    const currentMarker: '`' | '~' | '$' = markerRun[0] === '`' ? '`' : markerRun[0] === '~' ? '~' : '$';
-    const language = fenceMatch[2].toLowerCase();
-
-    if (!inFence) {
-      // Detect language when entering a code block, or mark as math block for $$
-      if (currentMarker === '$') {
-        // Math block - no language detection needed
-        return { didToggle: true, inFence: true, fenceMarker: currentMarker };
-      } else {
-        // Code block - detect language
-        this.detectLanguage(language);
-        return { didToggle: true, inFence: true, fenceMarker: currentMarker };
-      }
-    } else if (fenceMarker === currentMarker) {
-      // Reset language when exiting a code block or math block
-      this.currentLanguage = null;
-      this.multilineCommentState.setLanguage(null);
-      return { didToggle: true, inFence: false, fenceMarker: null };
-    }
-
-    // Different fence char while inside: ignore as plain text
-    return { didToggle: false, inFence, fenceMarker };
   }
 
   /**
@@ -661,15 +519,5 @@ export class TaskParser {
       this.languageRegistry = new LanguageRegistry();
     }
     return this.languageRegistry;
-  }
-
-  /**
-   * Lazy-load and return the LanguageAwareRegexBuilder instance
-   */
-  private getLanguageAwareRegex(): LanguageAwareRegexBuilder {
-    if (!this.languageAwareRegex) {
-      this.languageAwareRegex = new LanguageAwareRegexBuilder();
-    }
-    return this.languageAwareRegex;
   }
 }

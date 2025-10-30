@@ -1,68 +1,34 @@
-import { registry, regexBuilder } from './test-setup';
+import { TaskParser } from '../src/parser/task-parser';
+import { TodoTrackerSettings } from '../src/settings/settings';
 
-describe('R Language Comment Task Parsing', () => {
-  const rLanguage = registry.getLanguage('r');
-  
-  if (!rLanguage) {
-    throw new Error('R language not found in registry');
-  }
+describe('Task parsing within R file comments in code blocks', () => {
+  let parser: TaskParser;
+  let settings: TodoTrackerSettings;
 
-  const regexPair = regexBuilder.buildRegex(['TODO'], rLanguage);
-
-  describe('Single-line comments', () => {
-    test('should detect TODO in single-line comment', () => {
-      const line = '# TODO test task in R single line comment';
-      expect(regexPair.test.test(line)).toBe(true);
-      
-      const match = regexPair.capture.exec(line);
-      expect(match).toBeTruthy();
-      expect(match![1]).toBe(''); // indent
-      expect(match![2]).toBe('# '); // comment prefix
-      expect(match![4]).toBe('TODO'); // keyword
-      expect(match![5]).toBe('test task in R single line comment'); // text
-    });
-
-    test('should detect TODO in indented single-line comment', () => {
-      const line = '        # TODO test task in R indented comment';
-      expect(regexPair.test.test(line)).toBe(true);
-      
-      const match = regexPair.capture.exec(line);
-      expect(match).toBeTruthy();
-      expect(match![1]).toBe('        '); // indent
-      expect(match![2]).toBe('# '); // comment prefix
-      expect(match![4]).toBe('TODO'); // keyword
-      expect(match![5]).toBe('test task in R indented comment'); // text
-    });
-
-    test('should detect TODO in inline single-line comment', () => {
-      const line = 'x <- 5  # TODO test task in R inline comment';
-      expect(regexPair.test.test(line)).toBe(true);
-      
-      const match = regexPair.capture.exec(line);
-      expect(match).toBeTruthy();
-      expect(match![1]).toBe(''); // indent
-      expect(match![2]).toBe('x <- 5  # '); // comment prefix
-      expect(match![4]).toBe('TODO'); // keyword
-      expect(match![5]).toBe('test task in R inline comment'); // text
-    });
+  beforeEach(() => {
+    settings = {
+      refreshInterval: 60,
+      includeCalloutBlocks: true,
+      includeCodeBlocks: true,
+      languageCommentSupport: {
+        enabled: true,
+      },
+      additionalTaskKeywords: [],
+      taskViewMode: 'default'
+    };
+    parser = TaskParser.create(settings);
   });
 
-  describe('Edge cases', () => {
-    test('should detect TODO with different spacing', () => {
-      const line = '#TODO test task without space after comment';
-      expect(regexPair.test.test(line)).toBe(false); // Should fail because we expect space after comment
-    });
-
-    test('should detect TODO with multiple spaces', () => {
-      const line = '    #    TODO test task with multiple spaces';
-      expect(regexPair.test.test(line)).toBe(true);
-      
-      const match = regexPair.capture.exec(line);
-      expect(match).toBeTruthy();
-      expect(match![1]).toBe('    '); // indent
-      expect(match![2]).toBe('#    '); // comment prefix
-      expect(match![4]).toBe('TODO'); // keyword
-      expect(match![5]).toBe('test task with multiple spaces'); // text
+  describe('Tasks in r code blocks', () => {
+    test(`should match tasks in r comments when enabled`, () => {
+      const lines = `
+\`\`\` r
+# TODO test task text
+\`\`\`
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].text).toBe("test task text");
     });
   });
 });

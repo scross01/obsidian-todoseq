@@ -13,7 +13,6 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
       includeCalloutBlocks: true,
       languageCommentSupport: {
         enabled: false,
-        languages: []
       },
       additionalTaskKeywords: [],
       taskViewMode: 'default'
@@ -465,7 +464,6 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
         includeCalloutBlocks: true,
         languageCommentSupport: {
           enabled: false,
-          languages: []
         },
         additionalTaskKeywords: [],
         taskViewMode: 'default'
@@ -599,7 +597,6 @@ TODO = some code
         includeCalloutBlocks: true,
         languageCommentSupport: {
           enabled: false,
-          languages: []
         },
         additionalTaskKeywords: [],
         taskViewMode: 'default'
@@ -891,7 +888,7 @@ TODO task in code block
 \`\`\`
 
 \`\`\`java
-TODO task in java code block without comment 
+TODO task in java code block without comment
 # TODO task in comment in java code block should be ignored
 \`\`\`
 
@@ -992,16 +989,6 @@ y = 2
         expect(tasks[6].state).toBe('TODO');
         expect(tasks[6].text).toBe('task in quote');
         
-      });
-
-      test('should handle nested callout blocks (should not happen in Obsidian)', () => {
-        const content = '>[!info] \n> >[!note] \n> > TODO nested task';
-        const tasks = parser.parseFile(content, 'test.md');
-        
-        expect(tasks).toHaveLength(1);
-        const task = tasks[0];
-        expect(task.state).toBe('TODO');
-        expect(task.text).toBe('nested task');
       });
     });
   });

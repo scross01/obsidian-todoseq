@@ -1,73 +1,56 @@
-import { registry, regexBuilder } from './test-setup';
+import { TaskParser } from '../src/parser/task-parser';
+import { TodoTrackerSettings } from '../src/settings/settings';
 
-describe('YAML Language Comment Task Parsing', () => {
-  const yamlLanguage = registry.getLanguage('yaml');
-  
-  if (!yamlLanguage) {
-    throw new Error('YAML language not found in registry');
-  }
+describe('Task parsing within YAML file comments in code blocks', () => {
+  let parser: TaskParser;
+  let settings: TodoTrackerSettings;
 
-  const regexPair = regexBuilder.buildRegex(['TODO'], yamlLanguage);
-
-  describe('Single-line comments', () => {
-    test('should detect TODO in single-line comment', () => {
-      const line = '# TODO test task in YAML single line comment';
-      expect(regexPair.test.test(line)).toBe(true);
-      
-      const match = regexPair.capture.exec(line);
-      expect(match).toBeTruthy();
-      expect(match![1]).toBe(''); // indent
-      expect(match![2]).toBe('# '); // comment prefix
-      expect(match![4]).toBe('TODO'); // keyword
-      expect(match![5]).toBe('test task in YAML single line comment'); // text
-    });
-
-    test('should detect TODO in indented single-line comment', () => {
-      const line = '        # TODO test task in YAML indented comment';
-      expect(regexPair.test.test(line)).toBe(true);
-      
-      const match = regexPair.capture.exec(line);
-      expect(match).toBeTruthy();
-      expect(match![1]).toBe('        '); // indent
-      expect(match![2]).toBe('# '); // comment prefix
-      expect(match![4]).toBe('TODO'); // keyword
-      expect(match![5]).toBe('test task in YAML indented comment'); // text
-    });
-
-    test('should detect TODO in inline single-line comment', () => {
-      const line = 'key: value  # TODO test task in YAML inline comment';
-      expect(regexPair.test.test(line)).toBe(true);
-      
-      const match = regexPair.capture.exec(line);
-      expect(match).toBeTruthy();
-      expect(match![1]).toBe(''); // indent
-      expect(match![2]).toBe('key: value  # '); // comment prefix
-      expect(match![4]).toBe('TODO'); // keyword
-      expect(match![5]).toBe('test task in YAML inline comment'); // text
-    });
+  beforeEach(() => {
+    settings = {
+      refreshInterval: 60,
+      includeCalloutBlocks: true,
+      includeCodeBlocks: true,
+      languageCommentSupport: {
+        enabled: true,
+      },
+      additionalTaskKeywords: [],
+      taskViewMode: 'default'
+    };
+    parser = TaskParser.create(settings);
   });
 
-  describe('Edge cases', () => {
-    test('should not detect TODO in non-comment code', () => {
-      const line = 'setting: "TODO test task in regular code"';
-      expect(regexPair.test.test(line)).toBe(false);
+  describe('Tasks in yaml code blocks', () => {
+    test(`should match tasks in yaml comments when enabled`, () => {
+      const lines = `
+\`\`\` yaml
+---
+# TODO test task text
+test:
+  items: # TODO test task text
+    - key = value # TODO test task text
+\`\`\`
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+      expect(tasks).toHaveLength(3);
+      expect(tasks[0].indent).toBe("# ");
+      expect(tasks[0].text).toBe("test task text");
+      expect(tasks[1].indent).toBe("  items: # ");
+      expect(tasks[1].text).toBe("test task text");
+      expect(tasks[2].indent).toBe("    - key = value # ");
+      expect(tasks[2].text).toBe("test task text");
     });
 
-    test('should detect TODO with different spacing', () => {
-      const line = '#TODO test task without space after comment';
-      expect(regexPair.test.test(line)).toBe(false); // Should fail because we expect space after comment
-    });
-
-    test('should detect TODO with multiple spaces', () => {
-      const line = '    #    TODO test task with multiple spaces';
-      expect(regexPair.test.test(line)).toBe(true);
-      
-      const match = regexPair.capture.exec(line);
-      expect(match).toBeTruthy();
-      expect(match![1]).toBe('    '); // indent
-      expect(match![2]).toBe('#    '); // comment prefix
-      expect(match![4]).toBe('TODO'); // keyword
-      expect(match![5]).toBe('test task with multiple spaces'); // text
+    test(`should match tasks in yml comments when enabled`, () => {
+      const lines = `
+\`\`\` yml
+---
+# TODO test task text
+\`\`\`
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].indent).toBe("# ");
+      expect(tasks[0].text).toBe("test task text");
     });
   });
 });

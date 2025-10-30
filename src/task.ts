@@ -5,14 +5,13 @@ export interface Task {
   rawText: string; // original full line
   indent: string;  // leading whitespace before any list marker/state
   listMarker: string; // the exact list marker plus trailing space if present (e.g., "- ", "1. ", "(a) ")
-  commentPrefix: string; // comment prefix if task is in code block (e.g., "--", "#", "//", "/*")
   text: string;    // content after the state keyword with priority token removed
   state: string;   // state keyword, TODO, DOING, DONE etc.
   completed: boolean; // is the task considered complete
   priority: 'high' | 'med' | 'low' | null;
   scheduledDate: Date | null; // scheduled date from SCHEDULED: line
   deadlineDate: Date | null;  // deadline date from DEADLINE: line
-  trailingCommentEnd?: string; // trailing comment end characters (e.g., " */") for multiline comments
+  tail?: string;   // trailing end characters after the task text (e.g., " */")
 }
 
 export const DEFAULT_PENDING_STATES = new Set<string>(['TODO', 'LATER', 'WAIT', 'WAITING']);
