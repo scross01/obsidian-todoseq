@@ -23,6 +23,8 @@ or journaling than ackwardliy typing `- [ ]` to create a task checkbox.
   CANCELLED).
 - Supports tasks inside bullet and numbered lists and preserves the original
   list marker (e.g., "- ", "1. ", "(a) ") on update.
+- Optionally capture tasks from with quotes, callouts and code blocks
+- Supports extracting tasks within language specific comments in code blocks
 - Displays all detected tasks in a single Task View, sorted by file path and
   line number.
 - Toolbar search field filters tasks live by matching raw text and file
@@ -181,10 +183,37 @@ SCHEDULED: <2025-01-15>
   style)
 - Invalid date formats are ignored and logged to console
 
+### In Comment Blocks
+
+Tasks within comment blocks `%%` are always ignored:
+
+```md
+%% TODO ignored task %%
+
+%%
+TODO anothe ignored task
+%%
+```
+
+### In Callout Blocks
+
+When the "Include tasks with quote and callout blocks" option is enabled tasks are
+collected from lines with a leading `>` quote character:
+
+```md
+> TODO this is a task in a quote
+
+> [!info]
+> TODO this is a task in an info block
+
+> [!todo]-
+> - [ ] TODO this is a checkbox task in a collapsible `todo` block
+```
+
 ### In Code Blocks
 
-When "Include tasks inside code blocks" is enabled, TODOseq can also detect tasks
-within language-specific code blocks using the appropriate comment syntax for
+When "Include tasks inside code blocks" is enabled, TODOseq can also optionally detect
+tasks within language-specific code blocks using the appropriate comment syntax for
 each programming language.
 
 #### Language-Aware Comment Tasks
@@ -199,6 +228,7 @@ automatically detects the language and uses the appropriate comment syntax:
 - **INI**: `; TODO Configure this setting`
 
 Examples:
+
 ```python
 # TODO Write unit tests
 # FIXME Handle edge cases
@@ -309,12 +339,14 @@ patterns:
 
 **Include tasks inside code blocks**: When enabled, tasks inside fenced code blocks (``` or ~~~) are included. Disabled by default.
 
-**Language comment support**: When enabled and "Include tasks inside code blocks" is active, TODOseq automatically detects the programming language and uses appropriate comment syntax to find tasks. Supports 20+ programming languages including:
+**Enable langauge comment support**: Can only be enabled if "Include tasks inside code blocks" is enabled. TODOseq search for tasks within the  programming langauge specific comments within code blocks. Supports 20+ programming languages including:
 
 - **C-style languages**: C, C++, C#, Java, JavaScript, TypeScript, Go, Swift, Kotlin
 - **Scripting languages**: Python, Ruby, Shell/Bash, PowerShell, R
 - **Configuration languages**: YAML, TOML, INI
 - **Other**: SQL, Dockerfile, Rust
+
+**Include tasks inside quote and callout blocks**: When enabled, tasks are captured from quoted lines and within callout blocks.
 
 **Task view mode**: Choose how completed items are shown by default:
 
@@ -337,6 +369,7 @@ Scripts:
 
 - `npm run dev` — run the esbuild bundler in watch mode for development.
 - `npm run build` — type-check and build for production.
+- `npm tun test` - run the unit tests.
 
 Contributing:
 
