@@ -1,7 +1,7 @@
 {
 	"id": "todoseq",
 	"name": "TODOseq",
-	"version": "0.4.3",
+	"version": "0.5.0",
 	"minAppVersion": "0.16.0",
 	"description": "Lightweight keyword-based task tracker using Logseq style keywords.",
 	"author": "Stephen Cross",
