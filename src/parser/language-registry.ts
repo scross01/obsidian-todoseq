@@ -168,7 +168,7 @@ const RUST_LANGUAGE: LanguageDefinition = {
   name: 'rust',
   keywords: ['rust'],
   patterns: {
-    singleLine: /\/\/[\/!]?/,      // starts with //, /// or //!
+    singleLine: /\/\/[/!]?/,      // starts with //, /// or //!
     multiLineStart: /\/\*\*?/,     // starts with /* or /**
     multiLineEnd: /\*\//,          // ends with */
   },

@@ -1,4 +1,4 @@
-import { PluginSettingTab, App, Setting } from 'obsidian';
+import { PluginSettingTab, App, Setting, ToggleComponent } from 'obsidian';
 import TodoTracker from '../main';
 import { TodoView } from '../view/task-view';
 import { TaskViewMode } from "../view/task-view";
@@ -101,7 +101,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
 
     // Include tasks inside code blocks (parent setting)
-    let languageToggleComponent: any = null;
+    let languageToggleComponent: ToggleComponent | null = null;
     
     new Setting(containerEl)
       .setName('Include tasks inside code blocks')
@@ -157,7 +157,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     };
 
     // Listen for includeCodeBlocks changes and update language toggle accordingly
-    this.plugin.settings.includeCodeBlocks = this.plugin.settings.includeCodeBlocks; // Force reactivity
     updateLanguageToggle(this.plugin.settings.includeCodeBlocks);
 
     // Include tasks inside callout blocks

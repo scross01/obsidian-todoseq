@@ -5,17 +5,13 @@ import { DateParser } from "./date-parser";
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
-// Date keyword patterns
-const SCHEDULED_PATTERN = /SCHEDULED:\s*/.source;
-const DEADLINE_PATTERN = /DEADLINE:\s*/.source;
-
 // List marker patterns
 // Bullet points: matches -, *, or + characters
 const BULLET_LIST_PATTERN = /[-*+]\s+/.source;
 // Numbered lists: matches digits followed by . or ) (e.g., "1.", "2)", "12.")
-const NUMBERED_LIST_PATTERN = /\d+[\.\)]\s+/.source; 
+const NUMBERED_LIST_PATTERN = /\d+[.)]\s+/.source; 
 // Letter lists: matches letters followed by . or ) (e.g., "a.", "B)")
-const LETTER_LIST_PATTERN = /[A-Za-z][\.\)]\s+/.source; 
+const LETTER_LIST_PATTERN = /[A-Za-z][.)]\s+/.source; 
 // Custom lists: matches parentheses-enclosed alphanumeric identifiers (e.g., "(A1)", "(A2)")
 const CUSTOM_LIST_PATTERN = /\([A-Za-z0-9]+\)\s+/.source;
 
@@ -27,7 +23,7 @@ const STANDARD_PREFIX = /\s*/.source;
 // Quoted lines with leading ">"
 const QUOTED_PREFIX = /\s*>\s*/.source;
 // Callout block declaration, e.g. "> [!info]"
-const CALLOUT_PREFIX = /\s*>\s*\[\!\w+\]\-?\s+/.source
+const CALLOUT_PREFIX = /\s*>\s*\[!\w+\]-?\s+/.source
 
 // Code block marker ``` or ~~~ with language
 const CODE_BLOCK_REGEX = /^\s*(```|~~~)\s*(\S+)?$/
@@ -41,7 +37,7 @@ const CALLOUT_BLOCK_REGEX = /^\s*>.*/
 // Language code before comment - non greedy
 const CODE_PREFIX = /\s*[\s\S]*?/.source
 
-const TASK_TEXT = /[\w\[].+?/.source;  // at least one word
+const TASK_TEXT = /[\w[].+?/.source;  // at least one word
 
 
 export class TaskParser {
@@ -206,7 +202,6 @@ export class TaskParser {
     // m[4] is the state keyword
     // m[5] is the task text
     // m[6] is the closing comment characters
-    const fullMatch = m[0];
     const indent = m[1] || "";
     const listMarker = (m[2] || "") + (m[3] || "");
     const state = m[4]
@@ -272,7 +267,8 @@ export class TaskParser {
     }
     
     if (checkboxMatch) {
-      const [, checkboxIndent, checkboxListMarker, checkboxStatus, checkboxState, checkboxText] = checkboxMatch;
+      // map groups from match
+      const [, /*checkboxIndent*/, checkboxListMarker, checkboxStatus, checkboxState, /*checkboxText*/ ] = checkboxMatch;
       finalState = checkboxState;
       finalCompleted = checkboxStatus === 'x';
       // Update listMarker to preserve the original checkbox format, but trim trailing spaces

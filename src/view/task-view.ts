@@ -16,7 +16,7 @@ export class TodoView extends ItemView {
   private defaultSortMethod: SortMethod;
   private searchInputEl: HTMLInputElement | null = null;
   private _searchKeyHandler: ((e: KeyboardEvent) => void) | undefined;
-  private isCaseSensitive: boolean = false;
+  private isCaseSensitive = false;
 
   constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode) {
     super(leaf);
@@ -175,7 +175,6 @@ export class TodoView extends ItemView {
     setIcon(matchCase, 'uppercase-lowercase-a');
     
     // Toggle case sensitivity
-    let isCaseSensitive = false;
     matchCase.addEventListener('click', () => {
       this.isCaseSensitive = !this.isCaseSensitive;
       matchCase.toggleClass('is-active', this.isCaseSensitive);
@@ -814,7 +813,7 @@ export class TodoView extends ItemView {
    * @param includeTime Whether to include time if available
    * @returns Formatted date string
    */
-  private formatDateForDisplay(date: Date | null, includeTime: boolean = false): string {
+  private formatDateForDisplay(date: Date | null, includeTime = false): string {
     if (!date) return '';
     return DateUtils.formatDateForDisplay(date, includeTime);
   }
@@ -825,7 +824,7 @@ export class TodoView extends ItemView {
    * @param isDeadline Whether this is a deadline date
    * @returns Array of CSS classes
    */
-  private getDateStatusClasses(date: Date | null, isDeadline: boolean = false): string[] {
+  private getDateStatusClasses(date: Date | null, isDeadline = false): string[] {
     if (!date) return [];
     
     const now = new Date();
@@ -941,7 +940,7 @@ export class TodoView extends ItemView {
       // bare URLs
       { type: 'url', regex: /\bhttps?:\/\/[^\s)]+/g },
       // #tags (must come after URLs to avoid conflicts with URLs containing #)
-      { type: 'tag', regex: /#([^\s\]\)\[\}\{>]+)/g },
+      { type: 'tag', regex: /#([^\s\])[}{>]+)/g },
     ];
 
     let i = 0;
@@ -1112,6 +1111,4 @@ export class TodoView extends ItemView {
    await (super.onClose?.());
  }
 }
-/** Controls how tasks are displayed in the TodoView */
-
 

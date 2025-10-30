@@ -9,7 +9,7 @@ export class DateUtils {
      * @param includeTime Whether to include time if available
      * @returns Formatted date string
      */
-    static formatDateForDisplay(date: Date | null, includeTime: boolean = false): string {
+    static formatDateForDisplay(date: Date | null, includeTime = false): string {
       if (!date) return '';
       
       const now = new Date();
