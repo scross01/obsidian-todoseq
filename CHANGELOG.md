@@ -1,7 +1,9 @@
 # Change Log
 
-- Added new action and keyboard shortcut to toggle the state of the task on the current line in the Markdown editor. Default hotkey `Ctrl-Enter`
-- Fixed issue with tasks not being collected when the task content starts with a multibyte character
+## 0.5.2
+
+- Added new action and keyboard shortcut to toggle the state of the task on the current line in the Markdown editor. Default hotkey `Ctrl-Enter`. #7
+- Fixed issue with tasks not being collected when the task content starts with a multibyte character. #6
 
 ## 0.5.1
 
