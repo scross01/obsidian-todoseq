@@ -41,13 +41,15 @@ const TASK_TEXT = /[\S][\s\S]*?/.source;  // at least one non-whitespace charact
 
 
 export class TaskParser {
-  private readonly testRegex: RegExp;
-  private readonly captureRegex: RegExp;
   private readonly includeCalloutBlocks: boolean;
   private readonly includeCodeBlocks: boolean;
   private readonly languageCommentSupport: LanguageCommentSupportSettings;
   private readonly customKeywords: string[];
   private allKeywords: string[];
+
+  // Public access to regex patterns for editor commands
+  public readonly testRegex: RegExp;
+  public readonly captureRegex: RegExp;
   
   // Language support components (lazy-loaded)
   private languageRegistry: LanguageRegistry | null = null;

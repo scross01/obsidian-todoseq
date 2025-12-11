@@ -1,8 +1,9 @@
-import { Plugin, TFile, TAbstractFile, WorkspaceLeaf } from 'obsidian';
+import { Plugin, TFile, TAbstractFile, WorkspaceLeaf, Editor, MarkdownView } from 'obsidian';
 import { Task } from './task';
 import { TodoView, TaskViewMode } from "./view/task-view";
 import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
+import { TaskEditor } from './view/task-editor';
 
 export const TASK_VIEW_ICON = "list-todo";
 
@@ -13,6 +14,9 @@ export default class TodoTracker extends Plugin {
 
   // Parser instance configured from current settings
   private parser: TaskParser | null = null;
+
+  // Task editor instance for updating tasks
+  private taskEditor: TaskEditor | null = null;
 
   // Shared comparator to avoid reallocation and ensure consistent ordering
   private readonly taskComparator = (a: Task, b: Task): number => {
@@ -54,6 +58,24 @@ export default class TodoTracker extends Plugin {
       name: 'Show TODO tasks',
       callback: () => this.showTasks()
     });
+
+    // Add editor command to toggle task state
+    this.addCommand({
+      id: 'toggle-task-state',
+      name: 'Toggle task state',
+      editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
+        return this.handleToggleTaskState(checking, editor, view);
+      },
+      hotkeys: [
+        {
+          modifiers: ['Ctrl'],
+          key: 'Enter'
+        }
+      ]
+    });
+
+    // Initialize task editor
+    this.taskEditor = new TaskEditor(this.app);
 
     // Initial scan
     await this.scanVault();
@@ -261,5 +283,100 @@ export default class TodoTracker extends Plugin {
         await workspace.revealLeaf(leaf);
       }
     }
+  }
+
+  /**
+   * Handle the toggle task state command
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  private handleToggleTaskState(checking: boolean, editor: Editor, view: MarkdownView): boolean {
+    if (!this.taskEditor) {
+      return false;
+    }
+
+    // Get the current line from the editor
+    const cursor = editor.getCursor();
+    const line = editor.getLine(cursor.line);
+    
+    // Check if this line contains a valid task
+    if (!this.parser?.testRegex.test(line)) {
+      return false;
+    }
+
+    if (checking) {
+      return true;
+    }
+
+    // Parse the task from the current line
+    const task = this.parseTaskFromLine(line, cursor.line, view.file?.path || '');
+    
+    if (task) {
+      // Update the task state
+      this.taskEditor.updateTaskState(task);
+    }
+
+    return true;
+  }
+
+  /**
+   * Parse a task from a line of text
+   * @param line - The line of text containing the task
+   * @param lineNumber - The line number in the file
+   * @param filePath - The path to the file
+   * @returns Parsed Task object or null if not a valid task
+   */
+  private parseTaskFromLine(line: string, lineNumber: number, filePath: string): Task | null {
+    if (!this.parser) {
+      return null;
+    }
+
+    const match = this.parser.captureRegex.exec(line);
+    if (!match) {
+      return null;
+    }
+
+    // Extract task details using the same logic as TaskParser
+    const indent = match[1] || "";
+    const listMarker = (match[2] || "") + (match[3] || "");
+    const state = match[4];
+    const taskText = match[5];
+    const tail = match[6];
+
+    // Extract priority
+    let priority: 'high' | 'med' | 'low' | null = null;
+    const cleanedText = taskText.replace(/(\s*)\[#([ABC])\](\s*)/, (match, before, letter, after) => {
+      if (letter === 'A') priority = 'high';
+      else if (letter === 'B') priority = 'med';
+      else if (letter === 'C') priority = 'low';
+      return ' ';
+    }).replace(/[ \t]+/g, ' ').trimStart();
+
+    // Extract checkbox state
+    let completed = false;
+    const checkboxMatch = line.match(/^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/);
+    if (checkboxMatch) {
+      const [, , , checkboxStatus] = checkboxMatch;
+      completed = checkboxStatus === 'x';
+    } else {
+      completed = new Set(['DONE', 'CANCELED', 'CANCELLED']).has(state);
+    }
+
+    return {
+      path: filePath,
+      line: lineNumber,
+      rawText: line,
+      indent,
+      listMarker,
+      text: cleanedText,
+      state: state as Task['state'],
+      completed,
+      priority,
+      scheduledDate: null,
+      deadlineDate: null,
+      tail
+    };
   }
 }

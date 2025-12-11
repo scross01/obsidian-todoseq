@@ -359,6 +359,15 @@ patterns:
 - Ribbon: Click the "Open TODOseq" icon to open the task view.
 - Command Palette: Run "TODOseq: Show TODO tasks" to open the task view.
 
+## Editor Commands
+
+### Toggle Task State
+
+You can quickly toggle task states directly from the Markdown editor using the keyboard shortcut or command palette when the cursor is on a valid task line This cycles through states using the same next state logic as the Task View.
+
+- **Keyboard Shortcut**: `Ctrl+Enter` (default) - Toggles the task state on the current line. The keyboard shortcut can be changed in Obsidian's Hotkeys settings
+- **Command Palette**: Run "TODOseq: Toggle task state" to toggle the task state
+
 ## Development
 
 Requirements:
