@@ -522,6 +522,28 @@ TODO test task text
       expect(tasks[1].indent).toBe("");
       expect(tasks[1].text).toBe("test task text");
     });
+
+    test(`should match tasks with multibyte characters as first character`, () => {
+      const lines = `
+TODO letter a b
+TODO letter a 中
+TODO 中 letter a
+TODO 🚀 task text
+TODO 📝 another task
+TODO 你好世界
+TODO 🇨🇦 Canadian flag
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+      
+      expect(tasks).toHaveLength(7);
+      expect(tasks[0].text).toBe('letter a b');
+      expect(tasks[1].text).toBe('letter a 中');
+      expect(tasks[2].text).toBe('中 letter a');
+      expect(tasks[3].text).toBe('🚀 task text');
+      expect(tasks[4].text).toBe('📝 another task');
+      expect(tasks[5].text).toBe('你好世界');
+      expect(tasks[6].text).toBe('🇨🇦 Canadian flag');
+    });
   });
 });
 

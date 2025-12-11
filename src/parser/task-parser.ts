@@ -37,7 +37,7 @@ const CALLOUT_BLOCK_REGEX = /^\s*>.*/
 // Language code before comment - non greedy
 const CODE_PREFIX = /\s*[\s\S]*?/.source
 
-const TASK_TEXT = /[#\w[].+?/.source;  // at least one word or hashtag
+const TASK_TEXT = /[\S][\s\S]*?/.source;  // at least one non-whitespace character, then any characters
 
 
 export class TaskParser {

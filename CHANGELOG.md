@@ -1,5 +1,7 @@
 # Change Log
 
+- Fixed issue with tasks not being collected when the task content starts with a multibyte character
+
 ## 0.5.1
 
 - Fixed issue with tasks not being collected when the task content starts with a #tag
