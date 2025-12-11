@@ -456,6 +456,12 @@ export class TodoView extends ItemView {
       type: 'checkbox',
       cls: 'todo-checkbox'
     });
+    
+    // Add state-specific class for styling
+    if (DEFAULT_ACTIVE_STATES.has(task.state)) {
+      checkbox.addClass('todo-checkbox-active');
+    }
+        
     checkbox.checked = task.completed;
 
     checkbox.addEventListener('change', async () => {

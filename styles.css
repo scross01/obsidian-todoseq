@@ -98,6 +98,11 @@
   vertical-align: middle;
 }
 
+/* Checkbox styling for active tasks (using interactive accent) */
+.todo-view .todo-checkbox.todo-checkbox-active {
+  background-color: color-mix(in srgb, var(--interactive-accent, #7f6df2) 33%, transparent);
+}
+
 /* Non-clickable link-like styling for in-text links */
 .todo-view .todo-link-like {
   color: var(--link-color);

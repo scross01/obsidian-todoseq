@@ -1,5 +1,7 @@
 # Change Log
 
+- Updated checkbox style for active (DOING/NOW) tasks in the Task View.
+
 ## 0.5.2
 
 - Added new action and keyboard shortcut to toggle the state of the task on the current line in the Markdown editor. Default hotkey `Ctrl-Enter`. #7
