@@ -196,6 +196,22 @@ TODO task text
     });
   });
 
+  describe('Tasks with tags', () => {
+    test(`should match tasks starting with #tag`, () => {
+      const lines = `
+      TODO #tag my first task
+      TODO my second task #tag
+      `;
+      const tasks = parser.parseFile(lines, 'test.md');
+      
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].text).toBe('#tag my first task');
+      expect(tasks[1].state).toBe("TODO");
+      expect(tasks[1].text).toBe('my second task #tag');
+    });
+  });
+
   describe('Tasks with priorities', () => {
     test(`should match priorities`, () => {
       const lines = `

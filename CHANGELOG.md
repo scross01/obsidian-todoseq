@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.5.1
+
+- Fixed issue with tasks not being collected when the task content starts with a #tag
+
 ## 0.5.0
 
 - Added support for collecting tasks with language specific comments in code blocks
