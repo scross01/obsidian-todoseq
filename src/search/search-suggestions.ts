@@ -137,7 +137,7 @@ export class SearchSuggestions {
         // Comprehensive tag regex that matches #tag, #multi-word-tag, etc.
         // Must come after URLs to avoid conflicts with URLs containing #
         const tagRegex = /#([^\s\)\]\}\>]+)/g;
-         
+        
         tasks.forEach(task => {
             if (task.rawText) {
                 let matches;
@@ -147,11 +147,15 @@ export class SearchSuggestions {
                 }
             }
         });
-         
+        
         // Convert to array and sort alphabetically
         const tags = Array.from(tagsSet);
-        tags.sort((a, b) => a.localeCompare(b));
-        return tags;
+        
+        // Filter out special priority tags #A, #B, #C
+        const filteredTags = tags.filter(tag => !['A', 'B', 'C'].includes(tag));
+        
+        filteredTags.sort((a, b) => a.localeCompare(b));
+        return filteredTags;
     }
     
     /**

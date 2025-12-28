@@ -87,6 +87,66 @@ describe('Search Suggestions', () => {
       expect(filteredTags).toEqual(['urgent']);
     });
 
+    it('should exclude priority tags #A, #B, #C from tag suggestions', () => {
+      // Create mock tasks with priority tags
+      const mockTasksWithPriority: Task[] = [
+        {
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO high priority task #A #urgent',
+          indent: '',
+          listMarker: '-',
+          text: 'high priority task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'notes/tasks.md',
+          line: 2,
+          rawText: 'TODO medium priority task #B #work',
+          indent: '',
+          listMarker: '-',
+          text: 'medium priority task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'notes/tasks.md',
+          line: 3,
+          rawText: 'TODO low priority task #C #personal',
+          indent: '',
+          listMarker: '-',
+          text: 'low priority task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        }
+      ];
+      
+      const allTags = SearchSuggestions.getAllTags(mockTasksWithPriority);
+      
+      // Should not include priority tags A, B, C
+      expect(allTags).not.toContain('A');
+      expect(allTags).not.toContain('B');
+      expect(allTags).not.toContain('C');
+      
+      // Should include regular tags
+      expect(allTags).toContain('urgent');
+      expect(allTags).toContain('work');
+      expect(allTags).toContain('personal');
+      
+      // Should have exactly 3 tags (urgent, work, personal)
+      expect(allTags.length).toBe(3);
+    });
+
     it('should handle empty search term by returning all suggestions', () => {
       const mockVault = new MockVault() as Vault;
       

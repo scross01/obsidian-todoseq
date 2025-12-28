@@ -20,7 +20,7 @@ export class SearchTokenizer {
     { type: 'rparen' as const, regex: /\)/y },
     { type: 'prefix' as const, regex: /\b(path|file|tag|state|priority|content):/y },
     { type: 'word' as const, regex: /[^\s"()\-]+/y },
-    { type: 'prefix_value' as const, regex: /"(?:\\.|[^"\\])*"|[^\s)]+/y }
+    { type: 'prefix_value' as const, regex: /"(?:\\.|[^"\\])*"|[^\s)]+|[^\s)]+-[^\s)]+/y }
   ];
 
   static tokenize(query: string): SearchToken[] {
@@ -49,6 +49,37 @@ export class SearchTokenizer {
           // convert it to a prefix_value token
           if (type === 'word' && tokens.length > 0 && tokens[tokens.length - 1].type === 'prefix') {
             type = 'prefix_value';
+          }
+          
+          // Special handling: if this is a dash and the previous token was a prefix_value
+          // AND the previous token was a 'tag' prefix, merge it with the next word token
+          // to form a single prefix_value with dash (for tag names with dashes)
+          if (type === 'not' && tokens.length > 0 && tokens[tokens.length - 1].type === 'prefix_value') {
+            // Check if the previous prefix was a 'tag' prefix by looking at the token before the prefix_value
+            const prevTokenIndex = tokens.length - 1;
+            const prefixBeforeValueIndex = prevTokenIndex - 1;
+            
+            if (prefixBeforeValueIndex >= 0 && tokens[prefixBeforeValueIndex].type === 'prefix' && tokens[prefixBeforeValueIndex].value === 'tag') {
+              // Look ahead to see if there's a word after the dash
+              const lookaheadPos = pattern.regex.lastIndex;
+              const wordPattern = /[^\s"()\-]+/y;
+              wordPattern.lastIndex = lookaheadPos;
+              const wordMatch = wordPattern.exec(query);
+              
+              if (wordMatch && wordMatch.index === lookaheadPos) {
+                // Merge the previous prefix_value, dash, and next word into one prefix_value
+                const prevToken = tokens[tokens.length - 1];
+                tokens[tokens.length - 1] = {
+                  type: 'prefix_value',
+                  value: prevToken.value + '-' + wordMatch[0],
+                  original: prevToken.original + '-' + wordMatch[0],
+                  position: prevToken.position
+                };
+                pos = wordPattern.lastIndex;
+                matched = true;
+                break;
+              }
+            }
           }
 
           tokens.push({

@@ -105,6 +105,27 @@ describe('Search Prefix Filters', () => {
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
+
+    it('should filter tasks by tag with dash', () => {
+      // Create a test task with a tag containing a dash
+      const testTaskWithDash: Task = {
+        path: 'notes/test/task-with-dash.md',
+        line: 1,
+        rawText: 'TODO test task with dash #test-tag',
+        indent: '',
+        listMarker: '-',
+        text: 'test task with dash',
+        state: 'TODO',
+        completed: false,
+        priority: null,
+        scheduledDate: null,
+        deadlineDate: null
+      };
+      
+      const result = [testTaskWithDash].filter(task => Search.evaluate('tag:test-tag', task, false));
+      expect(result.length).toBe(1);
+      expect(result[0].path).toBe('notes/test/task-with-dash.md');
+    });
   });
 
   describe('State Filter', () => {
