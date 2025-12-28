@@ -1,0 +1,20 @@
+.search-error-container {
+  padding: 8px 12px;
+  margin: 8px 0;
+  background-color: var(--color-red-rgb);
+  color: var(--color-base-00-rgb);
+  border-radius: 4px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-error {
+  flex: 1;
+}
+
+.search-error::before {
+  content: "⚠️";
+  font-size: 16px;
+}

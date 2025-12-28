@@ -3,6 +3,7 @@ import { TASK_VIEW_ICON } from '../main';
 import { TaskEditor } from './task-editor';
 import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from '../task';
 import { DateUtils } from './date-utils';
+import { Search } from '../search/search';
 
 
 export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';
@@ -17,6 +18,7 @@ export class TodoView extends ItemView {
   private searchInputEl: HTMLInputElement | null = null;
   private _searchKeyHandler: ((e: KeyboardEvent) => void) | undefined;
   private isCaseSensitive = false;
+  private searchError: string | null = null;
 
   constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode) {
     super(leaf);
@@ -701,24 +703,52 @@ export class TodoView extends ItemView {
     // Apply search filtering
     const q = this.getSearchQuery().trim();
     if (q.length > 0) {
-      const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
-      const searchText = this.isCaseSensitive ? (text: string) => text : (text: string) => text.toLowerCase();
-      
-      visible = visible.filter(t => {
-        const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
-        return (
-          (t.rawText && searchText(t.rawText).includes(searchQuery)) ||
-          (t.text && searchText(t.text).includes(searchQuery)) ||
-          (t.path && searchText(t.path).includes(searchQuery)) ||
-          (baseName && searchText(baseName).includes(searchQuery))
-        );
-      });
+      try {
+        // Use new advanced search functionality
+        visible = visible.filter(t => {
+          return Search.evaluate(q, t, this.isCaseSensitive);
+        });
+        this.searchError = null;
+      } catch (error) {
+        // If there's an error in parsing, fall back to simple search
+        const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
+        const searchText = this.isCaseSensitive ? (text: string) => text : (text: string) => text.toLowerCase();
+        
+        visible = visible.filter(t => {
+          const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
+          return (
+            (t.rawText && searchText(t.rawText).includes(searchQuery)) ||
+            (t.text && searchText(t.text).includes(searchQuery)) ||
+            (t.path && searchText(t.path).includes(searchQuery)) ||
+            (baseName && searchText(baseName).includes(searchQuery))
+          );
+        });
+        
+        // Store the error for display
+        this.searchError = Search.getError(q) || 'Invalid search query';
+      }
+    } else {
+      this.searchError = null;
     }
 
     // Update search results info
     const searchResultsCount = container.querySelector('.search-results-result-count');
     if (searchResultsCount) {
       searchResultsCount.setText(`${visible.length} of ${allTasks.length} task` + (allTasks.length === 1 ? '' : 's'));
+    }
+
+    // Display search error if present
+    const searchErrorContainer = container.querySelector('.search-error-container');
+    if (this.searchError) {
+      if (!searchErrorContainer) {
+        const errorContainer = container.createEl('div', { cls: 'search-error-container' });
+        const errorEl = errorContainer.createEl('div', { cls: 'search-error' });
+        errorEl.setText(this.searchError);
+      }
+    } else {
+      if (searchErrorContainer) {
+        searchErrorContainer.detach();
+      }
     }
 
     // Empty-state guidance UI

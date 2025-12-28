@@ -270,6 +270,20 @@ tasks as you type.
 - The search field expands to fill available toolbar space.
 - Search results are displayed as "X of Y tasks" in the toolbar.
 
+**Advanced Search Syntax**: TODOseq supports powerful search queries:
+
+- **Exact phrases**: `"star wars"` - Match exact phrase sequences
+- **OR logic**: `meeting OR work` - Match either term
+- **AND logic**: `meeting work` - Match both terms (implicit AND)
+- **Exclusion**: `meeting -urgent` - Match "meeting" but exclude "urgent"
+- **Grouping**: `(meeting OR call) -urgent` - Complex expressions with parentheses
+- **Multiple exclusions**: `project -urgent -blocked` - Exclude multiple terms
+
+Examples:
+- `"star wars" (movie OR series) -spoiler` - Star Wars content without spoilers
+- `(meeting OR call) project -weekend` - Project meetings/calls, not on weekends
+- `work (home OR office) -urgent` - Work tasks at home/office, excluding urgent ones
+
 **View modes (toolbar icons)**: Adjust the sort and filter.
 
 - Default: Show all tasks in detected order (sorted by file path and line
