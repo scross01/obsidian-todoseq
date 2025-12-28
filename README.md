@@ -284,6 +284,23 @@ Examples:
 - `(meeting OR call) project -weekend` - Project meetings/calls, not on weekends
 - `work (home OR office) -urgent` - Work tasks at home/office, excluding urgent ones
 
+**Prefix Filters**: TODOseq now supports Obsidian-style prefix filters for targeted searching:
+
+- `path:` - Find tasks in files within specific paths
+- `file:` - Find tasks in files with matching filenames
+- `tag:` - Find tasks containing specific tags
+- `state:` - Find tasks with specific states
+- `priority:` Find tasks with specific priorities
+- `content:` - Find tasks with specific content
+
+Prefix filter examples:
+- `path:Journal tag:#urgent` - Urgent tasks in Journal folder (implicit AND)
+- `state:TODO OR state:DOING` - Tasks that are either TODO or DOING
+- `priority:high -state:DOING` - High priority tasks excluding those in DOING state
+- `file:meeting content:project` - Project-related tasks in meeting files
+
+Prefix filters can be combined with regular search terms and boolean operators for powerful, targeted task filtering.
+
 **View modes (toolbar icons)**: Adjust the sort and filter.
 
 - Default: Show all tasks in detected order (sorted by file path and line

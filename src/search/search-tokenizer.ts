@@ -18,7 +18,9 @@ export class SearchTokenizer {
     { type: 'not' as const, regex: /-/y },
     { type: 'lparen' as const, regex: /\(/y },
     { type: 'rparen' as const, regex: /\)/y },
-    { type: 'word' as const, regex: /[^\s"()\-]+/y }
+    { type: 'prefix' as const, regex: /\b(path|file|tag|state|priority|content):/y },
+    { type: 'word' as const, regex: /[^\s"()\-]+/y },
+    { type: 'prefix_value' as const, regex: /"(?:\\.|[^"\\])*"|[^\s)]+/y }
   ];
 
   static tokenize(query: string): SearchToken[] {
@@ -40,9 +42,17 @@ export class SearchTokenizer {
         const match = pattern.regex.exec(query);
 
         if (match && match.index === pos) {
-          const value = this.processTokenValue(match[0], pattern.type);
+          let value = this.processTokenValue(match[0], pattern.type);
+          let type = pattern.type;
+          
+          // Special handling: if this is a word token and the previous token was a prefix,
+          // convert it to a prefix_value token
+          if (type === 'word' && tokens.length > 0 && tokens[tokens.length - 1].type === 'prefix') {
+            type = 'prefix_value';
+          }
+
           tokens.push({
-            type: pattern.type,
+            type: type,
             value: value,
             original: match[0],
             position: pos
@@ -68,6 +78,16 @@ export class SearchTokenizer {
         // Remove surrounding quotes and process escaped quotes
         const content = token.slice(1, -1);
         return content.replace(/\\"/g, '"');
+      case 'prefix':
+        // Remove colon from prefix (e.g., "path:" -> "path")
+        return token.slice(0, -1);
+      case 'prefix_value':
+        // Remove surrounding quotes if present
+        if (token.startsWith('"') && token.endsWith('"')) {
+          const content = token.slice(1, -1);
+          return content.replace(/\\"/g, '"');
+        }
+        return token;
       case 'or':
       case 'and':
         // Convert to lowercase for consistency
@@ -87,6 +107,8 @@ export class SearchTokenizer {
       case 'not': return BP.NOT;
       case 'and': return BP.AND;
       case 'or': return BP.OR;
+      case 'prefix': return BP.DEFAULT;
+      case 'prefix_value': return BP.DEFAULT;
       case 'word': return BP.DEFAULT;
       case 'phrase': return BP.DEFAULT;
       default: return BP.DEFAULT;

@@ -62,8 +62,20 @@ class PrattParser {
         continue;
       }
 
+      // Handle prefix tokens as implicit AND with previous prefix filter
+      if (currentToken.type === 'prefix') {
+        // Parse the next prefix filter (don't increment position yet)
+        const right = this.parsePrefixFilter();
+        left = {
+          type: 'and',
+          children: [left, right],
+          position: currentToken.position
+        };
+        continue;
+      }
+
       this.position++;
-      
+       
       // Handle implicit AND for consecutive terms
       if (currentToken.type === 'word' || currentToken.type === 'phrase') {
         // Create an AND node with the current left and the new term
@@ -105,6 +117,9 @@ class PrattParser {
         this.position++; // consume rparen
         return parenExpr;
       
+      case 'prefix':
+        return this.parsePrefixFilter();
+      
       case 'word':
       case 'phrase':
         this.position++;
@@ -112,6 +127,43 @@ class PrattParser {
       
       default:
         throw new SearchError(`Unexpected token: ${token.original}`, token.position);
+    }
+  }
+
+  private parsePrefixFilter(): SearchNode {
+    // Expecting a prefix token followed by a prefix_value token
+    if (this.position >= this.tokens.length) {
+      throw new SearchError('Unexpected end of expression after prefix', this.position);
+    }
+
+    const prefixToken = this.tokens[this.position];
+    if (prefixToken.type !== 'prefix') {
+      throw new SearchError(`Expected prefix token, got ${prefixToken.type}`, prefixToken.position);
+    }
+
+    this.position++;
+
+    // Check if there's a value after the prefix
+    if (this.position >= this.tokens.length) {
+      throw new SearchError('Expected value after prefix', prefixToken.position);
+    }
+
+    const valueToken = this.tokens[this.position];
+    
+    // Handle both prefix_value and regular word/phrase tokens
+    if (valueToken.type === 'prefix_value' || valueToken.type === 'word' || valueToken.type === 'phrase') {
+      const field = prefixToken.value as any; // Will be validated in evaluator
+      const value = valueToken.value;
+      this.position++;
+      
+      return {
+        type: 'prefix_filter',
+        field: field,
+        value: value,
+        position: prefixToken.position
+      };
+    } else {
+      throw new SearchError(`Expected prefix value, got ${valueToken.type}`, valueToken.position);
     }
   }
 
@@ -138,6 +190,9 @@ class PrattParser {
         return { type: 'term', value: token.value, position: token.position };
       case 'phrase':
         return { type: 'phrase', value: token.value, position: token.position };
+      case 'prefix_value':
+        // Treat prefix_value as a term when not preceded by a prefix
+        return { type: 'term', value: token.value, position: token.position };
       default:
         throw new SearchError(`Cannot create term from token type: ${token.type}`, token.position);
     }

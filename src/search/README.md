@@ -145,13 +145,64 @@ Comprehensive test coverage includes:
 - Error conditions
 - Performance benchmarks
 
+## Prefix Filters (IMPLEMENTED)
+
+TODOseq now supports Obsidian-style prefix filters for targeted field-specific searching:
+
+### Available Prefix Filters
+
+- **Path filter**: `path:Journal` - Filter tasks by file path
+- **File filter**: `file:meeting` - Filter tasks by filename
+- **Tag filter**: `tag:#urgent` - Filter tasks by tags
+- **State filter**: `state:DOING` - Filter tasks by state
+- **Priority filter**: `priority:high` or `priority:A` - Filter tasks by priority
+- **Content filter**: `content:"project action"` - Filter tasks by content
+
+### Token Types (Extended)
+
+- `prefix`: Prefix keywords (path:, file:, tag:, state:, priority:, content:)
+- `prefix_value`: Values associated with prefix filters
+
+### AST Node Types (Extended)
+
+- `prefix_filter`: Prefix-based filtering operations
+
+### Prefix Filter Examples
+
+```
+path:Journal/                    // Tasks in Journal folder
+file:meeting                     // Tasks in files containing "meeting"
+tag:#urgent                      // Tasks with #urgent tag
+state:DOING                      // Tasks in DOING state
+priority:high                    // High priority tasks
+priority:A                       // Same as priority:high
+content:"project action"         // Tasks containing exact phrase
+```
+
+### Combined Prefix Filters
+
+```
+path:Journal/ tag:#urgent        // Implicit AND: urgent tasks in Journal
+state:TODO OR state:DOING       // OR logic with prefix filters
+priority:high -state:DOING      // High priority excluding DOING state
+file:meeting content:project    // Project tasks in meeting files
+```
+
+### Implementation Details
+
+- **Context-aware tokenization**: Words following prefix tokens are automatically treated as prefix values
+- **Implicit AND**: Consecutive prefix filters are combined with AND logic
+- **Full boolean support**: Prefix filters work with OR, AND, NOT operators
+- **Case sensitivity**: Respects global case sensitivity setting
+- **Quoted values**: Supports multi-word values with quotes (e.g., `path:"Folder Name"`)
+
 ## Future Enhancements
 
 Potential features for future versions:
 
-- Field-specific search: `path:word`, `text:"phrase"`
 - Date range search: `scheduled:2023-2024`
 - Regular expressions: `/pattern/`
 - Fuzzy search: `~approximate`
 - Search highlighting in results
 - Search history and suggestions
+- Autocomplete dropdown for prefix values

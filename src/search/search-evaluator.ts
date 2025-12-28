@@ -9,6 +9,8 @@ export class SearchEvaluator {
         return this.evaluateTerm(node.value!, task, caseSensitive);
       case 'phrase':
         return this.evaluatePhrase(node.value!, task, caseSensitive);
+      case 'prefix_filter':
+        return this.evaluatePrefixFilter(node, task, caseSensitive);
       case 'and':
         return this.evaluateAnd(node.children!, task, caseSensitive);
       case 'or':
@@ -67,6 +69,106 @@ export class SearchEvaluator {
 
   private static evaluateNot(node: SearchNode, task: Task, caseSensitive: boolean): boolean {
     return !this.evaluate(node, task, caseSensitive);
+  }
+
+  private static evaluatePrefixFilter(node: SearchNode, task: Task, caseSensitive: boolean): boolean {
+    const field = node.field;
+    const value = node.value;
+    
+    if (!field || !value) {
+      return false;
+    }
+
+    switch (field) {
+      case 'path':
+        return this.evaluatePathFilter(value, task, caseSensitive);
+      case 'file':
+        return this.evaluateFileFilter(value, task, caseSensitive);
+      case 'tag':
+        return this.evaluateTagFilter(value, task, caseSensitive);
+      case 'state':
+        return this.evaluateStateFilter(value, task, caseSensitive);
+      case 'priority':
+        return this.evaluatePriorityFilter(value, task, caseSensitive);
+      case 'content':
+        return this.evaluateContentFilter(value, task, caseSensitive);
+      default:
+        return false;
+    }
+  }
+
+  private static evaluatePathFilter(value: string, task: Task, caseSensitive: boolean): boolean {
+    if (!task.path) return false;
+    
+    const searchText = caseSensitive ? value : value.toLowerCase();
+    const targetPath = caseSensitive ? task.path : task.path.toLowerCase();
+    
+    return targetPath.includes(searchText);
+  }
+
+  private static evaluateFileFilter(value: string, task: Task, caseSensitive: boolean): boolean {
+    if (!task.path) return false;
+    
+    // Extract just the filename
+    const lastSlash = task.path.lastIndexOf('/');
+    const filename = lastSlash >= 0 ? task.path.slice(lastSlash + 1) : task.path;
+    
+    const searchText = caseSensitive ? value : value.toLowerCase();
+    const targetFilename = caseSensitive ? filename : filename.toLowerCase();
+    
+    return targetFilename.includes(searchText);
+  }
+
+  private static evaluateTagFilter(value: string, task: Task, caseSensitive: boolean): boolean {
+    if (!task.rawText) return false;
+    
+    const searchText = caseSensitive ? value : value.toLowerCase();
+    const targetText = caseSensitive ? task.rawText : task.rawText.toLowerCase();
+    
+    // Look for tag patterns (#tag)
+    const tagRegex = /#([\w\-]+)/g;
+    const matches = targetText.match(tagRegex) || [];
+    
+    return matches.some(tag => {
+      const tagContent = caseSensitive ? tag : tag.toLowerCase();
+      return tagContent.includes(searchText);
+    });
+  }
+
+  private static evaluateStateFilter(value: string, task: Task, caseSensitive: boolean): boolean {
+    const searchText = caseSensitive ? value : value.toLowerCase();
+    const taskState = caseSensitive ? task.state : task.state.toLowerCase();
+    
+    return taskState === searchText;
+  }
+
+  private static evaluatePriorityFilter(value: string, task: Task, caseSensitive: boolean): boolean {
+    // Normalize the search value
+    let normalizedSearch = value.toLowerCase();
+    
+    // Map priority keywords to standard values
+    if (normalizedSearch === 'high' || normalizedSearch === 'a') {
+      normalizedSearch = 'high';
+    } else if (normalizedSearch === 'medium' || normalizedSearch === 'b') {
+      normalizedSearch = 'med';
+    } else if (normalizedSearch === 'low' || normalizedSearch === 'c') {
+      normalizedSearch = 'low';
+    } else if (normalizedSearch === 'none') {
+      // Handle 'none' case separately
+      return !task.priority;
+    }
+
+    const taskPriority = task.priority ? task.priority.toLowerCase() : null;
+    return taskPriority === normalizedSearch;
+  }
+
+  private static evaluateContentFilter(value: string, task: Task, caseSensitive: boolean): boolean {
+    if (!task.text) return false;
+    
+    const searchText = caseSensitive ? value : value.toLowerCase();
+    const targetText = caseSensitive ? task.text : task.text.toLowerCase();
+    
+    return targetText.includes(searchText);
   }
 
   private static getSearchableFields(task: Task): string[] {
