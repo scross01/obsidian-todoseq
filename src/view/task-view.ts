@@ -4,6 +4,7 @@ import { TaskEditor } from './task-editor';
 import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from '../task';
 import { DateUtils } from './date-utils';
 import { Search } from '../search/search';
+import { SearchSuggestionDropdown } from '../search/search-suggestion-dropdown';
 
 
 export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';
@@ -19,6 +20,7 @@ export class TodoView extends ItemView {
   private _searchKeyHandler: ((e: KeyboardEvent) => void) | undefined;
   private isCaseSensitive = false;
   private searchError: string | null = null;
+  private suggestionDropdown: SearchSuggestionDropdown | null = null;
 
   constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode) {
     super(leaf);
@@ -158,7 +160,7 @@ export class TodoView extends ItemView {
 
     // First row: search input with mode icons on the right
     const firstRow = toolbar.createEl('div', { cls: 'todo-toolbar-first-row' });
-    
+     
     // Right-aligned search input with icon
     const searchWrap = firstRow.createEl('div', { cls: 'todo-toolbar-right' });
     const searchId = `todoseq-search-${Math.random().toString(36).slice(2, 8)}`;
@@ -175,7 +177,7 @@ export class TodoView extends ItemView {
     });
     const matchCase = searchInputWrap.createEl('div', { cls: 'input-right-decorator clickable-icon', attr: { 'aria-label': 'Match case' } });
     setIcon(matchCase, 'uppercase-lowercase-a');
-    
+
     // Toggle case sensitivity
     matchCase.addEventListener('click', () => {
       this.isCaseSensitive = !this.isCaseSensitive;
@@ -269,25 +271,25 @@ export class TodoView extends ItemView {
         'data-sort-mode': 'default'
       }
     });
-    
+
     const sortOptions = [
       { value: 'default', label: 'Default (file path)' },
       { value: 'sortByScheduled', label: 'Scheduled date' },
       { value: 'sortByDeadline', label: 'Deadline date' },
       { value: 'sortByPriority', label: 'Priority' }
     ];
-    
+
     for (const option of sortOptions) {
       const optionEl = select.createEl('option', {
         attr: { value: option.value }
       });
       optionEl.setText(option.label);
     }
-    
+
     // Set current sort mode
     const currentSortMethod = this.getSortMethod();
     select.value = currentSortMethod;
-    
+
     // Add change handler for dropdown
     select.addEventListener('change', () => {
       const selectedValue = select.value;
@@ -317,6 +319,119 @@ export class TodoView extends ItemView {
 
     // Keep a reference for keyboard handlers to focus later
     this.searchInputEl = inputEl;
+  }
+
+  /** Setup search suggestion dropdown for prefix filter autocomplete */
+  private setupSearchSuggestions(): void {
+    const inputEl = this.searchInputEl;
+    if (!inputEl) return;
+    
+    // Import the SearchSuggestionDropdown class dynamically to avoid circular dependencies
+    import('../search/search-suggestion-dropdown').then(module => {
+      this.suggestionDropdown = new module.SearchSuggestionDropdown(
+        inputEl,
+        this.app.vault,
+        this.tasks
+      );
+      
+      // Input event handler for dropdown triggering
+      inputEl.addEventListener('input', () => {
+        this.handleSearchInputForSuggestions();
+      });
+      
+      // Focus event handler
+      inputEl.addEventListener('focus', () => {
+        this.handleSearchFocus();
+      });
+      
+      // Blur event handler
+      inputEl.addEventListener('blur', () => {
+        // Small delay to allow click events to process
+        setTimeout(() => {
+          if (this.suggestionDropdown) {
+            // Don't hide if we're handling a prefix selection
+            if (!this.suggestionDropdown.isHandlingPrefixSelection) {
+              this.suggestionDropdown.hide();
+            }
+          }
+        }, 200);
+      });
+      
+      // Keydown event handler
+      inputEl.addEventListener('keydown', (e) => {
+        if (this.suggestionDropdown && this.suggestionDropdown.handleKeyDown(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      });
+    }).catch(error => {
+      console.error('Failed to load search suggestion dropdown:', error);
+    });
+  }
+
+  private handleSearchInputForSuggestions(): void {
+  if (!this.searchInputEl || !this.suggestionDropdown) return;
+  
+  const value = this.searchInputEl.value;
+  const cursorPos = this.searchInputEl.selectionStart ?? 0;
+  
+  // Check if we should show suggestions
+  if (value.length === 0) {
+      // Empty input - show options dropdown
+      this.suggestionDropdown.showOptionsDropdown();
+      return;
+  }
+  
+  // Check if cursor is at end of a prefix or typing after a prefix
+  const textBeforeCursor = value.substring(0, cursorPos);
+  
+  // Match either:
+  // 1. Complete prefix with colon and optional search term: path:search
+  // 2. Incomplete prefix being typed: path
+  const prefixMatch = textBeforeCursor.match(/(\w+)(:([^\s]*))?$/);
+  
+  if (prefixMatch) {
+      const prefixBase = prefixMatch[1];
+      const hasColon = prefixMatch[2] !== undefined;
+      const searchTerm = prefixMatch[3] || ''; // Text typed after the colon
+      
+      // Check if this is a valid prefix
+      const validPrefixes = ['path', 'file', 'tag', 'state', 'priority', 'content'];
+      if (validPrefixes.includes(prefixBase) || validPrefixes.some(p => p.startsWith(prefixBase))) {
+          if (hasColon) {
+              // Complete prefix with colon - show filtered suggestions
+              const prefix = prefixBase + ':';
+              this.suggestionDropdown.showPrefixDropdown(prefix, searchTerm);
+          } else {
+              // Incomplete prefix being typed - show options dropdown if it matches the start of any prefix
+              this.suggestionDropdown.showOptionsDropdown();
+          }
+          return;
+      }
+  }
+  
+  // Check if cursor is at end of text that ends with space
+  if (cursorPos === value.length && value.endsWith(' ')) {
+      // Show options dropdown
+      this.suggestionDropdown.showOptionsDropdown();
+      return;
+  }
+  
+  // No suggestions to show, but check if we're handling a prefix selection
+  if (!this.suggestionDropdown.isHandlingPrefixSelection) {
+      this.suggestionDropdown.hide();
+  }
+}
+
+  private handleSearchFocus(): void {
+    if (!this.searchInputEl || !this.suggestionDropdown) return;
+    
+    const value = this.searchInputEl.value;
+    
+    if (value.length === 0) {
+        // Show options dropdown when focusing empty input
+        this.suggestionDropdown.showOptionsDropdown();
+    }
   }
 
   // Cycle state via NEXT_STATE using TaskEditor
@@ -806,6 +921,9 @@ export class TodoView extends ItemView {
     // Toolbar
     this.buildToolbar(container);
 
+    // Setup search suggestions dropdown
+    this.setupSearchSuggestions();
+
     // Initial list render (preserves focus since toolbar/input already exists)
     this.refreshVisibleList();
 
@@ -1143,6 +1261,13 @@ export class TodoView extends ItemView {
      window.removeEventListener('keydown', handler);
      this._searchKeyHandler = undefined;
    }
+   
+   // Cleanup suggestion dropdown
+   if (this.suggestionDropdown) {
+     this.suggestionDropdown.cleanup();
+     this.suggestionDropdown = null;
+   }
+   
    this.searchInputEl = null;
    await (super.onClose?.());
  }
