@@ -77,6 +77,78 @@ describe('Search Prefix Filters', () => {
       const result = testTasks.filter(task => Search.evaluate('path:JOURNAL', task, true));
       expect(result.length).toBe(0);
     });
+
+    it('should match immediate parent directory and subfolders', () => {
+      // Test case: path:examples should match:
+      // - "examples/File.md" (immediate parent)
+      // - "examples/folder 1/notes.md" (subfolder)
+      // - "examples/folder 2/meeting.md" (subfolder)
+      // But should NOT match "notes/examples.md" (where "examples" is not parent or ancestor)
+      const testTasksForParent: Task[] = [
+        {
+          path: 'examples/File.md',
+          line: 1,
+          rawText: 'TODO example task',
+          indent: '',
+          listMarker: '-',
+          text: 'example task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'examples/folder 1/notes.md',
+          line: 2,
+          rawText: 'TODO notes in subfolder',
+          indent: '',
+          listMarker: '-',
+          text: 'notes in subfolder',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'examples/folder 2/meeting.md',
+          line: 3,
+          rawText: 'TODO meeting in subfolder',
+          indent: '',
+          listMarker: '-',
+          text: 'meeting in subfolder',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'notes/examples.md',
+          line: 4,
+          rawText: 'TODO notes example',
+          indent: '',
+          listMarker: '-',
+          text: 'notes example',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        }
+      ];
+
+      // Should match all examples/... files (3 matches)
+      const result = testTasksForParent.filter(task => Search.evaluate('path:examples', task, false));
+      expect(result.length).toBe(3);
+      expect(result[0].path).toBe('examples/File.md');
+      expect(result[1].path).toBe('examples/folder 1/notes.md');
+      expect(result[2].path).toBe('examples/folder 2/meeting.md');
+
+      // Should NOT include "notes/examples.md"
+      expect(result.some(task => task.path === 'notes/examples.md')).toBe(false);
+    });
   });
 
   describe('File Filter', () => {

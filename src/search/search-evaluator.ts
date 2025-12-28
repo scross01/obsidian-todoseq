@@ -103,7 +103,24 @@ export class SearchEvaluator {
     const searchText = caseSensitive ? value : value.toLowerCase();
     const targetPath = caseSensitive ? task.path : task.path.toLowerCase();
     
-    return targetPath.includes(searchText);
+    // Check if the path starts with the search value followed by a slash
+    // This matches both immediate parent and subfolders
+    const expectedPrefix = searchText + '/';
+    
+    // Handle root-level case (e.g., "examples/File.md" where search is "examples")
+    if (targetPath === searchText || targetPath.startsWith(expectedPrefix)) {
+      return true;
+    }
+    
+    // Also check if any parent directory in the path matches (for nested cases)
+    const pathParts = targetPath.split('/');
+    for (let i = 0; i < pathParts.length - 1; i++) { // Don't check the filename
+      if (pathParts[i] === searchText) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   private static evaluateFileFilter(value: string, task: Task, caseSensitive: boolean): boolean {
