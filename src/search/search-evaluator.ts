@@ -1,17 +1,18 @@
 import { SearchNode } from './search-types';
 import { Task } from '../task';
 import { DateUtils } from '../view/date-utils';
+import { TodoTrackerSettings } from '../settings/settings';
 
 export class SearchEvaluator {
   
-  static evaluate(node: SearchNode, task: Task, caseSensitive: boolean): boolean {
+  static evaluate(node: SearchNode, task: Task, caseSensitive: boolean, settings?: TodoTrackerSettings): boolean {
     switch (node.type) {
       case 'term':
         return this.evaluateTerm(node.value!, task, caseSensitive);
       case 'phrase':
         return this.evaluatePhrase(node.value!, task, caseSensitive);
       case 'prefix_filter':
-        return this.evaluatePrefixFilter(node, task, caseSensitive);
+        return this.evaluatePrefixFilter(node, task, caseSensitive, settings);
       case 'range_filter':
         return this.evaluateRangeFilter(node, task, caseSensitive);
       case 'and':
@@ -74,7 +75,7 @@ export class SearchEvaluator {
     return !this.evaluate(node, task, caseSensitive);
   }
 
-  private static evaluatePrefixFilter(node: SearchNode, task: Task, caseSensitive: boolean): boolean {
+  private static evaluatePrefixFilter(node: SearchNode, task: Task, caseSensitive: boolean, settings?: TodoTrackerSettings): boolean {
     const field = node.field;
     const value = node.value;
     
@@ -96,9 +97,9 @@ export class SearchEvaluator {
       case 'content':
         return this.evaluateContentFilter(value, task, caseSensitive);
       case 'scheduled':
-        return this.evaluateScheduledFilter(value, task, caseSensitive);
+        return this.evaluateScheduledFilter(value, task, caseSensitive, settings);
       case 'deadline':
-        return this.evaluateDeadlineFilter(value, task, caseSensitive);
+        return this.evaluateDeadlineFilter(value, task, caseSensitive, settings);
       default:
         return false;
     }
@@ -222,8 +223,8 @@ export class SearchEvaluator {
    * @param caseSensitive Whether matching should be case sensitive
    * @returns True if task matches the scheduled filter
    */
-  private static evaluateScheduledFilter(value: string, task: Task, caseSensitive: boolean): boolean {
-    const parsedDate = DateUtils.parseDateValue(value);
+  private static evaluateScheduledFilter(value: string, task: Task, caseSensitive: boolean, settings?: TodoTrackerSettings): boolean {
+   const parsedDate = DateUtils.parseDateValue(value);
     
     // Handle null/undefined parsedDate
     if (parsedDate === null || parsedDate === undefined) {
@@ -242,7 +243,7 @@ export class SearchEvaluator {
     
     // Handle string-based relative date expressions
     if (typeof parsedDate === 'string') {
-      return this.evaluateDateExpression(parsedDate, task.scheduledDate);
+      return this.evaluateDateExpression(parsedDate, task.scheduledDate, settings);
     }
     
     // Handle date ranges
@@ -290,8 +291,8 @@ export class SearchEvaluator {
    * @param caseSensitive Whether matching should be case sensitive
    * @returns True if task matches the deadline filter
    */
-  private static evaluateDeadlineFilter(value: string, task: Task, caseSensitive: boolean): boolean {
-    const parsedDate = DateUtils.parseDateValue(value);
+  private static evaluateDeadlineFilter(value: string, task: Task, caseSensitive: boolean, settings?: TodoTrackerSettings): boolean {
+   const parsedDate = DateUtils.parseDateValue(value);
     
     // Handle null/undefined parsedDate
     if (parsedDate === null || parsedDate === undefined) {
@@ -310,7 +311,7 @@ export class SearchEvaluator {
     
     // Handle string-based relative date expressions
     if (typeof parsedDate === 'string') {
-      return this.evaluateDateExpression(parsedDate, task.deadlineDate);
+      return this.evaluateDateExpression(parsedDate, task.deadlineDate, settings);
     }
     
     // Handle date ranges
@@ -357,35 +358,37 @@ export class SearchEvaluator {
    * @param date Date to evaluate
    * @returns True if date matches the expression
    */
-  private static evaluateDateExpression(expression: string, date: Date): boolean {
-    const now = new Date();
-    
-    switch (expression) {
-      case 'overdue':
-        return DateUtils.isDateOverdue(date, now);
-      case 'due':
-      case 'today':
-        return DateUtils.isDateDueToday(date, now);
-      case 'tomorrow':
-        return DateUtils.isDateDueTomorrow(date, now);
-      case 'this week':
-        return DateUtils.isDateInCurrentWeek(date, now);
-      case 'next week':
-        return DateUtils.isDateInNextWeek(date, now);
-      case 'this month':
-        return DateUtils.isDateInCurrentMonth(date, now);
-      case 'next month':
-        return DateUtils.isDateInNextMonth(date, now);
-      default:
-        // Handle "next N days" pattern
-        const nextNDaysMatch = expression.match(/^next\s+(\d+)\s+days$/);
-        if (nextNDaysMatch) {
-          const days = parseInt(nextNDaysMatch[1], 10);
-          return DateUtils.isDateInNextNDays(date, days, now);
-        }
-        return false;
-    }
-  }
+  private static evaluateDateExpression(expression: string, date: Date, settings?: TodoTrackerSettings): boolean {
+   const now = new Date();
+   const weekStartsOn = settings?.weekStartsOn ?? 'Monday';
+   
+   switch (expression) {
+     case 'overdue':
+       return DateUtils.isDateOverdue(date, now);
+     case 'due':
+       return DateUtils.isDateDueToday(date, now) || DateUtils.isDateOverdue(date, now);
+     case 'today':
+       return DateUtils.isDateDueToday(date, now);
+     case 'tomorrow':
+       return DateUtils.isDateDueTomorrow(date, now);
+     case 'this week':
+       return DateUtils.isDateInCurrentWeek(date, now, weekStartsOn);
+     case 'next week':
+       return DateUtils.isDateInNextWeek(date, now, weekStartsOn);
+     case 'this month':
+       return DateUtils.isDateInCurrentMonth(date, now);
+     case 'next month':
+       return DateUtils.isDateInNextMonth(date, now);
+     default:
+       // Handle "next N days" pattern
+       const nextNDaysMatch = expression.match(/^next\s+(\d+)\s+days$/);
+       if (nextNDaysMatch) {
+         const days = parseInt(nextNDaysMatch[1], 10);
+         return DateUtils.isDateInNextNDays(date, days, now);
+       }
+       return false;
+   }
+ }
 
   /**
    * Evaluate range filter (e.g., scheduled:2024-01-01..2024-01-31)

@@ -135,4 +135,78 @@ describe('DateUtils', () => {
       expect(result).toBe('Tomorrow 1:30 am');
     });
   });
+
+  describe('weekStartsOn functionality', () => {
+    // Test week starting on Monday (ISO standard)
+    describe('isDateInCurrentWeek with Monday start', () => {
+      test('should include Monday in current week', () => {
+        const monday = new Date('2023-12-04T12:00:00'); // Monday
+        const referenceDate = new Date('2023-12-04T12:00:00'); // Same Monday
+        const result = DateUtils.isDateInCurrentWeek(monday, referenceDate, 'Monday');
+        expect(result).toBe(true);
+      });
+
+      test('should include Sunday in current week when week starts on Monday', () => {
+        const sunday = new Date('2023-12-10T12:00:00'); // Sunday
+        const referenceDate = new Date('2023-12-04T12:00:00'); // Monday
+        const result = DateUtils.isDateInCurrentWeek(sunday, referenceDate, 'Monday');
+        expect(result).toBe(true);
+      });
+
+      test('should not include next Monday in current week', () => {
+        const nextMonday = new Date('2023-12-11T12:00:00'); // Next Monday
+        const referenceDate = new Date('2023-12-04T12:00:00'); // Monday
+        const result = DateUtils.isDateInCurrentWeek(nextMonday, referenceDate, 'Monday');
+        expect(result).toBe(false);
+      });
+    });
+
+    // Test week starting on Sunday
+    describe('isDateInCurrentWeek with Sunday start', () => {
+      test('should include Sunday in current week', () => {
+        const sunday = new Date('2023-12-03T12:00:00'); // Sunday
+        const referenceDate = new Date('2023-12-03T12:00:00'); // Same Sunday
+        const result = DateUtils.isDateInCurrentWeek(sunday, referenceDate, 'Sunday');
+        expect(result).toBe(true);
+      });
+
+      test('should include Saturday in current week when week starts on Sunday', () => {
+        const saturday = new Date('2023-12-09T12:00:00'); // Saturday
+        const referenceDate = new Date('2023-12-03T12:00:00'); // Sunday
+        const result = DateUtils.isDateInCurrentWeek(saturday, referenceDate, 'Sunday');
+        expect(result).toBe(true);
+      });
+
+      test('should not include next Sunday in current week', () => {
+        const nextSunday = new Date('2023-12-10T12:00:00'); // Next Sunday
+        const referenceDate = new Date('2023-12-03T12:00:00'); // Sunday
+        const result = DateUtils.isDateInCurrentWeek(nextSunday, referenceDate, 'Sunday');
+        expect(result).toBe(false);
+      });
+    });
+
+    // Test next week functionality
+    describe('isDateInNextWeek', () => {
+      test('should include next Monday in next week when week starts on Monday', () => {
+        const nextMonday = new Date('2023-12-11T12:00:00'); // Next Monday
+        const referenceDate = new Date('2023-12-04T12:00:00'); // Monday
+        const result = DateUtils.isDateInNextWeek(nextMonday, referenceDate, 'Monday');
+        expect(result).toBe(true);
+      });
+
+      test('should include next Sunday in next week when week starts on Sunday', () => {
+        const nextSunday = new Date('2023-12-10T12:00:00'); // Next Sunday
+        const referenceDate = new Date('2023-12-03T12:00:00'); // Sunday
+        const result = DateUtils.isDateInNextWeek(nextSunday, referenceDate, 'Sunday');
+        expect(result).toBe(true);
+      });
+
+      test('should not include current week dates in next week', () => {
+        const currentWeekDate = new Date('2023-12-04T12:00:00'); // Current Monday
+        const referenceDate = new Date('2023-12-04T12:00:00'); // Same Monday
+        const result = DateUtils.isDateInNextWeek(currentWeekDate, referenceDate, 'Monday');
+        expect(result).toBe(false);
+      });
+    });
+  });
 });

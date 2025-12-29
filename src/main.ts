@@ -31,7 +31,7 @@ export default class TodoTracker extends Plugin {
     // Register the custom view type
     this.registerView(
       TodoView.viewType,
-      (leaf) => new TodoView(leaf, this.tasks, this.settings.taskViewMode)
+      (leaf) => new TodoView(leaf, this.tasks, this.settings.taskViewMode, this.settings)
     );
  
     // Persist view-mode changes coming from TodoView toolbars

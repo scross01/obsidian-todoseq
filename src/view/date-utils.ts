@@ -294,28 +294,39 @@ export class DateUtils {
    * @param referenceDate Reference date (default: now)
    * @returns True if date is in current week
    */
-  static isDateInCurrentWeek(date: Date | null, referenceDate: Date = new Date()): boolean {
-    if (!date) return false;
-    
-    const target = new Date(date);
-    const ref = new Date(referenceDate);
-    
-    // Get the first day of the week (Monday)
-    const refDay = ref.getDay();
-    const daysSinceMonday = (refDay + 6) % 7; // 0=Sun, 1=Mon, ..., 6=Sat
-    const monday = new Date(ref);
-    monday.setDate(monday.getDate() - daysSinceMonday);
-    monday.setHours(0, 0, 0, 0);
-    
-    // Get the last day of the week (Sunday)
-    const sunday = new Date(monday);
-    sunday.setDate(sunday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-    
-    target.setHours(0, 0, 0, 0);
-    
-    return target >= monday && target <= sunday;
-  }
+  static isDateInCurrentWeek(date: Date | null, referenceDate: Date = new Date(), weekStartsOn: 'Monday' | 'Sunday' = 'Monday'): boolean {
+   if (!date) return false;
+   
+   const target = new Date(date);
+   const ref = new Date(referenceDate);
+   
+   // Get the first day of the week based on setting
+   const refDay = ref.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+   let firstDayOfWeek: Date;
+   
+   if (weekStartsOn === 'Monday') {
+     // Week starts on Monday (ISO standard)
+     const daysSinceMonday = (refDay + 6) % 7; // 0=Sun, 1=Mon, ..., 6=Sat
+     firstDayOfWeek = new Date(ref);
+     firstDayOfWeek.setDate(firstDayOfWeek.getDate() - daysSinceMonday);
+   } else {
+     // Week starts on Sunday
+     const daysSinceSunday = refDay; // 0=Sun, 1=Mon, ..., 6=Sat
+     firstDayOfWeek = new Date(ref);
+     firstDayOfWeek.setDate(firstDayOfWeek.getDate() - daysSinceSunday);
+   }
+   
+   firstDayOfWeek.setHours(0, 0, 0, 0);
+   
+   // Get the last day of the week (6 days after first day)
+   const lastDayOfWeek = new Date(firstDayOfWeek);
+   lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6);
+   lastDayOfWeek.setHours(23, 59, 59, 999);
+   
+   target.setHours(0, 0, 0, 0);
+   
+   return target >= firstDayOfWeek && target <= lastDayOfWeek;
+ }
 
   /**
    * Check if a date is in the next week
@@ -323,28 +334,41 @@ export class DateUtils {
    * @param referenceDate Reference date (default: now)
    * @returns True if date is in next week
    */
-  static isDateInNextWeek(date: Date | null, referenceDate: Date = new Date()): boolean {
-    if (!date) return false;
-    
-    const target = new Date(date);
-    const ref = new Date(referenceDate);
-    
-    // Get the first day of next week (Monday)
-    const refDay = ref.getDay();
-    const daysUntilNextMonday = (1 + 7 - refDay) % 7;
-    const nextMonday = new Date(ref);
-    nextMonday.setDate(nextMonday.getDate() + daysUntilNextMonday);
-    nextMonday.setHours(0, 0, 0, 0);
-    
-    // Get the last day of next week (Sunday)
-    const nextSunday = new Date(nextMonday);
-    nextSunday.setDate(nextSunday.getDate() + 6);
-    nextSunday.setHours(23, 59, 59, 999);
-    
-    target.setHours(0, 0, 0, 0);
-    
-    return target >= nextMonday && target <= nextSunday;
-  }
+  static isDateInNextWeek(date: Date | null, referenceDate: Date = new Date(), weekStartsOn: 'Monday' | 'Sunday' = 'Monday'): boolean {
+   if (!date) return false;
+   
+   const target = new Date(date);
+   const ref = new Date(referenceDate);
+   
+   // Get the first day of next week based on setting
+   const refDay = ref.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+   let nextFirstDayOfWeek: Date;
+   
+   if (weekStartsOn === 'Monday') {
+     // Next week starts on Monday (ISO standard)
+     // If today is Monday, next week starts in 7 days. Otherwise, calculate days until next Monday.
+     const daysUntilNextMonday = refDay === 1 ? 7 : (1 + 7 - refDay) % 7;
+     nextFirstDayOfWeek = new Date(ref);
+     nextFirstDayOfWeek.setDate(nextFirstDayOfWeek.getDate() + daysUntilNextMonday);
+   } else {
+     // Next week starts on Sunday
+     // If today is Sunday, next week starts in 7 days. Otherwise, calculate days until next Sunday.
+     const daysUntilNextSunday = refDay === 0 ? 7 : (7 - refDay) % 7;
+     nextFirstDayOfWeek = new Date(ref);
+     nextFirstDayOfWeek.setDate(nextFirstDayOfWeek.getDate() + daysUntilNextSunday);
+   }
+   
+   nextFirstDayOfWeek.setHours(0, 0, 0, 0);
+   
+   // Get the last day of next week (6 days after first day)
+   const nextLastDayOfWeek = new Date(nextFirstDayOfWeek);
+   nextLastDayOfWeek.setDate(nextLastDayOfWeek.getDate() + 6);
+   nextLastDayOfWeek.setHours(23, 59, 59, 999);
+   
+   target.setHours(0, 0, 0, 0);
+   
+   return target >= nextFirstDayOfWeek && target <= nextLastDayOfWeek;
+ }
 
   /**
    * Check if a date is in the current month
@@ -373,10 +397,12 @@ export class DateUtils {
     const target = new Date(date);
     const ref = new Date(referenceDate);
     
+    // Calculate next month, handling year rollover (December -> January)
     const nextMonth = ref.getMonth() + 1;
-    const nextMonthYear = ref.getFullYear();
+    const nextMonthYear = ref.getFullYear() + (nextMonth > 11 ? 1 : 0);
+    const actualNextMonth = nextMonth > 11 ? 0 : nextMonth;
     
-    return target.getFullYear() === nextMonthYear && target.getMonth() === nextMonth;
+    return target.getFullYear() === nextMonthYear && target.getMonth() === actualNextMonth;
   }
 
   /**

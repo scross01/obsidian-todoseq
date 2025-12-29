@@ -10,6 +10,7 @@ export interface TodoTrackerSettings {
   includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
   taskViewMode: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // controls view transformation in the task view
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
+  weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
 }
 
 export const DefaultSettings: TodoTrackerSettings = {
@@ -22,6 +23,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   languageCommentSupport: {
     enabled: true,
   },
+  weekStartsOn: 'Monday', // Default to Monday as requested
 };
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
@@ -186,8 +188,23 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.taskViewMode = mode;
           await this.plugin.saveSettings();
           await this.refreshAllTaskViews();
-        });
-      });
-  }
-}
+              });
+            });
+      
+          new Setting(containerEl)
+            .setName('Week starts on')
+            .setDesc('Choose which day the week starts on for date filtering')
+            .addDropdown(drop => {
+              drop.addOption('Monday', 'Monday');
+              drop.addOption('Sunday', 'Sunday');
+              drop.setValue(this.plugin.settings.weekStartsOn);
+              drop.onChange(async (value: string) => {
+                const weekStart = (value as 'Monday' | 'Sunday');
+                this.plugin.settings.weekStartsOn = weekStart;
+                await this.plugin.saveSettings();
+                await this.refreshAllTaskViews();
+              });
+            });
+        }
+      }
 

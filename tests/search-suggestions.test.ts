@@ -297,7 +297,7 @@ describe('Search Suggestions', () => {
       
       const mockVault = new MockVaultWithSpaces() as Vault;
       const allPaths = await SearchSuggestions.getAllPaths(mockVault);
-            
+             
       // Should include paths with spaces
       expect(allPaths).toContain('examples');
       expect(allPaths).toContain('examples/sub folder'); // This has a space
@@ -310,6 +310,563 @@ describe('Search Suggestions', () => {
       pathsWithSpaces.forEach(path => {
         expect(path.includes(' ')).toBe(true);
       });
+    });
+  });
+
+  describe('Path extraction methods', () => {
+    it('should extract paths from tasks correctly', () => {
+      const tasks = [
+        {
+          path: 'notes/journal/meeting.md',
+          line: 1,
+          rawText: 'TODO meeting',
+          indent: '',
+          listMarker: '-',
+          text: 'meeting',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'notes/work/tasks.md',
+          line: 2,
+          rawText: 'TODO work task',
+          indent: '',
+          listMarker: '-',
+          text: 'work task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        }
+      ];
+
+      const paths = SearchSuggestions.getAllPathsFromTasks(tasks);
+      
+      // Should extract parent directories
+      expect(paths).toContain('notes');
+      expect(paths).toContain('notes/journal');
+      expect(paths).toContain('notes/work');
+      
+      // Should be sorted alphabetically
+      expect(paths).toEqual(['notes', 'notes/journal', 'notes/work']);
+    });
+
+    it('should handle empty task array', () => {
+      const paths = SearchSuggestions.getAllPathsFromTasks([]);
+      expect(paths).toEqual([]);
+    });
+
+    it('should handle tasks with single-level paths', () => {
+      const tasks = [
+        {
+          path: 'file.md',
+          line: 1,
+          rawText: 'TODO task',
+          indent: '',
+          listMarker: '-',
+          text: 'task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        }
+      ];
+
+      const paths = SearchSuggestions.getAllPathsFromTasks(tasks);
+      expect(paths).toEqual([]); // No parent directories for single-level paths
+    });
+
+    it('should cache paths from vault correctly', async () => {
+      // Clear cache first
+      SearchSuggestions.clearCache();
+      
+      class MockVault implements Partial<Vault> {
+        getMarkdownFiles() {
+          return [
+            { path: 'notes/journal/meeting.md' },
+            { path: 'notes/work/tasks.md' },
+          ] as any;
+        }
+      }
+      
+      const mockVault = new MockVault() as Vault;
+      
+      // First call should populate cache
+      const paths1 = await SearchSuggestions.getAllPaths(mockVault);
+      expect(paths1).toContain('notes');
+      expect(paths1).toContain('notes/journal');
+      expect(paths1).toContain('notes/work');
+      
+      // Second call should use cache (within TTL)
+      const paths2 = await SearchSuggestions.getAllPaths(mockVault);
+      expect(paths2).toEqual(paths1);
+    });
+
+    it('should respect cache TTL', async () => {
+      // Clear cache first
+      SearchSuggestions.clearCache();
+      
+      class MockVault implements Partial<Vault> {
+        getMarkdownFiles() {
+          return [
+            { path: 'notes/test.md' },
+          ] as any;
+        }
+      }
+      
+      const mockVault = new MockVault() as Vault;
+      
+      // First call
+      const paths1 = await SearchSuggestions.getAllPaths(mockVault);
+      
+      // Manually expire cache by setting lastCacheTime to past
+      (SearchSuggestions as any).lastCacheTime = Date.now() - 700; // 700ms > 600ms TTL
+      
+      // Second call should bypass cache and recompute
+      const paths2 = await SearchSuggestions.getAllPaths(mockVault);
+      expect(paths2).toEqual(paths1); // Should still be same since same vault data
+    });
+  });
+
+  describe('File extraction methods', () => {
+    it('should extract filenames from tasks correctly', () => {
+      const tasks = [
+        {
+          path: 'notes/journal/meeting.md',
+          line: 1,
+          rawText: 'TODO meeting',
+          indent: '',
+          listMarker: '-',
+          text: 'meeting',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'notes/work/tasks.md',
+          line: 2,
+          rawText: 'TODO work task',
+          indent: '',
+          listMarker: '-',
+          text: 'work task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'notes/journal/meeting.md', // Duplicate filename
+          line: 3,
+          rawText: 'TODO another meeting',
+          indent: '',
+          listMarker: '-',
+          text: 'another meeting',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        }
+      ];
+
+      const files = SearchSuggestions.getAllFilesFromTasks(tasks);
+      
+      // Should extract unique filenames
+      expect(files).toContain('meeting.md');
+      expect(files).toContain('tasks.md');
+      
+      // Should be sorted alphabetically
+      expect(files).toEqual(['meeting.md', 'tasks.md']);
+    });
+
+    it('should handle empty task array for files', () => {
+      const files = SearchSuggestions.getAllFilesFromTasks([]);
+      expect(files).toEqual([]);
+    });
+
+    it('should extract filenames from vault correctly', async () => {
+      // Clear cache first
+      SearchSuggestions.clearCache();
+      
+      class MockVault implements Partial<Vault> {
+        getMarkdownFiles() {
+          return [
+            { path: 'notes/journal/meeting.md', name: 'meeting.md' },
+            { path: 'notes/work/tasks.md', name: 'tasks.md' },
+            { path: 'notes/journal/notes.md', name: 'notes.md' },
+          ] as any;
+        }
+      }
+      
+      const mockVault = new MockVault() as Vault;
+      
+      const files = await SearchSuggestions.getAllFiles(mockVault);
+      
+      // Should extract unique filenames
+      expect(files).toContain('meeting.md');
+      expect(files).toContain('tasks.md');
+      expect(files).toContain('notes.md');
+      
+      // Should be sorted alphabetically
+      expect(files).toEqual(['meeting.md', 'notes.md', 'tasks.md']);
+    });
+
+    it('should cache files from vault correctly', async () => {
+      // Clear cache first
+      SearchSuggestions.clearCache();
+      
+      class MockVault implements Partial<Vault> {
+        getMarkdownFiles() {
+          return [
+            { path: 'notes/test.md', name: 'test.md' },
+          ] as any;
+        }
+      }
+      
+      const mockVault = new MockVault() as Vault;
+      
+      // First call should populate cache
+      const files1 = await SearchSuggestions.getAllFiles(mockVault);
+      expect(files1).toContain('test.md');
+      
+      // Second call should use cache (within TTL)
+      const files2 = await SearchSuggestions.getAllFiles(mockVault);
+      expect(files2).toEqual(files1);
+    });
+  });
+
+  describe('State and priority methods', () => {
+    it('should return default task states', () => {
+      const states = SearchSuggestions.getAllStates();
+      
+      // Should contain default states
+      expect(states).toContain('TODO');
+      expect(states).toContain('DOING');
+      expect(states).toContain('DONE');
+      expect(states).toContain('NOW');
+      expect(states).toContain('LATER');
+      expect(states).toContain('WAIT');
+      expect(states).toContain('WAITING');
+      expect(states).toContain('IN-PROGRESS');
+      expect(states).toContain('CANCELED');
+      expect(states).toContain('CANCELLED');
+      
+      // Should be sorted alphabetically
+      expect(states).toEqual(['CANCELED', 'CANCELLED', 'DOING', 'DONE', 'IN-PROGRESS', 'LATER', 'NOW', 'TODO', 'WAIT', 'WAITING']);
+    });
+
+    it('should return priority options', () => {
+      const priorities = SearchSuggestions.getPriorityOptions();
+      
+      expect(priorities).toEqual(['A', 'B', 'C', 'high', 'medium', 'low', 'none']);
+    });
+
+    it('should return date suggestions', () => {
+      const dateSuggestions = SearchSuggestions.getDateSuggestions();
+      
+      expect(dateSuggestions).toEqual(['overdue', 'due', 'today', 'tomorrow', 'this week', 'next week', 'this month', 'next month', 'next 7 days', 'none']);
+    });
+  });
+
+  describe('Date extraction methods', () => {
+    it('should extract scheduled dates from tasks', () => {
+      const tasks = [
+        {
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO task with scheduled date',
+          indent: '',
+          listMarker: '-',
+          text: 'task with scheduled date',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: new Date('2023-01-15T00:00:00Z'),
+          deadlineDate: null
+        },
+        {
+          path: 'notes/tasks.md',
+          line: 2,
+          rawText: 'TODO task with different scheduled date',
+          indent: '',
+          listMarker: '-',
+          text: 'task with different scheduled date',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: new Date('2023-02-20T00:00:00Z'),
+          deadlineDate: null
+        },
+        {
+          path: 'notes/tasks.md',
+          line: 3,
+          rawText: 'TODO task without scheduled date',
+          indent: '',
+          listMarker: '-',
+          text: 'task without scheduled date',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        }
+      ];
+
+      const dates = SearchSuggestions.getScheduledDateSuggestions(tasks);
+      
+      // Should extract unique dates in YYYY-MM-DD format
+      expect(dates).toContain('2023-01-15');
+      expect(dates).toContain('2023-02-20');
+      
+      // Should be sorted chronologically
+      expect(dates).toEqual(['2023-01-15', '2023-02-20']);
+    });
+
+    it('should handle empty task array for scheduled dates', () => {
+      const dates = SearchSuggestions.getScheduledDateSuggestions([]);
+      expect(dates).toEqual([]);
+    });
+
+    it('should extract deadline dates from tasks', () => {
+      const tasks = [
+        {
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO task with deadline',
+          indent: '',
+          listMarker: '-',
+          text: 'task with deadline',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: new Date('2023-03-10T00:00:00Z')
+        },
+        {
+          path: 'notes/tasks.md',
+          line: 2,
+          rawText: 'TODO task with different deadline',
+          indent: '',
+          listMarker: '-',
+          text: 'task with different deadline',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: new Date('2023-04-05T00:00:00Z')
+        }
+      ];
+
+      const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
+      
+      // Should extract unique dates in YYYY-MM-DD format
+      expect(dates).toContain('2023-03-10');
+      expect(dates).toContain('2023-04-05');
+      
+      // Should be sorted chronologically
+      expect(dates).toEqual(['2023-03-10', '2023-04-05']);
+    });
+
+    it('should handle empty task array for deadline dates', () => {
+      const dates = SearchSuggestions.getDeadlineDateSuggestions([]);
+      expect(dates).toEqual([]);
+    });
+
+    it('should handle tasks with same scheduled date', () => {
+      const date = new Date('2023-01-15T00:00:00Z');
+      const tasks = [
+        {
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO task 1',
+          indent: '',
+          listMarker: '-',
+          text: 'task 1',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null
+        },
+        {
+          path: 'notes/tasks.md',
+          line: 2,
+          rawText: 'TODO task 2',
+          indent: '',
+          listMarker: '-',
+          text: 'task 2',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date, // Same date
+          deadlineDate: null
+        }
+      ];
+
+      const dates = SearchSuggestions.getScheduledDateSuggestions(tasks);
+      
+      // Should deduplicate same dates
+      expect(dates).toEqual(['2023-01-15']);
+    });
+
+    it('should handle tasks with no deadline dates', () => {
+      const tasks = [
+        {
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO task without deadline',
+          indent: '',
+          listMarker: '-',
+          text: 'task without deadline',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        }
+      ];
+
+      const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
+      expect(dates).toEqual([]);
+    });
+  });
+
+  describe('Edge case coverage', () => {
+    it('should handle files with single-level paths in vault', async () => {
+      // Clear cache first
+      SearchSuggestions.clearCache();
+      
+      class MockVault implements Partial<Vault> {
+        getMarkdownFiles() {
+          return [
+            { path: 'file1.md', name: 'file1.md' },
+            { path: 'file2.md', name: 'file2.md' }
+          ] as any;
+        }
+      }
+      
+      const mockVault = new MockVault() as Vault;
+      
+      const paths = await SearchSuggestions.getAllPaths(mockVault);
+      // Should return empty array for single-level paths (no parent directories)
+      expect(paths).toEqual([]);
+    });
+
+    it('should handle duplicate filenames in vault', async () => {
+      // Clear cache first
+      SearchSuggestions.clearCache();
+      
+      class MockVault implements Partial<Vault> {
+        getMarkdownFiles() {
+          return [
+            { path: 'notes/file.md', name: 'file.md' },
+            { path: 'work/file.md', name: 'file.md' } // Same filename, different path
+          ] as any;
+        }
+      }
+      
+      const mockVault = new MockVault() as Vault;
+      
+      const files = await SearchSuggestions.getAllFiles(mockVault);
+      // Should deduplicate filenames
+      expect(files).toEqual(['file.md']);
+    });
+
+    it('should handle tasks with no deadline dates mixed with tasks that have deadlines', () => {
+      const tasks = [
+        {
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO task with deadline',
+          indent: '',
+          listMarker: '-',
+          text: 'task with deadline',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: new Date('2023-03-10T00:00:00Z')
+        },
+        {
+          path: 'notes/tasks.md',
+          line: 2,
+          rawText: 'TODO task without deadline',
+          indent: '',
+          listMarker: '-',
+          text: 'task without deadline',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'notes/tasks.md',
+          line: 3,
+          rawText: 'TODO another task with deadline',
+          indent: '',
+          listMarker: '-',
+          text: 'another task with deadline',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: new Date('2023-04-05T00:00:00Z')
+        }
+      ];
+
+      const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
+      
+      // Should only include dates from tasks that have deadlines
+      expect(dates).toContain('2023-03-10');
+      expect(dates).toContain('2023-04-05');
+      expect(dates).toEqual(['2023-03-10', '2023-04-05']);
+    });
+
+    it('should handle tasks with missing rawText property', () => {
+      const tasks = [
+        {
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO task with tags #urgent #work',
+          indent: '',
+          listMarker: '-',
+          text: 'task with tags',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        },
+        {
+          path: 'notes/tasks.md',
+          line: 2,
+          rawText: undefined, // Missing rawText
+          indent: '',
+          listMarker: '-',
+          text: 'task without rawText',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null
+        }
+      ];
+
+      const tags = SearchSuggestions.getAllTags(tasks);
+      
+      // Should only extract tags from tasks that have rawText
+      expect(tags).toContain('urgent');
+      expect(tags).toContain('work');
+      expect(tags).toEqual(['urgent', 'work']);
     });
   });
 });

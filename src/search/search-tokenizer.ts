@@ -20,9 +20,8 @@ export class SearchTokenizer {
     { type: 'lparen' as const, regex: /\(/y },
     { type: 'rparen' as const, regex: /\)/y },
     { type: 'prefix' as const, regex: /\b(path|file|tag|state|priority|content|scheduled|deadline):/y },
-    { type: 'prefix_value' as const, regex: /"(?:\\.|[^"\\])*"|\d{4}-\d{2}-\d{2}|[^\s)]+-[^\s)]+|[^\s)]+/y },
     { type: 'word' as const, regex: /[^\s"()\-]+/y }
-  ];
+  ] as const;
 
   static tokenize(query: string): SearchToken[] {
     const tokens: SearchToken[] = [];
@@ -44,7 +43,7 @@ export class SearchTokenizer {
 
         if (match && match.index === pos) {
           const value = this.processTokenValue(match[0], pattern.type);
-          let type = pattern.type;
+          let type = pattern.type as SearchToken['type'];
           
           // Special handling: if this is a word token and the previous token was a prefix,
           // convert it to a prefix_value token
@@ -53,14 +52,15 @@ export class SearchTokenizer {
           }
           
           // Special handling: if this is a dash and the previous token was a prefix_value
-          // AND the previous token was a 'tag' prefix, merge it with the next word token
-          // to form a single prefix_value with dash (for tag names with dashes)
+          // AND the previous token was a 'tag', 'scheduled', or 'deadline' prefix, merge it with the next word token
+          // to form a single prefix_value with dash (for tag names and dates with dashes)
           if (type === 'not' && tokens.length > 0 && tokens[tokens.length - 1].type === 'prefix_value') {
             // Check if the previous prefix was a 'tag' prefix by looking at the token before the prefix_value
             const prevTokenIndex = tokens.length - 1;
             const prefixBeforeValueIndex = prevTokenIndex - 1;
             
-            if (prefixBeforeValueIndex >= 0 && tokens[prefixBeforeValueIndex].type === 'prefix' && tokens[prefixBeforeValueIndex].value === 'tag') {
+            if (prefixBeforeValueIndex >= 0 && tokens[prefixBeforeValueIndex].type === 'prefix' &&
+                ['tag', 'scheduled', 'deadline'].includes(tokens[prefixBeforeValueIndex].value)) {
               // Look ahead to see if there's a word after the dash
               const lookaheadPos = pattern.regex.lastIndex;
               const wordPattern = /[^\s"()\-]+/y;

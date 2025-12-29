@@ -5,6 +5,7 @@ import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAUL
 import { DateUtils } from './date-utils';
 import { Search } from '../search/search';
 import { SearchSuggestionDropdown } from '../search/search-suggestion-dropdown';
+import { TodoTrackerSettings } from '../settings/settings';
 
 
 export type TaskViewMode = 'showAll' | 'sortCompletedLast' | 'hideCompleted';
@@ -22,7 +23,7 @@ export class TodoView extends ItemView {
   private searchError: string | null = null;
   private suggestionDropdown: SearchSuggestionDropdown | null = null;
 
-  constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode) {
+  constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode, private settings: TodoTrackerSettings) {
     super(leaf);
     this.tasks = tasks;
     this.editor = new TaskEditor(this.app);
@@ -844,7 +845,7 @@ export class TodoView extends ItemView {
       try {
         // Use new advanced search functionality
         visible = visible.filter(t => {
-          return Search.evaluate(q, t, this.isCaseSensitive);
+          return Search.evaluate(q, t, this.isCaseSensitive, this.settings);
         });
         this.searchError = null;
       } catch (error) {
