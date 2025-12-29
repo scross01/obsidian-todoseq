@@ -27,7 +27,6 @@ export class SearchSuggestionDropdown {
     
     // Create dropdown container
     this.containerEl = document.createElement('div');
-    this.containerEl.className = 'suggestion-container mod-search-suggestion';
     this.containerEl.style.position = 'absolute';
     this.containerEl.style.zIndex = '1000';
     this.containerEl.style.display = 'none';
@@ -110,6 +109,12 @@ export class SearchSuggestionDropdown {
     // Remove colon from prefix for matching (e.g., "path:" -> "path")
     const prefixKey = prefix.endsWith(':') ? prefix.slice(0, -1) : prefix;
     
+    // For content prefix, don't show any dropdown since it's user input only
+    if (prefixKey === 'content') {
+        this.hide();
+        return;
+    }
+    
     // Get suggestions based on prefix type
     let allSuggestions: string[] = [];
     switch (prefixKey) {
@@ -159,17 +164,25 @@ export class SearchSuggestionDropdown {
     
     private async renderDropdown(): Promise<void> {
         this.containerEl.innerHTML = '';
-        
+
+        const suggestionContainerEl = this.containerEl.createEl('div', {
+            cls: 'suggestion-container mod-search-suggestion',
+            attr: { 'style': 'width: 300px;' }
+        });
+        const suggestionEl = suggestionContainerEl.createEl('div', {
+            cls: 'suggestion'
+        });
+
         if (this.currentSuggestions.length === 0) {
             if (this.currentPrefix === null) {
                 // No suggestions for options dropdown
                 return;
             } else {
                 // Show empty state for prefix dropdown
-                const emptyItem = this.containerEl.createEl('div', {
+                const emptyItem = suggestionEl.createEl('div', {
                     cls: 'suggestion-item mod-complex search-suggest-item'
                 });
-                emptyItem.createEl('div', { 
+                emptyItem.createEl('div', {
                     cls: 'suggestion-content',
                     text: 'No suggestions found'
                 });
@@ -177,9 +190,40 @@ export class SearchSuggestionDropdown {
             }
         }
         
+        // Add "Search options" title section for options dropdown
+        if (this.currentPrefix === null) {
+            const titleItem = suggestionEl.createEl('div', {
+                cls: 'suggestion-item mod-complex search-suggest-item mod-group'
+            });
+            
+            const titleContent = titleItem.createEl('div', { cls: 'suggestion-content' });
+            const titleText = titleContent.createEl('div', {
+                cls: 'suggestion-title list-item-part mod-extended'
+            });
+            titleText.createSpan({ text: 'Search options' });
+            
+            // Add info icon
+            const auxEl = titleItem.createEl('div', { cls: 'suggestion-aux' });
+            const iconContainer = auxEl.createEl('div', {
+                cls: 'list-item-part search-suggest-icon clickable-icon',
+                attr: { 'aria-label': 'Read more' }
+            });
+            
+            // Create SVG info icon using innerHTML
+            iconContainer.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" class="svg-icon lucide-info">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 16v-4"></path>
+                    <path d="M12 8h.01"></path>
+                </svg>
+            `;
+        }
+        
         // Render suggestions
         this.currentSuggestions.forEach((suggestion, index) => {
-            const itemEl = this.containerEl.createEl('div', {
+            const itemEl = suggestionEl.createEl('div', {
                 cls: `suggestion-item mod-complex search-suggest-item ${index === this.selectedIndex ? 'is-selected' : ''}`
             });
             
@@ -192,9 +236,9 @@ export class SearchSuggestionDropdown {
                 
                 const infoText = this.getPrefixDescription(suggestion);
                 if (infoText) {
-                    titleEl.createSpan({ 
+                    titleEl.createSpan({
                         cls: 'search-suggest-info-text',
-                        text: ` - ${infoText}`
+                        text: ` ${infoText}`
                     });
                 }
             } else {
@@ -237,7 +281,9 @@ export class SearchSuggestionDropdown {
     private updateSelection(): void {
         const items = this.containerEl.querySelectorAll('.search-suggest-item');
         items.forEach((item, index) => {
-            if (index === this.selectedIndex) {
+            // Skip the title section (index 0) when currentPrefix is null
+            const adjustedIndex = this.currentPrefix === null ? index - 1 : index;
+            if (adjustedIndex === this.selectedIndex) {
                 item.addClass('is-selected');
             } else {
                 item.removeClass('is-selected');
