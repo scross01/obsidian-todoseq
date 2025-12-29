@@ -9,7 +9,7 @@ export interface TodoTrackerSettings {
   additionalTaskKeywords: string[]; // capitalised keywords treated as NOT COMPLETED (e.g., FIXME, HACK)
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
   includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
-  taskViewMode: TaskViewMode; // controls view transformation in the task view
+  taskViewMode: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // controls view transformation in the task view
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
 }
 
@@ -19,7 +19,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   additionalTaskKeywords: [],
   includeCodeBlocks: false,
   includeCalloutBlocks: true, // Enabled by default
-  taskViewMode: 'default',
+  taskViewMode: 'showAll',
   languageCommentSupport: {
     enabled: true,
   },
@@ -178,12 +178,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       .setName('Task view mode')
       .setDesc('Choose how completed items are shown in the task view.')
       .addDropdown(drop => {
-        drop.addOption('default', 'Default');
+        drop.addOption('showAll', 'Show all tasks');
         drop.addOption('sortCompletedLast', 'Sort completed to end');
         drop.addOption('hideCompleted', 'Hide completed');
         drop.setValue(this.plugin.settings.taskViewMode);
         drop.onChange(async (value: string) => {
-          const mode = (value as TaskViewMode);
+          const mode = (value as 'showAll' | 'sortCompletedLast' | 'hideCompleted');
           this.plugin.settings.taskViewMode = mode;
           await this.plugin.saveSettings();
           await this.refreshAllTaskViews();

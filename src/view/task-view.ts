@@ -7,7 +7,7 @@ import { Search } from '../search/search';
 import { SearchSuggestionDropdown } from '../search/search-suggestion-dropdown';
 
 
-export type TaskViewMode = 'default' | 'sortCompletedLast' | 'hideCompleted';
+export type TaskViewMode = 'showAll' | 'sortCompletedLast' | 'hideCompleted';
 export type SortMethod = 'default' | 'sortByScheduled' | 'sortByDeadline' | 'sortByPriority';
 
 export class TodoView extends ItemView {
@@ -33,14 +33,24 @@ export class TodoView extends ItemView {
   private getViewMode(): TaskViewMode {
     const attr = this.contentEl.getAttr('data-view-mode');
     if (typeof attr === 'string') {
-      if (attr === 'default' || attr === 'sortCompletedLast' || attr === 'hideCompleted') return attr;
+      // Migrate old mode names to new ones
+      if (attr === 'default') return 'showAll';
+      if (attr === 'sortCompletedLast') return 'sortCompletedLast';
+      if (attr === 'hideCompleted') return 'hideCompleted';
+      // Handle new mode names
+      if (attr === 'showAll' || attr === 'sortCompletedLast' || attr === 'hideCompleted') return attr;
     }
     // Fallback to current plugin setting from constructor if attribute not set
-    if (this.defaultViewMode === 'default' || this.defaultViewMode === 'sortCompletedLast' || this.defaultViewMode === 'hideCompleted') {
-      return this.defaultViewMode;
+    // Handle migration from old mode names
+    const defaultMode = this.defaultViewMode as string; // Treat as string for migration
+    if (defaultMode === 'default') return 'showAll';
+    if (defaultMode === 'sortCompletedLast') return 'sortCompletedLast';
+    if (defaultMode === 'hideCompleted') return 'hideCompleted';
+    if (defaultMode === 'showAll' || defaultMode === 'sortCompletedLast' || defaultMode === 'hideCompleted') {
+      return defaultMode as TaskViewMode;
     }
     // Final safety fallback
-    return 'default';
+    return 'showAll';
   }
   setViewMode(mode: TaskViewMode) {
     this.contentEl.setAttr('data-view-mode', mode);
@@ -89,7 +99,7 @@ export class TodoView extends ItemView {
       
       transformed = pending.concat(done);
     } else {
-      // For other modes, apply sorting directly
+      // For other modes (showAll), apply sorting directly
       this.applySortToTasks(transformed);
     }
 
@@ -159,15 +169,14 @@ export class TodoView extends ItemView {
     const toolbar = container.createEl('div', { cls: 'todo-toolbar' });
 
     // First row: search input with mode icons on the right
-    const firstRow = toolbar.createEl('div', { cls: 'todo-toolbar-first-row' });
+    const firstRow = toolbar.createEl('div', { cls: 'search-row' });
      
     // Right-aligned search input with icon
-    const searchWrap = firstRow.createEl('div', { cls: 'todo-toolbar-right' });
     const searchId = `todoseq-search-${Math.random().toString(36).slice(2, 8)}`;
-    const label = searchWrap.createEl('label', { attr: { for: searchId } });
-    label.setText('Search');
-    label.addClass('sr-only');
-    const searchInputWrap = searchWrap.createEl('div', { cls: 'search-input-container global-search-input-container' });
+    const searchLabel = firstRow.createEl('label', { attr: { for: searchId } });
+    searchLabel.setText('Search');
+    searchLabel.addClass('sr-only');
+    const searchInputWrap = firstRow.createEl('div', { cls: 'search-input-container global-search-input-container' });
     const inputEl = searchInputWrap.createEl('input', { attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } });
     const clearSearch = searchInputWrap.createEl('div', { cls: 'search-input-clear-button', attr: { 'aria-label': 'Clear search' } });
     clearSearch.addEventListener('click', () => {
@@ -195,64 +204,78 @@ export class TodoView extends ItemView {
       this.refreshVisibleList();
     });
 
-    // Add mode icons to the right side of the first row
-    const group = firstRow.createEl('div', { cls: 'todo-mode-icons' });
-    group.setAttr('role', 'group');
-    group.setAttr('aria-label', 'Task view mode');
+    // Add Settings button to the right side of the first row
+    const settingsBtn = firstRow.createEl('div', { cls: 'clickable-icon' });
+    settingsBtn.setAttr('title', 'Task view settings');
+    settingsBtn.setAttr('aria-label', 'Task view settings');
+    settingsBtn.setAttr('aria-expanded', String(false));
+    setIcon(settingsBtn, 'lucide-sliders-horizontal');
 
-    type ButtonSpec = {
-      mode: TaskViewMode;
-      title: string;
-      icon: string;
-    };
+    // Create expandable settings section below the first row
+    const settingsSection = toolbar.createEl('div', { cls: 'search-params' });
+    settingsSection.style.display = 'none'; // Start hidden
 
-    const buttons: ButtonSpec[] = [
-      { mode: 'default',           title: 'Default view',          icon: 'lucide-list' },
-      { mode: 'sortCompletedLast', title: 'Sort completed to end', icon: 'lucide-sort-desc' },
-      { mode: 'hideCompleted',     title: 'Hide completed',        icon: 'lucide-eye-off' },
+    // Add "Show completed tasks" dropdown
+    const completedTasksSetting = settingsSection.createEl('div', { cls: 'setting-item' });
+    const completedTasksSettingInfo = completedTasksSetting.createEl('div', { cls: 'setting-item-info'});
+    const label = completedTasksSettingInfo.createEl('div', {
+      cls: 'setting-item-name',
+      text: 'Show completed tasks:',
+      attr: { for: 'completed-tasks-dropdown' }
+    });
+    
+    const completedTasksSettingControl = completedTasksSetting.createEl('div', { cls: 'setting-item-control'});
+    const dropdown = completedTasksSettingControl.createEl('select', {
+      cls: 'mod-small ',
+      attr: {
+        id: 'completed-tasks-dropdown',
+        'aria-label': 'Show completed tasks'
+      }
+    });
+
+    // Add dropdown options
+    const options = [
+      { value: 'showAll', label: 'Show' },
+      { value: 'sortCompletedLast', label: 'Sort to end' },
+      { value: 'hideCompleted', label: 'Hide' }
     ];
 
-    // Helper to sync aria-pressed on all mode buttons based on current view mode
-    const updateModeButtons = () => {
-      const activeMode = this.getViewMode();
-      const buttons = group.querySelectorAll<HTMLButtonElement>('div.todo-mode-icon-btn');
-      buttons.forEach((b: HTMLButtonElement) => {
-        const m = b.getAttr('data-mode');
-        const isValid = m === 'default' || m === 'sortCompletedLast' || m === 'hideCompleted';
-        const isActive = isValid && m === activeMode
-        b.setAttr('aria-pressed', String(isActive));
-        // Add or remove is-active class
-        if (isActive) {
-          b.addClass('is-active');
-        } else {
-          b.removeClass('is-active');
-        }
+    for (const option of options) {
+      const optionEl = dropdown.createEl('option', {
+        attr: { value: option.value },
+        text: option.label
       });
-    };
-
-    const makeHandler = (mode: TaskViewMode) => async () => {
-      this.setViewMode(mode);
-      // Update button pressed state to reflect newly selected mode
-      updateModeButtons();
-      const evt = new CustomEvent('todoseq:view-mode-change', { detail: { mode } });
-      window.dispatchEvent(evt);
-      // Lighter refresh: only re-render the visible list instead of full onOpen
-      this.refreshVisibleList();
-    };
-
-    for (const spec of buttons) {
-      const btn = group.createEl('div', { cls: 'clickable-icon todo-mode-icon-btn' });
-      btn.setAttr('data-mode', spec.mode);
-      btn.setAttr('title', spec.title);
-      btn.setAttr('aria-label', spec.title);
-      // aria-pressed will be set by updateModeButtons; initialize to false to avoid flicker
-      btn.setAttr('aria-pressed', String(false));
-      setIcon(btn, spec.icon);
-      btn.addEventListener('click', makeHandler(spec.mode));
     }
 
-    // After creating buttons, ensure correct one is marked pressed for initial state
-    updateModeButtons();
+    // Set current view mode
+    const currentMode = this.getViewMode();
+    dropdown.value = currentMode;
+
+    // Toggle settings section visibility
+    settingsBtn.addEventListener('click', () => {
+      const isExpanded = settingsSection.style.display !== 'none';
+      settingsSection.style.display = isExpanded ? 'none' : 'block';
+      settingsBtn.setAttr('aria-expanded', String(!isExpanded));
+      // Add/remove is-active class for visual feedback
+      if (isExpanded) {
+        settingsBtn.removeClass('is-active');
+      } else {
+        settingsBtn.addClass('is-active');
+      }
+    });
+
+    // Handle dropdown changes
+    dropdown.addEventListener('change', () => {
+      const selectedValue = dropdown.value as TaskViewMode;
+      this.setViewMode(selectedValue);
+      
+      // Dispatch event for persistence
+      const evt = new CustomEvent('todoseq:view-mode-change', { detail: { mode: selectedValue } });
+      window.dispatchEvent(evt);
+      
+      // Refresh the visible list
+      this.refreshVisibleList();
+    });
 
     // Add search results info bar (second row)
     const searchResultsInfo = toolbar.createEl('div', { cls: 'search-results-info' });
@@ -585,7 +608,7 @@ export class TodoView extends ItemView {
       const targetState = checkbox.checked ? 'DONE' : 'TODO';
       await this.updateTaskState(task, targetState);
       const mode = this.getViewMode();
-      if (mode !== 'default') {
+      if (mode !== 'showAll') {
         // Lighter refresh: recompute and redraw only the list
         this.refreshVisibleList();
       } else {

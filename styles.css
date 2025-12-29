@@ -11,23 +11,6 @@
   padding: 6px 0;
 }
 
-/* First row of toolbar - contains search input and mode icons */
-.todo-view .todo-toolbar-first-row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-/* Flexible container for search input: grows to fill available space */
-.todo-view .todo-toolbar-right {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 auto;
-  min-width: 120px;
-}
-
 /* Visually-hidden label for accessibility */
 .todo-view .sr-only {
   position: absolute !important;
@@ -39,11 +22,6 @@
   clip: rect(0 0 0 0) !important;
   white-space: nowrap !important;
   border: 0 !important;
-}
-
-.todo-view .todo-mode-icons {
-  /* group stays at the far right after the search grows */
-  display: inline-flex;
 }
 
 /* List layout */
@@ -200,45 +178,7 @@
   line-height: 1.45;
 }
 
-.todo-view .todo-empty-actions {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.todo-view .todo-empty-btn {
-  appearance: none;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  color: var(--text-normal);
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 60ms ease;
-}
-
-.todo-view .todo-empty-btn:hover {
-  background: var(--background-modifier-hover);
-  border-color: var(--interactive-accent);
-}
-
-.todo-view .todo-empty-btn:active {
-  transform: translateY(1px);
-}
-
 /* Icon base for toolbar buttons rendered via CSS masks */
-.todo-view .todo-mode-icon {
-  /* display: inline-block; */
-  /* width: var(--icon-size); */
-  /* height: var(--icon-size); */
-  background-color: currentColor;
-  /* mask-repeat: no-repeat; */
-  /* mask-position: center; */
-  /* mask-size: var(--icon-size) var(--icon-size); */
-}
 
 /* Date display styling */
 .todo-view .todo-date-container {
