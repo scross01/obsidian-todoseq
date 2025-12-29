@@ -75,7 +75,7 @@ class PrattParser {
       }
 
       this.position++;
-       
+
       // Handle implicit AND for consecutive terms
       if (currentToken.type === 'word' || currentToken.type === 'phrase') {
         // Create an AND node with the current left and the new term
@@ -177,6 +177,32 @@ class PrattParser {
           children: [left, right],
           position: operator.position
         };
+      }
+      
+      case 'range': {
+        // Handle range expressions like "2024-01-01..2024-01-31"
+        // The left node should be a prefix filter with a date value
+        if (left.type === 'prefix_filter' && left.field && (left.field === 'scheduled' || left.field === 'deadline')) {
+          // Parse the right side of the range
+          // Note: position was already incremented in parseExpression before calling parseInfix
+          const rightToken = this.tokens[this.position];
+          
+          if (!rightToken || (rightToken.type !== 'prefix_value' && rightToken.type !== 'word' && rightToken.type !== 'phrase')) {
+            throw new SearchError('Expected date value after range operator', operator.position);
+          }
+          
+          this.position++;
+          
+          return {
+            type: 'range_filter',
+            field: left.field,
+            start: left.value,
+            end: rightToken.value,
+            position: operator.position
+          };
+        } else {
+          throw new SearchError('Range operator can only be used with scheduled: or deadline: prefixes', operator.position);
+        }
       }
       
       default:

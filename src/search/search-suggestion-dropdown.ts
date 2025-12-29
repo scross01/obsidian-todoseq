@@ -12,10 +12,10 @@ export class SearchSuggestionDropdown {
     private vault: Vault;
     private tasks: Task[];
     private currentSuggestions: string[] = [];
-    private selectedIndex: number = -1;
+    private selectedIndex = -1;
     private currentPrefix: string | null = null;
-    private isShowing: boolean = false;
-    public isHandlingPrefixSelection: boolean = false;
+    private isShowing = false;
+    public isHandlingPrefixSelection = false;
     
     constructor(inputEl: HTMLInputElement, vault: Vault, tasks: Task[]) {
     this.inputEl = inputEl;
@@ -96,14 +96,14 @@ export class SearchSuggestionDropdown {
     public async showOptionsDropdown(): Promise<void> {
         this.currentPrefix = null;
         this.currentSuggestions = [
-            'path:', 'file:', 'tag:', 'state:', 'priority:', 'content:'
+            'path:', 'file:', 'tag:', 'state:', 'priority:', 'content:', 'scheduled:', 'deadline:'
         ];
         
         await this.renderDropdown();
         this.show();
     }
     
-    public async showPrefixDropdown(prefix: string, searchTerm: string = ''): Promise<void> {
+    public async showPrefixDropdown(prefix: string, searchTerm = ''): Promise<void> {
     this.currentPrefix = prefix;
     
     // Remove colon from prefix for matching (e.g., "path:" -> "path")
@@ -141,14 +141,30 @@ export class SearchSuggestionDropdown {
             allSuggestions = SearchSuggestions.getAllStates();
             break;
         case 'priority':
-            allSuggestions = SearchSuggestions.getPriorityOptions();
-            break;
+          allSuggestions = SearchSuggestions.getPriorityOptions();
+          break;
+        case 'scheduled':
+          // For scheduled dates, show both standard date suggestions and actual scheduled dates from tasks
+          const scheduledSuggestions = SearchSuggestions.getDateSuggestions();
+          const taskScheduledDates = this.tasks && this.tasks.length > 0
+            ? SearchSuggestions.getScheduledDateSuggestions(this.tasks)
+            : [];
+          allSuggestions = [...scheduledSuggestions, ...taskScheduledDates];
+          break;
+        case 'deadline':
+          // For deadlines, show both standard date suggestions and actual deadline dates from tasks
+          const deadlineSuggestions = SearchSuggestions.getDateSuggestions();
+          const taskDeadlineDates = this.tasks && this.tasks.length > 0
+            ? SearchSuggestions.getDeadlineDateSuggestions(this.tasks)
+            : [];
+          allSuggestions = [...deadlineSuggestions, ...taskDeadlineDates];
+          break;
         case 'content':
-            // For content, we don't have specific suggestions
-            allSuggestions = [];
-            break;
+          // For content, we don't have specific suggestions
+          allSuggestions = [];
+          break;
         default:
-            allSuggestions = [];
+          allSuggestions = [];
     }
     
     // Filter suggestions based on search term
@@ -274,6 +290,8 @@ export class SearchSuggestionDropdown {
             case 'state:': return 'match task state';
             case 'priority:': return 'match task priority';
             case 'content:': return 'match task content';
+            case 'scheduled:': return 'filter by scheduled date';
+            case 'deadline:': return 'filter by deadline date';
             default: return '';
         }
     }
@@ -337,46 +355,52 @@ export class SearchSuggestionDropdown {
     const cursorPos = input.selectionStart ?? 0;
     const currentValue = input.value;
     
-    // Determine what to replace
-    let startPos = cursorPos;
-    let endPos = cursorPos;
-    
-    // Find the start of the current word/prefix
-    while (startPos > 0 && !/\s/.test(currentValue[startPos - 1])) {
-        startPos--;
-    }
-    
-    // If we're completing a prefix, include the prefix in replacement
-    const beforeCursor = currentValue.substring(0, cursorPos);
-    const prefixMatch = beforeCursor.match(/(\w+):?$/);
-    
     // Check if this is a prefix selection (like "path:")
     const isPrefixSelection = suggestion.endsWith(':') && !suggestion.includes(' ');
     
+    // If we're completing a prefix, include the prefix in replacement
+    const beforeCursor = currentValue.substring(0, cursorPos);
+    const prefixMatch = beforeCursor.match(/(\w+):([^\s]*)$/);
+    
     if (prefixMatch) {
         const fullPrefix = prefixMatch[0];
+        const prefixBase = prefixMatch[1];
         const prefixStart = cursorPos - fullPrefix.length;
         
-        if (fullPrefix.endsWith(':')) {
-            // Complete the value after prefix
-            startPos = prefixStart + fullPrefix.length;
+        if (prefixBase + ':' === fullPrefix.substring(0, prefixBase.length + 1)) {
+            // Complete the value after prefix - replace any existing text after the colon
+            const startPos = prefixStart + prefixBase.length + 1; // +1 for the colon
+            let endPos = cursorPos;
+            
+            // Find the end position - either end of string or next space
+            while (endPos < currentValue.length && !/\s/.test(currentValue[endPos])) {
+                endPos++;
+            }
             
             // Add quotes if suggestion contains spaces
-            const finalSuggestion = suggestion.includes(' ') ? '"' + suggestion + '"' : suggestion;
+            const finalSuggestion = suggestion.includes(' ') ? `"${suggestion}"` : suggestion;
             
-            const newValue = currentValue.substring(0, startPos) + finalSuggestion + currentValue.substring(endPos);
+            // Reconstruct with the prefix + the final suggestion
+            const newValue = (currentValue.substring(0, startPos) + finalSuggestion + currentValue.substring(endPos));
             input.value = newValue;
             input.selectionStart = input.selectionEnd = startPos + finalSuggestion.length;
         } else {
             // Replace incomplete prefix
-            startPos = prefixStart;
+            const startPos = prefixStart;
+            const endPos = cursorPos;
             const newValue = currentValue.substring(0, startPos) + suggestion + currentValue.substring(endPos);
             input.value = newValue;
             input.selectionStart = input.selectionEnd = startPos + suggestion.length;
         }
     } else {
+        // Find the start of the current word/prefix
+        let startPos = cursorPos;
+        while (startPos > 0 && !/\s/.test(currentValue[startPos - 1])) {
+            startPos--;
+        }
+        
         // Insert new prefix
-        const newValue = currentValue.substring(0, startPos) + suggestion + currentValue.substring(endPos);
+        const newValue = currentValue.substring(0, startPos) + suggestion + currentValue.substring(cursorPos);
         input.value = newValue;
         input.selectionStart = input.selectionEnd = startPos + suggestion.length;
     }

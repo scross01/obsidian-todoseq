@@ -1,5 +1,6 @@
 import { SearchNode } from './search-types';
 import { Task } from '../task';
+import { DateUtils } from '../view/date-utils';
 
 export class SearchEvaluator {
   
@@ -11,6 +12,8 @@ export class SearchEvaluator {
         return this.evaluatePhrase(node.value!, task, caseSensitive);
       case 'prefix_filter':
         return this.evaluatePrefixFilter(node, task, caseSensitive);
+      case 'range_filter':
+        return this.evaluateRangeFilter(node, task, caseSensitive);
       case 'and':
         return this.evaluateAnd(node.children!, task, caseSensitive);
       case 'or':
@@ -92,6 +95,10 @@ export class SearchEvaluator {
         return this.evaluatePriorityFilter(value, task, caseSensitive);
       case 'content':
         return this.evaluateContentFilter(value, task, caseSensitive);
+      case 'scheduled':
+        return this.evaluateScheduledFilter(value, task, caseSensitive);
+      case 'deadline':
+        return this.evaluateDeadlineFilter(value, task, caseSensitive);
       default:
         return false;
     }
@@ -206,5 +213,243 @@ export class SearchEvaluator {
 
   private static escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Evaluate scheduled date filter
+   * @param value Filter value
+   * @param task Task to evaluate
+   * @param caseSensitive Whether matching should be case sensitive
+   * @returns True if task matches the scheduled filter
+   */
+  private static evaluateScheduledFilter(value: string, task: Task, caseSensitive: boolean): boolean {
+    const parsedDate = DateUtils.parseDateValue(value);
+    
+    // Handle null/undefined parsedDate
+    if (parsedDate === null || parsedDate === undefined) {
+      return false;
+    }
+    
+    // Handle 'none' case - tasks without scheduled dates
+    if (parsedDate === 'none') {
+      return !task.scheduledDate;
+    }
+    
+    // Handle tasks without scheduled dates
+    if (!task.scheduledDate) {
+      return false;
+    }
+    
+    // Handle string-based relative date expressions
+    if (typeof parsedDate === 'string') {
+      return this.evaluateDateExpression(parsedDate, task.scheduledDate);
+    }
+    
+    // Handle date ranges
+    if (typeof parsedDate === 'object' && parsedDate !== null && 'start' in parsedDate && 'end' in parsedDate) {
+      return DateUtils.isDateInRange(task.scheduledDate, parsedDate.start, parsedDate.end);
+    }
+    
+    // Handle exact date comparisons with format information
+    if (typeof parsedDate === 'object' && parsedDate !== null && 'date' in parsedDate && 'format' in parsedDate) {
+      const searchDate = parsedDate.date;
+      const format = parsedDate.format;
+      const taskDate = task.scheduledDate;
+      
+      switch (format) {
+        case 'year':
+          // Year-only search (e.g., 2025) - match any date in that year
+          return searchDate.getUTCFullYear() === taskDate.getUTCFullYear();
+          
+        case 'year-month':
+          // Year-month search (e.g., 2025-11) - match any date in that month/year
+          return searchDate.getUTCFullYear() === taskDate.getUTCFullYear() &&
+                 searchDate.getUTCMonth() === taskDate.getUTCMonth();
+          
+        case 'full':
+          // Full date search (e.g., 2025-11-30) - exact date match
+          return DateUtils.compareDates(taskDate, searchDate);
+          
+        default:
+          return false;
+      }
+    }
+    
+    // Handle Date objects (from natural language parsing)
+    if (parsedDate instanceof Date) {
+      return DateUtils.compareDates(task.scheduledDate, parsedDate);
+    }
+    
+    return false;
+  }
+
+  /**
+   * Evaluate deadline date filter
+   * @param value Filter value
+   * @param task Task to evaluate
+   * @param caseSensitive Whether matching should be case sensitive
+   * @returns True if task matches the deadline filter
+   */
+  private static evaluateDeadlineFilter(value: string, task: Task, caseSensitive: boolean): boolean {
+    const parsedDate = DateUtils.parseDateValue(value);
+    
+    // Handle null/undefined parsedDate
+    if (parsedDate === null || parsedDate === undefined) {
+      return false;
+    }
+    
+    // Handle 'none' case - tasks without deadline dates
+    if (parsedDate === 'none') {
+      return !task.deadlineDate;
+    }
+    
+    // Handle tasks without deadline dates
+    if (!task.deadlineDate) {
+      return false;
+    }
+    
+    // Handle string-based relative date expressions
+    if (typeof parsedDate === 'string') {
+      return this.evaluateDateExpression(parsedDate, task.deadlineDate);
+    }
+    
+    // Handle date ranges
+    if (typeof parsedDate === 'object' && parsedDate !== null && 'start' in parsedDate && 'end' in parsedDate) {
+      return DateUtils.isDateInRange(task.deadlineDate, parsedDate.start, parsedDate.end);
+    }
+    
+    // Handle exact date comparisons with format information
+    if (typeof parsedDate === 'object' && parsedDate !== null && 'date' in parsedDate && 'format' in parsedDate) {
+      const searchDate = parsedDate.date;
+      const format = parsedDate.format;
+      const taskDate = task.deadlineDate;
+      
+      switch (format) {
+        case 'year':
+          // Year-only search (e.g., 2025) - match any date in that year
+          return searchDate.getUTCFullYear() === taskDate.getUTCFullYear();
+          
+        case 'year-month':
+          // Year-month search (e.g., 2025-11) - match any date in that month/year
+          return searchDate.getUTCFullYear() === taskDate.getUTCFullYear() &&
+                 searchDate.getUTCMonth() === taskDate.getUTCMonth();
+          
+        case 'full':
+          // Full date search (e.g., 2025-11-30) - exact date match
+          return DateUtils.compareDates(taskDate, searchDate);
+          
+        default:
+          return false;
+      }
+    }
+    
+    // Handle Date objects (from natural language parsing)
+    if (parsedDate instanceof Date) {
+      return DateUtils.compareDates(task.deadlineDate, parsedDate);
+    }
+    
+    return false;
+  }
+
+  /**
+   * Evaluate date expressions like 'overdue', 'today', 'tomorrow', etc.
+   * @param expression Date expression
+   * @param date Date to evaluate
+   * @returns True if date matches the expression
+   */
+  private static evaluateDateExpression(expression: string, date: Date): boolean {
+    const now = new Date();
+    
+    switch (expression) {
+      case 'overdue':
+        return DateUtils.isDateOverdue(date, now);
+      case 'due':
+      case 'today':
+        return DateUtils.isDateDueToday(date, now);
+      case 'tomorrow':
+        return DateUtils.isDateDueTomorrow(date, now);
+      case 'this week':
+        return DateUtils.isDateInCurrentWeek(date, now);
+      case 'next week':
+        return DateUtils.isDateInNextWeek(date, now);
+      case 'this month':
+        return DateUtils.isDateInCurrentMonth(date, now);
+      case 'next month':
+        return DateUtils.isDateInNextMonth(date, now);
+      default:
+        // Handle "next N days" pattern
+        const nextNDaysMatch = expression.match(/^next\s+(\d+)\s+days$/);
+        if (nextNDaysMatch) {
+          const days = parseInt(nextNDaysMatch[1], 10);
+          return DateUtils.isDateInNextNDays(date, days, now);
+        }
+        return false;
+    }
+  }
+
+  /**
+   * Evaluate range filter (e.g., scheduled:2024-01-01..2024-01-31)
+   * @param node Range filter node
+   * @param task Task to evaluate
+   * @param caseSensitive Whether matching should be case sensitive
+   * @returns True if task matches the range filter
+   */
+  private static evaluateRangeFilter(node: SearchNode, task: Task, caseSensitive: boolean): boolean {
+    const field = node.field;
+    const start = node.start;
+    const end = node.end;
+    
+    if (!field || !start || !end) {
+      return false;
+    }
+    
+    // Parse the start and end dates
+    const startDate = DateUtils.parseDateValue(start);
+    const endDate = DateUtils.parseDateValue(end);
+    
+    // Both start and end must be valid date ranges or dates
+    if (startDate === null || endDate === null) {
+      return false;
+    }
+    
+    // Get the task date based on the field
+    const taskDate = field === 'scheduled' ? task.scheduledDate : task.deadlineDate;
+    
+    // Handle tasks without the specified date
+    if (!taskDate) {
+      return false;
+    }
+    
+    // Convert to date range format for comparison
+    let rangeStart: Date;
+    let rangeEnd: Date;
+    
+    // Handle start date
+    if (typeof startDate === 'object' && startDate !== null && 'start' in startDate && 'end' in startDate) {
+      rangeStart = startDate.start;
+    } else if (typeof startDate === 'object' && startDate !== null && 'date' in startDate) {
+      rangeStart = startDate.date;
+    } else if (startDate instanceof Date) {
+      rangeStart = startDate;
+    } else {
+      return false;
+    }
+    
+    // Handle end date
+    if (typeof endDate === 'object' && endDate !== null && 'start' in endDate && 'end' in endDate) {
+      rangeEnd = endDate.end;
+    } else if (typeof endDate === 'object' && endDate !== null && 'date' in endDate) {
+      rangeEnd = endDate.date;
+    } else if (endDate instanceof Date) {
+      rangeEnd = endDate;
+    } else {
+      return false;
+    }
+    
+    // Add one day to end date to make it inclusive
+    rangeEnd = new Date(rangeEnd);
+    rangeEnd.setDate(rangeEnd.getDate() + 1);
+    
+    return DateUtils.isDateInRange(taskDate, rangeStart, rangeEnd);
   }
 }

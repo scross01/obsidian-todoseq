@@ -49,6 +49,57 @@ meeting -work -urgent    // Matches "meeting" but neither "work" nor "urgent"
 project -(urgent OR blocked)  // Excludes both urgent and blocked projects
 ```
 
+### 6. Date Filters
+
+Filter tasks by scheduled or deadline dates:
+
+```
+// Exact dates
+scheduled:2024-01-31      // Tasks scheduled on January 31, 2024
+scheduled:2024-01         // Tasks scheduled in January 2024
+scheduled:2024            // Tasks scheduled in 2024
+deadline:2024-01-31       // Tasks with deadline on January 31, 2024
+
+// Relative date expressions
+scheduled:overdue         // Tasks with scheduled dates in the past
+deadline:due              // Tasks due today
+deadline:today            // Tasks due today
+deadline:tomorrow         // Tasks due tomorrow
+scheduled:"this week"      // Tasks scheduled this week
+scheduled:"next week"      // Tasks scheduled next week
+deadline:"this month"      // Tasks due this month
+deadline:"next month"      // Tasks due next month
+scheduled:"next 7 days"    // Tasks scheduled in the next 7 days
+
+// Natural language date expressions
+scheduled:"next Monday"     // Tasks scheduled next Monday
+deadline:"end of month"    // Tasks due at end of current month
+
+// Date ranges
+scheduled:2024-01-01..2024-01-31  // Tasks scheduled in January 2024
+deadline:2024-06-01..2024-06-30   // Tasks due in June 2024
+
+// Special cases
+scheduled:none            // Tasks without scheduled dates
+deadline:none             // Tasks without deadlines
+```
+
+### 7. Combining Date Filters with Other Filters
+
+```
+// Find urgent tasks due today
+priority:high deadline:today
+
+// Find tasks scheduled this week that are not completed
+scheduled:"this week" -state:DONE
+
+// Find tasks with deadlines this month or scheduled for next week
+(deadline:"this month" OR scheduled:"next week")
+
+// Find important tasks without deadlines
+priority:high deadline:none
+```
+
 ### 6. AND Logic (Implicit)
 
 Multiple terms without operators are ANDed by default:

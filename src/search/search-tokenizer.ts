@@ -16,11 +16,12 @@ export class SearchTokenizer {
     { type: 'or' as const, regex: /\bOR\b/y },
     { type: 'and' as const, regex: /\bAND\b/y },
     { type: 'not' as const, regex: /-/y },
+    { type: 'range' as const, regex: /\.\./y },
     { type: 'lparen' as const, regex: /\(/y },
     { type: 'rparen' as const, regex: /\)/y },
-    { type: 'prefix' as const, regex: /\b(path|file|tag|state|priority|content):/y },
-    { type: 'word' as const, regex: /[^\s"()\-]+/y },
-    { type: 'prefix_value' as const, regex: /"(?:\\.|[^"\\])*"|[^\s)]+|[^\s)]+-[^\s)]+/y }
+    { type: 'prefix' as const, regex: /\b(path|file|tag|state|priority|content|scheduled|deadline):/y },
+    { type: 'prefix_value' as const, regex: /"(?:\\.|[^"\\])*"|\d{4}-\d{2}-\d{2}|[^\s)]+-[^\s)]+|[^\s)]+/y },
+    { type: 'word' as const, regex: /[^\s"()\-]+/y }
   ];
 
   static tokenize(query: string): SearchToken[] {
@@ -42,7 +43,7 @@ export class SearchTokenizer {
         const match = pattern.regex.exec(query);
 
         if (match && match.index === pos) {
-          let value = this.processTokenValue(match[0], pattern.type);
+          const value = this.processTokenValue(match[0], pattern.type);
           let type = pattern.type;
           
           // Special handling: if this is a word token and the previous token was a prefix,
@@ -121,6 +122,7 @@ export class SearchTokenizer {
         return token;
       case 'or':
       case 'and':
+      case 'range':
         // Convert to lowercase for consistency
         return token.toLowerCase();
       case 'word':
@@ -138,6 +140,7 @@ export class SearchTokenizer {
       case 'not': return BP.NOT;
       case 'and': return BP.AND;
       case 'or': return BP.OR;
+      case 'range': return BP.DEFAULT;
       case 'prefix': return BP.DEFAULT;
       case 'prefix_value': return BP.DEFAULT;
       case 'word': return BP.DEFAULT;

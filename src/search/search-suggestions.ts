@@ -10,7 +10,7 @@ export class SearchSuggestions {
     /** Cache for vault data to improve performance */
     private static pathCache: string[] | null = null;
     private static fileCache: string[] | null = null;
-    private static lastCacheTime: number = 0;
+    private static lastCacheTime = 0;
     private static CACHE_TTL = 600; // 10 seconds
     
     /**
@@ -176,7 +176,57 @@ export class SearchSuggestions {
      * @returns Array of priority options
      */
     static getPriorityOptions(): string[] {
-        return ['A', 'B', 'C', 'high', 'medium', 'low', 'none'];
+      return ['A', 'B', 'C', 'high', 'medium', 'low', 'none'];
+    }
+ 
+    /**
+     * Get date suggestion options for scheduled and deadline filters
+     * @returns Array of date suggestion options
+     */
+    static getDateSuggestions(): string[] {
+      return ['overdue', 'due', 'today', 'tomorrow', 'this week', 'next week', 'this month', 'next month', 'next 7 days', 'none'];
+    }
+ 
+    /**
+     * Extract all unique scheduled dates from tasks
+     * @param tasks Array of tasks to analyze
+     * @returns Array of unique scheduled dates in YYYY-MM-DD format, sorted chronologically
+     */
+    static getScheduledDateSuggestions(tasks: Task[]): string[] {
+      const datesSet = new Set<string>();
+      
+      tasks.forEach(task => {
+        if (task.scheduledDate) {
+          const dateStr = task.scheduledDate.toISOString().split('T')[0];
+          datesSet.add(dateStr);
+        }
+      });
+      
+      // Convert to array and sort chronologically
+      const dates = Array.from(datesSet);
+      dates.sort((a, b) => a.localeCompare(b));
+      return dates;
+    }
+ 
+    /**
+     * Extract all unique deadline dates from tasks
+     * @param tasks Array of tasks to analyze
+     * @returns Array of unique deadline dates in YYYY-MM-DD format, sorted chronologically
+     */
+    static getDeadlineDateSuggestions(tasks: Task[]): string[] {
+      const datesSet = new Set<string>();
+      
+      tasks.forEach(task => {
+        if (task.deadlineDate) {
+          const dateStr = task.deadlineDate.toISOString().split('T')[0];
+          datesSet.add(dateStr);
+        }
+      });
+      
+      // Convert to array and sort chronologically
+      const dates = Array.from(datesSet);
+      dates.sort((a, b) => a.localeCompare(b));
+      return dates;
     }
     
     /**

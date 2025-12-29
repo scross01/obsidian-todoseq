@@ -7,8 +7,6 @@
 .todo-view .todo-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 6px 0;
 }
 
 /* Visually-hidden label for accessibility */

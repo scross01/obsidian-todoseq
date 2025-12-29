@@ -419,7 +419,7 @@ export class TodoView extends ItemView {
       const searchTerm = prefixMatch[3] || ''; // Text typed after the colon
       
       // Check if this is a valid prefix
-      const validPrefixes = ['path', 'file', 'tag', 'state', 'priority', 'content'];
+      const validPrefixes = ['path', 'file', 'tag', 'state', 'priority', 'content', 'scheduled', 'deadline'];
       if (validPrefixes.includes(prefixBase) || validPrefixes.some(p => p.startsWith(prefixBase))) {
           if (hasColon) {
               // Complete prefix with colon - show filtered suggestions
