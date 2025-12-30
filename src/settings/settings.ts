@@ -176,7 +176,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Task view mode')
+      .setName('Task View mode')
       .setDesc('Choose how completed items are shown in the task view.')
       .addDropdown(drop => {
         drop.addOption('showAll', 'Show all tasks');

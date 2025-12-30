@@ -207,8 +207,8 @@ export class TodoView extends ItemView {
 
     // Add Settings button to the right side of the first row
     const settingsBtn = firstRow.createEl('div', { cls: 'clickable-icon' });
-    settingsBtn.setAttr('title', 'Task view settings');
-    settingsBtn.setAttr('aria-label', 'Task view settings');
+    settingsBtn.setAttr('title', 'Task View settings');
+    settingsBtn.setAttr('aria-label', 'Task View settings');
     settingsBtn.setAttr('aria-expanded', String(false));
     setIcon(settingsBtn, 'lucide-sliders-horizontal');
 
