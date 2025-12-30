@@ -11,6 +11,10 @@ describe('Date Search Filters', () => {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   // Test tasks with various dates
+  // Create dates at midnight to avoid timezone issues
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const tomorrowMidnight = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate());
+  
   const testTasks: Task[] = [
     {
       path: 'test1.md',
@@ -22,7 +26,7 @@ describe('Date Search Filters', () => {
       state: 'TODO',
       completed: false,
       priority: null,
-      scheduledDate: today,
+      scheduledDate: todayMidnight,
       deadlineDate: null
     },
     {
@@ -36,7 +40,7 @@ describe('Date Search Filters', () => {
       completed: false,
       priority: null,
       scheduledDate: null,
-      deadlineDate: tomorrow
+      deadlineDate: tomorrowMidnight
     },
     {
       path: 'test3.md',
@@ -166,7 +170,7 @@ describe('Date Search Filters', () => {
     });
 
     test('should filter tasks with exact scheduled date', () => {
-      const dateStr = today.toISOString().split('T')[0];
+      const dateStr = todayMidnight.toISOString().split('T')[0];
       const query = `scheduled:${dateStr}`;
       const node = SearchParser.parse(query);
       
@@ -335,7 +339,7 @@ describe('Date Search Filters', () => {
     });
 
     test('should filter tasks with exact deadline date', () => {
-      const dateStr = tomorrow.toISOString().split('T')[0];
+      const dateStr = tomorrowMidnight.toISOString().split('T')[0];
       const query = `deadline:${dateStr}`;
       const node = SearchParser.parse(query);
       
