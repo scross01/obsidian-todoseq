@@ -268,6 +268,19 @@ When "Include tasks inside quote and callout blocks" is enabled:
 > - [ ] TODO Checkbox task in collapsible todo block
 ```
 
+### Tasks in Comment Blocks
+
+When "Include tasks inside comment blocks" is enabled:
+
+```markdown
+%% TODO Task in single-line comment block %%
+
+%%
+TODO Task in multi-line comment block
+DEADLINE: <2025-11-01>
+%%
+```
+
 ### Tasks in Code Blocks
 
 When "Include tasks inside code blocks" is enabled:

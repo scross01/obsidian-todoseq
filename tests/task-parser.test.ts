@@ -10,11 +10,13 @@ describe('Regular task parsing', () => {
       refreshInterval: 60,
       includeCalloutBlocks: true,
       includeCodeBlocks: false,
+      includeCommentBlocks: false,
       languageCommentSupport: {
         enabled: false,
       },
       additionalTaskKeywords: ["FIXME"],
-      taskViewMode: 'default'
+      taskViewMode: 'showAll',
+      weekStartsOn: 'Monday'
     };
     parser = TaskParser.create(settings);
   });
@@ -386,17 +388,166 @@ $$
   });
 
   describe('Tasks in comment blocks', () => {
-    test(`should not match comment blocks`, () => {
+    test(`should not match comment blocks when disabled (default)`, () => {
       const lines = `
 %% TODO task text %%
 
-%% 
+%%
 TODO task text
 %%
       `;
       const tasks = parser.parseFile(lines, 'test.md');
       
       expect(tasks).toHaveLength(0);
+    });
+
+    test(`should match comment blocks when enabled`, () => {
+      const settingsWithCommentBlocks = {
+        refreshInterval: 60,
+        includeCalloutBlocks: true,
+        includeCodeBlocks: false,
+        includeCommentBlocks: true,
+        languageCommentSupport: {
+          enabled: false,
+        },
+        additionalTaskKeywords: ["FIXME"],
+        taskViewMode: 'showAll',
+        weekStartsOn: 'Monday'
+      };
+      const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
+
+      const lines = `
+%% TODO task text %%
+
+%%
+TODO task text
+%%
+      `;
+      const tasks = parserWithCommentBlocks.parseFile(lines, 'test.md');
+      
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].text).toBe('task text');
+      expect(tasks[0].indent).toBe("");
+      expect(tasks[0].listMarker).toBe("");
+      expect(tasks[1].state).toBe("TODO");
+      expect(tasks[1].text).toBe('task text');
+      expect(tasks[1].indent).toBe("");
+      expect(tasks[1].listMarker).toBe("");
+    });
+
+    test(`should match comment blocks with different task states`, () => {
+      const settingsWithCommentBlocks = {
+        refreshInterval: 60,
+        includeCalloutBlocks: true,
+        includeCodeBlocks: false,
+        includeCommentBlocks: true,
+        languageCommentSupport: {
+          enabled: false,
+        },
+        additionalTaskKeywords: ["FIXME"],
+        taskViewMode: 'showAll',
+        weekStartsOn: 'Monday'
+      };
+      const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
+
+      const lines = `
+%% TODO task text %%
+%% DOING another task %%
+%% DONE completed task %%
+%% FIXME custom keyword task %%
+      `;
+      const tasks = parserWithCommentBlocks.parseFile(lines, 'test.md');
+      
+      expect(tasks).toHaveLength(4);
+      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].text).toBe('task text');
+      expect(tasks[0].completed).toBe(false);
+      expect(tasks[1].state).toBe("DOING");
+      expect(tasks[1].text).toBe('another task');
+      expect(tasks[1].completed).toBe(false);
+      expect(tasks[2].state).toBe("DONE");
+      expect(tasks[2].text).toBe('completed task');
+      expect(tasks[2].completed).toBe(true);
+      expect(tasks[3].state).toBe("FIXME");
+      expect(tasks[3].text).toBe('custom keyword task');
+      expect(tasks[3].completed).toBe(false);
+    });
+
+    test(`should match comment blocks with priorities`, () => {
+      const settingsWithCommentBlocks = {
+        refreshInterval: 60,
+        includeCalloutBlocks: true,
+        includeCodeBlocks: false,
+        includeCommentBlocks: true,
+        languageCommentSupport: {
+          enabled: false,
+        },
+        additionalTaskKeywords: ["FIXME"],
+        taskViewMode: 'showAll',
+        weekStartsOn: 'Monday'
+      };
+      const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
+
+      const lines = `
+%% TODO [#A] high priority task %%
+%% TODO [#B] medium priority task %%
+%% TODO [#C] low priority task %%
+%% TODO normal priority task %%
+      `;
+      const tasks = parserWithCommentBlocks.parseFile(lines, 'test.md');
+      
+      expect(tasks).toHaveLength(4);
+      expect(tasks[0].priority).toBe('high');
+      expect(tasks[0].text).toBe('high priority task');
+      expect(tasks[1].priority).toBe('med');
+      expect(tasks[1].text).toBe('medium priority task');
+      expect(tasks[2].priority).toBe('low');
+      expect(tasks[2].text).toBe('low priority task');
+      expect(tasks[3].priority).toBeNull();
+      expect(tasks[3].text).toBe('normal priority task');
+    });
+
+    test(`should match comment blocks with dates`, () => {
+      const settingsWithCommentBlocks = {
+        refreshInterval: 60,
+        includeCalloutBlocks: true,
+        includeCodeBlocks: false,
+        includeCommentBlocks: true,
+        languageCommentSupport: {
+          enabled: false,
+        },
+        additionalTaskKeywords: ["FIXME"],
+        taskViewMode: 'showAll',
+        weekStartsOn: 'Monday'
+      };
+      const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
+
+      const lines = `
+%% TODO task text %%
+SCHEDULED: <2025-10-31>
+DEADLINE: <2025-11-01>
+
+%% DOING another task %%
+      SCHEDULED: <2025-12-01>
+      `;
+      const tasks = parserWithCommentBlocks.parseFile(lines, 'test.md');
+      
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].text).toBe('task text');
+      expect(tasks[0].scheduledDate?.getFullYear()).toBe(2025);
+      expect(tasks[0].scheduledDate?.getMonth()).toBe(9);
+      expect(tasks[0].scheduledDate?.getDate()).toBe(31);
+      expect(tasks[0].deadlineDate?.getFullYear()).toBe(2025);
+      expect(tasks[0].deadlineDate?.getMonth()).toBe(10);
+      expect(tasks[0].deadlineDate?.getDate()).toBe(1);
+      
+      expect(tasks[1].state).toBe("DOING");
+      expect(tasks[1].text).toBe('another task');
+      expect(tasks[1].scheduledDate?.getFullYear()).toBe(2025);
+      expect(tasks[1].scheduledDate?.getMonth()).toBe(11);
+      expect(tasks[1].scheduledDate?.getDate()).toBe(1);
     });
   });
   
@@ -495,11 +646,13 @@ describe('Task parsing with code blocks', () => {
       refreshInterval: 60,
       includeCalloutBlocks: true,
       includeCodeBlocks: true,
+      includeCommentBlocks: false,
       languageCommentSupport: {
         enabled: false,
       },
       additionalTaskKeywords: [],
-      taskViewMode: 'default'
+      taskViewMode: 'showAll',
+      weekStartsOn: 'Monday'
     };
     parser = TaskParser.create(settings);
   });
@@ -537,11 +690,13 @@ describe('Task parsing within langauge spefic comments in code blocks', () => {
       refreshInterval: 60,
       includeCalloutBlocks: true,
       includeCodeBlocks: true,
+      includeCommentBlocks: false,
       languageCommentSupport: {
         enabled: true,
       },
       additionalTaskKeywords: [],
-      taskViewMode: 'default'
+      taskViewMode: 'showAll',
+      weekStartsOn: 'Monday'
     };
     parser = TaskParser.create(settings);
   });

@@ -27,10 +27,10 @@ const CALLOUT_PREFIX = /\s*>\s*\[!\w+\]-?\s+/.source
 
 // Code block marker ``` or ~~~ with language
 const CODE_BLOCK_REGEX = /^\s*(```|~~~)\s*(\S+)?$/
-// Math block marker %%
-const MATH_BLOCK_REGEX = /^\s*%%(?!.*%%).*/ // ignores open and close on same line
-// Comment block marker $$
-const COMMENT_BLOCK_REGEX = /^\s*\$\$(?!.*\$\$).*/ // ignores open and close on same line
+// Math block marker $$
+const MATH_BLOCK_REGEX = /^\s*\$\$(?!.*\$\$).*/ // ignores open and close on same line
+// Comment block marker %%
+const COMMENT_BLOCK_REGEX = /^\s*%%.*%%$|^\s*%%(?!.*%%).*/ // matches both single-line and multi-line comment blocks
 // Callout block marker >
 const CALLOUT_BLOCK_REGEX = /^\s*>.*/
 // Footnote definition marker
@@ -45,6 +45,7 @@ const TASK_TEXT = /[\S][\s\S]*?/.source;  // at least one non-whitespace charact
 export class TaskParser {
   private readonly includeCalloutBlocks: boolean;
   private readonly includeCodeBlocks: boolean;
+  private readonly includeCommentBlocks: boolean;
   private readonly languageCommentSupport: LanguageCommentSupportSettings;
   private readonly customKeywords: string[];
   private allKeywords: string[];
@@ -63,6 +64,7 @@ export class TaskParser {
     regex: RegexPair,
     includeCalloutBlocks: boolean,
     includeCodeBlocks: boolean,
+    includeCommentBlocks: boolean,
     languageCommentSupport: LanguageCommentSupportSettings,
     customKeywords: string[],
     allKeywords: string[]
@@ -75,6 +77,7 @@ export class TaskParser {
         
     this.includeCalloutBlocks = includeCalloutBlocks;
     this.includeCodeBlocks = includeCodeBlocks;
+    this.includeCommentBlocks = includeCommentBlocks;
     this.languageCommentSupport = languageCommentSupport;
   }
 
@@ -113,6 +116,7 @@ export class TaskParser {
       regex,
       settings.includeCalloutBlocks,
       settings.includeCodeBlocks,
+      settings.includeCommentBlocks,
       settings.languageCommentSupport,
       normalizedAdditional,
       allKeywordsArray,
@@ -590,8 +594,56 @@ export class TaskParser {
         inBlock = !inBlock
         blockMarker = inBlock ? 'math' : null
       } else if (COMMENT_BLOCK_REGEX.test(line)) {
-        inBlock = !inBlock
-        blockMarker = inBlock ? 'comment' : null
+        // Check if this is a single-line comment block (%% ... %%)
+        const singleLineCommentMatch = /^\s*%%.*%%$/.test(line);
+        if (singleLineCommentMatch) {
+          // For single-line comment blocks, process the task immediately if enabled
+          if (this.includeCommentBlocks) {
+            // Extract the content between %% and %% and process it as a task
+            const content = line.replace(/^\s*%%\s*/, '').replace(/\s*%%$/, '');
+            const tempLine = content;
+            
+            // Check if this line contains a task
+            if (this.testRegex.test(tempLine)) {
+              const taskDetails = this.extractTaskDetails(tempLine, this.captureRegex);
+              const { priority, cleanedText } = this.extractPriority(taskDetails.taskText);
+              const { state: finalState, completed: finalCompleted, listMarker: finalListMarker } =
+                this.extractCheckboxState(tempLine, taskDetails.state, taskDetails.listMarker);
+              
+              const task: Task = {
+                state: finalState,
+                completed: finalCompleted,
+                text: cleanedText,
+                priority: priority,
+                rawText: tempLine.trim(),
+                path: path,
+                line: index + 1,
+                indent: taskDetails.indent,
+                listMarker: finalListMarker,
+                scheduledDate: null,
+                deadlineDate: null,
+                tail: taskDetails.tail,
+              };
+              
+              // Extract dates from following lines for single-line comment block tasks
+              const { scheduledDate, deadlineDate } = this.extractTaskDates(
+                lines,
+                index + 1,
+                taskDetails.indent,
+              );
+              
+              task.scheduledDate = scheduledDate;
+              task.deadlineDate = deadlineDate;
+              
+              tasks.push(task);
+            }
+          }
+          // Don't toggle inBlock for single-line comment blocks
+        } else {
+          // For multi-line comment blocks, toggle the block state
+          inBlock = !inBlock;
+          blockMarker = inBlock ? 'comment' : null;
+        }
       }
 
       // Skip lines in quotes and callout blocks if disabled
@@ -609,8 +661,8 @@ export class TaskParser {
         continue;
       }
 
-      // Skip lines inside comment blocks
-      if (inBlock && blockMarker === 'comment') {
+      // Skip lines inside comment blocks if the setting is disabled
+      if (inBlock && blockMarker === 'comment' && !this.includeCommentBlocks) {
         continue;
       }
 

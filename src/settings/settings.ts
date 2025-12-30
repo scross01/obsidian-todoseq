@@ -9,6 +9,7 @@ export interface TodoTrackerSettings {
   additionalTaskKeywords: string[]; // capitalised keywords treated as NOT COMPLETED (e.g., FIXME, HACK)
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
   includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
+  includeCommentBlocks: boolean; // when true, tasks inside multiline comment blocks ($$) are included
   taskViewMode: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // controls view transformation in the task view
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
@@ -20,6 +21,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   additionalTaskKeywords: [],
   includeCodeBlocks: false,
   includeCalloutBlocks: true, // Enabled by default
+  includeCommentBlocks: false, // Disabled by default
   taskViewMode: 'showAll',
   languageCommentSupport: {
     enabled: true,
@@ -243,6 +245,21 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           await this.refreshAllTaskViews();
         }));
 
+    // Include tasks inside comment blocks
+    new Setting(containerEl)
+      .setName('Include tasks inside comment blocks')
+      .setDesc('When enabled, include tasks inside multiline comment blocks ($$).')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.includeCommentBlocks)
+        .onChange(async (value) => {
+          this.plugin.settings.includeCommentBlocks = value;
+          await this.plugin.saveSettings();
+          // Recreate parser to reflect includeCommentBlocks change and rescan
+          this.plugin.recreateParser();
+          await this.plugin.scanVault();
+          await this.refreshAllTaskViews();
+        }));
+
     new Setting(containerEl)
       .setName('Task View mode')
       .setDesc('Choose how completed items are shown in the task view.')
@@ -261,7 +278,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       
           new Setting(containerEl)
             .setName('Week starts on')
-            .setDesc('Choose which day the week starts on for date filtering')
+            .setDesc('Choose which day the week starts on for date filtering.')
             .addDropdown(drop => {
               drop.addOption('Monday', 'Monday');
               drop.addOption('Sunday', 'Sunday');

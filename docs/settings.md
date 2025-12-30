@@ -153,6 +153,14 @@ FIXME Handle edge cases
 - Track action items in callout blocks
 - Manage tasks in collapsible sections
 
+### Include Tasks Inside Comment Blocks
+
+**Setting**: "Include tasks inside comment blocks" (toggle)
+
+**Description**: Enable or disable task detection inside multiline comment blocks.
+
+**Default**: Disabled
+
 ## Task View Settings
 
 ### Task View Mode
