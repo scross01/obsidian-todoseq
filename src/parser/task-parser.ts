@@ -89,6 +89,11 @@ export class TaskParser {
       .map(k => k.trim())
       .filter(k => k.length > 0);
 
+   // Validate user-provided keywords to prevent regex injection vulnerabilities
+   if (normalizedAdditional.length > 0) {
+     TaskParser.validateKeywords(normalizedAdditional);
+   }
+
     const nonCompletedArray: string[] = [
       ...Array.from(DEFAULT_PENDING_STATES),
       ...Array.from(DEFAULT_ACTIVE_STATES),
@@ -110,6 +115,64 @@ export class TaskParser {
       normalizedAdditional,
       allKeywordsArray,
     );
+  }
+
+  /**
+   * Validate that keywords don't contain dangerous regex patterns
+   * that could cause catastrophic backtracking or other issues
+   * @param keywords Array of keywords to validate
+   * @throws Error if any keyword contains dangerous patterns
+   */
+  public static validateKeywords(keywords: string[]): void {
+    // Patterns that could cause catastrophic backtracking or other regex issues
+    const dangerousPatterns = [
+      // Nested quantifiers (can cause exponential backtracking)
+      /\*.*\*/,  // * followed by *
+      /\+.*\+/,  // + followed by +
+      /\?.*\?/,  // ? followed by ?
+      
+      // Repeated quantifiers (3 or more - allow single * as it gets escaped)
+      /\*\*\*+/,  // ***, ****, etc. (but allow single *)
+      /\+\+\++/,  // +++, ++++, etc. (but allow single +)
+      /\?\?\?+/,  // ???, ????, etc. (but allow single ?)
+      
+      // Very long repetitions that could cause performance issues
+      /\*\{10,\}/,  // *{10,} - excessive repetition
+      /\+\{10,\}/,  // +{10,} - excessive repetition
+      /\?\{10,\}/,  // ?{10,} - excessive repetition
+      
+      // Backreferences (complex and potentially dangerous)
+      /\([^)]*\)[^)]*\\\d+/,
+      
+      // Lookaheads/lookbehinds (complex and potentially dangerous)
+      /\(?=/,  // (?= positive lookahead
+      /\(?!/,  // (?! negative lookahead
+      /\(?<=/, // (?<= positive lookbehind
+      /\(?<!/, // (?<! negative lookbehind
+      
+      // Very long keywords (performance concern)
+      /^.{50,}$/  // keywords longer than 50 characters
+    ];
+
+    for (const keyword of keywords) {
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(keyword)) {
+          throw new Error(
+            `Invalid task keyword "${keyword}": contains dangerous regex pattern. ` +
+            `Keywords should be simple words without complex regex syntax.`
+          );
+        }
+      }
+      
+      // Additional validation: keywords should be reasonable task identifiers
+      if (keyword.length === 0) {
+        throw new Error(`Invalid task keyword: empty keyword not allowed`);
+      }
+      
+      if (/^\s+$/.test(keyword)) {
+        throw new Error(`Invalid task keyword "${keyword}": whitespace-only keywords not allowed`);
+      }
+    }
   }
 
   /**

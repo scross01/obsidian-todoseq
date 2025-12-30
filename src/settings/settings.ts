@@ -1,7 +1,8 @@
-import { PluginSettingTab, App, Setting, ToggleComponent } from 'obsidian';
+import { PluginSettingTab, App, Setting, ToggleComponent, Notice } from 'obsidian';
 import TodoTracker from '../main';
 import { TodoView } from '../view/task-view';
 import { LanguageCommentSupportSettings } from "../parser/language-registry";
+import { TaskParser } from "../parser/task-parser";
 
 export interface TodoTrackerSettings {
   refreshInterval: number; // refresh interval in seconds
@@ -91,12 +92,79 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               .map(k => k.trim())
               .filter(k => k.length > 0);
 
-            this.plugin.settings.additionalTaskKeywords = parsed;
-            await this.plugin.saveSettings();
-            // Recreate parser according to new settings and rescan
-            this.plugin.recreateParser();
-            await this.plugin.scanVault();
-            await this.refreshAllTaskViews();
+            // Create error display element
+            const settingContainer = text.inputEl.closest('.setting-item');
+            if (!settingContainer) {
+              console.error('Could not find setting container');
+              return;
+            }
+
+            const settingInfo = settingContainer.querySelector('.setting-item-info');
+            if (!settingInfo) {
+              console.error('Could not find setting info container');
+              return;
+            }
+            // Remove any existing error display
+            const existingError = settingContainer.querySelector('.todoseq-setting-item-error');
+            if (existingError) {
+              existingError.remove();
+              text.inputEl.classList.remove('todoseq-invalid-input');
+            }
+            
+            // Filter out invalid keywords and collect errors
+            const validKeywords: string[] = [];
+            const invalidKeywords: string[] = [];
+            const errorMessages: string[] = [];
+            
+            for (const keyword of parsed) {
+              try {
+                // Test if this single keyword is valid by trying to create a parser with just this keyword
+                const testSettings = {
+                  additionalTaskKeywords: [keyword],
+                  includeCalloutBlocks: this.plugin.settings.includeCalloutBlocks,
+                  includeCodeBlocks: this.plugin.settings.includeCodeBlocks,
+                  languageCommentSupport: this.plugin.settings.languageCommentSupport
+                };
+                // This will throw if the keyword is invalid
+                TaskParser.validateKeywords([keyword]);
+                validKeywords.push(keyword);
+              } catch (error) {
+                invalidKeywords.push(keyword);
+                errorMessages.push(`"${keyword}": ${error.message}`);
+              }
+            }
+            
+            if (invalidKeywords.length > 0) {
+              // Show error under the field
+              const errorDiv = document.createElement('div');
+              errorDiv.className = 'todoseq-setting-item-error';
+              errorDiv.textContent = `Invalid keyword ${invalidKeywords.join(', ')} will be ignored.`;
+              text.inputEl.classList.add('todoseq-invalid-input');
+
+              // Insert error after the setting description
+              settingInfo.appendChild(errorDiv);
+              
+              // Continue with valid keywords only for parsing, but keep original input for editing
+              this.plugin.settings.additionalTaskKeywords = validKeywords;
+              await this.plugin.saveSettings();
+              
+              // Always recreate parser and rescan with valid keywords
+              try {
+                this.plugin.recreateParser();
+                await this.plugin.scanVault();
+                await this.refreshAllTaskViews();
+              } catch (parseError) {
+                console.error('Failed to recreate parser with valid keywords:', parseError);
+              }
+            } else {            
+              // All keywords are valid, proceed normally
+              this.plugin.settings.additionalTaskKeywords = parsed;
+              await this.plugin.saveSettings();
+              // Recreate parser according to new settings and rescan
+              this.plugin.recreateParser();
+              await this.plugin.scanVault();
+              await this.refreshAllTaskViews();
+            }
           });
       });
 

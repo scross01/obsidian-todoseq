@@ -233,3 +233,15 @@
 .todo-view .todo-date-soon .date-value {
   color: var(--text-accent);
 }
+
+/* Settings UI - Keyword validation error */
+.todoseq-setting-item-error {
+  color: var(--error-color, #ff0000);
+  font-size: 0.7em;
+}
+
+/* Settings UI - Invalid input field highlighting */
+.setting-item .todoseq-invalid-input {
+border-color: var(--error-color, #ff0000) !important;
+border-width: 2px !important;
+}
