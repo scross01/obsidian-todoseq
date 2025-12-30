@@ -6,7 +6,9 @@ TODOseq ("to-do-seek") is a lightweight, keyword-based task management plugin fo
 
 ## Task Management Philosophy
 
-TODOseq is inspired by the task management approaches used in [Logseq](https://docs.logseq.com/#/page/tasks) and [orgmode](https://orgmode.org/), focusing on:
+TODOseq is inspired by the task management approaches used in [Logseq](https://docs.logseq.com/#/page/tasks) and [orgmode](https://orgmode.org/) where tasks are captured in context with the notes and journals they relate to. This allows for a more natural and flexible workflow, where tasks can be easily created, updated, and tracked without disrupting your note-taking process.
+
+TODOseq scans your vault for lines that begin with specific keywords, extracts them, and presents them in a dedicated Task View panel within Obsidian. This approach allows you to maintain your existing note structure while gaining powerful task management capabilities.
 
 ### 1. Natural Language Task Capture
 
@@ -33,11 +35,11 @@ Tasks progress through defined state sequences rather than just being "checked" 
 ```markdown
 TODO Simple task
 
-TODO [#A] Complex task with priority
-TODO [#B] Task with scheduled date
+TODO [#A] Task with high priority
+TODO [#B] Task with medium and scheduled date
 SCHEDULED: <2025-01-15>
 
-TODO [#C] Task with deadline
+TODO [#C] Task with low priority and deadline date/time
 DEADLINE: <2025-01-20 17:00>
 ```
 
@@ -53,7 +55,7 @@ DEADLINE: <2025-01-20 17:00>
 
 ### When Checkboxes Are Still Useful
 
-TODOseq supports both formats and can work with existing checkbox-based tasks:
+TODOseq supports can work with existing checkbox-based tasks when a task state keyword is added after the checkbox. For example:
 
 ```markdown
 - [ ] TODO this is a task
@@ -63,15 +65,20 @@ TODOseq supports both formats and can work with existing checkbox-based tasks:
 
 The checkbox state is automatically synchronized with the task's completion state when updated in the task view.
 
+Checkboxes without the keywords are ignored by TODOseq. This allows you to mix traditional checkbox tasks with keyword-based tasks if desired.
+
+```markdown
+- [ ] DOING this task is tracked by TODOseq
+    - [ ] subtask whithout state not tracked by TODOseq
+    - [x] another untracked subtask
+    - [ ] TODO important subtask tracked by TODOseq
+```
+
 ## Logseq Compatibility
 
-TODOseq is designed to be fully compatible with Logseq's task format, making it ideal for:
+TODOseq is designed to be compatible with Logseq's task format, making it ideal If you're migrating your Logseq markdown files Obsidian, or even if you want to use both tools together. Existing task entries should work without modification:
 
-### Migration from Logseq
-
-If you're migrating your Logseq markdown files from Logseq to Obsidian, your existing task files should work without modification:
-
-### Dual Use Workflow
+### Dual Use
 
 TODOseq allows you to maintain the same task format across both Logseq and Obsidian:
 
@@ -80,26 +87,14 @@ TODOseq allows you to maintain the same task format across both Logseq and Obsid
 - **Same priority system**: `[#A]`, `[#B]`, `[#C]` tokens work the same
 - **Same date formats**: SCHEDULED and DEADLINE dates are parsed identically
 
-## Target Audience
+Some TODOseq features are not available in Logseq, the use of checkboxes before the task keyword, the use of custom state keywords, and the capture of tasks within code, quotes, and callouts blocks will not get identified as tasks if you return to Logseq.
 
-TODOseq is ideal for:
-
-- **Logseq users migrating to Obsidian** who want to keep their task format
-- **Orgmode users** who prefer keyword-based task management
-- **Journalers and note-takers** who want quick task capture
+*Note: the Logseq import relates to the original Markdown based version of Logseq. Migration from the newer Logseq database version format has not been tested.
 
 ## Getting Started
 
-If you're new to keyword-based task management, we recommend:
-
-1. Start with simple `TODO` tasks in your notes
-2. Experiment with state cycling (TODO → DOING → DONE)
-3. Add priorities to important tasks
-4. Try scheduled and deadline dates for time-sensitive work
-5. Explore the powerful search and filtering capabilities
-
 For detailed usage guides, see:
 
-- [Task Entry Structure](task-entry-structure.md) - Learn about task syntax and formats
+- [Task Entry Structure](task-entry.md) - Learn about task syntax and formats
 - [Task View](task-view.md) - Understand how to use the dedicated task panel
-- [Search Functionality](search-functionality.md) - Master advanced task filtering
+- [Search Functionality](search.md) - Master advanced task filtering

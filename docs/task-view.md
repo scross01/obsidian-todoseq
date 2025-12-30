@@ -21,11 +21,15 @@ There are several ways to access the Task View:
 
 - You can assign a custom keyboard shortcut in Obsidian's Hotkeys settings
 
+## Task View Panel Location
+
+By default, the Task View opens as a full page in the main Obsidian content area. You can drag and drop the panel to reposition it within the Obsidian interface, such as moving it to the left or right sidebar or making it a floating window.
+
 ## Task View Interface
 
 The Task View consists of several key components:
 
-### 1. Toolbar
+### 1. Search and Settings Toolbar
 
 Located at the top of the Task View, the toolbar contains:
 
@@ -39,20 +43,12 @@ Located at the top of the Task View, the toolbar contains:
 
 The main area displays all detected tasks with the following information:
 
+- **Checkbox**: Visual indicator of completion status
 - **State keyword**: Colored badge showing task state (TODO, DOING, DONE, etc.)
+  Right click the badge to see all next state options
 - **Priority badge**: Shows `[#A]`, `[#B]`, or `[#C]` if present
 - **Task text**: The full text of the task
-- **File path**: Location of the task in your vault
-- **Checkbox**: Visual indicator of completion status
-
-### 3. Task Row Elements
-
-Each task row contains interactive elements:
-
-- **Checkbox**: Click to toggle between TODO and DONE states
-- **State keyword**: Click to cycle through state sequences
-- **Task text**: Click to jump to source file and line
-- **File path**: Shows the file location. Hover the mouse over it to see the full path.
+- **File path**: Shows the file name and line number location of the task in your vault. Hover the mouse over it to see the full path.
 
 ## Task Interactions
 
@@ -89,13 +85,15 @@ Click anywhere on the task row (except the checkbox or keyword) to:
 - Navigate to the specific line number
 - Focus the editor on the task for easy editing
 
+Shif-click to open the file in a new split pane.
+
 ## Sort Methods
 
 Choose how tasks are ordered using the sort method dropdown:
 
 ### 1. Default (File Path + Line Number)
 
-- Tasks sorted alphabetically by file path and file name
+- Tasks sorted alphabetically by vault file path and file name
 - Within each file, tasks sorted by line number
 
 ### 2. Scheduled Date
@@ -131,7 +129,9 @@ See [Search Functionality](search.md) for details.
 
 ### Priority Badges
 
-- `[#A]` - High priority (red badge)
-- `[#B]` - Medium priority (yellow badge)
-- `[#C]` - Low priority (green badge)
+Tasks priority indicatorsare show using colors picked from the current active theme.
+
+- `[#A]` - High priority - theme color red
+- `[#B]` - Medium priority - theme interactive accent
+- `[#C]` - Low priority - theme background modifier boarder
 - No priority - No badge displayed

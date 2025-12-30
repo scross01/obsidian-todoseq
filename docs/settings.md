@@ -17,7 +17,7 @@ Access TODOseq settings through Obsidian's settings interface:
 
 **Setting**: "Refresh Interval" (10-300 seconds, default: 60)
 
-**Description**: Controls how frequently TODOseq scans your vault for tasks.
+**Description**: Controls how frequently TODOseq rescans your vault for tasks. While the Task View should generally update automatically when files change, this setting ensures periodic rescans to catch any missed updates.
 
 **Impact**:
 
@@ -31,23 +31,23 @@ Access TODOseq settings through Obsidian's settings interface:
 
 **Setting**: "Additional Task Keywords" (comma-separated list)
 
-**Description**: Add custom capitalized keywords to treat as tasks.
+**Description**: Add custom keywords to be identified as tasks.
 
 **Format**: Comma-separated list of capitalized words (e.g., `FIXME, HACK, REVIEW`)
 
 **Rules:**
 
 - Keywords must be capitalized
-- Are additive (don't replace default keywords)
+- Are additive (doesn't replace default keywords)
 - Only the active state keyword can be added - completion still uses DONE/CANCELED states
 
 **Examples:**
 
-```
+```txt
 FIXME, HACK, REVIEW, BLOCKED, IDEA
 ```
 
-**Use Cases:**
+**Suggested Use Cases:**
 
 - Software development: `FIXME`, `HACK`, `REVIEW`
 - Research: `QUESTION`, `HYPOTHESIS`, `EXPERIMENT`
@@ -82,7 +82,6 @@ FIXME Handle edge cases
 ```
 </pre>
 
-
 ### Enable Language Comment Support
 
 **Setting**: "Enable language comment support" (toggle)
@@ -109,6 +108,7 @@ FIXME Handle edge cases
 - Comment syntax: `// TODO task` or `/* TODO task */`
 
 **Scripting languages**: Python, Ruby, Shell/Bash, R
+
 - Comment syntax: `# TODO task`
 
 **Configuration languages**: YAML, TOML, INI
@@ -127,7 +127,6 @@ FIXME Handle edge cases
 - Falls back to generic comment parsing if language unknown
 - Supports 20+ programming languages
 
-
 ### Include Tasks Inside Quote and Callout Blocks
 
 **Setting**: "Include tasks inside quote and callout blocks" (toggle)
@@ -137,7 +136,6 @@ FIXME Handle edge cases
 **Default**: Disabled
 
 **Supported Formats:**
-
 
 <pre>
 > TODO Task in a quote block
@@ -150,6 +148,7 @@ FIXME Handle edge cases
 </pre>
 
 **Use Cases:**
+
 - Capture tasks from meeting notes in quotes
 - Track action items in callout blocks
 - Manage tasks in collapsible sections
@@ -185,7 +184,7 @@ FIXME Handle edge cases
 **Behavior:**
 
 - Setting applies to initial Task View opening
-- Can also be updated directly in the Task View settings menu 
+- Can also be updated directly in the Task View settings menu
 - User preference is remembered across sessions
 
 ### Week Starts On
@@ -204,7 +203,6 @@ FIXME Handle edge cases
 - Affects date-based filtering expressions:
   - `this week`
   - `next week`
-  - `last week`
 - Does not affect absolute date ranges
 - Does not change how dates are displayed
 

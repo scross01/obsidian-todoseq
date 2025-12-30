@@ -28,3 +28,9 @@ data.json
 
 # exclude coverage report
 coverage/
+
+# exclude roo files
+.roo/
+.rooignore
+.roomodes
+plans/

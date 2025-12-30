@@ -6,7 +6,7 @@ This guide covers everything you need to know about how TODOseq recognizes, pars
 
 TODOseq identifies tasks based on specific patterns in your Markdown files. A task must match the following structure:
 
-```
+```txt
 [optional indentation][optional list marker][state keyword][space][task text]
 ```
 
@@ -78,7 +78,7 @@ TODOseq automatically syncs checkbox state with task keywords when updated from 
 - When you toggle state, both keyword and checkbox are updated
 - Proper spacing is maintained (e.g., `- [x] DONE`)
 
-*Note: If you modify the checkbox directly in the page, the task state keyword will not be updated accordingly.
+*Note: If you modify the checkbox directly on the page, the task state keyword will not be automatically updated accordingly.
 
 ## Task Keywords
 
@@ -108,26 +108,26 @@ Tasks progress through defined state sequences when you click the state keyword:
 
 **Basic Workflow:**
 
-```
+```txt
 TODO → DOING → DONE → TODO
 ```
 
 **Deferred Workflow:**
 
-```
+```txt
 LATER → NOW → DONE
 ```
 
 **Waiting Workflow:**
 
-```
+```txt
 WAIT → IN-PROGRESS → DONE
 WAITING → IN-PROGRESS → DONE
 ```
 
 **Cancelled Workflow:**
 
-```
+```txt
 CANCELED → TODO
 CANCELLED → TODO
 ```
@@ -140,42 +140,12 @@ You can add additional task keywords in the plugin settings:
 2. Find "Additional Task Keywords" field
 3. Enter comma-separated capitalized keywords (e.g., `FIXME, HACK, REVIEW`)
 
-**Custom Keyword Rules:**
-
-- Must be capitalized (case-sensitive matching)
-- Are additive (don't replace default keywords)
-- Only the keywords are custom - completion is still determined by DONE/CANCELED states
-- Can be used in state cycling like default keywords
-
 **Examples:**
 
 ```markdown
 FIXME Broken functionality
 HACK Temporary workaround
 REVIEW Needs code review
-```
-
-
-### Task Updates and Preservation
-
-When a task state is updated, TODOseq preserves:
-
-- **Indentation**: Original whitespace is maintained
-- **List markers**: `-`, `1.`, `(a)`, etc. are kept
-- **Priority tokens**: `[#A]`, `[#B]`, `[#C]` remain, but will be moved to the start of the task line
-- **Task text**: Everything after the state keyword is preserved
-- **File structure**: Task stays in original location
-
-**Before Update:**
-
-```markdown
-  - TODO Write documentation for new feature [#A]
-```
-
-**After Clicking TODO:**
-
-```markdown
-  - DOING [#A] Write documentation for new feature
 ```
 
 ## Priority System
@@ -344,4 +314,26 @@ TODOseq supports extracting tasks from comments in 20+ programming languages:
 ```ini
 ; TODO Configure settings
 ; FIXME Broken config
+```
+
+## Task Updates and Preservation
+
+When a task state is updated, TODOseq preserves:
+
+- **Indentation**: Original whitespace is maintained
+- **List markers**: `-`, `1.`, `(a)`, etc. are kept
+- **Priority tokens**: `[#A]`, `[#B]`, `[#C]` remain, but will be moved to the start of the task line
+- **Task text**: Everything after the state keyword is preserved
+- **File structure**: Task stays in original location
+
+**Before Update:**
+
+```markdown
+  - TODO Write documentation for new feature [#A]
+```
+
+**After Clicking TODO:**
+
+```markdown
+  - DOING [#A] Write documentation for new feature
 ```

@@ -1,9 +1,13 @@
 # Change Log
 
-- Added advanced search keyword filters to match specific task attributes, e.g. `status:TODO` or `priority:high`.
-- Enhanced the search evaluator to support complex queries, with AND/OR logic, negated search terms (`-word`, or `-priority:none`), date ranges (`scheduled:2026-01-01..2026-03-31`), and keyword combinations (e.g. `(status:DOING OR priority:high) AND tag:projectX`).
+## 0.6.0
+
+- Added advanced search keyword filters to match specific task attributes, e.g. `status:TODO` or `priority:high`, and enhanced the search evaluator to support complex queries with AND/OR logic,  negated search terms (`-word`, or `-priority:none`), date ranges (`scheduled:2026-01-01..2026-03-31`), and keyword combinations (e.g. `(status:DOING OR priority:high) AND tag:projectX`).
 - Introduced a search suggestion dropdown to provide real-time suggestions as users type their queries.
-- Updated the styling for active tasks (DOING/NOW) in the Task View to improve visibility.
+- Added mor eextensize documentation in the /docs folder.
+- Updated the styling for active tasks (DOING/NOW) in the Task View to highlight status vs inactive tasks.
+- Fixed potential security ReDoS vulnerability in regex parsing
+- Improved custom keyword validation to prevent invalid characters in keyword names.
 
 ## 0.5.2
 
