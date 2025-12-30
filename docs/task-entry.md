@@ -284,6 +284,16 @@ When "Include tasks inside code blocks" is enabled:
 ```
 </pre>
 
+### Tasks in Footnotes
+
+TODOseq can detect tasks in footnote definitions:
+
+```markdown
+This text has a footnote[^1]
+
+[^1]: TODO task in the footnote
+```
+
 ### Language-Aware Comment Tasks
 
 TODOseq supports extracting tasks from comments in 20+ programming languages:

@@ -4,8 +4,9 @@
 
 - Added advanced search keyword filters to match specific task attributes, e.g. `status:TODO` or `priority:high`, and enhanced the search evaluator to support complex queries with AND/OR logic,  negated search terms (`-word`, or `-priority:none`), date ranges (`scheduled:2026-01-01..2026-03-31`), and keyword combinations (e.g. `(status:DOING OR priority:high) AND tag:projectX`).
 - Introduced a search suggestion dropdown to provide real-time suggestions as users type their queries.
-- Added mor eextensize documentation in the /docs folder.
+- Added support for detecting tasks in footnote definitions (e.g., `[^1]: TODO task in footnote`). #4
 - Updated the styling for active tasks (DOING/NOW) in the Task View to highlight status vs inactive tasks.
+- Added plugin usage documentation in the /docs folder.
 - Fixed potential security ReDoS vulnerability in regex parsing
 - Improved custom keyword validation to prevent invalid characters in keyword names.
 

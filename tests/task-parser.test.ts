@@ -416,6 +416,74 @@ TODO task text
       expect(tasks).toHaveLength(0);
     });
   });
+
+  describe('Tasks in footnote definitions', () => {
+    test(`should match footnote tasks`, () => {
+      const lines = `
+This text a has a footnote[^1]
+
+[^1]: TODO task in the footnote description
+[^2]: DOING another task in footnote
+[^3]: DONE completed task in footnote
+[^4]: FIXME custom keyword task in footnote
+[^5]: TODO [#A] high priority task in footnote
+[^6]: TODO task with #tag in footnote
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+      
+      expect(tasks).toHaveLength(6);
+      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].text).toBe('task in the footnote description');
+      expect(tasks[0].indent).toBe("");
+      expect(tasks[0].listMarker).toBe("");
+      
+      expect(tasks[1].state).toBe("DOING");
+      expect(tasks[1].text).toBe('another task in footnote');
+      expect(tasks[1].completed).toBe(false);
+      
+      expect(tasks[2].state).toBe("DONE");
+      expect(tasks[2].text).toBe('completed task in footnote');
+      expect(tasks[2].completed).toBe(true);
+      
+      expect(tasks[3].state).toBe("FIXME");
+      expect(tasks[3].text).toBe('custom keyword task in footnote');
+      
+      expect(tasks[4].state).toBe("TODO");
+      expect(tasks[4].text).toBe('high priority task in footnote');
+      expect(tasks[4].priority).toBe('high');
+      
+      expect(tasks[5].state).toBe("TODO");
+      expect(tasks[5].text).toBe('task with #tag in footnote');
+    });
+
+    test(`should match footnote tasks with dates`, () => {
+      const lines = `
+[^1]: TODO task in footnote
+SCHEDULED: <2025-10-31>
+DEADLINE: <2025-11-01>
+
+[^2]: DOING another task
+      SCHEDULED: <2025-12-01>
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+      
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].text).toBe('task in footnote');
+      expect(tasks[0].scheduledDate?.getFullYear()).toBe(2025);
+      expect(tasks[0].scheduledDate?.getMonth()).toBe(9);
+      expect(tasks[0].scheduledDate?.getDate()).toBe(31);
+      expect(tasks[0].deadlineDate?.getFullYear()).toBe(2025);
+      expect(tasks[0].deadlineDate?.getMonth()).toBe(10);
+      expect(tasks[0].deadlineDate?.getDate()).toBe(1);
+      
+      expect(tasks[1].state).toBe("DOING");
+      expect(tasks[1].text).toBe('another task');
+      expect(tasks[1].scheduledDate?.getFullYear()).toBe(2025);
+      expect(tasks[1].scheduledDate?.getMonth()).toBe(11);
+      expect(tasks[1].scheduledDate?.getDate()).toBe(1);
+    });
+  });
 });
 
 describe('Task parsing with code blocks', () => {

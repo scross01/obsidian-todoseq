@@ -33,6 +33,8 @@ const MATH_BLOCK_REGEX = /^\s*%%(?!.*%%).*/ // ignores open and close on same li
 const COMMENT_BLOCK_REGEX = /^\s*\$\$(?!.*\$\$).*/ // ignores open and close on same line
 // Callout block marker >
 const CALLOUT_BLOCK_REGEX = /^\s*>.*/
+// Footnote definition marker
+const FOOTNOTE_DEFINITION_REGEX = /^\[\^\d+\]:\s*/
 
 // Language code before comment - non greedy
 const CODE_PREFIX = /\s*[\s\S]*?/.source
@@ -209,6 +211,26 @@ export class TaskParser {
   }
 
   /**
+   * Build footnote regex patterns for footnote task detection
+   * @param keywords Array of task keywords
+   * @returns RegexPair for testing and capturing footnote tasks
+   */
+  private static buildFootnoteRegex(keywords: string[]): RegexPair {
+    const escapedKeywords = TaskParser.escapeKeywords(keywords);
+    
+    // Footnote pattern: [^1]: TODO task text
+    const footnotePattern = `\\[\\^\\d+\\]:\\s+`;
+    
+    const test = new RegExp(
+      `^${footnotePattern}`
+      + `(${escapedKeywords})\\s+`
+      + `(${TASK_TEXT})$`
+    );
+    const capture = test;
+    return { test, capture };
+  }
+
+  /**
    * Build code language regex patterns with customizable components
    * @param keywords Array of task keywords
    * @param languageDefinition Language specific config
@@ -217,7 +239,7 @@ export class TaskParser {
   private static buildCodeRegex(
     keywords: string[],
     languageDefinition: LanguageDefinition,
-  ): RegexPair {    
+  ): RegexPair {
 
     const escapedKeywords = TaskParser.escapeKeywords(keywords);
     
@@ -239,6 +261,43 @@ export class TaskParser {
     );
     const capture = test;
     return { test, capture };
+  }
+
+  /**
+   * Extract footnote task details from a line using footnote regex
+   * @param line The line containing the footnote task
+   * @param regex The footnote regex to use
+   * @returns Parsed footnote task details
+   */
+  private extractFootnoteTaskDetails(line: string, regex: RegExp): {
+    indent: string;
+    listMarker: string;
+    taskText: string;
+    tail: string;
+    state: string;
+  } {
+    const m = regex.exec(line);
+    if (!m) {
+      throw new Error(`Failed to parse footnote task line: ${line}`);
+    }
+
+    // For footnote regex, the structure is:
+    // m[0] is the full match
+    // m[1] is the state keyword
+    // m[2] is the task text
+    const indent = ""; // Footnotes don't have traditional indentation
+    const listMarker = ""; // Footnotes don't have list markers
+    const state = m[1];
+    const taskText = m[2];
+    const tail = "";
+
+    return {
+      indent,
+      listMarker,
+      taskText,
+      tail,
+      state,
+    };
   }
 
   /**
@@ -463,6 +522,47 @@ export class TaskParser {
       if (line.trim() == '') {
         continue;
       }
+      
+      // Check for footnote definitions first
+      if (FOOTNOTE_DEFINITION_REGEX.test(line)) {
+        const footnoteRegex = TaskParser.buildFootnoteRegex(this.allKeywords);
+        if (footnoteRegex.test.test(line)) {
+          const taskDetails = this.extractFootnoteTaskDetails(line, footnoteRegex.capture);
+          
+          // Extract priority
+          const { priority, cleanedText } = this.extractPriority(taskDetails.taskText);
+          
+          // Initialize footnote task with date fields
+          const task: Task = {
+            path,
+            line: index,
+            rawText: line,
+            indent: taskDetails.indent,
+            listMarker: taskDetails.listMarker,
+            text: cleanedText,
+            state: taskDetails.state,
+            completed: DEFAULT_COMPLETED_STATES.has(taskDetails.state),
+            priority,
+            scheduledDate: null,
+            deadlineDate: null,
+            tail: taskDetails.tail,
+          };
+
+          // Extract dates from following lines
+          const { scheduledDate, deadlineDate } = this.extractTaskDates(
+            lines,
+            index + 1,
+            taskDetails.indent,
+          );
+          
+          task.scheduledDate = scheduledDate;
+          task.deadlineDate = deadlineDate;
+
+          tasks.push(task);
+        }
+        continue;
+      }
+      
       // check for change of context
       if (CODE_BLOCK_REGEX.test(line)) {
         if (!inBlock) {
@@ -484,21 +584,21 @@ export class TaskParser {
           }
         }
         inBlock = !inBlock
-        blockMarker = inBlock ? 'code' : null  
+        blockMarker = inBlock ? 'code' : null
         continue;
       } else if (MATH_BLOCK_REGEX.test(line)) {
         inBlock = !inBlock
-        blockMarker = inBlock ? 'math' : null  
+        blockMarker = inBlock ? 'math' : null
       } else if (COMMENT_BLOCK_REGEX.test(line)) {
         inBlock = !inBlock
-        blockMarker = inBlock ? 'comment' : null  
+        blockMarker = inBlock ? 'comment' : null
       }
 
-      // Skip lines in quotes and callout blocks if disabled 
+      // Skip lines in quotes and callout blocks if disabled
       if (!this.includeCalloutBlocks && CALLOUT_BLOCK_REGEX.test(line)) {
         continue;
       }
-  
+   
       // Skip lines inside code blocks if disabled
       if (inBlock && !this.includeCodeBlocks && blockMarker === 'code' ) {
         continue;
@@ -515,7 +615,7 @@ export class TaskParser {
       }
 
       // first use the test regex to see if this line has a task
-      const useCodeRegex = inBlock && this.includeCodeBlocks && blockMarker == 'code' && this.currentLanguage 
+      const useCodeRegex = inBlock && this.includeCodeBlocks && blockMarker == 'code' && this.currentLanguage
       if (useCodeRegex && codeRegex) {
         if (!codeRegex.test.test(line)) {
           continue;
