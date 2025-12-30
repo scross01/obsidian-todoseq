@@ -35,6 +35,8 @@
 .todo-view .todo-item {
   padding: var(--size-2-2) 0;
   border-bottom: 1px solid var(--background-modifier-border, rgba(0,0,0,0.1));
+  content-visibility: auto;
+  contain-intrinsic-size: 0 100px;
 }
 
 /* Task text and completion state */
