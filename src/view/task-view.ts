@@ -1067,12 +1067,9 @@ export class TodoView extends ItemView {
     if (!input) return '';
     let out = input;
 
-    // HTML tags (repeat until all tags are removed)
-    let prev;
-    do {
-      prev = out;
-      out = out.replace(/<[^>]+>/g, '');
-    } while (out !== prev);
+    // HTML tags - use DOMParser to safely strip HTML tags
+    const doc = new DOMParser().parseFromString(out, 'text/html');
+    out = doc.body.textContent || '';
 
     // Images: ![alt](url) -> alt
     out = out.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
