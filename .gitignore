@@ -24,7 +24,6 @@ data.json
 
 # exclude local tools
 .env
-.crush
 
 # exclude coverage report
 coverage/
@@ -34,3 +33,8 @@ coverage/
 .rooignore
 .roomodes
 plans/
+
+# ignore feature planning docs
+FEAT*.md
+
+Makefile
