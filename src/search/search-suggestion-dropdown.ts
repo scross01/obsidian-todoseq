@@ -421,17 +421,31 @@ export class SearchSuggestionDropdown {
         // Manually show the prefix dropdown since we just inserted a prefix
         const prefix = suggestion; // This is already in format like "path:"
         this.showPrefixDropdown(prefix, '');
-        
     }
-    // reset the flag 
-    this.isHandlingPrefixSelection = false;
     
     // Trigger search
     const event = new Event('input', { bubbles: true });
     input.dispatchEvent(event);
     
+    // For prefix selections, keep the flag set until the next user interaction
+    // The flag will be reset when the user starts typing or makes another selection
+    if (!isPrefixSelection) {
+        // Only reset the flag if this is not a prefix selection
+        this.isHandlingPrefixSelection = false;
+    }
+    
     // Focus input
     input.focus();
+    
+    // If this was a prefix selection, set up a one-time keydown handler to reset the flag
+    // when the user starts typing after the selection
+    if (isPrefixSelection) {
+        const resetFlagOnKeyDown = (e: KeyboardEvent) => {
+            this.isHandlingPrefixSelection = false;
+            input.removeEventListener('keydown', resetFlagOnKeyDown);
+        };
+        input.addEventListener('keydown', resetFlagOnKeyDown);
+    }
 }
     
     public show(): void {
