@@ -93,11 +93,18 @@ export class SearchSuggestionDropdown {
         this.containerEl.style.top = `${topPos}px`;
     }
     
-    public async showOptionsDropdown(): Promise<void> {
+    public async showOptionsDropdown(searchTerm = ''): Promise<void> {
         this.currentPrefix = null;
-        this.currentSuggestions = [
+        const allOptions = [
             'path:', 'file:', 'tag:', 'state:', 'priority:', 'content:', 'scheduled:', 'deadline:'
         ];
+        
+        // Filter options based on search term
+        if (searchTerm) {
+            this.currentSuggestions = SearchSuggestions.filterSuggestions(searchTerm, allOptions);
+        } else {
+            this.currentSuggestions = allOptions;
+        }
         
         await this.renderDropdown();
         this.show();

@@ -402,7 +402,7 @@ export class TodoView extends ItemView {
   // Check if we should show suggestions
   if (value.length === 0) {
       // Empty input - show options dropdown
-      this.suggestionDropdown.showOptionsDropdown();
+      this.suggestionDropdown.showOptionsDropdown(value);
       return;
   }
   
@@ -428,7 +428,7 @@ export class TodoView extends ItemView {
               this.suggestionDropdown.showPrefixDropdown(prefix, searchTerm);
           } else {
               // Incomplete prefix being typed - show options dropdown if it matches the start of any prefix
-              this.suggestionDropdown.showOptionsDropdown();
+              this.suggestionDropdown.showOptionsDropdown(prefixBase);
           }
           return;
       }
