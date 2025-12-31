@@ -22,9 +22,6 @@ export class SearchSuggestionDropdown {
     this.vault = vault;
     this.tasks = tasks;
     
-    // Clear cache to ensure fresh data
-    SearchSuggestions.clearCache();
-    
     // Create dropdown container
     this.containerEl = document.createElement('div');
     this.containerEl.style.position = 'absolute';
@@ -40,6 +37,14 @@ export class SearchSuggestionDropdown {
     // Add event listeners
     this.setupEventListeners();
 }
+
+    /**
+     * Update the tasks used for generating suggestions
+     * @param tasks New task list to use for suggestions
+     */
+    public updateTasks(tasks: Task[]): void {
+        this.tasks = tasks;
+    }
     
     private setupEventListeners(): void {
         // Click outside to close - but be careful not to interfere with suggestion clicks

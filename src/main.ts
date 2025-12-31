@@ -107,6 +107,8 @@ export default class TodoTracker extends Plugin {
       if (leaf.view instanceof TodoView) {
         // Update data source
         leaf.view.tasks = this.tasks;
+        // Update the dropdown's task reference so it uses the latest tasks
+        leaf.view.updateTasks(this.tasks);
         // Lighter refresh: only update the visible list rather than full onOpen re-init
         leaf.view.refreshVisibleList();
       }

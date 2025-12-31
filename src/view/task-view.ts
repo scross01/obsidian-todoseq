@@ -470,6 +470,18 @@ export class TodoView extends ItemView {
     task.completed = !!(updated as { completed?: unknown }).completed;
   }
 
+  /**
+   * Update the task list and refresh the search suggestions dropdown
+   * @param tasks New task list
+   */
+  public updateTasks(tasks: Task[]): void {
+    this.tasks = tasks;
+    // Update the dropdown's task reference so it uses the latest tasks
+    if (this.suggestionDropdown) {
+      this.suggestionDropdown.updateTasks(tasks);
+    }
+  }
+
   getViewType() {
     return TodoView.viewType;
   }

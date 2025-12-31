@@ -381,10 +381,7 @@ describe('Search Suggestions', () => {
       expect(paths).toEqual([]); // No parent directories for single-level paths
     });
 
-    it('should cache paths from vault correctly', async () => {
-      // Clear cache first
-      SearchSuggestions.clearCache();
-      
+    it('should generate paths from vault dynamically', async () => {
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
           return [
@@ -396,40 +393,35 @@ describe('Search Suggestions', () => {
       
       const mockVault = new MockVault() as Vault;
       
-      // First call should populate cache
+      // Each call should generate fresh data
       const paths1 = await SearchSuggestions.getAllPaths(mockVault);
       expect(paths1).toContain('notes');
       expect(paths1).toContain('notes/journal');
       expect(paths1).toContain('notes/work');
       
-      // Second call should use cache (within TTL)
+      // Second call should generate the same data (since vault hasn't changed)
       const paths2 = await SearchSuggestions.getAllPaths(mockVault);
       expect(paths2).toEqual(paths1);
     });
 
-    it('should respect cache TTL', async () => {
-      // Clear cache first
-      SearchSuggestions.clearCache();
-      
+    it('should generate files from vault dynamically', async () => {
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
           return [
-            { path: 'notes/test.md' },
+            { path: 'notes/test.md', name: 'test.md' },
           ] as any;
         }
       }
       
       const mockVault = new MockVault() as Vault;
       
-      // First call
-      const paths1 = await SearchSuggestions.getAllPaths(mockVault);
+      // Each call should generate fresh data
+      const files1 = await SearchSuggestions.getAllFiles(mockVault);
+      expect(files1).toContain('test.md');
       
-      // Manually expire cache by setting lastCacheTime to past
-      (SearchSuggestions as any).lastCacheTime = Date.now() - 700; // 700ms > 600ms TTL
-      
-      // Second call should bypass cache and recompute
-      const paths2 = await SearchSuggestions.getAllPaths(mockVault);
-      expect(paths2).toEqual(paths1); // Should still be same since same vault data
+      // Second call should generate the same data (since vault hasn't changed)
+      const files2 = await SearchSuggestions.getAllFiles(mockVault);
+      expect(files2).toEqual(files1);
     });
   });
 
@@ -493,9 +485,6 @@ describe('Search Suggestions', () => {
     });
 
     it('should extract filenames from vault correctly', async () => {
-      // Clear cache first
-      SearchSuggestions.clearCache();
-      
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
           return [
@@ -519,10 +508,7 @@ describe('Search Suggestions', () => {
       expect(files).toEqual(['meeting.md', 'notes.md', 'tasks.md']);
     });
 
-    it('should cache files from vault correctly', async () => {
-      // Clear cache first
-      SearchSuggestions.clearCache();
-      
+    it('should generate files from vault dynamically', async () => {
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
           return [
@@ -533,11 +519,11 @@ describe('Search Suggestions', () => {
       
       const mockVault = new MockVault() as Vault;
       
-      // First call should populate cache
+      // Each call should generate fresh data
       const files1 = await SearchSuggestions.getAllFiles(mockVault);
       expect(files1).toContain('test.md');
       
-      // Second call should use cache (within TTL)
+      // Second call should generate the same data (since vault hasn't changed)
       const files2 = await SearchSuggestions.getAllFiles(mockVault);
       expect(files2).toEqual(files1);
     });

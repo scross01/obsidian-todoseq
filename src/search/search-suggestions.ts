@@ -7,12 +7,6 @@ import { Task } from '../task';
  */
 export class SearchSuggestions {
     
-    /** Cache for vault data to improve performance */
-    private static pathCache: string[] | null = null;
-    private static fileCache: string[] | null = null;
-    private static lastCacheTime = 0;
-    private static CACHE_TTL = 600; // 10 seconds
-    
     /**
      * Get all unique paths from tasks
      * @param tasks Array of tasks to analyze
@@ -46,14 +40,9 @@ export class SearchSuggestions {
      * @returns Array of unique paths, sorted alphabetically
      */
     static async getAllPaths(vault: Vault): Promise<string[]> {
-        // Return cached data if still valid
-        if (this.pathCache && Date.now() - this.lastCacheTime < this.CACHE_TTL) {
-            return this.pathCache;
-        }
-         
         const paths: string[] = [];
         const files = vault.getMarkdownFiles();
-         
+        
         files.forEach(file => {
             const path = file.path;
             // Extract parent directories
@@ -68,12 +57,10 @@ export class SearchSuggestions {
                 }
             }
         });
-         
+        
         // Sort alphabetically
         paths.sort((a, b) => a.localeCompare(b));
-        this.pathCache = paths;
-        this.lastCacheTime = Date.now();
-         
+        
         return paths;
     }
     
@@ -104,26 +91,19 @@ export class SearchSuggestions {
      * @returns Array of unique filenames, sorted alphabetically
      */
     static async getAllFiles(vault: Vault): Promise<string[]> {
-        // Return cached data if still valid
-        if (this.fileCache && Date.now() - this.lastCacheTime < this.CACHE_TTL) {
-            return this.fileCache;
-        }
-         
         const files: string[] = [];
         const markdownFiles = vault.getMarkdownFiles();
-         
+        
         markdownFiles.forEach(file => {
             const filename = file.name;
             if (!files.includes(filename)) {
                 files.push(filename);
             }
         });
-         
+        
         // Sort alphabetically
         files.sort((a, b) => a.localeCompare(b));
-        this.fileCache = files;
-        this.lastCacheTime = Date.now();
-         
+        
         return files;
     }
     
@@ -248,8 +228,6 @@ export class SearchSuggestions {
      * Clear cached data (useful when vault changes)
      */
     static clearCache(): void {
-        this.pathCache = null;
-        this.fileCache = null;
-        this.lastCacheTime = 0;
+        // Cache has been removed, this method is now a no-op for backward compatibility
     }
 }
