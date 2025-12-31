@@ -163,6 +163,118 @@ describe('Search Prefix Filters', () => {
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/work/tasks.md');
     });
+
+    it('should filter tasks by filename with hyphens', () => {
+      const result = testTasks.filter(task => Search.evaluate('file:star-wars', task, false));
+      expect(result.length).toBe(1);
+      expect(result[0].path).toBe('notes/star-wars.md');
+    });
+
+    it('should filter tasks by partial filename with hyphens', () => {
+      const result = testTasks.filter(task => Search.evaluate('file:star', task, false));
+      expect(result.length).toBe(1);
+      expect(result[0].path).toBe('notes/star-wars.md');
+    });
+
+    it('should filter tasks by exact filename with multiple hyphens', () => {
+      // Create a test task with a date-like filename
+      const testTask: Task = {
+        path: 'notes/2025-03-28.md',
+        line: 1,
+        rawText: 'TODO meeting on 2025-03-28',
+        indent: '',
+        listMarker: '-',
+        text: 'meeting on 2025-03-28',
+        state: 'TODO',
+        completed: false,
+        priority: null,
+        scheduledDate: null,
+        deadlineDate: null
+      };
+      
+      const result = Search.evaluate('file:2025-03-28.md', testTask, false);
+      expect(result).toBe(true);
+    });
+
+    it('should filter tasks by path with hyphens', () => {
+      // Create a test task with a path containing hyphens
+      const testTask: Task = {
+        path: 'notes/2025-meetings/project-planning.md',
+        line: 1,
+        rawText: 'TODO project planning meeting',
+        indent: '',
+        listMarker: '-',
+        text: 'project planning meeting',
+        state: 'TODO',
+        completed: false,
+        priority: null,
+        scheduledDate: null,
+        deadlineDate: null
+      };
+      
+      const result = Search.evaluate('path:2025-meetings', testTask, false);
+      expect(result).toBe(true);
+    });
+
+    it('should handle hyphens in state values', () => {
+      // Create a test task with a custom state containing hyphens
+      const testTask: Task = {
+        path: 'notes/test.md',
+        line: 1,
+        rawText: 'IN-PROGRESS task with hyphenated state',
+        indent: '',
+        listMarker: '-',
+        text: 'task with hyphenated state',
+        state: 'IN-PROGRESS',
+        completed: false,
+        priority: null,
+        scheduledDate: null,
+        deadlineDate: null
+      };
+      
+      const result = Search.evaluate('state:IN-PROGRESS', testTask, false);
+      expect(result).toBe(true);
+    });
+
+    it('should handle hyphens in priority values', () => {
+      // Create a test task with a priority containing hyphens
+      const testTask: Task = {
+        path: 'notes/test.md',
+        line: 1,
+        rawText: 'TODO task with priority #high-priority',
+        indent: '',
+        listMarker: '-',
+        text: 'task with priority',
+        state: 'TODO',
+        completed: false,
+        priority: 'high-priority',
+        scheduledDate: null,
+        deadlineDate: null
+      };
+      
+      const result = Search.evaluate('priority:high-priority', testTask, false);
+      expect(result).toBe(true);
+    });
+
+    it('should handle hyphens in content values', () => {
+      // Create a test task with content containing hyphens
+      const testTask: Task = {
+        path: 'notes/test.md',
+        line: 1,
+        rawText: 'TODO task about state-of-the-art technology',
+        indent: '',
+        listMarker: '-',
+        text: 'task about state-of-the-art technology',
+        state: 'TODO',
+        completed: false,
+        priority: null,
+        scheduledDate: null,
+        deadlineDate: null
+      };
+      
+      const result = Search.evaluate('content:state-of-the-art', testTask, false);
+      expect(result).toBe(true);
+    });
   });
 
   describe('Tag Filter', () => {

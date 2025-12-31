@@ -52,15 +52,15 @@ export class SearchTokenizer {
           }
           
           // Special handling: if this is a dash and the previous token was a prefix_value
-          // AND the previous token was a 'tag', 'scheduled', or 'deadline' prefix, merge it with the next word token
-          // to form a single prefix_value with dash (for tag names and dates with dashes)
+          // merge it with the next word token to form a single prefix_value with dash
+          // Only merge if there was no whitespace before the dash (i.e., dash is immediately after the prefix_value)
           if (type === 'not' && tokens.length > 0 && tokens[tokens.length - 1].type === 'prefix_value') {
-            // Check if the previous prefix was a 'tag' prefix by looking at the token before the prefix_value
-            const prevTokenIndex = tokens.length - 1;
-            const prefixBeforeValueIndex = prevTokenIndex - 1;
+            // Only merge if there was no whitespace before the dash
+            const prevTokenEndPos = tokens[tokens.length - 1].position + tokens[tokens.length - 1].original.length;
+            const dashStartPos = pos;
+            const hasWhitespaceBeforeDash = dashStartPos > prevTokenEndPos;
             
-            if (prefixBeforeValueIndex >= 0 && tokens[prefixBeforeValueIndex].type === 'prefix' &&
-                ['tag', 'scheduled', 'deadline'].includes(tokens[prefixBeforeValueIndex].value)) {
+            if (!hasWhitespaceBeforeDash) {
               // Look ahead to see if there's a word after the dash
               const lookaheadPos = pattern.regex.lastIndex;
               const wordPattern = /[^\s"()\-]+/y;
