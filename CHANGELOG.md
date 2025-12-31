@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.6.1
+
+- Fixed issue with file and path suggestion dropdown not showing new files.
+- Fixed issue with file and path search not handing names with hyphens correctly.
+- Added dynamic filtering of search keyword dropdown to matching keyword on text input.
+
 ## 0.6.0
 
 - Added advanced search keyword filters to match specific task attributes, e.g. `status:TODO` or `priority:high`, and enhanced the search evaluator to support complex queries with AND/OR logic,  negated search terms (`-word`, or `-priority:none`), date ranges (`scheduled:2026-01-01..2026-03-31`), and keyword combinations (e.g. `(status:DOING OR priority:high) AND tag:projectX`).
