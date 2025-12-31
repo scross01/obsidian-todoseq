@@ -415,12 +415,9 @@ export class SearchSuggestionDropdown {
         const prefix = suggestion; // This is already in format like "path:"
         this.showPrefixDropdown(prefix, '');
         
-        // Don't reset the flag automatically - let the user dismiss it explicitly
-        // The flag will be reset when the user clicks outside or selects an item
-    } else {
-        // For non-prefix selections, reset the flag immediately
-        this.isHandlingPrefixSelection = false;
     }
+    // reset the flag 
+    this.isHandlingPrefixSelection = false;
     
     // Trigger search
     const event = new Event('input', { bubbles: true });
