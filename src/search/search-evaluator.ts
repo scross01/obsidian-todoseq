@@ -224,64 +224,7 @@ export class SearchEvaluator {
    * @returns True if task matches the scheduled filter
    */
   private static evaluateScheduledFilter(value: string, task: Task, caseSensitive: boolean, settings?: TodoTrackerSettings): boolean {
-   const parsedDate = DateUtils.parseDateValue(value);
-    
-    // Handle null/undefined parsedDate
-    if (parsedDate === null || parsedDate === undefined) {
-      return false;
-    }
-    
-    // Handle 'none' case - tasks without scheduled dates
-    if (parsedDate === 'none') {
-      return !task.scheduledDate;
-    }
-    
-    // Handle tasks without scheduled dates
-    if (!task.scheduledDate) {
-      return false;
-    }
-    
-    // Handle string-based relative date expressions
-    if (typeof parsedDate === 'string') {
-      return this.evaluateDateExpression(parsedDate, task.scheduledDate, settings);
-    }
-    
-    // Handle date ranges
-    if (typeof parsedDate === 'object' && parsedDate !== null && 'start' in parsedDate && 'end' in parsedDate) {
-      return DateUtils.isDateInRange(task.scheduledDate, parsedDate.start, parsedDate.end);
-    }
-    
-    // Handle exact date comparisons with format information
-    if (typeof parsedDate === 'object' && parsedDate !== null && 'date' in parsedDate && 'format' in parsedDate) {
-      const searchDate = parsedDate.date;
-      const format = parsedDate.format;
-      const taskDate = task.scheduledDate;
-      
-      switch (format) {
-        case 'year':
-          // Year-only search (e.g., 2025) - match any date in that year
-          return searchDate.getUTCFullYear() === taskDate.getUTCFullYear();
-          
-        case 'year-month':
-          // Year-month search (e.g., 2025-11) - match any date in that month/year
-          return searchDate.getUTCFullYear() === taskDate.getUTCFullYear() &&
-                 searchDate.getUTCMonth() === taskDate.getUTCMonth();
-          
-        case 'full':
-          // Full date search (e.g., 2025-11-30) - exact date match
-          return DateUtils.compareDates(taskDate, searchDate);
-          
-        default:
-          return false;
-      }
-    }
-    
-    // Handle Date objects (from natural language parsing)
-    if (parsedDate instanceof Date) {
-      return DateUtils.compareDates(task.scheduledDate, parsedDate);
-    }
-    
-    return false;
+    return this.evaluateDateFilter(value, task.scheduledDate, settings);
   }
 
   /**
@@ -292,38 +235,48 @@ export class SearchEvaluator {
    * @returns True if task matches the deadline filter
    */
   private static evaluateDeadlineFilter(value: string, task: Task, caseSensitive: boolean, settings?: TodoTrackerSettings): boolean {
-   const parsedDate = DateUtils.parseDateValue(value);
+    return this.evaluateDateFilter(value, task.deadlineDate, settings);
+  }
+
+  /**
+   * Common date filter evaluation logic
+   * @param value Filter value
+   * @param taskDate Task date to evaluate against
+   * @param settings Application settings
+   * @returns True if task matches the date filter
+   */
+  private static evaluateDateFilter(value: string, taskDate: Date | null, settings?: TodoTrackerSettings): boolean {
+    const parsedDate = DateUtils.parseDateValue(value);
     
     // Handle null/undefined parsedDate
     if (parsedDate === null || parsedDate === undefined) {
       return false;
     }
     
-    // Handle 'none' case - tasks without deadline dates
+    // Handle 'none' case - tasks without dates
     if (parsedDate === 'none') {
-      return !task.deadlineDate;
+      return !taskDate;
     }
     
-    // Handle tasks without deadline dates
-    if (!task.deadlineDate) {
+    // Handle tasks without dates
+    if (!taskDate) {
       return false;
     }
     
     // Handle string-based relative date expressions
     if (typeof parsedDate === 'string') {
-      return this.evaluateDateExpression(parsedDate, task.deadlineDate, settings);
+      return this.evaluateDateExpression(parsedDate, taskDate, settings);
     }
     
     // Handle date ranges
     if (typeof parsedDate === 'object' && parsedDate !== null && 'start' in parsedDate && 'end' in parsedDate) {
-      return DateUtils.isDateInRange(task.deadlineDate, parsedDate.start, parsedDate.end);
+      return DateUtils.isDateInRange(taskDate, parsedDate.start, parsedDate.end);
     }
     
     // Handle exact date comparisons with format information
     if (typeof parsedDate === 'object' && parsedDate !== null && 'date' in parsedDate && 'format' in parsedDate) {
       const searchDate = parsedDate.date;
       const format = parsedDate.format;
-      const taskDate = task.deadlineDate;
       
       switch (format) {
         case 'year':
@@ -346,11 +299,12 @@ export class SearchEvaluator {
     
     // Handle Date objects (from natural language parsing)
     if (parsedDate instanceof Date) {
-      return DateUtils.compareDates(task.deadlineDate, parsedDate);
+      return DateUtils.compareDates(taskDate, parsedDate);
     }
     
     return false;
   }
+
 
   /**
    * Evaluate date expressions like 'overdue', 'today', 'tomorrow', etc.

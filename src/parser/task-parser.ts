@@ -30,7 +30,7 @@ const CODE_BLOCK_REGEX = /^\s*(```|~~~)\s*(\S+)?$/
 // Math block marker $$
 const MATH_BLOCK_REGEX = /^\s*\$\$(?!.*\$\$).*/ // ignores open and close on same line
 // Comment block marker %%
-const COMMENT_BLOCK_REGEX = /^\s*%%.*%%$|^\s*%%(?!.*%%).*/ // matches both single-line and multi-line comment blocks
+export const COMMENT_BLOCK_REGEX = /^\s*%%.*%%$|^\s*%%(?!.*%%).*/ // matches both single-line and multi-line comment blocks
 // Callout block marker >
 const CALLOUT_BLOCK_REGEX = /^\s*>.*/
 // Footnote definition marker

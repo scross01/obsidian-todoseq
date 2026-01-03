@@ -261,6 +261,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.recreateParser();
           await this.plugin.scanVault();
           await this.refreshAllTaskViews();
+          // Force refresh of visible editor decorations to apply new CSS classes
+          this.plugin.refreshVisibleEditorDecorations();
         }));
 
     // Include tasks inside comment blocks
@@ -276,6 +278,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.recreateParser();
           await this.plugin.scanVault();
           await this.refreshAllTaskViews();
+          // Force refresh of visible editor decorations to apply new CSS classes
+          this.plugin.refreshVisibleEditorDecorations();
         }));
 
     new Setting(containerEl)
