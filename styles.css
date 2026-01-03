@@ -244,6 +244,43 @@
 
 /* Settings UI - Invalid input field highlighting */
 .setting-item .todoseq-invalid-input {
-border-color: var(--error-color, #ff0000) !important;
-border-width: 2px !important;
+ border-color: var(--error-color, #ff0000) !important;
+ border-width: 2px !important;
+}
+
+/* Task keyword formatting in editor and reading view */
+.todo-keyword-formatted {
+  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  color: var(--interactive-accent);
+  font-size: inherit; /* Ensure consistent sizing */
+  border-radius: 2px; /* Subtle rounding */
+  padding: 0 2px; /* Slight padding for better appearance */
+  
+  /* Ensure it works in CodeMirror context */
+  position: relative;
+  z-index: 1;
+}
+
+/* Specific styling for CodeMirror editor */
+.cm-editor .todo-keyword-formatted {
+  /* CodeMirror uses different CSS structure */
+  display: inline;
+  vertical-align: baseline;
+}
+
+/* Specific styling for reading view */
+.markdown-preview-view .todo-keyword-formatted {
+  /* Reading view might need different specificity */
+  background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+}
+
+/* Hover effect for better UX */
+.todo-keyword-formatted:hover {
+  background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
+  text-decoration: none; /* Prevent underline on hover */
+}
+
+/* Ensure formatting works in both light and dark themes */
+:is(.cm-editor, .markdown-preview-view) .todo-keyword-formatted {
+  text-shadow: 0 0 1px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
 }

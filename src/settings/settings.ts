@@ -13,6 +13,7 @@ export interface TodoTrackerSettings {
   taskViewMode: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // controls view transformation in the task view
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
+  formatTaskKeywords: boolean; // format task keywords in editor
 }
 
 export const DefaultSettings: TodoTrackerSettings = {
@@ -27,6 +28,7 @@ export const DefaultSettings: TodoTrackerSettings = {
     enabled: true,
   },
   weekStartsOn: 'Monday', // Default to Monday as requested
+  formatTaskKeywords: true, // Default to enabled
 };
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
@@ -170,6 +172,18 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           });
       });
 
+    // Format task keywords in editor
+    new Setting(containerEl)
+      .setName('Format task keywords')
+      .setDesc('Highlight task keywords (TODO, DOING, etc.) in bold with accent color in the editor')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.formatTaskKeywords)
+        .onChange(async (value) => {
+          this.plugin.settings.formatTaskKeywords = value;
+          await this.plugin.saveSettings();
+          // Trigger formatting updates
+          this.plugin.updateTaskFormatting();
+        }));
 
     // Include tasks inside code blocks (parent setting)
     let languageToggleComponent: ToggleComponent | null = null;
@@ -195,6 +209,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.recreateParser();
           await this.plugin.scanVault();
           await this.refreshAllTaskViews();
+          // Force refresh of visible editor decorations to apply new CSS classes
+          this.plugin.refreshVisibleEditorDecorations();
         }));
 
     // Language comment support settings (dependent on includeCodeBlocks)
@@ -212,6 +228,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             this.plugin.recreateParser();
             await this.plugin.scanVault();
             await this.refreshAllTaskViews();
+            // Force refresh of visible editor decorations to apply new CSS classes
+            this.plugin.refreshVisibleEditorDecorations();
           });
       });
 

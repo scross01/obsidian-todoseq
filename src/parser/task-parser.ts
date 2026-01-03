@@ -48,7 +48,7 @@ export class TaskParser {
   private readonly includeCommentBlocks: boolean;
   private readonly languageCommentSupport: LanguageCommentSupportSettings;
   private readonly customKeywords: string[];
-  private allKeywords: string[];
+  public allKeywords: string[];
 
   // Public access to regex patterns for editor commands
   public readonly testRegex: RegExp;
@@ -240,7 +240,7 @@ export class TaskParser {
    * @param languageDefinition Language specific config
    * @returns RegexPair for testing and capturing tasks
    */
-  private static buildCodeRegex(
+  public static buildCodeRegex(
     keywords: string[],
     languageDefinition: LanguageDefinition,
   ): RegexPair {

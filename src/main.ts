@@ -4,6 +4,7 @@ import { TodoView, TaskViewMode } from "./view/task-view";
 import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
 import { TaskEditor } from './view/task-editor';
+import { taskKeywordPlugin } from './view/task-formatting';
 
 export const TASK_VIEW_ICON = "list-todo";
 
@@ -17,6 +18,9 @@ export default class TodoTracker extends Plugin {
 
   // Task editor instance for updating tasks
   private taskEditor: TaskEditor | null = null;
+
+  // Task formatting instances
+  private taskFormatters: Map<string, any> = new Map();
 
   // Shared comparator to avoid reallocation and ensure consistent ordering
   private readonly taskComparator = (a: Task, b: Task): number => {
@@ -81,6 +85,9 @@ export default class TodoTracker extends Plugin {
     await this.scanVault();
     await this.refreshOpenTaskViews();
 
+    // Setup task formatting based on current settings
+    this.setupTaskFormatting();
+
     // Set up periodic refresh
     this.setupPeriodicRefresh();
 
@@ -140,6 +147,82 @@ export default class TodoTracker extends Plugin {
   // Obsidian lifecycle method called to save settings
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  // Update task formatting in all views
+  public updateTaskFormatting(): void {
+    // Always clear existing formatters first to prevent stacking
+    this.clearTaskFormatting();
+    
+    if (!this.settings.formatTaskKeywords) {
+      // When disabling formatting, we're done after clearing
+      return;
+    }
+    
+    // Setup editor decorations
+    this.setupEditorDecorations();
+    
+    // Force refresh of all visible markdown editors to apply new formatting
+    this.refreshVisibleEditorDecorations();
+  }
+  
+  // Force refresh of editor decorations in all visible markdown editors
+  public refreshVisibleEditorDecorations(): void {
+    // Get all visible markdown editors
+    const leaves = this.app.workspace.getLeavesOfType('markdown');
+    for (const leaf of leaves) {
+      const view = leaf.view;
+      if (view instanceof MarkdownView && view.editor) {
+        // Force the editor to refresh its decorations by triggering a viewport change
+        const editorView = (view.editor as any).cm;
+        if (editorView && typeof editorView.requestMeasure === 'function') {
+          // Request a measurement update which will trigger decoration refresh
+          editorView.requestMeasure();
+        }
+        
+        // Additional force refresh: trigger a viewport change to ensure decorations are re-evaluated
+        if (editorView && typeof editorView.dispatch === 'function') {
+          // Dispatch a dummy transaction to force re-render and clear any stacked decorations
+          editorView.dispatch({
+            selection: editorView.state.selection
+          });
+          
+          // Force a second update to ensure decorations are properly applied/removed
+          setTimeout(() => {
+            if (editorView && typeof editorView.requestMeasure === 'function') {
+              editorView.requestMeasure();
+            }
+          }, 0);
+        }
+      }
+    }
+  }
+  
+  // Setup task formatting based on current settings
+  private setupTaskFormatting(): void {
+    this.updateTaskFormatting();
+  }
+
+  private setupEditorDecorations(): void {
+    // Register editor extension for all markdown editors
+    const extension = this.registerEditorExtension([
+      taskKeywordPlugin(this.settings)
+    ]);
+    this.taskFormatters.set('editor-extension', extension);
+  }
+  
+  private clearEditorDecorations(): void {
+    // Clear editor decorations by registering an empty extension
+    const emptyExtension = this.registerEditorExtension([]);
+    this.taskFormatters.set('editor-extension', emptyExtension);
+  }
+
+  
+  
+  private clearTaskFormatting(): void {
+    // Clear editor decorations
+    this.clearEditorDecorations();
+    this.taskFormatters.clear();
   }
 
   // Serialize scans to avoid overlapping runs
