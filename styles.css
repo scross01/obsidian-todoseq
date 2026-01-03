@@ -284,3 +284,11 @@
 :is(.cm-editor, .markdown-preview-view) .todo-keyword-formatted {
   text-shadow: 0 0 1px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
 }
+
+/* Completed task styling for editor view (DONE, CANCELLED, CANCELED) */
+.cm-editor [data-task-keyword="DONE"],
+.cm-editor [data-task-keyword="CANCELLED"],
+.cm-editor [data-task-keyword="CANCELED"] {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
