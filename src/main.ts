@@ -5,6 +5,7 @@ import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./s
 import { TaskParser } from './parser/task-parser';
 import { TaskEditor } from './view/task-editor';
 import { taskKeywordPlugin } from './view/task-formatting';
+import { EditorKeywordMenu } from './view/editor-keyword-menu';
 
 export const TASK_VIEW_ICON = "list-todo";
 
@@ -18,6 +19,9 @@ export default class TodoTracker extends Plugin {
 
   // Task editor instance for updating tasks
   private taskEditor: TaskEditor | null = null;
+  
+  // Editor keyword menu for right-click context menu
+  private editorKeywordMenu: EditorKeywordMenu | null = null;
 
   // Task formatting instances
   private taskFormatters: Map<string, any> = new Map();
@@ -80,6 +84,12 @@ export default class TodoTracker extends Plugin {
 
     // Initialize task editor
     this.taskEditor = new TaskEditor(this.app);
+    
+    // Initialize editor keyword menu
+    this.editorKeywordMenu = new EditorKeywordMenu(this.app, this.settings, this.taskEditor);
+    
+    // Setup right-click event handlers for task keywords
+    this.setupTaskKeywordContextMenu();
 
     // Initial scan
     await this.scanVault();
@@ -217,6 +227,84 @@ export default class TodoTracker extends Plugin {
     this.taskFormatters.set('editor-extension', emptyExtension);
   }
 
+  private setupTaskKeywordContextMenu(): void {
+    // Add event listener for right-click on task keywords
+    this.registerEvent(
+      this.app.workspace.on('file-open', (file) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          // Small delay to allow editor to fully load
+          setTimeout(() => {
+            this.addContextMenuToEditor();
+          }, 100);
+        }
+      })
+    );
+    
+    // Also add to currently active editor if any
+    this.addContextMenuToEditor();
+  }
+
+  private addContextMenuToEditor(): void {
+    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (activeView) {
+      const editorContainer = activeView.containerEl;
+      const cmEditor = editorContainer.querySelector('.cm-editor');
+      
+      if (cmEditor) {
+        cmEditor.addEventListener('contextmenu', (evt: MouseEvent) => {
+          const target = evt.target as HTMLElement;
+          
+          // Check if the right-click was on a task keyword element
+          if (target.hasAttribute('data-task-keyword')) {
+            evt.preventDefault();
+            evt.stopPropagation();
+            
+            // Get the task keyword and line information
+            const keyword = target.getAttribute('data-task-keyword');
+            const lineNumber = this.getLineNumberFromElement(target);
+            
+            if (keyword && lineNumber !== null && activeView.file) {
+              // Parse the task from the line
+              const line = activeView.editor.getLine(lineNumber);
+              const task = this.parseTaskFromLine(line, lineNumber, activeView.file.path);
+              
+              if (task) {
+                // Open the context menu
+                this.editorKeywordMenu?.openStateMenuAtMouseEvent(task, target, evt);
+              }
+            }
+          }
+        });
+      }
+    }
+  }
+
+  private getLineNumberFromElement(element: HTMLElement): number | null {
+    // Find the line number by walking up the DOM tree to find the line element
+    let currentElement: HTMLElement | null = element;
+    
+    while (currentElement && !currentElement.classList.contains('cm-line')) {
+      currentElement = currentElement.parentElement;
+    }
+    
+    if (currentElement) {
+      // Get the line number from the data-line attribute or by counting
+      const lineAttr = currentElement.getAttribute('data-line');
+      if (lineAttr) {
+        return parseInt(lineAttr, 10);
+      }
+      
+      // Alternative: count lines from the top
+      const lineElements = document.querySelectorAll('.cm-line');
+      for (let i = 0; i < lineElements.length; i++) {
+        if (lineElements[i] === currentElement) {
+          return i;
+        }
+      }
+    }
+    
+    return null;
+  }
   
   
   private clearTaskFormatting(): void {
