@@ -163,7 +163,7 @@ export class TaskKeywordDecorator {
           const endPos = line.from + keywordEnd;
           
           // Determine which CSS classes to apply based on context and settings
-         let cssClasses = 'todo-keyword-formatted';
+         let cssClasses = 'todoseq-keyword-formatted';
  
          if (this.inCodeBlock && this.settings.includeCodeBlocks) {
            cssClasses += ' code-block-task-keyword';
