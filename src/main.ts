@@ -267,14 +267,15 @@ export default class TodoTracker extends Plugin {
             // Add event listener for click events on checkboxes and task keywords
             const clickHandler = (event: MouseEvent) => {
               const target = event.target as HTMLElement;
-              
+ 
               // Handle checkbox clicks
               if (target.classList.contains('task-list-item-checkbox')) {
                 this.handleCheckboxToggle(target as HTMLInputElement);
               }
               // Handle task keyword clicks
               else if (target.classList.contains('todoseq-keyword-formatted')) {
-                this.handleTaskKeywordClick(target, view);
+                // Handle task state update with double-click detection
+                this.handleTaskKeywordClickWithDoubleClickDetection(target, view, event);
               }
             };
 
@@ -356,6 +357,49 @@ export default class TodoTracker extends Plugin {
 
     // Update the checkbox state to match the new task state
     this.updateCheckboxState(keywordElement, nextState);
+  }
+
+  /**
+   * Handle task keyword click with double-click detection
+   * Uses a timeout to determine if a second click occurs (double-click)
+   */
+  private pendingClickTimeout: number | null = null;
+  private lastClickedElement: HTMLElement | null = null;
+  private lastClickTime: number = 0;
+
+  private handleTaskKeywordClickWithDoubleClickDetection(keywordElement: HTMLElement, view: MarkdownView, event: MouseEvent): void {
+    const currentTime = Date.now();
+    const isDoubleClick = (
+      this.lastClickedElement === keywordElement &&
+      currentTime - this.lastClickTime < 300
+    );
+
+    // Clear any pending single click timeout
+    if (this.pendingClickTimeout) {
+      clearTimeout(this.pendingClickTimeout);
+      this.pendingClickTimeout = null;
+    }
+
+    // If this is a double click, don't process it - let browser handle word selection
+    if (isDoubleClick) {
+      this.lastClickedElement = null;
+      this.lastClickTime = 0;
+      return; // Don't process this as a single click
+    }
+
+    // Store the clicked element and time for double-click detection
+    this.lastClickedElement = keywordElement;
+    this.lastClickTime = currentTime;
+
+    // Set a timeout to process as single click if no second click occurs
+    this.pendingClickTimeout = window.setTimeout(() => {
+      this.pendingClickTimeout = null;
+      this.lastClickedElement = null;
+      this.lastClickTime = 0;
+      
+      // Process as single click
+      this.handleTaskKeywordClick(keywordElement, view);
+    }, 300); // Standard double-click detection window
   }
 
   /**
