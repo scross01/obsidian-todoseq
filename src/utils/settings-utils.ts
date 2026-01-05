@@ -70,7 +70,8 @@ export class SettingsChangeDetector {
         includeCodeBlocks: settings.includeCodeBlocks,
         includeCalloutBlocks: settings.includeCalloutBlocks,
         includeCommentBlocks: settings.includeCommentBlocks,
-        languageCommentSupport: settings.languageCommentSupport
+        languageCommentSupport: settings.languageCommentSupport,
+        additionalTaskKeywords: settings.additionalTaskKeywords
       });
     } catch (error) {
       console.warn('Failed to create settings fingerprint:', error);

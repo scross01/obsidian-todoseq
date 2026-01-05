@@ -157,10 +157,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
                 this.plugin.recreateParser();
                 await this.plugin.scanVault();
                 await this.refreshAllTaskViews();
+                // Force refresh of visible editor decorations to apply new keywords
+                this.plugin.refreshVisibleEditorDecorations();
               } catch (parseError) {
                 console.error('Failed to recreate parser with valid keywords:', parseError);
               }
-            } else {            
+            } else {
               // All keywords are valid, proceed normally
               this.plugin.settings.additionalTaskKeywords = parsed;
               await this.plugin.saveSettings();
@@ -168,6 +170,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               this.plugin.recreateParser();
               await this.plugin.scanVault();
               await this.refreshAllTaskViews();
+              // Force refresh of visible editor decorations to apply new keywords
+              this.plugin.refreshVisibleEditorDecorations();
             }
           });
       });
