@@ -271,8 +271,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     // Include tasks inside comment blocks
     new Setting(containerEl)
-      .setName('Include tasks inside comment blocks')
-      .setDesc('When enabled, include tasks inside multiline comment blocks ($$).')
+      .setName('Include tasks inside comments')
+      .setDesc('When enabled, include tasks inside comments (%%).')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.includeCommentBlocks)
         .onChange(async (value) => {
