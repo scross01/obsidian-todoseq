@@ -6,16 +6,16 @@ import { TaskParser } from './parser/task-parser';
 import { TaskEditor } from './view/task-editor';
 import { taskKeywordPlugin } from './view/task-formatting';
 import { EditorKeywordMenu } from './view/editor-keyword-menu';
+import { VaultScanner } from './services/vault-scanner';
 
 export const TASK_VIEW_ICON = "list-todo";
 
 export default class TodoTracker extends Plugin {
   settings: TodoTrackerSettings;
   tasks: Task[] = [];
-  refreshIntervalId: number;
 
-  // Parser instance configured from current settings
-  private parser: TaskParser | null = null;
+  // Vault scanner service for handling all vault scanning operations
+  private vaultScanner: VaultScanner | null = null;
 
   // Task editor instance for updating tasks
   private taskEditor: TaskEditor | null = null;
@@ -33,89 +33,97 @@ export default class TodoTracker extends Plugin {
   };
 
  // Obsidian lifecycle method called when the plugin is loaded.
-  async onload() {
-    await this.loadSettings();
+ async onload() {
+   await this.loadSettings();
 
-    // Register the custom view type
-    this.registerView(
-      TodoView.viewType,
-      (leaf) => new TodoView(leaf, this.tasks, this.settings.taskViewMode, this.settings)
-    );
+   // Initialize VaultScanner service
+   this.vaultScanner = new VaultScanner(this.app, this.settings, TaskParser.create(this.settings));
+   
+   // Listen to VaultScanner events
+   this.vaultScanner.on('tasks-changed', (tasks) => {
+     this.tasks = tasks;
+     this.refreshOpenTaskViews();
+   });
+   
+   // Register the custom view type
+   this.registerView(
+     TodoView.viewType,
+     (leaf) => new TodoView(leaf, this.tasks, this.settings.taskViewMode, this.settings)
+   );
  
-    // Persist view-mode changes coming from TodoView toolbars
-    const handler = async (e: Event) => {
-      const detail = (e as CustomEvent).detail as { mode: TaskViewMode };
-      if (!detail?.mode) return;
-      this.settings.taskViewMode = detail.mode;
-      await this.saveSettings();
-      await this.refreshOpenTaskViews();
-    };
-    window.addEventListener('todoseq:view-mode-change', handler);
-    this.register(() => window.removeEventListener('todoseq:view-mode-change', handler));
+   // Persist view-mode changes coming from TodoView toolbars
+   const handler = async (e: Event) => {
+     const detail = (e as CustomEvent).detail as { mode: TaskViewMode };
+     if (!detail?.mode) return;
+     this.settings.taskViewMode = detail.mode;
+     await this.saveSettings();
+     await this.refreshOpenTaskViews();
+   };
+   window.addEventListener('todoseq:view-mode-change', handler);
+   this.register(() => window.removeEventListener('todoseq:view-mode-change', handler));
  
-    this.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
-      this.showTasks();
-    });
+   this.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
+     this.showTasks();
+   });
 
-    // Add settings tab
-    this.addSettingTab(new TodoTrackerSettingTab(this.app, this));
+   // Add settings tab
+   this.addSettingTab(new TodoTrackerSettingTab(this.app, this));
 
-    // Add command to show tasks
-    this.addCommand({
-      id: 'show-todo-tasks',
-      name: 'Show TODO tasks',
-      callback: () => this.showTasks()
-    });
+   // Add command to show tasks
+   this.addCommand({
+     id: 'show-todo-tasks',
+     name: 'Show TODO tasks',
+     callback: () => this.showTasks()
+   });
 
-    // Add editor command to toggle task state
-    this.addCommand({
-      id: 'toggle-task-state',
-      name: 'Toggle task state',
-      editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
-        return this.handleToggleTaskState(checking, editor, view);
-      },
-      hotkeys: [
-        {
-          modifiers: ['Ctrl'],
-          key: 'Enter'
-        }
-      ]
-    });
+   // Add editor command to toggle task state
+   this.addCommand({
+     id: 'toggle-task-state',
+     name: 'Toggle task state',
+     editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
+       return this.handleToggleTaskState(checking, editor, view);
+     },
+     hotkeys: [
+       {
+         modifiers: ['Ctrl'],
+         key: 'Enter'
+       }
+     ]
+   });
 
-    // Initialize task editor
-    this.taskEditor = new TaskEditor(this.app);
-    
-    // Initialize editor keyword menu
-    this.editorKeywordMenu = new EditorKeywordMenu(this.app, this.settings, this.taskEditor);
-    
-    // Setup right-click event handlers for task keywords
-    this.setupTaskKeywordContextMenu();
+   // Initialize task editor
+   this.taskEditor = new TaskEditor(this.app);
+   
+   // Initialize editor keyword menu
+   this.editorKeywordMenu = new EditorKeywordMenu(this.app, this.settings, this.taskEditor);
+   
+   // Setup right-click event handlers for task keywords
+   this.setupTaskKeywordContextMenu();
 
-    // Initial scan
-    await this.scanVault();
-    await this.refreshOpenTaskViews();
+   // Initial scan using VaultScanner
+   await this.vaultScanner.scanVault();
 
-    // Setup task formatting based on current settings
-    this.setupTaskFormatting();
+   // Setup task formatting based on current settings
+   this.setupTaskFormatting();
 
-    // Set up periodic refresh
-    this.setupPeriodicRefresh();
+   // Set up periodic refresh using VaultScanner
+   this.vaultScanner.setupPeriodicRefresh(this.settings.refreshInterval);
 
-    // Register file change events
-    this.registerEvent(
-      this.app.vault.on('modify', (file) => this.handleFileChange(file))
-    );
-    this.registerEvent(
-      this.app.vault.on('delete', (file) => this.handleFileChange(file))
-    );
-    this.registerEvent(
-      this.app.vault.on('create', (file) => this.handleFileChange(file))
-    );
-    this.registerEvent(
-      // Obsidian passes (file, oldPath) for rename
-      this.app.vault.on('rename', (file, oldPath) => this.handleFileRename(file, oldPath))
-    );
-  }
+   // Register file change events that delegate to VaultScanner
+   this.registerEvent(
+     this.app.vault.on('modify', (file) => this.vaultScanner?.handleFileChange(file))
+   );
+   this.registerEvent(
+     this.app.vault.on('delete', (file) => this.vaultScanner?.handleFileChange(file))
+   );
+   this.registerEvent(
+     this.app.vault.on('create', (file) => this.vaultScanner?.handleFileChange(file))
+   );
+   this.registerEvent(
+     // Obsidian passes (file, oldPath) for rename
+     this.app.vault.on('rename', (file, oldPath) => this.vaultScanner?.handleFileRename(file, oldPath))
+   );
+ }
 
   // Helper: refresh all open Todo views to reflect this.tasks without stealing focus
   private async refreshOpenTaskViews(): Promise<void> {
@@ -134,7 +142,8 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called when the plugin is unloaded
   onunload() {
-    window.clearInterval(this.refreshIntervalId);
+    // Clean up VaultScanner resources
+    this.vaultScanner?.destroy();
   }
 
   // Obsidian lifecycle method called to settings are loaded
@@ -145,13 +154,31 @@ export default class TodoTracker extends Plugin {
     if (!this.settings.additionalTaskKeywords) {
       this.settings.additionalTaskKeywords = [];
     }
-    // Recreate parser whenever settings are loaded (keywords may have changed)
-    this.recreateParser();
+    // Update VaultScanner with new settings if it exists
+    if (this.vaultScanner) {
+      this.vaultScanner.updateSettings(this.settings);
+    }
   }
 
-  // Public method to recreate the parser with current settings
+  // Public method to update parser in VaultScanner with current settings
   public recreateParser(): void {
-    this.parser = TaskParser.create(this.settings);
+    if (this.vaultScanner) {
+      this.vaultScanner.updateParser(TaskParser.create(this.settings));
+    }
+  }
+  
+  // Public method to trigger a vault scan using VaultScanner
+  public async scanVault(): Promise<void> {
+    if (this.vaultScanner) {
+      await this.vaultScanner.scanVault();
+    }
+  }
+  
+  // Public method to update periodic refresh using VaultScanner
+  public setupPeriodicRefresh(): void {
+    if (this.vaultScanner) {
+      this.vaultScanner.setupPeriodicRefresh(this.settings.refreshInterval);
+    }
   }
 
   // Obsidian lifecycle method called to save settings
@@ -313,124 +340,9 @@ export default class TodoTracker extends Plugin {
     this.taskFormatters.clear();
   }
 
+
   // Serialize scans to avoid overlapping runs
   private _isScanning = false;
-
-  // Run a regular refresh of the vault based on the refresh inerval
-  setupPeriodicRefresh() {
-    // Clear any previous interval
-    window.clearInterval(this.refreshIntervalId);
-
-    // Use a serialized async tick to avoid overlap and unhandled rejections
-    this.refreshIntervalId = window.setInterval(async () => {
-      if (this._isScanning) return;
-      this._isScanning = true;
-      try {
-        await this.scanVault();
-        await this.refreshOpenTaskViews(); // will now perform lighter refresh
-      } catch (err) {
-        console.error('TODOseq periodic scan error', err);
-      } finally {
-        this._isScanning = false;
-      }
-    }, this.settings.refreshInterval * 1000);
-  }
-
-  // Yield a frame to keep UI responsive during long operations
-  private async yieldToEventLoop(): Promise<void> {
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-  }
-
-  // Scan the Obsidian Vault for tasks
-  async scanVault() {
-    if (this._isScanning) return;
-    this._isScanning = true;
-    try {
-      this.tasks = [];
-      const files = this.app.vault.getFiles();
-
-      // Yield configuration: how often to yield a frame while scanning
-      const YIELD_EVERY_FILES = 20;
-      let processedMd = 0;
-
-      for (const file of files) {
-        if (file.extension === 'md') {
-          await this.scanFile(file);
-          processedMd++;
-
-          if (processedMd % YIELD_EVERY_FILES === 0) {
-            // Yield to the event loop to keep UI responsive during large scans
-            await this.yieldToEventLoop();
-          }
-        }
-      }
-      // Default sort
-      this.tasks.sort(this.taskComparator);
-    } finally {
-      this._isScanning = false;
-    }
-  }
-
-  // Scan a single file for tasks
-  async scanFile(file: TFile) {
-    const content = await this.app.vault.read(file);
-
-    if (!this.parser) {
-      // Lazily create if not already set (should be set by loadSettings)
-      this.parser = TaskParser.create(this.settings);
-    }
-
-    const parsed = this.parser.parseFile(content, file.path);
-    this.tasks.push(...parsed);
-  }
-
-  // Handle file change, rescan for tasks
-  async handleFileChange(file: TAbstractFile) {
-    try {
-      // Only process Markdown files
-      if (!(file instanceof TFile) || file.extension !== 'md') return;
-
-      // Remove existing tasks for this file (path-safe even if file was deleted/renamed)
-      this.tasks = this.tasks.filter(task => task.path !== file.path);
-
-      // Check if the file still exists before attempting to read it (delete events)
-      const stillExists = this.app.vault.getAbstractFileByPath(file.path) instanceof TFile;
-      if (stillExists) {
-        // Re-scan the file
-        await this.scanFile(file);
-      }
-
-      // Maintain default sort after incremental updates
-      this.tasks.sort(this.taskComparator);
-
-      // Refresh all open TodoView leaves (lighter refresh)
-      await this.refreshOpenTaskViews();
-    } catch (err) {
-      console.error('TODOseq handleFileChange error', err);
-      // Best-effort UI refresh so view doesn't get stuck
-      try { await this.refreshOpenTaskViews(); } catch (_) {}
-    }
-  }
-
-  // Handle rename: remove tasks for the old path, then scan the new file location and refresh views.
-  private async handleFileRename(file: TAbstractFile, oldPath: string) {
-    try {
-      // Remove existing tasks for the old path
-      this.tasks = this.tasks.filter(t => t.path !== oldPath);
-      
-      // If the file still exists (it should after rename), scan it at its new location
-      if (file instanceof TFile) {
-        await this.scanFile(file);
-      }
-      
-      // Keep sorted state
-      this.tasks.sort(this.taskComparator);
-      await this.refreshOpenTaskViews(); // lighter refresh
-    } catch (err) {
-      console.error('TODOseq handleFileRename error', err);
-      try { await this.refreshOpenTaskViews(); } catch (_) {}
-    }
-  }
   
   // Show tasks in the task view
   async showTasks() {
@@ -466,7 +378,7 @@ export default class TodoTracker extends Plugin {
    * @returns boolean indicating if the command is available
    */
   private handleToggleTaskState(checking: boolean, editor: Editor, view: MarkdownView): boolean {
-    if (!this.taskEditor) {
+    if (!this.taskEditor || !this.vaultScanner) {
       return false;
     }
 
@@ -474,8 +386,9 @@ export default class TodoTracker extends Plugin {
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
     
-    // Check if this line contains a valid task
-    if (!this.parser?.testRegex.test(line)) {
+    // Check if this line contains a valid task using VaultScanner's parser
+    const parser = this.vaultScanner.getParser();
+    if (!parser?.testRegex.test(line)) {
       return false;
     }
 
@@ -502,11 +415,16 @@ export default class TodoTracker extends Plugin {
    * @returns Parsed Task object or null if not a valid task
    */
   private parseTaskFromLine(line: string, lineNumber: number, filePath: string): Task | null {
-    if (!this.parser) {
+    if (!this.vaultScanner) {
       return null;
     }
 
-    const match = this.parser.captureRegex.exec(line);
+    const parser = this.vaultScanner.getParser();
+    if (!parser) {
+      return null;
+    }
+
+    const match = parser.captureRegex.exec(line);
     if (!match) {
       return null;
     }
@@ -520,7 +438,7 @@ export default class TodoTracker extends Plugin {
 
     // Extract priority
     let priority: 'high' | 'med' | 'low' | null = null;
-    const cleanedText = taskText.replace(/(\s*)\[#([ABC])\](\s*)/, (match, before, letter, after) => {
+    const cleanedText = taskText.replace(/(\s*)\[#([ABC])\](\s*)/, (match: string, before: string, letter: string, after: string) => {
       if (letter === 'A') priority = 'high';
       else if (letter === 'B') priority = 'med';
       else if (letter === 'C') priority = 'low';
