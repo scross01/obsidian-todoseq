@@ -75,6 +75,19 @@ export class TodoView extends ItemView {
     this.contentEl.setAttr('data-sort-method', method);
   }
 
+  /**
+   * Filter tasks based on view mode
+   * @param tasks Array of all tasks
+   * @param mode Current view mode
+   * @returns Filtered tasks array
+   */
+  private filterTasksByViewMode(tasks: Task[], mode: TaskViewMode): Task[] {
+    if (mode === 'hideCompleted') {
+      return tasks.filter(t => !t.completed);
+    }
+    return tasks.slice(); // Return copy for other modes
+  }
+
   /** Non-mutating transform for rendering */
   private transformForView(tasks: Task[], mode: TaskViewMode): Task[] {
     let transformed = tasks.slice();
@@ -361,7 +374,8 @@ export class TodoView extends ItemView {
         inputEl,
         this.app.vault,
         this.tasks,
-        this.settings
+        this.settings,
+        this.getViewMode()
       );
       
       this.optionsDropdown = new (optionsModule as any).SearchOptionsDropdown(
@@ -898,7 +912,8 @@ export class TodoView extends ItemView {
     // Update search results info
     const searchResultsCount = container.querySelector('.search-results-result-count');
     if (searchResultsCount) {
-      searchResultsCount.setText(`${visible.length} of ${allTasks.length} task` + (allTasks.length === 1 ? '' : 's'));
+      const filteredAllTasks = this.filterTasksByViewMode(allTasks, mode);
+      searchResultsCount.setText(`${visible.length} of ${filteredAllTasks.length} task` + (filteredAllTasks.length === 1 ? '' : 's'));
     }
 
     // Display search error if present

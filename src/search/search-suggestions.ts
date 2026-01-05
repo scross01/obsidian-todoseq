@@ -1,19 +1,87 @@
 import { Vault } from 'obsidian';
 import { Task } from '../task';
 import { TodoTrackerSettings } from '../settings/settings';
+import { TaskViewMode } from '../view/task-view';
 
 /**
  * Utility class for collecting and filtering search suggestions
  * Provides data for the prefix filter autocomplete dropdown
  */
 export class SearchSuggestions {
-    
+
+    /**
+     * Filter tasks based on view mode
+     * @param tasks Array of tasks to filter
+     * @param mode Current view mode
+     * @returns Filtered tasks array
+     */
+    private static filterTasksByViewMode(tasks: Task[], mode: TaskViewMode): Task[] {
+        if (mode === 'hideCompleted') {
+            return tasks.filter(t => !t.completed);
+        }
+        return tasks.slice(); // Return copy for other modes
+    }
+
+    /**
+     * Get files that have at least one non-completed task
+     * @param tasks Array of tasks to analyze
+     * @param mode Current view mode
+     * @returns Set of file paths that have non-completed tasks
+     */
+    private static getFilesWithNonCompletedTasks(tasks: Task[], mode: TaskViewMode): Set<string> {
+        if (mode !== 'hideCompleted') {
+            // For other modes, include all files
+            const allFiles = new Set<string>();
+            tasks.forEach(task => allFiles.add(task.path));
+            return allFiles;
+        }
+
+        // For hideCompleted mode, only include files with non-completed tasks
+        const filesWithNonCompleted = new Set<string>();
+        const filteredTasks = this.filterTasksByViewMode(tasks, mode);
+        filteredTasks.forEach(task => filesWithNonCompleted.add(task.path));
+        return filesWithNonCompleted;
+    }
+
     /**
      * Get all unique paths from tasks
      * @param tasks Array of tasks to analyze
+     * @param mode Current view mode (optional)
      * @returns Array of unique paths, sorted alphabetically
      */
-    static getAllPathsFromTasks(tasks: Task[]): string[] {
+    static getAllPathsFromTasks(tasks: Task[], mode?: TaskViewMode): string[] {
+        const pathsSet = new Set<string>();
+        
+        // Get files that should be included based on view mode
+        const filesToInclude = mode ? this.getFilesWithNonCompletedTasks(tasks, mode) : new Set(tasks.map(t => t.path));
+        
+        tasks.forEach(task => {
+            // Only process tasks from files that should be included
+            if (mode && !filesToInclude.has(task.path)) {
+                return;
+            }
+            
+            const path = task.path;
+            // Extract parent directories
+            const parts = path.split('/');
+            if (parts.length > 1) {
+                // Add full path segments (without trailing slashes for display)
+                for (let i = 1; i < parts.length; i++) {
+                    const segment = parts.slice(0, i).join('/');
+                    if (!pathsSet.has(segment)) {
+                        pathsSet.add(segment);
+                    }
+                }
+            }
+        });
+        
+        // Convert to array and sort alphabetically
+        const paths = Array.from(pathsSet);
+        paths.sort((a, b) => a.localeCompare(b));
+        return paths;
+    }
+
+    /**
         const pathsSet = new Set<string>();
          
         tasks.forEach(task => {
@@ -68,18 +136,27 @@ export class SearchSuggestions {
     /**
      * Get all unique filenames from tasks
      * @param tasks Array of tasks to analyze
+     * @param mode Current view mode (optional)
      * @returns Array of unique filenames, sorted alphabetically
      */
-    static getAllFilesFromTasks(tasks: Task[]): string[] {
+    static getAllFilesFromTasks(tasks: Task[], mode?: TaskViewMode): string[] {
         const filesSet = new Set<string>();
-         
+        
+        // Get files that should be included based on view mode
+        const filesToInclude = mode ? this.getFilesWithNonCompletedTasks(tasks, mode) : new Set(tasks.map(t => t.path));
+        
         tasks.forEach(task => {
+            // Only process tasks from files that should be included
+            if (mode && !filesToInclude.has(task.path)) {
+                return;
+            }
+            
             // Extract filename from path
             const parts = task.path.split('/');
             const filename = parts[parts.length - 1];
             filesSet.add(filename);
         });
-         
+        
         // Convert to array and sort alphabetically
         const files = Array.from(filesSet);
         files.sort((a, b) => a.localeCompare(b));
@@ -111,16 +188,23 @@ export class SearchSuggestions {
     /**
      * Extract all unique tags from tasks
      * @param tasks Array of tasks to analyze
+     * @param mode Current view mode (optional)
      * @returns Array of unique tags, sorted alphabetically
      */
-    static getAllTags(tasks: Task[]): string[] {
+    static getAllTags(tasks: Task[], mode?: TaskViewMode): string[] {
         const tagsSet = new Set<string>();
         // Comprehensive tag regex that matches #tag, #multi-word-tag, etc.
-        // Must come after URLs to avoid conflicts with URLs containing #
-        const tagRegex = /#([^\s\)\]\}\>]+)/g;
+        // Improved to avoid matching # characters within URLs
+        // Negative lookbehind to ensure # is not preceded by common URL characters
+        const tagRegex = /(?<![\/\:\.])#([^\s\)\]\}\>]+)/g;
         
-        tasks.forEach(task => {
+        // Filter tasks based on view mode
+        const filteredTasks = mode ? this.filterTasksByViewMode(tasks, mode) : tasks;
+        
+        filteredTasks.forEach(task => {
             if (task.rawText) {
+                // Reset regex for each task to avoid global state issues
+                tagRegex.lastIndex = 0;
                 let matches;
                 while ((matches = tagRegex.exec(task.rawText)) !== null) {
                     const tag = matches[1]; // Get the captured group
@@ -176,12 +260,16 @@ export class SearchSuggestions {
     /**
      * Extract all unique scheduled dates from tasks
      * @param tasks Array of tasks to analyze
+     * @param mode Current view mode (optional)
      * @returns Array of unique scheduled dates in YYYY-MM-DD format, sorted chronologically
      */
-    static getScheduledDateSuggestions(tasks: Task[]): string[] {
+    static getScheduledDateSuggestions(tasks: Task[], mode?: TaskViewMode): string[] {
       const datesSet = new Set<string>();
       
-      tasks.forEach(task => {
+      // Filter tasks based on view mode
+      const filteredTasks = mode ? this.filterTasksByViewMode(tasks, mode) : tasks;
+      
+      filteredTasks.forEach(task => {
         if (task.scheduledDate) {
           const dateStr = task.scheduledDate.toISOString().split('T')[0];
           datesSet.add(dateStr);
@@ -197,12 +285,16 @@ export class SearchSuggestions {
     /**
      * Extract all unique deadline dates from tasks
      * @param tasks Array of tasks to analyze
+     * @param mode Current view mode (optional)
      * @returns Array of unique deadline dates in YYYY-MM-DD format, sorted chronologically
      */
-    static getDeadlineDateSuggestions(tasks: Task[]): string[] {
+    static getDeadlineDateSuggestions(tasks: Task[], mode?: TaskViewMode): string[] {
       const datesSet = new Set<string>();
       
-      tasks.forEach(task => {
+      // Filter tasks based on view mode
+      const filteredTasks = mode ? this.filterTasksByViewMode(tasks, mode) : tasks;
+      
+      filteredTasks.forEach(task => {
         if (task.deadlineDate) {
           const dateStr = task.deadlineDate.toISOString().split('T')[0];
           datesSet.add(dateStr);

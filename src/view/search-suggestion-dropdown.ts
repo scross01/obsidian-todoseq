@@ -2,6 +2,7 @@ import { Vault } from 'obsidian';
 import { Task } from '../task';
 import { SearchSuggestions } from '../search/search-suggestions';
 import { TodoTrackerSettings } from '../settings/settings';
+import { TaskViewMode } from './task-view';
 
 /**
  * Dropdown component for search prefix filter suggestions
@@ -13,6 +14,7 @@ export class SearchSuggestionDropdown {
     private vault: Vault;
     private tasks: Task[];
     private settings: TodoTrackerSettings;
+    private viewMode: TaskViewMode;
     private currentSuggestions: string[] = [];
     private selectedIndex = -1;
     private currentPrefix: string | null = null;
@@ -20,11 +22,12 @@ export class SearchSuggestionDropdown {
     public isHandlingPrefixSelection = false;
     private justSelected = false;
     
-    constructor(inputEl: HTMLInputElement, vault: Vault, tasks: Task[], settings: TodoTrackerSettings) {
+    constructor(inputEl: HTMLInputElement, vault: Vault, tasks: Task[], settings: TodoTrackerSettings, viewMode: TaskViewMode) {
         this.inputEl = inputEl;
         this.vault = vault;
         this.tasks = tasks;
         this.settings = settings;
+        this.viewMode = viewMode;
 
         // Create dropdown container
         this.containerEl = document.createElement('div');
@@ -131,7 +134,7 @@ export class SearchSuggestionDropdown {
             case 'path':
                 // Use task-based method if tasks are available, otherwise fallback to vault scan
                 if (this.tasks && this.tasks.length > 0) {
-                    allSuggestions = SearchSuggestions.getAllPathsFromTasks(this.tasks);
+                    allSuggestions = SearchSuggestions.getAllPathsFromTasks(this.tasks, this.viewMode);
                 } else {
                     allSuggestions = await SearchSuggestions.getAllPaths(this.vault);
                 }
@@ -139,13 +142,13 @@ export class SearchSuggestionDropdown {
             case 'file':
                 // Use task-based method if tasks are available, otherwise fallback to vault scan
                 if (this.tasks && this.tasks.length > 0) {
-                    allSuggestions = SearchSuggestions.getAllFilesFromTasks(this.tasks);
+                    allSuggestions = SearchSuggestions.getAllFilesFromTasks(this.tasks, this.viewMode);
                 } else {
                     allSuggestions = await SearchSuggestions.getAllFiles(this.vault);
                 }
                 break;
             case 'tag':
-                allSuggestions = SearchSuggestions.getAllTags(this.tasks);
+                allSuggestions = SearchSuggestions.getAllTags(this.tasks, this.viewMode);
                 break;
             case 'state':
                 allSuggestions = SearchSuggestions.getAllStates(this.settings);
@@ -157,7 +160,7 @@ export class SearchSuggestionDropdown {
                 // For scheduled dates, show both standard date suggestions and actual scheduled dates from tasks
                 const scheduledSuggestions = SearchSuggestions.getDateSuggestions();
                 const taskScheduledDates = this.tasks && this.tasks.length > 0
-                    ? SearchSuggestions.getScheduledDateSuggestions(this.tasks)
+                    ? SearchSuggestions.getScheduledDateSuggestions(this.tasks, this.viewMode)
                     : [];
                 allSuggestions = [...scheduledSuggestions, ...taskScheduledDates];
                 break;
@@ -165,7 +168,7 @@ export class SearchSuggestionDropdown {
                 // For deadlines, show both standard date suggestions and actual deadline dates from tasks
                 const deadlineSuggestions = SearchSuggestions.getDateSuggestions();
                 const taskDeadlineDates = this.tasks && this.tasks.length > 0
-                    ? SearchSuggestions.getDeadlineDateSuggestions(this.tasks)
+                    ? SearchSuggestions.getDeadlineDateSuggestions(this.tasks, this.viewMode)
                     : [];
                 allSuggestions = [...deadlineSuggestions, ...taskDeadlineDates];
                 break;
