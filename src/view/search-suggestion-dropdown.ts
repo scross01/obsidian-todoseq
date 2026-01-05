@@ -1,6 +1,6 @@
 import { Vault } from 'obsidian';
 import { Task } from '../task';
-import { SearchSuggestions } from './search-suggestions';
+import { SearchSuggestions } from '../search/search-suggestions';
 import { TodoTrackerSettings } from '../settings/settings';
 
 /**

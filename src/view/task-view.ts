@@ -4,8 +4,8 @@ import { TaskEditor } from './task-editor';
 import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from '../task';
 import { DateUtils } from './date-utils';
 import { Search } from '../search/search';
-import { SearchOptionsDropdown } from '../search/search-options-dropdown';
-import { SearchSuggestionDropdown } from '../search/search-suggestion-dropdown';
+import { SearchOptionsDropdown } from './search-options-dropdown';
+import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
 import { TodoTrackerSettings } from '../settings/settings';
 
 
@@ -354,17 +354,17 @@ export class TodoView extends ItemView {
     
     // Import both dropdown classes dynamically to avoid circular dependencies
     Promise.all([
-      import('../search/search-options-dropdown'),
-      import('../search/search-suggestion-dropdown')
+      import('./search-options-dropdown'),
+      import('./search-suggestion-dropdown')
     ]).then(([optionsModule, suggestionsModule]) => {
-      this.suggestionDropdown = new suggestionsModule.SearchSuggestionDropdown(
+      this.suggestionDropdown = new (suggestionsModule as any).SearchSuggestionDropdown(
         inputEl,
         this.app.vault,
         this.tasks,
         this.settings
       );
       
-      this.optionsDropdown = new optionsModule.SearchOptionsDropdown(
+      this.optionsDropdown = new (optionsModule as any).SearchOptionsDropdown(
         inputEl,
         this.app.vault,
         this.tasks,
