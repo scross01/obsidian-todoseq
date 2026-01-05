@@ -272,7 +272,7 @@ describe('Date Search Filters', () => {
         state: 'TODO',
         completed: false,
         priority: null,
-        scheduledDate: new Date(`${currentYear}-01-15`),
+        scheduledDate: new Date(`2025-01-15`),
         deadlineDate: null
       };
       
@@ -286,12 +286,12 @@ describe('Date Search Filters', () => {
         state: 'TODO',
         completed: false,
         priority: null,
-        scheduledDate: new Date(`${currentYear}-01-25`),
+        scheduledDate: new Date(`2025-01-25`),
         deadlineDate: null
       };
       
       const allTasks = [...testTasks, rangeTask1, rangeTask2];
-      const query = `scheduled:${currentYear}-01-01..${currentYear}-01-31`;
+      const query = `scheduled:2025-01-01..2025-01-31`;
       const node = SearchParser.parse(query);
       
       const results = allTasks.filter(task => SearchEvaluator.evaluate(node, task, false));

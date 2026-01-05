@@ -4,6 +4,7 @@ import { TaskEditor } from './task-editor';
 import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from '../task';
 import { DateUtils } from './date-utils';
 import { Search } from '../search/search';
+import { SearchOptionsDropdown } from '../search/search-options-dropdown';
 import { SearchSuggestionDropdown } from '../search/search-suggestion-dropdown';
 import { TodoTrackerSettings } from '../settings/settings';
 
@@ -21,6 +22,7 @@ export class TodoView extends ItemView {
   private _searchKeyHandler: ((e: KeyboardEvent) => void) | undefined;
   private isCaseSensitive = false;
   private searchError: string | null = null;
+  private optionsDropdown: SearchOptionsDropdown | null = null;
   private suggestionDropdown: SearchSuggestionDropdown | null = null;
 
   constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode, private settings: TodoTrackerSettings) {
@@ -345,18 +347,29 @@ export class TodoView extends ItemView {
     this.searchInputEl = inputEl;
   }
 
-  /** Setup search suggestion dropdown for prefix filter autocomplete */
+  /** Setup search suggestion dropdowns for prefix filter autocomplete */
   private setupSearchSuggestions(): void {
     const inputEl = this.searchInputEl;
     if (!inputEl) return;
     
-    // Import the SearchSuggestionDropdown class dynamically to avoid circular dependencies
-    import('../search/search-suggestion-dropdown').then(module => {
-      this.suggestionDropdown = new module.SearchSuggestionDropdown(
+    // Import both dropdown classes dynamically to avoid circular dependencies
+    Promise.all([
+      import('../search/search-options-dropdown'),
+      import('../search/search-suggestion-dropdown')
+    ]).then(([optionsModule, suggestionsModule]) => {
+      this.suggestionDropdown = new suggestionsModule.SearchSuggestionDropdown(
         inputEl,
         this.app.vault,
         this.tasks,
         this.settings
+      );
+      
+      this.optionsDropdown = new optionsModule.SearchOptionsDropdown(
+        inputEl,
+        this.app.vault,
+        this.tasks,
+        this.settings,
+        this.suggestionDropdown
       );
       
       // Input event handler for dropdown triggering
@@ -369,33 +382,23 @@ export class TodoView extends ItemView {
         this.handleSearchFocus();
       });
       
-      // Blur event handler
-      inputEl.addEventListener('blur', () => {
-        // Small delay to allow click events to process
-        setTimeout(() => {
-          if (this.suggestionDropdown) {
-            // Don't hide if we're handling a prefix selection
-            if (!this.suggestionDropdown.isHandlingPrefixSelection) {
-              this.suggestionDropdown.hide();
-            }
-          }
-        }, 200);
-      });
-      
       // Keydown event handler
       inputEl.addEventListener('keydown', (e) => {
-        if (this.suggestionDropdown && this.suggestionDropdown.handleKeyDown(e)) {
+        if (this.optionsDropdown && this.optionsDropdown.handleKeyDown(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+        } else if (this.suggestionDropdown && this.suggestionDropdown.handleKeyDown(e)) {
           e.preventDefault();
           e.stopPropagation();
         }
       });
     }).catch(error => {
-      console.error('Failed to load search suggestion dropdown:', error);
+      console.error('Failed to load search suggestion dropdowns:', error);
     });
   }
 
   private handleSearchInputForSuggestions(): void {
-  if (!this.searchInputEl || !this.suggestionDropdown) return;
+  if (!this.searchInputEl || !this.optionsDropdown || !this.suggestionDropdown) return;
   
   const value = this.searchInputEl.value;
   const cursorPos = this.searchInputEl.selectionStart ?? 0;
@@ -403,7 +406,8 @@ export class TodoView extends ItemView {
   // Check if we should show suggestions
   if (value.length === 0) {
       // Empty input - show options dropdown
-      this.suggestionDropdown.showOptionsDropdown(value);
+      this.optionsDropdown.showOptionsDropdown(value);
+      this.suggestionDropdown.hide();
       return;
   }
   
@@ -427,9 +431,11 @@ export class TodoView extends ItemView {
               // Complete prefix with colon - show filtered suggestions
               const prefix = prefixBase + ':';
               this.suggestionDropdown.showPrefixDropdown(prefix, searchTerm);
+              this.optionsDropdown.hide();
           } else {
               // Incomplete prefix being typed - show options dropdown if it matches the start of any prefix
-              this.suggestionDropdown.showOptionsDropdown(prefixBase);
+              this.optionsDropdown.showOptionsDropdown(prefixBase);
+              this.suggestionDropdown.hide();
           }
           return;
       }
@@ -438,24 +444,27 @@ export class TodoView extends ItemView {
   // Check if cursor is at end of text that ends with space
   if (cursorPos === value.length && value.endsWith(' ')) {
       // Show options dropdown
-      this.suggestionDropdown.showOptionsDropdown();
+      this.optionsDropdown.showOptionsDropdown();
+      this.suggestionDropdown.hide();
       return;
   }
   
   // No suggestions to show, but check if we're handling a prefix selection
-  if (!this.suggestionDropdown.isHandlingPrefixSelection) {
+  if (!this.optionsDropdown.isHandlingPrefixSelection && !this.suggestionDropdown.isHandlingPrefixSelection) {
+      this.optionsDropdown.hide();
       this.suggestionDropdown.hide();
   }
 }
 
   private handleSearchFocus(): void {
-    if (!this.searchInputEl || !this.suggestionDropdown) return;
+    if (!this.searchInputEl || !this.optionsDropdown || !this.suggestionDropdown) return;
     
     const value = this.searchInputEl.value;
     
     if (value.length === 0) {
         // Show options dropdown when focusing empty input
-        this.suggestionDropdown.showOptionsDropdown();
+        this.optionsDropdown.showOptionsDropdown();
+        this.suggestionDropdown.hide();
     }
   }
 
@@ -477,7 +486,10 @@ export class TodoView extends ItemView {
    */
   public updateTasks(tasks: Task[]): void {
     this.tasks = tasks;
-    // Update the dropdown's task reference so it uses the latest tasks
+    // Update the dropdowns' task reference so they use the latest tasks
+    if (this.optionsDropdown) {
+      this.optionsDropdown.updateTasks(tasks);
+    }
     if (this.suggestionDropdown) {
       this.suggestionDropdown.updateTasks(tasks);
     }
@@ -1296,7 +1308,11 @@ export class TodoView extends ItemView {
      this._searchKeyHandler = undefined;
    }
    
-   // Cleanup suggestion dropdown
+   // Cleanup suggestion dropdowns
+   if (this.optionsDropdown) {
+     this.optionsDropdown.cleanup();
+     this.optionsDropdown = null;
+   }
    if (this.suggestionDropdown) {
      this.suggestionDropdown.cleanup();
      this.suggestionDropdown = null;

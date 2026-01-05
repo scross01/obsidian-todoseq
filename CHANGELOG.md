@@ -3,6 +3,7 @@
 ## 0.6.2
 
 - Fixed issue with custom keywords not shown in search suggestions. #12
+- Fixed issue with search suggestions dropdown not being removed on focus change. #16
 
 ## 0.6.1
 

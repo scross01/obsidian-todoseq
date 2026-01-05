@@ -2,12 +2,13 @@ import { Vault } from 'obsidian';
 import { Task } from '../task';
 import { SearchSuggestions } from './search-suggestions';
 import { TodoTrackerSettings } from '../settings/settings';
+import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
 
 /**
- * Dropdown component for search prefix filter suggestions
- * Provides autocomplete functionality for prefix-specific values
+ * Dropdown component for search prefix filter options
+ * Handles the selection of search prefixes like "path:", "state:", etc.
  */
-export class SearchSuggestionDropdown {
+export class SearchOptionsDropdown {
     private containerEl: HTMLElement;
     private inputEl: HTMLInputElement;
     private vault: Vault;
@@ -15,12 +16,10 @@ export class SearchSuggestionDropdown {
     private settings: TodoTrackerSettings;
     private currentSuggestions: string[] = [];
     private selectedIndex = -1;
-    private currentPrefix: string | null = null;
     private isShowing = false;
     public isHandlingPrefixSelection = false;
-    private justSelected = false;
     
-    constructor(inputEl: HTMLInputElement, vault: Vault, tasks: Task[], settings: TodoTrackerSettings) {
+    constructor(inputEl: HTMLInputElement, vault: Vault, tasks: Task[], settings: TodoTrackerSettings, private suggestionDropdown?: SearchSuggestionDropdown) {
         this.inputEl = inputEl;
         this.vault = vault;
         this.tasks = tasks;
@@ -111,77 +110,16 @@ export class SearchSuggestionDropdown {
         this.containerEl.style.top = `${topPos}px`;
     }
     
-    public async showPrefixDropdown(prefix: string, searchTerm = ''): Promise<void> {
-        if (this.justSelected) return;
-
-        this.currentPrefix = prefix;
+    public async showOptionsDropdown(searchTerm = ''): Promise<void> {
+        const allOptions = [
+            'path:', 'file:', 'tag:', 'state:', 'priority:', 'content:', 'scheduled:', 'deadline:'
+        ];
         
-        // Remove colon from prefix for matching (e.g., "path:" -> "path")
-        const prefixKey = prefix.endsWith(':') ? prefix.slice(0, -1) : prefix;
-        
-        // For content prefix, don't show any dropdown since it's user input only
-        if (prefixKey === 'content') {
-            this.hide();
-            return;
-        }
-        
-        // Get suggestions based on prefix type
-        let allSuggestions: string[] = [];
-        switch (prefixKey) {
-            case 'path':
-                // Use task-based method if tasks are available, otherwise fallback to vault scan
-                if (this.tasks && this.tasks.length > 0) {
-                    allSuggestions = SearchSuggestions.getAllPathsFromTasks(this.tasks);
-                } else {
-                    allSuggestions = await SearchSuggestions.getAllPaths(this.vault);
-                }
-                break;
-            case 'file':
-                // Use task-based method if tasks are available, otherwise fallback to vault scan
-                if (this.tasks && this.tasks.length > 0) {
-                    allSuggestions = SearchSuggestions.getAllFilesFromTasks(this.tasks);
-                } else {
-                    allSuggestions = await SearchSuggestions.getAllFiles(this.vault);
-                }
-                break;
-            case 'tag':
-                allSuggestions = SearchSuggestions.getAllTags(this.tasks);
-                break;
-            case 'state':
-                allSuggestions = SearchSuggestions.getAllStates(this.settings);
-                break;
-            case 'priority':
-                allSuggestions = SearchSuggestions.getPriorityOptions();
-                break;
-            case 'scheduled':
-                // For scheduled dates, show both standard date suggestions and actual scheduled dates from tasks
-                const scheduledSuggestions = SearchSuggestions.getDateSuggestions();
-                const taskScheduledDates = this.tasks && this.tasks.length > 0
-                    ? SearchSuggestions.getScheduledDateSuggestions(this.tasks)
-                    : [];
-                allSuggestions = [...scheduledSuggestions, ...taskScheduledDates];
-                break;
-            case 'deadline':
-                // For deadlines, show both standard date suggestions and actual deadline dates from tasks
-                const deadlineSuggestions = SearchSuggestions.getDateSuggestions();
-                const taskDeadlineDates = this.tasks && this.tasks.length > 0
-                    ? SearchSuggestions.getDeadlineDateSuggestions(this.tasks)
-                    : [];
-                allSuggestions = [...deadlineSuggestions, ...taskDeadlineDates];
-                break;
-            case 'content':
-                // For content, we don't have specific suggestions
-                allSuggestions = [];
-                break;
-            default:
-                allSuggestions = [];
-        }
-        
-        // Filter suggestions based on search term
+        // Filter options based on search term
         if (searchTerm) {
-            this.currentSuggestions = SearchSuggestions.filterSuggestions(searchTerm, allSuggestions);
+            this.currentSuggestions = SearchSuggestions.filterSuggestions(searchTerm, allOptions);
         } else {
-            this.currentSuggestions = allSuggestions;
+            this.currentSuggestions = allOptions;
         }
         
         await this.renderDropdown();
@@ -200,16 +138,38 @@ export class SearchSuggestionDropdown {
         });
         
         if (this.currentSuggestions.length === 0) {
-            // Show empty state for prefix dropdown
-            const emptyItem = suggestionEl.createEl('div', {
-                cls: 'suggestion-item mod-complex search-suggest-item'
-            });
-            emptyItem.createEl('div', {
-                cls: 'suggestion-content',
-                text: 'No suggestions found'
-            });
+            // No suggestions for options dropdown
             return;
         }
+        
+        // Add "Search options" title section for options dropdown
+        const titleItem = suggestionEl.createEl('div', {
+            cls: 'suggestion-item mod-complex search-suggest-item mod-group'
+        });
+        
+        const titleContent = titleItem.createEl('div', { cls: 'suggestion-content' });
+        const titleText = titleContent.createEl('div', {
+            cls: 'suggestion-title list-item-part mod-extended'
+        });
+        titleText.createSpan({ text: 'Search options' });
+        
+        // Add info icon
+        const auxEl = titleItem.createEl('div', { cls: 'suggestion-aux' });
+        const iconContainer = auxEl.createEl('div', {
+            cls: 'list-item-part search-suggest-icon clickable-icon',
+            attr: { 'aria-label': 'Read more' }
+        });
+        
+        // Create SVG info icon using innerHTML
+        iconContainer.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" class="svg-icon lucide-info">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 16v-4"></path>
+                <path d="M12 8h.01"></path>
+            </svg>
+        `;
         
         // Render suggestions
         this.currentSuggestions.forEach((suggestion, index) => {
@@ -220,15 +180,32 @@ export class SearchSuggestionDropdown {
             const contentEl = itemEl.createEl('div', { cls: 'suggestion-content' });
             const titleEl = contentEl.createEl('div', { cls: 'suggestion-title' });
             
-            // Prefix-specific dropdown - show values
-            // Display suggestion without quotes (quotes will be added in handleSelection if needed)
-            const displayText = suggestion.endsWith('/') ? suggestion.slice(0, -1) : suggestion;
-            titleEl.createSpan({ text: displayText });
+            // Options dropdown - show prefix with description
+            titleEl.createSpan({ text: suggestion });
+            
+            const infoText = this.getPrefixDescription(suggestion);
+            if (infoText) {
+                titleEl.createSpan({
+                    cls: 'search-suggest-info-text',
+                    text: ` ${infoText}`
+                });
+            }
             
             // Add click handler
             itemEl.addEventListener('mousedown', (e) => {
-                e.preventDefault(); // Prevent focus loss on input
+                e.preventDefault(); // Prevent focus loss
+                // For prefix selections, set the flag immediately to prevent race conditions
+                const isPrefixSelection = suggestion.endsWith(':') && !suggestion.includes(' ');
+                if (isPrefixSelection) {
+                    this.isHandlingPrefixSelection = true;
+                }
                 this.handleSelection(suggestion);
+            });
+
+            // Add click handler to prevent bubbling (fixes issue where suggestion dropdown closes immediately)
+            itemEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
             });
             
             // Add mouseover handler for selection
@@ -239,10 +216,26 @@ export class SearchSuggestionDropdown {
         });
     }
     
+    private getPrefixDescription(prefix: string): string {
+        switch (prefix) {
+            case 'path:': return 'match path of the file';
+            case 'file:': return 'match file name';
+            case 'tag:': return 'search for tags';
+            case 'state:': return 'match task state';
+            case 'priority:': return 'match task priority';
+            case 'content:': return 'match task content';
+            case 'scheduled:': return 'filter by scheduled date';
+            case 'deadline:': return 'filter by deadline date';
+            default: return '';
+        }
+    }
+    
     private updateSelection(): void {
         const items = this.containerEl.querySelectorAll('.search-suggest-item');
         items.forEach((item, index) => {
-            if (index === this.selectedIndex) {
+            // Skip the title section (index 0)
+            const adjustedIndex = index - 1;
+            if (adjustedIndex === this.selectedIndex) {
                 item.addClass('is-selected');
             } else {
                 item.removeClass('is-selected');
@@ -296,71 +289,57 @@ export class SearchSuggestionDropdown {
         const cursorPos = input.selectionStart ?? 0;
         const currentValue = input.value;
         
-        // If we're completing a prefix, include the prefix in replacement
-        const beforeCursor = currentValue.substring(0, cursorPos);
-        const prefixMatch = beforeCursor.match(/(\w+):([^\s]*)$/);
+        // Check if this is a prefix selection (like "path:")
+        const isPrefixSelection = suggestion.endsWith(':') && !suggestion.includes(' ');
         
-        if (prefixMatch) {
-            const fullPrefix = prefixMatch[0];
-            const prefixBase = prefixMatch[1];
-            const prefixStart = cursorPos - fullPrefix.length;
-            
-            if (prefixBase + ':' === fullPrefix.substring(0, prefixBase.length + 1)) {
-                // Complete the value after prefix - replace any existing text after the colon
-                const startPos = prefixStart + prefixBase.length + 1; // +1 for the colon
-                let endPos = cursorPos;
-                
-                // Find the end position - either end of string or next space
-                while (endPos < currentValue.length && !/\s/.test(currentValue[endPos])) {
-                    endPos++;
-                }
-                
-                // Add quotes if suggestion contains spaces
-                const finalSuggestion = suggestion.includes(' ') ? `"${suggestion}"` : suggestion;
-                
-                // Reconstruct with the prefix + the final suggestion
-                const newValue = (currentValue.substring(0, startPos) + finalSuggestion + currentValue.substring(endPos));
-                input.value = newValue;
-                input.selectionStart = input.selectionEnd = startPos + finalSuggestion.length;
-            } else {
-                // Replace incomplete prefix
-                const startPos = prefixStart;
-                const endPos = cursorPos;
-                const newValue = currentValue.substring(0, startPos) + suggestion + currentValue.substring(endPos);
-                input.value = newValue;
-                input.selectionStart = input.selectionEnd = startPos + suggestion.length;
-            }
-        } else {
-            // Find the start of the current word/prefix
-            let startPos = cursorPos;
-            while (startPos > 0 && !/\s/.test(currentValue[startPos - 1])) {
-                startPos--;
-            }
-            
-            // Insert new prefix
-            const newValue = currentValue.substring(0, startPos) + suggestion + currentValue.substring(cursorPos);
-            input.value = newValue;
-            input.selectionStart = input.selectionEnd = startPos + suggestion.length;
+        // Find the start of the current word/prefix
+        let startPos = cursorPos;
+        while (startPos > 0 && !/\s/.test(currentValue[startPos - 1])) {
+            startPos--;
         }
         
-        // Hide dropdown and set flag to prevent immediate reopening
-        this.hide();
-        this.justSelected = true;
-
-        // Trigger search
-        const event = new Event('input', { bubbles: true });
-        input.dispatchEvent(event);
+        // Insert new prefix
+        const newValue = currentValue.substring(0, startPos) + suggestion + currentValue.substring(cursorPos);
+        input.value = newValue;
+        input.selectionStart = input.selectionEnd = startPos + suggestion.length;
         
-        // Reset the prefix selection flag
-        this.isHandlingPrefixSelection = false;
+        // For prefix selections, we need to manually show the suggestions
+        // because the input handler might not catch it in time
+        if (isPrefixSelection) {
+            // Set flag to indicate we're handling a prefix selection
+            this.isHandlingPrefixSelection = true;
+            
+            // Trigger the suggestion dropdown for this prefix
+            if (this.suggestionDropdown) {
+                this.suggestionDropdown.showPrefixDropdown(suggestion, '');
+            }
+        }
+        
+        // Trigger search - defer to allow click event to process first
+        setTimeout(() => {
+            const event = new Event('input', { bubbles: true });
+            input.dispatchEvent(event);
+        }, 150);
+        
+        // For prefix selections, keep the flag set until the next user interaction
+        // The flag will be reset when the user starts typing or makes another selection
+        if (!isPrefixSelection) {
+            // Only reset the flag if this is not a prefix selection
+            this.isHandlingPrefixSelection = false;
+        }
         
         // Focus input
         input.focus();
-
-        // Reset justSelected flag after a delay to handle potential async calls in showPrefixDropdown
-        setTimeout(() => {
-            this.justSelected = false;
-        }, 100);
+        
+        // If this was a prefix selection, set up a one-time keydown handler to reset the flag
+        // when the user starts typing after the selection
+        if (isPrefixSelection) {
+            const resetFlagOnKeyDown = (e: KeyboardEvent) => {
+                this.isHandlingPrefixSelection = false;
+                input.removeEventListener('keydown', resetFlagOnKeyDown);
+            };
+            input.addEventListener('keydown', resetFlagOnKeyDown);
+        }
     }
     
     public show(): void {
