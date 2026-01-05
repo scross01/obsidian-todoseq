@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.7.0
+
+This release introduces formatting and interactivity for tasks is the editor view. Task state keywords are now highlighted and can be interacted with similar to the task list view.
+
+- Addded task formatting in the editor with setting soption to disable (enabled by default)
+- Added a right click option on the task keyword in the editor to change the state of the task
+- Added a single click action to the task keyword in the editor to cycle through the task states (TODO -> DOING -> DONE)
+- Added task state update when a task checkbox is toggled in the editor
+
 ## 0.6.2
 
 - Fixed issue with custom keywords not shown in search suggestions. #12
