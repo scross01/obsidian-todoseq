@@ -1,5 +1,5 @@
 import { Plugin, TFile, TAbstractFile, WorkspaceLeaf, Editor, MarkdownView } from 'obsidian';
-import { Task } from './task';
+import { Task, NEXT_STATE } from './task';
 import { TodoView, TaskViewMode } from "./view/task-view";
 import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
@@ -264,11 +264,17 @@ export default class TodoTracker extends Plugin {
           if (cmEditor && cmEditor.dom) {
             const editorContent = cmEditor.dom;
             
-            // Add event listener for click events on checkboxes
+            // Add event listener for click events on checkboxes and task keywords
             const clickHandler = (event: MouseEvent) => {
               const target = event.target as HTMLElement;
+              
+              // Handle checkbox clicks
               if (target.classList.contains('task-list-item-checkbox')) {
                 this.handleCheckboxToggle(target as HTMLInputElement);
+              }
+              // Handle task keyword clicks
+              else if (target.classList.contains('todoseq-keyword-formatted')) {
+                this.handleTaskKeywordClick(target, view);
               }
             };
 
@@ -326,8 +332,29 @@ export default class TodoTracker extends Plugin {
     keywordSpan.setAttribute('aria-label', `Task keyword: ${newKeyword}`);
   }
 
+  private async handleTaskKeywordClick(keywordElement: HTMLElement, view: MarkdownView): Promise<void> {
+    // Prevent default behavior and stop propagation
+    const event = window.event as MouseEvent;
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
 
-  
+    // Get current keyword
+    const currentKeyword = keywordElement.getAttribute('data-task-keyword');
+    if (!currentKeyword) {
+      return;
+    }
+
+    // Cycle to the next state using NEXT_STATE map
+    const nextState = NEXT_STATE.get(currentKeyword) || 'TODO';
+
+    // Update the task state directly in the DOM
+    keywordElement.textContent = nextState;
+    keywordElement.setAttribute('data-task-keyword', nextState);
+    keywordElement.setAttribute('aria-label', `Task keyword: ${nextState}`);
+  }
+
   private clearEditorDecorations(): void {
     // Clear editor decorations by registering an empty extension
     const emptyExtension = this.registerEditorExtension([]);
@@ -368,17 +395,10 @@ export default class TodoTracker extends Plugin {
             
             // Get the task keyword and line information
             const keyword = target.getAttribute('data-task-keyword');
-            const lineNumber = this.getLineNumberFromElement(target);
             
-            if (keyword && lineNumber !== null && activeView.file) {
-              // Parse the task from the line
-              const line = activeView.editor.getLine(lineNumber);
-              const task = this.parseTaskFromLine(line, lineNumber, activeView.file.path);
-              
-              if (task) {
-                // Open the context menu
-                this.editorKeywordMenu?.openStateMenuAtMouseEvent(task, target, evt);
-              }
+            if (keyword && activeView.file) {
+              // Open the context menu
+              this.editorKeywordMenu?.openStateMenuAtMouseEvent(keyword, target, evt);
             }
           }
         });
