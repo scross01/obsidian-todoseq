@@ -49,8 +49,6 @@ export class EditorKeywordMenu {
       
       // Find and update the checkbox state based on the new task state
       this.updateCheckboxState(keywordElement, newState);
-    } else {
-      console.log('No keyword element or text content found');
     }
   }
   
@@ -68,15 +66,10 @@ export class EditorKeywordMenu {
     
     if (taskLine) {
       const checkbox = taskLine.querySelector('.task-list-item-checkbox, input[type="checkbox"]');
-      
       if (checkbox && checkbox instanceof HTMLInputElement) {
         // Update the checkbox checked property for completed states
         checkbox.checked = isCompleted;
-      } else {
-        console.log('No checkbox element found');
       }
-    } else {
-        console.log('No task line element found');
     }
   }
 }
