@@ -1294,7 +1294,7 @@ export class TodoView extends ItemView {
       const pos = { line: task.line, ch: 0 };
       editor.setCursor(pos);
       try { (markdownView as unknown as { setEphemeralState?: (state: { line: number; col: number }) => void }).setEphemeralState?.({ line: task.line, col: 0 }); } catch (_) {}
-      editor.scrollIntoView({ from: pos, to: pos });
+      editor.scrollIntoView({ from: pos, to: pos }, true);
     }
 
     await workspace.revealLeaf(targetLeaf);
