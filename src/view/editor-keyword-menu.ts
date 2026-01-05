@@ -1,6 +1,6 @@
 import { Menu } from 'obsidian';
 import { TaskEditor } from './task-editor';
-import { Task } from '../task';
+import { Task, DEFAULT_COMPLETED_STATES } from '../task';
 import { TodoTrackerSettings } from '../settings/settings';
 import { App } from 'obsidian';
 import { StateMenuBuilder } from './state-menu-builder';
@@ -27,7 +27,7 @@ export class EditorKeywordMenu {
     const menu = this.menuBuilder.buildStateMenu(state, async (newState: string) => {
       await this.updateTaskKeywordState(state, keywordElement, newState);
     });
-
+ 
     // Show menu at mouse position
     menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
   }
@@ -36,6 +36,7 @@ export class EditorKeywordMenu {
    * Update the task keyword state by directly modifying the DOM element
    */
   private async updateTaskKeywordState(state: string, keywordElement: HTMLElement, newState: string): Promise<void> {
+    
     // Directly update the DOM element text to reflect the new state
     if (keywordElement && keywordElement.textContent) {
       // Replace the keyword text directly in the DOM
@@ -45,6 +46,37 @@ export class EditorKeywordMenu {
       
       // Update data attribute to reflect new state
       keywordElement.setAttribute('data-task-keyword', newState);
+      
+      // Find and update the checkbox state based on the new task state
+      this.updateCheckboxState(keywordElement, newState);
+    } else {
+      console.log('No keyword element or text content found');
+    }
+  }
+  
+  /**
+   * Find the checkbox element in the same task line and update its state
+   */
+  private updateCheckboxState(keywordElement: HTMLElement, newState: string): void {
+    
+    // Check if the new state is a completed state
+    const isCompleted = DEFAULT_COMPLETED_STATES.has(newState);
+    
+    // Find the checkbox element in the same task line
+    // The checkbox is an input element with class task-list-item-checkbox
+    const taskLine = keywordElement.closest('.HyperMD-task-line, .cm-line');
+    
+    if (taskLine) {
+      const checkbox = taskLine.querySelector('.task-list-item-checkbox, input[type="checkbox"]');
+      
+      if (checkbox && checkbox instanceof HTMLInputElement) {
+        // Update the checkbox checked property for completed states
+        checkbox.checked = isCompleted;
+      } else {
+        console.log('No checkbox element found');
+      }
+    } else {
+        console.log('No task line element found');
     }
   }
 }

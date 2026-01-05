@@ -1,5 +1,5 @@
 import { Plugin, TFile, TAbstractFile, WorkspaceLeaf, Editor, MarkdownView } from 'obsidian';
-import { Task, NEXT_STATE } from './task';
+import { Task, NEXT_STATE, DEFAULT_COMPLETED_STATES } from './task';
 import { TodoView, TaskViewMode } from "./view/task-view";
 import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
@@ -353,6 +353,30 @@ export default class TodoTracker extends Plugin {
     keywordElement.textContent = nextState;
     keywordElement.setAttribute('data-task-keyword', nextState);
     keywordElement.setAttribute('aria-label', `Task keyword: ${nextState}`);
+
+    // Update the checkbox state to match the new task state
+    this.updateCheckboxState(keywordElement, nextState);
+  }
+
+  /**
+   * Find the checkbox element in the same task line and update its state
+   */
+  private updateCheckboxState(keywordElement: HTMLElement, newState: string): void {
+    // Check if the new state is a completed state
+    const isCompleted = DEFAULT_COMPLETED_STATES.has(newState);
+
+    // Find the checkbox element in the same task line
+    // The checkbox is an input element with class task-list-item-checkbox
+    const taskLine = keywordElement.closest('.HyperMD-task-line, .cm-line');
+
+    if (taskLine) {
+      const checkbox = taskLine.querySelector('.task-list-item-checkbox, input[type="checkbox"]');
+
+      if (checkbox && checkbox instanceof HTMLInputElement) {
+        // Update the checkbox checked property for completed states
+        checkbox.checked = isCompleted;
+      }
+    }
   }
 
   private clearEditorDecorations(): void {
