@@ -2,6 +2,7 @@ import { SearchSuggestions } from '../src/search/search-suggestions';
 import { SearchSuggestionDropdown } from '../src/search/search-suggestion-dropdown';
 import { Task } from '../src/task';
 import { Vault } from 'obsidian';
+import { TodoTrackerSettings } from '../src/settings/settings';
 
 describe('Search Suggestions', () => {
 
@@ -853,6 +854,79 @@ describe('Search Suggestions', () => {
       expect(tags).toContain('urgent');
       expect(tags).toContain('work');
       expect(tags).toEqual(['urgent', 'work']);
+    });
+  });
+
+  describe('Custom state keywords', () => {
+    it('should include custom keywords from settings in getAllStates', () => {
+      const mockSettings: TodoTrackerSettings = {
+        additionalTaskKeywords: ['FIXME', 'HACK', 'REVIEW'],
+        refreshInterval: 60,
+        includeCodeBlocks: false,
+        includeCalloutBlocks: true,
+        includeCommentBlocks: false,
+        taskViewMode: 'showAll',
+        languageCommentSupport: {
+          enabled: true,
+        },
+        weekStartsOn: 'Monday'
+      };
+
+      const states = SearchSuggestions.getAllStates(mockSettings);
+
+      // Should include default states
+      expect(states).toContain('TODO');
+      expect(states).toContain('DOING');
+      expect(states).toContain('DONE');
+
+      // Should include custom keywords
+      expect(states).toContain('FIXME');
+      expect(states).toContain('HACK');
+      expect(states).toContain('REVIEW');
+
+      // Should be sorted alphabetically
+      expect(states).toEqual(states.sort((a, b) => a.localeCompare(b)));
+    });
+
+    it('should work without settings (backward compatibility)', () => {
+      const states = SearchSuggestions.getAllStates();
+
+      // Should include default states
+      expect(states).toContain('TODO');
+      expect(states).toContain('DOING');
+      expect(states).toContain('DONE');
+
+      // Should not include custom keywords when no settings provided
+      expect(states).not.toContain('FIXME');
+      expect(states).not.toContain('HACK');
+    });
+
+    it('should deduplicate states when custom keywords overlap with defaults', () => {
+      const mockSettings: TodoTrackerSettings = {
+        additionalTaskKeywords: ['TODO', 'DOING', 'CUSTOM'],
+        refreshInterval: 60,
+        includeCodeBlocks: false,
+        includeCalloutBlocks: true,
+        includeCommentBlocks: false,
+        taskViewMode: 'showAll',
+        languageCommentSupport: {
+          enabled: true,
+        },
+        weekStartsOn: 'Monday'
+      };
+
+      const states = SearchSuggestions.getAllStates(mockSettings);
+
+      // Should include all unique states
+      expect(states).toContain('TODO');
+      expect(states).toContain('DOING');
+      expect(states).toContain('CUSTOM');
+
+      // Should not have duplicates
+      const todoCount = states.filter(s => s === 'TODO').length;
+      const doingCount = states.filter(s => s === 'DOING').length;
+      expect(todoCount).toBe(1);
+      expect(doingCount).toBe(1);
     });
   });
 });

@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.6.2
+
+- Fixed issue with custom keywords not shown in search suggestions. #12
+
 ## 0.6.1
 
 - Fixed issue with file and path suggestion dropdown not showing new files.

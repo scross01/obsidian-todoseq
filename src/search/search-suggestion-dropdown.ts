@@ -1,6 +1,7 @@
 import { Vault } from 'obsidian';
 import { Task } from '../task';
 import { SearchSuggestions } from './search-suggestions';
+import { TodoTrackerSettings } from '../settings/settings';
 
 /**
  * Dropdown component for search prefix filter suggestions
@@ -11,16 +12,18 @@ export class SearchSuggestionDropdown {
     private inputEl: HTMLInputElement;
     private vault: Vault;
     private tasks: Task[];
+    private settings: TodoTrackerSettings;
     private currentSuggestions: string[] = [];
     private selectedIndex = -1;
     private currentPrefix: string | null = null;
     private isShowing = false;
     public isHandlingPrefixSelection = false;
     
-    constructor(inputEl: HTMLInputElement, vault: Vault, tasks: Task[]) {
+    constructor(inputEl: HTMLInputElement, vault: Vault, tasks: Task[], settings: TodoTrackerSettings) {
     this.inputEl = inputEl;
     this.vault = vault;
     this.tasks = tasks;
+    this.settings = settings;
     
     // Create dropdown container
     this.containerEl = document.createElement('div');
@@ -150,7 +153,7 @@ export class SearchSuggestionDropdown {
             allSuggestions = SearchSuggestions.getAllTags(this.tasks);
             break;
         case 'state':
-            allSuggestions = SearchSuggestions.getAllStates();
+            allSuggestions = SearchSuggestions.getAllStates(this.settings);
             break;
         case 'priority':
           allSuggestions = SearchSuggestions.getPriorityOptions();

@@ -355,7 +355,8 @@ export class TodoView extends ItemView {
       this.suggestionDropdown = new module.SearchSuggestionDropdown(
         inputEl,
         this.app.vault,
-        this.tasks
+        this.tasks,
+        this.settings
       );
       
       // Input event handler for dropdown triggering

@@ -1,5 +1,6 @@
 import { Vault } from 'obsidian';
 import { Task } from '../task';
+import { TodoTrackerSettings } from '../settings/settings';
 
 /**
  * Utility class for collecting and filtering search suggestions
@@ -140,15 +141,20 @@ export class SearchSuggestions {
     
     /**
      * Get all configured task states
+     * @param settings Plugin settings containing additional task keywords
      * @returns Array of task states, sorted alphabetically
      */
-    static getAllStates(): string[] {
+    static getAllStates(settings?: TodoTrackerSettings): string[] {
         // Default states plus any additional configured states
         const defaultStates = ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAIT', 'WAITING', 'IN-PROGRESS', 'CANCELED', 'CANCELLED'];
         
-        // In a real implementation, we would get additional states from plugin settings
-        // For now, return defaults
-        return defaultStates.sort((a, b) => a.localeCompare(b));
+        // Add custom keywords from settings if provided
+        const customStates = settings?.additionalTaskKeywords || [];
+        
+        // Combine and deduplicate states
+        const allStates = Array.from(new Set([...defaultStates, ...customStates]));
+        
+        return allStates.sort((a, b) => a.localeCompare(b));
     }
     
     /**
