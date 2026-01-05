@@ -238,6 +238,7 @@ export default class TodoTracker extends Plugin {
   // Setup task formatting based on current settings
   private setupTaskFormatting(): void {
     this.updateTaskFormatting();
+    this.setupCheckboxEventListeners();
   }
 
   private setupEditorDecorations(): void {
@@ -247,6 +248,85 @@ export default class TodoTracker extends Plugin {
     ]);
     this.taskFormatters.set('editor-extension', extension);
   }
+
+  private setupCheckboxEventListeners(): void {
+    if (!this.settings.formatTaskKeywords) {
+      return;
+    }
+
+    // Set up event listeners on all active markdown editors immediately
+    const setupEditorListeners = () => {
+      const leaves = this.app.workspace.getLeavesOfType('markdown');
+      leaves.forEach((leaf) => {
+        const view = leaf.view;
+        if (view instanceof MarkdownView && view.editor) {
+          const cmEditor = (view.editor as any)?.cm;
+          if (cmEditor && cmEditor.dom) {
+            const editorContent = cmEditor.dom;
+            
+            // Add event listener for click events on checkboxes
+            const clickHandler = (event: MouseEvent) => {
+              const target = event.target as HTMLElement;
+              if (target.classList.contains('task-list-item-checkbox')) {
+                this.handleCheckboxToggle(target as HTMLInputElement);
+              }
+            };
+
+            editorContent.addEventListener('click', clickHandler, { capture: true });
+
+            // Store the click handler for cleanup
+            const handlerId = 'checkbox-click-handler-' + Math.random().toString(36).substr(2, 9);
+            this.taskFormatters.set(handlerId, clickHandler);
+          }
+        }
+      });
+    };
+
+    // Set up listeners on currently active editors
+    setupEditorListeners();
+
+    // Also listen for new editors being opened
+    this.registerEvent(
+      this.app.workspace.on('layout-change', setupEditorListeners)
+    );
+  }
+
+  private handleCheckboxToggle(checkbox: HTMLInputElement): void {
+    // Find the task keyword span in the same line
+    const lineElement = checkbox.closest('.cm-line, .HyperMD-task-line');
+    if (!lineElement) {
+      return;
+    }
+
+    // Find the task keyword span
+    const keywordSpan = lineElement.querySelector('.todoseq-keyword-formatted');
+    if (!keywordSpan) {
+      return;
+    }
+
+    // Get current keyword
+    const currentKeyword = keywordSpan.getAttribute('data-task-keyword');
+    if (!currentKeyword) {
+      return;
+    }
+
+    // Determine new state based on checkbox state
+    let newKeyword = currentKeyword;
+    if (checkbox.checked) {
+      // Checkbox checked -> change to DONE
+      newKeyword = 'DONE';
+    } else {
+      // Checkbox unchecked -> change to TODO
+      newKeyword = 'TODO';
+    }
+
+    // Update the keyword text and data attribute directly in the DOM
+    keywordSpan.textContent = newKeyword;
+    keywordSpan.setAttribute('data-task-keyword', newKeyword);
+    keywordSpan.setAttribute('aria-label', `Task keyword: ${newKeyword}`);
+  }
+
+
   
   private clearEditorDecorations(): void {
     // Clear editor decorations by registering an empty extension
