@@ -7,7 +7,8 @@ import { Search } from '../search/search';
 import { SearchOptionsDropdown } from './search-options-dropdown';
 import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
 import { TodoTrackerSettings } from '../settings/settings';
-import { taskComparator } from '../utils/task-utils';
+import { taskComparator, getFilename } from '../utils/task-utils';
+import { getPluginSettings } from '../utils/settings-utils';
 
 
 export type TaskViewMode = 'showAll' | 'sortCompletedLast' | 'hideCompleted';
@@ -161,9 +162,7 @@ export class TodoView extends ItemView {
         }
         
         // If priorities are equal, fall back to default sorting using shared comparator
-        const pathCompare = a.path.localeCompare(b.path);
-        if (pathCompare !== 0) return pathCompare;
-        return a.line - b.line;
+        return taskComparator(a, b);
       });
     }
   }
@@ -362,6 +361,16 @@ export class TodoView extends ItemView {
     const inputEl = this.searchInputEl;
     if (!inputEl) return;
     
+    // Clean up any existing dropdowns before creating new ones
+    if (this.optionsDropdown) {
+      this.optionsDropdown.cleanup();
+      this.optionsDropdown = null;
+    }
+    if (this.suggestionDropdown) {
+      this.suggestionDropdown.cleanup();
+      this.suggestionDropdown = null;
+    }
+    
     // Import both dropdown classes dynamically to avoid circular dependencies
     Promise.all([
       import('./search-options-dropdown'),
@@ -518,20 +527,8 @@ export class TodoView extends ItemView {
     ];
     const completedDefaults = Array.from(DEFAULT_COMPLETED_STATES);
 
-    type AppWithPlugins = {
-      plugins?: {
-        plugins?: Record<string, unknown>;
-      };
-    };
-    type HasSettingsWithKeywords = {
-      settings?: {
-        additionalTaskKeywords?: unknown;
-      };
-    };
-    const appWithPlugins = this.app as unknown as AppWithPlugins;
-    // Avoid importing TodoTracker type just to read settings; keep structural typing
-    const maybePlugin = appWithPlugins.plugins?.plugins?.['todoseq'] as unknown as HasSettingsWithKeywords | undefined;
-    const configured = maybePlugin?.settings?.additionalTaskKeywords;
+    const settings = getPluginSettings(this.app);
+    const configured = settings?.additionalTaskKeywords;
     const additional = Array.isArray(configured)
       ? configured.filter((v): v is string => typeof v === 'string' && v.length > 0)
       : [];
@@ -815,9 +812,7 @@ export class TodoView extends ItemView {
 
     // File info
     const fileInfo = li.createEl('div', { cls: 'todo-file-info' });
-    const lastSlash = task.path.lastIndexOf('/');
-    const baseName = lastSlash >= 0 ? task.path.slice(lastSlash + 1) : task.path;
-    fileInfo.setText(`${baseName}:${task.line + 1}`);
+    fileInfo.setText(`${getFilename(task.path)}:${task.line + 1}`);
     fileInfo.setAttribute('title', task.path);
 
     // Click to open source (avoid checkbox and keyword)

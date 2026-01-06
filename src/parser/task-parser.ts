@@ -500,208 +500,389 @@ export class TaskParser {
     // Initialize state machine
     let inBlock = false;
     let blockMarker: 'code' | 'math' | 'comment' | null = null;
-    let codeRegex = null
-    
+    let codeRegex: RegExp | null = null;
+
     const tasks: Task[] = [];
 
     for (let index = 0; index < lines.length; index++) {
       const line = lines[index];
 
-      // skip blank lines
-      if (line.trim() == '') {
+      // Skip blank lines
+      if (line.trim() === '') {
         continue;
       }
-      
-      // Check for footnote definitions first
+
+      // Check for footnote definitions
       if (FOOTNOTE_DEFINITION_REGEX.test(line)) {
-        const footnoteRegex = TaskParser.buildFootnoteRegex(this.allKeywords);
-        if (footnoteRegex.test.test(line)) {
-          const taskDetails = this.extractFootnoteTaskDetails(line, footnoteRegex.capture);
-          
-          // Extract priority
-          const { priority, cleanedText } = this.extractPriority(taskDetails.taskText);
-          
-          // Initialize footnote task with date fields
-          const task: Task = {
-            path,
-            line: index,
-            rawText: line,
-            indent: taskDetails.indent,
-            listMarker: taskDetails.listMarker,
-            text: cleanedText,
-            state: taskDetails.state,
-            completed: DEFAULT_COMPLETED_STATES.has(taskDetails.state),
-            priority,
-            scheduledDate: null,
-            deadlineDate: null,
-            tail: taskDetails.tail,
-          };
-
-          // Extract dates from following lines
-          const { scheduledDate, deadlineDate } = this.extractTaskDates(
-            lines,
-            index + 1,
-            taskDetails.indent,
-          );
-          
-          task.scheduledDate = scheduledDate;
-          task.deadlineDate = deadlineDate;
-
-          tasks.push(task);
+        const footnoteTask = this.tryParseFootnoteTask(line, path, index, lines);
+        if (footnoteTask) {
+          tasks.push(footnoteTask);
         }
         continue;
       }
-      
-      // check for change of context
-      if (CODE_BLOCK_REGEX.test(line)) {
-        if (!inBlock) {
-          if (this.includeCodeBlocks) {
-            // starting a new code block, detect the coding language
-            if (this.languageCommentSupport.enabled) {
-              const m = CODE_BLOCK_REGEX.exec(line)
-              // m[0] is the full match
-              // m[1] is block marker
-              // m[2] is the language
-              // get the language from the registry
-              this.detectLanguage(m ? m[2] : "")
-              if(this.currentLanguage) {
-                codeRegex = TaskParser.buildCodeRegex(this.allKeywords, this.currentLanguage)
-              } else {
-                codeRegex = null
-              }
-            }
+
+      // Check for block transitions
+      const blockTransition = this.detectBlockTransition(line, inBlock, blockMarker);
+      if (blockTransition) {
+        const result = this.handleBlockTransition(blockTransition, index, lines, inBlock, codeRegex, path);
+        if (result) {
+          inBlock = result.inBlock;
+          blockMarker = result.blockMarker;
+          codeRegex = result.codeRegex;
+          if (result.task) {
+            tasks.push(result.task);
           }
         }
-        inBlock = !inBlock
-        blockMarker = inBlock ? 'code' : null
         continue;
-      } else if (MATH_BLOCK_REGEX.test(line)) {
-        inBlock = !inBlock
-        blockMarker = inBlock ? 'math' : null
-      } else if (COMMENT_BLOCK_REGEX.test(line)) {
-        // Check if this is a single-line comment block (%% ... %%)
-        const singleLineCommentMatch = /^\s*%%.*%%$/.test(line);
-        if (singleLineCommentMatch) {
-          // For single-line comment blocks, process the task immediately if enabled
-          if (this.includeCommentBlocks) {
-            // Extract the content between %% and %% and process it as a task
-            const content = line.replace(/^\s*%%\s*/, '').replace(/\s*%%$/, '');
-            const tempLine = content;
-            
-            // Check if this line contains a task
-            if (this.testRegex.test(tempLine)) {
-              const taskDetails = this.extractTaskDetails(tempLine, this.captureRegex);
-              const { priority, cleanedText } = this.extractPriority(taskDetails.taskText);
-              const { state: finalState, completed: finalCompleted, listMarker: finalListMarker } =
-                this.extractCheckboxState(tempLine, taskDetails.state, taskDetails.listMarker);
-              
-              const task: Task = {
-                state: finalState,
-                completed: finalCompleted,
-                text: cleanedText,
-                priority: priority,
-                rawText: tempLine.trim(),
-                path: path,
-                line: index + 1,
-                indent: taskDetails.indent,
-                listMarker: finalListMarker,
-                scheduledDate: null,
-                deadlineDate: null,
-                tail: taskDetails.tail,
-              };
-              
-              // Extract dates from following lines for single-line comment block tasks
-              const { scheduledDate, deadlineDate } = this.extractTaskDates(
-                lines,
-                index + 1,
-                taskDetails.indent,
-              );
-              
-              task.scheduledDate = scheduledDate;
-              task.deadlineDate = deadlineDate;
-              
-              tasks.push(task);
-            }
-          }
-          // Don't toggle inBlock for single-line comment blocks
-        } else {
-          // For multi-line comment blocks, toggle the block state
-          inBlock = !inBlock;
-          blockMarker = inBlock ? 'comment' : null;
+      }
+
+      // Check for single-line comment blocks (%% ... %%)
+      const isSingleLineComment = /^\s*%%.*%%$/.test(line);
+      if (isSingleLineComment) {
+        const commentTask = this.tryParseCommentBlockTask(line, path, index, lines);
+        if (commentTask) {
+          tasks.push(commentTask);
         }
-      }
-
-      // Skip lines in quotes and callout blocks if disabled
-      if (!this.includeCalloutBlocks && CALLOUT_BLOCK_REGEX.test(line)) {
-        continue;
-      }
-   
-      // Skip lines inside code blocks if disabled
-      if (inBlock && !this.includeCodeBlocks && blockMarker === 'code' ) {
         continue;
       }
 
-      // Skip lines inside math blocks
-      if (inBlock && blockMarker === 'math') {
+      // Check if line should be skipped
+      if (this.shouldSkipLine(line, inBlock, blockMarker)) {
         continue;
       }
 
-      // Skip lines inside comment blocks if the setting is disabled
-      if (inBlock && blockMarker === 'comment' && !this.includeCommentBlocks) {
+      // Determine which regex to use
+      const useCodeRegex = inBlock && this.includeCodeBlocks && blockMarker === 'code' && this.currentLanguage && codeRegex;
+      if (!this.shouldParseLine(line, useCodeRegex ? codeRegex! : undefined)) {
         continue;
       }
 
-      // first use the test regex to see if this line has a task
-      const useCodeRegex = inBlock && this.includeCodeBlocks && blockMarker == 'code' && this.currentLanguage
-      if (useCodeRegex && codeRegex) {
-        if (!codeRegex.test.test(line)) {
-          continue;
-        }
+      // Extract task details and create task
+      const regex = useCodeRegex ? codeRegex! : this.captureRegex;
+      const taskDetails = this.extractTaskDetails(line, regex);
+      const task = this.createTaskFromDetails(line, path, index, taskDetails, lines);
+
+      if (task) {
+        tasks.push(task);
       }
-      else if (!this.testRegex.test(line)) {
-        continue;
-      }
-
-      // Extract task details using the regular are langauge speciifc code regex
-      const taskDetails = this.extractTaskDetails(line, (useCodeRegex && codeRegex) ? codeRegex.capture : this.captureRegex);
-
-      // Extract priority
-      const { priority, cleanedText } = this.extractPriority(taskDetails.taskText);
-      
-      // Extract checkbox state
-      const { state: finalState, completed: finalCompleted, listMarker: finalListMarker } =
-        this.extractCheckboxState(line, taskDetails.state, taskDetails.listMarker);
-
-      // Initialize task with date fields
-      const task: Task = {
-        path,
-        line: index,
-        rawText: line,
-        indent: taskDetails.indent,
-        listMarker: finalListMarker,
-        text: cleanedText,
-        state: finalState,
-        completed: finalCompleted,
-        priority,
-        scheduledDate: null,
-        deadlineDate: null,
-        tail: taskDetails.tail,
-      };
-
-      // Extract dates from following lines
-      const { scheduledDate, deadlineDate } = this.extractTaskDates(
-        lines,
-        index + 1,
-        taskDetails.indent,
-      );
-      
-      task.scheduledDate = scheduledDate;
-      task.deadlineDate = deadlineDate;
-
-      tasks.push(task);
     }
 
     return tasks;
+  }
+
+  /**
+   * Determine if line starts/ends a code/math/comment block
+   * @param line The line to check
+   * @param currentInBlock Whether currently inside a block
+   * @param currentBlockMarker Current block type
+   * @returns Block transition info or null
+   */
+  private detectBlockTransition(
+    line: string,
+    currentInBlock: boolean,
+    currentBlockMarker: 'code' | 'math' | 'comment' | null
+  ): { type: 'code' | 'math' | 'comment'; entering: boolean; language?: string } | null {
+    const codeMatch = CODE_BLOCK_REGEX.exec(line);
+    if (codeMatch) {
+      // If we're already in a code block, this is an exit
+      if (currentInBlock && currentBlockMarker === 'code') {
+        return { type: 'code', entering: false };
+      }
+      return { type: 'code', entering: true };
+    }
+
+    const mathMatch = MATH_BLOCK_REGEX.exec(line);
+    if (mathMatch) {
+      if (currentInBlock && currentBlockMarker === 'math') {
+        return { type: 'math', entering: false };
+      }
+      return { type: 'math', entering: true };
+    }
+
+    const commentMatch = COMMENT_BLOCK_REGEX.exec(line);
+    if (commentMatch) {
+      // Check if it's a single-line comment (has closing %%)
+      const isSingleLine = /^\s*%%.*%%$/.test(line);
+      if (isSingleLine) {
+        // Single-line comments are not block transitions - they should be parsed normally
+        return null;
+      }
+      // Multi-line comment: entering if not already in one
+      if (currentInBlock && currentBlockMarker === 'comment') {
+        return { type: 'comment', entering: false };
+      }
+      return { type: 'comment', entering: true };
+    }
+
+    return null;
+  }
+
+  /**
+   * Handle entering/exiting a code/math/comment block
+   * @param transition Block transition info
+   * @param index Current line index
+   * @param lines All lines in file
+   * @param currentInBlock Current block state
+   * @param currentCodeRegex Current code regex
+   * @param path File path for task creation
+   * @returns Updated block state and optionally a parsed task
+   */
+  private handleBlockTransition(
+    transition: { type: 'code' | 'math' | 'comment'; entering: boolean; language?: string },
+    index: number,
+    lines: string[],
+    currentInBlock: boolean,
+    currentCodeRegex: RegExp | null,
+    path: string
+  ): { inBlock: boolean; blockMarker: 'code' | 'math' | 'comment' | null; codeRegex: RegExp | null; task: Task | null } {
+    let inBlock = currentInBlock;
+    let blockMarker: 'code' | 'math' | 'comment' | null = null;
+    let codeRegex: RegExp | null = currentCodeRegex;
+    let task: Task | null = null;
+
+    if (transition.type === 'code') {
+      if (transition.entering) {
+        inBlock = true;
+        blockMarker = 'code';
+        if (this.includeCodeBlocks && this.languageCommentSupport.enabled) {
+          const line = lines[index];
+          const m = CODE_BLOCK_REGEX.exec(line);
+          const language = m ? m[2] : '';
+          this.detectLanguage(language);
+          if (this.currentLanguage) {
+            const regexPair = TaskParser.buildCodeRegex(this.allKeywords, this.currentLanguage);
+            codeRegex = regexPair.test;
+          }
+        }
+      } else {
+        inBlock = false;
+        blockMarker = null;
+        codeRegex = null;
+        this.currentLanguage = null;
+      }
+    } else if (transition.type === 'math') {
+      if (transition.entering) {
+        inBlock = true;
+        blockMarker = 'math';
+      } else {
+        inBlock = false;
+        blockMarker = null;
+      }
+    } else if (transition.type === 'comment') {
+      if (transition.entering) {
+        inBlock = true;
+        blockMarker = 'comment';
+      } else {
+        inBlock = false;
+        blockMarker = null;
+      }
+    }
+
+    return { inBlock, blockMarker, codeRegex, task };
+  }
+
+  /**
+   * Check if a line should be skipped based on current block state and settings
+   * @param line The line to check
+   * @param inBlock Whether currently inside a block
+   * @param blockMarker Current block type
+   * @returns True if line should be skipped
+   */
+  private shouldSkipLine(line: string, inBlock: boolean, blockMarker: 'code' | 'math' | 'comment' | null): boolean {
+    // Skip lines in quotes and callout blocks if disabled
+    if (!this.includeCalloutBlocks && CALLOUT_BLOCK_REGEX.test(line)) {
+      return true;
+    }
+
+    // Skip lines inside code blocks if disabled
+    if (inBlock && !this.includeCodeBlocks && blockMarker === 'code') {
+      return true;
+    }
+
+    // Skip lines inside math blocks
+    if (inBlock && blockMarker === 'math') {
+      return true;
+    }
+
+    // Skip lines inside comment blocks if the setting is disabled
+    if (inBlock && blockMarker === 'comment' && !this.includeCommentBlocks) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if a line matches the task regex
+   * @param line The line to check
+   * @param codeRegex Optional code-specific regex
+   * @returns True if line should be parsed as a task
+   */
+  private shouldParseLine(line: string, codeRegex?: { test: (str: string) => boolean }): boolean {
+    if (codeRegex) {
+      return codeRegex.test(line);
+    }
+    return this.testRegex.test(line);
+  }
+
+  /**
+   * Try to parse a footnote task from a line
+   * @param line The line to parse
+   * @param path File path
+   * @param index Line index
+   * @param lines All lines in file
+   * @returns Parsed task or null
+   */
+  private tryParseFootnoteTask(
+    line: string,
+    path: string,
+    index: number,
+    lines: string[]
+  ): Task | null {
+    const footnoteRegex = TaskParser.buildFootnoteRegex(this.allKeywords);
+    if (!footnoteRegex.test.test(line)) {
+      return null;
+    }
+
+    const taskDetails = this.extractFootnoteTaskDetails(line, footnoteRegex.capture);
+    const { priority, cleanedText } = this.extractPriority(taskDetails.taskText);
+
+    const task: Task = {
+      path,
+      line: index,
+      rawText: line,
+      indent: taskDetails.indent,
+      listMarker: taskDetails.listMarker,
+      text: cleanedText,
+      state: taskDetails.state,
+      completed: DEFAULT_COMPLETED_STATES.has(taskDetails.state),
+      priority,
+      scheduledDate: null,
+      deadlineDate: null,
+      tail: taskDetails.tail,
+    };
+
+    // Extract dates from following lines
+    const { scheduledDate, deadlineDate } = this.extractTaskDates(
+      lines,
+      index + 1,
+      taskDetails.indent,
+    );
+
+    task.scheduledDate = scheduledDate;
+    task.deadlineDate = deadlineDate;
+
+    return task;
+  }
+
+  /**
+   * Try to parse a single-line comment block task
+   * @param line The line to parse
+   * @param path File path
+   * @param index Line index
+   * @param lines All lines in file
+   * @returns Parsed task or null
+   */
+  private tryParseCommentBlockTask(
+    line: string,
+    path: string,
+    index: number,
+    lines: string[]
+  ): Task | null {
+    if (!this.includeCommentBlocks) {
+      return null;
+    }
+
+    // Extract the content between %% and %%
+    const content = line.replace(/^\s*%%\s*/, '').replace(/\s*%%$/, '');
+
+    if (!this.testRegex.test(content)) {
+      return null;
+    }
+
+    const taskDetails = this.extractTaskDetails(content, this.captureRegex);
+    const { priority, cleanedText } = this.extractPriority(taskDetails.taskText);
+    const { state: finalState, completed: finalCompleted, listMarker: finalListMarker } =
+      this.extractCheckboxState(content, taskDetails.state, taskDetails.listMarker);
+
+    const task: Task = {
+      state: finalState,
+      completed: finalCompleted,
+      text: cleanedText,
+      priority,
+      rawText: content.trim(),
+      path,
+      line: index,
+      indent: taskDetails.indent,
+      listMarker: finalListMarker,
+      scheduledDate: null,
+      deadlineDate: null,
+      tail: taskDetails.tail,
+    };
+
+    // Extract dates from following lines
+    const { scheduledDate, deadlineDate } = this.extractTaskDates(
+      lines,
+      index + 1,
+      taskDetails.indent,
+    );
+
+    task.scheduledDate = scheduledDate;
+    task.deadlineDate = deadlineDate;
+
+    return task;
+  }
+
+  /**
+   * Create a Task from extracted task details
+   * @param line Original line
+   * @param path File path
+   * @param index Line index
+   * @param taskDetails Extracted task details
+   * @param lines All lines in file
+   * @returns Parsed task
+   */
+  private createTaskFromDetails(
+    line: string,
+    path: string,
+    index: number,
+    taskDetails: { indent: string; listMarker: string; taskText: string; tail: string; state: string },
+    lines: string[]
+  ): Task {
+    // Extract priority
+    const { priority, cleanedText } = this.extractPriority(taskDetails.taskText);
+
+    // Extract checkbox state
+    const { state: finalState, completed: finalCompleted, listMarker: finalListMarker } =
+      this.extractCheckboxState(line, taskDetails.state, taskDetails.listMarker);
+
+    // Initialize task with date fields
+    const task: Task = {
+      path,
+      line: index,
+      rawText: line,
+      indent: taskDetails.indent,
+      listMarker: finalListMarker,
+      text: cleanedText,
+      state: finalState,
+      completed: finalCompleted,
+      priority,
+      scheduledDate: null,
+      deadlineDate: null,
+      tail: taskDetails.tail,
+    };
+
+    // Extract dates from following lines
+    const { scheduledDate, deadlineDate } = this.extractTaskDates(
+      lines,
+      index + 1,
+      taskDetails.indent,
+    );
+
+    task.scheduledDate = scheduledDate;
+    task.deadlineDate = deadlineDate;
+
+    return task;
   }
 
   private detectLanguage(lang: string): void {

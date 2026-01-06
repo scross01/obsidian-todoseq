@@ -2,6 +2,7 @@ import { Menu } from 'obsidian';
 import { DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES, DEFAULT_COMPLETED_STATES } from '../task';
 import { TodoTrackerSettings } from '../settings/settings';
 import { App } from 'obsidian';
+import { getPluginSettings } from '../utils/settings-utils';
 
 export class StateMenuBuilder {
   constructor(
@@ -37,20 +38,8 @@ export class StateMenuBuilder {
     ];
     const completedDefaults = Array.from(DEFAULT_COMPLETED_STATES);
 
-    type AppWithPlugins = {
-      plugins?: {
-        plugins?: Record<string, unknown>;
-      };
-    };
-    type HasSettingsWithKeywords = {
-      settings?: {
-        additionalTaskKeywords?: unknown;
-      };
-    };
-    const appWithPlugins = this.app as unknown as AppWithPlugins;
-    // Avoid importing TodoTracker type just to read settings; keep structural typing
-    const maybePlugin = appWithPlugins.plugins?.plugins?.['todoseq'] as unknown as HasSettingsWithKeywords | undefined;
-    const configured = maybePlugin?.settings?.additionalTaskKeywords;
+    const settings = getPluginSettings(this.app);
+    const configured = settings?.additionalTaskKeywords;
     const additional = Array.isArray(configured)
       ? configured.filter((v): v is string => typeof v === 'string' && v.length > 0)
       : [];
