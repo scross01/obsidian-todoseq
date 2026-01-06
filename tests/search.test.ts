@@ -244,9 +244,11 @@ describe('Search functionality', () => {
       additionalTaskKeywords: [],
       includeCodeBlocks: false,
       includeCalloutBlocks: true,
+      includeCommentBlocks: false,
       taskViewMode: 'showAll',
       languageCommentSupport: { enabled: true },
-      weekStartsOn: 'Monday'
+      weekStartsOn: 'Monday',
+      formatTaskKeywords: true
     };
 
     it('should evaluate with settings parameter', () => {

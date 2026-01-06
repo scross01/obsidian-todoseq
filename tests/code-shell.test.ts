@@ -10,11 +10,14 @@ describe('Task parsing within Shell file comments in code blocks', () => {
       refreshInterval: 60,
       includeCalloutBlocks: true,
       includeCodeBlocks: true,
+      includeCommentBlocks: false,
       languageCommentSupport: {
         enabled: true,
       },
       additionalTaskKeywords: [],
-      taskViewMode: 'default'
+      taskViewMode: 'showAll',
+      weekStartsOn: 'Monday',
+      formatTaskKeywords: true
     };
     parser = TaskParser.create(settings);
   });

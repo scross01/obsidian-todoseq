@@ -3,6 +3,7 @@ import { TodoTrackerSettings } from '../src/settings/settings';
 import { Task, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_STATES, DEFAULT_COMPLETED_STATES } from '../src/task';
 
 describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
+  // @ts-ignore
   let parser: TaskParser;
   let settings: TodoTrackerSettings;
 
@@ -15,7 +16,10 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
         enabled: false,
       },
       additionalTaskKeywords: [],
-      taskViewMode: 'default'
+      includeCommentBlocks: false,
+      weekStartsOn: 'Monday',
+      taskViewMode: 'showAll',
+      formatTaskKeywords: true,
     };
     parser = TaskParser.create(settings);
   });
@@ -466,7 +470,10 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
           enabled: false,
         },
         additionalTaskKeywords: [],
-        taskViewMode: 'default'
+        taskViewMode: 'showAll',
+        includeCommentBlocks: false,
+        formatTaskKeywords: true,
+        weekStartsOn: 'Monday',
       };
       parser = TaskParser.create(settings);
     });
@@ -599,7 +606,10 @@ TODO = some code
           enabled: false,
         },
         additionalTaskKeywords: [],
-        taskViewMode: 'default'
+        includeCommentBlocks: false,
+        weekStartsOn: 'Monday',
+        taskViewMode: 'showAll',
+        formatTaskKeywords: true,
       };
       parser = TaskParser.create(settings);
     });

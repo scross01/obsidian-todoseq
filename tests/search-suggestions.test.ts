@@ -1,5 +1,4 @@
 import { SearchSuggestions } from '../src/search/search-suggestions';
-import { SearchSuggestionDropdown } from '../src/search/search-suggestion-dropdown';
 import { Task } from '../src/task';
 import { Vault } from 'obsidian';
 import { TodoTrackerSettings } from '../src/settings/settings';
@@ -836,7 +835,7 @@ describe('Search Suggestions', () => {
         {
           path: 'notes/tasks.md',
           line: 2,
-          rawText: undefined, // Missing rawText
+          rawText: '', // Missing rawText
           indent: '',
           listMarker: '-',
           text: 'task without rawText',
@@ -869,7 +868,8 @@ describe('Search Suggestions', () => {
         languageCommentSupport: {
           enabled: true,
         },
-        weekStartsOn: 'Monday'
+        weekStartsOn: 'Monday',
+        formatTaskKeywords: true
       };
 
       const states = SearchSuggestions.getAllStates(mockSettings);
@@ -912,7 +912,8 @@ describe('Search Suggestions', () => {
         languageCommentSupport: {
           enabled: true,
         },
-        weekStartsOn: 'Monday'
+        weekStartsOn: 'Monday',
+        formatTaskKeywords: true
       };
 
       const states = SearchSuggestions.getAllStates(mockSettings);

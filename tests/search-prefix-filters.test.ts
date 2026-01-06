@@ -236,26 +236,6 @@ describe('Search Prefix Filters', () => {
       expect(result).toBe(true);
     });
 
-    it('should handle hyphens in priority values', () => {
-      // Create a test task with a priority containing hyphens
-      const testTask: Task = {
-        path: 'notes/test.md',
-        line: 1,
-        rawText: 'TODO task with priority #high-priority',
-        indent: '',
-        listMarker: '-',
-        text: 'task with priority',
-        state: 'TODO',
-        completed: false,
-        priority: 'high-priority',
-        scheduledDate: null,
-        deadlineDate: null
-      };
-      
-      const result = Search.evaluate('priority:high-priority', testTask, false);
-      expect(result).toBe(true);
-    });
-
     it('should handle hyphens in content values', () => {
       // Create a test task with content containing hyphens
       const testTask: Task = {

@@ -16,8 +16,9 @@ describe('Regular task parsing', () => {
       },
       additionalTaskKeywords: ["FIXME"],
       taskViewMode: 'showAll',
-      weekStartsOn: 'Monday'
-    };
+      weekStartsOn: 'Monday',
+      formatTaskKeywords: true
+    } as TodoTrackerSettings;
     parser = TaskParser.create(settings);
   });
 
@@ -402,7 +403,7 @@ TODO task text
     });
 
     test(`should match comment blocks when enabled`, () => {
-      const settingsWithCommentBlocks = {
+      const settingsWithCommentBlocks: TodoTrackerSettings = {
         refreshInterval: 60,
         includeCalloutBlocks: true,
         includeCodeBlocks: false,
@@ -412,8 +413,8 @@ TODO task text
         },
         additionalTaskKeywords: ["FIXME"],
         taskViewMode: 'showAll',
-        weekStartsOn: 'Monday'
-      };
+        weekStartsOn: 'Monday',
+        formatTaskKeywords: true };
       const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
 
       const lines = `
@@ -437,7 +438,7 @@ TODO task text
     });
 
     test(`should match comment blocks with different task states`, () => {
-      const settingsWithCommentBlocks = {
+      const settingsWithCommentBlocks: TodoTrackerSettings = {
         refreshInterval: 60,
         includeCalloutBlocks: true,
         includeCodeBlocks: false,
@@ -448,7 +449,8 @@ TODO task text
         additionalTaskKeywords: ["FIXME"],
         taskViewMode: 'showAll',
         weekStartsOn: 'Monday'
-      };
+  ,
+  formatTaskKeywords: true };
       const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
 
       const lines = `
@@ -475,7 +477,7 @@ TODO task text
     });
 
     test(`should match comment blocks with priorities`, () => {
-      const settingsWithCommentBlocks = {
+      const settingsWithCommentBlocks: TodoTrackerSettings = {
         refreshInterval: 60,
         includeCalloutBlocks: true,
         includeCodeBlocks: false,
@@ -486,7 +488,8 @@ TODO task text
         additionalTaskKeywords: ["FIXME"],
         taskViewMode: 'showAll',
         weekStartsOn: 'Monday'
-      };
+  ,
+  formatTaskKeywords: true };
       const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
 
       const lines = `
@@ -509,7 +512,7 @@ TODO task text
     });
 
     test(`should match comment blocks with dates`, () => {
-      const settingsWithCommentBlocks = {
+      const settingsWithCommentBlocks: TodoTrackerSettings = {
         refreshInterval: 60,
         includeCalloutBlocks: true,
         includeCodeBlocks: false,
@@ -519,7 +522,8 @@ TODO task text
         },
         additionalTaskKeywords: ["FIXME"],
         taskViewMode: 'showAll',
-        weekStartsOn: 'Monday'
+        weekStartsOn: 'Monday',
+        formatTaskKeywords: true
       };
       const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
 
@@ -653,7 +657,8 @@ describe('Task parsing with code blocks', () => {
       additionalTaskKeywords: [],
       taskViewMode: 'showAll',
       weekStartsOn: 'Monday'
-    };
+ ,
+ formatTaskKeywords: true };
     parser = TaskParser.create(settings);
   });
 
@@ -697,7 +702,8 @@ describe('Task parsing within langauge spefic comments in code blocks', () => {
       additionalTaskKeywords: [],
       taskViewMode: 'showAll',
       weekStartsOn: 'Monday'
-    };
+ ,
+ formatTaskKeywords: true };
     parser = TaskParser.create(settings);
   });
 
@@ -769,4 +775,3 @@ TODO 🇨🇦 Canadian flag
     });
   });
 });
-
