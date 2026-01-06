@@ -1306,9 +1306,10 @@ export class TodoView extends ItemView {
     if (targetLeaf.view instanceof MarkdownView) {
       const markdownView = targetLeaf.view;
       const editor = markdownView.editor;
-      const pos = { line: task.line, ch: 0 };
+      const lineContent = editor.getLine(task.line);
+      const pos = { line: task.line, ch: lineContent.length };
       editor.setCursor(pos);
-      try { (markdownView as unknown as { setEphemeralState?: (state: { line: number; col: number }) => void }).setEphemeralState?.({ line: task.line, col: 0 }); } catch (_) {}
+      try { (markdownView as unknown as { setEphemeralState?: (state: { line: number; col: number }) => void }).setEphemeralState?.({ line: task.line, col: lineContent.length }); } catch (_) {}
       editor.scrollIntoView({ from: pos, to: pos }, true);
     }
 
