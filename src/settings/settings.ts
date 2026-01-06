@@ -71,8 +71,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Additional task Keywords')
-      .setDesc('Capitalised list of keywords for treat as tasks (e.g. FIXME, HACK). Leave empty for none.')
+      .setName('Additional task keywords')
+      .setDesc('Capitalized list of keywords to treat as tasks (e.g. FIXME, HACK). Leave empty for none.')
       .addText(text => {
         const current = this.plugin.settings.additionalTaskKeywords ?? [];
         text
@@ -287,7 +287,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Task View mode')
+      .setName('Task view mode')
       .setDesc('Choose how completed items are shown in the task view.')
       .addDropdown(drop => {
         drop.addOption('showAll', 'Show all tasks');
