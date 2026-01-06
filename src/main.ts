@@ -26,6 +26,9 @@ export default class TodoTracker extends Plugin {
   // Task formatting instances
   private taskFormatters: Map<string, any> = new Map();
 
+  // Status bar manager for task count
+  private statusBarManager: any | null = null;
+
   // Shared comparator to avoid reallocation and ensure consistent ordering
   private readonly taskComparator = (a: Task, b: Task): number => {
     if (a.path === b.path) return a.line - b.line;
@@ -106,6 +109,9 @@ export default class TodoTracker extends Plugin {
    // Setup task formatting based on current settings
    this.setupTaskFormatting();
 
+   // Setup status bar manager
+   this.setupStatusBarManager();
+
    // Set up periodic refresh using VaultScanner
    this.vaultScanner.setupPeriodicRefresh(this.settings.refreshInterval);
 
@@ -144,6 +150,12 @@ export default class TodoTracker extends Plugin {
   onunload() {
     // Clean up VaultScanner resources
     this.vaultScanner?.destroy();
+  
+    // Clean up status bar manager
+    if (this.statusBarManager) {
+      this.statusBarManager.cleanup();
+      this.statusBarManager = null;
+    }
   }
 
   // Obsidian lifecycle method called to settings are loaded
@@ -201,6 +213,16 @@ export default class TodoTracker extends Plugin {
     
     // Force refresh of all visible markdown editors to apply new formatting
     this.refreshVisibleEditorDecorations();
+  }
+
+  // Setup status bar manager for task count
+  private setupStatusBarManager(): void {
+    import('./view/status-bar').then((module) => {
+      this.statusBarManager = new module.StatusBarManager(this);
+      this.statusBarManager.setupStatusBarItem();
+    }).catch(error => {
+      console.error('Failed to load status bar manager:', error);
+    });
   }
   
   // Force refresh of editor decorations in all visible markdown editors

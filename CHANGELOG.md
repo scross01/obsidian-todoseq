@@ -9,6 +9,7 @@ This release introduces formatting and interactivity for tasks is the editor vie
 - Added a single click action to the task keyword in the editor to cycle through the task states (TODO -> DOING -> DONE).
 - Added task state update when a task checkbox is toggled in the editor.
 - Refined the task count and search suggestions when completed tasks are hidden.
+- Added status bar entry to show task count (not completed tasks) for the current page
 
 ## 0.6.2
 

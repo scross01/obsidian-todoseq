@@ -1,0 +1,113 @@
+import TodoTracker from '../main';
+import { Task } from '../task';
+import { TodoView } from './task-view';
+import { TFile } from 'obsidian';
+
+export class StatusBarManager {
+  private statusBarItem: HTMLElement | null = null;
+  
+  constructor(private plugin: TodoTracker) {}
+  
+  // Setup status bar item for task count
+  setupStatusBarItem(): void {
+    // Create status bar item
+    this.statusBarItem = this.plugin.addStatusBarItem();
+    this.statusBarItem.style.order = '-1'; // Move to beginning
+    this.statusBarItem.style.marginRight = 'auto'; // Push other items to right
+    this.statusBarItem.addClass('mod-clickable')
+    
+    // Add click event listener
+    if (this.statusBarItem) {
+      this.statusBarItem.addEventListener('click', () => {
+        this.handleStatusBarClick();
+      });
+    }
+    
+    // Update status bar item when tasks change
+    this.getVaultScanner()?.on('tasks-changed', (tasks: Task[]) => {
+      this.updateStatusBarItem(tasks);
+    });
+    
+    // Update status bar item when active file changes
+    this.plugin.registerEvent(
+      this.plugin.app.workspace.on('active-leaf-change', () => {
+        this.updateStatusBarItem(this.getTasks());
+      })
+    );
+  }
+  
+  // Update status bar item with current task count
+  updateStatusBarItem(tasks: Task[]): void {
+    if (!this.statusBarItem) return;
+    
+    const activeFile = this.plugin.app.workspace.getActiveFile();
+    if (!activeFile) {
+      this.statusBarItem.setText('');
+      return;
+    }
+    
+    // Count incomplete tasks for the current file
+    const incompleteTasks = tasks.filter(task =>
+      task.path === activeFile.path && !task.completed
+    );
+    
+    // Format as "X tasks" instead of "Tasks: X"
+    const taskCount = incompleteTasks.length;
+    this.statusBarItem.setText(`${taskCount} task${taskCount !== 1 ? 's' : ''}`);
+  }
+  
+  // Handle click on status bar item
+  handleStatusBarClick(): void {
+    const activeFile = this.plugin.app.workspace.getActiveFile();
+    if (!activeFile) return;
+    
+    // Open/focus the TODOseq Task View
+    this.plugin.showTasks();
+    
+    // Populate the search filter with file name only
+    // Omit path filter for files without parent directory
+    const hasParentDirectory = activeFile.path.contains('/');
+    const pathFilter = hasParentDirectory ? `path:"${(activeFile as TFile).parent?.path || ''}" ` : '';
+    const fileFilter = `file:"${activeFile.basename}"`;
+    const searchQuery = pathFilter + fileFilter;
+    
+    const leaves = this.plugin.app.workspace.getLeavesOfType(TodoView.viewType);
+    if (leaves.length > 0) {
+      const view = leaves[0].view as TodoView;
+      if (view) {
+        // Use the public method to set search query
+        this.setTaskViewSearchQuery(view, searchQuery);
+      }
+    }
+  }
+  
+  // Public method to set search query on a TodoView
+  private setTaskViewSearchQuery(view: TodoView, query: string): void {
+    // Access the private method through the content element attribute
+    view.contentEl.setAttr('data-search', query);
+    // Also update the search input element if it exists
+    const searchInput = view.contentEl.querySelector('.search-input-container input');
+    if (searchInput instanceof HTMLInputElement) {
+      searchInput.value = query;
+    }
+    // Trigger a refresh to apply the new search query
+    view.refreshVisibleList();
+  }
+  
+  // Clean up status bar item
+  cleanup(): void {
+    if (this.statusBarItem) {
+      this.statusBarItem.remove();
+      this.statusBarItem = null;
+    }
+  }
+  
+  // Helper methods to access plugin internals
+  private getVaultScanner() {
+    return (this.plugin as any).vaultScanner;
+  }
+  
+  private getTasks(): Task[] {
+    return (this.plugin as any).tasks || [];
+  }
+}
