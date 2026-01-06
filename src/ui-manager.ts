@@ -1,0 +1,403 @@
+import { MarkdownView, WorkspaceLeaf, TFile } from 'obsidian';
+import { EditorView } from '@codemirror/view';
+import TodoTracker from './main';
+import { DEFAULT_COMPLETED_STATES, NEXT_STATE } from './task';
+import { taskKeywordPlugin } from './view/task-formatting';
+import { TodoView } from './view/task-view';
+
+export class UIManager {
+  constructor(private plugin: TodoTracker) {}
+  
+  /**
+   * Setup task formatting based on current settings
+   */
+  setupTaskFormatting(): void {
+    this.updateTaskFormatting();
+    this.setupCheckboxEventListeners();
+  }
+
+  /**
+   * Setup editor decorations for task formatting
+   */
+  setupEditorDecorations(): void {
+    // Register editor extension for all markdown editors
+    const extension = this.plugin.registerEditorExtension([
+      taskKeywordPlugin(this.plugin.settings)
+    ]);
+    this.plugin.taskFormatters.set('editor-extension', extension);
+  }
+
+  /**
+   * Setup event listeners for checkbox interactions
+   */
+  setupCheckboxEventListeners(): void {
+    if (!this.plugin.settings.formatTaskKeywords) {
+      return;
+    }
+
+    // Set up event listeners on all active markdown editors immediately
+    const setupEditorListeners = () => {
+      const leaves = this.plugin.app.workspace.getLeavesOfType('markdown');
+      leaves.forEach((leaf) => {
+        const view = leaf.view;
+        if (view instanceof MarkdownView && view.editor) {
+          const cmEditor = (view.editor as any)?.cm;
+          if (cmEditor && cmEditor.dom) {
+            const editorContent = cmEditor.dom;
+            
+            // Add event listener for click events on checkboxes and task keywords
+            const clickHandler = (event: MouseEvent) => {
+              const target = event.target as HTMLElement;
+              
+              // Handle checkbox clicks
+              if (target.classList.contains('task-list-item-checkbox')) {
+                this.handleCheckboxToggle(target as HTMLInputElement);
+              }
+              // Handle task keyword clicks
+              else if (target.classList.contains('todoseq-keyword-formatted')) {
+                // Handle task state update with double-click detection
+                this.handleTaskKeywordClickWithDoubleClickDetection(target, view, event);
+              }
+            };
+            
+            editorContent.addEventListener('click', clickHandler, { capture: true });
+          }
+        }
+      });
+    };
+    
+    setupEditorListeners();
+    
+    // Also set up listeners for newly opened editors
+    this.plugin.registerEvent(
+      this.plugin.app.workspace.on('layout-change', setupEditorListeners)
+    );
+  }
+
+  private handleCheckboxToggle(checkbox: HTMLInputElement): void {
+   // Find the task keyword span in the same line
+   const lineElement = checkbox.closest('.cm-line, .HyperMD-task-line');
+   if (!lineElement) {
+     return;
+   }
+
+   // Find the task keyword span
+   const keywordSpan = lineElement.querySelector('.todoseq-keyword-formatted');
+   if (!keywordSpan) {
+     return;
+   }
+
+   // Get current keyword
+   const currentKeyword = keywordSpan.getAttribute('data-task-keyword');
+   if (!currentKeyword) {
+     return;
+   }
+
+   // Determine new state based on checkbox state
+   let newKeyword = currentKeyword;
+   if (checkbox.checked) {
+     // Checkbox checked -> change to DONE
+     newKeyword = 'DONE';
+   } else {
+     // Checkbox unchecked -> change to TODO
+     newKeyword = 'TODO';
+   }
+
+   // Update the keyword text and data attribute directly in the DOM
+   keywordSpan.textContent = newKeyword;
+   keywordSpan.setAttribute('data-task-keyword', newKeyword);
+   keywordSpan.setAttribute('aria-label', `Task keyword: ${newKeyword}`);
+  }
+
+  private async handleTaskKeywordClick(keywordElement: HTMLElement, view: MarkdownView): Promise<void> {
+    // Prevent default behavior and stop propagation
+    const event = window.event as MouseEvent;
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    // Get current keyword
+    const currentKeyword = keywordElement.getAttribute('data-task-keyword');
+    if (!currentKeyword) {
+      return;
+    }
+
+    // Cycle to the next state using NEXT_STATE map
+    const nextState = NEXT_STATE.get(currentKeyword) || 'TODO';
+
+    // Update the task state directly in the DOM
+    keywordElement.textContent = nextState;
+    keywordElement.setAttribute('data-task-keyword', nextState);
+    keywordElement.setAttribute('aria-label', `Task keyword: ${nextState}`);
+
+    // Update the checkbox state to match the new task state
+    this.updateCheckboxState(keywordElement, nextState);
+   }
+
+  /**
+   * Handle task keyword click with double-click detection
+   * Uses a timeout to determine if a second click occurs (double-click)
+   */
+  private pendingClickTimeout: number | null = null;
+  private lastClickedElement: HTMLElement | null = null;
+  private lastClickTime = 0;
+
+  private handleTaskKeywordClickWithDoubleClickDetection(keywordElement: HTMLElement, view: MarkdownView, event: MouseEvent): void {
+    const currentTime = Date.now();
+    const isDoubleClick = (
+      this.lastClickedElement === keywordElement &&
+      currentTime - this.lastClickTime < 300
+    );
+
+    // Clear any pending single click timeout
+    if (this.pendingClickTimeout) {
+      clearTimeout(this.pendingClickTimeout);
+      this.pendingClickTimeout = null;
+    }
+
+    // If this is a double click, don't process it - let browser handle word selection
+    if (isDoubleClick) {
+      this.lastClickedElement = null;
+      this.lastClickTime = 0;
+      return; // Don't process this as a single click
+    }
+
+    // Store the clicked element and time for double-click detection
+    this.lastClickedElement = keywordElement;
+    this.lastClickTime = currentTime;
+
+    // Set a timeout to process as single click if no second click occurs
+    this.pendingClickTimeout = window.setTimeout(() => {
+      this.pendingClickTimeout = null;
+      this.lastClickedElement = null;
+      this.lastClickTime = 0;
+      
+      // Process as single click
+      this.handleTaskKeywordClick(keywordElement, view);
+    }, 300); // Standard double-click detection window
+  }
+
+  /**
+   * Find the checkbox element in the same task line and update its state
+   */
+  private updateCheckboxState(keywordElement: HTMLElement, newState: string): void {
+   // Check if the new state is a completed state
+   const isCompleted = DEFAULT_COMPLETED_STATES.has(newState);
+
+   // Find the checkbox element in the same task line
+   // The checkbox is an input element with class task-list-item-checkbox
+   const taskLine = keywordElement.closest('.HyperMD-task-line, .cm-line');
+
+   if (taskLine) {
+     const checkbox = taskLine.querySelector('.task-list-item-checkbox, input[type="checkbox"]');
+
+     if (checkbox && checkbox instanceof HTMLInputElement) {
+       // Update the checkbox checked property for completed states
+       checkbox.checked = isCompleted;
+     }
+   }
+
+   // Update the markdown text for the checkbox state
+   this.updateMarkdownCheckboxState(keywordElement, isCompleted);
+  }
+
+  /**
+   * Get the EditorView from a DOM element
+   */
+  private getEditorViewFromElement(element: HTMLElement): EditorView | null {
+   // Find the closest CodeMirror editor container
+   const editorContainer = element.closest('.cm-editor') as HTMLElement | null;
+   if (!editorContainer) {
+     return null;
+   }
+
+   // Get the EditorView from the container
+   // In Obsidian, the EditorView is typically stored in the editor.cm property
+   const markdownView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+   if (markdownView && markdownView.editor) {
+     const cmEditor = (markdownView.editor as any)?.cm;
+     if (cmEditor) {
+       return cmEditor;
+     }
+   }
+
+   return null;
+  }
+
+  /**
+   * Update the markdown text for the checkbox state using EditorView.posAtDOM()
+   */
+  private updateMarkdownCheckboxState(keywordElement: HTMLElement, isCompleted: boolean): void {
+   try {
+     // Find the task line element
+     const taskLine = keywordElement.closest('.HyperMD-task-line, .cm-line') as HTMLElement | null;
+     if (!taskLine) {
+       return;
+     }
+
+     // Get the EditorView
+     const editorView = this.getEditorViewFromElement(taskLine);
+     if (!editorView) {
+       return;
+     }
+
+     // Use EditorView.posAtDOM() to get the position of the task line
+     const pos = editorView.posAtDOM(taskLine);
+     if (pos === null) {
+       return;
+     }
+
+     // Get the line number
+     const lineNumber = editorView.state.doc.lineAt(pos).number;
+
+     // Get the current line content
+     const line = editorView.state.doc.line(lineNumber);
+     const lineText = line.text;
+
+     // Find the checkbox in the line text (should be at the beginning)
+     const checkboxMatch = lineText.match(/^(\s*)(\[[ xX]?\])\s*/);
+     if (!checkboxMatch) {
+       return;
+     }
+
+     // Update the checkbox state
+     const newCheckbox = isCompleted ? '[x]' : '[ ]';
+     const newLineText = lineText.replace(checkboxMatch[2], newCheckbox);
+
+     // Replace the line in the document
+     const from = line.from;
+     const to = line.to;
+     editorView.dispatch({
+       changes: {
+         from: from,
+         to: to,
+         insert: newLineText
+       }
+     });
+
+   } catch (error) {
+     console.error('Failed to update markdown checkbox state:', error);
+     // Fallback: just update the DOM checkbox state
+   }
+  }
+
+  /**
+   * Update task formatting based on current settings
+   */
+  updateTaskFormatting(): void {
+    // Clear existing decorations
+    this.clearEditorDecorations();
+    
+    // Re-setup decorations with current settings
+    if (this.plugin.settings.formatTaskKeywords) {
+      this.setupEditorDecorations();
+    }
+  }
+
+  /**
+   * Clear editor decorations
+   */
+  clearEditorDecorations(): void {
+    // Clear editor decorations by registering an empty extension
+    const emptyExtension = this.plugin.registerEditorExtension([]);
+    this.plugin.taskFormatters.set('editor-extension', emptyExtension);
+  }
+
+  /**
+   * Setup task keyword context menu
+   */
+  setupTaskKeywordContextMenu(): void {
+    // Add event listener for right-click on task keywords
+    this.plugin.registerEvent(
+      this.plugin.app.workspace.on('file-open', (file) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          // Small delay to allow editor to fully load
+          setTimeout(() => {
+            this.addContextMenuToEditor();
+          }, 100);
+        }
+      })
+    );
+    
+    // Also add to currently active editor if any
+    this.addContextMenuToEditor();
+  }
+
+  /**
+   * Add context menu to the current editor
+   */
+  private addContextMenuToEditor(): void {
+    const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    if (activeView) {
+      const editorContainer = activeView.containerEl;
+      const cmEditor = editorContainer.querySelector('.cm-editor');
+      
+      if (cmEditor) {
+        cmEditor.addEventListener('contextmenu', (evt: MouseEvent) => {
+          const target = evt.target as HTMLElement;
+          
+          // Check if the right-click was on a task keyword element
+          if (target.hasAttribute('data-task-keyword')) {
+            evt.preventDefault();
+            evt.stopPropagation();
+            
+            // Get the task keyword and line information
+            const keyword = target.getAttribute('data-task-keyword');
+            
+            if (keyword && activeView.file && this.plugin.editorKeywordMenu) {
+              // Open the context menu
+              this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(keyword, target, evt);
+            }
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Show the tasks view
+   */
+  async showTasks(): Promise<void> {
+    const { workspace } = this.plugin.app;
+
+    // Create new leaf or use existing
+    let leaf: WorkspaceLeaf | null = null;
+    const leaves = workspace.getLeavesOfType(TodoView.viewType);
+
+    if (leaves.length > 0) {
+      leaf = leaves[0];
+      // Only reveal if the leaf is not already active to avoid focus stealing
+      const activeLeaf = workspace.activeLeaf;
+      if (activeLeaf !== leaf) {
+        await workspace.revealLeaf(leaf);
+      }
+    } else {
+      leaf = workspace.getLeaf(true);
+      leaf.setViewState({ type: TodoView.viewType, active: true });
+      // Only reveal if the leaf is not already active to avoid focus stealing
+      const activeLeaf = workspace.activeLeaf;
+      if (activeLeaf !== leaf) {
+        await workspace.revealLeaf(leaf);
+      }
+    }
+  }
+
+  /**
+   * Refresh all open task views
+   */
+  async refreshOpenTaskViews(): Promise<void> {
+    const { workspace } = this.plugin.app;
+    const leaves = workspace.getLeavesOfType(TodoView.viewType);
+
+    for (const leaf of leaves) {
+      if (leaf.view instanceof TodoView) {
+        leaf.view.tasks = this.plugin.tasks;
+        // Update the dropdown's task reference so it uses the latest tasks
+        leaf.view.updateTasks(this.plugin.tasks);
+        // Lighter refresh: only update the visible list rather than full onOpen re-init
+        leaf.view.refreshVisibleList();
+      }
+    }
+  }
+}
