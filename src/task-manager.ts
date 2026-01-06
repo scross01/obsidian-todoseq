@@ -1,6 +1,7 @@
 import { Editor, MarkdownView } from 'obsidian';
 import { Task } from './task';
 import TodoTracker from './main';
+import { extractPriority, CHECKBOX_REGEX } from './utils/task-utils';
 
 export class TaskManager {
   constructor(private plugin: TodoTracker) {}
@@ -34,18 +35,12 @@ export class TaskManager {
     const taskText = match[5];
     const tail = match[6];
 
-    // Extract priority
-    let priority: 'high' | 'med' | 'low' | null = null;
-    const cleanedText = taskText.replace(/(\s*)\[#([ABC])\](\s*)/, (match: string, before: string, letter: string, after: string) => {
-      if (letter === 'A') priority = 'high';
-      else if (letter === 'B') priority = 'med';
-      else if (letter === 'C') priority = 'low';
-      return ' ';
-    }).replace(/[ \t]+/g, ' ').trimStart();
+    // Extract priority using shared utility
+    const { priority, cleanedText } = extractPriority(taskText);
 
-    // Extract checkbox state
+    // Extract checkbox state using shared regex
     let completed = false;
-    const checkboxMatch = line.match(/^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/);
+    const checkboxMatch = CHECKBOX_REGEX.exec(line);
     if (checkboxMatch) {
       const [, , , checkboxStatus] = checkboxMatch;
       completed = checkboxStatus === 'x';

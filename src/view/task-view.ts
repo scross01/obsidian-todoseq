@@ -7,6 +7,7 @@ import { Search } from '../search/search';
 import { SearchOptionsDropdown } from './search-options-dropdown';
 import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
 import { TodoTrackerSettings } from '../settings/settings';
+import { taskComparator } from '../utils/task-utils';
 
 
 export type TaskViewMode = 'showAll' | 'sortCompletedLast' | 'hideCompleted';
@@ -130,12 +131,8 @@ export class TodoView extends ItemView {
     const sortMethod = this.getSortMethod();
     
     if (sortMethod === 'default') {
-      // Sort by file path, then by line number within each file
-      tasks.sort((a, b) => {
-        const pathCompare = a.path.localeCompare(b.path);
-        if (pathCompare !== 0) return pathCompare;
-        return a.line - b.line;
-      });
+      // Sort by file path, then by line number within each file using shared comparator
+      tasks.sort(taskComparator);
     } else if (sortMethod === 'sortByScheduled') {
       tasks.sort((a, b) => {
         // Tasks without scheduled dates go to the end
@@ -163,7 +160,7 @@ export class TodoView extends ItemView {
           return bPriority - aPriority; // Higher priority first (descending)
         }
         
-        // If priorities are equal, fall back to default sorting
+        // If priorities are equal, fall back to default sorting using shared comparator
         const pathCompare = a.path.localeCompare(b.path);
         if (pathCompare !== 0) return pathCompare;
         return a.line - b.line;

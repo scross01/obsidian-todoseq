@@ -2,6 +2,7 @@ import { Task, DEFAULT_COMPLETED_STATES, DEFAULT_PENDING_STATES, DEFAULT_ACTIVE_
 import { TodoTrackerSettings } from "../settings/settings";
 import { LanguageRegistry, LanguageDefinition, LanguageCommentSupportSettings } from "./language-registry";
 import { DateParser } from "./date-parser";
+import { extractPriority, CHECKBOX_REGEX } from '../utils/task-utils';
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
@@ -351,23 +352,7 @@ export class TaskParser {
    * @returns Priority information
    */
   private extractPriority(taskText: string): { priority: 'high' | 'med' | 'low' | null; cleanedText: string } {
-    let priority: 'high' | 'med' | 'low' | null = null;
-    let cleanedText = taskText;
-    
-    // look for [#A] [#B] or [#C]
-    const priMatch = /(\s*)\[#([ABC])\](\s*)/.exec(cleanedText);
-    if (priMatch) {
-      const letter = priMatch[2];
-      if (letter === 'A') priority = 'high';
-      else if (letter === 'B') priority = 'med';
-      else if (letter === 'C') priority = 'low';
-
-      const before = cleanedText.slice(0, priMatch.index);
-      const after = cleanedText.slice(priMatch.index + priMatch[0].length);
-      cleanedText = (before + ' ' + after).replace(/[ \t]+/g, ' ').trimStart();
-    }
-
-    return { priority, cleanedText };
+    return extractPriority(taskText);
   }
 
   /**
@@ -388,10 +373,10 @@ export class TaskParser {
     
     // Check if this is a markdown checkbox task and extract checkbox status
     // For callout blocks, we need to handle the > prefix
-    let checkboxMatch = line.match(/^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/);
+    let checkboxMatch = CHECKBOX_REGEX.exec(line);
     if (!checkboxMatch && line.startsWith('>')) {
       // Try again without the > prefix for callout blocks
-      checkboxMatch = line.substring(1).match(/^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/);
+      checkboxMatch = CHECKBOX_REGEX.exec(line.substring(1));
     }
     
     if (checkboxMatch) {

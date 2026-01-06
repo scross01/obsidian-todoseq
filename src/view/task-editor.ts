@@ -1,5 +1,6 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
 import { Task, DEFAULT_COMPLETED_STATES, NEXT_STATE } from '../task';
+import { CHECKBOX_REGEX } from '../utils/task-utils';
 
 export class TaskEditor {
   /**
@@ -18,8 +19,8 @@ export class TaskEditor {
     const priorityPart = priToken ? ` ${priToken}` : '';
     const textPart = task.text ? ` ${task.text}` : '';
     
-    // Check if the original task was a markdown checkbox
-    const isCheckbox = task.rawText.trim().match(/^(\s*[-*+]\s+)\[(\s|x)\]\s+(\w+)\s+/);
+    // Check if the original task was a markdown checkbox using shared regex
+    const isCheckbox = task.rawText.trim().match(CHECKBOX_REGEX);
     let newLine: string;
     
     if (isCheckbox) {

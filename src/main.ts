@@ -11,6 +11,7 @@ import { StatusBarManager } from './view/status-bar';
 import { TaskManager } from './task-manager';
 import { UIManager } from './ui-manager';
 import { PluginLifecycleManager } from './plugin-lifecycle';
+import { taskComparator } from './utils/task-utils';
 
 export const TASK_VIEW_ICON = "list-todo";
 
@@ -30,12 +31,6 @@ export default class TodoTracker extends Plugin {
   public taskFormatters: Map<string, any> = new Map();
   public statusBarManager: StatusBarManager | null = null;
   
-  // Shared comparator to avoid reallocation and ensure consistent ordering
-  private readonly taskComparator = (a: Task, b: Task): number => {
-    if (a.path === b.path) return a.line - b.line;
-    return a.path.localeCompare(b.path);
-  };
-
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
     return this.vaultScanner;

@@ -2,6 +2,7 @@ import { SearchNode } from './search-types';
 import { Task } from '../task';
 import { DateUtils } from '../view/date-utils';
 import { TodoTrackerSettings } from '../settings/settings';
+import { getFilename } from '../utils/task-utils';
 
 export class SearchEvaluator {
   
@@ -134,9 +135,8 @@ export class SearchEvaluator {
   private static evaluateFileFilter(value: string, task: Task, caseSensitive: boolean): boolean {
     if (!task.path) return false;
     
-    // Extract just the filename
-    const lastSlash = task.path.lastIndexOf('/');
-    const filename = lastSlash >= 0 ? task.path.slice(lastSlash + 1) : task.path;
+    // Extract just the filename using shared utility
+    const filename = getFilename(task.path);
     
     const searchText = caseSensitive ? value : value.toLowerCase();
     const targetFilename = caseSensitive ? filename : filename.toLowerCase();
@@ -203,10 +203,8 @@ export class SearchEvaluator {
     if (task.text) fields.push(task.text);
     if (task.path) {
       fields.push(task.path);
-      // Also add just the filename
-      const lastSlash = task.path.lastIndexOf('/');
-      const filename = lastSlash >= 0 ? task.path.slice(lastSlash + 1) : task.path;
-      fields.push(filename);
+      // Also add just the filename using shared utility
+      fields.push(getFilename(task.path));
     }
     
     return fields;

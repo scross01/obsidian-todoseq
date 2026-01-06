@@ -2,6 +2,7 @@ import { App, TFile, TAbstractFile } from 'obsidian';
 import { Task } from '../task';
 import { TaskParser } from '../parser/task-parser';
 import { TodoTrackerSettings } from '../settings/settings';
+import { taskComparator } from '../utils/task-utils';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -16,12 +17,6 @@ export class VaultScanner {
   private _isScanning = false;
   private refreshIntervalId: number | null = null;
   private eventListeners: Map<keyof VaultScannerEvents, Function[]> = new Map();
-  
-  // Shared comparator to ensure consistent task ordering
-  private readonly taskComparator = (a: Task, b: Task): number => {
-    if (a.path === b.path) return a.line - b.line;
-    return a.path.localeCompare(b.path);
-  };
   
   constructor(
     private app: App,
@@ -86,7 +81,7 @@ export class VaultScanner {
       }
       
       // Default sort
-      this.tasks.sort(this.taskComparator);
+      this.tasks.sort(taskComparator);
       
       // Emit tasks-changed event with new task list
       this.emit('tasks-changed', [...this.tasks]);
@@ -143,7 +138,7 @@ export class VaultScanner {
       }
 
       // Maintain default sort after incremental updates
-      this.tasks.sort(this.taskComparator);
+      this.tasks.sort(taskComparator);
 
       // Emit tasks-changed event with updated task list
       this.emit('tasks-changed', [...this.tasks]);
@@ -165,7 +160,7 @@ export class VaultScanner {
       }
       
       // Keep sorted state
-      this.tasks.sort(this.taskComparator);
+      this.tasks.sort(taskComparator);
       
       // Emit tasks-changed event with updated task list
       this.emit('tasks-changed', [...this.tasks]);
