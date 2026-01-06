@@ -40,19 +40,27 @@ export class TaskEditor {
     return { newLine, completed };
   }
 
-  // Applies the change and returns an updated, immutable snapshot of the Task
+  /**
+   * Applies the change and returns an updated, immutable snapshot of the Task.
+   *
+   * File Operation Strategy:
+   * - For active files: Uses Editor API (editor.replaceRange) to preserve cursor position, selection, and folds
+   * - For inactive files: Uses Vault.process() for atomic background operations that prevent plugin conflicts
+   */
   async applyLineUpdate(task: Task, newState: string, keepPriority = true): Promise<Task> {
     const { newLine, completed } = TaskEditor.generateTaskLine(task, newState, keepPriority);
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file instanceof TFile) {
       // Check if target is the active file in a MarkdownView
+      // Using getActiveViewOfType() is safer than accessing workspace.activeLeaf directly
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
       const isActive = md?.file?.path === task.path;
       const editor = md?.editor;
 
       if (isActive && editor) {
         // Replace only the specific line using Editor API to preserve editor state
+        // This maintains cursor position, selection, and code folds for better UX
         const currentLine = editor.getLine(task.line);
         if (typeof currentLine === 'string') {
           const from: EditorPosition = { line: task.line, ch: 0 };

@@ -98,6 +98,11 @@ export class VaultScanner {
     }
   }
   
+  /**
+   * Scans a single file for tasks using Vault.read() API for safe, serialized file reading
+   *
+   * @param file The TFile to scan for tasks
+   */
   async scanFile(file: TFile): Promise<void> {
     const content = await this.app.vault.read(file);
 
@@ -110,7 +115,16 @@ export class VaultScanner {
     this.tasks.push(...parsed);
   }
   
-  // Handle file change, rescan for tasks
+  /**
+   * Handles file change events (create, modify, delete) with incremental updates.
+   *
+   * File Operation Strategy:
+   * - Uses getAbstractFileByPath() for direct file lookup (better performance than iteration)
+   * - Filters by file extension to only process .md files (avoids unnecessary processing)
+   * - Checks file existence before operations to handle delete events safely
+   *
+   * @param file The file that changed
+   */
   async handleFileChange(file: TAbstractFile): Promise<void> {
     try {
       // Only process Markdown files
@@ -120,6 +134,7 @@ export class VaultScanner {
       this.tasks = this.tasks.filter(task => task.path !== file.path);
 
       // Check if the file still exists before attempting to read it (delete events)
+      // Using getAbstractFileByPath() is more efficient than iterating all files
       const stillExists = this.app.vault.getAbstractFileByPath(file.path) instanceof TFile;
       if (stillExists) {
         // Re-scan the file
