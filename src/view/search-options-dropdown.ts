@@ -27,9 +27,7 @@ export class SearchOptionsDropdown {
 
         // Create dropdown container
         this.containerEl = document.createElement('div');
-        this.containerEl.style.position = 'absolute';
-        this.containerEl.style.zIndex = '1000';
-        this.containerEl.style.display = 'none';
+        this.containerEl.addClass('todoseq-dropdown');
         
         // Add to document body
         document.body.appendChild(this.containerEl);
@@ -346,7 +344,7 @@ export class SearchOptionsDropdown {
         if (this.isShowing) return;
         
         this.updatePosition();
-        this.containerEl.style.display = 'block';
+        this.containerEl.addClass('show');
         this.isShowing = true;
         
         // Scroll selected item into view
@@ -359,7 +357,7 @@ export class SearchOptionsDropdown {
     public hide(): void {
         if (!this.isShowing) return;
         
-        this.containerEl.style.display = 'none';
+        this.containerEl.removeClass('show');
         this.isShowing = false;
         this.selectedIndex = -1;
     }

@@ -273,3 +273,20 @@
   text-decoration: line-through;
   text-decoration-color: var(--text-muted);
 }
+
+/* Dropdown containers for search suggestions and options */
+.todoseq-dropdown {
+  position: absolute;
+  z-index: 1000;
+  display: none;
+}
+
+.todoseq-dropdown.show {
+  display: block;
+}
+
+/* Status bar item styling */
+.todoseq-status-bar {
+  order: -1;
+  margin-right: auto;
+}

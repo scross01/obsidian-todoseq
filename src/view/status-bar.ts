@@ -12,9 +12,8 @@ export class StatusBarManager {
   setupStatusBarItem(): void {
     // Create status bar item
     this.statusBarItem = this.plugin.addStatusBarItem();
-    this.statusBarItem.style.order = '-1'; // Move to beginning
-    this.statusBarItem.style.marginRight = 'auto'; // Push other items to right
     this.statusBarItem.addClass('mod-clickable')
+    this.statusBarItem.addClass('todoseq-status-bar')
     
     // Add click event listener
     if (this.statusBarItem) {
