@@ -66,7 +66,7 @@ export class StatusBarManager {
     // Populate the search filter with file name only
     // Omit path filter for files without parent directory
     const hasParentDirectory = activeFile.path.contains('/');
-    const pathFilter = hasParentDirectory ? `path:"${(activeFile as TFile).parent?.path || ''}" ` : '';
+    const pathFilter = hasParentDirectory && activeFile instanceof TFile ? `path:"${activeFile.parent?.path || ''}" ` : '';
     const fileFilter = `file:"${activeFile.basename}"`;
     const searchQuery = pathFilter + fileFilter;
     
@@ -103,10 +103,10 @@ export class StatusBarManager {
   
   // Helper methods to access plugin internals
   private getVaultScanner() {
-    return (this.plugin as any).vaultScanner;
+    return (this.plugin as TodoTracker).getVaultScanner();
   }
   
   private getTasks(): Task[] {
-    return (this.plugin as any).tasks || [];
+    return (this.plugin as TodoTracker).getTasks();
   }
 }

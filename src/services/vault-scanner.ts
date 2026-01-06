@@ -1,6 +1,7 @@
 import { App, TFile, TAbstractFile } from 'obsidian';
 import { Task } from '../task';
 import { TaskParser } from '../parser/task-parser';
+import { TodoTrackerSettings } from '../settings/settings';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -24,7 +25,7 @@ export class VaultScanner {
   
   constructor(
     private app: App,
-    private settings: any,
+    private settings: TodoTrackerSettings,
     private parser: TaskParser
   ) {
     // Initialize event listeners map
@@ -207,7 +208,7 @@ export class VaultScanner {
   }
   
   // Update settings and recreate parser if needed
-  updateSettings(newSettings: any): void {
+  updateSettings(newSettings: TodoTrackerSettings): void {
     this.settings = newSettings;
     // Recreate parser with new settings
     this.updateParser(TaskParser.create(newSettings));

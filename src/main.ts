@@ -4,9 +4,10 @@ import { TodoView, TaskViewMode } from "./view/task-view";
 import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
 import { TaskEditor } from './view/task-editor';
-import { taskKeywordPlugin } from './view/task-formatting';
+import { taskKeywordPlugin, TaskKeywordDecorator } from './view/task-formatting';
 import { EditorKeywordMenu } from './view/editor-keyword-menu';
 import { VaultScanner } from './services/vault-scanner';
+import { StatusBarManager } from './view/status-bar';
 
 export const TASK_VIEW_ICON = "list-todo";
 
@@ -23,17 +24,26 @@ export default class TodoTracker extends Plugin {
   // Editor keyword menu for right-click context menu
   private editorKeywordMenu: EditorKeywordMenu | null = null;
 
-  // Task formatting instances
+  // Task formatting instances - stores various types of formatting-related objects
   private taskFormatters: Map<string, any> = new Map();
 
   // Status bar manager for task count
-  private statusBarManager: any | null = null;
+  private statusBarManager: StatusBarManager | null = null;
 
   // Shared comparator to avoid reallocation and ensure consistent ordering
   private readonly taskComparator = (a: Task, b: Task): number => {
     if (a.path === b.path) return a.line - b.line;
     return a.path.localeCompare(b.path);
   };
+
+  // Public getter methods for internal services
+  public getVaultScanner(): VaultScanner | null {
+    return this.vaultScanner;
+  }
+
+  public getTasks(): Task[] {
+    return this.tasks;
+  }
 
  // Obsidian lifecycle method called when the plugin is loaded.
  async onload() {

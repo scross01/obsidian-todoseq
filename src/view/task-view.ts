@@ -370,7 +370,7 @@ export class TodoView extends ItemView {
       import('./search-options-dropdown'),
       import('./search-suggestion-dropdown')
     ]).then(([optionsModule, suggestionsModule]) => {
-      this.suggestionDropdown = new (suggestionsModule as any).SearchSuggestionDropdown(
+      this.suggestionDropdown = new (suggestionsModule as { SearchSuggestionDropdown: typeof SearchSuggestionDropdown }).SearchSuggestionDropdown(
         inputEl,
         this.app.vault,
         this.tasks,
@@ -378,7 +378,7 @@ export class TodoView extends ItemView {
         this.getViewMode()
       );
       
-      this.optionsDropdown = new (optionsModule as any).SearchOptionsDropdown(
+      this.optionsDropdown = new (optionsModule as { SearchOptionsDropdown: typeof SearchOptionsDropdown }).SearchOptionsDropdown(
         inputEl,
         this.app.vault,
         this.tasks,

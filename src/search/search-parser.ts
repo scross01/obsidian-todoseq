@@ -1,4 +1,4 @@
-import { SearchToken, SearchNode, SearchError } from './search-types';
+import { SearchToken, SearchNode, SearchError, SearchPrefix } from './search-types';
 import { SearchTokenizer } from './search-tokenizer';
 
 export class SearchParser {
@@ -152,7 +152,7 @@ class PrattParser {
     
     // Handle both prefix_value and regular word/phrase tokens
     if (valueToken.type === 'prefix_value' || valueToken.type === 'word' || valueToken.type === 'phrase') {
-      const field = prefixToken.value as any; // Will be validated in evaluator
+      const field = prefixToken.value as SearchPrefix; // Will be validated in evaluator
       const value = valueToken.value;
       this.position++;
       
