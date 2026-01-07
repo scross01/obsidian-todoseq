@@ -5,6 +5,9 @@ import { DEFAULT_COMPLETED_STATES, NEXT_STATE } from './task';
 import { taskKeywordPlugin } from './view/task-formatting';
 import { TodoView } from './view/task-view';
 
+/**
+ * Manages UI elements and interactions in the editor
+ */
 export class UIManager {
   constructor(private plugin: TodoTracker) {}
   
@@ -85,6 +88,10 @@ export class UIManager {
     );
   }
 
+  /**
+   * When the task checkbox is updated update the task keyword to match.
+   * The keyword state is updated in the DOM directly, so it's handled like a manual line edit. 
+   */
   private handleCheckboxToggle(checkbox: HTMLInputElement): void {
    // Find the task keyword span in the same line
    const lineElement = checkbox.closest('.cm-line, .HyperMD-task-line');
@@ -106,13 +113,15 @@ export class UIManager {
 
    // Determine new state based on checkbox state
    let newKeyword = currentKeyword;
-   if (checkbox.checked) {
-     // Checkbox checked -> change to DONE
+   // Only change state if there's a mismatch between current state and checkbox
+   if (checkbox.checked && !DEFAULT_COMPLETED_STATES.has(currentKeyword)) {
+     // Checkbox checked but current state is not completed -> change to DONE
      newKeyword = 'DONE';
-   } else {
-     // Checkbox unchecked -> change to TODO
+   } else if (!checkbox.checked && DEFAULT_COMPLETED_STATES.has(currentKeyword)) {
+     // Checkbox unchecked but current state is completed -> change to TODO
      newKeyword = 'TODO';
    }
+   // If checkbox state matches current state, keep current keyword
 
    // Update the keyword text and data attribute directly in the DOM
    keywordSpan.textContent = newKeyword;
@@ -120,6 +129,9 @@ export class UIManager {
    keywordSpan.setAttribute('aria-label', `Task keyword: ${newKeyword}`);
   }
 
+  /**
+   * Handles the single-click event on the task keyword to cycle the task state
+   */
   private async handleTaskKeywordClick(keywordElement: HTMLElement, view: MarkdownView): Promise<void> {
     // Prevent default behavior and stop propagation
     const event = window.event as MouseEvent;
@@ -134,17 +146,17 @@ export class UIManager {
       return;
     }
 
-    // Cycle to the next state using NEXT_STATE map
-    const nextState = NEXT_STATE.get(currentKeyword) || 'TODO';
+    const currentLine = this.getLineForElement(keywordElement);
+    if (currentLine !== null) {      
+      // Save current cursor position
+      const cursorPosition = view.editor.getCursor();
+      
+      this.plugin.taskManager.handleUpdateTaskStateAtLine(false, currentLine - 1, view.editor, view);
 
-    // Update the task state directly in the DOM
-    keywordElement.textContent = nextState;
-    keywordElement.setAttribute('data-task-keyword', nextState);
-    keywordElement.setAttribute('aria-label', `Task keyword: ${nextState}`);
-
-    // Update the checkbox state to match the new task state
-    this.updateCheckboxState(keywordElement, nextState);
-   }
+      // Restore cursor position after update
+      view.editor.setCursor(cursorPosition);
+    }
+  }
 
   /**
    * Handle task keyword click with double-click detection
@@ -190,33 +202,33 @@ export class UIManager {
   }
 
   /**
-   * Find the checkbox element in the same task line and update its state
+   * Get the line number for a DOM element in the editor
    */
-  private updateCheckboxState(keywordElement: HTMLElement, newState: string): void {
-   // Check if the new state is a completed state
-   const isCompleted = DEFAULT_COMPLETED_STATES.has(newState);
+  public getLineForElement(element: HTMLElement): number | null {
+    // Get the EditorView for this element
+    const editorView = this.getEditorViewFromElement(element);
+    if (!editorView) {
+      return null;
+    }
 
-   // Find the checkbox element in the same task line
-   // The checkbox is an input element with class task-list-item-checkbox
-   const taskLine = keywordElement.closest('.HyperMD-task-line, .cm-line');
-
-   if (taskLine) {
-     const checkbox = taskLine.querySelector('.task-list-item-checkbox, input[type="checkbox"]');
-
-     if (checkbox && checkbox instanceof HTMLInputElement) {
-       // Update the checkbox checked property for completed states
-       checkbox.checked = isCompleted;
-     }
-   }
-
-   // Update the markdown text for the checkbox state
-   this.updateMarkdownCheckboxState(keywordElement, isCompleted);
+    try {
+      // Use CodeMirror 6's posAtDOM to get the position of the element
+      const pos = editorView.posAtDOM(element);
+      
+      // Get the line number from the position
+      const lineNumber = editorView.state.doc.lineAt(pos).number;
+      
+      return lineNumber;
+    } catch (error) {
+      console.warn('Failed to get line number for element:', error);
+      return null;
+    }
   }
 
   /**
    * Get the EditorView from a DOM element
    */
-  private getEditorViewFromElement(element: HTMLElement): EditorView | null {
+  public getEditorViewFromElement(element: HTMLElement): EditorView | null {
    // Find the closest CodeMirror editor container
    const editorContainer = element.closest('.cm-editor') as HTMLElement | null;
    if (!editorContainer) {
@@ -234,63 +246,6 @@ export class UIManager {
    }
 
    return null;
-  }
-
-  /**
-   * Update the markdown text for the checkbox state using EditorView.posAtDOM()
-   */
-  private updateMarkdownCheckboxState(keywordElement: HTMLElement, isCompleted: boolean): void {
-   try {
-     // Find the task line element
-     const taskLine = keywordElement.closest('.HyperMD-task-line, .cm-line') as HTMLElement | null;
-     if (!taskLine) {
-       return;
-     }
-
-     // Get the EditorView
-     const editorView = this.getEditorViewFromElement(taskLine);
-     if (!editorView) {
-       return;
-     }
-
-     // Use EditorView.posAtDOM() to get the position of the task line
-     const pos = editorView.posAtDOM(taskLine);
-     if (pos === null) {
-       return;
-     }
-
-     // Get the line number
-     const lineNumber = editorView.state.doc.lineAt(pos).number;
-
-     // Get the current line content
-     const line = editorView.state.doc.line(lineNumber);
-     const lineText = line.text;
-
-     // Find the checkbox in the line text (should be at the beginning)
-     const checkboxMatch = lineText.match(/^(\s*)(\[[ xX]?\])\s*/);
-     if (!checkboxMatch) {
-       return;
-     }
-
-     // Update the checkbox state
-     const newCheckbox = isCompleted ? '[x]' : '[ ]';
-     const newLineText = lineText.replace(checkboxMatch[2], newCheckbox);
-
-     // Replace the line in the document
-     const from = line.from;
-     const to = line.to;
-     editorView.dispatch({
-       changes: {
-         from: from,
-         to: to,
-         insert: newLineText
-       }
-     });
-
-   } catch (error) {
-     console.error('Failed to update markdown checkbox state:', error);
-     // Fallback: just update the DOM checkbox state
-   }
   }
 
   /**

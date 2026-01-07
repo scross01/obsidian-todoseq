@@ -22,7 +22,7 @@ export class PluginLifecycleManager {
     // Initialize services
     this.plugin.vaultScanner = new VaultScanner(this.plugin.app, this.plugin.settings, TaskParser.create(this.plugin.settings));
     this.plugin.taskEditor = new TaskEditor(this.plugin.app);
-    this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin.app, this.plugin.settings, this.plugin.taskEditor);
+    this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
     this.plugin.statusBarManager = new StatusBarManager(this.plugin);
     this.plugin.statusBarManager.setupStatusBarItem();
 
@@ -62,7 +62,7 @@ export class PluginLifecycleManager {
       id: 'toggle-task-state',
       name: 'Toggle task state',
       editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
-        return this.plugin.taskManager.handleToggleTaskState(checking, editor, view);
+        return this.plugin.taskManager.handleToggleTaskStateAtCursor(checking, editor, view);
       },
       hotkeys: [
         {

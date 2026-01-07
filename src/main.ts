@@ -1,17 +1,15 @@
-import { Plugin, TFile, TAbstractFile, WorkspaceLeaf, Editor, MarkdownView } from 'obsidian';
-import { Task, NEXT_STATE, DEFAULT_COMPLETED_STATES } from './task';
-import { TodoView, TaskViewMode } from "./view/task-view";
-import { TodoTrackerSettingTab, TodoTrackerSettings, DefaultSettings } from "./settings/settings";
+import { Plugin, WorkspaceLeaf, MarkdownView } from 'obsidian';
+import { Task } from './task';
+import { TodoView } from "./view/task-view";
+import { TodoTrackerSettings, DefaultSettings } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
 import { TaskEditor } from './view/task-editor';
-import { taskKeywordPlugin, TaskKeywordDecorator } from './view/task-formatting';
 import { EditorKeywordMenu } from './view/editor-keyword-menu';
 import { VaultScanner } from './services/vault-scanner';
 import { StatusBarManager } from './view/status-bar';
 import { TaskManager } from './task-manager';
 import { UIManager } from './ui-manager';
 import { PluginLifecycleManager } from './plugin-lifecycle';
-import { taskComparator } from './utils/task-utils';
 
 export const TASK_VIEW_ICON = "list-todo";
 

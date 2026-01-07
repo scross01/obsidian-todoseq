@@ -3,6 +3,9 @@ import { Task } from './task';
 import TodoTracker from './main';
 import { extractPriority, CHECKBOX_REGEX } from './utils/task-utils';
 
+/**
+ * TaskManager handles operations related to modifying tasks in the editor
+ */
 export class TaskManager {
   constructor(private plugin: TodoTracker) {}
   
@@ -65,43 +68,62 @@ export class TaskManager {
   }
 
   /**
-   * Handle the toggle task state command
+   * Handle the toggle or update of task state at a specific line
    * @param checking - Whether this is just a check to see if the command is available
+   * @param line - The line number to toggle
    * @param editor - The editor instance
    * @param view - The markdown view
-   * @returns boolean indicating if the command is available
+   * @param newState - Optional new state to set (if not provided, will cycle to next state)
+   * @returns boolean indicating if the operation was successful
    */
-  handleToggleTaskState(checking: boolean, editor: Editor, view: MarkdownView): boolean {
+  handleUpdateTaskStateAtLine(checking: boolean, lineNumber: number, editor: Editor, view: MarkdownView, newState?: string ): boolean {
     const taskEditor = this.plugin.taskEditor;
     const vaultScanner = this.plugin.getVaultScanner();
     
     if (!taskEditor || !vaultScanner) {
       return false;
     }
-
-    // Get the current line from the editor
-    const cursor = editor.getCursor();
-    const line = editor.getLine(cursor.line);
+    
+    // Get the line from the editor
+    const line = editor.getLine(lineNumber);
     
     // Check if this line contains a valid task using VaultScanner's parser
     const parser = vaultScanner.getParser();
     if (!parser?.testRegex.test(line)) {
       return false;
     }
-
+  
     if (checking) {
       return true;
     }
-
-    // Parse the task from the current line
-    const task = this.parseTaskFromLine(line, cursor.line, view.file?.path || '');
+    
+    // Parse the task from the line
+    const task = this.parseTaskFromLine(line, lineNumber, view.file?.path || '');
     
     if (task) {
       // Update the task state
-      taskEditor.updateTaskState(task);
+      if (newState) {
+        taskEditor.updateTaskState(task, newState);
+      } else {
+        taskEditor.updateTaskState(task);
+      }
     }
-
+  
     return true;
   }
 
+  /**
+   * Handle the toggle task state command to update the task state at the current cursor position
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  handleToggleTaskStateAtCursor(checking: boolean, editor: Editor, view: MarkdownView): boolean {
+    // Get the current line from the editor
+    const cursor = editor.getCursor();
+      
+    // Use the extracted method to handle the line-based logic
+    return this.handleUpdateTaskStateAtLine(checking, cursor.line, editor, view);
+  }
 }

@@ -1,18 +1,15 @@
-import { TaskEditor } from './task-editor';
 import { DEFAULT_COMPLETED_STATES } from '../task';
-import { TodoTrackerSettings } from '../settings/settings';
-import { App } from 'obsidian';
+import { MarkdownView, Editor } from 'obsidian';
 import { StateMenuBuilder } from './state-menu-builder';
+import TodoTracker from '../main';
 
 export class EditorKeywordMenu {
   private menuBuilder: StateMenuBuilder;
 
   constructor(
-    private app: App,
-    private settings: TodoTrackerSettings,
-    private taskEditor: TaskEditor
+    private plugin: TodoTracker
   ) {
-    this.menuBuilder = new StateMenuBuilder(app, settings);
+    this.menuBuilder = new StateMenuBuilder(plugin.app, plugin.settings);
   }
 
   /**
@@ -32,42 +29,21 @@ export class EditorKeywordMenu {
   }
 
   /**
-   * Update the task keyword state by directly modifying the DOM element
+   * Update the task keyword state using UIManager and TaskManager
    */
   private async updateTaskKeywordState(state: string, keywordElement: HTMLElement, newState: string): Promise<void> {
-    
-    // Directly update the DOM element text to reflect the new state
-    if (keywordElement && keywordElement.textContent) {
-      // Replace the keyword text directly in the DOM
-      const currentText = keywordElement.textContent;
-      const newText = currentText.replace(state, newState);
-      keywordElement.textContent = newText;
-      
-      // Update data attribute to reflect new state
-      keywordElement.setAttribute('data-task-keyword', newState);
-      
-      // Find and update the checkbox state based on the new task state
-      this.updateCheckboxState(keywordElement, newState);
-    }
-  }
-  
-  /**
-   * Find the checkbox element in the same task line and update its state
-   */
-  private updateCheckboxState(keywordElement: HTMLElement, newState: string): void {
-    
-    // Check if the new state is a completed state
-    const isCompleted = DEFAULT_COMPLETED_STATES.has(newState);
-    
-    // Find the checkbox element in the same task line
-    // The checkbox is an input element with class task-list-item-checkbox
-    const taskLine = keywordElement.closest('.HyperMD-task-line, .cm-line');
-    
-    if (taskLine) {
-      const checkbox = taskLine.querySelector('.task-list-item-checkbox, input[type="checkbox"]');
-      if (checkbox && checkbox instanceof HTMLInputElement) {
-        // Update the checkbox checked property for completed states
-        checkbox.checked = isCompleted;
+    // Use UIManager's methods to get line number and update through TaskManager
+    const currentLine = this.plugin.uiManager.getLineForElement(keywordElement);
+    if (currentLine !== null) {
+      const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+      if (view && view.editor) {
+        // Save current cursor position
+        const cursorPosition = view.editor.getCursor();
+        
+        this.plugin.taskManager.handleUpdateTaskStateAtLine(false, currentLine - 1, view.editor, view, newState);
+        
+        // Restore cursor position after update
+        view.editor.setCursor(cursorPosition);
       }
     }
   }
