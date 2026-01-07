@@ -8,7 +8,7 @@ import { TodoView, TaskViewMode } from "./view/task-view";
 import { TodoTrackerSettingTab } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
 import { TASK_VIEW_ICON } from './main';
-import { Editor, MarkdownView, TFile } from 'obsidian';
+import { Editor, MarkdownView, TFile, Platform } from 'obsidian';
 
 export class PluginLifecycleManager {
   constructor(private plugin: TodoTracker) {}
@@ -112,6 +112,13 @@ export class PluginLifecycleManager {
         this.plugin.vaultScanner?.handleFileRename(file, oldPath)
       })
     );
+
+    // Conditional ribbon icon - only show on mobile devices
+    if (Platform.isMobile) {
+      this.plugin.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
+        this.plugin.uiManager.showTasks();
+      });
+    }
 
     // Auto-open task view in right sidebar when plugin loads
     // Add a small delay to ensure workspace is fully initialized
