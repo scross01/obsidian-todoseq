@@ -9,19 +9,19 @@ export class SearchEvaluator {
   static evaluate(node: SearchNode, task: Task, caseSensitive: boolean, settings?: TodoTrackerSettings): boolean {
     switch (node.type) {
       case 'term':
-        return this.evaluateTerm(node.value!, task, caseSensitive);
+        return node.value ? this.evaluateTerm(node.value, task, caseSensitive) : false;
       case 'phrase':
-        return this.evaluatePhrase(node.value!, task, caseSensitive);
+        return node.value ? this.evaluatePhrase(node.value, task, caseSensitive) : false;
       case 'prefix_filter':
         return this.evaluatePrefixFilter(node, task, caseSensitive, settings);
       case 'range_filter':
         return this.evaluateRangeFilter(node, task, caseSensitive);
       case 'and':
-        return this.evaluateAnd(node.children!, task, caseSensitive);
+        return node.children ? this.evaluateAnd(node.children, task, caseSensitive) : false;
       case 'or':
-        return this.evaluateOr(node.children!, task, caseSensitive);
+        return node.children ? this.evaluateOr(node.children, task, caseSensitive) : false;
       case 'not':
-        return this.evaluateNot(node.children![0], task, caseSensitive);
+        return node.children && node.children[0] ? this.evaluateNot(node.children[0], task, caseSensitive) : false;
       default:
         return false;
     }
@@ -151,7 +151,7 @@ export class SearchEvaluator {
     const targetText = caseSensitive ? task.rawText : task.rawText.toLowerCase();
     
     // Look for tag patterns (#tag)
-    const tagRegex = /#([\w\-]+)/g;
+    const tagRegex = /#([\w-]+)/g;
     const matches = targetText.match(tagRegex) || [];
     
     return matches.some(tag => {
@@ -333,10 +333,12 @@ export class SearchEvaluator {
        return DateUtils.isDateInNextMonth(date, now);
      default:
        // Handle "next N days" pattern
-       const nextNDaysMatch = expression.match(/^next\s+(\d+)\s+days$/);
-       if (nextNDaysMatch) {
-         const days = parseInt(nextNDaysMatch[1], 10);
-         return DateUtils.isDateInNextNDays(date, days, now);
+       {
+         const nextNDaysMatch = expression.match(/^next\s+(\d+)\s+days$/);
+         if (nextNDaysMatch) {
+           const days = parseInt(nextNDaysMatch[1], 10);
+           return DateUtils.isDateInNextNDays(date, days, now);
+         }
        }
        return false;
    }

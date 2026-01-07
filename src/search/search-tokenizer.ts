@@ -20,7 +20,7 @@ export class SearchTokenizer {
     { type: 'lparen' as const, regex: /\(/y },
     { type: 'rparen' as const, regex: /\)/y },
     { type: 'prefix' as const, regex: /\b(path|file|tag|state|priority|content|scheduled|deadline):/y },
-    { type: 'word' as const, regex: /[^\s"()\-]+/y }
+    { type: 'word' as const, regex: /[^\s"()-]+/y }
   ] as const;
 
   static tokenize(query: string): SearchToken[] {
@@ -63,7 +63,7 @@ export class SearchTokenizer {
             if (!hasWhitespaceBeforeDash) {
               // Look ahead to see if there's a word after the dash
               const lookaheadPos = pattern.regex.lastIndex;
-              const wordPattern = /[^\s"()\-]+/y;
+              const wordPattern = /[^\s"()-]+/y;
               wordPattern.lastIndex = lookaheadPos;
               const wordMatch = wordPattern.exec(query);
               
@@ -108,8 +108,10 @@ export class SearchTokenizer {
     switch (type) {
       case 'phrase':
         // Remove surrounding quotes and process escaped quotes
-        const content = token.slice(1, -1);
-        return content.replace(/\\"/g, '"');
+        {
+          const content = token.slice(1, -1);
+          return content.replace(/\\"/g, '"');
+        }
       case 'prefix':
         // Remove colon from prefix (e.g., "path:" -> "path")
         return token.slice(0, -1);

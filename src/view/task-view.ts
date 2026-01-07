@@ -230,7 +230,7 @@ export class TodoView extends ItemView {
     // Add "Show completed tasks" dropdown
     const completedTasksSetting = settingsSection.createEl('div', { cls: 'setting-item' });
     const completedTasksSettingInfo = completedTasksSetting.createEl('div', { cls: 'setting-item-info'});
-    const label = completedTasksSettingInfo.createEl('div', {
+    completedTasksSettingInfo.createEl('div', {
       cls: 'setting-item-name',
       text: 'Show completed tasks:',
       attr: { for: 'completed-tasks-dropdown' }
@@ -253,7 +253,7 @@ export class TodoView extends ItemView {
     ];
 
     for (const option of options) {
-      const optionEl = dropdown.createEl('option', {
+      dropdown.createEl('option', {
         attr: { value: option.value },
         text: option.label
       });

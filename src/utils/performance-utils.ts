@@ -128,8 +128,6 @@ export class IncrementalTaskFormatter {
       maxChangedPercentage: 0.05  // Maximum percentage of document that can change
     };
 
-    const docLength = update.view.state.doc.length;
-    
     // For now, we'll be conservative and only use incremental updates for large documents
     // with small changes. The exact change detection logic can be enhanced later.
     return lineCount >= CONFIG.minLineCount;

@@ -16,7 +16,7 @@ export class VaultScanner {
   private tasks: Task[] = [];
   private _isScanning = false;
   private refreshIntervalId: number | null = null;
-  private eventListeners: Map<keyof VaultScannerEvents, Function[]> = new Map();
+  private eventListeners: Map<keyof VaultScannerEvents, ((...args: any[]) => void)[]> = new Map();
   
   constructor(
     private app: App,

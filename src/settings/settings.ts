@@ -1,4 +1,4 @@
-import { PluginSettingTab, App, Setting, ToggleComponent, Notice } from 'obsidian';
+import { PluginSettingTab, App, Setting, ToggleComponent } from 'obsidian';
 import TodoTracker from '../main';
 import { TodoView } from '../view/task-view';
 import { LanguageCommentSupportSettings } from "../parser/language-registry";
@@ -123,12 +123,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             for (const keyword of parsed) {
               try {
                 // Test if this single keyword is valid by trying to create a parser with just this keyword
-                const testSettings = {
-                  additionalTaskKeywords: [keyword],
-                  includeCalloutBlocks: this.plugin.settings.includeCalloutBlocks,
-                  includeCodeBlocks: this.plugin.settings.includeCodeBlocks,
-                  languageCommentSupport: this.plugin.settings.languageCommentSupport
-                };
                 // This will throw if the keyword is invalid
                 TaskParser.validateKeywords([keyword]);
                 validKeywords.push(keyword);

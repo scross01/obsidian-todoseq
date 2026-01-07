@@ -1,6 +1,5 @@
-import { Menu } from 'obsidian';
 import { TaskEditor } from './task-editor';
-import { Task, DEFAULT_COMPLETED_STATES } from '../task';
+import { DEFAULT_COMPLETED_STATES } from '../task';
 import { TodoTrackerSettings } from '../settings/settings';
 import { App } from 'obsidian';
 import { StateMenuBuilder } from './state-menu-builder';

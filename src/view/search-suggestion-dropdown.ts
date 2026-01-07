@@ -156,19 +156,23 @@ export class SearchSuggestionDropdown {
                 break;
             case 'scheduled':
                 // For scheduled dates, show both standard date suggestions and actual scheduled dates from tasks
-                const scheduledSuggestions = SearchSuggestions.getDateSuggestions();
-                const taskScheduledDates = this.tasks && this.tasks.length > 0
-                    ? SearchSuggestions.getScheduledDateSuggestions(this.tasks, this.viewMode)
-                    : [];
-                allSuggestions = [...scheduledSuggestions, ...taskScheduledDates];
+                {
+                    const scheduledSuggestions = SearchSuggestions.getDateSuggestions();
+                    const taskScheduledDates = this.tasks && this.tasks.length > 0
+                        ? SearchSuggestions.getScheduledDateSuggestions(this.tasks, this.viewMode)
+                        : [];
+                    allSuggestions = [...scheduledSuggestions, ...taskScheduledDates];
+                }
                 break;
             case 'deadline':
                 // For deadlines, show both standard date suggestions and actual deadline dates from tasks
-                const deadlineSuggestions = SearchSuggestions.getDateSuggestions();
-                const taskDeadlineDates = this.tasks && this.tasks.length > 0
-                    ? SearchSuggestions.getDeadlineDateSuggestions(this.tasks, this.viewMode)
-                    : [];
-                allSuggestions = [...deadlineSuggestions, ...taskDeadlineDates];
+                {
+                    const deadlineSuggestions = SearchSuggestions.getDateSuggestions();
+                    const taskDeadlineDates = this.tasks && this.tasks.length > 0
+                        ? SearchSuggestions.getDeadlineDateSuggestions(this.tasks, this.viewMode)
+                        : [];
+                    allSuggestions = [...deadlineSuggestions, ...taskDeadlineDates];
+                }
                 break;
             case 'content':
                 // For content, we don't have specific suggestions

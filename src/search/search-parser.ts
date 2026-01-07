@@ -103,19 +103,23 @@ class PrattParser {
     switch (token.type) {
       case 'not':
         this.position++;
-        const notExpr = this.parseExpression(SearchTokenizer.getBindingPower('not') - 1);
-        return { type: 'not', children: [notExpr], position: token.position };
-      
+        {
+          const notExpr = this.parseExpression(SearchTokenizer.getBindingPower('not') - 1);
+          return { type: 'not', children: [notExpr], position: token.position };
+        }
+       
       case 'lparen':
         this.position++;
-        const parenExpr = this.parseExpression(0);
+        {
+          const parenExpr = this.parseExpression(0);
         
-        if (this.position >= this.tokens.length || this.tokens[this.position].type !== 'rparen') {
-          throw new SearchError('Expected closing parenthesis', this.position);
+          if (this.position >= this.tokens.length || this.tokens[this.position].type !== 'rparen') {
+            throw new SearchError('Expected closing parenthesis', this.position);
+          }
+        
+          this.position++; // consume rparen
+          return parenExpr;
         }
-        
-        this.position++; // consume rparen
-        return parenExpr;
       
       case 'prefix':
         return this.parsePrefixFilter();

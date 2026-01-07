@@ -196,7 +196,7 @@ export class SearchSuggestions {
         // Comprehensive tag regex that matches #tag, #multi-word-tag, etc.
         // Improved to avoid matching # characters within URLs
         // Negative lookbehind to ensure # is not preceded by common URL characters
-        const tagRegex = /(?<![\/\:\.])#([^\s\)\]\}\>]+)/g;
+        const tagRegex = /(?<![/:.])#([^\s)\]}>]+)/g;
         
         // Filter tasks based on view mode
         const filteredTasks = mode ? this.filterTasksByViewMode(tasks, mode) : tasks;

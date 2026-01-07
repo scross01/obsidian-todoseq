@@ -143,8 +143,7 @@ export class TaskKeywordDecorator {
             // Try to find the keyword more precisely in code context
             const commentPatterns = (this.currentLanguage as LanguageDefinition).patterns;
             const singleLinePattern = commentPatterns?.singleLine;
-            const multiLineStartPattern = commentPatterns?.multiLineStart;
-            
+ 
             if (singleLinePattern) {
               const commentMatch = singleLinePattern.exec(lineText);
               if (commentMatch) {
