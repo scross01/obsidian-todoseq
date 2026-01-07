@@ -122,6 +122,9 @@ export class PluginLifecycleManager {
    * Obsidian lifecycle method called when the plugin is unloaded
    */
   onunload() {
+    // Clean up UI manager resources
+    this.plugin.uiManager?.cleanup();
+    
     // Clean up VaultScanner resources
     this.plugin.vaultScanner?.destroy();
     

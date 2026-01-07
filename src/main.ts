@@ -68,14 +68,22 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called when the plugin is unloaded
   onunload() {
+    // Clean up UI manager resources
+    this.uiManager?.cleanup();
+    
     // Clean up VaultScanner resources
     this.vaultScanner?.destroy();
-  
+   
     // Clean up status bar manager
     if (this.statusBarManager) {
       this.statusBarManager.cleanup();
       this.statusBarManager = null;
     }
+    
+    // Clear any remaining references
+    this.taskEditor = null;
+    this.editorKeywordMenu = null;
+    this.taskFormatters.clear();
   }
 
   // Obsidian lifecycle method called to settings are loaded

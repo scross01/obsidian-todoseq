@@ -30,6 +30,9 @@ export class UIManager {
   /**
    * Setup event listeners for checkbox interactions
    */
+  // Track registered event listeners for cleanup
+  private registeredEventListeners: {target: EventTarget, type: string, handler: EventListener, options?: AddEventListenerOptions}[] = [];
+
   setupCheckboxEventListeners(): void {
     if (!this.plugin.settings.formatTaskKeywords) {
       return;
@@ -48,7 +51,7 @@ export class UIManager {
             // Add event listener for click events on checkboxes and task keywords
             const clickHandler = (event: MouseEvent) => {
               const target = event.target as HTMLElement;
-              
+                
               // Handle checkbox clicks
               if (target.classList.contains('task-list-item-checkbox')) {
                 this.handleCheckboxToggle(target as HTMLInputElement);
@@ -60,14 +63,22 @@ export class UIManager {
               }
             };
             
+            // Store cleanup information
+            this.registeredEventListeners.push({
+              target: editorContent,
+              type: 'click',
+              handler: clickHandler,
+              options: { capture: true }
+            });
+            
             editorContent.addEventListener('click', clickHandler, { capture: true });
           }
         }
       });
     };
-    
+
     setupEditorListeners();
-    
+
     // Also set up listeners for newly opened editors
     this.plugin.registerEvent(
       this.plugin.app.workspace.on('layout-change', setupEditorListeners)
@@ -334,7 +345,7 @@ export class UIManager {
       const cmEditor = editorContainer.querySelector('.cm-editor');
       
       if (cmEditor) {
-        cmEditor.addEventListener('contextmenu', (evt: MouseEvent) => {
+        const contextMenuHandler = (evt: MouseEvent) => {
           const target = evt.target as HTMLElement;
           
           // Check if the right-click was on a task keyword element
@@ -350,7 +361,16 @@ export class UIManager {
               this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(keyword, target, evt);
             }
           }
+        };
+        
+        // Store cleanup information for manual cleanup
+        this.registeredEventListeners.push({
+          target: cmEditor,
+          type: 'contextmenu',
+          handler: contextMenuHandler
         });
+        
+        cmEditor.addEventListener('contextmenu', contextMenuHandler);
       }
     }
   }
@@ -384,8 +404,32 @@ export class UIManager {
   }
 
   /**
-   * Refresh all open task views
-   */
+  * Clean up all registered event listeners
+  */
+ cleanup(): void {
+   // Remove all registered event listeners
+   this.registeredEventListeners.forEach(({target, type, handler, options}) => {
+     try {
+       target.removeEventListener(type, handler, options);
+     } catch (error) {
+       console.warn('Failed to remove event listener during cleanup:', error);
+     }
+   });
+   this.registeredEventListeners = [];
+   
+   // Clear any pending timeouts
+   if (this.pendingClickTimeout) {
+     clearTimeout(this.pendingClickTimeout);
+     this.pendingClickTimeout = null;
+   }
+   
+   // Clear editor decorations
+   this.clearEditorDecorations();
+  }
+
+  /**
+    * Refresh all open task views
+    */
   async refreshOpenTaskViews(): Promise<void> {
     const { workspace } = this.plugin.app;
     const leaves = workspace.getLeavesOfType(TodoView.viewType);
