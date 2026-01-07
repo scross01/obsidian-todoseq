@@ -25,6 +25,45 @@ Access TODOseq settings through Obsidian's settings interface:
 - Higher values = Less frequent updates, better performance
 - Set to 60 seconds (1 minute) by default for balanced performance
 
+## Editor Integration Settings
+
+### Format Task Keywords
+
+**Setting**: "Format task keywords" toggle (in TODOseq settings)
+
+**Description**: Enable or disable visual formatting of task keywords in the editor.
+
+**Default**: Enabled
+
+**Visual Effects When Enabled:**
+
+Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font.
+All task states use your Obsidian theme's accent color.
+See [Editor Integration documentation](editor.md) for full details.
+
+### Editor Command: Toggle Task State
+
+**Setting**: Keyboard shortcut configuration (in Obsidian Hotkeys)
+
+**Description**: Toggle task states directly from the Markdown editor.
+
+**Default Shortcut**: `Ctrl+Enter`
+
+**Behavior:**
+
+- Works when cursor is on any valid task line
+- Follows same state cycling logic as Task View
+- Preserves indentation, list markers, and priority tokens
+- Updates both state keyword and checkbox simultaneously
+- Only available when editing Markdown files
+
+**Customization:**
+
+1. Open Obsidian Settings
+2. Go to "Hotkeys"
+3. Find "TODOseq: Toggle task state"
+4. Assign your preferred keyboard shortcut
+
 ## Task Recognition Settings
 
 ### Additional Task Keywords
@@ -225,28 +264,3 @@ With **Sunday start**:
 
 - Week 1: Sun Dec 31 - Sat Jan 6
 - "this week" on Jan 3 includes Dec 31 - Jan 6
-
-## Editor Integration Settings
-
-### Editor Command: Toggle Task State
-
-**Setting**: Keyboard shortcut configuration (in Obsidian Hotkeys)
-
-**Description**: Toggle task states directly from the Markdown editor.
-
-**Default Shortcut**: `Ctrl+Enter`
-
-**Behavior:**
-
-- Works when cursor is on any valid task line
-- Follows same state cycling logic as Task View
-- Preserves indentation, list markers, and priority tokens
-- Updates both state keyword and checkbox simultaneously
-- Only available when editing Markdown files
-
-**Customization:**
-
-1. Open Obsidian Settings
-2. Go to "Hotkeys"
-3. Find "TODOseq: Toggle task state"
-4. Assign your preferred keyboard shortcut
