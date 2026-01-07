@@ -348,12 +348,31 @@ export class UIManager {
         await workspace.revealLeaf(leaf);
       }
     } else {
-      leaf = workspace.getLeaf(true);
-      leaf.setViewState({ type: TodoView.viewType, active: true });
-      // Only reveal if the leaf is not already active to avoid focus stealing
-      const activeLeaf = workspace.activeLeaf;
-      if (activeLeaf !== leaf) {
-        await workspace.revealLeaf(leaf);
+      // Open in right sidebar instead of main area
+      // Use try-catch to handle workspace initialization issues
+      try {
+        leaf = workspace.getRightLeaf(false);
+        if (!leaf) {
+          // If no right leaf exists, create one by splitting the active leaf
+          const activeLeaf = workspace.getLeaf(false);
+          if (activeLeaf) {
+            leaf = workspace.createLeafBySplit(activeLeaf, 'vertical');
+          } else {
+            // Fallback to main area if no active leaf is available
+            leaf = workspace.getLeaf(true);
+          }
+        }
+        leaf.setViewState({ type: TodoView.viewType, active: true });
+        // Only reveal if the leaf is not already active to avoid focus stealing
+        const activeLeaf = workspace.activeLeaf;
+        if (activeLeaf !== leaf) {
+          await workspace.revealLeaf(leaf);
+        }
+      } catch (error) {
+        console.warn('Failed to open task view in right sidebar, falling back to main area:', error);
+        // Fallback to main area if right sidebar access fails
+        leaf = workspace.getLeaf(true);
+        leaf.setViewState({ type: TodoView.viewType, active: true });
       }
     }
   }

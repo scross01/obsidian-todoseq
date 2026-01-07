@@ -4,26 +4,23 @@ The Task View is the central interface for managing all your tasks across your O
 
 ## Opening the Task View
 
-There are several ways to access the Task View:
+**Note**: The Task View behavior has been updated for better user experience. - The left ribbon icon has been removed since v0.7.0. The right sidebar is now the default location for the TOODseq task list.
 
-### Ribbon Icon
+### Automatic Opening
 
-- Click the TODOseq icon in the left ribbon to open the Task View panel
-- The icon shows a checklist symbol for easy identification
+The Task View automatically opens in the right sidebar when the TODOseq plugin is enabled.
+
+You can drag and drop the panel to reposition it within the Obsidian interface, such as moving to different panel location, or making it a floating window.
 
 ### Command Palette
 
 1. Open the command palette with `Ctrl/Cmd + P`
 2. Search for "TODOseq: Show TODO tasks"
-3. Select the command to open the Task View
+3. Select the command to open/show the Task View in the right sidebar
 
 ### Keyboard Shortcut
 
-- You can assign a custom keyboard shortcut in Obsidian's Hotkeys settings
-
-## Task View Panel Location
-
-By default, the Task View opens as a full page in the main Obsidian content area. You can drag and drop the panel to reposition it within the Obsidian interface, such as moving it to the left or right sidebar or making it a floating window.
+- You can assign a custom keyboard shortcut to the "TODOseq: Show TODO tasks" in Obsidian's Hotkeys settings.
 
 ## Task View Interface
 

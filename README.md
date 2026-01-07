@@ -33,11 +33,13 @@ TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian
 
 ## Quick Start
 
-1. **Open Task View**: Click the TODOseq ribbon icon or use the command palette
+1. **Open Task View**: The TODOseq task view automatically opens in the right sidebar when the plugin is enabled, and can also be opened via the command palette.
 2. **Create tasks**: Add lines starting with `TODO`, `DOING`, `DONE`, etc. in your notes
 3. **Manage tasks**: Click task keywords to cycle states or use checkboxes for TODO/DONE toggle
 4. **Navigate**: Click task rows to jump to source files
 5. **Search**: Use the search field to filter tasks with powerful query syntax
+
+**Note**: The ribbon icon has been removed since v0.7.0. Use the command palette to reopen the right sidebar panel to access tasks.
 
 ## Examples
 

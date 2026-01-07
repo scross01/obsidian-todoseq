@@ -38,3 +38,5 @@ plans/
 FEAT*.md
 
 Makefile
+
+.obsidian/

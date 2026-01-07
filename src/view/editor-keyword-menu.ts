@@ -1,5 +1,4 @@
-import { DEFAULT_COMPLETED_STATES } from '../task';
-import { MarkdownView, Editor } from 'obsidian';
+import { MarkdownView } from 'obsidian';
 import { StateMenuBuilder } from './state-menu-builder';
 import TodoTracker from '../main';
 

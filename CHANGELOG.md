@@ -2,14 +2,15 @@
 
 ## 0.7.0
 
-This release introduces formatting and interactivity for tasks is the editor view. Task state keywords are now highlighted and can be interacted with similar to the task list view.
+This release introduces formatting and interactivity for tasks is the editor view. Task state keywords are now highlighted and can be interacted with similar to the task list view. The default location of the task list panel has been moved to the right sidebar.
 
 - Addded task formatting in the editor with setting soption to disable (enabled by default).
 - Added a right click option on the task keyword in the editor to change the state of the task.
 - Added a single click action to the task keyword in the editor to cycle through the task states (TODO -> DOING -> DONE).
 - Added task state update when a task checkbox is toggled in the editor.
+- Moved the default location of the task list panel to the right sidebar.
 - Refined the task count and search suggestions when completed tasks are hidden.
-- Added status bar entry to show task count (not completed tasks) for the current page
+- Added status bar entry to show task count (not completed tasks) for the current page.
 
 ## 0.6.2
 

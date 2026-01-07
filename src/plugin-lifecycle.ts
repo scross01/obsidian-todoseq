@@ -8,7 +8,7 @@ import { TodoView, TaskViewMode } from "./view/task-view";
 import { TodoTrackerSettingTab } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
 import { TASK_VIEW_ICON } from './main';
-import { Editor, MarkdownView } from 'obsidian';
+import { Editor, MarkdownView, TFile } from 'obsidian';
 
 export class PluginLifecycleManager {
   constructor(private plugin: TodoTracker) {}
@@ -42,10 +42,6 @@ export class PluginLifecycleManager {
     };
     window.addEventListener('todoseq:view-mode-change', handler);
     this.plugin.register(() => window.removeEventListener('todoseq:view-mode-change', handler));
-
-    this.plugin.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
-      this.plugin.uiManager.showTasks();
-    });
 
     // Add settings tab
     this.plugin.addSettingTab(new TodoTrackerSettingTab(this.plugin.app, this.plugin));
@@ -101,12 +97,12 @@ export class PluginLifecycleManager {
       })
     );
     this.plugin.registerEvent(
-      this.plugin.app.vault.on('delete', (file) => {
+      this.plugin.app.vault.on('create', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file)
       })
     );
     this.plugin.registerEvent(
-      this.plugin.app.vault.on('create', (file) => {
+      this.plugin.app.vault.on('delete', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file)
       })
     );
@@ -116,72 +112,62 @@ export class PluginLifecycleManager {
         this.plugin.vaultScanner?.handleFileRename(file, oldPath)
       })
     );
+
+    // Auto-open task view in right sidebar when plugin loads
+    // Add a small delay to ensure workspace is fully initialized
+    setTimeout(() => {
+      this.plugin.uiManager.showTasks();
+    }, 200);
   }
 
   /**
    * Obsidian lifecycle method called when the plugin is unloaded
    */
   onunload() {
-    // Clean up UI manager resources
-    this.plugin.uiManager?.cleanup();
-    
     // Clean up VaultScanner resources
     this.plugin.vaultScanner?.destroy();
+    
+    // Clean up UI manager resources
+    this.plugin.uiManager?.cleanup();
     
     // Clean up status bar manager
     if (this.plugin.statusBarManager) {
       this.plugin.statusBarManager.cleanup();
       this.plugin.statusBarManager = null;
     }
+    
+    // Clear any remaining references
+    this.plugin.taskEditor = null;
+    this.plugin.editorKeywordMenu = null;
+    this.plugin.taskFormatters.clear();
   }
 
   /**
-   * Obsidian lifecycle method called when settings are loaded
+   * Load settings from storage
    */
-  async loadSettings() {
-    const loaded = await this.plugin.loadData();  // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-    this.plugin.settings = Object.assign({}, DefaultSettings, loaded as Partial<TodoTrackerSettings>);
-    // Normalize settings shape after migration: ensure additionalTaskKeywords exists
-    if (!this.plugin.settings.additionalTaskKeywords) {
-      this.plugin.settings.additionalTaskKeywords = [];
-    }
-    // Update VaultScanner with new settings if it exists
-    if (this.plugin.vaultScanner) {
-      this.plugin.vaultScanner.updateSettings(this.plugin.settings);
-    }
+  private async loadSettings(): Promise<void> {
+    await this.plugin.loadSettings();
   }
 
   /**
-   * Save current settings
+   * Save settings to storage
    */
-  async saveSettings() {
-    await this.plugin.saveData(this.plugin.settings);
+  private async saveSettings(): Promise<void> {
+    await this.plugin.saveSettings();
   }
 
   /**
-   * Public method to update parser in VaultScanner with current settings
+   * Handle file metadata changes
    */
-  public recreateParser(): void {
-    if (this.plugin.vaultScanner) {
-      this.plugin.vaultScanner.updateParser(TaskParser.create(this.plugin.settings));
-    }
+  private handleMetadataChange(file: TFile): void {
+    this.plugin.vaultScanner?.handleFileChange(file);
   }
 
   /**
-   * Public method to trigger a vault scan using VaultScanner
+   * Handle workspace layout changes
    */
-  public async scanVault(): Promise<void> {
-    if (this.plugin.vaultScanner) {
-      await this.plugin.vaultScanner.scanVault();
-    }
-  }
-
-  /**
-   * Public method to update periodic refresh using VaultScanner
-   */
-  public setupPeriodicRefresh(): void {
-    if (this.plugin.vaultScanner) {
-      this.plugin.vaultScanner.setupPeriodicRefresh(this.plugin.settings.refreshInterval);
-    }
+  private handleLayoutChange(): void {
+    // Refresh task formatting when layout changes
+    this.plugin.uiManager.setupTaskFormatting();
   }
 }
