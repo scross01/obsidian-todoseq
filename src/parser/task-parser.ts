@@ -529,9 +529,6 @@ export class TaskParser {
           inBlock = result.inBlock;
           blockMarker = result.blockMarker;
           codeRegex = result.codeRegex;
-          if (result.task) {
-            tasks.push(result.task);
-          }
         }
         continue;
       }
@@ -634,11 +631,10 @@ export class TaskParser {
     currentInBlock: boolean,
     currentCodeRegex: RegExp | null,
     path: string
-  ): { inBlock: boolean; blockMarker: 'code' | 'math' | 'comment' | null; codeRegex: RegExp | null; task: Task | null } {
+  ): { inBlock: boolean; blockMarker: 'code' | 'math' | 'comment' | null; codeRegex: RegExp | null } {
     let inBlock = currentInBlock;
     let blockMarker: 'code' | 'math' | 'comment' | null = null;
     let codeRegex: RegExp | null = currentCodeRegex;
-    let task: Task | null = null;
 
     if (transition.type === 'code') {
       if (transition.entering) {
@@ -678,7 +674,7 @@ export class TaskParser {
       }
     }
 
-    return { inBlock, blockMarker, codeRegex, task };
+    return { inBlock, blockMarker, codeRegex };
   }
 
   /**
