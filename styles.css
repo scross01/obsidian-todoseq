@@ -1,6 +1,9 @@
 /* TodoView theme-aligned styles. Inherit fonts/colors from the active Obsidian theme. */
 .todo-view {
   color: var(--text-normal);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 /* Toolbar and mode icons */
@@ -20,6 +23,14 @@
   clip: rect(0 0 0 0) !important;
   white-space: nowrap !important;
   border: 0 !important;
+}
+
+/* Task list container - scrollable area */
+.todo-view .todo-task-list-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-grow: 1;
+  min-height: 0;
 }
 
 /* List layout */

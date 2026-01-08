@@ -26,6 +26,7 @@ export class TodoView extends ItemView {
   private searchError: string | null = null;
   private optionsDropdown: SearchOptionsDropdown | null = null;
   private suggestionDropdown: SearchSuggestionDropdown | null = null;
+  private taskListContainer: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode, private settings: TodoTrackerSettings) {
     super(leaf);
@@ -832,8 +833,8 @@ export class TodoView extends ItemView {
 
   // Replace only the LI subtree for the given task (state-driven, idempotent)
   private refreshTaskElement(task: Task): void {
-    const container = this.contentEl;
-    const list = container.querySelector('ul.todo-list');
+    const container = this.taskListContainer;
+    const list = container?.querySelector('ul.todo-list');
     if (!list) return;
 
     const selector = `li.todo-item[data-path="${CSS.escape(task.path)}"][data-line="${task.line}"]`;
@@ -860,11 +861,13 @@ export class TodoView extends ItemView {
     }
 
     // Ensure list container exists and is the sole place for items
-    let list = container.querySelector('ul.todo-list');
-    if (!list) {
-      list = container.createEl('ul', { cls: 'todo-list' });
+    let list = this.taskListContainer?.querySelector('ul.todo-list');
+    if (!list && this.taskListContainer) {
+      list = this.taskListContainer.createEl('ul', { cls: 'todo-list' });
     }
-    list.empty();
+    if (list) {
+      list.empty();
+    }
 
     const mode = this.getViewMode();
     const allTasks = this.tasks ?? [];
@@ -934,7 +937,8 @@ export class TodoView extends ItemView {
       const isHideCompleted = mode === 'hideCompleted';
 
       // Build empty message container (below toolbar, above list)
-      const empty = container.createEl('div', { cls: 'todo-empty' });
+      const emptyContainer = this.taskListContainer || container;
+      const empty = emptyContainer.createEl('div', { cls: 'todo-empty' });
 
       const title = empty.createEl('div', { cls: 'todo-empty-title' });
       const subtitle = empty.createEl('div', { cls: 'todo-empty-subtitle' });
@@ -962,9 +966,11 @@ export class TodoView extends ItemView {
     }
 
     // Render visible tasks
-    for (const task of visible) {
-      const li = this.buildTaskListItem(task);
-      list.appendChild(li);
+    if (list) {
+      for (const task of visible) {
+        const li = this.buildTaskListItem(task);
+        list.appendChild(li);
+      }
     }
   }
 
@@ -976,6 +982,9 @@ export class TodoView extends ItemView {
 
     // Toolbar
     this.buildToolbar(container);
+
+    // Create scrollable container for task list
+    this.taskListContainer = container.createEl('div', { cls: 'todo-task-list-container' });
 
     // Setup search suggestions dropdown
     this.setupSearchSuggestions();
@@ -1315,7 +1324,7 @@ export class TodoView extends ItemView {
      window.removeEventListener('keydown', handler);
      this._searchKeyHandler = undefined;
    }
-   
+    
    // Cleanup suggestion dropdowns
    if (this.optionsDropdown) {
      this.optionsDropdown.cleanup();
@@ -1325,8 +1334,9 @@ export class TodoView extends ItemView {
      this.suggestionDropdown.cleanup();
      this.suggestionDropdown = null;
    }
-   
+    
    this.searchInputEl = null;
+   this.taskListContainer = null;
    await (super.onClose?.());
  }
 }
