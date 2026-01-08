@@ -82,6 +82,30 @@
     color-mix(in srgb, var(--interactive-accent, #7f6df2) 20%, transparent);
 }
 
+/* Comprehensive focus styles for all interactive elements */
+.todo-view .clickable-icon:focus-visible,
+.todo-view button:focus-visible,
+.todo-view [tabindex='0']:focus-visible,
+.todo-view input:focus-visible,
+.todo-view select:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+}
+
+/* Focus styles for Obsidian-style elements */
+.todo-view .dropdown:focus-visible,
+.todo-view .mod-small:focus-visible {
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+  border-radius: var(--input-radius);
+}
+
+/* Touch target sizing for mobile accessibility */
+.todo-view .clickable-icon,
+.todo-view button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+}
+
 /* Checkbox alignment */
 .todo-view .todo-checkbox {
   margin-right: var(--size-2-2);

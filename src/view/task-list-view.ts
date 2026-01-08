@@ -47,6 +47,7 @@ export class TaskListView extends ItemView {
   private optionsDropdown: SearchOptionsDropdown | null = null;
   private suggestionDropdown: SearchSuggestionDropdown | null = null;
   private taskListContainer: HTMLElement | null = null;
+  private ariaLiveRegion: HTMLElement | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -282,6 +283,7 @@ export class TaskListView extends ItemView {
     settingsBtn.setAttr('title', 'Task List settings');
     settingsBtn.setAttr('aria-label', 'Task List settings');
     settingsBtn.setAttr('aria-expanded', String(false));
+    settingsBtn.setAttr('tabindex', '0');
     setIcon(settingsBtn, 'lucide-sliders-horizontal');
 
     // Create expandable settings section below the first row
@@ -331,7 +333,7 @@ export class TaskListView extends ItemView {
     dropdown.value = currentMode;
 
     // Toggle settings section visibility
-    settingsBtn.addEventListener('click', () => {
+    const toggleSettings = () => {
       const isExpanded = settingsSection.style.display !== 'none';
       settingsSection.style.display = isExpanded ? 'none' : 'block';
       settingsBtn.setAttr('aria-expanded', String(!isExpanded));
@@ -340,6 +342,16 @@ export class TaskListView extends ItemView {
         settingsBtn.removeClass('is-active');
       } else {
         settingsBtn.addClass('is-active');
+      }
+    };
+
+    settingsBtn.addEventListener('click', toggleSettings);
+
+    // Keyboard support for settings button
+    settingsBtn.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleSettings();
       }
     });
 
@@ -603,6 +615,9 @@ export class TaskListView extends ItemView {
 
   // Cycle state via NEXT_STATE using TaskEditor
   private async updateTaskState(task: Task, nextState: string): Promise<void> {
+    // Store old state for announcement
+    const oldState = task.state;
+
     // Construct editor bound to this vault so methods don't need App
     const updated = await this.editor.updateTaskState(task, nextState);
     // Sync in-memory task from returned snapshot
@@ -611,6 +626,11 @@ export class TaskListView extends ItemView {
       task.state = (updated as { state: string }).state as Task['state'];
     }
     task.completed = !!(updated as { completed?: unknown }).completed;
+
+    // Announce state change to screen readers
+    if (oldState !== task.state) {
+      this.announceTaskStateChange(task, oldState);
+    }
   }
 
   /**
@@ -910,6 +930,18 @@ export class TaskListView extends ItemView {
     return todoSpan;
   }
 
+  /**
+   * Announce task state change to screen readers
+   * @param task Task that was updated
+   * @param oldState Previous state of the task
+   */
+  private announceTaskStateChange(task: Task, oldState: string): void {
+    if (this.ariaLiveRegion) {
+      const taskDescription = `${task.text} changed from ${oldState} to ${task.state}`;
+      this.ariaLiveRegion.textContent = taskDescription;
+    }
+  }
+
   private buildText(task: Task, container: HTMLElement): HTMLSpanElement {
     const taskText = container.createEl('span', { cls: 'todo-text' });
 
@@ -1144,6 +1176,16 @@ export class TaskListView extends ItemView {
     // Create scrollable container for task list
     this.taskListContainer = container.createEl('div', {
       cls: 'todo-task-list-container',
+    });
+
+    // Create aria-live region for screen reader announcements
+    this.ariaLiveRegion = container.createEl('div', {
+      attr: {
+        role: 'status',
+        'aria-live': 'polite',
+        'aria-atomic': 'true',
+        class: 'sr-only',
+      },
     });
 
     // Setup search suggestions dropdown

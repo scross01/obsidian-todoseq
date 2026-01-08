@@ -43,6 +43,7 @@ export class SearchOptionsDropdown {
 
     // Add event listeners
     this.setupEventListeners();
+    this.setupKeyboardNavigation();
   }
 
   /**
@@ -405,6 +406,70 @@ export class SearchOptionsDropdown {
     this.containerEl.removeClass('show');
     this.isShowing = false;
     this.selectedIndex = -1;
+  }
+
+  /**
+   * Get all focusable elements within the dropdown
+   * @returns Array of focusable HTMLElements
+   */
+  private getFocusableElements(): HTMLElement[] {
+    const focusableSelector =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    return Array.from(
+      this.containerEl.querySelectorAll(focusableSelector)
+    ) as HTMLElement[];
+  }
+
+  /**
+   * Add keyboard navigation and focus trapping to dropdown
+   */
+  private setupKeyboardNavigation(): void {
+    this.containerEl.addEventListener('keydown', (e: KeyboardEvent) => {
+      const focusableElements = this.getFocusableElements();
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+
+      // Trap Tab key within dropdown
+      if (e.key === 'Tab') {
+        if (e.shiftKey && activeElement === firstElement) {
+          // Shift+Tab on first element - trap at first element
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && activeElement === lastElement) {
+          // Tab on last element - trap at last element
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+
+      // Arrow key navigation
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (focusableElements.length > 0) {
+          let currentIndex = focusableElements.findIndex(
+            (el: HTMLElement) => el === activeElement
+          );
+          if (currentIndex === -1) {
+            currentIndex = e.key === 'ArrowDown' ? -1 : 0;
+          }
+
+          currentIndex =
+            e.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
+
+          if (currentIndex >= 0 && currentIndex < focusableElements.length) {
+            focusableElements[currentIndex].focus();
+          }
+        }
+      }
+
+      // Escape key to close dropdown
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.hide();
+        this.inputEl.focus();
+      }
+    });
   }
 
   public cleanup(): void {
