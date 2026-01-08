@@ -189,6 +189,9 @@ export class UIManager {
   private pendingClickTimeout: number | null = null;
   private lastClickedElement: HTMLElement | null = null;
   private lastClickTime = 0;
+  private isMouseDownOnKeyword = false;
+  private mouseMoveHandler: ((event: MouseEvent) => void) | null = null;
+  private mouseUpHandler: ((event: MouseEvent) => void) | null = null;
 
   private handleTaskKeywordClickWithDoubleClickDetection(
     keywordElement: HTMLElement,
@@ -210,22 +213,93 @@ export class UIManager {
     if (isDoubleClick) {
       this.lastClickedElement = null;
       this.lastClickTime = 0;
+      this.isMouseDownOnKeyword = false;
       return; // Don't process this as a single click
     }
 
     // Store the clicked element and time for double-click detection
     this.lastClickedElement = keywordElement;
     this.lastClickTime = currentTime;
+    this.isMouseDownOnKeyword = true;
+
+    // Set up mouse movement tracking to detect if mouse leaves the element
+    this.mouseMoveHandler = (moveEvent: MouseEvent) => {
+      if (this.isMouseDownOnKeyword && moveEvent.buttons === 1) {
+        // Left mouse button is down
+        const relatedTarget = moveEvent.relatedTarget as HTMLElement | null;
+        // Check if mouse has moved outside the keyword element
+        if (!keywordElement.contains(relatedTarget)) {
+          // Mouse has moved away from the keyword element while button is down
+          // This indicates text selection, not a single click
+          this.cancelPendingClick();
+        }
+      }
+    };
+
+    // Set up mouse up tracking to detect when mouse button is released
+    this.mouseUpHandler = (upEvent: MouseEvent) => {
+      if (this.isMouseDownOnKeyword) {
+        // Check if mouse up occurred outside the keyword element
+        const target = upEvent.target as HTMLElement;
+        if (!keywordElement.contains(target)) {
+          // Mouse was released outside the keyword element
+          // This indicates text selection, not a single click
+          this.cancelPendingClick();
+        }
+        this.isMouseDownOnKeyword = false;
+      }
+    };
+
+    // Add temporary event listeners for mouse tracking
+    document.addEventListener('mousemove', this.mouseMoveHandler);
+    document.addEventListener('mouseup', this.mouseUpHandler);
 
     // Set a timeout to process as single click if no second click occurs
     this.pendingClickTimeout = window.setTimeout(() => {
+      // Clean up mouse event listeners
+      if (this.mouseMoveHandler) {
+        document.removeEventListener('mousemove', this.mouseMoveHandler);
+        this.mouseMoveHandler = null;
+      }
+      if (this.mouseUpHandler) {
+        document.removeEventListener('mouseup', this.mouseUpHandler);
+        this.mouseUpHandler = null;
+      }
+
       this.pendingClickTimeout = null;
       this.lastClickedElement = null;
       this.lastClickTime = 0;
+      this.isMouseDownOnKeyword = false;
 
-      // Process as single click
-      this.handleTaskKeywordClick(keywordElement, view);
+      // Process as single click only if mouse didn't move away
+      if (this.isMouseDownOnKeyword === false) {
+        this.handleTaskKeywordClick(keywordElement, view);
+      }
     }, 300); // Standard double-click detection window
+  }
+
+  /**
+   * Cancel pending click processing when mouse moves away during click
+   */
+  private cancelPendingClick(): void {
+    if (this.pendingClickTimeout) {
+      clearTimeout(this.pendingClickTimeout);
+      this.pendingClickTimeout = null;
+    }
+
+    // Remove mouse event listeners
+    if (this.mouseMoveHandler) {
+      document.removeEventListener('mousemove', this.mouseMoveHandler);
+      this.mouseMoveHandler = null;
+    }
+    if (this.mouseUpHandler) {
+      document.removeEventListener('mouseup', this.mouseUpHandler);
+      this.mouseUpHandler = null;
+    }
+
+    this.lastClickedElement = null;
+    this.lastClickTime = 0;
+    this.isMouseDownOnKeyword = false;
   }
 
   /**
@@ -432,11 +506,8 @@ export class UIManager {
     );
     this.registeredEventListeners = [];
 
-    // Clear any pending timeouts
-    if (this.pendingClickTimeout) {
-      clearTimeout(this.pendingClickTimeout);
-      this.pendingClickTimeout = null;
-    }
+    // Clear any pending timeouts and mouse handlers
+    this.cancelPendingClick();
 
     // Clear editor decorations
     this.clearEditorDecorations();
