@@ -319,7 +319,7 @@ export class TaskKeywordDecorator {
   private checkAndDecorateDateLine(
     lineNumber: number,
     lineText: string,
-    line: any,
+    line: { from: number; to: number },
     builder: RangeSetBuilder<Decoration>
   ): void {
     // Only check for date lines if we have a previous task line

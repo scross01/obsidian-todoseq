@@ -1,4 +1,5 @@
 import { Plugin, WorkspaceLeaf, MarkdownView } from 'obsidian';
+import { EditorView } from '@codemirror/view';
 import { Task } from './task';
 import { TaskListView } from './view/task-list-view';
 import { TodoTrackerSettings, DefaultSettings } from './settings/settings';
@@ -154,7 +155,7 @@ export default class TodoTracker extends Plugin {
       const view = leaf.view;
       if (view instanceof MarkdownView && view.editor) {
         // Force the editor to refresh its decorations by triggering a viewport change
-        const editorView = (view.editor as { cm?: any }).cm;
+        const editorView = (view.editor as { cm?: EditorView })?.cm;
         if (editorView && typeof editorView.requestMeasure === 'function') {
           // Request a measurement update which will trigger decoration refresh
           editorView.requestMeasure();

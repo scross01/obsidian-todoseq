@@ -54,7 +54,7 @@ export class UIManager {
       leaves.forEach((leaf) => {
         const view = leaf.view;
         if (view instanceof MarkdownView && view.editor) {
-          const cmEditor = (view.editor as any)?.cm;
+          const cmEditor = (view.editor as { cm?: EditorView })?.cm;
           if (cmEditor && cmEditor.dom) {
             const editorContent = cmEditor.dom;
 
@@ -267,7 +267,7 @@ export class UIManager {
     const markdownView =
       this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (markdownView && markdownView.editor) {
-      const cmEditor = (markdownView.editor as any)?.cm;
+      const cmEditor = (markdownView.editor as { cm?: EditorView })?.cm;
       if (cmEditor) {
         return cmEditor;
       }
