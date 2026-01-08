@@ -48,8 +48,8 @@ export class PluginLifecycleManager {
 
     // Add command to show tasks
     this.plugin.addCommand({
-      id: 'show-todo-tasks',
-      name: 'Show TODO tasks',
+      id: 'show-task-list',
+      name: 'Show task list',
       callback: () => this.plugin.uiManager.showTasks()
     });
 

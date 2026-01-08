@@ -15,12 +15,12 @@ You can drag and drop the panel to reposition it within the Obsidian interface, 
 ### Command Palette
 
 1. Open the command palette with `Ctrl/Cmd + P`
-2. Search for "TODOseq: Show TODO tasks"
+2. Search for "TODOseq: Show task list"
 3. Select the command to open/show the Task List in the right sidebar
 
 ### Keyboard Shortcut
 
-- You can assign a custom keyboard shortcut to the "TODOseq: Show TODO tasks" in Obsidian's Hotkeys settings.
+- You can assign a custom keyboard shortcut to the "TODOseq: Show task list" in Obsidian's Hotkeys settings.
 
 ## Task List Interface
 
