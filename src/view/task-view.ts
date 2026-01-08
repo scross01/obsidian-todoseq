@@ -1142,8 +1142,8 @@ export class TodoView extends ItemView {
     const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp; }[] = [
       // [[Page]] or [[Page|Alias]]
       { type: 'wiki', regex: /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g },
-      // [Alias](target)
-      { type: 'md', regex: /\[([^\]]+)\]\(([^)]+)\)/g },
+      // [Alias](target) - improved regex to handle brackets in link text
+      { type: 'md', regex: /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g },
       // bare URLs
       { type: 'url', regex: /\bhttps?:\/\/[^\s)]+/g },
       // #tags (must come after URLs to avoid conflicts with URLs containing #)
