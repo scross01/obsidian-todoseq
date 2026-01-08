@@ -1,12 +1,12 @@
 # Search Functionality
 
-The search field in the TODOseq Task View provides a powerful search system that allows you to quickly find and filter tasks across your entire vault. This guide covers all aspects of the search functionality, from basic filtering to advanced query syntax.
+The search field in the TODOseq Task List provides a powerful search system that allows you to quickly find and filter tasks across your entire vault. This guide covers all aspects of the search functionality, from basic filtering to advanced query syntax.
 
 ## Basic Search
 
 ### Search Field Overview
 
-The search field is located in the Task View toolbar and provides live filtering as you type. Basic search matches the entered text against task text, file path, and filename
+The search field is located in the Task List toolbar and provides live filtering as you type. Basic search matches the entered text against task text, file path, and filename
 
 ### Search Shortcuts
 

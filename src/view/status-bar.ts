@@ -1,6 +1,6 @@
 import TodoTracker from '../main';
 import { Task } from '../task';
-import { TodoView } from './task-view';
+import { TaskListView } from './task-list-view';
 import { TFile } from 'obsidian';
 
 export class StatusBarManager {
@@ -60,7 +60,7 @@ export class StatusBarManager {
     const activeFile = this.plugin.app.workspace.getActiveFile();
     if (!activeFile) return;
     
-    // Open/focus the TODOseq Task View
+    // Open/focus the TODOseq Task List
     this.plugin.showTasks();
     
     // Populate the search filter with file name only
@@ -70,18 +70,18 @@ export class StatusBarManager {
     const fileFilter = `file:"${activeFile.basename}"`;
     const searchQuery = pathFilter + fileFilter;
     
-    const leaves = this.plugin.app.workspace.getLeavesOfType(TodoView.viewType);
+    const leaves = this.plugin.app.workspace.getLeavesOfType(TaskListView.viewType);
     if (leaves.length > 0) {
-      const view = leaves[0].view as TodoView;
+      const view = leaves[0].view as TaskListView;
       if (view) {
         // Use the public method to set search query
-        this.setTaskViewSearchQuery(view, searchQuery);
+        this.setTaskListViewSearchQuery(view, searchQuery);
       }
     }
   }
   
   // Public method to set search query on a TodoView
-  private setTaskViewSearchQuery(view: TodoView, query: string): void {
+  private setTaskListViewSearchQuery(view: TaskListView, query: string): void {
     // Access the private method through the content element attribute
     view.contentEl.setAttr('data-search', query);
     // Also update the search input element if it exists

@@ -1,6 +1,6 @@
 import { PluginSettingTab, App, Setting, ToggleComponent } from 'obsidian';
 import TodoTracker from '../main';
-import { TodoView } from '../view/task-view';
+import { TaskListView } from '../view/task-list-view';
 import { LanguageCommentSupportSettings } from "../parser/language-registry";
 import { TaskParser } from "../parser/task-parser";
 
@@ -10,7 +10,7 @@ export interface TodoTrackerSettings {
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
   includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
   includeCommentBlocks: boolean; // when true, tasks inside multiline comment blocks ($$) are included
-  taskViewMode: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // controls view transformation in the task view
+  taskListViewMode: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // controls view transformation in the task view
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
@@ -23,7 +23,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   includeCodeBlocks: false,
   includeCalloutBlocks: true, // Enabled by default
   includeCommentBlocks: false, // Disabled by default
-  taskViewMode: 'showAll',
+  taskListViewMode: 'showAll',
   languageCommentSupport: {
     enabled: true,
   },
@@ -39,13 +39,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  private refreshAllTaskViews = async () => {
-    const leaves = this.app.workspace.getLeavesOfType(TodoView.viewType);
+  private refreshAllTaskListViews = async () => {
+    const leaves = this.app.workspace.getLeavesOfType(TaskListView.viewType);
     for (const leaf of leaves) {
-      if (leaf.view instanceof TodoView) {
+      if (leaf.view instanceof TaskListView) {
         leaf.view.tasks = this.plugin.tasks;
         // Sync each view's mode from settings before render
-        const mode = this.plugin.settings.taskViewMode;
+        const mode = this.plugin.settings.taskListViewMode;
         leaf.view.setViewMode(mode);
         await leaf.view.onOpen();
       }
@@ -67,7 +67,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.refreshInterval = value;
           await this.plugin.saveSettings();
           this.plugin.setupPeriodicRefresh();
-          await this.refreshAllTaskViews();
+          await this.refreshAllTaskListViews();
         }));
 
     new Setting(containerEl)
@@ -150,7 +150,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               try {
                 this.plugin.recreateParser();
                 await this.plugin.scanVault();
-                await this.refreshAllTaskViews();
+                await this.refreshAllTaskListViews();
                 // Force refresh of visible editor decorations to apply new keywords
                 this.plugin.refreshVisibleEditorDecorations();
               } catch (parseError) {
@@ -163,7 +163,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               // Recreate parser according to new settings and rescan
               this.plugin.recreateParser();
               await this.plugin.scanVault();
-              await this.refreshAllTaskViews();
+              await this.refreshAllTaskListViews();
               // Force refresh of visible editor decorations to apply new keywords
               this.plugin.refreshVisibleEditorDecorations();
             }
@@ -206,7 +206,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           // Recreate parser to reflect includeCodeBlocks change and rescan
           this.plugin.recreateParser();
           await this.plugin.scanVault();
-          await this.refreshAllTaskViews();
+          await this.refreshAllTaskListViews();
           // Force refresh of visible editor decorations to apply new CSS classes
           this.plugin.refreshVisibleEditorDecorations();
         }));
@@ -225,7 +225,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
             this.plugin.recreateParser();
             await this.plugin.scanVault();
-            await this.refreshAllTaskViews();
+            await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new CSS classes
             this.plugin.refreshVisibleEditorDecorations();
           });
@@ -258,7 +258,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           // Recreate parser to reflect includeCalloutBlocks change and rescan
           this.plugin.recreateParser();
           await this.plugin.scanVault();
-          await this.refreshAllTaskViews();
+          await this.refreshAllTaskListViews();
           // Force refresh of visible editor decorations to apply new CSS classes
           this.plugin.refreshVisibleEditorDecorations();
         }));
@@ -275,7 +275,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           // Recreate parser to reflect includeCommentBlocks change and rescan
           this.plugin.recreateParser();
           await this.plugin.scanVault();
-          await this.refreshAllTaskViews();
+          await this.refreshAllTaskListViews();
           // Force refresh of visible editor decorations to apply new CSS classes
           this.plugin.refreshVisibleEditorDecorations();
         }));
@@ -287,12 +287,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         drop.addOption('showAll', 'Show all tasks');
         drop.addOption('sortCompletedLast', 'Sort completed to end');
         drop.addOption('hideCompleted', 'Hide completed');
-        drop.setValue(this.plugin.settings.taskViewMode);
+        drop.setValue(this.plugin.settings.taskListViewMode);
         drop.onChange(async (value: string) => {
           const mode = (value as 'showAll' | 'sortCompletedLast' | 'hideCompleted');
-          this.plugin.settings.taskViewMode = mode;
+          this.plugin.settings.taskListViewMode = mode;
           await this.plugin.saveSettings();
-          await this.refreshAllTaskViews();
+          await this.refreshAllTaskListViews();
               });
             });
       
@@ -307,7 +307,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
                 const weekStart = (value as 'Monday' | 'Sunday');
                 this.plugin.settings.weekStartsOn = weekStart;
                 await this.plugin.saveSettings();
-                await this.refreshAllTaskViews();
+                await this.refreshAllTaskListViews();
               });
             });
         }

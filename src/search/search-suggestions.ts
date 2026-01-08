@@ -1,7 +1,7 @@
 import { Vault } from 'obsidian';
 import { Task } from '../task';
 import { TodoTrackerSettings } from '../settings/settings';
-import { TaskViewMode } from '../view/task-view';
+import { TaskListViewMode } from '../view/task-list-view';
 
 /**
  * Utility class for collecting and filtering search suggestions
@@ -15,7 +15,7 @@ export class SearchSuggestions {
      * @param mode Current view mode
      * @returns Filtered tasks array
      */
-    private static filterTasksByViewMode(tasks: Task[], mode: TaskViewMode): Task[] {
+    private static filterTasksByViewMode(tasks: Task[], mode: TaskListViewMode): Task[] {
         if (mode === 'hideCompleted') {
             return tasks.filter(t => !t.completed);
         }
@@ -28,7 +28,7 @@ export class SearchSuggestions {
      * @param mode Current view mode
      * @returns Set of file paths that have non-completed tasks
      */
-    private static getFilesWithNonCompletedTasks(tasks: Task[], mode: TaskViewMode): Set<string> {
+    private static getFilesWithNonCompletedTasks(tasks: Task[], mode: TaskListViewMode): Set<string> {
         if (mode !== 'hideCompleted') {
             // For other modes, include all files
             const allFiles = new Set<string>();
@@ -49,7 +49,7 @@ export class SearchSuggestions {
      * @param mode Current view mode (optional)
      * @returns Array of unique paths, sorted alphabetically
      */
-    static getAllPathsFromTasks(tasks: Task[], mode?: TaskViewMode): string[] {
+    static getAllPathsFromTasks(tasks: Task[], mode?: TaskListViewMode): string[] {
         const pathsSet = new Set<string>();
         
         // Get files that should be included based on view mode
@@ -139,7 +139,7 @@ export class SearchSuggestions {
      * @param mode Current view mode (optional)
      * @returns Array of unique filenames, sorted alphabetically
      */
-    static getAllFilesFromTasks(tasks: Task[], mode?: TaskViewMode): string[] {
+    static getAllFilesFromTasks(tasks: Task[], mode?: TaskListViewMode): string[] {
         const filesSet = new Set<string>();
         
         // Get files that should be included based on view mode
@@ -191,7 +191,7 @@ export class SearchSuggestions {
      * @param mode Current view mode (optional)
      * @returns Array of unique tags, sorted alphabetically
      */
-    static getAllTags(tasks: Task[], mode?: TaskViewMode): string[] {
+    static getAllTags(tasks: Task[], mode?: TaskListViewMode): string[] {
         const tagsSet = new Set<string>();
         // Comprehensive tag regex that matches #tag, #multi-word-tag, etc.
         // Improved to avoid matching # characters within URLs
@@ -263,7 +263,7 @@ export class SearchSuggestions {
      * @param mode Current view mode (optional)
      * @returns Array of unique scheduled dates in YYYY-MM-DD format, sorted chronologically
      */
-    static getScheduledDateSuggestions(tasks: Task[], mode?: TaskViewMode): string[] {
+    static getScheduledDateSuggestions(tasks: Task[], mode?: TaskListViewMode): string[] {
       const datesSet = new Set<string>();
       
       // Filter tasks based on view mode
@@ -288,7 +288,7 @@ export class SearchSuggestions {
      * @param mode Current view mode (optional)
      * @returns Array of unique deadline dates in YYYY-MM-DD format, sorted chronologically
      */
-    static getDeadlineDateSuggestions(tasks: Task[], mode?: TaskViewMode): string[] {
+    static getDeadlineDateSuggestions(tasks: Task[], mode?: TaskListViewMode): string[] {
       const datesSet = new Set<string>();
       
       // Filter tasks based on view mode

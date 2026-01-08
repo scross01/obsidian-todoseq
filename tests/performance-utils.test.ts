@@ -663,7 +663,7 @@ describe('Performance Utils Improvements', () => {
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         languageCommentSupport: { enabled: true },
         weekStartsOn: 'Monday',
         formatTaskKeywords: true

@@ -1,6 +1,6 @@
 import { Plugin, WorkspaceLeaf, MarkdownView } from 'obsidian';
 import { Task } from './task';
-import { TodoView } from "./view/task-view";
+import { TaskListView } from "./view/task-list-view";
 import { TodoTrackerSettings, DefaultSettings } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
 import { TaskEditor } from './view/task-editor';
@@ -50,10 +50,10 @@ export default class TodoTracker extends Plugin {
  }
 
   // Helper: refresh all open Todo views to reflect this.tasks without stealing focus
-  private async refreshOpenTaskViews(): Promise<void> {
-    const leaves = this.app.workspace.getLeavesOfType(TodoView.viewType);
+  private async refreshOpenTaskListViews(): Promise<void> {
+    const leaves = this.app.workspace.getLeavesOfType(TaskListView.viewType);
     for (const leaf of leaves) {
-      if (leaf.view instanceof TodoView) {
+      if (leaf.view instanceof TaskListView) {
         // Update data source
         leaf.view.tasks = this.tasks;
         // Update the dropdown's task reference so it uses the latest tasks
@@ -183,7 +183,7 @@ export default class TodoTracker extends Plugin {
     
     // Create new leaf or use existing
     let leaf: WorkspaceLeaf | null = null;
-    const leaves = workspace.getLeavesOfType(TodoView.viewType);
+    const leaves = workspace.getLeavesOfType(TaskListView.viewType);
 
     if (leaves.length > 0) {
       leaf = leaves[0];
@@ -207,7 +207,7 @@ export default class TodoTracker extends Plugin {
             leaf = workspace.getLeaf(true);
           }
         }
-        leaf.setViewState({ type: TodoView.viewType, active: true });
+        leaf.setViewState({ type: TaskListView.viewType, active: true });
         // Only reveal if the leaf is not already active to avoid focus stealing
         const activeLeaf = workspace.activeLeaf;
         if (activeLeaf !== leaf) {
@@ -217,7 +217,7 @@ export default class TodoTracker extends Plugin {
         console.warn('Failed to open task view in right sidebar, falling back to main area:', error);
         // Fallback to main area if right sidebar access fails
         leaf = workspace.getLeaf(true);
-        leaf.setViewState({ type: TodoView.viewType, active: true });
+        leaf.setViewState({ type: TaskListView.viewType, active: true });
       }
     }
   }

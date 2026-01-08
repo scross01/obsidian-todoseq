@@ -71,7 +71,7 @@ describe('settings-utils', () => {
         includeCodeBlocks: true,
         includeCalloutBlocks: false,
         includeCommentBlocks: true,
-        taskViewMode: 'hideCompleted',
+        taskListViewMode: 'hideCompleted',
         languageCommentSupport: { enabled: false },
         weekStartsOn: 'Sunday',
         formatTaskKeywords: false
@@ -103,7 +103,7 @@ describe('settings-utils', () => {
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         languageCommentSupport: { enabled: true },
         weekStartsOn: 'Monday',
         formatTaskKeywords: true
@@ -156,8 +156,8 @@ describe('settings-utils', () => {
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(false);
       });
 
-      test('should NOT detect changes in taskViewMode', () => {
-        const changedSettings: TodoTrackerSettings = { ...baseSettings, taskViewMode: 'hideCompleted' };
+      test('should NOT detect changes in taskListViewMode', () => {
+        const changedSettings: TodoTrackerSettings = { ...baseSettings, taskListViewMode: 'hideCompleted' };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(false);
       });
 
@@ -180,7 +180,7 @@ describe('settings-utils', () => {
         const changedSettings: TodoTrackerSettings = {
           ...baseSettings,
           refreshInterval: 30,
-          taskViewMode: 'sortCompletedLast',
+          taskListViewMode: 'sortCompletedLast',
           weekStartsOn: 'Sunday'
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(false);
@@ -287,7 +287,7 @@ describe('settings-utils', () => {
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         languageCommentSupport: { enabled: true },
         weekStartsOn: 'Monday',
         formatTaskKeywords: true

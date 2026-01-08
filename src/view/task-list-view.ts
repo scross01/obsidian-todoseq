@@ -11,14 +11,14 @@ import { taskComparator, getFilename } from '../utils/task-utils';
 import { getPluginSettings } from '../utils/settings-utils';
 
 
-export type TaskViewMode = 'showAll' | 'sortCompletedLast' | 'hideCompleted';
+export type TaskListViewMode = 'showAll' | 'sortCompletedLast' | 'hideCompleted';
 export type SortMethod = 'default' | 'sortByScheduled' | 'sortByDeadline' | 'sortByPriority';
 
-export class TodoView extends ItemView {
+export class TaskListView extends ItemView {
   static viewType = "todoseq-view";
   tasks: Task[];
   editor: TaskEditor;
-  private defaultViewMode: TaskViewMode;
+  private defaultViewMode: TaskListViewMode;
   private defaultSortMethod: SortMethod;
   private searchInputEl: HTMLInputElement | null = null;
   private _searchKeyHandler: ((e: KeyboardEvent) => void) | undefined;
@@ -28,7 +28,7 @@ export class TodoView extends ItemView {
   private suggestionDropdown: SearchSuggestionDropdown | null = null;
   private taskListContainer: HTMLElement | null = null;
 
-  constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskViewMode, private settings: TodoTrackerSettings) {
+  constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskListViewMode, private settings: TodoTrackerSettings) {
     super(leaf);
     this.tasks = tasks;
     this.editor = new TaskEditor(this.app);
@@ -36,7 +36,7 @@ export class TodoView extends ItemView {
   }
 
   /** View-mode accessors persisted on the root element to avoid cross-class coupling */
-  private getViewMode(): TaskViewMode {
+  private getViewMode(): TaskListViewMode {
     const attr = this.contentEl.getAttr('data-view-mode');
     if (typeof attr === 'string') {
       // Migrate old mode names to new ones
@@ -53,12 +53,12 @@ export class TodoView extends ItemView {
     if (defaultMode === 'sortCompletedLast') return 'sortCompletedLast';
     if (defaultMode === 'hideCompleted') return 'hideCompleted';
     if (defaultMode === 'showAll' || defaultMode === 'sortCompletedLast' || defaultMode === 'hideCompleted') {
-      return defaultMode as TaskViewMode;
+      return defaultMode as TaskListViewMode;
     }
     // Final safety fallback
     return 'showAll';
   }
-  setViewMode(mode: TaskViewMode) {
+  setViewMode(mode: TaskListViewMode) {
     this.contentEl.setAttr('data-view-mode', mode);
   }
 
@@ -84,7 +84,7 @@ export class TodoView extends ItemView {
    * @param mode Current view mode
    * @returns Filtered tasks array
    */
-  private filterTasksByViewMode(tasks: Task[], mode: TaskViewMode): Task[] {
+  private filterTasksByViewMode(tasks: Task[], mode: TaskListViewMode): Task[] {
     if (mode === 'hideCompleted') {
       return tasks.filter(t => !t.completed);
     }
@@ -92,7 +92,7 @@ export class TodoView extends ItemView {
   }
 
   /** Non-mutating transform for rendering */
-  private transformForView(tasks: Task[], mode: TaskViewMode): Task[] {
+  private transformForView(tasks: Task[], mode: TaskListViewMode): Task[] {
     let transformed = tasks.slice();
 
     // First, handle view mode filtering
@@ -219,8 +219,8 @@ export class TodoView extends ItemView {
 
     // Add Settings button to the right side of the first row
     const settingsBtn = firstRow.createEl('div', { cls: 'clickable-icon' });
-    settingsBtn.setAttr('title', 'Task View settings');
-    settingsBtn.setAttr('aria-label', 'Task View settings');
+    settingsBtn.setAttr('title', 'Task List settings');
+    settingsBtn.setAttr('aria-label', 'Task List settings');
     settingsBtn.setAttr('aria-expanded', String(false));
     setIcon(settingsBtn, 'lucide-sliders-horizontal');
 
@@ -279,7 +279,7 @@ export class TodoView extends ItemView {
 
     // Handle dropdown changes
     dropdown.addEventListener('change', () => {
-      const selectedValue = dropdown.value as TaskViewMode;
+      const selectedValue = dropdown.value as TaskListViewMode;
       this.setViewMode(selectedValue);
       
       // Dispatch event for persistence
@@ -517,7 +517,7 @@ export class TodoView extends ItemView {
   }
 
   getViewType() {
-    return TodoView.viewType;
+    return TaskListView.viewType;
   }
 
   /** Return default keyword sets (non-completed and completed) and additional keywords using constants from task.ts */
@@ -1241,7 +1241,7 @@ export class TodoView extends ItemView {
     };
     const isTodoSeqLeaf = (leaf: WorkspaceLeaf | null | undefined): boolean => {
       if (!leaf) return false;
-      return leaf.view instanceof TodoView;
+      return leaf.view instanceof TaskListView;
     };
     const findExistingLeafForFile = (): WorkspaceLeaf | null => {
       const leaves = workspace.getLeavesOfType('markdown');

@@ -1,14 +1,14 @@
-# Task View
+# Task List
 
-The Task View is the central interface for managing all your tasks across your Obsidian vault. It provides a comprehensive overview of your tasks and powerful tools for task management.
+The Task List is the central interface for managing all your tasks across your Obsidian vault. It provides a comprehensive overview of your tasks and powerful tools for task management.
 
-## Opening the Task View
+## Opening the Task List
 
-**Note**: The Task View behavior has been updated for better user experience. - The left ribbon icon has been removed since v0.7.0. The right sidebar is now the default location for the TOODseq task list.
+**Note**: The Task List behavior has been updated for better user experience. - The left ribbon icon has been removed since v0.7.0. The right sidebar is now the default location for the TOODseq task list.
 
 ### Automatic Opening
 
-The Task View automatically opens in the right sidebar when the TODOseq plugin is enabled.
+The Task List automatically opens in the right sidebar when the TODOseq plugin is enabled.
 
 You can drag and drop the panel to reposition it within the Obsidian interface, such as moving to different panel location, or making it a floating window.
 
@@ -16,19 +16,19 @@ You can drag and drop the panel to reposition it within the Obsidian interface, 
 
 1. Open the command palette with `Ctrl/Cmd + P`
 2. Search for "TODOseq: Show TODO tasks"
-3. Select the command to open/show the Task View in the right sidebar
+3. Select the command to open/show the Task List in the right sidebar
 
 ### Keyboard Shortcut
 
 - You can assign a custom keyboard shortcut to the "TODOseq: Show TODO tasks" in Obsidian's Hotkeys settings.
 
-## Task View Interface
+## Task List Interface
 
-The Task View consists of several key components:
+The Task List consists of several key components:
 
 ### 1. Search and Settings Toolbar
 
-Located at the top of the Task View, the toolbar contains:
+Located at the top of the Task List, the toolbar contains:
 
 - **Search field**: Live filtering of tasks as you type
 - **Case sensitivity toggle**: Button to toggle case-sensitive search

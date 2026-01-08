@@ -4,7 +4,7 @@ import { VaultScanner } from './services/vault-scanner';
 import { TaskEditor } from './view/task-editor';
 import { EditorKeywordMenu } from './view/editor-keyword-menu';
 import { StatusBarManager } from './view/status-bar';
-import { TodoView, TaskViewMode } from "./view/task-view";
+import { TaskListView, TaskListViewMode } from "./view/task-list-view";
 import { TodoTrackerSettingTab } from "./settings/settings";
 import { TaskParser } from './parser/task-parser';
 import { TASK_VIEW_ICON } from './main';
@@ -28,17 +28,17 @@ export class PluginLifecycleManager {
 
     // Register the custom view type
     this.plugin.registerView(
-      TodoView.viewType,
-      (leaf) => new TodoView(leaf, this.plugin.tasks, this.plugin.settings.taskViewMode, this.plugin.settings)
+      TaskListView.viewType,
+      (leaf) => new TaskListView(leaf, this.plugin.tasks, this.plugin.settings.taskListViewMode, this.plugin.settings)
     );
 
     // Persist view-mode changes coming from TodoView toolbars
     const handler = async (e: Event) => {
-      const detail = (e as CustomEvent).detail as { mode: TaskViewMode };
+      const detail = (e as CustomEvent).detail as { mode: TaskListViewMode };
       if (!detail?.mode) return;
-      this.plugin.settings.taskViewMode = detail.mode;
+      this.plugin.settings.taskListViewMode = detail.mode;
       await this.saveSettings();
-      await this.plugin.uiManager.refreshOpenTaskViews();
+      await this.plugin.uiManager.refreshOpenTaskListViews();
     };
     window.addEventListener('todoseq:view-mode-change', handler);
     this.plugin.register(() => window.removeEventListener('todoseq:view-mode-change', handler));
@@ -71,7 +71,7 @@ export class PluginLifecycleManager {
     // Listen to VaultScanner events for task updates
     this.plugin.vaultScanner.on('tasks-changed', (tasks) => {
       this.plugin.tasks = tasks;
-      this.plugin.uiManager.refreshOpenTaskViews();
+      this.plugin.uiManager.refreshOpenTaskListViews();
     });
 
     this.plugin.vaultScanner.on('scan-error', (error) => {

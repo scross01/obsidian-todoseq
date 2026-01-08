@@ -245,7 +245,7 @@ describe('Search functionality', () => {
       includeCodeBlocks: false,
       includeCalloutBlocks: true,
       includeCommentBlocks: false,
-      taskViewMode: 'showAll',
+      taskListViewMode: 'showAll',
       languageCommentSupport: { enabled: true },
       weekStartsOn: 'Monday',
       formatTaskKeywords: true

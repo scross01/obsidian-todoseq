@@ -864,7 +864,7 @@ describe('Search Suggestions', () => {
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         languageCommentSupport: {
           enabled: true,
         },
@@ -908,7 +908,7 @@ describe('Search Suggestions', () => {
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         languageCommentSupport: {
           enabled: true,
         },

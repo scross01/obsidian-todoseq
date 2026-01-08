@@ -87,4 +87,4 @@ TODOseq ensures that the task state and checkbox are always in sync:
 - Checking/unchecking the checkbox updates the task keyword
 - Both methods update the task's completion date if applicable
 
-This synchronization happens automatically as you interact with tasks in the editor or the [Task View](task-view.md).
+This synchronization happens automatically as you interact with tasks in the editor or the [Task List](task-list.md).

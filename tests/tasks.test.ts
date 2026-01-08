@@ -18,7 +18,7 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
       additionalTaskKeywords: [],
       includeCommentBlocks: false,
       weekStartsOn: 'Monday',
-      taskViewMode: 'showAll',
+      taskListViewMode: 'showAll',
       formatTaskKeywords: true,
     };
     parser = TaskParser.create(settings);
@@ -470,7 +470,7 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
           enabled: false,
         },
         additionalTaskKeywords: [],
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         includeCommentBlocks: false,
         formatTaskKeywords: true,
         weekStartsOn: 'Monday',
@@ -608,7 +608,7 @@ TODO = some code
         additionalTaskKeywords: [],
         includeCommentBlocks: false,
         weekStartsOn: 'Monday',
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         formatTaskKeywords: true,
       };
       parser = TaskParser.create(settings);

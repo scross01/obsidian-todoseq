@@ -8,7 +8,7 @@ TODOseq ("to-do-seek") is a lightweight, keyword-based task management plugin fo
 
 TODOseq is inspired by the task management approaches used in [Logseq](https://docs.logseq.com/#/page/tasks) and [orgmode](https://orgmode.org/) where tasks are captured in context with the notes and journals they relate to. This allows for a more natural and flexible workflow, where tasks can be easily created, updated, and tracked without disrupting your note-taking process.
 
-TODOseq scans your vault for lines that begin with specific keywords, extracts them, and presents them in a dedicated Task View panel within Obsidian. This approach allows you to maintain your existing note structure while gaining powerful task management capabilities.
+TODOseq scans your vault for lines that begin with specific keywords, extracts them, and presents them in a dedicated Task List panel within Obsidian. This approach allows you to maintain your existing note structure while gaining powerful task management capabilities.
 
 ### 1. Natural Language Task Capture
 
@@ -96,5 +96,5 @@ Some TODOseq features are not available in Logseq, the use of checkboxes before 
 For detailed usage guides, see:
 
 - [Task Entry Structure](task-entry.md) - Learn about task syntax and formats
-- [Task View](task-view.md) - Understand how to use the dedicated task panel
+- [Task List](task-list.md) - Understand how to use the dedicated task panel
 - [Search Functionality](search.md) - Master advanced task filtering

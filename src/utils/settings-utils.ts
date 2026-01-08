@@ -36,7 +36,7 @@ export function getPluginSettings(app: App): TodoTrackerSettings | null {
     includeCodeBlocks: false,
     includeCalloutBlocks: true,
     includeCommentBlocks: false,
-    taskViewMode: 'showAll',
+    taskListViewMode: 'showAll',
     languageCommentSupport: { enabled: true },
     weekStartsOn: 'Monday',
     formatTaskKeywords: true,

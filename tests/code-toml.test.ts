@@ -15,7 +15,7 @@ describe('Task parsing within TOML file comments in code blocks', () => {
         enabled: true,
       },
       additionalTaskKeywords: [],
-      taskViewMode: 'showAll',
+      taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
       formatTaskKeywords: true
     };

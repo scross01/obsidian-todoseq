@@ -17,7 +17,7 @@ Access TODOseq settings through Obsidian's settings interface:
 
 **Setting**: "Refresh Interval" (10-300 seconds, default: 60)
 
-**Description**: Controls how frequently TODOseq rescans your vault for tasks. While the Task View should generally update automatically when files change, this setting ensures periodic rescans to catch any missed updates.
+**Description**: Controls how frequently TODOseq rescans your vault for tasks. While the Task List should generally update automatically when files change, this setting ensures periodic rescans to catch any missed updates.
 
 **Impact**:
 
@@ -52,7 +52,7 @@ See [Editor Integration documentation](editor.md) for full details.
 **Behavior:**
 
 - Works when cursor is on any valid task line
-- Follows same state cycling logic as Task View
+- Follows same state cycling logic as Task List
 - Preserves indentation, list markers, and priority tokens
 - Updates both state keyword and checkbox simultaneously
 - Only available when editing Markdown files
@@ -95,7 +95,7 @@ FIXME, HACK, REVIEW, BLOCKED, IDEA
 
 **Custom Keyword Behavior:**
 
-- Appear in Task View like default keywords
+- Appear in Task List like default keywords
 - Can be clicked to cycle states
 - Follow same state sequences as similar default keywords
 
@@ -109,7 +109,7 @@ FIXME, HACK, REVIEW, BLOCKED, IDEA
 
 **Impact:**
 
-- **Enabled**: Tasks in code blocks are detected and shown in Task View
+- **Enabled**: Tasks in code blocks are detected and shown in Task List
 - **Disabled**: Code block tasks are ignored (better performance)
 
 **Code Block Examples:**
@@ -200,11 +200,11 @@ FIXME Handle edge cases
 
 **Default**: Disabled
 
-## Task View Settings
+## Task List Settings
 
-### Task View Mode
+### Task List Mode
 
-**Setting**: "Task View mode" (dropdown)
+**Setting**: "Task List mode" (dropdown)
 
 **Description**: Choose how completed items are shown by default.
 
@@ -230,8 +230,8 @@ FIXME Handle edge cases
 
 **Behavior:**
 
-- Setting applies to initial Task View opening
-- Can also be updated directly in the Task View settings menu
+- Setting applies to initial Task List opening
+- Can also be updated directly in the Task List settings menu
 - User preference is remembered across sessions
 
 ### Week Starts On

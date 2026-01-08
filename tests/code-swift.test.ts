@@ -15,7 +15,7 @@ describe('Task parsing within Swift comments in code blocks', () => {
         enabled: true,
       },
       additionalTaskKeywords: [],
-      taskViewMode: 'showAll',
+      taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
       formatTaskKeywords: true
     };

@@ -12,7 +12,7 @@ describe('Task Formatting Settings Change Detection', () => {
       includeCodeBlocks: false,
       includeCalloutBlocks: true,
       includeCommentBlocks: false,
-      taskViewMode: 'showAll',
+      taskListViewMode: 'showAll',
       languageCommentSupport: {
         enabled: false,
       },

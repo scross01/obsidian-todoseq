@@ -71,7 +71,7 @@ Combines checkboxes with state keywords:
 
 **Checkbox State Synchronization:**
 
-TODOseq automatically syncs checkbox state with task keywords when updated from the Task View*:
+TODOseq automatically syncs checkbox state with task keywords when updated from the Task List*:
 
 - Empty checkbox `[ ]` = Incomplete task (TODO, DOING, etc.)
 - Checked checkbox `[x]` = Completed task (DONE, CANCELED, etc.)

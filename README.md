@@ -1,6 +1,6 @@
 # TODOseq for Obsidian
 
-TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian. It scans your vault for task lines that begin with simple state keywords (e.g., TODO, DOING, DONE) and presents them in a dedicated Task View. Inspired by the task capture styles of [Emacs Org-mode](https://orgmode.org/) and [Logseq Tasks](https://docs.logseq.com/#/page/tasks) TODOseq preserves your original Markdown formatting and does not require checkbox syntax.
+TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian. It scans your vault for task lines that begin with simple state keywords (e.g., TODO, DOING, DONE) and presents them in a dedicated Task List view. Inspired by the task capture styles of [Emacs Org-mode](https://orgmode.org/) and [Logseq Tasks](https://docs.logseq.com/#/page/tasks) TODOseq preserves your original Markdown formatting and does not require checkbox syntax.
 
 ![screenshot of obsidian showing the page editor and the TODOseq panel in a separate tab showing the list of tasks found in the vault.](screenshot.png)
 
@@ -33,7 +33,7 @@ TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian
 
 ## Quick Start
 
-1. **Open Task View**: The TODOseq task view automatically opens in the right sidebar when the plugin is enabled, and can also be opened via the command palette.
+1. **Open Task List**: The TODOseq task view automatically opens in the right sidebar when the plugin is enabled, and can also be opened via the command palette.
 2. **Create tasks**: Add lines starting with `TODO`, `DOING`, `DONE`, etc. in your notes
 3. **Manage tasks**: Click task keywords to cycle states or use checkboxes for TODO/DONE toggle
 4. **Navigate**: Click task rows to jump to source files
@@ -58,7 +58,7 @@ DEADLINE: <2023-12-20>
 For detailed information, see the documentation:
 
 - [Introduction & Philosophy](docs/introduction.md) - Task management approach and Logseq compatibility
-- [Task View](docs/task-view.md) - Using the dedicated task panel
+- [Task List](docs/task-list.md) - Using the dedicated task panel
 - [Task Entry Structure](docs/task-entry.md) - Task syntax, keywords, and lifecycle
 - [Editor Integration](docs/editor.md) - Task display and interaction in the Markdown editor
 - [Search Functionality](docs/search.md) - Advanced search syntax and filters

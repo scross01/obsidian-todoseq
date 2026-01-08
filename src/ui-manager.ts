@@ -4,7 +4,7 @@ import TodoTracker from './main';
 import { DEFAULT_COMPLETED_STATES, NEXT_STATE } from './task';
 import { taskKeywordPlugin } from './view/task-formatting';
 import { dateAutocompleteExtension } from './view/date-autocomplete';
-import { TodoView } from './view/task-view';
+import { TaskListView } from './view/task-list-view';
 
 /**
  * Manages UI elements and interactions in the editor
@@ -340,7 +340,7 @@ export class UIManager {
 
     // Create new leaf or use existing
     let leaf: WorkspaceLeaf | null = null;
-    const leaves = workspace.getLeavesOfType(TodoView.viewType);
+    const leaves = workspace.getLeavesOfType(TaskListView.viewType);
 
     if (leaves.length > 0) {
       leaf = leaves[0];
@@ -364,7 +364,7 @@ export class UIManager {
             leaf = workspace.getLeaf(true);
           }
         }
-        leaf.setViewState({ type: TodoView.viewType, active: true });
+        leaf.setViewState({ type: TaskListView.viewType, active: true });
         // Only reveal if the leaf is not already active to avoid focus stealing
         const activeLeaf = workspace.activeLeaf;
         if (activeLeaf !== leaf) {
@@ -374,7 +374,7 @@ export class UIManager {
         console.warn('Failed to open task view in right sidebar, falling back to main area:', error);
         // Fallback to main area if right sidebar access fails
         leaf = workspace.getLeaf(true);
-        leaf.setViewState({ type: TodoView.viewType, active: true });
+        leaf.setViewState({ type: TaskListView.viewType, active: true });
       }
     }
   }
@@ -406,12 +406,12 @@ export class UIManager {
   /**
     * Refresh all open task views
     */
-  async refreshOpenTaskViews(): Promise<void> {
+  async refreshOpenTaskListViews(): Promise<void> {
     const { workspace } = this.plugin.app;
-    const leaves = workspace.getLeavesOfType(TodoView.viewType);
+    const leaves = workspace.getLeavesOfType(TaskListView.viewType);
 
     for (const leaf of leaves) {
-      if (leaf.view instanceof TodoView) {
+      if (leaf.view instanceof TaskListView) {
         leaf.view.tasks = this.plugin.tasks;
         // Update the dropdown's task reference so it uses the latest tasks
         leaf.view.updateTasks(this.plugin.tasks);

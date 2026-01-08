@@ -15,7 +15,7 @@ describe('Regular task parsing', () => {
         enabled: false,
       },
       additionalTaskKeywords: ["FIXME"],
-      taskViewMode: 'showAll',
+      taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
       formatTaskKeywords: true
     } as TodoTrackerSettings;
@@ -412,7 +412,7 @@ TODO task text
           enabled: false,
         },
         additionalTaskKeywords: ["FIXME"],
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         weekStartsOn: 'Monday',
         formatTaskKeywords: true };
       const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
@@ -447,7 +447,7 @@ TODO task text
           enabled: false,
         },
         additionalTaskKeywords: ["FIXME"],
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         weekStartsOn: 'Monday'
   ,
   formatTaskKeywords: true };
@@ -486,7 +486,7 @@ TODO task text
           enabled: false,
         },
         additionalTaskKeywords: ["FIXME"],
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         weekStartsOn: 'Monday'
   ,
   formatTaskKeywords: true };
@@ -521,7 +521,7 @@ TODO task text
           enabled: false,
         },
         additionalTaskKeywords: ["FIXME"],
-        taskViewMode: 'showAll',
+        taskListViewMode: 'showAll',
         weekStartsOn: 'Monday',
         formatTaskKeywords: true
       };
@@ -655,7 +655,7 @@ describe('Task parsing with code blocks', () => {
         enabled: false,
       },
       additionalTaskKeywords: [],
-      taskViewMode: 'showAll',
+      taskListViewMode: 'showAll',
       weekStartsOn: 'Monday'
  ,
  formatTaskKeywords: true };
@@ -700,7 +700,7 @@ describe('Task parsing within langauge spefic comments in code blocks', () => {
         enabled: true,
       },
       additionalTaskKeywords: [],
-      taskViewMode: 'showAll',
+      taskListViewMode: 'showAll',
       weekStartsOn: 'Monday'
  ,
  formatTaskKeywords: true };

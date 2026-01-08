@@ -31,7 +31,7 @@ This release introduces formatting and interactivity for tasks is the editor vie
 - Introduced a search suggestion dropdown to provide real-time suggestions as users type their queries.
 - Added support for detecting tasks in footnote definitions (e.g., `[^1]: TODO task in footnote`). #4
 - Added optional support for collecting tasks inside comment blocks (`%%` syntax). Disabled by default. #2
-- Updated the styling for active tasks (DOING/NOW) in the Task View to highlight status vs inactive tasks.
+- Updated the styling for active tasks (DOING/NOW) in the Task List to highlight status vs inactive tasks.
 - Added plugin usage documentation in the /docs folder.
 - Fixed potential security ReDoS vulnerability in regex parsing
 - Improved custom keyword validation to prevent invalid characters in keyword names.
