@@ -89,6 +89,40 @@ export class PluginLifecycleManager {
       ],
     });
 
+    // Add editor command to add scheduled date
+    this.plugin.addCommand({
+      id: 'add-scheduled-date',
+      name: 'Add scheduled date',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView
+      ) => {
+        return this.plugin.taskManager.handleAddScheduledDateAtCursor(
+          checking,
+          editor,
+          view
+        );
+      },
+    });
+
+    // Add editor command to add deadline date
+    this.plugin.addCommand({
+      id: 'add-deadline-date',
+      name: 'Add deadline date',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView
+      ) => {
+        return this.plugin.taskManager.handleAddDeadlineDateAtCursor(
+          checking,
+          editor,
+          view
+        );
+      },
+    });
+
     // Listen to VaultScanner events for task updates
     this.plugin.vaultScanner.on('tasks-changed', (tasks) => {
       this.plugin.tasks = tasks;

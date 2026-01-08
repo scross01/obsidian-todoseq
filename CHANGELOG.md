@@ -9,6 +9,7 @@ This release introduces formatting and interactivity for tasks is the editor vie
 - Added a single click action to the task keyword in the editor to cycle through the task states (TODO -> DOING -> DONE).
 - Added task state update when a task checkbox is toggled in the editor.
 - Added auto completion helpers for entering scheduled and deadline dates.
+- Added command palette commands to add scheduled and deadline dates to tasks.
 - Moved the default location of the task list panel to the right sidebar.
 - Refined the task count and search suggestions when completed tasks are hidden.
 - Added status bar entry to show task count (not completed tasks) for the current page.

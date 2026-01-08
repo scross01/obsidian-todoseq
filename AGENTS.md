@@ -33,6 +33,8 @@ This file provides guidance to agents when working with code in this repository.
 
 ### Code Style (Non-Standard)
 
+- **Prettier config**: include `.prettierrc` for specific formatting rules
+- **Editor config**: include `.editorconfig` for indentation and spacing settings
 - **ESLint exceptions**: `@typescript-eslint/no-explicit-any`: "warn" (not error)
 - **TypeScript config**: `rootDir`: "src" with explicit exclusion of test files
 - **Import structure**: Circular dependency handling between main plugin and parsers
