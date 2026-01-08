@@ -24,7 +24,7 @@ describe('Task Formatting Settings Change Detection', () => {
     prevSettingsState = JSON.stringify({
       includeCodeBlocks: mockSettings.includeCodeBlocks,
       languageCommentSupport: mockSettings.languageCommentSupport,
-      formatTaskKeywords: mockSettings.formatTaskKeywords
+      formatTaskKeywords: mockSettings.formatTaskKeywords,
     });
   });
 
@@ -32,7 +32,7 @@ describe('Task Formatting Settings Change Detection', () => {
     const currentState = JSON.stringify({
       includeCodeBlocks: mockSettings.includeCodeBlocks,
       languageCommentSupport: mockSettings.languageCommentSupport,
-      formatTaskKeywords: mockSettings.formatTaskKeywords
+      formatTaskKeywords: mockSettings.formatTaskKeywords,
     });
     return currentState !== prevSettingsState;
   }
@@ -41,7 +41,7 @@ describe('Task Formatting Settings Change Detection', () => {
     prevSettingsState = JSON.stringify({
       includeCodeBlocks: mockSettings.includeCodeBlocks,
       languageCommentSupport: mockSettings.languageCommentSupport,
-      formatTaskKeywords: mockSettings.formatTaskKeywords
+      formatTaskKeywords: mockSettings.formatTaskKeywords,
     });
   }
 

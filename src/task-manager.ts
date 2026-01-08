@@ -8,7 +8,7 @@ import { extractPriority, CHECKBOX_REGEX } from './utils/task-utils';
  */
 export class TaskManager {
   constructor(private plugin: TodoTracker) {}
-  
+
   /**
    * Parse a task from a line of text
    * @param line - The line of text containing the task
@@ -16,7 +16,11 @@ export class TaskManager {
    * @param filePath - The path to the file
    * @returns Parsed Task object or null if not a valid task
    */
-  parseTaskFromLine(line: string, lineNumber: number, filePath: string): Task | null {
+  parseTaskFromLine(
+    line: string,
+    lineNumber: number,
+    filePath: string
+  ): Task | null {
     if (!this.plugin.getVaultScanner()) {
       return null;
     }
@@ -32,8 +36,8 @@ export class TaskManager {
     }
 
     // Extract task details using the same logic as TaskParser
-    const indent = match[1] || "";
-    const listMarker = (match[2] || "") + (match[3] || "");
+    const indent = match[1] || '';
+    const listMarker = (match[2] || '') + (match[3] || '');
     const state = match[4];
     const taskText = match[5];
     const tail = match[6];
@@ -63,7 +67,7 @@ export class TaskManager {
       priority,
       scheduledDate: null,
       deadlineDate: null,
-      tail
+      tail,
     };
   }
 
@@ -76,30 +80,40 @@ export class TaskManager {
    * @param newState - Optional new state to set (if not provided, will cycle to next state)
    * @returns boolean indicating if the operation was successful
    */
-  handleUpdateTaskStateAtLine(checking: boolean, lineNumber: number, editor: Editor, view: MarkdownView, newState?: string ): boolean {
+  handleUpdateTaskStateAtLine(
+    checking: boolean,
+    lineNumber: number,
+    editor: Editor,
+    view: MarkdownView,
+    newState?: string
+  ): boolean {
     const taskEditor = this.plugin.taskEditor;
     const vaultScanner = this.plugin.getVaultScanner();
-    
+
     if (!taskEditor || !vaultScanner) {
       return false;
     }
-    
+
     // Get the line from the editor
     const line = editor.getLine(lineNumber);
-    
+
     // Check if this line contains a valid task using VaultScanner's parser
     const parser = vaultScanner.getParser();
     if (!parser?.testRegex.test(line)) {
       return false;
     }
-  
+
     if (checking) {
       return true;
     }
-    
+
     // Parse the task from the line
-    const task = this.parseTaskFromLine(line, lineNumber, view.file?.path || '');
-    
+    const task = this.parseTaskFromLine(
+      line,
+      lineNumber,
+      view.file?.path || ''
+    );
+
     if (task) {
       // Update the task state
       if (newState) {
@@ -108,7 +122,7 @@ export class TaskManager {
         taskEditor.updateTaskState(task);
       }
     }
-  
+
     return true;
   }
 
@@ -119,11 +133,20 @@ export class TaskManager {
    * @param view - The markdown view
    * @returns boolean indicating if the command is available
    */
-  handleToggleTaskStateAtCursor(checking: boolean, editor: Editor, view: MarkdownView): boolean {
+  handleToggleTaskStateAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView
+  ): boolean {
     // Get the current line from the editor
     const cursor = editor.getCursor();
-      
+
     // Use the extracted method to handle the line-based logic
-    return this.handleUpdateTaskStateAtLine(checking, cursor.line, editor, view);
+    return this.handleUpdateTaskStateAtLine(
+      checking,
+      cursor.line,
+      editor,
+      view
+    );
   }
 }

@@ -3,7 +3,11 @@
  */
 
 // Date format types
-export type DateFormat = 'DATE_ONLY' | 'DATE_WITH_DOW' | 'DATE_WITH_DOW_ONLY' | 'DATE_WITH_TIME';
+export type DateFormat =
+  | 'DATE_ONLY'
+  | 'DATE_WITH_DOW'
+  | 'DATE_WITH_DOW_ONLY'
+  | 'DATE_WITH_TIME';
 
 // Date pattern interface
 interface DatePattern {
@@ -17,28 +21,29 @@ interface DatePattern {
 const DATE_PATTERNS: DatePattern[] = [
   {
     type: 'DATE_WITH_DOW',
-    regex: /^<(\d{4}-\d{2}-\d{2})\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{2}:\d{2})>/,
+    regex:
+      /^<(\d{4}-\d{2}-\d{2})\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{2}:\d{2})>/,
     hasTime: true,
-    hasDayOfWeek: true
+    hasDayOfWeek: true,
   },
   {
     type: 'DATE_WITH_DOW_ONLY',
     regex: /^<(\d{4}-\d{2}-\d{2})\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun)>/,
     hasTime: false,
-    hasDayOfWeek: true
+    hasDayOfWeek: true,
   },
   {
     type: 'DATE_WITH_TIME',
     regex: /^<(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})>/,
     hasTime: true,
-    hasDayOfWeek: false
+    hasDayOfWeek: false,
   },
   {
     type: 'DATE_ONLY',
     regex: /^<(\d{4}-\d{2}-\d{2})>/,
     hasTime: false,
-    hasDayOfWeek: false
-  }
+    hasDayOfWeek: false,
+  },
 ];
 
 /**
@@ -84,7 +89,8 @@ export class DateParser {
         const dateStr = match[1];
 
         if (pattern.hasTime) {
-          const timeStr = pattern.type === 'DATE_WITH_DOW' ? match[3] : match[2];
+          const timeStr =
+            pattern.type === 'DATE_WITH_DOW' ? match[3] : match[2];
           return this.parseDateTimeString(dateStr, timeStr);
         } else {
           return this.parseDateString(dateStr);

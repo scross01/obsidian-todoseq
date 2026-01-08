@@ -6,7 +6,7 @@ import {
   isCompletedState,
   getCheckboxStatus,
   PRIORITY_TOKEN_REGEX,
-  CHECKBOX_REGEX
+  CHECKBOX_REGEX,
 } from '../src/utils/task-utils';
 
 describe('task-utils', () => {
@@ -93,13 +93,13 @@ describe('task-utils', () => {
       completed: false,
       priority: null,
       scheduledDate: null,
-      deadlineDate: null
+      deadlineDate: null,
     });
 
     test('should sort tasks by path first', () => {
       const taskA = createTask('a/file.md', 1);
       const taskB = createTask('b/file.md', 1);
-      
+
       expect(taskComparator(taskA, taskB)).toBeLessThan(0);
       expect(taskComparator(taskB, taskA)).toBeGreaterThan(0);
     });
@@ -107,7 +107,7 @@ describe('task-utils', () => {
     test('should sort tasks by line number when paths are equal', () => {
       const task1 = createTask('same/file.md', 5);
       const task2 = createTask('same/file.md', 10);
-      
+
       expect(taskComparator(task1, task2)).toBeLessThan(0);
       expect(taskComparator(task2, task1)).toBeGreaterThan(0);
     });
@@ -115,14 +115,14 @@ describe('task-utils', () => {
     test('should return 0 for identical tasks', () => {
       const task1 = createTask('same/file.md', 5);
       const task2 = createTask('same/file.md', 5);
-      
+
       expect(taskComparator(task1, task2)).toBe(0);
     });
 
     test('should handle different path lengths', () => {
       const taskShort = createTask('file.md', 1);
       const taskLong = createTask('very/long/path/to/file.md', 1);
-      
+
       expect(taskComparator(taskShort, taskLong)).toBeLessThan(0);
       expect(taskComparator(taskLong, taskShort)).toBeGreaterThan(0);
     });

@@ -25,10 +25,12 @@ export type HasPluginSettings = {
 export function getPluginSettings(app: App): TodoTrackerSettings | null {
   const appWithPlugins = app as unknown as AppWithPlugins;
   // Avoid importing TodoTracker type just to read settings; keep structural typing
-  const maybePlugin = appWithPlugins.plugins?.plugins?.['todoseq'] as unknown as HasPluginSettings | undefined;
+  const maybePlugin = appWithPlugins.plugins?.plugins?.[
+    'todoseq'
+  ] as unknown as HasPluginSettings | undefined;
   const settings = maybePlugin?.settings;
   if (!settings) return null;
-  
+
   // Return a complete settings object with defaults for any missing properties
   return {
     refreshInterval: 60,
@@ -59,9 +61,11 @@ export class SettingsChangeDetector {
    */
   initialize(settings: TodoTrackerSettings): void {
     if (this.isInitialized) {
-      throw new Error('SettingsChangeDetector is already initialized. Create a new instance instead.');
+      throw new Error(
+        'SettingsChangeDetector is already initialized. Create a new instance instead.'
+      );
     }
-    
+
     this.prevSettingsState = this.getSettingsFingerprint(settings);
     this.isInitialized = true;
   }
@@ -74,9 +78,11 @@ export class SettingsChangeDetector {
    */
   hasFormattingSettingsChanged(settings: TodoTrackerSettings): boolean {
     if (!this.isInitialized) {
-      throw new Error('SettingsChangeDetector must be initialized before use. Call initialize() first.');
+      throw new Error(
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+      );
     }
-    
+
     const currentState = this.getSettingsFingerprint(settings);
     return currentState !== this.prevSettingsState;
   }
@@ -88,9 +94,11 @@ export class SettingsChangeDetector {
    */
   updatePreviousState(settings: TodoTrackerSettings): void {
     if (!this.isInitialized) {
-      throw new Error('SettingsChangeDetector must be initialized before use. Call initialize() first.');
+      throw new Error(
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+      );
     }
-    
+
     this.prevSettingsState = this.getSettingsFingerprint(settings);
   }
 
@@ -115,7 +123,7 @@ export class SettingsChangeDetector {
         includeCalloutBlocks: settings.includeCalloutBlocks,
         includeCommentBlocks: settings.includeCommentBlocks,
         languageCommentSupport: settings.languageCommentSupport,
-        additionalTaskKeywords: settings.additionalTaskKeywords
+        additionalTaskKeywords: settings.additionalTaskKeywords,
       });
     } catch (error) {
       console.warn('Failed to create settings fingerprint:', error);

@@ -17,7 +17,7 @@ describe('Task parsing within Typescript comments in code blocks', () => {
       additionalTaskKeywords: [],
       taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
-      formatTaskKeywords: true
+      formatTaskKeywords: true,
     };
     parser = TaskParser.create(settings);
   });
@@ -47,17 +47,17 @@ private test() {
 `;
       const tasks = parser.parseFile(lines, 'test.md');
       expect(tasks).toHaveLength(7);
-      expect(tasks[0].indent).toBe("/* ");
-      expect(tasks[0].text).toBe("test task text");
-      expect(tasks[0].tail).toBe(" */");
-      expect(tasks[1].indent).toBe("");
-      expect(tasks[2].indent).toBe(" ");
-      expect(tasks[2].listMarker).toBe("* ");
-      expect(tasks[3].indent).toBe("// ");
-      expect(tasks[4].indent).toBe("  const key1 = value; // ");
-      expect(tasks[5].indent).toBe("  const key2 = value; /* ");
-      expect(tasks[5].tail).toBe(" */");
-      expect(tasks[6].indent).toBe("  ");
+      expect(tasks[0].indent).toBe('/* ');
+      expect(tasks[0].text).toBe('test task text');
+      expect(tasks[0].tail).toBe(' */');
+      expect(tasks[1].indent).toBe('');
+      expect(tasks[2].indent).toBe(' ');
+      expect(tasks[2].listMarker).toBe('* ');
+      expect(tasks[3].indent).toBe('// ');
+      expect(tasks[4].indent).toBe('  const key1 = value; // ');
+      expect(tasks[5].indent).toBe('  const key2 = value; /* ');
+      expect(tasks[5].tail).toBe(' */');
+      expect(tasks[6].indent).toBe('  ');
     });
 
     test(`should match tasks in js comments when enabled`, () => {
@@ -68,10 +68,8 @@ private test() {
 `;
       const tasks = parser.parseFile(lines, 'test.md');
       expect(tasks).toHaveLength(1);
-      expect(tasks[0].indent).toBe("// ");
-      expect(tasks[0].text).toBe("test task text");
+      expect(tasks[0].indent).toBe('// ');
+      expect(tasks[0].text).toBe('test task text');
     });
   });
-
 });
-

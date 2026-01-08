@@ -17,7 +17,7 @@ describe('Task parsing within Dockerfile comments in code blocks', () => {
       additionalTaskKeywords: [],
       taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
-      formatTaskKeywords: true
+      formatTaskKeywords: true,
     };
     parser = TaskParser.create(settings);
   });
@@ -35,11 +35,10 @@ WORKDIR /root/  # TODO test task text
 `;
       const tasks = parser.parseFile(lines, 'test.md');
       expect(tasks).toHaveLength(2);
-      expect(tasks[0].indent).toBe("# ");
-      expect(tasks[0].text).toBe("test task text");
-      expect(tasks[1].indent).toBe("WORKDIR /root/  # ");
-      expect(tasks[1].text).toBe("test task text");
+      expect(tasks[0].indent).toBe('# ');
+      expect(tasks[0].text).toBe('test task text');
+      expect(tasks[1].indent).toBe('WORKDIR /root/  # ');
+      expect(tasks[1].text).toBe('test task text');
     });
   });
 });
-

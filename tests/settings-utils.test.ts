@@ -1,5 +1,9 @@
 import { App } from 'obsidian';
-import { getPluginSettings, SettingsChangeDetector, createSettingsChangeDetector } from '../src/utils/settings-utils';
+import {
+  getPluginSettings,
+  SettingsChangeDetector,
+  createSettingsChangeDetector,
+} from '../src/utils/settings-utils';
 import { TodoTrackerSettings } from '../src/settings/settings';
 
 describe('settings-utils', () => {
@@ -25,8 +29,8 @@ describe('settings-utils', () => {
     test('should return null when todoseq plugin is not found', () => {
       (mockApp as any).plugins = {
         plugins: {
-          'other-plugin': {}
-        }
+          'other-plugin': {},
+        },
       };
       const result = getPluginSettings(mockApp as App);
       expect(result).toBeNull();
@@ -35,8 +39,8 @@ describe('settings-utils', () => {
     test('should return null when plugin exists but has no settings', () => {
       (mockApp as any).plugins = {
         plugins: {
-          'todoseq': {}
-        }
+          todoseq: {},
+        },
       };
 
       const result = getPluginSettings(mockApp as App);
@@ -46,13 +50,13 @@ describe('settings-utils', () => {
     test('should merge partial settings with defaults', () => {
       (mockApp as any).plugins = {
         plugins: {
-          'todoseq': {
+          todoseq: {
             settings: {
               formatTaskKeywords: false,
-              includeCodeBlocks: true
-            }
-          }
-        }
+              includeCodeBlocks: true,
+            },
+          },
+        },
       };
 
       const result = getPluginSettings(mockApp as App);
@@ -74,15 +78,15 @@ describe('settings-utils', () => {
         taskListViewMode: 'hideCompleted',
         languageCommentSupport: { enabled: false },
         weekStartsOn: 'Sunday',
-        formatTaskKeywords: false
+        formatTaskKeywords: false,
       };
 
       (mockApp as any).plugins = {
         plugins: {
-          'todoseq': {
-            settings: completeSettings
-          }
-        }
+          todoseq: {
+            settings: completeSettings,
+          },
+        },
       };
 
       const result = getPluginSettings(mockApp as App);
@@ -106,7 +110,7 @@ describe('settings-utils', () => {
         taskListViewMode: 'showAll',
         languageCommentSupport: { enabled: true },
         weekStartsOn: 'Monday',
-        formatTaskKeywords: true
+        formatTaskKeywords: true,
       };
     });
 
@@ -117,53 +121,80 @@ describe('settings-utils', () => {
 
       test('should detect changes in formatTaskKeywords', () => {
         const changedSettings = { ...baseSettings, formatTaskKeywords: false };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          true
+        );
       });
 
       test('should detect changes in includeCodeBlocks', () => {
         const changedSettings = { ...baseSettings, includeCodeBlocks: true };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          true
+        );
       });
 
       test('should detect changes in includeCalloutBlocks', () => {
-        const changedSettings = { ...baseSettings, includeCalloutBlocks: false };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+        const changedSettings = {
+          ...baseSettings,
+          includeCalloutBlocks: false,
+        };
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          true
+        );
       });
 
       test('should detect changes in includeCommentBlocks', () => {
         const changedSettings = { ...baseSettings, includeCommentBlocks: true };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          true
+        );
       });
 
       test('should detect changes in languageCommentSupport', () => {
-        const changedSettings = { 
-          ...baseSettings, 
-          languageCommentSupport: { enabled: false }
+        const changedSettings = {
+          ...baseSettings,
+          languageCommentSupport: { enabled: false },
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          true
+        );
       });
 
       test('should detect changes in additionalTaskKeywords', () => {
-        const changedSettings = { 
-          ...baseSettings, 
-          additionalTaskKeywords: ['FIXME', 'HACK']
+        const changedSettings = {
+          ...baseSettings,
+          additionalTaskKeywords: ['FIXME', 'HACK'],
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          true
+        );
       });
 
       test('should NOT detect changes in refreshInterval', () => {
         const changedSettings = { ...baseSettings, refreshInterval: 30 };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(false);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          false
+        );
       });
 
       test('should NOT detect changes in taskListViewMode', () => {
-        const changedSettings: TodoTrackerSettings = { ...baseSettings, taskListViewMode: 'hideCompleted' };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(false);
+        const changedSettings: TodoTrackerSettings = {
+          ...baseSettings,
+          taskListViewMode: 'hideCompleted',
+        };
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          false
+        );
       });
 
       test('should NOT detect changes in weekStartsOn', () => {
-        const changedSettings: TodoTrackerSettings = { ...baseSettings, weekStartsOn: 'Sunday' };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(false);
+        const changedSettings: TodoTrackerSettings = {
+          ...baseSettings,
+          weekStartsOn: 'Sunday',
+        };
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          false
+        );
       });
 
       test('should detect multiple formatting setting changes', () => {
@@ -171,9 +202,11 @@ describe('settings-utils', () => {
           ...baseSettings,
           formatTaskKeywords: false,
           includeCodeBlocks: true,
-          languageCommentSupport: { enabled: false }
+          languageCommentSupport: { enabled: false },
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          true
+        );
       });
 
       test('should not detect changes when only non-formatting settings change', () => {
@@ -181,9 +214,11 @@ describe('settings-utils', () => {
           ...baseSettings,
           refreshInterval: 30,
           taskListViewMode: 'sortCompletedLast',
-          weekStartsOn: 'Sunday'
+          weekStartsOn: 'Sunday',
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(false);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          false
+        );
       });
     });
 
@@ -195,11 +230,15 @@ describe('settings-utils', () => {
 
         // Detect change
         const changedSettings = { ...baseSettings, formatTaskKeywords: false };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          true
+        );
 
         // Update state
         detector.updatePreviousState(changedSettings);
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(false);
+        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
+          false
+        );
 
         // Detect new change
         const newSettings = { ...changedSettings, includeCodeBlocks: true };
@@ -210,24 +249,35 @@ describe('settings-utils', () => {
         detector.initialize(baseSettings);
 
         let currentSettings = baseSettings;
-        
+
         // First change
         currentSettings = { ...currentSettings, formatTaskKeywords: false };
-        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
+          true
+        );
         detector.updatePreviousState(currentSettings);
 
         // Second change
         currentSettings = { ...currentSettings, includeCodeBlocks: true };
-        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
+          true
+        );
         detector.updatePreviousState(currentSettings);
 
         // Third change
-        currentSettings = { ...currentSettings, languageCommentSupport: { enabled: false } };
-        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(true);
+        currentSettings = {
+          ...currentSettings,
+          languageCommentSupport: { enabled: false },
+        };
+        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
+          true
+        );
         detector.updatePreviousState(currentSettings);
 
         // No change after final update
-        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(false);
+        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
+          false
+        );
       });
     });
 
@@ -250,11 +300,13 @@ describe('settings-utils', () => {
 
         const settingsWithUndefined = {
           ...baseSettings,
-          formatTaskKeywords: undefined as any
+          formatTaskKeywords: undefined as any,
         };
 
         // Should detect as change (undefined is different from true)
-        expect(detector.hasFormattingSettingsChanged(settingsWithUndefined)).toBe(true);
+        expect(
+          detector.hasFormattingSettingsChanged(settingsWithUndefined)
+        ).toBe(true);
       });
 
       test('should handle null values in settings', () => {
@@ -262,11 +314,13 @@ describe('settings-utils', () => {
 
         const settingsWithNull = {
           ...baseSettings,
-          languageCommentSupport: null as any
+          languageCommentSupport: null as any,
         };
 
         // Should detect as change (null is different from object)
-        expect(detector.hasFormattingSettingsChanged(settingsWithNull)).toBe(true);
+        expect(detector.hasFormattingSettingsChanged(settingsWithNull)).toBe(
+          true
+        );
       });
     });
   });
@@ -290,7 +344,7 @@ describe('settings-utils', () => {
         taskListViewMode: 'showAll',
         languageCommentSupport: { enabled: true },
         weekStartsOn: 'Monday',
-        formatTaskKeywords: true
+        formatTaskKeywords: true,
       };
 
       detector1.initialize(settings);
@@ -299,14 +353,22 @@ describe('settings-utils', () => {
       const changedSettings = { ...settings, formatTaskKeywords: false };
 
       // Both should detect changes independently
-      expect(detector1.hasFormattingSettingsChanged(changedSettings)).toBe(true);
-      expect(detector2.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+      expect(detector1.hasFormattingSettingsChanged(changedSettings)).toBe(
+        true
+      );
+      expect(detector2.hasFormattingSettingsChanged(changedSettings)).toBe(
+        true
+      );
 
       // Update one detector
       detector1.updatePreviousState(changedSettings);
-      expect(detector1.hasFormattingSettingsChanged(changedSettings)).toBe(false);
+      expect(detector1.hasFormattingSettingsChanged(changedSettings)).toBe(
+        false
+      );
       // Other detector should still detect change
-      expect(detector2.hasFormattingSettingsChanged(changedSettings)).toBe(true);
+      expect(detector2.hasFormattingSettingsChanged(changedSettings)).toBe(
+        true
+      );
     });
   });
 });

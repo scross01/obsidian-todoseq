@@ -112,16 +112,16 @@ TODOseq supports filters keywords similar to Obsidians general vault search for 
 
 ### Available Prefix Filters
 
-| Prefix | Description | Example |
-| ------ | ----------- | ------- |
-| `path:` | Find tasks in specific file paths | `path:Journal` |
-| `file:` | Find tasks in files with matching names | `file:meeting.md` |
-| `tag:` | Find tasks containing specific tags | `tag:urgent` |
-| `state:` | Find tasks with specific states | `state:DOING` |
-| `priority:` | Find tasks with specific priorities | `priority:high` |
-| `content:` | Find tasks with specific content | `content:project` |
-| `scheduled:` | Find tasks with scheduled dates | `scheduled:due` |
-| `deadline:` | Find tasks with deadline dates | `deadline:"this week"` |
+| Prefix       | Description                             | Example                |
+| ------------ | --------------------------------------- | ---------------------- |
+| `path:`      | Find tasks in specific file paths       | `path:Journal`         |
+| `file:`      | Find tasks in files with matching names | `file:meeting.md`      |
+| `tag:`       | Find tasks containing specific tags     | `tag:urgent`           |
+| `state:`     | Find tasks with specific states         | `state:DOING`          |
+| `priority:`  | Find tasks with specific priorities     | `priority:high`        |
+| `content:`   | Find tasks with specific content        | `content:project`      |
+| `scheduled:` | Find tasks with scheduled dates         | `scheduled:due`        |
+| `deadline:`  | Find tasks with deadline dates          | `deadline:"this week"` |
 
 ### Using Search filters
 
@@ -165,18 +165,18 @@ TODOseq provides powerful date-based filtering expressions.
 
 ### Basic Date Expressions
 
-| Expression | Description |
-| ---------- | ----------- |
-| `overdue` | Tasks that are past their deadline |
-| `due` | Tasks due today or overdue |
-| `today` | Tasks due today |
-| `tomorrow` | Tasks due tomorrow |
-| `this week` | Tasks due this week* |
-| `next week` | Tasks due next week* |
-| `this month` | Tasks due this month |
-| `next month` | Tasks due next month |
+| Expression   | Description                        |
+| ------------ | ---------------------------------- |
+| `overdue`    | Tasks that are past their deadline |
+| `due`        | Tasks due today or overdue         |
+| `today`      | Tasks due today                    |
+| `tomorrow`   | Tasks due tomorrow                 |
+| `this week`  | Tasks due this week\*              |
+| `next week`  | Tasks due next week\*              |
+| `this month` | Tasks due this month               |
+| `next month` | Tasks due next month               |
 
-*Weeks start on Monday by default, this can be changed in the settings.
+\*Weeks start on Monday by default, this can be changed in the settings.
 
 ### Date Expression Examples
 
@@ -260,15 +260,15 @@ Find TODO tasks with deadlines in June 2026.
 
 TODOseq supports multiple ways to filter by priority.
 
-| Value | Description |
-| ----- | ----------- |
-| `high` | High priority tasks (`[#A]`) |
-| `med` | Medium priority tasks (`[#B]`) |
-| `low` | Low priority tasks (`[#C]`) |
-| `A` | Short form for high priority |
-| `B` | Short form for medium priority |
-| `C` | Short form for low priority |
-| `none` | Tasks without priority |
+| Value  | Description                    |
+| ------ | ------------------------------ |
+| `high` | High priority tasks (`[#A]`)   |
+| `med`  | Medium priority tasks (`[#B]`) |
+| `low`  | Low priority tasks (`[#C]`)    |
+| `A`    | Short form for high priority   |
+| `B`    | Short form for medium priority |
+| `C`    | Short form for low priority    |
+| `none` | Tasks without priority         |
 
 ### Priority Filter Examples
 

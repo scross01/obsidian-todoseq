@@ -17,7 +17,7 @@ describe('Task parsing within PowerShell comments in code blocks', () => {
       additionalTaskKeywords: [],
       taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
-      formatTaskKeywords: true
+      formatTaskKeywords: true,
     };
     parser = TaskParser.create(settings);
   });
@@ -39,19 +39,18 @@ Write-Host "world" <# TODO test task text #>
 `;
       const tasks = parser.parseFile(lines, 'test.md');
       expect(tasks).toHaveLength(5);
-      expect(tasks[0].indent).toBe("# ");
-      expect(tasks[0].text).toBe("test task text");
-      expect(tasks[1].indent).toBe("<# ");
-      expect(tasks[1].text).toBe("test task text");
-      expect(tasks[1].tail).toBe(" #>")
-      expect(tasks[2].indent).toBe(" # ");
-      expect(tasks[2].text).toBe("test task text");
-      expect(tasks[3].indent).toBe("Write-Host \"hello\" # ");
-      expect(tasks[3].text).toBe("test task text");
-      expect(tasks[4].indent).toBe("Write-Host \"world\" <# ");
-      expect(tasks[4].text).toBe("test task text");
-      expect(tasks[4].tail).toBe(" #>")
+      expect(tasks[0].indent).toBe('# ');
+      expect(tasks[0].text).toBe('test task text');
+      expect(tasks[1].indent).toBe('<# ');
+      expect(tasks[1].text).toBe('test task text');
+      expect(tasks[1].tail).toBe(' #>');
+      expect(tasks[2].indent).toBe(' # ');
+      expect(tasks[2].text).toBe('test task text');
+      expect(tasks[3].indent).toBe('Write-Host "hello" # ');
+      expect(tasks[3].text).toBe('test task text');
+      expect(tasks[4].indent).toBe('Write-Host "world" <# ');
+      expect(tasks[4].text).toBe('test task text');
+      expect(tasks[4].tail).toBe(' #>');
     });
   });
 });
-

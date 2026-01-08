@@ -37,7 +37,10 @@ export class IncrementalTaskFormatter {
     const currentVersion = view.state.doc.length; // Use document length as a simple version indicator
 
     // If the document hasn't changed, return cached decorations
-    if (this.lastProcessedVersion === currentVersion && this.cachedDecorations) {
+    if (
+      this.lastProcessedVersion === currentVersion &&
+      this.cachedDecorations
+    ) {
       return this.cachedDecorations;
     }
 
@@ -79,7 +82,13 @@ export class IncrementalTaskFormatter {
 
     // Merge with existing decorations for unchanged lines
     if (this.cachedDecorations) {
-      return this.mergeDecorations(this.cachedDecorations, newDecorations, startLine, endLine, view.state.doc.lines);
+      return this.mergeDecorations(
+        this.cachedDecorations,
+        newDecorations,
+        startLine,
+        endLine,
+        view.state.doc.lines
+      );
     }
 
     return newDecorations;
@@ -90,7 +99,9 @@ export class IncrementalTaskFormatter {
    * @param update The view update information
    * @returns Line range or null if entire document should be processed
    */
-  private getChangedLineRange(update: ViewUpdate): { startLine: number; endLine: number } | null {
+  private getChangedLineRange(
+    update: ViewUpdate
+  ): { startLine: number; endLine: number } | null {
     if (!update.docChanged) {
       return null;
     }
@@ -101,12 +112,12 @@ export class IncrementalTaskFormatter {
     if (!update.view || !update.view.state || !update.view.state.doc) {
       return {
         startLine: 1,
-        endLine: 0
+        endLine: 0,
       };
     }
     return {
       startLine: 1,
-      endLine: update.view.state.doc.lines
+      endLine: update.view.state.doc.lines,
     };
   }
 
@@ -124,8 +135,8 @@ export class IncrementalTaskFormatter {
     // This provides a reasonable balance between performance and complexity
     const lineCount = update.view.state.doc.lines;
     const CONFIG = {
-      minLineCount: 100,          // Minimum lines before considering incremental updates
-      maxChangedPercentage: 0.05  // Maximum percentage of document that can change
+      minLineCount: 100, // Minimum lines before considering incremental updates
+      maxChangedPercentage: 0.05, // Maximum percentage of document that can change
     };
 
     // For now, we'll be conservative and only use incremental updates for large documents

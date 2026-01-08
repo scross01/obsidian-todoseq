@@ -14,24 +14,22 @@ describe('Regular task parsing', () => {
       languageCommentSupport: {
         enabled: false,
       },
-      additionalTaskKeywords: ["FIXME"],
+      additionalTaskKeywords: ['FIXME'],
       taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
-      formatTaskKeywords: true
+      formatTaskKeywords: true,
     } as TodoTrackerSettings;
     parser = TaskParser.create(settings);
   });
 
-
   describe('Task prefixes', () => {
-
     test(`should match no prefix`, () => {
       const line = `TODO task`;
       const tasks = parser.parseFile(line, 'test.md');
-      
+
       expect(tasks).toHaveLength(1);
       const task = tasks[0];
-      expect(task.state).toBe("TODO");
+      expect(task.state).toBe('TODO');
       expect(task.text).toBe('task');
     });
 
@@ -43,10 +41,10 @@ describe('Regular task parsing', () => {
 # TODO invalid task
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(3);
       const task = tasks[0];
-      expect(task.state).toBe("TODO");
+      expect(task.state).toBe('TODO');
       expect(task.text).toBe('task');
     });
 
@@ -66,21 +64,20 @@ A1) TODO invalid task
 2> TODO invalid task
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(6);
-      expect(tasks[0].listMarker).toBe("1. [ ] ");
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].listMarker).toBe('1. [ ] ');
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
-      expect(tasks[1].listMarker).toBe("2. ");
-      expect(tasks[1].state).toBe("TODO");
+      expect(tasks[1].listMarker).toBe('2. ');
+      expect(tasks[1].state).toBe('TODO');
       expect(tasks[1].text).toBe('task text');
-      expect(tasks[2].listMarker).toBe("a) ");
-      expect(tasks[2].state).toBe("TODO");
+      expect(tasks[2].listMarker).toBe('a) ');
+      expect(tasks[2].state).toBe('TODO');
       expect(tasks[2].text).toBe('task text');
-      expect(tasks[4].listMarker).toBe("(A1) ");
-      expect(tasks[4].state).toBe("TODO");
+      expect(tasks[4].listMarker).toBe('(A1) ');
+      expect(tasks[4].state).toBe('TODO');
       expect(tasks[4].text).toBe('task text');
-      
     });
 
     test(`should match valid checkboxes`, () => {
@@ -96,10 +93,10 @@ A1) TODO invalid task
 - [  ] TODO invalid task
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(7);
       const task = tasks[0];
-      expect(task.state).toBe("TODO");
+      expect(task.state).toBe('TODO');
       expect(task.text).toBe('task text');
     });
 
@@ -112,21 +109,20 @@ TODO task text
   - TODO task text
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(5);
-      const task = tasks[0];
-      expect(tasks[0].indent).toBe("");
-      expect(tasks[0].listMarker).toBe("");
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].indent).toBe('');
+      expect(tasks[0].listMarker).toBe('');
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
-      expect(tasks[1].indent).toBe("  ");
-      expect(tasks[1].listMarker).toBe("");
-      expect(tasks[2].indent).toBe("    ");
-      expect(tasks[2].listMarker).toBe("");
-      expect(tasks[3].indent).toBe("");
-      expect(tasks[3].listMarker).toBe("- ");
-      expect(tasks[4].indent).toBe("  ");
-      expect(tasks[4].listMarker).toBe("- ");
+      expect(tasks[1].indent).toBe('  ');
+      expect(tasks[1].listMarker).toBe('');
+      expect(tasks[2].indent).toBe('    ');
+      expect(tasks[2].listMarker).toBe('');
+      expect(tasks[3].indent).toBe('');
+      expect(tasks[3].listMarker).toBe('- ');
+      expect(tasks[4].indent).toBe('  ');
+      expect(tasks[4].listMarker).toBe('- ');
     });
 
     test(`should match extra space after prefix`, () => {
@@ -136,10 +132,10 @@ TODO task text
       - [ ]  TODO task text
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(3);
       const task = tasks[0];
-      expect(task.state).toBe("TODO");
+      expect(task.state).toBe('TODO');
       expect(task.text).toBe('task text');
     });
   });
@@ -159,28 +155,28 @@ TODO task text
       CANCELLED task text
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(10);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
       expect(tasks[0].completed).toBe(false);
-      expect(tasks[1].state).toBe("DOING");
+      expect(tasks[1].state).toBe('DOING');
       expect(tasks[1].completed).toBe(false);
-      expect(tasks[2].state).toBe("DONE");
+      expect(tasks[2].state).toBe('DONE');
       expect(tasks[2].completed).toBe(true);
-      expect(tasks[3].state).toBe("NOW");
+      expect(tasks[3].state).toBe('NOW');
       expect(tasks[3].completed).toBe(false);
-      expect(tasks[4].state).toBe("LATER");
+      expect(tasks[4].state).toBe('LATER');
       expect(tasks[4].completed).toBe(false);
-      expect(tasks[5].state).toBe("IN-PROGRESS");
+      expect(tasks[5].state).toBe('IN-PROGRESS');
       expect(tasks[5].completed).toBe(false);
-      expect(tasks[6].state).toBe("WAIT");
+      expect(tasks[6].state).toBe('WAIT');
       expect(tasks[6].completed).toBe(false);
-      expect(tasks[7].state).toBe("WAITING");
+      expect(tasks[7].state).toBe('WAITING');
       expect(tasks[7].completed).toBe(false);
-      expect(tasks[8].state).toBe("CANCELED");
+      expect(tasks[8].state).toBe('CANCELED');
       expect(tasks[8].completed).toBe(true);
-      expect(tasks[9].state).toBe("CANCELLED");
+      expect(tasks[9].state).toBe('CANCELLED');
       expect(tasks[9].completed).toBe(true);
     });
 
@@ -190,10 +186,10 @@ TODO task text
       BOGUS not a task
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(1);
       const task = tasks[0];
-      expect(task.state).toBe("FIXME");
+      expect(task.state).toBe('FIXME');
       expect(task.text).toBe('task text');
       expect(task.completed).toBe(false);
     });
@@ -206,11 +202,11 @@ TODO task text
       TODO my second task #tag
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(2);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('#tag my first task');
-      expect(tasks[1].state).toBe("TODO");
+      expect(tasks[1].state).toBe('TODO');
       expect(tasks[1].text).toBe('my second task #tag');
     });
   });
@@ -227,7 +223,7 @@ TODO task text
       TODO tast text
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(6);
       expect(tasks[0].priority).toBe('high');
       expect(tasks[1].priority).toBe('med');
@@ -239,7 +235,6 @@ TODO task text
   });
 
   describe('Tasks with dates', () => {
-
     test(`should get sceduled task dates`, () => {
       const lines = `
       TODO tast text
@@ -255,7 +250,7 @@ TODO task text
       SCHEDULED: <2025-10-31 Fri 18:30>
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(4);
       expect(tasks[0].scheduledDate?.getFullYear()).toBe(2025);
       expect(tasks[0].scheduledDate?.getMonth()).toBe(9);
@@ -286,7 +281,7 @@ TODO task text
       DEADLINE: <2025-10-31 Fri 18:30>
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(4);
       expect(tasks[0].deadlineDate?.getFullYear()).toBe(2025);
       expect(tasks[0].deadlineDate?.getMonth()).toBe(9);
@@ -309,7 +304,7 @@ TODO task text
       DEADLINE: <2025-11-01>
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(1);
       expect(tasks[0].scheduledDate?.getFullYear()).toBe(2025);
       expect(tasks[0].scheduledDate?.getMonth()).toBe(9);
@@ -329,9 +324,9 @@ TODO task text
   > TODO task text 
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(4);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
     });
 
@@ -342,9 +337,9 @@ TODO task text
 > DEADLINE: <2025-11-01>
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(1);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
       expect(tasks[0].scheduledDate?.getFullYear()).toBe(2025);
       expect(tasks[0].scheduledDate?.getMonth()).toBe(9);
@@ -354,8 +349,6 @@ TODO task text
       expect(tasks[0].deadlineDate?.getDate()).toBe(1);
     });
 
-
-
     test(`should match callout block tasks`, () => {
       const lines = `
 >[!info] TODO task text
@@ -364,11 +357,11 @@ TODO task text
 > - [ ] TODO task text 
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(2);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
     });
   });
@@ -383,7 +376,7 @@ TODO task text
 $$
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(0);
     });
   });
@@ -398,7 +391,7 @@ TODO task text
 %%
       `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(0);
     });
 
@@ -411,11 +404,14 @@ TODO task text
         languageCommentSupport: {
           enabled: false,
         },
-        additionalTaskKeywords: ["FIXME"],
+        additionalTaskKeywords: ['FIXME'],
         taskListViewMode: 'showAll',
         weekStartsOn: 'Monday',
-        formatTaskKeywords: true };
-      const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
+        formatTaskKeywords: true,
+      };
+      const parserWithCommentBlocks = TaskParser.create(
+        settingsWithCommentBlocks
+      );
 
       const lines = `
 %% TODO task text %%
@@ -425,16 +421,16 @@ TODO task text
 %%
       `;
       const tasks = parserWithCommentBlocks.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(2);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
-      expect(tasks[0].indent).toBe("");
-      expect(tasks[0].listMarker).toBe("");
-      expect(tasks[1].state).toBe("TODO");
+      expect(tasks[0].indent).toBe('');
+      expect(tasks[0].listMarker).toBe('');
+      expect(tasks[1].state).toBe('TODO');
       expect(tasks[1].text).toBe('task text');
-      expect(tasks[1].indent).toBe("");
-      expect(tasks[1].listMarker).toBe("");
+      expect(tasks[1].indent).toBe('');
+      expect(tasks[1].listMarker).toBe('');
     });
 
     test(`should match comment blocks with different task states`, () => {
@@ -446,12 +442,14 @@ TODO task text
         languageCommentSupport: {
           enabled: false,
         },
-        additionalTaskKeywords: ["FIXME"],
+        additionalTaskKeywords: ['FIXME'],
         taskListViewMode: 'showAll',
-        weekStartsOn: 'Monday'
-  ,
-  formatTaskKeywords: true };
-      const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
+        weekStartsOn: 'Monday',
+        formatTaskKeywords: true,
+      };
+      const parserWithCommentBlocks = TaskParser.create(
+        settingsWithCommentBlocks
+      );
 
       const lines = `
 %% TODO task text %%
@@ -460,18 +458,18 @@ TODO task text
 %% FIXME custom keyword task %%
       `;
       const tasks = parserWithCommentBlocks.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(4);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
       expect(tasks[0].completed).toBe(false);
-      expect(tasks[1].state).toBe("DOING");
+      expect(tasks[1].state).toBe('DOING');
       expect(tasks[1].text).toBe('another task');
       expect(tasks[1].completed).toBe(false);
-      expect(tasks[2].state).toBe("DONE");
+      expect(tasks[2].state).toBe('DONE');
       expect(tasks[2].text).toBe('completed task');
       expect(tasks[2].completed).toBe(true);
-      expect(tasks[3].state).toBe("FIXME");
+      expect(tasks[3].state).toBe('FIXME');
       expect(tasks[3].text).toBe('custom keyword task');
       expect(tasks[3].completed).toBe(false);
     });
@@ -485,12 +483,14 @@ TODO task text
         languageCommentSupport: {
           enabled: false,
         },
-        additionalTaskKeywords: ["FIXME"],
+        additionalTaskKeywords: ['FIXME'],
         taskListViewMode: 'showAll',
-        weekStartsOn: 'Monday'
-  ,
-  formatTaskKeywords: true };
-      const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
+        weekStartsOn: 'Monday',
+        formatTaskKeywords: true,
+      };
+      const parserWithCommentBlocks = TaskParser.create(
+        settingsWithCommentBlocks
+      );
 
       const lines = `
 %% TODO [#A] high priority task %%
@@ -499,7 +499,7 @@ TODO task text
 %% TODO normal priority task %%
       `;
       const tasks = parserWithCommentBlocks.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(4);
       expect(tasks[0].priority).toBe('high');
       expect(tasks[0].text).toBe('high priority task');
@@ -520,12 +520,14 @@ TODO task text
         languageCommentSupport: {
           enabled: false,
         },
-        additionalTaskKeywords: ["FIXME"],
+        additionalTaskKeywords: ['FIXME'],
         taskListViewMode: 'showAll',
         weekStartsOn: 'Monday',
-        formatTaskKeywords: true
+        formatTaskKeywords: true,
       };
-      const parserWithCommentBlocks = TaskParser.create(settingsWithCommentBlocks);
+      const parserWithCommentBlocks = TaskParser.create(
+        settingsWithCommentBlocks
+      );
 
       const lines = `
 %% TODO task text %%
@@ -536,9 +538,9 @@ DEADLINE: <2025-11-01>
       SCHEDULED: <2025-12-01>
       `;
       const tasks = parserWithCommentBlocks.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(2);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
       expect(tasks[0].scheduledDate?.getFullYear()).toBe(2025);
       expect(tasks[0].scheduledDate?.getMonth()).toBe(9);
@@ -546,15 +548,15 @@ DEADLINE: <2025-11-01>
       expect(tasks[0].deadlineDate?.getFullYear()).toBe(2025);
       expect(tasks[0].deadlineDate?.getMonth()).toBe(10);
       expect(tasks[0].deadlineDate?.getDate()).toBe(1);
-      
-      expect(tasks[1].state).toBe("DOING");
+
+      expect(tasks[1].state).toBe('DOING');
       expect(tasks[1].text).toBe('another task');
       expect(tasks[1].scheduledDate?.getFullYear()).toBe(2025);
       expect(tasks[1].scheduledDate?.getMonth()).toBe(11);
       expect(tasks[1].scheduledDate?.getDate()).toBe(1);
     });
   });
-  
+
   describe('Tasks in code blocks when disabled', () => {
     test(`should not match code blocks when disabled`, () => {
       const lines = `
@@ -567,7 +569,7 @@ TODO task text
 ~~~
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(0);
     });
   });
@@ -585,29 +587,29 @@ This text a has a footnote[^1]
 [^6]: TODO task with #tag in footnote
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(6);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task in the footnote description');
-      expect(tasks[0].indent).toBe("");
-      expect(tasks[0].listMarker).toBe("");
-      
-      expect(tasks[1].state).toBe("DOING");
+      expect(tasks[0].indent).toBe('');
+      expect(tasks[0].listMarker).toBe('');
+
+      expect(tasks[1].state).toBe('DOING');
       expect(tasks[1].text).toBe('another task in footnote');
       expect(tasks[1].completed).toBe(false);
-      
-      expect(tasks[2].state).toBe("DONE");
+
+      expect(tasks[2].state).toBe('DONE');
       expect(tasks[2].text).toBe('completed task in footnote');
       expect(tasks[2].completed).toBe(true);
-      
-      expect(tasks[3].state).toBe("FIXME");
+
+      expect(tasks[3].state).toBe('FIXME');
       expect(tasks[3].text).toBe('custom keyword task in footnote');
-      
-      expect(tasks[4].state).toBe("TODO");
+
+      expect(tasks[4].state).toBe('TODO');
       expect(tasks[4].text).toBe('high priority task in footnote');
       expect(tasks[4].priority).toBe('high');
-      
-      expect(tasks[5].state).toBe("TODO");
+
+      expect(tasks[5].state).toBe('TODO');
       expect(tasks[5].text).toBe('task with #tag in footnote');
     });
 
@@ -621,9 +623,9 @@ DEADLINE: <2025-11-01>
       SCHEDULED: <2025-12-01>
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(2);
-      expect(tasks[0].state).toBe("TODO");
+      expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task in footnote');
       expect(tasks[0].scheduledDate?.getFullYear()).toBe(2025);
       expect(tasks[0].scheduledDate?.getMonth()).toBe(9);
@@ -631,8 +633,8 @@ DEADLINE: <2025-11-01>
       expect(tasks[0].deadlineDate?.getFullYear()).toBe(2025);
       expect(tasks[0].deadlineDate?.getMonth()).toBe(10);
       expect(tasks[0].deadlineDate?.getDate()).toBe(1);
-      
-      expect(tasks[1].state).toBe("DOING");
+
+      expect(tasks[1].state).toBe('DOING');
       expect(tasks[1].text).toBe('another task');
       expect(tasks[1].scheduledDate?.getFullYear()).toBe(2025);
       expect(tasks[1].scheduledDate?.getMonth()).toBe(11);
@@ -656,9 +658,9 @@ describe('Task parsing with code blocks', () => {
       },
       additionalTaskKeywords: [],
       taskListViewMode: 'showAll',
-      weekStartsOn: 'Monday'
- ,
- formatTaskKeywords: true };
+      weekStartsOn: 'Monday',
+      formatTaskKeywords: true,
+    };
     parser = TaskParser.create(settings);
   });
 
@@ -680,7 +682,7 @@ TODO task text
 
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(3);
     });
   });
@@ -701,9 +703,9 @@ describe('Task parsing within langauge spefic comments in code blocks', () => {
       },
       additionalTaskKeywords: [],
       taskListViewMode: 'showAll',
-      weekStartsOn: 'Monday'
- ,
- formatTaskKeywords: true };
+      weekStartsOn: 'Monday',
+      formatTaskKeywords: true,
+    };
     parser = TaskParser.create(settings);
   });
 
@@ -723,14 +725,14 @@ TODO test task text
 `;
       const tasks = parser.parseFile(lines, 'test.md');
       expect(tasks).toHaveLength(3);
-      expect(tasks[0].indent).toBe("");
-      expect(tasks[0].text).toBe("test task text");
-      expect(tasks[1].indent).toBe("");
-      expect(tasks[1].listMarker).toBe("- [ ]");
-      expect(tasks[1].priority).toBe("high");
-      expect(tasks[1].text).toBe("test task text");
-      expect(tasks[2].indent).toBe("");
-      expect(tasks[2].text).toBe("test task text");
+      expect(tasks[0].indent).toBe('');
+      expect(tasks[0].text).toBe('test task text');
+      expect(tasks[1].indent).toBe('');
+      expect(tasks[1].listMarker).toBe('- [ ]');
+      expect(tasks[1].priority).toBe('high');
+      expect(tasks[1].text).toBe('test task text');
+      expect(tasks[2].indent).toBe('');
+      expect(tasks[2].text).toBe('test task text');
     });
 
     test(`should match regular tasks in unknown code blocks when enabled`, () => {
@@ -746,10 +748,10 @@ TODO test task text
 `;
       const tasks = parser.parseFile(lines, 'test.md');
       expect(tasks).toHaveLength(2);
-      expect(tasks[0].indent).toBe("");
-      expect(tasks[0].text).toBe("test task text");
-      expect(tasks[1].indent).toBe("");
-      expect(tasks[1].text).toBe("test task text");
+      expect(tasks[0].indent).toBe('');
+      expect(tasks[0].text).toBe('test task text');
+      expect(tasks[1].indent).toBe('');
+      expect(tasks[1].text).toBe('test task text');
     });
 
     test(`should match tasks with multibyte characters as first character`, () => {
@@ -763,7 +765,7 @@ TODO 你好世界
 TODO 🇨🇦 Canadian flag
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      
+
       expect(tasks).toHaveLength(7);
       expect(tasks[0].text).toBe('letter a b');
       expect(tasks[1].text).toBe('letter a 中');

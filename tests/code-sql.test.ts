@@ -17,7 +17,7 @@ describe('Task parsing within SQL comments in code blocks', () => {
       additionalTaskKeywords: [],
       taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
-      formatTaskKeywords: true
+      formatTaskKeywords: true,
     };
     parser = TaskParser.create(settings);
   });
@@ -44,17 +44,16 @@ select * from users; /* TODO test task text */
 `;
       const tasks = parser.parseFile(lines, 'test.md');
       expect(tasks).toHaveLength(6);
-      expect(tasks[0].indent).toBe("/* ");
-      expect(tasks[0].text).toBe("test task text");
-      expect(tasks[0].tail).toBe(" */");
-      expect(tasks[1].indent).toBe("");
-      expect(tasks[2].indent).toBe(" ");
-      expect(tasks[2].listMarker).toBe("* ");
-      expect(tasks[3].indent).toBe("-- ");
-      expect(tasks[4].indent).toBe("select * from users; -- ");
-      expect(tasks[5].indent).toBe("select * from users; /* ");
-      expect(tasks[5].tail).toBe(" */");
+      expect(tasks[0].indent).toBe('/* ');
+      expect(tasks[0].text).toBe('test task text');
+      expect(tasks[0].tail).toBe(' */');
+      expect(tasks[1].indent).toBe('');
+      expect(tasks[2].indent).toBe(' ');
+      expect(tasks[2].listMarker).toBe('* ');
+      expect(tasks[3].indent).toBe('-- ');
+      expect(tasks[4].indent).toBe('select * from users; -- ');
+      expect(tasks[5].indent).toBe('select * from users; /* ');
+      expect(tasks[5].tail).toBe(' */');
     });
   });
 });
-

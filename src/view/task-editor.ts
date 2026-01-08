@@ -10,33 +10,41 @@ export class TaskEditor {
   constructor(private readonly app: App) {}
 
   // Pure formatter of a task line given a new state and optional priority retention
-  static generateTaskLine(task: Task, newState: string, keepPriority = true): { newLine: string; completed: boolean } {
+  static generateTaskLine(
+    task: Task,
+    newState: string,
+    keepPriority = true
+  ): { newLine: string; completed: boolean } {
     const priToken =
       keepPriority && task.priority
-        ? (task.priority === 'high' ? '[#A]' : task.priority === 'med' ? '[#B]' : '[#C]')
+        ? task.priority === 'high'
+          ? '[#A]'
+          : task.priority === 'med'
+            ? '[#B]'
+            : '[#C]'
         : null;
 
     const priorityPart = priToken ? ` ${priToken}` : '';
     const textPart = task.text ? ` ${task.text}` : '';
-    
+
     // Check if the original task was a markdown checkbox using shared regex
     const isCheckbox = task.rawText.trim().match(CHECKBOX_REGEX);
     let newLine: string;
-    
+
     if (isCheckbox) {
       // Generate markdown checkbox format with proper spacing
       const checkboxStatus = DEFAULT_COMPLETED_STATES.has(newState) ? 'x' : ' ';
       newLine = `${task.indent}- [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
     } else {
-      // Generate original format, preserving comment prefix if present      
+      // Generate original format, preserving comment prefix if present
       newLine = `${task.indent}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
-      
+
       // Add trailing comment end characters if they were present in the original task
       if (task.tail) {
         newLine += task.tail;
       }
     }
-    
+
     const completed = DEFAULT_COMPLETED_STATES.has(newState);
     return { newLine, completed };
   }
@@ -48,8 +56,16 @@ export class TaskEditor {
    * - For active files: Uses Editor API (editor.replaceRange) to preserve cursor position, selection, and folds
    * - For inactive files: Uses Vault.process() for atomic background operations that prevent plugin conflicts
    */
-  async applyLineUpdate(task: Task, newState: string, keepPriority = true): Promise<Task> {
-    const { newLine, completed } = TaskEditor.generateTaskLine(task, newState, keepPriority);
+  async applyLineUpdate(
+    task: Task,
+    newState: string,
+    keepPriority = true
+  ): Promise<Task> {
+    const { newLine, completed } = TaskEditor.generateTaskLine(
+      task,
+      newState,
+      keepPriority
+    );
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file instanceof TFile) {
@@ -65,7 +81,10 @@ export class TaskEditor {
         const currentLine = editor.getLine(task.line);
         if (typeof currentLine === 'string') {
           const from: EditorPosition = { line: task.line, ch: 0 };
-          const to: EditorPosition = { line: task.line, ch: currentLine.length };
+          const to: EditorPosition = {
+            line: task.line,
+            ch: currentLine.length,
+          };
           editor.replaceRange(newLine, from, to);
         }
       } else {
@@ -90,8 +109,12 @@ export class TaskEditor {
   }
 
   // Cycles a task to its next state according to NEXT_STATE and persists change
-  async updateTaskState(task: Task, nextState: string | null = null): Promise<Task> {
-    const state = nextState == null ? NEXT_STATE.get(task.state) || 'TODO' : nextState;
+  async updateTaskState(
+    task: Task,
+    nextState: string | null = null
+  ): Promise<Task> {
+    const state =
+      nextState == null ? NEXT_STATE.get(task.state) || 'TODO' : nextState;
     return await this.applyLineUpdate(task, state);
   }
 }

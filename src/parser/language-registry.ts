@@ -3,28 +3,27 @@
 export interface LanguageCommentPatterns {
   /** Regular expression for single-line comment start */
   singleLine?: RegExp;
-  
+
   /** Regular expression for multi-line comment start (optional) */
   multiLineStart?: RegExp;
-  
+
   /** Regular expression for multi-line comment end (optional) */
   multiLineEnd?: RegExp;
-  
+
   /** Regular expression for additional lines within multi-line comments (optional) */
   multilineMid?: RegExp;
-  
 }
 
 export interface LanguageDefinition {
   /** Unique language identifier */
   name: string;
-  
+
   /** Alternative keywords for this language */
   keywords?: string[];
-  
+
   /** Comment patterns for this language */
   patterns: LanguageCommentPatterns;
-  }
+}
 
 export interface LanguageCommentSupportSettings {
   /** Enable/disable language comment support */
@@ -34,22 +33,22 @@ export interface LanguageCommentSupportSettings {
 export interface RegexPair {
   /** Test regex to check if a line contains a task */
   test: RegExp;
-  
+
   /** Capture regex to extract task components */
   capture: RegExp;
 }
 
 // Base comment patterns for C-style languages
 const C_STYLE_COMMENTS: LanguageCommentPatterns = {
-  singleLine: /\/\//,             // starts with //
-  multiLineStart: /\/\*{1,2}/,    // starts with /* or /**
-  multiLineEnd: /\*\//,           // ends with */
+  singleLine: /\/\//, // starts with //
+  multiLineStart: /\/\*{1,2}/, // starts with /* or /**
+  multiLineEnd: /\*\//, // ends with */
   multilineMid: undefined,
 };
 
 // Base comment patterns for hash-style languages
 const HASH_STYLE_COMMENTS: LanguageCommentPatterns = {
-  singleLine: /#/,                // starts with #
+  singleLine: /#/, // starts with #
   multiLineStart: undefined,
   multiLineEnd: undefined,
   multilineMid: undefined,
@@ -129,9 +128,9 @@ const POWERSHELL_LANGUAGE: LanguageDefinition = {
   name: 'powershell',
   keywords: ['powershell'],
   patterns: {
-    singleLine: /#/,             // starts with #
-    multiLineStart: /<#/,        // starts with <#
-    multiLineEnd: /#>/,          // ends with #>
+    singleLine: /#/, // starts with #
+    multiLineStart: /<#/, // starts with <#
+    multiLineEnd: /#>/, // ends with #>
   },
 };
 
@@ -140,9 +139,9 @@ const PYTHON_LANGUAGE: LanguageDefinition = {
   name: 'python',
   keywords: ['python', 'py'],
   patterns: {
-    singleLine: /#/,             // starts with #
-    multiLineStart: /'''|"""/,   // starts with ''' or """
-    multiLineEnd: /'''|"""/,     // ends with ''' or """
+    singleLine: /#/, // starts with #
+    multiLineStart: /'''|"""/, // starts with ''' or """
+    multiLineEnd: /'''|"""/, // ends with ''' or """
   },
 };
 
@@ -157,9 +156,9 @@ const R_LANGUAGE: LanguageDefinition = {
 const RUBY_LANGUAGE: LanguageDefinition = {
   name: 'ruby',
   patterns: {
-    singleLine: /#/,           // starts with #
-    multiLineStart: /=begin/,  // starts with =begin
-    multiLineEnd: /=end/,      // ends with =end
+    singleLine: /#/, // starts with #
+    multiLineStart: /=begin/, // starts with =begin
+    multiLineEnd: /=end/, // ends with =end
   },
 };
 
@@ -168,9 +167,9 @@ const RUST_LANGUAGE: LanguageDefinition = {
   name: 'rust',
   keywords: ['rust'],
   patterns: {
-    singleLine: /\/\/[/!]?/,      // starts with //, /// or //!
-    multiLineStart: /\/\*\*?/,     // starts with /* or /**
-    multiLineEnd: /\*\//,          // ends with */
+    singleLine: /\/\/[/!]?/, // starts with //, /// or //!
+    multiLineStart: /\/\*\*?/, // starts with /* or /**
+    multiLineEnd: /\*\//, // ends with */
   },
 };
 
@@ -185,9 +184,9 @@ const SHELL_LANGUAGE: LanguageDefinition = {
 const SQL_LANGUAGE: LanguageDefinition = {
   name: 'sql',
   patterns: {
-    singleLine: /--/,            // starts with --
-    multiLineStart: /\/\*+/,     // starts with /* or /**
-    multiLineEnd: /\*\//,        // ends with */
+    singleLine: /--/, // starts with --
+    multiLineStart: /\/\*+/, // starts with /* or /**
+    multiLineEnd: /\*\//, // ends with */
   },
 };
 
@@ -234,7 +233,7 @@ export class LanguageRegistry {
   }
 
   /**
-   * Register supported languages 
+   * Register supported languages
    * Some languages support multiple keywords for identification
    */
   private registerDefaultLanguages(): void {
@@ -266,10 +265,10 @@ export class LanguageRegistry {
    */
   registerLanguage(language: LanguageDefinition): void {
     this.languages.set(language.name.toLowerCase(), language);
-    
+
     // Register additional keywords if they exist
     if (language.keywords) {
-      language.keywords.forEach(keyword => {
+      language.keywords.forEach((keyword) => {
         this.keywordToLanguage.set(keyword.toLowerCase(), language);
       });
     }
@@ -301,6 +300,8 @@ export class LanguageRegistry {
    * @returns The language definition or null if not found
    */
   getLanguageByIdentifier(identifier: string): LanguageDefinition | null {
-    return this.getLanguage(identifier) || this.getLanguageByKeyword(identifier);
+    return (
+      this.getLanguage(identifier) || this.getLanguageByKeyword(identifier)
+    );
   }
 }

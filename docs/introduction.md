@@ -59,7 +59,7 @@ TODOseq supports can work with existing checkbox-based tasks when a task state k
 
 ```markdown
 - [ ] TODO this is a task
-- [ ] DOING this is an in progress task  
+- [ ] DOING this is an in progress task
 - [x] DONE this is a completed task
 ```
 
@@ -69,9 +69,9 @@ Checkboxes without the keywords are ignored by TODOseq. This allows you to mix t
 
 ```markdown
 - [ ] DOING this task is tracked by TODOseq
-    - [ ] subtask whithout state not tracked by TODOseq
-    - [x] another untracked subtask
-    - [ ] TODO important subtask tracked by TODOseq
+  - [ ] subtask whithout state not tracked by TODOseq
+  - [x] another untracked subtask
+  - [ ] TODO important subtask tracked by TODOseq
 ```
 
 ## Logseq Compatibility
@@ -89,7 +89,7 @@ TODOseq allows you to maintain the same task format across both Logseq and Obsid
 
 Some TODOseq features are not available in Logseq, the use of checkboxes before the task keyword, the use of custom state keywords, and the capture of tasks within code, quotes, and callouts blocks will not get identified as tasks if you return to Logseq.
 
-*Note: the Logseq import relates to the original Markdown based version of Logseq. Migration from the newer Logseq database version format has not been tested.
+\*Note: the Logseq import relates to the original Markdown based version of Logseq. Migration from the newer Logseq database version format has not been tested.
 
 ## Getting Started
 

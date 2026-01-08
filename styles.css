@@ -45,7 +45,7 @@
 /* List item */
 .todo-view .todo-item {
   padding: var(--size-2-2) 0;
-  border-bottom: 1px solid var(--background-modifier-border, rgba(0,0,0,0.1));
+  border-bottom: 1px solid var(--background-modifier-border, rgba(0, 0, 0, 0.1));
   content-visibility: auto;
   contain-intrinsic-size: 0 100px;
 }
@@ -78,7 +78,8 @@
   outline: 2px solid var(--interactive-accent, #7f6df2);
   outline-offset: 2px;
   border-radius: 3px;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent, #7f6df2) 20%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--interactive-accent, #7f6df2) 20%, transparent);
 }
 
 /* Checkbox alignment */
@@ -89,7 +90,11 @@
 
 /* Checkbox styling for active tasks (using interactive accent) */
 .todo-view .todo-checkbox.todo-checkbox-active {
-  background-color: color-mix(in srgb, var(--interactive-accent, #7f6df2) 33%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent, #7f6df2) 33%,
+    transparent
+  );
 }
 
 /* Non-clickable link-like styling for in-text links */
@@ -105,7 +110,10 @@
   margin-left: var(--size-2-2);
   padding: 0 var(--size-2-2);
   border-radius: var(--radius-s);
-  background-color: var(--background-modifier-accent, var(--interactive-accent));
+  background-color: var(
+    --background-modifier-accent,
+    var(--interactive-accent)
+  );
   color: var(--text-on-accent);
   font-weight: var(--font-weight-medium, var(--font-medium));
   font-size: 0.7em;
@@ -168,12 +176,11 @@
   margin: 12px 12px 0;
   border: 1px dashed var(--background-modifier-border);
   border-radius: 12px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-secondary) 90%, transparent),
-      color-mix(in srgb, var(--background-secondary) 96%, transparent)
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--background-secondary) 90%, transparent),
+    color-mix(in srgb, var(--background-secondary) 96%, transparent)
+  );
 }
 
 .todo-view .todo-empty-title {
@@ -203,8 +210,16 @@
   margin: 2px 0;
   border-radius: var(--radius-s);
   border-left: 3px solid;
-  background-color: color-mix(in srgb, var(--interactive-accent) 5%, transparent);
-  border-left-color: color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 5%,
+    transparent
+  );
+  border-left-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 50%,
+    transparent
+  );
 }
 
 .todo-view .todo-date .date-label {
@@ -239,8 +254,16 @@
 }
 
 .todo-view .todo-date-soon {
-  background-color: color-mix(in srgb, var(--background-modifier-accent) 5%, transparent);
-  border-left-color: color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--background-modifier-accent) 5%,
+    transparent
+  );
+  border-left-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 50%,
+    transparent
+  );
 }
 
 .todo-view .todo-date-soon .date-value {
@@ -255,8 +278,8 @@
 
 /* Settings UI - Invalid input field highlighting */
 .setting-item .todoseq-invalid-input {
- border-color: var(--error-color, #ff0000) !important;
- border-width: 2px !important;
+  border-color: var(--error-color, #ff0000) !important;
+  border-width: 2px !important;
 }
 
 /* Task keyword formatting in editor and reading view */
@@ -281,18 +304,23 @@
 
 /* Hover effect for better UX */
 .todoseq-keyword-formatted:hover {
-  background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 15%,
+    transparent
+  );
 }
 
 /* Ensure formatting works in both light and dark themes */
 :is(.cm-editor, .markdown-preview-view) .todoseq-keyword-formatted {
-  text-shadow: 0 0 1px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+  text-shadow: 0 0 1px
+    color-mix(in srgb, var(--interactive-accent) 50%, transparent);
 }
 
 /* Completed task styling for editor view (DONE, CANCELLED, CANCELED) */
-.cm-editor [data-task-keyword="DONE"],
-.cm-editor [data-task-keyword="CANCELLED"],
-.cm-editor [data-task-keyword="CANCELED"] {
+.cm-editor [data-task-keyword='DONE'],
+.cm-editor [data-task-keyword='CANCELLED'],
+.cm-editor [data-task-keyword='CANCELED'] {
   text-decoration: line-through;
   text-decoration-color: var(--text-muted);
 }

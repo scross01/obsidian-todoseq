@@ -1,7 +1,21 @@
-import { ItemView, WorkspaceLeaf, Menu, TFile, Platform, MarkdownView, setIcon } from 'obsidian';
+import {
+  ItemView,
+  WorkspaceLeaf,
+  Menu,
+  TFile,
+  Platform,
+  MarkdownView,
+  setIcon,
+} from 'obsidian';
 import { TASK_VIEW_ICON } from '../main';
 import { TaskEditor } from './task-editor';
-import { Task, NEXT_STATE, DEFAULT_ACTIVE_STATES, DEFAULT_PENDING_STATES, DEFAULT_COMPLETED_STATES } from '../task';
+import {
+  Task,
+  NEXT_STATE,
+  DEFAULT_ACTIVE_STATES,
+  DEFAULT_PENDING_STATES,
+  DEFAULT_COMPLETED_STATES,
+} from '../task';
 import { DateUtils } from './date-utils';
 import { Search } from '../search/search';
 import { SearchOptionsDropdown } from './search-options-dropdown';
@@ -10,12 +24,18 @@ import { TodoTrackerSettings } from '../settings/settings';
 import { taskComparator, getFilename } from '../utils/task-utils';
 import { getPluginSettings } from '../utils/settings-utils';
 
-
-export type TaskListViewMode = 'showAll' | 'sortCompletedLast' | 'hideCompleted';
-export type SortMethod = 'default' | 'sortByScheduled' | 'sortByDeadline' | 'sortByPriority';
+export type TaskListViewMode =
+  | 'showAll'
+  | 'sortCompletedLast'
+  | 'hideCompleted';
+export type SortMethod =
+  | 'default'
+  | 'sortByScheduled'
+  | 'sortByDeadline'
+  | 'sortByPriority';
 
 export class TaskListView extends ItemView {
-  static viewType = "todoseq-view";
+  static viewType = 'todoseq-view';
   tasks: Task[];
   editor: TaskEditor;
   private defaultViewMode: TaskListViewMode;
@@ -28,7 +48,12 @@ export class TaskListView extends ItemView {
   private suggestionDropdown: SearchSuggestionDropdown | null = null;
   private taskListContainer: HTMLElement | null = null;
 
-  constructor(leaf: WorkspaceLeaf, tasks: Task[], defaultViewMode: TaskListViewMode, private settings: TodoTrackerSettings) {
+  constructor(
+    leaf: WorkspaceLeaf,
+    tasks: Task[],
+    defaultViewMode: TaskListViewMode,
+    private settings: TodoTrackerSettings
+  ) {
     super(leaf);
     this.tasks = tasks;
     this.editor = new TaskEditor(this.app);
@@ -44,7 +69,12 @@ export class TaskListView extends ItemView {
       if (attr === 'sortCompletedLast') return 'sortCompletedLast';
       if (attr === 'hideCompleted') return 'hideCompleted';
       // Handle new mode names
-      if (attr === 'showAll' || attr === 'sortCompletedLast' || attr === 'hideCompleted') return attr;
+      if (
+        attr === 'showAll' ||
+        attr === 'sortCompletedLast' ||
+        attr === 'hideCompleted'
+      )
+        return attr;
     }
     // Fallback to current plugin setting from constructor if attribute not set
     // Handle migration from old mode names
@@ -52,7 +82,11 @@ export class TaskListView extends ItemView {
     if (defaultMode === 'default') return 'showAll';
     if (defaultMode === 'sortCompletedLast') return 'sortCompletedLast';
     if (defaultMode === 'hideCompleted') return 'hideCompleted';
-    if (defaultMode === 'showAll' || defaultMode === 'sortCompletedLast' || defaultMode === 'hideCompleted') {
+    if (
+      defaultMode === 'showAll' ||
+      defaultMode === 'sortCompletedLast' ||
+      defaultMode === 'hideCompleted'
+    ) {
       return defaultMode as TaskListViewMode;
     }
     // Final safety fallback
@@ -65,10 +99,21 @@ export class TaskListView extends ItemView {
   private getSortMethod(): SortMethod {
     const attr = this.contentEl.getAttr('data-sort-method');
     if (typeof attr === 'string') {
-      if (attr === 'default' || attr === 'sortByScheduled' || attr === 'sortByDeadline' || attr === 'sortByPriority') return attr;
+      if (
+        attr === 'default' ||
+        attr === 'sortByScheduled' ||
+        attr === 'sortByDeadline' ||
+        attr === 'sortByPriority'
+      )
+        return attr;
     }
     // Fallback to current plugin setting from constructor if attribute not set
-    if (this.defaultSortMethod === 'default' || this.defaultSortMethod === 'sortByScheduled' || this.defaultSortMethod === 'sortByDeadline' || this.defaultSortMethod === 'sortByPriority') {
+    if (
+      this.defaultSortMethod === 'default' ||
+      this.defaultSortMethod === 'sortByScheduled' ||
+      this.defaultSortMethod === 'sortByDeadline' ||
+      this.defaultSortMethod === 'sortByPriority'
+    ) {
       return this.defaultSortMethod;
     }
     // Final safety fallback
@@ -86,7 +131,7 @@ export class TaskListView extends ItemView {
    */
   private filterTasksByViewMode(tasks: Task[], mode: TaskListViewMode): Task[] {
     if (mode === 'hideCompleted') {
-      return tasks.filter(t => !t.completed);
+      return tasks.filter((t) => !t.completed);
     }
     return tasks.slice(); // Return copy for other modes
   }
@@ -98,7 +143,7 @@ export class TaskListView extends ItemView {
     // First, handle view mode filtering
     if (mode === 'hideCompleted') {
       // Filter out completed tasks and then apply sorting
-      transformed = transformed.filter(t => !t.completed);
+      transformed = transformed.filter((t) => !t.completed);
       this.applySortToTasks(transformed);
       return transformed;
     }
@@ -111,11 +156,11 @@ export class TaskListView extends ItemView {
       for (const t of transformed) {
         (t.completed ? done : pending).push(t);
       }
-      
+
       // Apply the same sorting to both pending and done groups
       this.applySortToTasks(pending);
       this.applySortToTasks(done);
-      
+
       transformed = pending.concat(done);
     } else {
       // For other modes (showAll), apply sorting directly
@@ -131,7 +176,7 @@ export class TaskListView extends ItemView {
    */
   private applySortToTasks(tasks: Task[]): void {
     const sortMethod = this.getSortMethod();
-    
+
     if (sortMethod === 'default') {
       // Sort by file path, then by line number within each file using shared comparator
       tasks.sort(taskComparator);
@@ -154,14 +199,14 @@ export class TaskListView extends ItemView {
     } else if (sortMethod === 'sortByPriority') {
       tasks.sort((a, b) => {
         // Priority order: high > med > low > null (no priority)
-        const priorityOrder = { 'high': 3, 'med': 2, 'low': 1, 'null': 0 };
+        const priorityOrder = { high: 3, med: 2, low: 1, null: 0 };
         const aPriority = a.priority ? priorityOrder[a.priority] : 0;
         const bPriority = b.priority ? priorityOrder[b.priority] : 0;
-        
+
         if (aPriority !== bPriority) {
           return bPriority - aPriority; // Higher priority first (descending)
         }
-        
+
         // If priorities are equal, fall back to default sorting using shared comparator
         return taskComparator(a, b);
       });
@@ -183,21 +228,36 @@ export class TaskListView extends ItemView {
 
     // First row: search input with mode icons on the right
     const firstRow = toolbar.createEl('div', { cls: 'search-row' });
-     
+
     // Right-aligned search input with icon
     const searchId = `todoseq-search-${Math.random().toString(36).slice(2, 8)}`;
     const searchLabel = firstRow.createEl('label', { attr: { for: searchId } });
     searchLabel.setText('Search');
     searchLabel.addClass('sr-only');
-    const searchInputWrap = firstRow.createEl('div', { cls: 'search-input-container global-search-input-container' });
-    const inputEl = searchInputWrap.createEl('input', { attr: { id: searchId, type: 'search', placeholder: 'Search tasks…', 'aria-label': 'Search tasks' } });
-    const clearSearch = searchInputWrap.createEl('div', { cls: 'search-input-clear-button', attr: { 'aria-label': 'Clear search' } });
+    const searchInputWrap = firstRow.createEl('div', {
+      cls: 'search-input-container global-search-input-container',
+    });
+    const inputEl = searchInputWrap.createEl('input', {
+      attr: {
+        id: searchId,
+        type: 'search',
+        placeholder: 'Search tasks…',
+        'aria-label': 'Search tasks',
+      },
+    });
+    const clearSearch = searchInputWrap.createEl('div', {
+      cls: 'search-input-clear-button',
+      attr: { 'aria-label': 'Clear search' },
+    });
     clearSearch.addEventListener('click', () => {
       inputEl.value = '';
       this.setSearchQuery('');
       this.refreshVisibleList();
     });
-    const matchCase = searchInputWrap.createEl('div', { cls: 'input-right-decorator clickable-icon', attr: { 'aria-label': 'Match case' } });
+    const matchCase = searchInputWrap.createEl('div', {
+      cls: 'input-right-decorator clickable-icon',
+      attr: { 'aria-label': 'Match case' },
+    });
     setIcon(matchCase, 'uppercase-lowercase-a');
 
     // Toggle case sensitivity
@@ -229,34 +289,40 @@ export class TaskListView extends ItemView {
     settingsSection.style.display = 'none'; // Start hidden
 
     // Add "Show completed tasks" dropdown
-    const completedTasksSetting = settingsSection.createEl('div', { cls: 'setting-item' });
-    const completedTasksSettingInfo = completedTasksSetting.createEl('div', { cls: 'setting-item-info'});
+    const completedTasksSetting = settingsSection.createEl('div', {
+      cls: 'setting-item',
+    });
+    const completedTasksSettingInfo = completedTasksSetting.createEl('div', {
+      cls: 'setting-item-info',
+    });
     completedTasksSettingInfo.createEl('div', {
       cls: 'setting-item-name',
       text: 'Show completed tasks:',
-      attr: { for: 'completed-tasks-dropdown' }
+      attr: { for: 'completed-tasks-dropdown' },
     });
-    
-    const completedTasksSettingControl = completedTasksSetting.createEl('div', { cls: 'setting-item-control'});
+
+    const completedTasksSettingControl = completedTasksSetting.createEl('div', {
+      cls: 'setting-item-control',
+    });
     const dropdown = completedTasksSettingControl.createEl('select', {
       cls: 'mod-small ',
       attr: {
         id: 'completed-tasks-dropdown',
-        'aria-label': 'Show completed tasks'
-      }
+        'aria-label': 'Show completed tasks',
+      },
     });
 
     // Add dropdown options
     const options = [
       { value: 'showAll', label: 'Show' },
       { value: 'sortCompletedLast', label: 'Sort to end' },
-      { value: 'hideCompleted', label: 'Hide' }
+      { value: 'hideCompleted', label: 'Hide' },
     ];
 
     for (const option of options) {
       dropdown.createEl('option', {
         attr: { value: option.value },
-        text: option.label
+        text: option.label,
       });
     }
 
@@ -281,43 +347,49 @@ export class TaskListView extends ItemView {
     dropdown.addEventListener('change', () => {
       const selectedValue = dropdown.value as TaskListViewMode;
       this.setViewMode(selectedValue);
-      
+
       // Dispatch event for persistence
-      const evt = new CustomEvent('todoseq:view-mode-change', { detail: { mode: selectedValue } });
+      const evt = new CustomEvent('todoseq:view-mode-change', {
+        detail: { mode: selectedValue },
+      });
       window.dispatchEvent(evt);
-      
+
       // Refresh the visible list
       this.refreshVisibleList();
     });
 
     // Add search results info bar (second row)
-    const searchResultsInfo = toolbar.createEl('div', { cls: 'search-results-info' });
-    
+    const searchResultsInfo = toolbar.createEl('div', {
+      cls: 'search-results-info',
+    });
+
     // Left side: task count
-    const searchResultsWarp = searchResultsInfo.createEl('div', { cls: 'search-results-result-count' });
+    const searchResultsWarp = searchResultsInfo.createEl('div', {
+      cls: 'search-results-result-count',
+    });
     const searchResultsCount = searchResultsWarp.createEl('span');
     searchResultsCount.setText('0 of 0 tasks');
-    
+
     // Right side: sort dropdown
     // const sortDropdown = searchResultsInfo.createEl('div');
     const select = searchResultsInfo.createEl('select', {
       cls: 'dropdown',
       attr: {
         'aria-label': 'Sort tasks by',
-        'data-sort-mode': 'default'
-      }
+        'data-sort-mode': 'default',
+      },
     });
 
     const sortOptions = [
       { value: 'default', label: 'Default (file path)' },
       { value: 'sortByScheduled', label: 'Scheduled date' },
       { value: 'sortByDeadline', label: 'Deadline date' },
-      { value: 'sortByPriority', label: 'Priority' }
+      { value: 'sortByPriority', label: 'Priority' },
     ];
 
     for (const option of sortOptions) {
       const optionEl = select.createEl('option', {
-        attr: { value: option.value }
+        attr: { value: option.value },
       });
       optionEl.setText(option.label);
     }
@@ -330,7 +402,7 @@ export class TaskListView extends ItemView {
     select.addEventListener('change', () => {
       const selectedValue = select.value;
       let sortMethod: SortMethod = 'default';
-      
+
       if (selectedValue === 'sortByScheduled') {
         sortMethod = 'sortByScheduled';
       } else if (selectedValue === 'sortByDeadline') {
@@ -338,17 +410,19 @@ export class TaskListView extends ItemView {
       } else if (selectedValue === 'sortByPriority') {
         sortMethod = 'sortByPriority';
       }
-      
+
       // Update the sort method (keep the current view mode)
       this.setSortMethod(sortMethod);
-      
+
       // Update the dropdown to reflect the current sort method
       select.value = sortMethod;
-      
+
       // Dispatch event for persistence
-      const evt = new CustomEvent('todoseq:sort-method-change', { detail: { sortMethod } });
+      const evt = new CustomEvent('todoseq:sort-method-change', {
+        detail: { sortMethod },
+      });
       window.dispatchEvent(evt);
-      
+
       // Refresh the visible list (transformForView will handle the sorting)
       this.refreshVisibleList();
     });
@@ -361,7 +435,7 @@ export class TaskListView extends ItemView {
   private setupSearchSuggestions(): void {
     const inputEl = this.searchInputEl;
     if (!inputEl) return;
-    
+
     // Clean up any existing dropdowns before creating new ones
     if (this.optionsDropdown) {
       this.optionsDropdown.cleanup();
@@ -371,121 +445,159 @@ export class TaskListView extends ItemView {
       this.suggestionDropdown.cleanup();
       this.suggestionDropdown = null;
     }
-    
+
     // Import both dropdown classes dynamically to avoid circular dependencies
     Promise.all([
       import('./search-options-dropdown'),
-      import('./search-suggestion-dropdown')
-    ]).then(([optionsModule, suggestionsModule]) => {
-      this.suggestionDropdown = new (suggestionsModule as { SearchSuggestionDropdown: typeof SearchSuggestionDropdown }).SearchSuggestionDropdown(
-        inputEl,
-        this.app.vault,
-        this.tasks,
-        this.settings,
-        this.getViewMode()
-      );
-      
-      this.optionsDropdown = new (optionsModule as { SearchOptionsDropdown: typeof SearchOptionsDropdown }).SearchOptionsDropdown(
-        inputEl,
-        this.app.vault,
-        this.tasks,
-        this.settings,
-        this.suggestionDropdown
-      );
-      
-      // Input event handler for dropdown triggering
-      inputEl.addEventListener('input', () => {
-        this.handleSearchInputForSuggestions();
+      import('./search-suggestion-dropdown'),
+    ])
+      .then(([optionsModule, suggestionsModule]) => {
+        this.suggestionDropdown = new (
+          suggestionsModule as {
+            SearchSuggestionDropdown: typeof SearchSuggestionDropdown;
+          }
+        ).SearchSuggestionDropdown(
+          inputEl,
+          this.app.vault,
+          this.tasks,
+          this.settings,
+          this.getViewMode()
+        );
+
+        this.optionsDropdown = new (
+          optionsModule as {
+            SearchOptionsDropdown: typeof SearchOptionsDropdown;
+          }
+        ).SearchOptionsDropdown(
+          inputEl,
+          this.app.vault,
+          this.tasks,
+          this.settings,
+          this.suggestionDropdown
+        );
+
+        // Input event handler for dropdown triggering
+        inputEl.addEventListener('input', () => {
+          this.handleSearchInputForSuggestions();
+        });
+
+        // Focus event handler
+        inputEl.addEventListener('focus', () => {
+          this.handleSearchFocus();
+        });
+
+        // Keydown event handler
+        inputEl.addEventListener('keydown', (e) => {
+          if (this.optionsDropdown && this.optionsDropdown.handleKeyDown(e)) {
+            e.preventDefault();
+            e.stopPropagation();
+          } else if (
+            this.suggestionDropdown &&
+            this.suggestionDropdown.handleKeyDown(e)
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        });
+      })
+      .catch((error) => {
+        console.error('Failed to load search suggestion dropdowns:', error);
       });
-      
-      // Focus event handler
-      inputEl.addEventListener('focus', () => {
-        this.handleSearchFocus();
-      });
-      
-      // Keydown event handler
-      inputEl.addEventListener('keydown', (e) => {
-        if (this.optionsDropdown && this.optionsDropdown.handleKeyDown(e)) {
-          e.preventDefault();
-          e.stopPropagation();
-        } else if (this.suggestionDropdown && this.suggestionDropdown.handleKeyDown(e)) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      });
-    }).catch(error => {
-      console.error('Failed to load search suggestion dropdowns:', error);
-    });
   }
 
   private handleSearchInputForSuggestions(): void {
-  if (!this.searchInputEl || !this.optionsDropdown || !this.suggestionDropdown) return;
-  
-  const value = this.searchInputEl.value;
-  const cursorPos = this.searchInputEl.selectionStart ?? 0;
-  
-  // Check if we should show suggestions
-  if (value.length === 0) {
+    if (
+      !this.searchInputEl ||
+      !this.optionsDropdown ||
+      !this.suggestionDropdown
+    )
+      return;
+
+    const value = this.searchInputEl.value;
+    const cursorPos = this.searchInputEl.selectionStart ?? 0;
+
+    // Check if we should show suggestions
+    if (value.length === 0) {
       // Empty input - show options dropdown
       this.optionsDropdown.showOptionsDropdown(value);
       this.suggestionDropdown.hide();
       return;
-  }
-  
-  // Check if cursor is at end of a prefix or typing after a prefix
-  const textBeforeCursor = value.substring(0, cursorPos);
-  
-  // Match either:
-  // 1. Complete prefix with colon and optional search term: path:search
-  // 2. Incomplete prefix being typed: path
-  const prefixMatch = textBeforeCursor.match(/(\w+)(:([^\s]*))?$/);
-  
-  if (prefixMatch) {
+    }
+
+    // Check if cursor is at end of a prefix or typing after a prefix
+    const textBeforeCursor = value.substring(0, cursorPos);
+
+    // Match either:
+    // 1. Complete prefix with colon and optional search term: path:search
+    // 2. Incomplete prefix being typed: path
+    const prefixMatch = textBeforeCursor.match(/(\w+)(:([^\s]*))?$/);
+
+    if (prefixMatch) {
       const prefixBase = prefixMatch[1];
       const hasColon = prefixMatch[2] !== undefined;
       const searchTerm = prefixMatch[3] || ''; // Text typed after the colon
-      
+
       // Check if this is a valid prefix
-      const validPrefixes = ['path', 'file', 'tag', 'state', 'priority', 'content', 'scheduled', 'deadline'];
-      if (validPrefixes.includes(prefixBase) || validPrefixes.some(p => p.startsWith(prefixBase))) {
-          if (hasColon) {
-              // Complete prefix with colon - show filtered suggestions
-              const prefix = prefixBase + ':';
-              this.suggestionDropdown.showPrefixDropdown(prefix, searchTerm);
-              this.optionsDropdown.hide();
-          } else {
-              // Incomplete prefix being typed - show options dropdown if it matches the start of any prefix
-              this.optionsDropdown.showOptionsDropdown(prefixBase);
-              this.suggestionDropdown.hide();
-          }
-          return;
+      const validPrefixes = [
+        'path',
+        'file',
+        'tag',
+        'state',
+        'priority',
+        'content',
+        'scheduled',
+        'deadline',
+      ];
+      if (
+        validPrefixes.includes(prefixBase) ||
+        validPrefixes.some((p) => p.startsWith(prefixBase))
+      ) {
+        if (hasColon) {
+          // Complete prefix with colon - show filtered suggestions
+          const prefix = prefixBase + ':';
+          this.suggestionDropdown.showPrefixDropdown(prefix, searchTerm);
+          this.optionsDropdown.hide();
+        } else {
+          // Incomplete prefix being typed - show options dropdown if it matches the start of any prefix
+          this.optionsDropdown.showOptionsDropdown(prefixBase);
+          this.suggestionDropdown.hide();
+        }
+        return;
       }
-  }
-  
-  // Check if cursor is at end of text that ends with space
-  if (cursorPos === value.length && value.endsWith(' ')) {
+    }
+
+    // Check if cursor is at end of text that ends with space
+    if (cursorPos === value.length && value.endsWith(' ')) {
       // Show options dropdown
       this.optionsDropdown.showOptionsDropdown();
       this.suggestionDropdown.hide();
       return;
-  }
-  
-  // No suggestions to show, but check if we're handling a prefix selection
-  if (!this.optionsDropdown.isHandlingPrefixSelection && !this.suggestionDropdown.isHandlingPrefixSelection) {
+    }
+
+    // No suggestions to show, but check if we're handling a prefix selection
+    if (
+      !this.optionsDropdown.isHandlingPrefixSelection &&
+      !this.suggestionDropdown.isHandlingPrefixSelection
+    ) {
       this.optionsDropdown.hide();
       this.suggestionDropdown.hide();
+    }
   }
-}
 
   private handleSearchFocus(): void {
-    if (!this.searchInputEl || !this.optionsDropdown || !this.suggestionDropdown) return;
-    
+    if (
+      !this.searchInputEl ||
+      !this.optionsDropdown ||
+      !this.suggestionDropdown
+    )
+      return;
+
     const value = this.searchInputEl.value;
-    
+
     if (value.length === 0) {
-        // Show options dropdown when focusing empty input
-        this.optionsDropdown.showOptionsDropdown();
-        this.suggestionDropdown.hide();
+      // Show options dropdown when focusing empty input
+      this.optionsDropdown.showOptionsDropdown();
+      this.suggestionDropdown.hide();
     }
   }
 
@@ -521,7 +633,11 @@ export class TaskListView extends ItemView {
   }
 
   /** Return default keyword sets (non-completed and completed) and additional keywords using constants from task.ts */
-  private getKeywordSets(): { pendingActive: string[]; completed: string[]; additional: string[] } {
+  private getKeywordSets(): {
+    pendingActive: string[];
+    completed: string[];
+    additional: string[];
+  } {
     const pendingActiveDefaults = [
       ...Array.from(DEFAULT_PENDING_STATES),
       ...Array.from(DEFAULT_ACTIVE_STATES),
@@ -531,7 +647,9 @@ export class TaskListView extends ItemView {
     const settings = getPluginSettings(this.app);
     const configured = settings?.additionalTaskKeywords;
     const additional = Array.isArray(configured)
-      ? configured.filter((v): v is string => typeof v === 'string' && v.length > 0)
+      ? configured.filter(
+          (v): v is string => typeof v === 'string' && v.length > 0
+        )
       : [];
 
     return {
@@ -542,7 +660,9 @@ export class TaskListView extends ItemView {
   }
 
   /** Build the list of selectable states for the context menu, excluding the current state */
-  private getSelectableStatesForMenu(current: string): { group: string; states: string[] }[] {
+  private getSelectableStatesForMenu(
+    current: string
+  ): { group: string; states: string[] }[] {
     const { pendingActive, completed, additional } = this.getKeywordSets();
 
     const dedupe = (arr: string[]) => Array.from(new Set(arr));
@@ -551,10 +671,16 @@ export class TaskListView extends ItemView {
 
     // Present two groups: Non-completed and Completed
     const groups: { group: string; states: string[] }[] = [
-      { group: 'Not completed', states: nonCompleted.filter(s => s && s !== current) },
-      { group: 'Completed', states: completedOnly.filter(s => s && s !== current) },
+      {
+        group: 'Not completed',
+        states: nonCompleted.filter((s) => s && s !== current),
+      },
+      {
+        group: 'Completed',
+        states: completedOnly.filter((s) => s && s !== current),
+      },
     ];
-    return groups.filter(g => g.states.length > 0);
+    return groups.filter((g) => g.states.length > 0);
   }
 
   /** Open Obsidian Menu at mouse event location listing default and additional keywords (excluding current) */
@@ -584,7 +710,9 @@ export class TaskListView extends ItemView {
     }
 
     // Prefer API helper when available; fallback to explicit coordinates
-    const maybeShowAtMouseEvent = (menu as unknown as { showAtMouseEvent?: (e: MouseEvent) => void }).showAtMouseEvent;
+    const maybeShowAtMouseEvent = (
+      menu as unknown as { showAtMouseEvent?: (e: MouseEvent) => void }
+    ).showAtMouseEvent;
     if (typeof maybeShowAtMouseEvent === 'function') {
       maybeShowAtMouseEvent.call(menu, evt);
     } else {
@@ -593,7 +721,10 @@ export class TaskListView extends ItemView {
   }
 
   /** Open Obsidian Menu at a specific screen position */
-  private openStateMenuAtPosition(task: Task, pos: { x: number; y: number; }): void {
+  private openStateMenuAtPosition(
+    task: Task,
+    pos: { x: number; y: number }
+  ): void {
     const menu = new Menu();
     const groups = this.getSelectableStatesForMenu(task.state);
 
@@ -617,7 +748,7 @@ export class TaskListView extends ItemView {
   }
 
   getDisplayText() {
-    return "TODOseq";
+    return 'TODOseq';
   }
 
   getIcon(): string {
@@ -629,14 +760,14 @@ export class TaskListView extends ItemView {
   private buildCheckbox(task: Task, container: HTMLElement): HTMLInputElement {
     const checkbox = container.createEl('input', {
       type: 'checkbox',
-      cls: 'todo-checkbox'
+      cls: 'todo-checkbox',
     });
-    
+
     // Add state-specific class for styling
     if (DEFAULT_ACTIVE_STATES.has(task.state)) {
       checkbox.addClass('todo-checkbox-active');
     }
-        
+
     checkbox.checked = task.completed;
 
     checkbox.addEventListener('change', async () => {
@@ -730,19 +861,23 @@ export class TaskListView extends ItemView {
 
     // Long-press for mobile
     let touchTimer: number | null = null;
-    todoSpan.addEventListener('touchstart', (evt: TouchEvent) => {
-      if (evt.touches.length !== 1) return;
-      const touch = evt.touches[0];
-      // Many Android browsers will still emit a contextmenu after long press.
-      // We mark suppression immediately on touchstart so the later contextmenu is eaten.
-      suppressNextContextMenu = true;
-      touchTimer = window.setTimeout(() => {
-        // Re-read last known coordinates in case the user moved a bit during press
-        const x = touch.clientX;
-        const y = touch.clientY;
-        openMenuAtPositionOnce(x, y);
-      }, 450);
-    }, { passive: true });
+    todoSpan.addEventListener(
+      'touchstart',
+      (evt: TouchEvent) => {
+        if (evt.touches.length !== 1) return;
+        const touch = evt.touches[0];
+        // Many Android browsers will still emit a contextmenu after long press.
+        // We mark suppression immediately on touchstart so the later contextmenu is eaten.
+        suppressNextContextMenu = true;
+        touchTimer = window.setTimeout(() => {
+          // Re-read last known coordinates in case the user moved a bit during press
+          const x = touch.clientX;
+          const y = touch.clientY;
+          openMenuAtPositionOnce(x, y);
+        }, 450);
+      },
+      { passive: true }
+    );
 
     const clearTouch = () => {
       if (touchTimer) {
@@ -758,15 +893,19 @@ export class TaskListView extends ItemView {
     todoSpan.addEventListener('touchcancel', clearTouch, { passive: true });
 
     // Additionally, ignore a click that may be synthesized after contextmenu on mobile
-    todoSpan.addEventListener('click', (evt) => {
-      const now = Date.now();
-      if (now - lastMenuOpenTs < MENU_DEBOUNCE_MS) {
-        // a menu was just opened; prevent accidental state toggle
-        evt.preventDefault();
-        evt.stopPropagation();
-        return;
-      }
-    }, true); // capture to intercept before activate handler
+    todoSpan.addEventListener(
+      'click',
+      (evt) => {
+        const now = Date.now();
+        if (now - lastMenuOpenTs < MENU_DEBOUNCE_MS) {
+          // a menu was just opened; prevent accidental state toggle
+          evt.preventDefault();
+          evt.stopPropagation();
+          return;
+        }
+      },
+      true
+    ); // capture to intercept before activate handler
 
     return todoSpan;
   }
@@ -780,7 +919,9 @@ export class TaskListView extends ItemView {
     // Priority badge
     if (task.priority) {
       const pri = task.priority; // 'high' | 'med' | 'low'
-      const badge = taskText.createEl('span', { cls: ['priority-badge', `priority-${pri}`] });
+      const badge = taskText.createEl('span', {
+        cls: ['priority-badge', `priority-${pri}`],
+      });
       badge.setText(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C');
       badge.setAttribute('aria-label', `Priority ${pri}`);
       badge.setAttribute('title', `Priority ${pri}`);
@@ -854,7 +995,9 @@ export class TaskListView extends ItemView {
     const container = this.contentEl;
 
     // Sync dropdown with current sort method
-    const sortDropdown = container.querySelector('.sort-dropdown select') as HTMLSelectElement;
+    const sortDropdown = container.querySelector(
+      '.sort-dropdown select'
+    ) as HTMLSelectElement;
     if (sortDropdown) {
       const currentSortMethod = this.getSortMethod();
       sortDropdown.value = currentSortMethod;
@@ -878,16 +1021,18 @@ export class TaskListView extends ItemView {
     if (q.length > 0) {
       try {
         // Use new advanced search functionality
-        visible = visible.filter(t => {
+        visible = visible.filter((t) => {
           return Search.evaluate(q, t, this.isCaseSensitive, this.settings);
         });
         this.searchError = null;
       } catch (error) {
         // If there's an error in parsing, fall back to simple search
         const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
-        const searchText = this.isCaseSensitive ? (text: string) => text : (text: string) => text.toLowerCase();
-        
-        visible = visible.filter(t => {
+        const searchText = this.isCaseSensitive
+          ? (text: string) => text
+          : (text: string) => text.toLowerCase();
+
+        visible = visible.filter((t) => {
           const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
           return (
             (t.rawText && searchText(t.rawText).includes(searchQuery)) ||
@@ -896,7 +1041,7 @@ export class TaskListView extends ItemView {
             (baseName && searchText(baseName).includes(searchQuery))
           );
         });
-        
+
         // Store the error for display
         this.searchError = Search.getError(q) || 'Invalid search query';
       }
@@ -905,17 +1050,26 @@ export class TaskListView extends ItemView {
     }
 
     // Update search results info
-    const searchResultsCount = container.querySelector('.search-results-result-count');
+    const searchResultsCount = container.querySelector(
+      '.search-results-result-count'
+    );
     if (searchResultsCount) {
       const filteredAllTasks = this.filterTasksByViewMode(allTasks, mode);
-      searchResultsCount.setText(`${visible.length} of ${filteredAllTasks.length} task` + (filteredAllTasks.length === 1 ? '' : 's'));
+      searchResultsCount.setText(
+        `${visible.length} of ${filteredAllTasks.length} task` +
+          (filteredAllTasks.length === 1 ? '' : 's')
+      );
     }
 
     // Display search error if present
-    const searchErrorContainer = container.querySelector('.search-error-container');
+    const searchErrorContainer = container.querySelector(
+      '.search-error-container'
+    );
     if (this.searchError) {
       if (!searchErrorContainer) {
-        const errorContainer = container.createEl('div', { cls: 'search-error-container' });
+        const errorContainer = container.createEl('div', {
+          cls: 'search-error-container',
+        });
         const errorEl = errorContainer.createEl('div', { cls: 'search-error' });
         errorEl.setText(this.searchError);
       }
@@ -933,7 +1087,7 @@ export class TaskListView extends ItemView {
 
       // Determine scenario
       const hasAnyTasks = allTasks.length > 0;
-      const hasAnyIncomplete = allTasks.some(t => !t.completed);
+      const hasAnyIncomplete = allTasks.some((t) => !t.completed);
       const isHideCompleted = mode === 'hideCompleted';
 
       // Build empty message container (below toolbar, above list)
@@ -946,11 +1100,15 @@ export class TaskListView extends ItemView {
       if (!hasAnyTasks) {
         // a) No tasks found at all
         title.setText('No tasks found');
-        subtitle.setText('Create tasks in your notes using "TODO Your task". They will appear here automatically.');
+        subtitle.setText(
+          'Create tasks in your notes using "TODO Your task". They will appear here automatically.'
+        );
       } else if (isHideCompleted && !hasAnyIncomplete) {
         // b) Hide-completed enabled, but only completed tasks exist
         title.setText('All tasks are completed');
-        subtitle.setText('You are hiding completed tasks. Switch view mode or add new tasks to see more.');
+        subtitle.setText(
+          'You are hiding completed tasks. Switch view mode or add new tasks to see more.'
+        );
       } else {
         // General empty from search filter or other modes
         title.setText('No matching tasks');
@@ -984,7 +1142,9 @@ export class TaskListView extends ItemView {
     this.buildToolbar(container);
 
     // Create scrollable container for task list
-    this.taskListContainer = container.createEl('div', { cls: 'todo-task-list-container' });
+    this.taskListContainer = container.createEl('div', {
+      cls: 'todo-task-list-container',
+    });
 
     // Setup search suggestions dropdown
     this.setupSearchSuggestions();
@@ -1000,7 +1160,8 @@ export class TaskListView extends ItemView {
         !!active &&
         (active.tagName === 'INPUT' ||
           active.tagName === 'TEXTAREA' ||
-          (active as unknown as { isContentEditable?: boolean }).isContentEditable === true);
+          (active as unknown as { isContentEditable?: boolean })
+            .isContentEditable === true);
 
       if (evt.key === '/' && !evt.metaKey && !evt.ctrlKey && !evt.altKey) {
         if (!isTyping && input) {
@@ -1043,20 +1204,27 @@ export class TaskListView extends ItemView {
    * @param isDeadline Whether this is a deadline date
    * @returns Array of CSS classes
    */
-  private getDateStatusClasses(date: Date | null, isDeadline = false): string[] {
+  private getDateStatusClasses(
+    date: Date | null,
+    isDeadline = false
+  ): string[] {
     if (!date) return [];
-    
+
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const taskDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    
+    const taskDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+
     const diffTime = taskDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     const classes = ['todo-date'];
-    
+
     classes.push('todo-date');
-      
+
     if (diffDays < 0) {
       classes.push('todo-date-overdue');
     } else if (diffDays === 0) {
@@ -1064,7 +1232,7 @@ export class TaskListView extends ItemView {
     } else if (diffDays <= 3) {
       classes.push('todo-date-soon');
     }
-    
+
     return classes;
   }
 
@@ -1074,30 +1242,38 @@ export class TaskListView extends ItemView {
    * @param parent The parent element to append to
    */
   private buildDateDisplay(task: Task, parent: HTMLElement): void {
-    const dateContainer = parent.createEl('div', { cls: 'todo-date-container' });
-    
+    const dateContainer = parent.createEl('div', {
+      cls: 'todo-date-container',
+    });
+
     // Display scheduled date
     if (task.scheduledDate) {
       const scheduledDiv = dateContainer.createEl('div', {
-        cls: this.getDateStatusClasses(task.scheduledDate, false)
+        cls: this.getDateStatusClasses(task.scheduledDate, false),
       });
-      
-      const scheduledLabel = scheduledDiv.createEl('span', { cls: 'date-label' });
+
+      const scheduledLabel = scheduledDiv.createEl('span', {
+        cls: 'date-label',
+      });
       scheduledLabel.setText('Scheduled: ');
-      
-      const scheduledValue = scheduledDiv.createEl('span', { cls: 'date-value' });
-      scheduledValue.setText(this.formatDateForDisplay(task.scheduledDate, true));
+
+      const scheduledValue = scheduledDiv.createEl('span', {
+        cls: 'date-value',
+      });
+      scheduledValue.setText(
+        this.formatDateForDisplay(task.scheduledDate, true)
+      );
     }
-    
+
     // Display deadline date
     if (task.deadlineDate) {
       const deadlineDiv = dateContainer.createEl('div', {
-        cls: this.getDateStatusClasses(task.deadlineDate, true)
+        cls: this.getDateStatusClasses(task.deadlineDate, true),
       });
-      
+
       const deadlineLabel = deadlineDiv.createEl('span', { cls: 'date-label' });
       deadlineLabel.setText('Deadline: ');
-      
+
       const deadlineValue = deadlineDiv.createEl('span', { cls: 'date-value' });
       deadlineValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
     }
@@ -1148,7 +1324,7 @@ export class TaskListView extends ItemView {
   private renderTaskTextWithLinks(text: string, parent: HTMLElement) {
     // For display only, strip any markdown formatting first
     const textToProcess = this.stripMarkdown(text) || '';
-    const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp; }[] = [
+    const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp }[] = [
       // [[Page]] or [[Page|Alias]]
       { type: 'wiki', regex: /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g },
       // [Alias](target) - improved regex to handle brackets in link text
@@ -1161,7 +1337,10 @@ export class TaskListView extends ItemView {
 
     let i = 0;
     while (i < textToProcess.length) {
-      let nextMatch: { type: 'wiki' | 'md' | 'url' | 'tag'; match: RegExpExecArray; } | null = null;
+      let nextMatch: {
+        type: 'wiki' | 'md' | 'url' | 'tag';
+        match: RegExpExecArray;
+      } | null = null;
 
       for (const p of patterns) {
         p.regex.lastIndex = i;
@@ -1230,11 +1409,13 @@ export class TaskListView extends ItemView {
 
     const { workspace } = this.app;
     const isMac = Platform.isMacOS;
-    const isMiddle = (evt.button === 1);
+    const isMiddle = evt.button === 1;
     const metaOrCtrl = isMac ? evt.metaKey : evt.ctrlKey;
 
     // Helpers
-    const isMarkdownLeaf = (leaf: WorkspaceLeaf | null | undefined): boolean => {
+    const isMarkdownLeaf = (
+      leaf: WorkspaceLeaf | null | undefined
+    ): boolean => {
       if (!leaf) return false;
       if (leaf.view instanceof MarkdownView) return true;
       return leaf.view?.getViewType?.() === 'markdown';
@@ -1300,8 +1481,20 @@ export class TaskListView extends ItemView {
     await targetLeaf.openFile(file);
 
     if (evt.altKey) {
-      try { (targetLeaf as WorkspaceLeaf & { setPinned?: (pinned: boolean) => void }).setPinned?.(true); } catch (_) { /* ignore */ }
-      try { ((targetLeaf as WorkspaceLeaf) as { pinned?: boolean }).pinned = true; } catch (_) { /* ignore */ }
+      try {
+        (
+          targetLeaf as WorkspaceLeaf & {
+            setPinned?: (pinned: boolean) => void;
+          }
+        ).setPinned?.(true);
+      } catch (_) {
+        /* ignore */
+      }
+      try {
+        (targetLeaf as WorkspaceLeaf as { pinned?: boolean }).pinned = true;
+      } catch (_) {
+        /* ignore */
+      }
     }
 
     if (targetLeaf.view instanceof MarkdownView) {
@@ -1310,34 +1503,41 @@ export class TaskListView extends ItemView {
       const lineContent = editor.getLine(task.line);
       const pos = { line: task.line, ch: lineContent.length };
       editor.setCursor(pos);
-      try { (markdownView as unknown as { setEphemeralState?: (state: { line: number; col: number }) => void }).setEphemeralState?.({ line: task.line, col: lineContent.length }); } catch (_) {}
+      try {
+        (
+          markdownView as unknown as {
+            setEphemeralState?: (state: { line: number; col: number }) => void;
+          }
+        ).setEphemeralState?.({ line: task.line, col: lineContent.length });
+      } catch (_) {}
       editor.scrollIntoView({ from: pos, to: pos }, true);
     }
 
     await workspace.revealLeaf(targetLeaf);
   }
 
- // Cleanup listeners
- async onClose() {
-   const handler = this._searchKeyHandler as ((e: KeyboardEvent) => void) | undefined;
-   if (handler) {
-     window.removeEventListener('keydown', handler);
-     this._searchKeyHandler = undefined;
-   }
-    
-   // Cleanup suggestion dropdowns
-   if (this.optionsDropdown) {
-     this.optionsDropdown.cleanup();
-     this.optionsDropdown = null;
-   }
-   if (this.suggestionDropdown) {
-     this.suggestionDropdown.cleanup();
-     this.suggestionDropdown = null;
-   }
-    
-   this.searchInputEl = null;
-   this.taskListContainer = null;
-   await (super.onClose?.());
- }
-}
+  // Cleanup listeners
+  async onClose() {
+    const handler = this._searchKeyHandler as
+      | ((e: KeyboardEvent) => void)
+      | undefined;
+    if (handler) {
+      window.removeEventListener('keydown', handler);
+      this._searchKeyHandler = undefined;
+    }
 
+    // Cleanup suggestion dropdowns
+    if (this.optionsDropdown) {
+      this.optionsDropdown.cleanup();
+      this.optionsDropdown = null;
+    }
+    if (this.suggestionDropdown) {
+      this.suggestionDropdown.cleanup();
+      this.suggestionDropdown = null;
+    }
+
+    this.searchInputEl = null;
+    this.taskListContainer = null;
+    await super.onClose?.();
+  }
+}

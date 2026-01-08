@@ -1,5 +1,7 @@
 import { IncrementalTaskFormatter } from '../src/utils/performance-utils';
+import { createIncrementalTaskFormatter } from '../src/utils/performance-utils';
 import { SettingsChangeDetector } from '../src/utils/settings-utils';
+import { createSettingsChangeDetector } from '../src/utils/settings-utils';
 import { TodoTrackerSettings } from '../src/settings/settings';
 
 describe('Performance Utils Improvements', () => {
@@ -21,21 +23,27 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         const mockDecorations = { type: 'mock' } as any;
         const createDecorations = jest.fn().mockReturnValue(mockDecorations);
 
         // First call should create decorations
-        const result1 = formatter.getOptimizedDecorations(mockView, createDecorations);
+        const result1 = formatter.getOptimizedDecorations(
+          mockView,
+          createDecorations
+        );
         expect(result1).toBe(mockDecorations);
         expect(createDecorations).toHaveBeenCalledWith(1, 10);
 
         // Second call with same version should return cached result
-        const result2 = formatter.getOptimizedDecorations(mockView, createDecorations);
+        const result2 = formatter.getOptimizedDecorations(
+          mockView,
+          createDecorations
+        );
         expect(result2).toBe(mockDecorations);
         expect(createDecorations).toHaveBeenCalledTimes(1); // Should not be called again
       });
@@ -45,15 +53,18 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 200,
-              lines: 20
-            }
-          }
+              lines: 20,
+            },
+          },
         } as any;
 
         const mockDecorations = { type: 'mock' } as any;
         const createDecorations = jest.fn().mockReturnValue(mockDecorations);
 
-        const result = formatter.getOptimizedDecorations(mockView, createDecorations);
+        const result = formatter.getOptimizedDecorations(
+          mockView,
+          createDecorations
+        );
 
         expect(result).toBe(mockDecorations);
         expect(createDecorations).toHaveBeenCalledWith(1, 20);
@@ -64,23 +75,28 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 150,
-              lines: 15
-            }
-          }
+              lines: 15,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: false,
-          view: mockView
+          view: mockView,
         } as any;
 
         // Mock getLastUpdate to return the update
-        jest.spyOn(formatter as any, 'getLastUpdate').mockReturnValue(mockUpdate);
+        jest
+          .spyOn(formatter as any, 'getLastUpdate')
+          .mockReturnValue(mockUpdate);
 
         const mockDecorations = { type: 'mock' } as any;
         const createDecorations = jest.fn().mockReturnValue(mockDecorations);
 
-        const result = formatter.getOptimizedDecorations(mockView, createDecorations);
+        const result = formatter.getOptimizedDecorations(
+          mockView,
+          createDecorations
+        );
 
         expect(result).toBe(mockDecorations);
         expect(createDecorations).toHaveBeenCalledWith(1, 15);
@@ -91,29 +107,36 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 300,
-              lines: 30
-            }
-          }
+              lines: 30,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
         // Mock getLastUpdate to return the update
-        jest.spyOn(formatter as any, 'getLastUpdate').mockReturnValue(mockUpdate);
+        jest
+          .spyOn(formatter as any, 'getLastUpdate')
+          .mockReturnValue(mockUpdate);
 
         const mockDecorations = { type: 'mock' } as any;
         const createDecorations = jest.fn().mockReturnValue(mockDecorations);
 
-        const result = formatter.getOptimizedDecorations(mockView, createDecorations);
+        const result = formatter.getOptimizedDecorations(
+          mockView,
+          createDecorations
+        );
 
         expect(result).toBe(mockDecorations);
         expect(createDecorations).toHaveBeenCalledWith(1, 30);
       });
 
-      test.todo('should handle error in getLastUpdate gracefully - Error handling needs improvement');
+      test.todo(
+        'should handle error in getLastUpdate gracefully - Error handling needs improvement'
+      );
     });
 
     describe('shouldUseIncrementalUpdate', () => {
@@ -122,17 +145,19 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: false,
-          view: mockView
+          view: mockView,
         } as any;
 
-        const result = (formatter as any).shouldUseIncrementalUpdate(mockUpdate);
+        const result = (formatter as any).shouldUseIncrementalUpdate(
+          mockUpdate
+        );
         expect(result).toBe(false);
       });
 
@@ -141,17 +166,19 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 5000,
-              lines: 150
-            }
-          }
+              lines: 150,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
-        const result = (formatter as any).shouldUseIncrementalUpdate(mockUpdate);
+        const result = (formatter as any).shouldUseIncrementalUpdate(
+          mockUpdate
+        );
         expect(result).toBe(true);
       });
 
@@ -160,17 +187,19 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 1000,
-              lines: 50
-            }
-          }
+              lines: 50,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
-        const result = (formatter as any).shouldUseIncrementalUpdate(mockUpdate);
+        const result = (formatter as any).shouldUseIncrementalUpdate(
+          mockUpdate
+        );
         expect(result).toBe(false);
       });
 
@@ -179,17 +208,19 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 2000,
-              lines: 100
-            }
-          }
+              lines: 100,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
-        const result = (formatter as any).shouldUseIncrementalUpdate(mockUpdate);
+        const result = (formatter as any).shouldUseIncrementalUpdate(
+          mockUpdate
+        );
         expect(result).toBe(true);
       });
 
@@ -198,17 +229,19 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 0,
-              lines: 0
-            }
-          }
+              lines: 0,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
-        const result = (formatter as any).shouldUseIncrementalUpdate(mockUpdate);
+        const result = (formatter as any).shouldUseIncrementalUpdate(
+          mockUpdate
+        );
         expect(result).toBe(false);
       });
 
@@ -217,17 +250,19 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100000,
-              lines: 1000
-            }
-          }
+              lines: 1000,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
-        const result = (formatter as any).shouldUseIncrementalUpdate(mockUpdate);
+        const result = (formatter as any).shouldUseIncrementalUpdate(
+          mockUpdate
+        );
         expect(result).toBe(true);
       });
     });
@@ -235,7 +270,7 @@ describe('Performance Utils Improvements', () => {
     describe('getChangedLineRange', () => {
       test('should return null when docChanged is false', () => {
         const mockUpdate = {
-          docChanged: false
+          docChanged: false,
         } as any;
 
         const result = (formatter as any).getChangedLineRange(mockUpdate);
@@ -246,20 +281,20 @@ describe('Performance Utils Improvements', () => {
         const mockView = {
           state: {
             doc: {
-              lines: 50
-            }
-          }
+              lines: 50,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
         const result = (formatter as any).getChangedLineRange(mockUpdate);
         expect(result).toEqual({
           startLine: 1,
-          endLine: 50
+          endLine: 50,
         });
       });
 
@@ -267,20 +302,20 @@ describe('Performance Utils Improvements', () => {
         const mockView = {
           state: {
             doc: {
-              lines: 0
-            }
-          }
+              lines: 0,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
         const result = (formatter as any).getChangedLineRange(mockUpdate);
         expect(result).toEqual({
           startLine: 1,
-          endLine: 0
+          endLine: 0,
         });
       });
 
@@ -288,20 +323,20 @@ describe('Performance Utils Improvements', () => {
         const mockView = {
           state: {
             doc: {
-              lines: 1
-            }
-          }
+              lines: 1,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
         const result = (formatter as any).getChangedLineRange(mockUpdate);
         expect(result).toEqual({
           startLine: 1,
-          endLine: 1
+          endLine: 1,
         });
       });
 
@@ -309,50 +344,52 @@ describe('Performance Utils Improvements', () => {
         const mockView = {
           state: {
             doc: {
-              lines: 1000
-            }
-          }
+              lines: 1000,
+            },
+          },
         } as any;
 
         const mockUpdate = {
           docChanged: true,
-          view: mockView
+          view: mockView,
         } as any;
 
         const result = (formatter as any).getChangedLineRange(mockUpdate);
         expect(result).toEqual({
           startLine: 1,
-          endLine: 1000
+          endLine: 1000,
         });
       });
 
       test('should handle update without view property', () => {
         const mockUpdate = {
-          docChanged: true
+          docChanged: true,
         } as any;
 
         const result = (formatter as any).getChangedLineRange(mockUpdate);
         expect(result).toEqual({
           startLine: 1,
-          endLine: 0
+          endLine: 0,
         });
       });
 
       test('should handle update without view property', () => {
         const mockUpdate = {
-          docChanged: true
+          docChanged: true,
         } as any;
 
         const result = (formatter as any).getChangedLineRange(mockUpdate);
         expect(result).toEqual({
           startLine: 1,
-          endLine: 0
+          endLine: 0,
         });
       });
     });
 
     describe('mergeDecorations', () => {
-      test.todo('should handle empty decorations - RangeSetBuilder mocking is complex');
+      test.todo(
+        'should handle empty decorations - RangeSetBuilder mocking is complex'
+      );
     });
 
     describe('getLastUpdate', () => {
@@ -363,7 +400,7 @@ describe('Performance Utils Improvements', () => {
 
       test('should return null when view.state is null', () => {
         const mockView = {
-          state: null
+          state: null,
         } as any;
 
         const result = (formatter as any).getLastUpdate(mockView);
@@ -373,8 +410,8 @@ describe('Performance Utils Improvements', () => {
       test('should return null when view.state.doc is null', () => {
         const mockView = {
           state: {
-            doc: null
-          }
+            doc: null,
+          },
         } as any;
 
         const result = (formatter as any).getLastUpdate(mockView);
@@ -386,9 +423,9 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         const result = (formatter as any).getLastUpdate(mockView);
@@ -400,9 +437,9 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         // Mock console.warn to verify it's called
@@ -420,9 +457,9 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         // Mock console.warn to verify it's called
@@ -442,38 +479,48 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         const mockView2 = {
           state: {
             doc: {
               length: 200,
-              lines: 20
-            }
-          }
+              lines: 20,
+            },
+          },
         } as any;
 
         const mockDecorations1 = { type: 'mock1' } as any;
         const mockDecorations2 = { type: 'mock2' } as any;
-        const createDecorations = jest.fn()
+        const createDecorations = jest
+          .fn()
           .mockReturnValueOnce(mockDecorations1)
           .mockReturnValueOnce(mockDecorations2);
 
         // First call with view1
-        const result1 = formatter.getOptimizedDecorations(mockView1, createDecorations);
+        const result1 = formatter.getOptimizedDecorations(
+          mockView1,
+          createDecorations
+        );
         expect(result1).toBe(mockDecorations1);
         expect(createDecorations).toHaveBeenCalledWith(1, 10);
 
         // Second call with same view1 should use cache
-        const result2 = formatter.getOptimizedDecorations(mockView1, createDecorations);
+        const result2 = formatter.getOptimizedDecorations(
+          mockView1,
+          createDecorations
+        );
         expect(result2).toBe(mockDecorations1);
         expect(createDecorations).toHaveBeenCalledTimes(1);
 
         // Third call with different view2 should create new decorations
-        const result3 = formatter.getOptimizedDecorations(mockView2, createDecorations);
+        const result3 = formatter.getOptimizedDecorations(
+          mockView2,
+          createDecorations
+        );
         expect(result3).toBe(mockDecorations2);
         expect(createDecorations).toHaveBeenCalledWith(1, 20);
         expect(createDecorations).toHaveBeenCalledTimes(2);
@@ -484,9 +531,9 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         const mockDecorations = { type: 'mock' } as any;
@@ -494,7 +541,10 @@ describe('Performance Utils Improvements', () => {
 
         // Simulate rapid changes by calling multiple times
         for (let i = 0; i < 5; i++) {
-          const result = formatter.getOptimizedDecorations(mockView, createDecorations);
+          const result = formatter.getOptimizedDecorations(
+            mockView,
+            createDecorations
+          );
           expect(result).toBe(mockDecorations);
         }
 
@@ -507,9 +557,9 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         const mockDecorations = { type: 'mock' } as any;
@@ -534,9 +584,9 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         const createDecorations = jest.fn().mockImplementation(() => {
@@ -553,9 +603,9 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               length: 100,
-              lines: 10
-            }
-          }
+              lines: 10,
+            },
+          },
         } as any;
 
         expect(() => {
@@ -568,7 +618,10 @@ describe('Performance Utils Improvements', () => {
         const createDecorations = jest.fn().mockReturnValue(mockDecorations);
 
         expect(() => {
-          formatter.getOptimizedDecorations(undefined as any, createDecorations);
+          formatter.getOptimizedDecorations(
+            undefined as any,
+            createDecorations
+          );
         }).toThrow();
       });
 
@@ -589,7 +642,7 @@ describe('Performance Utils Improvements', () => {
         const mockView = {
           state: {
             // Missing doc property
-          }
+          },
         } as any;
 
         const mockDecorations = { type: 'mock' } as any;
@@ -605,15 +658,18 @@ describe('Performance Utils Improvements', () => {
           state: {
             doc: {
               // Missing length and lines properties
-            }
-          }
+            },
+          },
         } as any;
 
         const mockDecorations = { type: 'mock' } as any;
         const createDecorations = jest.fn().mockReturnValue(mockDecorations);
 
         // This should not throw, it should handle the missing properties gracefully
-        const result = formatter.getOptimizedDecorations(mockView, createDecorations);
+        const result = formatter.getOptimizedDecorations(
+          mockView,
+          createDecorations
+        );
         expect(result).toBe(mockDecorations);
       });
     });
@@ -621,7 +677,7 @@ describe('Performance Utils Improvements', () => {
     test('should clear cache when requested', () => {
       // Mock a cached decoration
       const mockDecorations = { type: 'mock' } as any;
-      
+
       // Access private method for testing
       (formatter as any).cachedDecorations = mockDecorations;
       (formatter as any).lastProcessedVersion = 123;
@@ -634,7 +690,7 @@ describe('Performance Utils Improvements', () => {
 
     test('should invalidate cache when settings change', () => {
       const mockDecorations = { type: 'mock' } as any;
-      
+
       // Access private method for testing
       (formatter as any).cachedDecorations = mockDecorations;
       (formatter as any).lastProcessedVersion = 123;
@@ -646,7 +702,7 @@ describe('Performance Utils Improvements', () => {
     });
 
     test('should create new formatter instance', () => {
-      const newFormatter = require('../src/utils/performance-utils').createIncrementalTaskFormatter();
+      const newFormatter = createIncrementalTaskFormatter();
       expect(newFormatter).toBeInstanceOf(IncrementalTaskFormatter);
     });
   });
@@ -666,54 +722,60 @@ describe('Performance Utils Improvements', () => {
         taskListViewMode: 'showAll',
         languageCommentSupport: { enabled: true },
         weekStartsOn: 'Monday',
-        formatTaskKeywords: true
+        formatTaskKeywords: true,
       };
     });
 
     test('should throw error when checking changes before initialization', () => {
       expect(() => {
         detector.hasFormattingSettingsChanged(mockSettings);
-      }).toThrow('SettingsChangeDetector must be initialized before use. Call initialize() first.');
+      }).toThrow(
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+      );
     });
 
     test('should throw error when updating state before initialization', () => {
       expect(() => {
         detector.updatePreviousState(mockSettings);
-      }).toThrow('SettingsChangeDetector must be initialized before use. Call initialize() first.');
+      }).toThrow(
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+      );
     });
 
     test('should throw error when initializing twice', () => {
       detector.initialize(mockSettings);
-      
+
       expect(() => {
         detector.initialize(mockSettings);
-      }).toThrow('SettingsChangeDetector is already initialized. Create a new instance instead.');
+      }).toThrow(
+        'SettingsChangeDetector is already initialized. Create a new instance instead.'
+      );
     });
 
     test('should detect settings changes correctly', () => {
       detector.initialize(mockSettings);
-      
+
       // Change a setting
       const changedSettings = { ...mockSettings, formatTaskKeywords: false };
-      
+
       expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(true);
     });
 
     test('should not detect changes when settings are the same', () => {
       detector.initialize(mockSettings);
-      
+
       // Same settings
       const sameSettings = { ...mockSettings };
-      
+
       expect(detector.hasFormattingSettingsChanged(sameSettings)).toBe(false);
     });
 
     test('should update previous state correctly', () => {
       detector.initialize(mockSettings);
-      
+
       const newSettings = { ...mockSettings, includeCodeBlocks: true };
       detector.updatePreviousState(newSettings);
-      
+
       // Should not detect changes when comparing to the updated state
       expect(detector.hasFormattingSettingsChanged(newSettings)).toBe(false);
     });
@@ -721,31 +783,35 @@ describe('Performance Utils Improvements', () => {
     test('should reset detector state', () => {
       detector.initialize(mockSettings);
       detector.reset();
-      
+
       expect(() => {
         detector.hasFormattingSettingsChanged(mockSettings);
-      }).toThrow('SettingsChangeDetector must be initialized before use. Call initialize() first.');
+      }).toThrow(
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+      );
     });
 
     test('should create new detector instance', () => {
-      const newDetector = require('../src/utils/settings-utils').createSettingsChangeDetector();
+      const newDetector = createSettingsChangeDetector();
       expect(newDetector).toBeInstanceOf(SettingsChangeDetector);
     });
 
     test('should handle JSON serialization errors gracefully', () => {
       detector.initialize(mockSettings);
-      
+
       // Create settings that might cause JSON serialization issues
       const problematicSettings = {
         ...mockSettings,
         // Add a circular reference that would cause JSON.stringify to fail
-        circular: {} as any
+        circular: {} as any,
       };
       problematicSettings.circular = problematicSettings;
 
       // Should not throw an error, but return false for change detection
       expect(() => {
-        detector.hasFormattingSettingsChanged(problematicSettings as TodoTrackerSettings);
+        detector.hasFormattingSettingsChanged(
+          problematicSettings as TodoTrackerSettings
+        );
       }).not.toThrow();
     });
   });

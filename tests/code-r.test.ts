@@ -17,7 +17,7 @@ describe('Task parsing within R file comments in code blocks', () => {
       additionalTaskKeywords: [],
       taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
-      formatTaskKeywords: true
+      formatTaskKeywords: true,
     };
     parser = TaskParser.create(settings);
   });
@@ -31,7 +31,7 @@ describe('Task parsing within R file comments in code blocks', () => {
 `;
       const tasks = parser.parseFile(lines, 'test.md');
       expect(tasks).toHaveLength(1);
-      expect(tasks[0].text).toBe("test task text");
+      expect(tasks[0].text).toBe('test task text');
     });
   });
 });

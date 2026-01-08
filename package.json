@@ -12,9 +12,12 @@
     "@typescript-eslint/parser": "5.29.0",
     "builtin-modules": "3.3.0",
     "esbuild": "^0.25.8",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
     "jest": "^30.2.0",
     "jest-environment-node": "^30.2.0",
     "obsidian": ">=0.12.12",
+    "prettier": "^3.7.4",
     "ts-jest": "^29.4.5",
     "tslib": "2.4.0",
     "typescript": "4.7.4"
@@ -23,6 +26,8 @@
     "dev": "node esbuild.config.mjs",
     "build": "tsc --noEmit src/main.ts --skipLibCheck && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
-    "test": "jest"
+    "test": "jest",
+    "format": "prettier --write .",
+    "lint": "eslint . --ext .ts"
   }
 }

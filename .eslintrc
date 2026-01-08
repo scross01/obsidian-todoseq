@@ -8,13 +8,26 @@
     "extends": [
       "eslint:recommended",
       "plugin:@typescript-eslint/eslint-recommended",
-      "plugin:@typescript-eslint/recommended"
+      "plugin:@typescript-eslint/recommended",
+      "plugin:prettier/recommended"
     ],
     "parserOptions": {
         "sourceType": "module",
         "project": ["./tsconfig.json"],
         "tsconfigRootDir": "."
     },
+    "overrides": [
+      {
+        "files": ["tests/**/*.ts"],
+        "parserOptions": {
+          "project": null
+        },
+        "rules": {
+          "@typescript-eslint/no-unsafe-assignment": "off",
+          "@typescript-eslint/no-explicit-any": "off"
+        }
+      }
+    ],
     "rules": {
       "no-unused-vars": "off",
       "no-empty": "off",

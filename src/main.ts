@@ -1,7 +1,7 @@
 import { Plugin, WorkspaceLeaf, MarkdownView } from 'obsidian';
 import { Task } from './task';
-import { TaskListView } from "./view/task-list-view";
-import { TodoTrackerSettings, DefaultSettings } from "./settings/settings";
+import { TaskListView } from './view/task-list-view';
+import { TodoTrackerSettings, DefaultSettings } from './settings/settings';
 import { TaskParser } from './parser/task-parser';
 import { TaskEditor } from './view/task-editor';
 import { EditorKeywordMenu } from './view/editor-keyword-menu';
@@ -11,24 +11,24 @@ import { TaskManager } from './task-manager';
 import { UIManager } from './ui-manager';
 import { PluginLifecycleManager } from './plugin-lifecycle';
 
-export const TASK_VIEW_ICON = "list-todo";
+export const TASK_VIEW_ICON = 'list-todo';
 
 export default class TodoTracker extends Plugin {
   settings: TodoTrackerSettings;
   tasks: Task[] = [];
-  
+
   // Managers for different functional areas
   public taskManager: TaskManager;
   public uiManager: UIManager;
   public lifecycleManager: PluginLifecycleManager;
-  
+
   // Services and components (made public for manager access)
   public vaultScanner: VaultScanner | null = null;
   public taskEditor: TaskEditor | null = null;
   public editorKeywordMenu: EditorKeywordMenu | null = null;
-  public taskFormatters: Map<string, any> = new Map();
+  public taskFormatters: Map<string, unknown> = new Map();
   public statusBarManager: StatusBarManager | null = null;
-  
+
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
     return this.vaultScanner;
@@ -38,16 +38,16 @@ export default class TodoTracker extends Plugin {
     return this.tasks;
   }
 
- // Obsidian lifecycle method called when the plugin is loaded.
- async onload() {
-   // Initialize managers
-   this.taskManager = new TaskManager(this);
-   this.uiManager = new UIManager(this);
-   this.lifecycleManager = new PluginLifecycleManager(this);
-   
-   // Delegate to lifecycle manager
-   await this.lifecycleManager.onload();
- }
+  // Obsidian lifecycle method called when the plugin is loaded.
+  async onload() {
+    // Initialize managers
+    this.taskManager = new TaskManager(this);
+    this.uiManager = new UIManager(this);
+    this.lifecycleManager = new PluginLifecycleManager(this);
+
+    // Delegate to lifecycle manager
+    await this.lifecycleManager.onload();
+  }
 
   // Helper: refresh all open Todo views to reflect this.tasks without stealing focus
   private async refreshOpenTaskListViews(): Promise<void> {
@@ -68,16 +68,16 @@ export default class TodoTracker extends Plugin {
   onunload() {
     // Clean up UI manager resources
     this.uiManager?.cleanup();
-    
+
     // Clean up VaultScanner resources
     this.vaultScanner?.destroy();
-   
+
     // Clean up status bar manager
     if (this.statusBarManager) {
       this.statusBarManager.cleanup();
       this.statusBarManager = null;
     }
-    
+
     // Clear any remaining references
     this.taskEditor = null;
     this.editorKeywordMenu = null;
@@ -86,8 +86,12 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called to settings are loaded
   async loadSettings() {
-    const loaded = await this.loadData();  // eslint-disable-line @typescript-eslint/no-unsafe-assignment
-    this.settings = Object.assign({}, DefaultSettings, loaded as Partial<TodoTrackerSettings>);
+    const loaded = await this.loadData(); // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+    this.settings = Object.assign(
+      {},
+      DefaultSettings,
+      loaded as Partial<TodoTrackerSettings>
+    );
     // Normalize settings shape after migration: ensure additionalTaskKeywords exists
     if (!this.settings.additionalTaskKeywords) {
       this.settings.additionalTaskKeywords = [];
@@ -104,14 +108,14 @@ export default class TodoTracker extends Plugin {
       this.vaultScanner.updateParser(TaskParser.create(this.settings));
     }
   }
-  
+
   // Public method to trigger a vault scan using VaultScanner
   public async scanVault(): Promise<void> {
     if (this.vaultScanner) {
       await this.vaultScanner.scanVault();
     }
   }
-  
+
   // Public method to update periodic refresh using VaultScanner
   public setupPeriodicRefresh(): void {
     if (this.vaultScanner) {
@@ -132,14 +136,16 @@ export default class TodoTracker extends Plugin {
 
   // Setup status bar manager for task count
   private setupStatusBarManager(): void {
-    import('./view/status-bar').then((module) => {
-      this.statusBarManager = new module.StatusBarManager(this);
-      this.statusBarManager.setupStatusBarItem();
-    }).catch(error => {
-      console.error('Failed to load status bar manager:', error);
-    });
+    import('./view/status-bar')
+      .then((module) => {
+        this.statusBarManager = new module.StatusBarManager(this);
+        this.statusBarManager.setupStatusBarItem();
+      })
+      .catch((error) => {
+        console.error('Failed to load status bar manager:', error);
+      });
   }
-  
+
   // Force refresh of editor decorations in all visible markdown editors
   public refreshVisibleEditorDecorations(): void {
     // Get all visible markdown editors
@@ -148,19 +154,19 @@ export default class TodoTracker extends Plugin {
       const view = leaf.view;
       if (view instanceof MarkdownView && view.editor) {
         // Force the editor to refresh its decorations by triggering a viewport change
-        const editorView = (view.editor as any).cm;
+        const editorView = (view.editor as { cm?: any }).cm;
         if (editorView && typeof editorView.requestMeasure === 'function') {
           // Request a measurement update which will trigger decoration refresh
           editorView.requestMeasure();
         }
-        
+
         // Additional force refresh: trigger a viewport change to ensure decorations are re-evaluated
         if (editorView && typeof editorView.dispatch === 'function') {
           // Dispatch a dummy transaction to force re-render and clear any stacked decorations
           editorView.dispatch({
-            selection: editorView.state.selection
+            selection: editorView.state.selection,
           });
-          
+
           // Force a second update to ensure decorations are properly applied/removed
           setTimeout(() => {
             if (editorView && typeof editorView.requestMeasure === 'function') {
@@ -171,16 +177,14 @@ export default class TodoTracker extends Plugin {
       }
     }
   }
-  
-
 
   // Serialize scans to avoid overlapping runs
   private _isScanning = false;
-  
+
   // Show tasks in the task view
   async showTasks() {
     const { workspace } = this.app;
-    
+
     // Create new leaf or use existing
     let leaf: WorkspaceLeaf | null = null;
     const leaves = workspace.getLeavesOfType(TaskListView.viewType);
@@ -214,12 +218,14 @@ export default class TodoTracker extends Plugin {
           await workspace.revealLeaf(leaf);
         }
       } catch (error) {
-        console.warn('Failed to open task view in right sidebar, falling back to main area:', error);
+        console.warn(
+          'Failed to open task view in right sidebar, falling back to main area:',
+          error
+        );
         // Fallback to main area if right sidebar access fails
         leaf = workspace.getLeaf(true);
         leaf.setViewState({ type: TaskListView.viewType, active: true });
       }
     }
   }
-
 }

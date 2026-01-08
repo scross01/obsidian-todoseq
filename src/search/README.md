@@ -8,7 +8,7 @@ This module implements advanced search functionality for TODOseq, providing powe
 
 Surround phrases with quotes to search for exact matches:
 
-```
+```txt
 "star wars"          // Matches tasks containing the exact phrase "star wars"
 "project meeting"    // Matches tasks with this exact sequence
 ```
@@ -17,7 +17,7 @@ Surround phrases with quotes to search for exact matches:
 
 Use `OR` to find tasks matching either term:
 
-```
+```txt
 meeting OR work       // Matches tasks containing "meeting" OR "work"
 personal OR urgent    // Matches either personal tasks or urgent ones
 ```
@@ -26,7 +26,7 @@ personal OR urgent    // Matches either personal tasks or urgent ones
 
 Control priority and grouping with parentheses:
 
-```
+```txt
 meeting (work OR personal)    // Matches "meeting" AND ("work" OR "personal")
 (project OR task) -urgent    // Matches non-urgent projects or tasks
 ```
@@ -35,7 +35,7 @@ meeting (work OR personal)    // Matches "meeting" AND ("work" OR "personal")
 
 Use `-` to exclude terms:
 
-```
+```txt
 meeting -work         // Matches "meeting" but NOT "work"
 project -urgent       // Matches "project" but excludes "urgent"
 ```
@@ -44,7 +44,7 @@ project -urgent       // Matches "project" but excludes "urgent"
 
 Exclude multiple terms:
 
-```
+```txt
 meeting -work -urgent    // Matches "meeting" but neither "work" nor "urgent"
 project -(urgent OR blocked)  // Excludes both urgent and blocked projects
 ```
@@ -53,7 +53,7 @@ project -(urgent OR blocked)  // Excludes both urgent and blocked projects
 
 Filter tasks by scheduled or deadline dates:
 
-```
+```txt
 // Exact dates
 scheduled:2024-01-31      // Tasks scheduled on January 31, 2024
 scheduled:2024-01         // Tasks scheduled in January 2024
@@ -86,7 +86,7 @@ deadline:none             // Tasks without deadlines
 
 ### 7. Combining Date Filters with Other Filters
 
-```
+```txt
 // Find urgent tasks due today
 priority:high deadline:today
 
@@ -104,7 +104,7 @@ priority:high deadline:none
 
 Multiple terms without operators are ANDed by default:
 
-```
+```txt
 meeting work          // Equivalent to: meeting AND work
 project urgent        // Matches tasks with both "project" AND "urgent"
 ```
@@ -113,7 +113,7 @@ project urgent        // Matches tasks with both "project" AND "urgent"
 
 Combine all features for powerful queries:
 
-```
+```txt
 (meeting OR call) project -urgent    // Non-urgent project meetings or calls
 work (home OR office) -weekend       // Work tasks at home/office, not weekends
 "star wars" (movie OR series) -spoiler  // Star Wars content without spoilers
@@ -123,7 +123,7 @@ work (home OR office) -weekend       // Work tasks at home/office, not weekends
 
 ### Architecture
 
-```
+```txt
 Search (main)
 ├── SearchTokenizer (lexical analysis)
 ├── SearchParser (syntax analysis, AST generation)
@@ -133,7 +133,7 @@ Search (main)
 ### Token Types
 
 - `word`: Regular search terms
-- `phrase`: Quoted exact phrases  
+- `phrase`: Quoted exact phrases
 - `or`: OR operator
 - `and`: AND operator (implicit)
 - `not`: NOT operator (`-`)
@@ -176,11 +176,12 @@ Simple word searches work exactly as before:
 ## Performance
 
 - **Tokenization**: O(n) - single pass through query
-- **Parsing**: O(n) - Pratt parser efficiency  
-- **Evaluation**: O(m*k) - m=AST nodes, k=fields searched
+- **Parsing**: O(n) - Pratt parser efficiency
+- **Evaluation**: O(m\*k) - m=AST nodes, k=fields searched
 - **Overall**: O(n + t*m*k) - t=tasks, n=query length
 
 Optimizations:
+
 - Short-circuit boolean evaluation
 - Word boundary regex for exact phrase matching
 - Memoization of parsed queries
@@ -196,7 +197,7 @@ Comprehensive test coverage includes:
 - Error conditions
 - Performance benchmarks
 
-## Prefix Filters (IMPLEMENTED)
+## Prefix Filters
 
 TODOseq now supports Obsidian-style prefix filters for targeted field-specific searching:
 
@@ -220,7 +221,7 @@ TODOseq now supports Obsidian-style prefix filters for targeted field-specific s
 
 ### Prefix Filter Examples
 
-```
+```txt
 path:Journal/                    // Tasks in Journal folder
 file:meeting                     // Tasks in files containing "meeting"
 tag:#urgent                      // Tasks with #urgent tag
@@ -232,7 +233,7 @@ content:"project action"         // Tasks containing exact phrase
 
 ### Combined Prefix Filters
 
-```
+```txt
 path:Journal/ tag:#urgent        // Implicit AND: urgent tasks in Journal
 state:TODO OR state:DOING       // OR logic with prefix filters
 priority:high -state:DOING      // High priority excluding DOING state

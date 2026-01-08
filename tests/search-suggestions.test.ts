@@ -4,7 +4,6 @@ import { Vault } from 'obsidian';
 import { TodoTrackerSettings } from '../src/settings/settings';
 
 describe('Search Suggestions', () => {
-
   const mockTasks: Task[] = [
     {
       path: 'notes/journal/meeting.md',
@@ -17,7 +16,7 @@ describe('Search Suggestions', () => {
       completed: false,
       priority: 'high',
       scheduledDate: null,
-      deadlineDate: null
+      deadlineDate: null,
     },
     {
       path: 'notes/personal/hobbies.md',
@@ -30,8 +29,8 @@ describe('Search Suggestions', () => {
       completed: false,
       priority: null,
       scheduledDate: null,
-      deadlineDate: null
-    }
+      deadlineDate: null,
+    },
   ];
 
   describe('SearchSuggestions utility methods', () => {
@@ -61,29 +60,30 @@ describe('Search Suggestions', () => {
         return [
           { path: 'notes/journal/meeting.md' },
           { path: 'notes/work/tasks.md' },
-          { path: 'notes/personal/hobbies.md' }
+          { path: 'notes/personal/hobbies.md' },
         ] as any;
       }
     }
 
     it('should filter path suggestions based on search term', async () => {
       const mockVault = new MockVault() as Vault;
-      
+
       // Test the filtering logic directly
       const allPaths = await SearchSuggestions.getAllPaths(mockVault);
-      const filteredPaths = SearchSuggestions.filterSuggestions('jour', allPaths);
-      
+      const filteredPaths = SearchSuggestions.filterSuggestions(
+        'jour',
+        allPaths
+      );
+
       expect(filteredPaths.length).toBeGreaterThan(0);
-      expect(filteredPaths.some(p => p.includes('journal'))).toBe(true);
+      expect(filteredPaths.some((p) => p.includes('journal'))).toBe(true);
     });
 
     it('should filter tag suggestions based on search term', () => {
-      const mockVault = new MockVault() as Vault;
-      
       // Test the filtering logic directly
       const allTags = SearchSuggestions.getAllTags(mockTasks);
       const filteredTags = SearchSuggestions.filterSuggestions('urg', allTags);
-      
+
       expect(filteredTags).toEqual(['urgent']);
     });
 
@@ -101,7 +101,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/tasks.md',
@@ -114,7 +114,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/tasks.md',
@@ -127,59 +127,60 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
-        }
+          deadlineDate: null,
+        },
       ];
-      
+
       const allTags = SearchSuggestions.getAllTags(mockTasksWithPriority);
-      
+
       // Should not include priority tags A, B, C
       expect(allTags).not.toContain('A');
       expect(allTags).not.toContain('B');
       expect(allTags).not.toContain('C');
-      
+
       // Should include regular tags
       expect(allTags).toContain('urgent');
       expect(allTags).toContain('work');
       expect(allTags).toContain('personal');
-      
+
       // Should have exactly 3 tags (urgent, work, personal)
       expect(allTags.length).toBe(3);
     });
 
     it('should handle empty search term by returning all suggestions', () => {
-      const mockVault = new MockVault() as Vault;
-      
       // Test with empty search term
       const allTags = SearchSuggestions.getAllTags(mockTasks);
       const filteredTags = SearchSuggestions.filterSuggestions('', allTags);
-      
+
       expect(filteredTags).toEqual(allTags);
     });
 
     it('should extract and filter paths correctly for examples folder', async () => {
       // Clear cache to ensure we get fresh data
       SearchSuggestions.clearCache();
-      
+
       // Mock Vault with examples folder
       class MockVaultWithExamples implements Partial<Vault> {
         getMarkdownFiles() {
           return [
             { path: 'examples/test1.md' },
             { path: 'examples/subfolder/test2.md' },
-            { path: 'notes/journal.md' }
+            { path: 'notes/journal.md' },
           ] as any;
         }
       }
-      
+
       const mockVault = new MockVaultWithExamples() as Vault;
       const allPaths = await SearchSuggestions.getAllPaths(mockVault);
-            
+
       // Should include 'examples' (without trailing slash)
       expect(allPaths).toContain('examples');
-      
+
       // Test filtering for 'exam'
-      const filteredPaths = SearchSuggestions.filterSuggestions('exam', allPaths);
+      const filteredPaths = SearchSuggestions.filterSuggestions(
+        'exam',
+        allPaths
+      );
 
       // Should find 'examples' when searching for 'exam'
       expect(filteredPaths).toContain('examples');
@@ -191,7 +192,7 @@ describe('Search Suggestions', () => {
     it('should detect complete prefix with colon', () => {
       const text = 'path:jour';
       const match = text.match(/(\w+)(:([^\s]*))?$/);
-      
+
       expect(match).not.toBeNull();
       if (match) {
         expect(match[1]).toBe('path');
@@ -203,7 +204,7 @@ describe('Search Suggestions', () => {
     it('should detect incomplete prefix without colon', () => {
       const text = 'path';
       const match = text.match(/(\w+)(:([^\s]*))?$/);
-      
+
       expect(match).not.toBeNull();
       if (match) {
         expect(match[1]).toBe('path');
@@ -215,7 +216,7 @@ describe('Search Suggestions', () => {
     it('should detect prefix with partial search term', () => {
       const text = 'tag:urg';
       const match = text.match(/(\w+)(:([^\s]*))?$/);
-      
+
       expect(match).not.toBeNull();
       if (match) {
         expect(match[1]).toBe('tag');
@@ -227,52 +228,52 @@ describe('Search Suggestions', () => {
     it('should handle cache clearing and reloading', async () => {
       // Clear cache to start fresh
       SearchSuggestions.clearCache();
-      
+
       // Mock Vault 1
       class MockVault1 implements Partial<Vault> {
         getMarkdownFiles() {
-          return [
-            { path: 'examples/test1.md' },
-          ] as any;
+          return [{ path: 'examples/test1.md' }] as any;
         }
       }
-      
+
       const mockVault1 = new MockVault1() as Vault;
       let allPaths = await SearchSuggestions.getAllPaths(mockVault1);
-      
+
       expect(allPaths).toContain('examples');
-      
+
       // Mock Vault 2 - different structure
       class MockVault2 implements Partial<Vault> {
         getMarkdownFiles() {
-          return [
-            { path: 'samples/test1.md' },
-          ] as any;
+          return [{ path: 'samples/test1.md' }] as any;
         }
       }
-      
+
       // Clear cache and get new paths
       SearchSuggestions.clearCache();
       const mockVault2 = new MockVault2() as Vault;
       allPaths = await SearchSuggestions.getAllPaths(mockVault2);
-      
+
       expect(allPaths).toContain('samples');
       expect(allPaths).not.toContain('examples');
     });
 
     it('should handle paths with spaces and require quotes', () => {
       // Test that paths with spaces are detected correctly
-      const pathsWithSpaces = ['examples/sub folder', 'my documents', 'project files'];
+      const pathsWithSpaces = [
+        'examples/sub folder',
+        'my documents',
+        'project files',
+      ];
       const pathsWithoutSpaces = ['examples', 'documents', 'projects'];
-      
-      pathsWithSpaces.forEach(path => {
+
+      pathsWithSpaces.forEach((path) => {
         expect(path.includes(' ')).toBe(true);
         // These should be quoted when used in search
         const shouldBeQuoted = path.includes(' ');
         expect(shouldBeQuoted).toBe(true);
       });
-      
-      pathsWithoutSpaces.forEach(path => {
+
+      pathsWithoutSpaces.forEach((path) => {
         expect(path.includes(' ')).toBe(false);
         // These should NOT be quoted
         const shouldBeQuoted = path.includes(' ');
@@ -283,31 +284,31 @@ describe('Search Suggestions', () => {
     it('should extract and handle paths with spaces correctly', async () => {
       // Clear cache to ensure we get fresh data
       SearchSuggestions.clearCache();
-      
+
       // Mock Vault with folders that have spaces in names
       class MockVaultWithSpaces implements Partial<Vault> {
         getMarkdownFiles() {
           return [
             { path: 'examples/sub folder/test.md' },
             { path: 'my documents/file.md' },
-            { path: 'notes/journal.md' }
+            { path: 'notes/journal.md' },
           ] as any;
         }
       }
-      
+
       const mockVault = new MockVaultWithSpaces() as Vault;
       const allPaths = await SearchSuggestions.getAllPaths(mockVault);
-             
+
       // Should include paths with spaces
       expect(allPaths).toContain('examples');
       expect(allPaths).toContain('examples/sub folder'); // This has a space
       expect(allPaths).toContain('my documents'); // This has a space
-      
+
       // Test that paths with spaces are correctly identified for quoting
-      const pathsWithSpaces = allPaths.filter(p => p.includes(' '));
-      
+      const pathsWithSpaces = allPaths.filter((p) => p.includes(' '));
+
       expect(pathsWithSpaces.length).toBeGreaterThan(0);
-      pathsWithSpaces.forEach(path => {
+      pathsWithSpaces.forEach((path) => {
         expect(path.includes(' ')).toBe(true);
       });
     });
@@ -327,7 +328,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/work/tasks.md',
@@ -340,17 +341,17 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
-        }
+          deadlineDate: null,
+        },
       ];
 
       const paths = SearchSuggestions.getAllPathsFromTasks(tasks);
-      
+
       // Should extract parent directories
       expect(paths).toContain('notes');
       expect(paths).toContain('notes/journal');
       expect(paths).toContain('notes/work');
-      
+
       // Should be sorted alphabetically
       expect(paths).toEqual(['notes', 'notes/journal', 'notes/work']);
     });
@@ -373,8 +374,8 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
-        }
+          deadlineDate: null,
+        },
       ];
 
       const paths = SearchSuggestions.getAllPathsFromTasks(tasks);
@@ -390,15 +391,15 @@ describe('Search Suggestions', () => {
           ] as any;
         }
       }
-      
+
       const mockVault = new MockVault() as Vault;
-      
+
       // Each call should generate fresh data
       const paths1 = await SearchSuggestions.getAllPaths(mockVault);
       expect(paths1).toContain('notes');
       expect(paths1).toContain('notes/journal');
       expect(paths1).toContain('notes/work');
-      
+
       // Second call should generate the same data (since vault hasn't changed)
       const paths2 = await SearchSuggestions.getAllPaths(mockVault);
       expect(paths2).toEqual(paths1);
@@ -407,18 +408,16 @@ describe('Search Suggestions', () => {
     it('should generate files from vault dynamically', async () => {
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
-          return [
-            { path: 'notes/test.md', name: 'test.md' },
-          ] as any;
+          return [{ path: 'notes/test.md', name: 'test.md' }] as any;
         }
       }
-      
+
       const mockVault = new MockVault() as Vault;
-      
+
       // Each call should generate fresh data
       const files1 = await SearchSuggestions.getAllFiles(mockVault);
       expect(files1).toContain('test.md');
-      
+
       // Second call should generate the same data (since vault hasn't changed)
       const files2 = await SearchSuggestions.getAllFiles(mockVault);
       expect(files2).toEqual(files1);
@@ -439,7 +438,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/work/tasks.md',
@@ -452,7 +451,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/journal/meeting.md', // Duplicate filename
@@ -465,16 +464,16 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
-        }
+          deadlineDate: null,
+        },
       ];
 
       const files = SearchSuggestions.getAllFilesFromTasks(tasks);
-      
+
       // Should extract unique filenames
       expect(files).toContain('meeting.md');
       expect(files).toContain('tasks.md');
-      
+
       // Should be sorted alphabetically
       expect(files).toEqual(['meeting.md', 'tasks.md']);
     });
@@ -494,16 +493,16 @@ describe('Search Suggestions', () => {
           ] as any;
         }
       }
-      
+
       const mockVault = new MockVault() as Vault;
-      
+
       const files = await SearchSuggestions.getAllFiles(mockVault);
-      
+
       // Should extract unique filenames
       expect(files).toContain('meeting.md');
       expect(files).toContain('tasks.md');
       expect(files).toContain('notes.md');
-      
+
       // Should be sorted alphabetically
       expect(files).toEqual(['meeting.md', 'notes.md', 'tasks.md']);
     });
@@ -511,18 +510,16 @@ describe('Search Suggestions', () => {
     it('should generate files from vault dynamically', async () => {
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
-          return [
-            { path: 'notes/test.md', name: 'test.md' },
-          ] as any;
+          return [{ path: 'notes/test.md', name: 'test.md' }] as any;
         }
       }
-      
+
       const mockVault = new MockVault() as Vault;
-      
+
       // Each call should generate fresh data
       const files1 = await SearchSuggestions.getAllFiles(mockVault);
       expect(files1).toContain('test.md');
-      
+
       // Second call should generate the same data (since vault hasn't changed)
       const files2 = await SearchSuggestions.getAllFiles(mockVault);
       expect(files2).toEqual(files1);
@@ -532,7 +529,7 @@ describe('Search Suggestions', () => {
   describe('State and priority methods', () => {
     it('should return default task states', () => {
       const states = SearchSuggestions.getAllStates();
-      
+
       // Should contain default states
       expect(states).toContain('TODO');
       expect(states).toContain('DOING');
@@ -544,21 +541,51 @@ describe('Search Suggestions', () => {
       expect(states).toContain('IN-PROGRESS');
       expect(states).toContain('CANCELED');
       expect(states).toContain('CANCELLED');
-      
+
       // Should be sorted alphabetically
-      expect(states).toEqual(['CANCELED', 'CANCELLED', 'DOING', 'DONE', 'IN-PROGRESS', 'LATER', 'NOW', 'TODO', 'WAIT', 'WAITING']);
+      expect(states).toEqual([
+        'CANCELED',
+        'CANCELLED',
+        'DOING',
+        'DONE',
+        'IN-PROGRESS',
+        'LATER',
+        'NOW',
+        'TODO',
+        'WAIT',
+        'WAITING',
+      ]);
     });
 
     it('should return priority options', () => {
       const priorities = SearchSuggestions.getPriorityOptions();
-      
-      expect(priorities).toEqual(['A', 'B', 'C', 'high', 'medium', 'low', 'none']);
+
+      expect(priorities).toEqual([
+        'A',
+        'B',
+        'C',
+        'high',
+        'medium',
+        'low',
+        'none',
+      ]);
     });
 
     it('should return date suggestions', () => {
       const dateSuggestions = SearchSuggestions.getDateSuggestions();
-      
-      expect(dateSuggestions).toEqual(['overdue', 'due', 'today', 'tomorrow', 'this week', 'next week', 'this month', 'next month', 'next 7 days', 'none']);
+
+      expect(dateSuggestions).toEqual([
+        'overdue',
+        'due',
+        'today',
+        'tomorrow',
+        'this week',
+        'next week',
+        'this month',
+        'next month',
+        'next 7 days',
+        'none',
+      ]);
     });
   });
 
@@ -576,7 +603,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: new Date('2023-01-15T00:00:00Z'),
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/tasks.md',
@@ -589,7 +616,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: new Date('2023-02-20T00:00:00Z'),
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/tasks.md',
@@ -602,16 +629,16 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
-        }
+          deadlineDate: null,
+        },
       ];
 
       const dates = SearchSuggestions.getScheduledDateSuggestions(tasks);
-      
+
       // Should extract unique dates in YYYY-MM-DD format
       expect(dates).toContain('2023-01-15');
       expect(dates).toContain('2023-02-20');
-      
+
       // Should be sorted chronologically
       expect(dates).toEqual(['2023-01-15', '2023-02-20']);
     });
@@ -634,7 +661,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: new Date('2023-03-10T00:00:00Z')
+          deadlineDate: new Date('2023-03-10T00:00:00Z'),
         },
         {
           path: 'notes/tasks.md',
@@ -647,16 +674,16 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: new Date('2023-04-05T00:00:00Z')
-        }
+          deadlineDate: new Date('2023-04-05T00:00:00Z'),
+        },
       ];
 
       const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
-      
+
       // Should extract unique dates in YYYY-MM-DD format
       expect(dates).toContain('2023-03-10');
       expect(dates).toContain('2023-04-05');
-      
+
       // Should be sorted chronologically
       expect(dates).toEqual(['2023-03-10', '2023-04-05']);
     });
@@ -680,7 +707,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: date,
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/tasks.md',
@@ -693,12 +720,12 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: date, // Same date
-          deadlineDate: null
-        }
+          deadlineDate: null,
+        },
       ];
 
       const dates = SearchSuggestions.getScheduledDateSuggestions(tasks);
-      
+
       // Should deduplicate same dates
       expect(dates).toEqual(['2023-01-15']);
     });
@@ -716,8 +743,8 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
-        }
+          deadlineDate: null,
+        },
       ];
 
       const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
@@ -729,18 +756,18 @@ describe('Search Suggestions', () => {
     it('should handle files with single-level paths in vault', async () => {
       // Clear cache first
       SearchSuggestions.clearCache();
-      
+
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
           return [
             { path: 'file1.md', name: 'file1.md' },
-            { path: 'file2.md', name: 'file2.md' }
+            { path: 'file2.md', name: 'file2.md' },
           ] as any;
         }
       }
-      
+
       const mockVault = new MockVault() as Vault;
-      
+
       const paths = await SearchSuggestions.getAllPaths(mockVault);
       // Should return empty array for single-level paths (no parent directories)
       expect(paths).toEqual([]);
@@ -749,18 +776,18 @@ describe('Search Suggestions', () => {
     it('should handle duplicate filenames in vault', async () => {
       // Clear cache first
       SearchSuggestions.clearCache();
-      
+
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
           return [
             { path: 'notes/file.md', name: 'file.md' },
-            { path: 'work/file.md', name: 'file.md' } // Same filename, different path
+            { path: 'work/file.md', name: 'file.md' }, // Same filename, different path
           ] as any;
         }
       }
-      
+
       const mockVault = new MockVault() as Vault;
-      
+
       const files = await SearchSuggestions.getAllFiles(mockVault);
       // Should deduplicate filenames
       expect(files).toEqual(['file.md']);
@@ -779,7 +806,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: new Date('2023-03-10T00:00:00Z')
+          deadlineDate: new Date('2023-03-10T00:00:00Z'),
         },
         {
           path: 'notes/tasks.md',
@@ -792,7 +819,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/tasks.md',
@@ -805,12 +832,12 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: new Date('2023-04-05T00:00:00Z')
-        }
+          deadlineDate: new Date('2023-04-05T00:00:00Z'),
+        },
       ];
 
       const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
-      
+
       // Should only include dates from tasks that have deadlines
       expect(dates).toContain('2023-03-10');
       expect(dates).toContain('2023-04-05');
@@ -830,7 +857,7 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
+          deadlineDate: null,
         },
         {
           path: 'notes/tasks.md',
@@ -843,12 +870,12 @@ describe('Search Suggestions', () => {
           completed: false,
           priority: null,
           scheduledDate: null,
-          deadlineDate: null
-        }
+          deadlineDate: null,
+        },
       ];
 
       const tags = SearchSuggestions.getAllTags(tasks);
-      
+
       // Should only extract tags from tasks that have rawText
       expect(tags).toContain('urgent');
       expect(tags).toContain('work');
@@ -869,7 +896,7 @@ describe('Search Suggestions', () => {
           enabled: true,
         },
         weekStartsOn: 'Monday',
-        formatTaskKeywords: true
+        formatTaskKeywords: true,
       };
 
       const states = SearchSuggestions.getAllStates(mockSettings);
@@ -913,7 +940,7 @@ describe('Search Suggestions', () => {
           enabled: true,
         },
         weekStartsOn: 'Monday',
-        formatTaskKeywords: true
+        formatTaskKeywords: true,
       };
 
       const states = SearchSuggestions.getAllStates(mockSettings);
@@ -924,8 +951,8 @@ describe('Search Suggestions', () => {
       expect(states).toContain('CUSTOM');
 
       // Should not have duplicates
-      const todoCount = states.filter(s => s === 'TODO').length;
-      const doingCount = states.filter(s => s === 'DOING').length;
+      const todoCount = states.filter((s) => s === 'TODO').length;
+      const doingCount = states.filter((s) => s === 'DOING').length;
       expect(todoCount).toBe(1);
       expect(doingCount).toBe(1);
     });

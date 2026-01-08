@@ -21,16 +21,17 @@ DONE Triage customer feedback
 ### Task with Indentation
 
 ```markdown
-  TODO Indented task
-    DOING Double indented task
+TODO Indented task
+DOING Double indented task
 ```
 
 ### Task with List Markers
 
 ```markdown
 - TODO Task in bullet list
+
 1. DOING Task in numbered list
-(a) DONE Task with parenthesized marker
+   (a) DONE Task with parenthesized marker
 ```
 
 ## Supported Task Formats
@@ -71,14 +72,14 @@ Combines checkboxes with state keywords:
 
 **Checkbox State Synchronization:**
 
-TODOseq automatically syncs checkbox state with task keywords when updated from the Task List*:
+TODOseq automatically syncs checkbox state with task keywords when updated from the Task List\*:
 
 - Empty checkbox `[ ]` = Incomplete task (TODO, DOING, etc.)
 - Checked checkbox `[x]` = Completed task (DONE, CANCELED, etc.)
 - When you toggle state, both keyword and checkbox are updated
 - Proper spacing is maintained (e.g., `- [x] DONE`)
 
-*Note: If you modify the checkbox directly on the page, the task state keyword will not be automatically updated accordingly.
+\*Note: If you modify the checkbox directly on the page, the task state keyword will not be automatically updated accordingly.
 
 ## Task Keywords
 
@@ -157,7 +158,7 @@ TODOseq supports Logseq-style priority tokens to indicate task importance.
 Add priority tokens immediately after the state keyword:
 
 - `[#A]` - High priority
-- `[#B]` - Medium priority  
+- `[#B]` - Medium priority
 - `[#C]` - Low priority
 
 **Examples:**
@@ -220,12 +221,12 @@ SCHEDULED: <2025-01-15>
 ```markdown
 TODO Write documentation
 Some text between
-SCHEDULED: <2025-01-15>  # Not immediately after task
+SCHEDULED: <2025-01-15> # Not immediately after task
 
 TODO Another task
-  SCHEDULED: <2025-01-15>
-  DEADLINE: <2025-01-20>
-  SCHEDULED: <2025-01-16>  # Only first SCHEDULED is used
+SCHEDULED: <2025-01-15>
+DEADLINE: <2025-01-20>
+SCHEDULED: <2025-01-16> # Only first SCHEDULED is used
 ```
 
 ### Date Parsing Details
@@ -265,6 +266,7 @@ When "Include tasks inside quote and callout blocks" is enabled:
 > TODO Task in an info callout
 
 > [!todo]-
+>
 > - [ ] TODO Checkbox task in collapsible todo block
 ```
 
@@ -352,11 +354,11 @@ When a task state is updated, TODOseq preserves:
 **Before Update:**
 
 ```markdown
-  - TODO Write documentation for new feature [#A]
+- TODO Write documentation for new feature [#A]
 ```
 
 **After Clicking TODO:**
 
 ```markdown
-  - DOING [#A] Write documentation for new feature
+- DOING [#A] Write documentation for new feature
 ```

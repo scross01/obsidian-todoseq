@@ -22,7 +22,7 @@ describe('Due Filter Behavior', () => {
       completed: false,
       priority: null,
       scheduledDate: today,
-      deadlineDate: null
+      deadlineDate: null,
     },
     {
       path: 'test2.md',
@@ -35,7 +35,7 @@ describe('Due Filter Behavior', () => {
       completed: false,
       priority: null,
       scheduledDate: null,
-      deadlineDate: today
+      deadlineDate: today,
     },
     {
       path: 'test3.md',
@@ -48,7 +48,7 @@ describe('Due Filter Behavior', () => {
       completed: false,
       priority: null,
       scheduledDate: yesterday,
-      deadlineDate: null
+      deadlineDate: null,
     },
     {
       path: 'test4.md',
@@ -61,7 +61,7 @@ describe('Due Filter Behavior', () => {
       completed: false,
       priority: null,
       scheduledDate: null,
-      deadlineDate: yesterday
+      deadlineDate: yesterday,
     },
     {
       path: 'test5.md',
@@ -74,7 +74,7 @@ describe('Due Filter Behavior', () => {
       completed: false,
       priority: null,
       scheduledDate: tomorrow,
-      deadlineDate: null
+      deadlineDate: null,
     },
     {
       path: 'test6.md',
@@ -87,79 +87,123 @@ describe('Due Filter Behavior', () => {
       completed: false,
       priority: null,
       scheduledDate: null,
-      deadlineDate: tomorrow
-    }
+      deadlineDate: tomorrow,
+    },
   ];
 
   test('scheduled:due should include both today and overdue scheduled tasks', () => {
     const query = 'scheduled:due';
     const node = SearchParser.parse(query);
-    
-    const results = testTasks.filter(task => SearchEvaluator.evaluate(node, task, false));
-    
+
+    const results = testTasks.filter((task) =>
+      SearchEvaluator.evaluate(node, task, false)
+    );
+
     expect(results.length).toBe(2);
-    expect(results.map(r => r.text)).toContain('Task with scheduled date today');
-    expect(results.map(r => r.text)).toContain('Task with overdue scheduled date');
-    expect(results.map(r => r.text)).not.toContain('Task with future scheduled date');
+    expect(results.map((r) => r.text)).toContain(
+      'Task with scheduled date today'
+    );
+    expect(results.map((r) => r.text)).toContain(
+      'Task with overdue scheduled date'
+    );
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with future scheduled date'
+    );
   });
 
   test('deadline:due should include both today and overdue deadline tasks', () => {
     const query = 'deadline:due';
     const node = SearchParser.parse(query);
-    
-    const results = testTasks.filter(task => SearchEvaluator.evaluate(node, task, false));
-    
+
+    const results = testTasks.filter((task) =>
+      SearchEvaluator.evaluate(node, task, false)
+    );
+
     expect(results.length).toBe(2);
-    expect(results.map(r => r.text)).toContain('Task with deadline date today');
-    expect(results.map(r => r.text)).toContain('Task with overdue deadline');
-    expect(results.map(r => r.text)).not.toContain('Task with future deadline');
+    expect(results.map((r) => r.text)).toContain(
+      'Task with deadline date today'
+    );
+    expect(results.map((r) => r.text)).toContain('Task with overdue deadline');
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with future deadline'
+    );
   });
 
   test('scheduled:today should only include scheduled tasks for today', () => {
     const query = 'scheduled:today';
     const node = SearchParser.parse(query);
-    
-    const results = testTasks.filter(task => SearchEvaluator.evaluate(node, task, false));
-    
+
+    const results = testTasks.filter((task) =>
+      SearchEvaluator.evaluate(node, task, false)
+    );
+
     expect(results.length).toBe(1);
-    expect(results.map(r => r.text)).toContain('Task with scheduled date today');
-    expect(results.map(r => r.text)).not.toContain('Task with overdue scheduled date');
-    expect(results.map(r => r.text)).not.toContain('Task with future scheduled date');
+    expect(results.map((r) => r.text)).toContain(
+      'Task with scheduled date today'
+    );
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with overdue scheduled date'
+    );
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with future scheduled date'
+    );
   });
 
   test('deadline:today should only include deadline tasks for today', () => {
     const query = 'deadline:today';
     const node = SearchParser.parse(query);
-    
-    const results = testTasks.filter(task => SearchEvaluator.evaluate(node, task, false));
-    
+
+    const results = testTasks.filter((task) =>
+      SearchEvaluator.evaluate(node, task, false)
+    );
+
     expect(results.length).toBe(1);
-    expect(results.map(r => r.text)).toContain('Task with deadline date today');
-    expect(results.map(r => r.text)).not.toContain('Task with overdue deadline');
-    expect(results.map(r => r.text)).not.toContain('Task with future deadline');
+    expect(results.map((r) => r.text)).toContain(
+      'Task with deadline date today'
+    );
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with overdue deadline'
+    );
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with future deadline'
+    );
   });
 
   test('scheduled:overdue should only include overdue scheduled tasks', () => {
     const query = 'scheduled:overdue';
     const node = SearchParser.parse(query);
-    
-    const results = testTasks.filter(task => SearchEvaluator.evaluate(node, task, false));
-    
+
+    const results = testTasks.filter((task) =>
+      SearchEvaluator.evaluate(node, task, false)
+    );
+
     expect(results.length).toBe(1);
-    expect(results.map(r => r.text)).toContain('Task with overdue scheduled date');
-    expect(results.map(r => r.text)).not.toContain('Task with scheduled date today');
-    expect(results.map(r => r.text)).not.toContain('Task with future scheduled date');
+    expect(results.map((r) => r.text)).toContain(
+      'Task with overdue scheduled date'
+    );
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with scheduled date today'
+    );
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with future scheduled date'
+    );
   });
 
   test('deadline:overdue should only include overdue deadline tasks', () => {
     const query = 'deadline:overdue';
     const node = SearchParser.parse(query);
-    
-    const results = testTasks.filter(task => SearchEvaluator.evaluate(node, task, false));
-    
+
+    const results = testTasks.filter((task) =>
+      SearchEvaluator.evaluate(node, task, false)
+    );
+
     expect(results.length).toBe(1);
-    expect(results.map(r => r.text)).toContain('Task with overdue deadline');
-    expect(results.map(r => r.text)).not.toContain('Task with deadline date today');
-    expect(results.map(r => r.text)).not.toContain('Task with future deadline');
+    expect(results.map((r) => r.text)).toContain('Task with overdue deadline');
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with deadline date today'
+    );
+    expect(results.map((r) => r.text)).not.toContain(
+      'Task with future deadline'
+    );
   });
 });

@@ -5,12 +5,16 @@ import { Task } from '../task';
 import { TodoTrackerSettings } from '../settings/settings';
 
 export class Search {
-  
   static parse(query: string): SearchNode {
     return SearchParser.parse(query);
   }
 
-  static evaluate(query: string, task: Task, caseSensitive = false, settings?: TodoTrackerSettings): boolean {
+  static evaluate(
+    query: string,
+    task: Task,
+    caseSensitive = false,
+    settings?: TodoTrackerSettings
+  ): boolean {
     try {
       const ast = this.parse(query);
       return SearchEvaluator.evaluate(ast, task, caseSensitive, settings);

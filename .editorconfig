@@ -1,0 +1,30 @@
+# EditorConfig is awesome: https://EditorConfig.org
+# top-most EditorConfig file
+root = true
+
+# Matches multiple files with brace expansion notation
+[*.{js,ts,json,md,css,html}]
+# Indentation style
+indent_style = space
+# Indentation size
+indent_size = 2
+# End of line character
+end_of_line = lf
+# Character set
+charset = utf-8
+# Trim trailing whitespace
+trim_trailing_whitespace = true
+# Insert final newline
+insert_final_newline = true
+
+# TypeScript-specific settings
+[*.ts]
+quote_type = single
+
+# JSON-specific settings
+[*.json]
+indent_size = 2
+
+# Markdown-specific settings
+[*.md]
+trim_trailing_whitespace = false

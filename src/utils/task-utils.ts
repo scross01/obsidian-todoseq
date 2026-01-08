@@ -10,7 +10,8 @@ export const PRIORITY_TOKEN_REGEX = /(\s*)\[#([ABC])\](\s*)/;
  * Checkbox regex pattern for detecting markdown checkbox tasks
  * Matches: - [ ], - [x], * [ ], * [x], + [ ], + [x]
  */
-export const CHECKBOX_REGEX = /^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/;
+export const CHECKBOX_REGEX =
+  /^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/;
 
 /**
  * Extract priority from task text and return cleaned text
