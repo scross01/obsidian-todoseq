@@ -24,6 +24,10 @@ export class TaskKeywordDecorator {
   private inCommentBlock = false;
   private disposables: Array<() => void> = [];
   
+  // Track task lines to detect SCHEDULED/DEADLINE lines that follow them
+  private previousTaskLine: number | null = null;
+  private previousTaskIndent = '';
+  
   constructor(private view: EditorView, settings: TodoTrackerSettings) {
     this.settings = settings;
     this.parser = TaskParser.create(settings);
@@ -53,6 +57,8 @@ export class TaskKeywordDecorator {
       this.inQuoteBlock = false;
       this.inCalloutBlock = false;
       this.inCommentBlock = false;
+      this.previousTaskLine = null;
+      this.previousTaskIndent = '';
 
       // Iterate through all lines in the document
       for (let lineNumber = 1; lineNumber <= doc.lines; lineNumber++) {
@@ -130,6 +136,10 @@ export class TaskKeywordDecorator {
           const keyword = match[4];
           let keywordStart = contentForTaskDetection.indexOf(keyword);
           let keywordEnd = keywordStart + keyword.length;
+           
+          // Track this as a task line for potential SCHEDULED/DEADLINE detection
+          this.previousTaskLine = lineNumber;
+          this.previousTaskIndent = lineText.substring(0, lineText.length - lineText.trimStart().length);
           
           // Adjust positions for single-line comment blocks
           if (singleLineCommentMatch) {
@@ -178,18 +188,21 @@ export class TaskKeywordDecorator {
            cssClasses += ' callout-block-task-keyword';
          }
           
-          builder.add(startPos, endPos,
-            Decoration.mark({
-              class: cssClasses,
-              attributes: {
-                'data-task-keyword': keyword,
-                'aria-label': `Task keyword: ${keyword}`,
-                'role': 'mark',
-                'tabindex': '0' // Make keyboard accessible
-              }
-            })
-          );
+         builder.add(startPos, endPos,
+           Decoration.mark({
+             class: cssClasses,
+             attributes: {
+               'data-task-keyword': keyword,
+               'aria-label': `Task keyword: ${keyword}`,
+               'role': 'mark',
+               'tabindex': '0' // Make keyboard accessible
+             }
+           })
+         );
         }
+        
+        // Check if this line contains SCHEDULED: or DEADLINE: and follows a task line
+        this.checkAndDecorateDateLine(lineNumber, lineText, line, builder);
       }
       
       return builder.finish();
@@ -249,6 +262,108 @@ export class TaskKeywordDecorator {
     }
     // Note: We don't reset inCommentBlock here because we want to maintain
     // the state between opening and closing %% markers for multi-line blocks
+  }
+  
+  /**
+   * Check if a line contains SCHEDULED: or DEADLINE: and apply appropriate decorations
+   * if it follows a task line at the same indent level
+   */
+  private checkAndDecorateDateLine(lineNumber: number, lineText: string, line: any, builder: RangeSetBuilder<Decoration>): void {
+    // Only check for date lines if we have a previous task line
+    if (this.previousTaskLine === null) {
+      return;
+    }
+    
+    // Check if this line is immediately after the task line (with possible empty lines in between)
+    const linesSinceTask = lineNumber - this.previousTaskLine;
+    
+    // Only consider lines that are close to the task line (within 5 lines)
+    if (linesSinceTask > 5) {
+      // Too far from task line, reset tracking
+      this.previousTaskLine = null;
+      this.previousTaskIndent = '';
+      return;
+    }
+    
+    // Check if this line contains SCHEDULED: or DEADLINE:
+    const trimmedLine = lineText.trim();
+    let dateLineType: 'scheduled' | 'deadline' | null = null;
+    
+    // Handle callout blocks (lines starting with >)
+    if (lineText.startsWith('>')) {
+      const contentAfterArrow = trimmedLine.substring(1).trim();
+      if (contentAfterArrow.startsWith('SCHEDULED:')) {
+        dateLineType = 'scheduled';
+      } else if (contentAfterArrow.startsWith('DEADLINE:')) {
+        dateLineType = 'deadline';
+      }
+    } else if (trimmedLine.startsWith('SCHEDULED:')) {
+      dateLineType = 'scheduled';
+    } else if (trimmedLine.startsWith('DEADLINE:')) {
+      dateLineType = 'deadline';
+    }
+    
+    // If this is a date line, check if it matches the indent level of the previous task
+    if (dateLineType !== null) {
+      const lineIndent = lineText.substring(0, lineText.length - trimmedLine.length);
+      
+      // Check if the indent matches or is deeper than the task indent
+      if (lineIndent === this.previousTaskIndent || lineIndent.startsWith(this.previousTaskIndent)) {
+        // Apply full-line decoration
+        const lineStartPos = line.from;
+        const lineEndPos = line.to;
+        
+        // Determine CSS classes based on line type
+        const lineClass = dateLineType === 'scheduled' ? 'todoseq-scheduled-line' : 'todoseq-deadline-line';
+        const keywordClass = dateLineType === 'scheduled' ? 'todoseq-scheduled-keyword' : 'todoseq-deadline-keyword';
+        
+        // Apply decoration to the entire line
+        builder.add(lineStartPos, lineEndPos,
+          Decoration.mark({
+            class: lineClass,
+            attributes: {
+              'data-date-line-type': dateLineType,
+              'aria-label': `${dateLineType} date line`,
+              'role': 'note'
+            }
+          })
+        );
+        
+        // Apply specific styling to the keyword itself
+        const keyword = dateLineType === 'scheduled' ? 'SCHEDULED:' : 'DEADLINE:';
+        const keywordStart = trimmedLine.indexOf(keyword);
+        const keywordEnd = keywordStart + keyword.length;
+        const keywordStartPos = line.from + (lineText.length - trimmedLine.length) + keywordStart;
+        const keywordEndPos = keywordStartPos + keyword.length;
+        
+        builder.add(keywordStartPos, keywordEndPos,
+          Decoration.mark({
+            class: keywordClass,
+            attributes: {
+              'data-date-keyword': keyword,
+              'aria-label': `${dateLineType} keyword`,
+              'role': 'mark'
+            }
+          })
+        );
+        
+        // Continue tracking for additional date lines (both SCHEDULED and DEADLINE)
+        // Don't reset tracking here, allow finding multiple date lines after a single task
+      }
+    } else if (linesSinceTask > 1 && !trimmedLine) {
+      // Empty line, continue tracking for potential date lines
+      // Don't reset the task tracking
+    } else if (linesSinceTask > 0 && trimmedLine) {
+      // Non-empty line that's not a date line, reset tracking
+      this.previousTaskLine = null;
+      this.previousTaskIndent = '';
+    }
+    
+    // Add limit to prevent infinite tracking - reset after 10 lines
+    if (linesSinceTask > 10) {
+      this.previousTaskLine = null;
+      this.previousTaskIndent = '';
+    }
   }
   
   public updateDecorations(): void {

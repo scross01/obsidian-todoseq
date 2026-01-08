@@ -256,6 +256,18 @@
   border-radius: 2px; /* Subtle rounding */
 }
 
+/* Scheduled and Deadline line styling - editor only */
+.cm-editor .todoseq-scheduled-line,
+.cm-editor .todoseq-deadline-line {
+  font-size: 0.9em; /* reduce font size of entire line */
+  color: var(--text-muted);
+}
+
+.cm-editor .todoseq-scheduled-keyword,
+.cm-editor .todoseq-deadline-keyword {
+  font-weight: var(--font-weight-normal, var(--font-normal, 400));
+}
+
 /* Hover effect for better UX */
 .todoseq-keyword-formatted:hover {
   background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
