@@ -21,6 +21,7 @@ DONE [#C] Fix critical bug in payment processing
 - **State keywords** (TODO, DOING, DONE, etc.) are highlighted with bold font and your theme's accent color
 - **Completed tasks** (DONE, CANCELED, CANCELLED) display with a line-through decoration
 - **Checkboxes** (when used) are synchronized with the task state
+- SCHEDULED and DEADLINE date lines are formatted with special styling
 - The styling is applied in real-time as you type
 
 ## Interactive Task Management
@@ -74,6 +75,9 @@ When tasks use the checkbox format, you have additional interaction options:
 Clicking the checkbox toggles between empty `[ ]` and checked `[x]` states.
 The task keyword is automatically synchronized with the checkbox state.
 
+### Entering scheduled and deadline dates
+
+When adding a `SCHEDULED:` or `DEADLINE:` date after a task, the editor will autocomplete after the keyword with the required date format, e.g. `<2026-01-01>`, with the date auto-filled to the current date and selected for easy replacement or editing.
 
 ## Task State Synchronization
 

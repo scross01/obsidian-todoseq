@@ -3,6 +3,7 @@ import { EditorView } from '@codemirror/view';
 import TodoTracker from './main';
 import { DEFAULT_COMPLETED_STATES, NEXT_STATE } from './task';
 import { taskKeywordPlugin } from './view/task-formatting';
+import { dateAutocompleteExtension } from './view/date-autocomplete';
 import { TodoView } from './view/task-view';
 
 /**
@@ -25,7 +26,8 @@ export class UIManager {
   setupEditorDecorations(): void {
     // Register editor extension for all markdown editors
     const extension = this.plugin.registerEditorExtension([
-      taskKeywordPlugin(this.plugin.settings)
+      taskKeywordPlugin(this.plugin.settings),
+      dateAutocompleteExtension(this.plugin.settings)
     ]);
     this.plugin.taskFormatters.set('editor-extension', extension);
   }
