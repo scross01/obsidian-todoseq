@@ -2,6 +2,8 @@
 
 The search field in the TODOseq Task List provides a powerful search system that allows you to quickly find and filter tasks across your entire vault. This guide covers all aspects of the search functionality, from basic filtering to advanced query syntax.
 
+![Search Options](./assets/todoseq-search-options-menu.png)
+
 ## Basic Search
 
 ### Search Field Overview

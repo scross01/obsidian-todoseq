@@ -12,15 +12,19 @@ The Task List automatically opens in the right sidebar when the TODOseq plugin i
 
 You can drag and drop the panel to reposition it within the Obsidian interface, such as moving to different panel location, or making it a floating window.
 
+![Ribbon icon](./assets/todoseq-ribbon-icon.png)
+
 ### Command Palette
 
 1. Open the command palette with `Ctrl/Cmd + P`
-2. Search for "TODOseq: Show task list"
+2. Search for "**TODOseq: Show task list**"
 3. Select the command to open/show the Task List in the right sidebar
+
+![Command Palette Example](./assets/todoseq-command-palette.png)
 
 ### Keyboard Shortcut
 
-- You can assign a custom keyboard shortcut to the "TODOseq: Show task list" in Obsidian's Hotkeys settings.
+- You can assign a custom keyboard shortcut to the "**TODOseq: Show task list**" in Obsidian's Hotkeys settings.
 
 ## Task List Interface
 
@@ -29,6 +33,8 @@ The Task List consists of several key components:
 ### 1. Search and Settings Toolbar
 
 Located at the top of the Task List, the toolbar contains:
+
+![Search and Settings Toolbar](./assets/todoseq-search-and-settings-toolbar.png)
 
 - **Search field**: Live filtering of tasks as you type
 - **Case sensitivity toggle**: Button to toggle case-sensitive search
@@ -39,6 +45,8 @@ Located at the top of the Task List, the toolbar contains:
 ### 2. Task List
 
 The main area displays all detected tasks with the following information:
+
+![Task List Example](./assets/todoseq-task-list-example.png)
 
 - **Checkbox**: Visual indicator of completion status
 - **State keyword**: Colored badge showing task state (TODO, DOING, DONE, etc.)

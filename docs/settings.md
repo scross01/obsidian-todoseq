@@ -2,6 +2,8 @@
 
 TODOseq provides configuration options to customize the plugin to your workflow. This guide covers all available settings and their impact on functionality.
 
+![TODOseq Settings](./assets/todoseq-settings.png)
+
 ## Accessing Settings
 
 Access TODOseq settings through Obsidian's settings interface:

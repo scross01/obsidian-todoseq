@@ -16,7 +16,7 @@ TODO [#C] Task with low priority, a scheduled date, and a deadline date/time
 SCHEDULED: <2026-01-15>
 DEADLINE: <2026-01-20 17:00>
 
-And if you prefer to use checkboxes jus tprefix the task keyword with the task keyword. Toggleing the checkbox will automatically update the state between TODO and DONE.
+And if you prefer to use checkboxes just prefix the task keyword with the task keyword. Toggling the checkbox will automatically update the state between TODO and DONE.
 
 - [ ] TODO task with a checkbox
 - [x] DONE completed task with a checkbox
