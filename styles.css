@@ -98,14 +98,6 @@
   border-radius: var(--input-radius);
 }
 
-/* Touch target sizing for mobile accessibility */
-.todo-view .clickable-icon,
-.todo-view button {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 8px;
-}
-
 /* Checkbox alignment */
 .todo-view .todo-checkbox {
   margin-right: var(--size-2-2);
