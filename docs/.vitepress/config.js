@@ -6,7 +6,7 @@ export default {
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'GitHub', link: 'https://github.com/scross01/todoseq' },
+      { text: 'GitHub', link: 'https://scross01.github.io/obsidian-todoseq' },
     ],
 
     sidebar: [
