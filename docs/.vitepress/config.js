@@ -6,6 +6,7 @@ export default {
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
+      { text: 'Install', link: 'https://obsidian.md/plugins?id=todoseq' },
       { text: 'GitHub', link: 'https://github.com/scross01/obsidian-todoseq' },
     ],
 
