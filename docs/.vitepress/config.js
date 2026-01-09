@@ -1,12 +1,12 @@
 export default {
   title: 'TODOseq',
   description: 'Lightweight, keyword-based task tracker for Obsidian',
-  base: '/todoseq/',
+  base: '/obsidian-todoseq/',
 
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'GitHub', link: 'https://scross01.github.io/obsidian-todoseq' },
+      { text: 'GitHub', link: 'https://github.com/scross01/obsidian-todoseq' },
     ],
 
     sidebar: [
@@ -24,7 +24,7 @@ export default {
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/scross01/todoseq' },
+      { icon: 'github', link: 'https://github.com/scross01/obsidian-todoseq' },
     ],
 
     footer: {
