@@ -12,7 +12,7 @@
 - `npm run lint` — Run ESLint to check code style
 - `npm run format` — Format code using Prettier
 - `npm run docs:dev` — Run dynamic docs site for development
-- `npm run docs:build` — Run VitePress to build production docs  
+- `npm run docs:build` — Run VitePress to build production docs
 - `npm run docs:preview` — Preview static production docs
 
 **Git Hooks**:
