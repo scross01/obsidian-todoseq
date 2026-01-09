@@ -40,3 +40,7 @@ FEAT*.md
 Makefile
 
 .obsidian/
+
+# VitePress build output
+docs/.vitepress/dist
+docs/.vitepress/cache
