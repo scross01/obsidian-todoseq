@@ -39,7 +39,8 @@ FEAT*.md
 
 Makefile
 
-.obsidian/
+.obsidian/plugins/
+.obsidian/workspace.json
 
 # VitePress build output
 docs/.vitepress/dist

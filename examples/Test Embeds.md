@@ -1,0 +1,21 @@
+Obsidian embedded references can be used to reference lines with tasks. 
+
+TODO this is a task with a embed reference ^abc123
+
+The task can be references on a page with:
+```
+![[Test Embeds#^abc123]]
+```
+
+![[Test Embeds#^abc123]]
+
+Embed references can also be from other pages, e.g.
+```
+![[Test Examples^xyz123]]
+```
+
+![[Task Examples#^xyz123]]
+
+>[!info]
+>Only the original task declaration location is collected by TODOseq
+>

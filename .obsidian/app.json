@@ -1,0 +1,8 @@
+{
+  "userIgnoreFilters": [
+    "__mocks__/",
+    "coverage/",
+    "node_modules/"
+  ],
+  "alwaysUpdateLinks": true
+}
