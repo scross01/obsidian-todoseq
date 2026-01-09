@@ -1,6 +1,6 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
 import { Task, DEFAULT_COMPLETED_STATES, NEXT_STATE } from '../task';
-import { CHECKBOX_REGEX } from '../utils/task-utils';
+import { CHECKBOX_REGEX, PRIORITY_TOKEN_REGEX } from '../utils/task-utils';
 import { getPluginSettings } from '../utils/settings-utils';
 
 export class TaskEditor {
@@ -131,5 +131,113 @@ export class TaskEditor {
       state = nextState;
     }
     return await this.applyLineUpdate(task, state);
+  }
+
+  // Updates task priority and persists change
+  async updateTaskPriority(
+    task: Task,
+    newPriority: 'high' | 'med' | 'low',
+  ): Promise<Task> {
+    const { newLine } = TaskEditor.generateTaskLine(
+      task,
+      task.state,
+      false, // Don't keep existing priority
+    );
+
+    // Add the new priority to the task line
+    const priorityToken =
+      newPriority === 'high' ? '[#A]' : newPriority === 'med' ? '[#B]' : '[#C]';
+
+    // First, remove any existing priority tokens from the task description
+    // to handle the case where priority exists but not at the beginning
+    // Preserve trailing spaces by using trimStart() instead of trim()
+    const cleanedLine = newLine
+      .replace(PRIORITY_TOKEN_REGEX, ' ')
+      .replace(/\s+/g, ' ')
+      .trimStart();
+
+    // Parse the cleaned line to find where to insert the priority
+    const match = CHECKBOX_REGEX.exec(cleanedLine);
+    let newTaskLine: string;
+
+    if (match) {
+      // For checkbox tasks: - [ ] TODO task text
+      // Insert priority after the state with proper spacing
+      const indent = match[1];
+      const listMarker = match[2];
+      const state = match[4];
+      const text = match[5];
+      newTaskLine = `${indent}${listMarker} ${state} ${priorityToken} ${text}`;
+    } else {
+      // Check for bulleted tasks without checkboxes: - TODO task text
+      const bulletMatch = /^(\s*)([-*+])\s+(.+)$/.exec(cleanedLine);
+      if (bulletMatch) {
+        // For bulleted tasks: - TODO task text
+        // Insert priority after the state with proper spacing
+        const indent = bulletMatch[1];
+        const bullet = bulletMatch[2];
+        const rest = bulletMatch[3];
+
+        // Split the rest into state and description
+        const restParts = rest.split(' ');
+        if (restParts.length >= 2) {
+          const state = restParts[0];
+          const description = restParts.slice(1).join(' ');
+          newTaskLine = `${indent}${bullet} ${state} ${priorityToken} ${description}`;
+        } else {
+          // Fallback for malformed bulleted tasks
+          newTaskLine = `${indent}${bullet} ${rest} ${priorityToken}`;
+        }
+      } else {
+        // For non-checkbox, non-bulleted tasks: TODO task text
+        // Insert priority after the state with proper spacing
+        const taskParts = cleanedLine.split(' ');
+        if (taskParts.length >= 2) {
+          const state = taskParts[0];
+          const rest = taskParts.slice(1).join(' ');
+          newTaskLine = `${state} ${priorityToken} ${rest}`;
+        } else {
+          // Fallback for malformed tasks
+          newTaskLine = `${cleanedLine} ${priorityToken}`;
+        }
+      }
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file instanceof TFile) {
+      // Check if target is the active file in a MarkdownView
+      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const isActive = md?.file?.path === task.path;
+      const editor = md?.editor;
+
+      if (isActive && editor) {
+        // Replace only the specific line using Editor API to preserve editor state
+        const currentLine = editor.getLine(task.line);
+        if (typeof currentLine === 'string') {
+          const from: EditorPosition = { line: task.line, ch: 0 };
+          const to: EditorPosition = {
+            line: task.line,
+            ch: currentLine.length,
+          };
+          editor.replaceRange(newTaskLine, from, to);
+        }
+      } else {
+        // Not active: use atomic background edit
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          if (task.line < lines.length) {
+            lines[task.line] = newTaskLine;
+          }
+          return lines.join('\n');
+        });
+      }
+    }
+
+    // Return an updated Task snapshot (do not mutate original)
+    return {
+      ...task,
+      rawText: newTaskLine,
+      priority: newPriority,
+    };
   }
 }

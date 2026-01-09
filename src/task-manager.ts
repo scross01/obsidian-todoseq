@@ -201,6 +201,132 @@ export class TaskManager {
   }
 
   /**
+   * Handle setting high priority on the task at the current cursor position
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  handleSetPriorityHighAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    // Get the current line from the editor
+    const cursor = editor.getCursor();
+
+    // Use the extracted method to handle the line-based logic
+    return this.handleSetPriorityAtLine(
+      checking,
+      cursor.line,
+      editor,
+      view,
+      'high',
+    );
+  }
+
+  /**
+   * Handle setting medium priority on the task at the current cursor position
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  handleSetPriorityMediumAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    // Get the current line from the editor
+    const cursor = editor.getCursor();
+
+    // Use the extracted method to handle the line-based logic
+    return this.handleSetPriorityAtLine(
+      checking,
+      cursor.line,
+      editor,
+      view,
+      'med',
+    );
+  }
+
+  /**
+   * Handle setting low priority on the task at the current cursor position
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  handleSetPriorityLowAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    // Get the current line from the editor
+    const cursor = editor.getCursor();
+
+    // Use the extracted method to handle the line-based logic
+    return this.handleSetPriorityAtLine(
+      checking,
+      cursor.line,
+      editor,
+      view,
+      'low',
+    );
+  }
+
+  /**
+   * Handle setting priority on the task at the specified line
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param lineNumber - The line number to check
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @param priority - The priority to set ('high', 'med', or 'low')
+   * @returns boolean indicating if the operation was successful
+   */
+  handleSetPriorityAtLine(
+    checking: boolean,
+    lineNumber: number,
+    editor: Editor,
+    view: MarkdownView,
+    priority: 'high' | 'med' | 'low',
+  ): boolean {
+    const taskEditor = this.plugin.taskEditor;
+    const vaultScanner = this.plugin.getVaultScanner();
+
+    if (!taskEditor || !vaultScanner) {
+      return false;
+    }
+
+    // Get the line from the editor
+    const line = editor.getLine(lineNumber);
+
+    // Check if this line contains a valid task using VaultScanner's parser
+    const parser = vaultScanner.getParser();
+    if (!parser?.testRegex.test(line)) {
+      return false;
+    }
+
+    if (checking) {
+      return true;
+    }
+
+    // Parse the task from the line
+    const task = this.parseTaskFromLine(
+      line,
+      lineNumber,
+      view.file?.path || '',
+    );
+
+    if (task) {
+      // Update the task priority
+      taskEditor.updateTaskPriority(task, priority);
+    }
+
+    return true;
+  }
+
+  /**
    * Handle adding a date to the task at the specified line
    * @param checking - Whether this is just a check to see if the command is available
    * @param lineNumber - The line number to check

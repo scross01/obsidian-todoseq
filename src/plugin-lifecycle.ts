@@ -123,6 +123,57 @@ export class PluginLifecycleManager {
       },
     });
 
+    // Add editor command to set high priority
+    this.plugin.addCommand({
+      id: 'set-priority-high',
+      name: 'Set priority high',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.taskManager.handleSetPriorityHighAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
+    // Add editor command to set medium priority
+    this.plugin.addCommand({
+      id: 'set-priority-medium',
+      name: 'Set priority medium',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.taskManager.handleSetPriorityMediumAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
+    // Add editor command to set low priority
+    this.plugin.addCommand({
+      id: 'set-priority-low',
+      name: 'Set priority low',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.taskManager.handleSetPriorityLowAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
     // Listen to VaultScanner events for task updates
     this.plugin.vaultScanner.on('tasks-changed', (tasks) => {
       this.plugin.tasks = tasks;
