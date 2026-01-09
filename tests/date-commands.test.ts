@@ -72,7 +72,7 @@ describe('Date Commands', () => {
       const result = taskManager.handleAddScheduledDateAtCursor(
         false,
         mockEditor as Editor,
-        mockView as MarkdownView
+        mockView as MarkdownView,
       );
 
       expect(result).toBe(false);
@@ -82,7 +82,7 @@ describe('Date Commands', () => {
       const result = taskManager.handleAddScheduledDateAtCursor(
         true,
         mockEditor as Editor,
-        mockView as MarkdownView
+        mockView as MarkdownView,
       );
 
       expect(result).toBe(true);
@@ -100,7 +100,7 @@ describe('Date Commands', () => {
       const result = taskManager.handleAddDeadlineDateAtCursor(
         false,
         mockEditor as Editor,
-        mockView as MarkdownView
+        mockView as MarkdownView,
       );
 
       expect(result).toBe(false);
@@ -110,7 +110,7 @@ describe('Date Commands', () => {
       const result = taskManager.handleAddDeadlineDateAtCursor(
         true,
         mockEditor as Editor,
-        mockView as MarkdownView
+        mockView as MarkdownView,
       );
 
       expect(result).toBe(true);
@@ -204,7 +204,7 @@ describe('Date Commands', () => {
 
       // Should insert newline + scheduled line only (no extra blank line)
       expect(insertedContent).toBe(
-        '\nSCHEDULED: <' + taskManager['getCurrentDateString']() + '>'
+        '\nSCHEDULED: <' + taskManager['getCurrentDateString']() + '>',
       );
     });
   });

@@ -45,7 +45,7 @@ export interface SearchNode {
 export class SearchError extends Error {
   constructor(
     message: string,
-    public position?: number
+    public position?: number,
   ) {
     super(message);
     this.name = 'SearchError';

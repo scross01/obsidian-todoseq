@@ -30,7 +30,7 @@ export class IncrementalTaskFormatter {
    */
   getOptimizedDecorations(
     view: EditorView,
-    createDecorations: (startLine: number, endLine: number) => DecorationSet
+    createDecorations: (startLine: number, endLine: number) => DecorationSet,
   ): DecorationSet {
     // Note: CodeMirror 6 doesn't expose document version directly
     // We'll use a different approach for change detection
@@ -67,7 +67,7 @@ export class IncrementalTaskFormatter {
   private getIncrementalDecorations(
     view: EditorView,
     update: ViewUpdate,
-    createDecorations: (startLine: number, endLine: number) => DecorationSet
+    createDecorations: (startLine: number, endLine: number) => DecorationSet,
   ): DecorationSet {
     // Calculate the range of lines that need to be re-processed
     const changedRange = this.getChangedLineRange(update);
@@ -87,7 +87,7 @@ export class IncrementalTaskFormatter {
         newDecorations,
         startLine,
         endLine,
-        view.state.doc.lines
+        view.state.doc.lines,
       );
     }
 
@@ -100,7 +100,7 @@ export class IncrementalTaskFormatter {
    * @returns Line range or null if entire document should be processed
    */
   private getChangedLineRange(
-    update: ViewUpdate
+    update: ViewUpdate,
   ): { startLine: number; endLine: number } | null {
     if (!update.docChanged) {
       return null;
@@ -158,7 +158,7 @@ export class IncrementalTaskFormatter {
     newDecorations: DecorationSet,
     startLine: number,
     endLine: number,
-    totalLines: number
+    totalLines: number,
   ): DecorationSet {
     const builder = new RangeSetBuilder<Decoration>();
 

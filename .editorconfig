@@ -20,6 +20,13 @@ insert_final_newline = true
 # TypeScript-specific settings
 [*.ts]
 quote_type = single
+# Prefer trailing commas in TypeScript
+ij_typescript_trailing_comma = true
+
+# JavaScript-specific settings  
+[*.js]
+# Prefer trailing commas in JavaScript
+ij_javascript_trailing_comma = true
 
 # JSON-specific settings
 [*.json]

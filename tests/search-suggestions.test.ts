@@ -72,7 +72,7 @@ describe('Search Suggestions', () => {
       const allPaths = await SearchSuggestions.getAllPaths(mockVault);
       const filteredPaths = SearchSuggestions.filterSuggestions(
         'jour',
-        allPaths
+        allPaths,
       );
 
       expect(filteredPaths.length).toBeGreaterThan(0);
@@ -179,7 +179,7 @@ describe('Search Suggestions', () => {
       // Test filtering for 'exam'
       const filteredPaths = SearchSuggestions.filterSuggestions(
         'exam',
-        allPaths
+        allPaths,
       );
 
       // Should find 'examples' when searching for 'exam'

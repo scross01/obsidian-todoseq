@@ -15,7 +15,7 @@ export class EditorKeywordMenu {
   public openStateMenuAtMouseEvent(
     state: string,
     keywordElement: HTMLElement,
-    evt: MouseEvent
+    evt: MouseEvent,
   ): void {
     evt.preventDefault();
     evt.stopPropagation();
@@ -25,7 +25,7 @@ export class EditorKeywordMenu {
       state,
       async (newState: string) => {
         await this.updateTaskKeywordState(state, keywordElement, newState);
-      }
+      },
     );
 
     // Show menu at mouse position
@@ -38,7 +38,7 @@ export class EditorKeywordMenu {
   private async updateTaskKeywordState(
     state: string,
     keywordElement: HTMLElement,
-    newState: string
+    newState: string,
   ): Promise<void> {
     // Use UIManager's methods to get line number and update through TaskManager
     const currentLine = this.plugin.uiManager.getLineForElement(keywordElement);
@@ -53,7 +53,7 @@ export class EditorKeywordMenu {
           currentLine - 1,
           view.editor,
           view,
-          newState
+          newState,
         );
 
         // Restore cursor position after update

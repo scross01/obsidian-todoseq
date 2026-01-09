@@ -53,7 +53,7 @@ export class TaskListView extends ItemView {
     leaf: WorkspaceLeaf,
     tasks: Task[],
     defaultViewMode: TaskListViewMode,
-    private settings: TodoTrackerSettings
+    private settings: TodoTrackerSettings,
   ) {
     super(leaf);
     this.tasks = tasks;
@@ -473,7 +473,7 @@ export class TaskListView extends ItemView {
           this.app.vault,
           this.tasks,
           this.settings,
-          this.getViewMode()
+          this.getViewMode(),
         );
 
         this.optionsDropdown = new (
@@ -485,7 +485,7 @@ export class TaskListView extends ItemView {
           this.app.vault,
           this.tasks,
           this.settings,
-          this.suggestionDropdown
+          this.suggestionDropdown,
         );
 
         // Input event handler for dropdown triggering
@@ -668,7 +668,7 @@ export class TaskListView extends ItemView {
     const configured = settings?.additionalTaskKeywords;
     const additional = Array.isArray(configured)
       ? configured.filter(
-          (v): v is string => typeof v === 'string' && v.length > 0
+          (v): v is string => typeof v === 'string' && v.length > 0,
         )
       : [];
 
@@ -681,7 +681,7 @@ export class TaskListView extends ItemView {
 
   /** Build the list of selectable states for the context menu, excluding the current state */
   private getSelectableStatesForMenu(
-    current: string
+    current: string,
   ): { group: string; states: string[] }[] {
     const { pendingActive, completed, additional } = this.getKeywordSets();
 
@@ -743,7 +743,7 @@ export class TaskListView extends ItemView {
   /** Open Obsidian Menu at a specific screen position */
   private openStateMenuAtPosition(
     task: Task,
-    pos: { x: number; y: number }
+    pos: { x: number; y: number },
   ): void {
     const menu = new Menu();
     const groups = this.getSelectableStatesForMenu(task.state);
@@ -896,7 +896,7 @@ export class TaskListView extends ItemView {
           openMenuAtPositionOnce(x, y);
         }, 450);
       },
-      { passive: true }
+      { passive: true },
     );
 
     const clearTouch = () => {
@@ -924,7 +924,7 @@ export class TaskListView extends ItemView {
           return;
         }
       },
-      true
+      true,
     ); // capture to intercept before activate handler
 
     return todoSpan;
@@ -1028,7 +1028,7 @@ export class TaskListView extends ItemView {
 
     // Sync dropdown with current sort method
     const sortDropdown = container.querySelector(
-      '.sort-dropdown select'
+      '.sort-dropdown select',
     ) as HTMLSelectElement;
     if (sortDropdown) {
       const currentSortMethod = this.getSortMethod();
@@ -1083,19 +1083,19 @@ export class TaskListView extends ItemView {
 
     // Update search results info
     const searchResultsCount = container.querySelector(
-      '.search-results-result-count'
+      '.search-results-result-count',
     );
     if (searchResultsCount) {
       const filteredAllTasks = this.filterTasksByViewMode(allTasks, mode);
       searchResultsCount.setText(
         `${visible.length} of ${filteredAllTasks.length} task` +
-          (filteredAllTasks.length === 1 ? '' : 's')
+          (filteredAllTasks.length === 1 ? '' : 's'),
       );
     }
 
     // Display search error if present
     const searchErrorContainer = container.querySelector(
-      '.search-error-container'
+      '.search-error-container',
     );
     if (this.searchError) {
       if (!searchErrorContainer) {
@@ -1133,13 +1133,13 @@ export class TaskListView extends ItemView {
         // a) No tasks found at all
         title.setText('No tasks found');
         subtitle.setText(
-          'Create tasks in your notes using "TODO Your task". They will appear here automatically.'
+          'Create tasks in your notes using "TODO Your task". They will appear here automatically.',
         );
       } else if (isHideCompleted && !hasAnyIncomplete) {
         // b) Hide-completed enabled, but only completed tasks exist
         title.setText('All tasks are completed');
         subtitle.setText(
-          'You are hiding completed tasks. Switch view mode or add new tasks to see more.'
+          'You are hiding completed tasks. Switch view mode or add new tasks to see more.',
         );
       } else {
         // General empty from search filter or other modes
@@ -1248,7 +1248,7 @@ export class TaskListView extends ItemView {
    */
   private getDateStatusClasses(
     date: Date | null,
-    isDeadline = false
+    isDeadline = false,
   ): string[] {
     if (!date) return [];
 
@@ -1257,7 +1257,7 @@ export class TaskListView extends ItemView {
     const taskDate = new Date(
       date.getFullYear(),
       date.getMonth(),
-      date.getDate()
+      date.getDate(),
     );
 
     const diffTime = taskDate.getTime() - today.getTime();
@@ -1303,7 +1303,7 @@ export class TaskListView extends ItemView {
         cls: 'date-value',
       });
       scheduledValue.setText(
-        this.formatDateForDisplay(task.scheduledDate, true)
+        this.formatDateForDisplay(task.scheduledDate, true),
       );
     }
 
@@ -1456,7 +1456,7 @@ export class TaskListView extends ItemView {
 
     // Helpers
     const isMarkdownLeaf = (
-      leaf: WorkspaceLeaf | null | undefined
+      leaf: WorkspaceLeaf | null | undefined,
     ): boolean => {
       if (!leaf) return false;
       if (leaf.view instanceof MarkdownView) return true;

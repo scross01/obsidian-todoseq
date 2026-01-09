@@ -16,7 +16,7 @@ export class DateUtils {
     const taskDate = new Date(
       date.getFullYear(),
       date.getMonth(),
-      date.getDate()
+      date.getDate(),
     );
 
     const diffTime = taskDate.getTime() - today.getTime();
@@ -73,7 +73,7 @@ export class DateUtils {
    */
   static parseDateValue(
     value: string,
-    referenceDate: Date = new Date()
+    referenceDate: Date = new Date(),
   ):
     | { date: Date; format: 'year' | 'year-month' | 'full' }
     | { start: Date; end: Date }
@@ -109,7 +109,7 @@ export class DateUtils {
 
     // Handle date ranges (e.g., 2024-01-01..2024-01-31)
     const rangeMatch = trimmedValue.match(
-      /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/
+      /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/,
     );
     if (rangeMatch) {
       const startDate = new Date(rangeMatch[1]);
@@ -190,7 +190,7 @@ export class DateUtils {
    */
   static parseNaturalLanguageDate(
     expression: string,
-    referenceDate: Date = new Date()
+    referenceDate: Date = new Date(),
   ): { date: Date; format: 'full' } | null {
     const normalized = expression.toLowerCase();
 
@@ -214,7 +214,7 @@ export class DateUtils {
 
     // Handle specific weekdays (e.g., "next Monday", "next Friday")
     const weekdayMatch = normalized.match(
-      /^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/
+      /^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/,
     );
     if (weekdayMatch) {
       const targetWeekday = weekdayMatch[1];
@@ -268,7 +268,7 @@ export class DateUtils {
    */
   static isDateOverdue(
     date: Date | null,
-    referenceDate: Date = new Date()
+    referenceDate: Date = new Date(),
   ): boolean {
     if (!date) return false;
 
@@ -289,7 +289,7 @@ export class DateUtils {
    */
   static isDateDueToday(
     date: Date | null,
-    referenceDate: Date = new Date()
+    referenceDate: Date = new Date(),
   ): boolean {
     if (!date) return false;
 
@@ -310,7 +310,7 @@ export class DateUtils {
    */
   static isDateDueTomorrow(
     date: Date | null,
-    referenceDate: Date = new Date()
+    referenceDate: Date = new Date(),
   ): boolean {
     if (!date) return false;
 
@@ -333,7 +333,7 @@ export class DateUtils {
   static isDateInCurrentWeek(
     date: Date | null,
     referenceDate: Date = new Date(),
-    weekStartsOn: 'Monday' | 'Sunday' = 'Monday'
+    weekStartsOn: 'Monday' | 'Sunday' = 'Monday',
   ): boolean {
     if (!date) return false;
 
@@ -377,7 +377,7 @@ export class DateUtils {
   static isDateInNextWeek(
     date: Date | null,
     referenceDate: Date = new Date(),
-    weekStartsOn: 'Monday' | 'Sunday' = 'Monday'
+    weekStartsOn: 'Monday' | 'Sunday' = 'Monday',
   ): boolean {
     if (!date) return false;
 
@@ -394,7 +394,7 @@ export class DateUtils {
       const daysUntilNextMonday = refDay === 1 ? 7 : (1 + 7 - refDay) % 7;
       nextFirstDayOfWeek = new Date(ref);
       nextFirstDayOfWeek.setDate(
-        nextFirstDayOfWeek.getDate() + daysUntilNextMonday
+        nextFirstDayOfWeek.getDate() + daysUntilNextMonday,
       );
     } else {
       // Next week starts on Sunday
@@ -402,7 +402,7 @@ export class DateUtils {
       const daysUntilNextSunday = refDay === 0 ? 7 : (7 - refDay) % 7;
       nextFirstDayOfWeek = new Date(ref);
       nextFirstDayOfWeek.setDate(
-        nextFirstDayOfWeek.getDate() + daysUntilNextSunday
+        nextFirstDayOfWeek.getDate() + daysUntilNextSunday,
       );
     }
 
@@ -426,7 +426,7 @@ export class DateUtils {
    */
   static isDateInCurrentMonth(
     date: Date | null,
-    referenceDate: Date = new Date()
+    referenceDate: Date = new Date(),
   ): boolean {
     if (!date) return false;
 
@@ -447,7 +447,7 @@ export class DateUtils {
    */
   static isDateInNextMonth(
     date: Date | null,
-    referenceDate: Date = new Date()
+    referenceDate: Date = new Date(),
   ): boolean {
     if (!date) return false;
 
@@ -475,7 +475,7 @@ export class DateUtils {
   static isDateInNextNDays(
     date: Date | null,
     days: number,
-    referenceDate: Date = new Date()
+    referenceDate: Date = new Date(),
   ): boolean {
     if (!date) return false;
 

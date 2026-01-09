@@ -410,7 +410,7 @@ TODO task text
         formatTaskKeywords: true,
       };
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks
+        settingsWithCommentBlocks,
       );
 
       const lines = `
@@ -448,7 +448,7 @@ TODO task text
         formatTaskKeywords: true,
       };
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks
+        settingsWithCommentBlocks,
       );
 
       const lines = `
@@ -489,7 +489,7 @@ TODO task text
         formatTaskKeywords: true,
       };
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks
+        settingsWithCommentBlocks,
       );
 
       const lines = `
@@ -526,7 +526,7 @@ TODO task text
         formatTaskKeywords: true,
       };
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks
+        settingsWithCommentBlocks,
       );
 
       const lines = `

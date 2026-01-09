@@ -72,7 +72,7 @@ export class UIManager {
                 this.handleTaskKeywordClickWithDoubleClickDetection(
                   target,
                   view,
-                  event
+                  event,
                 );
               }
             };
@@ -97,7 +97,7 @@ export class UIManager {
 
     // Also set up listeners for newly opened editors
     this.plugin.registerEvent(
-      this.plugin.app.workspace.on('layout-change', setupEditorListeners)
+      this.plugin.app.workspace.on('layout-change', setupEditorListeners),
     );
   }
 
@@ -150,7 +150,7 @@ export class UIManager {
    */
   private async handleTaskKeywordClick(
     keywordElement: HTMLElement,
-    view: MarkdownView
+    view: MarkdownView,
   ): Promise<void> {
     // Prevent default behavior and stop propagation
     const event = window.event as MouseEvent;
@@ -174,7 +174,7 @@ export class UIManager {
         false,
         currentLine - 1,
         view.editor,
-        view
+        view,
       );
 
       // Restore cursor position after update
@@ -196,7 +196,7 @@ export class UIManager {
   private handleTaskKeywordClickWithDoubleClickDetection(
     keywordElement: HTMLElement,
     view: MarkdownView,
-    event: MouseEvent
+    event: MouseEvent,
   ): void {
     const currentTime = Date.now();
     const isDoubleClick =
@@ -385,7 +385,7 @@ export class UIManager {
             this.addContextMenuToEditor();
           }, 100);
         }
-      })
+      }),
     );
 
     // Also add to currently active editor if any
@@ -419,7 +419,7 @@ export class UIManager {
               this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
                 keyword,
                 target,
-                evt
+                evt,
               );
             }
           }
@@ -478,7 +478,7 @@ export class UIManager {
       } catch (error) {
         console.warn(
           'Failed to open task view in right sidebar, falling back to main area:',
-          error
+          error,
         );
         // Fallback to main area if right sidebar access fails
         leaf = workspace.getLeaf(true);
@@ -499,10 +499,10 @@ export class UIManager {
         } catch (error) {
           console.warn(
             'Failed to remove event listener during cleanup:',
-            error
+            error,
           );
         }
-      }
+      },
     );
     this.registeredEventListeners = [];
 

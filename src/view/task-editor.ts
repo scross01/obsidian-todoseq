@@ -14,7 +14,7 @@ export class TaskEditor {
   static generateTaskLine(
     task: Task,
     newState: string,
-    keepPriority = true
+    keepPriority = true,
   ): { newLine: string; completed: boolean } {
     const priToken =
       keepPriority && task.priority
@@ -60,12 +60,12 @@ export class TaskEditor {
   async applyLineUpdate(
     task: Task,
     newState: string,
-    keepPriority = true
+    keepPriority = true,
   ): Promise<Task> {
     const { newLine, completed } = TaskEditor.generateTaskLine(
       task,
       newState,
-      keepPriority
+      keepPriority,
     );
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -112,7 +112,7 @@ export class TaskEditor {
   // Cycles a task to its next state according to NEXT_STATE and persists change
   async updateTaskState(
     task: Task,
-    nextState: string | null = null
+    nextState: string | null = null,
   ): Promise<Task> {
     let state: string;
     if (nextState == null) {

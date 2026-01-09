@@ -33,7 +33,7 @@ export class TaskKeywordDecorator {
 
   constructor(
     private view: EditorView,
-    settings: TodoTrackerSettings
+    settings: TodoTrackerSettings,
   ) {
     this.settings = settings;
     this.parser = TaskParser.create(settings);
@@ -128,7 +128,7 @@ export class TaskKeywordDecorator {
           // Use language-specific regex for code blocks when language comment support is enabled
           const codeRegex = TaskParser.buildCodeRegex(
             this.parser.allKeywords || [],
-            this.currentLanguage
+            this.currentLanguage,
           );
           if (codeRegex.test.test(lineText)) {
             match = codeRegex.test.exec(lineText);
@@ -165,7 +165,7 @@ export class TaskKeywordDecorator {
           this.previousTaskLine = lineNumber;
           this.previousTaskIndent = lineText.substring(
             0,
-            lineText.length - lineText.trimStart().length
+            lineText.length - lineText.trimStart().length,
           );
 
           // Adjust positions for single-line comment blocks
@@ -191,7 +191,7 @@ export class TaskKeywordDecorator {
               if (commentMatch) {
                 // Find keyword after comment prefix
                 const afterComment = lineText.substring(
-                  commentMatch.index + commentMatch[0].length
+                  commentMatch.index + commentMatch[0].length,
                 );
                 const keywordInComment = afterComment.indexOf(keyword);
                 if (keywordInComment !== -1) {
@@ -245,7 +245,7 @@ export class TaskKeywordDecorator {
                 role: 'mark',
                 tabindex: '0', // Make keyboard accessible
               },
-            })
+            }),
           );
         }
 
@@ -320,7 +320,7 @@ export class TaskKeywordDecorator {
     lineNumber: number,
     lineText: string,
     line: { from: number; to: number },
-    builder: RangeSetBuilder<Decoration>
+    builder: RangeSetBuilder<Decoration>,
   ): void {
     // Only check for date lines if we have a previous task line
     if (this.previousTaskLine === null) {
@@ -360,7 +360,7 @@ export class TaskKeywordDecorator {
     if (dateLineType !== null) {
       const lineIndent = lineText.substring(
         0,
-        lineText.length - trimmedLine.length
+        lineText.length - trimmedLine.length,
       );
 
       // Check if the indent matches or is deeper than the task indent
@@ -393,7 +393,7 @@ export class TaskKeywordDecorator {
               'aria-label': `${dateLineType} date line`,
               role: 'note',
             },
-          })
+          }),
         );
 
         // Apply specific styling to the keyword itself
@@ -415,7 +415,7 @@ export class TaskKeywordDecorator {
               'aria-label': `${dateLineType} keyword`,
               role: 'mark',
             },
-          })
+          }),
         );
 
         // Continue tracking for additional date lines (both SCHEDULED and DEADLINE)
@@ -500,6 +500,6 @@ export const taskKeywordPlugin = (settings: TodoTrackerSettings) => {
     },
     {
       decorations: (value) => value.decorations,
-    }
+    },
   );
 };

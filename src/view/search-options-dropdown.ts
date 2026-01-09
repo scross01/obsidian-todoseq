@@ -24,7 +24,7 @@ export class SearchOptionsDropdown {
     vault: Vault,
     tasks: Task[],
     settings: TodoTrackerSettings,
-    private suggestionDropdown?: SearchSuggestionDropdown
+    private suggestionDropdown?: SearchSuggestionDropdown,
   ) {
     this.inputEl = inputEl;
     this.vault = vault;
@@ -99,7 +99,7 @@ export class SearchOptionsDropdown {
       () => {
         this.updatePosition();
       },
-      { passive: true }
+      { passive: true },
     );
   }
 
@@ -135,7 +135,7 @@ export class SearchOptionsDropdown {
     if (searchTerm) {
       this.currentSuggestions = SearchSuggestions.filterSuggestions(
         searchTerm,
-        allOptions
+        allOptions,
       );
     } else {
       this.currentSuggestions = allOptions;
@@ -282,7 +282,7 @@ export class SearchOptionsDropdown {
         event.preventDefault();
         this.selectedIndex = Math.min(
           this.selectedIndex + 1,
-          this.currentSuggestions.length - 1
+          this.currentSuggestions.length - 1,
         );
         this.updateSelection();
         return true;
@@ -416,7 +416,7 @@ export class SearchOptionsDropdown {
     const focusableSelector =
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
     return Array.from(
-      this.containerEl.querySelectorAll(focusableSelector)
+      this.containerEl.querySelectorAll(focusableSelector),
     ) as HTMLElement[];
   }
 
@@ -448,7 +448,7 @@ export class SearchOptionsDropdown {
         e.preventDefault();
         if (focusableElements.length > 0) {
           let currentIndex = focusableElements.findIndex(
-            (el: HTMLElement) => el === activeElement
+            (el: HTMLElement) => el === activeElement,
           );
           if (currentIndex === -1) {
             currentIndex = e.key === 'ArrowDown' ? -1 : 0;

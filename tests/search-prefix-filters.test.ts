@@ -60,7 +60,7 @@ describe('Search Prefix Filters', () => {
   describe('Path Filter', () => {
     it('should filter tasks by path', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('path:journal', task, false)
+        Search.evaluate('path:journal', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
@@ -68,7 +68,7 @@ describe('Search Prefix Filters', () => {
 
     it('should handle case insensitive path filtering', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('path:JOURNAL', task, false)
+        Search.evaluate('path:JOURNAL', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
@@ -76,7 +76,7 @@ describe('Search Prefix Filters', () => {
 
     it('should handle case sensitive path filtering', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('path:JOURNAL', task, true)
+        Search.evaluate('path:JOURNAL', task, true),
       );
       expect(result.length).toBe(0);
     });
@@ -144,7 +144,7 @@ describe('Search Prefix Filters', () => {
 
       // Should match all examples/... files (3 matches)
       const result = testTasksForParent.filter((task) =>
-        Search.evaluate('path:examples', task, false)
+        Search.evaluate('path:examples', task, false),
       );
       expect(result.length).toBe(3);
       expect(result[0].path).toBe('examples/File.md');
@@ -153,7 +153,7 @@ describe('Search Prefix Filters', () => {
 
       // Should NOT include "notes/examples.md"
       expect(result.some((task) => task.path === 'notes/examples.md')).toBe(
-        false
+        false,
       );
     });
   });
@@ -161,7 +161,7 @@ describe('Search Prefix Filters', () => {
   describe('File Filter', () => {
     it('should filter tasks by filename', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('file:meeting', task, false)
+        Search.evaluate('file:meeting', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
@@ -169,7 +169,7 @@ describe('Search Prefix Filters', () => {
 
     it('should filter tasks by partial filename', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('file:tasks', task, false)
+        Search.evaluate('file:tasks', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/work/tasks.md');
@@ -177,7 +177,7 @@ describe('Search Prefix Filters', () => {
 
     it('should filter tasks by filename with hyphens', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('file:star-wars', task, false)
+        Search.evaluate('file:star-wars', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
@@ -185,7 +185,7 @@ describe('Search Prefix Filters', () => {
 
     it('should filter tasks by partial filename with hyphens', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('file:star', task, false)
+        Search.evaluate('file:star', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
@@ -270,7 +270,7 @@ describe('Search Prefix Filters', () => {
       const result = Search.evaluate(
         'content:state-of-the-art',
         testTask,
-        false
+        false,
       );
       expect(result).toBe(true);
     });
@@ -279,7 +279,7 @@ describe('Search Prefix Filters', () => {
   describe('Tag Filter', () => {
     it('should filter tasks by tag', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('tag:#urgent', task, false)
+        Search.evaluate('tag:#urgent', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
@@ -287,7 +287,7 @@ describe('Search Prefix Filters', () => {
 
     it('should filter tasks by tag without hash', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('tag:urgent', task, false)
+        Search.evaluate('tag:urgent', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
@@ -310,7 +310,7 @@ describe('Search Prefix Filters', () => {
       };
 
       const result = [testTaskWithDash].filter((task) =>
-        Search.evaluate('tag:test-tag', task, false)
+        Search.evaluate('tag:test-tag', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/test/task-with-dash.md');
@@ -320,7 +320,7 @@ describe('Search Prefix Filters', () => {
   describe('State Filter', () => {
     it('should filter tasks by state', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('state:DOING', task, false)
+        Search.evaluate('state:DOING', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/work/tasks.md');
@@ -328,7 +328,7 @@ describe('Search Prefix Filters', () => {
 
     it('should handle case insensitive state filtering', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('state:doing', task, false)
+        Search.evaluate('state:doing', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/work/tasks.md');
@@ -338,21 +338,21 @@ describe('Search Prefix Filters', () => {
   describe('Priority Filter', () => {
     it('should filter tasks by priority (high)', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('priority:high', task, false)
+        Search.evaluate('priority:high', task, false),
       );
       expect(result.length).toBe(2);
     });
 
     it('should filter tasks by priority (A)', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('priority:A', task, false)
+        Search.evaluate('priority:A', task, false),
       );
       expect(result.length).toBe(2);
     });
 
     it('should filter tasks by priority (low)', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('priority:low', task, false)
+        Search.evaluate('priority:low', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
@@ -360,7 +360,7 @@ describe('Search Prefix Filters', () => {
 
     it('should filter tasks by priority (none)', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('priority:none', task, false)
+        Search.evaluate('priority:none', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/personal/hobbies.md');
@@ -370,7 +370,7 @@ describe('Search Prefix Filters', () => {
   describe('Content Filter', () => {
     it('should filter tasks by content', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('content:project', task, false)
+        Search.evaluate('content:project', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
@@ -378,7 +378,7 @@ describe('Search Prefix Filters', () => {
 
     it('should filter tasks by multi-word content', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('content:"star wars"', task, false)
+        Search.evaluate('content:"star wars"', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
@@ -388,7 +388,7 @@ describe('Search Prefix Filters', () => {
   describe('Combined Filters', () => {
     it('should combine path and tag filters (implicit AND)', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('path:journal tag:#urgent', task, false)
+        Search.evaluate('path:journal tag:#urgent', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
@@ -396,7 +396,7 @@ describe('Search Prefix Filters', () => {
 
     it('should combine filters with OR operator', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('state:TODO OR state:DOING', task, false)
+        Search.evaluate('state:TODO OR state:DOING', task, false),
       );
       // Should return 4 tasks: 3 with TODO state + 1 with DOING state
       expect(result.length).toBe(4);
@@ -404,7 +404,7 @@ describe('Search Prefix Filters', () => {
 
     it('should handle complex combined filters', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('priority:high -state:DOING', task, false)
+        Search.evaluate('priority:high -state:DOING', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
@@ -414,7 +414,7 @@ describe('Search Prefix Filters', () => {
   describe('Error Handling', () => {
     it('should handle invalid prefix gracefully', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('invalid:test', task, false)
+        Search.evaluate('invalid:test', task, false),
       );
       // Should return false for all tasks when prefix is invalid
       expect(result.length).toBe(0);
@@ -422,7 +422,7 @@ describe('Search Prefix Filters', () => {
 
     it('should handle missing prefix value gracefully', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('path:', task, false)
+        Search.evaluate('path:', task, false),
       );
       // Should return false for all tasks when value is missing
       expect(result.length).toBe(0);
@@ -432,7 +432,7 @@ describe('Search Prefix Filters', () => {
   describe('Backward Compatibility', () => {
     it('should still support basic term search', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('meeting', task, false)
+        Search.evaluate('meeting', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
@@ -440,7 +440,7 @@ describe('Search Prefix Filters', () => {
 
     it('should still support phrase search', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('"star wars"', task, false)
+        Search.evaluate('"star wars"', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
@@ -448,7 +448,7 @@ describe('Search Prefix Filters', () => {
 
     it('should still support boolean operators', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('meeting OR personal', task, false)
+        Search.evaluate('meeting OR personal', task, false),
       );
       expect(result.length).toBe(2);
     });

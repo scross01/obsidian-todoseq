@@ -58,7 +58,7 @@ class PrattParser {
         this.position++;
         // Parse the term that NOT applies to
         const right = this.parseExpression(
-          SearchTokenizer.getBindingPower('not') - 1
+          SearchTokenizer.getBindingPower('not') - 1,
         );
         left = {
           type: 'and',
@@ -114,7 +114,7 @@ class PrattParser {
         this.position++;
         {
           const notExpr = this.parseExpression(
-            SearchTokenizer.getBindingPower('not') - 1
+            SearchTokenizer.getBindingPower('not') - 1,
           );
           return { type: 'not', children: [notExpr], position: token.position };
         }
@@ -130,7 +130,7 @@ class PrattParser {
           ) {
             throw new SearchError(
               'Expected closing parenthesis',
-              this.position
+              this.position,
             );
           }
 
@@ -149,7 +149,7 @@ class PrattParser {
       default:
         throw new SearchError(
           `Unexpected token: ${token.original}`,
-          token.position
+          token.position,
         );
     }
   }
@@ -159,7 +159,7 @@ class PrattParser {
     if (this.position >= this.tokens.length) {
       throw new SearchError(
         'Unexpected end of expression after prefix',
-        this.position
+        this.position,
       );
     }
 
@@ -167,7 +167,7 @@ class PrattParser {
     if (prefixToken.type !== 'prefix') {
       throw new SearchError(
         `Expected prefix token, got ${prefixToken.type}`,
-        prefixToken.position
+        prefixToken.position,
       );
     }
 
@@ -177,7 +177,7 @@ class PrattParser {
     if (this.position >= this.tokens.length) {
       throw new SearchError(
         'Expected value after prefix',
-        prefixToken.position
+        prefixToken.position,
       );
     }
 
@@ -202,7 +202,7 @@ class PrattParser {
     } else {
       throw new SearchError(
         `Expected prefix value, got ${valueToken.type}`,
-        valueToken.position
+        valueToken.position,
       );
     }
   }
@@ -212,7 +212,7 @@ class PrattParser {
       case 'or':
       case 'and': {
         const right = this.parseExpression(
-          SearchTokenizer.getBindingPower(operator.type) - 1
+          SearchTokenizer.getBindingPower(operator.type) - 1,
         );
         return {
           type: operator.type,
@@ -241,7 +241,7 @@ class PrattParser {
           ) {
             throw new SearchError(
               'Expected date value after range operator',
-              operator.position
+              operator.position,
             );
           }
 
@@ -257,7 +257,7 @@ class PrattParser {
         } else {
           throw new SearchError(
             'Range operator can only be used with scheduled: or deadline: prefixes',
-            operator.position
+            operator.position,
           );
         }
       }
@@ -265,7 +265,7 @@ class PrattParser {
       default:
         throw new SearchError(
           `Unexpected infix operator: ${operator.original}`,
-          operator.position
+          operator.position,
         );
     }
   }
@@ -282,7 +282,7 @@ class PrattParser {
       default:
         throw new SearchError(
           `Cannot create term from token type: ${token.type}`,
-          token.position
+          token.position,
         );
     }
   }
@@ -293,7 +293,7 @@ class PrattParser {
       // Already explicit, just process children
       if (node.children) {
         node.children = node.children.map((child) =>
-          this.postProcessAST(child)
+          this.postProcessAST(child),
         );
       }
       return node;

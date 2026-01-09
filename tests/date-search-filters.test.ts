@@ -15,12 +15,12 @@ describe('Date Search Filters', () => {
   const todayMidnight = new Date(
     today.getFullYear(),
     today.getMonth(),
-    today.getDate()
+    today.getDate(),
   );
   const tomorrowMidnight = new Date(
     tomorrow.getFullYear(),
     tomorrow.getMonth(),
-    tomorrow.getDate()
+    tomorrow.getDate(),
   );
 
   const testTasks: Task[] = [
@@ -147,7 +147,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(3); // Tasks with no scheduled date
       expect(results.map((r) => r.text)).toContain('Task with no dates');
@@ -159,7 +159,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1);
       expect(results[0].text).toBe('Task with scheduled date');
@@ -170,7 +170,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(0); // No tasks scheduled for tomorrow
     });
@@ -180,7 +180,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(0); // No tasks with overdue scheduled dates
     });
@@ -191,7 +191,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1);
       expect(results[0].text).toBe('Task with scheduled date');
@@ -220,11 +220,11 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = allTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(2); // Both tasks have scheduled dates in 2025
       expect(results.map((r) => r.text)).toContain(
-        `Task with ${currentYear} scheduled date`
+        `Task with ${currentYear} scheduled date`,
       );
       expect(results.map((r) => r.text)).toContain('Task with scheduled date');
     });
@@ -251,11 +251,11 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = allTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1);
       expect(results[0].text).toBe(
-        `Task with June ${currentYear} scheduled date`
+        `Task with June ${currentYear} scheduled date`,
       );
     });
 
@@ -281,7 +281,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = allTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1);
       expect(results[0].text).toBe('Task with specific date');
@@ -322,7 +322,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = allTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(2);
       expect(results.map((r) => r.text)).toContain('Task in range 1');
@@ -336,7 +336,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(2); // Tasks with no deadline and no scheduled date
       expect(results.map((r) => r.text)).toContain('Task with scheduled date');
@@ -348,7 +348,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1);
       expect(results[0].text).toBe('Task with deadline date');
@@ -359,7 +359,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1);
       expect(results[0].text).toBe('Task with overdue deadline');
@@ -370,7 +370,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(0); // No tasks with deadline today
     });
@@ -381,7 +381,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1);
       expect(results[0].text).toBe('Task with deadline date');
@@ -401,7 +401,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1); // Task scheduled for today
       expect(results[0].text).toBe('Task with scheduled date');
@@ -418,7 +418,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1); // Task with deadline tomorrow
       expect(results.map((r) => r.text)).toContain('Task with deadline date');
@@ -431,7 +431,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       // This depends on what day of the week today is
       expect(results.length).toBeGreaterThanOrEqual(0);
@@ -442,7 +442,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       // Should include tasks with deadlines this week
       expect(results.length).toBeGreaterThanOrEqual(0);
@@ -455,7 +455,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1);
       expect(results[0].text).toBe('Task with scheduled date');
@@ -466,7 +466,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(1);
       expect(results[0].text).toBe('Task with deadline date');
@@ -477,7 +477,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(2);
       expect(results.map((r) => r.text)).toContain('Task with scheduled date');
@@ -489,12 +489,12 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(2); // Tasks that have deadlines
       expect(results.map((r) => r.text)).toContain('Task with deadline date');
       expect(results.map((r) => r.text)).toContain(
-        'Task with overdue deadline'
+        'Task with overdue deadline',
       );
     });
   });
@@ -505,7 +505,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(0); // No matches for invalid dates
     });
@@ -515,7 +515,7 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       const results = testTasks.filter((task) =>
-        SearchEvaluator.evaluate(node, task, false)
+        SearchEvaluator.evaluate(node, task, false),
       );
       expect(results.length).toBe(0); // No matches for malformed ranges
     });

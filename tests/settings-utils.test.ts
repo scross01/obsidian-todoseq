@@ -122,14 +122,14 @@ describe('settings-utils', () => {
       test('should detect changes in formatTaskKeywords', () => {
         const changedSettings = { ...baseSettings, formatTaskKeywords: false };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true
+          true,
         );
       });
 
       test('should detect changes in includeCodeBlocks', () => {
         const changedSettings = { ...baseSettings, includeCodeBlocks: true };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true
+          true,
         );
       });
 
@@ -139,14 +139,14 @@ describe('settings-utils', () => {
           includeCalloutBlocks: false,
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true
+          true,
         );
       });
 
       test('should detect changes in includeCommentBlocks', () => {
         const changedSettings = { ...baseSettings, includeCommentBlocks: true };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true
+          true,
         );
       });
 
@@ -156,7 +156,7 @@ describe('settings-utils', () => {
           languageCommentSupport: { enabled: false },
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true
+          true,
         );
       });
 
@@ -166,14 +166,14 @@ describe('settings-utils', () => {
           additionalTaskKeywords: ['FIXME', 'HACK'],
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true
+          true,
         );
       });
 
       test('should NOT detect changes in refreshInterval', () => {
         const changedSettings = { ...baseSettings, refreshInterval: 30 };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false
+          false,
         );
       });
 
@@ -183,7 +183,7 @@ describe('settings-utils', () => {
           taskListViewMode: 'hideCompleted',
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false
+          false,
         );
       });
 
@@ -193,7 +193,7 @@ describe('settings-utils', () => {
           weekStartsOn: 'Sunday',
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false
+          false,
         );
       });
 
@@ -205,7 +205,7 @@ describe('settings-utils', () => {
           languageCommentSupport: { enabled: false },
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true
+          true,
         );
       });
 
@@ -217,7 +217,7 @@ describe('settings-utils', () => {
           weekStartsOn: 'Sunday',
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false
+          false,
         );
       });
     });
@@ -231,13 +231,13 @@ describe('settings-utils', () => {
         // Detect change
         const changedSettings = { ...baseSettings, formatTaskKeywords: false };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true
+          true,
         );
 
         // Update state
         detector.updatePreviousState(changedSettings);
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false
+          false,
         );
 
         // Detect new change
@@ -253,14 +253,14 @@ describe('settings-utils', () => {
         // First change
         currentSettings = { ...currentSettings, formatTaskKeywords: false };
         expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
-          true
+          true,
         );
         detector.updatePreviousState(currentSettings);
 
         // Second change
         currentSettings = { ...currentSettings, includeCodeBlocks: true };
         expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
-          true
+          true,
         );
         detector.updatePreviousState(currentSettings);
 
@@ -270,13 +270,13 @@ describe('settings-utils', () => {
           languageCommentSupport: { enabled: false },
         };
         expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
-          true
+          true,
         );
         detector.updatePreviousState(currentSettings);
 
         // No change after final update
         expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
-          false
+          false,
         );
       });
     });
@@ -305,7 +305,7 @@ describe('settings-utils', () => {
 
         // Should detect as change (undefined is different from true)
         expect(
-          detector.hasFormattingSettingsChanged(settingsWithUndefined)
+          detector.hasFormattingSettingsChanged(settingsWithUndefined),
         ).toBe(true);
       });
 
@@ -319,7 +319,7 @@ describe('settings-utils', () => {
 
         // Should detect as change (null is different from object)
         expect(detector.hasFormattingSettingsChanged(settingsWithNull)).toBe(
-          true
+          true,
         );
       });
     });
@@ -354,20 +354,20 @@ describe('settings-utils', () => {
 
       // Both should detect changes independently
       expect(detector1.hasFormattingSettingsChanged(changedSettings)).toBe(
-        true
+        true,
       );
       expect(detector2.hasFormattingSettingsChanged(changedSettings)).toBe(
-        true
+        true,
       );
 
       // Update one detector
       detector1.updatePreviousState(changedSettings);
       expect(detector1.hasFormattingSettingsChanged(changedSettings)).toBe(
-        false
+        false,
       );
       // Other detector should still detect change
       expect(detector2.hasFormattingSettingsChanged(changedSettings)).toBe(
-        true
+        true,
       );
     });
   });

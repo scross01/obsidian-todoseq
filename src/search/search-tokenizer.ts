@@ -118,7 +118,7 @@ export class SearchTokenizer {
 
   private static processTokenValue(
     token: string,
-    type: SearchToken['type']
+    type: SearchToken['type'],
   ): string {
     switch (type) {
       case 'phrase': {

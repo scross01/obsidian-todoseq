@@ -13,7 +13,7 @@ export class Search {
     query: string,
     task: Task,
     caseSensitive = false,
-    settings?: TodoTrackerSettings
+    settings?: TodoTrackerSettings,
   ): boolean {
     try {
       const ast = this.parse(query);

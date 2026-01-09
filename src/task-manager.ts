@@ -19,7 +19,7 @@ export class TaskManager {
   parseTaskFromLine(
     line: string,
     lineNumber: number,
-    filePath: string
+    filePath: string,
   ): Task | null {
     if (!this.plugin.getVaultScanner()) {
       return null;
@@ -85,7 +85,7 @@ export class TaskManager {
     lineNumber: number,
     editor: Editor,
     view: MarkdownView,
-    newState?: string
+    newState?: string,
   ): boolean {
     const taskEditor = this.plugin.taskEditor;
     const vaultScanner = this.plugin.getVaultScanner();
@@ -111,7 +111,7 @@ export class TaskManager {
     const task = this.parseTaskFromLine(
       line,
       lineNumber,
-      view.file?.path || ''
+      view.file?.path || '',
     );
 
     if (task) {
@@ -136,7 +136,7 @@ export class TaskManager {
   handleToggleTaskStateAtCursor(
     checking: boolean,
     editor: Editor,
-    view: MarkdownView
+    view: MarkdownView,
   ): boolean {
     // Get the current line from the editor
     const cursor = editor.getCursor();
@@ -146,7 +146,7 @@ export class TaskManager {
       checking,
       cursor.line,
       editor,
-      view
+      view,
     );
   }
 
@@ -160,7 +160,7 @@ export class TaskManager {
   handleAddScheduledDateAtCursor(
     checking: boolean,
     editor: Editor,
-    view: MarkdownView
+    view: MarkdownView,
   ): boolean {
     // Get the current line from the editor
     const cursor = editor.getCursor();
@@ -171,7 +171,7 @@ export class TaskManager {
       cursor.line,
       editor,
       view,
-      'SCHEDULED'
+      'SCHEDULED',
     );
   }
 
@@ -185,7 +185,7 @@ export class TaskManager {
   handleAddDeadlineDateAtCursor(
     checking: boolean,
     editor: Editor,
-    view: MarkdownView
+    view: MarkdownView,
   ): boolean {
     // Get the current line from the editor
     const cursor = editor.getCursor();
@@ -196,7 +196,7 @@ export class TaskManager {
       cursor.line,
       editor,
       view,
-      'DEADLINE'
+      'DEADLINE',
     );
   }
 
@@ -214,7 +214,7 @@ export class TaskManager {
     lineNumber: number,
     editor: Editor,
     view: MarkdownView,
-    dateType: 'SCHEDULED' | 'DEADLINE'
+    dateType: 'SCHEDULED' | 'DEADLINE',
   ): boolean {
     const vaultScanner = this.plugin.getVaultScanner();
 
@@ -239,7 +239,7 @@ export class TaskManager {
     const existingDateLine = this.findExistingDateLine(
       editor,
       lineNumber,
-      dateType
+      dateType,
     );
 
     if (existingDateLine !== null) {
@@ -263,7 +263,7 @@ export class TaskManager {
   private findExistingDateLine(
     editor: Editor,
     taskLineNumber: number,
-    dateType: 'SCHEDULED' | 'DEADLINE'
+    dateType: 'SCHEDULED' | 'DEADLINE',
   ): number | null {
     const totalLines = editor.lineCount();
     const keyword = `${dateType}:`;
@@ -304,7 +304,7 @@ export class TaskManager {
   private insertDateLine(
     editor: Editor,
     taskLineNumber: number,
-    dateType: 'SCHEDULED' | 'DEADLINE'
+    dateType: 'SCHEDULED' | 'DEADLINE',
   ): void {
     const currentDate = this.getCurrentDateString();
     const dateLine = `${dateType}: <${currentDate}>`;
@@ -377,7 +377,7 @@ export class TaskManager {
       editor.replaceRange(
         newlineBefore + dateLine,
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
-        { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length }
+        { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
       this.moveCursorToDateLine(editor, insertLine);
     } else if (isInsertingBeforeDateLine) {
@@ -387,7 +387,7 @@ export class TaskManager {
       editor.replaceRange(
         newlineBefore + dateLine,
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
-        { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length }
+        { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
       this.moveCursorToDateLine(editor, insertLine);
     } else {
@@ -395,7 +395,7 @@ export class TaskManager {
       editor.replaceRange(
         '\n' + dateLine + '\n',
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
-        { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length }
+        { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
       this.moveCursorToDateLine(editor, insertLine);
     }
@@ -420,7 +420,7 @@ export class TaskManager {
       editor.setCursor({ line: dateLineNumber, ch: dateStart });
       editor.setSelection(
         { line: dateLineNumber, ch: dateStart },
-        { line: dateLineNumber, ch: dateEnd }
+        { line: dateLineNumber, ch: dateEnd },
       );
     }
   }

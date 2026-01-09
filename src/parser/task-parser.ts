@@ -76,7 +76,7 @@ export class TaskParser {
     includeCommentBlocks: boolean,
     languageCommentSupport: LanguageCommentSupportSettings,
     customKeywords: string[],
-    allKeywords: string[]
+    allKeywords: string[],
   ) {
     this.customKeywords = customKeywords;
     this.allKeywords = allKeywords;
@@ -127,7 +127,7 @@ export class TaskParser {
       settings.includeCommentBlocks,
       settings.languageCommentSupport,
       normalizedAdditional,
-      allKeywordsArray
+      allKeywordsArray,
     );
   }
 
@@ -173,7 +173,7 @@ export class TaskParser {
         if (pattern.test(keyword)) {
           throw new Error(
             `Invalid task keyword "${keyword}": contains dangerous regex pattern. ` +
-              `Keywords should be simple words without complex regex syntax.`
+              `Keywords should be simple words without complex regex syntax.`,
           );
         }
       }
@@ -185,7 +185,7 @@ export class TaskParser {
 
       if (/^\s+$/.test(keyword)) {
         throw new Error(
-          `Invalid task keyword "${keyword}": whitespace-only keywords not allowed`
+          `Invalid task keyword "${keyword}": whitespace-only keywords not allowed`,
         );
       }
     }
@@ -215,7 +215,7 @@ export class TaskParser {
         `(${BULLET_LIST_PATTERN}|${NUMBERED_LIST_PATTERN}|${LETTER_LIST_PATTERN}|${CUSTOM_LIST_PATTERN})??` +
         `(${CHECKBOX})?` +
         `(${escaped_keywords})\\s+` +
-        `(${TASK_TEXT})$`
+        `(${TASK_TEXT})$`,
     );
     const capture = test;
     return { test, capture };
@@ -233,7 +233,7 @@ export class TaskParser {
     const footnotePattern = `\\[\\^\\d+\\]:\\s+`;
 
     const test = new RegExp(
-      `^${footnotePattern}` + `(${escapedKeywords})\\s+` + `(${TASK_TEXT})$`
+      `^${footnotePattern}` + `(${escapedKeywords})\\s+` + `(${TASK_TEXT})$`,
     );
     const capture = test;
     return { test, capture };
@@ -247,7 +247,7 @@ export class TaskParser {
    */
   public static buildCodeRegex(
     keywords: string[],
-    languageDefinition: LanguageDefinition
+    languageDefinition: LanguageDefinition,
   ): RegexPair {
     const escapedKeywords = TaskParser.escapeKeywords(keywords);
 
@@ -269,7 +269,7 @@ export class TaskParser {
         `(${CHECKBOX})?` +
         `(${escapedKeywords})\\s+` +
         `(${TASK_TEXT})` +
-        `(?=${endComment}$|$)?(${endComment})?$`
+        `(?=${endComment}$|$)?(${endComment})?$`,
     );
     const capture = test;
     return { test, capture };
@@ -283,7 +283,7 @@ export class TaskParser {
    */
   private extractFootnoteTaskDetails(
     line: string,
-    regex: RegExp
+    regex: RegExp,
   ): {
     indent: string;
     listMarker: string;
@@ -322,7 +322,7 @@ export class TaskParser {
    */
   private extractTaskDetails(
     line: string,
-    regex: RegExp
+    regex: RegExp,
   ): {
     indent: string;
     listMarker: string;
@@ -381,7 +381,7 @@ export class TaskParser {
   private extractCheckboxState(
     line: string,
     state: string,
-    listMarker: string
+    listMarker: string,
   ): {
     state: string;
     completed: boolean;
@@ -429,7 +429,7 @@ export class TaskParser {
    */
   getDateLineType(
     line: string,
-    taskIndent: string
+    taskIndent: string,
   ): 'scheduled' | 'deadline' | null {
     const trimmedLine = line.trim();
 
@@ -491,7 +491,7 @@ export class TaskParser {
   private extractTaskDates(
     lines: string[],
     startIndex: number,
-    indent: string
+    indent: string,
   ): { scheduledDate: Date | null; deadlineDate: Date | null } {
     let scheduledDate: Date | null = null;
     let deadlineDate: Date | null = null;
@@ -516,7 +516,7 @@ export class TaskParser {
           scheduledFound = true;
         } else {
           console.warn(
-            `Invalid scheduled date format at line ${i + 1}: "${nextLine.trim()}"`
+            `Invalid scheduled date format at line ${i + 1}: "${nextLine.trim()}"`,
           );
         }
       } else if (dateLineType === 'deadline' && !deadlineFound) {
@@ -526,7 +526,7 @@ export class TaskParser {
           deadlineFound = true;
         } else {
           console.warn(
-            `Invalid deadline date format at line ${i + 1}: "${nextLine.trim()}"`
+            `Invalid deadline date format at line ${i + 1}: "${nextLine.trim()}"`,
           );
         }
       } else {
@@ -566,7 +566,7 @@ export class TaskParser {
           line,
           path,
           index,
-          lines
+          lines,
         );
         if (footnoteTask) {
           tasks.push(footnoteTask);
@@ -578,7 +578,7 @@ export class TaskParser {
       const blockTransition = this.detectBlockTransition(
         line,
         inBlock,
-        blockMarker
+        blockMarker,
       );
       if (blockTransition) {
         const result = this.handleBlockTransition(
@@ -587,7 +587,7 @@ export class TaskParser {
           lines,
           inBlock,
           codeRegex,
-          path
+          path,
         );
         if (result) {
           inBlock = result.inBlock;
@@ -604,7 +604,7 @@ export class TaskParser {
           line,
           path,
           index,
-          lines
+          lines,
         );
         if (commentTask) {
           tasks.push(commentTask);
@@ -627,7 +627,7 @@ export class TaskParser {
       if (
         !this.shouldParseLine(
           line,
-          useCodeRegex && codeRegex ? codeRegex : undefined
+          useCodeRegex && codeRegex ? codeRegex : undefined,
         )
       ) {
         continue;
@@ -641,7 +641,7 @@ export class TaskParser {
         path,
         index,
         taskDetails,
-        lines
+        lines,
       );
 
       if (task) {
@@ -662,7 +662,7 @@ export class TaskParser {
   private detectBlockTransition(
     line: string,
     currentInBlock: boolean,
-    currentBlockMarker: 'code' | 'math' | 'comment' | null
+    currentBlockMarker: 'code' | 'math' | 'comment' | null,
   ): {
     type: 'code' | 'math' | 'comment';
     entering: boolean;
@@ -723,7 +723,7 @@ export class TaskParser {
     lines: string[],
     currentInBlock: boolean,
     currentCodeRegex: RegExp | null,
-    path: string
+    path: string,
   ): {
     inBlock: boolean;
     blockMarker: 'code' | 'math' | 'comment' | null;
@@ -745,7 +745,7 @@ export class TaskParser {
           if (this.currentLanguage) {
             const regexPair = TaskParser.buildCodeRegex(
               this.allKeywords,
-              this.currentLanguage
+              this.currentLanguage,
             );
             codeRegex = regexPair.test;
           }
@@ -787,7 +787,7 @@ export class TaskParser {
   private shouldSkipLine(
     line: string,
     inBlock: boolean,
-    blockMarker: 'code' | 'math' | 'comment' | null
+    blockMarker: 'code' | 'math' | 'comment' | null,
   ): boolean {
     // Skip lines in quotes and callout blocks if disabled
     if (!this.includeCalloutBlocks && CALLOUT_BLOCK_REGEX.test(line)) {
@@ -820,7 +820,7 @@ export class TaskParser {
    */
   private shouldParseLine(
     line: string,
-    codeRegex?: { test: (str: string) => boolean }
+    codeRegex?: { test: (str: string) => boolean },
   ): boolean {
     if (codeRegex) {
       return codeRegex.test(line);
@@ -840,7 +840,7 @@ export class TaskParser {
     line: string,
     path: string,
     index: number,
-    lines: string[]
+    lines: string[],
   ): Task | null {
     const footnoteRegex = TaskParser.buildFootnoteRegex(this.allKeywords);
     if (!footnoteRegex.test.test(line)) {
@@ -849,10 +849,10 @@ export class TaskParser {
 
     const taskDetails = this.extractFootnoteTaskDetails(
       line,
-      footnoteRegex.capture
+      footnoteRegex.capture,
     );
     const { priority, cleanedText } = this.extractPriority(
-      taskDetails.taskText
+      taskDetails.taskText,
     );
 
     const task: Task = {
@@ -874,7 +874,7 @@ export class TaskParser {
     const { scheduledDate, deadlineDate } = this.extractTaskDates(
       lines,
       index + 1,
-      taskDetails.indent
+      taskDetails.indent,
     );
 
     task.scheduledDate = scheduledDate;
@@ -895,7 +895,7 @@ export class TaskParser {
     line: string,
     path: string,
     index: number,
-    lines: string[]
+    lines: string[],
   ): Task | null {
     if (!this.includeCommentBlocks) {
       return null;
@@ -910,7 +910,7 @@ export class TaskParser {
 
     const taskDetails = this.extractTaskDetails(content, this.captureRegex);
     const { priority, cleanedText } = this.extractPriority(
-      taskDetails.taskText
+      taskDetails.taskText,
     );
     const {
       state: finalState,
@@ -919,7 +919,7 @@ export class TaskParser {
     } = this.extractCheckboxState(
       content,
       taskDetails.state,
-      taskDetails.listMarker
+      taskDetails.listMarker,
     );
 
     const task: Task = {
@@ -941,7 +941,7 @@ export class TaskParser {
     const { scheduledDate, deadlineDate } = this.extractTaskDates(
       lines,
       index + 1,
-      taskDetails.indent
+      taskDetails.indent,
     );
 
     task.scheduledDate = scheduledDate;
@@ -970,11 +970,11 @@ export class TaskParser {
       tail: string;
       state: string;
     },
-    lines: string[]
+    lines: string[],
   ): Task {
     // Extract priority
     const { priority, cleanedText } = this.extractPriority(
-      taskDetails.taskText
+      taskDetails.taskText,
     );
 
     // Extract checkbox state
@@ -985,7 +985,7 @@ export class TaskParser {
     } = this.extractCheckboxState(
       line,
       taskDetails.state,
-      taskDetails.listMarker
+      taskDetails.listMarker,
     );
 
     // Initialize task with date fields
@@ -1008,7 +1008,7 @@ export class TaskParser {
     const { scheduledDate, deadlineDate } = this.extractTaskDates(
       lines,
       index + 1,
-      taskDetails.indent
+      taskDetails.indent,
     );
 
     task.scheduledDate = scheduledDate;

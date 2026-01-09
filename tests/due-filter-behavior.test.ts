@@ -96,18 +96,18 @@ describe('Due Filter Behavior', () => {
     const node = SearchParser.parse(query);
 
     const results = testTasks.filter((task) =>
-      SearchEvaluator.evaluate(node, task, false)
+      SearchEvaluator.evaluate(node, task, false),
     );
 
     expect(results.length).toBe(2);
     expect(results.map((r) => r.text)).toContain(
-      'Task with scheduled date today'
+      'Task with scheduled date today',
     );
     expect(results.map((r) => r.text)).toContain(
-      'Task with overdue scheduled date'
+      'Task with overdue scheduled date',
     );
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with future scheduled date'
+      'Task with future scheduled date',
     );
   });
 
@@ -116,16 +116,16 @@ describe('Due Filter Behavior', () => {
     const node = SearchParser.parse(query);
 
     const results = testTasks.filter((task) =>
-      SearchEvaluator.evaluate(node, task, false)
+      SearchEvaluator.evaluate(node, task, false),
     );
 
     expect(results.length).toBe(2);
     expect(results.map((r) => r.text)).toContain(
-      'Task with deadline date today'
+      'Task with deadline date today',
     );
     expect(results.map((r) => r.text)).toContain('Task with overdue deadline');
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with future deadline'
+      'Task with future deadline',
     );
   });
 
@@ -134,18 +134,18 @@ describe('Due Filter Behavior', () => {
     const node = SearchParser.parse(query);
 
     const results = testTasks.filter((task) =>
-      SearchEvaluator.evaluate(node, task, false)
+      SearchEvaluator.evaluate(node, task, false),
     );
 
     expect(results.length).toBe(1);
     expect(results.map((r) => r.text)).toContain(
-      'Task with scheduled date today'
+      'Task with scheduled date today',
     );
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with overdue scheduled date'
+      'Task with overdue scheduled date',
     );
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with future scheduled date'
+      'Task with future scheduled date',
     );
   });
 
@@ -154,18 +154,18 @@ describe('Due Filter Behavior', () => {
     const node = SearchParser.parse(query);
 
     const results = testTasks.filter((task) =>
-      SearchEvaluator.evaluate(node, task, false)
+      SearchEvaluator.evaluate(node, task, false),
     );
 
     expect(results.length).toBe(1);
     expect(results.map((r) => r.text)).toContain(
-      'Task with deadline date today'
+      'Task with deadline date today',
     );
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with overdue deadline'
+      'Task with overdue deadline',
     );
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with future deadline'
+      'Task with future deadline',
     );
   });
 
@@ -174,18 +174,18 @@ describe('Due Filter Behavior', () => {
     const node = SearchParser.parse(query);
 
     const results = testTasks.filter((task) =>
-      SearchEvaluator.evaluate(node, task, false)
+      SearchEvaluator.evaluate(node, task, false),
     );
 
     expect(results.length).toBe(1);
     expect(results.map((r) => r.text)).toContain(
-      'Task with overdue scheduled date'
+      'Task with overdue scheduled date',
     );
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with scheduled date today'
+      'Task with scheduled date today',
     );
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with future scheduled date'
+      'Task with future scheduled date',
     );
   });
 
@@ -194,16 +194,16 @@ describe('Due Filter Behavior', () => {
     const node = SearchParser.parse(query);
 
     const results = testTasks.filter((task) =>
-      SearchEvaluator.evaluate(node, task, false)
+      SearchEvaluator.evaluate(node, task, false),
     );
 
     expect(results.length).toBe(1);
     expect(results.map((r) => r.text)).toContain('Task with overdue deadline');
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with deadline date today'
+      'Task with deadline date today',
     );
     expect(results.map((r) => r.text)).not.toContain(
-      'Task with future deadline'
+      'Task with future deadline',
     );
   });
 });

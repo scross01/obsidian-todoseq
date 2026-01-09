@@ -91,7 +91,7 @@ export default class TodoTracker extends Plugin {
     this.settings = Object.assign(
       {},
       DefaultSettings,
-      loaded as Partial<TodoTrackerSettings>
+      loaded as Partial<TodoTrackerSettings>,
     );
     // Normalize settings shape after migration: ensure additionalTaskKeywords exists
     if (!this.settings.additionalTaskKeywords) {
@@ -221,7 +221,7 @@ export default class TodoTracker extends Plugin {
       } catch (error) {
         console.warn(
           'Failed to open task view in right sidebar, falling back to main area:',
-          error
+          error,
         );
         // Fallback to main area if right sidebar access fails
         leaf = workspace.getLeaf(true);

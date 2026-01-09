@@ -22,7 +22,7 @@ export class PluginLifecycleManager {
     this.plugin.vaultScanner = new VaultScanner(
       this.plugin.app,
       this.plugin.settings,
-      TaskParser.create(this.plugin.settings)
+      TaskParser.create(this.plugin.settings),
     );
     this.plugin.taskEditor = new TaskEditor(this.plugin.app);
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
@@ -37,8 +37,8 @@ export class PluginLifecycleManager {
           leaf,
           this.plugin.tasks,
           this.plugin.settings.taskListViewMode,
-          this.plugin.settings
-        )
+          this.plugin.settings,
+        ),
     );
 
     // Persist view-mode changes coming from TodoView toolbars
@@ -51,12 +51,12 @@ export class PluginLifecycleManager {
     };
     window.addEventListener('todoseq:view-mode-change', handler);
     this.plugin.register(() =>
-      window.removeEventListener('todoseq:view-mode-change', handler)
+      window.removeEventListener('todoseq:view-mode-change', handler),
     );
 
     // Add settings tab
     this.plugin.addSettingTab(
-      new TodoTrackerSettingTab(this.plugin.app, this.plugin)
+      new TodoTrackerSettingTab(this.plugin.app, this.plugin),
     );
 
     // Add command to show tasks
@@ -73,12 +73,12 @@ export class PluginLifecycleManager {
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
-        view: MarkdownView
+        view: MarkdownView,
       ) => {
         return this.plugin.taskManager.handleToggleTaskStateAtCursor(
           checking,
           editor,
-          view
+          view,
         );
       },
       hotkeys: [
@@ -96,12 +96,12 @@ export class PluginLifecycleManager {
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
-        view: MarkdownView
+        view: MarkdownView,
       ) => {
         return this.plugin.taskManager.handleAddScheduledDateAtCursor(
           checking,
           editor,
-          view
+          view,
         );
       },
     });
@@ -113,12 +113,12 @@ export class PluginLifecycleManager {
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
-        view: MarkdownView
+        view: MarkdownView,
       ) => {
         return this.plugin.taskManager.handleAddDeadlineDateAtCursor(
           checking,
           editor,
-          view
+          view,
         );
       },
     });
@@ -149,23 +149,23 @@ export class PluginLifecycleManager {
     this.plugin.registerEvent(
       this.plugin.app.vault.on('modify', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file);
-      })
+      }),
     );
     this.plugin.registerEvent(
       this.plugin.app.vault.on('create', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file);
-      })
+      }),
     );
     this.plugin.registerEvent(
       this.plugin.app.vault.on('delete', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file);
-      })
+      }),
     );
     this.plugin.registerEvent(
       // Obsidian passes (file, oldPath) for rename
       this.plugin.app.vault.on('rename', (file, oldPath) => {
         this.plugin.vaultScanner?.handleFileRename(file, oldPath);
-      })
+      }),
     );
 
     // Conditional ribbon icon - only show on mobile devices

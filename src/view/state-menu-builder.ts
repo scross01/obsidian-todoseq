@@ -11,14 +11,14 @@ import { getPluginSettings } from '../utils/settings-utils';
 export class StateMenuBuilder {
   constructor(
     private app: App,
-    private settings: TodoTrackerSettings
+    private settings: TodoTrackerSettings,
   ) {}
 
   /**
    * Get the list of selectable states for the context menu, excluding the current state
    */
   public getSelectableStatesForMenu(
-    current: string
+    current: string,
   ): { group: string; states: string[] }[] {
     const { pendingActive, completed, additional } = this.getKeywordSets();
 
@@ -58,7 +58,7 @@ export class StateMenuBuilder {
     const configured = settings?.additionalTaskKeywords;
     const additional = Array.isArray(configured)
       ? configured.filter(
-          (v): v is string => typeof v === 'string' && v.length > 0
+          (v): v is string => typeof v === 'string' && v.length > 0,
         )
       : [];
 
@@ -74,7 +74,7 @@ export class StateMenuBuilder {
    */
   public buildStateMenu(
     currentState: string,
-    onStateSelected: (state: string) => void
+    onStateSelected: (state: string) => void,
   ): Menu {
     const menu = new Menu();
     const groups = this.getSelectableStatesForMenu(currentState);

@@ -16,7 +16,7 @@ export class SearchSuggestions {
    */
   private static filterTasksByViewMode(
     tasks: Task[],
-    mode: TaskListViewMode
+    mode: TaskListViewMode,
   ): Task[] {
     if (mode === 'hideCompleted') {
       return tasks.filter((t) => !t.completed);
@@ -32,7 +32,7 @@ export class SearchSuggestions {
    */
   private static getFilesWithNonCompletedTasks(
     tasks: Task[],
-    mode: TaskListViewMode
+    mode: TaskListViewMode,
   ): Set<string> {
     if (mode !== 'hideCompleted') {
       // For other modes, include all files
@@ -56,7 +56,7 @@ export class SearchSuggestions {
    */
   static getAllPathsFromTasks(
     tasks: Task[],
-    mode?: TaskListViewMode
+    mode?: TaskListViewMode,
   ): string[] {
     const pathsSet = new Set<string>();
 
@@ -151,7 +151,7 @@ export class SearchSuggestions {
    */
   static getAllFilesFromTasks(
     tasks: Task[],
-    mode?: TaskListViewMode
+    mode?: TaskListViewMode,
   ): string[] {
     const filesSet = new Set<string>();
 
@@ -304,7 +304,7 @@ export class SearchSuggestions {
    */
   static getScheduledDateSuggestions(
     tasks: Task[],
-    mode?: TaskListViewMode
+    mode?: TaskListViewMode,
   ): string[] {
     const datesSet = new Set<string>();
 
@@ -334,7 +334,7 @@ export class SearchSuggestions {
    */
   static getDeadlineDateSuggestions(
     tasks: Task[],
-    mode?: TaskListViewMode
+    mode?: TaskListViewMode,
   ): string[] {
     const datesSet = new Set<string>();
 
@@ -367,7 +367,7 @@ export class SearchSuggestions {
 
     const searchText = query.toLowerCase();
     return suggestions.filter((suggestion) =>
-      suggestion.toLowerCase().includes(searchText)
+      suggestion.toLowerCase().includes(searchText),
     );
   }
 

@@ -88,7 +88,7 @@ export class DateAutocompleteExtension {
    */
   private checkLineContext(
     view: EditorView,
-    currentLineNumber: number
+    currentLineNumber: number,
   ): boolean {
     const { state } = view;
     // Check if this is the first line
@@ -112,7 +112,7 @@ export class DateAutocompleteExtension {
         (keyword) =>
           prevLineText.startsWith(keyword) ||
           prevLineText.includes(` ${keyword} `) ||
-          prevLineText.includes(`\t${keyword} `)
+          prevLineText.includes(`\t${keyword} `),
       );
 
       if (isTaskLine) {
@@ -140,7 +140,7 @@ export class DateAutocompleteExtension {
    */
   private checkKeywordPosition(
     lineText: string,
-    cursorOffset: number
+    cursorOffset: number,
   ): boolean {
     const textBeforeCursor = lineText.substring(0, cursorOffset);
     const keywordMatch = textBeforeCursor.match(/(SCHEDULED|DEADLINE)$/);
@@ -182,7 +182,7 @@ export class DateAutocompleteExtension {
  * Create date autocomplete extension
  */
 export function dateAutocompleteExtension(
-  settings: TodoTrackerSettings
+  settings: TodoTrackerSettings,
 ): Extension {
   const extension = new DateAutocompleteExtension(settings);
   return extension.createExtension();

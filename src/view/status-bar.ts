@@ -31,7 +31,7 @@ export class StatusBarManager {
     this.plugin.registerEvent(
       this.plugin.app.workspace.on('active-leaf-change', () => {
         this.updateStatusBarItem(this.getTasks());
-      })
+      }),
     );
   }
 
@@ -47,13 +47,13 @@ export class StatusBarManager {
 
     // Count incomplete tasks for the current file
     const incompleteTasks = tasks.filter(
-      (task) => task.path === activeFile.path && !task.completed
+      (task) => task.path === activeFile.path && !task.completed,
     );
 
     // Format as "X tasks" instead of "Tasks: X"
     const taskCount = incompleteTasks.length;
     this.statusBarItem.setText(
-      `${taskCount} task${taskCount !== 1 ? 's' : ''}`
+      `${taskCount} task${taskCount !== 1 ? 's' : ''}`,
     );
   }
 
@@ -76,7 +76,7 @@ export class StatusBarManager {
     const searchQuery = pathFilter + fileFilter;
 
     const leaves = this.plugin.app.workspace.getLeavesOfType(
-      TaskListView.viewType
+      TaskListView.viewType,
     );
     if (leaves.length > 0) {
       const view = leaves[0].view as TaskListView;
@@ -93,7 +93,7 @@ export class StatusBarManager {
     view.contentEl.setAttr('data-search', query);
     // Also update the search input element if it exists
     const searchInput = view.contentEl.querySelector(
-      '.search-input-container input'
+      '.search-input-container input',
     );
     if (searchInput instanceof HTMLInputElement) {
       searchInput.value = query;

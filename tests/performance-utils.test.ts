@@ -34,7 +34,7 @@ describe('Performance Utils Improvements', () => {
         // First call should create decorations
         const result1 = formatter.getOptimizedDecorations(
           mockView,
-          createDecorations
+          createDecorations,
         );
         expect(result1).toBe(mockDecorations);
         expect(createDecorations).toHaveBeenCalledWith(1, 10);
@@ -42,7 +42,7 @@ describe('Performance Utils Improvements', () => {
         // Second call with same version should return cached result
         const result2 = formatter.getOptimizedDecorations(
           mockView,
-          createDecorations
+          createDecorations,
         );
         expect(result2).toBe(mockDecorations);
         expect(createDecorations).toHaveBeenCalledTimes(1); // Should not be called again
@@ -63,7 +63,7 @@ describe('Performance Utils Improvements', () => {
 
         const result = formatter.getOptimizedDecorations(
           mockView,
-          createDecorations
+          createDecorations,
         );
 
         expect(result).toBe(mockDecorations);
@@ -95,7 +95,7 @@ describe('Performance Utils Improvements', () => {
 
         const result = formatter.getOptimizedDecorations(
           mockView,
-          createDecorations
+          createDecorations,
         );
 
         expect(result).toBe(mockDecorations);
@@ -127,7 +127,7 @@ describe('Performance Utils Improvements', () => {
 
         const result = formatter.getOptimizedDecorations(
           mockView,
-          createDecorations
+          createDecorations,
         );
 
         expect(result).toBe(mockDecorations);
@@ -135,7 +135,7 @@ describe('Performance Utils Improvements', () => {
       });
 
       test.todo(
-        'should handle error in getLastUpdate gracefully - Error handling needs improvement'
+        'should handle error in getLastUpdate gracefully - Error handling needs improvement',
       );
     });
 
@@ -156,7 +156,7 @@ describe('Performance Utils Improvements', () => {
         } as any;
 
         const result = (formatter as any).shouldUseIncrementalUpdate(
-          mockUpdate
+          mockUpdate,
         );
         expect(result).toBe(false);
       });
@@ -177,7 +177,7 @@ describe('Performance Utils Improvements', () => {
         } as any;
 
         const result = (formatter as any).shouldUseIncrementalUpdate(
-          mockUpdate
+          mockUpdate,
         );
         expect(result).toBe(true);
       });
@@ -198,7 +198,7 @@ describe('Performance Utils Improvements', () => {
         } as any;
 
         const result = (formatter as any).shouldUseIncrementalUpdate(
-          mockUpdate
+          mockUpdate,
         );
         expect(result).toBe(false);
       });
@@ -219,7 +219,7 @@ describe('Performance Utils Improvements', () => {
         } as any;
 
         const result = (formatter as any).shouldUseIncrementalUpdate(
-          mockUpdate
+          mockUpdate,
         );
         expect(result).toBe(true);
       });
@@ -240,7 +240,7 @@ describe('Performance Utils Improvements', () => {
         } as any;
 
         const result = (formatter as any).shouldUseIncrementalUpdate(
-          mockUpdate
+          mockUpdate,
         );
         expect(result).toBe(false);
       });
@@ -261,7 +261,7 @@ describe('Performance Utils Improvements', () => {
         } as any;
 
         const result = (formatter as any).shouldUseIncrementalUpdate(
-          mockUpdate
+          mockUpdate,
         );
         expect(result).toBe(true);
       });
@@ -388,7 +388,7 @@ describe('Performance Utils Improvements', () => {
 
     describe('mergeDecorations', () => {
       test.todo(
-        'should handle empty decorations - RangeSetBuilder mocking is complex'
+        'should handle empty decorations - RangeSetBuilder mocking is complex',
       );
     });
 
@@ -503,7 +503,7 @@ describe('Performance Utils Improvements', () => {
         // First call with view1
         const result1 = formatter.getOptimizedDecorations(
           mockView1,
-          createDecorations
+          createDecorations,
         );
         expect(result1).toBe(mockDecorations1);
         expect(createDecorations).toHaveBeenCalledWith(1, 10);
@@ -511,7 +511,7 @@ describe('Performance Utils Improvements', () => {
         // Second call with same view1 should use cache
         const result2 = formatter.getOptimizedDecorations(
           mockView1,
-          createDecorations
+          createDecorations,
         );
         expect(result2).toBe(mockDecorations1);
         expect(createDecorations).toHaveBeenCalledTimes(1);
@@ -519,7 +519,7 @@ describe('Performance Utils Improvements', () => {
         // Third call with different view2 should create new decorations
         const result3 = formatter.getOptimizedDecorations(
           mockView2,
-          createDecorations
+          createDecorations,
         );
         expect(result3).toBe(mockDecorations2);
         expect(createDecorations).toHaveBeenCalledWith(1, 20);
@@ -543,7 +543,7 @@ describe('Performance Utils Improvements', () => {
         for (let i = 0; i < 5; i++) {
           const result = formatter.getOptimizedDecorations(
             mockView,
-            createDecorations
+            createDecorations,
           );
           expect(result).toBe(mockDecorations);
         }
@@ -620,7 +620,7 @@ describe('Performance Utils Improvements', () => {
         expect(() => {
           formatter.getOptimizedDecorations(
             undefined as any,
-            createDecorations
+            createDecorations,
           );
         }).toThrow();
       });
@@ -668,7 +668,7 @@ describe('Performance Utils Improvements', () => {
         // This should not throw, it should handle the missing properties gracefully
         const result = formatter.getOptimizedDecorations(
           mockView,
-          createDecorations
+          createDecorations,
         );
         expect(result).toBe(mockDecorations);
       });
@@ -730,7 +730,7 @@ describe('Performance Utils Improvements', () => {
       expect(() => {
         detector.hasFormattingSettingsChanged(mockSettings);
       }).toThrow(
-        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.',
       );
     });
 
@@ -738,7 +738,7 @@ describe('Performance Utils Improvements', () => {
       expect(() => {
         detector.updatePreviousState(mockSettings);
       }).toThrow(
-        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.',
       );
     });
 
@@ -748,7 +748,7 @@ describe('Performance Utils Improvements', () => {
       expect(() => {
         detector.initialize(mockSettings);
       }).toThrow(
-        'SettingsChangeDetector is already initialized. Create a new instance instead.'
+        'SettingsChangeDetector is already initialized. Create a new instance instead.',
       );
     });
 
@@ -787,7 +787,7 @@ describe('Performance Utils Improvements', () => {
       expect(() => {
         detector.hasFormattingSettingsChanged(mockSettings);
       }).toThrow(
-        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.',
       );
     });
 
@@ -810,7 +810,7 @@ describe('Performance Utils Improvements', () => {
       // Should not throw an error, but return false for change detection
       expect(() => {
         detector.hasFormattingSettingsChanged(
-          problematicSettings as TodoTrackerSettings
+          problematicSettings as TodoTrackerSettings,
         );
       }).not.toThrow();
     });

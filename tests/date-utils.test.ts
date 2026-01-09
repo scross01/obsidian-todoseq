@@ -8,13 +8,13 @@ describe('DateUtils', () => {
   beforeAll(() => {
     Date.prototype.toLocaleDateString = function (
       locales?: any,
-      options?: any
+      options?: any,
     ) {
       return originalToLocaleDateString.call(this, 'en-US', options);
     };
     Date.prototype.toLocaleTimeString = function (
       locales?: any,
-      options?: any
+      options?: any,
     ) {
       return originalToLocaleTimeString.call(this, 'en-US', options);
     };
@@ -361,7 +361,7 @@ describe('DateUtils', () => {
         const dayAfterTomorrow = new Date('2025-10-17T00:00:00');
         const result = DateUtils.isDateDueTomorrow(
           dayAfterTomorrow,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(false);
       });
@@ -377,7 +377,7 @@ describe('DateUtils', () => {
         const currentMonthDate = new Date('2025-10-20T00:00:00');
         const result = DateUtils.isDateInCurrentMonth(
           currentMonthDate,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(true);
       });
@@ -386,7 +386,7 @@ describe('DateUtils', () => {
         const prevMonthDate = new Date('2025-09-30T00:00:00');
         const result = DateUtils.isDateInCurrentMonth(
           prevMonthDate,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(false);
       });
@@ -395,7 +395,7 @@ describe('DateUtils', () => {
         const nextMonthDate = new Date('2025-11-01T00:00:00');
         const result = DateUtils.isDateInCurrentMonth(
           nextMonthDate,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(false);
       });
@@ -404,7 +404,7 @@ describe('DateUtils', () => {
         const differentYearDate = new Date('2024-10-15T00:00:00');
         const result = DateUtils.isDateInCurrentMonth(
           differentYearDate,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(false);
       });
@@ -420,7 +420,7 @@ describe('DateUtils', () => {
         const nextMonthDate = new Date('2025-11-15T00:00:00');
         const result = DateUtils.isDateInNextMonth(
           nextMonthDate,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(true);
       });
@@ -429,7 +429,7 @@ describe('DateUtils', () => {
         const currentMonthDate = new Date('2025-10-20T00:00:00');
         const result = DateUtils.isDateInNextMonth(
           currentMonthDate,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(false);
       });
@@ -438,7 +438,7 @@ describe('DateUtils', () => {
         const monthAfterNext = new Date('2025-12-01T00:00:00');
         const result = DateUtils.isDateInNextMonth(
           monthAfterNext,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(false);
       });
@@ -462,7 +462,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInNextNDays(
           withinRange,
           5,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(true);
       });
@@ -472,7 +472,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInNextNDays(
           beyondRange,
           5,
-          referenceDate
+          referenceDate,
         );
         expect(result).toBe(false);
       });
@@ -572,7 +572,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInCurrentWeek(
           monday,
           referenceDate,
-          'Monday'
+          'Monday',
         );
         expect(result).toBe(true);
       });
@@ -583,7 +583,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInCurrentWeek(
           sunday,
           referenceDate,
-          'Monday'
+          'Monday',
         );
         expect(result).toBe(true);
       });
@@ -594,7 +594,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInCurrentWeek(
           nextMonday,
           referenceDate,
-          'Monday'
+          'Monday',
         );
         expect(result).toBe(false);
       });
@@ -608,7 +608,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInCurrentWeek(
           sunday,
           referenceDate,
-          'Sunday'
+          'Sunday',
         );
         expect(result).toBe(true);
       });
@@ -619,7 +619,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInCurrentWeek(
           saturday,
           referenceDate,
-          'Sunday'
+          'Sunday',
         );
         expect(result).toBe(true);
       });
@@ -630,7 +630,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInCurrentWeek(
           nextSunday,
           referenceDate,
-          'Sunday'
+          'Sunday',
         );
         expect(result).toBe(false);
       });
@@ -644,7 +644,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInNextWeek(
           nextMonday,
           referenceDate,
-          'Monday'
+          'Monday',
         );
         expect(result).toBe(true);
       });
@@ -655,7 +655,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInNextWeek(
           nextSunday,
           referenceDate,
-          'Sunday'
+          'Sunday',
         );
         expect(result).toBe(true);
       });
@@ -666,7 +666,7 @@ describe('DateUtils', () => {
         const result = DateUtils.isDateInNextWeek(
           currentWeekDate,
           referenceDate,
-          'Monday'
+          'Monday',
         );
         expect(result).toBe(false);
       });

@@ -61,7 +61,7 @@ describe('Search functionality', () => {
   describe('Basic term search', () => {
     it('should find tasks containing single term', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('meeting', task, false)
+        Search.evaluate('meeting', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/meeting.md');
@@ -69,7 +69,7 @@ describe('Search functionality', () => {
 
     it('should find tasks containing multiple terms (AND)', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('work urgent', task, false)
+        Search.evaluate('work urgent', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/work.md');
@@ -79,7 +79,7 @@ describe('Search functionality', () => {
   describe('OR logic', () => {
     it('should find tasks matching either term', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('meeting OR personal', task, false)
+        Search.evaluate('meeting OR personal', task, false),
       );
       expect(result.length).toBe(2);
       expect(result.map((t) => t.path)).toContain('notes/meeting.md');
@@ -90,7 +90,7 @@ describe('Search functionality', () => {
   describe('Exact phrase search', () => {
     it('should find exact phrase matches', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('"star wars"', task, false)
+        Search.evaluate('"star wars"', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
@@ -98,7 +98,7 @@ describe('Search functionality', () => {
 
     it('should match exact word in phrase', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('"star"', task, false)
+        Search.evaluate('"star"', task, false),
       );
       expect(result.length).toBe(1); // "star" appears as a word in "star wars"
       expect(result[0].path).toBe('notes/star-wars.md');
@@ -128,14 +128,14 @@ describe('Search functionality', () => {
   describe('NOT logic', () => {
     it('should exclude tasks containing term', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('work -urgent', task, false)
+        Search.evaluate('work -urgent', task, false),
       );
       expect(result.length).toBe(0); // The work task contains "urgent"
     });
 
     it('should find tasks without excluded term', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('meeting -urgent', task, false)
+        Search.evaluate('meeting -urgent', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/meeting.md');
@@ -145,7 +145,7 @@ describe('Search functionality', () => {
   describe('Complex combinations', () => {
     it('should handle parentheses grouping', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('(meeting OR personal) -urgent', task, false)
+        Search.evaluate('(meeting OR personal) -urgent', task, false),
       );
       expect(result.length).toBe(2);
       expect(result.map((t) => t.path)).toContain('notes/meeting.md');
@@ -156,7 +156,7 @@ describe('Search functionality', () => {
   describe('Case sensitivity', () => {
     it('should be case insensitive by default', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('MEETING', task, false)
+        Search.evaluate('MEETING', task, false),
       );
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/meeting.md');
@@ -164,7 +164,7 @@ describe('Search functionality', () => {
 
     it('should be case sensitive when enabled', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('MEETING', task, true)
+        Search.evaluate('MEETING', task, true),
       );
       expect(result.length).toBe(0); // No task has "MEETING" in uppercase
     });
@@ -173,7 +173,7 @@ describe('Search functionality', () => {
   describe('Error handling', () => {
     it('should handle invalid queries gracefully', () => {
       const result = testTasks.filter((task) =>
-        Search.evaluate('meeting OR', task, false)
+        Search.evaluate('meeting OR', task, false),
       );
       // Should return false for all tasks when query is invalid
       expect(result.length).toBe(0);
@@ -284,7 +284,7 @@ describe('Search functionality', () => {
         'content OR',
         testTask,
         false,
-        mockSettings
+        mockSettings,
       );
       expect(result).toBe(false);
     });

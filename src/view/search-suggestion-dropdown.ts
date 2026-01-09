@@ -27,7 +27,7 @@ export class SearchSuggestionDropdown {
     vault: Vault,
     tasks: Task[],
     settings: TodoTrackerSettings,
-    viewMode: TaskListViewMode
+    viewMode: TaskListViewMode,
   ) {
     this.inputEl = inputEl;
     this.vault = vault;
@@ -102,7 +102,7 @@ export class SearchSuggestionDropdown {
       () => {
         this.updatePosition();
       },
-      { passive: true }
+      { passive: true },
     );
   }
 
@@ -124,7 +124,7 @@ export class SearchSuggestionDropdown {
 
   public async showPrefixDropdown(
     prefix: string,
-    searchTerm = ''
+    searchTerm = '',
   ): Promise<void> {
     if (this.justSelected) return;
 
@@ -147,7 +147,7 @@ export class SearchSuggestionDropdown {
         if (this.tasks && this.tasks.length > 0) {
           allSuggestions = SearchSuggestions.getAllPathsFromTasks(
             this.tasks,
-            this.viewMode
+            this.viewMode,
           );
         } else {
           allSuggestions = await SearchSuggestions.getAllPaths(this.vault);
@@ -158,7 +158,7 @@ export class SearchSuggestionDropdown {
         if (this.tasks && this.tasks.length > 0) {
           allSuggestions = SearchSuggestions.getAllFilesFromTasks(
             this.tasks,
-            this.viewMode
+            this.viewMode,
           );
         } else {
           allSuggestions = await SearchSuggestions.getAllFiles(this.vault);
@@ -167,7 +167,7 @@ export class SearchSuggestionDropdown {
       case 'tag':
         allSuggestions = SearchSuggestions.getAllTags(
           this.tasks,
-          this.viewMode
+          this.viewMode,
         );
         break;
       case 'state':
@@ -184,7 +184,7 @@ export class SearchSuggestionDropdown {
             this.tasks && this.tasks.length > 0
               ? SearchSuggestions.getScheduledDateSuggestions(
                   this.tasks,
-                  this.viewMode
+                  this.viewMode,
                 )
               : [];
           allSuggestions = [...scheduledSuggestions, ...taskScheduledDates];
@@ -198,7 +198,7 @@ export class SearchSuggestionDropdown {
             this.tasks && this.tasks.length > 0
               ? SearchSuggestions.getDeadlineDateSuggestions(
                   this.tasks,
-                  this.viewMode
+                  this.viewMode,
                 )
               : [];
           allSuggestions = [...deadlineSuggestions, ...taskDeadlineDates];
@@ -216,7 +216,7 @@ export class SearchSuggestionDropdown {
     if (searchTerm) {
       this.currentSuggestions = SearchSuggestions.filterSuggestions(
         searchTerm,
-        allSuggestions
+        allSuggestions,
       );
     } else {
       this.currentSuggestions = allSuggestions;
@@ -298,7 +298,7 @@ export class SearchSuggestionDropdown {
         event.preventDefault();
         this.selectedIndex = Math.min(
           this.selectedIndex + 1,
-          this.currentSuggestions.length - 1
+          this.currentSuggestions.length - 1,
         );
         this.updateSelection();
         return true;

@@ -736,7 +736,7 @@ TODO = some code
         expect(task.completed).toBe(false);
         expect(task.text).toBe('task with checkbox in expandable info block');
         expect(task.rawText).toBe(
-          '> TODO task with checkbox in expandable info block'
+          '> TODO task with checkbox in expandable info block',
         );
       });
 
@@ -936,7 +936,7 @@ TODO task in language code block for unsupported language
         expect(tasks[1].text).toBe('task in java code block without comment');
         expect(tasks[2].state).toBe('TODO');
         expect(tasks[2].text).toBe(
-          'task in language code block for unsupported language'
+          'task in language code block for unsupported language',
         );
       });
     });

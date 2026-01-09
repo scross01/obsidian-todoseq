@@ -9,7 +9,7 @@ export class SearchEvaluator {
     node: SearchNode,
     task: Task,
     caseSensitive: boolean,
-    settings?: TodoTrackerSettings
+    settings?: TodoTrackerSettings,
   ): boolean {
     switch (node.type) {
       case 'term':
@@ -44,7 +44,7 @@ export class SearchEvaluator {
   private static evaluateTerm(
     term: string,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     const searchText = caseSensitive ? term : term.toLowerCase();
     const fields = this.getSearchableFields(task);
@@ -58,7 +58,7 @@ export class SearchEvaluator {
   private static evaluatePhrase(
     phrase: string,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     // Escape regex special characters in the phrase
     const escapedPhrase = this.escapeRegex(phrase);
@@ -77,7 +77,7 @@ export class SearchEvaluator {
   private static evaluateAnd(
     nodes: SearchNode[],
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     // Short-circuit: return false on first false
     for (const node of nodes) {
@@ -91,7 +91,7 @@ export class SearchEvaluator {
   private static evaluateOr(
     nodes: SearchNode[],
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     // Short-circuit: return true on first true
     for (const node of nodes) {
@@ -105,7 +105,7 @@ export class SearchEvaluator {
   private static evaluateNot(
     node: SearchNode,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     return !this.evaluate(node, task, caseSensitive);
   }
@@ -114,7 +114,7 @@ export class SearchEvaluator {
     node: SearchNode,
     task: Task,
     caseSensitive: boolean,
-    settings?: TodoTrackerSettings
+    settings?: TodoTrackerSettings,
   ): boolean {
     const field = node.field;
     const value = node.value;
@@ -141,14 +141,14 @@ export class SearchEvaluator {
           value,
           task,
           caseSensitive,
-          settings
+          settings,
         );
       case 'deadline':
         return this.evaluateDeadlineFilter(
           value,
           task,
           caseSensitive,
-          settings
+          settings,
         );
       default:
         return false;
@@ -158,7 +158,7 @@ export class SearchEvaluator {
   private static evaluatePathFilter(
     value: string,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     if (!task.path) return false;
 
@@ -189,7 +189,7 @@ export class SearchEvaluator {
   private static evaluateFileFilter(
     value: string,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     if (!task.path) return false;
 
@@ -205,7 +205,7 @@ export class SearchEvaluator {
   private static evaluateTagFilter(
     value: string,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     if (!task.rawText) return false;
 
@@ -227,7 +227,7 @@ export class SearchEvaluator {
   private static evaluateStateFilter(
     value: string,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     const searchText = caseSensitive ? value : value.toLowerCase();
     const taskState = caseSensitive ? task.state : task.state.toLowerCase();
@@ -238,7 +238,7 @@ export class SearchEvaluator {
   private static evaluatePriorityFilter(
     value: string,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     // Normalize the search value
     let normalizedSearch = value.toLowerCase();
@@ -262,7 +262,7 @@ export class SearchEvaluator {
   private static evaluateContentFilter(
     value: string,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     if (!task.text) return false;
 
@@ -301,7 +301,7 @@ export class SearchEvaluator {
     value: string,
     task: Task,
     caseSensitive: boolean,
-    settings?: TodoTrackerSettings
+    settings?: TodoTrackerSettings,
   ): boolean {
     return this.evaluateDateFilter(value, task.scheduledDate, settings);
   }
@@ -317,7 +317,7 @@ export class SearchEvaluator {
     value: string,
     task: Task,
     caseSensitive: boolean,
-    settings?: TodoTrackerSettings
+    settings?: TodoTrackerSettings,
   ): boolean {
     return this.evaluateDateFilter(value, task.deadlineDate, settings);
   }
@@ -332,7 +332,7 @@ export class SearchEvaluator {
   private static evaluateDateFilter(
     value: string,
     taskDate: Date | null,
-    settings?: TodoTrackerSettings
+    settings?: TodoTrackerSettings,
   ): boolean {
     const parsedDate = DateUtils.parseDateValue(value);
 
@@ -366,7 +366,7 @@ export class SearchEvaluator {
       return DateUtils.isDateInRange(
         taskDate,
         parsedDate.start,
-        parsedDate.end
+        parsedDate.end,
       );
     }
 
@@ -418,7 +418,7 @@ export class SearchEvaluator {
   private static evaluateDateExpression(
     expression: string,
     date: Date,
-    settings?: TodoTrackerSettings
+    settings?: TodoTrackerSettings,
   ): boolean {
     const now = new Date();
     const weekStartsOn = settings?.weekStartsOn ?? 'Monday';
@@ -466,7 +466,7 @@ export class SearchEvaluator {
   private static evaluateRangeFilter(
     node: SearchNode,
     task: Task,
-    caseSensitive: boolean
+    caseSensitive: boolean,
   ): boolean {
     const field = node.field;
     const start = node.start;

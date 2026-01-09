@@ -62,7 +62,7 @@ export class SettingsChangeDetector {
   initialize(settings: TodoTrackerSettings): void {
     if (this.isInitialized) {
       throw new Error(
-        'SettingsChangeDetector is already initialized. Create a new instance instead.'
+        'SettingsChangeDetector is already initialized. Create a new instance instead.',
       );
     }
 
@@ -79,7 +79,7 @@ export class SettingsChangeDetector {
   hasFormattingSettingsChanged(settings: TodoTrackerSettings): boolean {
     if (!this.isInitialized) {
       throw new Error(
-        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.',
       );
     }
 
@@ -95,7 +95,7 @@ export class SettingsChangeDetector {
   updatePreviousState(settings: TodoTrackerSettings): void {
     if (!this.isInitialized) {
       throw new Error(
-        'SettingsChangeDetector must be initialized before use. Call initialize() first.'
+        'SettingsChangeDetector must be initialized before use. Call initialize() first.',
       );
     }
 

@@ -24,7 +24,7 @@ export class VaultScanner {
   constructor(
     private app: App,
     private settings: TodoTrackerSettings,
-    private parser: TaskParser
+    private parser: TaskParser,
   ) {
     // Initialize event listeners map
     const eventKeys: Array<keyof VaultScannerEvents> = [
@@ -41,7 +41,7 @@ export class VaultScanner {
   // Event management methods
   on<T extends keyof VaultScannerEvents>(
     event: T,
-    listener: VaultScannerEvents[T]
+    listener: VaultScannerEvents[T],
   ): void {
     const listeners = this.eventListeners.get(event) || [];
     listeners.push(listener);
@@ -50,7 +50,7 @@ export class VaultScanner {
 
   off<T extends keyof VaultScannerEvents>(
     event: T,
-    listener: VaultScannerEvents[T]
+    listener: VaultScannerEvents[T],
   ): void {
     const listeners = this.eventListeners.get(event) || [];
     const filteredListeners = listeners.filter((l) => l !== listener);
@@ -68,7 +68,7 @@ export class VaultScanner {
       } catch (error) {
         console.error(
           `Error in VaultScanner event listener for ${String(event)}`,
-          error
+          error,
         );
       }
     });
@@ -110,7 +110,7 @@ export class VaultScanner {
       console.error('VaultScanner scanVault error', error);
       this.emit(
         'scan-error',
-        error instanceof Error ? error : new Error(String(error))
+        error instanceof Error ? error : new Error(String(error)),
       );
     } finally {
       this._isScanning = false;
@@ -170,7 +170,7 @@ export class VaultScanner {
       console.error('VaultScanner handleFileChange error', err);
       this.emit(
         'scan-error',
-        err instanceof Error ? err : new Error(String(err))
+        err instanceof Error ? err : new Error(String(err)),
       );
     }
   }
@@ -195,7 +195,7 @@ export class VaultScanner {
       console.error('VaultScanner handleFileRename error', err);
       this.emit(
         'scan-error',
-        err instanceof Error ? err : new Error(String(err))
+        err instanceof Error ? err : new Error(String(err)),
       );
     }
   }
@@ -217,7 +217,7 @@ export class VaultScanner {
         console.error('VaultScanner periodic scan error', err);
         this.emit(
           'scan-error',
-          err instanceof Error ? err : new Error(String(err))
+          err instanceof Error ? err : new Error(String(err)),
         );
       } finally {
         this._isScanning = false;
@@ -250,7 +250,7 @@ export class VaultScanner {
   // Utility method to yield to event loop
   private async yieldToEventLoop(): Promise<void> {
     await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => resolve())
+      requestAnimationFrame(() => resolve()),
     );
   }
 

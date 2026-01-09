@@ -69,13 +69,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
             this.plugin.setupPeriodicRefresh();
             await this.refreshAllTaskListViews();
-          })
+          }),
       );
 
     new Setting(containerEl)
       .setName('Additional task keywords')
       .setDesc(
-        'Capitalized list of keywords to treat as tasks (e.g. FIXME, HACK). Leave empty for none.'
+        'Capitalized list of keywords to treat as tasks (e.g. FIXME, HACK). Leave empty for none.',
       )
       .addText((text) => {
         const current = this.plugin.settings.additionalTaskKeywords ?? [];
@@ -113,7 +113,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }
           // Remove any existing error display
           const existingError = settingContainer.querySelector(
-            '.todoseq-setting-item-error'
+            '.todoseq-setting-item-error',
           );
           if (existingError) {
             existingError.remove();
@@ -161,7 +161,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             } catch (parseError) {
               console.error(
                 'Failed to recreate parser with valid keywords:',
-                parseError
+                parseError,
               );
             }
           } else {
@@ -182,7 +182,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Format task keywords')
       .setDesc(
-        'Highlight task keywords (TODO, DOING, etc.) in bold with accent color in the editor'
+        'Highlight task keywords (TODO, DOING, etc.) in bold with accent color in the editor',
       )
       .addToggle((toggle) =>
         toggle
@@ -192,7 +192,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
             // Trigger formatting updates
             this.plugin.updateTaskFormatting();
-          })
+          }),
       );
 
     // Include tasks inside code blocks (parent setting)
@@ -201,7 +201,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Include tasks inside code blocks')
       .setDesc(
-        'When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.'
+        'When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.',
       )
       .addToggle((toggle) =>
         toggle
@@ -216,7 +216,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             // Update language toggle visual state by recreating it
             if (languageToggleComponent) {
               languageToggleComponent.setValue(
-                this.plugin.settings.languageCommentSupport.enabled
+                this.plugin.settings.languageCommentSupport.enabled,
               );
             }
             languageSetting.setDisabled(!value);
@@ -226,7 +226,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new CSS classes
             this.plugin.refreshVisibleEditorDecorations();
-          })
+          }),
       );
 
     // Language comment support settings (dependent on includeCodeBlocks)
@@ -234,7 +234,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     const languageSetting = new Setting(languageSettingContainer)
       .setName('Enable language comment support')
       .setDesc(
-        'When enabled, tasks inside code blocks will be detected using language-specific comment patterns e.g. `// TODO`'
+        'When enabled, tasks inside code blocks will be detected using language-specific comment patterns e.g. `// TODO`',
       )
       .addToggle((toggle) => {
         languageToggleComponent = toggle;
@@ -257,7 +257,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     // Update language toggle when includeCodeBlocks changes
     const updateLanguageToggle = (enabled: boolean) => {
       const languageToggle = languageSetting.settingEl.querySelector(
-        'input[type="checkbox"]'
+        'input[type="checkbox"]',
       ) as HTMLInputElement;
       if (languageToggle) {
         languageToggle.checked = enabled;
@@ -272,7 +272,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Include tasks inside quote and callout blocks')
       .setDesc(
-        'When enabled, include tasks inside quote and callout blocks (>, >[!info], >[!todo], etc.)'
+        'When enabled, include tasks inside quote and callout blocks (>, >[!info], >[!todo], etc.)',
       )
       .addToggle((toggle) =>
         toggle
@@ -286,7 +286,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new CSS classes
             this.plugin.refreshVisibleEditorDecorations();
-          })
+          }),
       );
 
     // Include tasks inside comment blocks
@@ -305,7 +305,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new CSS classes
             this.plugin.refreshVisibleEditorDecorations();
-          })
+          }),
       );
 
     new Setting(containerEl)
