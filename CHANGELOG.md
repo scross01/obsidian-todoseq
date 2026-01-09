@@ -2,7 +2,7 @@
 
 ## 0.7.0
 
-This release introduces formatting and interactivity for tasks is the editor view. Task state keywords are now highlighted and can be interacted with similar to the task list view. The default location of the task list panel has been moved to the right sidebar.
+This release introduces formatting and interactivity for tasks in the editor view. Task state keywords are now highlighted automatically and can be interacted with to update the taske atate similar to the task list view. The default location of the task list panel has been moved to the right sidebar. New actions have been added to the command palette to add scheduled and deadline dates to tasks and set priority.
 
 - Addded task formatting in the editor with settings option to disable (enabled by default).
 - Added a right click option on the task keyword in the editor to change the state of the task.
