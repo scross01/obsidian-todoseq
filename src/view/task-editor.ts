@@ -1,6 +1,7 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
 import { Task, DEFAULT_COMPLETED_STATES, NEXT_STATE } from '../task';
 import { CHECKBOX_REGEX } from '../utils/task-utils';
+import { getPluginSettings } from '../utils/settings-utils';
 
 export class TaskEditor {
   /**
@@ -113,8 +114,22 @@ export class TaskEditor {
     task: Task,
     nextState: string | null = null
   ): Promise<Task> {
-    const state =
-      nextState == null ? NEXT_STATE.get(task.state) || 'TODO' : nextState;
+    let state: string;
+    if (nextState == null) {
+      // Check if current state is a custom keyword
+      const settings = getPluginSettings(this.app);
+      const customKeywords = settings?.additionalTaskKeywords || [];
+
+      if (customKeywords.includes(task.state)) {
+        // If it's a custom keyword, cycle to DONE
+        state = 'DONE';
+      } else {
+        // Otherwise use the standard NEXT_STATE mapping
+        state = NEXT_STATE.get(task.state) || 'TODO';
+      }
+    } else {
+      state = nextState;
+    }
     return await this.applyLineUpdate(task, state);
   }
 }
