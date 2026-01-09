@@ -2,6 +2,8 @@
 
 TODOseq seamlessly integrates with Obsidian's Markdown editor, providing visual feedback and interactive controls for managing your tasks directly within your notes. This guide explains how tasks are displayed and how you can interact with them in the editor.
 
+![TODOseq task entry and update](./assets/todoseq-task-entry.gif)
+
 ## Task Display in the Editor
 
 When you create tasks using TODOseq's keyword-based format, they appear in your Markdown editor with special styling that helps you quickly identify and manage them.

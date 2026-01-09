@@ -21,17 +21,18 @@ DONE Triage customer feedback
 ### Task with Indentation
 
 ```markdown
-TODO Indented task
-DOING Double indented task
+  TODO Indented task
+    DOING Double indented task
 ```
 
 ### Task with List Markers
 
 ```markdown
 - TODO Task in bullet list
++ TODO Task in bullet list using plus marker
 
 1. DOING Task in numbered list
-   (a) DONE Task with parenthesized marker
+   * DONE Task with indented bullet
 ```
 
 ## Supported Task Formats
@@ -52,12 +53,12 @@ DONE Completed task
 
 ```markdown
 - TODO Write documentation
-  - DOING Update README
-  - DONE Fix typos
+  - DONE Update README
+  - DOING Fix typos
 
-1. TODO First step
+1. DONE First step
 2. DOING Second step
-3. DONE Final step
+3. TODO Final step
 ```
 
 ### 2. Markdown Checkbox Format
@@ -79,7 +80,7 @@ TODOseq automatically syncs checkbox state with task keywords when updated from 
 - When you toggle state, both keyword and checkbox are updated
 - Proper spacing is maintained (e.g., `- [x] DONE`)
 
-\*Note: If you modify the checkbox directly on the page, the task state keyword will not be automatically updated accordingly.
+\*Note: If you modify the checkbox directly on the page in the Obsdian editor, the task state keyword will not be automatically updated accordingly.
 
 ## Task Keywords
 
@@ -250,9 +251,6 @@ TODOseq preserves list structure and markers:
 1. TODO First numbered task
 2. DOING Second numbered task
 3. DONE Third numbered task
-
-(a) TODO Parenthesized list task
-(b) DOING Another parenthesized task
 ```
 
 ### Tasks in Quotes and Callouts
@@ -288,14 +286,9 @@ DEADLINE: <2025-11-01>
 When "Include tasks inside code blocks" is enabled:
 
 <pre>
-```python
-# TODO Write unit tests
-# FIXME Handle edge cases
-```
-
-```javascript
-// TODO Implement error handling
-// DOING Refactor authentication
+```txt
+TODO task in code block
+TODO another task in code block
 ```
 </pre>
 
@@ -346,7 +339,7 @@ TODOseq supports extracting tasks from comments in 20+ programming languages:
 When a task state is updated, TODOseq preserves:
 
 - **Indentation**: Original whitespace is maintained
-- **List markers**: `-`, `1.`, `(a)`, etc. are kept
+- **List markers**: `-`, `+`, `*`, `1.`, etc. are kept
 - **Priority tokens**: `[#A]`, `[#B]`, `[#C]` remain, but will be moved to the start of the task line
 - **Task text**: Everything after the state keyword is preserved
 - **File structure**: Task stays in original location
