@@ -57,9 +57,11 @@ DEADLINE: <2023-12-20>
 
 For detailed information, see the documentation:
 
-- [Introduction & Philosophy](docs/introduction.md) - Task management approach and Logseq compatibility
-- [Task List](docs/task-list.md) - Using the dedicated task panel
-- [Task Entry Structure](docs/task-entry.md) - Task syntax, keywords, and lifecycle
-- [Editor Integration](docs/editor.md) - Task display and interaction in the Markdown editor
-- [Search Functionality](docs/search.md) - Advanced search syntax and filters
-- [Settings](docs/settings.md) - Configuration options and customization
+[TODOseq Documentation](https://scross01.github.io/obsidian-todoseq/)
+
+- [Introduction & Philosophy](https://scross01.github.io/obsidian-todoseq/introduction.html) - Task management approach and Logseq compatibility
+- [Task List](https://scross01.github.io/obsidian-todoseq/task-list.html) - Using the dedicated task panel
+- [Task Entry](https://scross01.github.io/obsidian-todoseq/task-entry.html) - Task syntax, keywords, and lifecycle
+- [Editor Integration](https://scross01.github.io/obsidian-todoseq/editor.html) - Task display and interaction in the Markdown editor
+- [Search Functionality](https://scross01.github.io/obsidian-todoseq/search.html) - Advanced search syntax and filters
+- [Settings](https://scross01.github.io/obsidian-todoseq/settings.html) - Configuration options and customization
