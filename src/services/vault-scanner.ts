@@ -118,12 +118,12 @@ export class VaultScanner {
   }
 
   /**
-   * Scans a single file for tasks using Vault.read() API for safe, serialized file reading
+   * Scans a single file for tasks using Vault.cachedRead() API for better performance
    *
    * @param file The TFile to scan for tasks
    */
   async scanFile(file: TFile): Promise<void> {
-    const content = await this.app.vault.read(file);
+    const content = await this.app.vault.cachedRead(file);
 
     if (!this.parser) {
       // Lazily create if not already set (should be set by constructor)
