@@ -227,10 +227,10 @@ export class PluginLifecycleManager {
     }
 
     // Auto-open task view in right sidebar when plugin loads
-    // Add a small delay to ensure workspace is fully initialized
-    setTimeout(() => {
+    // Use onLayoutReady to ensure workspace is fully initialized
+    this.plugin.app.workspace.onLayoutReady(() => {
       this.plugin.uiManager.showTasks();
-    }, 200);
+    });
   }
 
   /**
