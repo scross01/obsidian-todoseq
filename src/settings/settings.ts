@@ -5,7 +5,6 @@ import { LanguageCommentSupportSettings } from '../parser/language-registry';
 import { TaskParser } from '../parser/task-parser';
 
 export interface TodoTrackerSettings {
-  refreshInterval: number; // refresh interval in seconds
   additionalTaskKeywords: string[]; // capitalised keywords treated as NOT COMPLETED (e.g., FIXME, HACK)
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
   includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
@@ -17,7 +16,6 @@ export interface TodoTrackerSettings {
 }
 
 export const DefaultSettings: TodoTrackerSettings = {
-  refreshInterval: 60,
   // No additional keywords by default; built-in defaults live in task.ts
   additionalTaskKeywords: [],
   includeCodeBlocks: false,
@@ -55,22 +53,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-
-    new Setting(containerEl)
-      .setName('Refresh interval')
-      .setDesc('How often to rescan the vault for TODOs (in seconds)')
-      .addSlider((slider) =>
-        slider
-          .setLimits(10, 300, 10)
-          .setValue(this.plugin.settings.refreshInterval)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            this.plugin.settings.refreshInterval = value;
-            await this.plugin.saveSettings();
-            this.plugin.setupPeriodicRefresh();
-            await this.refreshAllTaskListViews();
-          }),
-      );
 
     new Setting(containerEl)
       .setName('Additional task keywords')

@@ -103,13 +103,6 @@ export default class TodoTracker extends Plugin {
     }
   }
 
-  // Public method to update periodic refresh using VaultScanner
-  public setupPeriodicRefresh(): void {
-    if (this.vaultScanner) {
-      this.vaultScanner.setupPeriodicRefresh(this.settings.refreshInterval);
-    }
-  }
-
   // Obsidian lifecycle method called to save settings
   async saveSettings() {
     await this.saveData(this.settings);

@@ -15,7 +15,6 @@ export interface VaultScannerEvents {
 export class VaultScanner {
   private tasks: Task[] = [];
   private _isScanning = false;
-  private refreshIntervalId: number | null = null;
   private eventListeners: Map<
     keyof VaultScannerEvents,
     ((...args: unknown[]) => void)[]
@@ -200,31 +199,6 @@ export class VaultScanner {
     }
   }
 
-  // Run a regular refresh of the vault based on the refresh interval
-  setupPeriodicRefresh(intervalSeconds: number): void {
-    // Clear any previous interval
-    if (this.refreshIntervalId) {
-      window.clearInterval(this.refreshIntervalId);
-    }
-
-    // Use a serialized async tick to avoid overlap and unhandled rejections
-    this.refreshIntervalId = window.setInterval(async () => {
-      if (this._isScanning) return;
-      this._isScanning = true;
-      try {
-        await this.scanVault();
-      } catch (err) {
-        console.error('VaultScanner periodic scan error', err);
-        this.emit(
-          'scan-error',
-          err instanceof Error ? err : new Error(String(err)),
-        );
-      } finally {
-        this._isScanning = false;
-      }
-    }, intervalSeconds * 1000);
-  }
-
   // Get a copy of the current tasks
   getTasks(): Task[] {
     return [...this.tasks];
@@ -256,10 +230,6 @@ export class VaultScanner {
 
   // Clean up resources
   destroy(): void {
-    if (this.refreshIntervalId) {
-      window.clearInterval(this.refreshIntervalId);
-      this.refreshIntervalId = null;
-    }
     // Clear all event listeners
     this.eventListeners.clear();
   }

@@ -193,9 +193,6 @@ export class PluginLifecycleManager {
     // Initial scan using VaultScanner
     await this.plugin.vaultScanner.scanVault();
 
-    // Setup periodic refresh
-    this.plugin.setupPeriodicRefresh();
-
     // Register file change events that delegate to VaultScanner
     this.plugin.registerEvent(
       this.plugin.app.vault.on('modify', (file) => {
