@@ -1,9 +1,10 @@
 # Change Log
 
-## v.next
+## 0.8.0 (development)
 
-- Updated vault scanner to use cached reads when collecting tasks
-- Added task view option to hide future dated tasks
+- Added new Urgency sort option that applies a multi-factor algorithm to calculate task urgency (see docs).
+- Added task view option to limit or hide display of future dated tasks.
+- Updated vault scanner to use cached reads when collecting tasks.
 
 ## 0.7.0
 

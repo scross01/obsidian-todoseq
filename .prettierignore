@@ -1,3 +1,6 @@
 examples/
 .obsidian/
 docs/task-entry.md
+manifest.json
+versions.json
+main.js
