@@ -123,14 +123,14 @@ export function getDefaultCoefficients(): UrgencyCoefficients {
 }
 
 /**
- * Calculate the age of a task in days (only for daily notes)
+ * Calculate the age factor of a task (only for daily notes)
  * @param task The task to calculate age for
- * @returns Age in days, or 0 if not a daily note
+ * @returns Age factor between 0.0 and 1.0, or 1.0 if not a daily note
  */
 function getTaskAge(task: Task): number {
   // Use the new isDailyNote field and dailyNoteDate
   if (!task.isDailyNote || !task.dailyNoteDate) {
-    return 0;
+    return 1.0;
   }
 
   try {
@@ -139,12 +139,13 @@ function getTaskAge(task: Task): number {
     today.setHours(0, 0, 0, 0);
 
     const diffTime = today.getTime() - noteDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const age = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const urgencyAgeMax = 365;
 
-    return Math.max(0, diffDays);
+    return Math.min(age / urgencyAgeMax, 1.0);
   } catch (error) {
     console.warn('Failed to calculate task age', error);
-    return 0;
+    return 1.0;
   }
 }
 

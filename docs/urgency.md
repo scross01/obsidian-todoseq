@@ -13,7 +13,7 @@ The urgency score considers various aspects of your tasks:
 - **Scheduled dates**: Tasks with scheduled dates are more urgent than those without
 - **Deadlines**: Tasks with deadline dates are more urgent than those without
 - **Active state**: Tasks that are currently being worked on (DOING, NOW, IN-PROGRESS) are more urgent
-- **Task age**: Older tasks in dail notes journal pages gain urgency over time
+- **Task age**: Older tasks in daily note pages gain urgency over time using a linear scale (0.0 to 1.0) based on days since creation, with a maximum of 365 days
 - **Tags**: Tasks with tags receive a small urgency boost
 - **Waiting state**: Tasks in WAIT or WAITING states have reduced urgency
 
@@ -40,7 +40,7 @@ urgency.priority.low.coefficient = 1.8     # priority is low [#C]
 urgency.scheduled.coefficient = 5.0        # task has a scheduled date that is today or in the past
 urgency.deadline.coefficient = 12.0        # deadline date is upcoming (+14 days) due (today) or overdue (-7 days)
 urgency.active.coefficient = 4.0           # state is either DOING, NOW, or IN-PROGRESS
-urgency.age.coefficient = 2.0              # if the page is a journal page, using the date the page represents
+urgency.age.coefficient = 2.0              # if the page is a daily notes page, weight tasks on older pages heigher
 urgency.tags.coefficient = 1.0             # the task has one or more tags
 urgency.waiting.coefficient = -3.0         # the task in is a WAIT or WAITING state
 ```
@@ -88,6 +88,27 @@ When a task has a priority value, the corresponding coefficient is added to the 
 - **Low priority** (`[#C]`): Adds **+1.8** to the urgency score
 
 For example, a task with high priority (`[#A]`) gets +6.0 added to its urgency score, while a task with medium priority (`[#B]`) gets +3.9, and a task with low priority (`[#C]`) gets +1.8.
+
+## Age Calculation
+
+The age urgency factor applies only to tasks in daily note journal pages and increases as the task gets older:
+
+**Formula**: `min(age / 365, 1.0)`
+
+This creates a linear scale where:
+
+- **New task (0 days old)**: 0.0 × coefficient = 0.0 urgency contribution
+- **182 days old**: 0.5 × coefficient = 1.0 urgency contribution
+- **365+ days old**: 1.0 × coefficient = 2.0 urgency contribution (maximum)
+
+**Key behaviors**:
+
+- **Daily note tasks**: Age is calculated as days since the daily note date
+- **Non-daily note tasks**: Always return 1.0 age factor (maximum urgency contribution)
+- **Maximum age**: 365 days maps to 1.0 age factor
+- **Linear scaling**: Age increases urgency proportionally over time
+
+This helps surface older tasks in your daily journal that may need attention, while non-daily-note tasks get the maximum age urgency contribution by default.
 
 ## Using Urgency Sorting
 

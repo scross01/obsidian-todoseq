@@ -175,7 +175,9 @@ describe('Urgency Calculation', () => {
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // getDeadlineUrgency returns 1.0, multiplied by 12.0 = 12.0
-    expect(urgency).toBeCloseTo(12.0, 2);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total = 14.0
+    expect(urgency).toBeCloseTo(14.0, 2);
   });
 
   it('should calculate urgency with deadline date (today)', () => {
@@ -191,7 +193,9 @@ describe('Urgency Calculation', () => {
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // getDeadlineUrgency returns ~0.733, multiplied by 12.0 ≈ 8.8
-    expect(urgency).toBeCloseTo(8.8, 2);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total ≈ 10.8
+    expect(urgency).toBeCloseTo(10.8, 2);
   });
 
   it('should add urgency for future deadline dates', () => {
@@ -208,7 +212,9 @@ describe('Urgency Calculation', () => {
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // getDeadlineUrgency returns ~0.695, multiplied by 12.0 ≈ 8.34
-    expect(urgency).toBeCloseTo(8.34, 2);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total ≈ 10.34
+    expect(urgency).toBeCloseTo(10.34, 2);
   });
 
   it('should calculate urgency with priority high', () => {
@@ -220,7 +226,8 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(defaultCoefficients.priorityHigh);
+    // priorityHigh (6.0) + age factor (1.0) * age coefficient (2.0) = 8.0
+    expect(urgency).toBe(8.0);
   });
 
   it('should calculate urgency with priority medium', () => {
@@ -232,7 +239,8 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(defaultCoefficients.priorityMedium);
+    // priorityMedium (3.9) + age factor (1.0) * age coefficient (2.0) = 5.9
+    expect(urgency).toBe(5.9);
   });
 
   it('should calculate urgency with priority low', () => {
@@ -244,7 +252,8 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(defaultCoefficients.priorityLow);
+    // priorityLow (1.8) + age factor (1.0) * age coefficient (2.0) = 3.8
+    expect(urgency).toBe(3.8);
   });
 
   it('should handle tasks with no priority', () => {
@@ -256,7 +265,8 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(0);
+    // Only age factor (1.0) * age coefficient (2.0) = 2.0
+    expect(urgency).toBe(2.0);
   });
 
   it('should add urgency for scheduled date (today)', () => {
@@ -272,7 +282,9 @@ describe('Urgency Calculation', () => {
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // getScheduledUrgency returns 1.0, multiplied by 5.0 = 5.0
-    expect(urgency).toBe(defaultCoefficients.scheduled);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total = 7.0
+    expect(urgency).toBe(7.0);
   });
 
   it('should add urgency for scheduled date (past)', () => {
@@ -289,7 +301,9 @@ describe('Urgency Calculation', () => {
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // getScheduledUrgency returns 1.0, multiplied by 5.0 = 5.0
-    expect(urgency).toBe(defaultCoefficients.scheduled);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total = 7.0
+    expect(urgency).toBe(7.0);
   });
 
   it('should NOT add urgency for future scheduled dates', () => {
@@ -306,7 +320,8 @@ describe('Urgency Calculation', () => {
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // getScheduledUrgency returns 0, so no scheduled urgency
-    expect(urgency).toBe(0);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    expect(urgency).toBe(2.0);
   });
 
   it('should add urgency for deadline date', () => {
@@ -323,7 +338,9 @@ describe('Urgency Calculation', () => {
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // getDeadlineUrgency returns ~0.543, multiplied by 12.0 ≈ 6.51
-    expect(urgency).toBeCloseTo(6.51, 2);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total ≈ 8.51
+    expect(urgency).toBeCloseTo(8.51, 2);
   });
 
   it('should use both scheduled and deadline when both exist', () => {
@@ -346,8 +363,9 @@ describe('Urgency Calculation', () => {
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // Scheduled urgency: 0 (future date)
     // Deadline urgency: ~0.543 * 12.0 ≈ 6.51
-    // Total ≈ 6.51
-    expect(urgency).toBeCloseTo(6.51, 2);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total ≈ 8.51
+    expect(urgency).toBeCloseTo(8.51, 2);
   });
 
   it('should use both scheduled and deadline when both exist (scheduled is past)', () => {
@@ -370,8 +388,9 @@ describe('Urgency Calculation', () => {
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // Scheduled urgency: 5.0 (past date)
     // Deadline urgency: ~0.543 * 12.0 ≈ 6.51
-    // Total ≈ 5.0 + 6.51 = 11.51
-    expect(urgency).toBeCloseTo(11.51, 2);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total ≈ 13.51
+    expect(urgency).toBeCloseTo(13.51, 2);
   });
 
   it('should add urgency for active states', () => {
@@ -383,7 +402,8 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(defaultCoefficients.active);
+    // active (4.0) + age factor (1.0) * age coefficient (2.0) = 6.0
+    expect(urgency).toBe(6.0);
   });
 
   it('should add urgency for each tag', () => {
@@ -395,7 +415,8 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(3 * defaultCoefficients.tags);
+    // tags (3.0) + age factor (1.0) * age coefficient (2.0) = 5.0
+    expect(urgency).toBe(5.0);
   });
 
   it('should handle empty tags array', () => {
@@ -407,7 +428,8 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(0);
+    // Only age factor (1.0) * age coefficient (2.0) = 2.0
+    expect(urgency).toBe(2.0);
   });
 
   it('should subtract urgency for waiting state', () => {
@@ -419,7 +441,8 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(defaultCoefficients.waiting);
+    // waiting (-3.0) + age factor (1.0) * age coefficient (2.0) = -1.0
+    expect(urgency).toBe(-1.0);
   });
 
   it('should calculate combined urgency correctly', () => {
@@ -439,14 +462,60 @@ describe('Urgency Calculation', () => {
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // getDeadlineUrgency = ~0.733, * 12.0 ≈ 8.8
     // + priorityHigh (6.0) + active (4.0) + tags (1.0)
-    // Total ≈ 8.8 + 6.0 + 4.0 + 1.0 = 19.8
-    expect(urgency).toBeCloseTo(19.8, 2);
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total ≈ 8.8 + 6.0 + 4.0 + 1.0 + 2.0 = 21.8
+    expect(urgency).toBeCloseTo(21.8, 2);
   });
 
   it('should handle task with no urgency factors', () => {
     const task = createTestTask();
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(0);
+    // Only age factor (1.0) * age coefficient (2.0) = 2.0
+    expect(urgency).toBe(2.0);
+  });
+
+  it('should calculate age factor for daily note tasks', () => {
+    const tenDaysAgo = new Date();
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+    tenDaysAgo.setHours(0, 0, 0, 0);
+
+    const task = createTestTask({
+      isDailyNote: true,
+      dailyNoteDate: tenDaysAgo,
+      urgency: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // Age factor = 10/365 ≈ 0.0274, multiplied by age coefficient (2.0) ≈ 0.0548
+    expect(urgency).toBeCloseTo(0.0548, 3);
+  });
+
+  it('should return maximum age factor for very old daily note tasks', () => {
+    const twoYearsAgo = new Date();
+    twoYearsAgo.setDate(twoYearsAgo.getDate() - 730); // 2 years
+    twoYearsAgo.setHours(0, 0, 0, 0);
+
+    const task = createTestTask({
+      isDailyNote: true,
+      dailyNoteDate: twoYearsAgo,
+      urgency: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // Age factor = min(730/365, 1.0) = 1.0, multiplied by age coefficient (2.0) = 2.0
+    expect(urgency).toBe(2.0);
+  });
+
+  it('should return 1.0 age factor for non-daily-note tasks', () => {
+    const task = createTestTask({
+      isDailyNote: false,
+      dailyNoteDate: null,
+      urgency: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // Age factor = 1.0, multiplied by age coefficient (2.0) = 2.0
+    expect(urgency).toBe(2.0);
   });
 });
 
