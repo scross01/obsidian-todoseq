@@ -62,6 +62,27 @@ export class PluginLifecycleManager {
       window.removeEventListener('todoseq:view-mode-change', handler),
     );
 
+    // Persist future task sorting changes coming from TodoView toolbars
+    const futureTaskHandler = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        mode: 'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture';
+      };
+      if (!detail?.mode) return;
+      this.plugin.settings.futureTaskSorting = detail.mode;
+      await this.saveSettings();
+      await this.plugin.uiManager.refreshOpenTaskListViews();
+    };
+    window.addEventListener(
+      'todoseq:future-task-sorting-change',
+      futureTaskHandler,
+    );
+    this.plugin.register(() =>
+      window.removeEventListener(
+        'todoseq:future-task-sorting-change',
+        futureTaskHandler,
+      ),
+    );
+
     // Add settings tab
     this.plugin.addSettingTab(
       new TodoTrackerSettingTab(this.plugin.app, this.plugin),
