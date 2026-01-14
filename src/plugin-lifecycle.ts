@@ -25,7 +25,11 @@ export class PluginLifecycleManager {
     this.plugin.vaultScanner = new VaultScanner(
       this.plugin.app,
       this.plugin.settings,
-      TaskParser.create(this.plugin.settings, urgencyCoefficients),
+      TaskParser.create(
+        this.plugin.settings,
+        this.plugin.app,
+        urgencyCoefficients,
+      ),
       urgencyCoefficients,
     );
     this.plugin.taskEditor = new TaskEditor(this.plugin.app);

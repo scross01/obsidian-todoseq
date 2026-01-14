@@ -94,6 +94,9 @@ describe('task-utils', () => {
       priority: null,
       scheduledDate: null,
       deadlineDate: null,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     test('should sort tasks by path first', () => {

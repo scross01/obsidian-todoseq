@@ -30,6 +30,8 @@ describe('Task Sorting System', () => {
     deadlineDate: null,
     tail: '',
     urgency: null,
+    isDailyNote: false,
+    dailyNoteDate: null,
     ...overrides,
   });
 

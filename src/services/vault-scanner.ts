@@ -152,7 +152,11 @@ export class VaultScanner {
 
     if (!this.parser) {
       // Lazily create if not already set (should be set by constructor)
-      this.parser = TaskParser.create(this.settings, this.urgencyCoefficients);
+      this.parser = TaskParser.create(
+        this.settings,
+        this.app,
+        this.urgencyCoefficients,
+      );
     }
 
     const parsed = this.parser.parseFile(content, file.path, file);
@@ -247,7 +251,9 @@ export class VaultScanner {
     } else {
       await this.loadUrgencyCoefficients();
     }
-    this.updateParser(TaskParser.create(newSettings, this.urgencyCoefficients));
+    this.updateParser(
+      TaskParser.create(newSettings, this.app, this.urgencyCoefficients),
+    );
   }
 
   // Update parser instance

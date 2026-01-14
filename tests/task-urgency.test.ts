@@ -37,6 +37,8 @@ const createTestTask = (overrides: Partial<Task> = {}): Task => ({
   scheduledDate: null,
   deadlineDate: null,
   urgency: null,
+  isDailyNote: false,
+  dailyNoteDate: null,
   tags: [],
   ...overrides,
 });
@@ -167,6 +169,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       deadlineDate: sevenDaysAgo,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -181,6 +185,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       deadlineDate: today,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -196,6 +202,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       deadlineDate: tomorrow,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -207,6 +215,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       priority: 'high',
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -217,6 +227,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       priority: 'med',
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -227,6 +239,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       priority: 'low',
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -237,6 +251,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       priority: null,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -250,6 +266,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       scheduledDate: today,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -265,6 +283,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       scheduledDate: yesterday,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -280,6 +300,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       scheduledDate: tomorrow,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -295,6 +317,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       deadlineDate: future,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -315,6 +339,8 @@ describe('Urgency Calculation', () => {
       scheduledDate: soon,
       deadlineDate: later,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -337,6 +363,8 @@ describe('Urgency Calculation', () => {
       scheduledDate: yesterday,
       deadlineDate: later,
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -350,6 +378,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       state: 'DOING',
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -360,6 +390,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       tags: ['work', 'urgent', 'project'],
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -370,6 +402,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       tags: [],
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -380,6 +414,8 @@ describe('Urgency Calculation', () => {
     const task = createTestTask({
       state: 'WAIT',
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -396,6 +432,8 @@ describe('Urgency Calculation', () => {
       tags: ['work'],
       state: 'DOING',
       urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);

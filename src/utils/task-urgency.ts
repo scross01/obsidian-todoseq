@@ -1,5 +1,5 @@
 import { Task } from '../task';
-import { TFile, App } from 'obsidian';
+import { App } from 'obsidian';
 
 /**
  * Urgency coefficients interface matching the urgency.ini configuration
@@ -123,70 +123,18 @@ export function getDefaultCoefficients(): UrgencyCoefficients {
 }
 
 /**
- * Check if a file path represents a daily note based on common patterns
- * @param filePath The file path to check
- * @returns true if the file appears to be a daily note
- * TODO FIXME this this needs to be more robust to use Obsidian Daily Notes settings to determine if page is a daily note
- */
-function isDailyNotePath(filePath?: string): boolean {
-  if (!filePath) return false;
-
-  // Check if file is in daily notes folder (common patterns)
-  const path = filePath.toLowerCase();
-
-  // Common daily note patterns
-  const dailyPatterns = [
-    /^daily\//,
-    /^journal\//,
-    /^diary\//,
-    /^notes\/daily\//,
-    /^notes\/journal\//,
-  ];
-
-  // Check path patterns
-  for (const pattern of dailyPatterns) {
-    if (pattern.test(path)) return true;
-  }
-
-  // Check if filename matches date pattern (YYYY-MM-DD, YYYYMMDD, etc.)
-  const filename = path.split('/').pop() || '';
-  const datePattern = /^\d{4}[-._]\d{2}[-._]\d{2}/;
-  if (datePattern.test(filename)) return true;
-
-  return false;
-}
-
-/**
- * Check if a file is a daily note based on common patterns
- * @param file The file to check
- * @returns true if the file appears to be a daily note
- */
-function isDailyNote(file?: TFile): boolean {
-  if (!file) return false;
-  return isDailyNotePath(file.path);
-}
-
-/**
  * Calculate the age of a task in days (only for daily notes)
  * @param task The task to calculate age for
  * @returns Age in days, or 0 if not a daily note
  */
 function getTaskAge(task: Task): number {
-  if (!task.file || !isDailyNote(task.file)) {
+  // Use the new isDailyNote field and dailyNoteDate
+  if (!task.isDailyNote || !task.dailyNoteDate) {
     return 0;
   }
 
   try {
-    // Extract date from filename
-    const name = task.file.name;
-    const dateMatch = name.match(/(\d{4})[-._](\d{2})[-._](\d{2})/);
-    if (!dateMatch) return 0;
-
-    const year = parseInt(dateMatch[1], 10);
-    const month = parseInt(dateMatch[2], 10) - 1; // JavaScript months are 0-indexed
-    const day = parseInt(dateMatch[3], 10);
-
-    const noteDate = new Date(year, month, day);
+    const noteDate = task.dailyNoteDate;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -276,12 +224,12 @@ function isWaiting(task: Task): number {
  * @returns Number of tags
  */
 function countTags(task: Task): number {
-  // First check if task has a tags array property
+  // Use the tags array if available
   if (task.tags && Array.isArray(task.tags)) {
     return task.tags.length;
   }
 
-  // Fall back to parsing tags from text
+  // Fall back to parsing tags from text (shouldn't happen with new implementation)
   // Match #tag patterns, but not #A, #B, #C (priorities)
   const tagRegex = /#(?!A|B|C)(\w+)/g;
   const matches = task.text.match(tagRegex);
@@ -362,7 +310,8 @@ export function needsUrgencyRecalculation(
     'state',
     'completed',
     'tags', // tags array
-    'file', // file affects daily notes detection
+    'isDailyNote', // new field
+    'dailyNoteDate', // new field
   ];
 
   return changedProps.some((prop) => urgencyAffectingProps.includes(prop));

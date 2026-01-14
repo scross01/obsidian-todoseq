@@ -12,12 +12,13 @@ import {
 } from './language-registry';
 import { DateParser } from './date-parser';
 import { extractPriority, CHECKBOX_REGEX } from '../utils/task-utils';
-import { TFile } from 'obsidian';
+import { TFile, App } from 'obsidian';
 import {
   calculateTaskUrgency,
   getDefaultCoefficients,
   UrgencyCoefficients,
 } from '../utils/task-urgency';
+import { getDailyNoteInfo } from '../utils/daily-note-utils';
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
@@ -78,6 +79,9 @@ export class TaskParser {
   // Urgency coefficients (loaded on startup)
   private urgencyCoefficients: UrgencyCoefficients;
 
+  // App instance for daily note detection (optional for decoration-only use)
+  private readonly app: App | null;
+
   private constructor(
     regex: RegexPair,
     includeCalloutBlocks: boolean,
@@ -86,6 +90,7 @@ export class TaskParser {
     languageCommentSupport: LanguageCommentSupportSettings,
     customKeywords: string[],
     allKeywords: string[],
+    app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
     this.customKeywords = customKeywords;
@@ -98,6 +103,7 @@ export class TaskParser {
     this.includeCodeBlocks = includeCodeBlocks;
     this.includeCommentBlocks = includeCommentBlocks;
     this.languageCommentSupport = languageCommentSupport;
+    this.app = app;
 
     // Use provided urgency coefficients or defaults
     this.urgencyCoefficients = urgencyCoefficients || getDefaultCoefficients();
@@ -105,6 +111,7 @@ export class TaskParser {
 
   static create(
     settings: TodoTrackerSettings,
+    app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
   ): TaskParser {
     // Build union of non-completed states (defaults + user additional) and completed states (defaults only)
@@ -144,6 +151,7 @@ export class TaskParser {
       settings.languageCommentSupport,
       normalizedAdditional,
       allKeywordsArray,
+      app || null,
       urgencyCoefficients,
     );
   }
@@ -880,6 +888,26 @@ export class TaskParser {
       taskDetails.taskText,
     );
 
+    // Detect daily note information if file is provided
+    let isDailyNote = false;
+    let dailyNoteDate: Date | null = null;
+    let taskFile: TFile | undefined = undefined;
+
+    if (this.app) {
+      try {
+        const dailyNoteInfo = getDailyNoteInfo(
+          this.app,
+          this.app.vault.getAbstractFileByPath(path) as TFile,
+        );
+        isDailyNote = dailyNoteInfo.isDailyNote;
+        dailyNoteDate = dailyNoteInfo.dailyNoteDate;
+        taskFile = this.app.vault.getAbstractFileByPath(path) as TFile;
+      } catch (error) {
+        // If daily note detection fails, continue without it
+        console.warn('Daily note detection failed:', error);
+      }
+    }
+
     const task: Task = {
       path,
       line: index,
@@ -894,7 +922,9 @@ export class TaskParser {
       deadlineDate: null,
       tail: taskDetails.tail,
       urgency: null,
-      file: undefined,
+      file: taskFile,
+      isDailyNote,
+      dailyNoteDate,
     };
 
     // Extract dates from following lines
@@ -954,6 +984,26 @@ export class TaskParser {
       taskDetails.listMarker,
     );
 
+    // Detect daily note information if file is provided
+    let isDailyNote = false;
+    let dailyNoteDate: Date | null = null;
+    let taskFile: TFile | undefined = undefined;
+
+    if (this.app) {
+      try {
+        const dailyNoteInfo = getDailyNoteInfo(
+          this.app,
+          this.app.vault.getAbstractFileByPath(path) as TFile,
+        );
+        isDailyNote = dailyNoteInfo.isDailyNote;
+        dailyNoteDate = dailyNoteInfo.dailyNoteDate;
+        taskFile = this.app.vault.getAbstractFileByPath(path) as TFile;
+      } catch (error) {
+        // If daily note detection fails, continue without it
+        console.warn('Daily note detection failed:', error);
+      }
+    }
+
     const task: Task = {
       state: finalState,
       completed: finalCompleted,
@@ -968,7 +1018,9 @@ export class TaskParser {
       deadlineDate: null,
       tail: taskDetails.tail,
       urgency: null,
-      file: undefined,
+      file: taskFile,
+      isDailyNote,
+      dailyNoteDate,
     };
 
     // Extract dates from following lines
@@ -1046,6 +1098,22 @@ export class TaskParser {
       taskDetails.listMarker,
     );
 
+    // Detect daily note information if file is provided
+    let isDailyNote = false;
+    let dailyNoteDate: Date | null = null;
+    const taskFile: TFile | undefined = file;
+
+    if (file && this.app) {
+      try {
+        const dailyNoteInfo = getDailyNoteInfo(this.app, file);
+        isDailyNote = dailyNoteInfo.isDailyNote;
+        dailyNoteDate = dailyNoteInfo.dailyNoteDate;
+      } catch (error) {
+        // If daily note detection fails, continue without it
+        console.warn('Daily note detection failed:', error);
+      }
+    }
+
     // Initialize task with date fields
     const task: Task = {
       path,
@@ -1061,8 +1129,10 @@ export class TaskParser {
       deadlineDate: null,
       tail: taskDetails.tail,
       urgency: null,
-      file: undefined,
+      file: taskFile,
       tags,
+      isDailyNote,
+      dailyNoteDate,
     };
 
     // Extract dates from following lines

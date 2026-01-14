@@ -36,7 +36,9 @@ export class TaskKeywordDecorator {
     settings: TodoTrackerSettings,
   ) {
     this.settings = settings;
-    this.parser = TaskParser.create(settings);
+    // For editor decorations, we don't have access to the App instance
+    // Pass null for app parameter - daily note detection won't work in editor but parsing will work
+    this.parser = TaskParser.create(settings, null);
     this.decorations = this.createDecorations();
   }
 

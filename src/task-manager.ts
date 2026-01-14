@@ -70,6 +70,8 @@ export class TaskManager {
       tail,
       urgency: null,
       file: undefined,
+      isDailyNote: false,
+      dailyNoteDate: null,
     };
   }
 

@@ -16,6 +16,8 @@ export interface Task {
   urgency: number | null; // calculated urgency score
   file?: TFile; // reference to the file for daily notes detection
   tags?: string[]; // array of tags extracted from task text
+  isDailyNote: boolean; // true if the task is on a daily note page
+  dailyNoteDate: Date | null; // the date of the daily note if it's a daily note
 }
 
 export const DEFAULT_PENDING_STATES = new Set<string>([
