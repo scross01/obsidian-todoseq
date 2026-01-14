@@ -3,7 +3,6 @@ import { EditorView } from '@codemirror/view';
 import { Task } from './task';
 import { TaskListView } from './view/task-list-view';
 import { TodoTrackerSettings, DefaultSettings } from './settings/settings';
-import { TaskParser } from './parser/task-parser';
 import { TaskEditor } from './view/task-editor';
 import { EditorKeywordMenu } from './view/editor-keyword-menu';
 import { VaultScanner } from './services/vault-scanner';
@@ -86,7 +85,12 @@ export default class TodoTracker extends Plugin {
     }
     // Update VaultScanner with new settings if it exists
     if (this.vaultScanner) {
-      await this.vaultScanner.updateSettings(this.settings);
+      // Parse urgency coefficients once and pass to updateSettings to avoid redundant calls
+      const urgencyCoefficients = await parseUrgencyCoefficients(this.app);
+      await this.vaultScanner.updateSettings(
+        this.settings,
+        urgencyCoefficients,
+      );
     }
   }
 
@@ -94,8 +98,10 @@ export default class TodoTracker extends Plugin {
   public async recreateParser(): Promise<void> {
     if (this.vaultScanner) {
       const urgencyCoefficients = await parseUrgencyCoefficients(this.app);
-      this.vaultScanner.updateParser(
-        TaskParser.create(this.settings, urgencyCoefficients),
+      // Update settings with urgency coefficients to avoid redundant parsing
+      await this.vaultScanner.updateSettings(
+        this.settings,
+        urgencyCoefficients,
       );
     }
   }

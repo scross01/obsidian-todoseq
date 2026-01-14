@@ -29,6 +29,7 @@ export class VaultScanner {
     private app: App,
     private settings: TodoTrackerSettings,
     private parser: TaskParser,
+    urgencyCoefficients?: UrgencyCoefficients,
   ) {
     // Initialize event listeners map
     const eventKeys: Array<keyof VaultScannerEvents> = [
@@ -41,8 +42,13 @@ export class VaultScanner {
       this.eventListeners.set(event, []);
     });
 
-    // Load urgency coefficients on startup
-    this.loadUrgencyCoefficients();
+    // Use provided urgency coefficients or load them if not provided
+    if (urgencyCoefficients) {
+      this.urgencyCoefficients = urgencyCoefficients;
+    } else {
+      // Fallback: load urgency coefficients on startup if not provided
+      this.loadUrgencyCoefficients();
+    }
   }
 
   /**
@@ -52,10 +58,7 @@ export class VaultScanner {
     try {
       this.urgencyCoefficients = await parseUrgencyCoefficients(this.app);
     } catch (error) {
-      console.warn(
-        'Failed to load urgency coefficients, using defaults',
-        error,
-      );
+      // Failed to load urgency coefficients
       // Fallback to defaults handled in parseUrgencyCoefficients
     }
   }
@@ -233,10 +236,17 @@ export class VaultScanner {
   }
 
   // Update settings and recreate parser if needed
-  async updateSettings(newSettings: TodoTrackerSettings): Promise<void> {
+  async updateSettings(
+    newSettings: TodoTrackerSettings,
+    urgencyCoefficients?: UrgencyCoefficients,
+  ): Promise<void> {
     this.settings = newSettings;
-    // Reload urgency coefficients and recreate parser with new settings
-    await this.loadUrgencyCoefficients();
+    // Use provided urgency coefficients or reload them if not provided
+    if (urgencyCoefficients) {
+      this.urgencyCoefficients = urgencyCoefficients;
+    } else {
+      await this.loadUrgencyCoefficients();
+    }
     this.updateParser(TaskParser.create(newSettings, this.urgencyCoefficients));
   }
 

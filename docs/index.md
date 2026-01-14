@@ -61,6 +61,7 @@ DEADLINE: <2023-12-20>
 - [Editor Integration](editor.md) - Task display and interaction in the Markdown editor
 - [Search Functionality](search.md) - Advanced search syntax and filters
 - [Settings](settings.md) - Configuration options and customization
+- [Task Urgency](urgency.md) - Urgency sorting philosophy, calculation, and configuration
 
 ## Support
 

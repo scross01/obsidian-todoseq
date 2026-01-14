@@ -20,6 +20,7 @@ export default {
           { text: 'Editor Integration', link: '/editor' },
           { text: 'Search', link: '/search' },
           { text: 'Settings', link: '/settings' },
+          { text: 'Task Urgency', link: '/urgency' },
           { text: 'Import', link: '/import' },
         ],
       },

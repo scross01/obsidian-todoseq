@@ -48,11 +48,20 @@ export function parseUrgencyCoefficientsFromContent(
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
 
-    const match = trimmed.match(
-      /^urgency\.(\w+)\.(\w+)?\.coefficient\s*=\s*([-\d.]+)/,
+    // Try pattern with subcategory first: urgency.category.subcategory.coefficient
+    let match = trimmed.match(
+      /^urgency\.(\w+)\.(\w+)\.coefficient\s*=\s*([-\d.]+)/,
     );
+
+    // If no match, try pattern without subcategory: urgency.category.coefficient
+    if (!match) {
+      match = trimmed.match(/^urgency\.(\w+)\.coefficient\s*=\s*([-\d.]+)/);
+    }
+
     if (match) {
-      const [, category, subcategory, value] = match;
+      const category = match[1];
+      const subcategory = match.length === 4 ? match[2] : null;
+      const value = match.length === 4 ? match[3] : match[2];
       const numValue = parseFloat(value);
 
       if (category === 'due') {
@@ -90,16 +99,22 @@ export async function parseUrgencyCoefficients(
   app: App,
 ): Promise<UrgencyCoefficients> {
   try {
-    const file = app.vault.getAbstractFileByPath('src/urgency.ini');
-    if (!file || !(file instanceof TFile)) {
-      console.warn('urgency.ini not found, using default coefficients');
-      return { ...DEFAULT_URGENCY_COEFFICIENTS };
+    // Get the plugin directory path using configDir
+    const configDir = app.vault.configDir;
+    const pluginDir = `${configDir}/plugins/todoseq`;
+    const filePath = `${pluginDir}/urgency.ini`;
+
+    // Try to load user-customized urgency.ini from the plugin directory
+    const content = await app.vault.adapter.read(filePath);
+    if (content) {
+      return parseUrgencyCoefficientsFromContent(content);
     }
 
-    const content = await app.vault.read(file);
-    return parseUrgencyCoefficientsFromContent(content);
+    // If no custom file found, use default coefficients
+    return { ...DEFAULT_URGENCY_COEFFICIENTS };
   } catch (error) {
     console.warn('Error reading urgency.ini, using defaults', error);
+    // Fallback to defaults on any error
     return { ...DEFAULT_URGENCY_COEFFICIENTS };
   }
 }

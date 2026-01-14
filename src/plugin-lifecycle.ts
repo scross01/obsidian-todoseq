@@ -26,6 +26,7 @@ export class PluginLifecycleManager {
       this.plugin.app,
       this.plugin.settings,
       TaskParser.create(this.plugin.settings, urgencyCoefficients),
+      urgencyCoefficients,
     );
     this.plugin.taskEditor = new TaskEditor(this.plugin.app);
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);

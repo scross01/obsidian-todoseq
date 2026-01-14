@@ -9,39 +9,41 @@ import {
   needsUrgencyRecalculation,
 } from '../src/utils/task-urgency';
 import { Task } from '../src/task';
-import { TFile, App, Vault } from 'obsidian';
+import { App, Vault, DataAdapter } from 'obsidian';
 
 // Mock Obsidian app for testing
 const createMockApp = (): App => {
   return {
     vault: {
-      getAbstractFileByPath: jest.fn(),
-      read: jest.fn(),
+      configDir: '.obsidian',
+      adapter: {
+        read: jest.fn(),
+      } as unknown as DataAdapter,
     } as unknown as Vault,
   } as App;
 };
 
 // Helper to create a test task
 const createTestTask = (overrides: Partial<Task> = {}): Task => ({
-  id: 'test-task',
-  text: 'Test task',
   path: 'test.md',
   line: 1,
-  lineEnd: 1,
-  completed: false,
+  rawText: 'Test task',
+  indent: '',
+  listMarker: '- ',
+  text: 'Test task',
   state: 'TODO',
+  completed: false,
   priority: null,
   scheduledDate: null,
   deadlineDate: null,
-  tags: [],
   urgency: null,
+  tags: [],
   ...overrides,
 });
 
 describe('Urgency Coefficient Parsing', () => {
   it('should parse urgency.ini file correctly', async () => {
     const mockApp = createMockApp();
-    const mockFile = { path: 'src/urgency.ini' } as TFile;
     const iniContent = `
 # Urgency coefficients
 urgency.due.coefficient = 12.0
@@ -56,10 +58,7 @@ urgency.tags.coefficient = 1.0
 urgency.waiting.coefficient = -3.0
 `;
 
-    (mockApp.vault.getAbstractFileByPath as jest.Mock).mockReturnValue(
-      mockFile,
-    );
-    (mockApp.vault.read as jest.Mock).mockResolvedValue(iniContent);
+    (mockApp.vault.adapter.read as jest.Mock).mockResolvedValue(iniContent);
 
     const coefficients = await parseUrgencyCoefficients(mockApp);
 
@@ -73,11 +72,18 @@ urgency.waiting.coefficient = -3.0
     expect(coefficients.age).toBe(2.0);
     expect(coefficients.tags).toBe(1.0);
     expect(coefficients.waiting).toBe(-3.0);
+
+    // Verify the correct path was used
+    expect(mockApp.vault.adapter.read).toHaveBeenCalledWith(
+      '.obsidian/plugins/todoseq/urgency.ini',
+    );
   });
 
   it('should return default coefficients when file not found', async () => {
     const mockApp = createMockApp();
-    (mockApp.vault.getAbstractFileByPath as jest.Mock).mockReturnValue(null);
+    (mockApp.vault.adapter.read as jest.Mock).mockRejectedValue(
+      new Error('File not found'),
+    );
 
     const coefficients = await parseUrgencyCoefficients(mockApp);
     const defaults = getDefaultCoefficients();
@@ -87,12 +93,7 @@ urgency.waiting.coefficient = -3.0
 
   it('should return default coefficients on parse error', async () => {
     const mockApp = createMockApp();
-    const mockFile = { path: 'src/urgency.ini' } as TFile;
-
-    (mockApp.vault.getAbstractFileByPath as jest.Mock).mockReturnValue(
-      mockFile,
-    );
-    (mockApp.vault.read as jest.Mock).mockRejectedValue(
+    (mockApp.vault.adapter.read as jest.Mock).mockRejectedValue(
       new Error('Parse error'),
     );
 
@@ -104,7 +105,6 @@ urgency.waiting.coefficient = -3.0
 
   it('should handle malformed lines gracefully', async () => {
     const mockApp = createMockApp();
-    const mockFile = { path: 'src/urgency.ini' } as TFile;
     const iniContent = `
 urgency.due.coefficient = 12.0
 malformed line here
@@ -113,16 +113,44 @@ urgency.priority.high.coefficient = 6.0
 urgency.invalid.format = 99.0
 `;
 
-    (mockApp.vault.getAbstractFileByPath as jest.Mock).mockReturnValue(
-      mockFile,
-    );
-    (mockApp.vault.read as jest.Mock).mockResolvedValue(iniContent);
+    (mockApp.vault.adapter.read as jest.Mock).mockResolvedValue(iniContent);
 
     const coefficients = await parseUrgencyCoefficients(mockApp);
 
     expect(coefficients.due).toBe(12.0);
     expect(coefficients.priorityHigh).toBe(6.0);
     // Invalid lines should be ignored
+  });
+
+  it('should handle negative coefficient values correctly', async () => {
+    const mockApp = createMockApp();
+    const iniContent = `
+urgency.due.coefficient = -12.0
+urgency.priority.high.coefficient = 6.0
+urgency.priority.medium.coefficient = 3.9
+urgency.priority.low.coefficient = 1.8
+urgency.scheduled.coefficient = -4.0
+urgency.deadline.coefficient = -5.0
+urgency.active.coefficient = 4.0
+urgency.age.coefficient = 2.0
+urgency.tags.coefficient = 1.0
+urgency.waiting.coefficient = -3.0
+`;
+
+    (mockApp.vault.adapter.read as jest.Mock).mockResolvedValue(iniContent);
+
+    const coefficients = await parseUrgencyCoefficients(mockApp);
+
+    expect(coefficients.due).toBe(-12.0);
+    expect(coefficients.scheduled).toBe(-4.0);
+    expect(coefficients.deadline).toBe(-5.0);
+    expect(coefficients.waiting).toBe(-3.0);
+    expect(coefficients.priorityHigh).toBe(6.0);
+    expect(coefficients.priorityMedium).toBe(3.9);
+    expect(coefficients.priorityLow).toBe(1.8);
+    expect(coefficients.active).toBe(4.0);
+    expect(coefficients.age).toBe(2.0);
+    expect(coefficients.tags).toBe(1.0);
   });
 });
 
