@@ -13,7 +13,8 @@ export type SortMethod =
   | 'default'
   | 'sortByScheduled'
   | 'sortByDeadline'
-  | 'sortByPriority';
+  | 'sortByPriority'
+  | 'sortByUrgency';
 
 /**
  * Future task display options
@@ -140,6 +141,24 @@ function getSortFunction(sortMethod: SortMethod): (a: Task, b: Task) => number {
         }
 
         // If priorities are equal, fall back to default sorting
+        return taskComparator(a, b);
+      };
+
+    case 'sortByUrgency':
+      return (a, b) => {
+        // Handle null urgency values - sort to end
+        if (a.urgency === null && b.urgency === null) {
+          return taskComparator(a, b);
+        }
+        if (a.urgency === null) return 1;
+        if (b.urgency === null) return -1;
+
+        // Sort by urgency descending (higher urgency first)
+        if (a.urgency !== b.urgency) {
+          return b.urgency - a.urgency;
+        }
+
+        // If urgencies are equal, fall back to default sorting
         return taskComparator(a, b);
       };
 

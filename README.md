@@ -16,6 +16,7 @@ TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian
 - **State cycling**: Click keywords to cycle through task states
 - **Priority system**: Use `[#A]`, `[#B]`, `[#C]` for high, medium, low priority
 - **Date management**: Support for SCHEDULED and DEADLINE dates
+- **Urgency sorting**: Smart task ranking based on due dates, priority, tags, and task state
 
 ## Installation
 

@@ -36,7 +36,8 @@ export type SortMethod =
   | 'default'
   | 'sortByScheduled'
   | 'sortByDeadline'
-  | 'sortByPriority';
+  | 'sortByPriority'
+  | 'sortByUrgency';
 
 export class TaskListView extends ItemView {
   static viewType = 'todoseq-view';
@@ -108,7 +109,8 @@ export class TaskListView extends ItemView {
         attr === 'default' ||
         attr === 'sortByScheduled' ||
         attr === 'sortByDeadline' ||
-        attr === 'sortByPriority'
+        attr === 'sortByPriority' ||
+        attr === 'sortByUrgency'
       )
         return attr;
     }
@@ -117,7 +119,8 @@ export class TaskListView extends ItemView {
       this.defaultSortMethod === 'default' ||
       this.defaultSortMethod === 'sortByScheduled' ||
       this.defaultSortMethod === 'sortByDeadline' ||
-      this.defaultSortMethod === 'sortByPriority'
+      this.defaultSortMethod === 'sortByPriority' ||
+      this.defaultSortMethod === 'sortByUrgency'
     ) {
       return this.defaultSortMethod;
     }
@@ -425,6 +428,7 @@ export class TaskListView extends ItemView {
       { value: 'sortByScheduled', label: 'Scheduled date' },
       { value: 'sortByDeadline', label: 'Deadline date' },
       { value: 'sortByPriority', label: 'Priority' },
+      { value: 'sortByUrgency', label: 'Urgency' },
     ];
 
     for (const option of sortOptions) {
@@ -449,6 +453,8 @@ export class TaskListView extends ItemView {
         sortMethod = 'sortByDeadline';
       } else if (selectedValue === 'sortByPriority') {
         sortMethod = 'sortByPriority';
+      } else if (selectedValue === 'sortByUrgency') {
+        sortMethod = 'sortByUrgency';
       }
 
       // Update the sort method (keep the current view mode)

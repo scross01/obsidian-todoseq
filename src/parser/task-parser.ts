@@ -12,6 +12,12 @@ import {
 } from './language-registry';
 import { DateParser } from './date-parser';
 import { extractPriority, CHECKBOX_REGEX } from '../utils/task-utils';
+import { TFile } from 'obsidian';
+import {
+  calculateTaskUrgency,
+  getDefaultCoefficients,
+  UrgencyCoefficients,
+} from '../utils/task-urgency';
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
@@ -69,6 +75,9 @@ export class TaskParser {
   // Language state tracking
   private currentLanguage: LanguageDefinition | null = null;
 
+  // Urgency coefficients (loaded on startup)
+  private urgencyCoefficients: UrgencyCoefficients;
+
   private constructor(
     regex: RegexPair,
     includeCalloutBlocks: boolean,
@@ -77,6 +86,7 @@ export class TaskParser {
     languageCommentSupport: LanguageCommentSupportSettings,
     customKeywords: string[],
     allKeywords: string[],
+    urgencyCoefficients?: UrgencyCoefficients,
   ) {
     this.customKeywords = customKeywords;
     this.allKeywords = allKeywords;
@@ -88,9 +98,15 @@ export class TaskParser {
     this.includeCodeBlocks = includeCodeBlocks;
     this.includeCommentBlocks = includeCommentBlocks;
     this.languageCommentSupport = languageCommentSupport;
+
+    // Use provided urgency coefficients or defaults
+    this.urgencyCoefficients = urgencyCoefficients || getDefaultCoefficients();
   }
 
-  static create(settings: TodoTrackerSettings): TaskParser {
+  static create(
+    settings: TodoTrackerSettings,
+    urgencyCoefficients?: UrgencyCoefficients,
+  ): TaskParser {
     // Build union of non-completed states (defaults + user additional) and completed states (defaults only)
     const additional: string[] = Array.isArray(settings.additionalTaskKeywords)
       ? (settings.additionalTaskKeywords as string[])
@@ -128,6 +144,7 @@ export class TaskParser {
       settings.languageCommentSupport,
       normalizedAdditional,
       allKeywordsArray,
+      urgencyCoefficients,
     );
   }
 
@@ -372,6 +389,13 @@ export class TaskParser {
   }
 
   /**
+   * Update urgency coefficients (called when settings change)
+   */
+  public updateUrgencyCoefficients(coefficients: UrgencyCoefficients): void {
+    this.urgencyCoefficients = coefficients;
+  }
+
+  /**
    * Extract checkbox state from task line
    * @param line The task line to parse
    * @param state The current state
@@ -542,7 +566,7 @@ export class TaskParser {
   }
 
   // Parse a single file content into Task[], pure and stateless w.r.t. external app
-  parseFile(content: string, path: string): Task[] {
+  parseFile(content: string, path: string, file?: TFile): Task[] {
     const lines = content.split('\n');
 
     // Initialize state machine
@@ -642,6 +666,7 @@ export class TaskParser {
         index,
         taskDetails,
         lines,
+        file,
       );
 
       if (task) {
@@ -868,6 +893,8 @@ export class TaskParser {
       scheduledDate: null,
       deadlineDate: null,
       tail: taskDetails.tail,
+      urgency: null,
+      file: undefined,
     };
 
     // Extract dates from following lines
@@ -879,6 +906,11 @@ export class TaskParser {
 
     task.scheduledDate = scheduledDate;
     task.deadlineDate = deadlineDate;
+
+    // Calculate urgency for non-completed tasks
+    if (!task.completed) {
+      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+    }
 
     return task;
   }
@@ -935,6 +967,8 @@ export class TaskParser {
       scheduledDate: null,
       deadlineDate: null,
       tail: taskDetails.tail,
+      urgency: null,
+      file: undefined,
     };
 
     // Extract dates from following lines
@@ -946,6 +980,11 @@ export class TaskParser {
 
     task.scheduledDate = scheduledDate;
     task.deadlineDate = deadlineDate;
+
+    // Calculate urgency for non-completed tasks
+    if (!task.completed) {
+      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+    }
 
     return task;
   }
@@ -959,6 +998,21 @@ export class TaskParser {
    * @param lines All lines in file
    * @returns Parsed task
    */
+  /**
+   * Extract tags from task text
+   * @param taskText The task text to parse
+   * @returns Array of tag strings (without #)
+   */
+  private extractTags(taskText: string): string[] {
+    // Match #tag patterns, but not #A, #B, #C (priorities)
+    const tagRegex = /#(?!A|B|C)(\w+)/g;
+    const matches = taskText.match(tagRegex);
+    if (!matches) return [];
+
+    // Remove the # prefix from each tag
+    return matches.map((tag) => tag.substring(1));
+  }
+
   private createTaskFromDetails(
     line: string,
     path: string,
@@ -971,11 +1025,15 @@ export class TaskParser {
       state: string;
     },
     lines: string[],
+    file?: TFile,
   ): Task {
     // Extract priority
     const { priority, cleanedText } = this.extractPriority(
       taskDetails.taskText,
     );
+
+    // Extract tags
+    const tags = this.extractTags(taskDetails.taskText);
 
     // Extract checkbox state
     const {
@@ -1002,6 +1060,9 @@ export class TaskParser {
       scheduledDate: null,
       deadlineDate: null,
       tail: taskDetails.tail,
+      urgency: null,
+      file: undefined,
+      tags,
     };
 
     // Extract dates from following lines
@@ -1013,6 +1074,11 @@ export class TaskParser {
 
     task.scheduledDate = scheduledDate;
     task.deadlineDate = deadlineDate;
+
+    // Calculate urgency for non-completed tasks
+    if (!task.completed) {
+      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+    }
 
     return task;
   }

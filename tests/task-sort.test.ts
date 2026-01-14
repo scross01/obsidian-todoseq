@@ -29,6 +29,7 @@ describe('Task Sorting System', () => {
     scheduledDate: null,
     deadlineDate: null,
     tail: '',
+    urgency: null,
     ...overrides,
   });
 
@@ -432,6 +433,84 @@ describe('Task Sorting System', () => {
         'showAll',
         'showAll',
         'sortByPriority',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('sorts by urgency when selected', () => {
+      const task1 = createTask({ urgency: 5.0, text: 'Medium urgency' });
+      const task2 = createTask({ urgency: 15.0, text: 'High urgency' });
+      const task3 = createTask({ urgency: 2.0, text: 'Low urgency' });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2, task3],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      const texts = mainBlock.tasks.map((t) => t.text);
+      expect(texts).toEqual(['High urgency', 'Medium urgency', 'Low urgency']);
+    });
+
+    it('sorts null urgency values to the end', () => {
+      const task1 = createTask({ urgency: 5.0, text: 'Has urgency' });
+      const task2 = createTask({ urgency: null, text: 'No urgency' });
+      const task3 = createTask({ urgency: 10.0, text: 'High urgency' });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2, task3],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      const texts = mainBlock.tasks.map((t) => t.text);
+      expect(texts).toEqual(['High urgency', 'Has urgency', 'No urgency']);
+    });
+
+    it('falls back to default sorting when urgencies are equal', () => {
+      const task1 = createTask({ urgency: 10.0, path: 'b.md', line: 1 });
+      const task2 = createTask({ urgency: 10.0, path: 'a.md', line: 1 });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('handles all null urgency values with default sorting', () => {
+      const task1 = createTask({ urgency: null, path: 'b.md', line: 1 });
+      const task2 = createTask({ urgency: null, path: 'a.md', line: 1 });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
       );
 
       const mainBlock = blocks.find((b) => b.type === 'main');

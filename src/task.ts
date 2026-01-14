@@ -1,3 +1,5 @@
+import { TFile } from 'obsidian';
+
 export interface Task {
   path: string; // path to the page in the vault
   line: number; // line number of the task in the page
@@ -11,6 +13,9 @@ export interface Task {
   scheduledDate: Date | null; // scheduled date from SCHEDULED: line
   deadlineDate: Date | null; // deadline date from DEADLINE: line
   tail?: string; // trailing end characters after the task text (e.g., " */")
+  urgency: number | null; // calculated urgency score
+  file?: TFile; // reference to the file for daily notes detection
+  tags?: string[]; // array of tags extracted from task text
 }
 
 export const DEFAULT_PENDING_STATES = new Set<string>([

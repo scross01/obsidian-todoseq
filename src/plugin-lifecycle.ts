@@ -8,6 +8,7 @@ import { TodoTrackerSettingTab } from './settings/settings';
 import { TaskParser } from './parser/task-parser';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, TFile, Platform } from 'obsidian';
+import { parseUrgencyCoefficients } from './utils/task-urgency';
 
 export class PluginLifecycleManager {
   constructor(private plugin: TodoTracker) {}
@@ -19,10 +20,12 @@ export class PluginLifecycleManager {
     await this.loadSettings();
 
     // Initialize services
+    // Load urgency coefficients on startup
+    const urgencyCoefficients = await parseUrgencyCoefficients(this.plugin.app);
     this.plugin.vaultScanner = new VaultScanner(
       this.plugin.app,
       this.plugin.settings,
-      TaskParser.create(this.plugin.settings),
+      TaskParser.create(this.plugin.settings, urgencyCoefficients),
     );
     this.plugin.taskEditor = new TaskEditor(this.plugin.app);
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);

@@ -68,6 +68,8 @@ export class TaskManager {
       scheduledDate: null,
       deadlineDate: null,
       tail,
+      urgency: null,
+      file: undefined,
     };
   }
 

@@ -3,6 +3,10 @@ import { Task } from '../task';
 import { TaskParser } from '../parser/task-parser';
 import { TodoTrackerSettings } from '../settings/settings';
 import { taskComparator } from '../utils/task-utils';
+import {
+  parseUrgencyCoefficients,
+  UrgencyCoefficients,
+} from '../utils/task-urgency';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -19,6 +23,7 @@ export class VaultScanner {
     keyof VaultScannerEvents,
     ((...args: unknown[]) => void)[]
   > = new Map();
+  private urgencyCoefficients: UrgencyCoefficients;
 
   constructor(
     private app: App,
@@ -35,6 +40,24 @@ export class VaultScanner {
     eventKeys.forEach((event) => {
       this.eventListeners.set(event, []);
     });
+
+    // Load urgency coefficients on startup
+    this.loadUrgencyCoefficients();
+  }
+
+  /**
+   * Load urgency coefficients from urgency.ini file
+   */
+  private async loadUrgencyCoefficients(): Promise<void> {
+    try {
+      this.urgencyCoefficients = await parseUrgencyCoefficients(this.app);
+    } catch (error) {
+      console.warn(
+        'Failed to load urgency coefficients, using defaults',
+        error,
+      );
+      // Fallback to defaults handled in parseUrgencyCoefficients
+    }
   }
 
   // Event management methods
@@ -126,10 +149,10 @@ export class VaultScanner {
 
     if (!this.parser) {
       // Lazily create if not already set (should be set by constructor)
-      this.parser = TaskParser.create(this.settings);
+      this.parser = TaskParser.create(this.settings, this.urgencyCoefficients);
     }
 
-    const parsed = this.parser.parseFile(content, file.path);
+    const parsed = this.parser.parseFile(content, file.path, file);
     this.tasks.push(...parsed);
   }
 
@@ -210,10 +233,11 @@ export class VaultScanner {
   }
 
   // Update settings and recreate parser if needed
-  updateSettings(newSettings: TodoTrackerSettings): void {
+  async updateSettings(newSettings: TodoTrackerSettings): Promise<void> {
     this.settings = newSettings;
-    // Recreate parser with new settings
-    this.updateParser(TaskParser.create(newSettings));
+    // Reload urgency coefficients and recreate parser with new settings
+    await this.loadUrgencyCoefficients();
+    this.updateParser(TaskParser.create(newSettings, this.urgencyCoefficients));
   }
 
   // Update parser instance

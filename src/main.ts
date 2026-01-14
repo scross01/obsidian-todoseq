@@ -11,6 +11,7 @@ import { StatusBarManager } from './view/status-bar';
 import { TaskManager } from './task-manager';
 import { UIManager } from './ui-manager';
 import { PluginLifecycleManager } from './plugin-lifecycle';
+import { parseUrgencyCoefficients } from './utils/task-urgency';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -85,14 +86,17 @@ export default class TodoTracker extends Plugin {
     }
     // Update VaultScanner with new settings if it exists
     if (this.vaultScanner) {
-      this.vaultScanner.updateSettings(this.settings);
+      await this.vaultScanner.updateSettings(this.settings);
     }
   }
 
   // Public method to update parser in VaultScanner with current settings
-  public recreateParser(): void {
+  public async recreateParser(): Promise<void> {
     if (this.vaultScanner) {
-      this.vaultScanner.updateParser(TaskParser.create(this.settings));
+      const urgencyCoefficients = await parseUrgencyCoefficients(this.app);
+      this.vaultScanner.updateParser(
+        TaskParser.create(this.settings, urgencyCoefficients),
+      );
     }
   }
 

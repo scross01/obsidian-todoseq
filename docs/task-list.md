@@ -118,6 +118,13 @@ Choose how tasks are ordered using the sort method dropdown:
 - Tasks sorted by priority: High (`[#A]`) > Medium (`[#B]`) > Low (`[#C]`) > No priority
 - Within each priority level, tasks sorted by file path and line number
 
+### 5. Urgency
+
+- Tasks sorted by calculated urgency score (highest to lowest)
+- Urgency is calculated based on multiple factors including due dates, priority, tags, and task state
+- Tasks with no urgency score appear at the end
+- Completed tasks are not included in urgency sorting
+
 ## Search Functionality
 
 The search field provides powerful live filtering of tasks.
