@@ -266,3 +266,34 @@ With **Sunday start**:
 
 - Week 1: Sun Dec 31 - Sat Jan 6
 - "this week" on Jan 3 includes Dec 31 - Jan 6
+
+## Task List View Settings
+
+### Completed Tasks
+
+**Setting**: "Completed tasls" dropdown
+
+**Description**: Controls how completed tasks are displayed in the Task List view.
+
+**Options:**
+
+- **Show all tasks**: Display all tasks regardless of completion status
+- **Sort completed to end**: Show completed tasks at the end of the list
+- **Hide completed**: Only show incomplete tasks
+
+**Default**: Show all tasks
+
+### Future Dated Tasks
+
+**Setting**: "Future dated tasks" dropdown
+
+**Description**: Controls how tasks with future scheduled or deadline dates are displayed in the Task List view.
+
+**Options:**
+
+- **Show all**: Display all tasks normally (default behavior)
+- **Sort to end**: Show future tasks at the end of the list, after current tasks
+- **Show upcoming (7 days)**: Only show future tasks that are within the next 7 days
+- **Hide future**: Hide all future tasks completely
+
+**Default**: Show all

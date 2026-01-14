@@ -10,6 +10,7 @@ export interface TodoTrackerSettings {
   includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
   includeCommentBlocks: boolean; // when true, tasks inside multiline comment blocks ($$) are included
   taskListViewMode: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // controls view transformation in the task view
+  futureTaskSorting: 'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture'; // controls how future tasks are handled
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
@@ -22,6 +23,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   includeCalloutBlocks: true, // Enabled by default
   includeCommentBlocks: false, // Disabled by default
   taskListViewMode: 'showAll',
+  futureTaskSorting: 'showAll',
   languageCommentSupport: {
     enabled: true,
   },
@@ -291,7 +293,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Task view mode')
+      .setName('Completed tasks')
       .setDesc('Choose how completed items are shown in the task view.')
       .addDropdown((drop) => {
         drop.addOption('showAll', 'Show all tasks');
@@ -304,6 +306,27 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             | 'sortCompletedLast'
             | 'hideCompleted';
           this.plugin.settings.taskListViewMode = mode;
+          await this.plugin.saveSettings();
+          await this.refreshAllTaskListViews();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Future dated tasks')
+      .setDesc('Chooose how tasks with future dates are displayed')
+      .addDropdown((drop) => {
+        drop.addOption('showAll', 'Show all tasks');
+        drop.addOption('showUpcoming', 'Show upcoming (7 days)');
+        drop.addOption('sortToEnd', 'Sort future to end');
+        drop.addOption('hideFuture', 'Hide future');
+        drop.setValue(this.plugin.settings.futureTaskSorting);
+        drop.onChange(async (value: string) => {
+          const mode = value as
+            | 'showAll'
+            | 'showUpcoming'
+            | 'sortToEnd'
+            | 'hideFuture';
+          this.plugin.settings.futureTaskSorting = mode;
           await this.plugin.saveSettings();
           await this.refreshAllTaskListViews();
         });

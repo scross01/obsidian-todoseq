@@ -33,6 +33,9 @@ coverage/
 .roomodes
 plans/
 
+# exclude kilocode files
+.kilocode/
+
 # ignore feature planning docs
 FEAT*.md
 

@@ -1,8 +1,9 @@
 # Change Log
 
-## 0.7.1
+## v.next
 
 - Updated vault scanner to use cached reads when collecting tasks
+- Added task view option to hide future dated tasks
 
 ## 0.7.0
 

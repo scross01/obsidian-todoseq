@@ -21,7 +21,11 @@ import { Search } from '../search/search';
 import { SearchOptionsDropdown } from './search-options-dropdown';
 import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
 import { TodoTrackerSettings } from '../settings/settings';
-import { taskComparator, getFilename } from '../utils/task-utils';
+import { getFilename } from '../utils/task-utils';
+import {
+  sortTasksWithThreeBlockSystem,
+  SortMethod as TaskSortMethod,
+} from '../utils/task-sort';
 import { getPluginSettings } from '../utils/settings-utils';
 
 export type TaskListViewMode =
@@ -139,79 +143,37 @@ export class TaskListView extends ItemView {
 
   /** Non-mutating transform for rendering */
   private transformForView(tasks: Task[], mode: TaskListViewMode): Task[] {
-    let transformed = tasks.slice();
+    const now = new Date();
+    const sortMethod = this.getSortMethod() as TaskSortMethod;
 
-    // First, handle view mode filtering
-    if (mode === 'hideCompleted') {
-      // Filter out completed tasks and then apply sorting
-      transformed = transformed.filter((t) => !t.completed);
-      this.applySortToTasks(transformed);
-      return transformed;
+    // Map TaskListViewMode to CompletedTaskSetting
+    let completedSetting: 'showAll' | 'sortToEnd' | 'hide';
+    switch (mode) {
+      case 'hideCompleted':
+        completedSetting = 'hide';
+        break;
+      case 'sortCompletedLast':
+        completedSetting = 'sortToEnd';
+        break;
+      case 'showAll':
+      default:
+        completedSetting = 'showAll';
+        break;
     }
 
-    // Then apply sorting based on the current sort method
-    if (mode === 'sortCompletedLast') {
-      // Sort completed tasks to the end, but keep them sorted by the current sort selection
-      const pending: Task[] = [];
-      const done: Task[] = [];
-      for (const t of transformed) {
-        (t.completed ? done : pending).push(t);
-      }
+    // Use the new three-block sorting system
+    const futureSetting = this.settings.futureTaskSorting;
 
-      // Apply the same sorting to both pending and done groups
-      this.applySortToTasks(pending);
-      this.applySortToTasks(done);
+    // Apply the new sorting logic
+    const sortedTasks = sortTasksWithThreeBlockSystem(
+      tasks,
+      now,
+      futureSetting,
+      completedSetting,
+      sortMethod,
+    );
 
-      transformed = pending.concat(done);
-    } else {
-      // For other modes (showAll), apply sorting directly
-      this.applySortToTasks(transformed);
-    }
-
-    return transformed;
-  }
-
-  /**
-   * Apply sorting to tasks based on the current sort method
-   * @param tasks Array of tasks to sort
-   */
-  private applySortToTasks(tasks: Task[]): void {
-    const sortMethod = this.getSortMethod();
-
-    if (sortMethod === 'default') {
-      // Sort by file path, then by line number within each file using shared comparator
-      tasks.sort(taskComparator);
-    } else if (sortMethod === 'sortByScheduled') {
-      tasks.sort((a, b) => {
-        // Tasks without scheduled dates go to the end
-        if (!a.scheduledDate && !b.scheduledDate) return 0;
-        if (!a.scheduledDate) return 1;
-        if (!b.scheduledDate) return -1;
-        return a.scheduledDate.getTime() - b.scheduledDate.getTime();
-      });
-    } else if (sortMethod === 'sortByDeadline') {
-      tasks.sort((a, b) => {
-        // Tasks without deadline dates go to the end
-        if (!a.deadlineDate && !b.deadlineDate) return 0;
-        if (!a.deadlineDate) return 1;
-        if (!b.deadlineDate) return -1;
-        return a.deadlineDate.getTime() - b.deadlineDate.getTime();
-      });
-    } else if (sortMethod === 'sortByPriority') {
-      tasks.sort((a, b) => {
-        // Priority order: high > med > low > null (no priority)
-        const priorityOrder = { high: 3, med: 2, low: 1, null: 0 };
-        const aPriority = a.priority ? priorityOrder[a.priority] : 0;
-        const bPriority = b.priority ? priorityOrder[b.priority] : 0;
-
-        if (aPriority !== bPriority) {
-          return bPriority - aPriority; // Higher priority first (descending)
-        }
-
-        // If priorities are equal, fall back to default sorting using shared comparator
-        return taskComparator(a, b);
-      });
-    }
+    return sortedTasks;
   }
 
   /** Search query (persisted on root contentEl attribute to survive re-renders) */
@@ -299,7 +261,7 @@ export class TaskListView extends ItemView {
     });
     completedTasksSettingInfo.createEl('div', {
       cls: 'setting-item-name',
-      text: 'Show completed tasks:',
+      text: 'Completed tasks:',
       attr: { for: 'completed-tasks-dropdown' },
     });
 
@@ -368,6 +330,72 @@ export class TaskListView extends ItemView {
 
       // Refresh the visible list
       this.refreshVisibleList();
+    });
+
+    // Add Future Task Sorting dropdown
+    const futureTasksSetting = settingsSection.createEl('div', {
+      cls: 'setting-item',
+    });
+    const futureTasksSettingInfo = futureTasksSetting.createEl('div', {
+      cls: 'setting-item-info',
+    });
+    futureTasksSettingInfo.createEl('div', {
+      cls: 'setting-item-name',
+      text: 'Future dated tasks:',
+      attr: { for: 'future-tasks-dropdown' },
+    });
+    //  futureTasksSettingInfo.createEl('div', {
+    //    cls: 'setting-item-description',
+    //    text: 'Control how tasks with future dates are displayed',
+    //  });
+
+    const futureTasksSettingControl = futureTasksSetting.createEl('div', {
+      cls: 'setting-item-control',
+    });
+    const futureDropdown = futureTasksSettingControl.createEl('select', {
+      cls: 'mod-small',
+      attr: {
+        id: 'future-tasks-dropdown',
+        'aria-label': 'Future task sorting',
+      },
+    });
+
+    // Add future task sorting options
+    const futureOptions = [
+      { value: 'showAll', label: 'Show' },
+      { value: 'showUpcoming', label: 'Show upcoming' },
+      { value: 'sortToEnd', label: 'Sort to end' },
+      { value: 'hideFuture', label: 'Hide' },
+    ];
+
+    for (const option of futureOptions) {
+      futureDropdown.createEl('option', {
+        attr: { value: option.value },
+        text: option.label,
+      });
+    }
+
+    // Set current future task sorting mode
+    futureDropdown.value = this.settings.futureTaskSorting;
+
+    // Handle future task sorting changes
+    futureDropdown.addEventListener('change', () => {
+      const selectedValue = futureDropdown.value as
+        | 'showAll'
+        | 'showUpcoming'
+        | 'sortToEnd'
+        | 'hideFuture';
+
+      // Update settings and re-render
+      this.settings.futureTaskSorting = selectedValue;
+
+      // Dispatch event for persistence
+      const evt = new CustomEvent('todoseq:future-task-sorting-change', {
+        detail: { mode: selectedValue },
+      });
+      window.dispatchEvent(evt);
+
+      this.refreshVisibleList(); // Re-render with new future task sorting
     });
 
     // Add search results info bar (second row)
