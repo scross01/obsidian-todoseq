@@ -34,19 +34,60 @@ This approach allows different aspects of your tasks to contribute to their over
 Each factor in the urgency calculation has a coefficient that determines its relative importance:
 
 ```ini
-urgency.due.coefficient = 12.0             # schedule and/or deadline date is due (today) or overdue
 urgency.priority.high.coefficient = 6.0    # priority is high [#A]
-urgency.priority.medium.coefficient = 3.9  # priority is medium [#B]
+urgency.priority.medium.coefficient = 3.9  # prioity is medium [#B]
 urgency.priority.low.coefficient = 1.8     # priority is low [#C]
-urgency.scheduled.coefficient = 5.0        # task has a scheduled date
-urgency.deadline.coefficient = 5.0         # task has a deadline date
+urgency.scheduled.coefficient = 5.0        # task has a scheduled date that is today or in the past
+urgency.deadline.coefficient = 12.0        # deadline date is upcoming (+14 days) due (today) or overdue (-7 days)
 urgency.active.coefficient = 4.0           # state is either DOING, NOW, or IN-PROGRESS
 urgency.age.coefficient = 2.0              # if the page is a journal page, using the date the page represents
 urgency.tags.coefficient = 1.0             # the task has one or more tags
-urgency.waiting.coefficient = -3.0         # the task is in a WAIT or WAITING state
+urgency.waiting.coefficient = -3.0         # the task in is a WAIT or WAITING state
 ```
 
-The highest coefficient (12.0) is assigned to due dates, meaning tasks that are due today or overdue will always appear near the top of your urgency-sorted list. High priority tasks come next with a coefficient of 6.0, while waiting tasks actually reduce urgency with a negative coefficient (-3.0).
+The highest coefficient (12.0) is assigned to deadline dates, meaning tasks with deadlines will always appear near the top of your urgency-sorted list. High priority tasks come next with a coefficient of 6.0, while waiting tasks actually reduce urgency with a negative coefficient (-3.0).
+
+## How Scheduled and Deadline Dates Are Calculated
+
+### Scheduled Date Calculation
+
+The scheduled date uses a simple binary approach:
+
+- **If scheduled date is today or in the past**: Contributes the full `urgency.scheduled.coefficient` (5.0) to the urgency score
+- **If scheduled date is in the future**: Contributes 0 to the urgency score
+
+This means a task scheduled for tomorrow won't receive any scheduled urgency boost until that day arrives.
+
+### Deadline Date Calculation
+
+The deadline date uses a more sophisticated gradient formula that considers how close the deadline is:
+
+**Formula**: `((days_overdue + 14.0) * 0.8 / 21.0) + 0.2`
+
+This creates a linear gradient where:
+
+- **7 days overdue**: Maximum urgency (1.0 × coefficient = 12.0)
+- **Today (0 days)**: High urgency (~0.847 × coefficient ≈ 10.2)
+- **7 days in future**: Moderate urgency (~0.6 × coefficient ≈ 7.2)
+- **14 days in future**: Minimum urgency (0.2 × coefficient = 2.4)
+
+The formula clamps the range to -14 days (14 days in the future) to +7 days (7 days overdue), so tasks with deadlines further in the future won't become less urgent, and tasks overdue by more than 7 days won't become more urgent.
+
+**Examples**:
+
+- Task due today: `((0 + 14.0) * 0.8 / 21.0) + 0.2 = 0.733 × 12.0 ≈ 8.8`
+- Task due tomorrow: `((-1 + 14.0) * 0.8 / 21.0) + 0.2 = 0.695 × 12.0 ≈ 8.3`
+- Task 7 days overdue: `((7 + 14.0) * 0.8 / 21.0) + 0.2 = 1.0 × 12.0 = 12.0`
+
+## Priority Calculation
+
+When a task has a priority value, the corresponding coefficient is added to the urgency score:
+
+- **High priority** (`[#A]`): Adds **+6.0** to the urgency score
+- **Medium priority** (`[#B]`): Adds **+3.9** to the urgency score
+- **Low priority** (`[#C]`): Adds **+1.8** to the urgency score
+
+For example, a task with high priority (`[#A]`) gets +6.0 added to its urgency score, while a task with medium priority (`[#B]`) gets +3.9, and a task with low priority (`[#C]`) gets +1.8.
 
 ## Using Urgency Sorting
 

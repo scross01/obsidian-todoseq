@@ -5,7 +5,6 @@ import { TFile, App } from 'obsidian';
  * Urgency coefficients interface matching the urgency.ini configuration
  */
 export interface UrgencyCoefficients {
-  due: number;
   priorityHigh: number;
   priorityMedium: number;
   priorityLow: number;
@@ -21,12 +20,11 @@ export interface UrgencyCoefficients {
  * Default urgency coefficients (fallback if INI parsing fails)
  */
 const DEFAULT_URGENCY_COEFFICIENTS: UrgencyCoefficients = {
-  due: 12.0,
   priorityHigh: 6.0,
   priorityMedium: 3.9,
   priorityLow: 1.8,
   scheduled: 5.0,
-  deadline: 5.0,
+  deadline: 12.0,
   active: 4.0,
   age: 2.0,
   tags: 1.0,
@@ -64,16 +62,14 @@ export function parseUrgencyCoefficientsFromContent(
       const value = match.length === 4 ? match[3] : match[2];
       const numValue = parseFloat(value);
 
-      if (category === 'due') {
-        coefficients.due = numValue;
-      } else if (category === 'priority') {
+      if (category === 'priority') {
         if (subcategory === 'high') coefficients.priorityHigh = numValue;
         else if (subcategory === 'medium')
           coefficients.priorityMedium = numValue;
         else if (subcategory === 'low') coefficients.priorityLow = numValue;
       } else if (category === 'scheduled') {
         coefficients.scheduled = numValue;
-      } else if (category === 'deadline') {
+      } else if (category === 'deadline' || category === 'due') {
         coefficients.deadline = numValue;
       } else if (category === 'active') {
         coefficients.active = numValue;
@@ -130,6 +126,7 @@ export function getDefaultCoefficients(): UrgencyCoefficients {
  * Check if a file path represents a daily note based on common patterns
  * @param filePath The file path to check
  * @returns true if the file appears to be a daily note
+ * TODO FIXME this this needs to be more robust to use Obsidian Daily Notes settings to determine if page is a daily note
  */
 function isDailyNotePath(filePath?: string): boolean {
   if (!filePath) return false;
@@ -204,24 +201,53 @@ function getTaskAge(task: Task): number {
 }
 
 /**
- * Check if task has due urgency (overdue or due today)
+ * Calculate due urgency based on deadline date using linear gradient formula
  * @param task The task to check
- * @returns 1 if due/overdue, 0 otherwise
+ * @returns Urgency value between 0.2 and 1.0 based on deadline proximity
+ *
+ * Formula: ((days_overdue + 14.0) * 0.8 / 21.0) + 0.2
+ * - 7 days overdue: 1.0
+ * - Today (0 days): ~0.847
+ * - 7 days future: ~0.6
+ * - 14 days future: 0.2
  */
-function getDueUrgency(task: Task): number {
-  const dates: Date[] = [];
-  if (task.scheduledDate) dates.push(task.scheduledDate);
-  if (task.deadlineDate) dates.push(task.deadlineDate);
+function getDeadlineUrgency(task: Task): number {
+  // Only use deadline date (not scheduled date)
+  if (!task.deadlineDate) return 0;
 
-  if (dates.length === 0) return 0;
-
-  const earliestDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+  const deadline = task.deadlineDate;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  if (earliestDate < today) return 1; // overdue
-  if (earliestDate.toDateString() === today.toDateString()) return 1; // due today
-  return 0; // future date
+  // Calculate days overdue (positive for overdue, negative for future)
+  // daysOverdue = today - deadline (so overdue tasks have positive values)
+  const diffTime = today.getTime() - deadline.getTime();
+  const daysOverdue = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  // Clamp to the 21-day range: -14 (14 days future) to +7 (7 days overdue)
+  const clampedDays = Math.max(-14, Math.min(7, daysOverdue));
+
+  // Apply the formula: ((days_overdue + 14.0) * 0.8 / 21.0) + 0.2
+  const urgency = ((clampedDays + 14.0) * 0.8) / 21.0 + 0.2;
+
+  return urgency;
+}
+
+/**
+ * Calculate scheduled urgency based on scheduled date
+ * @param task The task to check
+ * @returns 1.0 if scheduled date is today or in the past, 0 otherwise
+ */
+function getScheduledUrgency(task: Task): number {
+  if (!task.scheduledDate) return 0;
+
+  const scheduled = task.scheduledDate;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Check if scheduled date is today or in the past
+  // scheduled <= today means today or overdue
+  return scheduled <= today ? 1.0 : 0;
 }
 
 /**
@@ -280,9 +306,8 @@ export function calculateTaskUrgency(
 
     let urgency = 0;
 
-    // Due date urgency
-    const dueUrgency = getDueUrgency(task);
-    urgency += coefficients.due * dueUrgency;
+    const deadlineUrgency = getDeadlineUrgency(task);
+    urgency += coefficients.deadline * deadlineUrgency;
 
     // Priority urgency
     if (task.priority === 'high') {
@@ -293,26 +318,9 @@ export function calculateTaskUrgency(
       urgency += coefficients.priorityLow;
     }
 
-    // Scheduled and deadline date urgency (use earliest to avoid double-counting)
-    const dates: Date[] = [];
-    if (task.scheduledDate) dates.push(task.scheduledDate);
-    if (task.deadlineDate) dates.push(task.deadlineDate);
-
-    if (dates.length > 0) {
-      const earliestDate = new Date(Math.min(...dates.map((d) => d.getTime())));
-      const isScheduledEarliest =
-        task.scheduledDate &&
-        earliestDate.getTime() === task.scheduledDate.getTime();
-      const isDeadlineEarliest =
-        task.deadlineDate &&
-        earliestDate.getTime() === task.deadlineDate.getTime();
-
-      if (isScheduledEarliest) {
-        urgency += coefficients.scheduled;
-      } else if (isDeadlineEarliest) {
-        urgency += coefficients.deadline;
-      }
-    }
+    // Scheduled date urgency - use getScheduledUrgency() function
+    const scheduledUrgency = getScheduledUrgency(task);
+    urgency += coefficients.scheduled * scheduledUrgency;
 
     // Active state urgency
     const active = isActive(task);

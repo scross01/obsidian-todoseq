@@ -51,7 +51,6 @@ urgency.priority.high.coefficient = 6.0
 urgency.priority.medium.coefficient = 3.9
 urgency.priority.low.coefficient = 1.8
 urgency.scheduled.coefficient = 5.0
-urgency.deadline.coefficient = 5.0
 urgency.active.coefficient = 4.0
 urgency.age.coefficient = 2.0
 urgency.tags.coefficient = 1.0
@@ -62,12 +61,11 @@ urgency.waiting.coefficient = -3.0
 
     const coefficients = await parseUrgencyCoefficients(mockApp);
 
-    expect(coefficients.due).toBe(12.0);
     expect(coefficients.priorityHigh).toBe(6.0);
     expect(coefficients.priorityMedium).toBe(3.9);
     expect(coefficients.priorityLow).toBe(1.8);
     expect(coefficients.scheduled).toBe(5.0);
-    expect(coefficients.deadline).toBe(5.0);
+    expect(coefficients.deadline).toBe(12.0); // urgency.due.coefficient should map to deadline
     expect(coefficients.active).toBe(4.0);
     expect(coefficients.age).toBe(2.0);
     expect(coefficients.tags).toBe(1.0);
@@ -117,7 +115,7 @@ urgency.invalid.format = 99.0
 
     const coefficients = await parseUrgencyCoefficients(mockApp);
 
-    expect(coefficients.due).toBe(12.0);
+    expect(coefficients.deadline).toBe(12.0); // Should map to deadline
     expect(coefficients.priorityHigh).toBe(6.0);
     // Invalid lines should be ignored
   });
@@ -130,7 +128,6 @@ urgency.priority.high.coefficient = 6.0
 urgency.priority.medium.coefficient = 3.9
 urgency.priority.low.coefficient = 1.8
 urgency.scheduled.coefficient = -4.0
-urgency.deadline.coefficient = -5.0
 urgency.active.coefficient = 4.0
 urgency.age.coefficient = 2.0
 urgency.tags.coefficient = 1.0
@@ -141,9 +138,8 @@ urgency.waiting.coefficient = -3.0
 
     const coefficients = await parseUrgencyCoefficients(mockApp);
 
-    expect(coefficients.due).toBe(-12.0);
+    expect(coefficients.deadline).toBe(-12.0); // urgency.due.coefficient maps to deadline
     expect(coefficients.scheduled).toBe(-4.0);
-    expect(coefficients.deadline).toBe(-5.0);
     expect(coefficients.waiting).toBe(-3.0);
     expect(coefficients.priorityHigh).toBe(6.0);
     expect(coefficients.priorityMedium).toBe(3.9);
@@ -163,46 +159,48 @@ describe('Urgency Calculation', () => {
     expect(urgency).toBeNull();
   });
 
-  it('should calculate urgency with due date (overdue)', () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+  it('should calculate urgency with deadline date (7 days overdue)', () => {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
 
     const task = createTestTask({
-      scheduledDate: yesterday,
+      deadlineDate: sevenDaysAgo,
       urgency: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBeGreaterThan(0);
-    expect(urgency).toBeGreaterThanOrEqual(defaultCoefficients.due);
+    // getDeadlineUrgency returns 1.0, multiplied by 12.0 = 12.0
+    expect(urgency).toBeCloseTo(12.0, 2);
   });
 
-  it('should calculate urgency with due date (today)', () => {
+  it('should calculate urgency with deadline date (today)', () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const task = createTestTask({
-      scheduledDate: today,
+      deadlineDate: today,
       urgency: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBeGreaterThan(0);
-    expect(urgency).toBeGreaterThanOrEqual(defaultCoefficients.due);
+    // getDeadlineUrgency returns ~0.733, multiplied by 12.0 ≈ 8.8
+    expect(urgency).toBeCloseTo(8.8, 2);
   });
 
-  it('should not add due urgency for future dates', () => {
+  it('should add urgency for future deadline dates', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
 
     const task = createTestTask({
-      scheduledDate: tomorrow,
+      deadlineDate: tomorrow,
       urgency: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    // Future scheduled dates add scheduled coefficient but not due coefficient
-    expect(urgency).toBe(defaultCoefficients.scheduled);
+    // getDeadlineUrgency returns ~0.695, multiplied by 12.0 ≈ 8.34
+    expect(urgency).toBeCloseTo(8.34, 2);
   });
 
   it('should calculate urgency with priority high', () => {
@@ -245,22 +243,54 @@ describe('Urgency Calculation', () => {
     expect(urgency).toBe(0);
   });
 
-  it('should add urgency for scheduled date', () => {
-    const future = new Date();
-    future.setDate(future.getDate() + 5);
+  it('should add urgency for scheduled date (today)', () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const task = createTestTask({
-      scheduledDate: future,
+      scheduledDate: today,
       urgency: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // getScheduledUrgency returns 1.0, multiplied by 5.0 = 5.0
     expect(urgency).toBe(defaultCoefficients.scheduled);
+  });
+
+  it('should add urgency for scheduled date (past)', () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+
+    const task = createTestTask({
+      scheduledDate: yesterday,
+      urgency: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // getScheduledUrgency returns 1.0, multiplied by 5.0 = 5.0
+    expect(urgency).toBe(defaultCoefficients.scheduled);
+  });
+
+  it('should NOT add urgency for future scheduled dates', () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    const task = createTestTask({
+      scheduledDate: tomorrow,
+      urgency: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // getScheduledUrgency returns 0, so no scheduled urgency
+    expect(urgency).toBe(0);
   });
 
   it('should add urgency for deadline date', () => {
     const future = new Date();
     future.setDate(future.getDate() + 5);
+    future.setHours(0, 0, 0, 0);
 
     const task = createTestTask({
       deadlineDate: future,
@@ -268,15 +298,18 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    expect(urgency).toBe(defaultCoefficients.deadline);
+    // getDeadlineUrgency returns ~0.543, multiplied by 12.0 ≈ 6.51
+    expect(urgency).toBeCloseTo(6.51, 2);
   });
 
-  it('should use earliest date when both scheduled and deadline exist', () => {
+  it('should use both scheduled and deadline when both exist', () => {
     const soon = new Date();
     soon.setDate(soon.getDate() + 2);
+    soon.setHours(0, 0, 0, 0);
 
     const later = new Date();
     later.setDate(later.getDate() + 5);
+    later.setHours(0, 0, 0, 0);
 
     const task = createTestTask({
       scheduledDate: soon,
@@ -285,8 +318,32 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    // Should only count scheduled once (earliest)
-    expect(urgency).toBe(defaultCoefficients.scheduled);
+    // Scheduled urgency: 0 (future date)
+    // Deadline urgency: ~0.543 * 12.0 ≈ 6.51
+    // Total ≈ 6.51
+    expect(urgency).toBeCloseTo(6.51, 2);
+  });
+
+  it('should use both scheduled and deadline when both exist (scheduled is past)', () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+
+    const later = new Date();
+    later.setDate(later.getDate() + 5);
+    later.setHours(0, 0, 0, 0);
+
+    const task = createTestTask({
+      scheduledDate: yesterday,
+      deadlineDate: later,
+      urgency: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // Scheduled urgency: 5.0 (past date)
+    // Deadline urgency: ~0.543 * 12.0 ≈ 6.51
+    // Total ≈ 5.0 + 6.51 = 11.51
+    expect(urgency).toBeCloseTo(11.51, 2);
   });
 
   it('should add urgency for active states', () => {
@@ -335,21 +392,17 @@ describe('Urgency Calculation', () => {
 
     const task = createTestTask({
       priority: 'high',
-      scheduledDate: today,
+      deadlineDate: today,
       tags: ['work'],
       state: 'DOING',
       urgency: null,
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    const expected =
-      defaultCoefficients.due +
-      defaultCoefficients.priorityHigh +
-      defaultCoefficients.scheduled +
-      defaultCoefficients.tags +
-      defaultCoefficients.active;
-
-    expect(urgency).toBe(expected);
+    // getDeadlineUrgency = ~0.733, * 12.0 ≈ 8.8
+    // + priorityHigh (6.0) + active (4.0) + tags (1.0)
+    // Total ≈ 8.8 + 6.0 + 4.0 + 1.0 = 19.8
+    expect(urgency).toBeCloseTo(19.8, 2);
   });
 
   it('should handle task with no urgency factors', () => {
@@ -405,12 +458,11 @@ describe('Default Coefficients', () => {
   it('should return correct default values', () => {
     const defaults = getDefaultCoefficients();
 
-    expect(defaults.due).toBe(12.0);
     expect(defaults.priorityHigh).toBe(6.0);
     expect(defaults.priorityMedium).toBe(3.9);
     expect(defaults.priorityLow).toBe(1.8);
     expect(defaults.scheduled).toBe(5.0);
-    expect(defaults.deadline).toBe(5.0);
+    expect(defaults.deadline).toBe(12.0);
     expect(defaults.active).toBe(4.0);
     expect(defaults.age).toBe(2.0);
     expect(defaults.tags).toBe(1.0);
