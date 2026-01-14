@@ -279,9 +279,21 @@ export function calculateTaskUrgency(
     const age = getTaskAge(task);
     urgency += coefficients.age * age;
 
-    // Tag count urgency
+    // Tag count urgency - factor based on number of tags
     const tagCount = countTags(task);
-    urgency += coefficients.tags * tagCount;
+    let tagFactor = 0.0;
+
+    if (tagCount === 0) {
+      tagFactor = 0.0;
+    } else if (tagCount === 1) {
+      tagFactor = 0.8;
+    } else if (tagCount === 2) {
+      tagFactor = 0.9;
+    } else if (tagCount >= 3) {
+      tagFactor = 1.0;
+    }
+
+    urgency += coefficients.tags * tagFactor;
 
     // Waiting state urgency (negative)
     const waiting = isWaiting(task);

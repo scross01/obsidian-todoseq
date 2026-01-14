@@ -415,8 +415,10 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    // tags (3.0) + age factor (1.0) * age coefficient (2.0) = 5.0
-    expect(urgency).toBe(5.0);
+    // 3 tags → tag factor = 1.0, multiplied by tags coefficient (1.0) = 1.0
+    // + age factor (1.0) * age coefficient (2.0) = 2.0
+    // Total = 3.0
+    expect(urgency).toBe(3.0);
   });
 
   it('should handle empty tags array', () => {
@@ -461,10 +463,10 @@ describe('Urgency Calculation', () => {
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
     // getDeadlineUrgency = ~0.733, * 12.0 ≈ 8.8
-    // + priorityHigh (6.0) + active (4.0) + tags (1.0)
+    // + priorityHigh (6.0) + active (4.0) + tags (0.8)
     // + age factor (1.0) * age coefficient (2.0) = 2.0
-    // Total ≈ 8.8 + 6.0 + 4.0 + 1.0 + 2.0 = 21.8
-    expect(urgency).toBeCloseTo(21.8, 2);
+    // Total ≈ 8.8 + 6.0 + 4.0 + 0.8 + 2.0 = 21.6
+    expect(urgency).toBeCloseTo(21.6, 2);
   });
 
   it('should handle task with no urgency factors', () => {
@@ -502,7 +504,7 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    // Age factor = min(730/365, 1.0) = 1.0, multiplied by age coefficient (2.0) = 2.0
+    // Age factor = 365/365 = 1.0, multiplied by age coefficient (2.0) = 2.0
     expect(urgency).toBe(2.0);
   });
 
@@ -521,50 +523,61 @@ describe('Urgency Calculation', () => {
 
 describe('Urgency Recalculation Logic', () => {
   it('should require recalculation when priority changes', () => {
-    const changes = ['priority'];
-    expect(needsUrgencyRecalculation(createTestTask(), changes)).toBe(true);
+    const task = createTestTask({ priority: 'high' });
+    const changed = needsUrgencyRecalculation(task, ['priority']);
+    expect(changed).toBe(true);
   });
 
   it('should require recalculation when scheduled date changes', () => {
-    const changes = ['scheduledDate'];
-    expect(needsUrgencyRecalculation(createTestTask(), changes)).toBe(true);
+    const task = createTestTask({ scheduledDate: new Date() });
+    const changed = needsUrgencyRecalculation(task, ['scheduledDate']);
+    expect(changed).toBe(true);
   });
 
   it('should require recalculation when deadline date changes', () => {
-    const changes = ['deadlineDate'];
-    expect(needsUrgencyRecalculation(createTestTask(), changes)).toBe(true);
+    const task = createTestTask({ deadlineDate: new Date() });
+    const changed = needsUrgencyRecalculation(task, ['deadlineDate']);
+    expect(changed).toBe(true);
   });
 
   it('should require recalculation when state changes', () => {
-    const changes = ['state'];
-    expect(needsUrgencyRecalculation(createTestTask(), changes)).toBe(true);
+    const task = createTestTask({ state: 'DOING' });
+    const changed = needsUrgencyRecalculation(task, ['state']);
+    expect(changed).toBe(true);
   });
 
   it('should require recalculation when tags change', () => {
-    const changes = ['tags'];
-    expect(needsUrgencyRecalculation(createTestTask(), changes)).toBe(true);
+    const task = createTestTask({ tags: ['work'] });
+    const changed = needsUrgencyRecalculation(task, ['tags']);
+    expect(changed).toBe(true);
   });
 
   it('should require recalculation when completion status changes', () => {
-    const changes = ['completed'];
-    expect(needsUrgencyRecalculation(createTestTask(), changes)).toBe(true);
+    const task = createTestTask({ completed: false });
+    const changed = needsUrgencyRecalculation(task, ['completed']);
+    expect(changed).toBe(true);
   });
 
   it('should not require recalculation for unrelated changes', () => {
-    const changes = ['text', 'path', 'line'];
-    expect(needsUrgencyRecalculation(createTestTask(), changes)).toBe(false);
+    const task = createTestTask({ text: 'new text' });
+    const changed = needsUrgencyRecalculation(task, ['text']);
+    expect(changed).toBe(false);
   });
 
   it('should require recalculation for multiple relevant changes', () => {
-    const changes = ['text', 'priority', 'tags'];
-    expect(needsUrgencyRecalculation(createTestTask(), changes)).toBe(true);
+    const task = createTestTask({ priority: 'high', state: 'DOING' });
+    const changed = needsUrgencyRecalculation(task, [
+      'priority',
+      'state',
+      'text',
+    ]);
+    expect(changed).toBe(true);
   });
 });
 
 describe('Default Coefficients', () => {
   it('should return correct default values', () => {
     const defaults = getDefaultCoefficients();
-
     expect(defaults.priorityHigh).toBe(6.0);
     expect(defaults.priorityMedium).toBe(3.9);
     expect(defaults.priorityLow).toBe(1.8);
@@ -579,10 +592,7 @@ describe('Default Coefficients', () => {
   it('should return a new object each time (no mutation)', () => {
     const first = getDefaultCoefficients();
     const second = getDefaultCoefficients();
-
-    // Should be different objects
     expect(first).not.toBe(second);
-    // But with same values
     expect(first).toEqual(second);
   });
 });

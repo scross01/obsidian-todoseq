@@ -14,7 +14,7 @@ The urgency score considers various aspects of your tasks:
 - **Deadlines**: Tasks with deadline dates are more urgent than those without
 - **Active state**: Tasks that are currently being worked on (DOING, NOW, IN-PROGRESS) are more urgent
 - **Task age**: Older tasks in daily note pages gain urgency over time using a linear scale (0.0 to 1.0) based on days since creation, with a maximum of 365 days
-- **Tags**: Tasks with tags receive a small urgency boost
+- **Tags**: Tasks with tags receive a small urgency boost based on the number of tags (0.8 for 1 tag, 0.9 for 2 tags, 1.0 for 3+ tags)
 - **Waiting state**: Tasks in WAIT or WAITING states have reduced urgency
 
 ## How Urgency is Calculated
@@ -41,11 +41,30 @@ urgency.scheduled.coefficient = 5.0        # task has a scheduled date that is t
 urgency.deadline.coefficient = 12.0        # deadline date is upcoming (+14 days) due (today) or overdue (-7 days)
 urgency.active.coefficient = 4.0           # state is either DOING, NOW, or IN-PROGRESS
 urgency.age.coefficient = 2.0              # if the page is a daily notes page, weight tasks on older pages heigher
-urgency.tags.coefficient = 1.0             # the task has one or more tags
+urgency.tags.coefficient = 1.0             # the task has one or more tags (multiplied by tag factor)
 urgency.waiting.coefficient = -3.0         # the task in is a WAIT or WAITING state
 ```
 
 The highest coefficient (12.0) is assigned to deadline dates, meaning tasks with deadlines will always appear near the top of your urgency-sorted list. High priority tasks come next with a coefficient of 6.0, while waiting tasks actually reduce urgency with a negative coefficient (-3.0).
+
+## Tag Urgency Calculation
+
+The tag urgency calculation uses a factor-based system rather than counting tags directly:
+
+- **0 tags**: 0.0 urgency factor (no contribution)
+- **1 tag**: 0.8 urgency factor
+- **2 tags**: 0.9 urgency factor
+- **3+ tags**: 1.0 urgency factor (maximum)
+
+The tag urgency contribution is calculated as: `urgency.tags.coefficient × tag_factor`
+
+**Examples**:
+
+- Task with 1 tag: `1.0 × 0.8 = 0.8` urgency contribution
+- Task with 2 tags: `1.0 × 0.9 = 0.9` urgency contribution
+- Task with 3+ tags: `1.0 × 1.0 = 1.0` urgency contribution
+
+This approach provides diminishing returns for additional tags, encouraging focused tagging rather than tag spam.
 
 ## How Scheduled and Deadline Dates Are Calculated
 
