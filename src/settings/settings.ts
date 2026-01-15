@@ -11,6 +11,12 @@ export interface TodoTrackerSettings {
   includeCommentBlocks: boolean; // when true, tasks inside multiline comment blocks ($$) are included
   taskListViewMode: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // controls view transformation in the task view
   futureTaskSorting: 'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture'; // controls how future tasks are handled
+  defaultSortMethod:
+    | 'default'
+    | 'sortByScheduled'
+    | 'sortByDeadline'
+    | 'sortByPriority'
+    | 'sortByUrgency'; // default sort method for task list view
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
@@ -24,6 +30,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   includeCommentBlocks: false, // Disabled by default
   taskListViewMode: 'showAll',
   futureTaskSorting: 'showAll',
+  defaultSortMethod: 'default', // Default to file path sorting
   languageCommentSupport: {
     enabled: true,
   },
@@ -56,6 +63,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
+    // Keep these at top level (no grouping)
     new Setting(containerEl)
       .setName('Additional task keywords')
       .setDesc(
@@ -179,6 +187,9 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
+    // Task detection Group
+    new Setting(containerEl).setName('Task detection').setHeading();
+
     // Include tasks inside code blocks (parent setting)
     let languageToggleComponent: ToggleComponent | null = null;
 
@@ -292,6 +303,11 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
+    // Task list search and filter Group
+    new Setting(containerEl)
+      .setName('Task list search and filter')
+      .setHeading();
+
     new Setting(containerEl)
       .setName('Completed tasks')
       .setDesc('Choose how completed items are shown in the task view.')
@@ -344,6 +360,30 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.weekStartsOn = weekStart;
           await this.plugin.saveSettings();
           await this.refreshAllTaskListViews();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Default sort method')
+      .setDesc('Choose the default sort method for the task list view.')
+      .addDropdown((drop) => {
+        drop.addOption('default', 'Default (file path)');
+        drop.addOption('sortByScheduled', 'Scheduled date');
+        drop.addOption('sortByDeadline', 'Deadline date');
+        drop.addOption('sortByPriority', 'Priority');
+        drop.addOption('sortByUrgency', 'Urgency');
+        drop.setValue(this.plugin.settings.defaultSortMethod);
+        drop.onChange(async (value: string) => {
+          const sortMethod = value as
+            | 'default'
+            | 'sortByScheduled'
+            | 'sortByDeadline'
+            | 'sortByPriority'
+            | 'sortByUrgency';
+          this.plugin.settings.defaultSortMethod = sortMethod;
+          await this.plugin.saveSettings();
+          // Note: This setting only applies when the plugin is started/reloaded
+          // Changing the selection in the Task view does not update this setting
         });
       });
   }

@@ -202,39 +202,36 @@ FIXME Handle edge cases
 
 **Default**: Disabled
 
-## Task List Settings
+## Task list search and filter settings
 
-### Task List Mode
+### Completed Tasks
 
-**Setting**: "Task List mode" (dropdown)
+**Setting**: "Completed tasks" dropdown
 
-**Description**: Choose how completed items are shown by default.
+**Description**: Controls how completed tasks are displayed in the Task List view.
 
 **Options:**
 
-1. **Default**: Show all tasks in detected order
-   - Completed and incomplete tasks mixed
-   - Sorted by file path and line number
-   - Good for overall task overview
+- **Show all tasks**: Display all tasks regardless of completion status
+- **Sort completed to end**: Show completed tasks at the end of the list
+- **Hide completed**: Only show incomplete tasks
 
-2. **Sort completed to end**: Move completed tasks to the end
-   - Pending tasks appear first
-   - Completed tasks grouped at bottom
-   - Both groups sorted by selected sort method
-   - Ideal for focusing on active work
+**Default**: Show all tasks
 
-3. **Hide completed**: Completely hide completed tasks
-   - Only shows incomplete tasks
-   - Reduces visual clutter
-   - Best for focused work sessions
+### Future Dated Tasks
 
-**Default**: Default mode
+**Setting**: "Future dated tasks" dropdown
 
-**Behavior:**
+**Description**: Controls how tasks with future scheduled or deadline dates are displayed in the Task List view.
 
-- Setting applies to initial Task List opening
-- Can also be updated directly in the Task List settings menu
-- User preference is remembered across sessions
+**Options:**
+
+- **Show all**: Display all tasks normally (default behavior)
+- **Sort to end**: Show future tasks at the end of the list, after current tasks
+- **Show upcoming (7 days)**: Only show future tasks that are within the next 7 days
+- **Hide future**: Hide all future tasks completely
+
+**Default**: Show all
 
 ### Week Starts On
 
@@ -266,34 +263,3 @@ With **Sunday start**:
 
 - Week 1: Sun Dec 31 - Sat Jan 6
 - "this week" on Jan 3 includes Dec 31 - Jan 6
-
-## Task List View Settings
-
-### Completed Tasks
-
-**Setting**: "Completed tasls" dropdown
-
-**Description**: Controls how completed tasks are displayed in the Task List view.
-
-**Options:**
-
-- **Show all tasks**: Display all tasks regardless of completion status
-- **Sort completed to end**: Show completed tasks at the end of the list
-- **Hide completed**: Only show incomplete tasks
-
-**Default**: Show all tasks
-
-### Future Dated Tasks
-
-**Setting**: "Future dated tasks" dropdown
-
-**Description**: Controls how tasks with future scheduled or deadline dates are displayed in the Task List view.
-
-**Options:**
-
-- **Show all**: Display all tasks normally (default behavior)
-- **Sort to end**: Show future tasks at the end of the list, after current tasks
-- **Show upcoming (7 days)**: Only show future tasks that are within the next 7 days
-- **Hide future**: Hide all future tasks completely
-
-**Default**: Show all

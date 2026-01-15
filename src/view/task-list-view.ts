@@ -64,6 +64,7 @@ export class TaskListView extends ItemView {
     this.tasks = tasks;
     this.editor = new TaskEditor(this.app);
     this.defaultViewMode = defaultViewMode;
+    this.defaultSortMethod = settings.defaultSortMethod;
   }
 
   /** View-mode accessors persisted on the root element to avoid cross-class coupling */

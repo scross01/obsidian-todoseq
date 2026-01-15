@@ -4,8 +4,10 @@
 
 - Added new Urgency sort option that applies a multi-factor algorithm to calculate task urgency (see docs).
 - Added task view option to limit or hide display of future dated tasks.
+- Added new settings option to persist the preferred task list sort.
 - Updated styling of completed tasks in editor view to striketrough the full task line.
 - Updated vault scanner to use cached reads when collecting tasks.
+- Reorganized settings using Obsidian 1.11's new Setting Groups for better organization.
 
 ## 0.7.0
 
