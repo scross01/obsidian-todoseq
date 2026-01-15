@@ -13,6 +13,7 @@ import {
   LanguageDefinition,
 } from '../parser/language-registry';
 import { SettingsChangeDetector } from '../utils/settings-utils';
+import { DEFAULT_COMPLETED_STATES } from '../task';
 
 export class TaskKeywordDecorator {
   private decorations: DecorationSet;
@@ -249,6 +250,27 @@ export class TaskKeywordDecorator {
               },
             }),
           );
+
+          // Add separate span for task text in completed tasks
+          if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+            // Calculate task text position (text after keyword)
+            const taskTextStart = line.from + keywordEnd;
+            const taskTextEnd = line.to; // End of line
+
+            // Only create task text decoration if there's actual text after keyword
+            if (taskTextStart < taskTextEnd) {
+              builder.add(
+                taskTextStart,
+                taskTextEnd,
+                Decoration.mark({
+                  class: 'todoseq-completed-task-text',
+                  attributes: {
+                    'data-completed-task-text': 'true',
+                  },
+                }),
+              );
+            }
+          }
         }
 
         // Check if this line contains SCHEDULED: or DEADLINE: and follows a task line

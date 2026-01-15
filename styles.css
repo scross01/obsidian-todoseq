@@ -333,6 +333,12 @@
     color-mix(in srgb, var(--interactive-accent) 50%, transparent);
 }
 
+/* Task text strikethrough for completed tasks */
+.cm-editor .todoseq-completed-task-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+
 /* Completed task styling for editor view (DONE, CANCELLED, CANCELED) */
 .cm-editor [data-task-keyword='DONE'],
 .cm-editor [data-task-keyword='CANCELLED'],

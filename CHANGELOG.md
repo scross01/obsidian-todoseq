@@ -4,6 +4,7 @@
 
 - Added new Urgency sort option that applies a multi-factor algorithm to calculate task urgency (see docs).
 - Added task view option to limit or hide display of future dated tasks.
+- Updated styling of completed tasks in editor view to striketrough the full task line.
 - Updated vault scanner to use cached reads when collecting tasks.
 
 ## 0.7.0
