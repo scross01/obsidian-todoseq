@@ -1,6 +1,6 @@
 # Change Log
 
-## 0.8.0 (development)
+## 0.8.0
 
 - Scanning for tasks now honors the vaults "Excluded files" setting.
 - Added new Urgency sort option that applies a multi-factor algorithm to calculate task urgency (see docs).
