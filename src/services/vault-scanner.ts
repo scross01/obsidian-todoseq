@@ -114,7 +114,7 @@ export class VaultScanner {
       let processedMd = 0;
 
       for (const file of files) {
-        if (file.extension === 'md') {
+        if (file.extension === 'md' && !this.isExcluded(file.path)) {
           await this.scanFile(file);
           processedMd++;
 
@@ -139,6 +139,52 @@ export class VaultScanner {
       );
     } finally {
       this._isScanning = false;
+    }
+  }
+
+  /**
+   * Check if a file path should be excluded based on Obsidian's userIgnoreFilters
+   *
+   * @param filePath The file path to check
+   * @returns true if the file should be excluded, false otherwise
+   */
+  private isExcluded(filePath: string): boolean {
+    try {
+      // Use type assertion since getConfig is not part of the public Obsidian API
+      // but is available in practice (undocumented)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      const excludedPatterns =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+        (this.app.vault as any).getConfig('userIgnoreFilters') || [];
+
+      return excludedPatterns.some((pattern: string) => {
+        try {
+          // Handle regex patterns (wrapped in /)
+          if (pattern.startsWith('/') && pattern.endsWith('/')) {
+            const regexPattern = pattern.slice(1, -1); // Remove / delimiters
+            const regex = new RegExp(regexPattern);
+            return regex.test(filePath);
+          }
+          // Handle path patterns (ending with /)
+          else if (pattern.endsWith('/')) {
+            // Convert path to regex: match path prefix
+            // Escape special regex characters in the path
+            const escapedPath = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pathRegex = new RegExp(`^${escapedPath}`);
+            return pathRegex.test(filePath);
+          }
+          // Handle simple string matching
+          else {
+            return filePath.includes(pattern);
+          }
+        } catch (e) {
+          // Invalid pattern - skip it
+          return false;
+        }
+      });
+    } catch (error) {
+      // If we can't get the config, don't exclude anything
+      return false;
     }
   }
 

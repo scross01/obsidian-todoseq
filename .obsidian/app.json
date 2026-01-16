@@ -2,7 +2,9 @@
   "userIgnoreFilters": [
     "__mocks__/",
     "coverage/",
-    "node_modules/"
+    "node_modules/",
+    "docs/",
+    "plans/"
   ],
   "alwaysUpdateLinks": true
 }

@@ -29,6 +29,10 @@ export class Vault {
   getMarkdownFiles(): TFile[] {
     return [];
   }
+
+  getConfig(key: string): unknown {
+    return null;
+  }
 }
 
 // Export other commonly used types

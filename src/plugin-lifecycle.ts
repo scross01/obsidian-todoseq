@@ -95,6 +95,15 @@ export class PluginLifecycleManager {
       callback: () => this.plugin.uiManager.showTasks(),
     });
 
+    // Add command to rescan vault
+    this.plugin.addCommand({
+      id: 'rescan-vault',
+      name: 'Rescan vault',
+      callback: async () => {
+        await this.plugin.vaultScanner?.scanVault();
+      },
+    });
+
     // Add editor command to toggle task state
     this.plugin.addCommand({
       id: 'toggle-task-state',
