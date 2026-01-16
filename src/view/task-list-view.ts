@@ -16,7 +16,7 @@ import {
   DEFAULT_PENDING_STATES,
   DEFAULT_COMPLETED_STATES,
 } from '../task';
-import { DateUtils } from './date-utils';
+import { DateUtils } from '../utils/date-utils';
 import { Search } from '../search/search';
 import { SearchOptionsDropdown } from './search-options-dropdown';
 import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
@@ -1287,16 +1287,11 @@ export class TaskListView extends ItemView {
   ): string[] {
     if (!date) return [];
 
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const taskDate = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-    );
+    const today = DateUtils.getDateOnly(new Date());
+    const taskDate = DateUtils.getDateOnly(date);
 
     const diffTime = taskDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
 
     const classes = ['todo-date'];
 

@@ -1,4 +1,5 @@
 import { Task } from '../task';
+import { DateUtils } from './date-utils';
 
 /**
  * Task Classification Types
@@ -96,8 +97,7 @@ function classifyTask(task: Task, now: Date): TaskClassification {
   }
 
   // Tasks with dates within 7 days (excluding today) are upcoming
-  const sevenDaysFromNow = new Date(now);
-  sevenDaysFromNow.setDate(now.getDate() + 7);
+  const sevenDaysFromNow = DateUtils.addDays(now, 7);
 
   if (earliestDate <= sevenDaysFromNow) {
     return { category: 'upcoming', earliestDate };

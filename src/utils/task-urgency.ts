@@ -1,5 +1,6 @@
 import { Task } from '../task';
 import { App } from 'obsidian';
+import { DateUtils } from './date-utils';
 
 /**
  * Urgency coefficients interface matching the urgency.ini configuration
@@ -135,11 +136,10 @@ function getTaskAge(task: Task): number {
 
   try {
     const noteDate = task.dailyNoteDate;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = DateUtils.getStartOfDay(new Date());
 
     const diffTime = today.getTime() - noteDate.getTime();
-    const age = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const age = Math.floor(diffTime / DateUtils.MILLISECONDS_PER_DAY);
     const urgencyAgeMax = 365;
 
     return Math.min(age / urgencyAgeMax, 1.0);
@@ -165,13 +165,12 @@ function getDeadlineUrgency(task: Task): number {
   if (!task.deadlineDate) return 0;
 
   const deadline = task.deadlineDate;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = DateUtils.getStartOfDay(new Date());
 
   // Calculate days overdue (positive for overdue, negative for future)
   // daysOverdue = today - deadline (so overdue tasks have positive values)
   const diffTime = today.getTime() - deadline.getTime();
-  const daysOverdue = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const daysOverdue = Math.floor(diffTime / DateUtils.MILLISECONDS_PER_DAY);
 
   // Clamp to the 21-day range: -14 (14 days future) to +7 (7 days overdue)
   const clampedDays = Math.max(-14, Math.min(7, daysOverdue));
@@ -191,8 +190,7 @@ function getScheduledUrgency(task: Task): number {
   if (!task.scheduledDate) return 0;
 
   const scheduled = task.scheduledDate;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = DateUtils.getStartOfDay(new Date());
 
   // Check if scheduled date is today or in the past
   // scheduled <= today means today or overdue

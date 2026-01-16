@@ -1,6 +1,6 @@
 import { SearchNode } from './search-types';
 import { Task } from '../task';
-import { DateUtils } from '../view/date-utils';
+import { DateUtils } from '../utils/date-utils';
 import { TodoTrackerSettings } from '../settings/settings';
 import { getFilename } from '../utils/task-utils';
 
@@ -539,8 +539,7 @@ export class SearchEvaluator {
     }
 
     // Add one day to end date to make it inclusive
-    rangeEnd = new Date(rangeEnd);
-    rangeEnd.setDate(rangeEnd.getDate() + 1);
+    rangeEnd = DateUtils.addDays(rangeEnd, 1);
 
     return DateUtils.isDateInRange(taskDate, rangeStart, rangeEnd);
   }

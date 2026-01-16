@@ -1,7 +1,7 @@
 import { SearchParser } from '../src/search/search-parser';
 import { SearchEvaluator } from '../src/search/search-evaluator';
 import { Task } from '../src/task';
-import { DateUtils } from '../src/view/date-utils';
+import { DateUtils } from '../src/utils/date-utils';
 
 describe('Date Search Filters', () => {
   const today = new Date();

@@ -1,4 +1,4 @@
-import { DateUtils } from '../src/view/date-utils';
+import { DateUtils } from '../src/utils/date-utils';
 
 describe('DateUtils', () => {
   // Force a deterministic locale for all toLocale* calls in tests

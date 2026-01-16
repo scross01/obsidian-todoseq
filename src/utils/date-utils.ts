@@ -12,15 +12,11 @@ export class DateUtils {
     if (!date) return '';
 
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const taskDate = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-    );
+    const today = this.getDateOnly(now);
+    const taskDate = this.getDateOnly(date);
 
     const diffTime = taskDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
 
     const formatTime = (d: Date) => {
       // Format time showing hours and minutes (no leading zero for hour).
@@ -272,11 +268,8 @@ export class DateUtils {
   ): boolean {
     if (!date) return false;
 
-    const today = new Date(referenceDate);
-    today.setHours(0, 0, 0, 0);
-
-    const target = new Date(date);
-    target.setHours(0, 0, 0, 0);
+    const today = this.getStartOfDay(referenceDate);
+    const target = this.getStartOfDay(date);
 
     return target < today;
   }
@@ -293,13 +286,7 @@ export class DateUtils {
   ): boolean {
     if (!date) return false;
 
-    const today = new Date(referenceDate);
-    today.setHours(0, 0, 0, 0);
-
-    const target = new Date(date);
-    target.setHours(0, 0, 0, 0);
-
-    return target.getTime() === today.getTime();
+    return this.isSameDay(date, referenceDate);
   }
 
   /**
@@ -314,14 +301,8 @@ export class DateUtils {
   ): boolean {
     if (!date) return false;
 
-    const tomorrow = new Date(referenceDate);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-
-    const target = new Date(date);
-    target.setHours(0, 0, 0, 0);
-
-    return target.getTime() === tomorrow.getTime();
+    const tomorrow = this.addDays(referenceDate, 1);
+    return this.isSameDay(date, tomorrow);
   }
 
   /**
@@ -337,35 +318,10 @@ export class DateUtils {
   ): boolean {
     if (!date) return false;
 
-    const target = new Date(date);
-    const ref = new Date(referenceDate);
+    const target = this.getStartOfDay(date);
+    const weekRange = this.getWeekRange(referenceDate, weekStartsOn);
 
-    // Get the first day of the week based on setting
-    const refDay = ref.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    let firstDayOfWeek: Date;
-
-    if (weekStartsOn === 'Monday') {
-      // Week starts on Monday (ISO standard)
-      const daysSinceMonday = (refDay + 6) % 7; // 0=Sun, 1=Mon, ..., 6=Sat
-      firstDayOfWeek = new Date(ref);
-      firstDayOfWeek.setDate(firstDayOfWeek.getDate() - daysSinceMonday);
-    } else {
-      // Week starts on Sunday
-      const daysSinceSunday = refDay; // 0=Sun, 1=Mon, ..., 6=Sat
-      firstDayOfWeek = new Date(ref);
-      firstDayOfWeek.setDate(firstDayOfWeek.getDate() - daysSinceSunday);
-    }
-
-    firstDayOfWeek.setHours(0, 0, 0, 0);
-
-    // Get the last day of the week (6 days after first day)
-    const lastDayOfWeek = new Date(firstDayOfWeek);
-    lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6);
-    lastDayOfWeek.setHours(23, 59, 59, 999);
-
-    target.setHours(0, 0, 0, 0);
-
-    return target >= firstDayOfWeek && target <= lastDayOfWeek;
+    return target >= weekRange.start && target <= weekRange.end;
   }
 
   /**
@@ -381,41 +337,22 @@ export class DateUtils {
   ): boolean {
     if (!date) return false;
 
-    const target = new Date(date);
-    const ref = new Date(referenceDate);
+    const target = this.getStartOfDay(date);
 
-    // Get the first day of next week based on setting
-    const refDay = ref.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    let nextFirstDayOfWeek: Date;
+    // Get the next week range
+    const nextWeekRange = this.getWeekRange(
+      this.addDays(referenceDate, 7),
+      weekStartsOn,
+    );
 
-    if (weekStartsOn === 'Monday') {
-      // Next week starts on Monday (ISO standard)
-      // If today is Monday, next week starts in 7 days. Otherwise, calculate days until next Monday.
-      const daysUntilNextMonday = refDay === 1 ? 7 : (1 + 7 - refDay) % 7;
-      nextFirstDayOfWeek = new Date(ref);
-      nextFirstDayOfWeek.setDate(
-        nextFirstDayOfWeek.getDate() + daysUntilNextMonday,
-      );
-    } else {
-      // Next week starts on Sunday
-      // If today is Sunday, next week starts in 7 days. Otherwise, calculate days until next Sunday.
-      const daysUntilNextSunday = refDay === 0 ? 7 : (7 - refDay) % 7;
-      nextFirstDayOfWeek = new Date(ref);
-      nextFirstDayOfWeek.setDate(
-        nextFirstDayOfWeek.getDate() + daysUntilNextSunday,
-      );
-    }
+    // Check if target is in next week but not in current week
+    const currentWeekRange = this.getWeekRange(referenceDate, weekStartsOn);
+    const isInNextWeek =
+      target >= nextWeekRange.start && target <= nextWeekRange.end;
+    const isInCurrentWeek =
+      target >= currentWeekRange.start && target <= currentWeekRange.end;
 
-    nextFirstDayOfWeek.setHours(0, 0, 0, 0);
-
-    // Get the last day of next week (6 days after first day)
-    const nextLastDayOfWeek = new Date(nextFirstDayOfWeek);
-    nextLastDayOfWeek.setDate(nextLastDayOfWeek.getDate() + 6);
-    nextLastDayOfWeek.setHours(23, 59, 59, 999);
-
-    target.setHours(0, 0, 0, 0);
-
-    return target >= nextFirstDayOfWeek && target <= nextLastDayOfWeek;
+    return isInNextWeek && !isInCurrentWeek;
   }
 
   /**
@@ -430,13 +367,7 @@ export class DateUtils {
   ): boolean {
     if (!date) return false;
 
-    const target = new Date(date);
-    const ref = new Date(referenceDate);
-
-    return (
-      target.getFullYear() === ref.getFullYear() &&
-      target.getMonth() === ref.getMonth()
-    );
+    return this.isSameMonth(date, referenceDate);
   }
 
   /**
@@ -451,18 +382,11 @@ export class DateUtils {
   ): boolean {
     if (!date) return false;
 
-    const target = new Date(date);
-    const ref = new Date(referenceDate);
+    // Calculate next month
+    const nextMonthDate = new Date(referenceDate);
+    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
 
-    // Calculate next month, handling year rollover (December -> January)
-    const nextMonth = ref.getMonth() + 1;
-    const nextMonthYear = ref.getFullYear() + (nextMonth > 11 ? 1 : 0);
-    const actualNextMonth = nextMonth > 11 ? 0 : nextMonth;
-
-    return (
-      target.getFullYear() === nextMonthYear &&
-      target.getMonth() === actualNextMonth
-    );
+    return this.isSameMonth(date, nextMonthDate);
   }
 
   /**
@@ -479,14 +403,9 @@ export class DateUtils {
   ): boolean {
     if (!date) return false;
 
-    const target = new Date(date);
-    const ref = new Date(referenceDate);
-    const endDate = new Date(ref);
-
-    target.setHours(0, 0, 0, 0);
-    ref.setHours(0, 0, 0, 0);
-    endDate.setDate(endDate.getDate() + days);
-    endDate.setHours(23, 59, 59, 999);
+    const target = this.getStartOfDay(date);
+    const ref = this.getStartOfDay(referenceDate);
+    const endDate = this.getStartOfDay(this.addDays(referenceDate, days));
 
     return target >= ref && target <= endDate;
   }
@@ -501,8 +420,7 @@ export class DateUtils {
   static isDateInRange(date: Date | null, start: Date, end: Date): boolean {
     if (!date) return false;
 
-    const target = new Date(date);
-    target.setHours(0, 0, 0, 0);
+    const target = this.getStartOfDay(date);
 
     return target >= start && target < end;
   }
@@ -528,4 +446,152 @@ export class DateUtils {
 
     return year1 === year2 && month1 === month2 && day1 === day2;
   }
+
+  /**
+   * Get the start of the day for a given date
+   * @param date The date to get the start of the day for
+   * @returns A new Date object set to the start of the day (00:00:00.000)
+   */
+  static getStartOfDay(date: Date): Date {
+    const result = new Date(date);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+
+  /**
+   * Create a date object normalized to midnight (start of day)
+   * @param date The date to normalize
+   * @returns A new Date object at midnight of the same day
+   */
+  static getDateOnly(date: Date): Date {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  /**
+   * Get days since Monday for a given date
+   * @param date The date to calculate from
+   * @returns Number of days since Monday (0-6)
+   */
+  static getDaysSinceMonday(date: Date): number {
+    const day = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    return (day + 6) % 7; // Convert to 0=Mon, 1=Tue, ..., 6=Sun
+  }
+
+  /**
+   * Get days since Sunday for a given date
+   * @param date The date to calculate from
+   * @returns Number of days since Sunday (0-6)
+   */
+  static getDaysSinceSunday(date: Date): number {
+    return date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  }
+
+  /**
+   * Add days to a date
+   * @param date The base date
+   * @param days Number of days to add (can be negative)
+   * @returns New Date object with days added
+   */
+  static addDays(date: Date, days: number): Date {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+
+  /**
+   * Check if two dates represent the same day
+   * @param date1 First date
+   * @param date2 Second date
+   * @returns True if dates represent the same day (ignoring time)
+   */
+  static isSameDay(date1: Date, date2: Date): boolean {
+    const d1 = this.getDateOnly(date1);
+    const d2 = this.getDateOnly(date2);
+    return d1.getTime() === d2.getTime();
+  }
+
+  /**
+   * Check if two dates are in the same month and year
+   * @param date1 First date
+   * @param date2 Second date
+   * @returns True if dates are in the same month and year
+   */
+  static isSameMonth(date1: Date, date2: Date): boolean {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth()
+    );
+  }
+
+  /**
+   * Check if two dates are in the same year
+   * @param date1 First date
+   * @param date2 Second date
+   * @returns True if dates are in the same year
+   */
+  static isSameYear(date1: Date, date2: Date): boolean {
+    return date1.getFullYear() === date2.getFullYear();
+  }
+
+  /**
+   * Get the end of month for a given date
+   * @param date The date to calculate from
+   * @returns Last day of the month
+   */
+  static getEndOfMonth(date: Date): Date {
+    const result = new Date(date);
+    result.setMonth(result.getMonth() + 1, 0); // Last day of current month
+    return result;
+  }
+
+  /**
+   * Get a date range for the week containing the given date
+   * @param date The date within the week
+   * @param weekStartsOn Day the week starts ('Monday' or 'Sunday')
+   * @returns Object with start and end dates of the week
+   */
+  static getWeekRange(
+    date: Date,
+    weekStartsOn: 'Monday' | 'Sunday' = 'Monday',
+  ): { start: Date; end: Date } {
+    const ref = new Date(date);
+    let firstDayOfWeek: Date;
+
+    if (weekStartsOn === 'Monday') {
+      const daysSinceMonday = this.getDaysSinceMonday(ref);
+      firstDayOfWeek = this.getStartOfDay(this.addDays(ref, -daysSinceMonday));
+    } else {
+      const daysSinceSunday = this.getDaysSinceSunday(ref);
+      firstDayOfWeek = this.getStartOfDay(this.addDays(ref, -daysSinceSunday));
+    }
+
+    const lastDayOfWeek = this.getStartOfDay(this.addDays(firstDayOfWeek, 6));
+    lastDayOfWeek.setHours(23, 59, 59, 999); // Include entire last day
+
+    return {
+      start: firstDayOfWeek,
+      end: lastDayOfWeek,
+    };
+  }
+
+  /**
+   * Get a date range for the month containing the given date
+   * @param date The date within the month
+   * @returns Object with start and end dates of the month
+   */
+  static getMonthRange(date: Date): { start: Date; end: Date } {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    return {
+      start: new Date(year, month, 1),
+      end: this.getEndOfMonth(date),
+    };
+  }
+
+  /**
+   * Number of milliseconds in one day
+   * @constant {number}
+   */
+  static readonly MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24;
 }
