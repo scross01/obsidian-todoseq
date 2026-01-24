@@ -1,0 +1,56 @@
+{
+  "todoseq:cycle-task-state": [
+    {
+      "modifiers": [
+        "Ctrl",
+        "Shift"
+      ],
+      "key": "Enter"
+    }
+  ],
+  "todoseq:add-deadline-date": [
+    {
+      "modifiers": [
+        "Ctrl",
+        "Shift"
+      ],
+      "key": "S"
+    }
+  ],
+  "todoseq:add-scheduled-date": [
+    {
+      "modifiers": [
+        "Ctrl",
+        "Shift"
+      ],
+      "key": "D"
+    }
+  ],
+  "todoseq:set-priority-high": [
+    {
+      "modifiers": [
+        "Ctrl",
+        "Shift"
+      ],
+      "key": "H"
+    }
+  ],
+  "todoseq:set-priority-low": [
+    {
+      "modifiers": [
+        "Ctrl",
+        "Shift"
+      ],
+      "key": "L"
+    }
+  ],
+  "todoseq:set-priority-medium": [
+    {
+      "modifiers": [
+        "Ctrl",
+        "Shift"
+      ],
+      "key": "M"
+    }
+  ]
+}

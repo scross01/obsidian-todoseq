@@ -127,6 +127,23 @@ export class PluginLifecycleManager {
       ],
     });
 
+    // Add editor command to cycle task state
+    this.plugin.addCommand({
+      id: 'cycle-task-state',
+      name: 'Cycle task state',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.taskManager.handleCycleTaskStateAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
     // Add editor command to add scheduled date
     this.plugin.addCommand({
       id: 'add-scheduled-date',

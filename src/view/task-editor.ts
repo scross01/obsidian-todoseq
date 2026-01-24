@@ -1,5 +1,10 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
-import { Task, DEFAULT_COMPLETED_STATES, NEXT_STATE } from '../task';
+import {
+  Task,
+  DEFAULT_COMPLETED_STATES,
+  NEXT_STATE,
+  CYCLE_TASK_STATE,
+} from '../task';
 import { CHECKBOX_REGEX, PRIORITY_TOKEN_REGEX } from '../utils/task-utils';
 import { getPluginSettings } from '../utils/settings-utils';
 
@@ -26,18 +31,38 @@ export class TaskEditor {
         : null;
 
     const priorityPart = priToken ? ` ${priToken}` : '';
-    const textPart = task.text ? ` ${task.text}` : '';
 
     // Check if the original task was a markdown checkbox using shared regex
     const isCheckbox = task.rawText.trim().match(CHECKBOX_REGEX);
     let newLine: string;
 
-    if (isCheckbox) {
+    if (newState === '') {
+      // Handle empty state - remove task keyword entirely
+      if (isCheckbox) {
+        // For checkboxes, keep the checkbox format but remove the task keyword
+        // Use single space between checkbox and text
+        const textPart = task.text ? ` ${task.text}` : '';
+        newLine = `${task.indent}- [ ]${textPart}`;
+      } else {
+        // For regular tasks, remove the task keyword entirely
+        // Handle spacing properly based on whether there's a list marker
+        // Note: task.listMarker already includes trailing space if present
+        const textPart = task.text ? task.text : '';
+        newLine = `${task.indent}${task.listMarker || ''}${textPart}`;
+      }
+
+      // Add trailing comment end characters if they were present in the original task
+      if (task.tail) {
+        newLine += task.tail;
+      }
+    } else if (isCheckbox) {
       // Generate markdown checkbox format with proper spacing
       const checkboxStatus = DEFAULT_COMPLETED_STATES.has(newState) ? 'x' : ' ';
+      const textPart = task.text ? ` ${task.text}` : '';
       newLine = `${task.indent}- [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
     } else {
       // Generate original format, preserving comment prefix if present
+      const textPart = task.text ? ` ${task.text}` : '';
       newLine = `${task.indent}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
 
       // Add trailing comment end characters if they were present in the original task
@@ -87,6 +112,16 @@ export class TaskEditor {
             ch: currentLine.length,
           };
           editor.replaceRange(newLine, from, to);
+
+          // Special cursor positioning for blank lines when adding task keywords
+          if (currentLine.trim() === '' && newState === 'TODO') {
+            // Position cursor after the TODO keyword on blank lines
+            const keywordPosition = newLine.indexOf('TODO');
+            if (keywordPosition !== -1) {
+              const cursorPosition = keywordPosition + 'TODO'.length;
+              editor.setCursor({ line: task.line, ch: cursorPosition });
+            }
+          }
         }
       } else {
         // Not active: use atomic background edit
@@ -126,6 +161,31 @@ export class TaskEditor {
       } else {
         // Otherwise use the standard NEXT_STATE mapping
         state = NEXT_STATE.get(task.state) || 'TODO';
+      }
+    } else {
+      state = nextState;
+    }
+    return await this.applyLineUpdate(task, state);
+  }
+
+  // Cycles a task to its next state according to CYCLE_BULLET_STATE and persists change
+  async updateTaskCycleState(
+    task: Task,
+    nextState: string | null = null,
+  ): Promise<Task> {
+    let state: string;
+    if (nextState == null) {
+      // Check if current state is a custom keyword
+      const settings = getPluginSettings(this.app);
+      const customKeywords = settings?.additionalTaskKeywords || [];
+
+      if (customKeywords.includes(task.state)) {
+        // If it's a custom keyword, cycle to DONE
+        state = 'DONE';
+      } else {
+        // Otherwise use the cycle bullet state mapping
+        const nextState = CYCLE_TASK_STATE.get(task.state);
+        state = nextState !== undefined ? nextState : 'TODO';
       }
     } else {
       state = nextState;

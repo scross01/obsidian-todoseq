@@ -131,6 +131,152 @@ export class TaskManager {
   }
 
   /**
+   * Handle the cycle task state command to update the task state at the current cursor position
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  handleCycleTaskStateAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    // Get the current line from the editor
+    const cursor = editor.getCursor();
+
+    // Use the extracted method to handle the line-based logic
+    return this.handleUpdateTaskCycleStateAtLine(
+      checking,
+      cursor.line,
+      editor,
+      view,
+    );
+  }
+
+  /**
+   * Handle updating task state at a specific line for cycle task state
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param lineNumber - The line number to update
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @param newState - Optional specific state to set
+   * @returns boolean indicating if the command is available
+   */
+  handleUpdateTaskCycleStateAtLine(
+    checking: boolean,
+    lineNumber: number,
+    editor: Editor,
+    view: MarkdownView,
+    newState?: string,
+  ): boolean {
+    const taskEditor = this.plugin.taskEditor;
+    const vaultScanner = this.plugin.getVaultScanner();
+
+    if (!taskEditor || !vaultScanner) {
+      return false;
+    }
+
+    // Get the line from the editor
+    const line = editor.getLine(lineNumber);
+
+    if (checking) {
+      // For cycle task state, the command should be available on any line
+      return true;
+    }
+
+    // Parse the task from the line (this will return null for lines without task keywords)
+    const task = this.parseTaskFromLine(
+      line,
+      lineNumber,
+      view.file?.path || '',
+    );
+
+    if (task) {
+      // Update the task state using cycle task state logic
+      if (newState) {
+        taskEditor.updateTaskCycleState(task, newState);
+      } else {
+        taskEditor.updateTaskCycleState(task);
+      }
+    } else {
+      // For lines without existing task keywords, we need to add a TODO keyword
+      // This handles the case where we cycle from no keyword to TODO
+      if (!newState || newState === 'TODO') {
+        // Properly parse the line structure to maintain bullets/indentation
+        const lineTrimmed = line.trim();
+        const indentMatch = line.match(/^\s*/);
+        const indent = indentMatch ? indentMatch[0] : '';
+
+        // Extract list marker if present (checkbox, bullet, number, etc.)
+        let listMarker = '';
+        let text = lineTrimmed;
+
+        // Check for markdown checkboxes first: - [ ], - [x], etc.
+        const checkboxMatch = lineTrimmed.match(
+          /^(-|\*|\+)\s+\[[ x]\]\s*(.*)$/,
+        );
+        if (checkboxMatch) {
+          listMarker = checkboxMatch[1] + ' [ ] ';
+          text = checkboxMatch[2];
+        }
+        // Check for bullet lists: -, *, +
+        else if (lineTrimmed.match(/^[-*+]\s*.*$/)) {
+          const bulletMatch = lineTrimmed.match(/^([-*+])\s*(.*)$/);
+          if (bulletMatch) {
+            listMarker = bulletMatch[1] + ' ';
+            text = bulletMatch[2];
+          }
+        }
+        // Check for numbered lists: 1., 2), etc.
+        else if (lineTrimmed.match(/^\d+[.)]\s*.*$/)) {
+          const numberedMatch = lineTrimmed.match(/^(\d+[.)])\s*(.*)$/);
+          if (numberedMatch) {
+            listMarker = numberedMatch[1] + ' ';
+            text = numberedMatch[2];
+          }
+        }
+        // Check for letter lists: a., b), etc.
+        else if (lineTrimmed.match(/^[A-Za-z][.)]\s*.*$/)) {
+          const letterMatch = lineTrimmed.match(/^([A-Za-z][.)])\s*(.*)$/);
+          if (letterMatch) {
+            listMarker = letterMatch[1] + ' ';
+            text = letterMatch[2];
+          }
+        }
+        // Check for quote lines: >
+        else if (lineTrimmed.startsWith('>')) {
+          listMarker = '> ';
+          text = lineTrimmed.substring(2).trim();
+        }
+
+        // Create a proper task structure
+        const basicTask: Task = {
+          path: view.file?.path || '',
+          line: lineNumber,
+          rawText: line,
+          indent: indent,
+          listMarker: listMarker,
+          text: text,
+          state: '',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        };
+
+        // Add TODO keyword to the line
+        taskEditor.updateTaskCycleState(basicTask, 'TODO');
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Handle the toggle task state command to update the task state at the current cursor position
    * @param checking - Whether this is just a check to see if the command is available
    * @param editor - The editor instance

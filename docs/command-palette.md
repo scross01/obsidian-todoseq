@@ -7,6 +7,7 @@ TODOseq provides several commands that can be accessed through Obsidian's Comman
 - TODOseq: Show task list
 - TODOseq: Rescan vault
 - TODOseq: Toggle task state _(editor only)_
+- TODOseq: Cycle task state _(editor only)_
 - TODOseq: Add scheduled date _(editor only)_
 - TODOseq: Add deadline date _(editor only)_
 - TODOseq: Set priority high _(editor only)_
@@ -34,6 +35,26 @@ Toggle the state of the task at the current cursor position in the Markdown edit
 - `DONE` → `TODO` (cycles back)
 
 **Default Shortcut**: `Ctrl + Enter`
+
+### Cycle task state
+
+Cycle the state of any task line between task states and no task keyword. This command is available on any line that can contain a task.
+
+**State Cycle**:
+
+- No task keyword → `TODO` → `DOING` → `DONE` → No task keyword (cycles back)
+
+**Example**:
+
+```markdown
+- test new cycle task state command
+```
+
+After using the command:
+
+```markdown
+- TODO test new cycle task state command
+```
 
 ### Add scheduled date
 

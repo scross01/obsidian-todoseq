@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.8.1
+
+- Added new "Cycle task state" command, similar to the "Toggle task state" but also works on non-task lines to add the TODO task keyword, and the final transition from DONE removes the task keyword rather than cycling stright back to TODO. i.e. "no keyword" -> TODO -> DOING -> DONE -> "no keyword". #20
+
 ## 0.8.0
 
 - Scanning for tasks now honors the vaults "Excluded files" setting.
