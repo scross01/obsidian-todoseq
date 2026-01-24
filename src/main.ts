@@ -12,6 +12,7 @@ import { UIManager } from './ui-manager';
 import { ReaderViewFormatter } from './view/reader-formatting';
 import { PluginLifecycleManager } from './plugin-lifecycle';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
+import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 import { TaskStateManager } from './services/task-state-manager';
 
 export const TASK_VIEW_ICON = 'list-todo';
@@ -34,6 +35,9 @@ export default class TodoTracker extends Plugin {
   public taskFormatters: Map<string, unknown> = new Map();
   public statusBarManager: StatusBarManager | null = null;
   public readerViewFormatter: ReaderViewFormatter | null = null;
+  
+  // Embedded task list processor
+  public embeddedTaskListProcessor: TodoseqCodeBlockProcessor | null = null;
 
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
@@ -58,6 +62,10 @@ export default class TodoTracker extends Plugin {
     this.uiManager = new UIManager(this);
     this.lifecycleManager = new PluginLifecycleManager(this);
 
+    // Initialize embedded task list processor
+    this.embeddedTaskListProcessor = new TodoseqCodeBlockProcessor(this);
+    this.embeddedTaskListProcessor.registerProcessor();
+
     // Delegate to lifecycle manager (which initializes vaultScanner and readerViewFormatter)
     await this.lifecycleManager.onload();
   }
@@ -78,6 +86,11 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called when the plugin is unloaded
   onunload() {
+    // Clean up embedded task list processor
+    if (this.embeddedTaskListProcessor) {
+      this.embeddedTaskListProcessor.cleanup();
+    }
+
     // Delegate cleanup to lifecycle manager to centralize cleanup logic
     this.lifecycleManager?.onunload();
   }
@@ -115,6 +128,11 @@ export default class TodoTracker extends Plugin {
         urgencyCoefficients,
       );
     }
+
+    // Update embedded task list processor with new settings
+    if (this.embeddedTaskListProcessor) {
+      this.embeddedTaskListProcessor.updateSettings();
+    }
   }
 
   // Public method to update reader view formatter with current settings
@@ -148,6 +166,17 @@ export default class TodoTracker extends Plugin {
   public updateTaskFormatting(): void {
     // Delegate to UI manager
     this.uiManager.updateTaskFormatting();
+  }
+
+  /**
+   * Refresh all open task list views (including embedded task lists)
+   */
+  public refreshAllTaskListViews(): void {
+    // Refresh main task list views
+    this.uiManager.refreshOpenTaskListViews();
+    
+    // Note: Embedded task lists are automatically refreshed via event handlers
+    // when tasks change, so no additional refresh is needed here
   }
 
   // Setup status bar manager for task count
