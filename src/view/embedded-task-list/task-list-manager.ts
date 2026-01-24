@@ -1,0 +1,181 @@
+import { Task } from '../../task';
+import { Search } from '../../search/search';
+import { TodoTrackerSettings } from '../../settings/settings';
+import { sortTasksWithThreeBlockSystem, SortMethod as TaskSortMethod } from '../../utils/task-sort';
+import { TodoseqParameters } from './code-block-parser';
+
+/**
+ * Manages task filtering and sorting for embedded task lists.
+ * Reuses existing Search and task-sort utilities for maximum consistency.
+ */
+export class EmbeddedTaskListManager {
+  private settings: TodoTrackerSettings;
+  private taskCache: Map<string, { tasks: Task[], timestamp: number }> = new Map();
+  private cacheTTL = 5000; // 5 seconds cache TTL
+
+  constructor(settings: TodoTrackerSettings) {
+    this.settings = settings;
+  }
+
+  /**
+   * Filter and sort tasks based on code block parameters
+   * @param tasks All tasks from the vault
+   * @param params Parsed code block parameters
+   * @returns Filtered and sorted tasks
+   */
+  filterAndSortTasks(tasks: Task[], params: TodoseqParameters): Task[] {
+    // Generate cache key
+    const cacheKey = this.generateCacheKey(tasks, params);
+    
+    // Check cache
+    const cached = this.taskCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
+      return cached.tasks;
+    }
+
+    try {
+      // Filter tasks based on search query
+      let filteredTasks = tasks;
+      
+      if (params.searchQuery) {
+        filteredTasks = this.filterTasks(tasks, params.searchQuery);
+      }
+
+      // Sort tasks based on sort method
+      const sortedTasks = this.sortTasks(filteredTasks, params);
+
+      // Cache the result
+      this.taskCache.set(cacheKey, {
+        tasks: sortedTasks,
+        timestamp: Date.now()
+      });
+
+      return sortedTasks;
+
+    } catch (error) {
+      console.error('Error filtering/sorting tasks:', error);
+      // Return unfiltered tasks as fallback
+      return tasks;
+    }
+  }
+
+  /**
+   * Filter tasks using the existing Search class
+   * @param tasks Tasks to filter
+   * @param searchQuery Search query string
+   * @returns Filtered tasks
+   */
+  private filterTasks(tasks: Task[], searchQuery: string): Task[] {
+    try {
+      // Use the existing Search class for consistent filtering
+      return tasks.filter(task => 
+        Search.evaluate(searchQuery, task, false, this.settings)
+      );
+    } catch (error) {
+      console.error('Error evaluating search query:', error);
+      // Return all tasks if search fails
+      return tasks;
+    }
+  }
+
+  /**
+   * Sort tasks using the existing task-sort utilities
+   * @param tasks Tasks to sort
+   * @param params Parsed parameters
+   * @returns Sorted tasks
+   */
+  private sortTasks(tasks: Task[], params: TodoseqParameters): Task[] {
+    try {
+      const now = new Date();
+      const sortMethod = this.getSortMethod(params);
+      const futureSetting = this.settings?.futureTaskSorting || 'showAll';
+      const completedSetting = 'showAll' as const; // Embedded lists show all tasks
+
+      // Use the existing three-block sorting system
+      return sortTasksWithThreeBlockSystem(
+        tasks,
+        now,
+        futureSetting,
+        completedSetting,
+        sortMethod
+      );
+    } catch (error) {
+      console.error('Error sorting tasks:', error);
+      // Return unsorted tasks as fallback
+      return tasks;
+    }
+  }
+
+  /**
+   * Get the sort method for task-sort utilities
+   * @param params Parsed parameters
+   * @returns Sort method compatible with task-sort utilities
+   */
+  private getSortMethod(params: TodoseqParameters): TaskSortMethod {
+    const sortMap: Record<string, TaskSortMethod> = {
+      'default': 'default',
+      'Priority': 'sortByPriority',
+      'Due': 'sortByDeadline',
+      'Urgency': 'sortByUrgency'
+    };
+
+    return sortMap[params.sortMethod] || 'default';
+  }
+
+  /**
+   * Generate a cache key for the current task set and parameters
+   * @param tasks Tasks to cache
+   * @param params Parameters used for filtering/sorting
+   * @returns Cache key string
+   */
+  private generateCacheKey(tasks: Task[], params: TodoseqParameters): string {
+    // Use task count and parameters for cache key
+    // This is a simple approach - could be enhanced with task hashes
+    const taskCount = tasks.length;
+    const searchHash = params.searchQuery ? this.hashString(params.searchQuery) : 'none';
+    const sortHash = params.sortMethod;
+    
+    return `${taskCount}-${searchHash}-${sortHash}`;
+  }
+
+  /**
+   * Simple string hash for cache keys
+   * @param str String to hash
+   * @returns Hash string
+   */
+  private hashString(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return hash.toString(36);
+  }
+
+  /**
+   * Clear the task cache
+   */
+  clearCache(): void {
+    this.taskCache.clear();
+  }
+
+  /**
+   * Invalidate cache for specific file path
+   * @param filePath Path of the file that changed
+   */
+  invalidateCacheForFile(filePath: string): void {
+    // For now, clear entire cache when any file changes
+    // In future, could track which tasks come from which files
+    this.clearCache();
+  }
+
+  /**
+   * Update settings
+   * @param settings New settings
+   */
+  updateSettings(settings: TodoTrackerSettings): void {
+    this.settings = settings;
+    this.clearCache();
+  }
+}
