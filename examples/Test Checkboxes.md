@@ -11,15 +11,36 @@ Examples of using markdown checkboxes in front of the TODOseq task keywords.
 - [x] CANCELED this is canceled
 - [x] CANCELLED this is cancelled
 
+**Indented Checkboxes**
+
+- [ ] TODO Parent checkbox
+	- [ ] TODO Indented checkbox
+	- [ ] DOING another Intended checkbox
+	- [ ] DONE completed indented checkbox
+
+**Quoted Checkboxes**
+
+> - [ ] TODO quoted checkbox
+> - [ ] DOING another quoted checkbox
+> - [x] DONE yet another quoted checkbox
+
+*^ above formatting issue appears to be an Obsidian bug in the editor view*
+
 **Custom keywords**
 
-Add FIXME and HACK in the custom keyword settings.
+Ensure FIXME and HACK are in the custom keyword settings.
 
 - [ ] FIXME this is a custom keyword
-- [ ] HACK this is a custom keyword
+- [ ] HACK this is also custom keyword
+- [ ] WIP this not a custom keyword
 
 **Normal checkboxes**
 
 - [ ] regular checkbox without a task keyword
-- [ ] completed checkbox without a task keyword
+- [x] completed checkbox without a task keyword
+
+
+
+
+
 
