@@ -2,6 +2,8 @@
 
 TODOseq seamlessly integrates with Obsidian's Markdown editor, providing visual feedback and interactive controls for managing your tasks directly within your notes. This guide explains how tasks are displayed and how you can interact with them in the editor.
 
+For information about task display and interaction in Reader view (Reading/Preview mode), see the [Reader View documentation](reader.md).
+
 ![TODOseq task entry and update](./assets/todoseq-task-entry.gif)
 
 ## Task Display in the Editor
@@ -96,3 +98,19 @@ TODOseq ensures that the task state and checkbox are always in sync:
 - Both methods update the task's completion date if applicable
 
 This synchronization happens automatically as you interact with tasks in the editor or the [Task List](task-list.md).
+
+## Editor-Specific Features
+
+While many task interactions work similarly in both Edit mode and Reader view, the editor offers some unique capabilities:
+
+### Real-time Styling
+
+Task formatting appears as you type in Edit mode. As soon as you type a valid task keyword, it receives styling immediately. This instant feedback helps you confirm that TODOseq recognizes your task syntax.
+
+### Code Block Styling
+
+When "Include tasks inside code blocks" is enabled, TODOseq can apply styling to task keywords within code blocks in the editor. This makes tasks in code examples visually distinct. Note that code block styling is only applied in Edit mode; Reader view always displays code blocks without task formatting to preserve code readability.
+
+### Cursor Position Awareness
+
+Editor interactions respect your cursor position. The Ctrl+Enter keyboard shortcut works based on where your cursor is placed, allowing you to toggle task states without precisely clicking on keywords.

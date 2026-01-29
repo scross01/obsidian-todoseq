@@ -1,5 +1,8 @@
 # Change Log
 
+- Added task keyword styling in the reader view with interactive state updates. #22
+- Centralized task state management across all views (task list view, page editor, page reader).
+
 ## 0.8.1
 
 - Added new "Cycle task state" command, similar to the "Toggle task state" but also works on non-task lines to add the TODO task keyword, and the final transition from DONE removes the task keyword rather than cycling stright back to TODO. i.e. "no keyword" -> TODO -> DOING -> DONE -> "no keyword". #20

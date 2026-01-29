@@ -21,15 +21,14 @@ Access TODOseq settings through Obsidian's settings interface:
 
 **Setting**: "Format task keywords" toggle (in TODOseq settings)
 
-**Description**: Enable or disable visual formatting of task keywords in the editor.
+**Description**: Enable or disable visual formatting of task keywords in both the editor and reader views.
 
 **Default**: Enabled
 
 **Visual Effects When Enabled:**
 
 Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font.
-All task states use your Obsidian theme's accent color.
-See [Editor Integration documentation](editor.md) for full details.
+All task states use your Obsidian theme's accent color.See [Editor Integration](editor.md) and [Reader View](reader.md) documentation for full details.
 
 ## Task Recognition Settings
 

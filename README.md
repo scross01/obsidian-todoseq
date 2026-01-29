@@ -11,7 +11,7 @@ TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian
 - **Flexible task recognition**: Works with traditional keywords and markdown checkboxes
 - **Powerful search**: Advanced search with boolean logic, prefix filters, and date expressions
 - **Task List View**: Dedicated panel showing all tasks across your vault
-- **Editor integration**: Interactive task management with visual styling directly in the Markdown editor
+- **Inline styling**: Keyword styling and interactive task state updates directly in the Markdown editor and reader views
 - **Code block support**: Extract tasks from comments in 20+ programming languages
 - **State cycling**: Click keywords to cycle through task states
 - **Priority system**: Use `[#A]`, `[#B]`, `[#C]` for high, medium, low priority
@@ -64,5 +64,6 @@ For detailed information, see the documentation:
 - [Task List](https://scross01.github.io/obsidian-todoseq/task-list.html) - Using the dedicated task panel
 - [Task Entry](https://scross01.github.io/obsidian-todoseq/task-entry.html) - Task syntax, keywords, and lifecycle
 - [Editor Integration](https://scross01.github.io/obsidian-todoseq/editor.html) - Task display and interaction in the Markdown editor
+- [Reader View](https://scross01.github.io/obsidian-todoseq/reader.html) - Task styling and interaction in Reading mode
 - [Search Functionality](https://scross01.github.io/obsidian-todoseq/search.html) - Advanced search syntax and filters
 - [Settings](https://scross01.github.io/obsidian-todoseq/settings.html) - Configuration options and customization
