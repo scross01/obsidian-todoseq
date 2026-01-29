@@ -1,9 +1,10 @@
 import TodoTracker from '../main';
-import { DEFAULT_COMPLETED_STATES } from '../task';
+import { DEFAULT_COMPLETED_STATES, Task } from '../task';
 import { TaskParser } from '../parser/task-parser';
 import { VaultScanner } from '../services/vault-scanner';
 import { buildTaskKeywords } from '../utils/task-utils';
 import { SettingsChangeDetector } from '../utils/settings-utils';
+import { TFile } from 'obsidian';
 
 /**
  * Handles task keyword formatting in the reader view
@@ -112,7 +113,142 @@ export class ReaderViewFormatter {
 
       // Process SCHEDULED and DEADLINE lines
       this.processDateLines(element);
+
+      // Attach checkbox click handlers for task state toggling
+      this.attachCheckboxClickHandlers(element, context);
     });
+  }
+
+  /**
+   * Attach click event handlers to checkboxes for task state toggling
+   */
+  private attachCheckboxClickHandlers(
+    element: HTMLElement,
+    context: { sourcePath: string },
+  ): void {
+    const checkboxes = element.querySelectorAll('.task-list-item-checkbox');
+
+    checkboxes.forEach((checkbox) => {
+      if (!(checkbox instanceof HTMLElement)) {
+        return;
+      }
+      // Check if this checkbox is inside an embedded transclusion
+      const embed = checkbox.closest('.internal-embed');
+      if (embed) {
+        // For embedded content, get the source from the embed element
+        const src = embed.getAttribute('src');
+        if (src) {
+          // Extract file path from src (format: "filename.md#^blockid" or "filename.md")
+          const filePath = src.split('#')[0];
+          if (filePath) {
+            // Use registerDomEvent for automatic cleanup
+            this.plugin.registerDomEvent(checkbox, 'click', (event: Event) => {
+              void this.handleCheckboxClick(event, filePath);
+            });
+            return;
+          }
+        }
+      }
+      // Use registerDomEvent for automatic cleanup
+      this.plugin.registerDomEvent(checkbox, 'click', (event: Event) => {
+        void this.handleCheckboxClick(event, context.sourcePath);
+      });
+    });
+  }
+
+  /**
+   * Handle checkbox click event to toggle task state
+   */
+  private async handleCheckboxClick(
+    event: Event,
+    sourcePath: string,
+  ): Promise<void> {
+    const checkbox = event.target as HTMLInputElement;
+    const isChecked = checkbox.checked;
+
+    // Find the task list item containing this checkbox
+    const taskListItem = checkbox.closest('.task-list-item');
+    if (!taskListItem) {
+      return;
+    }
+
+    // Get the file
+    const file = this.plugin.app.vault.getAbstractFileByPath(sourcePath);
+    if (!(file instanceof TFile)) {
+      return;
+    }
+
+    // Find the task associated with this checkbox
+    const task = await this.findTaskForCheckbox(taskListItem, file);
+    if (!task) {
+      return;
+    }
+
+    // Determine the new state based on checkbox state
+    const newState = isChecked ? 'DONE' : 'TODO';
+
+    // Use TaskEditor to update the task
+    if (this.plugin.taskEditor) {
+      await this.plugin.taskEditor.applyLineUpdate(task, newState);
+    }
+  }
+
+  /**
+   * Find the task associated with a checkbox element
+   */
+  private async findTaskForCheckbox(
+    taskListItem: Element,
+    file: TFile,
+  ): Promise<Task | null> {
+    // Get the text content of the task list item
+    // Note: textContent includes the checkbox state character which we need to handle
+    const taskText = taskListItem.textContent || '';
+
+    // Read the file content to find the matching line
+    const content = await this.plugin.app.vault.read(file);
+    const lines = content.split('\n');
+
+    // Get the task parser
+    const taskParser = this.getTaskParser();
+    if (!taskParser) {
+      return null;
+    }
+
+    // Parse all tasks in the file
+    const allTasks = taskParser.parseFile(content, file.path, file);
+
+    // The rendered text doesn't include the checkbox marker (- [ ] or - [x])
+    // It also doesn't include block reference IDs (^reference)
+    // We need to find tasks that match the content after the checkbox
+    // Normalize the task text by removing leading/trailing whitespace
+    const normalizedTaskText = taskText.trim().replace(/\s+/g, ' ');
+
+    // Find the line that matches this task
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (taskParser.testRegex.test(line)) {
+        // For checkbox tasks, the line format is: "- [ ] TODO text" or "- [x] TODO text"
+        // We need to compare just the task part (after the checkbox)
+        // Also remove any block reference ID (^reference) from the end
+        const normalizedLine = line
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/\s*\^[a-zA-Z0-9-]+$/, '');
+
+        // Check if the line ends with the task text
+        // The rendered text is just the task content without the checkbox prefix or block reference
+        if (normalizedLine.endsWith(normalizedTaskText)) {
+          // The Task.line property is 0-indexed (line index), matching the array index
+          const matchingTask = allTasks.find((t) => t.line === i);
+          if (matchingTask) {
+            return matchingTask;
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   /**

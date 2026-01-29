@@ -33,8 +33,20 @@ export class TaskEditor {
     const priorityPart = priToken ? ` ${priToken}` : '';
 
     // Check if the original task was a markdown checkbox using shared regex
-    const isCheckbox = task.rawText.trim().match(CHECKBOX_REGEX);
+    // For quoted lines, we need to check without the quote prefix
+    const rawText = task.rawText;
+    const quoteMatch = rawText.match(/^(\s*>\s*)/);
+    const quotePrefix = quoteMatch ? quoteMatch[1] : '';
+    const textWithoutQuote = quotePrefix
+      ? rawText.substring(quotePrefix.length)
+      : rawText;
+    const isCheckbox = textWithoutQuote.match(CHECKBOX_REGEX);
     let newLine: string;
+
+    // Get the indent without the quote prefix (task.indent already includes the quote prefix for quoted tasks)
+    const indentWithoutQuote = quotePrefix
+      ? task.indent.replace(/\s*>\s*$/, '')
+      : task.indent;
 
     if (newState === '') {
       // Handle empty state - remove task keyword entirely
@@ -42,7 +54,7 @@ export class TaskEditor {
         // For checkboxes, keep the checkbox format but remove the task keyword
         // Use single space between checkbox and text
         const textPart = task.text ? ` ${task.text}` : '';
-        newLine = `${task.indent}- [ ]${textPart}`;
+        newLine = `${indentWithoutQuote}${quotePrefix}- [ ]${textPart}`;
       } else {
         // For regular tasks, remove the task keyword entirely
         // Handle spacing properly based on whether there's a list marker
@@ -59,7 +71,7 @@ export class TaskEditor {
       // Generate markdown checkbox format with proper spacing
       const checkboxStatus = DEFAULT_COMPLETED_STATES.has(newState) ? 'x' : ' ';
       const textPart = task.text ? ` ${task.text}` : '';
-      newLine = `${task.indent}- [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
+      newLine = `${indentWithoutQuote}${quotePrefix}- [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
     } else {
       // Generate original format, preserving comment prefix if present
       const textPart = task.text ? ` ${task.text}` : '';
@@ -101,7 +113,16 @@ export class TaskEditor {
       const isActive = md?.file?.path === task.path;
       const editor = md?.editor;
 
-      if (isActive && editor) {
+      // Check if we're in source/edit mode (has editor) vs preview/reader mode
+      // In preview mode, getViewType() returns 'markdown' but editor is undefined or null
+      const isSourceMode =
+        isActive &&
+        editor &&
+        md?.getViewType() === 'markdown' &&
+        md?.getMode &&
+        md.getMode() === 'source';
+
+      if (isSourceMode) {
         // Replace only the specific line using Editor API to preserve editor state
         // This maintains cursor position, selection, and code folds for better UX
         const currentLine = editor.getLine(task.line);
@@ -124,7 +145,7 @@ export class TaskEditor {
           }
         }
       } else {
-        // Not active: use atomic background edit
+        // Not in source mode (preview/reader mode) or not active: use atomic background edit
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
           if (task.line < lines.length) {
