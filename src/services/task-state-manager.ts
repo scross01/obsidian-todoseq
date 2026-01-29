@@ -9,6 +9,7 @@ export class TaskStateManager {
   private _tasks: Task[] = [];
   private subscribers = new Set<(tasks: Task[]) => void>();
   private isNotifying = false;
+  private pendingNotification = false;
 
   /**
    * Subscribe to task changes. The callback is called immediately with current tasks.
@@ -114,21 +115,25 @@ export class TaskStateManager {
 
   /**
    * Notify all subscribers of task changes.
-   * Guards against re-entrant notifications.
+   * Guards against re-entrant notifications and queues pending notifications.
    */
   private notifySubscribers(): void {
     if (this.isNotifying) {
+      this.pendingNotification = true;
       return;
     }
     this.isNotifying = true;
     try {
-      this.subscribers.forEach((callback) => {
-        try {
-          callback(this._tasks);
-        } catch (error) {
-          console.error('Error in TaskStateManager subscriber:', error);
-        }
-      });
+      do {
+        this.pendingNotification = false;
+        this.subscribers.forEach((callback) => {
+          try {
+            callback(this._tasks);
+          } catch (error) {
+            console.error('Error in TaskStateManager subscriber:', error);
+          }
+        });
+      } while (this.pendingNotification);
     } finally {
       this.isNotifying = false;
     }
