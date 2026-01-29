@@ -1,6 +1,4 @@
-	# Embedded Task Lists
-
-The TODOseq plugin now supports rendering task lists directly within your notes using code blocks. This feature allows you to create dynamic, interactive task lists that are filtered and sorted according to your specifications.
+The TODOseq plugin supports rendering task lists directly within your notes using code blocks. This feature allows you to create dynamic, interactive task lists that are filtered and sorted according to your specifications.
 
 ## Basic Usage
 
@@ -23,10 +21,6 @@ search: content:"example"
 
 ```todoseq
 search: state:DOING
-```
-
-```todoseq
-search: priority:high AND due:today
 ```
 
 ### Sort Method

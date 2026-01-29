@@ -35,7 +35,7 @@ export default class TodoTracker extends Plugin {
   public taskFormatters: Map<string, unknown> = new Map();
   public statusBarManager: StatusBarManager | null = null;
   public readerViewFormatter: ReaderViewFormatter | null = null;
-  
+
   // Embedded task list processor
   public embeddedTaskListProcessor: TodoseqCodeBlockProcessor | null = null;
 
@@ -174,7 +174,7 @@ export default class TodoTracker extends Plugin {
   public refreshAllTaskListViews(): void {
     // Refresh main task list views
     this.uiManager.refreshOpenTaskListViews();
-    
+
     // Note: Embedded task lists are automatically refreshed via event handlers
     // when tasks change, so no additional refresh is needed here
   }

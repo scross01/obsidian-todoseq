@@ -23,39 +23,43 @@ export class EmbeddedTaskListRenderer {
    * @param tasks Tasks to render
    * @param params Code block parameters for context
    */
-  renderTaskList(container: HTMLElement, tasks: Task[], params: TodoseqParameters): void {
+  renderTaskList(
+    container: HTMLElement,
+    tasks: Task[],
+    params: TodoseqParameters,
+  ): void {
     // Clear existing content
     container.empty();
 
     // Create task list container
     const taskListContainer = container.createEl('div', {
-      cls: 'embedded-task-list-container'
+      cls: 'embedded-task-list-container',
     });
 
     // Add header with search/sort info
     if (params.searchQuery || params.sortMethod !== 'default') {
       const header = taskListContainer.createEl('div', {
-        cls: 'embedded-task-list-header'
+        cls: 'embedded-task-list-header',
       });
-      
+
       if (params.searchQuery) {
         header.createEl('span', {
           cls: 'embedded-task-list-search',
-          text: `Search: ${params.searchQuery}`
+          text: `Search: ${params.searchQuery}`,
         });
       }
-      
+
       if (params.sortMethod !== 'default') {
         header.createEl('span', {
           cls: 'embedded-task-list-sort',
-          text: `Sort: ${params.sortMethod}`
+          text: `Sort: ${params.sortMethod}`,
         });
       }
     }
 
     // Create task list
     const taskList = taskListContainer.createEl('ul', {
-      cls: 'embedded-task-list'
+      cls: 'embedded-task-list',
     });
 
     // Render each task
@@ -67,15 +71,15 @@ export class EmbeddedTaskListRenderer {
     // Add empty state if no tasks
     if (tasks.length === 0) {
       const emptyState = taskListContainer.createEl('div', {
-        cls: 'embedded-task-list-empty'
+        cls: 'embedded-task-list-empty',
       });
       emptyState.createEl('div', {
         cls: 'embedded-task-list-empty-title',
-        text: 'No tasks found'
+        text: 'No tasks found',
       });
       emptyState.createEl('div', {
         cls: 'embedded-task-list-empty-subtitle',
-        text: 'Try adjusting your search or sort parameters'
+        text: 'Try adjusting your search or sort parameters',
       });
     }
   }
@@ -98,8 +102,11 @@ export class EmbeddedTaskListRenderer {
     checkbox.type = 'checkbox';
     checkbox.className = 'embedded-task-checkbox';
     checkbox.checked = task.completed;
-    checkbox.setAttribute('aria-label', `Toggle task: ${task.text || task.state}`);
-    
+    checkbox.setAttribute(
+      'aria-label',
+      `Toggle task: ${task.text || task.state}`,
+    );
+
     // Create task text container
     const textContainer = document.createElement('div');
     textContainer.className = 'embedded-task-text-container';
@@ -150,21 +157,24 @@ export class EmbeddedTaskListRenderer {
    * @param checkbox The checkbox element
    * @param task The task data
    */
-  private addTaskEventListeners(li: HTMLLIElement, checkbox: HTMLInputElement, task: Task): void {
+  private addTaskEventListeners(
+    li: HTMLLIElement,
+    checkbox: HTMLInputElement,
+    task: Task,
+  ): void {
     // Checkbox change handler
     checkbox.addEventListener('change', async (e) => {
       e.stopPropagation();
-      
+
       try {
         const newCompleted = checkbox.checked;
         const newState = newCompleted ? 'DONE' : 'TODO';
-        
+
         // Update task state using existing TaskEditor
         await this.taskEditor.updateTaskState(task, newState);
-        
+
         // Update the task in the plugin's task list
         this.updateTaskInPlugin(task, newState);
-        
       } catch (error) {
         console.error('Error updating task state:', error);
         // Revert checkbox on error
@@ -190,10 +200,11 @@ export class EmbeddedTaskListRenderer {
       if (file) {
         // Open the file and navigate to the task line
         this.plugin.app.workspace.openLinkText(task.path, '', true);
-        
+
         // Focus the editor and move cursor to the task line
         setTimeout(() => {
-          const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+          const activeView =
+            this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
           if (activeView && activeView.editor) {
             activeView.editor.setCursor({ line: task.line, ch: 0 });
             activeView.editor.focus();
@@ -211,22 +222,19 @@ export class EmbeddedTaskListRenderer {
    * @param newState The new state for the task
    */
   private updateTaskInPlugin(task: Task, newState: string): void {
-    // Find and update the task in the plugin's task list
-    const taskIndex = this.plugin.tasks.findIndex(t => 
-      t.path === task.path && t.line === task.line
+    // Find the task in the plugin's task list and update it via TaskStateManager
+    const tasks = this.plugin.getTasks();
+    const taskToUpdate = tasks.find(
+      (t) => t.path === task.path && t.line === task.line,
     );
-    
-    if (taskIndex !== -1) {
-      // Create updated task
-      const updatedTask = {
-        ...this.plugin.tasks[taskIndex],
+
+    if (taskToUpdate) {
+      // Update the task via the centralized TaskStateManager
+      this.plugin.taskStateManager.updateTask(taskToUpdate, {
         state: newState,
-        completed: DEFAULT_COMPLETED_STATES.has(newState)
-      };
-      
-      // Update the task in the plugin's list
-      this.plugin.tasks[taskIndex] = updatedTask;
-      
+        completed: DEFAULT_COMPLETED_STATES.has(newState),
+      });
+
       // Trigger refresh of other views
       this.plugin.uiManager.refreshOpenTaskListViews();
     }
@@ -239,24 +247,24 @@ export class EmbeddedTaskListRenderer {
    */
   renderError(container: HTMLElement, errorMessage: string): void {
     container.empty();
-    
+
     const errorContainer = container.createEl('div', {
-      cls: 'embedded-task-list-error'
+      cls: 'embedded-task-list-error',
     });
-    
+
     errorContainer.createEl('div', {
       cls: 'embedded-task-list-error-title',
-      text: 'Error rendering task list'
+      text: 'Error rendering task list',
     });
-    
+
     errorContainer.createEl('div', {
       cls: 'embedded-task-list-error-message',
-      text: errorMessage
+      text: errorMessage,
     });
-    
+
     errorContainer.createEl('div', {
       cls: 'embedded-task-list-error-help',
-      text: 'Check your search and sort parameters for syntax errors.'
+      text: 'Check your search and sort parameters for syntax errors.',
     });
   }
 }

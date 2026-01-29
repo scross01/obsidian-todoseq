@@ -1,8 +1,9 @@
-import { Plugin, TFile, EventRef } from 'obsidian';
+import { TFile } from 'obsidian';
 import TodoTracker from '../../main';
 import { EmbeddedTaskListRenderer } from './task-list-renderer';
 import { EmbeddedTaskListManager } from './task-list-manager';
 import { TodoseqCodeBlockParser } from './code-block-parser';
+import { TodoTrackerSettings } from '../../settings/settings';
 
 /**
  * Handles real-time updates for embedded task lists.
@@ -12,15 +13,22 @@ export class EmbeddedTaskListEventHandler {
   private plugin: TodoTracker;
   private renderer: EmbeddedTaskListRenderer;
   private manager: EmbeddedTaskListManager;
-  
+
   // Track active code blocks
-  private activeCodeBlocks: Map<string, { element: HTMLElement, source: string, filePath: string }> = new Map();
-  
+  private activeCodeBlocks: Map<
+    string,
+    { element: HTMLElement; source: string; filePath: string }
+  > = new Map();
+
   // Debounce timers for file changes
   private refreshTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private readonly DEBOUNCE_MS = 300;
 
-  constructor(plugin: TodoTracker, renderer: EmbeddedTaskListRenderer, manager: EmbeddedTaskListManager) {
+  constructor(
+    plugin: TodoTracker,
+    renderer: EmbeddedTaskListRenderer,
+    manager: EmbeddedTaskListManager,
+  ) {
     this.plugin = plugin;
     this.renderer = renderer;
     this.manager = manager;
@@ -36,7 +44,7 @@ export class EmbeddedTaskListEventHandler {
         if (file instanceof TFile && file.extension === 'md') {
           this.handleFileModified(file.path);
         }
-      })
+      }),
     );
 
     // File creation events
@@ -45,7 +53,7 @@ export class EmbeddedTaskListEventHandler {
         if (file instanceof TFile && file.extension === 'md') {
           this.handleFileCreated(file.path);
         }
-      })
+      }),
     );
 
     // File deletion events
@@ -54,7 +62,7 @@ export class EmbeddedTaskListEventHandler {
         if (file instanceof TFile && file.extension === 'md') {
           this.handleFileDeleted(file.path);
         }
-      })
+      }),
     );
 
     // File rename events
@@ -63,7 +71,7 @@ export class EmbeddedTaskListEventHandler {
         if (file instanceof TFile && file.extension === 'md') {
           this.handleFileRenamed(oldPath, file.path);
         }
-      })
+      }),
     );
 
     // Metadata cache events (for task changes)
@@ -72,7 +80,7 @@ export class EmbeddedTaskListEventHandler {
         if (file instanceof TFile) {
           this.handleMetadataChanged(file.path);
         }
-      })
+      }),
     );
 
     // Workspace events for file opening
@@ -81,7 +89,7 @@ export class EmbeddedTaskListEventHandler {
         if (file instanceof TFile) {
           this.handleFileOpened(file.path);
         }
-      })
+      }),
     );
   }
 
@@ -92,7 +100,12 @@ export class EmbeddedTaskListEventHandler {
    * @param source The code block source content
    * @param filePath The file path containing this code block
    */
-  trackCodeBlock(containerId: string, element: HTMLElement, source: string, filePath: string): void {
+  trackCodeBlock(
+    containerId: string,
+    element: HTMLElement,
+    source: string,
+    filePath: string,
+  ): void {
     this.activeCodeBlocks.set(containerId, { element, source, filePath });
   }
 
@@ -133,7 +146,7 @@ export class EmbeddedTaskListEventHandler {
         this.untrackCodeBlock(containerId);
       }
     });
-    
+
     // Refresh remaining code blocks
     this.refreshAllCodeBlocks();
   }
@@ -150,7 +163,7 @@ export class EmbeddedTaskListEventHandler {
         codeBlock.filePath = newPath;
       }
     });
-    
+
     // Refresh code blocks that might reference the renamed file
     this.refreshAllCodeBlocks();
   }
@@ -184,10 +197,13 @@ export class EmbeddedTaskListEventHandler {
     }
 
     // Set new timeout
-    this.refreshTimeouts.set(filePath, setTimeout(() => {
-      this.refreshAffectedCodeBlocks(filePath);
-      this.refreshTimeouts.delete(filePath);
-    }, this.DEBOUNCE_MS));
+    this.refreshTimeouts.set(
+      filePath,
+      setTimeout(() => {
+        this.refreshAffectedCodeBlocks(filePath);
+        this.refreshTimeouts.delete(filePath);
+      }, this.DEBOUNCE_MS),
+    );
   }
 
   /**
@@ -197,7 +213,12 @@ export class EmbeddedTaskListEventHandler {
   private refreshAffectedCodeBlocks(changedFilePath: string): void {
     this.activeCodeBlocks.forEach((codeBlock, containerId) => {
       // Check if this code block's query might include tasks from the changed file
-      if (TodoseqCodeBlockParser.mightAffectCodeBlock(codeBlock.source, changedFilePath)) {
+      if (
+        TodoseqCodeBlockParser.mightAffectCodeBlock(
+          codeBlock.source,
+          changedFilePath,
+        )
+      ) {
         this.refreshCodeBlock(containerId);
       }
     });
@@ -235,24 +256,26 @@ export class EmbeddedTaskListEventHandler {
     try {
       // Parse parameters
       const params = TodoseqCodeBlockParser.parse(codeBlock.source);
-      
+
       if (params.error) {
         this.renderer.renderError(codeBlock.element, params.error);
         return;
       }
 
       // Get all tasks
-      const allTasks = this.plugin.tasks;
-      
+      const allTasks = this.plugin.getTasks();
+
       // Filter and sort tasks
       const filteredTasks = this.manager.filterAndSortTasks(allTasks, params);
-      
+
       // Re-render the task list
       this.renderer.renderTaskList(codeBlock.element, filteredTasks, params);
-
     } catch (error) {
       console.error('Error refreshing code block:', error);
-      this.renderer.renderError(codeBlock.element, `Refresh error: ${error.message}`);
+      this.renderer.renderError(
+        codeBlock.element,
+        `Refresh error: ${error.message}`,
+      );
     }
   }
 
@@ -261,7 +284,7 @@ export class EmbeddedTaskListEventHandler {
    */
   clearAllCodeBlocks(): void {
     this.activeCodeBlocks.clear();
-    this.refreshTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.refreshTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.refreshTimeouts.clear();
   }
 
@@ -269,7 +292,7 @@ export class EmbeddedTaskListEventHandler {
    * Update the task list manager with new settings
    * @param settings New settings
    */
-  updateSettings(settings: any): void {
+  updateSettings(settings: TodoTrackerSettings): void {
     this.manager.updateSettings(settings);
   }
 }
