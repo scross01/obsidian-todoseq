@@ -1,13 +1,56 @@
 import { Editor, MarkdownView } from 'obsidian';
-import { Task } from './task';
+import { Task, DEFAULT_COMPLETED_STATES } from './task';
 import TodoTracker from './main';
 import { extractPriority, CHECKBOX_REGEX } from './utils/task-utils';
+import { TaskEditor } from './view/task-editor';
 
 /**
  * TaskManager handles operations related to modifying tasks in the editor
  */
 export class TaskManager {
   constructor(private plugin: TodoTracker) {}
+
+  /**
+   * Find a task in the in-memory task list by file path and line number
+   * @param filePath - The path to the file
+   * @param lineNumber - The line number (0-indexed)
+   * @returns The Task object or null if not found
+   */
+  private findTaskByPathAndLine(
+    filePath: string,
+    lineNumber: number,
+  ): Task | null {
+    return (
+      this.plugin.tasks.find(
+        (t) => t.path === filePath && t.line === lineNumber,
+      ) || null
+    );
+  }
+
+  /**
+   * Update a task in-memory immediately for optimistic UI updates
+   * @param task - The task to update
+   * @param newState - The new state to set
+   * @returns The updated task line content
+   */
+  private updateTaskInMemory(task: Task, newState: string): string {
+    // Update the task immediately
+    task.state = newState as Task['state'];
+    task.completed = DEFAULT_COMPLETED_STATES.has(newState);
+
+    // Generate the new rawText
+    const { newLine } = TaskEditor.generateTaskLine(task, newState);
+    task.rawText = newLine;
+
+    return newLine;
+  }
+
+  /**
+   * Refresh the task list view immediately
+   */
+  private refreshTaskListView(): void {
+    this.plugin.uiManager.refreshOpenTaskListViews();
+  }
 
   /**
    * Parse a task from a line of text
@@ -84,13 +127,13 @@ export class TaskManager {
    * @param newState - Optional new state to set (if not provided, will cycle to next state)
    * @returns boolean indicating if the operation was successful
    */
-  handleUpdateTaskStateAtLine(
+  async handleUpdateTaskStateAtLine(
     checking: boolean,
     lineNumber: number,
     editor: Editor,
     view: MarkdownView,
     newState?: string,
-  ): boolean {
+  ): Promise<boolean> {
     const taskEditor = this.plugin.taskEditor;
     const vaultScanner = this.plugin.getVaultScanner();
 
@@ -111,19 +154,54 @@ export class TaskManager {
       return true;
     }
 
-    // Parse the task from the line
-    const task = this.parseTaskFromLine(
-      line,
-      lineNumber,
-      view.file?.path || '',
-    );
+    const filePath = view.file?.path || '';
 
-    if (task) {
-      // Update the task state
-      if (newState) {
-        taskEditor.updateTaskState(task, newState);
-      } else {
-        taskEditor.updateTaskState(task);
+    // OPTIMISTIC UPDATE: Find and update the in-memory task immediately
+    const existingTask = this.findTaskByPathAndLine(filePath, lineNumber);
+    let targetState = newState;
+
+    if (existingTask) {
+      // Determine the target state
+      if (!targetState) {
+        // Cycle to next state
+        const settings = this.plugin.settings;
+        const customKeywords = settings?.additionalTaskKeywords || [];
+        if (customKeywords.includes(existingTask.state)) {
+          targetState = 'DONE';
+        } else {
+          // Import NEXT_STATE dynamically to avoid circular dependency
+          const { NEXT_STATE } = await import('./task');
+          targetState = NEXT_STATE.get(existingTask.state) || 'TODO';
+        }
+      }
+
+      // Update in-memory task immediately
+      this.updateTaskInMemory(existingTask, targetState);
+
+      // Refresh the task list view immediately
+      this.refreshTaskListView();
+    }
+
+    // Parse the task from the line for the file operation
+    const task = this.parseTaskFromLine(line, lineNumber, filePath);
+
+    if (task && targetState) {
+      // Perform the file write in the background
+      try {
+        await taskEditor.updateTaskState(task, targetState);
+      } catch (error) {
+        console.error(
+          `[TODOseq] File write failed for task at line ${lineNumber}:`,
+          error,
+        );
+
+        // Rollback on error if we had an existing task
+        if (existingTask) {
+          // Revert to the original state by re-reading the file
+          if (view.file) {
+            this.plugin.vaultScanner?.handleFileChange(view.file);
+          }
+        }
       }
     }
 
@@ -292,12 +370,11 @@ export class TaskManager {
     const cursor = editor.getCursor();
 
     // Use the extracted method to handle the line-based logic
-    return this.handleUpdateTaskStateAtLine(
-      checking,
-      cursor.line,
-      editor,
-      view,
-    );
+    // Note: handleUpdateTaskStateAtLine is now async, but we can't await here
+    // because the editorCheckCallback expects a synchronous return
+    // The UI update will happen asynchronously
+    void this.handleUpdateTaskStateAtLine(checking, cursor.line, editor, view);
+    return true;
   }
 
   /**

@@ -650,21 +650,43 @@ export class TaskListView extends ItemView {
 
   // Cycle state via NEXT_STATE using TaskEditor
   private async updateTaskState(task: Task, nextState: string): Promise<void> {
-    // Store old state for announcement
+    // Store old state for announcement and potential rollback
     const oldState = task.state;
+    const oldCompleted = task.completed;
+    const oldRawText = task.rawText;
 
-    // Construct editor bound to this vault so methods don't need App
-    const updated = await this.editor.updateTaskState(task, nextState);
-    // Sync in-memory task from returned snapshot
-    task.rawText = updated.rawText;
-    if (typeof (updated as { state?: unknown }).state === 'string') {
-      task.state = (updated as { state: string }).state as Task['state'];
-    }
-    task.completed = !!(updated as { completed?: unknown }).completed;
+    // OPTIMISTIC UPDATE: Update in-memory task immediately for instant UI feedback
+    task.state = nextState as Task['state'];
+    task.completed = DEFAULT_COMPLETED_STATES.has(nextState);
+    // Generate the new rawText optimistically to match what TaskEditor will produce
+    const { newLine } = TaskEditor.generateTaskLine(task, nextState);
+    task.rawText = newLine;
 
-    // Announce state change to screen readers
+    // Announce state change to screen readers immediately
     if (oldState !== task.state) {
       this.announceTaskStateChange(task, oldState);
+    }
+
+    try {
+      // Perform the actual file update in the background
+      const updated = await this.editor.updateTaskState(task, nextState);
+
+      // Sync in-memory task from returned snapshot (in case of any differences)
+      task.rawText = updated.rawText;
+      if (typeof (updated as { state?: unknown }).state === 'string') {
+        task.state = (updated as { state: string }).state as Task['state'];
+      }
+      task.completed = !!(updated as { completed?: unknown }).completed;
+    } catch (error) {
+      // ROLLBACK: Restore previous state on error
+      task.state = oldState;
+      task.completed = oldCompleted;
+      task.rawText = oldRawText;
+
+      // Re-render with rolled-back state
+      this.refreshTaskElement(task);
+
+      console.error('TODOseq: Failed to update task state:', error);
     }
   }
 
