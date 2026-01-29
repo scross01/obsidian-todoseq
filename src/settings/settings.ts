@@ -48,9 +48,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
   private refreshAllTaskListViews = async () => {
     const leaves = this.app.workspace.getLeavesOfType(TaskListView.viewType);
+    const tasks = this.plugin.getTasks();
     for (const leaf of leaves) {
       if (leaf.view instanceof TaskListView) {
-        leaf.view.tasks = this.plugin.tasks;
+        leaf.view.updateTasks(tasks);
         // Sync each view's mode from settings before render
         const mode = this.plugin.settings.taskListViewMode;
         leaf.view.setViewMode(mode);

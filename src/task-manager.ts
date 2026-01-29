@@ -20,10 +20,9 @@ export class TaskManager {
     filePath: string,
     lineNumber: number,
   ): Task | null {
-    return (
-      this.plugin.tasks.find(
-        (t) => t.path === filePath && t.line === lineNumber,
-      ) || null
+    return this.plugin.taskStateManager.findTaskByPathAndLine(
+      filePath,
+      lineNumber,
     );
   }
 
@@ -34,13 +33,15 @@ export class TaskManager {
    * @returns The updated task line content
    */
   private updateTaskInMemory(task: Task, newState: string): string {
-    // Update the task immediately
-    task.state = newState as Task['state'];
-    task.completed = DEFAULT_COMPLETED_STATES.has(newState);
-
-    // Generate the new rawText
+    // Generate the new rawText first
     const { newLine } = TaskEditor.generateTaskLine(task, newState);
-    task.rawText = newLine;
+
+    // Update the task in the centralized state manager
+    this.plugin.taskStateManager.updateTask(task, {
+      state: newState as Task['state'],
+      completed: DEFAULT_COMPLETED_STATES.has(newState),
+      rawText: newLine,
+    });
 
     return newLine;
   }

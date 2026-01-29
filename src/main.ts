@@ -12,12 +12,15 @@ import { UIManager } from './ui-manager';
 import { ReaderViewFormatter } from './view/reader-formatting';
 import { PluginLifecycleManager } from './plugin-lifecycle';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
+import { TaskStateManager } from './services/task-state-manager';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
 export default class TodoTracker extends Plugin {
   settings: TodoTrackerSettings;
-  tasks: Task[] = [];
+
+  // Centralized state manager - single source of truth for tasks
+  public taskStateManager: TaskStateManager;
 
   // Managers for different functional areas
   public taskManager: TaskManager;
@@ -37,12 +40,19 @@ export default class TodoTracker extends Plugin {
     return this.vaultScanner;
   }
 
+  /**
+   * Get tasks from the centralized state manager.
+   * @returns Current tasks array
+   */
   public getTasks(): Task[] {
-    return this.tasks;
+    return this.taskStateManager.getTasks();
   }
 
   // Obsidian lifecycle method called when the plugin is loaded.
   async onload() {
+    // Initialize centralized state manager first
+    this.taskStateManager = new TaskStateManager();
+
     // Initialize managers
     this.taskManager = new TaskManager(this);
     this.uiManager = new UIManager(this);
@@ -52,15 +62,14 @@ export default class TodoTracker extends Plugin {
     await this.lifecycleManager.onload();
   }
 
-  // Helper: refresh all open Todo views to reflect this.tasks without stealing focus
+  // Helper: refresh all open Todo views to reflect current tasks without stealing focus
   private async refreshOpenTaskListViews(): Promise<void> {
     const leaves = this.app.workspace.getLeavesOfType(TaskListView.viewType);
+    const tasks = this.getTasks();
     for (const leaf of leaves) {
       if (leaf.view instanceof TaskListView) {
-        // Update data source
-        leaf.view.tasks = this.tasks;
         // Update the dropdown's task reference so it uses the latest tasks
-        leaf.view.updateTasks(this.tasks);
+        leaf.view.updateTasks(tasks);
         // Lighter refresh: only update the visible list rather than full onOpen re-init
         leaf.view.refreshVisibleList();
       }

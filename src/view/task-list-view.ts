@@ -27,6 +27,7 @@ import {
   SortMethod as TaskSortMethod,
 } from '../utils/task-sort';
 import { getPluginSettings } from '../utils/settings-utils';
+import { TaskStateManager } from '../services/task-state-manager';
 
 export type TaskListViewMode =
   | 'showAll'
@@ -53,18 +54,32 @@ export class TaskListView extends ItemView {
   private suggestionDropdown: SearchSuggestionDropdown | null = null;
   private taskListContainer: HTMLElement | null = null;
   private ariaLiveRegion: HTMLElement | null = null;
+  private unsubscribeFromStateManager: (() => void) | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
-    tasks: Task[],
+    taskStateManager: TaskStateManager,
     defaultViewMode: TaskListViewMode,
     private settings: TodoTrackerSettings,
   ) {
     super(leaf);
-    this.tasks = tasks;
+    this.tasks = taskStateManager.getTasks();
     this.editor = new TaskEditor(this.app);
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = settings.defaultSortMethod;
+
+    // Subscribe to task changes from the centralized state manager
+    this.unsubscribeFromStateManager = taskStateManager.subscribe((tasks) => {
+      this.tasks = tasks;
+      // Only update dropdowns if they've been initialized
+      if (this.optionsDropdown || this.suggestionDropdown) {
+        this.updateTasks(tasks);
+      }
+      // Only refresh if the view is already open (has contentEl)
+      if (this.contentEl && this.taskListContainer) {
+        this.refreshVisibleList();
+      }
+    });
   }
 
   /** View-mode accessors persisted on the root element to avoid cross-class coupling */
@@ -1628,6 +1643,12 @@ export class TaskListView extends ItemView {
     if (this.suggestionDropdown) {
       this.suggestionDropdown.cleanup();
       this.suggestionDropdown = null;
+    }
+
+    // Unsubscribe from state manager
+    if (this.unsubscribeFromStateManager) {
+      this.unsubscribeFromStateManager();
+      this.unsubscribeFromStateManager = null;
     }
 
     this.searchInputEl = null;
