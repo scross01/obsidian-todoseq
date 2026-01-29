@@ -519,12 +519,12 @@ export class UIManager {
   async refreshOpenTaskListViews(): Promise<void> {
     const { workspace } = this.plugin.app;
     const leaves = workspace.getLeavesOfType(TaskListView.viewType);
+    const tasks = this.plugin.getTasks();
 
     for (const leaf of leaves) {
       if (leaf.view instanceof TaskListView) {
-        leaf.view.tasks = this.plugin.tasks;
         // Update the dropdown's task reference so it uses the latest tasks
-        leaf.view.updateTasks(this.plugin.tasks);
+        leaf.view.updateTasks(tasks);
         // Lighter refresh: only update the visible list rather than full onOpen re-init
         leaf.view.refreshVisibleList();
       }

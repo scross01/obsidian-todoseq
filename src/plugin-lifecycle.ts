@@ -23,6 +23,8 @@ export class PluginLifecycleManager {
     // Initialize services
     // Load urgency coefficients on startup
     const urgencyCoefficients = await parseUrgencyCoefficients(this.plugin.app);
+
+    // VaultScanner now uses the centralized TaskStateManager
     this.plugin.vaultScanner = new VaultScanner(
       this.plugin.app,
       this.plugin.settings,
@@ -31,6 +33,7 @@ export class PluginLifecycleManager {
         this.plugin.app,
         urgencyCoefficients,
       ),
+      this.plugin.taskStateManager,
       urgencyCoefficients,
     );
     this.plugin.taskEditor = new TaskEditor(this.plugin.app);
@@ -47,12 +50,13 @@ export class PluginLifecycleManager {
     this.plugin.readerViewFormatter.registerPostProcessor();
 
     // Register the custom view type
+    // TaskListView now subscribes to TaskStateManager for task updates
     this.plugin.registerView(
       TaskListView.viewType,
       (leaf) =>
         new TaskListView(
           leaf,
-          this.plugin.tasks,
+          this.plugin.taskStateManager,
           this.plugin.settings.taskListViewMode,
           this.plugin.settings,
         ),
@@ -239,9 +243,12 @@ export class PluginLifecycleManager {
     });
 
     // Listen to VaultScanner events for task updates
-    this.plugin.vaultScanner.on('tasks-changed', (tasks) => {
-      this.plugin.tasks = tasks;
-      this.plugin.uiManager.refreshOpenTaskListViews();
+    // Note: TaskListView now subscribes directly to TaskStateManager,
+    // but we still refresh UI components that need updates
+    this.plugin.vaultScanner.on('tasks-changed', () => {
+      // UI components that aren't subscribed to TaskStateManager directly
+      // can be refreshed here if needed
+      this.plugin.statusBarManager?.updateTaskCount();
     });
 
     this.plugin.vaultScanner.on('scan-error', (error) => {
@@ -253,9 +260,6 @@ export class PluginLifecycleManager {
 
     // Setup right-click event handlers for task keywords
     this.plugin.uiManager.setupTaskKeywordContextMenu();
-
-    // Initial scan using VaultScanner
-    await this.plugin.vaultScanner.scanVault();
 
     // Register file change events that delegate to VaultScanner
     this.plugin.registerEvent(
@@ -289,7 +293,10 @@ export class PluginLifecycleManager {
 
     // Auto-open task view in right sidebar when plugin loads
     // Use onLayoutReady to ensure workspace is fully initialized
-    this.plugin.app.workspace.onLayoutReady(() => {
+    this.plugin.app.workspace.onLayoutReady(async () => {
+      // Wait for the initial vault scan to complete before showing the task view
+      // This ensures tasks are available when the view first renders
+      await this.plugin.vaultScanner?.scanVault();
       this.plugin.uiManager.showTasks();
     });
   }

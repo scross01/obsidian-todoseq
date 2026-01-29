@@ -22,8 +22,8 @@ export class StatusBarManager {
       });
     }
 
-    // Update status bar item when tasks change
-    this.getVaultScanner()?.on('tasks-changed', (tasks: Task[]) => {
+    // Subscribe to TaskStateManager for task changes
+    this.plugin.taskStateManager.subscribe((tasks: Task[]) => {
       this.updateStatusBarItem(tasks);
     });
 
@@ -36,7 +36,7 @@ export class StatusBarManager {
   }
 
   // Update status bar item with current task count
-  updateStatusBarItem(tasks: Task[]): void {
+  updateStatusBarItem(tasks?: Task[]): void {
     if (!this.statusBarItem) return;
 
     const activeFile = this.plugin.app.workspace.getActiveFile();
@@ -45,8 +45,11 @@ export class StatusBarManager {
       return;
     }
 
+    // Use provided tasks or get from plugin
+    const taskList = tasks ?? this.getTasks();
+
     // Count incomplete tasks for the current file
-    const incompleteTasks = tasks.filter(
+    const incompleteTasks = taskList.filter(
       (task) => task.path === activeFile.path && !task.completed,
     );
 
@@ -55,6 +58,11 @@ export class StatusBarManager {
     this.statusBarItem.setText(
       `${taskCount} task${taskCount !== 1 ? 's' : ''}`,
     );
+  }
+
+  // Update task count from current state
+  updateTaskCount(): void {
+    this.updateStatusBarItem();
   }
 
   // Handle click on status bar item

@@ -7,6 +7,7 @@ import {
   parseUrgencyCoefficients,
   UrgencyCoefficients,
 } from '../utils/task-urgency';
+import { TaskStateManager } from './task-state-manager';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -17,18 +18,18 @@ export interface VaultScannerEvents {
 }
 
 export class VaultScanner {
-  private tasks: Task[] = [];
   private _isScanning = false;
   private eventListeners: Map<
     keyof VaultScannerEvents,
     ((...args: unknown[]) => void)[]
   > = new Map();
-  private urgencyCoefficients: UrgencyCoefficients;
+  private urgencyCoefficients!: UrgencyCoefficients;
 
   constructor(
     private app: App,
     private settings: TodoTrackerSettings,
     private parser: TaskParser,
+    private taskStateManager: TaskStateManager,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
     // Initialize event listeners map
@@ -106,7 +107,7 @@ export class VaultScanner {
 
     try {
       this.emit('scan-started');
-      this.tasks = [];
+      const newTasks: Task[] = [];
       const files = this.app.vault.getFiles();
 
       // Yield configuration: how often to yield a frame while scanning
@@ -115,7 +116,8 @@ export class VaultScanner {
 
       for (const file of files) {
         if (file.extension === 'md' && !this.isExcluded(file.path)) {
-          await this.scanFile(file);
+          const fileTasks = await this.scanFile(file);
+          newTasks.push(...fileTasks);
           processedMd++;
 
           if (processedMd % YIELD_EVERY_FILES === 0) {
@@ -126,10 +128,13 @@ export class VaultScanner {
       }
 
       // Default sort
-      this.tasks.sort(taskComparator);
+      newTasks.sort(taskComparator);
 
-      // Emit tasks-changed event with new task list
-      this.emit('tasks-changed', [...this.tasks]);
+      // Update the centralized state manager
+      this.taskStateManager.setTasks(newTasks);
+
+      // Emit events for backward compatibility
+      this.emit('tasks-changed', newTasks);
       this.emit('scan-completed');
     } catch (error) {
       console.error('VaultScanner scanVault error', error);
@@ -192,8 +197,9 @@ export class VaultScanner {
    * Scans a single file for tasks using Vault.cachedRead() API for better performance
    *
    * @param file The TFile to scan for tasks
+   * @returns Array of tasks found in the file
    */
-  async scanFile(file: TFile): Promise<void> {
+  async scanFile(file: TFile): Promise<Task[]> {
     const content = await this.app.vault.cachedRead(file);
 
     if (!this.parser) {
@@ -206,7 +212,7 @@ export class VaultScanner {
     }
 
     const parsed = this.parser.parseFile(content, file.path, file);
-    this.tasks.push(...parsed);
+    return parsed;
   }
 
   /**
@@ -224,8 +230,11 @@ export class VaultScanner {
       // Only process Markdown files
       if (!(file instanceof TFile) || file.extension !== 'md') return;
 
-      // Remove existing tasks for this file (path-safe even if file was deleted/renamed)
-      this.tasks = this.tasks.filter((task) => task.path !== file.path);
+      // Get current tasks and remove existing tasks for this file
+      const currentTasks = this.taskStateManager.getTasks();
+      const updatedTasks = currentTasks.filter(
+        (task) => task.path !== file.path,
+      );
 
       // Check if the file still exists before attempting to read it (delete events)
       // Using getAbstractFileByPath() is more efficient than iterating all files
@@ -233,14 +242,18 @@ export class VaultScanner {
         this.app.vault.getAbstractFileByPath(file.path) instanceof TFile;
       if (stillExists) {
         // Re-scan the file
-        await this.scanFile(file);
+        const fileTasks = await this.scanFile(file);
+        updatedTasks.push(...fileTasks);
       }
 
       // Maintain default sort after incremental updates
-      this.tasks.sort(taskComparator);
+      updatedTasks.sort(taskComparator);
 
-      // Emit tasks-changed event with updated task list
-      this.emit('tasks-changed', [...this.tasks]);
+      // Update the centralized state manager
+      this.taskStateManager.setTasks(updatedTasks);
+
+      // Emit events for backward compatibility
+      this.emit('tasks-changed', updatedTasks);
     } catch (err) {
       console.error('VaultScanner handleFileChange error', err);
       this.emit(
@@ -253,19 +266,24 @@ export class VaultScanner {
   // Handle rename: remove tasks for the old path, then scan the new file location
   async handleFileRename(file: TAbstractFile, oldPath: string): Promise<void> {
     try {
-      // Remove existing tasks for the old path
-      this.tasks = this.tasks.filter((t) => t.path !== oldPath);
+      // Get current tasks and remove existing tasks for the old path
+      const currentTasks = this.taskStateManager.getTasks();
+      const updatedTasks = currentTasks.filter((t) => t.path !== oldPath);
 
       // If the file still exists (it should after rename), scan it at its new location
       if (file instanceof TFile) {
-        await this.scanFile(file);
+        const fileTasks = await this.scanFile(file);
+        updatedTasks.push(...fileTasks);
       }
 
       // Keep sorted state
-      this.tasks.sort(taskComparator);
+      updatedTasks.sort(taskComparator);
 
-      // Emit tasks-changed event with updated task list
-      this.emit('tasks-changed', [...this.tasks]);
+      // Update the centralized state manager
+      this.taskStateManager.setTasks(updatedTasks);
+
+      // Emit events for backward compatibility
+      this.emit('tasks-changed', updatedTasks);
     } catch (err) {
       console.error('VaultScanner handleFileRename error', err);
       this.emit(
@@ -275,9 +293,14 @@ export class VaultScanner {
     }
   }
 
-  // Get a copy of the current tasks
+  // Get the current tasks from the state manager
   getTasks(): Task[] {
-    return [...this.tasks];
+    return this.taskStateManager.getTasks();
+  }
+
+  // Get the TaskStateManager instance
+  getTaskStateManager(): TaskStateManager {
+    return this.taskStateManager;
   }
 
   // Get the current parser instance
