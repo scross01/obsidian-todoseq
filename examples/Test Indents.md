@@ -21,6 +21,7 @@ TODO test at top level
 1. TODO task in numbered bullet list 1
 2. TODO task in numbered bullet list 2
 
+  - TODO in indented bullet
 
 >[!info]
 >Obsidian doesn't render lettered bullets with any formated styles, but TODOseq still recognizes them at then as task lines.

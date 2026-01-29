@@ -605,6 +605,11 @@ export class ReaderViewFormatter {
 
   /**
    * Process bullet list items without checkboxes
+   * Handles various list formats including:
+   * - Indented bullets (with leading spaces)
+   * - Different bullet markers (-, *, +)
+   * - Numbered lists (1., 2), a., A))
+   * - Letter lists (a., b., A), B))
    */
   private processBulletListItems(
     element: HTMLElement,
@@ -622,11 +627,170 @@ export class ReaderViewFormatter {
         return;
       }
 
+      if (!(listItem instanceof HTMLElement)) {
+        return;
+      }
+
+      // Try to find a paragraph first (standard case)
       const paragraph = listItem.querySelector('p');
       if (paragraph instanceof HTMLElement) {
         this.processParagraphForTasks(paragraph);
+        return;
+      }
+
+      // Handle list items without paragraphs (direct text content)
+      // This is common for simple bullet items like:
+      // <li><span class="list-bullet"></span>TODO task text</li>
+      this.processListItemDirectly(listItem);
+    });
+  }
+
+  /**
+   * Process a list item that contains text directly (without <p> elements)
+   * Handles cases like:
+   // <li data-line="0" dir="auto"><span class="list-bullet"></span>TODO in indented bullet</li>
+   * <li data-line="0" dir="auto"><span class="list-bullet"></span>TODO task in a star * bullet</li>
+   * <li data-line="0" dir="auto">TODO task in numbered bullet list 1</li>
+   */
+  private processListItemDirectly(listItem: HTMLElement): void {
+    const taskParser = this.getTaskParser();
+    if (!taskParser) {
+      return;
+    }
+
+    // Get the text content of the list item
+    const listItemText = listItem.textContent || '';
+
+    // Use the task parser to test if this contains a task
+    if (!taskParser.testRegex.test(listItemText)) {
+      return;
+    }
+
+    const match = taskParser.testRegex.exec(listItemText);
+    if (!match || !match[4]) {
+      return;
+    }
+
+    // match[4] contains the keyword
+    const keyword = match[4];
+
+    // Create a span for the task keyword
+    const keywordSpan = this.createKeywordSpan(keyword);
+
+    // Find the keyword position in the text
+    const fullMatchStart = match.index || 0;
+    const keywordStart =
+      fullMatchStart +
+      (match[1]?.length || 0) +
+      (match[2]?.length || 0) +
+      (match[3]?.length || 0);
+
+    // Find and replace the keyword in the list item's text nodes
+    this.replaceKeywordInListItem(listItem, keyword, keywordStart, keywordSpan);
+
+    // Create a task container for styling
+    const taskContainer = this.createTaskContainer();
+
+    // Move all children into the task container, but preserve special elements
+    // like list-bullet, list-collapse-indicator, and checkboxes
+    const childrenToWrap: ChildNode[] = [];
+    const childrenToPreserve: ChildNode[] = [];
+
+    listItem.childNodes.forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const el = child as HTMLElement;
+        // Preserve list-related elements and checkboxes
+        if (
+          el.classList?.contains('task-list-item-checkbox') ||
+          el.classList?.contains('list-bullet') ||
+          el.classList?.contains('list-collapse-indicator') ||
+          el.classList?.contains('collapse-indicator') ||
+          el.classList?.contains('collapse-icon')
+        ) {
+          childrenToPreserve.push(child);
+        } else {
+          childrenToWrap.push(child);
+        }
+      } else {
+        childrenToWrap.push(child);
       }
     });
+
+    // Clear the list item
+    while (listItem.firstChild) {
+      listItem.removeChild(listItem.firstChild);
+    }
+
+    // Add preserved children first (checkbox, list-bullet, collapse indicator)
+    childrenToPreserve.forEach((child) => {
+      listItem.appendChild(child);
+    });
+
+    // Add wrapped children to task container
+    childrenToWrap.forEach((child) => {
+      taskContainer.appendChild(child);
+    });
+
+    // Add the task container to the list item
+    listItem.appendChild(taskContainer);
+
+    // Apply completed task text styling if needed
+    if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+      this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
+    }
+  }
+
+  /**
+   * Replace keyword in list item's text nodes
+   */
+  private replaceKeywordInListItem(
+    listItem: HTMLElement,
+    keyword: string,
+    keywordStart: number,
+    keywordSpan: HTMLElement,
+  ): void {
+    // Get all text nodes in the list item
+    const textNodes = this.getTextNodes(listItem);
+    let currentPosition = 0;
+
+    for (const textNode of textNodes) {
+      if (textNode.nodeType !== Node.TEXT_NODE) {
+        continue;
+      }
+
+      const nodeText = textNode.textContent || '';
+      const nodeStart = currentPosition;
+      const nodeEnd = currentPosition + nodeText.length;
+
+      // Check if this text node contains the keyword
+      if (keywordStart >= nodeStart && keywordStart < nodeEnd) {
+        const keywordStartInNode = keywordStart - nodeStart;
+        const keywordEndInNode = keywordStartInNode + keyword.length;
+
+        if (keywordEndInNode <= nodeText.length) {
+          // Create text nodes for before, after, and replace the keyword
+          const beforeText = nodeText.substring(0, keywordStartInNode);
+          const afterText = nodeText.substring(keywordEndInNode);
+
+          // Create new nodes
+          const beforeNode = document.createTextNode(beforeText);
+          const afterNode = document.createTextNode(afterText);
+
+          // Replace the text node with our structured content
+          const parent = textNode.parentNode;
+          if (parent) {
+            parent.insertBefore(afterNode, textNode);
+            parent.insertBefore(keywordSpan, afterNode);
+            parent.insertBefore(beforeNode, keywordSpan);
+            parent.removeChild(textNode);
+          }
+
+          break;
+        }
+      }
+
+      currentPosition = nodeEnd;
+    }
   }
 
   /**
