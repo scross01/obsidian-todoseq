@@ -48,7 +48,8 @@ export class EditorKeywordMenu {
         // Save current cursor position
         const cursorPosition = view.editor.getCursor();
 
-        this.plugin.taskManager.handleUpdateTaskStateAtLine(
+        // handleUpdateTaskStateAtLine is now async, so we need to await it
+        await this.plugin.taskManager.handleUpdateTaskStateAtLine(
           false,
           currentLine - 1,
           view.editor,

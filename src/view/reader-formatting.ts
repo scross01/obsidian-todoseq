@@ -1,10 +1,11 @@
 import TodoTracker from '../main';
-import { DEFAULT_COMPLETED_STATES, Task } from '../task';
+import { DEFAULT_COMPLETED_STATES, Task, NEXT_STATE } from '../task';
 import { TaskParser } from '../parser/task-parser';
 import { VaultScanner } from '../services/vault-scanner';
 import { buildTaskKeywords } from '../utils/task-utils';
 import { SettingsChangeDetector } from '../utils/settings-utils';
 import { TFile } from 'obsidian';
+import { StateMenuBuilder } from './state-menu-builder';
 
 /**
  * Handles task keyword formatting in the reader view
@@ -12,6 +13,13 @@ import { TFile } from 'obsidian';
  */
 export class ReaderViewFormatter {
   private settingsDetector: SettingsChangeDetector;
+  private menuBuilder: StateMenuBuilder;
+
+  // Double-click detection state
+  private lastClickTime = 0;
+  private lastClickedElement: HTMLElement | null = null;
+  private pendingClickTimeout: number | null = null;
+  private readonly DOUBLE_CLICK_THRESHOLD = 300; // ms
 
   constructor(
     private plugin: TodoTracker,
@@ -20,6 +28,12 @@ export class ReaderViewFormatter {
     // Initialize settings change detector
     this.settingsDetector = new SettingsChangeDetector();
     this.settingsDetector.initialize(this.plugin.settings);
+
+    // Initialize menu builder for state selection dropdown
+    this.menuBuilder = new StateMenuBuilder(
+      this.plugin.app,
+      this.plugin.settings,
+    );
   }
 
   /**
@@ -116,6 +130,9 @@ export class ReaderViewFormatter {
 
       // Attach checkbox click handlers for task state toggling
       this.attachCheckboxClickHandlers(element, context);
+
+      // Attach keyword click handlers for task state toggling and context menu
+      this.attachKeywordClickHandlers(element, context);
     });
   }
 
@@ -1315,9 +1332,295 @@ export class ReaderViewFormatter {
   }
 
   /**
+   * Attach click event handlers to task keywords for state toggling and context menu
+   */
+  private attachKeywordClickHandlers(
+    element: HTMLElement,
+    context: { sourcePath: string },
+  ): void {
+    const keywords = element.querySelectorAll('.todoseq-keyword-formatted');
+
+    keywords.forEach((keyword: Element) => {
+      if (!(keyword instanceof HTMLElement)) {
+        return;
+      }
+
+      // Skip if already has handlers attached (check for data attribute)
+      if (keyword.hasAttribute('data-todoseq-handlers-attached')) {
+        return;
+      }
+      keyword.setAttribute('data-todoseq-handlers-attached', 'true');
+
+      // Make the keyword focusable and add role for accessibility
+      keyword.setAttribute('tabindex', '0');
+      keyword.setAttribute('role', 'button');
+
+      // Single click handler with double-click detection
+      this.plugin.registerDomEvent(keyword, 'click', (event: MouseEvent) => {
+        this.handleKeywordClick(event, keyword, context.sourcePath);
+      });
+
+      // Right-click context menu handler
+      this.plugin.registerDomEvent(
+        keyword,
+        'contextmenu',
+        (event: MouseEvent) => {
+          this.handleKeywordContextMenu(event, keyword, context.sourcePath);
+        },
+      );
+
+      // Keyboard support for accessibility
+      this.plugin.registerDomEvent(
+        keyword,
+        'keydown',
+        (event: KeyboardEvent) => {
+          this.handleKeywordKeydown(event, keyword, context.sourcePath);
+        },
+      );
+    });
+  }
+
+  /**
+   * Handle click on task keyword with double-click detection
+   * Single click toggles state, double click falls through for text selection
+   */
+  private handleKeywordClick(
+    event: MouseEvent,
+    keywordElement: HTMLElement,
+    sourcePath: string,
+  ): void {
+    const currentTime = Date.now();
+    const isDoubleClick =
+      this.lastClickedElement === keywordElement &&
+      currentTime - this.lastClickTime < this.DOUBLE_CLICK_THRESHOLD;
+
+    // Clear any pending single click timeout
+    if (this.pendingClickTimeout) {
+      clearTimeout(this.pendingClickTimeout);
+      this.pendingClickTimeout = null;
+    }
+
+    if (isDoubleClick) {
+      // Double click detected - reset state and allow default behavior (text selection)
+      this.lastClickedElement = null;
+      this.lastClickTime = 0;
+      return; // Don't prevent default - let text selection happen
+    }
+
+    // Store click state for double-click detection
+    this.lastClickedElement = keywordElement;
+    this.lastClickTime = currentTime;
+
+    // Prevent default behavior for single click
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Set a timeout to process as single click if no second click occurs
+    this.pendingClickTimeout = window.setTimeout(() => {
+      this.pendingClickTimeout = null;
+      this.lastClickedElement = null;
+      this.lastClickTime = 0;
+
+      // Process the single click - toggle task state
+      void this.toggleTaskState(keywordElement, sourcePath);
+    }, this.DOUBLE_CLICK_THRESHOLD);
+  }
+
+  /**
+   * Handle right-click context menu on task keyword
+   */
+  private handleKeywordContextMenu(
+    event: MouseEvent,
+    keywordElement: HTMLElement,
+    sourcePath: string,
+  ): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Clear any pending single click timeout
+    if (this.pendingClickTimeout) {
+      clearTimeout(this.pendingClickTimeout);
+      this.pendingClickTimeout = null;
+      this.lastClickedElement = null;
+      this.lastClickTime = 0;
+    }
+
+    const currentState = keywordElement.getAttribute('data-task-keyword');
+    if (!currentState) {
+      return;
+    }
+
+    // Build and show the state selection menu
+    const menu = this.menuBuilder.buildStateMenu(
+      currentState,
+      async (newState: string) => {
+        await this.updateTaskState(keywordElement, sourcePath, newState);
+      },
+    );
+
+    menu.showAtPosition({ x: event.clientX, y: event.clientY });
+  }
+
+  /**
+   * Handle keyboard events on task keyword for accessibility
+   */
+  private handleKeywordKeydown(
+    event: KeyboardEvent,
+    keywordElement: HTMLElement,
+    sourcePath: string,
+  ): void {
+    const key = event.key;
+
+    if (key === 'Enter' || key === ' ') {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.toggleTaskState(keywordElement, sourcePath);
+    } else if (key === 'F10' && event.shiftKey) {
+      // Shift+F10 opens context menu (Windows convention)
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = keywordElement.getBoundingClientRect();
+      const currentState = keywordElement.getAttribute('data-task-keyword');
+      if (!currentState) return;
+
+      const menu = this.menuBuilder.buildStateMenu(
+        currentState,
+        async (newState: string) => {
+          await this.updateTaskState(keywordElement, sourcePath, newState);
+        },
+      );
+      menu.showAtPosition({ x: rect.left, y: rect.bottom });
+    } else if (key === 'ContextMenu') {
+      // ContextMenu key opens context menu
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = keywordElement.getBoundingClientRect();
+      const currentState = keywordElement.getAttribute('data-task-keyword');
+      if (!currentState) return;
+
+      const menu = this.menuBuilder.buildStateMenu(
+        currentState,
+        async (newState: string) => {
+          await this.updateTaskState(keywordElement, sourcePath, newState);
+        },
+      );
+      menu.showAtPosition({ x: rect.left, y: rect.bottom });
+    }
+  }
+
+  /**
+   * Toggle task state to the next state in the cycle
+   */
+  private async toggleTaskState(
+    keywordElement: HTMLElement,
+    sourcePath: string,
+  ): Promise<void> {
+    const currentState = keywordElement.getAttribute('data-task-keyword');
+    if (!currentState) {
+      return;
+    }
+
+    // Get the next state from the NEXT_STATE map
+    const nextState = NEXT_STATE.get(currentState);
+    if (!nextState) {
+      return;
+    }
+
+    await this.updateTaskState(keywordElement, sourcePath, nextState);
+  }
+
+  /**
+   * Update task state to a specific new state
+   */
+  private async updateTaskState(
+    keywordElement: HTMLElement,
+    sourcePath: string,
+    newState: string,
+  ): Promise<void> {
+    // Find the task associated with this keyword
+    const task = await this.findTaskForKeyword(keywordElement, sourcePath);
+    if (!task) {
+      return;
+    }
+
+    // Use TaskEditor to update the task
+    if (this.plugin.taskEditor) {
+      await this.plugin.taskEditor.applyLineUpdate(task, newState);
+    }
+  }
+
+  /**
+   * Find the task associated with a keyword element
+   */
+  private async findTaskForKeyword(
+    keywordElement: HTMLElement,
+    sourcePath: string,
+  ): Promise<Task | null> {
+    // Get the file
+    const file = this.plugin.app.vault.getAbstractFileByPath(sourcePath);
+    if (!(file instanceof TFile)) {
+      return null;
+    }
+
+    // Get the task parser
+    const taskParser = this.getTaskParser();
+    if (!taskParser) {
+      return null;
+    }
+
+    // Read the file content
+    const content = await this.plugin.app.vault.read(file);
+    const lines = content.split('\n');
+
+    // Parse all tasks in the file
+    const allTasks = taskParser.parseFile(content, file.path, file);
+
+    // Find the task list item or paragraph containing this keyword
+    const taskContainer = keywordElement.closest(
+      '.task-list-item, .todoseq-task, p, li',
+    );
+    if (!taskContainer) {
+      return null;
+    }
+
+    // Get the text content of the task container
+    const taskText = taskContainer.textContent || '';
+
+    // Normalize the task text by removing leading/trailing whitespace
+    const normalizedTaskText = taskText.trim().replace(/\s+/g, ' ');
+
+    // Find the line that matches this task
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (taskParser.testRegex.test(line)) {
+        // Normalize the line for comparison
+        const normalizedLine = line
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/\s*\^[a-zA-Z0-9-]+$/, '');
+
+        // Check if the line ends with the task text
+        if (normalizedLine.endsWith(normalizedTaskText)) {
+          const matchingTask = allTasks.find((t) => t.line === i);
+          if (matchingTask) {
+            return matchingTask;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Clean up any resources
    */
   cleanup(): void {
-    // Any cleanup needed for the reader view formatting
+    // Clear any pending timeouts
+    if (this.pendingClickTimeout) {
+      clearTimeout(this.pendingClickTimeout);
+      this.pendingClickTimeout = null;
+    }
   }
 }
