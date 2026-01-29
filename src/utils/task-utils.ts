@@ -1,10 +1,64 @@
-import { Task } from '../task';
+import {
+  Task,
+  DEFAULT_COMPLETED_STATES,
+  DEFAULT_PENDING_STATES,
+  DEFAULT_ACTIVE_STATES,
+} from '../task';
 
 /**
  * Priority token regex pattern for extracting priority from task text
  * Matches patterns like: [#A], [#B], [#C]
  */
 export const PRIORITY_TOKEN_REGEX = /(\s*)\[#([ABC])\](\s*)/;
+
+/**
+ * Result of building the task keyword list
+ */
+export interface TaskKeywordResult {
+  /** All unique keywords (pending + active + completed + additional) */
+  allKeywords: string[];
+  /** Non-completed keywords (pending + active + additional) */
+  nonCompletedKeywords: string[];
+  /** Normalized additional keywords from settings */
+  normalizedAdditional: string[];
+}
+
+/**
+ * Build the complete list of task keywords from settings
+ * Combines default pending/active/completed states with user-defined additional keywords
+ * @param additionalTaskKeywords Array of additional keywords from settings
+ * @returns TaskKeywordResult containing all keyword arrays
+ */
+export function buildTaskKeywords(
+  additionalTaskKeywords: unknown[],
+): TaskKeywordResult {
+  // Normalize additional keywords: ensure strings, trim, filter empties
+  const normalizedAdditional: string[] = Array.isArray(additionalTaskKeywords)
+    ? (additionalTaskKeywords as string[])
+        .filter((k): k is string => typeof k === 'string')
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0)
+    : [];
+
+  // Build non-completed keywords (pending + active + additional)
+  const nonCompletedKeywords: string[] = [
+    ...Array.from(DEFAULT_PENDING_STATES),
+    ...Array.from(DEFAULT_ACTIVE_STATES),
+    ...normalizedAdditional,
+  ];
+
+  // Build all keywords (non-completed + completed)
+  const allKeywords: string[] = [
+    ...nonCompletedKeywords,
+    ...Array.from(DEFAULT_COMPLETED_STATES),
+  ];
+
+  return {
+    allKeywords: Array.from(new Set(allKeywords)),
+    nonCompletedKeywords: Array.from(new Set(nonCompletedKeywords)),
+    normalizedAdditional,
+  };
+}
 
 /**
  * Checkbox regex pattern for detecting markdown checkbox tasks

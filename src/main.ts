@@ -9,6 +9,7 @@ import { VaultScanner } from './services/vault-scanner';
 import { StatusBarManager } from './view/status-bar';
 import { TaskManager } from './task-manager';
 import { UIManager } from './ui-manager';
+import { ReaderViewFormatter } from './view/reader-formatting';
 import { PluginLifecycleManager } from './plugin-lifecycle';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 
@@ -29,6 +30,7 @@ export default class TodoTracker extends Plugin {
   public editorKeywordMenu: EditorKeywordMenu | null = null;
   public taskFormatters: Map<string, unknown> = new Map();
   public statusBarManager: StatusBarManager | null = null;
+  public readerViewFormatter: ReaderViewFormatter | null = null;
 
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
@@ -46,7 +48,7 @@ export default class TodoTracker extends Plugin {
     this.uiManager = new UIManager(this);
     this.lifecycleManager = new PluginLifecycleManager(this);
 
-    // Delegate to lifecycle manager
+    // Delegate to lifecycle manager (which initializes vaultScanner and readerViewFormatter)
     await this.lifecycleManager.onload();
   }
 
@@ -106,6 +108,14 @@ export default class TodoTracker extends Plugin {
     }
   }
 
+  // Public method to update reader view formatter with current settings
+  // Note: The parser is now shared via VaultScanner, so this method
+  // is kept for API compatibility but doesn't need to recreate the parser
+  public refreshReaderViewFormatter(): void {
+    // Parser is managed by VaultScanner - no action needed here
+    // The reader view formatter uses the shared parser from vaultScanner
+  }
+
   // Public method to trigger a vault scan using VaultScanner
   public async scanVault(): Promise<void> {
     if (this.vaultScanner) {
@@ -116,6 +126,13 @@ export default class TodoTracker extends Plugin {
   // Obsidian lifecycle method called to save settings
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  // Test method to manually update reader view formatter
+  // Note: The parser is now shared via VaultScanner, so this method
+  // is kept for API compatibility but doesn't need to recreate the parser
+  public testUpdateReaderViewFormatter(): void {
+    // Parser is managed by VaultScanner - no action needed here
   }
 
   // Update task formatting in all views

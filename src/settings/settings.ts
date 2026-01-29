@@ -150,6 +150,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               await this.refreshAllTaskListViews();
               // Force refresh of visible editor decorations to apply new keywords
               this.plugin.refreshVisibleEditorDecorations();
+              this.plugin.refreshReaderViewFormatter();
             } catch (parseError) {
               console.error(
                 'Failed to recreate parser with valid keywords:',
@@ -166,6 +167,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new keywords
             this.plugin.refreshVisibleEditorDecorations();
+            this.plugin.refreshReaderViewFormatter();
           }
         });
       });
@@ -281,6 +283,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new CSS classes
             this.plugin.refreshVisibleEditorDecorations();
+            // Force refresh of reader view to apply new formatting
+            this.plugin.refreshReaderViewFormatter();
           }),
       );
 
