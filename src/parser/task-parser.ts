@@ -1,9 +1,4 @@
-import {
-  Task,
-  DEFAULT_COMPLETED_STATES,
-  DEFAULT_PENDING_STATES,
-  DEFAULT_ACTIVE_STATES,
-} from '../task';
+import { Task, DEFAULT_COMPLETED_STATES } from '../task';
 import { TodoTrackerSettings } from '../settings/settings';
 import {
   LanguageRegistry,
@@ -11,7 +6,11 @@ import {
   LanguageCommentSupportSettings,
 } from './language-registry';
 import { DateParser } from './date-parser';
-import { extractPriority, CHECKBOX_REGEX } from '../utils/task-utils';
+import {
+  extractPriority,
+  CHECKBOX_REGEX,
+  buildTaskKeywords,
+} from '../utils/task-utils';
 import { TFile, App } from 'obsidian';
 import {
   calculateTaskUrgency,
@@ -114,35 +113,17 @@ export class TaskParser {
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
   ): TaskParser {
-    // Build union of non-completed states (defaults + user additional) and completed states (defaults only)
-    const additional: string[] = Array.isArray(settings.additionalTaskKeywords)
-      ? (settings.additionalTaskKeywords as string[])
-      : [];
-
-    // Ensure values are strings and already capitalised by settings UI; filter out empties defensively
-    const normalizedAdditional: string[] = additional
-      .filter((k): k is string => typeof k === 'string')
-      .map((k) => k.trim())
-      .filter((k) => k.length > 0);
+    // Build keyword lists using shared utility
+    const { allKeywords, normalizedAdditional } = buildTaskKeywords(
+      settings.additionalTaskKeywords,
+    );
 
     // Validate user-provided keywords to prevent regex injection vulnerabilities
     if (normalizedAdditional.length > 0) {
       TaskParser.validateKeywords(normalizedAdditional);
     }
 
-    const nonCompletedArray: string[] = [
-      ...Array.from(DEFAULT_PENDING_STATES),
-      ...Array.from(DEFAULT_ACTIVE_STATES),
-      ...normalizedAdditional,
-    ];
-    const nonCompleted = new Set<string>(nonCompletedArray);
-
-    const allKeywordsArray: string[] = [
-      ...Array.from(nonCompleted),
-      ...Array.from(DEFAULT_COMPLETED_STATES),
-    ];
-
-    const regex = TaskParser.buildRegex(allKeywordsArray);
+    const regex = TaskParser.buildRegex(allKeywords);
     return new TaskParser(
       regex,
       settings.includeCalloutBlocks,
@@ -150,7 +131,7 @@ export class TaskParser {
       settings.includeCommentBlocks,
       settings.languageCommentSupport,
       normalizedAdditional,
-      allKeywordsArray,
+      allKeywords,
       app || null,
       urgencyCoefficients,
     );

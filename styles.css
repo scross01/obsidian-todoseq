@@ -333,16 +333,41 @@
     color-mix(in srgb, var(--interactive-accent) 50%, transparent);
 }
 
-/* Task text strikethrough for completed tasks */
-.cm-editor .todoseq-completed-task-text {
+/* Reader view specific styling for scheduled and deadline lines */
+.markdown-preview-view .todoseq-scheduled-line,
+.markdown-preview-view .todoseq-deadline-line {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  display: inline-block; /* Ensure it doesn't affect the entire paragraph */
+}
+
+.markdown-preview-view .todoseq-scheduled-keyword,
+.markdown-preview-view .todoseq-deadline-keyword {
+  font-weight: var(--font-weight-normal, var(--font-normal, 400));
+}
+
+/* Ensure paragraphs containing date lines don't inherit date styling */
+.markdown-preview-view
+  p:not(.todoseq-scheduled-line):not(.todoseq-deadline-line) {
+  font-size: var(--font-text-size);
+  color: var(--text-normal);
+}
+
+/* Completed task styling - consolidated using :is() selector */
+/* Applies to both reader view and editor, for both container and text classes */
+:is(.markdown-preview-view, .cm-editor)
+  :is(.todoseq-completed-task-container, .todoseq-completed-task-text) {
   text-decoration: line-through;
   text-decoration-color: var(--text-muted);
 }
 
-/* Completed task styling for editor view (DONE, CANCELLED, CANCELED) */
-.cm-editor [data-task-keyword='DONE'],
-.cm-editor [data-task-keyword='CANCELLED'],
-.cm-editor [data-task-keyword='CANCELED'] {
+/* Completed task styling for DONE, CANCELLED, CANCELED keywords */
+:is(.markdown-preview-view, .cm-editor)
+  :is(
+    [data-task-keyword='DONE'],
+    [data-task-keyword='CANCELLED'],
+    [data-task-keyword='CANCELED']
+  ) {
   text-decoration: line-through;
   text-decoration-color: var(--text-muted);
 }

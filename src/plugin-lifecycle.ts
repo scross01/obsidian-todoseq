@@ -9,6 +9,7 @@ import { TaskParser } from './parser/task-parser';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, TFile, Platform } from 'obsidian';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
+import { ReaderViewFormatter } from './view/reader-formatting';
 
 export class PluginLifecycleManager {
   constructor(private plugin: TodoTracker) {}
@@ -36,6 +37,14 @@ export class PluginLifecycleManager {
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
     this.plugin.statusBarManager = new StatusBarManager(this.plugin);
     this.plugin.statusBarManager.setupStatusBarItem();
+
+    // Initialize reader view formatter with vaultScanner
+    // Note: ReaderViewFormatter now uses the shared parser from VaultScanner
+    this.plugin.readerViewFormatter = new ReaderViewFormatter(
+      this.plugin,
+      this.plugin.vaultScanner,
+    );
+    this.plugin.readerViewFormatter.registerPostProcessor();
 
     // Register the custom view type
     this.plugin.registerView(
@@ -299,6 +308,12 @@ export class PluginLifecycleManager {
     if (this.plugin.statusBarManager) {
       this.plugin.statusBarManager.cleanup();
       this.plugin.statusBarManager = null;
+    }
+
+    // Clean up reader view formatter
+    if (this.plugin.readerViewFormatter) {
+      this.plugin.readerViewFormatter.cleanup();
+      this.plugin.readerViewFormatter = null;
     }
 
     // Clear any remaining references
