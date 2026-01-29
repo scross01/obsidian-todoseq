@@ -1,5 +1,4 @@
 import { Search } from '../../search/search';
-import { TodoTrackerSettings } from '../../settings/settings';
 
 /**
  * Parsed parameters from a todoseq code block
@@ -12,7 +11,7 @@ export interface TodoseqParameters {
 
 /**
  * Parses the content of a todoseq code block to extract search and sort parameters.
- * 
+ *
  * Example code block:
  * ```
  * todoseq
@@ -35,7 +34,7 @@ export class TodoseqCodeBlockParser {
       // Parse each line for parameters
       for (const line of lines) {
         const trimmed = line.trim();
-        
+
         if (trimmed.startsWith('search:')) {
           searchQuery = trimmed.substring('search:'.length).trim();
         } else if (trimmed.startsWith('sort:')) {
@@ -46,7 +45,9 @@ export class TodoseqCodeBlockParser {
       // Validate sort method
       const validSortMethods = ['default', 'Priority', 'Due', 'Urgency'];
       if (!validSortMethods.includes(sortMethod)) {
-        throw new Error(`Invalid sort method: ${sortMethod}. Valid options: ${validSortMethods.join(', ')}`);
+        throw new Error(
+          `Invalid sort method: ${sortMethod}. Valid options: ${validSortMethods.join(', ')}`,
+        );
       }
 
       // Validate search query syntax
@@ -59,12 +60,13 @@ export class TodoseqCodeBlockParser {
       }
 
       return { searchQuery, sortMethod };
-
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       return {
         searchQuery: '',
         sortMethod: 'default',
-        error: error.message
+        error: errorMessage,
       };
     }
   }
@@ -75,7 +77,10 @@ export class TodoseqCodeBlockParser {
    * @param changedFilePath The path of the file that changed
    * @returns True if the code block might display tasks from the changed file
    */
-  static mightAffectCodeBlock(source: string, changedFilePath: string): boolean {
+  static mightAffectCodeBlock(
+    source: string,
+    changedFilePath: string,
+  ): boolean {
     // If no search query, it might show all tasks including from this file
     if (!source.includes('search:')) {
       return true;
@@ -90,7 +95,7 @@ export class TodoseqCodeBlockParser {
     // Check if search query contains file path references
     const searchQuery = params.searchQuery.toLowerCase();
     const filePath = changedFilePath.toLowerCase();
-    
+
     // Check for file: filter
     if (searchQuery.includes('file:')) {
       return searchQuery.includes(filePath);
@@ -113,10 +118,10 @@ export class TodoseqCodeBlockParser {
   static getSortMethod(params: TodoseqParameters): string {
     // Map user-friendly sort names to internal sort methods
     const sortMap: Record<string, string> = {
-      'default': 'default',
-      'Priority': 'sortByPriority',
-      'Due': 'sortByDeadline',
-      'Urgency': 'sortByUrgency'
+      default: 'default',
+      Priority: 'sortByPriority',
+      Due: 'sortByDeadline',
+      Urgency: 'sortByUrgency',
     };
 
     return sortMap[params.sortMethod] || 'default';

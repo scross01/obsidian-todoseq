@@ -1,7 +1,10 @@
 import { Task } from '../../task';
 import { Search } from '../../search/search';
 import { TodoTrackerSettings } from '../../settings/settings';
-import { sortTasksWithThreeBlockSystem, SortMethod as TaskSortMethod } from '../../utils/task-sort';
+import {
+  sortTasksWithThreeBlockSystem,
+  SortMethod as TaskSortMethod,
+} from '../../utils/task-sort';
 import { TodoseqParameters } from './code-block-parser';
 
 /**
@@ -10,7 +13,8 @@ import { TodoseqParameters } from './code-block-parser';
  */
 export class EmbeddedTaskListManager {
   private settings: TodoTrackerSettings;
-  private taskCache: Map<string, { tasks: Task[], timestamp: number }> = new Map();
+  private taskCache: Map<string, { tasks: Task[]; timestamp: number }> =
+    new Map();
   private cacheTTL = 5000; // 5 seconds cache TTL
 
   constructor(settings: TodoTrackerSettings) {
@@ -26,7 +30,7 @@ export class EmbeddedTaskListManager {
   filterAndSortTasks(tasks: Task[], params: TodoseqParameters): Task[] {
     // Generate cache key
     const cacheKey = this.generateCacheKey(tasks, params);
-    
+
     // Check cache
     const cached = this.taskCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
@@ -36,7 +40,7 @@ export class EmbeddedTaskListManager {
     try {
       // Filter tasks based on search query
       let filteredTasks = tasks;
-      
+
       if (params.searchQuery) {
         filteredTasks = this.filterTasks(tasks, params.searchQuery);
       }
@@ -47,11 +51,10 @@ export class EmbeddedTaskListManager {
       // Cache the result
       this.taskCache.set(cacheKey, {
         tasks: sortedTasks,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       return sortedTasks;
-
     } catch (error) {
       console.error('Error filtering/sorting tasks:', error);
       // Return unfiltered tasks as fallback
@@ -68,8 +71,8 @@ export class EmbeddedTaskListManager {
   private filterTasks(tasks: Task[], searchQuery: string): Task[] {
     try {
       // Use the existing Search class for consistent filtering
-      return tasks.filter(task => 
-        Search.evaluate(searchQuery, task, false, this.settings)
+      return tasks.filter((task) =>
+        Search.evaluate(searchQuery, task, false, this.settings),
       );
     } catch (error) {
       console.error('Error evaluating search query:', error);
@@ -97,7 +100,7 @@ export class EmbeddedTaskListManager {
         now,
         futureSetting,
         completedSetting,
-        sortMethod
+        sortMethod,
       );
     } catch (error) {
       console.error('Error sorting tasks:', error);
@@ -113,10 +116,10 @@ export class EmbeddedTaskListManager {
    */
   private getSortMethod(params: TodoseqParameters): TaskSortMethod {
     const sortMap: Record<string, TaskSortMethod> = {
-      'default': 'default',
-      'Priority': 'sortByPriority',
-      'Due': 'sortByDeadline',
-      'Urgency': 'sortByUrgency'
+      default: 'default',
+      Priority: 'sortByPriority',
+      Due: 'sortByDeadline',
+      Urgency: 'sortByUrgency',
     };
 
     return sortMap[params.sortMethod] || 'default';
@@ -132,9 +135,11 @@ export class EmbeddedTaskListManager {
     // Use task count and parameters for cache key
     // This is a simple approach - could be enhanced with task hashes
     const taskCount = tasks.length;
-    const searchHash = params.searchQuery ? this.hashString(params.searchQuery) : 'none';
+    const searchHash = params.searchQuery
+      ? this.hashString(params.searchQuery)
+      : 'none';
     const sortHash = params.sortMethod;
-    
+
     return `${taskCount}-${searchHash}-${sortHash}`;
   }
 
@@ -147,7 +152,7 @@ export class EmbeddedTaskListManager {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return hash.toString(36);

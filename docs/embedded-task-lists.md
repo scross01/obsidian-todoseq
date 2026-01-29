@@ -90,6 +90,7 @@ This will open the file and scroll to the task's line.
 ### Refresh List
 
 The list automatically refreshes when:
+
 - Tasks are modified in the vault
 - Files are created, deleted, or renamed
 - Settings are changed
@@ -148,6 +149,7 @@ The error message will indicate what went wrong and suggest how to fix it.
 ## Performance
 
 Embedded task lists are optimized for performance:
+
 - **Debounced updates**: Rapid file changes are batched to prevent excessive refreshes
 - **Caching**: Search results are cached for 5 seconds to reduce computation
 - **Targeted refresh**: Only affected code blocks are refreshed when tasks change
@@ -155,6 +157,7 @@ Embedded task lists are optimized for performance:
 ## Independence
 
 Embedded task lists are independent from the main task list view:
+
 - Changes in embedded lists don't affect the main task list view
 - Changes in the main task list view don't affect embedded lists
 - Each embedded list maintains its own state and refreshes independently
@@ -216,6 +219,7 @@ The plugin registers a markdown code block processor for the `todoseq` language.
 ### Event Handling
 
 The plugin monitors vault events to keep embedded task lists up-to-date:
+
 - **File modification**: Triggers refresh of affected code blocks
 - **File creation**: Triggers refresh of all code blocks
 - **File deletion**: Triggers refresh of all code blocks
@@ -224,6 +228,7 @@ The plugin monitors vault events to keep embedded task lists up-to-date:
 ### State Management
 
 Each embedded task list maintains its own state:
+
 - **Task cache**: Filtered and sorted tasks are cached for 5 seconds
 - **Event listeners**: DOM event listeners are attached to each task item
 - **Cleanup**: Event listeners are properly cleaned up when the code block is destroyed
@@ -237,6 +242,7 @@ Each embedded task list maintains its own state:
 ## Future Enhancements
 
 Potential future enhancements:
+
 - Sorting options dropdown in reading view
 - Task editing capabilities
 - Custom styling options
