@@ -7,3 +7,8 @@ $$
 TODO this is a task in a math block to be ignored
 $$
 
+---
+
+```todoseq
+search: file:"Test Math blocks"
+```

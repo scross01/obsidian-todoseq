@@ -5,7 +5,7 @@ import {
   sortTasksWithThreeBlockSystem,
   SortMethod as TaskSortMethod,
 } from '../../utils/task-sort';
-import { TodoseqParameters } from './code-block-parser';
+import { TodoseqParameters, TodoseqCodeBlockParser } from './code-block-parser';
 
 /**
  * Manages task filtering and sorting for embedded task lists.
@@ -46,7 +46,12 @@ export class EmbeddedTaskListManager {
       }
 
       // Sort tasks based on sort method
-      const sortedTasks = this.sortTasks(filteredTasks, params);
+      let sortedTasks = this.sortTasks(filteredTasks, params);
+
+      // Apply limit if specified
+      if (params.limit && params.limit > 0) {
+        sortedTasks = sortedTasks.slice(0, params.limit);
+      }
 
       // Cache the result
       this.taskCache.set(cacheKey, {
@@ -59,6 +64,31 @@ export class EmbeddedTaskListManager {
       console.error('Error filtering/sorting tasks:', error);
       // Return unfiltered tasks as fallback
       return tasks;
+    }
+  }
+
+  /**
+   * Get the total number of tasks that match the search query (before applying limit)
+   * @param tasks All tasks from the vault
+   * @param params Parsed code block parameters
+   * @returns Total number of matching tasks
+   */
+  getTotalTasksCount(tasks: Task[], params: TodoseqParameters): number {
+    try {
+      // Filter tasks based on search query
+      let filteredTasks = tasks;
+
+      if (params.searchQuery) {
+        filteredTasks = this.filterTasks(tasks, params.searchQuery);
+      }
+
+      // Sort tasks based on sort method (needed for consistent filtering)
+      const sortedTasks = this.sortTasks(filteredTasks, params);
+
+      return sortedTasks.length;
+    } catch (error) {
+      console.error('Error counting tasks:', error);
+      return tasks.length;
     }
   }
 
@@ -91,8 +121,17 @@ export class EmbeddedTaskListManager {
     try {
       const now = new Date();
       const sortMethod = this.getSortMethod(params);
-      const futureSetting = this.settings?.futureTaskSorting || 'showAll';
-      const completedSetting = 'showAll' as const; // Embedded lists show all tasks
+
+      // Use code block specific settings if provided, otherwise fall back to global settings
+      const futureSetting =
+        params.future !== undefined
+          ? TodoseqCodeBlockParser.getFutureSetting(params.future)
+          : this.settings?.futureTaskSorting || 'showAll';
+
+      const completedSetting =
+        params.completed !== undefined
+          ? TodoseqCodeBlockParser.getCompletedSetting(params.completed)
+          : 'showAll'; // Default embedded lists to show all unless overridden
 
       // Use the existing three-block sorting system
       return sortTasksWithThreeBlockSystem(
@@ -117,9 +156,11 @@ export class EmbeddedTaskListManager {
   private getSortMethod(params: TodoseqParameters): TaskSortMethod {
     const sortMap: Record<string, TaskSortMethod> = {
       default: 'default',
-      Priority: 'sortByPriority',
-      Due: 'sortByDeadline',
-      Urgency: 'sortByUrgency',
+      filepath: 'default',
+      scheduled: 'sortByScheduled',
+      deadline: 'sortByDeadline',
+      priority: 'sortByPriority',
+      urgency: 'sortByUrgency',
     };
 
     return sortMap[params.sortMethod] || 'default';
@@ -139,8 +180,11 @@ export class EmbeddedTaskListManager {
       ? this.hashString(params.searchQuery)
       : 'none';
     const sortHash = params.sortMethod;
+    const completedHash = params.completed || 'default';
+    const futureHash = params.future || 'default';
+    const limitHash = params.limit || 'none';
 
-    return `${taskCount}-${searchHash}-${sortHash}`;
+    return `${taskCount}-${searchHash}-${sortHash}-${completedHash}-${futureHash}-${limitHash}`;
   }
 
   /**

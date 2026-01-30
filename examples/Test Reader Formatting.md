@@ -89,3 +89,9 @@ Dates without associated tasks should not be styled.
 
 SCHEDULED: <2023-01-01>
 DEADLINE: <2023-12-31>
+
+---
+
+```todoseq
+search: file:"Test Reader Formatting"
+```

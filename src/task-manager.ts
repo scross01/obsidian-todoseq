@@ -50,7 +50,7 @@ export class TaskManager {
    * Refresh the task list view immediately
    */
   private refreshTaskListView(): void {
-    this.plugin.uiManager.refreshOpenTaskListViews();
+    this.plugin.refreshAllTaskListViews();
   }
 
   /**

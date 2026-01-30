@@ -8,6 +8,11 @@ TODO this is a task that has a footnote reference[^2]
 [^2]: this is the second footnote
 
 
+---
+
+```todoseq
+search: file:"Test Footnotes"
+```
 
 
 

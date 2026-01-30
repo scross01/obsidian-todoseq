@@ -12,3 +12,9 @@ TODO [#A] This is a high priority task
 LATER This is a different state keyword
 
 CANCELLED This is a cancelled task
+
+---
+
+```todoseq
+search: file:"TODOseq for Obsidian"
+```

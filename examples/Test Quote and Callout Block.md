@@ -31,3 +31,8 @@ Highlighting of tasks in the Obsidian formatted callout block style is currently
 >[!todo]- TODO 17 task in an expandable todo block title  
 > - [ ] TODO 18 task in an expandable todo block  
 
+---
+
+```todoseq
+search: file:"Test Quote and Callout Block"
+```

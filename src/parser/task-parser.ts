@@ -373,6 +373,7 @@ export class TaskParser {
   private extractPriority(taskText: string): {
     priority: 'high' | 'med' | 'low' | null;
     cleanedText: string;
+    embedReference?: string;
   } {
     return extractPriority(taskText);
   }
@@ -865,7 +866,7 @@ export class TaskParser {
       line,
       footnoteRegex.capture,
     );
-    const { priority, cleanedText } = this.extractPriority(
+    const { priority, cleanedText, embedReference } = this.extractPriority(
       taskDetails.taskText,
     );
 
@@ -906,6 +907,7 @@ export class TaskParser {
       file: taskFile,
       isDailyNote,
       dailyNoteDate,
+      embedReference,
     };
 
     // Extract dates from following lines
@@ -952,7 +954,7 @@ export class TaskParser {
     }
 
     const taskDetails = this.extractTaskDetails(content, this.captureRegex);
-    const { priority, cleanedText } = this.extractPriority(
+    const { priority, cleanedText, embedReference } = this.extractPriority(
       taskDetails.taskText,
     );
     const {
@@ -1002,6 +1004,7 @@ export class TaskParser {
       file: taskFile,
       isDailyNote,
       dailyNoteDate,
+      embedReference,
     };
 
     // Extract dates from following lines
@@ -1060,8 +1063,8 @@ export class TaskParser {
     lines: string[],
     file?: TFile,
   ): Task {
-    // Extract priority
-    const { priority, cleanedText } = this.extractPriority(
+    // Extract priority and embed reference
+    const { priority, cleanedText, embedReference } = this.extractPriority(
       taskDetails.taskText,
     );
 
@@ -1114,6 +1117,7 @@ export class TaskParser {
       tags,
       isDailyNote,
       dailyNoteDate,
+      embedReference,
     };
 
     // Extract dates from following lines

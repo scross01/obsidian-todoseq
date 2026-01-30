@@ -31,3 +31,9 @@ b. TODO task in lettered bullet b
 
 A) TODO task in lettered bullet A
 B) TODO task in lettered bullet B
+
+---
+
+```todoseq
+search: file:"Test Indents"
+```

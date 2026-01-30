@@ -24,3 +24,9 @@ Embed references can also be from other pages, e.g.
 >[!info]
 >Only the original task declaration location is collected by TODOseq
 >
+
+---
+
+```todoseq
+search: file:"Test Embeds"
+```

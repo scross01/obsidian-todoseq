@@ -8,3 +8,9 @@ TODO task in comment block
 %%
 
 This is some other text proceeding an inline comment %% TODO embedded task in inline comment %% - *not currently supported*
+
+---
+
+```todoseq
+search: file:"Comments"
+```
