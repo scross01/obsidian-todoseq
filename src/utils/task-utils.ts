@@ -75,23 +75,32 @@ export const CHECKBOX_REGEX =
 export function extractPriority(taskText: string): {
   priority: 'high' | 'med' | 'low' | null;
   cleanedText: string;
+  embedReference?: string;
 } {
   let priority: 'high' | 'med' | 'low' | null = null;
   let cleanedText = taskText;
+  let embedReference: string | undefined;
 
-  const priMatch = PRIORITY_TOKEN_REGEX.exec(taskText);
+  // Extract Obsidian embed references like ^abc123
+  const embedMatch = taskText.match(/(\s*\^[^\s]+)$/);
+  if (embedMatch) {
+    embedReference = embedMatch[1].trim();
+    cleanedText = taskText.slice(0, embedMatch.index).trim();
+  }
+
+  const priMatch = PRIORITY_TOKEN_REGEX.exec(cleanedText);
   if (priMatch) {
     const letter = priMatch[2];
     if (letter === 'A') priority = 'high';
     else if (letter === 'B') priority = 'med';
     else if (letter === 'C') priority = 'low';
 
-    const before = taskText.slice(0, priMatch.index);
-    const after = taskText.slice(priMatch.index + priMatch[0].length);
+    const before = cleanedText.slice(0, priMatch.index);
+    const after = cleanedText.slice(priMatch.index + priMatch[0].length);
     cleanedText = (before + ' ' + after).replace(/[ \t]+/g, ' ').trimStart();
   }
 
-  return { priority, cleanedText };
+  return { priority, cleanedText, embedReference };
 }
 
 /**

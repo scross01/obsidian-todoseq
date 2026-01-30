@@ -52,3 +52,9 @@ SCHEDULED: <2027-01-01>
 TODO test date in comment block
 SCHEDULED: <2027-01-01>
 %%
+
+---
+
+```todoseq
+search: file:"Test Dates"
+```

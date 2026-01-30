@@ -1,11 +1,38 @@
 import { Search } from '../../search/search';
 
 /**
+ * Valid sort options for embedded task lists
+ */
+export type SortOption =
+  | 'filepath'
+  | 'scheduled'
+  | 'deadline'
+  | 'priority'
+  | 'urgency';
+
+/**
+ * Valid completed task display options
+ */
+export type CompletedOption = 'show' | 'hide' | 'sort-to-end';
+
+/**
+ * Valid future task display options
+ */
+export type FutureOption =
+  | 'show-all'
+  | 'show-upcoming'
+  | 'hide'
+  | 'sort-to-end';
+
+/**
  * Parsed parameters from a todoseq code block
  */
 export interface TodoseqParameters {
   searchQuery: string;
-  sortMethod: string;
+  sortMethod: SortOption | 'default';
+  completed?: CompletedOption;
+  future?: FutureOption;
+  limit?: number;
   error?: string;
 }
 
@@ -16,7 +43,10 @@ export interface TodoseqParameters {
  * ```
  * todoseq
  * search: tag:project1 AND content:"example"
- * sort: Priority
+ * sort: priority
+ * completed: hide
+ * future: show-all
+ * limit: 10
  * ```
  */
 export class TodoseqCodeBlockParser {
@@ -29,7 +59,10 @@ export class TodoseqCodeBlockParser {
     try {
       const lines = source.split('\n');
       let searchQuery = '';
-      let sortMethod = 'default';
+      let sortMethod: SortOption | 'default' = 'default';
+      let completed: CompletedOption | undefined;
+      let future: FutureOption | undefined;
+      let limit: number | undefined;
 
       // Parse each line for parameters
       for (const line of lines) {
@@ -38,16 +71,76 @@ export class TodoseqCodeBlockParser {
         if (trimmed.startsWith('search:')) {
           searchQuery = trimmed.substring('search:'.length).trim();
         } else if (trimmed.startsWith('sort:')) {
-          sortMethod = trimmed.substring('sort:'.length).trim();
+          const sortValue = trimmed
+            .substring('sort:'.length)
+            .trim()
+            .toLowerCase();
+          // Map old sort values to new ones for backward compatibility
+          const sortMap: Record<string, SortOption | 'default'> = {
+            default: 'default',
+            priority: 'priority',
+            due: 'deadline',
+            deadline: 'deadline',
+            urgency: 'urgency',
+            urgent: 'urgency',
+            scheduled: 'scheduled',
+            filepath: 'filepath',
+            file: 'filepath',
+            path: 'filepath',
+          };
+          const mappedSort = sortMap[sortValue];
+          if (mappedSort) {
+            sortMethod = mappedSort;
+          } else {
+            throw new Error(
+              `Invalid sort method: ${sortValue}. Valid options: filepath, scheduled, deadline, priority, urgency`,
+            );
+          }
+        } else if (trimmed.startsWith('completed:')) {
+          const completedValue = trimmed
+            .substring('completed:'.length)
+            .trim()
+            .toLowerCase();
+          const validCompleted: CompletedOption[] = [
+            'show',
+            'hide',
+            'sort-to-end',
+          ];
+          if (validCompleted.includes(completedValue as CompletedOption)) {
+            completed = completedValue as CompletedOption;
+          } else {
+            throw new Error(
+              `Invalid completed option: ${completedValue}. Valid options: show, hide, sort-to-end`,
+            );
+          }
+        } else if (trimmed.startsWith('future:')) {
+          const futureValue = trimmed
+            .substring('future:'.length)
+            .trim()
+            .toLowerCase();
+          const validFuture: FutureOption[] = [
+            'show-all',
+            'show-upcoming',
+            'hide',
+            'sort-to-end',
+          ];
+          if (validFuture.includes(futureValue as FutureOption)) {
+            future = futureValue as FutureOption;
+          } else {
+            throw new Error(
+              `Invalid future option: ${futureValue}. Valid options: show-all, show-upcoming, hide, sort-to-end`,
+            );
+          }
+        } else if (trimmed.startsWith('limit:')) {
+          const limitValue = trimmed.substring('limit:'.length).trim();
+          const parsedLimit = parseInt(limitValue, 10);
+          if (isNaN(parsedLimit) || parsedLimit < 1) {
+            throw new Error(
+              `Invalid limit value: ${limitValue}. Must be a positive number.`,
+            );
+          }
+          limit = parsedLimit;
         }
-      }
-
-      // Validate sort method
-      const validSortMethods = ['default', 'Priority', 'Due', 'Urgency'];
-      if (!validSortMethods.includes(sortMethod)) {
-        throw new Error(
-          `Invalid sort method: ${sortMethod}. Valid options: ${validSortMethods.join(', ')}`,
-        );
       }
 
       // Validate search query syntax
@@ -59,7 +152,7 @@ export class TodoseqCodeBlockParser {
         }
       }
 
-      return { searchQuery, sortMethod };
+      return { searchQuery, sortMethod, completed, future, limit };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -119,11 +212,55 @@ export class TodoseqCodeBlockParser {
     // Map user-friendly sort names to internal sort methods
     const sortMap: Record<string, string> = {
       default: 'default',
-      Priority: 'sortByPriority',
-      Due: 'sortByDeadline',
-      Urgency: 'sortByUrgency',
+      filepath: 'default',
+      scheduled: 'sortByScheduled',
+      deadline: 'sortByDeadline',
+      priority: 'sortByPriority',
+      urgency: 'sortByUrgency',
     };
 
     return sortMap[params.sortMethod] || 'default';
+  }
+
+  /**
+   * Map completed option to internal completed task setting
+   * @param completed The completed option from code block
+   * @returns Internal completed task setting value
+   */
+  static getCompletedSetting(
+    completed: CompletedOption | undefined,
+  ): 'showAll' | 'sortToEnd' | 'hide' {
+    if (!completed) {
+      return 'showAll'; // Default to showing all
+    }
+    const map: Record<CompletedOption, 'showAll' | 'sortToEnd' | 'hide'> = {
+      show: 'showAll',
+      'sort-to-end': 'sortToEnd',
+      hide: 'hide',
+    };
+    return map[completed];
+  }
+
+  /**
+   * Map future option to internal future task setting
+   * @param future The future option from code block
+   * @returns Internal future task setting value
+   */
+  static getFutureSetting(
+    future: FutureOption | undefined,
+  ): 'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture' {
+    if (!future) {
+      return 'showAll'; // Default to showing all
+    }
+    const map: Record<
+      FutureOption,
+      'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture'
+    > = {
+      'show-all': 'showAll',
+      'show-upcoming': 'showUpcoming',
+      hide: 'hideFuture',
+      'sort-to-end': 'sortToEnd',
+    };
+    return map[future];
   }
 }

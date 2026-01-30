@@ -18,6 +18,7 @@ export interface Task {
   tags?: string[]; // array of tags extracted from task text
   isDailyNote: boolean; // true if the task is on a daily note page
   dailyNoteDate: Date | null; // the date of the daily note if it's a daily note
+  embedReference?: string; // Obsidian embed reference like ^abc123
 }
 
 export const DEFAULT_PENDING_STATES = new Set<string>([

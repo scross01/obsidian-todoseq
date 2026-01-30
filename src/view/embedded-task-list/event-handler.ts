@@ -227,7 +227,7 @@ export class EmbeddedTaskListEventHandler {
   /**
    * Refresh all code blocks
    */
-  private refreshAllCodeBlocks(): void {
+  public refreshAllCodeBlocks(): void {
     this.activeCodeBlocks.forEach((_, containerId) => {
       this.refreshCodeBlock(containerId);
     });

@@ -6,10 +6,25 @@ To create an embedded task list, use a code block with the `todoseq` language:
 
 ```todoseq
 search: scheduled:due
-sort: Priority
+sort: priority
 ```
 
 ## Code Block Parameters
+
+- `search:` any valid search string.
+- `sort:` one of `filepath`, `scheduled`, `deadline`, `priority` or `urgency`.
+- `completed:` (optional) overrides "Completed tasks" setting. `show`, `hide`, `sort-to-end`.
+- `future:` (optional) overrides "Future dated tasks" setting. `show-all`, `show-upcoming`, `hide`, `sort-to-end`.
+- `limit:` (optional) set the display limit to result the number of results shown.
+
+
+```todoseq
+search: state:DOING
+sort: filepath
+completed: hide
+future: sort-to-end
+limit: 5
+```
 
 ### Search Query
 
@@ -19,28 +34,34 @@ The `search:` parameter accepts any valid TODOseq search query:
 search: content:"example"
 ```
 
-```todoseq
-search: state:DOING
-```
-
 ### Sort Method
 
 The `sort:` parameter accepts any valid TODOseq sort method:
 
+- `filepath` lists tasks in their natural order based on the file path and line number.
+- `scheduled` - sort by scheduled date
+- `deadline` - sort by deadline date
+- `priority` - sort by priority
+- `urgency` - sort by urgency (see [urgency](urgency.md))
+
 ```todoseq
 sort: Priority
+limit: 10
 ```
 
 ```todoseq
 sort: Urgency
+limit: 10
 ```
 
 ```todoseq
-sort: Due Date
+sort: scheduled
+limit: 5
 ```
 
 ```todoseq
-sort: File
+sort: filepath
+limit: 5
 ```
 
 ### Combined Parameters
@@ -54,7 +75,8 @@ sort: Priority
 
 ```todoseq
 search: state:TODO
-sort: Scheduled date
+sort: scheduled
+limit: 5
 ```
 
 ## Interactive Features
@@ -62,24 +84,11 @@ sort: Scheduled date
 ### Toggle Task State
 
 Click the checkbox next to a task to toggle its state between TODO and DONE:
-
-```todoseq
-search: content:Test
-sort: Priority
-```
-
 The task will be updated in the original file, and the embedded list will refresh automatically.
 
 ### Navigate to Task
 
-Click on the task text (excluding the checkbox) to navigate to the task's location in the original file:
-
-```todoseq
-search: tag:project1
-sort: Priority
-```
-
-This will open the file and scroll to the task's line.
+Click on the task text (excluding the checkbox) to navigate to the task's location in the original file. This will open the file and scroll to the task's line.
 
 ### Refresh List
 
@@ -88,151 +97,24 @@ The list automatically refreshes when:
 - Files are created, deleted, or renamed
 - Settings are changed
 
-You can also manually refresh by clicking the refresh button in the header.
-
-## Examples
-
-### Project Tasks
-
-Show all TODO tasks for a specific project:
-
-```todoseq
-search: tag:project1 AND state:TODO
-sort: Priority
-```
-
-### High Priority Tasks
-
-Show all high-priority tasks:
-
-```todoseq
-search: priority:high
-sort: Urgency
-```
-
-### Due Today
-
-Show tasks due today:
-
-```todoseq
-search: due:today
-sort: Due Date
-```
-
-### Custom Search
-
-Show tasks with specific content:
-
-```todoseq
-search: content:"review" AND state:TODO
-sort: File
-```
-
 ## Error Handling
 
 If there's an error parsing the search query or sort method, an error message will be displayed:
 
 ```todoseq
-search: invalid query syntax
-sort: Invalid Sort
-```
-
-The error message will indicate what went wrong and suggest how to fix it.
-
-## Performance
-
-Embedded task lists are optimized for performance:
-- **Debounced updates**: Rapid file changes are batched to prevent excessive refreshes
-- **Caching**: Search results are cached for 5 seconds to reduce computation
-- **Targeted refresh**: Only affected code blocks are refreshed when tasks change
-
-## Independence
-
-Embedded task lists are independent from the main task list view:
-- Changes in embedded lists don't affect the main task list view
-- Changes in the main task list view don't affect embedded lists
-- Each embedded list maintains its own state and refreshes independently
-
-## Best Practices
-
-### Use Descriptive Search Queries
-
-Be specific with your search queries to show relevant tasks:
-
-```todoseq
-search: tag:project1 AND state:TODO AND due:next-week
-sort: Priority
-```
-
-### Choose Appropriate Sort Methods
-
-Select sort methods that match your workflow:
-
-```todoseq
-search: tag:project1
-sort: Due Date
-```
-
-### Limit Results
-
-For large vaults, consider limiting results with specific search criteria:
-
-```todoseq
-search: tag:project1 AND state:TODO AND priority:high
-sort: Urgency
-```
-
-### Use Multiple Lists
-
-Create multiple embedded lists for different views of your tasks:
-
-```todoseq
-search: tag:project1 AND state:TODO
-sort: Priority
+sort: invalid
 ```
 
 ```todoseq
-search: tag:project1 AND state:DOING
-sort: Urgency
+future: invalid
 ```
 
 ```todoseq
-search: tag:project1 AND state:DONE
-sort: Due Date
+completed: invalid
 ```
 
-## Technical Details
+```todoseq
+limit: invalid
+```
 
-### Code Block Processing
-
-The plugin registers a markdown code block processor for the `todoseq` language. When Obsidian encounters a code block with this language, it renders the task list using the specified parameters.
-
-### Event Handling
-
-The plugin monitors vault events to keep embedded task lists up-to-date:
-- **File modification**: Triggers refresh of affected code blocks
-- **File creation**: Triggers refresh of all code blocks
-- **File deletion**: Triggers refresh of all code blocks
-- **File rename**: Triggers refresh of all code blocks
-
-### State Management
-
-Each embedded task list maintains its own state:
-- **Task cache**: Filtered and sorted tasks are cached for 5 seconds
-- **Event listeners**: DOM event listeners are attached to each task item
-- **Cleanup**: Event listeners are properly cleaned up when the code block is destroyed
-
-## Limitations
-
-- **Read-only in reading view**: Task interactions (checkboxes, navigation) only work in reading view
-- **No editing**: Tasks cannot be edited directly in the embedded list (only state changes)
-- **No sorting options UI**: Sort methods must be specified in the code block (no dropdown menu)
-
-## Future Enhancements
-
-Potential future enhancements:
-- Sorting options dropdown in reading view
-- Task editing capabilities
-- Custom styling options
-- Support for more complex search queries
-- Export functionality
+The error message indicate what went wrong and suggest how to fix it.

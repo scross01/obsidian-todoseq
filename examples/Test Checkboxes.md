@@ -39,7 +39,11 @@ Ensure FIXME and HACK are in the custom keyword settings.
 - [ ] regular checkbox without a task keyword
 - [x] completed checkbox without a task keyword
 
+---
 
+```todoseq
+search: file:"Test Checkboxes"
+```
 
 
 

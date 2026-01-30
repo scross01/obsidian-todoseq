@@ -68,8 +68,11 @@ export class TodoseqCodeBlockProcessor {
       // Filter and sort tasks based on parameters
       const filteredTasks = this.manager.filterAndSortTasks(allTasks, params);
 
+      // Get total number of tasks (before applying limit)
+      const totalTasksCount = this.manager.getTotalTasksCount(allTasks, params);
+
       // Render the task list
-      this.renderer.renderTaskList(el, filteredTasks, params);
+      this.renderer.renderTaskList(el, filteredTasks, params, totalTasksCount);
 
       // Track this code block for real-time updates
       const containerId = `todoseq-${Math.random().toString(36).slice(2, 8)}`;
@@ -87,6 +90,17 @@ export class TodoseqCodeBlockProcessor {
   updateSettings(): void {
     this.manager.updateSettings(this.plugin.settings);
     this.eventHandler.updateSettings(this.plugin.settings);
+  }
+
+  /**
+   * Refresh all active embedded task lists
+   * This is called when tasks are updated directly in views (not via file changes)
+   */
+  refreshAllEmbeddedTaskLists(): void {
+    // Clear the task cache to ensure we get fresh results
+    this.manager.clearCache();
+    // Refresh all active code blocks
+    this.eventHandler.refreshAllCodeBlocks();
   }
 
   /**

@@ -54,6 +54,9 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called when the plugin is loaded.
   async onload() {
+    // Expose plugin instance globally for easy access
+    (window as unknown as { todoSeqPlugin?: TodoTracker }).todoSeqPlugin = this;
+
     // Initialize centralized state manager first
     this.taskStateManager = new TaskStateManager();
 
@@ -175,8 +178,10 @@ export default class TodoTracker extends Plugin {
     // Refresh main task list views
     this.uiManager.refreshOpenTaskListViews();
 
-    // Note: Embedded task lists are automatically refreshed via event handlers
-    // when tasks change, so no additional refresh is needed here
+    // Refresh embedded task lists
+    if (this.embeddedTaskListProcessor) {
+      this.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
+    }
   }
 
   // Setup status bar manager for task count

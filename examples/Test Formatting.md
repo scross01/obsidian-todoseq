@@ -25,3 +25,8 @@ TODO task with a math block $$x = y * 4$$ in the text
 
 TODO task with %% embedded comment %% in the text
 
+---
+
+```todoseq
+search: file:"Test Formatting"
+```

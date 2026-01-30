@@ -249,6 +249,9 @@ export class PluginLifecycleManager {
       // UI components that aren't subscribed to TaskStateManager directly
       // can be refreshed here if needed
       this.plugin.statusBarManager?.updateTaskCount();
+
+      // Refresh embedded task lists to ensure they show the latest tasks
+      this.plugin.refreshAllTaskListViews();
     });
 
     this.plugin.vaultScanner.on('scan-error', (error) => {

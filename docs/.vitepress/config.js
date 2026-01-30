@@ -1,3 +1,5 @@
+import { text } from 'stream/consumers';
+
 export default {
   title: 'TODOseq',
   description: 'Lightweight, keyword-based task tracker for Obsidian',
@@ -18,6 +20,7 @@ export default {
           { text: 'Task List', link: '/task-list' },
           { text: 'Task Entry', link: '/task-entry' },
           { text: 'Editor Integration', link: '/editor' },
+          { text: 'Embedded Task Lists', link: '/embedded-task-lists' },
           { text: 'Search', link: '/search' },
           { text: 'Settings', link: '/settings' },
           { text: 'Task Urgency', link: '/urgency' },

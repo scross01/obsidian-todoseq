@@ -692,6 +692,16 @@ export class TaskListView extends ItemView {
         task.state = (updated as { state: string }).state as Task['state'];
       }
       task.completed = !!(updated as { completed?: unknown }).completed;
+
+      // Refresh embedded task lists to show the latest task state
+      const plugin = (
+        window as unknown as {
+          todoSeqPlugin?: { refreshAllTaskListViews?: () => void };
+        }
+      ).todoSeqPlugin;
+      if (plugin && typeof plugin.refreshAllTaskListViews === 'function') {
+        plugin.refreshAllTaskListViews();
+      }
     } catch (error) {
       // ROLLBACK: Restore previous state on error
       task.state = oldState;

@@ -21,3 +21,8 @@ And if you prefer to use checkboxes just prefix the task keyword with the task k
 - [ ] TODO task with a checkbox
 - [x] DONE completed task with a checkbox
 
+---
+
+```todoseq
+search: file:"Task Entry Examples"
+```

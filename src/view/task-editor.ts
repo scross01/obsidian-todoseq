@@ -83,6 +83,11 @@ export class TaskEditor {
       }
     }
 
+    // Add embed reference if it exists
+    if (task.embedReference) {
+      newLine += ` ${task.embedReference}`;
+    }
+
     const completed = DEFAULT_COMPLETED_STATES.has(newState);
     return { newLine, completed };
   }
@@ -93,11 +98,13 @@ export class TaskEditor {
    * File Operation Strategy:
    * - For active files: Uses Editor API (editor.replaceRange) to preserve cursor position, selection, and folds
    * - For inactive files: Uses Vault.process() for atomic background operations that prevent plugin conflicts
+   * - If forceVaultApi is true, uses Vault.process() even for active files to prevent focus jump
    */
   async applyLineUpdate(
     task: Task,
     newState: string,
     keepPriority = true,
+    forceVaultApi = false,
   ): Promise<Task> {
     const { newLine, completed } = TaskEditor.generateTaskLine(
       task,
@@ -122,7 +129,7 @@ export class TaskEditor {
         md?.getMode &&
         md.getMode() === 'source';
 
-      if (isSourceMode) {
+      if (isSourceMode && !forceVaultApi) {
         // Replace only the specific line using Editor API to preserve editor state
         // This maintains cursor position, selection, and code folds for better UX
         const currentLine = editor.getLine(task.line);
@@ -145,7 +152,7 @@ export class TaskEditor {
           }
         }
       } else {
-        // Not in source mode (preview/reader mode) or not active: use atomic background edit
+        // Not in source mode (preview/reader mode) or not active or forceVaultApi: use atomic background edit
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
           if (task.line < lines.length) {
@@ -169,6 +176,7 @@ export class TaskEditor {
   async updateTaskState(
     task: Task,
     nextState: string | null = null,
+    forceVaultApi = false,
   ): Promise<Task> {
     let state: string;
     if (nextState == null) {
@@ -186,13 +194,14 @@ export class TaskEditor {
     } else {
       state = nextState;
     }
-    return await this.applyLineUpdate(task, state);
+    return await this.applyLineUpdate(task, state, true, forceVaultApi);
   }
 
   // Cycles a task to its next state according to CYCLE_BULLET_STATE and persists change
   async updateTaskCycleState(
     task: Task,
     nextState: string | null = null,
+    forceVaultApi = false,
   ): Promise<Task> {
     let state: string;
     if (nextState == null) {
@@ -211,7 +220,7 @@ export class TaskEditor {
     } else {
       state = nextState;
     }
-    return await this.applyLineUpdate(task, state);
+    return await this.applyLineUpdate(task, state, true, forceVaultApi);
   }
 
   // Updates task priority and persists change

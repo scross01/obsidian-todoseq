@@ -1,8 +1,14 @@
-import { Task, DEFAULT_COMPLETED_STATES } from '../../task';
+import {
+  Task,
+  DEFAULT_COMPLETED_STATES,
+  DEFAULT_ACTIVE_STATES,
+  DEFAULT_PENDING_STATES,
+} from '../../task';
 import { TaskEditor } from '../task-editor';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
-import { MarkdownView } from 'obsidian';
+import { MarkdownView, Menu } from 'obsidian';
+import { getPluginSettings } from '../../utils/settings-utils';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -22,11 +28,13 @@ export class EmbeddedTaskListRenderer {
    * @param container The container element to render into
    * @param tasks Tasks to render
    * @param params Code block parameters for context
+   * @param totalTasksCount Total number of tasks before applying limit
    */
   renderTaskList(
     container: HTMLElement,
     tasks: Task[],
     params: TodoseqParameters,
+    totalTasksCount?: number,
   ): void {
     // Clear existing content
     container.empty();
@@ -37,7 +45,14 @@ export class EmbeddedTaskListRenderer {
     });
 
     // Add header with search/sort info
-    if (params.searchQuery || params.sortMethod !== 'default') {
+    const hasHeaderContent =
+      params.searchQuery ||
+      params.sortMethod !== 'default' ||
+      params.completed !== undefined ||
+      params.future !== undefined ||
+      params.limit !== undefined;
+
+    if (hasHeaderContent) {
       const header = taskListContainer.createEl('div', {
         cls: 'embedded-task-list-header',
       });
@@ -55,6 +70,27 @@ export class EmbeddedTaskListRenderer {
           text: `Sort: ${params.sortMethod}`,
         });
       }
+
+      if (params.completed !== undefined) {
+        header.createEl('span', {
+          cls: 'embedded-task-list-completed',
+          text: `Completed: ${params.completed}`,
+        });
+      }
+
+      if (params.future !== undefined) {
+        header.createEl('span', {
+          cls: 'embedded-task-list-future',
+          text: `Future: ${params.future}`,
+        });
+      }
+
+      if (params.limit !== undefined) {
+        header.createEl('span', {
+          cls: 'embedded-task-list-limit',
+          text: `Limit: ${params.limit}`,
+        });
+      }
     }
 
     // Create task list
@@ -67,6 +103,19 @@ export class EmbeddedTaskListRenderer {
       const taskItem = this.createTaskListItem(task, index);
       taskList.appendChild(taskItem);
     });
+
+    // Add truncated indicator if results were limited
+    if (
+      params.limit &&
+      totalTasksCount !== undefined &&
+      totalTasksCount > params.limit
+    ) {
+      const truncatedIndicator = taskListContainer.createEl('div', {
+        cls: 'embedded-task-list-truncated',
+      });
+      const moreTasksCount = totalTasksCount - params.limit;
+      truncatedIndicator.textContent = `${moreTasksCount} more task${moreTasksCount > 1 ? 's' : ''} not shown`;
+    }
 
     // Add empty state if no tasks
     if (tasks.length === 0) {
@@ -81,6 +130,127 @@ export class EmbeddedTaskListRenderer {
         cls: 'embedded-task-list-empty-subtitle',
         text: 'Try adjusting your search or sort parameters',
       });
+    }
+  }
+
+  /**
+   * Strip Markdown formatting to produce display-only plain text
+   */
+  private stripMarkdown(input: string): string {
+    if (!input) return '';
+    let out = input;
+
+    // HTML tags - use DOMParser to safely strip HTML tags
+    const doc = new DOMParser().parseFromString(out, 'text/html');
+    out = doc.body.textContent || '';
+
+    // Images: ![alt](url) -> alt
+    out = out.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+
+    // Inline code: `code` -> code
+    out = out.replace(/`([^`]+)`/g, '$1');
+
+    // Headings
+    out = out.replace(/^\s{0,3}#{1,6}\s+/gm, '');
+
+    // Emphasis/strong
+    out = out.replace(/(\*\*|__)(.*?)\1/g, '$2');
+    out = out.replace(/(\*|_)(.*?)\1/g, '$2');
+
+    // Strike/highlight/math
+    out = out.replace(/~~(.*?)~~/g, '$1');
+    out = out.replace(/==(.*?)==/g, '$1');
+    out = out.replace(/\$\$(.*?)\$\$/g, '$1');
+
+    // Normalize whitespace
+    out = out.replace(/\r/g, '');
+    out = out.replace(/[ \t]+\n/g, '\n');
+    out = out.replace(/\n{3,}/g, '\n\n');
+    out = out.trim();
+
+    return out;
+  }
+
+  // Render Obsidian-style links and tags as non-clickable, styled spans inside task text.
+  // Supports:
+  //  - Wiki links: [[Note]] and [[Note|Alias]]
+  //  - Markdown links: [Alias](url-or-path)
+  //  - Bare URLs: http(s)://...
+  //  - Tags: #tag
+  private renderTaskTextWithLinks(text: string, parent: HTMLElement) {
+    // For display only, strip any markdown formatting first
+    const textToProcess = this.stripMarkdown(text) || '';
+    const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp }[] = [
+      // [[Page]] or [[Page|Alias]]
+      { type: 'wiki', regex: /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g },
+      // [Alias](target) - improved regex to handle brackets in link text
+      { type: 'md', regex: /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g },
+      // bare URLs
+      { type: 'url', regex: /\bhttps?:\/\/[^\s)]+/g },
+      // #tags (must come after URLs to avoid conflicts with URLs containing #)
+      { type: 'tag', regex: /#([^\s\])[}{>]+)/g },
+    ];
+
+    let i = 0;
+    while (i < textToProcess.length) {
+      let nextMatch: {
+        type: 'wiki' | 'md' | 'url' | 'tag';
+        match: RegExpExecArray;
+      } | null = null;
+
+      for (const p of patterns) {
+        p.regex.lastIndex = i;
+        const m = p.regex.exec(textToProcess);
+        if (m) {
+          if (!nextMatch || m.index < nextMatch.match.index) {
+            nextMatch = { type: p.type, match: m };
+          }
+        }
+      }
+
+      if (!nextMatch) {
+        // Append any remaining text
+        parent.appendText(textToProcess.slice(i));
+        break;
+      }
+
+      // Append plain text preceding the match
+      if (nextMatch.match.index > i) {
+        parent.appendText(textToProcess.slice(i, nextMatch.match.index));
+      }
+
+      // Create appropriate styled element based on type
+      if (nextMatch.type === 'tag') {
+        // Create a tag-like span using our custom tag styling
+        const span = parent.createEl('span', { cls: 'embedded-task-tag' });
+        const tagName = nextMatch.match[0]; // Full #tag text including #
+        span.setText(tagName);
+        span.setAttribute('title', tagName);
+      } else {
+        // Create a non-interactive, link-like span for other types
+        const span = parent.createEl('span', {
+          cls: 'embedded-task-link-like',
+        });
+
+        if (nextMatch.type === 'wiki') {
+          const target = nextMatch.match[1];
+          const alias = nextMatch.match[2];
+          span.setText(alias ?? target);
+          span.setAttribute('title', target);
+        } else if (nextMatch.type === 'md') {
+          const label = nextMatch.match[1];
+          const url = nextMatch.match[2];
+          span.setText(label);
+          span.setAttribute('title', url);
+        } else {
+          const url = nextMatch.match[0];
+          span.setText(url);
+          span.setAttribute('title', url);
+        }
+      }
+
+      // Advance past the match
+      i = nextMatch.match.index + nextMatch.match[0].length;
     }
   }
 
@@ -115,22 +285,80 @@ export class EmbeddedTaskListRenderer {
     const stateSpan = document.createElement('span');
     stateSpan.className = 'embedded-task-state';
     stateSpan.textContent = task.state;
+    stateSpan.setAttribute('role', 'button');
+    stateSpan.setAttribute('tabindex', '0');
+    stateSpan.setAttribute('aria-checked', String(task.completed));
+
+    // Right-click to open state selection menu
+    stateSpan.addEventListener('contextmenu', (evt: MouseEvent) => {
+      this.openStateMenuAtMouseEvent(task, evt);
+    });
+
+    // Long-press for mobile
+    let touchTimer: number | null = null;
+    let suppressNextContextMenu = false;
+
+    stateSpan.addEventListener(
+      'touchstart',
+      (evt: TouchEvent) => {
+        if (evt.touches.length !== 1) return;
+        const touch = evt.touches[0];
+        suppressNextContextMenu = true;
+        touchTimer = window.setTimeout(() => {
+          const x = touch.clientX;
+          const y = touch.clientY;
+          this.openStateMenuAtPosition(task, { x, y });
+        }, 450);
+      },
+      { passive: true },
+    );
+
+    const clearTouch = () => {
+      if (touchTimer) {
+        window.clearTimeout(touchTimer);
+        touchTimer = null;
+      }
+      window.setTimeout(() => {
+        suppressNextContextMenu = false;
+      }, 250);
+    };
+
+    stateSpan.addEventListener('touchend', clearTouch, { passive: true });
+    stateSpan.addEventListener('touchcancel', clearTouch, { passive: true });
+
+    // Prevent duplicate context menu on Android
+    stateSpan.addEventListener('contextmenu', (evt: MouseEvent) => {
+      if (suppressNextContextMenu) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        return;
+      }
+      this.openStateMenuAtMouseEvent(task, evt);
+    });
+
     textContainer.appendChild(stateSpan);
+
+    // Create priority indicator if present
+    if (task.priority) {
+      const pri = task.priority; // 'high' | 'med' | 'low'
+      const prioritySpan = document.createElement('span');
+      prioritySpan.className = ['priority-badge', `priority-${pri}`].join(' ');
+      prioritySpan.textContent =
+        pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C';
+      prioritySpan.setAttribute('aria-label', `Priority ${pri}`);
+      prioritySpan.setAttribute('title', `Priority ${pri}`);
+      textContainer.appendChild(prioritySpan);
+    }
 
     // Create task text if present
     if (task.text) {
       const textSpan = document.createElement('span');
       textSpan.className = 'embedded-task-text';
-      textSpan.textContent = task.text;
+      if (textContainer.children.length > 0) {
+        textSpan.appendText(' ');
+      }
+      this.renderTaskTextWithLinks(task.text, textSpan);
       textContainer.appendChild(textSpan);
-    }
-
-    // Create priority indicator if present
-    if (task.priority) {
-      const prioritySpan = document.createElement('span');
-      prioritySpan.className = 'embedded-task-priority';
-      prioritySpan.textContent = `[#${task.priority.toUpperCase()}]`;
-      textContainer.appendChild(prioritySpan);
     }
 
     // Create file info
@@ -171,10 +399,7 @@ export class EmbeddedTaskListRenderer {
         const newState = newCompleted ? 'DONE' : 'TODO';
 
         // Update task state using existing TaskEditor
-        await this.taskEditor.updateTaskState(task, newState);
-
-        // Update the task in the plugin's task list
-        this.updateTaskInPlugin(task, newState);
+        await this.updateTaskState(task, newState);
       } catch (error) {
         console.error('Error updating task state:', error);
         // Revert checkbox on error
@@ -188,6 +413,150 @@ export class EmbeddedTaskListRenderer {
         this.navigateToTask(task);
       }
     });
+  }
+
+  /**
+   * Return default keyword sets (non-completed and completed) and additional keywords using constants from task.ts
+   */
+  private getKeywordSets(): {
+    pendingActive: string[];
+    completed: string[];
+    additional: string[];
+  } {
+    const pendingActiveDefaults = [
+      ...Array.from(DEFAULT_PENDING_STATES),
+      ...Array.from(DEFAULT_ACTIVE_STATES),
+    ];
+    const completedDefaults = Array.from(DEFAULT_COMPLETED_STATES);
+
+    const settings = getPluginSettings(this.plugin.app);
+    const configured = settings?.additionalTaskKeywords;
+    const additional = Array.isArray(configured)
+      ? configured.filter(
+          (v): v is string => typeof v === 'string' && v.length > 0,
+        )
+      : [];
+
+    return {
+      pendingActive: pendingActiveDefaults,
+      completed: completedDefaults,
+      additional,
+    };
+  }
+
+  /**
+   * Build the list of selectable states for the context menu, excluding the current state
+   * @param current Current task state
+   */
+  private getSelectableStatesForMenu(
+    current: string,
+  ): { group: string; states: string[] }[] {
+    const { pendingActive, completed, additional } = this.getKeywordSets();
+
+    const dedupe = (arr: string[]) => Array.from(new Set(arr));
+    const nonCompleted = dedupe([...pendingActive, ...additional]);
+    const completedOnly = dedupe(completed);
+
+    // Present two groups: Non-completed and Completed
+    const groups: { group: string; states: string[] }[] = [
+      {
+        group: 'Not completed',
+        states: nonCompleted.filter((s) => s && s !== current),
+      },
+      {
+        group: 'Completed',
+        states: completedOnly.filter((s) => s && s !== current),
+      },
+    ];
+    return groups.filter((g) => g.states.length > 0);
+  }
+
+  /**
+   * Open Obsidian Menu at a specific screen position
+   * @param task The task to update
+   * @param pos The position to show the menu
+   */
+  private openStateMenuAtPosition(
+    task: Task,
+    pos: { x: number; y: number },
+  ): void {
+    const menu = new Menu();
+    const groups = this.getSelectableStatesForMenu(task.state);
+
+    for (const g of groups) {
+      menu.addItem((item) => {
+        item.setTitle(g.group);
+        item.setDisabled(true);
+      });
+      for (const state of g.states) {
+        menu.addItem((item) => {
+          item.setTitle(state);
+          item.onClick(async () => {
+            await this.updateTaskState(task, state);
+          });
+        });
+      }
+      menu.addSeparator();
+    }
+    menu.showAtPosition({ x: pos.x, y: pos.y });
+  }
+
+  /**
+   * Open Obsidian Menu at mouse event location listing default and additional keywords (excluding current)
+   * @param task The task to update
+   * @param evt The mouse event
+   */
+  private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
+    evt.preventDefault();
+    evt.stopPropagation();
+    const menu = new Menu();
+    const groups = this.getSelectableStatesForMenu(task.state);
+
+    for (const g of groups) {
+      // Section header (disabled item)
+      menu.addItem((item) => {
+        item.setTitle(g.group);
+        item.setDisabled(true);
+      });
+      for (const state of g.states) {
+        menu.addItem((item) => {
+          item.setTitle(state);
+          item.onClick(async () => {
+            await this.updateTaskState(task, state);
+          });
+        });
+      }
+      // Divider between groups when both exist
+      menu.addSeparator();
+    }
+
+    // Prefer API helper when available; fallback to explicit coordinates
+    const maybeShowAtMouseEvent = (
+      menu as unknown as { showAtMouseEvent?: (e: MouseEvent) => void }
+    ).showAtMouseEvent;
+    if (typeof maybeShowAtMouseEvent === 'function') {
+      maybeShowAtMouseEvent.call(menu, evt);
+    } else {
+      menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
+    }
+  }
+
+  /**
+   * Update task state with proper error handling
+   * @param task The task to update
+   * @param newState The new state
+   */
+  private async updateTaskState(task: Task, newState: string): Promise<void> {
+    try {
+      // Update task state using existing TaskEditor
+      // Use forceVaultApi=true to prevent focus from jumping to the source task
+      await this.taskEditor.updateTaskState(task, newState, true);
+
+      // Update the task in the plugin's task list
+      this.updateTaskInPlugin(task, newState);
+    } catch (error) {
+      console.error('Error updating task state:', error);
+    }
   }
 
   /**
@@ -235,8 +604,8 @@ export class EmbeddedTaskListRenderer {
         completed: DEFAULT_COMPLETED_STATES.has(newState),
       });
 
-      // Trigger refresh of other views
-      this.plugin.uiManager.refreshOpenTaskListViews();
+      // Trigger refresh of all task list views, including embedded ones
+      this.plugin.refreshAllTaskListViews();
     }
   }
 

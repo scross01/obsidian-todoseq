@@ -331,6 +331,11 @@ export class ReaderViewFormatter {
     const taskElements = element.querySelectorAll('.task-list-item');
 
     taskElements.forEach((taskElement) => {
+      // Skip if element is inside an embedded task list container
+      if (taskElement.closest('.embedded-task-list-container')) {
+        return;
+      }
+
       // Skip if quote/callout blocks are disabled and this element is inside one
       if (
         !includeCalloutBlocks &&
@@ -349,6 +354,78 @@ export class ReaderViewFormatter {
         // Process tasks without paragraph elements (direct text in li)
         this.processTaskListItemDirectly(taskElement);
       }
+    });
+  }
+
+  /**
+   * Process regular paragraphs with task keywords
+   */
+  private processRegularParagraphs(
+    element: HTMLElement,
+    includeCalloutBlocks: boolean,
+  ): void {
+    const paragraphs = element.querySelectorAll('p:not(.task-list-item p)');
+
+    paragraphs.forEach((paragraph) => {
+      // Skip if element is inside an embedded task list container
+      if (paragraph.closest('.embedded-task-list-container')) {
+        return;
+      }
+
+      if (paragraph instanceof HTMLElement) {
+        // Skip if quote/callout blocks are disabled and this paragraph is inside one
+        if (!includeCalloutBlocks && this.isInQuoteOrCalloutBlock(paragraph)) {
+          return;
+        }
+        this.processParagraphForTasks(paragraph);
+      }
+    });
+  }
+
+  /**
+   * Process bullet list items without checkboxes
+   * Handles various list formats including:
+   * - Indented bullets (with leading spaces)
+   * - Different bullet markers (-, *, +)
+   * - Numbered lists (1., 2), a., A))
+   * - Letter lists (a., b., A), B))
+   */
+  private processBulletListItems(
+    element: HTMLElement,
+    includeCalloutBlocks: boolean,
+  ): void {
+    const listItems = element.querySelectorAll('li:not(.task-list-item)');
+
+    listItems.forEach((listItem) => {
+      // Skip if element is inside an embedded task list container
+      if (listItem.closest('.embedded-task-list-container')) {
+        return;
+      }
+
+      // Skip if quote/callout blocks are disabled and this list item is inside one
+      if (
+        !includeCalloutBlocks &&
+        listItem instanceof HTMLElement &&
+        this.isInQuoteOrCalloutBlock(listItem)
+      ) {
+        return;
+      }
+
+      if (!(listItem instanceof HTMLElement)) {
+        return;
+      }
+
+      // Try to find a paragraph first (standard case)
+      const paragraph = listItem.querySelector('p');
+      if (paragraph instanceof HTMLElement) {
+        this.processParagraphForTasks(paragraph);
+        return;
+      }
+
+      // Handle list items without paragraphs (direct text content)
+      // This is common for simple bullet items like:
+      // <li><span class="list-bullet"></span>TODO task text</li>
+      this.processListItemDirectly(listItem);
     });
   }
 
@@ -598,68 +675,6 @@ export class ReaderViewFormatter {
         completedContainer.firstChild,
       );
     }
-  }
-
-  /**
-   * Process regular paragraphs with task keywords
-   */
-  private processRegularParagraphs(
-    element: HTMLElement,
-    includeCalloutBlocks: boolean,
-  ): void {
-    const paragraphs = element.querySelectorAll('p:not(.task-list-item p)');
-
-    paragraphs.forEach((paragraph) => {
-      if (paragraph instanceof HTMLElement) {
-        // Skip if quote/callout blocks are disabled and this paragraph is inside one
-        if (!includeCalloutBlocks && this.isInQuoteOrCalloutBlock(paragraph)) {
-          return;
-        }
-        this.processParagraphForTasks(paragraph);
-      }
-    });
-  }
-
-  /**
-   * Process bullet list items without checkboxes
-   * Handles various list formats including:
-   * - Indented bullets (with leading spaces)
-   * - Different bullet markers (-, *, +)
-   * - Numbered lists (1., 2), a., A))
-   * - Letter lists (a., b., A), B))
-   */
-  private processBulletListItems(
-    element: HTMLElement,
-    includeCalloutBlocks: boolean,
-  ): void {
-    const listItems = element.querySelectorAll('li:not(.task-list-item)');
-
-    listItems.forEach((listItem) => {
-      // Skip if quote/callout blocks are disabled and this list item is inside one
-      if (
-        !includeCalloutBlocks &&
-        listItem instanceof HTMLElement &&
-        this.isInQuoteOrCalloutBlock(listItem)
-      ) {
-        return;
-      }
-
-      if (!(listItem instanceof HTMLElement)) {
-        return;
-      }
-
-      // Try to find a paragraph first (standard case)
-      const paragraph = listItem.querySelector('p');
-      if (paragraph instanceof HTMLElement) {
-        this.processParagraphForTasks(paragraph);
-        return;
-      }
-
-      // Handle list items without paragraphs (direct text content)
-      // This is common for simple bullet items like:
-      // <li><span class="list-bullet"></span>TODO task text</li>
-      this.processListItemDirectly(listItem);
-    });
   }
 
   /**

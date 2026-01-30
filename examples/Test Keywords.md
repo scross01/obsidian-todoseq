@@ -18,3 +18,9 @@ HACK this is a custom keyword
 Not a keyword
 
 BOGUS this is not a custom keyword
+
+---
+
+```todoseq
+search: file:"Test Keywords"
+```

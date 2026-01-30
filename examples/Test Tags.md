@@ -10,3 +10,8 @@ Ensure that `#` symbols in URLs are not interpreted as tags.
 
 TODO test task that has a URL not a tag https://example.com/text#ref
 
+---
+
+```todoseq
+search: file:"Test Tags"
+```
