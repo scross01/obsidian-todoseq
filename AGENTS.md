@@ -7,8 +7,8 @@ This file provides guidance to agents when working with code in this repository.
 ### Build System
 
 - **Custom build process**: `npm run build` runs `tsc --noEmit src/main.ts --skipLibCheck && node esbuild.config.mjs production`
-- **TypeScript compilation**: Uses `--noEmit` flag to skip output generation, relying on esbuild for final bundle
-- **Development mode**: `npm run dev` uses esbuild.config.mjs without production optimizations
+- **Code formatting**: `npm run format` uses Prettier with specific configuration
+- **Code linting**: `npm run lint` uses ESLint with specific rules
 
 ### Testing
 

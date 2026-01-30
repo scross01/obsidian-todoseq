@@ -84,13 +84,15 @@ Right-click any **task keyword** to see all available state options in a popup m
 
 ### Opening Source Location
 
-Click anywhere on the task row (except the checkbox or keyword) to:
+Clicking on a task row opens the source file in a smart, intuitive way that adapts to your workflow. The behavior varies based on how you click:
 
-- Jump to the exact file containing the task
-- Navigate to the specific line number
-- Focus the editor on the task for easy editing
+**Simple click** opens the file by reusing existing tabs whenever possible. If you already have markdown tabs open, TODOseq will use those to display the new page, keeping your workspace clean and organized. If no tabs are available, it opens in the current active pane or creates a new tab.
 
-Shif-click to open the file in a new split pane.
+**Shift-click** creates a new split pane and opens the file there. This is perfect for when you want to reference the task while working on something else in your main workspace.
+
+**Ctrl/Cmd-click** always opens the file in a brand new tab, ensuring you have a fresh workspace for the task without disrupting your current view.
+
+In all cases, TODOseq navigates to the exact line containing the task and focuses the editor for immediate editing.
 
 ## Sort Methods
 

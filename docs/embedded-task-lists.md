@@ -145,7 +145,15 @@ Right click on the task keyword to select the desired state. The task will be up
 
 ### Navigate to Task
 
-Click on the task text (excluding the checkbox) to navigate to the task's location in the original file. This will open the file and scroll to the task's line.
+Click on the task text to navigate to the task's location in the original file.
+
+**Simple click** opens the file in the current active page or brining the existing open page into focus.
+
+**Shift-click** creates a new split pane and opens the file there. This is perfect for when you want to reference the task while working on something else in your main workspace.
+
+**Ctrl/Cmd-click** always opens the file in a brand new tab, ensuring you have a fresh workspace for the task without disrupting your current view.
+
+In all cases, TODOseq navigates to the exact line containing the task and focuses the editor for immediate editing.
 
 ## Error Handling
 

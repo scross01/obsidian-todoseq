@@ -1554,47 +1554,80 @@ export class TaskListView extends ItemView {
       }
       return null;
     };
-    // Each page should own its tab. Only "reuse" when it's the same file.
-    const findReusableMarkdownLeaf = (): WorkspaceLeaf | null => {
-      // Only return a leaf if it's already showing this exact file.
-      return findExistingLeafForFile();
-    };
-
     const forceNewTab = isMiddle || metaOrCtrl;
     const doSplit = evt.shiftKey;
 
     let targetLeaf: WorkspaceLeaf | null = null;
 
+    // Get current active leaf and check if it's a markdown view
+    const currentActiveLeaf = workspace.activeLeaf;
+    const isCurrentActiveMarkdown =
+      currentActiveLeaf && isMarkdownLeaf(currentActiveLeaf);
+
+    // Check if file is already open
+    const existingLeafForFile = findExistingLeafForFile();
+    const isFileAlreadyOpen = existingLeafForFile !== null;
+
+    // Shift-click: Always open new tab in split pane, even if already open
     if (doSplit) {
-      // New behavior: if the file is already open, focus that existing tab instead of creating a split.
-      const existing = findExistingLeafForFile();
-      if (existing) {
-        targetLeaf = existing;
-      } else {
-        targetLeaf = workspace.getLeaf('split');
-        // Guard: ensure not TODOseq and is a markdown-capable leaf
-        if (isTodoSeqLeaf(targetLeaf) || !isMarkdownLeaf(targetLeaf)) {
-          targetLeaf = findReusableMarkdownLeaf() ?? workspace.getLeaf('tab');
-        }
-      }
-    } else if (forceNewTab) {
+      targetLeaf = workspace.getLeaf('split');
+      // For shift-click, we should ALWAYS use the split leaf, even if it's not perfect
+      // Don't fall back to existing leaves - this ensures the page opens in the split
+    }
+    // Cmd/Ctrl-click: Always open new tab, even if page is already open
+    else if (forceNewTab) {
       targetLeaf = workspace.getLeaf('tab');
-      if (isTodoSeqLeaf(targetLeaf) || !isMarkdownLeaf(targetLeaf)) {
-        targetLeaf = findReusableMarkdownLeaf() ?? workspace.getLeaf('tab');
+      // For cmd/ctrl-click, we should ALWAYS use the new tab, even if it's not perfect
+      // Don't fall back to existing leaves - this ensures the page opens in the new tab
+    }
+    // Default click: Order of preference
+    // 1. Bring page into focus if already open
+    // 2. Reuse existing open tab to display new page
+    // 3. Open in current active tab if it's markdown
+    // 4. Open new tab if no pages already open
+    else {
+      // Priority 1: If file is already open, focus it
+      if (isFileAlreadyOpen) {
+        targetLeaf = existingLeafForFile;
       }
-    } else {
-      targetLeaf = findExistingLeafForFile();
-      if (!targetLeaf) {
-        targetLeaf = findReusableMarkdownLeaf();
-      }
-      if (!targetLeaf) {
-        targetLeaf = workspace.getLeaf('tab');
-      }
-      if (isTodoSeqLeaf(targetLeaf)) {
-        targetLeaf = findReusableMarkdownLeaf() ?? workspace.getLeaf('tab');
+      // Priority 2: Reuse existing markdown leaf (any leaf, not just same file)
+      else {
+        const allLeaves = workspace.getLeavesOfType('markdown');
+        for (const leaf of allLeaves) {
+          if (isMarkdownLeaf(leaf) && !isTodoSeqLeaf(leaf)) {
+            targetLeaf = leaf;
+            break;
+          }
+        }
+        // Priority 3: If current active tab is markdown, use it
+        if (!targetLeaf && isCurrentActiveMarkdown) {
+          targetLeaf = currentActiveLeaf;
+        }
+        // Priority 4: Create new tab
+        if (!targetLeaf) {
+          targetLeaf = workspace.getLeaf('tab');
+          // Guard against TODOseq leaf
+          if (isTodoSeqLeaf(targetLeaf)) {
+            const allLeaves = workspace.getLeavesOfType('markdown');
+            for (const leaf of allLeaves) {
+              if (isMarkdownLeaf(leaf) && !isTodoSeqLeaf(leaf)) {
+                targetLeaf = leaf;
+                break;
+              }
+            }
+            // If still no good leaf, create regular tab
+            if (isTodoSeqLeaf(targetLeaf) || !isMarkdownLeaf(targetLeaf)) {
+              targetLeaf = workspace.getLeaf('tab');
+            }
+          }
+        }
       }
     }
 
+    if (!targetLeaf) {
+      // Fallback to creating a new tab if somehow targetLeaf is null
+      targetLeaf = workspace.getLeaf('tab');
+    }
     await targetLeaf.openFile(file);
 
     if (evt.altKey) {
@@ -1630,7 +1663,9 @@ export class TaskListView extends ItemView {
       editor.scrollIntoView({ from: pos, to: pos }, true);
     }
 
-    await workspace.revealLeaf(targetLeaf);
+    if (targetLeaf) {
+      await workspace.revealLeaf(targetLeaf);
+    }
   }
 
   // Cleanup listeners

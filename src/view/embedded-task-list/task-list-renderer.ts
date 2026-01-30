@@ -7,7 +7,7 @@ import {
 import { TaskEditor } from '../task-editor';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
-import { MarkdownView, Menu } from 'obsidian';
+import { MarkdownView, Menu, WorkspaceLeaf, TFile, Platform } from 'obsidian';
 import { getPluginSettings } from '../../utils/settings-utils';
 
 /**
@@ -410,7 +410,7 @@ export class EmbeddedTaskListRenderer {
     // Click handler for navigation (excluding checkbox)
     li.addEventListener('click', (e) => {
       if (e.target !== checkbox) {
-        this.navigateToTask(task);
+        this.navigateToTask(task, e);
       }
     });
   }
@@ -560,26 +560,156 @@ export class EmbeddedTaskListRenderer {
   }
 
   /**
-   * Navigate to the task's location in the vault
+   * Navigate to the task's location in the vault with smart tab management
    * @param task The task to navigate to
+   * @param evt The mouse event to determine click behavior
    */
-  private navigateToTask(task: Task): void {
+  private navigateToTask(task: Task, evt?: MouseEvent): void {
     try {
-      const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
-      if (file) {
-        // Open the file and navigate to the task line
-        this.plugin.app.workspace.openLinkText(task.path, '', true);
+      const { workspace } = this.plugin.app;
+      const isMac = Platform.isMacOS;
+      const isMiddle = evt?.button === 1;
+      const metaOrCtrl = isMac ? evt?.metaKey : evt?.ctrlKey;
 
-        // Focus the editor and move cursor to the task line
+      const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
+      if (!(file instanceof TFile)) return;
+
+      // Helper functions
+      const isMarkdownLeaf = (
+        leaf: WorkspaceLeaf | null | undefined,
+      ): boolean => {
+        if (!leaf) return false;
+        if (leaf.view instanceof MarkdownView) return true;
+        return leaf.view?.getViewType?.() === 'markdown';
+      };
+
+      const isTodoSeqLeaf = (
+        leaf: WorkspaceLeaf | null | undefined,
+      ): boolean => {
+        if (!leaf) return false;
+        return leaf.view?.getViewType?.() === 'todoseq';
+      };
+
+      const findExistingLeafForFile = (): WorkspaceLeaf | null => {
+        const leaves = workspace.getLeavesOfType('markdown');
+        for (const leaf of leaves) {
+          if (isTodoSeqLeaf(leaf)) continue;
+          if (leaf.view instanceof MarkdownView) {
+            const openFile = leaf.view.file;
+            if (openFile && openFile.path === file.path) {
+              return leaf;
+            }
+          }
+        }
+        return null;
+      };
+
+      const forceNewTab = isMiddle || metaOrCtrl;
+      const doSplit = evt?.shiftKey;
+
+      let targetLeaf: WorkspaceLeaf | null = null;
+
+      // Shift-click: Always open new tab in split pane, even if already open
+      if (doSplit) {
+        targetLeaf = workspace.getLeaf('split');
+        // For shift-click, we should ALWAYS use the split leaf, even if it's not perfect
+        // Don't fall back to existing leaves - this ensures the page opens in the split
+      }
+      // Cmd/Ctrl-click: Always open new tab, even if page is already open
+      else if (forceNewTab) {
+        targetLeaf = workspace.getLeaf('tab');
+        // For cmd/ctrl-click, we should ALWAYS use the new tab, even if it's not perfect
+        // Don't fall back to existing leaves - this ensures the page opens in the new tab
+      }
+      // Default click: Order of preference
+      // 1. Bring page into focus if already open
+      // 2. Reuse existing open tab to display new page
+      // 3. Open in current active tab if it's markdown
+      // 4. Open new tab if no pages already open
+      else {
+        const currentActiveLeaf = workspace.activeLeaf;
+        const isCurrentActiveMarkdown =
+          currentActiveLeaf && isMarkdownLeaf(currentActiveLeaf);
+
+        // Priority 1: If file is already open, focus it
+        const existingLeafForFile = findExistingLeafForFile();
+        if (existingLeafForFile) {
+          targetLeaf = existingLeafForFile;
+        }
+        // Priority 2: Reuse existing markdown leaf (any leaf, not just same file)
+        else {
+          const allLeaves = workspace.getLeavesOfType('markdown');
+          for (const leaf of allLeaves) {
+            if (isMarkdownLeaf(leaf) && !isTodoSeqLeaf(leaf)) {
+              targetLeaf = leaf;
+              break;
+            }
+          }
+          // Priority 3: If current active tab is markdown, use it
+          if (!targetLeaf && isCurrentActiveMarkdown) {
+            targetLeaf = currentActiveLeaf;
+          }
+          // Priority 4: Create new tab
+          if (!targetLeaf) {
+            targetLeaf = workspace.getLeaf('tab');
+            // Guard against TODOseq leaf
+            if (isTodoSeqLeaf(targetLeaf)) {
+              const allLeaves = workspace.getLeavesOfType('markdown');
+              for (const leaf of allLeaves) {
+                if (isMarkdownLeaf(leaf) && !isTodoSeqLeaf(leaf)) {
+                  targetLeaf = leaf;
+                  break;
+                }
+              }
+              // If still no good leaf, create regular tab
+              if (isTodoSeqLeaf(targetLeaf) || !isMarkdownLeaf(targetLeaf)) {
+                targetLeaf = workspace.getLeaf('tab');
+              }
+            }
+          }
+        }
+      }
+
+      // Open the file in the target leaf
+      targetLeaf.openFile(file).then(() => {
+        // Focus the editor and move cursor to the task line with highlighting
         setTimeout(() => {
-          const activeView =
-            this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+          const activeView = workspace.getActiveViewOfType(MarkdownView);
           if (activeView && activeView.editor) {
-            activeView.editor.setCursor({ line: task.line, ch: 0 });
+            const lineContent = activeView.editor.getLine(task.line);
+            const pos = { line: task.line, ch: lineContent.length };
+
+            // Set cursor position
+            activeView.editor.setCursor(pos);
+
+            // Try to set ephemeral state for better navigation
+            try {
+              (
+                activeView as MarkdownView & {
+                  setEphemeralState?: (state: {
+                    line: number;
+                    col: number;
+                  }) => void;
+                }
+              ).setEphemeralState?.({
+                line: task.line,
+                col: lineContent.length,
+              });
+            } catch (_) {
+              // Ignore if ephemeral state is not available
+            }
+
+            // Scroll into view with highlighting
+            activeView.editor.scrollIntoView({ from: pos, to: pos }, true);
+
+            // Focus the editor
             activeView.editor.focus();
           }
         }, 100);
-      }
+      });
+
+      // Reveal the leaf to ensure proper focus
+      workspace.revealLeaf(targetLeaf);
     } catch (error) {
       console.error('Error navigating to task:', error);
     }

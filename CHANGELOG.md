@@ -1,7 +1,12 @@
 # Change Log
 
+## 0.9.0
+
 - Added task keyword styling in the reader view with interactive state updates. #22
+- Added new embedded task lists to add customer filtered lists with a page. #21
 - Centralized task state management across all views (task list view, page editor, page reader).
+- Fixed issues with changing settings not updating task collection and display.
+- Fixed task navigation for consistent behavior with cmd-/ctrl- and shift- select modifiers.
 
 ## 0.8.1
 
