@@ -90,6 +90,8 @@ export class TodoseqCodeBlockProcessor {
   updateSettings(): void {
     this.manager.updateSettings(this.plugin.settings);
     this.eventHandler.updateSettings(this.plugin.settings);
+    // Refresh all embedded task lists to reflect new settings
+    this.refreshAllEmbeddedTaskLists();
   }
 
   /**

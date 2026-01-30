@@ -7,7 +7,8 @@ import {
 } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { TodoTrackerSettings } from '../settings/settings';
-import { TaskParser, COMMENT_BLOCK_REGEX } from '../parser/task-parser';
+import { TaskParser } from '../parser/task-parser';
+import { COMMENT_BLOCK_REGEX } from '../utils/patterns';
 import {
   LanguageRegistry,
   LanguageDefinition,
@@ -35,11 +36,10 @@ export class TaskKeywordDecorator {
   constructor(
     private view: EditorView,
     settings: TodoTrackerSettings,
+    parser: TaskParser,
   ) {
     this.settings = settings;
-    // For editor decorations, we don't have access to the App instance
-    // Pass null for app parameter - daily note detection won't work in editor but parsing will work
-    this.parser = TaskParser.create(settings, null);
+    this.parser = parser;
     this.decorations = this.createDecorations();
   }
 
@@ -150,7 +150,7 @@ export class TaskKeywordDecorator {
         } else if (
           !this.inCommentBlock ||
           this.settings.includeCommentBlocks ||
-          singleLineCommentMatch
+          (singleLineCommentMatch && this.settings.includeCommentBlocks)
         ) {
           // Use standard regex for non-code blocks, but skip if we're in a comment block and comment blocks are disabled
           if (this.parser.testRegex.test(contentForTaskDetection)) {
@@ -480,15 +480,20 @@ export class TaskKeywordDecorator {
 }
 
 // ViewPlugin for CodeMirror 6
-export const taskKeywordPlugin = (settings: TodoTrackerSettings) => {
+export const taskKeywordPlugin = (
+  settings: TodoTrackerSettings,
+  parser: TaskParser,
+) => {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
       private settings: TodoTrackerSettings;
+      private parser: TaskParser;
       private settingsDetector: SettingsChangeDetector;
 
       constructor(view: EditorView) {
         this.settings = settings;
+        this.parser = parser;
         this.settingsDetector = new SettingsChangeDetector();
         this.settingsDetector.initialize(settings);
         this.updateDecorations(view);
@@ -499,7 +504,11 @@ export const taskKeywordPlugin = (settings: TodoTrackerSettings) => {
           // When formatting is disabled, return empty decorations
           this.decorations = Decoration.none;
         } else {
-          const decorator = new TaskKeywordDecorator(view, this.settings);
+          const decorator = new TaskKeywordDecorator(
+            view,
+            this.settings,
+            this.parser,
+          );
           this.decorations = decorator.getDecorations();
         }
       }

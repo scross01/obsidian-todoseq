@@ -157,10 +157,12 @@ export class VaultScanner {
     try {
       // Use type assertion since getConfig is not part of the public Obsidian API
       // but is available in practice (undocumented)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-      const excludedPatterns =
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-        (this.app.vault as any).getConfig('userIgnoreFilters') || [];
+      const rawPatterns = (
+        this.app.vault as unknown as { getConfig: (key: string) => unknown }
+      ).getConfig('userIgnoreFilters');
+      const excludedPatterns = Array.isArray(rawPatterns)
+        ? rawPatterns.map(String)
+        : [];
 
       return excludedPatterns.some((pattern: string) => {
         try {

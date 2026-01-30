@@ -18,44 +18,25 @@ import {
   UrgencyCoefficients,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
+import {
+  BULLET_LIST_PATTERN_SOURCE,
+  NUMBERED_LIST_PATTERN_SOURCE,
+  LETTER_LIST_PATTERN_SOURCE,
+  CUSTOM_LIST_PATTERN_SOURCE,
+  CHECKBOX_PATTERN_SOURCE,
+  STANDARD_PREFIX_SOURCE,
+  QUOTED_PREFIX_SOURCE,
+  CALLOUT_PREFIX_SOURCE,
+  CODE_BLOCK_REGEX,
+  MATH_BLOCK_REGEX,
+  COMMENT_BLOCK_REGEX,
+  CALLOUT_BLOCK_REGEX,
+  FOOTNOTE_DEFINITION_REGEX,
+  CODE_PREFIX_SOURCE,
+  TASK_TEXT_SOURCE,
+} from '../utils/patterns';
 
 type RegexPair = { test: RegExp; capture: RegExp };
-
-// List marker patterns
-// Bullet points: matches -, *, or + characters
-const BULLET_LIST_PATTERN = /[-*+]\s+/.source;
-// Numbered lists: matches digits followed by . or ) (e.g., "1.", "2)", "12.")
-const NUMBERED_LIST_PATTERN = /\d+[.)]\s+/.source;
-// Letter lists: matches letters followed by . or ) (e.g., "a.", "B)")
-const LETTER_LIST_PATTERN = /[A-Za-z][.)]\s+/.source;
-// Custom lists: matches parentheses-enclosed alphanumeric identifiers (e.g., "(A1)", "(A2)")
-const CUSTOM_LIST_PATTERN = /\([A-Za-z0-9]+\)\s+/.source;
-
-// Checkboxes: [ ] (unchecked), [x] (checked) or [*] (other checkbox states)
-const CHECKBOX = /\[[ x\S]\]\s+/.source;
-
-// Leading spaces only
-const STANDARD_PREFIX = /\s*/.source;
-// Quoted lines with leading ">"
-const QUOTED_PREFIX = /\s*>\s*/.source;
-// Callout block declaration, e.g. "> [!info]"
-const CALLOUT_PREFIX = /\s*>\s*\[!\w+\]-?\s+/.source;
-
-// Code block marker ``` or ~~~ with language
-const CODE_BLOCK_REGEX = /^\s*(```|~~~)\s*(\S+)?$/;
-// Math block marker $$
-const MATH_BLOCK_REGEX = /^\s*\$\$(?!.*\$\$).*/; // ignores open and close on same line
-// Comment block marker %%
-export const COMMENT_BLOCK_REGEX = /^\s*%%.*%%$|^\s*%%(?!.*%%).*/; // matches both single-line and multi-line comment blocks
-// Callout block marker >
-const CALLOUT_BLOCK_REGEX = /^\s*>.*/;
-// Footnote definition marker
-const FOOTNOTE_DEFINITION_REGEX = /^\[\^\d+\]:\s*/;
-
-// Language code before comment - non greedy
-const CODE_PREFIX = /\s*[\s\S]*?/.source;
-
-const TASK_TEXT = /[\S][\s\S]*?/.source; // at least one non-whitespace character, then any characters
 
 export class TaskParser {
   private readonly includeCalloutBlocks: boolean;
@@ -217,11 +198,11 @@ export class TaskParser {
     const escaped_keywords = TaskParser.escapeKeywords(keywords);
 
     const test = new RegExp(
-      `^(${STANDARD_PREFIX}|${QUOTED_PREFIX}|${CALLOUT_PREFIX})?` +
-        `(${BULLET_LIST_PATTERN}|${NUMBERED_LIST_PATTERN}|${LETTER_LIST_PATTERN}|${CUSTOM_LIST_PATTERN})??` +
-        `(${CHECKBOX})?` +
+      `^(${STANDARD_PREFIX_SOURCE}|${QUOTED_PREFIX_SOURCE}|${CALLOUT_PREFIX_SOURCE})?` +
+        `(${BULLET_LIST_PATTERN_SOURCE}|${NUMBERED_LIST_PATTERN_SOURCE}|${LETTER_LIST_PATTERN_SOURCE}|${CUSTOM_LIST_PATTERN_SOURCE})??` +
+        `(${CHECKBOX_PATTERN_SOURCE})?` +
         `(${escaped_keywords})\\s+` +
-        `(${TASK_TEXT})$`,
+        `(${TASK_TEXT_SOURCE})$`,
     );
     const capture = test;
     return { test, capture };
@@ -239,7 +220,9 @@ export class TaskParser {
     const footnotePattern = `\\[\\^\\d+\\]:\\s+`;
 
     const test = new RegExp(
-      `^${footnotePattern}` + `(${escapedKeywords})\\s+` + `(${TASK_TEXT})$`,
+      `^${footnotePattern}` +
+        `(${escapedKeywords})\\s+` +
+        `(${TASK_TEXT_SOURCE})$`,
     );
     const capture = test;
     return { test, capture };
@@ -270,11 +253,11 @@ export class TaskParser {
       `\\s+${languageDefinition.patterns.multiLineEnd?.source}\\s*` || '';
 
     const test = new RegExp(
-      `^((?:(?:${CODE_PREFIX})?(?:(?:${startComment})\\s+))|(?:${midComment}\\s*))` +
-        `(${BULLET_LIST_PATTERN}|${NUMBERED_LIST_PATTERN}|${LETTER_LIST_PATTERN}|${CUSTOM_LIST_PATTERN})??` +
-        `(${CHECKBOX})?` +
+      `^((?:(?:${CODE_PREFIX_SOURCE})?(?:(?:${startComment})\\s+))|(?:${midComment}\\s*))` +
+        `(${BULLET_LIST_PATTERN_SOURCE}|${NUMBERED_LIST_PATTERN_SOURCE}|${LETTER_LIST_PATTERN_SOURCE}|${CUSTOM_LIST_PATTERN_SOURCE})??` +
+        `(${CHECKBOX_PATTERN_SOURCE})?` +
         `(${escapedKeywords})\\s+` +
-        `(${TASK_TEXT})` +
+        `(${TASK_TEXT_SOURCE})` +
         `(?=${endComment}$|$)?(${endComment})?$`,
     );
     const capture = test;
@@ -614,14 +597,16 @@ export class TaskParser {
       // Check for single-line comment blocks (%% ... %%)
       const isSingleLineComment = /^\s*%%.*%%$/.test(line);
       if (isSingleLineComment) {
-        const commentTask = this.tryParseCommentBlockTask(
-          line,
-          path,
-          index,
-          lines,
-        );
-        if (commentTask) {
-          tasks.push(commentTask);
+        if (this.includeCommentBlocks) {
+          const commentTask = this.tryParseCommentBlockTask(
+            line,
+            path,
+            index,
+            lines,
+          );
+          if (commentTask) {
+            tasks.push(commentTask);
+          }
         }
         continue;
       }
@@ -1147,6 +1132,70 @@ export class TaskParser {
   /**
    * Lazy-load and return the LanguageRegistry instance
    */
+  /**
+   * Parse a single line as a task. Returns a simplified structure that
+   * TaskManager can consume for editor operations.
+   *
+   * @param line The line of text to parse
+   * @param lineNumber The line number (for Task creation)
+   * @param filePath The file path (for Task creation)
+   * @returns Parsed Task object or null if not a valid task
+   */
+  public parseLineAsTask(
+    line: string,
+    lineNumber: number,
+    filePath: string,
+  ): Task | null {
+    // Check if line matches task regex
+    if (!this.testRegex.test(line)) {
+      return null;
+    }
+
+    const match = this.captureRegex.exec(line);
+    if (!match) {
+      return null;
+    }
+
+    // Extract task details
+    const indent = match[1] || '';
+    const listMarker = (match[2] || '') + (match[3] || '');
+    const state = match[4];
+    const taskText = match[5];
+    const tail = match[6];
+
+    // Extract priority using shared utility
+    const { priority, cleanedText } = extractPriority(taskText);
+
+    // Extract checkbox state using shared regex
+    let completed = false;
+    const checkboxMatch = CHECKBOX_REGEX.exec(line);
+    if (checkboxMatch) {
+      const [, , , checkboxStatus] = checkboxMatch;
+      completed = checkboxStatus === 'x';
+    } else {
+      completed = new Set(['DONE', 'CANCELED', 'CANCELLED']).has(state);
+    }
+
+    return {
+      path: filePath,
+      line: lineNumber,
+      rawText: line,
+      indent,
+      listMarker,
+      text: cleanedText,
+      state: state as Task['state'],
+      completed,
+      priority,
+      scheduledDate: null,
+      deadlineDate: null,
+      tail,
+      urgency: null,
+      file: undefined,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    };
+  }
+
   private getLanguageRegistry(): LanguageRegistry {
     if (!this.languageRegistry) {
       this.languageRegistry = new LanguageRegistry();

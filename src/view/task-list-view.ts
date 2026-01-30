@@ -71,10 +71,8 @@ export class TaskListView extends ItemView {
     // Subscribe to task changes from the centralized state manager
     this.unsubscribeFromStateManager = taskStateManager.subscribe((tasks) => {
       this.tasks = tasks;
-      // Only update dropdowns if they've been initialized
-      if (this.optionsDropdown || this.suggestionDropdown) {
-        this.updateTasks(tasks);
-      }
+      // Always update the tasks reference and refresh the view
+      this.updateTasks(tasks);
       // Only refresh if the view is already open (has contentEl)
       if (this.contentEl && this.taskListContainer) {
         this.refreshVisibleList();

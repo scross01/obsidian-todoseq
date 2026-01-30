@@ -1,8 +1,7 @@
 import { Editor, MarkdownView } from 'obsidian';
-import { Task, DEFAULT_COMPLETED_STATES } from './task';
+import { Task } from './task';
 import TodoTracker from './main';
-import { extractPriority, CHECKBOX_REGEX } from './utils/task-utils';
-import { TaskEditor } from './view/task-editor';
+import { detectListMarker } from './utils/patterns';
 
 /**
  * TaskManager handles operations related to modifying tasks in the editor
@@ -33,17 +32,7 @@ export class TaskManager {
    * @returns The updated task line content
    */
   private updateTaskInMemory(task: Task, newState: string): string {
-    // Generate the new rawText first
-    const { newLine } = TaskEditor.generateTaskLine(task, newState);
-
-    // Update the task in the centralized state manager
-    this.plugin.taskStateManager.updateTask(task, {
-      state: newState as Task['state'],
-      completed: DEFAULT_COMPLETED_STATES.has(newState),
-      rawText: newLine,
-    });
-
-    return newLine;
+    return this.plugin.taskStateManager.optimisticUpdate(task, newState);
   }
 
   /**
@@ -74,49 +63,7 @@ export class TaskManager {
       return null;
     }
 
-    const match = parser.captureRegex.exec(line);
-    if (!match) {
-      return null;
-    }
-
-    // Extract task details using the same logic as TaskParser
-    const indent = match[1] || '';
-    const listMarker = (match[2] || '') + (match[3] || '');
-    const state = match[4];
-    const taskText = match[5];
-    const tail = match[6];
-
-    // Extract priority using shared utility
-    const { priority, cleanedText } = extractPriority(taskText);
-
-    // Extract checkbox state using shared regex
-    let completed = false;
-    const checkboxMatch = CHECKBOX_REGEX.exec(line);
-    if (checkboxMatch) {
-      const [, , , checkboxStatus] = checkboxMatch;
-      completed = checkboxStatus === 'x';
-    } else {
-      completed = new Set(['DONE', 'CANCELED', 'CANCELLED']).has(state);
-    }
-
-    return {
-      path: filePath,
-      line: lineNumber,
-      rawText: line,
-      indent,
-      listMarker,
-      text: cleanedText,
-      state: state as Task['state'],
-      completed,
-      priority,
-      scheduledDate: null,
-      deadlineDate: null,
-      tail,
-      urgency: null,
-      file: undefined,
-      isDailyNote: false,
-      dailyNoteDate: null,
-    };
+    return parser.parseLineAsTask(line, lineNumber, filePath);
   }
 
   /**
@@ -283,51 +230,10 @@ export class TaskManager {
       // This handles the case where we cycle from no keyword to TODO
       if (!newState || newState === 'TODO') {
         // Properly parse the line structure to maintain bullets/indentation
-        const lineTrimmed = line.trim();
-        const indentMatch = line.match(/^\s*/);
-        const indent = indentMatch ? indentMatch[0] : '';
-
-        // Extract list marker if present (checkbox, bullet, number, etc.)
-        let listMarker = '';
-        let text = lineTrimmed;
-
-        // Check for markdown checkboxes first: - [ ], - [x], etc.
-        const checkboxMatch = lineTrimmed.match(
-          /^(-|\*|\+)\s+\[[ x]\]\s*(.*)$/,
-        );
-        if (checkboxMatch) {
-          listMarker = checkboxMatch[1] + ' [ ] ';
-          text = checkboxMatch[2];
-        }
-        // Check for bullet lists: -, *, +
-        else if (lineTrimmed.match(/^[-*+]\s*.*$/)) {
-          const bulletMatch = lineTrimmed.match(/^([-*+])\s*(.*)$/);
-          if (bulletMatch) {
-            listMarker = bulletMatch[1] + ' ';
-            text = bulletMatch[2];
-          }
-        }
-        // Check for numbered lists: 1., 2), etc.
-        else if (lineTrimmed.match(/^\d+[.)]\s*.*$/)) {
-          const numberedMatch = lineTrimmed.match(/^(\d+[.)])\s*(.*)$/);
-          if (numberedMatch) {
-            listMarker = numberedMatch[1] + ' ';
-            text = numberedMatch[2];
-          }
-        }
-        // Check for letter lists: a., b), etc.
-        else if (lineTrimmed.match(/^[A-Za-z][.)]\s*.*$/)) {
-          const letterMatch = lineTrimmed.match(/^([A-Za-z][.)])\s*(.*)$/);
-          if (letterMatch) {
-            listMarker = letterMatch[1] + ' ';
-            text = letterMatch[2];
-          }
-        }
-        // Check for quote lines: >
-        else if (lineTrimmed.startsWith('>')) {
-          listMarker = '> ';
-          text = lineTrimmed.substring(2).trim();
-        }
+        const markerInfo = detectListMarker(line);
+        const indent = markerInfo.indent;
+        const listMarker = markerInfo.marker;
+        const text = markerInfo.text;
 
         // Create a proper task structure
         const basicTask: Task = {
@@ -429,6 +335,33 @@ export class TaskManager {
   }
 
   /**
+   * Handle setting priority on the task at the current cursor position
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @param priority - The priority to set ('high', 'med', or 'low')
+   * @returns boolean indicating if the command is available
+   */
+  handleSetPriorityAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+    priority: 'high' | 'med' | 'low',
+  ): boolean {
+    // Get the current line from the editor
+    const cursor = editor.getCursor();
+
+    // Use the extracted method to handle the line-based logic
+    return this.handleSetPriorityAtLine(
+      checking,
+      cursor.line,
+      editor,
+      view,
+      priority,
+    );
+  }
+
+  /**
    * Handle setting high priority on the task at the current cursor position
    * @param checking - Whether this is just a check to see if the command is available
    * @param editor - The editor instance
@@ -440,17 +373,7 @@ export class TaskManager {
     editor: Editor,
     view: MarkdownView,
   ): boolean {
-    // Get the current line from the editor
-    const cursor = editor.getCursor();
-
-    // Use the extracted method to handle the line-based logic
-    return this.handleSetPriorityAtLine(
-      checking,
-      cursor.line,
-      editor,
-      view,
-      'high',
-    );
+    return this.handleSetPriorityAtCursor(checking, editor, view, 'high');
   }
 
   /**
@@ -465,17 +388,7 @@ export class TaskManager {
     editor: Editor,
     view: MarkdownView,
   ): boolean {
-    // Get the current line from the editor
-    const cursor = editor.getCursor();
-
-    // Use the extracted method to handle the line-based logic
-    return this.handleSetPriorityAtLine(
-      checking,
-      cursor.line,
-      editor,
-      view,
-      'med',
-    );
+    return this.handleSetPriorityAtCursor(checking, editor, view, 'med');
   }
 
   /**
@@ -490,17 +403,7 @@ export class TaskManager {
     editor: Editor,
     view: MarkdownView,
   ): boolean {
-    // Get the current line from the editor
-    const cursor = editor.getCursor();
-
-    // Use the extracted method to handle the line-based logic
-    return this.handleSetPriorityAtLine(
-      checking,
-      cursor.line,
-      editor,
-      view,
-      'low',
-    );
+    return this.handleSetPriorityAtCursor(checking, editor, view, 'low');
   }
 
   /**

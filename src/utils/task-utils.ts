@@ -4,12 +4,7 @@ import {
   DEFAULT_PENDING_STATES,
   DEFAULT_ACTIVE_STATES,
 } from '../task';
-
-/**
- * Priority token regex pattern for extracting priority from task text
- * Matches patterns like: [#A], [#B], [#C]
- */
-export const PRIORITY_TOKEN_REGEX = /(\s*)\[#([ABC])\](\s*)/;
+import { PRIORITY_TOKEN_REGEX } from './patterns';
 
 /**
  * Result of building the task keyword list
@@ -61,11 +56,9 @@ export function buildTaskKeywords(
 }
 
 /**
- * Checkbox regex pattern for detecting markdown checkbox tasks
- * Matches: - [ ], - [x], * [ ], * [x], + [ ], + [x]
+ * Re-export patterns for backward compatibility
  */
-export const CHECKBOX_REGEX =
-  /^(\s*)([-*+]\s*\[(\s|x)\]\s*)\s+([^\s]+)\s+(.+)$/;
+export { PRIORITY_TOKEN_REGEX, CHECKBOX_REGEX } from './patterns';
 
 /**
  * Extract priority from task text and return cleaned text

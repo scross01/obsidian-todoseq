@@ -51,6 +51,71 @@ describe('Priority Commands', () => {
     taskManager = new TaskManager(mockPlugin);
   });
 
+  describe('handleSetPriorityAtCursor', () => {
+    it('should set high priority on task line via cursor handler', () => {
+      const mockEditor = {
+        getLine: (lineNumber: number) => 'TODO Test task without priority',
+        getCursor: () => ({ line: 0 }),
+      };
+
+      const mockView = {
+        file: { path: 'test.md' },
+      };
+
+      const result = taskManager.handleSetPriorityAtCursor(
+        false, // not checking
+        mockEditor as any,
+        mockView as any,
+        'high',
+      );
+
+      expect(result).toBe(true);
+      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalled();
+    });
+
+    it('should set medium priority on task line via cursor handler', () => {
+      const mockEditor = {
+        getLine: (lineNumber: number) => 'TODO Test task without priority',
+        getCursor: () => ({ line: 0 }),
+      };
+
+      const mockView = {
+        file: { path: 'test.md' },
+      };
+
+      const result = taskManager.handleSetPriorityAtCursor(
+        false, // not checking
+        mockEditor as any,
+        mockView as any,
+        'med',
+      );
+
+      expect(result).toBe(true);
+      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalled();
+    });
+
+    it('should set low priority on task line via cursor handler', () => {
+      const mockEditor = {
+        getLine: (lineNumber: number) => 'TODO Test task without priority',
+        getCursor: () => ({ line: 0 }),
+      };
+
+      const mockView = {
+        file: { path: 'test.md' },
+      };
+
+      const result = taskManager.handleSetPriorityAtCursor(
+        false, // not checking
+        mockEditor as any,
+        mockView as any,
+        'low',
+      );
+
+      expect(result).toBe(true);
+      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalled();
+    });
+  });
+
   describe('handleSetPriorityAtLine', () => {
     it('should set high priority on task line', () => {
       const mockEditor = {

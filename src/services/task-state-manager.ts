@@ -1,4 +1,5 @@
-import { Task } from '../task';
+import { Task, DEFAULT_COMPLETED_STATES } from '../task';
+import { TaskEditor } from '../view/task-editor';
 
 /**
  * TaskStateManager provides centralized state management for tasks.
@@ -87,6 +88,26 @@ export class TaskStateManager {
    */
   findTaskByPathAndLine(path: string, line: number): Task | null {
     return this._tasks.find((t) => t.path === path && t.line === line) || null;
+  }
+
+  /**
+   * Perform an optimistic update on a task.
+   * @param task The task to update
+   * @param newState The new state to set
+   * @returns The updated task line content
+   */
+  optimisticUpdate(task: Task, newState: string): string {
+    // Generate the new rawText first
+    const { newLine } = TaskEditor.generateTaskLine(task, newState);
+
+    // Update the task in the centralized state manager
+    this.updateTask(task, {
+      state: newState as Task['state'],
+      completed: DEFAULT_COMPLETED_STATES.has(newState),
+      rawText: newLine,
+    });
+
+    return newLine;
   }
 
   /**

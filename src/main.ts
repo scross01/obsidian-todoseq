@@ -130,6 +130,9 @@ export default class TodoTracker extends Plugin {
         this.settings,
         urgencyCoefficients,
       );
+
+      // Wait for the parser to be fully created
+      await this.vaultScanner.getParser();
     }
 
     // Update embedded task list processor with new settings
@@ -139,11 +142,21 @@ export default class TodoTracker extends Plugin {
   }
 
   // Public method to update reader view formatter with current settings
-  // Note: The parser is now shared via VaultScanner, so this method
-  // is kept for API compatibility but doesn't need to recreate the parser
   public refreshReaderViewFormatter(): void {
-    // Parser is managed by VaultScanner - no action needed here
-    // The reader view formatter uses the shared parser from vaultScanner
+    // Force a refresh of all open markdown views to reprocess with new settings
+    const leaves = this.app.workspace.getLeavesOfType('markdown');
+    leaves.forEach((leaf) => {
+      const view = leaf.view;
+      if (view && 'previewMode' in view) {
+        const previewMode = (
+          view as { previewMode?: { rerender: (force: boolean) => void } }
+        ).previewMode;
+        if (previewMode) {
+          // If in reader/preview mode, use rerender() method
+          previewMode.rerender(true);
+        }
+      }
+    });
   }
 
   // Public method to trigger a vault scan using VaultScanner

@@ -110,7 +110,6 @@ export async function parseUrgencyCoefficients(
     // If no custom file found, use default coefficients
     return { ...DEFAULT_URGENCY_COEFFICIENTS };
   } catch (error) {
-    console.warn('Error reading urgency.ini, using defaults', error);
     // Fallback to defaults on any error
     return { ...DEFAULT_URGENCY_COEFFICIENTS };
   }

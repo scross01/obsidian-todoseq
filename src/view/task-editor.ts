@@ -5,7 +5,7 @@ import {
   NEXT_STATE,
   CYCLE_TASK_STATE,
 } from '../task';
-import { CHECKBOX_REGEX, PRIORITY_TOKEN_REGEX } from '../utils/task-utils';
+import { PRIORITY_TOKEN_REGEX, CHECKBOX_REGEX } from '../utils/patterns';
 import { getPluginSettings } from '../utils/settings-utils';
 
 export class TaskEditor {

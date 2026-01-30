@@ -55,7 +55,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         // Sync each view's mode from settings before render
         const mode = this.plugin.settings.taskListViewMode;
         leaf.view.setViewMode(mode);
-        await leaf.view.onOpen();
+        // Use lighter refresh instead of full onOpen rebuild
+        leaf.view.refreshVisibleList();
       }
     }
   };
@@ -146,7 +147,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
             // Always recreate parser and rescan with valid keywords
             try {
-              this.plugin.recreateParser();
+              await this.plugin.recreateParser();
               await this.plugin.scanVault();
               await this.refreshAllTaskListViews();
               // Force refresh of visible editor decorations to apply new keywords
@@ -163,7 +164,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             this.plugin.settings.additionalTaskKeywords = parsed;
             await this.plugin.saveSettings();
             // Recreate parser according to new settings and rescan
-            this.plugin.recreateParser();
+            await this.plugin.recreateParser();
             await this.plugin.scanVault();
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new keywords
@@ -219,11 +220,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             }
             languageSetting.setDisabled(!value);
             // Recreate parser to reflect includeCodeBlocks change and rescan
-            this.plugin.recreateParser();
+            await this.plugin.recreateParser();
             await this.plugin.scanVault();
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new CSS classes
             this.plugin.refreshVisibleEditorDecorations();
+            // Force refresh of reader view to apply new formatting
+            this.plugin.refreshReaderViewFormatter();
           }),
       );
 
@@ -241,11 +244,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.languageCommentSupport.enabled = value;
             await this.plugin.saveSettings();
-            this.plugin.recreateParser();
+            await this.plugin.recreateParser();
             await this.plugin.scanVault();
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new CSS classes
             this.plugin.refreshVisibleEditorDecorations();
+            // Force refresh of reader view to apply new formatting
+            this.plugin.refreshReaderViewFormatter();
           });
       });
 
@@ -279,7 +284,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             this.plugin.settings.includeCalloutBlocks = value;
             await this.plugin.saveSettings();
             // Recreate parser to reflect includeCalloutBlocks change and rescan
-            this.plugin.recreateParser();
+            await this.plugin.recreateParser();
             await this.plugin.scanVault();
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new CSS classes
@@ -300,11 +305,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             this.plugin.settings.includeCommentBlocks = value;
             await this.plugin.saveSettings();
             // Recreate parser to reflect includeCommentBlocks change and rescan
-            this.plugin.recreateParser();
+            await this.plugin.recreateParser();
             await this.plugin.scanVault();
             await this.refreshAllTaskListViews();
             // Force refresh of visible editor decorations to apply new CSS classes
             this.plugin.refreshVisibleEditorDecorations();
+            // Force refresh of reader view to apply new formatting
+            this.plugin.refreshReaderViewFormatter();
           }),
       );
 
