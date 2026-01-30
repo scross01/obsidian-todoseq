@@ -229,8 +229,13 @@ export class VaultScanner {
    */
   async handleFileChange(file: TAbstractFile): Promise<void> {
     try {
-      // Only process Markdown files
-      if (!(file instanceof TFile) || file.extension !== 'md') return;
+      // Only process Markdown files that are not excluded
+      if (
+        !(file instanceof TFile) ||
+        file.extension !== 'md' ||
+        this.isExcluded(file.path)
+      )
+        return;
 
       // Get current tasks and remove existing tasks for this file
       const currentTasks = this.taskStateManager.getTasks();
@@ -271,6 +276,12 @@ export class VaultScanner {
       // Get current tasks and remove existing tasks for the old path
       const currentTasks = this.taskStateManager.getTasks();
       const updatedTasks = currentTasks.filter((t) => t.path !== oldPath);
+
+      // If the file still exists (it should after rename), scan it at its new location
+      if (file instanceof TFile && !this.isExcluded(file.path)) {
+        const fileTasks = await this.scanFile(file);
+        updatedTasks.push(...fileTasks);
+      }
 
       // If the file still exists (it should after rename), scan it at its new location
       if (file instanceof TFile) {

@@ -6,7 +6,8 @@
 - Added new embedded task lists to add customer filtered lists with a page. #21
 - Centralized task state management across all views (task list view, page editor, page reader).
 - Fixed issues with changing settings not updating task collection and display.
-- Fixed task navigation for consistent behavior with cmd-/ctrl- and shift- select modifiers.
+- Fixed task selection navigation for consistent behavior with cmd-/ctrl- and shift- select modifiers.
+- Fixed file change handling check to honor the global excludes settings, improves startup performance.
 
 ## 0.8.1
 
