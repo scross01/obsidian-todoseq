@@ -23,6 +23,7 @@ Using the following parameters within the `todoseq` code block you define which 
 - `sort:` one of `filepath`, `scheduled`, `deadline`, `priority` or `urgency`.
 - `completed:` (optional) one of `show`, `hide`, `sort-to-end`. Overrides the "Completed tasks" setting.
 - `future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Overrides the overrides "Future dated tasks" setting.
+- `show-file:` (optional) `true` or `false`. Controls whether to show the source file info column. Defaults to `true` (responsive layout).
 - `limit:` (optional) set the display limit to result the number of results shown.
 
 Example:
@@ -118,6 +119,20 @@ limit: 10
 ```
 ````
 
+### Show File Info
+
+The `show-file:` parameter controls whether to display the source file information column:
+
+- `true` - Show file info (default, responsive layout)
+- `false` - Always hide file info
+
+````txt
+```todoseq
+search: tag:project1
+show-file: false
+```
+````
+
 ### Combined Parameters
 
 You can combine multiple parameters:
@@ -128,6 +143,7 @@ search: (file:Project1 OR tag:project1) AND content:"example"
 sort: priority
 completed: hide
 future: show-all
+show-file: false
 limit: 10
 ```
 ````

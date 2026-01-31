@@ -33,6 +33,7 @@ export interface TodoseqParameters {
   completed?: CompletedOption;
   future?: FutureOption;
   limit?: number;
+  showFile?: boolean;
   error?: string;
 }
 
@@ -63,6 +64,7 @@ export class TodoseqCodeBlockParser {
       let completed: CompletedOption | undefined;
       let future: FutureOption | undefined;
       let limit: number | undefined;
+      let showFile: boolean | undefined;
 
       // Parse each line for parameters
       for (const line of lines) {
@@ -140,6 +142,20 @@ export class TodoseqCodeBlockParser {
             );
           }
           limit = parsedLimit;
+        } else if (trimmed.startsWith('show-file:')) {
+          const showFileValue = trimmed
+            .substring('show-file:'.length)
+            .trim()
+            .toLowerCase();
+          if (showFileValue === 'false') {
+            showFile = false;
+          } else if (showFileValue === 'true') {
+            showFile = true;
+          } else {
+            throw new Error(
+              `Invalid show-file option: ${showFileValue}. Valid options: true, false`,
+            );
+          }
         }
       }
 
@@ -152,7 +168,7 @@ export class TodoseqCodeBlockParser {
         }
       }
 
-      return { searchQuery, sortMethod, completed, future, limit };
+      return { searchQuery, sortMethod, completed, future, limit, showFile };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -160,6 +176,7 @@ export class TodoseqCodeBlockParser {
         searchQuery: '',
         sortMethod: 'default',
         error: errorMessage,
+        showFile: undefined,
       };
     }
   }

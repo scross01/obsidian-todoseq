@@ -1066,7 +1066,10 @@ export class TaskListView extends ItemView {
 
     // File info
     const fileInfo = li.createEl('div', { cls: 'todo-file-info' });
-    fileInfo.setText(`${getFilename(task.path)}:${task.line + 1}`);
+    const fileName = getFilename(task.path);
+    // Strip .md extension from display name
+    const displayName = fileName.replace(/\.md$/, '');
+    fileInfo.setText(`${displayName}:${task.line + 1}`);
     fileInfo.setAttribute('title', task.path);
 
     // Click to open source (avoid checkbox and keyword)

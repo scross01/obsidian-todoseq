@@ -100,7 +100,7 @@ export class EmbeddedTaskListRenderer {
 
     // Render each task
     tasks.forEach((task, index) => {
-      const taskItem = this.createTaskListItem(task, index);
+      const taskItem = this.createTaskListItem(task, index, params);
       taskList.appendChild(taskItem);
     });
 
@@ -321,9 +321,14 @@ export class EmbeddedTaskListRenderer {
    * Create a single task list item element
    * @param task The task to render
    * @param index The index of the task in the list
+   * @param params Code block parameters
    * @returns HTML list item element
    */
-  private createTaskListItem(task: Task, index: number): HTMLLIElement {
+  private createTaskListItem(
+    task: Task,
+    index: number,
+    params: TodoseqParameters,
+  ): HTMLLIElement {
     const li = document.createElement('li');
     li.className = 'embedded-task-item';
 
@@ -431,17 +436,25 @@ export class EmbeddedTaskListRenderer {
       textContainer.appendChild(textSpan);
     }
 
-    // Create file info
-    const fileInfo = document.createElement('div');
-    fileInfo.className = 'embedded-task-file-info';
-    const fileName = task.path.split('/').pop() || task.path;
-    fileInfo.textContent = `${fileName}:${task.line + 1}`;
-    fileInfo.setAttribute('title', task.path);
+    // Create file info if show-file is not explicitly false
+    if (params.showFile !== false) {
+      const fileInfo = document.createElement('div');
+      fileInfo.className = 'embedded-task-file-info';
+      const fileName = task.path.split('/').pop() || task.path;
+      // Strip .md extension from display name
+      const displayName = fileName.replace(/\.md$/, '');
+      fileInfo.textContent = `${displayName}:${task.line + 1}`;
+      fileInfo.setAttribute('title', task.path);
 
-    // Assemble the item
-    li.appendChild(checkbox);
-    li.appendChild(textContainer);
-    li.appendChild(fileInfo);
+      // Assemble the item
+      li.appendChild(checkbox);
+      li.appendChild(textContainer);
+      li.appendChild(fileInfo);
+    } else {
+      // Assemble the item without file info
+      li.appendChild(checkbox);
+      li.appendChild(textContainer);
+    }
 
     // Add event listeners
     this.addTaskEventListeners(li, checkbox, task);
