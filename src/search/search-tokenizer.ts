@@ -57,6 +57,16 @@ export class SearchTokenizer {
             type = 'prefix_value';
           }
 
+          // Special handling: if this is a phrase token and the previous token was a prefix,
+          // convert it to prefix_value_quoted to track it was originally quoted
+          if (
+            type === 'phrase' &&
+            tokens.length > 0 &&
+            tokens[tokens.length - 1].type === 'prefix'
+          ) {
+            type = 'prefix_value_quoted';
+          }
+
           // Special handling: if this is a dash and the previous token was a prefix_value
           // merge it with the next word token to form a single prefix_value with dash
           // Only merge if there was no whitespace before the dash (i.e., dash is immediately after the prefix_value)
@@ -136,6 +146,13 @@ export class SearchTokenizer {
           return content.replace(/\\"/g, '"');
         }
         return token;
+      case 'prefix_value_quoted':
+        // Remove surrounding quotes from quoted prefix values
+        if (token.startsWith('"') && token.endsWith('"')) {
+          const content = token.slice(1, -1);
+          return content.replace(/\\"/g, '"');
+        }
+        return token;
       case 'or':
       case 'and':
       case 'range':
@@ -164,6 +181,8 @@ export class SearchTokenizer {
       case 'prefix':
         return BP.DEFAULT;
       case 'prefix_value':
+        return BP.DEFAULT;
+      case 'prefix_value_quoted':
         return BP.DEFAULT;
       case 'word':
         return BP.DEFAULT;

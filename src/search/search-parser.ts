@@ -187,10 +187,14 @@ class PrattParser {
     if (
       valueToken.type === 'prefix_value' ||
       valueToken.type === 'word' ||
-      valueToken.type === 'phrase'
+      valueToken.type === 'phrase' ||
+      valueToken.type === 'prefix_value_quoted'
     ) {
       const field = prefixToken.value as SearchPrefix; // Will be validated in evaluator
       const value = valueToken.value;
+      const exact =
+        valueToken.type === 'phrase' ||
+        valueToken.type === 'prefix_value_quoted'; // Quoted values should be exact matches
       this.position++;
 
       return {
@@ -198,6 +202,7 @@ class PrattParser {
         field: field,
         value: value,
         position: prefixToken.position,
+        exact: exact,
       };
     } else {
       throw new SearchError(

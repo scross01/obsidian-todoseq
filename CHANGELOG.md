@@ -1,5 +1,7 @@
 # Change Log
 
+- Fixed tag search functionality with subtag support and exact matching. #28
+
 ## 0.9.0
 
 - Added task keyword styling in the reader view with interactive state updates. #22

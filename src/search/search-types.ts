@@ -19,7 +19,8 @@ export interface SearchToken {
     | 'lparen'
     | 'rparen'
     | 'prefix'
-    | 'prefix_value';
+    | 'prefix_value'
+    | 'prefix_value_quoted';
   value: string;
   original: string;
   position: number;
@@ -40,6 +41,7 @@ export interface SearchNode {
   start?: string;
   end?: string;
   position?: number;
+  exact?: boolean; // Track if value was originally quoted for exact matching
 }
 
 export class SearchError extends Error {

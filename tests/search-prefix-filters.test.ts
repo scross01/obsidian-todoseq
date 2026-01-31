@@ -15,6 +15,9 @@ describe('Search Prefix Filters', () => {
       priority: 'high',
       scheduledDate: null,
       deadlineDate: null,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     },
     {
       path: 'notes/work/tasks.md',
@@ -28,6 +31,9 @@ describe('Search Prefix Filters', () => {
       priority: 'high',
       scheduledDate: null,
       deadlineDate: null,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     },
     {
       path: 'notes/personal/hobbies.md',
@@ -41,6 +47,9 @@ describe('Search Prefix Filters', () => {
       priority: null,
       scheduledDate: null,
       deadlineDate: null,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     },
     {
       path: 'notes/star-wars.md',
@@ -54,6 +63,9 @@ describe('Search Prefix Filters', () => {
       priority: 'low',
       scheduledDate: null,
       deadlineDate: null,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
     },
   ];
 
@@ -100,6 +112,9 @@ describe('Search Prefix Filters', () => {
           priority: null,
           scheduledDate: null,
           deadlineDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
         },
         {
           path: 'examples/folder 1/notes.md',
@@ -113,6 +128,9 @@ describe('Search Prefix Filters', () => {
           priority: null,
           scheduledDate: null,
           deadlineDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
         },
         {
           path: 'examples/folder 2/meeting.md',
@@ -126,6 +144,9 @@ describe('Search Prefix Filters', () => {
           priority: null,
           scheduledDate: null,
           deadlineDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
         },
         {
           path: 'notes/examples.md',
@@ -139,6 +160,9 @@ describe('Search Prefix Filters', () => {
           priority: null,
           scheduledDate: null,
           deadlineDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
         },
       ];
 

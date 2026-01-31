@@ -129,7 +129,7 @@ export class SearchEvaluator {
       case 'file':
         return this.evaluateFileFilter(value, task, caseSensitive);
       case 'tag':
-        return this.evaluateTagFilter(value, task, caseSensitive);
+        return this.evaluateTagFilter(value, task, caseSensitive, node.exact);
       case 'state':
         return this.evaluateStateFilter(value, task, caseSensitive);
       case 'priority':
@@ -206,22 +206,60 @@ export class SearchEvaluator {
     value: string,
     task: Task,
     caseSensitive: boolean,
+    exact?: boolean,
   ): boolean {
     if (!task.rawText) return false;
 
-    const searchText = caseSensitive ? value : value.toLowerCase();
     const targetText = caseSensitive
       ? task.rawText
       : task.rawText.toLowerCase();
 
-    // Look for tag patterns (#tag)
-    const tagRegex = /#([\w-]+)/g;
+    // Look for tag patterns with support for subtags (#context, #context/home, etc.)
+    const tagRegex = /#([\w/-]+)/g;
     const matches = targetText.match(tagRegex) || [];
 
-    return matches.some((tag) => {
-      const tagContent = caseSensitive ? tag : tag.toLowerCase();
-      return tagContent.includes(searchText);
-    });
+    if (exact) {
+      // Exact match behavior for quoted searches
+      // Normalize search value - make # prefix optional
+      let normalizedValue = value;
+      if (normalizedValue.startsWith('#')) {
+        normalizedValue = normalizedValue.slice(1);
+      }
+      const searchText = caseSensitive
+        ? normalizedValue
+        : normalizedValue.toLowerCase();
+
+      return matches.some((tag) => {
+        const tagContent = tag.slice(1); // Remove #
+        const normalizedTag = caseSensitive
+          ? tagContent
+          : tagContent.toLowerCase();
+        return normalizedTag === searchText;
+      });
+    } else {
+      // Unquoted behavior - exact match if starts with #, prefix match otherwise
+      if (value.startsWith('#')) {
+        // Exact match on the full tag including the #
+        const searchText = caseSensitive ? value : value.toLowerCase();
+        return matches.some((tag) => {
+          const normalizedTag = caseSensitive ? tag : tag.toLowerCase();
+          return normalizedTag === searchText;
+        });
+      } else {
+        // Prefix match behavior for unquoted searches without #
+        const searchText = caseSensitive ? value : value.toLowerCase();
+        return matches.some((tag) => {
+          const tagContent = tag.slice(1); // Remove #
+          const normalizedTag = caseSensitive
+            ? tagContent
+            : tagContent.toLowerCase();
+          return (
+            normalizedTag === searchText ||
+            normalizedTag.startsWith(searchText + '/')
+          );
+        });
+      }
+    }
   }
 
   private static evaluateStateFilter(
