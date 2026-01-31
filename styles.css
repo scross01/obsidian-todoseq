@@ -682,9 +682,11 @@
   color: var(--text-muted);
   font-size: 0.7em;
   font-family: var(--font-monospace);
-  white-space: nowrap;
   margin-left: 8px;
   opacity: 0.7;
+  max-width: 32ch; /* Fallback: ensure max width of 23 monospace characters */
+  overflow: hidden;
+  text-overflow: ellipsis; /* Additional fallback for safety */
 }
 
 /* Completed task styling */

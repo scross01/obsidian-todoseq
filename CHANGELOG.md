@@ -1,5 +1,6 @@
 # Change Log
 
+- Added truncation to long file names in the embedded task list views. Hover over the truncated name to see the full path. #25
 - Fixed tag search functionality with subtag support and exact matching. #28
 
 ## 0.9.0

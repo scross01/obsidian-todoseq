@@ -136,3 +136,24 @@ export function isCompletedState(state: string): boolean {
 export function getCheckboxStatus(completed: boolean): string {
   return completed ? 'x' : ' ';
 }
+
+/**
+ * Truncate a string in the middle with ellipsis
+ * @param str The string to truncate
+ * @param maxLength Maximum length of the result string
+ * @returns Truncated string with '...' in middle if needed
+ */
+export function truncateMiddle(str: string, maxLength: number): string {
+  if (str.length <= maxLength) return str;
+
+  const ellipsis = '..';
+  const availableChars = maxLength - ellipsis.length;
+  const startChars = Math.ceil(availableChars / 2);
+  const endChars = Math.floor(availableChars / 2);
+
+  return (
+    str.substring(0, startChars) +
+    ellipsis +
+    str.substring(str.length - endChars)
+  );
+}

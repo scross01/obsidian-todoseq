@@ -9,6 +9,7 @@ import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import { MarkdownView, Menu, WorkspaceLeaf, TFile, Platform } from 'obsidian';
 import { getPluginSettings } from '../../utils/settings-utils';
+import { truncateMiddle } from '../../utils/task-utils';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -443,7 +444,9 @@ export class EmbeddedTaskListRenderer {
       const fileName = task.path.split('/').pop() || task.path;
       // Strip .md extension from display name
       const displayName = fileName.replace(/\.md$/, '');
-      fileInfo.textContent = `${displayName}:${task.line + 1}`;
+      const displayText = `${displayName}:${task.line + 1}`;
+      // Apply middle truncation with 23 character limit
+      fileInfo.textContent = truncateMiddle(displayText, 32);
       fileInfo.setAttribute('title', task.path);
 
       // Assemble the item
