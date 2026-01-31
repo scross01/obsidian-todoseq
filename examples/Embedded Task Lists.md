@@ -16,14 +16,19 @@ sort: priority
 - `completed:` (optional) overrides "Completed tasks" setting. `show`, `hide`, `sort-to-end`.
 - `future:` (optional) overrides "Future dated tasks" setting. `show-all`, `show-upcoming`, `hide`, `sort-to-end`.
 - `limit:` (optional) set the display limit to result the number of results shown.
-
+- `title:` (optional) adds a custom title displayed above the task list.
+- `show-file:` (optional) `true` or `false`. Controls whether to show the source file info column. Defaults to `true` (responsive layout).
+- `show-query:` (optional) `true` or `false`. Controls whether to show the search query and filter parameters in the header.
 
 ```todoseq
+title: Example
 search: state:DOING
 sort: filepath
 completed: hide
 future: sort-to-end
 limit: 5
+show-query: true
+show-file: true
 ```
 
 ### Search Query

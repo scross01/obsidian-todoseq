@@ -25,6 +25,8 @@ Using the following parameters within the `todoseq` code block you define which 
 - `future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Overrides the overrides "Future dated tasks" setting.
 - `show-file:` (optional) `true` or `false`. Controls whether to show the source file info column. Defaults to `true` (responsive layout).
 - `limit:` (optional) set the display limit to result the number of results shown.
+- `title:` (optional) adds a custom title displayed above the task list.
+- `show-query:` (optional) `true` or `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `true`.
 
 Example:
 
@@ -35,6 +37,8 @@ sort: filepath
 completed: hide
 future: show-upcoming
 limit: 5
+title: Project Tasks
+show-query: true
 ```
 ````
 
@@ -132,6 +136,40 @@ search: tag:project1
 show-file: false
 ```
 ````
+
+### Title
+
+The `title:` parameter adds a custom title displayed above the task list:
+
+````txt
+```todoseq
+search: tag:urgent
+sort: priority
+title: Urgent Tasks
+```
+````
+
+The title appears at the top of the embedded task list, above the search query and other parameters.
+
+### Show Query Header
+
+The `show-query:` parameter controls whether the search query and filter parameters are displayed in the header:
+
+- `true` - Show the query header (default)
+- `false` - Hide the query header
+
+This is useful when you want a cleaner look, especially when combined with a title:
+
+````txt
+```todoseq
+search: tag:urgent
+sort: priority
+title: Urgent Tasks
+show-query: false
+```
+````
+
+When `show-query: false` is set without a `title:`, the task list will display without any header at all.
 
 ### Combined Parameters
 

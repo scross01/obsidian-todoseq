@@ -45,13 +45,23 @@ export class EmbeddedTaskListRenderer {
       cls: 'embedded-task-list-container',
     });
 
-    // Add header with search/sort info
+    // Add title if provided
+    if (params.title) {
+      taskListContainer.createEl('div', {
+        cls: 'embedded-task-list-title',
+        text: params.title,
+      });
+    }
+
+    // Add header with search/sort info (only if showQuery is not explicitly false)
+    const showQueryHeader = params.showQuery !== false;
     const hasHeaderContent =
-      params.searchQuery ||
-      params.sortMethod !== 'default' ||
-      params.completed !== undefined ||
-      params.future !== undefined ||
-      params.limit !== undefined;
+      showQueryHeader &&
+      (params.searchQuery ||
+        params.sortMethod !== 'default' ||
+        params.completed !== undefined ||
+        params.future !== undefined ||
+        params.limit !== undefined);
 
     if (hasHeaderContent) {
       const header = taskListContainer.createEl('div', {
@@ -91,6 +101,16 @@ export class EmbeddedTaskListRenderer {
           cls: 'embedded-task-list-limit',
           text: `Limit: ${params.limit}`,
         });
+      }
+    }
+
+    // Add bottom border to title if there's no header and no task list border will be added
+    if (params.title && !hasHeaderContent) {
+      const titleEl = taskListContainer.querySelector(
+        '.embedded-task-list-title',
+      );
+      if (titleEl) {
+        titleEl.addClass('embedded-task-list-title-bordered');
       }
     }
 

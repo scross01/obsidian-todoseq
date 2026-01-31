@@ -1,6 +1,8 @@
 # Change Log
 
 - Added truncation to long file names in the embedded task list views. Hover over the truncated name to see the full path. #25
+- Added `title:` parameter to embedded task lists to display a custom title above the list. #27
+- Added `show-query:` parameter to embedded task lists to toggle display of the search query and filter parameters in the header. #27
 - Fixed tag search functionality with subtag support and exact matching. #28
 
 ## 0.9.0

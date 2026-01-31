@@ -34,6 +34,8 @@ export interface TodoseqParameters {
   future?: FutureOption;
   limit?: number;
   showFile?: boolean;
+  title?: string;
+  showQuery?: boolean;
   error?: string;
 }
 
@@ -65,6 +67,8 @@ export class TodoseqCodeBlockParser {
       let future: FutureOption | undefined;
       let limit: number | undefined;
       let showFile: boolean | undefined;
+      let title: string | undefined;
+      let showQuery: boolean | undefined;
 
       // Parse each line for parameters
       for (const line of lines) {
@@ -156,6 +160,22 @@ export class TodoseqCodeBlockParser {
               `Invalid show-file option: ${showFileValue}. Valid options: true, false`,
             );
           }
+        } else if (trimmed.startsWith('title:')) {
+          title = trimmed.substring('title:'.length).trim();
+        } else if (trimmed.startsWith('show-query:')) {
+          const showQueryValue = trimmed
+            .substring('show-query:'.length)
+            .trim()
+            .toLowerCase();
+          if (showQueryValue === 'false') {
+            showQuery = false;
+          } else if (showQueryValue === 'true') {
+            showQuery = true;
+          } else {
+            throw new Error(
+              `Invalid show-query option: ${showQueryValue}. Valid options: true, false`,
+            );
+          }
         }
       }
 
@@ -168,7 +188,16 @@ export class TodoseqCodeBlockParser {
         }
       }
 
-      return { searchQuery, sortMethod, completed, future, limit, showFile };
+      return {
+        searchQuery,
+        sortMethod,
+        completed,
+        future,
+        limit,
+        showFile,
+        title,
+        showQuery,
+      };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -177,6 +206,8 @@ export class TodoseqCodeBlockParser {
         sortMethod: 'default',
         error: errorMessage,
         showFile: undefined,
+        title: undefined,
+        showQuery: undefined,
       };
     }
   }

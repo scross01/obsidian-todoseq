@@ -528,6 +528,22 @@
   margin: 16px 0;
 }
 
+/* Title styling */
+.embedded-task-list-title {
+  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  font-size: 1em;
+  color: var(--text-normal);
+  padding: 2px 6px 6px 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 8px;
+}
+
+/* Title with border when no header follows */
+.embedded-task-list-title-bordered {
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 8px;
+}
+
 /* Header with search/sort info */
 .embedded-task-list-header {
   display: flex;
@@ -538,6 +554,11 @@
   margin-bottom: 8px;
   font-size: 0.75em;
   color: var(--text-muted);
+}
+
+/* When title is present, remove top padding from header */
+.embedded-task-list-title + .embedded-task-list-header {
+  padding-top: 0;
 }
 
 .embedded-task-list-search,
