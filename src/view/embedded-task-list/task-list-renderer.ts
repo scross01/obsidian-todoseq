@@ -255,6 +255,69 @@ export class EmbeddedTaskListRenderer {
   }
 
   /**
+   * Determine the date category for a task based on its scheduled and deadline dates
+   * @param task The task to analyze
+   * @returns Date category: 'overdue', 'today', 'soon', 'later', or 'none'
+   */
+  private getDateCategory(
+    task: Task,
+  ): 'overdue' | 'today' | 'soon' | 'later' | 'none' {
+    const now = new Date();
+    const today = this.getDateOnly(now);
+
+    // Get the earliest date if both exist, or the single available date
+    let targetDate: Date | null = null;
+
+    if (task.scheduledDate && task.deadlineDate) {
+      targetDate =
+        task.scheduledDate < task.deadlineDate
+          ? task.scheduledDate
+          : task.deadlineDate;
+    } else if (task.scheduledDate) {
+      targetDate = task.scheduledDate;
+    } else if (task.deadlineDate) {
+      targetDate = task.deadlineDate;
+    }
+
+    // If no dates, return 'none'
+    if (!targetDate) {
+      return 'none';
+    }
+
+    const target = this.getDateOnly(targetDate);
+
+    // Check if overdue (before today)
+    if (target < today) {
+      return 'overdue';
+    }
+
+    // Check if due today
+    if (target.getTime() === today.getTime()) {
+      return 'today';
+    }
+
+    // Check if due soon (within next 7 days)
+    const soonDate = this.getDateOnly(
+      new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+    );
+    if (target <= soonDate) {
+      return 'soon';
+    }
+
+    // Otherwise, it's later
+    return 'later';
+  }
+
+  /**
+   * Get date only (time part set to 00:00:00.000)
+   * @param date The date to normalize
+   * @returns A new Date object at midnight of the same day
+   */
+  private getDateOnly(date: Date): Date {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  /**
    * Create a single task list item element
    * @param task The task to render
    * @param index The index of the task in the list
@@ -263,6 +326,13 @@ export class EmbeddedTaskListRenderer {
   private createTaskListItem(task: Task, index: number): HTMLLIElement {
     const li = document.createElement('li');
     li.className = 'embedded-task-item';
+
+    // Apply date-based background styling if the task has scheduled or deadline dates
+    const dateCategory = this.getDateCategory(task);
+    if (dateCategory !== 'none') {
+      li.classList.add(`embedded-task-item-date-${dateCategory}`);
+    }
+
     li.setAttribute('data-path', task.path);
     li.setAttribute('data-line', String(task.line));
     li.setAttribute('data-index', String(index));

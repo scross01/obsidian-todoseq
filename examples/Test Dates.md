@@ -43,11 +43,6 @@ TODO test date in code block
 SCHEDULED: <2027-01-01>
 ```
 
-```python
-# TODO test date in language block
-# SCHEDULED: <2027-01-01>
-```
-
 %%
 TODO test date in comment block
 SCHEDULED: <2027-01-01>

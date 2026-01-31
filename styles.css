@@ -270,16 +270,8 @@
 }
 
 .todo-view .todo-date-soon {
-  background-color: color-mix(
-    in srgb,
-    var(--background-modifier-accent) 5%,
-    transparent
-  );
-  border-left-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 50%,
-    transparent
-  );
+  background-color: color-mix(in srgb, var(--color-green) 5%, transparent);
+  border-left-color: color-mix(in srgb, var(--color-green) 50%, transparent);
 }
 
 .todo-view .todo-date-soon .date-value {
@@ -860,4 +852,35 @@
 .todoseq-embedded-task-list-refresh-btn:focus-visible {
   outline: 2px solid var(--interactive-accent, #7f6df2);
   outline-offset: 2px;
+}
+
+/* Embedded Task List Date Background Styling */
+.embedded-task-item-date-overdue {
+  background-color: color-mix(in srgb, var(--color-red) 5%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--color-red) 50%, transparent);
+  padding-left: 5px; /* Reduce left padding to compensate for border */
+}
+
+.embedded-task-item-date-today {
+  background-color: color-mix(in srgb, var(--color-orange) 5%, transparent);
+  border-left: 3px solid
+    color-mix(in srgb, var(--color-orange) 50%, transparent);
+  padding-left: 5px; /* Reduce left padding to compensate for border */
+}
+
+.embedded-task-item-date-soon {
+  background-color: color-mix(in srgb, var(--color-green) 5%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--color-green) 50%, transparent);
+  padding-left: 5px; /* Reduce left padding to compensate for border */
+}
+
+.embedded-task-item-date-later {
+  background-color: color-mix(
+    in srgb,
+    var(--background-modifier-accent) 5%,
+    transparent
+  );
+  border-left: 3px solid
+    color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+  padding-left: 5px; /* Reduce left padding to compensate for border */
 }
