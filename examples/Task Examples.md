@@ -15,7 +15,9 @@ TODO this is a task with overdue dates
 SCHEDULED: <2025-08-01>
 DEADLINE: <2025-08-02>
 
-- [ ] TODO this is a task on the Examples page with and embed reference ^xyz123
+ TODO this is a task on the Examples page with and embed reference ^xyz789
+ 
+- [ ] TODO this is a checkbox task on the Examples page with and embed reference ^xyz123
 
 ---
 

@@ -204,9 +204,13 @@ export class ReaderViewFormatter {
     // Determine the new state based on checkbox state
     const newState = isChecked ? 'DONE' : 'TODO';
 
-    // Use TaskEditor to update the task
-    if (this.plugin.taskEditor) {
-      await this.plugin.taskEditor.applyLineUpdate(task, newState);
+    // Use the centralized coordinator for the update
+    if (this.plugin.taskUpdateCoordinator) {
+      await this.plugin.taskUpdateCoordinator.updateTaskState(
+        task,
+        newState,
+        'reader',
+      );
     }
   }
 
@@ -1558,9 +1562,13 @@ export class ReaderViewFormatter {
       return;
     }
 
-    // Use TaskEditor to update the task
-    if (this.plugin.taskEditor) {
-      await this.plugin.taskEditor.applyLineUpdate(task, newState);
+    // Use the centralized coordinator for the update
+    if (this.plugin.taskUpdateCoordinator) {
+      await this.plugin.taskUpdateCoordinator.updateTaskState(
+        task,
+        newState,
+        'reader',
+      );
     }
   }
 

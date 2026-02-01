@@ -1,5 +1,7 @@
 # Change Log
 
+- Improved update responsiveness with centralized service to handle all task state updates consistently across the plugin.
+
 ## 0.9.1
 
 - Added truncation to long file names in the embedded task list views. Hover over the truncated name to see the full path. #25

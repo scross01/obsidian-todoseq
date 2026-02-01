@@ -100,12 +100,29 @@ export class TaskStateManager {
     // Generate the new rawText first
     const { newLine } = TaskEditor.generateTaskLine(task, newState);
 
-    // Update the task in the centralized state manager
-    this.updateTask(task, {
-      state: newState as Task['state'],
-      completed: DEFAULT_COMPLETED_STATES.has(newState),
-      rawText: newLine,
-    });
+    // Find the task in our array by path and line to ensure we're updating the right object
+    const existingTask = this.findTaskByPathAndLine(task.path, task.line);
+    if (existingTask) {
+      // Update the existing task object in place to maintain reference equality
+      const updatedTask = {
+        ...existingTask,
+        state: newState as Task['state'],
+        completed: DEFAULT_COMPLETED_STATES.has(newState),
+        rawText: newLine,
+      };
+      const index = this._tasks.indexOf(existingTask);
+      if (index !== -1) {
+        this._tasks[index] = updatedTask;
+        this.notifySubscribers();
+      }
+    } else {
+      // Fallback: try to update by reference
+      this.updateTask(task, {
+        state: newState as Task['state'],
+        completed: DEFAULT_COMPLETED_STATES.has(newState),
+        rawText: newLine,
+      });
+    }
 
     return newLine;
   }

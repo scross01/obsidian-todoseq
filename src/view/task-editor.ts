@@ -158,6 +158,9 @@ export class TaskEditor {
         // This maintains cursor position, selection, and code folds for better UX
         const currentLine = editor.getLine(task.line);
         if (typeof currentLine === 'string') {
+          // Save current cursor position before the update
+          const cursorPosition = editor.getCursor();
+
           const from: EditorPosition = { line: task.line, ch: 0 };
           const to: EditorPosition = {
             line: task.line,
@@ -170,8 +173,16 @@ export class TaskEditor {
             // Position cursor after the TODO keyword on blank lines
             const keywordPosition = newLine.indexOf('TODO');
             if (keywordPosition !== -1) {
-              const cursorPosition = keywordPosition + 'TODO'.length;
-              editor.setCursor({ line: task.line, ch: cursorPosition });
+              const newCursorPosition = keywordPosition + 'TODO'.length;
+              editor.setCursor({ line: task.line, ch: newCursorPosition });
+            }
+          } else if (cursorPosition.line === task.line) {
+            // If cursor was on the same line, position it after the new keyword
+            // Find where the new keyword starts in the new line
+            const keywordPosition = newLine.indexOf(newState);
+            if (keywordPosition !== -1) {
+              const newCursorPosition = keywordPosition + newState.length;
+              editor.setCursor({ line: task.line, ch: newCursorPosition });
             }
           }
         }

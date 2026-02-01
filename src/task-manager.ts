@@ -1,5 +1,5 @@
 import { Editor, MarkdownView } from 'obsidian';
-import { Task } from './task';
+import { Task, CYCLE_TASK_STATE } from './task';
 import TodoTracker from './main';
 import { detectListMarker } from './utils/patterns';
 
@@ -23,23 +23,6 @@ export class TaskManager {
       filePath,
       lineNumber,
     );
-  }
-
-  /**
-   * Update a task in-memory immediately for optimistic UI updates
-   * @param task - The task to update
-   * @param newState - The new state to set
-   * @returns The updated task line content
-   */
-  private updateTaskInMemory(task: Task, newState: string): string {
-    return this.plugin.taskStateManager.optimisticUpdate(task, newState);
-  }
-
-  /**
-   * Refresh the task list view immediately
-   */
-  private refreshTaskListView(): void {
-    this.plugin.refreshAllTaskListViews();
   }
 
   /**
@@ -82,10 +65,9 @@ export class TaskManager {
     view: MarkdownView,
     newState?: string,
   ): Promise<boolean> {
-    const taskEditor = this.plugin.taskEditor;
     const vaultScanner = this.plugin.getVaultScanner();
 
-    if (!taskEditor || !vaultScanner) {
+    if (!vaultScanner) {
       return false;
     }
 
@@ -111,52 +93,42 @@ export class TaskManager {
 
     const filePath = view.file?.path || '';
 
-    // OPTIMISTIC UPDATE: Find and update the in-memory task immediately
-    const existingTask = this.findTaskByPathAndLine(filePath, lineNumber);
-    let targetState = newState;
+    // Parse the task from the line for the file operation
+    const task = this.parseTaskFromLine(line, lineNumber, filePath);
 
-    if (existingTask) {
+    if (task) {
       // Determine the target state
+      let targetState = newState;
       if (!targetState) {
         // Cycle to next state
         const settings = this.plugin.settings;
         const customKeywords = settings?.additionalTaskKeywords || [];
-        if (customKeywords.includes(existingTask.state)) {
+        if (customKeywords.includes(task.state)) {
           targetState = 'DONE';
         } else {
           // Import NEXT_STATE dynamically to avoid circular dependency
           const { NEXT_STATE } = await import('./task');
-          targetState = NEXT_STATE.get(existingTask.state) || 'TODO';
+          targetState = NEXT_STATE.get(task.state) || 'TODO';
         }
       }
 
-      // Update in-memory task immediately
-      this.updateTaskInMemory(existingTask, targetState);
-
-      // Refresh the task list view immediately
-      this.refreshTaskListView();
-    }
-
-    // Parse the task from the line for the file operation
-    const task = this.parseTaskFromLine(line, lineNumber, filePath);
-
-    if (task && targetState) {
-      // Perform the file write in the background
+      // Use the centralized coordinator for the update
       try {
-        await taskEditor.updateTaskState(task, targetState);
+        await this.plugin.taskUpdateCoordinator.updateTaskState(
+          task,
+          targetState,
+          'editor',
+        );
       } catch (error) {
         console.error(
-          `[TODOseq] File write failed for task at line ${lineNumber}:`,
+          `[TODOseq] Failed to update task at line ${lineNumber}:`,
           error,
         );
+      }
 
-        // Rollback on error if we had an existing task
-        if (existingTask) {
-          // Revert to the original state by re-reading the file
-          if (view.file) {
-            this.plugin.vaultScanner?.handleFileChange(view.file);
-          }
-        }
+      // Refresh editor decorations to show the updated task state
+      if (this.plugin.refreshVisibleEditorDecorations) {
+        this.plugin.refreshVisibleEditorDecorations();
       }
     }
 
@@ -179,12 +151,16 @@ export class TaskManager {
     const cursor = editor.getCursor();
 
     // Use the extracted method to handle the line-based logic
-    return this.handleUpdateTaskCycleStateAtLine(
+    // Note: handleUpdateTaskCycleStateAtLine is now async, but we can't await here
+    // because the editorCheckCallback expects a synchronous return
+    // The UI update will happen asynchronously
+    void this.handleUpdateTaskCycleStateAtLine(
       checking,
       cursor.line,
       editor,
       view,
     );
+    return true;
   }
 
   /**
@@ -196,17 +172,16 @@ export class TaskManager {
    * @param newState - Optional specific state to set
    * @returns boolean indicating if the command is available
    */
-  handleUpdateTaskCycleStateAtLine(
+  async handleUpdateTaskCycleStateAtLine(
     checking: boolean,
     lineNumber: number,
     editor: Editor,
     view: MarkdownView,
     newState?: string,
-  ): boolean {
-    const taskEditor = this.plugin.taskEditor;
+  ): Promise<boolean> {
     const vaultScanner = this.plugin.getVaultScanner();
 
-    if (!taskEditor || !vaultScanner) {
+    if (!vaultScanner) {
       return false;
     }
 
@@ -225,17 +200,35 @@ export class TaskManager {
       view.file?.path || '',
     );
 
-    if (task) {
-      // Update the task state using cycle task state logic
-      if (newState) {
-        taskEditor.updateTaskCycleState(task, newState);
+    // Determine the target state using cycle task state logic
+    let targetState = newState;
+    if (!targetState) {
+      if (task) {
+        // Use CYCLE_TASK_STATE mapping for existing tasks
+        const settings = this.plugin.settings;
+        const customKeywords = settings?.additionalTaskKeywords || [];
+        if (customKeywords.includes(task.state)) {
+          targetState = 'DONE';
+        } else {
+          targetState = CYCLE_TASK_STATE.get(task.state) ?? 'TODO';
+        }
       } else {
-        taskEditor.updateTaskCycleState(task);
+        // For lines without existing task keywords, start with TODO
+        targetState = 'TODO';
       }
-    } else {
-      // For lines without existing task keywords, we need to add a TODO keyword
-      // This handles the case where we cycle from no keyword to TODO
-      if (!newState || newState === 'TODO') {
+    }
+
+    // Use the centralized coordinator for the update
+    try {
+      if (task) {
+        // Update existing task using coordinator
+        await this.plugin.taskUpdateCoordinator.updateTaskState(
+          task,
+          targetState,
+          'editor',
+        );
+      } else {
+        // For lines without existing task keywords, create a basic task and update it
         // Properly parse the line structure to maintain bullets/indentation
         const markerInfo = detectListMarker(line);
         const indent = markerInfo.indent;
@@ -260,9 +253,23 @@ export class TaskManager {
           dailyNoteDate: null,
         };
 
-        // Add TODO keyword to the line
-        taskEditor.updateTaskCycleState(basicTask, 'TODO');
+        // Use coordinator to update the task state
+        await this.plugin.taskUpdateCoordinator.updateTaskState(
+          basicTask,
+          targetState,
+          'editor',
+        );
       }
+    } catch (error) {
+      console.error(
+        `[TODOseq] Failed to update task cycle state at line ${lineNumber}:`,
+        error,
+      );
+    }
+
+    // Refresh editor decorations to show the updated task state
+    if (this.plugin.refreshVisibleEditorDecorations) {
+      this.plugin.refreshVisibleEditorDecorations();
     }
 
     return true;

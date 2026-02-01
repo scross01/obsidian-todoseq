@@ -14,6 +14,7 @@ import { PluginLifecycleManager } from './plugin-lifecycle';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 import { TaskStateManager } from './services/task-state-manager';
+import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -22,6 +23,9 @@ export default class TodoTracker extends Plugin {
 
   // Centralized state manager - single source of truth for tasks
   public taskStateManager: TaskStateManager;
+
+  // Centralized task update coordinator
+  public taskUpdateCoordinator: TaskUpdateCoordinator;
 
   // Managers for different functional areas
   public taskManager: TaskManager;
@@ -59,6 +63,12 @@ export default class TodoTracker extends Plugin {
 
     // Initialize centralized state manager first
     this.taskStateManager = new TaskStateManager();
+
+    // Initialize task update coordinator
+    this.taskUpdateCoordinator = new TaskUpdateCoordinator(
+      this,
+      this.taskStateManager,
+    );
 
     // Initialize managers
     this.taskManager = new TaskManager(this);

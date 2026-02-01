@@ -46,26 +46,14 @@ export class EditorKeywordMenu {
     if (currentLine !== null) {
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
       if (view && view.editor) {
-        // Save current cursor position
-        const cursorPosition = view.editor.getCursor();
-
         // handleUpdateTaskStateAtLine is now async, so we need to await it
-        const result =
-          await this.plugin.taskManager.handleUpdateTaskStateAtLine(
-            false,
-            currentLine - 1,
-            view.editor,
-            view,
-            newState,
-          );
-
-        // Refresh editor decorations to show the updated task state
-        if (result && this.plugin.refreshVisibleEditorDecorations) {
-          this.plugin.refreshVisibleEditorDecorations();
-        }
-
-        // Restore cursor position after update
-        view.editor.setCursor(cursorPosition);
+        await this.plugin.taskManager.handleUpdateTaskStateAtLine(
+          false,
+          currentLine - 1,
+          view.editor,
+          view,
+          newState,
+        );
       }
     }
   }

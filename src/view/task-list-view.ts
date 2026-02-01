@@ -8,7 +8,6 @@ import {
   setIcon,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../main';
-import { TaskEditor } from './task-editor';
 import {
   Task,
   NEXT_STATE,
@@ -43,7 +42,6 @@ export type SortMethod =
 export class TaskListView extends ItemView {
   static viewType = 'todoseq-view';
   tasks: Task[];
-  editor: TaskEditor;
   private defaultViewMode: TaskListViewMode;
   private defaultSortMethod: SortMethod;
   private searchInputEl: HTMLInputElement | null = null;
@@ -64,7 +62,6 @@ export class TaskListView extends ItemView {
   ) {
     super(leaf);
     this.tasks = taskStateManager.getTasks();
-    this.editor = new TaskEditor(this.app);
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = settings.defaultSortMethod;
 
@@ -75,7 +72,10 @@ export class TaskListView extends ItemView {
       this.updateTasks(tasks);
       // Only refresh if the view is already open (has contentEl)
       if (this.contentEl && this.taskListContainer) {
-        this.refreshVisibleList();
+        // Use requestAnimationFrame for immediate visual update
+        requestAnimationFrame(() => {
+          this.refreshVisibleList();
+        });
       }
     });
   }
@@ -661,52 +661,51 @@ export class TaskListView extends ItemView {
     }
   }
 
-  // Cycle state via NEXT_STATE using TaskEditor
+  // Cycle state via NEXT_STATE using the centralized coordinator
   private async updateTaskState(task: Task, nextState: string): Promise<void> {
-    // Store old state for announcement and potential rollback
+    // Store old state for announcement
     const oldState = task.state;
-    const oldCompleted = task.completed;
-    const oldRawText = task.rawText;
 
-    // OPTIMISTIC UPDATE: Update in-memory task immediately for instant UI feedback
-    task.state = nextState as Task['state'];
-    task.completed = DEFAULT_COMPLETED_STATES.has(nextState);
-    // Generate the new rawText optimistically to match what TaskEditor will produce
-    const { newLine } = TaskEditor.generateTaskLine(task, nextState);
-    task.rawText = newLine;
+    // Get the plugin instance
+    const plugin = (
+      window as unknown as {
+        todoSeqPlugin?: {
+          taskUpdateCoordinator?: {
+            updateTaskState: (
+              task: Task,
+              newState: string,
+              source: 'task-list',
+            ) => Promise<Task>;
+          };
+        };
+      }
+    ).todoSeqPlugin;
 
-    // Announce state change to screen readers immediately
-    if (oldState !== task.state) {
-      this.announceTaskStateChange(task, oldState);
+    if (!plugin?.taskUpdateCoordinator) {
+      console.error('TODOseq: TaskUpdateCoordinator not available');
+      return;
     }
 
     try {
-      // Perform the actual file update in the background
-      const updated = await this.editor.updateTaskState(task, nextState);
+      // Use the centralized coordinator for the update
+      // This handles optimistic updates, file writes, and embed refreshes
+      const updated = await plugin.taskUpdateCoordinator.updateTaskState(
+        task,
+        nextState,
+        'task-list',
+      );
 
-      // Sync in-memory task from returned snapshot (in case of any differences)
+      // Sync in-memory task from returned snapshot
       task.rawText = updated.rawText;
-      if (typeof (updated as { state?: unknown }).state === 'string') {
-        task.state = (updated as { state: string }).state as Task['state'];
-      }
-      task.completed = !!(updated as { completed?: unknown }).completed;
+      task.state = updated.state;
+      task.completed = updated.completed;
 
-      // Refresh embedded task lists to show the latest task state
-      const plugin = (
-        window as unknown as {
-          todoSeqPlugin?: { refreshAllTaskListViews?: () => void };
-        }
-      ).todoSeqPlugin;
-      if (plugin && typeof plugin.refreshAllTaskListViews === 'function') {
-        plugin.refreshAllTaskListViews();
+      // Announce state change to screen readers
+      if (oldState !== task.state) {
+        this.announceTaskStateChange(task, oldState);
       }
     } catch (error) {
-      // ROLLBACK: Restore previous state on error
-      task.state = oldState;
-      task.completed = oldCompleted;
-      task.rawText = oldRawText;
-
-      // Re-render with rolled-back state
+      // Re-render with rolled-back state (coordinator handles rollback)
       this.refreshTaskElement(task);
 
       console.error('TODOseq: Failed to update task state:', error);
@@ -738,11 +737,11 @@ export class TaskListView extends ItemView {
     completed: string[];
     additional: string[];
   } {
-    const pendingActiveDefaults = [
+    const pendingActiveDefaults: string[] = [
       ...Array.from(DEFAULT_PENDING_STATES),
       ...Array.from(DEFAULT_ACTIVE_STATES),
     ];
-    const completedDefaults = Array.from(DEFAULT_COMPLETED_STATES);
+    const completedDefaults: string[] = Array.from(DEFAULT_COMPLETED_STATES);
 
     const settings = getPluginSettings(this.app);
     const configured = settings?.additionalTaskKeywords;

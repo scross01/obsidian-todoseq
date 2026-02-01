@@ -110,7 +110,9 @@ export class UIManager {
 
   /**
    * When the task checkbox is updated update the task keyword to match.
-   * The keyword state is updated in the DOM directly, so it's handled like a manual line edit.
+   * The keyword state is updated in the DOM directly, and optimistic updates
+   * are triggered for dependent views. The file update is handled by Obsidian's
+   * natural checkbox behavior.
    */
   private handleCheckboxToggle(checkbox: HTMLInputElement): void {
     // Find the task keyword span in the same line
@@ -150,6 +152,33 @@ export class UIManager {
     keywordSpan.textContent = newKeyword;
     keywordSpan.setAttribute('data-task-keyword', newKeyword);
     keywordSpan.setAttribute('aria-label', `Task keyword: ${newKeyword}`);
+
+    // Trigger optimistic update for task list views
+    // The file will be updated by Obsidian's natural checkbox behavior
+    const currentLine = this.getLineForElement(checkbox);
+    if (currentLine !== null) {
+      const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+      if (view && view.file) {
+        const lineNumber = currentLine - 1; // Convert to 0-indexed
+        const filePath = view.file.path;
+
+        // Parse the task from the line for optimistic update
+        const line = view.editor.getLine(lineNumber);
+        const task = this.plugin.taskManager.parseTaskFromLine(
+          line,
+          lineNumber,
+          filePath,
+        );
+
+        if (task && this.plugin.taskStateManager) {
+          // Perform optimistic update without file modification
+          // File will be updated by Obsidian's checkbox handling
+          this.plugin.taskStateManager.optimisticUpdate(task, newKeyword);
+          // Refresh task list views
+          this.plugin.refreshAllTaskListViews();
+        }
+      }
+    }
   }
 
   /**
@@ -174,18 +203,15 @@ export class UIManager {
 
     const currentLine = this.getLineForElement(keywordElement);
     if (currentLine !== null) {
-      // Save current cursor position
-      const cursorPosition = view.editor.getCursor();
-
+      // The cursor positioning is now handled by TaskEditor.applyLineUpdate
+      // which detects when the cursor is on the same line and positions it
+      // after the new keyword
       this.plugin.taskManager.handleUpdateTaskStateAtLine(
         false,
         currentLine - 1,
         view.editor,
         view,
       );
-
-      // Restore cursor position after update
-      view.editor.setCursor(cursorPosition);
     }
   }
 
