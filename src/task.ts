@@ -6,6 +6,7 @@ export interface Task {
   rawText: string; // original full line
   indent: string; // leading whitespace before any list marker/state
   listMarker: string; // the exact list marker plus trailing space if present (e.g., "- ", "1. ", "(a) ")
+  footnoteMarker?: string; // footnote marker if present (e.g., "[^1]: ")
   text: string; // content after the state keyword with priority token removed
   state: string; // state keyword, TODO, DOING, DONE etc.
   completed: boolean; // is the task considered complete
@@ -19,6 +20,7 @@ export interface Task {
   isDailyNote: boolean; // true if the task is on a daily note page
   dailyNoteDate: Date | null; // the date of the daily note if it's a daily note
   embedReference?: string; // Obsidian embed reference like ^abc123
+  footnoteReference?: string; // footnote reference like [^2]
 }
 
 export const DEFAULT_PENDING_STATES = new Set<string>([

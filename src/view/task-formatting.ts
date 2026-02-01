@@ -8,7 +8,10 @@ import {
 import { RangeSetBuilder } from '@codemirror/state';
 import { TodoTrackerSettings } from '../settings/settings';
 import { TaskParser } from '../parser/task-parser';
-import { COMMENT_BLOCK_REGEX } from '../utils/patterns';
+import {
+  COMMENT_BLOCK_REGEX,
+  FOOTNOTE_DEFINITION_REGEX,
+} from '../utils/patterns';
 import {
   LanguageRegistry,
   LanguageDefinition,
@@ -27,6 +30,7 @@ export class TaskKeywordDecorator {
   private inQuoteBlock = false;
   private inCalloutBlock = false;
   private inCommentBlock = false;
+  private inFootnote = false;
   private disposables: Array<() => void> = [];
 
   // Track task lines to detect SCHEDULED/DEADLINE lines that follow them
@@ -67,6 +71,7 @@ export class TaskKeywordDecorator {
       this.inQuoteBlock = false;
       this.inCalloutBlock = false;
       this.inCommentBlock = false;
+      this.inFootnote = false;
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
 
@@ -103,6 +108,30 @@ export class TaskKeywordDecorator {
         let useCodeRegex = false;
         let contentForTaskDetection = lineText;
         let positionOffset = 0;
+
+        // Handle footnote tasks with a more robust approach
+        if (this.inFootnote) {
+          // Check if this line matches footnote pattern and extract task content
+          const footnoteMarkerMatch = lineText.match(/^\[\^\d+\]:\s*/);
+          if (footnoteMarkerMatch) {
+            // Extract content after footnote marker for task detection
+            const contentAfterFootnote = lineText.substring(
+              footnoteMarkerMatch[0].length,
+            );
+
+            // Check if the content after footnote marker contains a task
+            if (this.parser.testRegex.test(contentAfterFootnote)) {
+              // Use the original parser regex but adjust positions
+              const contentMatch =
+                this.parser.testRegex.exec(contentAfterFootnote);
+              if (contentMatch) {
+                match = contentMatch;
+                // Use the position after the footnote marker
+                positionOffset = footnoteMarkerMatch[0].length;
+              }
+            }
+          }
+        }
 
         // Handle single-line comment blocks (%% ... %%)
         const singleLineCommentMatch = /^\s*%%.*%%$/.test(lineText);
@@ -161,8 +190,44 @@ export class TaskKeywordDecorator {
         if (match && match[4]) {
           // match[4] contains the keyword
           const keyword = match[4];
-          let keywordStart = contentForTaskDetection.indexOf(keyword);
-          let keywordEnd = keywordStart + keyword.length;
+
+          // For footnotes, we need to find the keyword position directly in the original line text
+          let keywordStart = 0;
+          let keywordEnd = 0;
+
+          if (this.inFootnote) {
+            // Find the actual position of the keyword in the original line text
+            const footnoteMarkerMatch = lineText.match(/^\[\^\d+\]:\s*/);
+            if (footnoteMarkerMatch) {
+              // Search for the keyword after the footnote marker
+              const contentAfterFootnote = lineText.substring(
+                footnoteMarkerMatch[0].length,
+              );
+              const keywordInContent = contentAfterFootnote.indexOf(keyword);
+              if (keywordInContent !== -1) {
+                keywordStart = footnoteMarkerMatch[0].length + keywordInContent;
+                keywordEnd = keywordStart + keyword.length;
+              } else {
+                // Fallback: search the entire line
+                keywordStart = lineText.indexOf(keyword);
+                keywordEnd = keywordStart + keyword.length;
+              }
+            } else {
+              // Fallback: search the entire line
+              keywordStart = lineText.indexOf(keyword);
+              keywordEnd = keywordStart + keyword.length;
+            }
+          } else {
+            // For non-footnote content, use the original logic
+            keywordStart = contentForTaskDetection.indexOf(keyword);
+            keywordEnd = keywordStart + keyword.length;
+
+            // Adjust positions for single-line comment blocks
+            if (singleLineCommentMatch) {
+              keywordStart += positionOffset;
+              keywordEnd += positionOffset;
+            }
+          }
 
           // Track this as a task line for potential SCHEDULED/DEADLINE detection
           this.previousTaskLine = lineNumber;
@@ -170,12 +235,6 @@ export class TaskKeywordDecorator {
             0,
             lineText.length - lineText.trimStart().length,
           );
-
-          // Adjust positions for single-line comment blocks
-          if (singleLineCommentMatch) {
-            keywordStart += positionOffset;
-            keywordEnd += positionOffset;
-          }
 
           // For code blocks with language comment support, we need to find the actual keyword position
           // considering comment prefixes
@@ -235,6 +294,8 @@ export class TaskKeywordDecorator {
             this.settings.includeCalloutBlocks
           ) {
             cssClasses += ' callout-block-task-keyword';
+          } else if (this.inFootnote) {
+            cssClasses += ' footnote-task-keyword';
           }
 
           builder.add(
@@ -316,6 +377,13 @@ export class TaskKeywordDecorator {
     } else {
       this.inQuoteBlock = false;
       this.inCalloutBlock = false;
+    }
+
+    // Update footnote state
+    if (FOOTNOTE_DEFINITION_REGEX.test(lineText)) {
+      this.inFootnote = true;
+    } else {
+      this.inFootnote = false;
     }
 
     // Update comment block state using same logic as task parser

@@ -75,7 +75,9 @@ export class TaskEditor {
     } else {
       // Generate original format, preserving comment prefix if present
       const textPart = task.text ? ` ${task.text}` : '';
-      newLine = `${task.indent}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
+      // Check if this is a footnote task and include the footnote marker
+      const footnoteMarker = task.footnoteMarker || '';
+      newLine = `${task.indent}${footnoteMarker}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
 
       // Add trailing comment end characters if they were present in the original task
       if (task.tail) {
@@ -85,7 +87,29 @@ export class TaskEditor {
 
     // Add embed reference if it exists
     if (task.embedReference) {
-      newLine += ` ${task.embedReference}`;
+      // Extract the original spacing from the raw text
+      // Find where the task text (plus any footnote reference) ends and the embed reference begins
+      const textToSearch = task.text + (task.footnoteReference || '');
+      const textEndIndex =
+        task.rawText.indexOf(textToSearch) + textToSearch.length;
+      const originalSpacing = task.rawText.substring(
+        textEndIndex,
+        task.rawText.indexOf(task.embedReference, textEndIndex),
+      );
+      newLine += originalSpacing + task.embedReference;
+    }
+
+    // Add footnote reference if it exists
+    if (task.footnoteReference) {
+      // Extract the original spacing from the raw text
+      // Find where the task text ends and the footnote reference begins
+      const taskTextEndIndex =
+        task.rawText.indexOf(task.text) + task.text.length;
+      const originalSpacing = task.rawText.substring(
+        taskTextEndIndex,
+        task.rawText.indexOf(task.footnoteReference, taskTextEndIndex),
+      );
+      newLine += originalSpacing + task.footnoteReference;
     }
 
     const completed = DEFAULT_COMPLETED_STATES.has(newState);

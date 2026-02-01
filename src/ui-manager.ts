@@ -343,12 +343,23 @@ export class UIManager {
       return null;
     }
 
-    // Get the EditorView from the container
-    // In Obsidian, the EditorView is typically stored in the editor.cm property
-    const markdownView =
+    // Try to find the MarkdownView that contains this editor container
+    const allLeaves = this.plugin.app.workspace.getLeavesOfType('markdown');
+    for (const leaf of allLeaves) {
+      const view = leaf.view;
+      if (view instanceof MarkdownView && view.editor) {
+        const cmEditor = (view.editor as { cm?: EditorView })?.cm;
+        if (cmEditor && cmEditor.dom === editorContainer) {
+          return cmEditor;
+        }
+      }
+    }
+
+    // Fallback: try to get the active view
+    const activeView =
       this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (markdownView && markdownView.editor) {
-      const cmEditor = (markdownView.editor as { cm?: EditorView })?.cm;
+    if (activeView && activeView.editor) {
+      const cmEditor = (activeView.editor as { cm?: EditorView })?.cm;
       if (cmEditor) {
         return cmEditor;
       }
@@ -413,22 +424,34 @@ export class UIManager {
         const contextMenuHandler = (evt: MouseEvent) => {
           const target = evt.target as HTMLElement;
 
-          // Check if the right-click was on a task keyword element
-          if (target.hasAttribute('data-task-keyword')) {
+          // Check if the right-click was on a task keyword element or its parent
+          let keywordElement = target;
+          let keyword = target.getAttribute('data-task-keyword');
+
+          // If the target doesn't have the attribute, check parent elements
+          if (!keyword && target.parentElement) {
+            keywordElement = target.parentElement;
+            keyword = keywordElement.getAttribute('data-task-keyword');
+          }
+
+          // Also check for footnote task keywords
+          if (!keyword && target.closest('.footnote-task-keyword')) {
+            keywordElement = target.closest(
+              '.footnote-task-keyword',
+            ) as HTMLElement;
+            keyword = keywordElement.getAttribute('data-task-keyword');
+          }
+
+          if (keyword && activeView.file && this.plugin.editorKeywordMenu) {
             evt.preventDefault();
             evt.stopPropagation();
 
-            // Get the task keyword and line information
-            const keyword = target.getAttribute('data-task-keyword');
-
-            if (keyword && activeView.file && this.plugin.editorKeywordMenu) {
-              // Open the context menu
-              this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
-                keyword,
-                target,
-                evt,
-              );
-            }
+            // Open the context menu
+            this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
+              keyword,
+              keywordElement,
+              evt,
+            );
           }
         };
 

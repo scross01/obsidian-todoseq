@@ -8,6 +8,8 @@ import {
 import { DateParser } from './date-parser';
 import {
   extractPriority,
+  extractFootnoteReference,
+  extractEmbedReference,
   CHECKBOX_REGEX,
   buildTaskKeywords,
 } from '../utils/task-utils';
@@ -217,10 +219,9 @@ export class TaskParser {
     const escapedKeywords = TaskParser.escapeKeywords(keywords);
 
     // Footnote pattern: [^1]: TODO task text
-    const footnotePattern = `\\[\\^\\d+\\]:\\s+`;
-
+    // Capture groups: 1 = footnote marker, 2 = state keyword, 3 = task text
     const test = new RegExp(
-      `^${footnotePattern}` +
+      `^(\\[\\^\\d+\\]:\\s+)` +
         `(${escapedKeywords})\\s+` +
         `(${TASK_TEXT_SOURCE})$`,
     );
@@ -276,6 +277,7 @@ export class TaskParser {
   ): {
     indent: string;
     listMarker: string;
+    footnoteMarker: string;
     taskText: string;
     tail: string;
     state: string;
@@ -287,17 +289,20 @@ export class TaskParser {
 
     // For footnote regex, the structure is:
     // m[0] is the full match
-    // m[1] is the state keyword
-    // m[2] is the task text
+    // m[1] is the footnote marker
+    // m[2] is the state keyword
+    // m[3] is the task text
     const indent = ''; // Footnotes don't have traditional indentation
     const listMarker = ''; // Footnotes don't have list markers
-    const state = m[1];
-    const taskText = m[2];
+    const footnoteMarker = m[1]; // Capture the footnote marker [^1]:
+    const state = m[2];
+    const taskText = m[3];
     const tail = '';
 
     return {
       indent,
       listMarker,
+      footnoteMarker,
       taskText,
       tail,
       state,
@@ -357,8 +362,24 @@ export class TaskParser {
     priority: 'high' | 'med' | 'low' | null;
     cleanedText: string;
     embedReference?: string;
+    footnoteReference?: string;
   } {
-    return extractPriority(taskText);
+    // Extract footnote reference first
+    const { footnoteReference, cleanedText: textAfterFootnote } =
+      extractFootnoteReference(taskText);
+    // Then extract embed reference from the remaining text
+    const { embedReference, cleanedText } =
+      extractEmbedReference(textAfterFootnote);
+    // Finally extract priority
+    const { priority, cleanedText: finalCleanedText } =
+      extractPriority(cleanedText);
+
+    return {
+      priority,
+      cleanedText: finalCleanedText,
+      embedReference,
+      footnoteReference,
+    };
   }
 
   /**
@@ -851,9 +872,8 @@ export class TaskParser {
       line,
       footnoteRegex.capture,
     );
-    const { priority, cleanedText, embedReference } = this.extractPriority(
-      taskDetails.taskText,
-    );
+    const { priority, cleanedText, embedReference, footnoteReference } =
+      this.extractPriority(taskDetails.taskText);
 
     // Detect daily note information if file is provided
     let isDailyNote = false;
@@ -881,6 +901,7 @@ export class TaskParser {
       rawText: line,
       indent: taskDetails.indent,
       listMarker: taskDetails.listMarker,
+      footnoteMarker: taskDetails.footnoteMarker,
       text: cleanedText,
       state: taskDetails.state,
       completed: DEFAULT_COMPLETED_STATES.has(taskDetails.state),
@@ -893,6 +914,7 @@ export class TaskParser {
       isDailyNote,
       dailyNoteDate,
       embedReference,
+      footnoteReference,
     };
 
     // Extract dates from following lines
@@ -939,9 +961,8 @@ export class TaskParser {
     }
 
     const taskDetails = this.extractTaskDetails(content, this.captureRegex);
-    const { priority, cleanedText, embedReference } = this.extractPriority(
-      taskDetails.taskText,
-    );
+    const { priority, cleanedText, embedReference, footnoteReference } =
+      this.extractPriority(taskDetails.taskText);
     const {
       state: finalState,
       completed: finalCompleted,
@@ -990,6 +1011,7 @@ export class TaskParser {
       isDailyNote,
       dailyNoteDate,
       embedReference,
+      footnoteReference,
     };
 
     // Extract dates from following lines
@@ -1049,9 +1071,8 @@ export class TaskParser {
     file?: TFile,
   ): Task {
     // Extract priority and embed reference
-    const { priority, cleanedText, embedReference } = this.extractPriority(
-      taskDetails.taskText,
-    );
+    const { priority, cleanedText, embedReference, footnoteReference } =
+      this.extractPriority(taskDetails.taskText);
 
     // Extract tags
     const tags = this.extractTags(taskDetails.taskText);
@@ -1103,6 +1124,7 @@ export class TaskParser {
       isDailyNote,
       dailyNoteDate,
       embedReference,
+      footnoteReference,
     };
 
     // Extract dates from following lines
@@ -1148,7 +1170,47 @@ export class TaskParser {
   ): Task | null {
     // Check if line matches task regex
     if (!this.testRegex.test(line)) {
-      return null;
+      // Check if it's a footnote task
+      const footnoteRegex = TaskParser.buildFootnoteRegex(this.allKeywords);
+      if (!footnoteRegex.test.test(line)) {
+        return null;
+      }
+
+      // Parse as footnote task
+      const footnoteMatch = footnoteRegex.capture.exec(line);
+      if (!footnoteMatch) {
+        return null;
+      }
+
+      const taskDetails = this.extractFootnoteTaskDetails(
+        line,
+        footnoteRegex.capture,
+      );
+      const { priority, cleanedText, embedReference, footnoteReference } =
+        this.extractPriority(taskDetails.taskText);
+
+      const task: Task = {
+        path: filePath,
+        line: lineNumber,
+        rawText: line,
+        indent: taskDetails.indent,
+        listMarker: taskDetails.listMarker,
+        footnoteMarker: taskDetails.footnoteMarker,
+        text: cleanedText,
+        state: taskDetails.state,
+        completed: DEFAULT_COMPLETED_STATES.has(taskDetails.state),
+        priority,
+        scheduledDate: null,
+        deadlineDate: null,
+        tail: taskDetails.tail,
+        urgency: null,
+        isDailyNote: false,
+        dailyNoteDate: null,
+        embedReference,
+        footnoteReference,
+      };
+
+      return task;
     }
 
     const match = this.captureRegex.exec(line);
@@ -1163,8 +1225,9 @@ export class TaskParser {
     const taskText = match[5];
     const tail = match[6];
 
-    // Extract priority using shared utility
-    const { priority, cleanedText } = extractPriority(taskText);
+    // Extract priority using shared utility (with footnote and embed reference support)
+    const { priority, cleanedText, embedReference, footnoteReference } =
+      extractPriority(taskText);
 
     // Extract checkbox state using shared regex
     let completed = false;
@@ -1191,6 +1254,8 @@ export class TaskParser {
       tail,
       urgency: null,
       file: undefined,
+      embedReference,
+      footnoteReference,
       isDailyNote: false,
       dailyNoteDate: null,
     };

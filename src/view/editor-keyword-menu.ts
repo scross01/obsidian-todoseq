@@ -42,6 +42,7 @@ export class EditorKeywordMenu {
   ): Promise<void> {
     // Use UIManager's methods to get line number and update through TaskManager
     const currentLine = this.plugin.uiManager.getLineForElement(keywordElement);
+
     if (currentLine !== null) {
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
       if (view && view.editor) {
@@ -49,13 +50,19 @@ export class EditorKeywordMenu {
         const cursorPosition = view.editor.getCursor();
 
         // handleUpdateTaskStateAtLine is now async, so we need to await it
-        await this.plugin.taskManager.handleUpdateTaskStateAtLine(
-          false,
-          currentLine - 1,
-          view.editor,
-          view,
-          newState,
-        );
+        const result =
+          await this.plugin.taskManager.handleUpdateTaskStateAtLine(
+            false,
+            currentLine - 1,
+            view.editor,
+            view,
+            newState,
+          );
+
+        // Refresh editor decorations to show the updated task state
+        if (result && this.plugin.refreshVisibleEditorDecorations) {
+          this.plugin.refreshVisibleEditorDecorations();
+        }
 
         // Restore cursor position after update
         view.editor.setCursor(cursorPosition);

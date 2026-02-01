@@ -94,8 +94,15 @@ export class TaskManager {
 
     // Check if this line contains a valid task using VaultScanner's parser
     const parser = vaultScanner.getParser();
+
     if (!parser?.testRegex.test(line)) {
-      return false;
+      // Try footnote regex specifically
+      const footnoteRegex =
+        /\[\^\d+\]:\s+(TODO|DOING|LATER|DONE|CANCELED|CANCELLED|WAIT|WAITING|NOW|IN-PROGRESS)\s+/;
+      const footnoteResult = footnoteRegex.test(line);
+      if (!footnoteResult) {
+        return false;
+      }
     }
 
     if (checking) {

@@ -891,6 +891,23 @@
   padding-left: 5px; /* Reduce left padding to compensate for border */
 }
 
+/* Footnote task keyword styling */
+.cm-editor .footnote-task-keyword {
+  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  color: var(--interactive-accent);
+  font-size: 0.9em;
+  border-radius: 2px;
+}
+
+/* Hover effect for footnote task keywords */
+.cm-editor .footnote-task-keyword:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 15%,
+    transparent
+  );
+}
+
 .embedded-task-item-date-soon {
   background-color: color-mix(in srgb, var(--color-green) 5%, transparent);
   border-left: 3px solid color-mix(in srgb, var(--color-green) 50%, transparent);
