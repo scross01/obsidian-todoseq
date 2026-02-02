@@ -102,6 +102,11 @@ The list automatically refreshes when:
 - Files are created, deleted, or renamed
 - Settings are changed
 
+## Empty Lists
+
+```todoseq
+search: bogus
+```
 ## Error Handling
 
 If there's an error parsing the search query or sort method, an error message will be displayed:

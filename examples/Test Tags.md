@@ -9,7 +9,7 @@ TODO test task with tag #tag
 TODO test task with tag path #tag/path
 TODO test task with another tag path #tag/another
 TODO test tag with emoji #⚠️
-TODO test tag with multibye characters #标签
+TODO test tag with multibyte characters #标签
 TODO test tag with mixed content  #tag/标签/🏷️
 
 
