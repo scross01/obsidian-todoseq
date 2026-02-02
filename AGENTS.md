@@ -2,50 +2,31 @@
 
 This file provides guidance to agents when working with code in this repository.
 
-## Project-Specific Non-Obvious Information
+## Build & Test
 
-### Build System
+- **Build command**: `npm run build` runs TypeScript compilation + esbuild bundling in sequence (not parallel)
+- **Single test**: `npm test -- --testNamePattern="pattern"` (Jest with regex match)
+- **Coverage excludes**: `src/main.ts` excluded from coverage (line 9 in jest.config.json)
+- **Test console**: Tests mock console methods to reduce noise (lines 21-28 in tests/test-setup.ts)
 
-- **Custom build process**: `npm run build` runs `tsc --noEmit src/main.ts --skipLibCheck && node esbuild.config.mjs production`
-- **Code formatting**: `npm run format` uses Prettier with specific configuration
-- **Code linting**: `npm run lint` uses ESLint with specific rules
+## Architecture
 
-### Testing
+- **Single source of truth**: `TaskStateManager` maintains tasks; all views subscribe to changes
+- **Parser lifecycle**: Parser created once in `VaultScanner` and reused; `recreateParser()` only called when settings change (lines 147-158 in src/main.ts)
+- **Event-driven**: `VaultScannerEvents` interface defines events; listeners stored in Map (lines 12-18 in src/services/vault-scanner.ts)
+- **Embedded lists**: `TodoseqCodeBlockProcessor` registers as markdown processor; separate from main plugin lifecycle
+- **Update coordination**: `TaskUpdateCoordinator` provides single entry point for all state updates with optimistic UI updates (lines 27-50 in src/services/task-update-coordinator.ts)
 
-- **Jest configuration**: Tests are in `/tests` directory with `.test.ts` extension
-- **Test utilities**: Global test setup in `tests/test-setup.ts` provides shared registry and regex builder
-- **Coverage**: Excludes `src/main.ts` from coverage reporting (line 19 in jest.config.json)
-- **Mock console**: Tests mock console methods to reduce noise (lines 14-20 in tests/test-setup.ts)
+## Critical Patterns
 
-### Architecture
+- **Yield to event loop**: `yieldToEventLoop()` called during vault scans to prevent UI freezing (lines 125-126 in src/services/vault-scanner.ts)
+- **Task ordering**: `taskComparator` sorts by path then line; used consistently across all views (lines 173-176 in src/utils/task-utils.ts)
+- **Editor refresh**: `refreshVisibleEditorDecorations()` uses `requestMeasure()` + `dispatch()` + `setTimeout` sequence to force decoration updates (lines 243-260 in src/main.ts)
+- **Reader view refresh**: `refreshReaderViewFormatter()` iterates leaves and calls `previewMode.rerender(true)` (lines 167-182 in src/main.ts)
 
-- **Obsidian plugin structure**: Main plugin class in `src/main.ts` extends `Plugin`
-- **Task parsing**: Complex regex-based parsing in `src/parser/` with language-aware handling
-- **State management**: Tasks use state transitions defined in `NEXT_STATE` map in `src/task.ts`
-- **Event handling**: File changes trigger incremental updates, not full rescans
+## Code Style
 
-### Critical Patterns
-
-- **Parser recreation**: Parser must be recreated when settings change via `recreateParser()` method
-- **Task comparator**: Shared `taskComparator` ensures consistent task ordering across views
-- **Yielding**: `yieldToEventLoop()` prevents UI freezing during large vault scans
-- **Error handling**: File operations wrapped in try/catch with fallback UI refreshes
-
-### Code Style (Non-Standard)
-
-- **Prettier config**: include `.prettierrc` for specific formatting rules
-- **Editor config**: include `.editorconfig` for indentation and spacing settings
-- **ESLint exceptions**: `@typescript-eslint/no-explicit-any`: "warn" (not error)
-- **TypeScript config**: `rootDir`: "src" with explicit exclusion of test files
-- **Import structure**: Circular dependency handling between main plugin and parsers
-
-### Documentation
-
-- **User documentation**: `README.md` and `/docs/` contains user-facing guides for features and usage patterns
-- **Technical documentation**: Inline code comments and README files in subdirectories
-
-### Gotchas
-
-- **Task state parsing**: Priority extraction uses regex `[#ABC]` pattern with specific spacing rules
-- **File scanning**: Only processes `.md` files, skips other extensions
-- **View refresh**: Uses "lighter refresh" pattern to avoid focus stealing in Obsidian UI
+- **TypeScript rootDir**: "src" with test files explicitly excluded (line 18 in tsconfig.json)
+- **ESLint exceptions**: `@typescript-eslint/no-explicit-any` is "warn" (not error) for all files (line 48 in .eslintrc)
+- **Prettier**: Single quotes, 2-space tabs, 80 char width, trailing commas (lines 2-7 in .prettierrc)
+- **Import order**: Circular dependency handled between main plugin and parsers
