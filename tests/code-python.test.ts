@@ -1,25 +1,14 @@
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings';
+import { baseCodeLanguageSettings } from './helpers/code-language-test-helper';
 
 describe('Task parsing within Python comments in code blocks', () => {
   let parser: TaskParser;
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    settings = {
-      refreshInterval: 60,
-      includeCalloutBlocks: true,
-      includeCodeBlocks: true,
-      includeCommentBlocks: false,
-      languageCommentSupport: {
-        enabled: true,
-      },
-      additionalTaskKeywords: [],
-      taskListViewMode: 'showAll',
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
-    parser = TaskParser.create(settings);
+    settings = baseCodeLanguageSettings;
+    parser = TaskParser.create(settings, null);
   });
 
   describe('Tasks in python code blocks', () => {
