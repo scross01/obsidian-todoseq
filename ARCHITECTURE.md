@@ -55,6 +55,7 @@ graph TB
             TaskUtils["Task Utilities"]
             DateUtils["Date Utilities"]
             PerformanceUtils["Performance Utils"]
+            RegexCache["RegexCache<br/>Pattern Caching"]
         end
     end
 
@@ -222,6 +223,7 @@ graph TD
         DateUtils[DateUtils]
         Performance[PerformanceUtils]
         Patterns[Patterns]
+        RegexCache[RegexCache]
     end
 
     subgraph "External APIs"
@@ -275,6 +277,10 @@ graph TD
 
     Performance --> StateManager
     Performance --> VaultScanner
+
+    %% RegexCache dependencies
+    VaultScanner --> RegexCache
+    SearchEvaluator --> RegexCache
 
     %% Styling for dependency direction
     linkStyle 0,1,2,3,4 stroke:#2196f3,stroke-width:2px
@@ -433,6 +439,7 @@ graph LR
 - **Yielding to Event Loop**: Prevent UI freezing during large operations
 - **Lazy Loading**: Components created on-demand
 - **Efficient Parsing**: Optimized regex patterns and caching
+- **Regex Caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches
 
 ### 5. Security Patterns
 
@@ -546,12 +553,12 @@ interface Task {
 3. **Efficient Parsing**: Optimized regex patterns and state machines
 4. **Yielding**: Prevents UI freezing during operations
 5. **Lazy Loading**: Components created when needed
-6. **Caching**: Parser instances and compiled patterns cached
+6. **Caching**: Parser instances and compiled patterns cached via `RegexCache` utility for file path filtering and phrase search evaluation
 
 ### Performance Bottlenecks to Monitor
 
 1. **Large Vault Scans**: Initial vault scan can be slow
-2. **Regex Compilation**: Complex regex patterns for parsing
+2. **Regex Compilation**: Complex regex patterns for parsing (mitigated by `RegexCache` for file path filtering and phrase search)
 3. **DOM Updates**: Frequent view updates can impact performance
 4. **File I/O**: Synchronous file operations during updates
 5. **Search Evaluation**: Complex queries on large task sets

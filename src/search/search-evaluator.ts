@@ -3,8 +3,11 @@ import { Task } from '../task';
 import { DateUtils } from '../utils/date-utils';
 import { TodoTrackerSettings } from '../settings/settings';
 import { getFilename } from '../utils/task-utils';
+import { RegexCache } from '../utils/regex-cache';
 
 export class SearchEvaluator {
+  private static regexCache = new RegexCache();
+
   static evaluate(
     node: SearchNode,
     task: Task,
@@ -65,7 +68,11 @@ export class SearchEvaluator {
     const regexFlags = caseSensitive ? 'g' : 'gi';
 
     // Use word boundaries to ensure exact phrase matching
-    const phraseRegex = new RegExp(`\\b${escapedPhrase}\\b`, regexFlags);
+    // Cache the compiled regex to avoid repeated compilation
+    const phraseRegex = this.regexCache.get(
+      `\\b${escapedPhrase}\\b`,
+      regexFlags,
+    );
 
     const fields = this.getSearchableFields(task);
 

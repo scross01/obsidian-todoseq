@@ -23,6 +23,7 @@ This file provides guidance to agents when working with code in this repository.
 - **Task ordering**: `taskComparator` sorts by path then line; used consistently across all views (lines 173-176 in src/utils/task-utils.ts)
 - **Editor refresh**: `refreshVisibleEditorDecorations()` uses `requestMeasure()` + `dispatch()` + `setTimeout` sequence to force decoration updates (lines 243-260 in src/main.ts)
 - **Reader view refresh**: `refreshReaderViewFormatter()` iterates leaves and calls `previewMode.rerender(true)` (lines 167-182 in src/main.ts)
+- **Regex caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches (src/utils/regex-cache.ts)
 
 ## Code Style
 

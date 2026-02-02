@@ -8,6 +8,7 @@ import {
   UrgencyCoefficients,
 } from '../utils/task-urgency';
 import { TaskStateManager } from './task-state-manager';
+import { RegexCache } from '../utils/regex-cache';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -24,6 +25,7 @@ export class VaultScanner {
     ((...args: unknown[]) => void)[]
   > = new Map();
   private urgencyCoefficients!: UrgencyCoefficients;
+  private regexCache = new RegexCache();
 
   constructor(
     private app: App,
@@ -105,6 +107,8 @@ export class VaultScanner {
     if (this._isScanning) return;
     this._isScanning = true;
 
+    const startTime = performance.now();
+
     try {
       this.emit('scan-started');
       const newTasks: Task[] = [];
@@ -136,6 +140,12 @@ export class VaultScanner {
       // Emit events for backward compatibility
       this.emit('tasks-changed', newTasks);
       this.emit('scan-completed');
+
+      const endTime = performance.now();
+      const scanDuration = endTime - startTime;
+      console.log(
+        `VaultScanner: scanVault completed in ${scanDuration.toFixed(2)}ms (${newTasks.length} tasks found)`,
+      );
     } catch (error) {
       console.error('VaultScanner scanVault error', error);
       this.emit(
@@ -169,7 +179,7 @@ export class VaultScanner {
           // Handle regex patterns (wrapped in /)
           if (pattern.startsWith('/') && pattern.endsWith('/')) {
             const regexPattern = pattern.slice(1, -1); // Remove / delimiters
-            const regex = new RegExp(regexPattern);
+            const regex = this.regexCache.get(regexPattern);
             return regex.test(filePath);
           }
           // Handle path patterns (ending with /)
@@ -177,7 +187,7 @@ export class VaultScanner {
             // Convert path to regex: match path prefix
             // Escape special regex characters in the path
             const escapedPath = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const pathRegex = new RegExp(`^${escapedPath}`);
+            const pathRegex = this.regexCache.get(`^${escapedPath}`);
             return pathRegex.test(filePath);
           }
           // Handle simple string matching
@@ -327,6 +337,8 @@ export class VaultScanner {
     urgencyCoefficients?: UrgencyCoefficients,
   ): Promise<void> {
     this.settings = newSettings;
+    // Clear regex cache when settings change (userIgnoreFilters may have changed)
+    this.regexCache.clear();
     // Use provided urgency coefficients or reload them if not provided
     if (urgencyCoefficients) {
       this.urgencyCoefficients = urgencyCoefficients;
