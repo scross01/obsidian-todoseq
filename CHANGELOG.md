@@ -1,5 +1,6 @@
 # Change Log
 
+- Fixed reliability of the keyword click handler to toggle state.
 - Fixed tag recognition and search to work with mutlibyte characters and emojies
 
 ## 0.9.2

@@ -65,7 +65,7 @@ export class UIManager {
           if (cmEditor && cmEditor.dom) {
             const editorContent = cmEditor.dom;
 
-            // Add event listener for click events on checkboxes and task keywords
+            // Handle click events on checkboxes and task keywords
             const clickHandler = (event: MouseEvent) => {
               const target = event.target as HTMLElement;
 
@@ -73,26 +73,90 @@ export class UIManager {
               if (target.classList.contains('task-list-item-checkbox')) {
                 this.handleCheckboxToggle(target as HTMLInputElement);
               }
-              // Handle task keyword clicks
-              else if (target.classList.contains('todoseq-keyword-formatted')) {
-                // Handle task state update with double-click detection
-                this.handleTaskKeywordClickWithDoubleClickDetection(
-                  target,
-                  view,
-                  event,
+              // Handle task keyword clicks (check target or any ancestor)
+              else {
+                const keywordElement = target.closest(
+                  '.todoseq-keyword-formatted',
                 );
+                if (keywordElement) {
+                  // Handle task state update with double-click detection
+                  this.handleTaskKeywordClickWithDoubleClickDetection(
+                    keywordElement as HTMLElement,
+                    view,
+                    event,
+                  );
+                }
               }
             };
 
-            // Store cleanup information
-            this.registeredEventListeners.push({
-              target: editorContent,
-              type: 'click',
-              handler: clickHandler,
-              options: { capture: true },
-            });
+            // Handle touch events to prevent text selection and ensure consistent behavior
+            let touchStartTime: number;
+            const touchHandler = (event: TouchEvent) => {
+              const target = event.target as HTMLElement;
+              const keywordElement = target.closest(
+                '.todoseq-keyword-formatted',
+              );
+
+              if (keywordElement && event.touches.length === 1) {
+                if (event.type === 'touchstart') {
+                  // Record touch start time
+                  touchStartTime = Date.now();
+                } else if (event.type === 'touchend') {
+                  // Calculate touch duration
+                  const touchDuration = Date.now() - touchStartTime;
+
+                  // Distinguish between single tap (short duration) and long press (long duration)
+                  if (touchDuration < 500) {
+                    // 500ms threshold for single tap
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    // Create a synthetic click event
+                    const touch = event.changedTouches[0];
+                    const clickEvent = new MouseEvent('click', {
+                      bubbles: true,
+                      cancelable: true,
+                      view: window,
+                      clientX: touch.clientX,
+                      clientY: touch.clientY,
+                    });
+
+                    keywordElement.dispatchEvent(clickEvent);
+                  }
+                  // For long presses (>= 500ms), we allow the default behavior (context menu)
+                }
+              }
+            };
+
+            // Store cleanup information and add event listeners
+            this.registeredEventListeners.push(
+              {
+                target: editorContent,
+                type: 'click',
+                handler: clickHandler,
+                options: { capture: true },
+              },
+              {
+                target: editorContent,
+                type: 'touchstart',
+                handler: touchHandler,
+                options: { capture: true },
+              },
+              {
+                target: editorContent,
+                type: 'touchend',
+                handler: touchHandler,
+                options: { capture: true },
+              },
+            );
 
             editorContent.addEventListener('click', clickHandler, {
+              capture: true,
+            });
+            editorContent.addEventListener('touchstart', touchHandler, {
+              capture: true,
+            });
+            editorContent.addEventListener('touchend', touchHandler, {
               capture: true,
             });
           }
@@ -246,40 +310,34 @@ export class UIManager {
     if (isDoubleClick) {
       this.lastClickedElement = null;
       this.lastClickTime = 0;
-      this.isMouseDownOnKeyword = false;
       return; // Don't process this as a single click
     }
 
     // Store the clicked element and time for double-click detection
     this.lastClickedElement = keywordElement;
     this.lastClickTime = currentTime;
-    this.isMouseDownOnKeyword = true;
+    let clickCancelled = false;
 
     // Set up mouse movement tracking to detect if mouse leaves the element
     this.mouseMoveHandler = (moveEvent: MouseEvent) => {
-      if (this.isMouseDownOnKeyword && moveEvent.buttons === 1) {
+      if (moveEvent.buttons === 1) {
         // Left mouse button is down
         const relatedTarget = moveEvent.relatedTarget as HTMLElement | null;
         // Check if mouse has moved outside the keyword element
         if (!keywordElement.contains(relatedTarget)) {
           // Mouse has moved away from the keyword element while button is down
           // This indicates text selection, not a single click
-          this.cancelPendingClick();
+          clickCancelled = true;
         }
       }
     };
 
     // Set up mouse up tracking to detect when mouse button is released
     this.mouseUpHandler = (upEvent: MouseEvent) => {
-      if (this.isMouseDownOnKeyword) {
-        // Check if mouse up occurred outside the keyword element
-        const target = upEvent.target as HTMLElement;
-        if (!keywordElement.contains(target)) {
-          // Mouse was released outside the keyword element
-          // This indicates text selection, not a single click
-          this.cancelPendingClick();
-        }
-        this.isMouseDownOnKeyword = false;
+      if (!keywordElement.contains(upEvent.target as HTMLElement)) {
+        // Mouse was released outside the keyword element
+        // This indicates text selection, not a single click
+        clickCancelled = true;
       }
     };
 
@@ -302,10 +360,9 @@ export class UIManager {
       this.pendingClickTimeout = null;
       this.lastClickedElement = null;
       this.lastClickTime = 0;
-      this.isMouseDownOnKeyword = false;
 
-      // Process as single click only if mouse didn't move away
-      if (this.isMouseDownOnKeyword === false) {
+      // Process as single click only if click wasn't cancelled
+      if (!clickCancelled) {
         this.handleTaskKeywordClick(keywordElement, view);
       }
     }, 300); // Standard double-click detection window
