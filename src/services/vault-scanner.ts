@@ -144,7 +144,7 @@ export class VaultScanner {
       const endTime = performance.now();
       const scanDuration = endTime - startTime;
       console.log(
-        `VaultScanner: scanVault completed in ${scanDuration.toFixed(2)}ms (${newTasks.length} tasks found)`,
+        `TODOseq: : scan vault completed in ${scanDuration.toFixed(2)}ms (${newTasks.length} tasks found)`,
       );
     } catch (error) {
       console.error('VaultScanner scanVault error', error);
