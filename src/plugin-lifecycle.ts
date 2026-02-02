@@ -300,7 +300,17 @@ export class PluginLifecycleManager {
       // Wait for the initial vault scan to complete before showing the task view
       // This ensures tasks are available when the view first renders
       await this.plugin.vaultScanner?.scanVault();
-      this.plugin.uiManager.showTasks();
+
+      // Only show the task view on first install (not on subsequent reloads)
+      if (!this.plugin.settings._hasShownFirstInstallView) {
+        this.plugin.settings._hasShownFirstInstallView = true;
+        await this.plugin.saveSettings();
+        // First install: reveal=true to show the sidebar and bring view into focus
+        this.plugin.uiManager.showTasks(true);
+      } else {
+        // On subsequent reloads, ensure the panel is available but don't steal focus
+        this.plugin.uiManager.showTasks(false);
+      }
     });
   }
 

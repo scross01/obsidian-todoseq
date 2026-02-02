@@ -61,6 +61,18 @@ export default class TodoTracker extends Plugin {
     // Expose plugin instance globally for easy access
     (window as unknown as { todoSeqPlugin?: TodoTracker }).todoSeqPlugin = this;
 
+    // Expose developer utility to reset first-install flag via console
+    // Usage: todoSeqResetFirstInstall()
+    (
+      window as unknown as { todoSeqResetFirstInstall?: () => void }
+    ).todoSeqResetFirstInstall = async () => {
+      this.settings._hasShownFirstInstallView = false;
+      await this.saveSettings();
+      console.log(
+        'TODOseq: First install flag reset. Reload plugin to test first-install behavior.',
+      );
+    };
+
     // Initialize centralized state manager first
     this.taskStateManager = new TaskStateManager();
 

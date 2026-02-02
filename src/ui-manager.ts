@@ -495,8 +495,9 @@ export class UIManager {
 
   /**
    * Show the tasks view
+   * @param reveal - Whether to reveal/open the sidebar panel (default: true)
    */
-  async showTasks(): Promise<void> {
+  async showTasks(reveal = true): Promise<void> {
     const { workspace } = this.plugin.app;
 
     // Create new leaf or use existing
@@ -507,7 +508,7 @@ export class UIManager {
       leaf = leaves[0];
       // Only reveal if the leaf is not already active to avoid focus stealing
       const activeLeaf = workspace.activeLeaf;
-      if (activeLeaf !== leaf) {
+      if (activeLeaf !== leaf && reveal) {
         await workspace.revealLeaf(leaf);
       }
     } else {
@@ -525,10 +526,11 @@ export class UIManager {
             leaf = workspace.getLeaf(true);
           }
         }
-        leaf.setViewState({ type: TaskListView.viewType, active: true });
+        // Use active: false to prevent focus stealing on first install
+        leaf.setViewState({ type: TaskListView.viewType, active: false });
         // Only reveal if the leaf is not already active to avoid focus stealing
         const activeLeaf = workspace.activeLeaf;
-        if (activeLeaf !== leaf) {
+        if (activeLeaf !== leaf && reveal) {
           await workspace.revealLeaf(leaf);
         }
       } catch (error) {
@@ -538,7 +540,7 @@ export class UIManager {
         );
         // Fallback to main area if right sidebar access fails
         leaf = workspace.getLeaf(true);
-        leaf.setViewState({ type: TaskListView.viewType, active: true });
+        leaf.setViewState({ type: TaskListView.viewType, active: false });
       }
     }
   }

@@ -1,5 +1,6 @@
 # Change Log
 
+- Fixed task list panel always tasking focus on app startup and plugin reload.
 - Improved update responsiveness with centralized service to handle all task state updates consistently across the plugin.
 
 ## 0.9.1
