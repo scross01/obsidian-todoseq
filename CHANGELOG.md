@@ -1,6 +1,7 @@
 # Change Log
 
 - Added a vault scan in progress indicator to empty task lists.
+- Fixed new custom keywords not getting styled in the editor view until restart.
 - Fixed embedded task list not updating with task content changes.
 - Fixed reliability of the keyword click handler to toggle state.
 - Fixed tag recognition and search to work with mutlibyte characters and emojies

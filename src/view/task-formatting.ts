@@ -565,18 +565,18 @@ export class TaskKeywordDecorator {
 // ViewPlugin for CodeMirror 6
 export const taskKeywordPlugin = (
   settings: TodoTrackerSettings,
-  parser: TaskParser,
+  getParser: () => TaskParser | null,
 ) => {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
       private settings: TodoTrackerSettings;
-      private parser: TaskParser;
+      private getParser: () => TaskParser | null;
       private settingsDetector: SettingsChangeDetector;
 
       constructor(view: EditorView) {
         this.settings = settings;
-        this.parser = parser;
+        this.getParser = getParser;
         this.settingsDetector = new SettingsChangeDetector();
         this.settingsDetector.initialize(settings);
         this.updateDecorations(view);
@@ -587,10 +587,16 @@ export const taskKeywordPlugin = (
           // When formatting is disabled, return empty decorations
           this.decorations = Decoration.none;
         } else {
+          const parser = this.getParser();
+          if (!parser) {
+            // If parser is not available, return empty decorations
+            this.decorations = Decoration.none;
+            return;
+          }
           const decorator = new TaskKeywordDecorator(
             view,
             this.settings,
-            this.parser,
+            parser,
           );
           this.decorations = decorator.getDecorations();
         }

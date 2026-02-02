@@ -24,16 +24,15 @@ export class UIManager {
    * Setup editor decorations for task formatting
    */
   setupEditorDecorations(): void {
-    // Get the shared parser instance from VaultScanner
-    const parser = this.plugin.vaultScanner?.getParser();
-    if (!parser) {
-      console.warn('Task parser not available for editor decorations');
-      return;
-    }
-
     // Register editor extension for all markdown editors
+    // Pass a function that gets the parser dynamically from VaultScanner
+    // This ensures that when the parser is recreated (e.g., when custom keywords are added),
+    // the editor decorations will use the updated parser
     const extension = this.plugin.registerEditorExtension([
-      taskKeywordPlugin(this.plugin.settings, parser),
+      taskKeywordPlugin(
+        this.plugin.settings,
+        () => this.plugin.vaultScanner?.getParser() ?? null,
+      ),
       dateAutocompleteExtension(this.plugin.settings),
     ]);
     this.plugin.taskFormatters.set('editor-extension', extension);
