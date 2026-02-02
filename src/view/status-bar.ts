@@ -71,7 +71,7 @@ export class StatusBarManager {
     if (!activeFile) return;
 
     // Open/focus the TODOseq Task List
-    this.plugin.showTasks();
+    this.plugin.uiManager.showTasks();
 
     // Populate the search filter with file name only
     // Omit path filter for files without parent directory
