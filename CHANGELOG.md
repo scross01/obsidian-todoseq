@@ -1,5 +1,6 @@
 # Change Log
 
+- Fixed embedded task list from wrapping keywords when page space is condensed.
 - Fixed task list panel always tasking focus on app startup and plugin reload.
 - Improved update responsiveness with centralized service to handle all task state updates consistently across the plugin.
 

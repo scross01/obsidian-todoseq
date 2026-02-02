@@ -633,6 +633,7 @@
   color: var(--text-normal);
   font-family: var(--font-monospace);
   font-size: 0.9em;
+  white-space: nowrap; /* Prevent keyword wrapping */
 }
 
 /* Task text */
