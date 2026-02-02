@@ -1,6 +1,110 @@
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings';
 
+describe('TaskParser.extractPriorityFromText', () => {
+  test('should extract high priority [#A] and clean text', () => {
+    const result = TaskParser['extractPriorityFromText'](
+      'Some task [#A] with priority',
+    );
+    expect(result.priority).toBe('high');
+    expect(result.cleanedText).toBe('Some task with priority');
+  });
+
+  test('should extract medium priority [#B] and clean text', () => {
+    const result = TaskParser['extractPriorityFromText'](
+      'Another [#B] task here',
+    );
+    expect(result.priority).toBe('med');
+    expect(result.cleanedText).toBe('Another task here');
+  });
+
+  test('should extract low priority [#C] and clean text', () => {
+    const result = TaskParser['extractPriorityFromText'](
+      'Low priority [#C] item',
+    );
+    expect(result.priority).toBe('low');
+    expect(result.cleanedText).toBe('Low priority item');
+  });
+
+  test('should return null priority and original text when no priority token', () => {
+    const result = TaskParser['extractPriorityFromText'](
+      'Regular task without priority',
+    );
+    expect(result.priority).toBeNull();
+    expect(result.cleanedText).toBe('Regular task without priority');
+  });
+
+  test('should handle priority token with surrounding spaces', () => {
+    const result = TaskParser['extractPriorityFromText'](
+      'Task  [#A]  with spaces',
+    );
+    expect(result.priority).toBe('high');
+    expect(result.cleanedText).toBe('Task with spaces');
+  });
+
+  test('should handle priority token at beginning of text', () => {
+    const result = TaskParser['extractPriorityFromText'](
+      '[#B] Task at beginning',
+    );
+    expect(result.priority).toBe('med');
+    expect(result.cleanedText).toBe('Task at beginning');
+  });
+
+  test('should handle priority token at end of text', () => {
+    const result = TaskParser['extractPriorityFromText']('Task at end [#C]');
+    expect(result.priority).toBe('low');
+    expect(result.cleanedText).toBe('Task at end ');
+  });
+});
+
+describe('TaskParser.extractFootnoteReference', () => {
+  test('should extract footnote reference from task text', () => {
+    const result = TaskParser['extractFootnoteReference'](
+      'Some task text [^1]',
+    );
+    expect(result.footnoteReference).toBe('[^1]');
+    expect(result.cleanedText).toBe('Some task text');
+  });
+
+  test('should extract first footnote reference when multiple exist', () => {
+    const result = TaskParser['extractFootnoteReference'](
+      'Task [^1] with [^2] references',
+    );
+    expect(result.footnoteReference).toBe('[^1]');
+    expect(result.cleanedText).toBe('Task  with  references');
+  });
+
+  test('should return original text when no footnote reference', () => {
+    const result = TaskParser['extractFootnoteReference']('Regular task text');
+    expect(result.footnoteReference).toBeUndefined();
+    expect(result.cleanedText).toBe('Regular task text');
+  });
+});
+
+describe('TaskParser.extractEmbedReference', () => {
+  test('should extract embed reference from end of task text', () => {
+    const result = TaskParser['extractEmbedReference'](
+      'Some task text ^abc123',
+    );
+    expect(result.embedReference).toBe('^abc123');
+    expect(result.cleanedText).toBe('Some task text');
+  });
+
+  test('should return original text when no embed reference', () => {
+    const result = TaskParser['extractEmbedReference']('Regular task text');
+    expect(result.embedReference).toBeUndefined();
+    expect(result.cleanedText).toBe('Regular task text');
+  });
+
+  test('should not extract embed reference from middle of text', () => {
+    const result = TaskParser['extractEmbedReference'](
+      'Task ^abc123 more text',
+    );
+    expect(result.embedReference).toBeUndefined();
+    expect(result.cleanedText).toBe('Task ^abc123 more text');
+  });
+});
+
 describe('Regular task parsing', () => {
   let parser: TaskParser;
   let settings: TodoTrackerSettings;

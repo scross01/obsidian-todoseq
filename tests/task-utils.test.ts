@@ -1,55 +1,10 @@
 import {
-  extractPriority,
   getFilename,
   isCompletedState,
   getCheckboxStatus,
 } from '../src/utils/task-utils';
 
 describe('task-utils', () => {
-  describe('extractPriority', () => {
-    test('should extract high priority [#A] and clean text', () => {
-      const result = extractPriority('Some task [#A] with priority');
-      expect(result.priority).toBe('high');
-      expect(result.cleanedText).toBe('Some task with priority');
-    });
-
-    test('should extract medium priority [#B] and clean text', () => {
-      const result = extractPriority('Another [#B] task here');
-      expect(result.priority).toBe('med');
-      expect(result.cleanedText).toBe('Another task here');
-    });
-
-    test('should extract low priority [#C] and clean text', () => {
-      const result = extractPriority('Low priority [#C] item');
-      expect(result.priority).toBe('low');
-      expect(result.cleanedText).toBe('Low priority item');
-    });
-
-    test('should return null priority and original text when no priority token', () => {
-      const result = extractPriority('Regular task without priority');
-      expect(result.priority).toBeNull();
-      expect(result.cleanedText).toBe('Regular task without priority');
-    });
-
-    test('should handle priority token with surrounding spaces', () => {
-      const result = extractPriority('Task  [#A]  with spaces');
-      expect(result.priority).toBe('high');
-      expect(result.cleanedText).toBe('Task with spaces');
-    });
-
-    test('should handle priority token at beginning of text', () => {
-      const result = extractPriority('[#B] Task at beginning');
-      expect(result.priority).toBe('med');
-      expect(result.cleanedText).toBe('Task at beginning');
-    });
-
-    test('should handle priority token at end of text', () => {
-      const result = extractPriority('Task at end [#C]');
-      expect(result.priority).toBe('low');
-      expect(result.cleanedText).toBe('Task at end ');
-    });
-  });
-
   describe('getFilename', () => {
     test('should extract filename from Unix path', () => {
       const result = getFilename('/path/to/file.txt');

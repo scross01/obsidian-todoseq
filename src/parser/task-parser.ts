@@ -6,12 +6,7 @@ import {
   LanguageCommentSupportSettings,
 } from './language-registry';
 import { DateParser } from './date-parser';
-import {
-  extractPriority,
-  extractFootnoteReference,
-  extractEmbedReference,
-  buildTaskKeywords,
-} from '../utils/task-utils';
+import { buildTaskKeywords } from '../utils/task-utils';
 import { TFile, App } from 'obsidian';
 import {
   calculateTaskUrgency,
@@ -36,6 +31,7 @@ import {
   CODE_PREFIX_SOURCE,
   TASK_TEXT_SOURCE,
   CHECKBOX_REGEX,
+  PRIORITY_TOKEN_REGEX,
 } from '../utils/patterns';
 
 type RegexPair = { test: RegExp; capture: RegExp };
@@ -376,7 +372,80 @@ export class TaskParser {
   }
 
   /**
-   * Extract priority from task text
+   * Extract footnote references from task text
+   * @param taskText The task text to extract from
+   * @returns Object containing footnote reference and cleaned text
+   */
+  private static extractFootnoteReference(taskText: string): {
+    footnoteReference?: string;
+    cleanedText: string;
+  } {
+    let cleanedText = taskText;
+    let footnoteReference: string | undefined;
+
+    // Extract footnote references like [^2], [^3], etc. (anywhere in text)
+    const footnoteMatches = taskText.match(/\[\^\d+\]/g);
+    if (footnoteMatches && footnoteMatches.length > 0) {
+      // Take the first footnote reference found
+      footnoteReference = footnoteMatches[0];
+      // Remove all footnote references from the text
+      cleanedText = taskText.replace(/\[\^\d+\]/g, '').trim();
+    }
+
+    return { footnoteReference, cleanedText };
+  }
+
+  /**
+   * Extract Obsidian embed references from task text
+   * @param taskText The task text to extract from
+   * @returns Object containing embed reference and cleaned text
+   */
+  private static extractEmbedReference(taskText: string): {
+    embedReference?: string;
+    cleanedText: string;
+  } {
+    let cleanedText = taskText;
+    let embedReference: string | undefined;
+
+    // Extract Obsidian embed references like ^abc123 (only at end of text)
+    const embedMatch = taskText.match(/(\s*\^[^\s]+)$/);
+    if (embedMatch) {
+      embedReference = embedMatch[1].trim();
+      cleanedText = taskText.slice(0, embedMatch.index).trim();
+    }
+
+    return { embedReference, cleanedText };
+  }
+
+  /**
+   * Extract priority from task text and return cleaned text
+   * @param taskText The task text to parse
+   * @returns Object containing priority and cleaned text
+   */
+  private static extractPriorityFromText(taskText: string): {
+    priority: 'high' | 'med' | 'low' | null;
+    cleanedText: string;
+  } {
+    let priority: 'high' | 'med' | 'low' | null = null;
+    let cleanedText = taskText;
+
+    const priMatch = PRIORITY_TOKEN_REGEX.exec(cleanedText);
+    if (priMatch) {
+      const letter = priMatch[2];
+      if (letter === 'A') priority = 'high';
+      else if (letter === 'B') priority = 'med';
+      else if (letter === 'C') priority = 'low';
+
+      const before = cleanedText.slice(0, priMatch.index);
+      const after = cleanedText.slice(priMatch.index + priMatch[0].length);
+      cleanedText = (before + ' ' + after).replace(/[ \t]+/g, ' ').trimStart();
+    }
+
+    return { priority, cleanedText };
+  }
+
+  /**
+   * Extract priority from task text with footnote and embed reference support
    * @param taskText The task text to parse
    * @returns Priority information
    */
@@ -388,13 +457,13 @@ export class TaskParser {
   } {
     // Extract footnote reference first
     const { footnoteReference, cleanedText: textAfterFootnote } =
-      extractFootnoteReference(taskText);
+      TaskParser.extractFootnoteReference(taskText);
     // Then extract embed reference from the remaining text
     const { embedReference, cleanedText } =
-      extractEmbedReference(textAfterFootnote);
+      TaskParser.extractEmbedReference(textAfterFootnote);
     // Finally extract priority
     const { priority, cleanedText: finalCleanedText } =
-      extractPriority(cleanedText);
+      TaskParser.extractPriorityFromText(cleanedText);
 
     return {
       priority,
@@ -1253,9 +1322,9 @@ export class TaskParser {
     // Extract quote nesting level
     const quoteNestingLevel = TaskParser.extractQuoteNestingLevel(line);
 
-    // Extract priority using shared utility (with footnote and embed reference support)
+    // Extract priority using instance method (with footnote and embed reference support)
     const { priority, cleanedText, embedReference, footnoteReference } =
-      extractPriority(taskText);
+      this.extractPriority(taskText);
 
     // Extract checkbox state using shared regex
     let completed = false;

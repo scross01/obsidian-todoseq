@@ -3,7 +3,6 @@ import {
   DEFAULT_PENDING_STATES,
   DEFAULT_ACTIVE_STATES,
 } from '../task';
-import { PRIORITY_TOKEN_REGEX } from './patterns';
 
 /**
  * Result of building the task keyword list
@@ -52,99 +51,6 @@ export function buildTaskKeywords(
     nonCompletedKeywords: Array.from(new Set(nonCompletedKeywords)),
     normalizedAdditional,
   };
-}
-
-/**
- * Extract footnote references from task text
- * @param taskText The task text to extract from
- * @returns Object containing footnote reference and cleaned text
- */
-export function extractFootnoteReference(taskText: string): {
-  footnoteReference?: string;
-  cleanedText: string;
-} {
-  let cleanedText = taskText;
-  let footnoteReference: string | undefined;
-
-  // Extract footnote references like [^2], [^3], etc. (anywhere in text)
-  const footnoteMatches = taskText.match(/\[\^\d+\]/g);
-  if (footnoteMatches && footnoteMatches.length > 0) {
-    // Take the first footnote reference found
-    footnoteReference = footnoteMatches[0];
-    // Remove all footnote references from the text
-    cleanedText = taskText.replace(/\[\^\d+\]/g, '').trim();
-  }
-
-  return { footnoteReference, cleanedText };
-}
-
-/**
- * Extract Obsidian embed references from task text
- * @param taskText The task text to extract from
- * @returns Object containing embed reference and cleaned text
- */
-export function extractEmbedReference(taskText: string): {
-  embedReference?: string;
-  cleanedText: string;
-} {
-  let cleanedText = taskText;
-  let embedReference: string | undefined;
-
-  // Extract Obsidian embed references like ^abc123 (only at end of text)
-  const embedMatch = taskText.match(/(\s*\^[^\s]+)$/);
-  if (embedMatch) {
-    embedReference = embedMatch[1].trim();
-    cleanedText = taskText.slice(0, embedMatch.index).trim();
-  }
-
-  return { embedReference, cleanedText };
-}
-
-/**
- * Extract priority from task text and return cleaned text
- * @param taskText The task text to parse
- * @returns Object containing priority and cleaned text
- */
-export function extractPriority(taskText: string): {
-  priority: 'high' | 'med' | 'low' | null;
-  cleanedText: string;
-  embedReference?: string;
-  footnoteReference?: string;
-} {
-  let priority: 'high' | 'med' | 'low' | null = null;
-  let cleanedText = taskText;
-  let embedReference: string | undefined;
-  let footnoteReference: string | undefined;
-
-  // eslint-disable-next-line prefer-const
-
-  // Extract footnote reference first
-  const { footnoteReference: ref, cleanedText: textAfterFootnote } =
-    extractFootnoteReference(taskText);
-  // eslint-disable-next-line prefer-const
-  footnoteReference = ref;
-  cleanedText = textAfterFootnote;
-
-  // Then extract embed reference from the remaining text
-  const { embedReference: embedRef, cleanedText: textAfterEmbed } =
-    extractEmbedReference(cleanedText);
-  // eslint-disable-next-line prefer-const
-  embedReference = embedRef;
-  cleanedText = textAfterEmbed;
-
-  const priMatch = PRIORITY_TOKEN_REGEX.exec(cleanedText);
-  if (priMatch) {
-    const letter = priMatch[2];
-    if (letter === 'A') priority = 'high';
-    else if (letter === 'B') priority = 'med';
-    else if (letter === 'C') priority = 'low';
-
-    const before = cleanedText.slice(0, priMatch.index);
-    const after = cleanedText.slice(priMatch.index + priMatch[0].length);
-    cleanedText = (before + ' ' + after).replace(/[ \t]+/g, ' ').trimStart();
-  }
-
-  return { priority, cleanedText, embedReference, footnoteReference };
 }
 
 /**
