@@ -11,6 +11,7 @@ import { TaskParser } from '../parser/task-parser';
 import {
   COMMENT_BLOCK_REGEX,
   FOOTNOTE_DEFINITION_REGEX,
+  SINGLE_LINE_COMMENT_REGEX,
 } from '../utils/patterns';
 import {
   LanguageRegistry,
@@ -113,7 +114,7 @@ export class TaskKeywordDecorator {
         // Handle footnote tasks with a more robust approach
         if (this.inFootnote) {
           // Check if this line matches footnote pattern and extract task content
-          const footnoteMarkerMatch = lineText.match(/^\[\^\d+\]:\s*/);
+          const footnoteMarkerMatch = lineText.match(FOOTNOTE_DEFINITION_REGEX);
           if (footnoteMarkerMatch) {
             // Extract content after footnote marker for task detection
             const contentAfterFootnote = lineText.substring(
@@ -135,7 +136,7 @@ export class TaskKeywordDecorator {
         }
 
         // Handle single-line comment blocks (%% ... %%)
-        const singleLineCommentMatch = /^\s*%%.*%%$/.test(lineText);
+        const singleLineCommentMatch = SINGLE_LINE_COMMENT_REGEX.test(lineText);
         if (singleLineCommentMatch && this.settings.includeCommentBlocks) {
           // Extract content between %% markers for task detection
           contentForTaskDetection = lineText
@@ -198,7 +199,9 @@ export class TaskKeywordDecorator {
 
           if (this.inFootnote) {
             // Find the actual position of the keyword in the original line text
-            const footnoteMarkerMatch = lineText.match(/^\[\^\d+\]:\s*/);
+            const footnoteMarkerMatch = lineText.match(
+              FOOTNOTE_DEFINITION_REGEX,
+            );
             if (footnoteMarkerMatch) {
               // Search for the keyword after the footnote marker
               const contentAfterFootnote = lineText.substring(
@@ -401,7 +404,7 @@ export class TaskKeywordDecorator {
     // Update comment block state using same logic as task parser
     if (COMMENT_BLOCK_REGEX.test(lineText)) {
       // Check if this is a single-line comment block (%% ... %%)
-      const singleLineCommentMatch = /^\s*%%.*%%$/.test(lineText);
+      const singleLineCommentMatch = SINGLE_LINE_COMMENT_REGEX.test(lineText);
 
       if (singleLineCommentMatch) {
         // For single-line comment blocks, treat as comment context for this line only

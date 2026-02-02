@@ -112,23 +112,27 @@ export const MATH_BLOCK_REGEX = /^\s*\$\$(?!.*\$\$).*/;
  * Matches both single-line (%% ... %%) and multi-line start
  */
 export const COMMENT_BLOCK_REGEX = /^\s*%%.*%%$|^\s*%%(?!.*%%).*/;
+export const COMMENT_BLOCK_SOURCE = COMMENT_BLOCK_REGEX.source;
 
 /**
  * Single-line comment pattern
  * Example: "%% TODO task %%"
  */
 export const SINGLE_LINE_COMMENT_REGEX = /^\s*%%.*%%$/;
+export const SINGLE_LINE_COMMENT_SOURCE = SINGLE_LINE_COMMENT_REGEX.source;
 
 /**
  * Callout block marker (lines starting with >)
  */
 export const CALLOUT_BLOCK_REGEX = /^\s*>.*/;
+export const CALLOUT_BLOCK_SOURCE = CALLOUT_BLOCK_REGEX.source;
 
 /**
  * Footnote definition marker
  * Example: "[^1]: ", "[^10]: "
  */
 export const FOOTNOTE_DEFINITION_REGEX = /^\[\^\d+\]:\s*/;
+export const FOOTNOTE_DEFINITION_SOURCE = FOOTNOTE_DEFINITION_REGEX.source;
 
 // ============================================================================
 // Task Content Patterns
@@ -279,14 +283,4 @@ export function detectListMarker(line: string): {
     marker: '',
     text: trimmed,
   };
-}
-
-/**
- * Extract indent from the beginning of a line
- * @param line The line to extract indent from
- * @returns The leading whitespace
- */
-export function extractIndent(line: string): string {
-  const match = line.match(/^(\s*)/);
-  return match ? match[1] : '';
 }

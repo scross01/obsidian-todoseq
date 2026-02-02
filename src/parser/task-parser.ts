@@ -32,6 +32,7 @@ import {
   TASK_TEXT_SOURCE,
   CHECKBOX_REGEX,
   PRIORITY_TOKEN_REGEX,
+  SINGLE_LINE_COMMENT_REGEX,
 } from '../utils/patterns';
 
 type RegexPair = { test: RegExp; capture: RegExp };
@@ -707,7 +708,7 @@ export class TaskParser {
       }
 
       // Check for single-line comment blocks (%% ... %%)
-      const isSingleLineComment = /^\s*%%.*%%$/.test(line);
+      const isSingleLineComment = SINGLE_LINE_COMMENT_REGEX.test(line);
       if (isSingleLineComment) {
         if (this.includeCommentBlocks) {
           const commentTask = this.tryParseCommentBlockTask(
@@ -800,7 +801,7 @@ export class TaskParser {
     const commentMatch = COMMENT_BLOCK_REGEX.exec(line);
     if (commentMatch) {
       // Check if it's a single-line comment (has closing %%)
-      const isSingleLine = /^\s*%%.*%%$/.test(line);
+      const isSingleLine = SINGLE_LINE_COMMENT_REGEX.test(line);
       if (isSingleLine) {
         // Single-line comments are not block transitions - they should be parsed normally
         return null;

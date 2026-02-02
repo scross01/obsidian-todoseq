@@ -1,6 +1,5 @@
 import {
   detectListMarker,
-  extractIndent,
   PRIORITY_TOKEN_REGEX,
   CHECKBOX_REGEX,
   BULLET_LIST_PATTERN,
@@ -66,15 +65,6 @@ describe('patterns', () => {
       expect(result.indent).toBe('');
       expect(result.marker).toBe('');
       expect(result.text).toBe('Plain text line');
-    });
-  });
-
-  describe('extractIndent', () => {
-    test('should extract leading whitespace', () => {
-      expect(extractIndent('  - Task')).toBe('  ');
-      expect(extractIndent('\t- Task')).toBe('\t');
-      expect(extractIndent('    1. Task')).toBe('    ');
-      expect(extractIndent('Task')).toBe('');
     });
   });
 
