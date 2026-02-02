@@ -1,5 +1,6 @@
 # Change Log
 
+- Added a vault scan in progress indicator to empty task lists.
 - Fixed reliability of the keyword click handler to toggle state.
 - Fixed tag recognition and search to work with mutlibyte characters and emojies
 

@@ -144,14 +144,38 @@ export class EmbeddedTaskListRenderer {
       const emptyState = taskListContainer.createEl('div', {
         cls: 'embedded-task-list-empty',
       });
-      emptyState.createEl('div', {
-        cls: 'embedded-task-list-empty-title',
-        text: 'No tasks found',
-      });
-      emptyState.createEl('div', {
-        cls: 'embedded-task-list-empty-subtitle',
-        text: 'Try adjusting your search or sort parameters',
-      });
+
+      // Check if we should show scanning message
+      // This includes both plugin scanning and Obsidian's internal index building
+      const isScanning =
+        this.plugin.vaultScanner?.shouldShowScanningMessage() ?? false;
+
+      // Check if we're in initial load state (before first scan has started)
+      // This prevents "No tasks found" from flashing before the scan begins
+      const allTasks = this.plugin.vaultScanner?.getTasks() ?? [];
+      const isInitialLoad = !isScanning && allTasks.length === 0;
+
+      if (isScanning || isInitialLoad) {
+        emptyState.createEl('div', {
+          cls: 'embedded-task-list-empty-title',
+          text: isScanning ? 'Scanning vault...' : 'Loading tasks...',
+        });
+        emptyState.createEl('div', {
+          cls: 'embedded-task-list-empty-subtitle',
+          text: isScanning
+            ? 'Please wait while your tasks are being indexed'
+            : 'Please wait while your vault is being indexed',
+        });
+      } else {
+        emptyState.createEl('div', {
+          cls: 'embedded-task-list-empty-title',
+          text: 'No tasks found',
+        });
+        emptyState.createEl('div', {
+          cls: 'embedded-task-list-empty-subtitle',
+          text: 'Try adjusting your search or sort parameters',
+        });
+      }
     }
   }
 
@@ -694,7 +718,7 @@ export class EmbeddedTaskListRenderer {
         leaf: WorkspaceLeaf | null | undefined,
       ): boolean => {
         if (!leaf) return false;
-        return leaf.view?.getViewType?.() === 'todoseq';
+        return leaf.view?.getViewType() === 'todoseq';
       };
 
       const findExistingLeafForFile = (): WorkspaceLeaf | null => {

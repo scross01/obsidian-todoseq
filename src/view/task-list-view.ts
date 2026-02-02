@@ -1195,15 +1195,29 @@ export class TaskListView extends ItemView {
     }
 
     // Empty-state guidance UI
-    if (visible.length === 0) {
+    // Check scan status first - show scanning message even when tasks exist
+    const plugin = (
+      window as unknown as {
+        todoSeqPlugin?: {
+          vaultScanner?: {
+            isScanning: () => boolean;
+            shouldShowScanningMessage: () => boolean;
+          };
+        };
+      }
+    ).todoSeqPlugin;
+    const isScanning =
+      plugin?.vaultScanner?.shouldShowScanningMessage() ?? false;
+
+    // Check if we're in initial load state (before first scan has started)
+    // This prevents "No tasks found" from flashing before the scan begins
+    const isInitialLoad =
+      !isScanning && visible.length === 0 && allTasks.length === 0;
+
+    if (isScanning || isInitialLoad) {
       // Remove any previous empty-state
       const prevEmpty = container.querySelector('.todo-empty');
       if (prevEmpty) prevEmpty.detach?.();
-
-      // Determine scenario
-      const hasAnyTasks = allTasks.length > 0;
-      const hasAnyIncomplete = allTasks.some((t) => !t.completed);
-      const isHideCompleted = mode === 'hideCompleted';
 
       // Build empty message container (below toolbar, above list)
       const emptyContainer = this.taskListContainer || container;
@@ -1212,8 +1226,38 @@ export class TaskListView extends ItemView {
       const title = empty.createEl('div', { cls: 'todo-empty-title' });
       const subtitle = empty.createEl('div', { cls: 'todo-empty-subtitle' });
 
+      // Show appropriate message based on state
+      if (isScanning) {
+        // Vault scan in progress with no visible tasks
+        title.setText('Scanning vault...');
+        subtitle.setText('Please wait while your tasks are being indexed.');
+      } else {
+        // Initial load state (Obsidian starting up, no tasks loaded yet)
+        title.setText('Loading tasks...');
+        subtitle.setText('Please wait while your vault is being indexed.');
+      }
+
+      // Keep toolbar enabled: do not disable or overlay; list remains empty
+      return;
+    } else if (visible.length === 0) {
+      // Remove any previous empty-state
+      const prevEmpty = container.querySelector('.todo-empty');
+      if (prevEmpty) prevEmpty.detach?.();
+
+      // Build empty message container (below toolbar, above list)
+      const emptyContainer = this.taskListContainer || container;
+      const empty = emptyContainer.createEl('div', { cls: 'todo-empty' });
+
+      const title = empty.createEl('div', { cls: 'todo-empty-title' });
+      const subtitle = empty.createEl('div', { cls: 'todo-empty-subtitle' });
+
+      // Determine scenario
+      const hasAnyTasks = allTasks.length > 0;
+      const hasAnyIncomplete = allTasks.some((t) => !t.completed);
+      const isHideCompleted = mode === 'hideCompleted';
+
       if (!hasAnyTasks) {
-        // a) No tasks found at all
+        // No tasks in vault at all
         title.setText('No tasks found');
         subtitle.setText(
           'Create tasks in your notes using "TODO Your task". They will appear here automatically.',

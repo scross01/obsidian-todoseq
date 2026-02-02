@@ -245,13 +245,27 @@ export class PluginLifecycleManager {
     // Listen to VaultScanner events for task updates
     // Note: TaskListView now subscribes directly to TaskStateManager,
     // but we still refresh UI components that need updates
+    this.plugin.vaultScanner.on('scan-started', () => {
+      // Refresh all task list views to show "Scanning vault..." message
+      // This updates views that have no tasks yet to indicate scan is in progress
+      this.plugin.uiManager.refreshOpenTaskListViews();
+      this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists();
+    });
+
+    this.plugin.vaultScanner.on('scan-completed', () => {
+      // Use setTimeout to ensure tasks are fully set in TaskStateManager before refreshing
+      setTimeout(() => {
+        // Explicitly refresh the TaskListView to ensure it updates
+        this.plugin.uiManager.refreshOpenTaskListViews();
+        // Also refresh embedded lists
+        this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists();
+      }, 0);
+    });
+
     this.plugin.vaultScanner.on('tasks-changed', () => {
       // UI components that aren't subscribed to TaskStateManager directly
       // can be refreshed here if needed
       this.plugin.statusBarManager?.updateTaskCount();
-
-      // Refresh embedded task lists to ensure they show the latest tasks
-      this.plugin.refreshAllTaskListViews();
     });
 
     this.plugin.vaultScanner.on('scan-error', (error) => {
@@ -297,6 +311,10 @@ export class PluginLifecycleManager {
     // Auto-open task view in right sidebar when plugin loads
     // Use onLayoutReady to ensure workspace is fully initialized
     this.plugin.app.workspace.onLayoutReady(async () => {
+      // Set initialization flag to show scanning message immediately
+      // This ensures views show "Scanning vault..." before the scan starts
+      this.plugin.vaultScanner?.setInitializationComplete();
+
       // Wait for the initial vault scan to complete before showing the task view
       // This ensures tasks are available when the view first renders
       await this.plugin.vaultScanner?.scanVault();

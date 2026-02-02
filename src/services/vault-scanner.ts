@@ -20,6 +20,7 @@ export interface VaultScannerEvents {
 
 export class VaultScanner {
   private _isScanning = false;
+  private _isInitializing = true; // Track Obsidian initialization state
   private eventListeners: Map<
     keyof VaultScannerEvents,
     ((...args: unknown[]) => void)[]
@@ -314,6 +315,35 @@ export class VaultScanner {
         err instanceof Error ? err : new Error(String(err)),
       );
     }
+  }
+
+  // Get the current scanning state
+  isScanning(): boolean {
+    return this._isScanning;
+  }
+
+  /**
+   * Check if Obsidian's vault is still initializing
+   * Set to false after initial scan completes
+   */
+  isObsidianInitializing(): boolean {
+    return this._isInitializing;
+  }
+
+  /**
+   * Mark Obsidian initialization as complete
+   * Called after the initial vault scan completes
+   */
+  setInitializationComplete(): void {
+    this._isInitializing = false;
+  }
+
+  /**
+   * Check if we should show the scanning message
+   * Returns true if either the plugin is scanning or Obsidian is still initializing
+   */
+  shouldShowScanningMessage(): boolean {
+    return this._isScanning || this._isInitializing;
   }
 
   // Get the current tasks from the state manager
