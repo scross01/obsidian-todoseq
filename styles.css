@@ -909,6 +909,71 @@
   );
 }
 
+/* Nested quote task keyword styling */
+/* Level 1: > TODO task */
+.cm-editor .quote-block-task-keyword-1 {
+  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  color: var(--interactive-accent);
+  font-size: 0.9em;
+  border-radius: 2px;
+}
+
+.cm-editor .quote-block-task-keyword-1:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 15%,
+    transparent
+  );
+}
+
+/* Level 2: > > TODO task */
+.cm-editor .quote-block-task-keyword-2 {
+  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  color: var(--interactive-accent);
+  font-size: 0.9em;
+  border-radius: 2px;
+}
+
+.cm-editor .quote-block-task-keyword-2:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 15%,
+    transparent
+  );
+}
+
+/* Level 3: > > > TODO task */
+.cm-editor .quote-block-task-keyword-3 {
+  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  color: var(--interactive-accent);
+  font-size: 0.9em;
+  border-radius: 2px;
+}
+
+.cm-editor .quote-block-task-keyword-3:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 15%,
+    transparent
+  );
+}
+
+/* Level 4+ nested quote task keyword styling */
+.cm-editor .quote-block-task-keyword-n {
+  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  color: var(--interactive-accent);
+  font-size: 0.9em;
+  border-radius: 2px;
+}
+
+.cm-editor .quote-block-task-keyword-n:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 15%,
+    transparent
+  );
+}
+
 .embedded-task-item-date-soon {
   background-color: color-mix(in srgb, var(--color-green) 5%, transparent);
   border-left: 3px solid color-mix(in srgb, var(--color-green) 50%, transparent);

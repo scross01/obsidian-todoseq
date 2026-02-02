@@ -21,6 +21,7 @@ export interface Task {
   dailyNoteDate: Date | null; // the date of the daily note if it's a daily note
   embedReference?: string; // Obsidian embed reference like ^abc123
   footnoteReference?: string; // footnote reference like [^2]
+  quoteNestingLevel?: number; // number of nested quote levels (e.g., 1 for "> ", 2 for "> > ")
 }
 
 export const DEFAULT_PENDING_STATES = new Set<string>([

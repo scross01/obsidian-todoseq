@@ -211,6 +211,23 @@ export class TaskParser {
   }
 
   /**
+   * Extract quote nesting level from a line
+   * Counts the number of consecutive ">" characters at the start
+   * @param line The line to analyze
+   * @returns The nesting level (number of consecutive ">" characters)
+   */
+  private static extractQuoteNestingLevel(line: string): number {
+    const match = line.match(/^>\s*/);
+    if (!match) {
+      return 0;
+    }
+    // Count consecutive ">" characters
+    const prefix = match[0];
+    const nestingLevel = (prefix.match(/>/g) || []).length;
+    return nestingLevel;
+  }
+
+  /**
    * Build footnote regex patterns for footnote task detection
    * @param keywords Array of task keywords
    * @returns RegexPair for testing and capturing footnote tasks
@@ -323,6 +340,7 @@ export class TaskParser {
     taskText: string;
     tail: string;
     state: string;
+    quoteNestingLevel: number;
   } {
     // Use language-aware regex if applicable or callout regex for callout tasks
     const m = regex.exec(line);
@@ -344,12 +362,16 @@ export class TaskParser {
     const taskText = m[5];
     const tail = m[6];
 
+    // Extract quote nesting level
+    const quoteNestingLevel = TaskParser.extractQuoteNestingLevel(line);
+
     return {
       indent,
       listMarker,
       taskText,
       tail,
       state,
+      quoteNestingLevel,
     };
   }
 
@@ -1066,6 +1088,7 @@ export class TaskParser {
       taskText: string;
       tail: string;
       state: string;
+      quoteNestingLevel: number;
     },
     lines: string[],
     file?: TFile,
@@ -1125,6 +1148,7 @@ export class TaskParser {
       dailyNoteDate,
       embedReference,
       footnoteReference,
+      quoteNestingLevel: taskDetails.quoteNestingLevel,
     };
 
     // Extract dates from following lines
@@ -1208,6 +1232,7 @@ export class TaskParser {
         dailyNoteDate: null,
         embedReference,
         footnoteReference,
+        quoteNestingLevel: 0, // Footnotes don't have quote nesting
       };
 
       return task;
@@ -1224,6 +1249,9 @@ export class TaskParser {
     const state = match[4];
     const taskText = match[5];
     const tail = match[6];
+
+    // Extract quote nesting level
+    const quoteNestingLevel = TaskParser.extractQuoteNestingLevel(line);
 
     // Extract priority using shared utility (with footnote and embed reference support)
     const { priority, cleanedText, embedReference, footnoteReference } =
@@ -1258,6 +1286,7 @@ export class TaskParser {
       footnoteReference,
       isDailyNote: false,
       dailyNoteDate: null,
+      quoteNestingLevel,
     };
   }
 

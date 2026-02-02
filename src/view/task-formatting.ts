@@ -28,6 +28,7 @@ export class TaskKeywordDecorator {
   private inCodeBlock = false;
   private codeBlockLanguage = '';
   private inQuoteBlock = false;
+  private quoteNestingLevel = 0;
   private inCalloutBlock = false;
   private inCommentBlock = false;
   private inFootnote = false;
@@ -288,7 +289,8 @@ export class TaskKeywordDecorator {
           ) {
             cssClasses += ' comment-block-task-keyword';
           } else if (this.inQuoteBlock && this.settings.includeCalloutBlocks) {
-            cssClasses += ' quote-block-task-keyword';
+            // Add nesting level to CSS class (e.g., quote-block-task-keyword-2 for > > TODO)
+            cssClasses += ` quote-block-task-keyword-${this.quoteNestingLevel}`;
           } else if (
             this.inCalloutBlock &&
             this.settings.includeCalloutBlocks
@@ -367,16 +369,26 @@ export class TaskKeywordDecorator {
     // Update code block state
     this.updateCodeBlockState(lineText);
 
-    // Update quote/callout block state
+    // Update quote/callout block state and nesting level
     const quoteMatch = /^\s*>/?.exec(lineText);
     if (quoteMatch) {
       // Check if this is a callout block (e.g., > [!info])
       const calloutMatch = /^\s*>\[!\w+\]-?\s+/.exec(lineText);
       this.inCalloutBlock = !!calloutMatch;
       this.inQuoteBlock = !calloutMatch;
+
+      // Calculate quote nesting level (count consecutive ">" characters)
+      const quotePrefixMatch = lineText.match(/^>\s*/);
+      if (quotePrefixMatch) {
+        const quotePrefix = quotePrefixMatch[0];
+        this.quoteNestingLevel = (quotePrefix.match(/>/g) || []).length;
+      } else {
+        this.quoteNestingLevel = 0;
+      }
     } else {
       this.inQuoteBlock = false;
       this.inCalloutBlock = false;
+      this.quoteNestingLevel = 0;
     }
 
     // Update footnote state

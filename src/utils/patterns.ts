@@ -79,9 +79,9 @@ export const STANDARD_PREFIX_SOURCE = STANDARD_PREFIX_PATTERN.source;
 
 /**
  * Quoted lines with leading ">"
- * Example: "> ", ">  "
+ * Example: "> ", ">  ", "> > ", "> > > "
  */
-export const QUOTED_PREFIX_PATTERN = /\s*>\s*/;
+export const QUOTED_PREFIX_PATTERN = /\s*(?:>\s*)+/;
 export const QUOTED_PREFIX_SOURCE = QUOTED_PREFIX_PATTERN.source;
 
 /**

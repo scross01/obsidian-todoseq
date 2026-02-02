@@ -260,6 +260,10 @@ When "Include tasks inside quote and callout blocks" is enabled:
 ```markdown
 > TODO Task in a quote block
 
+> > TODO Task in a nested quote block
+
+> > > TODO Task in three level nested quote block
+
 > [!info]
 > TODO Task in an info callout
 
@@ -267,6 +271,17 @@ When "Include tasks inside quote and callout blocks" is enabled:
 >
 > - [ ] TODO Checkbox task in collapsible todo block
 ```
+
+**Nested Quote Styling:**
+
+When formatting is enabled, tasks in nested quotes receive styling that reflects their nesting level:
+
+- Level 1 (`> TODO task`): Styled with `quote-block-task-keyword` class
+- Level 2 (`> > TODO task`): Styled with `quote-block-task-keyword-2` class
+- Level 3 (`> > > TODO task`): Styled with `quote-block-task-keyword-3` class
+- Level 4+ (`> > > > TODO task`): Styled with `quote-block-task-keyword-n` class
+
+This allows for visual differentiation between deeply nested quote blocks.
 
 ### Tasks in Comment Blocks
 

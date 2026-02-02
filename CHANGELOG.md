@@ -1,7 +1,9 @@
 # Change Log
 
+- Added support for tasks declared in nested quotes.
 - Fixed embedded task list from wrapping keywords when page space is condensed.
 - Fixed task list panel always tasking focus on app startup and plugin reload.
+- Fixed task capture and styling for tasks declared in footnotes.
 - Improved update responsiveness with centralized service to handle all task state updates consistently across the plugin.
 
 ## 0.9.1
