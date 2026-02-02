@@ -2,6 +2,7 @@ import { Vault } from 'obsidian';
 import { Task } from '../task';
 import { TodoTrackerSettings } from '../settings/settings';
 import { TaskListViewMode } from '../view/task-list-view';
+import { TAG_PATTERN } from '../utils/patterns';
 
 /**
  * Utility class for collecting and filtering search suggestions
@@ -208,10 +209,6 @@ export class SearchSuggestions {
    */
   static getAllTags(tasks: Task[], mode?: TaskListViewMode): string[] {
     const tagsSet = new Set<string>();
-    // Comprehensive tag regex that matches #tag, #multi-word-tag, etc.
-    // Improved to avoid matching # characters within URLs
-    // Negative lookbehind to ensure # is not preceded by common URL characters
-    const tagRegex = /(?<![/:.])#([^\s)\]}>]+)/g;
 
     // Filter tasks based on view mode
     const filteredTasks = mode
@@ -221,9 +218,9 @@ export class SearchSuggestions {
     filteredTasks.forEach((task) => {
       if (task.rawText) {
         // Reset regex for each task to avoid global state issues
-        tagRegex.lastIndex = 0;
+        TAG_PATTERN.lastIndex = 0;
         let matches;
-        while ((matches = tagRegex.exec(task.rawText)) !== null) {
+        while ((matches = TAG_PATTERN.exec(task.rawText)) !== null) {
           const tag = matches[1]; // Get the captured group
           tagsSet.add(tag);
         }

@@ -278,5 +278,86 @@ describe('Tag Search with Subtags and Exact Matching', () => {
         ).toBe(false);
       });
     });
+
+    describe('Emoji tags', () => {
+      it('should recognize emoji tags', () => {
+        const emojiTask: Task = {
+          path: 'notes/emoji.md',
+          line: 1,
+          rawText: 'TODO test tag with emoji #🚀',
+          indent: '',
+          listMarker: '-',
+          text: 'test tag with emoji',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        };
+
+        expect(Search.evaluate('tag:#🚀', emojiTask, false)).toBe(true);
+        expect(Search.evaluate('tag:🚀', emojiTask, false)).toBe(true);
+        expect(Search.evaluate('tag:"#🚀"', emojiTask, false)).toBe(true);
+        expect(Search.evaluate('tag:"🚀"', emojiTask, false)).toBe(true);
+      });
+    });
+
+    describe('URL anchor exclusion', () => {
+      it('should not match #ref in URLs as tags', () => {
+        const urlTask: Task = {
+          path: 'notes/url.md',
+          line: 1,
+          rawText:
+            'TODO test task that has a URL not a tag https://example.com/text#ref',
+          indent: '',
+          listMarker: '-',
+          text: 'test task that has a URL not a tag https://example.com/text#ref',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        };
+
+        expect(Search.evaluate('tag:#ref', urlTask, false)).toBe(false);
+        expect(Search.evaluate('tag:ref', urlTask, false)).toBe(false);
+      });
+
+      it('should still recognize tags in same task as URL', () => {
+        const taskWithUrlAndTag: Task = {
+          path: 'notes/url-tag.md',
+          line: 1,
+          rawText:
+            'TODO task with URL and tag https://example.com/page#section #important',
+          indent: '',
+          listMarker: '-',
+          text: 'task with URL and tag https://example.com/page#section',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        };
+
+        expect(
+          Search.evaluate('tag:#important', taskWithUrlAndTag, false),
+        ).toBe(true);
+        expect(Search.evaluate('tag:important', taskWithUrlAndTag, false)).toBe(
+          true,
+        );
+        expect(Search.evaluate('tag:#section', taskWithUrlAndTag, false)).toBe(
+          false,
+        );
+      });
+    });
   });
 });

@@ -203,6 +203,19 @@ export const LETTER_MATCH_REGEX = /^([A-Za-z][.)])\s*(.*)$/;
 export const QUOTE_LINE_REGEX = /^>\s*(.*)$/;
 
 // ============================================================================
+// Tag Patterns
+// ============================================================================
+
+/**
+ * Tag pattern for matching valid Obsidian tags
+ * Matches: #tag, #context/home, #multi-word-tag, #emoji🎯
+ * Supports: alphanumeric (including multibyte/emoji), /, -, _
+ * Excludes: URL anchors (via negative lookbehind)
+ */
+export const TAG_PATTERN = /(?<![\w/:?#[\]])#([^\s)\]}>]+)/gu;
+export const TAG_PATTERN_SOURCE = TAG_PATTERN.source;
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 

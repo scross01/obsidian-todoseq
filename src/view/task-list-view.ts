@@ -27,6 +27,7 @@ import {
 } from '../utils/task-sort';
 import { getPluginSettings } from '../utils/settings-utils';
 import { TaskStateManager } from '../services/task-state-manager';
+import { TAG_PATTERN } from '../utils/patterns';
 
 export type TaskListViewMode =
   | 'showAll'
@@ -1451,7 +1452,7 @@ export class TaskListView extends ItemView {
       // bare URLs
       { type: 'url', regex: /\bhttps?:\/\/[^\s)]+/g },
       // #tags (must come after URLs to avoid conflicts with URLs containing #)
-      { type: 'tag', regex: /#([^\s\])[}{>]+)/g },
+      { type: 'tag', regex: TAG_PATTERN },
     ];
 
     let i = 0;

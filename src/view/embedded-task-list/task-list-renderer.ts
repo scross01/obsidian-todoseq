@@ -10,6 +10,7 @@ import { TodoseqParameters } from './code-block-parser';
 import { MarkdownView, Menu, WorkspaceLeaf, TFile, Platform } from 'obsidian';
 import { getPluginSettings } from '../../utils/settings-utils';
 import { truncateMiddle } from '../../utils/task-utils';
+import { TAG_PATTERN } from '../../utils/patterns';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -209,7 +210,7 @@ export class EmbeddedTaskListRenderer {
       // bare URLs
       { type: 'url', regex: /\bhttps?:\/\/[^\s)]+/g },
       // #tags (must come after URLs to avoid conflicts with URLs containing #)
-      { type: 'tag', regex: /#([^\s\])[}{>]+)/g },
+      { type: 'tag', regex: TAG_PATTERN },
     ];
 
     let i = 0;

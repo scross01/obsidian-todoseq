@@ -4,6 +4,7 @@ import { DateUtils } from '../utils/date-utils';
 import { TodoTrackerSettings } from '../settings/settings';
 import { getFilename } from '../utils/task-utils';
 import { RegexCache } from '../utils/regex-cache';
+import { TAG_PATTERN } from '../utils/patterns';
 
 export class SearchEvaluator {
   private static regexCache = new RegexCache();
@@ -222,8 +223,7 @@ export class SearchEvaluator {
       : task.rawText.toLowerCase();
 
     // Look for tag patterns with support for subtags (#context, #context/home, etc.)
-    const tagRegex = /#([\w/-]+)/g;
-    const matches = targetText.match(tagRegex) || [];
+    const matches = targetText.match(TAG_PATTERN) || [];
 
     if (exact) {
       // Exact match behavior for quoted searches
