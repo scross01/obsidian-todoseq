@@ -757,5 +757,39 @@ describe('Task Sorting System', () => {
       expect(sorted[0]).toBe(task2); // a.md comes before z.md
       expect(sorted[1]).toBe(task1);
     });
+
+    it('should sort tasks by path first', () => {
+      const taskA = createTask({ path: 'a/file.md', line: 1 });
+      const taskB = createTask({ path: 'b/file.md', line: 1 });
+
+      expect(taskComparator(taskA, taskB)).toBeLessThan(0);
+      expect(taskComparator(taskB, taskA)).toBeGreaterThan(0);
+    });
+
+    it('should sort tasks by line number when paths are equal', () => {
+      const task1 = createTask({ path: 'same/file.md', line: 5 });
+      const task2 = createTask({ path: 'same/file.md', line: 10 });
+
+      expect(taskComparator(task1, task2)).toBeLessThan(0);
+      expect(taskComparator(task2, task1)).toBeGreaterThan(0);
+    });
+
+    it('should return 0 for identical tasks', () => {
+      const task1 = createTask({ path: 'same/file.md', line: 5 });
+      const task2 = createTask({ path: 'same/file.md', line: 5 });
+
+      expect(taskComparator(task1, task2)).toBe(0);
+    });
+
+    it('should handle different path lengths', () => {
+      const taskShort = createTask({ path: 'file.md', line: 1 });
+      const taskLong = createTask({
+        path: 'very/long/path/to/file.md',
+        line: 1,
+      });
+
+      expect(taskComparator(taskShort, taskLong)).toBeLessThan(0);
+      expect(taskComparator(taskLong, taskShort)).toBeGreaterThan(0);
+    });
   });
 });

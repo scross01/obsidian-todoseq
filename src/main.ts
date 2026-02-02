@@ -193,13 +193,6 @@ export default class TodoTracker extends Plugin {
     await this.saveData(this.settings);
   }
 
-  // Test method to manually update reader view formatter
-  // Note: The parser is now shared via VaultScanner, so this method
-  // is kept for API compatibility but doesn't need to recreate the parser
-  public testUpdateReaderViewFormatter(): void {
-    // Parser is managed by VaultScanner - no action needed here
-  }
-
   // Update task formatting in all views
   public updateTaskFormatting(): void {
     // Delegate to UI manager
@@ -217,18 +210,6 @@ export default class TodoTracker extends Plugin {
     if (this.embeddedTaskListProcessor) {
       this.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
     }
-  }
-
-  // Setup status bar manager for task count
-  private setupStatusBarManager(): void {
-    import('./view/status-bar')
-      .then((module) => {
-        this.statusBarManager = new module.StatusBarManager(this);
-        this.statusBarManager.setupStatusBarItem();
-      })
-      .catch((error) => {
-        console.error('Failed to load status bar manager:', error);
-      });
   }
 
   // Force refresh of editor decorations in all visible markdown editors
@@ -262,7 +243,4 @@ export default class TodoTracker extends Plugin {
       }
     }
   }
-
-  // Serialize scans to avoid overlapping runs
-  private _isScanning = false;
 }

@@ -2,7 +2,7 @@ import { App, TFile, TAbstractFile } from 'obsidian';
 import { Task } from '../task';
 import { TaskParser } from '../parser/task-parser';
 import { TodoTrackerSettings } from '../settings/settings';
-import { taskComparator } from '../utils/task-utils';
+import { taskComparator } from '../utils/task-sort';
 import {
   parseUrgencyCoefficients,
   UrgencyCoefficients,

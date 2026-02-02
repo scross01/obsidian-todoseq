@@ -10,7 +10,6 @@ import {
   extractPriority,
   extractFootnoteReference,
   extractEmbedReference,
-  CHECKBOX_REGEX,
   buildTaskKeywords,
 } from '../utils/task-utils';
 import { TFile, App } from 'obsidian';
@@ -36,6 +35,7 @@ import {
   FOOTNOTE_DEFINITION_REGEX,
   CODE_PREFIX_SOURCE,
   TASK_TEXT_SOURCE,
+  CHECKBOX_REGEX,
 } from '../utils/patterns';
 
 type RegexPair = { test: RegExp; capture: RegExp };
