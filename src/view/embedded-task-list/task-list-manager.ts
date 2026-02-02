@@ -16,6 +16,7 @@ export class EmbeddedTaskListManager {
   private taskCache: Map<string, { tasks: Task[]; timestamp: number }> =
     new Map();
   private cacheTTL = 5000; // 5 seconds cache TTL
+  private cacheVersion = 0; // Version number to invalidate cache on task changes
 
   constructor(settings: TodoTrackerSettings) {
     this.settings = settings;
@@ -173,8 +174,8 @@ export class EmbeddedTaskListManager {
    * @returns Cache key string
    */
   private generateCacheKey(tasks: Task[], params: TodoseqParameters): string {
-    // Use task count and parameters for cache key
-    // This is a simple approach - could be enhanced with task hashes
+    // Use cache version and task count for cache key
+    // This ensures cache is invalidated when tasks change
     const taskCount = tasks.length;
     const searchHash = params.searchQuery
       ? this.hashString(params.searchQuery)
@@ -184,7 +185,7 @@ export class EmbeddedTaskListManager {
     const futureHash = params.future || 'default';
     const limitHash = params.limit || 'none';
 
-    return `${taskCount}-${searchHash}-${sortHash}-${completedHash}-${futureHash}-${limitHash}`;
+    return `${this.cacheVersion}-${taskCount}-${searchHash}-${sortHash}-${completedHash}-${futureHash}-${limitHash}`;
   }
 
   /**
@@ -210,13 +211,21 @@ export class EmbeddedTaskListManager {
   }
 
   /**
+   * Invalidate the cache by incrementing the version number
+   * This should be called when tasks are updated or removed
+   */
+  invalidateCache(): void {
+    this.cacheVersion++;
+    this.taskCache.clear();
+  }
+
+  /**
    * Invalidate cache for specific file path
    * @param filePath Path of the file that changed
    */
   invalidateCacheForFile(filePath: string): void {
-    // For now, clear entire cache when any file changes
-    // In future, could track which tasks come from which files
-    this.clearCache();
+    // Increment version and clear cache when any file changes
+    this.invalidateCache();
   }
 
   /**

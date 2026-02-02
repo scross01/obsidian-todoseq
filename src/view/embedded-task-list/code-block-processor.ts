@@ -14,6 +14,7 @@ export class TodoseqCodeBlockProcessor {
   private renderer: EmbeddedTaskListRenderer;
   private manager: EmbeddedTaskListManager;
   private eventHandler: EmbeddedTaskListEventHandler;
+  private unsubscribeFromStateManager: (() => void) | null = null;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
@@ -23,6 +24,14 @@ export class TodoseqCodeBlockProcessor {
       plugin,
       this.renderer,
       this.manager,
+    );
+
+    // Subscribe to task state changes from the centralized state manager
+    // This ensures embedded lists refresh when tasks are updated, added, or removed
+    this.unsubscribeFromStateManager = plugin.taskStateManager.subscribe(
+      (tasks) => {
+        this.onTasksChanged();
+      },
     );
   }
 
@@ -99,16 +108,29 @@ export class TodoseqCodeBlockProcessor {
    * This is called when tasks are updated directly in views (not via file changes)
    */
   refreshAllEmbeddedTaskLists(): void {
-    // Clear the task cache to ensure we get fresh results
-    this.manager.clearCache();
+    // Invalidate the cache to ensure we get fresh results
+    // This increments the version number to force cache miss
+    this.manager.invalidateCache();
     // Refresh all active code blocks
     this.eventHandler.refreshAllCodeBlocks();
+  }
+
+  /**
+   * Called when tasks change in the state manager
+   */
+  private onTasksChanged(): void {
+    this.refreshAllEmbeddedTaskLists();
   }
 
   /**
    * Clean up resources when plugin unloads
    */
   cleanup(): void {
+    // Unsubscribe from state manager
+    if (this.unsubscribeFromStateManager) {
+      this.unsubscribeFromStateManager();
+      this.unsubscribeFromStateManager = null;
+    }
     this.eventHandler.clearAllCodeBlocks();
   }
 }

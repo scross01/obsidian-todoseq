@@ -59,6 +59,12 @@ export class TaskUpdateCoordinator {
     // touches the specific elements that need to change.
     this.performDirectEmbedDOMUpdate(task, newState);
 
+    // 4. Refresh all embedded task lists (code blocks) to reflect the task change
+    // This ensures that any todoseq code blocks displaying this task are updated
+    if (this.plugin.embeddedTaskListProcessor) {
+      this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
+    }
+
     return updatedTask;
   }
 
