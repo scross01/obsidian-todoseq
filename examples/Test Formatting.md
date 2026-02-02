@@ -1,6 +1,10 @@
 
 These are examples of tasks with various markdown and Obsidian formatting in the task description
 
+TODO task with multi language characters 你好 | 헬로  | مرحباً بالعالم
+
+TODO task with emoji characters 🫣
+
 TODO task with **Bold** *Italic* ~~strikethrough~~ and ==highlighted== text
 
 TODO task with image ![](image.jpg) in the text
