@@ -4,12 +4,12 @@ import TodoTracker from '../main';
 import { detectListMarker } from '../utils/patterns';
 
 /**
- * TaskManager handles operations related to modifying tasks in the editor
+ * EditorController handles operations related to modifying tasks in the editor
  * acting as an Editor Command Controller it parses the line under the cursor,
  * determines intent (toggle, cycle, priority), and delegates to the services.
  * It bridges the gap between the Editor UI and the Service Layer
  */
-export class TaskManager {
+export class EditorController {
   constructor(private plugin: TodoTracker) {}
 
   /**

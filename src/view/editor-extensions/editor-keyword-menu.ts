@@ -33,21 +33,21 @@ export class EditorKeywordMenu {
   }
 
   /**
-   * Update the task keyword state using UIManager and TaskManager
+   * Update the task keyword state using UIManager and EditorController
    */
   private async updateTaskKeywordState(
     state: string,
     keywordElement: HTMLElement,
     newState: string,
   ): Promise<void> {
-    // Use UIManager's methods to get line number and update through TaskManager
+    // Use UIManager's methods to get line number and update through EditorController
     const currentLine = this.plugin.uiManager.getLineForElement(keywordElement);
 
     if (currentLine !== null) {
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
       if (view && view.editor) {
         // handleUpdateTaskStateAtLine is now async, so we need to await it
-        await this.plugin.taskManager.handleUpdateTaskStateAtLine(
+        await this.plugin.editorController.handleUpdateTaskStateAtLine(
           false,
           currentLine - 1,
           view.editor,

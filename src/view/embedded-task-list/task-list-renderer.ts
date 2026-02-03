@@ -4,7 +4,7 @@ import {
   DEFAULT_ACTIVE_STATES,
   DEFAULT_PENDING_STATES,
 } from '../../types/task';
-import { TaskEditor } from '../../services/task-writer';
+import { TaskWriter } from '../../services/task-writer';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import { MarkdownView, Menu, WorkspaceLeaf, TFile, Platform } from 'obsidian';
@@ -19,11 +19,11 @@ import { DateUtils } from '../../utils/date-utils';
  */
 export class EmbeddedTaskListRenderer {
   private plugin: TodoTracker;
-  private taskEditor: TaskEditor;
+  private taskEditor: TaskWriter;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
-    this.taskEditor = new TaskEditor(plugin.app);
+    this.taskEditor = new TaskWriter(plugin.app);
   }
 
   /**
