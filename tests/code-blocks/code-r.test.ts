@@ -1,6 +1,6 @@
-import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
-import { baseCodeLanguageSettings } from './helpers/code-language-test-helper';
+import { TaskParser } from '../../src/parser/task-parser';
+import { TodoTrackerSettings } from '../../src/settings/settings';
+import { baseCodeLanguageSettings } from '../helpers/code-language-test-helper';
 
 describe('Task parsing within R file comments in code blocks', () => {
   let parser: TaskParser;
