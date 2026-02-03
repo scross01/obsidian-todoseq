@@ -1,6 +1,6 @@
 import TodoTracker from './main';
 import { VaultScanner } from './services/vault-scanner';
-import { TaskEditor } from './services/task-writer';
+import { TaskWriter } from './services/task-writer';
 import { EditorKeywordMenu } from './view/editor-extensions/editor-keyword-menu';
 import { StatusBarManager } from './view/editor-extensions/status-bar';
 import {
@@ -39,7 +39,7 @@ export class PluginLifecycleManager {
       this.plugin.taskStateManager,
       urgencyCoefficients,
     );
-    this.plugin.taskEditor = new TaskEditor(this.plugin.app);
+    this.plugin.taskEditor = new TaskWriter(this.plugin.app);
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
     this.plugin.statusBarManager = new StatusBarManager(this.plugin);
     this.plugin.statusBarManager.setupStatusBarItem();
@@ -129,7 +129,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleToggleTaskStateAtCursor(
+        return this.plugin.editorController.handleToggleTaskStateAtCursor(
           checking,
           editor,
           view,
@@ -152,7 +152,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleCycleTaskStateAtCursor(
+        return this.plugin.editorController.handleCycleTaskStateAtCursor(
           checking,
           editor,
           view,
@@ -169,7 +169,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleAddScheduledDateAtCursor(
+        return this.plugin.editorController.handleAddScheduledDateAtCursor(
           checking,
           editor,
           view,
@@ -186,7 +186,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleAddDeadlineDateAtCursor(
+        return this.plugin.editorController.handleAddDeadlineDateAtCursor(
           checking,
           editor,
           view,
@@ -203,7 +203,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleSetPriorityHighAtCursor(
+        return this.plugin.editorController.handleSetPriorityHighAtCursor(
           checking,
           editor,
           view,
@@ -220,7 +220,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleSetPriorityMediumAtCursor(
+        return this.plugin.editorController.handleSetPriorityMediumAtCursor(
           checking,
           editor,
           view,
@@ -237,7 +237,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleSetPriorityLowAtCursor(
+        return this.plugin.editorController.handleSetPriorityLowAtCursor(
           checking,
           editor,
           view,

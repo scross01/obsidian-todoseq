@@ -8,7 +8,10 @@ import {
 import { PRIORITY_TOKEN_REGEX, CHECKBOX_REGEX } from '../utils/patterns';
 import { getPluginSettings } from '../utils/settings-utils';
 
-export class TaskEditor {
+/**
+ * Handles writing task state changes to files.
+ */
+export class TaskWriter {
   /**
    * Prefer Editor API for the active file to preserve cursor/selection/folds and UX.
    * Prefer Vault.process for background edits to perform atomic writes.
@@ -130,7 +133,7 @@ export class TaskEditor {
     keepPriority = true,
     forceVaultApi = false,
   ): Promise<Task> {
-    const { newLine, completed } = TaskEditor.generateTaskLine(
+    const { newLine, completed } = TaskWriter.generateTaskLine(
       task,
       newState,
       keepPriority,
@@ -263,7 +266,7 @@ export class TaskEditor {
     task: Task,
     newPriority: 'high' | 'med' | 'low',
   ): Promise<Task> {
-    const { newLine } = TaskEditor.generateTaskLine(
+    const { newLine } = TaskWriter.generateTaskLine(
       task,
       task.state,
       false, // Don't keep existing priority

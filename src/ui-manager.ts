@@ -227,7 +227,7 @@ export class UIManager {
 
         // Parse the task from the line for optimistic update
         const line = view.editor.getLine(lineNumber);
-        const task = this.plugin.taskManager.parseTaskFromLine(
+        const task = this.plugin.editorController.parseTaskFromLine(
           line,
           lineNumber,
           filePath,
@@ -269,7 +269,7 @@ export class UIManager {
       // The cursor positioning is now handled by TaskEditor.applyLineUpdate
       // which detects when the cursor is on the same line and positions it
       // after the new keyword
-      this.plugin.taskManager.handleUpdateTaskStateAtLine(
+      this.plugin.editorController.handleUpdateTaskStateAtLine(
         false,
         currentLine - 1,
         view.editor,

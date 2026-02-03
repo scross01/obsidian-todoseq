@@ -1,5 +1,5 @@
 import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
-import { TaskEditor } from './task-writer';
+import { TaskWriter } from './task-writer';
 
 /**
  * TaskStateManager provides centralized state management for tasks.
@@ -98,7 +98,7 @@ export class TaskStateManager {
    */
   optimisticUpdate(task: Task, newState: string): string {
     // Generate the new rawText first
-    const { newLine } = TaskEditor.generateTaskLine(task, newState);
+    const { newLine } = TaskWriter.generateTaskLine(task, newState);
 
     // Find the task in our array by path and line to ensure we're updating the right object
     const existingTask = this.findTaskByPathAndLine(task.path, task.line);

@@ -3,11 +3,11 @@ import { EditorView } from '@codemirror/view';
 import { Task } from './types/task';
 import { TaskListView } from './view/task-list/task-list-view';
 import { TodoTrackerSettings, DefaultSettings } from './settings/settings';
-import { TaskEditor } from './services/task-writer';
+import { TaskWriter } from './services/task-writer';
 import { EditorKeywordMenu } from './view/editor-extensions/editor-keyword-menu';
 import { VaultScanner } from './services/vault-scanner';
 import { StatusBarManager } from './view/editor-extensions/status-bar';
-import { TaskManager } from './services/editor-controller';
+import { EditorController } from './services/editor-controller';
 import { UIManager } from './ui-manager';
 import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
 import { PluginLifecycleManager } from './plugin-lifecycle';
@@ -28,13 +28,13 @@ export default class TodoTracker extends Plugin {
   public taskUpdateCoordinator: TaskUpdateCoordinator;
 
   // Managers for different functional areas
-  public taskManager: TaskManager;
+  public editorController: EditorController;
   public uiManager: UIManager;
   public lifecycleManager: PluginLifecycleManager;
 
   // Services and components (made public for manager access)
   public vaultScanner: VaultScanner | null = null;
-  public taskEditor: TaskEditor | null = null;
+  public taskEditor: TaskWriter | null = null;
   public editorKeywordMenu: EditorKeywordMenu | null = null;
   public taskFormatters: Map<string, unknown> = new Map();
   public statusBarManager: StatusBarManager | null = null;
@@ -83,7 +83,7 @@ export default class TodoTracker extends Plugin {
     );
 
     // Initialize managers
-    this.taskManager = new TaskManager(this);
+    this.editorController = new EditorController(this);
     this.uiManager = new UIManager(this);
     this.lifecycleManager = new PluginLifecycleManager(this);
 

@@ -1,10 +1,10 @@
-import { TaskManager } from '../src/services/editor-controller';
+import { EditorController } from '../src/services/editor-controller';
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings';
 import { Task } from '../src/types/task';
 
 describe('Priority Commands', () => {
-  let taskManager: TaskManager;
+  let editorController: EditorController;
   let mockPlugin: any;
   let settings: TodoTrackerSettings;
 
@@ -48,7 +48,7 @@ describe('Priority Commands', () => {
       },
     };
 
-    taskManager = new TaskManager(mockPlugin);
+    editorController = new EditorController(mockPlugin);
   });
 
   describe('handleSetPriorityAtCursor', () => {
@@ -62,7 +62,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = taskManager.handleSetPriorityAtCursor(
+      const result = editorController.handleSetPriorityAtCursor(
         false, // not checking
         mockEditor as any,
         mockView as any,
@@ -83,7 +83,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = taskManager.handleSetPriorityAtCursor(
+      const result = editorController.handleSetPriorityAtCursor(
         false, // not checking
         mockEditor as any,
         mockView as any,
@@ -104,7 +104,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = taskManager.handleSetPriorityAtCursor(
+      const result = editorController.handleSetPriorityAtCursor(
         false, // not checking
         mockEditor as any,
         mockView as any,
@@ -128,7 +128,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = taskManager.handleSetPriorityAtLine(
+      const result = editorController.handleSetPriorityAtLine(
         false, // not checking
         0, // line number
         mockEditor as any,
@@ -151,7 +151,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = taskManager.handleSetPriorityAtLine(
+      const result = editorController.handleSetPriorityAtLine(
         false, // not checking
         0, // line number
         mockEditor as any,
@@ -174,7 +174,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = taskManager.handleSetPriorityAtLine(
+      const result = editorController.handleSetPriorityAtLine(
         false, // not checking
         0, // line number
         mockEditor as any,
@@ -197,7 +197,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = taskManager.handleSetPriorityAtLine(
+      const result = editorController.handleSetPriorityAtLine(
         false, // not checking
         0, // line number
         mockEditor as any,
@@ -220,7 +220,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = taskManager.handleSetPriorityAtLine(
+      const result = editorController.handleSetPriorityAtLine(
         true, // checking only
         0, // line number
         mockEditor as any,
