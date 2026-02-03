@@ -1,5 +1,6 @@
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { Task } from '../src/types/task';
+import { createBaseTask, createCheckboxTask } from './helpers/test-helper';
 
 describe('TaskStateManager.optimisticUpdate', () => {
   let stateManager: TaskStateManager;
@@ -10,22 +11,7 @@ describe('TaskStateManager.optimisticUpdate', () => {
 
   describe('Optimistic updates', () => {
     test('should update task in memory with new state', () => {
-      const task: Task = {
-        path: 'test.md',
-        line: 0,
-        rawText: 'TODO Task text',
-        indent: '',
-        listMarker: '',
-        text: 'Task text',
-        state: 'TODO',
-        completed: false,
-        priority: null,
-        scheduledDate: null,
-        deadlineDate: null,
-        urgency: null,
-        isDailyNote: false,
-        dailyNoteDate: null,
-      };
+      const task: Task = createBaseTask();
 
       // Add task to state manager
       stateManager.addTask(task);
@@ -44,22 +30,7 @@ describe('TaskStateManager.optimisticUpdate', () => {
     });
 
     test('should mark task as completed when setting to DONE', () => {
-      const task: Task = {
-        path: 'test.md',
-        line: 0,
-        rawText: 'TODO Task text',
-        indent: '',
-        listMarker: '',
-        text: 'Task text',
-        state: 'TODO',
-        completed: false,
-        priority: null,
-        scheduledDate: null,
-        deadlineDate: null,
-        urgency: null,
-        isDailyNote: false,
-        dailyNoteDate: null,
-      };
+      const task: Task = createBaseTask();
 
       stateManager.addTask(task);
       stateManager.optimisticUpdate(task, 'DONE');
@@ -69,22 +40,11 @@ describe('TaskStateManager.optimisticUpdate', () => {
     });
 
     test('should preserve priority when updating state', () => {
-      const task: Task = {
-        path: 'test.md',
-        line: 0,
+      const task: Task = createBaseTask({
         rawText: 'TODO [#A] High priority task',
-        indent: '',
-        listMarker: '',
         text: 'High priority task',
-        state: 'TODO',
-        completed: false,
         priority: 'high',
-        scheduledDate: null,
-        deadlineDate: null,
-        urgency: null,
-        isDailyNote: false,
-        dailyNoteDate: null,
-      };
+      });
 
       stateManager.addTask(task);
       stateManager.optimisticUpdate(task, 'DOING');
@@ -94,22 +54,7 @@ describe('TaskStateManager.optimisticUpdate', () => {
     });
 
     test('should update checkbox state for completed tasks', () => {
-      const task: Task = {
-        path: 'test.md',
-        line: 0,
-        rawText: '- [ ] TODO Task text',
-        indent: '',
-        listMarker: '- [ ]',
-        text: 'Task text',
-        state: 'TODO',
-        completed: false,
-        priority: null,
-        scheduledDate: null,
-        deadlineDate: null,
-        urgency: null,
-        isDailyNote: false,
-        dailyNoteDate: null,
-      };
+      const task: Task = createCheckboxTask();
 
       stateManager.addTask(task);
       const updatedLine = stateManager.optimisticUpdate(task, 'DONE');
@@ -118,22 +63,10 @@ describe('TaskStateManager.optimisticUpdate', () => {
     });
 
     test('should handle tasks without list markers', () => {
-      const task: Task = {
-        path: 'test.md',
-        line: 0,
+      const task: Task = createBaseTask({
         rawText: 'TODO No list marker',
-        indent: '',
-        listMarker: '',
         text: 'No list marker',
-        state: 'TODO',
-        completed: false,
-        priority: null,
-        scheduledDate: null,
-        deadlineDate: null,
-        urgency: null,
-        isDailyNote: false,
-        dailyNoteDate: null,
-      };
+      });
 
       stateManager.addTask(task);
       const updatedLine = stateManager.optimisticUpdate(task, 'DOING');
@@ -144,22 +77,10 @@ describe('TaskStateManager.optimisticUpdate', () => {
 
   describe('State transitions', () => {
     test('should update task state from TODO to DOING', () => {
-      const task: Task = {
-        path: 'test.md',
-        line: 0,
+      const task: Task = createBaseTask({
         rawText: 'TODO Initial state',
-        indent: '',
-        listMarker: '',
         text: 'Initial state',
-        state: 'TODO',
-        completed: false,
-        priority: null,
-        scheduledDate: null,
-        deadlineDate: null,
-        urgency: null,
-        isDailyNote: false,
-        dailyNoteDate: null,
-      };
+      });
 
       stateManager.addTask(task);
       stateManager.optimisticUpdate(task, 'DOING');
@@ -169,22 +90,11 @@ describe('TaskStateManager.optimisticUpdate', () => {
     });
 
     test('should update task state from DOING to DONE', () => {
-      const task: Task = {
-        path: 'test.md',
-        line: 0,
+      const task: Task = createBaseTask({
         rawText: 'DOING In progress',
-        indent: '',
-        listMarker: '',
         text: 'In progress',
         state: 'DOING',
-        completed: false,
-        priority: null,
-        scheduledDate: null,
-        deadlineDate: null,
-        urgency: null,
-        isDailyNote: false,
-        dailyNoteDate: null,
-      };
+      });
 
       stateManager.addTask(task);
       stateManager.optimisticUpdate(task, 'DONE');

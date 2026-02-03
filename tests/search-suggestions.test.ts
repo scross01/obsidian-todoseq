@@ -2,35 +2,25 @@ import { SearchSuggestions } from '../src/search/search-suggestions';
 import { Task } from '../src/types/task';
 import { Vault } from 'obsidian';
 import { TodoTrackerSettings } from '../src/settings/settings';
+import { createBaseTask } from './helpers/test-helper';
 
 describe('Search Suggestions', () => {
   const mockTasks: Task[] = [
-    {
+    createBaseTask({
       path: 'notes/journal/meeting.md',
       line: 1,
       rawText: 'TODO meeting about project planning #urgent #work',
-      indent: '',
       listMarker: '-',
       text: 'meeting about project planning',
-      state: 'TODO',
-      completed: false,
       priority: 'high',
-      scheduledDate: null,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/personal/hobbies.md',
       line: 2,
       rawText: 'TODO personal meetup with friends #social',
-      indent: '',
       listMarker: '-',
       text: 'personal meetup with friends',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    },
+    }),
   ];
 
   describe('SearchSuggestions utility methods', () => {
@@ -90,45 +80,30 @@ describe('Search Suggestions', () => {
     it('should exclude priority tags #A, #B, #C from tag suggestions', () => {
       // Create mock tasks with priority tags
       const mockTasksWithPriority: Task[] = [
-        {
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 1,
           rawText: 'TODO high priority task #A #urgent',
-          indent: '',
           listMarker: '-',
           text: 'high priority task',
-          state: 'TODO',
-          completed: false,
           priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 2,
           rawText: 'TODO medium priority task #B #work',
-          indent: '',
           listMarker: '-',
           text: 'medium priority task',
-          state: 'TODO',
-          completed: false,
           priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 3,
           rawText: 'TODO low priority task #C #personal',
-          indent: '',
           listMarker: '-',
           text: 'low priority task',
-          state: 'TODO',
-          completed: false,
           priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
+        }),
       ];
 
       const allTags = SearchSuggestions.getAllTags(mockTasksWithPriority);
@@ -317,32 +292,20 @@ describe('Search Suggestions', () => {
   describe('Path extraction methods', () => {
     it('should extract paths from tasks correctly', () => {
       const tasks = [
-        {
+        createBaseTask({
           path: 'notes/journal/meeting.md',
           line: 1,
           rawText: 'TODO meeting',
-          indent: '',
           listMarker: '-',
           text: 'meeting',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/work/tasks.md',
           line: 2,
           rawText: 'TODO work task',
-          indent: '',
           listMarker: '-',
           text: 'work task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
+        }),
       ];
 
       const paths = SearchSuggestions.getAllPathsFromTasks(tasks);
@@ -363,19 +326,13 @@ describe('Search Suggestions', () => {
 
     it('should handle tasks with single-level paths', () => {
       const tasks = [
-        {
+        createBaseTask({
           path: 'file.md',
           line: 1,
           rawText: 'TODO task',
-          indent: '',
           listMarker: '-',
           text: 'task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
+        }),
       ];
 
       const paths = SearchSuggestions.getAllPathsFromTasks(tasks);
@@ -427,45 +384,27 @@ describe('Search Suggestions', () => {
   describe('File extraction methods', () => {
     it('should extract filenames from tasks correctly', () => {
       const tasks = [
-        {
+        createBaseTask({
           path: 'notes/journal/meeting.md',
           line: 1,
           rawText: 'TODO meeting',
-          indent: '',
           listMarker: '-',
           text: 'meeting',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/work/tasks.md',
           line: 2,
           rawText: 'TODO work task',
-          indent: '',
           listMarker: '-',
           text: 'work task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/journal/meeting.md', // Duplicate filename
           line: 3,
           rawText: 'TODO another meeting',
-          indent: '',
           listMarker: '-',
           text: 'another meeting',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
+        }),
       ];
 
       const files = SearchSuggestions.getAllFilesFromTasks(tasks);
@@ -592,45 +531,30 @@ describe('Search Suggestions', () => {
   describe('Date extraction methods', () => {
     it('should extract scheduled dates from tasks', () => {
       const tasks = [
-        {
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 1,
           rawText: 'TODO task with scheduled date',
-          indent: '',
           listMarker: '-',
           text: 'task with scheduled date',
-          state: 'TODO',
-          completed: false,
-          priority: null,
           scheduledDate: new Date('2023-01-15T00:00:00Z'),
-          deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 2,
           rawText: 'TODO task with different scheduled date',
-          indent: '',
           listMarker: '-',
           text: 'task with different scheduled date',
-          state: 'TODO',
-          completed: false,
-          priority: null,
           scheduledDate: new Date('2023-02-20T00:00:00Z'),
-          deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 3,
           rawText: 'TODO task without scheduled date',
-          indent: '',
           listMarker: '-',
           text: 'task without scheduled date',
-          state: 'TODO',
-          completed: false,
-          priority: null,
           scheduledDate: null,
-          deadlineDate: null,
-        },
+        }),
       ];
 
       const dates = SearchSuggestions.getScheduledDateSuggestions(tasks);
@@ -650,32 +574,22 @@ describe('Search Suggestions', () => {
 
     it('should extract deadline dates from tasks', () => {
       const tasks = [
-        {
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 1,
           rawText: 'TODO task with deadline',
-          indent: '',
           listMarker: '-',
           text: 'task with deadline',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
           deadlineDate: new Date('2023-03-10T00:00:00Z'),
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 2,
           rawText: 'TODO task with different deadline',
-          indent: '',
           listMarker: '-',
           text: 'task with different deadline',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
           deadlineDate: new Date('2023-04-05T00:00:00Z'),
-        },
+        }),
       ];
 
       const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
@@ -696,32 +610,22 @@ describe('Search Suggestions', () => {
     it('should handle tasks with same scheduled date', () => {
       const date = new Date('2023-01-15T00:00:00Z');
       const tasks = [
-        {
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 1,
           rawText: 'TODO task 1',
-          indent: '',
           listMarker: '-',
           text: 'task 1',
-          state: 'TODO',
-          completed: false,
-          priority: null,
           scheduledDate: date,
-          deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 2,
           rawText: 'TODO task 2',
-          indent: '',
           listMarker: '-',
           text: 'task 2',
-          state: 'TODO',
-          completed: false,
-          priority: null,
           scheduledDate: date, // Same date
-          deadlineDate: null,
-        },
+        }),
       ];
 
       const dates = SearchSuggestions.getScheduledDateSuggestions(tasks);
@@ -732,19 +636,14 @@ describe('Search Suggestions', () => {
 
     it('should handle tasks with no deadline dates', () => {
       const tasks = [
-        {
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 1,
           rawText: 'TODO task without deadline',
-          indent: '',
           listMarker: '-',
           text: 'task without deadline',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
           deadlineDate: null,
-        },
+        }),
       ];
 
       const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
@@ -795,45 +694,30 @@ describe('Search Suggestions', () => {
 
     it('should handle tasks with no deadline dates mixed with tasks that have deadlines', () => {
       const tasks = [
-        {
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 1,
           rawText: 'TODO task with deadline',
-          indent: '',
           listMarker: '-',
           text: 'task with deadline',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
           deadlineDate: new Date('2023-03-10T00:00:00Z'),
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 2,
           rawText: 'TODO task without deadline',
-          indent: '',
           listMarker: '-',
           text: 'task without deadline',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
           deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 3,
           rawText: 'TODO another task with deadline',
-          indent: '',
           listMarker: '-',
           text: 'another task with deadline',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
           deadlineDate: new Date('2023-04-05T00:00:00Z'),
-        },
+        }),
       ];
 
       const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
@@ -846,32 +730,20 @@ describe('Search Suggestions', () => {
 
     it('should handle tasks with missing rawText property', () => {
       const tasks = [
-        {
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 1,
           rawText: 'TODO task with tags #urgent #work',
-          indent: '',
           listMarker: '-',
           text: 'task with tags',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/tasks.md',
           line: 2,
           rawText: '', // Missing rawText
-          indent: '',
           listMarker: '-',
           text: 'task without rawText',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-        },
+        }),
       ];
 
       const tags = SearchSuggestions.getAllTags(tasks);
@@ -887,11 +759,12 @@ describe('Search Suggestions', () => {
     it('should include custom keywords from settings in getAllStates', () => {
       const mockSettings: TodoTrackerSettings = {
         additionalTaskKeywords: ['FIXME', 'HACK', 'REVIEW'],
-        refreshInterval: 60,
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
         taskListViewMode: 'showAll',
+        futureTaskSorting: 'showAll',
+        defaultSortMethod: 'default',
         languageCommentSupport: {
           enabled: true,
         },
@@ -931,11 +804,12 @@ describe('Search Suggestions', () => {
     it('should deduplicate states when custom keywords overlap with defaults', () => {
       const mockSettings: TodoTrackerSettings = {
         additionalTaskKeywords: ['TODO', 'DOING', 'CUSTOM'],
-        refreshInterval: 60,
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
         taskListViewMode: 'showAll',
+        futureTaskSorting: 'showAll',
+        defaultSortMethod: 'default',
         languageCommentSupport: {
           enabled: true,
         },

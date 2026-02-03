@@ -1,72 +1,37 @@
 import { Search } from '../src/search/search';
 import { Task } from '../src/types/task';
+import { createBaseTask } from './helpers/test-helper';
 
 describe('Tag Search with Subtags and Exact Matching', () => {
   const testTasksWithSubtags: Task[] = [
-    {
+    createBaseTask({
       path: 'notes/context.md',
       line: 1,
       rawText: 'TODO task with context tag #context',
-      indent: '',
       listMarker: '-',
       text: 'task with context tag',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-      urgency: null,
-      isDailyNote: false,
-      dailyNoteDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/context-home.md',
       line: 2,
       rawText: 'TODO task with context/home tag #context/home',
-      indent: '',
       listMarker: '-',
       text: 'task with context/home tag',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-      urgency: null,
-      isDailyNote: false,
-      dailyNoteDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/context-work.md',
       line: 3,
       rawText: 'TODO task with context/work tag #context/work',
-      indent: '',
       listMarker: '-',
       text: 'task with context/work tag',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-      urgency: null,
-      isDailyNote: false,
-      dailyNoteDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/other.md',
       line: 4,
       rawText: 'TODO task with unrelated tag #unrelated',
-      indent: '',
       listMarker: '-',
       text: 'task with unrelated tag',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-      urgency: null,
-      isDailyNote: false,
-      dailyNoteDate: null,
-    },
+    }),
   ];
 
   describe('Issue #28: Subtag searching behavior', () => {
@@ -193,38 +158,20 @@ describe('Tag Search with Subtags and Exact Matching', () => {
 
     describe('Complex tag scenarios', () => {
       const complexTasks: Task[] = [
-        {
+        createBaseTask({
           path: 'notes/deep.md',
           line: 1,
           rawText: 'TODO task with deep subtag #project/feature/bugfix',
-          indent: '',
           listMarker: '-',
           text: 'task with deep subtag',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-        },
-        {
+        }),
+        createBaseTask({
           path: 'notes/mixed.md',
           line: 2,
           rawText: 'TODO task with mixed chars #test-tag/sub_category_v2',
-          indent: '',
           listMarker: '-',
           text: 'task with mixed chars',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-        },
+        }),
       ];
 
       it('should handle multiple levels of subtags', () => {
@@ -281,22 +228,13 @@ describe('Tag Search with Subtags and Exact Matching', () => {
 
     describe('Emoji tags', () => {
       it('should recognize emoji tags', () => {
-        const emojiTask: Task = {
+        const emojiTask: Task = createBaseTask({
           path: 'notes/emoji.md',
           line: 1,
           rawText: 'TODO test tag with emoji #🚀',
-          indent: '',
           listMarker: '-',
           text: 'test tag with emoji',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-        };
+        });
 
         expect(Search.evaluate('tag:#🚀', emojiTask, false)).toBe(true);
         expect(Search.evaluate('tag:🚀', emojiTask, false)).toBe(true);
@@ -307,46 +245,28 @@ describe('Tag Search with Subtags and Exact Matching', () => {
 
     describe('URL anchor exclusion', () => {
       it('should not match #ref in URLs as tags', () => {
-        const urlTask: Task = {
+        const urlTask: Task = createBaseTask({
           path: 'notes/url.md',
           line: 1,
           rawText:
             'TODO test task that has a URL not a tag https://example.com/text#ref',
-          indent: '',
           listMarker: '-',
           text: 'test task that has a URL not a tag https://example.com/text#ref',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-        };
+        });
 
         expect(Search.evaluate('tag:#ref', urlTask, false)).toBe(false);
         expect(Search.evaluate('tag:ref', urlTask, false)).toBe(false);
       });
 
       it('should still recognize tags in same task as URL', () => {
-        const taskWithUrlAndTag: Task = {
+        const taskWithUrlAndTag: Task = createBaseTask({
           path: 'notes/url-tag.md',
           line: 1,
           rawText:
             'TODO task with URL and tag https://example.com/page#section #important',
-          indent: '',
           listMarker: '-',
           text: 'task with URL and tag https://example.com/page#section',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-        };
+        });
 
         expect(
           Search.evaluate('tag:#important', taskWithUrlAndTag, false),
