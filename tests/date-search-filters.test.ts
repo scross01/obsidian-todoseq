@@ -2,6 +2,7 @@ import { SearchParser } from '../src/search/search-parser';
 import { SearchEvaluator } from '../src/search/search-evaluator';
 import { Task } from '../src/types/task';
 import { DateUtils } from '../src/utils/date-utils';
+import { createCheckboxTask } from './helpers/test-helper';
 
 describe('Date Search Filters', () => {
   const today = new Date();
@@ -24,58 +25,33 @@ describe('Date Search Filters', () => {
   );
 
   const testTasks: Task[] = [
-    {
+    createCheckboxTask({
       path: 'test1.md',
       line: 1,
-      rawText: '- [ ] Task with scheduled date',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with scheduled date',
       text: 'Task with scheduled date',
-      state: 'TODO',
-      completed: false,
-      priority: null,
       scheduledDate: todayMidnight,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createCheckboxTask({
       path: 'test2.md',
       line: 2,
-      rawText: '- [ ] Task with deadline date',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with deadline date',
       text: 'Task with deadline date',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
       deadlineDate: tomorrowMidnight,
-    },
-    {
+    }),
+    createCheckboxTask({
       path: 'test3.md',
       line: 3,
-      rawText: '- [ ] Task with overdue deadline',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with overdue deadline',
       text: 'Task with overdue deadline',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
       deadlineDate: yesterday,
-    },
-    {
+    }),
+    createCheckboxTask({
       path: 'test4.md',
       line: 4,
-      rawText: '- [ ] Task with no dates',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with no dates',
       text: 'Task with no dates',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    },
+    }),
   ];
 
   describe('DateUtils parsing', () => {
@@ -201,19 +177,13 @@ describe('Date Search Filters', () => {
     test('should filter tasks by year only', () => {
       // Create a task with a specific year
       const currentYear = today.getFullYear();
-      const yearTask: Task = {
+      const yearTask: Task = createCheckboxTask({
         path: 'test-year.md',
         line: 1,
-        rawText: `- [ ] Task with ${currentYear} scheduled date`,
-        indent: '',
-        listMarker: '- ',
+        rawText: `- [ ] TODO Task with ${currentYear} scheduled date`,
         text: `Task with ${currentYear} scheduled date`,
-        state: 'TODO',
-        completed: false,
-        priority: null,
         scheduledDate: new Date(`${currentYear}-06-15`),
-        deadlineDate: null,
-      };
+      });
 
       const allTasks = [...testTasks, yearTask];
       const query = `scheduled:${currentYear}`;
@@ -232,19 +202,13 @@ describe('Date Search Filters', () => {
     test('should filter tasks by year-month', () => {
       // Create a task with a specific year-month
       const currentYear = today.getFullYear();
-      const monthTask: Task = {
+      const monthTask: Task = createCheckboxTask({
         path: 'test-month.md',
         line: 1,
-        rawText: `- [ ] Task with June ${currentYear} scheduled date`,
-        indent: '',
-        listMarker: '- ',
+        rawText: `- [ ] TODO Task with June ${currentYear} scheduled date`,
         text: `Task with June ${currentYear} scheduled date`,
-        state: 'TODO',
-        completed: false,
-        priority: null,
         scheduledDate: new Date(`${currentYear}-06-15`),
-        deadlineDate: null,
-      };
+      });
 
       const allTasks = [...testTasks, monthTask];
       const query = `scheduled:${currentYear}-06`;
@@ -262,19 +226,13 @@ describe('Date Search Filters', () => {
     test('should filter tasks by specific day', () => {
       // Create a task with a specific date
       const currentYear = today.getFullYear();
-      const dayTask: Task = {
+      const dayTask: Task = createCheckboxTask({
         path: 'test-day.md',
         line: 1,
-        rawText: '- [ ] Task with specific date',
-        indent: '',
-        listMarker: '- ',
+        rawText: '- [ ] TODO Task with specific date',
         text: 'Task with specific date',
-        state: 'TODO',
-        completed: false,
-        priority: null,
         scheduledDate: new Date(currentYear, 5, 15), // month is 0-indexed, so 5 = June
-        deadlineDate: null,
-      };
+      });
 
       const allTasks = [...testTasks, dayTask];
       const query = `scheduled:${currentYear}-06-15`;
@@ -289,33 +247,21 @@ describe('Date Search Filters', () => {
 
     test('should filter tasks with date ranges', () => {
       // Create tasks with dates in different ranges
-      const rangeTask1: Task = {
+      const rangeTask1: Task = createCheckboxTask({
         path: 'test-range1.md',
         line: 1,
-        rawText: '- [ ] Task in range 1',
-        indent: '',
-        listMarker: '- ',
+        rawText: '- [ ] TODO Task in range 1',
         text: 'Task in range 1',
-        state: 'TODO',
-        completed: false,
-        priority: null,
         scheduledDate: new Date(`2025-01-15`),
-        deadlineDate: null,
-      };
+      });
 
-      const rangeTask2: Task = {
+      const rangeTask2: Task = createCheckboxTask({
         path: 'test-range2.md',
         line: 1,
-        rawText: '- [ ] Task in range 2',
-        indent: '',
-        listMarker: '- ',
+        rawText: '- [ ] TODO Task in range 2',
         text: 'Task in range 2',
-        state: 'TODO',
-        completed: false,
-        priority: null,
         scheduledDate: new Date(`2025-01-25`),
-        deadlineDate: null,
-      };
+      });
 
       const allTasks = [...testTasks, rangeTask1, rangeTask2];
       const query = `scheduled:2025-01-01..2025-01-31`;
@@ -525,19 +471,13 @@ describe('Date Search Filters', () => {
       const node = SearchParser.parse(query);
 
       // Task with null scheduledDate should not match
-      const taskWithNullDate: Task = {
+      const taskWithNullDate: Task = createCheckboxTask({
         path: 'test.md',
         line: 1,
-        rawText: '- [ ] Task with null date',
-        indent: '',
-        listMarker: '- ',
+        rawText: '- [ ] TODO Task with null date',
         text: 'Task with null date',
-        state: 'TODO',
-        completed: false,
-        priority: null,
         scheduledDate: null,
-        deadlineDate: null,
-      };
+      });
 
       const result = SearchEvaluator.evaluate(node, taskWithNullDate, false);
       expect(result).toBe(false);

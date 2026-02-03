@@ -6,6 +6,7 @@ import {
   taskComparator,
 } from '../src/utils/task-sort';
 import { Task } from '../src/types/task';
+import { createBaseTask } from './helpers/test-helper';
 
 describe('Task Sorting System', () => {
   const now = new Date('2024-01-15T12:00:00Z');
@@ -16,24 +17,15 @@ describe('Task Sorting System', () => {
   const sevenDaysDate = new Date('2024-01-22T12:00:00Z'); // 7 days from now
   const futureDate = new Date('2024-01-25T12:00:00Z'); // 10 days from now
 
-  const createTask = (overrides: Partial<Task> = {}): Task => ({
-    path: 'test.md',
-    line: 1,
-    rawText: 'TODO Test task',
-    indent: '',
-    listMarker: '- ',
-    text: 'Test task',
-    state: 'TODO',
-    completed: false,
-    priority: null,
-    scheduledDate: null,
-    deadlineDate: null,
-    tail: '',
-    urgency: null,
-    isDailyNote: false,
-    dailyNoteDate: null,
-    ...overrides,
-  });
+  const createTask = (overrides: Partial<Task> = {}): Task =>
+    createBaseTask({
+      line: 1,
+      rawText: 'TODO Test task',
+      listMarker: '- ',
+      text: 'Test task',
+      tail: '',
+      ...overrides,
+    });
 
   describe('Task Classification', () => {
     it('should classify completed tasks as completed regardless of dates', () => {

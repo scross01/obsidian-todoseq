@@ -10,6 +10,7 @@ import {
 } from '../src/utils/task-urgency';
 import { Task } from '../src/types/task';
 import { App, Vault, DataAdapter } from 'obsidian';
+import { createBaseTask } from './helpers/test-helper';
 
 // Mock Obsidian app for testing
 const createMockApp = (): App => {
@@ -24,24 +25,15 @@ const createMockApp = (): App => {
 };
 
 // Helper to create a test task
-const createTestTask = (overrides: Partial<Task> = {}): Task => ({
-  path: 'test.md',
-  line: 1,
-  rawText: 'Test task',
-  indent: '',
-  listMarker: '- ',
-  text: 'Test task',
-  state: 'TODO',
-  completed: false,
-  priority: null,
-  scheduledDate: null,
-  deadlineDate: null,
-  urgency: null,
-  isDailyNote: false,
-  dailyNoteDate: null,
-  tags: [],
-  ...overrides,
-});
+const createTestTask = (overrides: Partial<Task> = {}): Task =>
+  createBaseTask({
+    line: 1,
+    rawText: 'Test task',
+    listMarker: '- ',
+    text: 'Test task',
+    tags: [],
+    ...overrides,
+  });
 
 describe('Urgency Coefficient Parsing', () => {
   it('should parse urgency.ini file correctly', async () => {

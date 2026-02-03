@@ -1,61 +1,40 @@
 import { Search } from '../src/search/search';
 import { Task } from '../src/types/task';
 import { TodoTrackerSettings } from '../src/settings/settings';
+import { createBaseTask } from './helpers/test-helper';
 
 describe('Search functionality', () => {
   const testTasks: Task[] = [
-    {
+    createBaseTask({
       path: 'notes/meeting.md',
       line: 1,
       rawText: 'TODO meeting about project planning',
-      indent: '',
       listMarker: '-',
       text: 'meeting about project planning',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/work.md',
       line: 2,
       rawText: 'DOING work on urgent task',
-      indent: '',
       listMarker: '-',
       text: 'work on urgent task',
       state: 'DOING',
-      completed: false,
       priority: 'high',
-      scheduledDate: null,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/personal.md',
       line: 3,
       rawText: 'TODO personal meetup with friends',
-      indent: '',
       listMarker: '-',
       text: 'personal meetup with friends',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/star-wars.md',
       line: 4,
       rawText: 'TODO watch "star wars" movie',
-      indent: '',
       listMarker: '-',
       text: 'watch "star wars" movie',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    },
+    }),
   ];
 
   describe('Basic term search', () => {
@@ -106,19 +85,13 @@ describe('Search functionality', () => {
 
     it('should not match partial word in phrase', () => {
       // Create a task with "starfish" to test partial word matching
-      const starfishTask: Task = {
+      const starfishTask: Task = createBaseTask({
         path: 'notes/test.md',
         line: 1,
         rawText: 'TODO find starfish in ocean',
-        indent: '',
         listMarker: '-',
         text: 'find starfish in ocean',
-        state: 'TODO',
-        completed: false,
-        priority: null,
-        scheduledDate: null,
-        deadlineDate: null,
-      };
+      });
 
       const result = Search.evaluate('"star"', starfishTask, false);
       expect(result).toBe(false); // "star" should not match "starfish"
@@ -248,27 +221,22 @@ describe('Search functionality', () => {
   });
 
   describe('evaluate() method with settings', () => {
-    const testTask: Task = {
+    const testTask: Task = createBaseTask({
       path: 'notes/test.md',
       line: 1,
       rawText: 'TODO test task with content',
-      indent: '',
       listMarker: '-',
       text: 'test task with content',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    };
+    });
 
     const mockSettings: TodoTrackerSettings = {
-      refreshInterval: 60,
       additionalTaskKeywords: [],
       includeCodeBlocks: false,
       includeCalloutBlocks: true,
       includeCommentBlocks: false,
       taskListViewMode: 'showAll',
+      futureTaskSorting: 'showAll',
+      defaultSortMethod: 'default',
       languageCommentSupport: { enabled: true },
       weekStartsOn: 'Monday',
       formatTaskKeywords: true,

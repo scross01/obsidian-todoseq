@@ -1,6 +1,7 @@
 import { SearchParser } from '../src/search/search-parser';
 import { SearchEvaluator } from '../src/search/search-evaluator';
 import { Task } from '../src/types/task';
+import { createCheckboxTask } from './helpers/test-helper';
 
 describe('Due Filter Behavior', () => {
   const today = new Date();
@@ -11,84 +12,48 @@ describe('Due Filter Behavior', () => {
 
   // Test tasks with various dates
   const testTasks: Task[] = [
-    {
+    createCheckboxTask({
       path: 'test1.md',
       line: 1,
-      rawText: '- [ ] Task with scheduled date today',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with scheduled date today',
       text: 'Task with scheduled date today',
-      state: 'TODO',
-      completed: false,
-      priority: null,
       scheduledDate: today,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createCheckboxTask({
       path: 'test2.md',
       line: 2,
-      rawText: '- [ ] Task with deadline date today',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with deadline date today',
       text: 'Task with deadline date today',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
       deadlineDate: today,
-    },
-    {
+    }),
+    createCheckboxTask({
       path: 'test3.md',
       line: 3,
-      rawText: '- [ ] Task with overdue scheduled date',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with overdue scheduled date',
       text: 'Task with overdue scheduled date',
-      state: 'TODO',
-      completed: false,
-      priority: null,
       scheduledDate: yesterday,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createCheckboxTask({
       path: 'test4.md',
       line: 4,
-      rawText: '- [ ] Task with overdue deadline',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with overdue deadline',
       text: 'Task with overdue deadline',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
       deadlineDate: yesterday,
-    },
-    {
+    }),
+    createCheckboxTask({
       path: 'test5.md',
       line: 5,
-      rawText: '- [ ] Task with future scheduled date',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with future scheduled date',
       text: 'Task with future scheduled date',
-      state: 'TODO',
-      completed: false,
-      priority: null,
       scheduledDate: tomorrow,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createCheckboxTask({
       path: 'test6.md',
       line: 6,
-      rawText: '- [ ] Task with future deadline',
-      indent: '',
-      listMarker: '- ',
+      rawText: '- [ ] TODO Task with future deadline',
       text: 'Task with future deadline',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
       deadlineDate: tomorrow,
-    },
+    }),
   ];
 
   test('scheduled:due should include both today and overdue scheduled tasks', () => {
