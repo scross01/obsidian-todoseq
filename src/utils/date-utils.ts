@@ -11,9 +11,12 @@ export class DateUtils {
   static formatDateForDisplay(date: Date | null, includeTime = false): string {
     if (!date) return '';
 
+    // Ensure date is timezone independent - zero out time if no time component
+    const normalizedDate = this.normalizeDateForTimezone(date);
+
     const now = new Date();
     const today = this.getDateOnly(now);
-    const taskDate = this.getDateOnly(date);
+    const taskDate = this.getDateOnly(normalizedDate);
 
     const diffTime = taskDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
@@ -108,8 +111,14 @@ export class DateUtils {
       /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/,
     );
     if (rangeMatch) {
-      const startDate = new Date(rangeMatch[1]);
-      const endDate = new Date(rangeMatch[2]);
+      // Parse dates using DateUtils.createDate to ensure timezone consistency
+      const [startYear, startMonth, startDay] = rangeMatch[1]
+        .split('-')
+        .map(Number);
+      const [endYear, endMonth, endDay] = rangeMatch[2].split('-').map(Number);
+
+      const startDate = this.createDate(startYear, startMonth - 1, startDay);
+      const endDate = this.createDate(endYear, endMonth - 1, endDay);
 
       // Add one day to end date to make it inclusive
       endDate.setDate(endDate.getDate() + 1);
@@ -126,7 +135,7 @@ export class DateUtils {
       // Parse as local date to match task date creation
       // Split the date and create a new Date object to ensure local timezone
       const parts = trimmedValue.split('-').map(Number);
-      const date = new Date(parts[0], parts[1] - 1, parts[2]); // month is 0-indexed
+      const date = this.createDate(parts[0], parts[1] - 1, parts[2]); // month is 0-indexed
       if (!isNaN(date.getTime())) {
         return { date, format: 'full' as const };
       }
@@ -136,7 +145,7 @@ export class DateUtils {
     // Year-Month: YYYY-MM
     if (trimmedValue.match(/^\d{4}-\d{2}$/)) {
       const parts = trimmedValue.split('-').map(Number);
-      const date = new Date(parts[0], parts[1] - 1, 1); // month is 0-indexed
+      const date = this.createDate(parts[0], parts[1] - 1, 1); // month is 0-indexed
       if (!isNaN(date.getTime())) {
         return { date, format: 'year-month' as const };
       }
@@ -146,7 +155,7 @@ export class DateUtils {
     // Year only: YYYY
     if (trimmedValue.match(/^\d{4}$/)) {
       const year = parseInt(trimmedValue, 10);
-      const date = new Date(year, 0, 1); // January 1st
+      const date = this.createDate(year, 0, 1); // January 1st
       if (!isNaN(date.getTime())) {
         return { date, format: 'year' as const };
       }
@@ -192,19 +201,19 @@ export class DateUtils {
 
     // Handle "next week"
     if (normalized === 'next week') {
-      const result = new Date(referenceDate);
-      const today = referenceDate.getDay();
-      const daysUntilNextMonday = (1 + 7 - today) % 7;
-      result.setDate(result.getDate() + daysUntilNextMonday);
+      const result = this.addDays(
+        referenceDate,
+        (1 + 7 - referenceDate.getDay()) % 7,
+      );
       return { date: result, format: 'full' };
     }
 
     // Handle "this week"
     if (normalized === 'this week') {
-      const result = new Date(referenceDate);
-      const today = referenceDate.getDay();
-      const daysSinceMonday = (today + 6) % 7; // 0=Sun, 1=Mon, ..., 6=Sat
-      result.setDate(result.getDate() - daysSinceMonday);
+      const result = this.addDays(
+        referenceDate,
+        -(referenceDate.getDay() + 6) % 7,
+      );
       return { date: result, format: 'full' };
     }
 
@@ -225,22 +234,19 @@ export class DateUtils {
       ];
       const targetDay = weekdays.indexOf(targetWeekday);
 
-      const result = new Date(referenceDate);
-      const currentDay = result.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-
+      const currentDay = referenceDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
       let daysToAdd = (targetDay - currentDay + 7) % 7;
       if (daysToAdd === 0) {
         daysToAdd = 7; // Next week if same day
       }
 
-      result.setDate(result.getDate() + daysToAdd);
+      const result = this.addDays(referenceDate, daysToAdd);
       return { date: result, format: 'full' };
     }
 
     // Handle "end of month"
     if (normalized === 'end of month' || normalized === 'end of the month') {
-      const result = new Date(referenceDate);
-      result.setMonth(result.getMonth() + 1, 0); // Last day of current month
+      const result = this.getEndOfMonth(referenceDate);
       return { date: result, format: 'full' };
     }
 
@@ -248,8 +254,7 @@ export class DateUtils {
     const inDaysMatch = normalized.match(/^in\s+(\d+)\s+days$/);
     if (inDaysMatch) {
       const days = parseInt(inDaysMatch[1], 10);
-      const result = new Date(referenceDate);
-      result.setDate(result.getDate() + days);
+      const result = this.addDays(referenceDate, days);
       return { date: result, format: 'full' };
     }
 
@@ -453,9 +458,7 @@ export class DateUtils {
    * @returns A new Date object set to the start of the day (00:00:00.000)
    */
   static getStartOfDay(date: Date): Date {
-    const result = new Date(date);
-    result.setHours(0, 0, 0, 0);
-    return result;
+    return this.createDate(date.getFullYear(), date.getMonth(), date.getDate());
   }
 
   /**
@@ -464,7 +467,7 @@ export class DateUtils {
    * @returns A new Date object at midnight of the same day
    */
   static getDateOnly(date: Date): Date {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    return this.createDate(date.getFullYear(), date.getMonth(), date.getDate());
   }
 
   /**
@@ -495,7 +498,8 @@ export class DateUtils {
   static addDays(date: Date, days: number): Date {
     const result = new Date(date);
     result.setDate(result.getDate() + days);
-    return result;
+    // Normalize to ensure timezone independence
+    return this.normalizeDateForTimezone(result);
   }
 
   /**
@@ -539,9 +543,7 @@ export class DateUtils {
    * @returns Last day of the month
    */
   static getEndOfMonth(date: Date): Date {
-    const result = new Date(date);
-    result.setMonth(result.getMonth() + 1, 0); // Last day of current month
-    return result;
+    return this.createDate(date.getFullYear(), date.getMonth() + 1, 0); // Last day of current month
   }
 
   /**
@@ -566,11 +568,20 @@ export class DateUtils {
     }
 
     const lastDayOfWeek = this.getStartOfDay(this.addDays(firstDayOfWeek, 6));
-    lastDayOfWeek.setHours(23, 59, 59, 999); // Include entire last day
+    // Ensure end of day is properly normalized
+    const endDate = this.createDate(
+      lastDayOfWeek.getFullYear(),
+      lastDayOfWeek.getMonth(),
+      lastDayOfWeek.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
 
     return {
       start: firstDayOfWeek,
-      end: lastDayOfWeek,
+      end: endDate,
     };
   }
 
@@ -584,7 +595,7 @@ export class DateUtils {
     const month = date.getMonth();
 
     return {
-      start: new Date(year, month, 1),
+      start: this.createDate(year, month, 1),
       end: this.getEndOfMonth(date),
     };
   }
@@ -594,4 +605,82 @@ export class DateUtils {
    * @constant {number}
    */
   static readonly MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24;
+
+  /**
+   * Normalize a date to ensure timezone independence
+   * - If time is zero (00:00:00), treat as date-only and zero timezone
+   * - If time is non-zero, ensure no timezone association and use local time
+   * @param date The date to normalize
+   * @returns A new Date object with proper timezone handling
+   */
+  static normalizeDateForTimezone(date: Date): Date {
+    const result = new Date(date);
+
+    // Check if time is zero (indicating date-only)
+    const hasTime =
+      result.getHours() !== 0 ||
+      result.getMinutes() !== 0 ||
+      result.getSeconds() !== 0;
+
+    if (!hasTime) {
+      // Date-only - ensure it's at midnight with no timezone issues
+      result.setHours(0, 0, 0, 0);
+    } else {
+      // Has time - preserve the exact local time but ensure no timezone complications
+      // Get the local time components
+      const year = result.getFullYear();
+      const month = result.getMonth();
+      const day = result.getDate();
+      const hours = result.getHours();
+      const minutes = result.getMinutes();
+      const seconds = result.getSeconds();
+      const milliseconds = result.getMilliseconds();
+
+      // Create a new date with the same local components
+      result.setTime(0); // Clear the date first
+      result.setFullYear(year, month, day);
+      result.setHours(hours, minutes, seconds, milliseconds);
+    }
+
+    return result;
+  }
+
+  /**
+   * Create a date from date parts ensuring timezone independence
+   * @param year Year
+   * @param month Month (0-11)
+   * @param day Day of month
+   * @param hours Hours (optional, default 0)
+   * @param minutes Minutes (optional, default 0)
+   * @param seconds Seconds (optional, default 0)
+   * @param milliseconds Milliseconds (optional, default 0)
+   * @returns A new Date object with proper timezone handling
+   */
+  static createDate(
+    year: number,
+    month: number,
+    day: number,
+    hours = 0,
+    minutes = 0,
+    seconds = 0,
+    milliseconds = 0,
+  ): Date {
+    // Create date using local time to avoid timezone complications
+    const date = new Date(
+      year,
+      month,
+      day,
+      hours,
+      minutes,
+      seconds,
+      milliseconds,
+    );
+
+    // If time is zero, ensure it's purely a date
+    if (hours === 0 && minutes === 0 && seconds === 0 && milliseconds === 0) {
+      date.setHours(0, 0, 0, 0);
+    }
+
+    return date;
+  }
 }

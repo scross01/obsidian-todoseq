@@ -428,13 +428,13 @@ export class SearchEvaluator {
       switch (format) {
         case 'year':
           // Year-only search (e.g., 2025) - match any date in that year
-          return searchDate.getUTCFullYear() === taskDate.getUTCFullYear();
+          return searchDate.getFullYear() === taskDate.getFullYear();
 
         case 'year-month':
           // Year-month search (e.g., 2025-11) - match any date in that month/year
           return (
-            searchDate.getUTCFullYear() === taskDate.getUTCFullYear() &&
-            searchDate.getUTCMonth() === taskDate.getUTCMonth()
+            searchDate.getFullYear() === taskDate.getFullYear() &&
+            searchDate.getMonth() === taskDate.getMonth()
           );
 
         case 'full':

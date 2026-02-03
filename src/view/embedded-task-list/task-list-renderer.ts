@@ -11,6 +11,7 @@ import { MarkdownView, Menu, WorkspaceLeaf, TFile, Platform } from 'obsidian';
 import { getPluginSettings } from '../../utils/settings-utils';
 import { truncateMiddle } from '../../utils/task-utils';
 import { TAG_PATTERN } from '../../utils/patterns';
+import { DateUtils } from '../../utils/date-utils';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -360,7 +361,7 @@ export class EmbeddedTaskListRenderer {
    * @returns A new Date object at midnight of the same day
    */
   private getDateOnly(date: Date): Date {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    return DateUtils.getDateOnly(date);
   }
 
   /**

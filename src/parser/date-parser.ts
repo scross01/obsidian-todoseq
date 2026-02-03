@@ -2,6 +2,8 @@
  * Date utility functions for parsing various date formats
  */
 
+import { DateUtils } from '../utils/date-utils';
+
 // Date format types
 export type DateFormat =
   | 'DATE_ONLY'
@@ -60,8 +62,8 @@ export class DateParser {
     const [year, month, day] = dateStr.split('-').map(Number);
     const [hours, minutes] = timeStr.split(':').map(Number);
 
-    // Create date in local time to preserve the intended time
-    return new Date(year, month - 1, day, hours, minutes);
+    // Use DateUtils.createDate for timezone-independent date creation
+    return DateUtils.createDate(year, month - 1, day, hours, minutes);
   }
 
   /**
@@ -72,8 +74,8 @@ export class DateParser {
   static parseDateString(dateStr: string): Date {
     const [year, month, day] = dateStr.split('-').map(Number);
 
-    // Create date at midnight local time
-    return new Date(year, month - 1, day, 0, 0, 0, 0);
+    // Use DateUtils.createDate for timezone-independent date creation
+    return DateUtils.createDate(year, month - 1, day);
   }
 
   /**

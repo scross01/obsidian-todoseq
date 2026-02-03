@@ -1,5 +1,7 @@
 # Change Log
 
+- Fixed date parsing for consistent date normalization.
+
 ## 0.9.3
 
 - Added a vault scan in progress indicator to empty task lists.

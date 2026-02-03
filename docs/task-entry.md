@@ -174,6 +174,10 @@ DONE [#C] Documentation update
 
 TODOseq supports Logseq-style SCHEDULED and DEADLINE dates for task organization.
 
+TODOseq treats all dates and times as timezone-independent values that assume local time. This means when you schedule a task for "2026-01-31 22:00" TODOseq interprets these times in your local timezone rather than UTC or any other timezone.
+
+If your device changes timezone then "2026-01-31 22:00" represents Jan 31st 10pm in your new timezone. TODOseq does not try to make any timezone adjustments, and does not currently support timezone-aware date handling.
+
 ### Date Formats
 
 #### Date Only
