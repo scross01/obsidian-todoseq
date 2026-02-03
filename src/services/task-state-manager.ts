@@ -1,5 +1,5 @@
-import { Task, DEFAULT_COMPLETED_STATES } from '../task';
-import { TaskEditor } from '../view/task-editor';
+import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
+import { TaskEditor } from './task-writer';
 
 /**
  * TaskStateManager provides centralized state management for tasks.

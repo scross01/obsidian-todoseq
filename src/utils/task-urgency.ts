@@ -1,4 +1,4 @@
-import { Task } from '../task';
+import { Task } from '../types/task';
 import { App } from 'obsidian';
 import { DateUtils } from './date-utils';
 

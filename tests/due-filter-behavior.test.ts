@@ -1,6 +1,6 @@
 import { SearchParser } from '../src/search/search-parser';
 import { SearchEvaluator } from '../src/search/search-evaluator';
-import { Task } from '../src/task';
+import { Task } from '../src/types/task';
 
 describe('Due Filter Behavior', () => {
   const today = new Date();

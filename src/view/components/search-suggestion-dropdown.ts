@@ -1,8 +1,8 @@
 import { Vault } from 'obsidian';
-import { Task } from '../task';
-import { SearchSuggestions } from '../search/search-suggestions';
-import { TodoTrackerSettings } from '../settings/settings';
-import { TaskListViewMode } from './task-list-view';
+import { Task } from '../../types/task';
+import { SearchSuggestions } from '../../search/search-suggestions';
+import { TodoTrackerSettings } from '../../settings/settings';
+import { TaskListViewMode } from '../task-list/task-list-view';
 
 /**
  * Dropdown component for search prefix filter suggestions

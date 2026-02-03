@@ -6,19 +6,19 @@ import {
   ViewUpdate,
 } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
-import { TodoTrackerSettings } from '../settings/settings';
-import { TaskParser } from '../parser/task-parser';
+import { TodoTrackerSettings } from '../../settings/settings';
+import { TaskParser } from '../../parser/task-parser';
 import {
   COMMENT_BLOCK_REGEX,
   FOOTNOTE_DEFINITION_REGEX,
   SINGLE_LINE_COMMENT_REGEX,
-} from '../utils/patterns';
+} from '../../utils/patterns';
 import {
   LanguageRegistry,
   LanguageDefinition,
-} from '../parser/language-registry';
-import { SettingsChangeDetector } from '../utils/settings-utils';
-import { DEFAULT_COMPLETED_STATES } from '../task';
+} from '../../parser/language-registry';
+import { SettingsChangeDetector } from '../../utils/settings-utils';
+import { DEFAULT_COMPLETED_STATES } from '../../types/task';
 
 export class TaskKeywordDecorator {
   private decorations: DecorationSet;

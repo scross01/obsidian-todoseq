@@ -8,7 +8,7 @@ import {
   getDefaultCoefficients,
   needsUrgencyRecalculation,
 } from '../src/utils/task-urgency';
-import { Task } from '../src/task';
+import { Task } from '../src/types/task';
 import { App, Vault, DataAdapter } from 'obsidian';
 
 // Mock Obsidian app for testing

@@ -7,27 +7,27 @@ import {
   MarkdownView,
   setIcon,
 } from 'obsidian';
-import { TASK_VIEW_ICON } from '../main';
+import { TASK_VIEW_ICON } from '../../main';
 import {
   Task,
   NEXT_STATE,
   DEFAULT_ACTIVE_STATES,
   DEFAULT_PENDING_STATES,
   DEFAULT_COMPLETED_STATES,
-} from '../task';
-import { DateUtils } from '../utils/date-utils';
-import { Search } from '../search/search';
-import { SearchOptionsDropdown } from './search-options-dropdown';
-import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
-import { TodoTrackerSettings } from '../settings/settings';
-import { getFilename } from '../utils/task-utils';
+} from '../../types/task';
+import { DateUtils } from '../../utils/date-utils';
+import { Search } from '../../search/search';
+import { SearchOptionsDropdown } from '../components/search-options-dropdown';
+import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdown';
+import { TodoTrackerSettings } from '../../settings/settings';
+import { getFilename } from '../../utils/task-utils';
 import {
   sortTasksWithThreeBlockSystem,
   SortMethod as TaskSortMethod,
-} from '../utils/task-sort';
-import { getPluginSettings } from '../utils/settings-utils';
-import { TaskStateManager } from '../services/task-state-manager';
-import { TAG_PATTERN } from '../utils/patterns';
+} from '../../utils/task-sort';
+import { getPluginSettings } from '../../utils/settings-utils';
+import { TaskStateManager } from '../../services/task-state-manager';
+import { TAG_PATTERN } from '../../utils/patterns';
 
 export type TaskListViewMode =
   | 'showAll'
@@ -509,8 +509,8 @@ export class TaskListView extends ItemView {
 
     // Import both dropdown classes dynamically to avoid circular dependencies
     Promise.all([
-      import('./search-options-dropdown'),
-      import('./search-suggestion-dropdown'),
+      import('../components/search-options-dropdown'),
+      import('../components/search-suggestion-dropdown'),
     ])
       .then(([optionsModule, suggestionsModule]) => {
         this.suggestionDropdown = new (

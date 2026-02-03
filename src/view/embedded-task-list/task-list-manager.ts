@@ -1,4 +1,4 @@
-import { Task } from '../../task';
+import { Task } from '../../types/task';
 import { Search } from '../../search/search';
 import { TodoTrackerSettings } from '../../settings/settings';
 import {

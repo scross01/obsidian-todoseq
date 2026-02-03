@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { ReaderViewFormatter } from '../src/view/reader-formatting';
+import { ReaderViewFormatter } from '../src/view/markdown-renderers/reader-formatting';
 import { TodoTrackerSettings } from '../src/settings/settings';
 import { TaskParser } from '../src/parser/task-parser';
 import { VaultScanner } from '../src/services/vault-scanner';

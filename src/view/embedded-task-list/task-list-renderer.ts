@@ -3,8 +3,8 @@ import {
   DEFAULT_COMPLETED_STATES,
   DEFAULT_ACTIVE_STATES,
   DEFAULT_PENDING_STATES,
-} from '../../task';
-import { TaskEditor } from '../task-editor';
+} from '../../types/task';
+import { TaskEditor } from '../../services/task-writer';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import { MarkdownView, Menu, WorkspaceLeaf, TFile, Platform } from 'obsidian';

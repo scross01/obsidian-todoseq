@@ -3,10 +3,10 @@ import {
   DEFAULT_PENDING_STATES,
   DEFAULT_ACTIVE_STATES,
   DEFAULT_COMPLETED_STATES,
-} from '../task';
-import { TodoTrackerSettings } from '../settings/settings';
+} from '../../types/task';
+import { TodoTrackerSettings } from '../../settings/settings';
 import { App } from 'obsidian';
-import { getPluginSettings } from '../utils/settings-utils';
+import { getPluginSettings } from '../../utils/settings-utils';
 
 export class StateMenuBuilder {
   constructor(
