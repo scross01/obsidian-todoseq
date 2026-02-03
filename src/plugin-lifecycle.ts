@@ -1,15 +1,18 @@
 import TodoTracker from './main';
 import { VaultScanner } from './services/vault-scanner';
-import { TaskEditor } from './view/task-editor';
-import { EditorKeywordMenu } from './view/editor-keyword-menu';
-import { StatusBarManager } from './view/status-bar';
-import { TaskListView, TaskListViewMode } from './view/task-list-view';
+import { TaskEditor } from './services/task-writer';
+import { EditorKeywordMenu } from './view/editor-extensions/editor-keyword-menu';
+import { StatusBarManager } from './view/editor-extensions/status-bar';
+import {
+  TaskListView,
+  TaskListViewMode,
+} from './view/task-list/task-list-view';
 import { TodoTrackerSettingTab } from './settings/settings';
 import { TaskParser } from './parser/task-parser';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, TFile, Platform } from 'obsidian';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
-import { ReaderViewFormatter } from './view/reader-formatting';
+import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
 
 export class PluginLifecycleManager {
   constructor(private plugin: TodoTracker) {}

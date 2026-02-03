@@ -1,5 +1,5 @@
 import { SearchNode } from './search-types';
-import { Task } from '../task';
+import { Task } from '../types/task';
 import { DateUtils } from '../utils/date-utils';
 import { TodoTrackerSettings } from '../settings/settings';
 import { getFilename } from '../utils/task-utils';

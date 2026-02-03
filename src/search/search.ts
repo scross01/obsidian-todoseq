@@ -1,7 +1,7 @@
 import { SearchParser } from './search-parser';
 import { SearchEvaluator } from './search-evaluator';
 import { SearchNode, SearchError } from './search-types';
-import { Task } from '../task';
+import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings';
 
 export class Search {

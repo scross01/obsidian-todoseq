@@ -4,7 +4,7 @@ import {
   DEFAULT_COMPLETED_STATES,
   NEXT_STATE,
   CYCLE_TASK_STATE,
-} from '../task';
+} from '../types/task';
 import { PRIORITY_TOKEN_REGEX, CHECKBOX_REGEX } from '../utils/patterns';
 import { getPluginSettings } from '../utils/settings-utils';
 

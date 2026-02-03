@@ -1,6 +1,6 @@
 import { EditorView, keymap } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
-import { TodoTrackerSettings } from '../settings/settings';
+import { TodoTrackerSettings } from '../../settings/settings';
 
 /**
  * Editor extension for automatic date insertion after SCHEDULED: and DEADLINE: keywords

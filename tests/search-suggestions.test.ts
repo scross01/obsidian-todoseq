@@ -1,5 +1,5 @@
 import { SearchSuggestions } from '../src/search/search-suggestions';
-import { Task } from '../src/task';
+import { Task } from '../src/types/task';
 import { Vault } from 'obsidian';
 import { TodoTrackerSettings } from '../src/settings/settings';
 

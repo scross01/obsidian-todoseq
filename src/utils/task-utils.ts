@@ -2,7 +2,7 @@ import {
   DEFAULT_COMPLETED_STATES,
   DEFAULT_PENDING_STATES,
   DEFAULT_ACTIVE_STATES,
-} from '../task';
+} from '../types/task';
 
 /**
  * Result of building the task keyword list

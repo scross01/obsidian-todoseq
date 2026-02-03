@@ -1,11 +1,11 @@
-import TodoTracker from '../main';
-import { DEFAULT_COMPLETED_STATES, Task, NEXT_STATE } from '../task';
-import { TaskParser } from '../parser/task-parser';
-import { VaultScanner } from '../services/vault-scanner';
-import { buildTaskKeywords } from '../utils/task-utils';
-import { SettingsChangeDetector } from '../utils/settings-utils';
+import TodoTracker from '../../main';
+import { DEFAULT_COMPLETED_STATES, Task, NEXT_STATE } from '../../types/task';
+import { TaskParser } from '../../parser/task-parser';
+import { VaultScanner } from '../../services/vault-scanner';
+import { buildTaskKeywords } from '../../utils/task-utils';
+import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { TFile } from 'obsidian';
-import { StateMenuBuilder } from './state-menu-builder';
+import { StateMenuBuilder } from '../components/state-menu-builder';
 
 /**
  * Handles task keyword formatting in the reader view

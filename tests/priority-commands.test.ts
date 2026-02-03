@@ -1,7 +1,7 @@
-import { TaskManager } from '../src/task-manager';
+import { TaskManager } from '../src/services/editor-controller';
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings';
-import { Task } from '../src/task';
+import { Task } from '../src/types/task';
 
 describe('Priority Commands', () => {
   let taskManager: TaskManager;

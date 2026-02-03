@@ -1,6 +1,6 @@
 import { MarkdownView } from 'obsidian';
-import { StateMenuBuilder } from './state-menu-builder';
-import TodoTracker from '../main';
+import { StateMenuBuilder } from '../components/state-menu-builder';
+import TodoTracker from '../../main';
 
 export class EditorKeywordMenu {
   private menuBuilder: StateMenuBuilder;

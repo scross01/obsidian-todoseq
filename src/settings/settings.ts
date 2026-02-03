@@ -1,6 +1,6 @@
 import { PluginSettingTab, App, Setting, ToggleComponent } from 'obsidian';
 import TodoTracker from '../main';
-import { TaskListView } from '../view/task-list-view';
+import { TaskListView } from '../view/task-list/task-list-view';
 import { LanguageCommentSupportSettings } from '../parser/language-registry';
 import { TaskParser } from '../parser/task-parser';
 

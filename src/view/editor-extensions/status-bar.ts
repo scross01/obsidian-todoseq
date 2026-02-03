@@ -1,6 +1,6 @@
-import TodoTracker from '../main';
-import { Task } from '../task';
-import { TaskListView } from './task-list-view';
+import TodoTracker from '../../main';
+import { Task } from '../../types/task';
+import { TaskListView } from '../task-list/task-list-view';
 import { TFile } from 'obsidian';
 
 export class StatusBarManager {

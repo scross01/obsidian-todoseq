@@ -1,10 +1,13 @@
 import { Editor, MarkdownView } from 'obsidian';
-import { Task, CYCLE_TASK_STATE } from './task';
-import TodoTracker from './main';
-import { detectListMarker } from './utils/patterns';
+import { Task, CYCLE_TASK_STATE } from '../types/task';
+import TodoTracker from '../main';
+import { detectListMarker } from '../utils/patterns';
 
 /**
  * TaskManager handles operations related to modifying tasks in the editor
+ * acting as an Editor Command Controller it parses the line under the cursor,
+ * determines intent (toggle, cycle, priority), and delegates to the services.
+ * It bridges the gap between the Editor UI and the Service Layer
  */
 export class TaskManager {
   constructor(private plugin: TodoTracker) {}
@@ -107,7 +110,7 @@ export class TaskManager {
           targetState = 'DONE';
         } else {
           // Import NEXT_STATE dynamically to avoid circular dependency
-          const { NEXT_STATE } = await import('./task');
+          const { NEXT_STATE } = await import('../types/task');
           targetState = NEXT_STATE.get(task.state) || 'TODO';
         }
       }

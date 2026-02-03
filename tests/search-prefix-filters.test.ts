@@ -1,5 +1,5 @@
 import { Search } from '../src/search/search';
-import { Task } from '../src/task';
+import { Task } from '../src/types/task';
 
 describe('Search Prefix Filters', () => {
   const testTasks: Task[] = [

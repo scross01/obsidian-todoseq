@@ -5,7 +5,7 @@ import {
   sortTasksWithThreeBlockSystem,
   taskComparator,
 } from '../src/utils/task-sort';
-import { Task } from '../src/task';
+import { Task } from '../src/types/task';
 
 describe('Task Sorting System', () => {
   const now = new Date('2024-01-15T12:00:00Z');

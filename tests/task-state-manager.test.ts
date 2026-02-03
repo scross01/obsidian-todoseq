@@ -1,5 +1,5 @@
 import { TaskStateManager } from '../src/services/task-state-manager';
-import { Task } from '../src/task';
+import { Task } from '../src/types/task';
 
 describe('TaskStateManager.optimisticUpdate', () => {
   let stateManager: TaskStateManager;

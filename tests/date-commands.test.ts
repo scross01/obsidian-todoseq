@@ -1,4 +1,4 @@
-import { TaskManager } from '../src/task-manager';
+import { TaskManager } from '../src/services/editor-controller';
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings';
 import { Editor, MarkdownView } from 'obsidian';
