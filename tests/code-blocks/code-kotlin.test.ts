@@ -1,8 +1,8 @@
-import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
-import { baseCodeLanguageSettings } from './helpers/code-language-test-helper';
+import { TaskParser } from '../../src/parser/task-parser';
+import { TodoTrackerSettings } from '../../src/settings/settings';
+import { baseCodeLanguageSettings } from '../helpers/code-language-test-helper';
 
-describe('Task parsing within C# comments in code blocks', () => {
+describe('Task parsing within Kotlin comments in code blocks', () => {
   let parser: TaskParser;
   let settings: TodoTrackerSettings;
 
@@ -11,10 +11,10 @@ describe('Task parsing within C# comments in code blocks', () => {
     parser = TaskParser.create(settings, null);
   });
 
-  describe('Tasks in csharp code blocks', () => {
-    test(`should match tasks in csharp comments when enabled`, () => {
+  describe('Tasks in kotlin code blocks', () => {
+    test(`should match tasks in kotlin comments when enabled`, () => {
       const lines = `
-\`\`\` csharp
+\`\`\` kotlin
 /* TODO test task text */
 
 /*
@@ -32,11 +32,10 @@ private test() {
   const key2 = value; /* TODO test task text */
   TODO task task
 }
-/// TODO test task text
 \`\`\`
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      expect(tasks).toHaveLength(8);
+      expect(tasks).toHaveLength(7);
       expect(tasks[0].indent).toBe('/* ');
       expect(tasks[0].text).toBe('test task text');
       expect(tasks[0].tail).toBe(' */');
@@ -48,22 +47,6 @@ private test() {
       expect(tasks[5].indent).toBe('  const key2 = value; /* ');
       expect(tasks[5].tail).toBe(' */');
       expect(tasks[6].indent).toBe('  ');
-      expect(tasks[7].indent).toBe('/// ');
-    });
-
-    test(`should match tasks in cs comments when enabled`, () => {
-      const lines = `
-\`\`\`cs
-// TODO test task text
-/// TODO test task text
-\`\`\`
-`;
-      const tasks = parser.parseFile(lines, 'test.md');
-      expect(tasks).toHaveLength(2);
-      expect(tasks[0].indent).toBe('// ');
-      expect(tasks[0].text).toBe('test task text');
-      expect(tasks[1].indent).toBe('/// ');
-      expect(tasks[1].text).toBe('test task text');
     });
   });
 });

@@ -1,8 +1,8 @@
-import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
-import { baseCodeLanguageSettings } from './helpers/code-language-test-helper';
+import { TaskParser } from '../../src/parser/task-parser';
+import { TodoTrackerSettings } from '../../src/settings/settings';
+import { baseCodeLanguageSettings } from '../helpers/code-language-test-helper';
 
-describe('Task parsing within C++ comments in code blocks', () => {
+describe('Task parsing within Javascript comments in code blocks', () => {
   let parser: TaskParser;
   let settings: TodoTrackerSettings;
 
@@ -11,10 +11,10 @@ describe('Task parsing within C++ comments in code blocks', () => {
     parser = TaskParser.create(settings, null);
   });
 
-  describe('Tasks in c++ code blocks', () => {
-    test(`should match tasks in c++ comments when enabled`, () => {
+  describe('Tasks in javascript code blocks', () => {
+    test(`should match tasks in javascript comments when enabled`, () => {
       const lines = `
-\`\`\` c++
+\`\`\` javascript
 /* TODO test task text */
 
 /*
@@ -49,9 +49,9 @@ private test() {
       expect(tasks[6].indent).toBe('  ');
     });
 
-    test(`should match tasks in cpp comments when enabled`, () => {
+    test(`should match tasks in js comments when enabled`, () => {
       const lines = `
-\`\`\`cpp
+\`\`\`js
 // TODO test task text
 \`\`\`
 `;

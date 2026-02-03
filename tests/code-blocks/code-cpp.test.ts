@@ -1,8 +1,8 @@
-import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
-import { baseCodeLanguageSettings } from './helpers/code-language-test-helper';
+import { TaskParser } from '../../src/parser/task-parser';
+import { TodoTrackerSettings } from '../../src/settings/settings';
+import { baseCodeLanguageSettings } from '../helpers/code-language-test-helper';
 
-describe('Task parsing within Rust comments in code blocks', () => {
+describe('Task parsing within C++ comments in code blocks', () => {
   let parser: TaskParser;
   let settings: TodoTrackerSettings;
 
@@ -11,10 +11,10 @@ describe('Task parsing within Rust comments in code blocks', () => {
     parser = TaskParser.create(settings, null);
   });
 
-  describe('Tasks in rust code blocks', () => {
-    test(`should match tasks in rust comments when enabled`, () => {
+  describe('Tasks in c++ code blocks', () => {
+    test(`should match tasks in c++ comments when enabled`, () => {
       const lines = `
-\`\`\` rust
+\`\`\` c++
 /* TODO test task text */
 
 /*
@@ -49,19 +49,16 @@ private test() {
       expect(tasks[6].indent).toBe('  ');
     });
 
-    test(`should match tasks in rust doc comments when enabled`, () => {
+    test(`should match tasks in cpp comments when enabled`, () => {
       const lines = `
-\`\`\` rust
-/// TODO test task text
-//! TODO test task text
+\`\`\`cpp
+// TODO test task text
 \`\`\`
 `;
       const tasks = parser.parseFile(lines, 'test.md');
-      expect(tasks).toHaveLength(2);
-      expect(tasks[0].indent).toBe('/// ');
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].indent).toBe('// ');
       expect(tasks[0].text).toBe('test task text');
-      expect(tasks[1].indent).toBe('//! ');
-      expect(tasks[1].text).toBe('test task text');
     });
   });
 });
