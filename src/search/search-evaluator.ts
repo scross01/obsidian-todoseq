@@ -583,8 +583,7 @@ export class SearchEvaluator {
       return false;
     }
 
-    // Add one day to end date to make it inclusive
-    rangeEnd = DateUtils.addDays(rangeEnd, 1);
+    // Do not add one day to end date - parseDateValue already makes ranges inclusive
 
     return DateUtils.isDateInRange(taskDate, rangeStart, rangeEnd);
   }

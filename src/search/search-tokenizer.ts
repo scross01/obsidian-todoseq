@@ -14,7 +14,6 @@ export class SearchTokenizer {
     { type: 'phrase' as const, regex: /"(?:\\.|[^"\\])*"/y },
     { type: 'or' as const, regex: /\bOR\b/y },
     { type: 'and' as const, regex: /\bAND\b/y },
-    { type: 'not' as const, regex: /-/y },
     { type: 'range' as const, regex: /\.\./y },
     { type: 'lparen' as const, regex: /\(/y },
     { type: 'rparen' as const, regex: /\)/y },
@@ -22,7 +21,8 @@ export class SearchTokenizer {
       type: 'prefix' as const,
       regex: /\b(path|file|tag|state|priority|content|scheduled|deadline):/y,
     },
-    { type: 'word' as const, regex: /[^\s"()-]+/y },
+    { type: 'not' as const, regex: /-/y },
+    { type: 'word' as const, regex: /[^\s"()]+/y },
   ] as const;
 
   static tokenize(query: string): SearchToken[] {
@@ -38,82 +38,126 @@ export class SearchTokenizer {
 
       let matched = false;
 
-      // Try each pattern in order
-      for (const pattern of this.PATTERNS) {
-        pattern.regex.lastIndex = pos;
-        const match = pattern.regex.exec(query);
-
-        if (match && match.index === pos) {
-          const value = this.processTokenValue(match[0], pattern.type);
-          let type = pattern.type as SearchToken['type'];
-
-          // Special handling: if this is a word token and the previous token was a prefix,
-          // convert it to a prefix_value token
+      // Try range pattern first after prefix_value
+      if (
+        tokens.length > 0 &&
+        (tokens[tokens.length - 1].type === 'prefix_value' ||
+          tokens[tokens.length - 1].type === 'prefix_value_quoted') &&
+        query.slice(pos).startsWith('..')
+      ) {
+        tokens.push({
+          type: 'range',
+          value: '..',
+          original: '..',
+          position: pos,
+        });
+        pos += 2;
+        matched = true;
+      } else {
+        // Try each pattern in order, but skip word pattern if we might have a range
+        for (const pattern of this.PATTERNS) {
+          // Skip word pattern if we're after a prefix and might have a range
           if (
-            type === 'word' &&
+            pattern.type === 'word' &&
             tokens.length > 0 &&
-            tokens[tokens.length - 1].type === 'prefix'
+            tokens[tokens.length - 1].type === 'prefix' &&
+            query.slice(pos).includes('..')
           ) {
-            type = 'prefix_value';
-          }
-
-          // Special handling: if this is a phrase token and the previous token was a prefix,
-          // convert it to prefix_value_quoted to track it was originally quoted
-          if (
-            type === 'phrase' &&
-            tokens.length > 0 &&
-            tokens[tokens.length - 1].type === 'prefix'
-          ) {
-            type = 'prefix_value_quoted';
-          }
-
-          // Special handling: if this is a dash and the previous token was a prefix_value
-          // merge it with the next word token to form a single prefix_value with dash
-          // Only merge if there was no whitespace before the dash (i.e., dash is immediately after the prefix_value)
-          if (
-            type === 'not' &&
-            tokens.length > 0 &&
-            tokens[tokens.length - 1].type === 'prefix_value'
-          ) {
-            // Only merge if there was no whitespace before the dash
-            const prevTokenEndPos =
-              tokens[tokens.length - 1].position +
-              tokens[tokens.length - 1].original.length;
-            const dashStartPos = pos;
-            const hasWhitespaceBeforeDash = dashStartPos > prevTokenEndPos;
-
-            if (!hasWhitespaceBeforeDash) {
-              // Look ahead to see if there's a word after the dash
-              const lookaheadPos = pattern.regex.lastIndex;
-              const wordPattern = /[^\s"()-]+/y;
-              wordPattern.lastIndex = lookaheadPos;
-              const wordMatch = wordPattern.exec(query);
-
-              if (wordMatch && wordMatch.index === lookaheadPos) {
-                // Merge the previous prefix_value, dash, and next word into one prefix_value
-                const prevToken = tokens[tokens.length - 1];
-                tokens[tokens.length - 1] = {
+            // Find the position of the first ..
+            const rangePos = query.indexOf('..', pos);
+            if (rangePos !== -1) {
+              // Extract the part before .. as prefix_value
+              const prefixValue = query.slice(pos, rangePos);
+              if (prefixValue.length > 0) {
+                tokens.push({
                   type: 'prefix_value',
-                  value: prevToken.value + '-' + wordMatch[0],
-                  original: prevToken.original + '-' + wordMatch[0],
-                  position: prevToken.position,
-                };
-                pos = wordPattern.lastIndex;
+                  value: prefixValue,
+                  original: prefixValue,
+                  position: pos,
+                });
+                pos = rangePos;
                 matched = true;
-                break;
+                // Now we should match the range in the next iteration
               }
+              break;
             }
           }
 
-          tokens.push({
-            type: type,
-            value: value,
-            original: match[0],
-            position: pos,
-          });
-          pos = pattern.regex.lastIndex;
-          matched = true;
-          break;
+          pattern.regex.lastIndex = pos;
+          const match = pattern.regex.exec(query);
+
+          if (match && match.index === pos) {
+            const value = this.processTokenValue(match[0], pattern.type);
+            let type = pattern.type as SearchToken['type'];
+
+            // Special handling: if this is a word token and the previous token was a prefix,
+            // convert it to a prefix_value token
+            if (
+              type === 'word' &&
+              tokens.length > 0 &&
+              tokens[tokens.length - 1].type === 'prefix'
+            ) {
+              type = 'prefix_value';
+            }
+
+            // Special handling: if this is a phrase token and the previous token was a prefix,
+            // convert it to prefix_value_quoted to track it was originally quoted
+            if (
+              type === 'phrase' &&
+              tokens.length > 0 &&
+              tokens[tokens.length - 1].type === 'prefix'
+            ) {
+              type = 'prefix_value_quoted';
+            }
+
+            // Special handling: if this is a dash and the previous token was a prefix_value
+            // merge it with the next word token to form a single prefix_value with dash
+            // Only merge if there was no whitespace before the dash (i.e., dash is immediately after the prefix_value)
+            if (
+              type === 'not' &&
+              tokens.length > 0 &&
+              tokens[tokens.length - 1].type === 'prefix_value'
+            ) {
+              // Only merge if there was no whitespace before the dash
+              const prevTokenEndPos =
+                tokens[tokens.length - 1].position +
+                tokens[tokens.length - 1].original.length;
+              const dashStartPos = pos;
+              const hasWhitespaceBeforeDash = dashStartPos > prevTokenEndPos;
+
+              if (!hasWhitespaceBeforeDash) {
+                // Look ahead to see if there's a word after the dash
+                const lookaheadPos = pattern.regex.lastIndex;
+                const wordPattern = /[^\s"()-]+/y;
+                wordPattern.lastIndex = lookaheadPos;
+                const wordMatch = wordPattern.exec(query);
+
+                if (wordMatch && wordMatch.index === lookaheadPos) {
+                  // Merge the previous prefix_value, dash, and next word into one prefix_value
+                  const prevToken = tokens[tokens.length - 1];
+                  tokens[tokens.length - 1] = {
+                    type: 'prefix_value',
+                    value: prevToken.value + '-' + wordMatch[0],
+                    original: prevToken.original + '-' + wordMatch[0],
+                    position: prevToken.position,
+                  };
+                  pos = wordPattern.lastIndex;
+                  matched = true;
+                  break;
+                }
+              }
+            }
+
+            tokens.push({
+              type: type,
+              value: value,
+              original: match[0],
+              position: pos,
+            });
+            pos = pattern.regex.lastIndex;
+            matched = true;
+            break;
+          }
         }
       }
 
