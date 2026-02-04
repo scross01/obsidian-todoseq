@@ -3,6 +3,7 @@ import { Task } from '../../types/task';
 import { SearchSuggestions } from '../../search/search-suggestions';
 import { TodoTrackerSettings } from '../../settings/settings';
 import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
+import { DOCS_SEARCH_URL } from '../../utils/constants';
 
 /**
  * Dropdown component for search prefix filter options
@@ -166,6 +167,12 @@ export class SearchOptionsDropdown {
       cls: 'suggestion-item mod-complex search-suggest-item mod-group',
     });
 
+    // Add click handler to titleItem to prevent bubbling
+    titleItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
     const titleContent = titleItem.createEl('div', {
       cls: 'suggestion-content',
     });
@@ -191,6 +198,25 @@ export class SearchOptionsDropdown {
                 <path d="M12 8h.01"></path>
             </svg>
         `;
+
+    // Add mousedown handler to prevent focus loss and handle click
+    iconContainer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    // Add click listener to open search documentation
+    iconContainer.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      try {
+        // Open the search documentation in the default browser
+        window.open(DOCS_SEARCH_URL, '_blank');
+      } catch (error) {
+        console.error('TODOseq: Failed to open search documentation:', error);
+      }
+    });
 
     // Render suggestions
     this.currentSuggestions.forEach((suggestion, index) => {
