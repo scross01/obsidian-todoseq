@@ -2,6 +2,20 @@
  * @jest-environment jsdom
  */
 
+// Mock localStorage to prevent --localstorage-file warning in Node.js v20+
+const mockLocalStorage = {
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+  clear: jest.fn(),
+  key: jest.fn(),
+  length: 0,
+};
+Object.defineProperty(global, 'localStorage', {
+  value: mockLocalStorage,
+  writable: true,
+});
+
 import { ReaderViewFormatter } from '../src/view/markdown-renderers/reader-formatting';
 import { TodoTrackerSettings } from '../src/settings/settings';
 import { TaskParser } from '../src/parser/task-parser';
