@@ -1,6 +1,9 @@
 # Change Log
 
+## 0.9.4
+
 - Fixed date parsing for consistent date normalization.
+- Added examples of using Obsidan Canvas to create Kanban and Eisenhower Matrix views.
 
 ## 0.9.3
 

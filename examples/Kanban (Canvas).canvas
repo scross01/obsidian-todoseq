@@ -1,0 +1,9 @@
+{
+	"nodes":[
+		{"id":"dfe2c26c16373019","type":"text","text":"```todoseq\nsearch: state:TODO\nshow-file: false\n```","x":-460,"y":-400,"width":340,"height":800},
+		{"id":"f30702a8b399428c","type":"text","text":"```todoseq\nsearch: state:DOING\nshow-file: false\n```","x":-100,"y":-400,"width":340,"height":800},
+		{"id":"0923a6cf84ab10ba","type":"text","text":"```todoseq\nsearch: state:DONE\nshow-file: false\n```","x":260,"y":-400,"width":340,"height":800},
+		{"id":"f7780a004eda75b2","type":"text","text":"# Kanban\nCreate Kanban style views by adding TODOseq embedded task lists into Canvas cards ","x":-460,"y":-500,"width":1060,"height":84}
+	],
+	"edges":[]
+}

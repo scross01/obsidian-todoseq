@@ -1,0 +1,10 @@
+{
+	"nodes":[
+		{"id":"2131f421ee7b6dd9","type":"text","text":"```todoseq\ntitle: Urgent and Important\nsearch: priority:high\n```\n","x":-400,"y":-360,"width":480,"height":340},
+		{"id":"b040e915f5a9a16b","type":"text","text":"```todoseq\ntitle: Neither Urgent nor Important\nsearch: -(priority:high OR priority:medium OR priority:low)\nlimit: 5\n```\n","x":100,"y":0,"width":480,"height":340},
+		{"id":"7f07a8418e60ea67","type":"text","text":"```todoseq\ntitle: Not Urgent but Important\nsearch: priority:medium\n```\n","x":100,"y":-360,"width":480,"height":340},
+		{"id":"453a553e83869f85","type":"text","text":"```todoseq\ntitle: Urgent but Not Important\nsearch: priority:low\n```\n","x":-400,"y":0,"width":480,"height":340},
+		{"id":"315edcaf0390c339","type":"text","text":"# Eisenhower Matrix\nAdd TODOseq task lists into Canvas cards. Customize search queries to represent your definition urgency and importance","x":-400,"y":-460,"width":980,"height":80}
+	],
+	"edges":[]
+}

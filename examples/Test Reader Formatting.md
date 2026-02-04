@@ -10,7 +10,7 @@ DONE This task is completed
 
 > TODO This is an incomplete task in quote
 > DOING This task is in progress in quote
-> DONE This task is completed in quote 
+> DONE This task is completed in quote
 
 - TODO This is an incomplete task with bullet
 - DOING This task is in progress with bullet
@@ -48,7 +48,7 @@ DONE Task with **bold text** and ==highlight==
 
 - [ ] TODO Task in a list with **bold text** and *italic text*
 - [ ] DOING Another task with `code formatting`
-- [ ] DONE Task with **bold text** and ==highlight==
+- [x] DONE Task with **bold text** and ==highlight==
 
 More regular text here.
 
