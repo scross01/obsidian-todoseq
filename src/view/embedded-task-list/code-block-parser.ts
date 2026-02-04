@@ -102,6 +102,23 @@ export class TodoseqCodeBlockParser {
               `Invalid sort method: ${sortValue}. Valid options: filepath, scheduled, deadline, priority, urgency`,
             );
           }
+        } else if (trimmed.startsWith('show-completed:')) {
+          const completedValue = trimmed
+            .substring('show-completed:'.length)
+            .trim()
+            .toLowerCase();
+          const validCompleted: CompletedOption[] = [
+            'show',
+            'hide',
+            'sort-to-end',
+          ];
+          if (validCompleted.includes(completedValue as CompletedOption)) {
+            completed = completedValue as CompletedOption;
+          } else {
+            throw new Error(
+              `Invalid show-completed option: ${completedValue}. Valid options: show, hide, sort-to-end`,
+            );
+          }
         } else if (trimmed.startsWith('completed:')) {
           const completedValue = trimmed
             .substring('completed:'.length)
@@ -117,6 +134,24 @@ export class TodoseqCodeBlockParser {
           } else {
             throw new Error(
               `Invalid completed option: ${completedValue}. Valid options: show, hide, sort-to-end`,
+            );
+          }
+        } else if (trimmed.startsWith('show-future:')) {
+          const futureValue = trimmed
+            .substring('show-future:'.length)
+            .trim()
+            .toLowerCase();
+          const validFuture: FutureOption[] = [
+            'show-all',
+            'show-upcoming',
+            'hide',
+            'sort-to-end',
+          ];
+          if (validFuture.includes(futureValue as FutureOption)) {
+            future = futureValue as FutureOption;
+          } else {
+            throw new Error(
+              `Invalid show-future option: ${futureValue}. Valid options: show-all, show-upcoming, hide, sort-to-end`,
             );
           }
         } else if (trimmed.startsWith('future:')) {

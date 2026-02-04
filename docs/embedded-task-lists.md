@@ -20,12 +20,12 @@ sort: priority
 Using the following parameters within the `todoseq` code block you define which tasks are displayed.
 
 - `search:` any valid search string (see [search](/search.html))
-- `sort:` one of `filepath`, `scheduled`, `deadline`, `priority` or `urgency`.
-- `completed:` (optional) one of `show`, `hide`, `sort-to-end`. Overrides the "Completed tasks" setting.
-- `future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Overrides the overrides "Future dated tasks" setting.
-- `show-file:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the source file info column. Defaults to `show` (responsive layout).
-- `limit:` (optional) set the display limit to result the number of results shown.
 - `title:` (optional) adds a custom title displayed above the task list.
+- `sort:` (optional) one of `filepath`, `scheduled`, `deadline`, `priority` or `urgency`. Default is `filepath`.
+- `limit:` (optional) set the display limit to result the number of results shown.
+- `show-completed:` (optional) one of `show`, `hide`, `sort-to-end`. Controls how completed tasks are displayed. Defaults to `show`. (`completed:` is an alternative alias for this parameter)
+- `show-file:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the source file info column. Defaults to `show` (responsive layout).
+- `show-future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Controls how future-dated tasks are displayed. Defaults to `show-all`. (`future:` is an alternative alias for this parameter)
 - `show-query:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `show`.
 
 Example:
@@ -34,11 +34,11 @@ Example:
 ```todoseq
 search: file:Project1 OR tag:project1
 sort: filepath
-completed: hide
-future: show-upcoming
+show-completed: hide
+show-future: show-upcoming
 limit: 5
 title: Project Tasks
-show-query: true
+show-query: show
 ```
 ````
 
@@ -83,32 +83,36 @@ sort: priority
 
 ### Completed Tasks
 
-The `completed:` parameter controls how completed tasks are displayed. This overrides the global "Completed tasks" setting:
+The `show-completed:` parameter controls how completed tasks are displayed. This overrides the global "Completed tasks" setting:
 
 - `show` - Show all completed tasks (default)
 - `hide` - Hide completed tasks
 - `sort-to-end` - Sort completed tasks to the end of the list
 
+> **Note:** `completed:` is an alternative alias for `show-completed:` and works the same way.
+
 ````txt
 ```todoseq
 search: scheduled:due OR deadline:due OR priority:high
-completed: sort-to-end
+show-completed: sort-to-end
 ```
 ````
 
 ### Future Tasks
 
-The `future:` parameter controls how future-dated tasks are displayed. This overrides the global "Future dated tasks" setting:
+The `show-future:` parameter controls how future-dated tasks are displayed. This overrides the global "Future dated tasks" setting:
 
 - `show-all` - Show all future tasks (default)
 - `show-upcoming` - Show only upcoming tasks (within 7 days)
 - `hide` - Hide all future tasks
 - `sort-to-end` - Sort future tasks to the end of the list
 
+> **Note:** `future:` is an alternative alias for `show-future:` and works the same way.
+
 ````txt
 ```todoseq
 search: tag:project1 OR tag:project1
-future: show-upcoming
+show-future: show-upcoming
 ```
 ````
 
@@ -179,8 +183,8 @@ You can combine multiple parameters:
 ```todoseq
 search: (file:Project1 OR tag:project1) AND content:"example"
 sort: priority
-completed: hide
-future: show-all
+show-completed: hide
+show-future: show-all
 show-file: false
 limit: 10
 ```
