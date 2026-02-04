@@ -16,7 +16,7 @@ Examples of using markdown checkboxes in front of the TODOseq task keywords.
 - [ ] TODO Parent checkbox
 	- [ ] TODO Indented checkbox
 	- [ ] DOING another Intended checkbox
-	- [ ] DONE completed indented checkbox
+	- [x] DONE completed indented checkbox
 
 **Quoted Checkboxes**
 

@@ -140,7 +140,7 @@ export class TaskWriter {
     );
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
-    if (file instanceof TFile) {
+    if (file && file instanceof TFile) {
       // Check if target is the active file in a MarkdownView
       // Using getActiveViewOfType() is safer than accessing workspace.activeLeaf directly
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -332,7 +332,7 @@ export class TaskWriter {
     }
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
-    if (file instanceof TFile) {
+    if (file && file instanceof TFile) {
       // Check if target is the active file in a MarkdownView
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
       const isActive = md?.file?.path === task.path;

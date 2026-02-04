@@ -369,6 +369,66 @@ describe('Date Search Filters', () => {
       expect(results.length).toBe(1); // Task with deadline tomorrow
       expect(results.map((r) => r.text)).toContain('Task with deadline date');
     });
+
+    test('should handle tasks without the specified date field', () => {
+      // Task with no scheduled date should not match scheduled range
+      const query = `scheduled:2025-01-01..2025-01-31`;
+      const node = SearchParser.parse(query);
+
+      const taskWithoutScheduledDate: Task = createCheckboxTask({
+        path: 'test-no-scheduled.md',
+        line: 1,
+        rawText: '- [ ] TODO Task without scheduled date',
+        text: 'Task without scheduled date',
+        deadlineDate: new Date('2025-01-15'),
+      });
+
+      expect(
+        SearchEvaluator.evaluate(node, taskWithoutScheduledDate, false),
+      ).toBe(false);
+    });
+
+    test('should handle invalid range dates', () => {
+      const query = `scheduled:invalid..2025-01-31`;
+      const node = SearchParser.parse(query);
+
+      const results = testTasks.filter((task) =>
+        SearchEvaluator.evaluate(node, task, false),
+      );
+      expect(results.length).toBe(0); // No matches for invalid range
+    });
+
+    test('should handle tasks with dates before range starts', () => {
+      const query = `scheduled:2025-01-15..2025-01-31`;
+      const node = SearchParser.parse(query);
+
+      const taskBefore: Task = createCheckboxTask({
+        path: 'test-before.md',
+        line: 1,
+        rawText: '- [ ] TODO Task before range',
+        text: 'Task before range',
+        scheduledDate: new Date('2025-01-10'),
+      });
+
+      expect(SearchEvaluator.evaluate(node, taskBefore, false)).toBe(false);
+    });
+
+    test('should handle tasks with dates after range ends', () => {
+      const query = `scheduled:2025-01-15..2025-01-31`;
+      const node = SearchParser.parse(query);
+
+      const taskAfter: Task = createCheckboxTask({
+        path: 'test-after.md',
+        line: 1,
+        rawText: '- [ ] TODO Task after range',
+        text: 'Task after range',
+        scheduledDate: new Date('2025-02-01'),
+      });
+
+      const result = SearchEvaluator.evaluate(node, taskAfter, false);
+
+      expect(result).toBe(false);
+    });
   });
 
   describe('Relative date expressions', () => {
