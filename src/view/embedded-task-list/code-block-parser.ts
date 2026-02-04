@@ -151,13 +151,13 @@ export class TodoseqCodeBlockParser {
             .substring('show-file:'.length)
             .trim()
             .toLowerCase();
-          if (showFileValue === 'false') {
+          if (showFileValue === 'false' || showFileValue === 'hide') {
             showFile = false;
-          } else if (showFileValue === 'true') {
+          } else if (showFileValue === 'true' || showFileValue === 'show') {
             showFile = true;
           } else {
             throw new Error(
-              `Invalid show-file option: ${showFileValue}. Valid options: true, false`,
+              `Invalid show-file option: ${showFileValue}. Valid options: true, false, show, hide`,
             );
           }
         } else if (trimmed.startsWith('title:')) {
@@ -167,13 +167,13 @@ export class TodoseqCodeBlockParser {
             .substring('show-query:'.length)
             .trim()
             .toLowerCase();
-          if (showQueryValue === 'false') {
+          if (showQueryValue === 'false' || showQueryValue === 'hide') {
             showQuery = false;
-          } else if (showQueryValue === 'true') {
+          } else if (showQueryValue === 'true' || showQueryValue === 'show') {
             showQuery = true;
           } else {
             throw new Error(
-              `Invalid show-query option: ${showQueryValue}. Valid options: true, false`,
+              `Invalid show-query option: ${showQueryValue}. Valid options: true, false, show, hide`,
             );
           }
         }

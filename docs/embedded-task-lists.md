@@ -23,10 +23,10 @@ Using the following parameters within the `todoseq` code block you define which 
 - `sort:` one of `filepath`, `scheduled`, `deadline`, `priority` or `urgency`.
 - `completed:` (optional) one of `show`, `hide`, `sort-to-end`. Overrides the "Completed tasks" setting.
 - `future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Overrides the overrides "Future dated tasks" setting.
-- `show-file:` (optional) `true` or `false`. Controls whether to show the source file info column. Defaults to `true` (responsive layout).
+- `show-file:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the source file info column. Defaults to `show` (responsive layout).
 - `limit:` (optional) set the display limit to result the number of results shown.
 - `title:` (optional) adds a custom title displayed above the task list.
-- `show-query:` (optional) `true` or `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `true`.
+- `show-query:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `show`.
 
 Example:
 
@@ -127,8 +127,8 @@ limit: 10
 
 The `show-file:` parameter controls whether to display the source file information column:
 
-- `true` - Show file info (default, responsive layout)
-- `false` - Always hide file info
+- `true` or `show` - Show file info (default, responsive layout)
+- `false` or `hide` - Always hide file info
 
 ````txt
 ```todoseq
@@ -155,8 +155,8 @@ The title appears at the top of the embedded task list, above the search query a
 
 The `show-query:` parameter controls whether the search query and filter parameters are displayed in the header:
 
-- `true` - Show the query header (default)
-- `false` - Hide the query header
+- `true` or `show` - Show the query header (default)
+- `false` or `hide` - Hide the query header
 
 This is useful when you want a cleaner look, especially when combined with a title:
 
