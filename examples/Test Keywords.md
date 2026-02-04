@@ -15,7 +15,7 @@ Custom keywords
 FIXME this is a custom keyword
 HACK this is a custom keyword
 课题 this is a custom keyword in Chinese
-🤔 this is an custom emoji keyword
+🤔 this is a custom emoji keyword
 
 Not a keyword
 
