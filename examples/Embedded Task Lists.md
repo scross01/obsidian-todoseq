@@ -12,23 +12,23 @@ sort: priority
 ## Code Block Parameters
 
 - `search:` any valid search string.
-- `sort:` one of `filepath`, `scheduled`, `deadline`, `priority` or `urgency`.
-- `completed:` (optional) overrides "Completed tasks" setting. `show`, `hide`, `sort-to-end`.
-- `future:` (optional) overrides "Future dated tasks" setting. `show-all`, `show-upcoming`, `hide`, `sort-to-end`.
-- `limit:` (optional) set the display limit to result the number of results shown.
 - `title:` (optional) adds a custom title displayed above the task list.
-- `show-file:` (optional) `true` or `false`. Controls whether to show the source file info column. Defaults to `true` (responsive layout).
-- `show-query:` (optional) `true` or `false`. Controls whether to show the search query and filter parameters in the header.
+- `sort:` one of `filepath`, `scheduled`, `deadline`, `priority` or `urgency`.
+- `limit:` (optional) set the display limit to result the number of results shown.
+- `show-completed:` (optional) overrides "Completed tasks" setting. `show`, `hide`, `sort-to-end`.
+- `show-future:` (optional) overrides "Future dated tasks" setting. `show-all`, `show-upcoming`, `hide`, `sort-to-end`.
+- `show-file:` (optional) `show` or `hide`. Controls whether to show the source file info column. Defaults to `true` (responsive layout).
+- `show-query:` (optional) `show` or `hide`. Controls whether to show the search query and filter parameters in the header.
 
 ```todoseq
 title: Example
 search: state:DOING
 sort: filepath
-completed: hide
-future: sort-to-end
 limit: 5
-show-query: true
-show-file: true
+show-completed: hide
+show-future: sort-to-end
+show-query: show
+show-file: show
 ```
 
 ### Search Query
@@ -116,11 +116,11 @@ sort: invalid
 ```
 
 ```todoseq
-future: invalid
+show-future: invalid
 ```
 
 ```todoseq
-completed: invalid
+show-completed: invalid
 ```
 
 ```todoseq
