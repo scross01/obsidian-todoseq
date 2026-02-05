@@ -249,7 +249,7 @@ export class EmbeddedTaskListEventHandler {
    * Refresh a specific code block
    * @param containerId ID of the code block to refresh
    */
-  private refreshCodeBlock(containerId: string): void {
+  private async refreshCodeBlock(containerId: string): Promise<void> {
     const codeBlock = this.activeCodeBlocks.get(containerId);
     if (!codeBlock) return;
 
@@ -266,7 +266,7 @@ export class EmbeddedTaskListEventHandler {
       const allTasks = this.plugin.getTasks();
 
       // Filter and sort tasks
-      const filteredTasks = this.manager.filterAndSortTasks(allTasks, params);
+      const filteredTasks = await this.manager.filterAndSortTasks(allTasks, params);
 
       // Re-render the task list
       this.renderer.renderTaskList(codeBlock.element, filteredTasks, params);

@@ -28,7 +28,7 @@ export class EmbeddedTaskListManager {
    * @param params Parsed code block parameters
    * @returns Filtered and sorted tasks
    */
-  filterAndSortTasks(tasks: Task[], params: TodoseqParameters): Task[] {
+  async filterAndSortTasks(tasks: Task[], params: TodoseqParameters): Promise<Task[]> {
     // Generate cache key
     const cacheKey = this.generateCacheKey(tasks, params);
 
@@ -43,7 +43,7 @@ export class EmbeddedTaskListManager {
       let filteredTasks = tasks;
 
       if (params.searchQuery) {
-        filteredTasks = this.filterTasks(tasks, params.searchQuery);
+        filteredTasks = await this.filterTasks(tasks, params.searchQuery);
       }
 
       // Sort tasks based on sort method
@@ -74,13 +74,13 @@ export class EmbeddedTaskListManager {
    * @param params Parsed code block parameters
    * @returns Total number of matching tasks
    */
-  getTotalTasksCount(tasks: Task[], params: TodoseqParameters): number {
+  async getTotalTasksCount(tasks: Task[], params: TodoseqParameters): Promise<number> {
     try {
       // Filter tasks based on search query
       let filteredTasks = tasks;
 
       if (params.searchQuery) {
-        filteredTasks = this.filterTasks(tasks, params.searchQuery);
+        filteredTasks = await this.filterTasks(tasks, params.searchQuery);
       }
 
       // Sort tasks based on sort method (needed for consistent filtering)
@@ -99,12 +99,18 @@ export class EmbeddedTaskListManager {
    * @param searchQuery Search query string
    * @returns Filtered tasks
    */
-  private filterTasks(tasks: Task[], searchQuery: string): Task[] {
+  private async filterTasks(tasks: Task[], searchQuery: string): Promise<Task[]> {
     try {
       // Use the existing Search class for consistent filtering
-      return tasks.filter((task) =>
-        Search.evaluate(searchQuery, task, false, this.settings),
+      const results = await Promise.all(
+        tasks.map(async (task) => {
+          const matches = await Search.evaluate(searchQuery, task, false, this.settings);
+          return { task, matches };
+        })
       );
+      
+      // Filter based on results
+      return results.filter((result) => result.matches).map((result) => result.task);
     } catch (error) {
       console.error('Error evaluating search query:', error);
       // Return all tasks if search fails

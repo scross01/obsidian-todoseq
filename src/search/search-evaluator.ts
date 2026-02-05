@@ -5,16 +5,17 @@ import { TodoTrackerSettings } from '../settings/settings';
 import { getFilename } from '../utils/task-utils';
 import { RegexCache } from '../utils/regex-cache';
 import { TAG_PATTERN } from '../utils/patterns';
+import { PropertySearchEngine } from '../services/property-search-engine';
 
 export class SearchEvaluator {
   private static regexCache = new RegexCache();
 
-  static evaluate(
+  static async evaluate(
     node: SearchNode,
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
-  ): boolean {
+  ): Promise<boolean> {
     switch (node.type) {
       case 'term':
         return node.value
@@ -84,43 +85,43 @@ export class SearchEvaluator {
     });
   }
 
-  private static evaluateAnd(
+  private static async evaluateAnd(
     nodes: SearchNode[],
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
-  ): boolean {
+  ): Promise<boolean> {
     // Short-circuit: return false on first false
     for (const node of nodes) {
-      if (!this.evaluate(node, task, caseSensitive, settings)) {
+      if (!(await this.evaluate(node, task, caseSensitive, settings))) {
         return false;
       }
     }
     return true;
   }
 
-  private static evaluateOr(
+  private static async evaluateOr(
     nodes: SearchNode[],
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
-  ): boolean {
+  ): Promise<boolean> {
     // Short-circuit: return true on first true
     for (const node of nodes) {
-      if (this.evaluate(node, task, caseSensitive, settings)) {
+      if (await this.evaluate(node, task, caseSensitive, settings)) {
         return true;
       }
     }
     return false;
   }
 
-  private static evaluateNot(
+  private static async evaluateNot(
     node: SearchNode,
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
-  ): boolean {
-    return !this.evaluate(node, task, caseSensitive, settings);
+  ): Promise<boolean> {
+    return !(await this.evaluate(node, task, caseSensitive, settings));
   }
 
   private static evaluatePrefixFilter(
@@ -601,12 +602,12 @@ export class SearchEvaluator {
    * @param settings Application settings
    * @returns True if task matches the property filter
    */
-  private static evaluatePropertyFilter(
+  private static async evaluatePropertyFilter(
     node: SearchNode,
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
-  ): boolean {
+  ): Promise<boolean> {
     const field = node.field;
     const value = node.value;
 
@@ -642,14 +643,38 @@ export class SearchEvaluator {
       app = (window as any).todoSeqPlugin.app;
     } else {
       // In test environment, return false since we can't access the app
-      console.error('evaluatePropertyFilter: No app available in test environment');
       return false;
     }
 
+    // Get the PropertySearchEngine instance from settings
+    let propertySearchEngine: PropertySearchEngine | null = null;
+    if (settings && (settings as any).propertySearchEngine) {
+      propertySearchEngine = (settings as any).propertySearchEngine;
+    } else if (typeof window !== 'undefined' && (window as any).todoSeqPlugin) {
+      // Fallback to global plugin instance for backward compatibility
+      propertySearchEngine = (window as any).todoSeqPlugin.propertySearchEngine;
+    }
 
     // When exact flag is true (quoted values), force case sensitivity
     const effectiveCaseSensitive = node.exact ? true : caseSensitive;
 
+    // Use PropertySearchEngine for efficient property search
+    if (propertySearchEngine) {
+      try {
+        // Build the query string
+        const query = propertyValue !== null ? `[${propertyKey}:${propertyValue}]` : `[${propertyKey}]`;
+        
+        // Search for files matching the property query
+        const matchingFiles = await propertySearchEngine.searchProperties(query);
+        
+        // Check if the task's file is in the matching files
+        return matchingFiles.has(task.path);
+      } catch (error) {
+        // Fall back to direct metadata access if PropertySearchEngine fails
+      }
+    }
+
+    // Fall back to direct metadata access
     // Get file cache and frontmatter
     const fileCache = app.metadataCache.getFileCache(task.path);
     if (!fileCache || !fileCache.frontmatter) {

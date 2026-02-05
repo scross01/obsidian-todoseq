@@ -37,7 +37,7 @@ export class PluginLifecycleManager {
         urgencyCoefficients,
       ),
       this.plugin.taskStateManager,
-      urgencyCoefficients,
+      this.plugin.propertySearchEngine,
     );
     this.plugin.taskEditor = new TaskWriter(this.plugin.app);
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
@@ -285,22 +285,30 @@ export class PluginLifecycleManager {
     this.plugin.registerEvent(
       this.plugin.app.vault.on('modify', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file);
+        // Emit file-changed event for property search engine
+        this.plugin.vaultScanner?.emit('file-changed', file);
       }),
     );
     this.plugin.registerEvent(
       this.plugin.app.vault.on('create', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file);
+        // Emit file-changed event for property search engine
+        this.plugin.vaultScanner?.emit('file-changed', file);
       }),
     );
     this.plugin.registerEvent(
       this.plugin.app.vault.on('delete', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file);
+        // Emit file-deleted event for property search engine
+        this.plugin.vaultScanner?.emit('file-deleted', file);
       }),
     );
     this.plugin.registerEvent(
       // Obsidian passes (file, oldPath) for rename
       this.plugin.app.vault.on('rename', (file, oldPath) => {
         this.plugin.vaultScanner?.handleFileRename(file, oldPath);
+        // Emit file-changed event for property search engine
+        this.plugin.vaultScanner?.emit('file-changed', file);
       }),
     );
 

@@ -40,30 +40,39 @@ describe('Search Prefix Filters', () => {
   ];
 
   describe('Path Filter', () => {
-    it('should filter tasks by path', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('path:journal', task, false),
+    it('should filter tasks by path', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('path:journal', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
 
-    it('should handle case insensitive path filtering', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('path:JOURNAL', task, false),
+    it('should handle case insensitive path filtering', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('path:JOURNAL', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
 
-    it('should handle case sensitive path filtering', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('path:JOURNAL', task, true),
+    it('should handle case sensitive path filtering', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('path:JOURNAL', task, true);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(0);
     });
 
-    it('should match immediate parent directory and subfolders', () => {
+    it('should match immediate parent directory and subfolders', async () => {
       // Test case: path:examples should match:
       // - "examples/File.md" (immediate parent)
       // - "examples/folder 1/notes.md" (subfolder)
@@ -101,9 +110,12 @@ describe('Search Prefix Filters', () => {
       ];
 
       // Should match all examples/... files (3 matches)
-      const result = testTasksForParent.filter((task) =>
-        Search.evaluate('path:examples', task, false),
+      const results = await Promise.all(
+        testTasksForParent.map(async (task) => {
+          return await Search.evaluate('path:examples', task, false);
+        })
       );
+      const result = testTasksForParent.filter((_, index) => results[index]);
       expect(result.length).toBe(3);
       expect(result[0].path).toBe('examples/File.md');
       expect(result[1].path).toBe('examples/folder 1/notes.md');
@@ -117,39 +129,51 @@ describe('Search Prefix Filters', () => {
   });
 
   describe('File Filter', () => {
-    it('should filter tasks by filename', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('file:meeting', task, false),
+    it('should filter tasks by filename', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('file:meeting', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
 
-    it('should filter tasks by partial filename', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('file:tasks', task, false),
+    it('should filter tasks by partial filename', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('file:tasks', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/work/tasks.md');
     });
 
-    it('should filter tasks by filename with hyphens', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('file:star-wars', task, false),
+    it('should filter tasks by filename with hyphens', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('file:star-wars', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
     });
 
-    it('should filter tasks by partial filename with hyphens', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('file:star', task, false),
+    it('should filter tasks by partial filename with hyphens', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('file:star', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
     });
 
-    it('should filter tasks by exact filename with multiple hyphens', () => {
+    it('should filter tasks by exact filename with multiple hyphens', async () => {
       // Create a test task with a date-like filename
       const testTask: Task = createBaseTask({
         path: 'notes/2025-03-28.md',
@@ -159,11 +183,11 @@ describe('Search Prefix Filters', () => {
         text: 'meeting on 2025-03-28',
       });
 
-      const result = Search.evaluate('file:2025-03-28.md', testTask, false);
+      const result = await Search.evaluate('file:2025-03-28.md', testTask, false);
       expect(result).toBe(true);
     });
 
-    it('should filter tasks by path with hyphens', () => {
+    it('should filter tasks by path with hyphens', async () => {
       // Create a test task with a path containing hyphens
       const testTask: Task = createBaseTask({
         path: 'notes/2025-meetings/project-planning.md',
@@ -173,11 +197,11 @@ describe('Search Prefix Filters', () => {
         text: 'project planning meeting',
       });
 
-      const result = Search.evaluate('path:2025-meetings', testTask, false);
+      const result = await Search.evaluate('path:2025-meetings', testTask, false);
       expect(result).toBe(true);
     });
 
-    it('should handle hyphens in state values', () => {
+    it('should handle hyphens in state values', async () => {
       // Create a test task with a custom state containing hyphens
       const testTask: Task = createBaseTask({
         path: 'notes/test.md',
@@ -188,11 +212,11 @@ describe('Search Prefix Filters', () => {
         state: 'IN-PROGRESS',
       });
 
-      const result = Search.evaluate('state:IN-PROGRESS', testTask, false);
+      const result = await Search.evaluate('state:IN-PROGRESS', testTask, false);
       expect(result).toBe(true);
     });
 
-    it('should handle hyphens in content values', () => {
+    it('should handle hyphens in content values', async () => {
       // Create a test task with content containing hyphens
       const testTask: Task = createBaseTask({
         path: 'notes/test.md',
@@ -202,7 +226,7 @@ describe('Search Prefix Filters', () => {
         text: 'task about state-of-the-art technology',
       });
 
-      const result = Search.evaluate(
+      const result = await Search.evaluate(
         'content:state-of-the-art',
         testTask,
         false,
@@ -212,23 +236,29 @@ describe('Search Prefix Filters', () => {
   });
 
   describe('Tag Filter', () => {
-    it('should filter tasks by tag', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('tag:#urgent', task, false),
+    it('should filter tasks by tag', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('tag:#urgent', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
 
-    it('should filter tasks by tag without hash', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('tag:urgent', task, false),
+    it('should filter tasks by tag without hash', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('tag:urgent', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
 
-    it('should filter tasks by tag with dash', () => {
+    it('should filter tasks by tag with dash', async () => {
       // Create a test task with a tag containing a dash
       const testTaskWithDash: Task = createBaseTask({
         path: 'notes/test/task-with-dash.md',
@@ -238,147 +268,198 @@ describe('Search Prefix Filters', () => {
         text: 'test task with dash',
       });
 
-      const result = [testTaskWithDash].filter((task) =>
-        Search.evaluate('tag:test-tag', task, false),
+      const results = await Promise.all(
+        [testTaskWithDash].map(async (task) => {
+          return await Search.evaluate('tag:test-tag', task, false);
+        })
       );
+      const result = [testTaskWithDash].filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/test/task-with-dash.md');
     });
   });
 
   describe('State Filter', () => {
-    it('should filter tasks by state', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('state:DOING', task, false),
+    it('should filter tasks by state', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('state:DOING', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/work/tasks.md');
     });
 
-    it('should handle case insensitive state filtering', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('state:doing', task, false),
+    it('should handle case insensitive state filtering', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('state:doing', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/work/tasks.md');
     });
   });
 
   describe('Priority Filter', () => {
-    it('should filter tasks by priority (high)', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('priority:high', task, false),
+    it('should filter tasks by priority (high)', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('priority:high', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
     });
 
-    it('should filter tasks by priority (A)', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('priority:A', task, false),
+    it('should filter tasks by priority (A)', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('priority:A', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
     });
 
-    it('should filter tasks by priority (low)', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('priority:low', task, false),
+    it('should filter tasks by priority (low)', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('priority:low', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
     });
 
-    it('should filter tasks by priority (none)', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('priority:none', task, false),
+    it('should filter tasks by priority (none)', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('priority:none', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/personal/hobbies.md');
     });
   });
 
   describe('Content Filter', () => {
-    it('should filter tasks by content', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('content:project', task, false),
+    it('should filter tasks by content', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('content:project', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
 
-    it('should filter tasks by multi-word content', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('content:"star wars"', task, false),
+    it('should filter tasks by multi-word content', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('content:"star wars"', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
     });
   });
 
   describe('Combined Filters', () => {
-    it('should combine path and tag filters (implicit AND)', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('path:journal tag:#urgent', task, false),
+    it('should combine path and tag filters (implicit AND)', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('path:journal tag:#urgent', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
 
-    it('should combine filters with OR operator', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('state:TODO OR state:DOING', task, false),
+    it('should combine filters with OR operator', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('state:TODO OR state:DOING', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       // Should return 4 tasks: 3 with TODO state + 1 with DOING state
       expect(result.length).toBe(4);
     });
 
-    it('should handle complex combined filters', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('priority:high -state:DOING', task, false),
+    it('should handle complex combined filters', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('priority:high -state:DOING', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
   });
 
   describe('Error Handling', () => {
-    it('should handle invalid prefix gracefully', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('invalid:test', task, false),
+    it('should handle invalid prefix gracefully', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('invalid:test', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       // Should return false for all tasks when prefix is invalid
       expect(result.length).toBe(0);
     });
 
-    it('should handle missing prefix value gracefully', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('path:', task, false),
+    it('should handle missing prefix value gracefully', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('path:', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       // Should return false for all tasks when value is missing
       expect(result.length).toBe(0);
     });
   });
 
   describe('Backward Compatibility', () => {
-    it('should still support basic term search', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('meeting', task, false),
+    it('should still support basic term search', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('meeting', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/journal/meeting.md');
     });
 
-    it('should still support phrase search', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('"star wars"', task, false),
+    it('should still support phrase search', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('"star wars"', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
     });
 
-    it('should still support boolean operators', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('meeting OR personal', task, false),
+    it('should still support boolean operators', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('meeting OR personal', task, false);
+        })
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
     });
   });
