@@ -74,7 +74,7 @@ limit: 5
 You can combine multiple parameters:
 
 ```todoseq
-search: content:"example"
+search: content:"example" -content:"block"
 sort: Priority
 ```
 

@@ -21,6 +21,11 @@ export class SearchTokenizer {
       type: 'prefix' as const,
       regex: /\b(path|file|tag|state|priority|content|scheduled|deadline):/y,
     },
+    // Property bracket syntax: [key:value], ["key":"value"], [type], [type:Draft OR Published]
+    {
+      type: 'property' as const,
+      regex: /\["?(?:[^":\\]|\\.)*"?(?:\s*:\s*(?:"(?:\\.|[^"\\])*"|null|>=?|<=?|>|<|\[[^\]]*\]|(?:[^"\]]+(?:\s+(?:OR|AND)\s+[^"\]]+)*))?)?\]/y,
+    },
     { type: 'not' as const, regex: /-/y },
     { type: 'word' as const, regex: /[^\s"()]+/y },
   ] as const;
@@ -197,6 +202,33 @@ export class SearchTokenizer {
           return content.replace(/\\"/g, '"');
         }
         return token;
+      case 'property':
+        // Remove outer brackets and process quotes within
+        // Format: [key:value] or ["key":"value"] or [key:"value"] etc.
+        const inner = token.slice(1, -1); // Remove [ and ]
+        // Find the colon to split key and value
+        const colonIndex = inner.indexOf(':');
+        if (colonIndex === -1) {
+          // Key-only case like [type]
+          return inner;
+        }
+        const keyPart = inner.slice(0, colonIndex).trim();
+        const valuePart = inner.slice(colonIndex + 1).trim();
+        
+        // Process key: remove quotes if present
+        let processedKey = keyPart;
+        if (processedKey.startsWith('"') && processedKey.endsWith('"')) {
+          processedKey = processedKey.slice(1, -1).replace(/\\"/g, '"');
+        }
+        
+        // Process value: remove quotes if present, keep null, operators, and expressions as-is
+        let processedValue = valuePart;
+        if (processedValue.startsWith('"') && processedValue.endsWith('"')) {
+          processedValue = processedValue.slice(1, -1).replace(/\\"/g, '"');
+        }
+        
+        // Return as "key:value" format for parsing
+        return `${processedKey}:${processedValue}`;
       case 'or':
       case 'and':
       case 'range':
@@ -227,6 +259,8 @@ export class SearchTokenizer {
       case 'prefix_value':
         return BP.DEFAULT;
       case 'prefix_value_quoted':
+        return BP.DEFAULT;
+      case 'property':
         return BP.DEFAULT;
       case 'word':
         return BP.DEFAULT;

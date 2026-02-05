@@ -1,4 +1,4 @@
-import { Vault } from 'obsidian';
+import { Vault, App } from 'obsidian';
 import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings';
 import { TaskListViewMode } from '../view/task-list/task-list-view';
@@ -351,6 +351,27 @@ export class SearchSuggestions {
     const dates = Array.from(datesSet);
     dates.sort((a, b) => a.localeCompare(b));
     return dates;
+  }
+
+  /**
+   * Get all unique property keys from the vault
+   * @param app Obsidian app instance
+   * @returns Array of unique property keys, sorted alphabetically
+   */
+  static getAllPropertyKeys(app: App): string[] {
+    const propertyKeys = new Set<string>();
+    const files = app.vault.getMarkdownFiles();
+
+    files.forEach(file => {
+      const cache = app.metadataCache.getFileCache(file);
+      if (cache?.frontmatter) {
+        Object.keys(cache.frontmatter).forEach(key => {
+          propertyKeys.add(key);
+        });
+      }
+    });
+
+    return Array.from(propertyKeys).sort();
   }
 
   /**

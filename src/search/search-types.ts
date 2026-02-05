@@ -6,7 +6,8 @@ export type SearchPrefix =
   | 'priority'
   | 'content'
   | 'scheduled'
-  | 'deadline';
+  | 'deadline'
+  | 'property';
 
 export interface SearchToken {
   type:
@@ -20,7 +21,8 @@ export interface SearchToken {
     | 'rparen'
     | 'prefix'
     | 'prefix_value'
-    | 'prefix_value_quoted';
+    | 'prefix_value_quoted'
+    | 'property';
   value: string;
   original: string;
   position: number;
@@ -34,10 +36,11 @@ export interface SearchNode {
     | 'term'
     | 'phrase'
     | 'prefix_filter'
-    | 'range_filter';
+    | 'range_filter'
+    | 'property_filter';
   children?: SearchNode[];
   value?: string;
-  field?: SearchPrefix;
+  field?: SearchPrefix | 'property'; // Allow 'property' as a field type
   start?: string;
   end?: string;
   position?: number;

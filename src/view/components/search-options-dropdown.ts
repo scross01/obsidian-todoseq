@@ -130,6 +130,7 @@ export class SearchOptionsDropdown {
       'content:',
       'scheduled:',
       'deadline:',
+      'property:',
     ];
 
     // Filter options based on search term
@@ -282,6 +283,8 @@ export class SearchOptionsDropdown {
         return 'filter by scheduled date';
       case 'deadline:':
         return 'filter by deadline date';
+      case 'property:':
+        return 'match page property';
       default:
         return '';
     }
