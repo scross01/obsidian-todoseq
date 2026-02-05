@@ -28,17 +28,19 @@ export class SearchEvaluator {
         return this.evaluatePrefixFilter(node, task, caseSensitive, settings);
       case 'range_filter':
         return this.evaluateRangeFilter(node, task, caseSensitive);
+      case 'property_filter':
+        return this.evaluatePropertyFilter(node, task, caseSensitive, settings);
       case 'and':
         return node.children
-          ? this.evaluateAnd(node.children, task, caseSensitive)
+          ? this.evaluateAnd(node.children, task, caseSensitive, settings)
           : false;
       case 'or':
         return node.children
-          ? this.evaluateOr(node.children, task, caseSensitive)
+          ? this.evaluateOr(node.children, task, caseSensitive, settings)
           : false;
       case 'not':
         return node.children && node.children[0]
-          ? this.evaluateNot(node.children[0], task, caseSensitive)
+          ? this.evaluateNot(node.children[0], task, caseSensitive, settings)
           : false;
       default:
         return false;
@@ -86,10 +88,11 @@ export class SearchEvaluator {
     nodes: SearchNode[],
     task: Task,
     caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
   ): boolean {
     // Short-circuit: return false on first false
     for (const node of nodes) {
-      if (!this.evaluate(node, task, caseSensitive)) {
+      if (!this.evaluate(node, task, caseSensitive, settings)) {
         return false;
       }
     }
@@ -100,10 +103,11 @@ export class SearchEvaluator {
     nodes: SearchNode[],
     task: Task,
     caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
   ): boolean {
     // Short-circuit: return true on first true
     for (const node of nodes) {
-      if (this.evaluate(node, task, caseSensitive)) {
+      if (this.evaluate(node, task, caseSensitive, settings)) {
         return true;
       }
     }
@@ -114,8 +118,9 @@ export class SearchEvaluator {
     node: SearchNode,
     task: Task,
     caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
   ): boolean {
-    return !this.evaluate(node, task, caseSensitive);
+    return !this.evaluate(node, task, caseSensitive, settings);
   }
 
   private static evaluatePrefixFilter(
@@ -586,5 +591,267 @@ export class SearchEvaluator {
     // Do not add one day to end date - parseDateValue already makes ranges inclusive
 
     return DateUtils.isDateInRange(taskDate, rangeStart, rangeEnd);
+  }
+
+  /**
+   * Evaluate property filter (e.g., [type:Project])
+   * @param node Property filter node
+   * @param task Task to evaluate
+   * @param caseSensitive Whether matching should be case sensitive
+   * @param settings Application settings
+   * @returns True if task matches the property filter
+   */
+  private static evaluatePropertyFilter(
+    node: SearchNode,
+    task: Task,
+    caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
+  ): boolean {
+    const field = node.field;
+    const value = node.value;
+
+    if (!field || !value) {
+      return false;
+    }
+
+    // Parse the field and property value from the stored value
+    // The parser stores it as "key:propertyValue" format
+    let propertyKey: string;
+    let propertyValue: string | null;
+
+    if (value.includes(':')) {
+      const colonIndex = value.indexOf(':');
+      propertyKey = value.slice(0, colonIndex);
+      propertyValue = value.slice(colonIndex + 1);
+      
+      // Handle empty value case [type:]
+      if (propertyValue === '') {
+        propertyValue = null;
+      }
+    } else {
+      // Key-only case like [type]
+      propertyKey = value;
+      propertyValue = null;
+    }
+
+    // Get the app instance from settings or global
+    let app;
+    if (settings && (settings as any).app) {
+      app = (settings as any).app;
+    } else if (typeof window !== 'undefined' && (window as any).todoSeqPlugin) {
+      app = (window as any).todoSeqPlugin.app;
+    } else {
+      // In test environment, return false since we can't access the app
+      console.error('evaluatePropertyFilter: No app available in test environment');
+      return false;
+    }
+
+
+    // When exact flag is true (quoted values), force case sensitivity
+    const effectiveCaseSensitive = node.exact ? true : caseSensitive;
+
+    // Get file cache and frontmatter
+    const fileCache = app.metadataCache.getFileCache(task.path);
+    if (!fileCache || !fileCache.frontmatter) {
+      return false;
+    }
+
+    const frontmatter = fileCache.frontmatter;
+    
+    // Handle key-only searches (e.g., [type] or [type:])
+    // But NOT [type:""] which is a search for empty string value
+    if (propertyValue === null || (propertyValue === '' && !node.exact)) {
+      // Check if property exists (regardless of value)
+      if (effectiveCaseSensitive) {
+        return Object.prototype.hasOwnProperty.call(frontmatter, propertyKey);
+      } else {
+        // Case insensitive key search
+        const lowerField = propertyKey.toLowerCase();
+        return Object.keys(frontmatter).some(key =>
+          key.toLowerCase() === lowerField
+        );
+      }
+    }
+
+    // Handle null value search (e.g., [type:null])
+    if (propertyValue === 'null') {
+      if (effectiveCaseSensitive) {
+        return Object.prototype.hasOwnProperty.call(frontmatter, propertyKey) &&
+               frontmatter[propertyKey] === null;
+      } else {
+        // Case insensitive key search for null value
+        const lowerField = propertyKey.toLowerCase();
+        return Object.keys(frontmatter).some(key => {
+          if (key.toLowerCase() === lowerField) {
+            return frontmatter[key] === null;
+          }
+          return false;
+        });
+      }
+    }
+
+    // Get the property value (case sensitive or insensitive key search)
+    let actualPropertyValue;
+    if (effectiveCaseSensitive) {
+      actualPropertyValue = frontmatter[propertyKey];
+    } else {
+      // Case insensitive key search
+      const lowerField = propertyKey.toLowerCase();
+      const foundKey = Object.keys(frontmatter).find(key =>
+        key.toLowerCase() === lowerField
+      );
+      actualPropertyValue = foundKey ? frontmatter[foundKey] : undefined;
+    }
+
+    if (actualPropertyValue === undefined) {
+      return false;
+    }
+
+    // Special case: searching for empty string should NOT match null values
+    if (propertyValue === '' && actualPropertyValue === null) {
+      return false;
+    }
+
+    // Handle parentheses in OR expressions first (e.g., [status:(Draft OR Published)])
+    if (propertyValue.startsWith('(') && propertyValue.endsWith(')')) {
+      const innerValue = propertyValue.slice(1, -1);
+      if (innerValue.includes(' OR ')) {
+        const orValues = innerValue.split(' OR ').map(v => v.trim());
+        return orValues.some(orValue => {
+          // Create a temporary node for each OR value with just the value part
+          const tempNode = { ...node, value: orValue };
+          return this.evaluateSinglePropertyValue(tempNode, actualPropertyValue, effectiveCaseSensitive);
+        });
+      }
+    }
+
+    // Handle OR expressions in the value (e.g., [status:Draft OR Published])
+    if (propertyValue.includes(' OR ')) {
+      const orValues = propertyValue.split(' OR ').map(v => v.trim());
+      return orValues.some(orValue => {
+        // Create a temporary node for each OR value with just the value part
+        const tempNode = { ...node, value: orValue };
+        return this.evaluateSinglePropertyValue(tempNode, actualPropertyValue, effectiveCaseSensitive);
+      });
+    }
+
+    // Handle single value comparison - create a node with just the property value
+    const valueOnlyNode = { ...node, value: propertyValue };
+    return this.evaluateSinglePropertyValue(valueOnlyNode, actualPropertyValue, effectiveCaseSensitive);
+  }
+
+  /**
+   * Evaluate a single property value against a filter
+   * @param node Property filter node with a single value
+   * @param propertyValue Property value from frontmatter
+   * @param caseSensitive Whether matching should be case sensitive
+   * @returns True if property value matches the filter
+   */
+  private static evaluateSinglePropertyValue(
+    node: SearchNode,
+    propertyValue: unknown,
+    caseSensitive: boolean,
+  ): boolean {
+    const value = node.value;
+    const exact = node.exact;
+
+    if (value === undefined) {
+      return false;
+    }
+
+    // Handle comparison operators (e.g., ["size":>100])
+    if (exact && typeof value === 'string') {
+      const comparisonMatch = value.match(/^([><]=?|==?)\s*(.+)$/);
+      if (comparisonMatch) {
+        const operator = comparisonMatch[1];
+        const compareValue = comparisonMatch[2];
+        
+        // Only numeric comparisons are supported
+        if (typeof propertyValue === 'number' && !isNaN(Number(compareValue))) {
+          const numCompareValue = Number(compareValue);
+          
+          switch (operator) {
+            case '>':
+              return propertyValue > numCompareValue;
+            case '>=':
+              return propertyValue >= numCompareValue;
+            case '<':
+              return propertyValue < numCompareValue;
+            case '<=':
+              return propertyValue <= numCompareValue;
+            case '==':
+            case '=':
+              return propertyValue === numCompareValue;
+            default:
+              return false;
+          }
+        }
+        
+        // For non-numeric values, comparison operators are not supported
+        return false;
+      }
+    }
+
+    // Handle different property types
+    if (Array.isArray(propertyValue)) {
+      // For arrays, check if the search value matches any element
+      return propertyValue.some(item => {
+        if (typeof item === 'string') {
+          const itemStr = caseSensitive ? item : item.toLowerCase();
+          const searchStr = caseSensitive ? value : value.toLowerCase();
+          
+          if (exact) {
+            return itemStr === searchStr;
+          } else {
+            return itemStr.includes(searchStr);
+          }
+        }
+        return false;
+      });
+    } else if (typeof propertyValue === 'string') {
+      // For strings, perform comparison
+      const propStr = caseSensitive ? propertyValue : propertyValue.toLowerCase();
+      const searchStr = caseSensitive ? value : value.toLowerCase();
+      
+      if (exact) {
+        return propStr === searchStr;
+      } else {
+        return propStr.includes(searchStr);
+      }
+    } else if (typeof propertyValue === 'number') {
+      // For numbers, try to parse the search value as a number
+      const searchNum = Number(value);
+      if (!isNaN(searchNum)) {
+        return propertyValue === searchNum;
+      }
+      
+      // If not a number, convert to string and compare
+      const propStr = caseSensitive ? String(propertyValue) : String(propertyValue).toLowerCase();
+      const searchStr = caseSensitive ? value : value.toLowerCase();
+      
+      if (exact) {
+        return propStr === searchStr;
+      } else {
+        return propStr.includes(searchStr);
+      }
+    } else if (typeof propertyValue === 'boolean') {
+      // For booleans, check if the search value matches the boolean
+      const searchLower = value.toLowerCase();
+      if (propertyValue) {
+        return searchLower === 'true';
+      } else {
+        return searchLower === 'false';
+      }
+    }
+    
+    // For other types, convert to string and compare
+    const propStr = caseSensitive ? String(propertyValue) : String(propertyValue).toLowerCase();
+    const searchStr = caseSensitive ? value : value.toLowerCase();
+    
+    if (exact) {
+      return propStr === searchStr;
+    } else {
+      return propStr.includes(searchStr);
+    }
   }
 }

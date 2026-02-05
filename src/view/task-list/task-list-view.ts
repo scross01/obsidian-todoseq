@@ -520,6 +520,7 @@ export class TaskListView extends ItemView {
         ).SearchSuggestionDropdown(
           inputEl,
           this.app.vault,
+          this.app,
           this.tasks,
           this.settings,
           this.getViewMode(),

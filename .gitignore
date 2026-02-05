@@ -48,4 +48,6 @@ Makefile
 docs/.vitepress/dist
 docs/.vitepress/cache
 
+# Claude Code
 CLAUDE.md
+.claude/

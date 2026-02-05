@@ -1,4 +1,4 @@
-import { Vault } from 'obsidian';
+import { Vault, App } from 'obsidian';
 import { Task } from '../../types/task';
 import { SearchSuggestions } from '../../search/search-suggestions';
 import { TodoTrackerSettings } from '../../settings/settings';
@@ -12,6 +12,7 @@ export class SearchSuggestionDropdown {
   private containerEl: HTMLElement;
   private inputEl: HTMLInputElement;
   private vault: Vault;
+  private app: App;
   private tasks: Task[];
   private settings: TodoTrackerSettings;
   private viewMode: TaskListViewMode;
@@ -25,12 +26,14 @@ export class SearchSuggestionDropdown {
   constructor(
     inputEl: HTMLInputElement,
     vault: Vault,
+    app: App,
     tasks: Task[],
     settings: TodoTrackerSettings,
     viewMode: TaskListViewMode,
   ) {
     this.inputEl = inputEl;
     this.vault = vault;
+    this.app = app;
     this.tasks = tasks;
     this.settings = settings;
     this.viewMode = viewMode;
@@ -204,6 +207,10 @@ export class SearchSuggestionDropdown {
           allSuggestions = [...deadlineSuggestions, ...taskDeadlineDates];
         }
         break;
+      case 'property':
+        // Get all property keys from the vault
+        allSuggestions = SearchSuggestions.getAllPropertyKeys(this.app);
+        break;
       case 'content':
         // For content, we don't have specific suggestions
         allSuggestions = [];
@@ -354,7 +361,18 @@ export class SearchSuggestionDropdown {
       const prefixBase = prefixMatch[1];
       const prefixStart = cursorPos - fullPrefix.length;
 
-      if (prefixBase + ':' === fullPrefix.substring(0, prefixBase.length + 1)) {
+      if (prefixBase === 'property') {
+        // Special handling for property prefix - insert ["key": format
+        const startPos = prefixStart;
+        const endPos = cursorPos;
+        const newValue =
+          currentValue.substring(0, startPos) +
+          `["${suggestion}":` +
+          currentValue.substring(endPos);
+        input.value = newValue;
+        input.selectionStart = input.selectionEnd =
+          startPos + `["${suggestion}":`.length;
+      } else if (prefixBase + ':' === fullPrefix.substring(0, prefixBase.length + 1)) {
         // Complete the value after prefix - replace any existing text after the colon
         const startPos = prefixStart + prefixBase.length + 1; // +1 for the colon
         let endPos = cursorPos;
