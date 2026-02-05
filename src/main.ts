@@ -1,4 +1,4 @@
-import { Plugin, MarkdownView } from 'obsidian';
+import { Plugin, MarkdownView, TFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from './types/task';
 import { TaskListView } from './view/task-list/task-list-view';
@@ -15,6 +15,7 @@ import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 import { TaskStateManager } from './services/task-state-manager';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
+import { PropertySearchEngine } from './services/property-search-engine';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -42,6 +43,9 @@ export default class TodoTracker extends Plugin {
 
   // Embedded task list processor
   public embeddedTaskListProcessor: TodoseqCodeBlockProcessor | null = null;
+
+  // Property search engine
+  public propertySearchEngine: PropertySearchEngine | null = null;
 
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
@@ -91,8 +95,22 @@ export default class TodoTracker extends Plugin {
     this.embeddedTaskListProcessor = new TodoseqCodeBlockProcessor(this);
     this.embeddedTaskListProcessor.registerProcessor();
 
+    // Initialize property search engine
+    this.propertySearchEngine = PropertySearchEngine.getInstance(this.app);
+    await this.propertySearchEngine.initialize();
+
     // Delegate to lifecycle manager (which initializes vaultScanner and readerViewFormatter)
     await this.lifecycleManager.onload();
+
+    // Register file change listeners with property search engine
+    if (this.vaultScanner) {
+      this.registerPropertySearchEventListeners();
+    }
+
+    // Initialize startup scan if enabled
+    if (this.propertySearchEngine) {
+      await this.propertySearchEngine.initializeStartupScan(this.settings);
+    }
   }
 
   // Helper: refresh all open Todo views to reflect current tasks without stealing focus
@@ -116,6 +134,11 @@ export default class TodoTracker extends Plugin {
       this.embeddedTaskListProcessor.cleanup();
     }
 
+    // Clean up property search engine
+    if (this.propertySearchEngine) {
+      this.propertySearchEngine.destroy();
+    }
+
     // Delegate cleanup to lifecycle manager to centralize cleanup logic
     this.lifecycleManager?.onunload();
   }
@@ -128,6 +151,9 @@ export default class TodoTracker extends Plugin {
       DefaultSettings,
       loaded as Partial<TodoTrackerSettings>,
     );
+    
+    // Add app instance to settings for PropertySearchEngine access
+    (this.settings as any).app = this.app;
     // Normalize settings shape after migration: ensure additionalTaskKeywords exists
     if (!this.settings.additionalTaskKeywords) {
       this.settings.additionalTaskKeywords = [];
@@ -161,6 +187,11 @@ export default class TodoTracker extends Plugin {
     if (this.embeddedTaskListProcessor) {
       this.embeddedTaskListProcessor.updateSettings();
     }
+
+    // Rebuild property search engine when settings change
+    if (this.propertySearchEngine) {
+      await this.propertySearchEngine.rebuildAll();
+    }
   }
 
   // Public method to update reader view formatter with current settings
@@ -190,6 +221,14 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called to save settings
   async saveSettings() {
+    // Add app instance to settings for PropertySearchEngine access
+    (this.settings as any).app = this.app;
+    
+    // Update property search engine with new settings
+    if (this.propertySearchEngine) {
+      // Property search engine settings are handled in initializeStartupScan
+    }
+    
     await this.saveData(this.settings);
   }
 
@@ -242,5 +281,21 @@ export default class TodoTracker extends Plugin {
         }
       }
     }
+  }
+
+  /**
+   * Register file change event listeners with property search engine
+   */
+  private registerPropertySearchEventListeners(): void {
+    if (!this.vaultScanner || !this.propertySearchEngine) return;
+
+    // Register file change listeners
+    this.vaultScanner.on('file-changed', (file) => {
+      this.propertySearchEngine!.onFileChanged(file as TFile);
+    });
+
+    this.vaultScanner.on('file-deleted', (file) => {
+      this.propertySearchEngine!.onFileChanged(file as TFile);
+    });
   }
 }

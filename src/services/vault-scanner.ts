@@ -9,6 +9,7 @@ import {
 } from '../utils/task-urgency';
 import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
+import { PropertySearchEngine } from './property-search-engine';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -16,6 +17,8 @@ export interface VaultScannerEvents {
   'scan-started': () => void;
   'scan-completed': () => void;
   'scan-error': (error: Error) => void;
+  'file-changed': (file: TAbstractFile) => void;
+  'file-deleted': (file: TAbstractFile) => void;
 }
 
 export class VaultScanner {
@@ -33,6 +36,7 @@ export class VaultScanner {
     private settings: TodoTrackerSettings,
     private parser: TaskParser,
     private taskStateManager: TaskStateManager,
+    private propertySearchEngine?: PropertySearchEngine,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
     // Initialize event listeners map
@@ -41,6 +45,8 @@ export class VaultScanner {
       'scan-started',
       'scan-completed',
       'scan-error',
+      'file-changed',
+      'file-deleted',
     ];
     eventKeys.forEach((event) => {
       this.eventListeners.set(event, []);
@@ -52,6 +58,11 @@ export class VaultScanner {
     } else {
       // Fallback: load urgency coefficients on startup if not provided
       this.loadUrgencyCoefficients();
+    }
+
+    // Register file change handlers for property search engine
+    if (this.propertySearchEngine) {
+      this.registerPropertySearchHandlers();
     }
   }
 
@@ -65,6 +76,39 @@ export class VaultScanner {
       // Failed to load urgency coefficients
       // Fallback to defaults handled in parseUrgencyCoefficients
     }
+  }
+
+  /**
+   * Register file change handlers for property search engine
+   */
+  private registerPropertySearchHandlers(): void {
+    if (!this.propertySearchEngine) return;
+
+    // Register handlers for metadata cache changes
+    this.app.metadataCache.on('changed', (file) => {
+      if (file instanceof TFile) {
+        this.propertySearchEngine!.onFileChanged(file);
+      }
+    });
+
+    // Register handlers for vault events
+    this.app.vault.on('rename', (file, oldPath) => {
+      if (file instanceof TFile) {
+        this.propertySearchEngine!.onFileRenamed(file, oldPath);
+      }
+    });
+
+    this.app.vault.on('delete', (file) => {
+      if (file instanceof TFile) {
+        this.propertySearchEngine!.onFileDeleted(file);
+      }
+    });
+
+    this.app.vault.on('modify', (file) => {
+      if (file instanceof TFile) {
+        this.propertySearchEngine!.onFileChanged(file);
+      }
+    });
   }
 
   // Event management methods

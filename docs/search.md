@@ -108,7 +108,7 @@ work (home OR office) -phone
 
 Find work tasks related to home or office, excluding phone related ones.
 
-## Prefix Filters
+## Search Filters
 
 TODOseq supports filters keywords similar to Obsidians general vault search for targeted searching.
 
@@ -149,118 +149,10 @@ state:TODO priority:high
 Find high priority tasks that are in TODO state.
 
 ```txt
-property:[type:Project]
+[type:Project]
 ```
 
 Find tasks on pages marked as projects.
-
-### Combining Multiple Prefixes
-
-```txt
-path:work tag:urgent state:TODO
-```
-
-Find #urgent tagged TODO tasks in the work folder.
-
-```txt
-file:report scheduled:"this week" priority:high
-```
-
-Find high priority tasks scheduled for this week in files with "report" in the file name.
-
-```txt
-property:[type:Project] state:TODO priority:high
-```
-
-Find high priority TODO tasks on pages marked as projects.
-
-## Property Search
-
-You can search for tasks based on page properties (frontmatter/YAML metadata). This allows you to filter tasks by the properties set on your markdown files, providing a powerful way to organize and find tasks based on document context.
-
-### Basic Property Search
-
-To search for tasks on pages with a specific property, use brackets with the property name and value separated by a colon. For example, to find all tasks on pages marked as a "Project", you would use `["type":Project]`. The property name and value are separated by a colon within the brackets. You can use quotes around either the property name or value for exact matching. Without quotes, the search will match partially (case insensitive by default).
-
-```txt
-["type":Project]
-```
-
-This syntax follows Obsidian's native property search format, making it familiar if you've used Obsidian's property search before. The quotes are optional but recommended for exact matching.
-
-### Key-Only Search
-
-You can also search for pages that have a specific property regardless of its value. Use `[type:]` or just `[type]` to find all pages with the `type` property set. This is useful when you want to see all tasks on pages of a certain category, regardless of their specific status or other property values.
-
-```txt
-[type:]
-```
-
-This will match all pages that have a `type` property, whether it's set to "Project", "Personal", "Note", or any other value.
-
-### Exact vs Partial Matching
-
-By default, property searches match partially. The search `[type:ject]` would match "Project" because "ject" is contained within "Project". For exact matching, use quotes around the value: `["type":"Project"]`. This will only match pages where the property value is exactly "Project".
-
-```txt
-["type":"Project"]
-```
-
-Exact matching is case sensitive, while partial matching is case insensitive by default. You can also toggle case sensitivity using the A/a button in the toolbar.
-
-### Negation
-
-You can exclude pages with specific properties using the minus sign. For example, `-[type:Personal]` will exclude all pages where the type property is "Personal".
-
-```txt
--[type:Personal]
-```
-
-This is particularly useful when you want to focus on work-related tasks and exclude personal ones.
-
-### Null Values
-
-You can search for properties that exist but have no value using `[type:null]` or `[type:]`. This is different from searching for pages where the property doesn't exist at all. Null value matching is useful for finding pages where a property has been initialized but not yet filled in.
-
-```txt
-[type:null]
-```
-
-This will match pages where the `type` property exists but has no value assigned to it.
-
-### OR Operator
-
-You can combine multiple values using the OR operator within a property search. For example, `[status:Draft OR Published]` will match pages where the status is either "Draft" or "Published".
-
-```txt
-[status:Draft OR Published]
-```
-
-This allows you to search for tasks across multiple related categories without needing separate searches.
-
-### Type-Aware Comparisons
-
-For numeric properties, you can use comparison operators like `>`, `<, `>=`, and `<=`. For example, `["size":>100]` matches pages where the size property is greater than 100.
-
-```txt
-["priority":>5]
-```
-
-This type-aware comparison works with numeric values and allows for more precise filtering based on quantitative properties.
-
-### Top-Level Properties Only
-
-Property search only supports top-level properties, not nested ones. This means you can search for `[type:Project]` but not for `[project.type:Feature]`. This limitation aligns with Obsidian's property search behavior.
-
-### Combined Filters
-
-You can combine property searches with other search terms and filters. For example, `state:TODO [type:Project]` will find TODO tasks on Project pages.
-
-```txt
-state:TODO [type:Project] priority:high
-```
-
-This example finds high-priority TODO tasks on pages marked as projects, demonstrating how property search integrates with the rest of the search system.
 
 ## Date Filter Expressions
 
@@ -399,6 +291,94 @@ priority:none
 
 Find tasks without priority assignments.
 
+## Property Search
+
+You can search for tasks based on page properties (frontmatter/YAML metadata). This allows you to filter tasks by the properties set on your markdown files, providing a powerful way to organize and find tasks based on document context.
+
+### Basic Property Search
+
+To search for tasks on pages with a specific property, use brackets with the property name and value separated by a colon. For example, to find all tasks on pages marked as a "Project", you would use `[type:Project]`. The property name and value are separated by a colon within the brackets. You can use quotes around either the property name or value for exact matching. Without quotes, the search will match partially (case insensitive by default).
+
+```txt
+[type:Project]
+```
+
+This syntax is consistent with Obsidian's native property search format, making it familiar if you've used Obsidian's property search before. The quotes are optional but recommended for exact matching.
+
+### Key-Only Search
+
+You can also search for pages that have a specific property regardless of its value. Use `[type:]` or just `[type]` to find all pages with the `type` property set. This is useful when you want to see all tasks on pages of a certain category, regardless of their specific status or other property values.
+
+```txt
+[type:]
+```
+
+This will match all pages that have a `type` property, whether it's set to "Project", "Personal", "Note", or any other value.
+
+### Exact vs Partial Matching
+
+By default, property searches match partially. The search `[type:ject]` would match "Project" because "ject" is contained within "Project". For exact matching, use quotes around the value: `[type:"Project"]`. This will only match pages where the property value is exactly "Project".
+
+```txt
+[type:"Project"]
+```
+
+Exact matching is case sensitive, while partial matching is case insensitive by default. You can also toggle case sensitivity using the A/a button in the toolbar.
+
+### Negation
+
+You can exclude pages with specific properties using the minus sign. For example, `-[type:Personal]` will exclude all pages where the type property is "Personal".
+
+```txt
+-[type:Personal]
+```
+
+This is particularly useful when you want to focus on work-related tasks and exclude personal ones.
+
+### Null Values
+
+You can search for properties that exist but have no value using `[type:null]` or `[type:]`. This is different from searching for pages where the property doesn't exist at all. Null value matching is useful for finding pages where a property has been initialized but not yet filled in.
+
+```txt
+[type:null]
+```
+
+This will match pages where the `type` property exists but has no value assigned to it.
+
+### OR Operator
+
+You can combine multiple values using the OR operator within a property search. For example, `[status:Draft OR Published]` will match pages where the status is either "Draft" or "Published".
+
+```txt
+[status:Draft OR Published]
+```
+
+This allows you to search for tasks across multiple related categories without needing separate searches.
+
+### Type-Aware Comparisons
+
+For numeric properties, you can use comparison operators like `>`, `<, `>=`, and `<=`. For example, `["size":>100]` matches pages where the size property is greater than 100.
+
+```txt
+["priority":>5]
+```
+
+This type-aware comparison works with numeric values and allows for more precise filtering based on quantitative properties.
+
+### Property Search Cache
+
+TODOseq builds it's own index of all properties across your vault for fast, efficient searching. This approach ensures that property searches work even for files that haven't been recently accessed, providing comprehensive coverage of your entire vault.
+
+The property search engine automatically updates when files change, ensuring that your search results are always current without requiring manual intervention.
+
+You can configure the property search behavior in the TODOseq settings:
+
+- **Run Startup Scan**: Enable/disable automatic index building on plugin load
+- **Startup Scan Delay**: Configure delay before starting the scan (default: 3 seconds)
+- **Show Progress**: Display console messages during the startup scan process
+
+These settings help balance performance with functionality, especially in large vaults.
+
 ## Combining Search Techniques
 
 TODOseq allows combining all search features for powerful, targeted filtering.
@@ -430,7 +410,7 @@ path:work/ scheduled:2026-01-01..2026-01-31 priority:A OR priority:B
 Find high or medium priority tasks scheduled in January 2026 in the work folder.
 
 ```txt
-property:[type:Project] (state:TODO OR state:DOING) -[status:Blocked]
+[type:Project] (state:TODO OR state:DOING) -[status:Blocked]
 ```
 
 Find TODO or DOING tasks on project pages, excluding those with blocked status.

@@ -74,8 +74,8 @@ export class TaskListView extends ItemView {
       // Only refresh if the view is already open (has contentEl)
       if (this.contentEl && this.taskListContainer) {
         // Use requestAnimationFrame for immediate visual update
-        requestAnimationFrame(() => {
-          this.refreshVisibleList();
+        requestAnimationFrame(async () => {
+          await this.refreshVisibleList();
         });
       }
     });
@@ -230,10 +230,10 @@ export class TaskListView extends ItemView {
       cls: 'search-input-clear-button',
       attr: { 'aria-label': 'Clear search' },
     });
-    clearSearch.addEventListener('click', () => {
+    clearSearch.addEventListener('click', async () => {
       inputEl.value = '';
       this.setSearchQuery('');
-      this.refreshVisibleList();
+      await this.refreshVisibleList();
     });
     const matchCase = searchInputWrap.createEl('div', {
       cls: 'input-right-decorator clickable-icon',
@@ -242,20 +242,20 @@ export class TaskListView extends ItemView {
     setIcon(matchCase, 'uppercase-lowercase-a');
 
     // Toggle case sensitivity
-    matchCase.addEventListener('click', () => {
+    matchCase.addEventListener('click', async () => {
       this.isCaseSensitive = !this.isCaseSensitive;
       matchCase.toggleClass('is-active', this.isCaseSensitive);
-      this.refreshVisibleList();
+      await this.refreshVisibleList();
     });
     // Narrow to HTMLInputElement via runtime guard
     if (!(inputEl instanceof HTMLInputElement)) {
       throw new Error('Failed to create search input element');
     }
     inputEl.value = this.getSearchQuery();
-    inputEl.addEventListener('input', () => {
+    inputEl.addEventListener('input', async () => {
       // Update attribute and re-render list only, preserving focus
       this.setSearchQuery(inputEl.value);
-      this.refreshVisibleList();
+      await this.refreshVisibleList();
     });
 
     // Add Settings button to the right side of the first row
@@ -397,7 +397,7 @@ export class TaskListView extends ItemView {
     futureDropdown.value = this.settings.futureTaskSorting;
 
     // Handle future task sorting changes
-    futureDropdown.addEventListener('change', () => {
+    futureDropdown.addEventListener('change', async () => {
       const selectedValue = futureDropdown.value as
         | 'showAll'
         | 'showUpcoming'
@@ -413,7 +413,7 @@ export class TaskListView extends ItemView {
       });
       window.dispatchEvent(evt);
 
-      this.refreshVisibleList(); // Re-render with new future task sorting
+      await this.refreshVisibleList(); // Re-render with new future task sorting
     });
 
     // Add search results info bar (second row)
@@ -877,7 +877,7 @@ export class TaskListView extends ItemView {
       const mode = this.getViewMode();
       if (mode !== 'showAll') {
         // Lighter refresh: recompute and redraw only the list
-        this.refreshVisibleList();
+        await this.refreshVisibleList();
       } else {
         this.refreshTaskElement(task);
       }
@@ -1107,7 +1107,7 @@ export class TaskListView extends ItemView {
   }
 
   /** Recalculate visible tasks for current mode + search and update only the list subtree */
-  refreshVisibleList(): void {
+  async refreshVisibleList(): Promise<void> {
     const container = this.contentEl;
 
     // Sync dropdown with current sort method
@@ -1137,9 +1137,15 @@ export class TaskListView extends ItemView {
     if (q.length > 0) {
       try {
         // Use new advanced search functionality
-        visible = visible.filter((t) => {
-          return Search.evaluate(q, t, this.isCaseSensitive, this.settings);
-        });
+        const searchResults = await Promise.all(
+          visible.map(async (t) => {
+            const matches = await Search.evaluate(q, t, this.isCaseSensitive, this.settings);
+            return { task: t, matches };
+          })
+        );
+        
+        // Filter based on the results
+        visible = searchResults.filter((result) => result.matches).map((result) => result.task);
         this.searchError = null;
       } catch (error) {
         // If there's an error in parsing, fall back to simple search
@@ -1320,11 +1326,11 @@ export class TaskListView extends ItemView {
     this.setupSearchSuggestions();
 
     // Initial list render (preserves focus since toolbar/input already exists)
-    this.refreshVisibleList();
+    await this.refreshVisibleList();
 
     // Keyboard shortcuts: Slash to focus search, Esc to clear
     const input: HTMLInputElement | null = this.searchInputEl ?? null;
-    const keyHandler = (evt: KeyboardEvent) => {
+    const keyHandler = async (evt: KeyboardEvent) => {
       const active = document.activeElement as HTMLElement | null;
       const isTyping =
         !!active &&
@@ -1346,7 +1352,7 @@ export class TaskListView extends ItemView {
           evt.preventDefault();
           input.value = '';
           this.setSearchQuery('');
-          this.refreshVisibleList(); // re-render cleared without losing focus context
+          await this.refreshVisibleList(); // re-render cleared without losing focus context
           queueMicrotask(() => input.blur());
         }
       }
