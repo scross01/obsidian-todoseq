@@ -75,10 +75,16 @@ export class TodoseqCodeBlockProcessor {
       const allTasks = this.plugin.getTasks();
 
       // Filter and sort tasks based on parameters
-      const filteredTasks = await this.manager.filterAndSortTasks(allTasks, params);
+      const filteredTasks = await this.manager.filterAndSortTasks(
+        allTasks,
+        params,
+      );
 
       // Get total number of tasks (before applying limit)
-      const totalTasksCount = await this.manager.getTotalTasksCount(allTasks, params);
+      const totalTasksCount = await this.manager.getTotalTasksCount(
+        allTasks,
+        params,
+      );
 
       // Render the task list
       this.renderer.renderTaskList(el, filteredTasks, params, totalTasksCount);

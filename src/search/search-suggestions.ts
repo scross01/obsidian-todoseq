@@ -362,10 +362,10 @@ export class SearchSuggestions {
     const propertyKeys = new Set<string>();
     const files = app.vault.getMarkdownFiles();
 
-    files.forEach(file => {
+    files.forEach((file) => {
       const cache = app.metadataCache.getFileCache(file);
       if (cache?.frontmatter) {
-        Object.keys(cache.frontmatter).forEach(key => {
+        Object.keys(cache.frontmatter).forEach((key) => {
           propertyKeys.add(key);
         });
       }

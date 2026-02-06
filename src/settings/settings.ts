@@ -402,7 +402,5 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           // Changing the selection in the Task view does not update this setting
         });
       });
-
-
   }
 }

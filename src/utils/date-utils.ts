@@ -429,13 +429,15 @@ export class DateUtils {
     if (!date) return false;
 
     const target = this.getStartOfDay(date);
-    
+
     // Normalize all dates to ensure timezone consistency
     const normalizedTarget = this.normalizeDateForTimezone(target);
     const normalizedStart = this.normalizeDateForTimezone(start);
     const normalizedEnd = this.normalizeDateForTimezone(end);
 
-    return normalizedTarget >= normalizedStart && normalizedTarget < normalizedEnd;
+    return (
+      normalizedTarget >= normalizedStart && normalizedTarget < normalizedEnd
+    );
   }
 
   /**

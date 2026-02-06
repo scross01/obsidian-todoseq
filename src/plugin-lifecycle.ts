@@ -28,20 +28,22 @@ export class PluginLifecycleManager {
     // Load urgency coefficients on startup
     const urgencyCoefficients = await parseUrgencyCoefficients(this.plugin.app);
 
-     // VaultScanner now uses the centralized TaskStateManager
-     this.plugin.vaultScanner = new VaultScanner(
-       this.plugin.app,
-       this.plugin.settings,
-       TaskParser.create(
-         this.plugin.settings,
-         this.plugin.app,
-         urgencyCoefficients,
-       ),
-       this.plugin.taskStateManager,
-     );
+    // VaultScanner now uses the centralized TaskStateManager
+    this.plugin.vaultScanner = new VaultScanner(
+      this.plugin.app,
+      this.plugin.settings,
+      TaskParser.create(
+        this.plugin.settings,
+        this.plugin.app,
+        urgencyCoefficients,
+      ),
+      this.plugin.taskStateManager,
+    );
 
-     // Initialize property search engine after vault scanner (we'll register listeners later)
-     this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(this.plugin.app);
+    // Initialize property search engine after vault scanner (we'll register listeners later)
+    this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(
+      this.plugin.app,
+    );
     this.plugin.taskEditor = new TaskWriter(this.plugin.app);
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
     this.plugin.statusBarManager = new StatusBarManager(this.plugin);
@@ -322,33 +324,35 @@ export class PluginLifecycleManager {
       });
     }
 
-     // Auto-open task view in right sidebar when plugin loads
-      // Use onLayoutReady to ensure workspace is fully initialized
-      this.plugin.app.workspace.onLayoutReady(async () => {
-        // Set initialization flag to show scanning message immediately
-        // This ensures views show "Scanning vault..." before the scan starts
-        this.plugin.vaultScanner?.setInitializationComplete();
+    // Auto-open task view in right sidebar when plugin loads
+    // Use onLayoutReady to ensure workspace is fully initialized
+    this.plugin.app.workspace.onLayoutReady(async () => {
+      // Set initialization flag to show scanning message immediately
+      // This ensures views show "Scanning vault..." before the scan starts
+      this.plugin.vaultScanner?.setInitializationComplete();
 
-        // Wait for the initial vault scan to complete before showing the task view
-        // This ensures tasks are available when the view first renders
-        await this.plugin.vaultScanner?.scanVault();
+      // Wait for the initial vault scan to complete before showing the task view
+      // This ensures tasks are available when the view first renders
+      await this.plugin.vaultScanner?.scanVault();
 
-        // Set property search engine on vault scanner and register listeners (but don't initialize yet - lazy initialize)
-        if (this.plugin.propertySearchEngine) {
-          this.plugin.vaultScanner?.setPropertySearchEngine(this.plugin.propertySearchEngine);
-        }
+      // Set property search engine on vault scanner and register listeners (but don't initialize yet - lazy initialize)
+      if (this.plugin.propertySearchEngine) {
+        this.plugin.vaultScanner?.setPropertySearchEngine(
+          this.plugin.propertySearchEngine,
+        );
+      }
 
-       // Only show the task view on first install (not on subsequent reloads)
-       if (!this.plugin.settings._hasShownFirstInstallView) {
-         this.plugin.settings._hasShownFirstInstallView = true;
-         await this.plugin.saveSettings();
-         // First install: reveal=true to show the sidebar and bring view into focus
-         this.plugin.uiManager.showTasks(true);
-       } else {
-         // On subsequent reloads, ensure the panel is available but don't steal focus
-         this.plugin.uiManager.showTasks(false);
-       }
-     });
+      // Only show the task view on first install (not on subsequent reloads)
+      if (!this.plugin.settings._hasShownFirstInstallView) {
+        this.plugin.settings._hasShownFirstInstallView = true;
+        await this.plugin.saveSettings();
+        // First install: reveal=true to show the sidebar and bring view into focus
+        this.plugin.uiManager.showTasks(true);
+      } else {
+        // On subsequent reloads, ensure the panel is available but don't steal focus
+        this.plugin.uiManager.showTasks(false);
+      }
+    });
   }
 
   /**

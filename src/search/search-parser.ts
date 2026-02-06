@@ -75,7 +75,7 @@ class PrattParser {
       if (currentToken.type === 'prefix') {
         // Parse the next prefix filter (don't increment position yet)
         const right = this.parsePrefixFilter();
-        
+
         // If left is already an AND node, just add the new filter to its children
         if (left.type === 'and') {
           left.children!.push(right);
@@ -93,7 +93,7 @@ class PrattParser {
       if (currentToken.type === 'property') {
         // Parse the property filter (don't increment position yet)
         const right = this.parsePropertyFilter();
-        
+
         // If left is already an AND node, just add the new filter to its children
         if (left.type === 'and') {
           left.children!.push(right);
@@ -117,14 +117,11 @@ class PrattParser {
           this.position >= this.tokens.length ||
           this.tokens[this.position].type !== 'rparen'
         ) {
-          throw new SearchError(
-            'Expected closing parenthesis',
-            this.position,
-          );
+          throw new SearchError('Expected closing parenthesis', this.position);
         }
 
         this.position++; // consume rparen
-        
+
         // If left is already an AND node, just add the parenthesized expression to its children
         if (left.type === 'and') {
           left.children!.push(parenExpr);
@@ -142,7 +139,7 @@ class PrattParser {
         if (currentToken.type === 'word' || currentToken.type === 'phrase') {
           // Create an AND node with the current left and the new term
           const right = this.createTermNode(currentToken);
-          
+
           // If left is already an AND node, just add the new term to its children
           if (left.type === 'and') {
             left.children!.push(right);
@@ -296,10 +293,10 @@ class PrattParser {
 
     // Parse the property value which is in "key:value" format
     const propertyValue = propertyToken.value;
-    
+
     // Find the colon to split key and value
     const colonIndex = propertyValue.indexOf(':');
-    
+
     let key: string;
     let value: string | null = null;
     let exact = false;
@@ -312,28 +309,28 @@ class PrattParser {
       // Key-value case like [type:Project]
       key = propertyValue.slice(0, colonIndex);
       value = propertyValue.slice(colonIndex + 1);
-      
+
       // Check if the original property token had quoted values
       // We need to check the original token to determine if it was quoted
       const original = propertyToken.original;
-      
+
       // Extract the original value part (after colon)
       const originalColonIndex = original.indexOf(':');
       if (originalColonIndex !== -1) {
         const originalValue = original.slice(originalColonIndex + 1, -1); // -1 to exclude closing bracket
-        
+
         // Check if the original value was quoted
         if (originalValue.startsWith('"') && originalValue.endsWith('"')) {
           exact = true;
         }
-        
+
         // Check if the original key was quoted
         const originalKeyPart = original.slice(1, originalColonIndex); // 1 to exclude opening bracket
         if (originalKeyPart.startsWith('"') && originalKeyPart.endsWith('"')) {
           exact = true;
         }
       }
-      
+
       // Handle empty value case [type:]
       if (value === '') {
         value = null;

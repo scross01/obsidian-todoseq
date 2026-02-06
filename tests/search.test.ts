@@ -42,7 +42,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('meeting', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -53,7 +53,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('work urgent', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -66,7 +66,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('meeting OR personal', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
@@ -80,7 +80,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('"star wars"', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -91,7 +91,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('"star"', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1); // "star" appears as a word in "star wars"
@@ -118,7 +118,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('work -urgent', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(0); // The work task contains "urgent"
@@ -128,7 +128,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('meeting -urgent', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -140,8 +140,12 @@ describe('Search functionality', () => {
     it('should handle parentheses grouping', async () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
-          return await Search.evaluate('(meeting OR personal) -urgent', task, false);
-        })
+          return await Search.evaluate(
+            '(meeting OR personal) -urgent',
+            task,
+            false,
+          );
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
@@ -155,7 +159,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('MEETING', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -166,7 +170,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('MEETING', task, true);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(0); // No task has "MEETING" in uppercase
@@ -178,7 +182,7 @@ describe('Search functionality', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('meeting OR', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       // Should return false for all tasks when query is invalid
@@ -276,7 +280,12 @@ describe('Search functionality', () => {
     };
 
     it('should evaluate with settings parameter', async () => {
-      const result = await Search.evaluate('content', testTask, false, mockSettings);
+      const result = await Search.evaluate(
+        'content',
+        testTask,
+        false,
+        mockSettings,
+      );
       expect(result).toBe(true);
     });
 
@@ -291,7 +300,12 @@ describe('Search functionality', () => {
     });
 
     it('should handle case sensitivity with settings', async () => {
-      const result = await Search.evaluate('CONTENT', testTask, true, mockSettings);
+      const result = await Search.evaluate(
+        'CONTENT',
+        testTask,
+        true,
+        mockSettings,
+      );
       expect(result).toBe(false); // Case sensitive should not match
     });
   });

@@ -5,14 +5,19 @@ import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { App, TFile } from 'obsidian';
 
 // Create simple mock files with known properties
-const createMockFile = (index: number, hasProperties: boolean = true): TFile => {
+const createMockFile = (
+  index: number,
+  hasProperties: boolean = true,
+): TFile => {
   const fileNum = index;
-  const frontmatter: any = hasProperties ? {
-    status: fileNum % 2 === 0 ? 'draft' : 'published',
-    priority: fileNum % 3 === 0 ? 'high' : 'normal',
-    tags: fileNum % 4 === 0 ? ['work', 'urgent'] : ['personal'],
-    type: 'task',
-  } : {};
+  const frontmatter: any = hasProperties
+    ? {
+        status: fileNum % 2 === 0 ? 'draft' : 'published',
+        priority: fileNum % 3 === 0 ? 'high' : 'normal',
+        tags: fileNum % 4 === 0 ? ['work', 'urgent'] : ['personal'],
+        type: 'task',
+      }
+    : {};
 
   const mockFile = {
     path: `file-${index}.md`,
@@ -25,9 +30,9 @@ const createMockFile = (index: number, hasProperties: boolean = true): TFile => 
   };
 
   // Make it recognize as TFile instance
-  Object.setPrototypeOf(mockFile, { 
-    constructor: { name: 'TFile' }, 
-    __proto__: { __proto__: Object.prototype } 
+  Object.setPrototypeOf(mockFile, {
+    constructor: { name: 'TFile' },
+    __proto__: { __proto__: Object.prototype },
   });
 
   return mockFile as unknown as TFile;
@@ -81,18 +86,20 @@ const mockApp = {
   },
   metadataCache: {
     getFileCache: (file: TFile) => {
-      const fileNum = parseInt(file.path.replace('file-', '').replace('.md', ''));
+      const fileNum = parseInt(
+        file.path.replace('file-', '').replace('.md', ''),
+      );
       const hasProperties = fileNum % 5 !== 0;
-      
+
       if (!hasProperties) return null;
-      
+
       const frontmatter: any = {
         status: fileNum % 2 === 0 ? 'draft' : 'published',
         priority: fileNum % 3 === 0 ? 'high' : 'normal',
         tags: fileNum % 4 === 0 ? ['work', 'urgent'] : ['personal'],
         type: 'task',
       };
-      
+
       return { frontmatter };
     },
     getAllPropertyInfos: () => {
@@ -131,9 +138,9 @@ describe('PropertySearchEngine Simple Tests', () => {
     testFilesCache.forEach((file, path) => {
       const cache = mockApp.metadataCache.getFileCache(file);
     });
-    
+
     await propertySearchEngine.initialize();
-    
+
     expect(propertySearchEngine.isReady()).toBe(true);
     expect(propertySearchEngine.getPropertyCount()).toBeGreaterThan(0);
     expect(propertySearchEngine.getPropertyKeys().size).toBe(4); // status, priority, tags, type
@@ -141,60 +148,62 @@ describe('PropertySearchEngine Simple Tests', () => {
 
   test('should search for specific property values', async () => {
     await propertySearchEngine.initialize();
-    
-    const results = await propertySearchEngine.searchProperties('[status:draft]');
-    
+
+    const results =
+      await propertySearchEngine.searchProperties('[status:draft]');
+
     expect(results.size).toBeGreaterThan(0);
     expect(results.size).toBeLessThanOrEqual(10); // Should be roughly half of files with properties
   });
 
   test('should handle key-only searches', async () => {
     await propertySearchEngine.initialize();
-    
+
     const results = await propertySearchEngine.searchProperties('[priority]');
-    
+
     expect(results.size).toBeGreaterThan(0);
     expect(results.size).toBeGreaterThan(5); // Most files should have priority
   });
 
   test('should handle array property searches', async () => {
     await propertySearchEngine.initialize();
-    
+
     const results = await propertySearchEngine.searchProperties('[tags:work]');
     expect(results.size).toBeGreaterThan(0);
   });
 
   test('should get files with property key', async () => {
     await propertySearchEngine.initialize();
-    
+
     const files = propertySearchEngine.getFilesWithPropertyKey('status');
-    
+
     expect(files.size).toBeGreaterThan(0);
   });
 
   test('should get files with specific property value', async () => {
     await propertySearchEngine.initialize();
-    
+
     const files = propertySearchEngine.getFilesWithProperty('status', 'draft');
-    
+
     expect(files.size).toBeGreaterThan(0);
   });
 
   test('should handle invalid queries gracefully', async () => {
     await propertySearchEngine.initialize();
-    
-    const results = await propertySearchEngine.searchProperties('[invalid:query');
+
+    const results =
+      await propertySearchEngine.searchProperties('[invalid:query');
     expect(results.size).toBe(0);
   });
 
   test('should handle file invalidation', async () => {
     await propertySearchEngine.initialize();
-    
+
     const initialCount = propertySearchEngine.getFileCountForProperty('status');
     const mockFile = createMockFile(21);
-    
+
     propertySearchEngine.invalidateFile(mockFile);
-    
+
     // After invalidation, the property count should remain the same (no rebuild in this simple test)
     const newCount = propertySearchEngine.getFileCountForProperty('status');
     expect(newCount).toBe(initialCount);

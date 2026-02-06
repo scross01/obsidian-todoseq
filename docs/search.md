@@ -114,16 +114,16 @@ TODOseq supports filters keywords similar to Obsidians general vault search for 
 
 ### Available Prefix Filters
 
-| Prefix       | Description                             | Example                |
-| ------------ | --------------------------------------- | ---------------------- |
-| `path:`      | Find tasks in specific file paths       | `path:Journal`         |
-| `file:`      | Find tasks in files with matching names | `file:meeting.md`      |
-| `tag:`       | Find tasks containing specific tags     | `tag:urgent`           |
-| `state:`     | Find tasks with specific states         | `state:DOING`          |
-| `priority:`  | Find tasks with specific priorities     | `priority:high`        |
-| `content:`   | Find tasks with specific content        | `content:project`      |
-| `scheduled:` | Find tasks with scheduled dates         | `scheduled:due`        |
-| `deadline:`  | Find tasks with deadline dates          | `deadline:"this week"` |
+| Prefix       | Description                             | Example                   |
+| ------------ | --------------------------------------- | ------------------------- |
+| `path:`      | Find tasks in specific file paths       | `path:Journal`            |
+| `file:`      | Find tasks in files with matching names | `file:meeting.md`         |
+| `tag:`       | Find tasks containing specific tags     | `tag:urgent`              |
+| `state:`     | Find tasks with specific states         | `state:DOING`             |
+| `priority:`  | Find tasks with specific priorities     | `priority:high`           |
+| `content:`   | Find tasks with specific content        | `content:project`         |
+| `scheduled:` | Find tasks with scheduled dates         | `scheduled:due`           |
+| `deadline:`  | Find tasks with deadline dates          | `deadline:"this week"`    |
 | `property:`  | Find tasks based on page properties     | `property:[type:Project]` |
 
 ### Using Search filters

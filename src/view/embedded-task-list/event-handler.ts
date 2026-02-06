@@ -266,7 +266,10 @@ export class EmbeddedTaskListEventHandler {
       const allTasks = this.plugin.getTasks();
 
       // Filter and sort tasks
-      const filteredTasks = await this.manager.filterAndSortTasks(allTasks, params);
+      const filteredTasks = await this.manager.filterAndSortTasks(
+        allTasks,
+        params,
+      );
 
       // Re-render the task list
       this.renderer.renderTaskList(codeBlock.element, filteredTasks, params);

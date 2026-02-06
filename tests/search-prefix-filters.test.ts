@@ -44,7 +44,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('path:journal', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -55,7 +55,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('path:JOURNAL', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -66,7 +66,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('path:JOURNAL', task, true);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(0);
@@ -113,7 +113,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasksForParent.map(async (task) => {
           return await Search.evaluate('path:examples', task, false);
-        })
+        }),
       );
       const result = testTasksForParent.filter((_, index) => results[index]);
       expect(result.length).toBe(3);
@@ -133,7 +133,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('file:meeting', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -144,7 +144,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('file:tasks', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -155,7 +155,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('file:star-wars', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -166,7 +166,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('file:star', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -183,7 +183,11 @@ describe('Search Prefix Filters', () => {
         text: 'meeting on 2025-03-28',
       });
 
-      const result = await Search.evaluate('file:2025-03-28.md', testTask, false);
+      const result = await Search.evaluate(
+        'file:2025-03-28.md',
+        testTask,
+        false,
+      );
       expect(result).toBe(true);
     });
 
@@ -197,7 +201,11 @@ describe('Search Prefix Filters', () => {
         text: 'project planning meeting',
       });
 
-      const result = await Search.evaluate('path:2025-meetings', testTask, false);
+      const result = await Search.evaluate(
+        'path:2025-meetings',
+        testTask,
+        false,
+      );
       expect(result).toBe(true);
     });
 
@@ -212,7 +220,11 @@ describe('Search Prefix Filters', () => {
         state: 'IN-PROGRESS',
       });
 
-      const result = await Search.evaluate('state:IN-PROGRESS', testTask, false);
+      const result = await Search.evaluate(
+        'state:IN-PROGRESS',
+        testTask,
+        false,
+      );
       expect(result).toBe(true);
     });
 
@@ -240,7 +252,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('tag:#urgent', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -251,7 +263,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('tag:urgent', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -271,7 +283,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         [testTaskWithDash].map(async (task) => {
           return await Search.evaluate('tag:test-tag', task, false);
-        })
+        }),
       );
       const result = [testTaskWithDash].filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -284,7 +296,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('state:DOING', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -295,7 +307,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('state:doing', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -308,7 +320,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('priority:high', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
@@ -318,7 +330,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('priority:A', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
@@ -328,7 +340,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('priority:low', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -339,7 +351,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('priority:none', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -352,7 +364,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('content:project', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -363,7 +375,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('content:"star wars"', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -376,7 +388,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('path:journal tag:#urgent', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -386,8 +398,12 @@ describe('Search Prefix Filters', () => {
     it('should combine filters with OR operator', async () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
-          return await Search.evaluate('state:TODO OR state:DOING', task, false);
-        })
+          return await Search.evaluate(
+            'state:TODO OR state:DOING',
+            task,
+            false,
+          );
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       // Should return 4 tasks: 3 with TODO state + 1 with DOING state
@@ -397,8 +413,12 @@ describe('Search Prefix Filters', () => {
     it('should handle complex combined filters', async () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
-          return await Search.evaluate('priority:high -state:DOING', task, false);
-        })
+          return await Search.evaluate(
+            'priority:high -state:DOING',
+            task,
+            false,
+          );
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -411,7 +431,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('invalid:test', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       // Should return false for all tasks when prefix is invalid
@@ -422,7 +442,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('path:', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       // Should return false for all tasks when value is missing
@@ -435,7 +455,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('meeting', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -446,7 +466,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('"star wars"', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
@@ -457,7 +477,7 @@ describe('Search Prefix Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await Search.evaluate('meeting OR personal', task, false);
-        })
+        }),
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);

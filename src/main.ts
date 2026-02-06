@@ -91,12 +91,12 @@ export default class TodoTracker extends Plugin {
     this.uiManager = new UIManager(this);
     this.lifecycleManager = new PluginLifecycleManager(this);
 
-     // Initialize embedded task list processor
-     this.embeddedTaskListProcessor = new TodoseqCodeBlockProcessor(this);
-     this.embeddedTaskListProcessor.registerProcessor();
+    // Initialize embedded task list processor
+    this.embeddedTaskListProcessor = new TodoseqCodeBlockProcessor(this);
+    this.embeddedTaskListProcessor.registerProcessor();
 
-      // Delegate to lifecycle manager (which initializes vaultScanner and readerViewFormatter)
-      await this.lifecycleManager.onload();
+    // Delegate to lifecycle manager (which initializes vaultScanner and readerViewFormatter)
+    await this.lifecycleManager.onload();
   }
 
   // Helper: refresh all open Todo views to reflect current tasks without stealing focus
@@ -137,7 +137,7 @@ export default class TodoTracker extends Plugin {
       DefaultSettings,
       loaded as Partial<TodoTrackerSettings>,
     );
-    
+
     // Add app instance to settings for PropertySearchEngine access
     (this.settings as any).app = this.app;
     // Normalize settings shape after migration: ensure additionalTaskKeywords exists
@@ -209,12 +209,12 @@ export default class TodoTracker extends Plugin {
   async saveSettings() {
     // Add app instance to settings for PropertySearchEngine access
     (this.settings as any).app = this.app;
-    
+
     // Update property search engine with new settings
     if (this.propertySearchEngine) {
       // Property search engine settings are handled in initializeStartupScan
     }
-    
+
     await this.saveData(this.settings);
   }
 
@@ -268,6 +268,4 @@ export default class TodoTracker extends Plugin {
       }
     }
   }
-
-
 }

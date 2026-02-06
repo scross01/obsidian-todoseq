@@ -94,7 +94,9 @@ describe('Due Filter Behavior', () => {
     expect(filteredResults.map((r) => r.text)).toContain(
       'Task with deadline date today',
     );
-    expect(filteredResults.map((r) => r.text)).toContain('Task with overdue deadline');
+    expect(filteredResults.map((r) => r.text)).toContain(
+      'Task with overdue deadline',
+    );
     expect(filteredResults.map((r) => r.text)).not.toContain(
       'Task with future deadline',
     );
@@ -181,7 +183,9 @@ describe('Due Filter Behavior', () => {
     const filteredResults = testTasks.filter((_, index) => results[index]);
 
     expect(filteredResults.length).toBe(1);
-    expect(filteredResults.map((r) => r.text)).toContain('Task with overdue deadline');
+    expect(filteredResults.map((r) => r.text)).toContain(
+      'Task with overdue deadline',
+    );
     expect(filteredResults.map((r) => r.text)).not.toContain(
       'Task with deadline date today',
     );

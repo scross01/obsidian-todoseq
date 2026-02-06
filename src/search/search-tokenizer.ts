@@ -22,9 +22,10 @@ export class SearchTokenizer {
       regex: /\b(path|file|tag|state|priority|content|scheduled|deadline):/y,
     },
     // Property bracket syntax: [key:value], ["key":"value"], [type], [type:Draft OR Published]
-     {
+    {
       type: 'property' as const,
-      regex: /\[(?:"([^"\\]*(?:\\.[^"\\]*)*)"|([^\s:"\]]+))(?:\s*:\s*(?:"([^"\\]*(?:\\.[^"\\]*)*)"|([^\]]*)))?\]/y,
+      regex:
+        /\[(?:"([^"\\]*(?:\\.[^"\\]*)*)"|([^\s:"\]]+))(?:\s*:\s*(?:"([^"\\]*(?:\\.[^"\\]*)*)"|([^\]]*)))?\]/y,
     },
     { type: 'not' as const, regex: /-/y },
     { type: 'word' as const, regex: /[^\s"()]+/y },
@@ -206,10 +207,12 @@ export class SearchTokenizer {
         // Remove outer brackets and process quotes within
         // Format: [key:value] or ["key":"value"] or [key:"value"] etc.
         const inner = token.slice(1, -1); // Remove [ and ]
-        
+
         // Extract key and value from the regex groups (if using our new regex)
         // First, try to find quoted keys or values
-        const quotedKeyMatch = inner.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"(\s*:(?:\s*"([^"\\]*(?:\\.[^"\\]*)*)"|\s*([^\]]*)))?$/);
+        const quotedKeyMatch = inner.match(
+          /^"([^"\\]*(?:\\.[^"\\]*)*)"(\s*:(?:\s*"([^"\\]*(?:\\.[^"\\]*)*)"|\s*([^\]]*)))?$/,
+        );
         if (quotedKeyMatch) {
           const processedKey = quotedKeyMatch[1].replace(/\\"/g, '"');
           if (quotedKeyMatch[3]) {
@@ -218,14 +221,18 @@ export class SearchTokenizer {
             return `${processedKey}:${processedValue}`;
           } else if (quotedKeyMatch[4]) {
             // Unquoted value
-            const processedValue = quotedKeyMatch[4].trim().replace(/\\"/g, '"');
-            return processedValue ? `${processedKey}:${processedValue}` : processedKey;
+            const processedValue = quotedKeyMatch[4]
+              .trim()
+              .replace(/\\"/g, '"');
+            return processedValue
+              ? `${processedKey}:${processedValue}`
+              : processedKey;
           } else {
             // Key-only
             return processedKey;
           }
         }
-        
+
         // Fallback to original method for unquoted keys
         const colonIndex = inner.indexOf(':');
         if (colonIndex === -1) {
@@ -234,19 +241,19 @@ export class SearchTokenizer {
         }
         const keyPart = inner.slice(0, colonIndex).trim();
         const valuePart = inner.slice(colonIndex + 1).trim();
-        
+
         // Process key: remove quotes if present
         let processedKey = keyPart;
         if (processedKey.startsWith('"') && processedKey.endsWith('"')) {
           processedKey = processedKey.slice(1, -1).replace(/\\"/g, '"');
         }
-        
+
         // Process value: remove quotes if present, keep null, operators, and expressions as-is
         let processedValue = valuePart;
         if (processedValue.startsWith('"') && processedValue.endsWith('"')) {
           processedValue = processedValue.slice(1, -1).replace(/\\"/g, '"');
         }
-        
+
         // Return as "key:value" format for parsing
         return `${processedKey}:${processedValue}`;
       case 'or':

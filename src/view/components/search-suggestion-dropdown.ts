@@ -372,7 +372,10 @@ export class SearchSuggestionDropdown {
         input.value = newValue;
         input.selectionStart = input.selectionEnd =
           startPos + `["${suggestion}":`.length;
-      } else if (prefixBase + ':' === fullPrefix.substring(0, prefixBase.length + 1)) {
+      } else if (
+        prefixBase + ':' ===
+        fullPrefix.substring(0, prefixBase.length + 1)
+      ) {
         // Complete the value after prefix - replace any existing text after the colon
         const startPos = prefixStart + prefixBase.length + 1; // +1 for the colon
         let endPos = cursorPos;
