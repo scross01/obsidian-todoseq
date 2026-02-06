@@ -91,26 +91,12 @@ export default class TodoTracker extends Plugin {
     this.uiManager = new UIManager(this);
     this.lifecycleManager = new PluginLifecycleManager(this);
 
-    // Initialize embedded task list processor
-    this.embeddedTaskListProcessor = new TodoseqCodeBlockProcessor(this);
-    this.embeddedTaskListProcessor.registerProcessor();
+     // Initialize embedded task list processor
+     this.embeddedTaskListProcessor = new TodoseqCodeBlockProcessor(this);
+     this.embeddedTaskListProcessor.registerProcessor();
 
-    // Initialize property search engine
-    this.propertySearchEngine = PropertySearchEngine.getInstance(this.app);
-    await this.propertySearchEngine.initialize();
-
-    // Delegate to lifecycle manager (which initializes vaultScanner and readerViewFormatter)
-    await this.lifecycleManager.onload();
-
-    // Register file change listeners with property search engine
-    if (this.vaultScanner) {
-      this.registerPropertySearchEventListeners();
-    }
-
-    // Initialize startup scan if enabled
-    if (this.propertySearchEngine) {
-      await this.propertySearchEngine.initializeStartupScan(this.settings);
-    }
+      // Delegate to lifecycle manager (which initializes vaultScanner and readerViewFormatter)
+      await this.lifecycleManager.onload();
   }
 
   // Helper: refresh all open Todo views to reflect current tasks without stealing focus
@@ -283,19 +269,5 @@ export default class TodoTracker extends Plugin {
     }
   }
 
-  /**
-   * Register file change event listeners with property search engine
-   */
-  private registerPropertySearchEventListeners(): void {
-    if (!this.vaultScanner || !this.propertySearchEngine) return;
 
-    // Register file change listeners
-    this.vaultScanner.on('file-changed', (file) => {
-      this.propertySearchEngine!.onFileChanged(file as TFile);
-    });
-
-    this.vaultScanner.on('file-deleted', (file) => {
-      this.propertySearchEngine!.onFileChanged(file as TFile);
-    });
-  }
 }

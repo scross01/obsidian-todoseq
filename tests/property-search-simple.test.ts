@@ -1,3 +1,6 @@
+/**
+ * @jest-environment jsdom
+ */
 import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { App, TFile } from 'obsidian';
 
@@ -11,13 +14,52 @@ const createMockFile = (index: number, hasProperties: boolean = true): TFile => 
     type: 'task',
   } : {};
 
-  return {
+  const mockFile = {
     path: `file-${index}.md`,
     name: `file-${index}.md`,
     basename: `file-${index}`,
     extension: 'md',
     stat: { size: 1024, mtime: Date.now() },
-  } as TFile;
+    // Add isTFile property to help with type check
+    isTFile: true,
+  };
+
+  // Make it recognize as TFile instance
+  Object.setPrototypeOf(mockFile, { 
+    constructor: { name: 'TFile' }, 
+    __proto__: { __proto__: Object.prototype } 
+  });
+
+  return mockFile as unknown as TFile;
+};
+
+// Mock TaskStateManager
+const mockTaskStateManager = {
+  getTasks: () => {
+    // Create mock tasks for all test files
+    const tasks = [];
+    for (let i = 0; i < 20; i++) {
+      tasks.push({
+        path: `file-${i}.md`,
+        text: `Test task ${i}`,
+        completed: false,
+        state: 'TODO',
+        priority: null,
+        scheduledDate: null,
+        deadlineDate: null,
+        tags: [],
+        context: '',
+        project: '',
+        urgency: 0,
+        estimatedDuration: 0,
+        isRecurring: false,
+        recurrenceRule: '',
+        lineNumber: 1,
+        listType: 'bullet',
+      });
+    }
+    return tasks;
+  },
 };
 
 // Simple mock app with known files
@@ -31,11 +73,15 @@ const mockApp = {
       }
       return files;
     },
+    getAbstractFileByPath: (path: string) => {
+      // Return mock file from cache for given path
+      return testFilesCache.get(path) || null;
+    },
+    on: jest.fn(),
   },
   metadataCache: {
     getFileCache: (file: TFile) => {
-      const fileName = file.name; // e.g., "file-0.md"
-      const fileNum = parseInt(fileName.replace('file-', '').replace('.md', ''));
+      const fileNum = parseInt(file.path.replace('file-', '').replace('.md', ''));
       const hasProperties = fileNum % 5 !== 0;
       
       if (!hasProperties) return null;
@@ -61,6 +107,18 @@ const mockApp = {
   },
 } as unknown as App;
 
+// Create a cache of test files for quick lookup
+const testFilesCache = new Map<string, TFile>();
+for (let i = 0; i < 20; i++) {
+  const file = createMockFile(i, i % 5 !== 0);
+  testFilesCache.set(file.path, file);
+}
+
+// Expose plugin instance with task state manager for testing
+(window as unknown as { todoSeqPlugin?: any }).todoSeqPlugin = {
+  taskStateManager: mockTaskStateManager,
+};
+
 describe('PropertySearchEngine Simple Tests', () => {
   let propertySearchEngine: PropertySearchEngine;
 
@@ -69,9 +127,12 @@ describe('PropertySearchEngine Simple Tests', () => {
   });
 
   test('should initialize and find property keys', async () => {
-    await propertySearchEngine.initialize();
+    // Log what our metadata cache knows
+    testFilesCache.forEach((file, path) => {
+      const cache = mockApp.metadataCache.getFileCache(file);
+    });
     
-    console.log(`Indexed ${propertySearchEngine.getPropertyCount()} property keys`);
+    await propertySearchEngine.initialize();
     
     expect(propertySearchEngine.isReady()).toBe(true);
     expect(propertySearchEngine.getPropertyCount()).toBeGreaterThan(0);
@@ -82,7 +143,6 @@ describe('PropertySearchEngine Simple Tests', () => {
     await propertySearchEngine.initialize();
     
     const results = await propertySearchEngine.searchProperties('[status:draft]');
-    console.log(`Found ${results.size} files with status:draft`);
     
     expect(results.size).toBeGreaterThan(0);
     expect(results.size).toBeLessThanOrEqual(10); // Should be roughly half of files with properties
@@ -92,7 +152,6 @@ describe('PropertySearchEngine Simple Tests', () => {
     await propertySearchEngine.initialize();
     
     const results = await propertySearchEngine.searchProperties('[priority]');
-    console.log(`Found ${results.size} files with priority property`);
     
     expect(results.size).toBeGreaterThan(0);
     expect(results.size).toBeGreaterThan(5); // Most files should have priority
@@ -109,7 +168,6 @@ describe('PropertySearchEngine Simple Tests', () => {
     await propertySearchEngine.initialize();
     
     const files = propertySearchEngine.getFilesWithPropertyKey('status');
-    console.log(`Found ${files.size} files with status property`);
     
     expect(files.size).toBeGreaterThan(0);
   });
@@ -118,7 +176,6 @@ describe('PropertySearchEngine Simple Tests', () => {
     await propertySearchEngine.initialize();
     
     const files = propertySearchEngine.getFilesWithProperty('status', 'draft');
-    console.log(`Found ${files.size} files with status:draft`);
     
     expect(files.size).toBeGreaterThan(0);
   });

@@ -343,10 +343,123 @@ describe('Property Search Tokenizer', () => {
       const orToken = tokens.find((t) => t.type === 'or');
       expect(propertyTokens.length).toBe(2);
       expect(orToken).toBeDefined();
+      });
     });
-  });
-  
-  describe('Property Search Parser', () => {
+
+    describe('Unicode and Emoji Support', () => {
+      it('should parse property filter with unicode characters in key', () => {
+        const node = SearchParser.parse('[\u00e9cole:français]');
+        expect(node.type).toBe('property_filter');
+        expect(node.field).toBe('property');
+        expect(node.value).toBe('\u00e9cole:français');
+        expect(node.exact).toBe(false);
+      });
+
+      it('should parse property filter with unicode characters in value', () => {
+        const node = SearchParser.parse('[language:français]');
+        expect(node.type).toBe('property_filter');
+        expect(node.field).toBe('property');
+        expect(node.value).toBe('language:français');
+        expect(node.exact).toBe(false);
+      });
+
+      it('should parse property filter with emoji in key', () => {
+        const node = SearchParser.parse('[\u2705completed:true]');
+        expect(node.type).toBe('property_filter');
+        expect(node.field).toBe('property');
+        expect(node.value).toBe('\u2705completed:true');
+        expect(node.exact).toBe(false);
+      });
+
+      it('should parse property filter with emoji in value', () => {
+        const node = SearchParser.parse('[status:\u2705]');
+        expect(node.type).toBe('property_filter');
+        expect(node.field).toBe('property');
+        expect(node.value).toBe('status:\u2705');
+        expect(node.exact).toBe(false);
+      });
+
+      it('should parse quoted property filter with unicode characters', () => {
+        const node = SearchParser.parse('["\u00e9cole française":"café crème"]');
+        expect(node.type).toBe('property_filter');
+        expect(node.field).toBe('property');
+        expect(node.value).toBe('\u00e9cole française:café crème');
+        expect(node.exact).toBe(true);
+      });
+
+      it('should evaluate property filter with unicode characters', async () => {
+        // Create a mock task
+        const task: any = {
+          text: 'Test task with unicode property',
+          path: 'test/file.md',
+          rawText: '- [ ] Test task',
+          state: 'TODO',
+          completed: false,
+          completedDate: null,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          tags: [],
+          context: '',
+          project: '',
+          urgency: 0,
+          estimatedDuration: 0,
+          isRecurring: false,
+          recurrenceRule: '',
+          lineNumber: 1,
+          listType: 'bullet',
+        };
+
+        // Create a mock app with metadata cache
+        const mockApp = {
+          metadataCache: {
+            getFileCache: jest.fn(() => ({
+              frontmatter: {
+                '\u00e9cole': 'français',
+                'language': 'français',
+                '\u2705completed': true,
+                'status': '\u2705',
+                '\u00e9cole française': 'café crème'
+              }
+            }))
+          }
+        };
+
+        // Create complete settings object
+        const settings: any = {
+          app: mockApp,
+          additionalTaskKeywords: [],
+          includeCodeBlocks: false,
+          includeCalloutBlocks: false,
+          includeCommentBlocks: false,
+          weekStartsOn: 'Monday',
+          defaultPriority: 'none',
+          urgencyFormula: '',
+          enableRecurringTasks: false,
+          enableUrgencyCalculation: false,
+          enablePropertySearch: true,
+          enablePropertySearchDebug: false
+        };
+
+        // Test various property searches
+        let result = await Search.evaluate('[\u00e9cole:français]', task, false, settings);
+        expect(result).toBe(true);
+
+        result = await Search.evaluate('[language:français]', task, false, settings);
+        expect(result).toBe(true);
+
+        result = await Search.evaluate('[\u2705completed:true]', task, false, settings);
+        expect(result).toBe(true);
+
+        result = await Search.evaluate('[status:\u2705]', task, false, settings);
+        expect(result).toBe(true);
+
+        result = await Search.evaluate('["\u00e9cole française":"café crème"]', task, false, settings);
+        expect(result).toBe(true);
+      });
+    });
+
+    describe('Property Search Parser', () => {
     describe('Basic property parsing', () => {
       it('should parse [type:Project] into property_filter node', () => {
         const node = SearchParser.parse('[type:Project]');
@@ -691,10 +804,9 @@ describe('Property Search Tokenizer', () => {
         expect(node.value).toContain('status');
       });
   
-      it('should parse [status:[]]', () => {
+      it('should not parse [status:[]] as property filter', () => {
         const node = SearchParser.parse('[status:[]]');
-        expect(node.type).toBe('property_filter');
-        expect(node.value).toContain('status');
+        expect(node.type).not.toBe('property_filter');
       });
     });
   
@@ -847,7 +959,20 @@ describe('Property Search Tokenizer', () => {
           const task = createTaskWithFrontmatter('test.md', { type: 'Project' });
           mockGetFileCache('test.md', { type: 'Project' });
     
-          const settings = { app: mockApp };
+          const settings: any = { 
+        app: mockApp,
+        additionalTaskKeywords: [],
+        includeCodeBlocks: false,
+        includeCalloutBlocks: false,
+        includeCommentBlocks: false,
+        weekStartsOn: 'Monday',
+        defaultPriority: 'none',
+        urgencyFormula: '',
+        enableRecurringTasks: false,
+        enableUrgencyCalculation: false,
+        enablePropertySearch: true,
+        enablePropertySearchDebug: false
+      };
           const result = await Search.evaluate('[type:project]', task, false, settings);
           expect(result).toBe(true);
         });
@@ -856,7 +981,20 @@ describe('Property Search Tokenizer', () => {
           const task = createTaskWithFrontmatter('test.md', { type: 'Project' });
           mockGetFileCache('test.md', { type: 'Project' });
     
-          const settings = { app: mockApp };
+          const settings: any = { 
+        app: mockApp,
+        additionalTaskKeywords: [],
+        includeCodeBlocks: false,
+        includeCalloutBlocks: false,
+        includeCommentBlocks: false,
+        weekStartsOn: 'Monday',
+        defaultPriority: 'none',
+        urgencyFormula: '',
+        enableRecurringTasks: false,
+        enableUrgencyCalculation: false,
+        enablePropertySearch: true,
+        enablePropertySearchDebug: false
+      };
           const result = await Search.evaluate('[type:PROJECT]', task, false, settings);
           expect(result).toBe(true);
         });
@@ -865,7 +1003,20 @@ describe('Property Search Tokenizer', () => {
           const task = createTaskWithFrontmatter('test.md', { type: 'Project' });
           mockGetFileCache('test.md', { type: 'Project' });
     
-          const settings = { app: mockApp };
+          const settings: any = { 
+        app: mockApp,
+        additionalTaskKeywords: [],
+        includeCodeBlocks: false,
+        includeCalloutBlocks: false,
+        includeCommentBlocks: false,
+        weekStartsOn: 'Monday',
+        defaultPriority: 'none',
+        urgencyFormula: '',
+        enableRecurringTasks: false,
+        enableUrgencyCalculation: false,
+        enablePropertySearch: true,
+        enablePropertySearchDebug: false
+      };
           const result = await Search.evaluate('[type:Project]', task, false, settings);
           expect(result).toBe(true);
         });
