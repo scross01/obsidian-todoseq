@@ -303,6 +303,38 @@ export class PropertySearchEngine {
       return files;
     }
 
+    // Handle OR expressions in the value (e.g., [status:Draft OR Active])
+    // Also handle parentheses (e.g., [status:(Draft OR Active)])
+    let processedValue = value;
+    if (value.startsWith('(') && value.endsWith(')')) {
+      processedValue = value.slice(1, -1);
+    }
+
+    if (processedValue.includes(' OR ')) {
+      const orValues = processedValue.split(' OR ').map((v) => v.trim());
+      const matchingFiles = new Set<string>();
+
+      // Search for each OR value and union the results
+      for (const orValue of orValues) {
+        const results = await this.searchSingleValue(key, orValue, cache);
+        results.forEach((filePath) => {
+          matchingFiles.add(filePath);
+        });
+      }
+
+      return matchingFiles;
+    }
+
+    // Single value search
+    return this.searchSingleValue(key, processedValue, cache);
+  }
+
+  // Search for a single property value (no OR processing)
+  private async searchSingleValue(
+    key: string,
+    value: string,
+    cache: Map<unknown, Set<string>>,
+  ): Promise<Set<string>> {
     // Check if it's a comparison operator query
     const comparisonMatch = value.match(/^([><]=?)(\d+(\.\d+)?)$/);
     if (comparisonMatch) {
