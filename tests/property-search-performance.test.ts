@@ -17,9 +17,9 @@ const createMockFile = (index: number): TFile => {
   };
 
   // Make it recognize as TFile instance
-  Object.setPrototypeOf(mockFile, { 
-    constructor: { name: 'TFile' }, 
-    __proto__: { __proto__: Object.prototype } 
+  Object.setPrototypeOf(mockFile, {
+    constructor: { name: 'TFile' },
+    __proto__: { __proto__: Object.prototype },
   });
 
   return mockFile as unknown as TFile;
@@ -32,7 +32,13 @@ const mockTaskStateManager = {
     const tasks = [];
     for (let i = 0; i < 1000; i++) {
       // Create tasks for files that have properties (about 20% of files)
-      if (i % 5 === 0 || i % 7 === 0 || i % 11 === 0 || i % 13 === 0 || i % 17 === 0) {
+      if (
+        i % 5 === 0 ||
+        i % 7 === 0 ||
+        i % 11 === 0 ||
+        i % 13 === 0 ||
+        i % 17 === 0
+      ) {
         tasks.push({
           path: `file-${i}.md`,
           text: `Test task ${i}`,
@@ -84,16 +90,18 @@ const mockApp = {
   metadataCache: {
     getFileCache: (file: TFile) => {
       // Simulate files with different properties
-      const fileNum = parseInt(file.path.replace('file-', '').replace('.md', ''));
+      const fileNum = parseInt(
+        file.path.replace('file-', '').replace('.md', ''),
+      );
       const frontmatter: any = {};
-      
+
       // Add properties to about 20% of files
       if (fileNum % 5 === 0) frontmatter.status = 'draft';
       if (fileNum % 7 === 0) frontmatter.priority = 'high';
       if (fileNum % 11 === 0) frontmatter.tags = ['work', 'urgent'];
       if (fileNum % 13 === 0) frontmatter.due = '2023-12-31';
       if (fileNum % 17 === 0) frontmatter.type = 'task';
-      
+
       return Object.keys(frontmatter).length > 0 ? { frontmatter } : null;
     },
     getAllPropertyInfos: () => {
@@ -124,19 +132,17 @@ describe('PropertySearchEngine Performance', () => {
 
   test('should handle file invalidation efficiently', async () => {
     await propertySearchEngine.initialize();
-    
+
     // Get initial count
     const initialCount = propertySearchEngine.getFileCountForProperty('status');
-    
+
     // Simulate file change
     const mockFile = createMockFile(1);
-    
+
     const startTime = Date.now();
     propertySearchEngine.invalidateFile(mockFile);
     const endTime = Date.now();
-    
+
     expect(endTime - startTime).toBeLessThan(50); // Should be very fast (< 50ms)
   });
-
-
 });

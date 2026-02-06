@@ -28,7 +28,10 @@ export class EmbeddedTaskListManager {
    * @param params Parsed code block parameters
    * @returns Filtered and sorted tasks
    */
-  async filterAndSortTasks(tasks: Task[], params: TodoseqParameters): Promise<Task[]> {
+  async filterAndSortTasks(
+    tasks: Task[],
+    params: TodoseqParameters,
+  ): Promise<Task[]> {
     // Generate cache key
     const cacheKey = this.generateCacheKey(tasks, params);
 
@@ -74,7 +77,10 @@ export class EmbeddedTaskListManager {
    * @param params Parsed code block parameters
    * @returns Total number of matching tasks
    */
-  async getTotalTasksCount(tasks: Task[], params: TodoseqParameters): Promise<number> {
+  async getTotalTasksCount(
+    tasks: Task[],
+    params: TodoseqParameters,
+  ): Promise<number> {
     try {
       // Filter tasks based on search query
       let filteredTasks = tasks;
@@ -99,18 +105,28 @@ export class EmbeddedTaskListManager {
    * @param searchQuery Search query string
    * @returns Filtered tasks
    */
-  private async filterTasks(tasks: Task[], searchQuery: string): Promise<Task[]> {
+  private async filterTasks(
+    tasks: Task[],
+    searchQuery: string,
+  ): Promise<Task[]> {
     try {
       // Use the existing Search class for consistent filtering
       const results = await Promise.all(
         tasks.map(async (task) => {
-          const matches = await Search.evaluate(searchQuery, task, false, this.settings);
+          const matches = await Search.evaluate(
+            searchQuery,
+            task,
+            false,
+            this.settings,
+          );
           return { task, matches };
-        })
+        }),
       );
-      
+
       // Filter based on results
-      return results.filter((result) => result.matches).map((result) => result.task);
+      return results
+        .filter((result) => result.matches)
+        .map((result) => result.task);
     } catch (error) {
       console.error('Error evaluating search query:', error);
       // Return all tasks if search fails

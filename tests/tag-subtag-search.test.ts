@@ -42,7 +42,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:#context', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(1);
         expect(result[0].path).toBe('notes/context.md');
       });
@@ -53,7 +55,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:context', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(3);
         expect(result.map((t) => t.path).sort()).toEqual([
           'notes/context-home.md',
@@ -68,7 +72,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:#context/home', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(1);
         expect(result[0].path).toBe('notes/context-home.md');
       });
@@ -79,7 +85,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:context/home', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(1);
         expect(result[0].path).toBe('notes/context-home.md');
       });
@@ -90,7 +98,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:nonexistent', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(0);
       });
     });
@@ -102,7 +112,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:"#context"', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(1);
         expect(result[0].path).toBe('notes/context.md');
       });
@@ -113,7 +125,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:"#context"', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(1);
         expect(result[0].path).toBe('notes/context.md');
         // Should not include context/home or context/work
@@ -132,7 +146,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:"#context/home"', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(1);
         expect(result[0].path).toBe('notes/context-home.md');
       });
@@ -143,7 +159,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:"context"', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(1);
         expect(result[0].path).toBe('notes/context.md');
       });
@@ -154,7 +172,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:"nonexistent"', task, false);
           }),
         );
-        const result = testTasksWithSubtags.filter((_, index) => results[index]);
+        const result = testTasksWithSubtags.filter(
+          (_, index) => results[index],
+        );
         expect(result.length).toBe(0);
       });
     });
@@ -171,8 +191,12 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:context', task, false);
           }),
         );
-        const withHash = testTasksWithSubtags.filter((_, index) => withHashResults[index]);
-        const withoutHash = testTasksWithSubtags.filter((_, index) => withoutHashResults[index]);
+        const withHash = testTasksWithSubtags.filter(
+          (_, index) => withHashResults[index],
+        );
+        const withoutHash = testTasksWithSubtags.filter(
+          (_, index) => withoutHashResults[index],
+        );
         expect(withHash.length).toBe(1);
         expect(withoutHash.length).toBe(3);
         // #context matches only exact, context matches prefix + subtags
@@ -189,8 +213,12 @@ describe('Tag Search with Subtags and Exact Matching', () => {
             return await Search.evaluate('tag:"context"', task, false);
           }),
         );
-        const withHash = testTasksWithSubtags.filter((_, index) => withHashResults[index]);
-        const withoutHash = testTasksWithSubtags.filter((_, index) => withoutHashResults[index]);
+        const withHash = testTasksWithSubtags.filter(
+          (_, index) => withHashResults[index],
+        );
+        const withoutHash = testTasksWithSubtags.filter(
+          (_, index) => withoutHashResults[index],
+        );
         expect(withHash.length).toBe(withoutHash.length);
         expect(withHash.map((t) => t.path).sort()).toEqual(
           withoutHash.map((t) => t.path).sort(),
@@ -237,9 +265,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
         expect(
           await Search.evaluate('tag:project/feature', complexTasks[0], false),
         ).toBe(true);
-        expect(await Search.evaluate('tag:project', complexTasks[0], false)).toBe(
-          true,
-        );
+        expect(
+          await Search.evaluate('tag:project', complexTasks[0], false),
+        ).toBe(true);
 
         // Should not match unrelated prefixes
         expect(
@@ -258,9 +286,9 @@ describe('Tag Search with Subtags and Exact Matching', () => {
         ).toBe(true);
 
         // Should match prefix
-        expect(await Search.evaluate('tag:test-tag', complexTasks[1], false)).toBe(
-          true,
-        );
+        expect(
+          await Search.evaluate('tag:test-tag', complexTasks[1], false),
+        ).toBe(true);
         // This should NOT match because sub_category_v2 doesn't start with sub/ - it's a different naming pattern
         expect(
           await Search.evaluate('tag:test-tag/sub', complexTasks[1], false),
@@ -313,12 +341,12 @@ describe('Tag Search with Subtags and Exact Matching', () => {
         expect(
           await Search.evaluate('tag:#important', taskWithUrlAndTag, false),
         ).toBe(true);
-        expect(await Search.evaluate('tag:important', taskWithUrlAndTag, false)).toBe(
-          true,
-        );
-        expect(await Search.evaluate('tag:#section', taskWithUrlAndTag, false)).toBe(
-          false,
-        );
+        expect(
+          await Search.evaluate('tag:important', taskWithUrlAndTag, false),
+        ).toBe(true);
+        expect(
+          await Search.evaluate('tag:#section', taskWithUrlAndTag, false),
+        ).toBe(false);
       });
     });
   });

@@ -1139,13 +1139,20 @@ export class TaskListView extends ItemView {
         // Use new advanced search functionality
         const searchResults = await Promise.all(
           visible.map(async (t) => {
-            const matches = await Search.evaluate(q, t, this.isCaseSensitive, this.settings);
+            const matches = await Search.evaluate(
+              q,
+              t,
+              this.isCaseSensitive,
+              this.settings,
+            );
             return { task: t, matches };
-          })
+          }),
         );
-        
+
         // Filter based on the results
-        visible = searchResults.filter((result) => result.matches).map((result) => result.task);
+        visible = searchResults
+          .filter((result) => result.matches)
+          .map((result) => result.task);
         this.searchError = null;
       } catch (error) {
         // If there's an error in parsing, fall back to simple search

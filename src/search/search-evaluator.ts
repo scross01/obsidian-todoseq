@@ -646,7 +646,7 @@ export class SearchEvaluator {
       const colonIndex = value.indexOf(':');
       propertyKey = value.slice(0, colonIndex);
       propertyValue = value.slice(colonIndex + 1);
-      
+
       // Handle empty value case [type:]
       if (propertyValue === '') {
         propertyValue = null;
@@ -684,11 +684,15 @@ export class SearchEvaluator {
     if (propertySearchEngine) {
       try {
         // Build the query string
-        const query = propertyValue !== null ? `[${propertyKey}:${propertyValue}]` : `[${propertyKey}]`;
-        
+        const query =
+          propertyValue !== null
+            ? `[${propertyKey}:${propertyValue}]`
+            : `[${propertyKey}]`;
+
         // Search for files matching the property query
-        const matchingFiles = await propertySearchEngine.searchProperties(query);
-        
+        const matchingFiles =
+          await propertySearchEngine.searchProperties(query);
+
         // Check if the task's file is in the matching files
         return matchingFiles.has(task.path);
       } catch (error) {
@@ -704,7 +708,7 @@ export class SearchEvaluator {
     }
 
     const frontmatter = fileCache.frontmatter;
-    
+
     // Handle key-only searches (e.g., [type] or [type:])
     // But NOT [type:""] which is a search for empty string value
     if (propertyValue === null || (propertyValue === '' && !node.exact)) {
@@ -714,8 +718,8 @@ export class SearchEvaluator {
       } else {
         // Case insensitive key search
         const lowerField = propertyKey.toLowerCase();
-        return Object.keys(frontmatter).some(key =>
-          key.toLowerCase() === lowerField
+        return Object.keys(frontmatter).some(
+          (key) => key.toLowerCase() === lowerField,
         );
       }
     }
@@ -723,12 +727,14 @@ export class SearchEvaluator {
     // Handle null value search (e.g., [type:null])
     if (propertyValue === 'null') {
       if (effectiveCaseSensitive) {
-        return Object.prototype.hasOwnProperty.call(frontmatter, propertyKey) &&
-               frontmatter[propertyKey] === null;
+        return (
+          Object.prototype.hasOwnProperty.call(frontmatter, propertyKey) &&
+          frontmatter[propertyKey] === null
+        );
       } else {
         // Case insensitive key search for null value
         const lowerField = propertyKey.toLowerCase();
-        return Object.keys(frontmatter).some(key => {
+        return Object.keys(frontmatter).some((key) => {
           if (key.toLowerCase() === lowerField) {
             return frontmatter[key] === null;
           }
@@ -744,8 +750,8 @@ export class SearchEvaluator {
     } else {
       // Case insensitive key search
       const lowerField = propertyKey.toLowerCase();
-      const foundKey = Object.keys(frontmatter).find(key =>
-        key.toLowerCase() === lowerField
+      const foundKey = Object.keys(frontmatter).find(
+        (key) => key.toLowerCase() === lowerField,
       );
       actualPropertyValue = foundKey ? frontmatter[foundKey] : undefined;
     }
@@ -763,28 +769,40 @@ export class SearchEvaluator {
     if (propertyValue.startsWith('(') && propertyValue.endsWith(')')) {
       const innerValue = propertyValue.slice(1, -1);
       if (innerValue.includes(' OR ')) {
-        const orValues = innerValue.split(' OR ').map(v => v.trim());
-        return orValues.some(orValue => {
+        const orValues = innerValue.split(' OR ').map((v) => v.trim());
+        return orValues.some((orValue) => {
           // Create a temporary node for each OR value with just the value part
           const tempNode = { ...node, value: orValue };
-          return this.evaluateSinglePropertyValue(tempNode, actualPropertyValue, effectiveCaseSensitive);
+          return this.evaluateSinglePropertyValue(
+            tempNode,
+            actualPropertyValue,
+            effectiveCaseSensitive,
+          );
         });
       }
     }
 
     // Handle OR expressions in the value (e.g., [status:Draft OR Published])
     if (propertyValue.includes(' OR ')) {
-      const orValues = propertyValue.split(' OR ').map(v => v.trim());
-      return orValues.some(orValue => {
+      const orValues = propertyValue.split(' OR ').map((v) => v.trim());
+      return orValues.some((orValue) => {
         // Create a temporary node for each OR value with just the value part
         const tempNode = { ...node, value: orValue };
-        return this.evaluateSinglePropertyValue(tempNode, actualPropertyValue, effectiveCaseSensitive);
+        return this.evaluateSinglePropertyValue(
+          tempNode,
+          actualPropertyValue,
+          effectiveCaseSensitive,
+        );
       });
     }
 
     // Handle single value comparison - create a node with just the property value
     const valueOnlyNode = { ...node, value: propertyValue };
-    return this.evaluateSinglePropertyValue(valueOnlyNode, actualPropertyValue, effectiveCaseSensitive);
+    return this.evaluateSinglePropertyValue(
+      valueOnlyNode,
+      actualPropertyValue,
+      effectiveCaseSensitive,
+    );
   }
 
   /**
@@ -808,17 +826,21 @@ export class SearchEvaluator {
 
     // Handle date property comparisons
     const parsedDate = DateUtils.parseDateValue(value);
-    
+
     if (parsedDate) {
       // Try to parse property value as date
       let taskDate: Date | null = null;
-      
+
       if (propertyValue instanceof Date) {
         taskDate = propertyValue;
       } else if (typeof propertyValue === 'string') {
         // Try to parse string as date
         const parsedPropDate = DateUtils.parseDateValue(propertyValue);
-        if (parsedPropDate && parsedPropDate !== 'none' && !(typeof parsedPropDate === 'string')) {
+        if (
+          parsedPropDate &&
+          parsedPropDate !== 'none' &&
+          !(typeof parsedPropDate === 'string')
+        ) {
           if (typeof parsedPropDate === 'object' && 'date' in parsedPropDate) {
             taskDate = parsedPropDate.date;
           } else if (parsedPropDate instanceof Date) {
@@ -826,7 +848,7 @@ export class SearchEvaluator {
           }
         }
       }
-      
+
       if (taskDate) {
         // Handle date comparisons similar to evaluateDateFilter
         if (typeof parsedDate === 'string') {
@@ -835,12 +857,16 @@ export class SearchEvaluator {
         } else if (typeof parsedDate === 'object' && parsedDate !== null) {
           if ('start' in parsedDate && 'end' in parsedDate) {
             // Date range
-            return DateUtils.isDateInRange(taskDate, parsedDate.start, parsedDate.end);
+            return DateUtils.isDateInRange(
+              taskDate,
+              parsedDate.start,
+              parsedDate.end,
+            );
           } else if ('date' in parsedDate && 'format' in parsedDate) {
             // Exact date with format information
             const searchDate = parsedDate.date;
             const format = parsedDate.format;
-            
+
             switch (format) {
               case 'year':
                 // Year-only search (e.g., 2025)
@@ -871,7 +897,7 @@ export class SearchEvaluator {
       if (comparisonMatch) {
         const operator = comparisonMatch[1];
         const compareValue = Number(comparisonMatch[2]);
-        
+
         // Only numeric comparisons are supported for numeric properties
         if (typeof propertyValue === 'number') {
           switch (operator) {
@@ -887,7 +913,7 @@ export class SearchEvaluator {
               return false;
           }
         }
-        
+
         // For non-numeric properties, comparison operators are not supported
         return false;
       }
@@ -896,11 +922,11 @@ export class SearchEvaluator {
     // Handle different property types
     if (Array.isArray(propertyValue)) {
       // For arrays, check if the search value matches any element
-      return propertyValue.some(item => {
+      return propertyValue.some((item) => {
         if (typeof item === 'string') {
           const itemStr = caseSensitive ? item : item.toLowerCase();
           const searchStr = caseSensitive ? value : value.toLowerCase();
-          
+
           if (exact) {
             return itemStr === searchStr;
           } else {
@@ -911,9 +937,11 @@ export class SearchEvaluator {
       });
     } else if (typeof propertyValue === 'string') {
       // For strings, perform comparison
-      const propStr = caseSensitive ? propertyValue : propertyValue.toLowerCase();
+      const propStr = caseSensitive
+        ? propertyValue
+        : propertyValue.toLowerCase();
       const searchStr = caseSensitive ? value : value.toLowerCase();
-      
+
       if (exact) {
         return propStr === searchStr;
       } else {
@@ -925,11 +953,13 @@ export class SearchEvaluator {
       if (!isNaN(searchNum)) {
         return propertyValue === searchNum;
       }
-      
+
       // If not a number, convert to string and compare
-      const propStr = caseSensitive ? String(propertyValue) : String(propertyValue).toLowerCase();
+      const propStr = caseSensitive
+        ? String(propertyValue)
+        : String(propertyValue).toLowerCase();
       const searchStr = caseSensitive ? value : value.toLowerCase();
-      
+
       if (exact) {
         return propStr === searchStr;
       } else {
@@ -944,11 +974,13 @@ export class SearchEvaluator {
         return searchLower === 'false';
       }
     }
-    
+
     // For other types, convert to string and compare
-    const propStr = caseSensitive ? String(propertyValue) : String(propertyValue).toLowerCase();
+    const propStr = caseSensitive
+      ? String(propertyValue)
+      : String(propertyValue).toLowerCase();
     const searchStr = caseSensitive ? value : value.toLowerCase();
-    
+
     if (exact) {
       return propStr === searchStr;
     } else {

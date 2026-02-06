@@ -76,7 +76,10 @@ describe('Date Search Filters', () => {
 
     it('should parse year-month format', () => {
       const result = DateUtils.parseDateValue('2024-01');
-      expect(result).toEqual({ date: new Date(2024, 0, 1), format: 'year-month' });
+      expect(result).toEqual({
+        date: new Date(2024, 0, 1),
+        format: 'year-month',
+      });
     });
 
     it('should parse year only', () => {
@@ -115,11 +118,11 @@ describe('Date Search Filters', () => {
 
   describe('Scheduled date filtering', () => {
     it('should debug test tasks dates', async () => {
-      testTasks.forEach(task => {
+      testTasks.forEach((task) => {
         if (task.scheduledDate) {
         }
       });
-      testTasks.forEach(task => {
+      testTasks.forEach((task) => {
         if (task.deadlineDate) {
         }
       });
@@ -132,12 +135,14 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(3); // Tasks with no scheduled date
       expect(filteredTasks.map((r) => r.text)).toContain('Task with no dates');
-      expect(filteredTasks.map((r) => r.text)).toContain('Task with deadline date');
+      expect(filteredTasks.map((r) => r.text)).toContain(
+        'Task with deadline date',
+      );
     });
 
     it('should filter tasks with scheduled:today', async () => {
@@ -147,12 +152,16 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(2);
-      expect(filteredTasks.some((t) => t.text === 'Task with scheduled date')).toBe(true);
-      expect(filteredTasks.some((t) => t.text === 'Task with both dates')).toBe(true);
+      expect(
+        filteredTasks.some((t) => t.text === 'Task with scheduled date'),
+      ).toBe(true);
+      expect(filteredTasks.some((t) => t.text === 'Task with both dates')).toBe(
+        true,
+      );
     });
 
     it('should filter tasks with scheduled:tomorrow', async () => {
@@ -162,7 +171,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(0); // No tasks scheduled for tomorrow
@@ -175,7 +184,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(1); // One task with overdue scheduled date
@@ -189,7 +198,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(2); // Two tasks with today's scheduled date
@@ -202,7 +211,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(3); // Tasks with scheduled dates in current year
@@ -215,7 +224,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(3); // Tasks with scheduled dates in current month
@@ -228,7 +237,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(2); // Two tasks with today's scheduled date
@@ -245,7 +254,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(3); // Tasks with scheduled dates in range
@@ -260,7 +269,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(3); // Tasks with no deadline date
@@ -273,7 +282,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(2); // Two tasks with deadline tomorrow
@@ -286,7 +295,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(1); // One task with overdue deadline
@@ -299,7 +308,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(0); // No tasks with deadline today
@@ -312,7 +321,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(2); // Two tasks with tomorrow's deadline
@@ -331,7 +340,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(3); // Tasks with scheduled dates in range
@@ -352,7 +361,7 @@ describe('Date Search Filters', () => {
           } else if (task.deadlineDate) {
           }
           return result;
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(3); // Three tasks with deadline in range (yesterday, tomorrow, tomorrow)
@@ -365,7 +374,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(0); // No tasks with that deadline date
@@ -378,7 +387,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(0); // No matches for invalid ranges
@@ -395,7 +404,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(0); // No tasks with dates in future range
@@ -412,7 +421,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(1); // One task with scheduled date in range (yesterday)
@@ -427,7 +436,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(0); // No tasks scheduled for next week
@@ -440,7 +449,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(3); // Tasks with deadlines this week
@@ -455,7 +464,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(2); // Two TODO tasks with scheduled today
@@ -468,7 +477,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(0); // No high priority tasks with deadline tomorrow
@@ -481,7 +490,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(3); // Tasks with scheduled today OR deadline tomorrow
@@ -494,7 +503,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(1); // Tasks with scheduled today but not deadline tomorrow
@@ -509,7 +518,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(0); // No matches for invalid dates
@@ -522,7 +531,7 @@ describe('Date Search Filters', () => {
       const results = await Promise.all(
         testTasks.map(async (task) => {
           return await SearchEvaluator.evaluate(node, task, false);
-        })
+        }),
       );
       const filteredTasks = testTasks.filter((_, index) => results[index]);
       expect(filteredTasks.length).toBe(0); // No matches for malformed ranges
@@ -541,7 +550,11 @@ describe('Date Search Filters', () => {
         scheduledDate: null,
       });
 
-      const result = await SearchEvaluator.evaluate(node, taskWithNullDate, false);
+      const result = await SearchEvaluator.evaluate(
+        node,
+        taskWithNullDate,
+        false,
+      );
       expect(result).toBe(false);
     });
   });

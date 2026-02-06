@@ -239,11 +239,13 @@ With **Sunday start**:
 **Default**: Disabled
 
 **When Enabled:**
+
 - All vault files are scanned on plugin startup to build property search indexes
 - Property searches work immediately without waiting for files to be accessed
 - May increase startup time for large vaults
 
 **When Disabled:**
+
 - Property search indexes are built lazily as files are accessed
 - Faster startup but property searches may be slower initially
 - Property search functionality still works, just builds indexes on-demand
@@ -267,6 +269,7 @@ With **Sunday start**:
 **Default**: Disabled
 
 **When Enabled:**
+
 - Shows progress updates in the Obsidian status bar
 - Provides feedback during long scans
 - Helps monitor scan completion
