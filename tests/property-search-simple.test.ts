@@ -278,4 +278,133 @@ describe('PropertySearchEngine Simple Tests', () => {
       expect(results.size).toBeGreaterThanOrEqual(0);
     });
   });
+
+  describe('Case sensitivity', () => {
+    test('should match property key case-insensitively by default', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'status'
+      // Test with uppercase key
+      const results =
+        await propertySearchEngine.searchProperties('[STATUS:draft]');
+
+      // Should find results because key matching is case-insensitive by default
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should match property value case-insensitively by default', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'draft'
+      // Test with uppercase value
+      const results =
+        await propertySearchEngine.searchProperties('[status:DRAFT]');
+
+      // Should find results because value matching is case-insensitive by default
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should match both key and value case-insensitively by default', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'status' and 'draft'
+      // Test with both uppercase
+      const results =
+        await propertySearchEngine.searchProperties('[STATUS:DRAFT]');
+
+      // Should find results because both key and value matching are case-insensitive by default
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should match property key with mixed case by default', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'status'
+      // Test with mixed case key
+      const results =
+        await propertySearchEngine.searchProperties('[StAtUs:draft]');
+
+      // Should find results because key matching is case-insensitive by default
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should match property value with mixed case by default', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'draft'
+      // Test with mixed case value
+      const results =
+        await propertySearchEngine.searchProperties('[status:DrAfT]');
+
+      // Should find results because value matching is case-insensitive by default
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should NOT match value case-insensitively when caseSensitive is true', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'draft'
+      // Test with uppercase value and caseSensitive=true
+      const results = await propertySearchEngine.searchProperties(
+        '[status:DRAFT]',
+        true,
+      );
+
+      // Should NOT find results because value matching is case-sensitive
+      expect(results.size).toBe(0);
+    });
+
+    test('should NOT match key case-insensitively when caseSensitive is true', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'status'
+      // Test with uppercase key and caseSensitive=true
+      const results = await propertySearchEngine.searchProperties(
+        '[STATUS:draft]',
+        true,
+      );
+
+      // Should NOT find results because key matching is case-sensitive
+      expect(results.size).toBe(0);
+    });
+
+    test('should match exact case when caseSensitive is true', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'status' and 'draft'
+      // Test with exact case and caseSensitive=true
+      const results = await propertySearchEngine.searchProperties(
+        '[status:draft]',
+        true,
+      );
+
+      // Should find results because case matches exactly
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should handle case-insensitive array property values', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'work' in tags array
+      // Test with uppercase value
+      const results =
+        await propertySearchEngine.searchProperties('[tags:WORK]');
+
+      // Should find results because value matching is case-insensitive by default
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should handle case-insensitive OR expressions', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'draft' and 'published'
+      // Test OR with different cases
+      const results = await propertySearchEngine.searchProperties(
+        '[status:DRAFT OR PUBLISHED]',
+      );
+
+      // Should find results (all files with status property)
+      expect(results.size).toBeGreaterThan(0);
+    });
+  });
 });

@@ -658,23 +658,49 @@ export class SearchEvaluator {
     }
 
     // Get the app instance from settings or global
-    let app;
-    if (settings && (settings as any).app) {
-      app = (settings as any).app;
-    } else if (typeof window !== 'undefined' && (window as any).todoSeqPlugin) {
-      app = (window as any).todoSeqPlugin.app;
-    } else {
+    type SettingsWithApp = TodoTrackerSettings & {
+      app: import('obsidian').App;
+    };
+    type WindowWithPlugin = Window & {
+      todoSeqPlugin?: {
+        app: import('obsidian').App;
+        propertySearchEngine: PropertySearchEngine | null;
+      };
+    };
+    let app: import('obsidian').App | undefined;
+    if (settings && (settings as SettingsWithApp).app) {
+      app = (settings as SettingsWithApp).app;
+    } else if (
+      typeof window !== 'undefined' &&
+      (window as WindowWithPlugin).todoSeqPlugin
+    ) {
+      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
+      if (plugin) {
+        app = plugin.app;
+      }
+    }
+    if (!app) {
       // In test environment, return false since we can't access the app
       return false;
     }
 
     // Get the PropertySearchEngine instance from settings
     let propertySearchEngine: PropertySearchEngine | null = null;
-    if (settings && (settings as any).propertySearchEngine) {
-      propertySearchEngine = (settings as any).propertySearchEngine;
-    } else if (typeof window !== 'undefined' && (window as any).todoSeqPlugin) {
+    type SettingsWithEngine = TodoTrackerSettings & {
+      propertySearchEngine: PropertySearchEngine;
+    };
+    if (settings && (settings as SettingsWithEngine).propertySearchEngine) {
+      propertySearchEngine = (settings as SettingsWithEngine)
+        .propertySearchEngine;
+    } else if (
+      typeof window !== 'undefined' &&
+      (window as WindowWithPlugin).todoSeqPlugin
+    ) {
       // Fallback to global plugin instance for backward compatibility
-      propertySearchEngine = (window as any).todoSeqPlugin.propertySearchEngine;
+      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
+      if (plugin) {
+        propertySearchEngine = plugin.propertySearchEngine;
+      }
     }
 
     // When exact flag is true (quoted values), force case sensitivity
@@ -690,8 +716,11 @@ export class SearchEvaluator {
             : `[${propertyKey}]`;
 
         // Search for files matching the property query
-        const matchingFiles =
-          await propertySearchEngine.searchProperties(query);
+        // Pass case sensitivity flag (inverted: caseSensitive=false means insensitive matching)
+        const matchingFiles = await propertySearchEngine.searchProperties(
+          query,
+          effectiveCaseSensitive,
+        );
 
         // Check if the task's file is in the matching files
         return matchingFiles.has(task.path);
@@ -702,7 +731,11 @@ export class SearchEvaluator {
 
     // Fall back to direct metadata access
     // Get file cache and frontmatter
-    const fileCache = app.metadataCache.getFileCache(task.path);
+    const file = app.vault.getAbstractFileByPath(task.path);
+    const fileCache =
+      file && 'extension' in file
+        ? app.metadataCache.getFileCache(file as import('obsidian').TFile)
+        : null;
     if (!fileCache || !fileCache.frontmatter) {
       return false;
     }
@@ -744,7 +777,7 @@ export class SearchEvaluator {
     }
 
     // Get the property value (case sensitive or insensitive key search)
-    let actualPropertyValue;
+    let actualPropertyValue: unknown;
     if (effectiveCaseSensitive) {
       actualPropertyValue = frontmatter[propertyKey];
     } else {

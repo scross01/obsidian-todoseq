@@ -424,6 +424,12 @@ describe('Property Search Tokenizer', () => {
             },
           })),
         },
+        vault: {
+          getAbstractFileByPath: jest.fn(() => ({
+            path: 'test/file.md',
+            extension: 'md',
+          })),
+        },
       };
 
       // Create complete settings object
@@ -938,8 +944,16 @@ describe('Property Search Tokenizer', () => {
         getFileCache: jest.fn(),
       };
 
+      const mockVault = {
+        getAbstractFileByPath: jest.fn((path: string) => ({
+          path,
+          extension: 'md',
+        })),
+      };
+
       const mockApp = {
         metadataCache: mockMetadataCache,
+        vault: mockVault,
       };
 
       // Helper function to create a task with frontmatter
@@ -971,8 +985,8 @@ describe('Property Search Tokenizer', () => {
         frontmatter: Record<string, unknown> | null,
       ) {
         mockMetadataCache.getFileCache.mockImplementation(
-          (filePath: string) => {
-            if (filePath === path) {
+          (file: { path: string }) => {
+            if (file.path === path) {
               return { frontmatter };
             }
             return null;

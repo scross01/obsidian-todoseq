@@ -1,6 +1,28 @@
 import { App, TFile } from 'obsidian';
 import { DateUtils } from '../utils/date-utils';
 
+// Interface for the plugin instance accessed via window
+interface TodoSeqPlugin {
+  taskStateManager?: {
+    getTasks: () => Array<{
+      path: string;
+      text: string;
+      completed: boolean;
+      state: string;
+    }>;
+  };
+  vaultScanner?: {
+    isScanning: () => boolean;
+    isObsidianInitializing: () => boolean;
+  };
+  refreshAllTaskListViews?: () => void;
+}
+
+// Interface for window with plugin reference
+interface WindowWithPlugin extends Window {
+  todoSeqPlugin?: TodoSeqPlugin;
+}
+
 export class PropertySearchEngine {
   private static instance: PropertySearchEngine;
   private propertyCache = new Map<string, Map<unknown, Set<string>>>();
@@ -84,9 +106,8 @@ export class PropertySearchEngine {
   private async waitForVaultScan(): Promise<void> {
     // Check if we have access to the plugin and vault scanner
     try {
-      const plugin = (window as unknown as { todoSeqPlugin?: any })
-        .todoSeqPlugin;
-      if (plugin && plugin.vaultScanner) {
+      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
+      if (plugin?.vaultScanner) {
         // Wait for vault scan to complete if it's in progress
         while (
           plugin.vaultScanner.isScanning() ||
@@ -104,9 +125,8 @@ export class PropertySearchEngine {
   // Refresh all visible task list views
   private refreshVisibleTaskListViews(): void {
     try {
-      const plugin = (window as unknown as { todoSeqPlugin?: any })
-        .todoSeqPlugin;
-      if (plugin) {
+      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
+      if (plugin?.refreshAllTaskListViews) {
         // Refresh all open task list views
         plugin.refreshAllTaskListViews();
       }
@@ -138,14 +158,13 @@ export class PropertySearchEngine {
     // First, try to get tasks from TaskStateManager (faster if available)
     try {
       // This is a hack to get tasks from the plugin instance
-      const plugin = (window as unknown as { todoSeqPlugin?: any })
-        .todoSeqPlugin;
+      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
       if (plugin?.taskStateManager) {
         const tasks = plugin.taskStateManager.getTasks();
         const taskFiles = new Set<string>();
 
         // Collect all unique file paths from tasks
-        tasks.forEach((task: any) => {
+        tasks.forEach((task) => {
           taskFiles.add(task.path);
         });
 
@@ -155,11 +174,11 @@ export class PropertySearchEngine {
             const file = this.app.vault.getAbstractFileByPath(filePath);
             // Check if it's a markdown file - type narrow from TAbstractFile to TFile
             // TFile has extension, TFolder has children
-            const isMarkdownFile =
-              file && !('children' in file) && (file as any).extension === 'md';
+            const tfile = file as TFile | undefined;
+            const isMarkdownFile = tfile && tfile.extension === 'md';
 
-            if (isMarkdownFile) {
-              const cache = this.app.metadataCache.getFileCache(file as TFile);
+            if (isMarkdownFile && tfile) {
+              const cache = this.app.metadataCache.getFileCache(tfile);
               if (cache?.frontmatter) {
                 Object.keys(cache.frontmatter).forEach((key) => {
                   this.propertyKeys.add(key);
@@ -191,13 +210,12 @@ export class PropertySearchEngine {
     // Get files with tasks from vault scanner
     let filesToScan: TFile[] = [];
     try {
-      const plugin = (window as unknown as { todoSeqPlugin?: any })
-        .todoSeqPlugin;
+      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
       if (plugin?.taskStateManager) {
         const tasks = plugin.taskStateManager.getTasks();
         const taskFiles = new Set<string>();
 
-        tasks.forEach((task: any) => {
+        tasks.forEach((task) => {
           taskFiles.add(task.path);
         });
 
@@ -206,9 +224,9 @@ export class PropertySearchEngine {
             const file = this.app.vault.getAbstractFileByPath(filePath);
             // Check if it's a markdown file - type narrow from TAbstractFile to TFile
             // TFile has extension, TFolder has children
-            const isMarkdownFile =
-              file && !('children' in file) && (file as any).extension === 'md';
-            return isMarkdownFile ? (file as TFile) : null;
+            const tfile = file as TFile | undefined;
+            const isMarkdownFile = tfile && tfile.extension === 'md';
+            return isMarkdownFile ? tfile : null;
           })
           .filter(Boolean) as TFile[];
       }
@@ -233,7 +251,7 @@ export class PropertySearchEngine {
       for (const file of batch) {
         const fileCache = this.app.metadataCache.getFileCache(file);
         if (fileCache?.frontmatter && key in fileCache.frontmatter) {
-          const value = fileCache.frontmatter[key];
+          const value: unknown = fileCache.frontmatter[key];
 
           if (Array.isArray(value)) {
             // For arrays, add each element as a separate key in the cache
@@ -267,7 +285,10 @@ export class PropertySearchEngine {
   }
 
   // Search for files matching property query
-  async searchProperties(query: string): Promise<Set<string>> {
+  async searchProperties(
+    query: string,
+    caseSensitive = false,
+  ): Promise<Set<string>> {
     await this.initialize();
 
     // Parse query: [key:value] or [key]
@@ -289,7 +310,8 @@ export class PropertySearchEngine {
       return new Set();
     }
 
-    const cache = this.propertyCache.get(key);
+    // Find the cache with case-insensitive key matching if needed
+    const cache = this.getPropertyCacheForKey(key, caseSensitive);
     if (!cache) return new Set();
 
     if (value === null) {
@@ -316,7 +338,12 @@ export class PropertySearchEngine {
 
       // Search for each OR value and union the results
       for (const orValue of orValues) {
-        const results = await this.searchSingleValue(key, orValue, cache);
+        const results = await this.searchSingleValue(
+          key,
+          orValue,
+          cache,
+          caseSensitive,
+        );
         results.forEach((filePath) => {
           matchingFiles.add(filePath);
         });
@@ -326,7 +353,28 @@ export class PropertySearchEngine {
     }
 
     // Single value search
-    return this.searchSingleValue(key, processedValue, cache);
+    return this.searchSingleValue(key, processedValue, cache, caseSensitive);
+  }
+
+  // Get property cache for a key, with case-insensitive lookup if needed
+  private getPropertyCacheForKey(
+    key: string,
+    caseSensitive: boolean,
+  ): Map<unknown, Set<string>> | null {
+    if (caseSensitive) {
+      // Case sensitive: exact key match
+      return this.propertyCache.get(key) || null;
+    }
+
+    // Case insensitive: find key matching lowercase
+    const lowerKey = key.toLowerCase();
+    const cacheKeys = Array.from(this.propertyCache.keys());
+    for (const cacheKey of cacheKeys) {
+      if (typeof cacheKey === 'string' && cacheKey.toLowerCase() === lowerKey) {
+        return this.propertyCache.get(cacheKey) || null;
+      }
+    }
+    return null;
   }
 
   // Search for a single property value (no OR processing)
@@ -334,6 +382,7 @@ export class PropertySearchEngine {
     key: string,
     value: string,
     cache: Map<unknown, Set<string>>,
+    caseSensitive = false,
   ): Promise<Set<string>> {
     // Check if it's a comparison operator query
     const comparisonMatch = value.match(/^([><]=?)(\d+(\.\d+)?)$/);
@@ -493,7 +542,7 @@ export class PropertySearchEngine {
 
     // Value search: return files with this value
     // Try to match with the same type, or convert to number if possible
-    let result = cache.get(value);
+    let result = this.findValueInCache(cache, value, caseSensitive);
     if (!result) {
       // Try to parse as number
       const numValue = Number(value);
@@ -502,6 +551,35 @@ export class PropertySearchEngine {
       }
     }
     return result || new Set();
+  }
+
+  // Find a value in the cache with optional case-insensitive matching
+  private findValueInCache(
+    cache: Map<unknown, Set<string>>,
+    searchValue: string,
+    caseSensitive: boolean,
+  ): Set<string> | undefined {
+    // First try exact match
+    const exactResult = cache.get(searchValue);
+    if (exactResult) {
+      return exactResult;
+    }
+
+    // If case-insensitive, search for matching string keys
+    if (!caseSensitive) {
+      const lowerSearch = searchValue.toLowerCase();
+      const cacheEntries = Array.from(cache.entries());
+      for (const [cacheKey, fileSet] of cacheEntries) {
+        if (
+          typeof cacheKey === 'string' &&
+          cacheKey.toLowerCase() === lowerSearch
+        ) {
+          return fileSet;
+        }
+      }
+    }
+
+    return undefined;
   }
 
   // Get all files with a specific property key (any value)
@@ -568,11 +646,10 @@ export class PropertySearchEngine {
   // Check if a file contains any tasks
   private fileContainsTasks(file: TFile): boolean {
     try {
-      const plugin = (window as unknown as { todoSeqPlugin?: any })
-        .todoSeqPlugin;
+      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
       if (plugin?.taskStateManager) {
         const tasks = plugin.taskStateManager.getTasks();
-        return tasks.some((task: any) => task.path === file.path);
+        return tasks.some((task) => task.path === file.path);
       }
     } catch (error) {
       console.error('TODOseq: Failed to check if file contains tasks:', error);
@@ -668,11 +745,10 @@ export class PropertySearchEngine {
   // Check if a file path contains any tasks
   private filePathContainsTasks(filePath: string): boolean {
     try {
-      const plugin = (window as unknown as { todoSeqPlugin?: any })
-        .todoSeqPlugin;
+      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
       if (plugin?.taskStateManager) {
         const tasks = plugin.taskStateManager.getTasks();
-        return tasks.some((task: any) => task.path === filePath);
+        return tasks.some((task) => task.path === filePath);
       }
     } catch (error) {
       console.error(

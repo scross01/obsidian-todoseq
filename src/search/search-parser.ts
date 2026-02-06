@@ -130,7 +130,8 @@ class PrattParser {
 
         // If left is already an AND node, just add the parenthesized expression to its children
         if (left.type === 'and') {
-          left.children!.push(parenExpr);
+          left.children = left.children ?? [];
+          left.children.push(parenExpr);
         } else {
           left = {
             type: 'and',
