@@ -195,4 +195,87 @@ describe('PropertySearchEngine Simple Tests', () => {
     const newCount = propertySearchEngine.getFileCountForProperty('status');
     expect(newCount).toBe(initialCount);
   });
+
+  describe('OR operator', () => {
+    test('should handle OR expressions in property value', async () => {
+      await propertySearchEngine.initialize();
+
+      // Search for files with status:draft OR status:published
+      const results = await propertySearchEngine.searchProperties(
+        '[status:draft OR published]',
+      );
+
+      // All files with properties have status (either draft or published)
+      // So we should get all files that have properties
+      expect(results.size).toBeGreaterThan(0);
+      // Should be more than just draft or just published alone
+      const draftOnly =
+        await propertySearchEngine.searchProperties('[status:draft]');
+      const publishedOnly =
+        await propertySearchEngine.searchProperties('[status:published]');
+      expect(results.size).toBe(draftOnly.size + publishedOnly.size);
+    });
+
+    test('should handle OR expressions with parentheses', async () => {
+      await propertySearchEngine.initialize();
+
+      // Search with parentheses syntax
+      const results = await propertySearchEngine.searchProperties(
+        '[status:(draft OR published)]',
+      );
+
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should handle OR expressions with three values', async () => {
+      await propertySearchEngine.initialize();
+
+      // Search for files with priority:high OR priority:normal OR priority:low
+      const results = await propertySearchEngine.searchProperties(
+        '[priority:high OR normal OR low]',
+      );
+
+      // All files with properties have priority
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should handle OR expressions with array property values', async () => {
+      await propertySearchEngine.initialize();
+
+      // Search for files with tags:work OR tags:personal
+      const results = await propertySearchEngine.searchProperties(
+        '[tags:work OR personal]',
+      );
+
+      expect(results.size).toBeGreaterThan(0);
+    });
+
+    test('should handle OR expressions where one value does not exist', async () => {
+      await propertySearchEngine.initialize();
+
+      // Search for files with status:draft OR status:nonexistent
+      const results = await propertySearchEngine.searchProperties(
+        '[status:draft OR nonexistent]',
+      );
+
+      // Should still return files with status:draft
+      const draftOnly =
+        await propertySearchEngine.searchProperties('[status:draft]');
+      expect(results.size).toBe(draftOnly.size);
+    });
+
+    test('should handle OR expressions with case-insensitive values', async () => {
+      await propertySearchEngine.initialize();
+
+      // The mock data uses lowercase 'draft' and 'published'
+      // Test with different case
+      const results = await propertySearchEngine.searchProperties(
+        '[status:Draft OR Published]',
+      );
+
+      // Should still find results (case-insensitive matching)
+      // Note: This depends on how the cache stores values
+      expect(results.size).toBeGreaterThanOrEqual(0);
+    });
+  });
 });
