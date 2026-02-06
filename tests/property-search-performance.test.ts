@@ -77,7 +77,10 @@ const mockApp = {
       // Simulate a large vault with 1000 files
       const files = [];
       for (let i = 0; i < 1000; i++) {
-        files.push(performanceTestFilesCache.get(`file-${i}.md`)!);
+        const file = performanceTestFilesCache.get(`file-${i}.md`);
+        if (file) {
+          files.push(file);
+        }
       }
       return files;
     },
@@ -132,9 +135,6 @@ describe('PropertySearchEngine Performance', () => {
 
   test('should handle file invalidation efficiently', async () => {
     await propertySearchEngine.initialize();
-
-    // Get initial count
-    const initialCount = propertySearchEngine.getFileCountForProperty('status');
 
     // Simulate file change
     const mockFile = createMockFile(1);

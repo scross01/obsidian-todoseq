@@ -90,21 +90,21 @@ export class VaultScanner {
 
     // Register handlers for vault events
     this.app.vault.on('rename', (file, oldPath) => {
-      if (file instanceof TFile) {
-        this.propertySearchEngine!.onFileRenamed(file, oldPath);
+      if (file instanceof TFile && this.propertySearchEngine) {
+        this.propertySearchEngine.onFileRenamed(file, oldPath);
       }
     });
 
     this.app.vault.on('delete', (file) => {
-      if (file instanceof TFile) {
-        this.propertySearchEngine!.onFileDeleted(file);
+      if (file instanceof TFile && this.propertySearchEngine) {
+        this.propertySearchEngine.onFileDeleted(file);
       }
     });
 
     // Only register metadata cache change handler - this is sufficient for all file content changes
     this.app.metadataCache.on('changed', (file) => {
-      if (file instanceof TFile) {
-        this.propertySearchEngine!.onFileChanged(file);
+      if (file instanceof TFile && this.propertySearchEngine) {
+        this.propertySearchEngine.onFileChanged(file);
       }
     });
 

@@ -1,6 +1,5 @@
 import { SearchTokenizer } from '../src/search/search-tokenizer';
 import { SearchParser } from '../src/search/search-parser';
-import { SearchToken } from '../src/search/search-types';
 import { Search } from '../src/search/search';
 import { Task } from '../src/types/task';
 

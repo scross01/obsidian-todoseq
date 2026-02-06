@@ -241,14 +241,20 @@ export class PropertySearchEngine {
               if (!cache.has(item)) {
                 cache.set(item, new Set());
               }
-              cache.get(item)!.add(file.path);
+              const filePathSet = cache.get(item);
+              if (filePathSet) {
+                filePathSet.add(file.path);
+              }
             });
           } else {
             // For non-array values, add directly to cache
             if (!cache.has(value)) {
               cache.set(value, new Set());
             }
-            cache.get(value)!.add(file.path);
+            const filePathSet = cache.get(value);
+            if (filePathSet) {
+              filePathSet.add(file.path);
+            }
           }
         }
       }
