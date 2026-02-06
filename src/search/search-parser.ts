@@ -78,7 +78,10 @@ class PrattParser {
 
         // If left is already an AND node, just add the new filter to its children
         if (left.type === 'and') {
-          left.children!.push(right);
+          if (!left.children) {
+            left.children = [];
+          }
+          left.children.push(right);
         } else {
           left = {
             type: 'and',
@@ -96,7 +99,10 @@ class PrattParser {
 
         // If left is already an AND node, just add the new filter to its children
         if (left.type === 'and') {
-          left.children!.push(right);
+          if (!left.children) {
+            left.children = [];
+          }
+          left.children.push(right);
         } else {
           left = {
             type: 'and',
@@ -142,7 +148,10 @@ class PrattParser {
 
           // If left is already an AND node, just add the new term to its children
           if (left.type === 'and') {
-            left.children!.push(right);
+            if (!left.children) {
+              left.children = [];
+            }
+            left.children.push(right);
           } else {
             left = {
               type: 'and',

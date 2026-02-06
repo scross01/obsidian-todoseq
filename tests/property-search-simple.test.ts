@@ -5,20 +5,7 @@ import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { App, TFile } from 'obsidian';
 
 // Create simple mock files with known properties
-const createMockFile = (
-  index: number,
-  hasProperties: boolean = true,
-): TFile => {
-  const fileNum = index;
-  const frontmatter: any = hasProperties
-    ? {
-        status: fileNum % 2 === 0 ? 'draft' : 'published',
-        priority: fileNum % 3 === 0 ? 'high' : 'normal',
-        tags: fileNum % 4 === 0 ? ['work', 'urgent'] : ['personal'],
-        type: 'task',
-      }
-    : {};
-
+const createMockFile = (index: number, hasProperties = true): TFile => {
   const mockFile = {
     path: `file-${index}.md`,
     name: `file-${index}.md`,
@@ -136,7 +123,7 @@ describe('PropertySearchEngine Simple Tests', () => {
   test('should initialize and find property keys', async () => {
     // Log what our metadata cache knows
     testFilesCache.forEach((file, path) => {
-      const cache = mockApp.metadataCache.getFileCache(file);
+      mockApp.metadataCache.getFileCache(file);
     });
 
     await propertySearchEngine.initialize();

@@ -203,7 +203,7 @@ export class SearchTokenizer {
           return content.replace(/\\"/g, '"');
         }
         return token;
-      case 'property':
+      case 'property': {
         // Remove outer brackets and process quotes within
         // Format: [key:value] or ["key":"value"] or [key:"value"] etc.
         const inner = token.slice(1, -1); // Remove [ and ]
@@ -256,6 +256,7 @@ export class SearchTokenizer {
 
         // Return as "key:value" format for parsing
         return `${processedKey}:${processedValue}`;
+      }
       case 'or':
       case 'and':
       case 'range':

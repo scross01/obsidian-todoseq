@@ -1,4 +1,4 @@
-import { Plugin, MarkdownView, TFile } from 'obsidian';
+import { Plugin, MarkdownView } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from './types/task';
 import { TaskListView } from './view/task-list/task-list-view';
