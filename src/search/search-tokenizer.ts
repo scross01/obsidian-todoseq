@@ -22,9 +22,9 @@ export class SearchTokenizer {
       regex: /\b(path|file|tag|state|priority|content|scheduled|deadline):/y,
     },
     // Property bracket syntax: [key:value], ["key":"value"], [type], [type:Draft OR Published]
-    {
+     {
       type: 'property' as const,
-      regex: /\["?(?:[^":\\]|\\.)*"?(?:\s*:\s*(?:"(?:\\.|[^"\\])*"|null|>=?|<=?|>|<|\[[^\]]*\]|(?:[^"\]]+(?:\s+(?:OR|AND)\s+[^"\]]+)*))?)?\]/y,
+      regex: /\[(?:"([^"\\]*(?:\\.[^"\\]*)*)"|([^\s:"\]]+))(?:\s*:\s*(?:"([^"\\]*(?:\\.[^"\\]*)*)"|([^\]]*)))?\]/y,
     },
     { type: 'not' as const, regex: /-/y },
     { type: 'word' as const, regex: /[^\s"()]+/y },
@@ -206,7 +206,27 @@ export class SearchTokenizer {
         // Remove outer brackets and process quotes within
         // Format: [key:value] or ["key":"value"] or [key:"value"] etc.
         const inner = token.slice(1, -1); // Remove [ and ]
-        // Find the colon to split key and value
+        
+        // Extract key and value from the regex groups (if using our new regex)
+        // First, try to find quoted keys or values
+        const quotedKeyMatch = inner.match(/^"([^"\\]*(?:\\.[^"\\]*)*)"(\s*:(?:\s*"([^"\\]*(?:\\.[^"\\]*)*)"|\s*([^\]]*)))?$/);
+        if (quotedKeyMatch) {
+          const processedKey = quotedKeyMatch[1].replace(/\\"/g, '"');
+          if (quotedKeyMatch[3]) {
+            // Quoted value
+            const processedValue = quotedKeyMatch[3].replace(/\\"/g, '"');
+            return `${processedKey}:${processedValue}`;
+          } else if (quotedKeyMatch[4]) {
+            // Unquoted value
+            const processedValue = quotedKeyMatch[4].trim().replace(/\\"/g, '"');
+            return processedValue ? `${processedKey}:${processedValue}` : processedKey;
+          } else {
+            // Key-only
+            return processedKey;
+          }
+        }
+        
+        // Fallback to original method for unquoted keys
         const colonIndex = inner.indexOf(':');
         if (colonIndex === -1) {
           // Key-only case like [type]

@@ -24,6 +24,7 @@ export interface VaultScannerEvents {
 export class VaultScanner {
   private _isScanning = false;
   private _isInitializing = true; // Track Obsidian initialization state
+  private _propertySearchHandlersRegistered = false; // Track if property search handlers are already registered
   private eventListeners: Map<
     keyof VaultScannerEvents,
     ((...args: unknown[]) => void)[]
@@ -60,10 +61,8 @@ export class VaultScanner {
       this.loadUrgencyCoefficients();
     }
 
-    // Register file change handlers for property search engine
-    if (this.propertySearchEngine) {
-      this.registerPropertySearchHandlers();
-    }
+    // NOTE: PropertySearchEngine now registers its own event listeners
+    // during initialization to support lazy initialization
   }
 
   /**
@@ -84,12 +83,10 @@ export class VaultScanner {
   private registerPropertySearchHandlers(): void {
     if (!this.propertySearchEngine) return;
 
-    // Register handlers for metadata cache changes
-    this.app.metadataCache.on('changed', (file) => {
-      if (file instanceof TFile) {
-        this.propertySearchEngine!.onFileChanged(file);
-      }
-    });
+    // Prevent duplicate listener registration
+    if (this._propertySearchHandlersRegistered) {
+      return;
+    }
 
     // Register handlers for vault events
     this.app.vault.on('rename', (file, oldPath) => {
@@ -104,11 +101,14 @@ export class VaultScanner {
       }
     });
 
-    this.app.vault.on('modify', (file) => {
+    // Only register metadata cache change handler - this is sufficient for all file content changes
+    this.app.metadataCache.on('changed', (file) => {
       if (file instanceof TFile) {
         this.propertySearchEngine!.onFileChanged(file);
       }
     });
+
+    this._propertySearchHandlersRegistered = true;
   }
 
   // Event management methods
@@ -434,6 +434,12 @@ export class VaultScanner {
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => resolve()),
     );
+  }
+
+  // Set property search engine and register handlers (can be called after initialization)
+  setPropertySearchEngine(propertySearchEngine: PropertySearchEngine): void {
+    this.propertySearchEngine = propertySearchEngine;
+    this.registerPropertySearchHandlers();
   }
 
   // Clean up resources

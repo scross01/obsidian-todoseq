@@ -2,34 +2,18 @@
 # Property Search Examples
 
 This page contains embedded task list code blocks that demonstrate various property search scenarios. Use these examples to test and validate the property search feature.
-
 ## Basic Property Matching
 
 ### String Properties
 
-Find tasks on pages with type "Test Page":
+Find tasks on pages with property `type: Test Page`:
 ```todoseq
 search: [type:Test Page]
 ```
 
-Find tasks on pages with type "Test Page" (case insensitive):
-```todoseq
-search: [type:test page]
-```
-
-Find tasks on pages with type "TEST PAGE" (case insensitive):
-```todoseq
-search: [type:TEST PAGE]
-```
-
-Find tasks on pages with type "Project":
+Find tasks on pages with `type: Project`
 ```todoseq
 search: [type:Project]
-```
-
-Find tasks on pages with assignee "John Doe":
-```todoseq
-search: [assignee:John Doe]
 ```
 
 ### Array Properties
@@ -44,11 +28,6 @@ Find tasks on pages with "feature" in tags:
 search: [tags:feature]
 ```
 
-Find tasks on pages with "backend" in tags:
-```todoseq
-search: [tags:backend]
-```
-
 ### Numeric Properties
 
 Find tasks on pages with size exactly 100:
@@ -56,19 +35,14 @@ Find tasks on pages with size exactly 100:
 search: [size:100]
 ```
 
-Find tasks on pages with size exactly 150:
+Find tasks on pages with size
 ```todoseq
-search: [size:150]
+search: [size]
 ```
 
-Find tasks on pages with priority exactly 3:
+Find tasks on pages with size >=99:
 ```todoseq
-search: [priority:3]
-```
-
-Find tasks on pages with estimated hours exactly 40:
-```todoseq
-search: [estimated_hours:40]
+search: [size:>=99]
 ```
 
 ### Boolean Properties
@@ -85,24 +59,26 @@ Find tasks on pages with target date 2026-03-31:
 search: [target:2026-03-31]
 ```
 
+Find tasks on pages with partial target date 2026-03:
+```todoseq
+search: [target:2026-03]
+```
+
 ## Negation
 
-Find tasks on pages that are NOT archived:
+Find tasks on with page by not "Test Page":
 ```todoseq
-search: -[archived:true]
-limit: 5
+search: [type] -[type:Test Page]
 ```
 
 Find tasks on pages that do NOT have "urgent" in tags:
 ```todoseq
-search: -[tags:urgent]
-limit: 5
+search: [tags] -[tags:urgent]
 ```
 
 Find tasks on pages that do NOT have status "Active":
 ```todoseq
-search: -[status:Active]
-limit: 5
+search: [status] -[status:Active]
 ```
 
 ## OR Operator
@@ -150,11 +126,6 @@ search: [priority:1]
 
 ### Boolean Properties
 
-Find tasks on pages that are archived (true):
-```todoseq
-search: [archived:true]
-```
-
 Find tasks on pages that are not archived (false):
 ```todoseq
 search: [archived:false]
@@ -164,12 +135,7 @@ search: [archived:false]
 
 Find tasks on pages with "urgent" in tags:
 ```todoseq
-search: [tags:urgent]
-```
-
-Find tasks on pages with "feature" in tags:
-```todoseq
-search: [tags:feature]
+search: [category:test]
 ```
 
 ## Null/Empty Values
@@ -186,12 +152,7 @@ search: [status:""]
 
 Find tasks on pages with null status (property doesn't exist or is null):
 ```todoseq
-search: [status:null]
-```
-
-Find tasks on pages with empty tags array:
-```todoseq
-search: [tags:[]]
+search: [status:""]
 ```
 
 ## Case Sensitivity Variations

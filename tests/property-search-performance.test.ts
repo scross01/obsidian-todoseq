@@ -1,14 +1,68 @@
+/**
+ * @jest-environment jsdom
+ */
 import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { App, TFile } from 'obsidian';
 
 // Create mock file objects
-const createMockFile = (index: number): TFile => ({
-  path: `file-${index}.md`,
-  name: `file-${index}.md`,
-  basename: `file-${index}`,
-  extension: 'md',
-  stat: { size: 1024, mtime: Date.now() },
-} as TFile);
+const createMockFile = (index: number): TFile => {
+  const mockFile = {
+    path: `file-${index}.md`,
+    name: `file-${index}.md`,
+    basename: `file-${index}`,
+    extension: 'md',
+    stat: { size: 1024, mtime: Date.now() },
+    // Add isTFile property to help with type check
+    isTFile: true,
+  };
+
+  // Make it recognize as TFile instance
+  Object.setPrototypeOf(mockFile, { 
+    constructor: { name: 'TFile' }, 
+    __proto__: { __proto__: Object.prototype } 
+  });
+
+  return mockFile as unknown as TFile;
+};
+
+// Mock TaskStateManager
+const mockTaskStateManager = {
+  getTasks: () => {
+    // Create mock tasks for files with properties
+    const tasks = [];
+    for (let i = 0; i < 1000; i++) {
+      // Create tasks for files that have properties (about 20% of files)
+      if (i % 5 === 0 || i % 7 === 0 || i % 11 === 0 || i % 13 === 0 || i % 17 === 0) {
+        tasks.push({
+          path: `file-${i}.md`,
+          text: `Test task ${i}`,
+          completed: false,
+          state: 'TODO',
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          tags: [],
+          context: '',
+          project: '',
+          urgency: 0,
+          estimatedDuration: 0,
+          isRecurring: false,
+          recurrenceRule: '',
+          lineNumber: 1,
+          listType: 'bullet',
+        });
+      }
+    }
+    return tasks;
+  },
+};
+
+// Create a cache of test files for quick lookup
+const performanceTestFilesCache = new Map<string, TFile>();
+for (let i = 0; i < 1000; i++) {
+  const file = createMockFile(i);
+  performanceTestFilesCache.set(file.path, file);
+}
 
 // Mock the Obsidian app
 const mockApp = {
@@ -17,15 +71,20 @@ const mockApp = {
       // Simulate a large vault with 1000 files
       const files = [];
       for (let i = 0; i < 1000; i++) {
-        files.push(createMockFile(i));
+        files.push(performanceTestFilesCache.get(`file-${i}.md`)!);
       }
       return files;
     },
+    getAbstractFileByPath: (path: string) => {
+      // Return mock file from cache for given path
+      return performanceTestFilesCache.get(path) || null;
+    },
+    on: jest.fn(),
   },
   metadataCache: {
     getFileCache: (file: TFile) => {
       // Simulate files with different properties
-      const fileNum = parseInt(file.name.replace('.md', ''));
+      const fileNum = parseInt(file.path.replace('file-', '').replace('.md', ''));
       const frontmatter: any = {};
       
       // Add properties to about 20% of files
@@ -51,6 +110,11 @@ const mockApp = {
   },
 } as unknown as App;
 
+// Expose plugin instance with task state manager for testing
+(window as unknown as { todoSeqPlugin?: any }).todoSeqPlugin = {
+  taskStateManager: mockTaskStateManager,
+};
+
 describe('PropertySearchEngine Performance', () => {
   let propertySearchEngine: PropertySearchEngine;
 
@@ -71,27 +135,8 @@ describe('PropertySearchEngine Performance', () => {
     propertySearchEngine.invalidateFile(mockFile);
     const endTime = Date.now();
     
-    console.log(`File invalidation took ${endTime - startTime}ms`);
-    
     expect(endTime - startTime).toBeLessThan(50); // Should be very fast (< 50ms)
   });
 
-  test('should startup scan with delay', async () => {
-    const testSettings = {
-      runStartupScan: true,
-      startupScanDelay: 100, // 100ms delay for testing
-      showStartupScanProgress: true,
-    };
-    
-    const startTime = Date.now();
-    await propertySearchEngine.initializeStartupScan(testSettings);
-    
-    // Wait for the delayed startup scan to complete
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const endTime = Date.now();
-    console.log(`Startup scan with delay took ${endTime - startTime}ms`);
-    
-    expect(propertySearchEngine.isReady()).toBe(true);
-  });
+
 });

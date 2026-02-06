@@ -1,7 +1,11 @@
 ---
 type: Test Page
-tags: []
-categories: []
+tags:
+  - urgent
+  - feature
+category:
+  - test
+  - example
 ---
 
 TODO a task on a page with empty arrays

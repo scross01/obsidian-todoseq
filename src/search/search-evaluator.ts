@@ -528,6 +528,7 @@ export class SearchEvaluator {
     }
 
     // Parse the start and end dates
+    // Ensure we parse dates in local timezone to match task date format
     const startDate = DateUtils.parseDateValue(start);
     const endDate = DateUtils.parseDateValue(end);
 
@@ -556,40 +557,61 @@ export class SearchEvaluator {
       'start' in startDate &&
       'end' in startDate
     ) {
-      rangeStart = startDate.start;
+      rangeStart = DateUtils.getStartOfDay(startDate.start);
+      rangeEnd = DateUtils.getStartOfDay(startDate.end);
     } else if (
       typeof startDate === 'object' &&
       startDate !== null &&
       'date' in startDate
     ) {
-      rangeStart = startDate.date;
+      rangeStart = DateUtils.getStartOfDay(startDate.date);
+      // Handle end date
+      if (
+        typeof endDate === 'object' &&
+        endDate !== null &&
+        'start' in endDate &&
+        'end' in endDate
+      ) {
+        rangeEnd = DateUtils.getStartOfDay(endDate.end);
+      } else if (
+        typeof endDate === 'object' &&
+        endDate !== null &&
+        'date' in endDate
+      ) {
+        rangeEnd = DateUtils.getStartOfDay(endDate.date);
+        rangeEnd.setDate(rangeEnd.getDate() + 1); // Make end date exclusive
+      } else if (endDate instanceof Date) {
+        rangeEnd = DateUtils.getStartOfDay(endDate);
+        rangeEnd.setDate(rangeEnd.getDate() + 1); // Make end date exclusive
+      } else {
+        return false;
+      }
     } else if (startDate instanceof Date) {
-      rangeStart = startDate;
+      rangeStart = DateUtils.getStartOfDay(startDate);
+      // Handle end date
+      if (
+        typeof endDate === 'object' &&
+        endDate !== null &&
+        'start' in endDate &&
+        'end' in endDate
+      ) {
+        rangeEnd = DateUtils.getStartOfDay(endDate.end);
+      } else if (
+        typeof endDate === 'object' &&
+        endDate !== null &&
+        'date' in endDate
+      ) {
+        rangeEnd = DateUtils.getStartOfDay(endDate.date);
+        rangeEnd.setDate(rangeEnd.getDate() + 1); // Make end date exclusive
+      } else if (endDate instanceof Date) {
+        rangeEnd = DateUtils.getStartOfDay(endDate);
+        rangeEnd.setDate(rangeEnd.getDate() + 1); // Make end date exclusive
+      } else {
+        return false;
+      }
     } else {
       return false;
     }
-
-    // Handle end date
-    if (
-      typeof endDate === 'object' &&
-      endDate !== null &&
-      'start' in endDate &&
-      'end' in endDate
-    ) {
-      rangeEnd = endDate.end;
-    } else if (
-      typeof endDate === 'object' &&
-      endDate !== null &&
-      'date' in endDate
-    ) {
-      rangeEnd = endDate.date;
-    } else if (endDate instanceof Date) {
-      rangeEnd = endDate;
-    } else {
-      return false;
-    }
-
-    // Do not add one day to end date - parseDateValue already makes ranges inclusive
 
     return DateUtils.isDateInRange(taskDate, rangeStart, rangeEnd);
   }
@@ -784,35 +806,89 @@ export class SearchEvaluator {
       return false;
     }
 
-    // Handle comparison operators (e.g., ["size":>100])
-    if (exact && typeof value === 'string') {
-      const comparisonMatch = value.match(/^([><]=?|==?)\s*(.+)$/);
+    // Handle date property comparisons
+    const parsedDate = DateUtils.parseDateValue(value);
+    
+    if (parsedDate) {
+      // Try to parse property value as date
+      let taskDate: Date | null = null;
+      
+      if (propertyValue instanceof Date) {
+        taskDate = propertyValue;
+      } else if (typeof propertyValue === 'string') {
+        // Try to parse string as date
+        const parsedPropDate = DateUtils.parseDateValue(propertyValue);
+        if (parsedPropDate && parsedPropDate !== 'none' && !(typeof parsedPropDate === 'string')) {
+          if (typeof parsedPropDate === 'object' && 'date' in parsedPropDate) {
+            taskDate = parsedPropDate.date;
+          } else if (parsedPropDate instanceof Date) {
+            taskDate = parsedPropDate;
+          }
+        }
+      }
+      
+      if (taskDate) {
+        // Handle date comparisons similar to evaluateDateFilter
+        if (typeof parsedDate === 'string') {
+          // Relative date expressions like 'today', 'tomorrow'
+          return this.evaluateDateExpression(parsedDate, taskDate);
+        } else if (typeof parsedDate === 'object' && parsedDate !== null) {
+          if ('start' in parsedDate && 'end' in parsedDate) {
+            // Date range
+            return DateUtils.isDateInRange(taskDate, parsedDate.start, parsedDate.end);
+          } else if ('date' in parsedDate && 'format' in parsedDate) {
+            // Exact date with format information
+            const searchDate = parsedDate.date;
+            const format = parsedDate.format;
+            
+            switch (format) {
+              case 'year':
+                // Year-only search (e.g., 2025)
+                return searchDate.getFullYear() === taskDate.getFullYear();
+              case 'year-month':
+                // Year-month search (e.g., 2025-11)
+                return (
+                  searchDate.getFullYear() === taskDate.getFullYear() &&
+                  searchDate.getMonth() === taskDate.getMonth()
+                );
+              case 'full':
+                // Full date search (e.g., 2025-11-30)
+                return DateUtils.compareDates(taskDate, searchDate);
+              default:
+                return false;
+            }
+          } else if (parsedDate instanceof Date) {
+            // Date object (from natural language parsing)
+            return DateUtils.compareDates(taskDate, parsedDate);
+          }
+        }
+      }
+    }
+
+    // Handle comparison operators (e.g., [size:>100])
+    if (typeof value === 'string') {
+      const comparisonMatch = value.match(/^([><]=?)\s*(\d+(\.\d+)?)$/);
       if (comparisonMatch) {
         const operator = comparisonMatch[1];
-        const compareValue = comparisonMatch[2];
+        const compareValue = Number(comparisonMatch[2]);
         
-        // Only numeric comparisons are supported
-        if (typeof propertyValue === 'number' && !isNaN(Number(compareValue))) {
-          const numCompareValue = Number(compareValue);
-          
+        // Only numeric comparisons are supported for numeric properties
+        if (typeof propertyValue === 'number') {
           switch (operator) {
             case '>':
-              return propertyValue > numCompareValue;
+              return propertyValue > compareValue;
             case '>=':
-              return propertyValue >= numCompareValue;
+              return propertyValue >= compareValue;
             case '<':
-              return propertyValue < numCompareValue;
+              return propertyValue < compareValue;
             case '<=':
-              return propertyValue <= numCompareValue;
-            case '==':
-            case '=':
-              return propertyValue === numCompareValue;
+              return propertyValue <= compareValue;
             default:
               return false;
           }
         }
         
-        // For non-numeric values, comparison operators are not supported
+        // For non-numeric properties, comparison operators are not supported
         return false;
       }
     }

@@ -124,7 +124,10 @@ export class DateUtils {
       endDate.setDate(endDate.getDate() + 1);
 
       if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-        return { start: startDate, end: endDate };
+        // Normalize dates to ensure timezone consistency with tasks
+        const normalizedStart = this.normalizeDateForTimezone(startDate);
+        const normalizedEnd = this.normalizeDateForTimezone(endDate);
+        return { start: normalizedStart, end: normalizedEnd };
       }
       return null;
     }
@@ -426,8 +429,13 @@ export class DateUtils {
     if (!date) return false;
 
     const target = this.getStartOfDay(date);
+    
+    // Normalize all dates to ensure timezone consistency
+    const normalizedTarget = this.normalizeDateForTimezone(target);
+    const normalizedStart = this.normalizeDateForTimezone(start);
+    const normalizedEnd = this.normalizeDateForTimezone(end);
 
-    return target >= start && target < end;
+    return normalizedTarget >= normalizedStart && normalizedTarget < normalizedEnd;
   }
 
   /**

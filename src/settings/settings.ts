@@ -20,10 +20,6 @@ export interface TodoTrackerSettings {
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
-  // Property search settings
-  runStartupScan: boolean; // Build index on startup (default: false for performance)
-  startupScanDelay: number; // Delay before running startup scan (default: 3000ms)
-  showStartupScanProgress: boolean; // Show progress during startup scan
   // Property search engine instance
   propertySearchEngine?: import('../services/property-search-engine').PropertySearchEngine; // Property search engine instance
   // Hidden setting - not exposed in UI, used to track first install
@@ -44,10 +40,6 @@ export const DefaultSettings: TodoTrackerSettings = {
   },
   weekStartsOn: 'Monday', // Default to Monday as requested
   formatTaskKeywords: true, // Default to enabled
-  // Property search settings
-  runStartupScan: false, // Disabled by default for performance
-  startupScanDelay: 3000, // 3 seconds default delay
-  showStartupScanProgress: false, // Disabled by default
 };
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
@@ -411,47 +403,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         });
       });
 
-    // Property search Group
-    new Setting(containerEl)
-      .setName('Property search')
-      .setHeading();
 
-    new Setting(containerEl)
-      .setName('Run startup scan')
-      .setDesc('Build property index on plugin startup for faster property searches (may slow down plugin loading)')
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.runStartupScan)
-          .onChange(async (value) => {
-            this.plugin.settings.runStartupScan = value;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName('Startup scan delay')
-      .setDesc('Delay before running startup scan (in milliseconds)')
-      .addSlider((slider) =>
-        slider
-          .setLimits(1000, 10000, 500)
-          .setValue(this.plugin.settings.startupScanDelay)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            this.plugin.settings.startupScanDelay = value;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName('Show startup scan progress')
-      .setDesc('Show progress messages in console during startup scan')
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showStartupScanProgress)
-          .onChange(async (value) => {
-            this.plugin.settings.showStartupScanProgress = value;
-            await this.plugin.saveSettings();
-          }),
-      );
   }
 }
