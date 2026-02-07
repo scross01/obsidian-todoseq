@@ -4,6 +4,7 @@ import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
 import { buildTaskKeywords } from '../../utils/task-utils';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
+import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { TFile } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 
@@ -124,6 +125,9 @@ export class ReaderViewFormatter {
 
       // Process task keywords in the rendered content
       this.processTaskKeywords(element);
+
+      // Process priority pills in task lines
+      this.processPriorityPills(element);
 
       // Process SCHEDULED and DEADLINE lines
       this.processDateLines(element);
@@ -431,6 +435,335 @@ export class ReaderViewFormatter {
       // <li><span class="list-bullet"></span>TODO task text</li>
       this.processListItemDirectly(listItem);
     });
+  }
+
+  /**
+   * Process priority tokens [#A], [#B], [#C] in task lines and replace with styled pills
+   * Called after task keyword processing to avoid interference
+   */
+  private processPriorityPills(element: HTMLElement): void {
+    // Skip if formatting is disabled
+    if (!this.plugin.settings.formatTaskKeywords) {
+      return;
+    }
+
+    // Check if we should skip quote/callout blocks
+    const includeCalloutBlocks =
+      this.plugin.settings?.includeCalloutBlocks ?? true;
+
+    // Find all task list items
+    const taskItems = element.querySelectorAll('.task-list-item');
+
+    taskItems.forEach((taskItem) => {
+      // Skip if element is inside an embedded task list container
+      if (taskItem.closest('.embedded-task-list-container')) {
+        return;
+      }
+
+      // Skip if quote/callout blocks are disabled and this element is inside one
+      if (
+        !includeCalloutBlocks &&
+        taskItem instanceof HTMLElement &&
+        this.isInQuoteOrCalloutBlock(taskItem)
+      ) {
+        return;
+      }
+
+      if (!(taskItem instanceof HTMLElement)) {
+        return;
+      }
+
+      // Process priority tokens in this task item
+      this.processPriorityPillsInElement(taskItem);
+    });
+
+    // Also process regular list items that might have tasks
+    const listItems = element.querySelectorAll('li:not(.task-list-item)');
+
+    listItems.forEach((listItem) => {
+      // Skip if element is inside an embedded task list container
+      if (listItem.closest('.embedded-task-list-container')) {
+        return;
+      }
+
+      // Skip if quote/callout blocks are disabled and this element is inside one
+      if (
+        !includeCalloutBlocks &&
+        listItem instanceof HTMLElement &&
+        this.isInQuoteOrCalloutBlock(listItem)
+      ) {
+        return;
+      }
+
+      if (!(listItem instanceof HTMLElement)) {
+        return;
+      }
+
+      // Process priority tokens in this list item
+      this.processPriorityPillsInElement(listItem);
+    });
+
+    // Process paragraphs that might contain tasks
+    const paragraphs = element.querySelectorAll('p');
+
+    paragraphs.forEach((paragraph) => {
+      // Skip if element is inside an embedded task list container
+      if (paragraph.closest('.embedded-task-list-container')) {
+        return;
+      }
+
+      // Skip if quote/callout blocks are disabled and this paragraph is inside one
+      if (
+        !includeCalloutBlocks &&
+        paragraph instanceof HTMLElement &&
+        this.isInQuoteOrCalloutBlock(paragraph)
+      ) {
+        return;
+      }
+
+      if (!(paragraph instanceof HTMLElement)) {
+        return;
+      }
+
+      // Only process priority pills in lines that contain task keywords
+      // This matches the editor behavior which checks isTaskLine() before processing
+      const taskParser = this.getTaskParser();
+      if (
+        taskParser &&
+        !taskParser.testRegex.test(paragraph.textContent || '')
+      ) {
+        return;
+      }
+
+      // Process priority tokens in this paragraph
+      this.processPriorityPillsInElement(paragraph);
+    });
+  }
+
+  /**
+   * Process priority tokens in a single element
+   */
+  private processPriorityPillsInElement(element: HTMLElement): void {
+    // First, handle tag links that Obsidian has already rendered (e.g., [<a class="tag">#A</a>])
+    this.processPriorityTagLinks(element);
+
+    // Get all text nodes in the element
+    const textNodes = this.getTextNodes(element);
+
+    // Process each text node for priority tokens
+    // We need to process in reverse order to avoid offset issues when replacing
+    for (let i = textNodes.length - 1; i >= 0; i--) {
+      const textNode = textNodes[i];
+      if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+        continue;
+      }
+
+      this.processPriorityPillsInTextNode(textNode);
+    }
+  }
+
+  /**
+   * Process priority tokens that Obsidian has rendered as tag links
+   * Handles the case where [#A] becomes [<a href="#A" class="tag">#A</a>]
+   */
+  private processPriorityTagLinks(element: HTMLElement): void {
+    // Find all anchor tags with class "tag" that might be priority tokens
+    const tagLinks = element.querySelectorAll('a.tag');
+
+    tagLinks.forEach((tagLink) => {
+      if (!(tagLink instanceof HTMLElement)) {
+        return;
+      }
+
+      // Get the href and text content
+      const href = tagLink.getAttribute('href') || '';
+      const text = tagLink.textContent || '';
+
+      // Check if this is a priority tag (#A, #B, or #C)
+      const priorityMatch = href.match(/^#([ABC])$/);
+      if (!priorityMatch) {
+        return;
+      }
+
+      const letter = priorityMatch[1];
+
+      // Verify the text content matches
+      if (text !== `#${letter}`) {
+        return;
+      }
+
+      // Check if this tag link is wrapped in brackets [ ]
+      const parentNode = tagLink.parentNode;
+      if (!parentNode) {
+        return;
+      }
+
+      // Get the previous and next siblings
+      const prevSibling = tagLink.previousSibling;
+      const nextSibling = tagLink.nextSibling;
+
+      // Check if previous sibling is a text node ending with '['
+      let hasOpeningBracket = false;
+      let bracketTextNode: Text | null = null;
+
+      if (prevSibling && prevSibling.nodeType === Node.TEXT_NODE) {
+        const prevText = prevSibling.textContent || '';
+        if (prevText.endsWith('[')) {
+          hasOpeningBracket = true;
+          bracketTextNode = prevSibling as Text;
+        }
+      }
+
+      // Check if next sibling is a text node starting with ']'
+      let hasClosingBracket = false;
+      let closingBracketTextNode: Text | null = null;
+
+      if (nextSibling && nextSibling.nodeType === Node.TEXT_NODE) {
+        const nextText = nextSibling.textContent || '';
+        if (nextText.startsWith(']')) {
+          hasClosingBracket = true;
+          closingBracketTextNode = nextSibling as Text;
+        }
+      }
+
+      // Only process if both brackets are present
+      if (!hasOpeningBracket || !hasClosingBracket) {
+        return;
+      }
+
+      // Create the priority pill
+      const pill = this.createPriorityPill(letter);
+
+      // Handle the opening bracket text node - remove the '['
+      if (bracketTextNode) {
+        const prevText = bracketTextNode.textContent || '';
+        const newText = prevText.slice(0, -1);
+        if (newText.length === 0) {
+          // Remove the entire text node if it only contained '['
+          parentNode.removeChild(bracketTextNode);
+        } else {
+          bracketTextNode.textContent = newText;
+        }
+      }
+
+      // Handle the closing bracket text node - remove the ']'
+      if (closingBracketTextNode) {
+        const nextText = closingBracketTextNode.textContent || '';
+        const newText = nextText.slice(1);
+        if (newText.length === 0) {
+          // Remove the entire text node if it only contained ']'
+          parentNode.removeChild(closingBracketTextNode);
+        } else {
+          closingBracketTextNode.textContent = newText;
+        }
+      }
+
+      // Replace the tag link with the priority pill
+      parentNode.replaceChild(pill, tagLink);
+    });
+  }
+
+  /**
+   * Process priority tokens in a single text node
+   */
+  private processPriorityPillsInTextNode(textNode: Node): void {
+    const text = textNode.textContent || '';
+
+    // Create a regex with global flag to find all matches
+    const regex = new RegExp(PRIORITY_TOKEN_REGEX.source, 'g');
+    let match: RegExpExecArray | null;
+
+    // Collect all matches first (since we'll be modifying the DOM)
+    const matches: Array<{
+      index: number;
+      leadingSpace: string;
+      letter: string;
+      trailingSpace: string;
+      fullMatch: string;
+    }> = [];
+
+    while ((match = regex.exec(text)) !== null) {
+      matches.push({
+        index: match.index,
+        leadingSpace: match[1] || '',
+        letter: match[2],
+        trailingSpace: match[3] || '',
+        fullMatch: match[0],
+      });
+    }
+
+    // If no matches, nothing to do
+    if (matches.length === 0) {
+      return;
+    }
+
+    // Process matches in reverse order to maintain correct offsets
+    let currentNode = textNode;
+
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const m = matches[i];
+      const tokenStart = m.index;
+      const tokenEnd = tokenStart + m.fullMatch.length;
+
+      // The actual [#A] part (without surrounding whitespace)
+      const pillStart = tokenStart + m.leadingSpace.length;
+      const pillEnd = tokenEnd - m.trailingSpace.length;
+
+      // Create the priority pill
+      const pill = this.createPriorityPill(m.letter);
+
+      // Get the current text content
+      const currentText = currentNode.textContent || '';
+
+      // Split the text node
+      const beforeText = currentText.substring(0, pillStart);
+      const afterText = currentText.substring(pillEnd);
+
+      // Create new text nodes
+      const beforeNode = document.createTextNode(beforeText);
+      const afterNode = document.createTextNode(afterText);
+
+      // Replace the current node with before + pill + after
+      const parentNode = currentNode.parentNode;
+      if (parentNode) {
+        parentNode.insertBefore(afterNode, currentNode);
+        parentNode.insertBefore(pill, afterNode);
+        parentNode.insertBefore(beforeNode, pill);
+        parentNode.removeChild(currentNode);
+
+        // Update current node reference for next iteration
+        currentNode = afterNode;
+      }
+    }
+  }
+
+  /**
+   * Create a styled priority pill element
+   * @param letter - The priority letter: A, B, or C
+   * @returns HTMLSpanElement with appropriate classes
+   */
+  private createPriorityPill(letter: string): HTMLSpanElement {
+    // Map priority letter to CSS class
+    const priorityClass =
+      letter === 'A'
+        ? 'priority-high'
+        : letter === 'B'
+          ? 'priority-med'
+          : 'priority-low';
+
+    const container = document.createElement('div');
+    const span = container.createSpan({
+      cls: `priority-badge ${priorityClass}`,
+      attr: {
+        'data-priority': letter,
+        'aria-label': `Priority ${letter}`,
+        role: 'badge',
+      },
+    });
+
+    span.textContent = letter;
+
+    return span;
   }
 
   /**

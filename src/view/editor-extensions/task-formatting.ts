@@ -4,6 +4,7 @@ import {
   DecorationSet,
   ViewPlugin,
   ViewUpdate,
+  WidgetType,
 } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { TodoTrackerSettings } from '../../settings/settings';
@@ -12,6 +13,7 @@ import {
   COMMENT_BLOCK_REGEX,
   FOOTNOTE_DEFINITION_REGEX,
   SINGLE_LINE_COMMENT_REGEX,
+  PRIORITY_TOKEN_REGEX,
 } from '../../utils/patterns';
 import {
   LanguageRegistry,
@@ -19,6 +21,43 @@ import {
 } from '../../parser/language-registry';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { DEFAULT_COMPLETED_STATES } from '../../types/task';
+
+/**
+ * Priority type definition
+ */
+type PriorityLevel = 'high' | 'med' | 'low';
+
+/**
+ * Custom widget for rendering priority pills in the editor
+ * Implements eq() for efficient updates and toDOM() for rendering
+ */
+class PriorityWidget extends WidgetType {
+  constructor(
+    readonly letter: string,
+    readonly priority: PriorityLevel,
+  ) {
+    super();
+  }
+
+  eq(other: PriorityWidget): boolean {
+    return this.letter === other.letter && this.priority === other.priority;
+  }
+
+  toDOM(): HTMLElement {
+    const container = document.createElement('span');
+    container.className = `cm-priority-pill priority-badge priority-${this.priority}`;
+    container.textContent = this.letter;
+    container.setAttribute('data-priority', this.letter);
+    container.setAttribute('aria-label', `Priority ${this.letter}`);
+    container.setAttribute('role', 'badge');
+    return container;
+  }
+
+  ignoreEvent(): boolean {
+    // Allow text selection within widget area
+    return false;
+  }
+}
 
 export class TaskKeywordDecorator {
   private decorations: DecorationSet;
@@ -39,6 +78,9 @@ export class TaskKeywordDecorator {
   private previousTaskLine: number | null = null;
   private previousTaskIndent = '';
 
+  // Proximity buffer for cursor detection (in characters)
+  private readonly PROXIMITY_BUFFER = 0;
+
   constructor(
     private view: EditorView,
     settings: TodoTrackerSettings,
@@ -47,6 +89,49 @@ export class TaskKeywordDecorator {
     this.settings = settings;
     this.parser = parser;
     this.decorations = this.createDecorations();
+  }
+
+  /**
+   * Check if cursor is near a priority token
+   * Used to determine whether to show raw text or widget
+   */
+  private isCursorNearPriority(tokenFrom: number, tokenTo: number): boolean {
+    const selection = this.view.state.selection.main;
+    const cursorPos = selection.head;
+
+    // Get line information
+    const tokenLine = this.view.state.doc.lineAt(tokenFrom);
+    const cursorLine = this.view.state.doc.lineAt(cursorPos);
+
+    // If cursor is on a different line, show widget
+    if (tokenLine.number !== cursorLine.number) {
+      return false;
+    }
+
+    // Define proximity threshold - cursor within or adjacent to token
+    const nearStart = tokenFrom - this.PROXIMITY_BUFFER;
+    const nearEnd = tokenTo + this.PROXIMITY_BUFFER;
+
+    // Check if cursor is within proximity zone
+    if (cursorPos >= nearStart && cursorPos <= nearEnd) {
+      return true;
+    }
+
+    // Also check if selection overlaps with token
+    if (selection.from <= tokenTo && selection.to >= tokenFrom) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Get the priority level from a priority letter
+   */
+  private getPriorityLevel(letter: string): PriorityLevel {
+    if (letter === 'A') return 'high';
+    if (letter === 'B') return 'med';
+    return 'low';
   }
 
   private getLanguageRegistry(): LanguageRegistry {
@@ -339,6 +424,9 @@ export class TaskKeywordDecorator {
           }
         }
 
+        // Process priority tokens on this line
+        this.processPriorityTokens(lineText, line, builder);
+
         // Check if this line contains SCHEDULED: or DEADLINE: and follows a task line
         this.checkAndDecorateDateLine(lineNumber, lineText, line, builder);
       }
@@ -544,6 +632,112 @@ export class TaskKeywordDecorator {
     }
   }
 
+  /**
+   * Check if the editor is in Live Preview mode
+   * Priority pills should only be rendered in Live Preview, not Source mode
+   * Note: The is-live-preview class is on the parent .markdown-source-view element, not .cm-editor
+   */
+  private isLivePreviewMode(): boolean {
+    return (
+      this.view.dom.parentElement?.classList.contains('is-live-preview') ??
+      false
+    );
+  }
+
+  /**
+   * Check if a line is a task line (starts with - [ ] or - [x])
+   * Priority tokens should only be decorated on actual task lines
+   */
+  private isTaskLine(lineText: string): boolean {
+    // Use the parser's test regex to check if this line contains a task
+    return this.parser.testRegex.test(lineText);
+  }
+
+  /**
+   * Process priority tokens [#A], [#B], [#C] in a line and add decorations
+   */
+  private processPriorityTokens(
+    lineText: string,
+    line: { from: number; to: number },
+    builder: RangeSetBuilder<Decoration>,
+  ): void {
+    // Check if we're in Live Preview mode
+    const isLivePreview = this.isLivePreviewMode();
+
+    // Skip if this is not a task line - priority pills only appear on tasks
+    if (!this.isTaskLine(lineText)) {
+      return;
+    }
+
+    // Skip if in code block and code blocks disabled
+    if (this.inCodeBlock && !this.settings.includeCodeBlocks) {
+      return;
+    }
+
+    // Skip if in quote block and callout blocks disabled
+    if (
+      (this.inQuoteBlock || this.inCalloutBlock) &&
+      !this.settings.includeCalloutBlocks
+    ) {
+      return;
+    }
+
+    // Skip if in comment block and comment blocks disabled
+    if (this.inCommentBlock && !this.settings.includeCommentBlocks) {
+      return;
+    }
+
+    // Create a regex with global flag to find all matches
+    const regex = new RegExp(PRIORITY_TOKEN_REGEX.source, 'g');
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(lineText)) !== null) {
+      const leadingSpace = match[1] || '';
+      const letter = match[2];
+      const trailingSpace = match[3] || '';
+
+      // Calculate absolute positions
+      const tokenStart = line.from + match.index;
+      const tokenEnd = tokenStart + match[0].length;
+
+      // The actual [#A] part (without surrounding whitespace)
+      const pillStart = tokenStart + leadingSpace.length;
+      const pillEnd = tokenEnd - trailingSpace.length;
+
+      // In Source mode: always show colored text (no pill)
+      // In Live Preview: show colored text when cursor is near, otherwise show pill widget
+      const showRawText =
+        !isLivePreview || this.isCursorNearPriority(pillStart, pillEnd);
+
+      if (showRawText) {
+        // Show raw text with colored formatting class
+        builder.add(
+          pillStart,
+          pillEnd,
+          Decoration.mark({
+            class: `cm-priority-raw cm-priority-${letter.toLowerCase()}`,
+            attributes: {
+              'data-priority': letter,
+            },
+          }),
+        );
+      } else {
+        // Replace with widget (Live Preview only, when cursor not near)
+        const priority = this.getPriorityLevel(letter);
+        const widget = new PriorityWidget(letter, priority);
+
+        builder.add(
+          pillStart,
+          pillEnd,
+          Decoration.replace({
+            widget: widget,
+            inclusive: false,
+          }),
+        );
+      }
+    }
+  }
+
   public updateDecorations(): void {
     this.decorations = this.createDecorations();
   }
@@ -573,13 +767,37 @@ export const taskKeywordPlugin = (
       private settings: TodoTrackerSettings;
       private getParser: () => TaskParser | null;
       private settingsDetector: SettingsChangeDetector;
+      private wasLivePreviewMode: boolean | null = null;
 
       constructor(view: EditorView) {
         this.settings = settings;
         this.getParser = getParser;
         this.settingsDetector = new SettingsChangeDetector();
         this.settingsDetector.initialize(settings);
+        // Initialize the mode state
+        this.wasLivePreviewMode = this.isLivePreviewMode(view);
         this.updateDecorations(view);
+      }
+
+      /**
+       * Check if the editor is in Live Preview mode
+       */
+      private isLivePreviewMode(view: EditorView): boolean {
+        return (
+          view.dom.parentElement?.classList.contains('is-live-preview') ?? false
+        );
+      }
+
+      /**
+       * Check if the editor mode has changed (Source <-> Live Preview)
+       */
+      private hasModeChanged(view: EditorView): boolean {
+        const currentMode = this.isLivePreviewMode(view);
+        if (this.wasLivePreviewMode !== currentMode) {
+          this.wasLivePreviewMode = currentMode;
+          return true;
+        }
+        return false;
       }
 
       private updateDecorations(view: EditorView): void {
@@ -609,11 +827,15 @@ export const taskKeywordPlugin = (
           return;
         }
 
-        // Recreate decorations when document changes, viewport changes, or settings have changed
+        // Recreate decorations when document changes, viewport changes, settings have changed,
+        // selection changes (for cursor proximity detection of priority pills),
+        // or when switching between Source mode and Live Preview mode
         if (
           update.docChanged ||
           update.viewportChanged ||
-          this.settingsDetector.hasFormattingSettingsChanged(this.settings)
+          update.selectionSet ||
+          this.settingsDetector.hasFormattingSettingsChanged(this.settings) ||
+          this.hasModeChanged(update.view)
         ) {
           this.updateDecorations(update.view);
           this.settingsDetector.updatePreviousState(this.settings);
