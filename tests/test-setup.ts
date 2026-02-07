@@ -4,7 +4,7 @@ import {
   DEFAULT_PENDING_STATES,
   DEFAULT_ACTIVE_STATES,
   DEFAULT_COMPLETED_STATES,
-} from '../src/task';
+} from '../src/types/task';
 
 // Create a global registry instance for all tests
 const registry = new LanguageRegistry();

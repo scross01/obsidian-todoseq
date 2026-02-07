@@ -127,6 +127,27 @@ Choose how tasks are ordered using the sort method dropdown:
 - Tasks with no urgency score appear at the end
 - Completed tasks are not included in urgency sorting
 
+### 6. Keyword
+
+- Tasks sorted by an implied order if the keyword states
+- Tasks are classified into 5 ordered groups based on their keyword:
+
+| Group         | Keywords                   |
+| ------------- | -------------------------- |
+| 1 - Active    | NOW, DOING, IN-PROGRESS    |
+| 2 - Inactive  | TODO, LATER                |
+| 3 - Custom    | User-defined from settings |
+| 4 - Waiting   | WAIT, WAITING              |
+| 5 - Completed | DONE, CANCELED, CANCELLED  |
+
+**Example:**
+
+If you have current tasks with keywords DOING, TODO, and WAIT, they will be ordered as:
+
+1. DOING tasks (Group 1 - Active)
+2. TODO tasks (Group 2 - Inactive)
+3. WAIT tasks (Group 4 - Waiting)
+
 ## Search Functionality
 
 The search field provides powerful live filtering of tasks.

@@ -1,7 +1,7 @@
 import { SearchParser } from './search-parser';
 import { SearchEvaluator } from './search-evaluator';
 import { SearchNode, SearchError } from './search-types';
-import { Task } from '../task';
+import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings';
 
 export class Search {
@@ -9,15 +9,15 @@ export class Search {
     return SearchParser.parse(query);
   }
 
-  static evaluate(
+  static async evaluate(
     query: string,
     task: Task,
     caseSensitive = false,
     settings?: TodoTrackerSettings,
-  ): boolean {
+  ): Promise<boolean> {
     try {
       const ast = this.parse(query);
-      return SearchEvaluator.evaluate(ast, task, caseSensitive, settings);
+      return await SearchEvaluator.evaluate(ast, task, caseSensitive, settings);
     } catch (error) {
       if (error instanceof SearchError) {
         // If there's a parse error, return false (don't match)

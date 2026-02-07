@@ -29,14 +29,18 @@ graph TB
             StateManager["TaskStateManager<br/>Central State"]
             VaultScanner["VaultScanner<br/>File Monitoring"]
             UpdateCoordinator["TaskUpdateCoordinator<br/>Update Pipeline"]
+            EditorController["EditorController<br/>Editor Operations"]
+            TaskWriter["TaskWriter<br/>File Operations"]
         end
 
         subgraph "UI Layer"
-            UIManager["UIManager<br/>Editor Extensions"]
+            UIManager["UIManager<br/>UI Coordination"]
             TaskListView["TaskListView<br/>Main Task Panel"]
-            TaskEditor["TaskEditor<br/>File Operations"]
             ReaderFormatter["ReaderViewFormatter<br/>Reader Mode"]
-            EmbeddedProcessor["EmbeddedTaskProcessor<br/>Code Blocks"]
+            StatusBarManager["StatusBarManager<br/>Status Bar"]
+            EditorKeywordMenu["EditorKeywordMenu<br/>Keyword Menu"]
+            StateMenuBuilder["StateMenuBuilder<br/>State Menu"]
+            EmbeddedProcessor["TodoseqCodeBlockProcessor<br/>Embedded Lists"]
         end
 
         subgraph "Parser Layer"
@@ -49,13 +53,23 @@ graph TB
             Search["Search System<br/>Query Engine"]
             SearchParser["Search Parser<br/>AST Builder"]
             SearchEvaluator["Search Evaluator<br/>Task Filtering"]
+            SearchTokenizer["SearchTokenizer<br/>Lexical Analysis"]
+            SearchSuggestions["SearchSuggestions<br/>Auto-complete"]
         end
 
         subgraph "Utilities"
             TaskUtils["Task Utilities"]
             DateUtils["Date Utilities"]
-            PerformanceUtils["Performance Utils"]
+            SettingsUtils["Settings Utils"]
             RegexCache["RegexCache<br/>Pattern Caching"]
+            Patterns["Regex Patterns"]
+            TaskSort["Task Sorting"]
+            TaskUrgency["Task Urgency"]
+            DailyNoteUtils["Daily Note Utils"]
+        end
+
+        subgraph "Lifecycle"
+            LifecycleManager["PluginLifecycleManager<br/>Plugin Lifecycle"]
         end
     end
 
@@ -127,12 +141,12 @@ graph TB
 
 - **Responsibility**: Single source of truth for all task data
 - **Key Patterns**: Observer pattern for reactive updates
-- **Interface**: `getTasks()`, `setTasks()`, `subscribe(callback)`
+- **Interface**: `getTasks()`, `setTasks()`, `subscribe(callback)`, `findTaskByPathAndLine()`
 
 **VaultScanner** (`src/services/vault-scanner.ts`)
 
 - **Responsibility**: File system monitoring and incremental scanning
-- **Key Patterns**: Event-driven architecture, performance optimization
+- **Key Patterns**: Event-driven architecture, performance optimization, yielding to event loop
 - **Interface**: `scanVault()`, `updateSettings()`, event emission
 
 **TaskUpdateCoordinator** (`src/services/task-update-coordinator.ts`)
@@ -141,25 +155,61 @@ graph TB
 - **Key Patterns**: Command pattern, optimistic updates
 - **Interface**: `updateTaskState()`, `createTask()`, coordinate updates
 
+**EditorController** (`src/services/editor-controller.ts`)
+
+- **Responsibility**: Editor operations, task parsing under cursor, intent detection
+- **Key Patterns**: Bridge pattern, command delegation
+- **Interface**: Task cycling, priority changes, keyword toggling
+
+**TaskWriter** (`src/services/task-writer.ts`)
+
+- **Responsibility**: Atomic file operations, state preservation, formatting
+- **Key Patterns**: Strategy pattern, atomic operations
+- **Interface**: `updateFile()`, `generateTaskLine()`, file persistence
+
 ### 2. UI Layer (User Interaction)
 
 **UIManager** (`src/ui-manager.ts`)
 
-- **Responsibility**: Editor extensions, decorations, event handling
+- **Responsibility**: Central UI coordination, extension registration
 - **Key Patterns**: Extension system, event delegation
-- **Interface**: CodeMirror extension registration, UI coordination
+- **Interface**: UI component lifecycle, event coordination
 
-**TaskListView** (`src/view/task-list-view.ts`)
+**TaskListView** (`src/view/task-list/task-list-view.ts`)
 
 - **Responsibility**: Main task panel with search, filtering, sorting
 - **Key Patterns**: Observer pattern, component-based rendering
 - **Interface**: Obsidian View API implementation
 
-**TaskEditor** (`src/view/task-editor.ts`)
+**ReaderViewFormatter** (`src/view/markdown-renderers/reader-formatting.ts`)
 
-- **Responsibility**: Atomic file operations, state preservation
-- **Key Patterns**: Strategy pattern, atomic operations
-- **Interface**: `updateTaskInFile()`, `createTaskInFile()`
+- **Responsibility**: Task keyword formatting in reader/preview mode
+- **Key Patterns**: Double-click detection, settings change detection
+- **Interface**: `refreshReaderViewFormatter()`, keyword styling, state menus
+
+**StatusBarManager** (`src/view/editor-extensions/status-bar.ts`)
+
+- **Responsibility**: Status bar integration with task count display
+- **Key Patterns**: Event subscription, UI updates
+- **Interface**: `setupStatusBarItem()`, task count display
+
+**EditorKeywordMenu** (`src/view/editor-extensions/editor-keyword-menu.ts`)
+
+- **Responsibility**: In-editor keyword interaction and menu display
+- **Key Patterns**: Context menu, keyword detection
+- **Interface**: Keyword menu management
+
+**StateMenuBuilder** (`src/view/components/state-menu-builder.ts`)
+
+- **Responsibility**: Context menu generation for task state changes
+- **Key Patterns**: Dynamic menu building, state categorization
+- **Interface**: `getSelectableStatesForMenu()`, menu generation
+
+**TodoseqCodeBlockProcessor** (`src/view/embedded-task-list/code-block-processor.ts`)
+
+- **Responsibility**: Embedded task list processing in markdown blocks
+- **Key Patterns**: Post-processor registration, separate lifecycle
+- **Interface**: Code block parsing, embedded list rendering
 
 ### 3. Parser Layer (Data Extraction)
 
@@ -183,6 +233,30 @@ graph TB
 - **Key Patterns**: Compiler pattern (parsing → AST → evaluation)
 - **Interface**: `search()`, query validation, error handling
 
+**SearchParser** (`src/search/search-parser.ts`)
+
+- **Responsibility**: AST building from query tokens
+- **Key Patterns**: Parser combinators, syntax tree construction
+- **Interface**: Query parsing, AST generation
+
+**SearchEvaluator** (`src/search/search-evaluator.ts`)
+
+- **Responsibility**: Task matching and filtering based on query AST
+- **Key Patterns**: Visitor pattern, filter chain execution
+- **Interface**: Task evaluation, result filtering
+
+**SearchTokenizer** (`src/search/search-tokenizer.ts`)
+
+- **Responsibility**: Lexical analysis of search queries
+- **Key Patterns**: Tokenization, pattern matching
+- **Interface**: Token generation, lexical analysis
+
+**SearchSuggestions** (`src/search/search-suggestions.ts`)
+
+- **Responsibility**: Auto-complete functionality for search queries
+- **Key Patterns**: Suggestion ranking, prefix matching
+- **Interface**: Suggestion generation, completion lists
+
 ## Component Dependency Diagram
 
 ```mermaid
@@ -200,9 +274,11 @@ graph TD
     subgraph "UI Layer Dependencies"
         UIManager[UIManager]
         TaskListView[TaskListView]
-        TaskEditor[TaskEditor]
         ReaderFormatter[ReaderViewFormatter]
         StatusBar[StatusBarManager]
+        EditorKeywordMenu[EditorKeywordMenu]
+        StateMenuBuilder[StateMenuBuilder]
+        EmbeddedProcessor[TodoseqCodeBlockProcessor]
     end
 
     subgraph "Parser Dependencies"
@@ -216,14 +292,27 @@ graph TD
         SearchParser[SearchParser]
         SearchEvaluator[SearchEvaluator]
         SearchTokenizer[SearchTokenizer]
+        SearchSuggestions[SearchSuggestions]
     end
 
     subgraph "Utility Dependencies"
         TaskUtils[TaskUtils]
         DateUtils[DateUtils]
-        Performance[PerformanceUtils]
+        SettingsUtils[SettingsUtils]
         Patterns[Patterns]
         RegexCache[RegexCache]
+        TaskSort[TaskSort]
+        TaskUrgency[TaskUrgency]
+        DailyNoteUtils[DailyNoteUtils]
+    end
+
+    subgraph "Service Layer Dependencies"
+        EditorController[EditorController]
+        TaskWriter[TaskWriter]
+    end
+
+    subgraph "Lifecycle Dependencies"
+        LifecycleManager[PluginLifecycleManager]
     end
 
     subgraph "External APIs"
@@ -236,18 +325,26 @@ graph TD
     Main --> VaultScanner
     Main --> UpdateCoordinator
     Main --> UIManager
+    Main --> EditorController
+    Main --> TaskWriter
+    Main --> LifecycleManager
 
     StateManager -.-> Main
     VaultScanner -.-> Main
     UpdateCoordinator -.-> Main
     UIManager -.-> Main
+    EditorController -.-> Main
+    TaskWriter -.-> Main
+    LifecycleManager -.-> Main
 
     UpdateCoordinator --> StateManager
-    UpdateCoordinator --> TaskEditor
+    UpdateCoordinator --> TaskWriter
 
     UIManager --> TaskListView
     UIManager --> ReaderFormatter
     UIManager --> StatusBar
+    UIManager --> EditorKeywordMenu
+    UIManager --> StateMenuBuilder
 
     TaskListView --> StateManager
     TaskListView --> Search
@@ -261,9 +358,13 @@ graph TD
     Search --> SearchParser
     Search --> SearchEvaluator
     SearchParser --> SearchTokenizer
+    Search --> SearchSuggestions
     Search --> StateManager
 
-    TaskEditor --> Obsidian
+    EditorController --> TaskWriter
+    EditorController --> StateManager
+
+    TaskWriter --> Obsidian
     VaultScanner --> Obsidian
     DateUtils --> DailyNotes
 
@@ -271,24 +372,38 @@ graph TD
     ReaderFormatter --> Obsidian
 
     %% Utility dependencies
-    TaskEditor --> TaskUtils
+    TaskWriter --> TaskUtils
     TaskListView --> TaskUtils
     SearchEvaluator --> TaskUtils
-
-    Performance --> StateManager
-    Performance --> VaultScanner
+    EditorController --> Patterns
 
     %% RegexCache dependencies
     VaultScanner --> RegexCache
     SearchEvaluator --> RegexCache
 
+    %% Lifecycle dependencies
+    LifecycleManager --> VaultScanner
+    LifecycleManager --> TaskWriter
+    LifecycleManager --> EditorKeywordMenu
+    LifecycleManager --> StatusBar
+    LifecycleManager --> TaskListView
+
     %% Styling for dependency direction
-    linkStyle 0,1,2,3,4 stroke:#2196f3,stroke-width:2px
-    linkStyle 5,6,7 stroke:#4caf50,stroke-width:2px
-    linkStyle 8,9,10,11,12,13 stroke:#ff9800,stroke-width:2px
-    linkStyle 14,15,16,17,18,19,20 stroke:#9c27b0,stroke-width:2px
-    linkStyle 21,22,23,24,25 stroke:#f44336,stroke-width:2px
-    linkStyle 26,27,28,29,30 stroke:#607d8b,stroke-width:2px
+    linkStyle 0,1,2,3,4,5,6 stroke:#2196f3,stroke-width:2px
+    linkStyle 7,8,9,10,11,12 stroke:#4caf50,stroke-width:2px
+    linkStyle 13,14,15,16,17,18,19,20,21,22 stroke:#ff9800,stroke-width:2px
+    linkStyle 23,24,25,26,27,28,29,30,31 stroke:#9c27b0,stroke-width:2px
+    linkStyle 32,33,34,35,36 stroke:#f44336,stroke-width:2px
+    linkStyle 37,38,39,40,41 stroke:#607d8b,stroke-width:2px
+
+    %% Class styling for component types
+    class Main,LifecycleManager pluginLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter serviceLayer
+    class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor uiLayer
+    class TaskParser,LanguageRegistry,DateParser parserLayer
+    class Search,SearchParser,SearchEvaluator,SearchTokenizer,SearchSuggestions searchLayer
+    class TaskUtils,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils utilityLayer
+    class Obsidian,DailyNotes external
 ```
 
 ## Data Flow Architecture: Task Updates
@@ -299,6 +414,8 @@ sequenceDiagram
     participant UI as UI Component
     participant Coordinator as TaskUpdateCoordinator
     participant StateMgr as TaskStateManager
+    participant EditorCtrl as EditorController
+    participant TaskWriter as TaskWriter
     participant FileSys as File System
     participant VaultScan as VaultScanner
     participant Views as All Views
@@ -306,20 +423,24 @@ sequenceDiagram
     User->>UI: Click task keyword / edit task
     UI->>Coordinator: requestTaskUpdate()
 
-    Note over Coordinator: Phase 1: Optimistic Update
+    Note over Coordinator: Phase 1: Intent Detection
+    Coordinator->>EditorCtrl: detectIntent()
+    EditorCtrl->>StateMgr: findTaskByPathAndLine()
+    Note over Coordinator: Phase 2: Optimistic Update
     Coordinator->>StateMgr: optimisticUpdate()
     StateMgr->>StateMgr: Update internal state
     StateMgr->>Views: notifySubscribers()
     Views->>Views: Update UI immediately
     Coordinator->>UI: Return success (optimistic)
 
-    Note over Coordinator: Phase 2: File Persistence
-    Coordinator->>FileSys: updateFile()
-    FileSys->>FileSys: Write changes to disk
-    FileSys-->>Coordinator: Success/Failure
+    Note over Coordinator: Phase 3: File Persistence
+    Coordinator->>TaskWriter: updateFile()
+    TaskWriter->>FileSys: Write changes to disk
+    FileSys-->>TaskWriter: Success/Failure
+    TaskWriter-->>Coordinator: Success/Failure
 
     alt File Update Success
-        Note over Coordinator: Phase 3: View Synchronization
+        Note over Coordinator: Phase 4: View Synchronization
         Coordinator->>VaultScan: notifyFileChanged()
         VaultScan->>VaultScan: Re-parse affected file
         VaultScan->>StateMgr: updateTasks()
@@ -531,10 +652,12 @@ interface Task {
 ### Critical Gotchas
 
 1. **Circular Dependencies**: Avoid importing components that depend on each other
-2. **Parser Recreation**: Call `recreateParser()` when settings change
+2. **Parser Recreation**: Call `recreateParser()` when settings change via `src/main.ts`
 3. **State Consistency**: Use `TaskUpdateCoordinator` for all state changes
-4. **File Race Conditions**: Use atomic operations and proper error handling
-5. **Performance Testing**: Test with large vaults (1000+ files, 10000+ tasks)
+4. **Editor Operations**: Use `EditorController` for intent detection and `TaskWriter` for file operations
+5. **File Race Conditions**: Use atomic operations and proper error handling
+6. **Performance Testing**: Test with large vaults (1000+ files, 10000+ tasks)
+7. **Embedded Lists**: Use `TodoseqCodeBlockProcessor` with separate lifecycle from main plugin
 
 ### Testing Architecture
 
@@ -551,16 +674,18 @@ interface Task {
 1. **Incremental Updates**: Only re-scan changed files
 2. **Optimistic UI**: Immediate feedback with async persistence
 3. **Efficient Parsing**: Optimized regex patterns and state machines
-4. **Yielding**: Prevents UI freezing during operations
+4. **Yielding**: `yieldToEventLoop()` prevents UI freezing during vault scans
 5. **Lazy Loading**: Components created when needed
-6. **Caching**: Parser instances and compiled patterns cached via `RegexCache` utility for file path filtering and phrase search evaluation
+6. **Regex Caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches
+7. **Shared Parser**: Single parser instance reused across vault scans, recreated only when settings change
 
 ### Performance Bottlenecks to Monitor
 
 1. **Large Vault Scans**: Initial vault scan can be slow
-2. **Regex Compilation**: Complex regex patterns for parsing (mitigated by `RegexCache` for file path filtering and phrase search)
+2. **Regex Compilation**: Complex regex patterns for parsing (mitigated by `RegexCache` utility)
 3. **DOM Updates**: Frequent view updates can impact performance
 4. **File I/O**: Synchronous file operations during updates
 5. **Search Evaluation**: Complex queries on large task sets
+6. **Editor Refresh**: Complex `requestMeasure()` + `dispatch()` + `setTimeout` sequence for decoration updates
 
-This architecture provides a robust, maintainable, and extensible foundation for task management while ensuring optimal performance and user experience through careful design patterns and performance optimizations.
+This architecture provides a robust, maintainable, and extensible foundation for task management while ensuring optimal performance and user experience through careful design patterns, performance optimizations, and a well-structured component hierarchy.

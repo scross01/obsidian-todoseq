@@ -1,4 +1,4 @@
-import { Task, DEFAULT_COMPLETED_STATES } from '../task';
+import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 

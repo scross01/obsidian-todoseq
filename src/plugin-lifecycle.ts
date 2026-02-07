@@ -1,15 +1,19 @@
 import TodoTracker from './main';
 import { VaultScanner } from './services/vault-scanner';
-import { TaskEditor } from './view/task-editor';
-import { EditorKeywordMenu } from './view/editor-keyword-menu';
-import { StatusBarManager } from './view/status-bar';
-import { TaskListView, TaskListViewMode } from './view/task-list-view';
+import { TaskWriter } from './services/task-writer';
+import { EditorKeywordMenu } from './view/editor-extensions/editor-keyword-menu';
+import { StatusBarManager } from './view/editor-extensions/status-bar';
+import {
+  TaskListView,
+  TaskListViewMode,
+} from './view/task-list/task-list-view';
 import { TodoTrackerSettingTab } from './settings/settings';
 import { TaskParser } from './parser/task-parser';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, TFile, Platform } from 'obsidian';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
-import { ReaderViewFormatter } from './view/reader-formatting';
+import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
+import { PropertySearchEngine } from './services/property-search-engine';
 
 export class PluginLifecycleManager {
   constructor(private plugin: TodoTracker) {}
@@ -34,9 +38,13 @@ export class PluginLifecycleManager {
         urgencyCoefficients,
       ),
       this.plugin.taskStateManager,
-      urgencyCoefficients,
     );
-    this.plugin.taskEditor = new TaskEditor(this.plugin.app);
+
+    // Initialize property search engine after vault scanner (we'll register listeners later)
+    this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(
+      this.plugin.app,
+    );
+    this.plugin.taskEditor = new TaskWriter(this.plugin.app);
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
     this.plugin.statusBarManager = new StatusBarManager(this.plugin);
     this.plugin.statusBarManager.setupStatusBarItem();
@@ -126,7 +134,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleToggleTaskStateAtCursor(
+        return this.plugin.editorController.handleToggleTaskStateAtCursor(
           checking,
           editor,
           view,
@@ -149,7 +157,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleCycleTaskStateAtCursor(
+        return this.plugin.editorController.handleCycleTaskStateAtCursor(
           checking,
           editor,
           view,
@@ -166,7 +174,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleAddScheduledDateAtCursor(
+        return this.plugin.editorController.handleAddScheduledDateAtCursor(
           checking,
           editor,
           view,
@@ -183,7 +191,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleAddDeadlineDateAtCursor(
+        return this.plugin.editorController.handleAddDeadlineDateAtCursor(
           checking,
           editor,
           view,
@@ -200,7 +208,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleSetPriorityHighAtCursor(
+        return this.plugin.editorController.handleSetPriorityHighAtCursor(
           checking,
           editor,
           view,
@@ -217,7 +225,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleSetPriorityMediumAtCursor(
+        return this.plugin.editorController.handleSetPriorityMediumAtCursor(
           checking,
           editor,
           view,
@@ -234,7 +242,7 @@ export class PluginLifecycleManager {
         editor: Editor,
         view: MarkdownView,
       ) => {
-        return this.plugin.taskManager.handleSetPriorityLowAtCursor(
+        return this.plugin.editorController.handleSetPriorityLowAtCursor(
           checking,
           editor,
           view,
@@ -282,22 +290,30 @@ export class PluginLifecycleManager {
     this.plugin.registerEvent(
       this.plugin.app.vault.on('modify', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file);
+        // Emit file-changed event for property search engine
+        this.plugin.vaultScanner?.emit('file-changed', file);
       }),
     );
     this.plugin.registerEvent(
       this.plugin.app.vault.on('create', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file);
+        // Emit file-changed event for property search engine
+        this.plugin.vaultScanner?.emit('file-changed', file);
       }),
     );
     this.plugin.registerEvent(
       this.plugin.app.vault.on('delete', (file) => {
         this.plugin.vaultScanner?.handleFileChange(file);
+        // Emit file-deleted event for property search engine
+        this.plugin.vaultScanner?.emit('file-deleted', file);
       }),
     );
     this.plugin.registerEvent(
       // Obsidian passes (file, oldPath) for rename
       this.plugin.app.vault.on('rename', (file, oldPath) => {
         this.plugin.vaultScanner?.handleFileRename(file, oldPath);
+        // Emit file-changed event for property search engine
+        this.plugin.vaultScanner?.emit('file-changed', file);
       }),
     );
 
@@ -319,6 +335,13 @@ export class PluginLifecycleManager {
       // This ensures tasks are available when the view first renders
       await this.plugin.vaultScanner?.scanVault();
 
+      // Set property search engine on vault scanner and register listeners (but don't initialize yet - lazy initialize)
+      if (this.plugin.propertySearchEngine) {
+        this.plugin.vaultScanner?.setPropertySearchEngine(
+          this.plugin.propertySearchEngine,
+        );
+      }
+
       // Only show the task view on first install (not on subsequent reloads)
       if (!this.plugin.settings._hasShownFirstInstallView) {
         this.plugin.settings._hasShownFirstInstallView = true;
@@ -338,6 +361,9 @@ export class PluginLifecycleManager {
   onunload() {
     // Clean up VaultScanner resources
     this.plugin.vaultScanner?.destroy();
+
+    // Reset PropertySearchEngine singleton to prevent stale references on reload
+    PropertySearchEngine.resetInstance();
 
     // Clean up UI manager resources
     this.plugin.uiManager?.cleanup();

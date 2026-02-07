@@ -1,4 +1,4 @@
-import { Task, DEFAULT_COMPLETED_STATES } from '../task';
+import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings';
 import {
   LanguageRegistry,
@@ -1250,7 +1250,7 @@ export class TaskParser {
    */
   /**
    * Parse a single line as a task. Returns a simplified structure that
-   * TaskManager can consume for editor operations.
+   * EditorController can consume for editor operations.
    *
    * @param line The line of text to parse
    * @param lineNumber The line number (for Task creation)

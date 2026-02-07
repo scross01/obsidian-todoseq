@@ -8,7 +8,8 @@ export type SortOption =
   | 'scheduled'
   | 'deadline'
   | 'priority'
-  | 'urgency';
+  | 'urgency'
+  | 'keyword';
 
 /**
  * Valid completed task display options
@@ -93,13 +94,32 @@ export class TodoseqCodeBlockParser {
             filepath: 'filepath',
             file: 'filepath',
             path: 'filepath',
+            keyword: 'keyword',
+            keywords: 'keyword',
           };
           const mappedSort = sortMap[sortValue];
           if (mappedSort) {
             sortMethod = mappedSort;
           } else {
             throw new Error(
-              `Invalid sort method: ${sortValue}. Valid options: filepath, scheduled, deadline, priority, urgency`,
+              `Invalid sort method: ${sortValue}. Valid options: filepath, scheduled, deadline, priority, urgency, keyword`,
+            );
+          }
+        } else if (trimmed.startsWith('show-completed:')) {
+          const completedValue = trimmed
+            .substring('show-completed:'.length)
+            .trim()
+            .toLowerCase();
+          const validCompleted: CompletedOption[] = [
+            'show',
+            'hide',
+            'sort-to-end',
+          ];
+          if (validCompleted.includes(completedValue as CompletedOption)) {
+            completed = completedValue as CompletedOption;
+          } else {
+            throw new Error(
+              `Invalid show-completed option: ${completedValue}. Valid options: show, hide, sort-to-end`,
             );
           }
         } else if (trimmed.startsWith('completed:')) {
@@ -117,6 +137,24 @@ export class TodoseqCodeBlockParser {
           } else {
             throw new Error(
               `Invalid completed option: ${completedValue}. Valid options: show, hide, sort-to-end`,
+            );
+          }
+        } else if (trimmed.startsWith('show-future:')) {
+          const futureValue = trimmed
+            .substring('show-future:'.length)
+            .trim()
+            .toLowerCase();
+          const validFuture: FutureOption[] = [
+            'show-all',
+            'show-upcoming',
+            'hide',
+            'sort-to-end',
+          ];
+          if (validFuture.includes(futureValue as FutureOption)) {
+            future = futureValue as FutureOption;
+          } else {
+            throw new Error(
+              `Invalid show-future option: ${futureValue}. Valid options: show-all, show-upcoming, hide, sort-to-end`,
             );
           }
         } else if (trimmed.startsWith('future:')) {
@@ -151,13 +189,13 @@ export class TodoseqCodeBlockParser {
             .substring('show-file:'.length)
             .trim()
             .toLowerCase();
-          if (showFileValue === 'false') {
+          if (showFileValue === 'false' || showFileValue === 'hide') {
             showFile = false;
-          } else if (showFileValue === 'true') {
+          } else if (showFileValue === 'true' || showFileValue === 'show') {
             showFile = true;
           } else {
             throw new Error(
-              `Invalid show-file option: ${showFileValue}. Valid options: true, false`,
+              `Invalid show-file option: ${showFileValue}. Valid options: true, false, show, hide`,
             );
           }
         } else if (trimmed.startsWith('title:')) {
@@ -167,13 +205,13 @@ export class TodoseqCodeBlockParser {
             .substring('show-query:'.length)
             .trim()
             .toLowerCase();
-          if (showQueryValue === 'false') {
+          if (showQueryValue === 'false' || showQueryValue === 'hide') {
             showQuery = false;
-          } else if (showQueryValue === 'true') {
+          } else if (showQueryValue === 'true' || showQueryValue === 'show') {
             showQuery = true;
           } else {
             throw new Error(
-              `Invalid show-query option: ${showQueryValue}. Valid options: true, false`,
+              `Invalid show-query option: ${showQueryValue}. Valid options: true, false, show, hide`,
             );
           }
         }

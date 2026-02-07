@@ -1,20 +1,21 @@
 import { Plugin, MarkdownView } from 'obsidian';
 import { EditorView } from '@codemirror/view';
-import { Task } from './task';
-import { TaskListView } from './view/task-list-view';
+import { Task } from './types/task';
+import { TaskListView } from './view/task-list/task-list-view';
 import { TodoTrackerSettings, DefaultSettings } from './settings/settings';
-import { TaskEditor } from './view/task-editor';
-import { EditorKeywordMenu } from './view/editor-keyword-menu';
+import { TaskWriter } from './services/task-writer';
+import { EditorKeywordMenu } from './view/editor-extensions/editor-keyword-menu';
 import { VaultScanner } from './services/vault-scanner';
-import { StatusBarManager } from './view/status-bar';
-import { TaskManager } from './task-manager';
+import { StatusBarManager } from './view/editor-extensions/status-bar';
+import { EditorController } from './services/editor-controller';
 import { UIManager } from './ui-manager';
-import { ReaderViewFormatter } from './view/reader-formatting';
+import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
 import { PluginLifecycleManager } from './plugin-lifecycle';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 import { TaskStateManager } from './services/task-state-manager';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
+import { PropertySearchEngine } from './services/property-search-engine';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -28,13 +29,13 @@ export default class TodoTracker extends Plugin {
   public taskUpdateCoordinator: TaskUpdateCoordinator;
 
   // Managers for different functional areas
-  public taskManager: TaskManager;
+  public editorController: EditorController;
   public uiManager: UIManager;
   public lifecycleManager: PluginLifecycleManager;
 
   // Services and components (made public for manager access)
   public vaultScanner: VaultScanner | null = null;
-  public taskEditor: TaskEditor | null = null;
+  public taskEditor: TaskWriter | null = null;
   public editorKeywordMenu: EditorKeywordMenu | null = null;
   public taskFormatters: Map<string, unknown> = new Map();
   public statusBarManager: StatusBarManager | null = null;
@@ -42,6 +43,9 @@ export default class TodoTracker extends Plugin {
 
   // Embedded task list processor
   public embeddedTaskListProcessor: TodoseqCodeBlockProcessor | null = null;
+
+  // Property search engine
+  public propertySearchEngine: PropertySearchEngine | null = null;
 
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
@@ -83,7 +87,7 @@ export default class TodoTracker extends Plugin {
     );
 
     // Initialize managers
-    this.taskManager = new TaskManager(this);
+    this.editorController = new EditorController(this);
     this.uiManager = new UIManager(this);
     this.lifecycleManager = new PluginLifecycleManager(this);
 
@@ -116,6 +120,11 @@ export default class TodoTracker extends Plugin {
       this.embeddedTaskListProcessor.cleanup();
     }
 
+    // Clean up property search engine
+    if (this.propertySearchEngine) {
+      this.propertySearchEngine.destroy();
+    }
+
     // Delegate cleanup to lifecycle manager to centralize cleanup logic
     this.lifecycleManager?.onunload();
   }
@@ -128,6 +137,10 @@ export default class TodoTracker extends Plugin {
       DefaultSettings,
       loaded as Partial<TodoTrackerSettings>,
     );
+
+    // Add app instance to settings for PropertySearchEngine access
+    (this.settings as TodoTrackerSettings & { app: typeof this.app }).app =
+      this.app;
     // Normalize settings shape after migration: ensure additionalTaskKeywords exists
     if (!this.settings.additionalTaskKeywords) {
       this.settings.additionalTaskKeywords = [];
@@ -161,6 +174,11 @@ export default class TodoTracker extends Plugin {
     if (this.embeddedTaskListProcessor) {
       this.embeddedTaskListProcessor.updateSettings();
     }
+
+    // Rebuild property search engine when settings change
+    if (this.propertySearchEngine) {
+      await this.propertySearchEngine.rebuildAll();
+    }
   }
 
   // Public method to update reader view formatter with current settings
@@ -190,6 +208,15 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called to save settings
   async saveSettings() {
+    // Add app instance to settings for PropertySearchEngine access
+    (this.settings as TodoTrackerSettings & { app: typeof this.app }).app =
+      this.app;
+
+    // Update property search engine with new settings
+    if (this.propertySearchEngine) {
+      // Property search engine settings are handled in initializeStartupScan
+    }
+
     await this.saveData(this.settings);
   }
 

@@ -65,6 +65,10 @@ FIXME, HACK, REVIEW, BLOCKED, IDEA
 - Can be clicked to cycle states
 - Follow same state sequences as similar default keywords
 
+**Keyword Sort Ordering:**
+
+When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, custom keywords are sorted by the order they are defined in the setting, placed in the overall sort after the Inactive task keywords states (TODO, LATER) and before Waiting keyword states (WAIT, WAITING)
+
 ### Include Tasks Inside Code Blocks
 
 **Setting**: "Include tasks inside code blocks" (toggle)
@@ -227,6 +231,52 @@ With **Sunday start**:
 
 - Week 1: Sun Dec 31 - Sat Jan 6
 - "this week" on Jan 3 includes Dec 31 - Jan 6
+
+## Property Search Settings
+
+### Run Startup Scan
+
+**Setting**: "Run startup scan" (toggle)
+
+**Description**: Enable or disable automatic scanning of all vault files when TODOseq loads to build the property search index.
+
+**Default**: Disabled
+
+**When Enabled:**
+
+- All vault files are scanned on plugin startup to build property search indexes
+- Property searches work immediately without waiting for files to be accessed
+- May increase startup time for large vaults
+
+**When Disabled:**
+
+- Property search indexes are built lazily as files are accessed
+- Faster startup but property searches may be slower initially
+- Property search functionality still works, just builds indexes on-demand
+
+### Startup Scan Delay
+
+**Setting**: "Startup scan delay" (number input, milliseconds)
+
+**Description**: Delay before starting the startup scan after plugin loads.
+
+**Default**: 3000 ms (3 seconds)
+
+**Purpose**: Allows time for Obsidian to fully load before scanning, improving reliability in large vaults.
+
+### Show Startup Scan Progress
+
+**Setting**: "Show startup scan progress" (toggle)
+
+**Description**: Show progress notifications during the startup scan process.
+
+**Default**: Disabled
+
+**When Enabled:**
+
+- Shows progress updates in the Obsidian status bar
+- Provides feedback during long scans
+- Helps monitor scan completion
 
 ## Other Settings
 

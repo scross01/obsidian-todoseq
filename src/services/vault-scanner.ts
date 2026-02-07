@@ -1,5 +1,5 @@
 import { App, TFile, TAbstractFile } from 'obsidian';
-import { Task } from '../task';
+import { Task } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
 import { TodoTrackerSettings } from '../settings/settings';
 import { taskComparator } from '../utils/task-sort';
@@ -9,6 +9,7 @@ import {
 } from '../utils/task-urgency';
 import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
+import { PropertySearchEngine } from './property-search-engine';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -16,11 +17,14 @@ export interface VaultScannerEvents {
   'scan-started': () => void;
   'scan-completed': () => void;
   'scan-error': (error: Error) => void;
+  'file-changed': (file: TAbstractFile) => void;
+  'file-deleted': (file: TAbstractFile) => void;
 }
 
 export class VaultScanner {
   private _isScanning = false;
   private _isInitializing = true; // Track Obsidian initialization state
+  private _propertySearchHandlersRegistered = false; // Track if property search handlers are already registered
   private eventListeners: Map<
     keyof VaultScannerEvents,
     ((...args: unknown[]) => void)[]
@@ -33,6 +37,7 @@ export class VaultScanner {
     private settings: TodoTrackerSettings,
     private parser: TaskParser,
     private taskStateManager: TaskStateManager,
+    private propertySearchEngine?: PropertySearchEngine,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
     // Initialize event listeners map
@@ -41,6 +46,8 @@ export class VaultScanner {
       'scan-started',
       'scan-completed',
       'scan-error',
+      'file-changed',
+      'file-deleted',
     ];
     eventKeys.forEach((event) => {
       this.eventListeners.set(event, []);
@@ -53,6 +60,9 @@ export class VaultScanner {
       // Fallback: load urgency coefficients on startup if not provided
       this.loadUrgencyCoefficients();
     }
+
+    // NOTE: PropertySearchEngine now registers its own event listeners
+    // during initialization to support lazy initialization
   }
 
   /**
@@ -65,6 +75,40 @@ export class VaultScanner {
       // Failed to load urgency coefficients
       // Fallback to defaults handled in parseUrgencyCoefficients
     }
+  }
+
+  /**
+   * Register file change handlers for property search engine
+   */
+  private registerPropertySearchHandlers(): void {
+    if (!this.propertySearchEngine) return;
+
+    // Prevent duplicate listener registration
+    if (this._propertySearchHandlersRegistered) {
+      return;
+    }
+
+    // Register handlers for vault events
+    this.app.vault.on('rename', (file, oldPath) => {
+      if (file instanceof TFile && this.propertySearchEngine) {
+        this.propertySearchEngine.onFileRenamed(file, oldPath);
+      }
+    });
+
+    this.app.vault.on('delete', (file) => {
+      if (file instanceof TFile && this.propertySearchEngine) {
+        this.propertySearchEngine.onFileDeleted(file);
+      }
+    });
+
+    // Only register metadata cache change handler - this is sufficient for all file content changes
+    this.app.metadataCache.on('changed', (file) => {
+      if (file instanceof TFile && this.propertySearchEngine) {
+        this.propertySearchEngine.onFileChanged(file);
+      }
+    });
+
+    this._propertySearchHandlersRegistered = true;
   }
 
   // Event management methods
@@ -390,6 +434,12 @@ export class VaultScanner {
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => resolve()),
     );
+  }
+
+  // Set property search engine and register handlers (can be called after initialization)
+  setPropertySearchEngine(propertySearchEngine: PropertySearchEngine): void {
+    this.propertySearchEngine = propertySearchEngine;
+    this.registerPropertySearchHandlers();
   }
 
   // Clean up resources

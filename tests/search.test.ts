@@ -1,86 +1,74 @@
 import { Search } from '../src/search/search';
-import { Task } from '../src/task';
+import { Task } from '../src/types/task';
 import { TodoTrackerSettings } from '../src/settings/settings';
+import { createBaseTask } from './helpers/test-helper';
 
 describe('Search functionality', () => {
   const testTasks: Task[] = [
-    {
+    createBaseTask({
       path: 'notes/meeting.md',
       line: 1,
       rawText: 'TODO meeting about project planning',
-      indent: '',
       listMarker: '-',
       text: 'meeting about project planning',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/work.md',
       line: 2,
       rawText: 'DOING work on urgent task',
-      indent: '',
       listMarker: '-',
       text: 'work on urgent task',
       state: 'DOING',
-      completed: false,
       priority: 'high',
-      scheduledDate: null,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/personal.md',
       line: 3,
       rawText: 'TODO personal meetup with friends',
-      indent: '',
       listMarker: '-',
       text: 'personal meetup with friends',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    },
-    {
+    }),
+    createBaseTask({
       path: 'notes/star-wars.md',
       line: 4,
       rawText: 'TODO watch "star wars" movie',
-      indent: '',
       listMarker: '-',
       text: 'watch "star wars" movie',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    },
+    }),
   ];
 
   describe('Basic term search', () => {
-    it('should find tasks containing single term', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('meeting', task, false),
+    it('should find tasks containing single term', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('meeting', task, false);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/meeting.md');
     });
 
-    it('should find tasks containing multiple terms (AND)', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('work urgent', task, false),
+    it('should find tasks containing multiple terms (AND)', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('work urgent', task, false);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/work.md');
     });
   });
 
   describe('OR logic', () => {
-    it('should find tasks matching either term', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('meeting OR personal', task, false),
+    it('should find tasks matching either term', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('meeting OR personal', task, false);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
       expect(result.map((t) => t.path)).toContain('notes/meeting.md');
       expect(result.map((t) => t.path)).toContain('notes/personal.md');
@@ -88,65 +76,78 @@ describe('Search functionality', () => {
   });
 
   describe('Exact phrase search', () => {
-    it('should find exact phrase matches', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('"star wars"', task, false),
+    it('should find exact phrase matches', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('"star wars"', task, false);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/star-wars.md');
     });
 
-    it('should match exact word in phrase', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('"star"', task, false),
+    it('should match exact word in phrase', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('"star"', task, false);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1); // "star" appears as a word in "star wars"
       expect(result[0].path).toBe('notes/star-wars.md');
     });
 
-    it('should not match partial word in phrase', () => {
+    it('should not match partial word in phrase', async () => {
       // Create a task with "starfish" to test partial word matching
-      const starfishTask: Task = {
+      const starfishTask: Task = createBaseTask({
         path: 'notes/test.md',
         line: 1,
         rawText: 'TODO find starfish in ocean',
-        indent: '',
         listMarker: '-',
         text: 'find starfish in ocean',
-        state: 'TODO',
-        completed: false,
-        priority: null,
-        scheduledDate: null,
-        deadlineDate: null,
-      };
+      });
 
-      const result = Search.evaluate('"star"', starfishTask, false);
+      const result = await Search.evaluate('"star"', starfishTask, false);
       expect(result).toBe(false); // "star" should not match "starfish"
     });
   });
 
   describe('NOT logic', () => {
-    it('should exclude tasks containing term', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('work -urgent', task, false),
+    it('should exclude tasks containing term', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('work -urgent', task, false);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(0); // The work task contains "urgent"
     });
 
-    it('should find tasks without excluded term', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('meeting -urgent', task, false),
+    it('should find tasks without excluded term', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('meeting -urgent', task, false);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/meeting.md');
     });
   });
 
   describe('Complex combinations', () => {
-    it('should handle parentheses grouping', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('(meeting OR personal) -urgent', task, false),
+    it('should handle parentheses grouping', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate(
+            '(meeting OR personal) -urgent',
+            task,
+            false,
+          );
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
       expect(result.map((t) => t.path)).toContain('notes/meeting.md');
       expect(result.map((t) => t.path)).toContain('notes/personal.md');
@@ -154,27 +155,36 @@ describe('Search functionality', () => {
   });
 
   describe('Case sensitivity', () => {
-    it('should be case insensitive by default', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('MEETING', task, false),
+    it('should be case insensitive by default', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('MEETING', task, false);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(1);
       expect(result[0].path).toBe('notes/meeting.md');
     });
 
-    it('should be case sensitive when enabled', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('MEETING', task, true),
+    it('should be case sensitive when enabled', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('MEETING', task, true);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(0); // No task has "MEETING" in uppercase
     });
   });
 
   describe('Error handling', () => {
-    it('should handle invalid queries gracefully', () => {
-      const result = testTasks.filter((task) =>
-        Search.evaluate('meeting OR', task, false),
+    it('should handle invalid queries gracefully', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('meeting OR', task, false);
+        }),
       );
+      const result = testTasks.filter((_, index) => results[index]);
       // Should return false for all tasks when query is invalid
       expect(result.length).toBe(0);
     });
@@ -248,39 +258,39 @@ describe('Search functionality', () => {
   });
 
   describe('evaluate() method with settings', () => {
-    const testTask: Task = {
+    const testTask: Task = createBaseTask({
       path: 'notes/test.md',
       line: 1,
       rawText: 'TODO test task with content',
-      indent: '',
       listMarker: '-',
       text: 'test task with content',
-      state: 'TODO',
-      completed: false,
-      priority: null,
-      scheduledDate: null,
-      deadlineDate: null,
-    };
+    });
 
     const mockSettings: TodoTrackerSettings = {
-      refreshInterval: 60,
       additionalTaskKeywords: [],
       includeCodeBlocks: false,
       includeCalloutBlocks: true,
       includeCommentBlocks: false,
       taskListViewMode: 'showAll',
+      futureTaskSorting: 'showAll',
+      defaultSortMethod: 'default',
       languageCommentSupport: { enabled: true },
       weekStartsOn: 'Monday',
       formatTaskKeywords: true,
     };
 
-    it('should evaluate with settings parameter', () => {
-      const result = Search.evaluate('content', testTask, false, mockSettings);
+    it('should evaluate with settings parameter', async () => {
+      const result = await Search.evaluate(
+        'content',
+        testTask,
+        false,
+        mockSettings,
+      );
       expect(result).toBe(true);
     });
 
-    it('should handle invalid query with settings gracefully', () => {
-      const result = Search.evaluate(
+    it('should handle invalid query with settings gracefully', async () => {
+      const result = await Search.evaluate(
         'content OR',
         testTask,
         false,
@@ -289,8 +299,13 @@ describe('Search functionality', () => {
       expect(result).toBe(false);
     });
 
-    it('should handle case sensitivity with settings', () => {
-      const result = Search.evaluate('CONTENT', testTask, true, mockSettings);
+    it('should handle case sensitivity with settings', async () => {
+      const result = await Search.evaluate(
+        'CONTENT',
+        testTask,
+        true,
+        mockSettings,
+      );
       expect(result).toBe(false); // Case sensitive should not match
     });
   });

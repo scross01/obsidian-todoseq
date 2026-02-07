@@ -1,10 +1,10 @@
 import { MarkdownView, WorkspaceLeaf, TFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import TodoTracker from './main';
-import { DEFAULT_COMPLETED_STATES } from './task';
-import { taskKeywordPlugin } from './view/task-formatting';
-import { dateAutocompleteExtension } from './view/date-autocomplete';
-import { TaskListView } from './view/task-list-view';
+import { DEFAULT_COMPLETED_STATES } from './types/task';
+import { taskKeywordPlugin } from './view/editor-extensions/task-formatting';
+import { dateAutocompleteExtension } from './view/editor-extensions/date-autocomplete';
+import { TaskListView } from './view/task-list/task-list-view';
 
 /**
  * Manages UI elements and interactions in the editor
@@ -227,7 +227,7 @@ export class UIManager {
 
         // Parse the task from the line for optimistic update
         const line = view.editor.getLine(lineNumber);
-        const task = this.plugin.taskManager.parseTaskFromLine(
+        const task = this.plugin.editorController.parseTaskFromLine(
           line,
           lineNumber,
           filePath,
@@ -269,7 +269,7 @@ export class UIManager {
       // The cursor positioning is now handled by TaskEditor.applyLineUpdate
       // which detects when the cursor is on the same line and positions it
       // after the new keyword
-      this.plugin.taskManager.handleUpdateTaskStateAtLine(
+      this.plugin.editorController.handleUpdateTaskStateAtLine(
         false,
         currentLine - 1,
         view.editor,

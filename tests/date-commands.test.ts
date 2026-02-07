@@ -1,43 +1,36 @@
-import { TaskManager } from '../src/task-manager';
+import { EditorController } from '../src/services/editor-controller';
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings';
 import { Editor, MarkdownView } from 'obsidian';
+import { createBaseSettings } from './helpers/test-helper';
 
 describe('Date Commands', () => {
-  let taskManager: TaskManager;
+  let editorController: EditorController;
   let mockPlugin: any;
   let mockEditor: any;
   let mockView: any;
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    // Create settings manually to avoid importing DefaultSettings
-    settings = {
-      refreshInterval: 60,
-      includeCalloutBlocks: true,
-      includeCodeBlocks: false,
-      includeCommentBlocks: false,
+    // Create settings using the base settings helper with overrides
+    settings = createBaseSettings({
       languageCommentSupport: {
         enabled: false,
       },
-      additionalTaskKeywords: [],
-      taskListViewMode: 'showAll',
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
+    });
 
     // Mock plugin with necessary properties
     mockPlugin = {
       getVaultScanner: () => ({
         getParser: () => {
-          const parser = TaskParser.create(settings);
+          const parser = TaskParser.create(settings, null);
           return parser;
         },
       }),
       taskEditor: {},
     };
 
-    taskManager = new TaskManager(mockPlugin);
+    editorController = new EditorController(mockPlugin);
 
     // Mock editor
     mockEditor = {
@@ -69,7 +62,7 @@ describe('Date Commands', () => {
         return lines[lineNumber] || '';
       };
 
-      const result = taskManager.handleAddScheduledDateAtCursor(
+      const result = editorController.handleAddScheduledDateAtCursor(
         false,
         mockEditor as Editor,
         mockView as MarkdownView,
@@ -79,7 +72,7 @@ describe('Date Commands', () => {
     });
 
     it('should return true when checking on a task line', () => {
-      const result = taskManager.handleAddScheduledDateAtCursor(
+      const result = editorController.handleAddScheduledDateAtCursor(
         true,
         mockEditor as Editor,
         mockView as MarkdownView,
@@ -97,7 +90,7 @@ describe('Date Commands', () => {
         return lines[lineNumber] || '';
       };
 
-      const result = taskManager.handleAddDeadlineDateAtCursor(
+      const result = editorController.handleAddDeadlineDateAtCursor(
         false,
         mockEditor as Editor,
         mockView as MarkdownView,
@@ -107,7 +100,7 @@ describe('Date Commands', () => {
     });
 
     it('should return true when checking on a task line', () => {
-      const result = taskManager.handleAddDeadlineDateAtCursor(
+      const result = editorController.handleAddDeadlineDateAtCursor(
         true,
         mockEditor as Editor,
         mockView as MarkdownView,
@@ -119,7 +112,7 @@ describe('Date Commands', () => {
 
   describe('getCurrentDateString', () => {
     it('should return current date in YYYY-MM-DD format', () => {
-      const dateString = taskManager['getCurrentDateString']();
+      const dateString = editorController['getCurrentDateString']();
 
       // Check if it matches the expected format
       expect(dateString).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -160,7 +153,7 @@ describe('Date Commands', () => {
       };
 
       // Call the private method directly
-      taskManager['insertDateLine'](mockEditor, 0, 'SCHEDULED');
+      editorController['insertDateLine'](mockEditor, 0, 'SCHEDULED');
 
       // Verify that replaceRange was called with the correct position
       // It should insert at line 0 (immediately after task line), not line 2 (after blank lines)
@@ -190,7 +183,7 @@ describe('Date Commands', () => {
       };
 
       // Call the private method directly to add scheduled date
-      taskManager['insertDateLine'](mockEditor, 0, 'SCHEDULED');
+      editorController['insertDateLine'](mockEditor, 0, 'SCHEDULED');
 
       // Verify that replaceRange was called
       expect(mockEditor.replaceRange).toHaveBeenCalled();
@@ -204,7 +197,7 @@ describe('Date Commands', () => {
 
       // Should insert newline + scheduled line only (no extra blank line)
       expect(insertedContent).toBe(
-        '\nSCHEDULED: <' + taskManager['getCurrentDateString']() + '>',
+        '\nSCHEDULED: <' + editorController['getCurrentDateString']() + '>',
       );
     });
   });

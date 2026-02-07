@@ -4,7 +4,7 @@ import {
   DEFAULT_PENDING_STATES,
   DEFAULT_ACTIVE_STATES,
   DEFAULT_COMPLETED_STATES,
-} from '../src/task';
+} from '../src/types/task';
 
 describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
   // @ts-ignore
