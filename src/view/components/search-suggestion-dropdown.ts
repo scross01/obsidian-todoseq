@@ -355,8 +355,23 @@ export class SearchSuggestionDropdown {
     // If we're completing a prefix, include the prefix in replacement
     const beforeCursor = currentValue.substring(0, cursorPos);
     const prefixMatch = beforeCursor.match(/(\w+):([^\s]*)$/);
+    // Also check for [] pattern for property search
+    const bracketMatch = beforeCursor.match(/\[([^\]]*)$/);
 
-    if (prefixMatch) {
+    if (bracketMatch && !prefixMatch) {
+      // Property search with [] - insert [key: format
+      const bracketContent = bracketMatch[1];
+      const bracketStart = cursorPos - bracketContent.length;
+
+      // Insert the property key with colon
+      const newValue =
+        currentValue.substring(0, bracketStart) +
+        `${suggestion}:` +
+        currentValue.substring(cursorPos);
+      input.value = newValue;
+      input.selectionStart = input.selectionEnd =
+        bracketStart + suggestion.length + 1;
+    } else if (prefixMatch) {
       const fullPrefix = prefixMatch[0];
       const prefixBase = prefixMatch[1];
       const prefixStart = cursorPos - fullPrefix.length;
