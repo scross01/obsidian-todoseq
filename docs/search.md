@@ -357,7 +357,7 @@ This allows you to search for tasks across multiple related categories without n
 
 ### Type-Aware Comparisons
 
-For numeric properties, you can use comparison operators like `>`, `<, `>=`, and `<=`. For example, `["size":>100]` matches pages where the size property is greater than 100.
+For numeric properties, you can use comparison operators like `>`, `<`, `>=`, and `<=`. For example, `["size":>100]` matches pages where the size property is greater than 100.
 
 ```txt
 ["priority":>5]
@@ -365,19 +365,41 @@ For numeric properties, you can use comparison operators like `>`, `<, `>=`, and
 
 This type-aware comparison works with numeric values and allows for more precise filtering based on quantitative properties.
 
+### Date Property Comparisons
+
+Comparison operators also work with date properties, enabling you to filter tasks based on page preporty date ranges. You can use `>`, `<`, `>=`, and `<=` with dates in `YYYY-MM-DD` format to find tasks with dates before or after a specific point in time.
+
+```txt
+[deadline:>2026-01-15]
+```
+
+This finds tasks on pages with a deadline property after January 15, 2024. Similarly, `[created:<2026-01-01]` would find tasks created before the start of 2026.
+
+### Checkbox (Boolean) Property Search
+
+Boolean properties can be searched using `true` and `false` values.
+
+```txt
+[published:true]
+```
+
+This finds tasks on pages where the published property is set to true. Conversely, `[active:false]` would find tasks on pages where the active property is explicitly set to false.
+
+### Array Property Matching
+
+When a property contains multiple values (an array or list), the search will match if any element in the array matches your search term. For example, if a page has `tags: [work, urgent]`, both `[tags:work]` and `[tags:urgent]` will match that page.
+
+```txt
+[tags:work]
+```
+
+This finds tasks on pages where "work" appears anywhere in the tags array.
+
 ### Property Search Cache
 
 TODOseq builds it's own index of all properties across your vault for fast, efficient searching. This approach ensures that property searches work even for files that haven't been recently accessed, providing comprehensive coverage of your entire vault.
 
-The property search engine automatically updates when files change, ensuring that your search results are always current without requiring manual intervention.
-
-You can configure the property search behavior in the TODOseq settings:
-
-- **Run Startup Scan**: Enable/disable automatic index building on plugin load
-- **Startup Scan Delay**: Configure delay before starting the scan (default: 3 seconds)
-- **Show Progress**: Display console messages during the startup scan process
-
-These settings help balance performance with functionality, especially in large vaults.
+The property search engine automatically updates when files change, ensuring that your search results are always current.
 
 ## Combining Search Techniques
 
