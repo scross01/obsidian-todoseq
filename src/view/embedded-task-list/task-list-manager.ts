@@ -4,6 +4,8 @@ import { TodoTrackerSettings } from '../../settings/settings';
 import {
   sortTasksWithThreeBlockSystem,
   SortMethod as TaskSortMethod,
+  buildKeywordSortConfig,
+  KeywordSortConfig,
 } from '../../utils/task-sort';
 import { TodoseqParameters, TodoseqCodeBlockParser } from './code-block-parser';
 
@@ -156,6 +158,14 @@ export class EmbeddedTaskListManager {
           ? TodoseqCodeBlockParser.getCompletedSetting(params.completed)
           : 'showAll'; // Default embedded lists to show all unless overridden
 
+      // Build keyword config if sorting by keyword
+      let keywordConfig: KeywordSortConfig | undefined;
+      if (sortMethod === 'sortByKeyword') {
+        keywordConfig = buildKeywordSortConfig(
+          this.settings?.additionalTaskKeywords ?? [],
+        );
+      }
+
       // Use the existing three-block sorting system
       return sortTasksWithThreeBlockSystem(
         tasks,
@@ -163,6 +173,7 @@ export class EmbeddedTaskListManager {
         futureSetting,
         completedSetting,
         sortMethod,
+        keywordConfig,
       );
     } catch (error) {
       console.error('Error sorting tasks:', error);
@@ -184,6 +195,7 @@ export class EmbeddedTaskListManager {
       deadline: 'sortByDeadline',
       priority: 'sortByPriority',
       urgency: 'sortByUrgency',
+      keyword: 'sortByKeyword',
     };
 
     return sortMap[params.sortMethod] || 'default';

@@ -65,6 +65,10 @@ FIXME, HACK, REVIEW, BLOCKED, IDEA
 - Can be clicked to cycle states
 - Follow same state sequences as similar default keywords
 
+**Keyword Sort Ordering:**
+
+When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, custom keywords are sorted by the order they are defined in the setting, placed in the overall sort after the Inactive task keywords states (TODO, LATER) and before Waiting keyword states (WAIT, WAITING)
+
 ### Include Tasks Inside Code Blocks
 
 **Setting**: "Include tasks inside code blocks" (toggle)
