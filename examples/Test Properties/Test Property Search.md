@@ -1,4 +1,3 @@
-
 # Property Search Examples
 
 This page contains embedded task list code blocks that demonstrate various property search scenarios. Use these examples to test and validate the property search feature.
@@ -13,7 +12,13 @@ search: [type:Test Page]
 
 Find tasks on pages with `type: Project`
 ```todoseq
-search: [type:Project]
+search: [type:"Project"]
+```
+
+
+Find tasks on pages with `type: Project`
+```todoseq
+search: [type:project]
 ```
 
 ### Array Properties
@@ -119,11 +124,6 @@ Find tasks on pages with size less than 101:
 search: [size:<101]
 ```
 
-Find tasks on pages with priority 1:
-```todoseq
-search: [priority:1]
-```
-
 ### Boolean Properties
 
 Find tasks on pages that are not archived (false):
@@ -155,23 +155,6 @@ Find tasks on pages with null status (property doesn't exist or is null):
 search: [status:""]
 ```
 
-## Case Sensitivity Variations
-
-Find tasks on pages with type "Test Page" (case sensitive):
-```todoseq
-search: [type:Test Page]
-```
-
-Find tasks on pages with type "test page" (lowercase):
-```todoseq
-search: [type:test page]
-```
-
-Find tasks on pages with type "TEST PAGE" (uppercase):
-```todoseq
-search: [type:TEST PAGE]
-```
-
 ## Partial vs Exact Matching
 
 Find tasks on pages with type containing "Test" (partial matching):
@@ -183,12 +166,6 @@ Find tasks on pages with type exactly "Test Page" (exact matching):
 ```todoseq
 search: [type:"Test Page"]
 ```
-
-Find tasks on pages with status containing "Active" (partial matching):
-```todoseq
-search: [status:Active]
-```
-
 ## Comparison Operators
 
 ### Greater Than
@@ -289,43 +266,7 @@ Find tasks with state "TODO" on pages with type "Test Page":
 search: state:TODO [type:Test Page]
 ```
 
-Find tasks with state "DONE" on pages with status "Active":
-```todoseq
-search: state:DONE [status:Active]
-```
-
 Find tasks with state "TODO" on pages with tags "urgent":
 ```todoseq
 search: state:TODO [tags:urgent]
 ```
-
-## Advanced Scenarios
-
-### Multiple Array Values
-
-Find tasks on pages with both "urgent" AND "feature" in tags:
-```todoseq
-search: [tags:urgent] AND [tags:feature]
-```
-
-### Date Ranges
-
-Find tasks on pages with target date in March 2026:
-```todoseq
-search: [target:>=2026-03-01] AND [target:<=2026-03-31]
-```
-
-### Complex Query Example
-
-Find active, non-archived project tasks with high priority:
-```todoseq
-search: [status:Active] AND -[archived:true] AND [type:Project] AND [priority:>3]
-```
-
-## Testing Notes
-
-1. Each embedded task list above should display the tasks that match the property search query
-2. Compare the results in the embedded lists with the results when using the same query in the search bar
-3. Verify that negation, OR operations, and comparison operators work as expected
-4. Test case sensitivity by trying both uppercase and lowercase values
-5. Test partial vs exact matching by using quoted and unquoted values
