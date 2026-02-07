@@ -24,6 +24,8 @@ import { getFilename } from '../../utils/task-utils';
 import {
   sortTasksWithThreeBlockSystem,
   SortMethod as TaskSortMethod,
+  buildKeywordSortConfig,
+  KeywordSortConfig,
 } from '../../utils/task-sort';
 import { getPluginSettings } from '../../utils/settings-utils';
 import { TaskStateManager } from '../../services/task-state-manager';
@@ -38,7 +40,8 @@ export type SortMethod =
   | 'sortByScheduled'
   | 'sortByDeadline'
   | 'sortByPriority'
-  | 'sortByUrgency';
+  | 'sortByUrgency'
+  | 'sortByKeyword';
 
 export class TaskListView extends ItemView {
   static viewType = 'todoseq-view';
@@ -125,7 +128,8 @@ export class TaskListView extends ItemView {
         attr === 'sortByScheduled' ||
         attr === 'sortByDeadline' ||
         attr === 'sortByPriority' ||
-        attr === 'sortByUrgency'
+        attr === 'sortByUrgency' ||
+        attr === 'sortByKeyword'
       )
         return attr;
     }
@@ -135,7 +139,8 @@ export class TaskListView extends ItemView {
       this.defaultSortMethod === 'sortByScheduled' ||
       this.defaultSortMethod === 'sortByDeadline' ||
       this.defaultSortMethod === 'sortByPriority' ||
-      this.defaultSortMethod === 'sortByUrgency'
+      this.defaultSortMethod === 'sortByUrgency' ||
+      this.defaultSortMethod === 'sortByKeyword'
     ) {
       return this.defaultSortMethod;
     }
@@ -182,6 +187,14 @@ export class TaskListView extends ItemView {
     // Use the new three-block sorting system
     const futureSetting = this.settings.futureTaskSorting;
 
+    // Build keyword config if sorting by keyword
+    let keywordConfig: KeywordSortConfig | undefined;
+    if (sortMethod === 'sortByKeyword') {
+      keywordConfig = buildKeywordSortConfig(
+        this.settings?.additionalTaskKeywords ?? [],
+      );
+    }
+
     // Apply the new sorting logic
     const sortedTasks = sortTasksWithThreeBlockSystem(
       tasks,
@@ -189,6 +202,7 @@ export class TaskListView extends ItemView {
       futureSetting,
       completedSetting,
       sortMethod,
+      keywordConfig,
     );
 
     return sortedTasks;
@@ -444,6 +458,7 @@ export class TaskListView extends ItemView {
       { value: 'sortByDeadline', label: 'Deadline date' },
       { value: 'sortByPriority', label: 'Priority' },
       { value: 'sortByUrgency', label: 'Urgency' },
+      { value: 'sortByKeyword', label: 'Keyword' },
     ];
 
     for (const option of sortOptions) {
@@ -470,6 +485,8 @@ export class TaskListView extends ItemView {
         sortMethod = 'sortByPriority';
       } else if (selectedValue === 'sortByUrgency') {
         sortMethod = 'sortByUrgency';
+      } else if (selectedValue === 'sortByKeyword') {
+        sortMethod = 'sortByKeyword';
       }
 
       // Update the sort method (keep the current view mode)

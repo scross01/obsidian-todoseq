@@ -8,7 +8,8 @@ export type SortOption =
   | 'scheduled'
   | 'deadline'
   | 'priority'
-  | 'urgency';
+  | 'urgency'
+  | 'keyword';
 
 /**
  * Valid completed task display options
@@ -93,13 +94,15 @@ export class TodoseqCodeBlockParser {
             filepath: 'filepath',
             file: 'filepath',
             path: 'filepath',
+            keyword: 'keyword',
+            keywords: 'keyword',
           };
           const mappedSort = sortMap[sortValue];
           if (mappedSort) {
             sortMethod = mappedSort;
           } else {
             throw new Error(
-              `Invalid sort method: ${sortValue}. Valid options: filepath, scheduled, deadline, priority, urgency`,
+              `Invalid sort method: ${sortValue}. Valid options: filepath, scheduled, deadline, priority, urgency, keyword`,
             );
           }
         } else if (trimmed.startsWith('show-completed:')) {

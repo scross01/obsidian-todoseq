@@ -8,6 +8,28 @@ export type TaskCategory = 'current' | 'upcoming' | 'future' | 'completed';
 export type BlockType = 'main' | 'future' | 'completed';
 
 /**
+ * Keyword Group type for keyword-based sorting
+ * Groups are sorted in priority order: 1 (highest) to 5 (lowest)
+ */
+export type KeywordGroup = 1 | 2 | 3 | 4 | 5;
+
+/**
+ * Configuration for keyword-based sorting
+ * Each group has both a Set for fast lookup and an ordered array for intra-group sorting
+ */
+export interface KeywordSortConfig {
+  activeStates: Set<string>; // Group 1 - highest priority (fast lookup)
+  activeStatesOrder: string[]; // Group 1 - ordered: NOW, DOING, IN-PROGRESS
+  pendingStates: Set<string>; // Group 2 - inactive/pending (fast lookup)
+  pendingStatesOrder: string[]; // Group 2 - ordered: TODO, LATER
+  customKeywords: string[]; // Group 3 - user-defined keywords (already ordered)
+  waitingStates: Set<string>; // Group 4 - waiting states (fast lookup)
+  waitingStatesOrder: string[]; // Group 4 - ordered: WAIT, WAITING
+  completedStates: Set<string>; // Group 5 - lowest priority (fast lookup)
+  completedStatesOrder: string[]; // Group 5 - ordered: DONE, CANCELED, CANCELLED
+}
+
+/**
  * Sorting method types
  */
 export type SortMethod =
@@ -15,7 +37,8 @@ export type SortMethod =
   | 'sortByScheduled'
   | 'sortByDeadline'
   | 'sortByPriority'
-  | 'sortByUrgency';
+  | 'sortByUrgency'
+  | 'sortByKeyword';
 
 /**
  * Future task display options
@@ -55,6 +78,164 @@ export const taskComparator = (a: Task, b: Task): number => {
   if (a.path === b.path) return a.line - b.line;
   return a.path.localeCompare(b.path);
 };
+
+/**
+ * Classify a task into a keyword group for sorting
+ *
+ * Group Priority (1 = highest, 5 = lowest):
+ * - Group 1: Active states (NOW, DOING, IN-PROGRESS)
+ * - Group 2: Inactive/Pending states (TODO, LATER)
+ * - Group 3: Custom keywords or unknown/empty states
+ * - Group 4: Waiting states (WAIT, WAITING)
+ * - Group 5: Completed states (DONE, CANCELED, CANCELLED)
+ *
+ * @param task The task to classify
+ * @param config Keyword sort configuration
+ * @returns The keyword group (1-5)
+ */
+export function getKeywordGroup(
+  task: Task,
+  config: KeywordSortConfig,
+): KeywordGroup {
+  // Completed flag takes precedence - always group 5
+  if (task.completed) {
+    return 5;
+  }
+
+  const stateUpper = task.state.toUpperCase();
+
+  // Group 1: Active states
+  if (config.activeStates.has(stateUpper)) {
+    return 1;
+  }
+
+  // Group 2: Pending/Inactive states
+  if (config.pendingStates.has(stateUpper)) {
+    return 2;
+  }
+
+  // Group 4: Waiting states (check before custom to prioritize)
+  if (config.waitingStates.has(stateUpper)) {
+    return 4;
+  }
+
+  // Group 5: Completed keyword states (for tasks with DONE/CANCELED keyword but completed: false)
+  if (config.completedStates.has(stateUpper)) {
+    return 5;
+  }
+
+  // Group 3: Custom keywords or unknown/empty states (default)
+  return 3;
+}
+
+/**
+ * Comparator for sorting tasks by keyword group
+ *
+ * @param a First task
+ * @param b Second task
+ * @param config Keyword sort configuration
+ * @returns Negative if a should come before b, positive if b should come before a
+ */
+/**
+ * Get the position of a keyword within its group for intra-group sorting
+ * Returns -1 if keyword not found in the order array
+ *
+ * @param stateUpper The uppercase state/keyword to find
+ * @param group The keyword group (1-5)
+ * @param config Keyword sort configuration
+ * @returns The index of the keyword in the group's order array, or -1 if not found
+ */
+function getKeywordPosition(
+  stateUpper: string,
+  group: KeywordGroup,
+  config: KeywordSortConfig,
+): number {
+  switch (group) {
+    case 1:
+      return config.activeStatesOrder.indexOf(stateUpper);
+    case 2:
+      return config.pendingStatesOrder.indexOf(stateUpper);
+    case 3:
+      // For custom keywords, use the customKeywords array directly
+      return config.customKeywords.indexOf(stateUpper);
+    case 4:
+      return config.waitingStatesOrder.indexOf(stateUpper);
+    case 5:
+      return config.completedStatesOrder.indexOf(stateUpper);
+    default:
+      return -1;
+  }
+}
+
+export function keywordSortComparator(
+  a: Task,
+  b: Task,
+  config: KeywordSortConfig,
+): number {
+  const groupA = getKeywordGroup(a, config);
+  const groupB = getKeywordGroup(b, config);
+
+  // Compare groups - lower group number = higher priority
+  if (groupA !== groupB) {
+    return groupA - groupB;
+  }
+
+  // Same group - compare by keyword position within the group
+  const stateA = a.state.toUpperCase();
+  const stateB = b.state.toUpperCase();
+  const posA = getKeywordPosition(stateA, groupA, config);
+  const posB = getKeywordPosition(stateB, groupB, config);
+
+  // If both keywords have defined positions, sort by position
+  if (posA !== -1 && posB !== -1 && posA !== posB) {
+    return posA - posB;
+  }
+
+  // If only one has a position, it comes first
+  if (posA !== -1 && posB === -1) {
+    return -1;
+  }
+  if (posA === -1 && posB !== -1) {
+    return 1;
+  }
+
+  // Same group, same or unknown keyword position - fall back to taskComparator
+  return taskComparator(a, b);
+}
+
+/**
+ * Build keyword sort configuration from settings
+ *
+ * @param additionalKeywords Custom keywords from user settings (order is preserved)
+ * @returns Complete KeywordSortConfig object
+ */
+export function buildKeywordSortConfig(
+  additionalKeywords: string[],
+): KeywordSortConfig {
+  // Define ordered keyword arrays for each group
+  // These arrays define both the keywords in the group AND their sort order
+  const activeStatesOrder = ['NOW', 'DOING', 'IN-PROGRESS'];
+  const pendingStatesOrder = ['TODO', 'LATER'];
+  const waitingStatesOrder = ['WAIT', 'WAITING'];
+  const completedStatesOrder = ['DONE', 'CANCELED', 'CANCELLED'];
+
+  // Normalize custom keywords to uppercase, preserving order from settings
+  const customKeywords = (additionalKeywords ?? []).map((k) => k.toUpperCase());
+
+  return {
+    // Sets for fast O(1) lookup
+    activeStates: new Set(activeStatesOrder),
+    pendingStates: new Set(pendingStatesOrder),
+    waitingStates: new Set(waitingStatesOrder),
+    completedStates: new Set(completedStatesOrder),
+    // Ordered arrays for intra-group sorting
+    activeStatesOrder,
+    pendingStatesOrder,
+    customKeywords,
+    waitingStatesOrder,
+    completedStatesOrder,
+  };
+}
 
 /**
  * Get the earliest date from a task (scheduled or deadline)
@@ -110,9 +291,13 @@ function classifyTask(task: Task, now: Date): TaskClassification {
 /**
  * Get sort function based on sort method
  * @param sortMethod The sort method to use
+ * @param keywordConfig Optional keyword sort configuration for sortByKeyword
  * @returns Sort function
  */
-function getSortFunction(sortMethod: SortMethod): (a: Task, b: Task) => number {
+function getSortFunction(
+  sortMethod: SortMethod,
+  keywordConfig?: KeywordSortConfig,
+): (a: Task, b: Task) => number {
   switch (sortMethod) {
     case 'sortByScheduled':
       return (a, b) => {
@@ -162,6 +347,13 @@ function getSortFunction(sortMethod: SortMethod): (a: Task, b: Task) => number {
         return taskComparator(a, b);
       };
 
+    case 'sortByKeyword':
+      if (keywordConfig) {
+        return (a, b) => keywordSortComparator(a, b, keywordConfig);
+      }
+      // Fallback to default if no config provided
+      return taskComparator;
+
     case 'default':
     default:
       return taskComparator;
@@ -172,10 +364,15 @@ function getSortFunction(sortMethod: SortMethod): (a: Task, b: Task) => number {
  * Sort tasks within a single category
  * @param tasks Tasks to sort
  * @param sortMethod Sort method to apply
+ * @param keywordConfig Optional keyword sort configuration
  * @returns Sorted tasks
  */
-function sortCategory(tasks: Task[], sortMethod: SortMethod): Task[] {
-  const sortFunction = getSortFunction(sortMethod);
+function sortCategory(
+  tasks: Task[],
+  sortMethod: SortMethod,
+  keywordConfig?: KeywordSortConfig,
+): Task[] {
+  const sortFunction = getSortFunction(sortMethod, keywordConfig);
   return [...tasks].sort(sortFunction);
 }
 
@@ -200,6 +397,7 @@ export function sortTasksInBlocks(
   futureSetting: FutureTaskSetting,
   completedSetting: CompletedTaskSetting,
   sortMethod: SortMethod = 'default',
+  keywordConfig?: KeywordSortConfig,
 ): TaskBlock[] {
   // Classify all tasks
   const classified: Record<TaskCategory, Task[]> = {
@@ -216,10 +414,10 @@ export function sortTasksInBlocks(
 
   // Sort each category
   const sorted: Record<TaskCategory, Task[]> = {
-    current: sortCategory(classified.current, sortMethod),
-    upcoming: sortCategory(classified.upcoming, sortMethod),
-    future: sortCategory(classified.future, sortMethod),
-    completed: sortCategory(classified.completed, sortMethod),
+    current: sortCategory(classified.current, sortMethod, keywordConfig),
+    upcoming: sortCategory(classified.upcoming, sortMethod, keywordConfig),
+    future: sortCategory(classified.future, sortMethod, keywordConfig),
+    completed: sortCategory(classified.completed, sortMethod, keywordConfig),
   };
 
   const blocks: TaskBlock[] = [];
@@ -241,7 +439,7 @@ export function sortTasksInBlocks(
       }
       // Sort all tasks together using the selected method
       {
-        const sortFunction = getSortFunction(sortMethod);
+        const sortFunction = getSortFunction(sortMethod, keywordConfig);
         mainBlockTasks.sort(sortFunction);
       }
       break;
@@ -255,7 +453,7 @@ export function sortTasksInBlocks(
       }
       // Sort the main block using the selected method
       {
-        const sortFunction2 = getSortFunction(sortMethod);
+        const sortFunction2 = getSortFunction(sortMethod, keywordConfig);
         mainBlockTasks.sort(sortFunction2);
       }
       break;
@@ -269,7 +467,7 @@ export function sortTasksInBlocks(
       }
       // Sort the main block using the selected method
       {
-        const sortFunction3 = getSortFunction(sortMethod);
+        const sortFunction3 = getSortFunction(sortMethod, keywordConfig);
         mainBlockTasks.sort(sortFunction3);
       }
       break;
@@ -283,7 +481,7 @@ export function sortTasksInBlocks(
       }
       // Sort the main block using the selected method
       {
-        const sortFunction4 = getSortFunction(sortMethod);
+        const sortFunction4 = getSortFunction(sortMethod, keywordConfig);
         mainBlockTasks.sort(sortFunction4);
       }
       break;
@@ -301,7 +499,7 @@ export function sortTasksInBlocks(
     const futureTasks = [...sorted.upcoming, ...sorted.future];
     if (futureTasks.length > 0) {
       // Sort future tasks using the selected method
-      const sortFunction = getSortFunction(sortMethod);
+      const sortFunction = getSortFunction(sortMethod, keywordConfig);
       futureTasks.sort(sortFunction);
       blocks.push({ type: 'future', tasks: futureTasks });
     }
@@ -311,7 +509,7 @@ export function sortTasksInBlocks(
   if (completedSetting === 'sortToEnd') {
     if (sorted.completed.length > 0) {
       // Sort completed tasks using the selected method
-      const sortFunction = getSortFunction(sortMethod);
+      const sortFunction = getSortFunction(sortMethod, keywordConfig);
       sorted.completed.sort(sortFunction);
       blocks.push({ type: 'completed', tasks: sorted.completed });
     }
@@ -339,6 +537,7 @@ export function sortTasksWithThreeBlockSystem(
   futureSetting: FutureTaskSetting,
   completedSetting: CompletedTaskSetting,
   sortMethod: SortMethod = 'default',
+  keywordConfig?: KeywordSortConfig,
 ): Task[] {
   const blocks = sortTasksInBlocks(
     tasks,
@@ -346,6 +545,7 @@ export function sortTasksWithThreeBlockSystem(
     futureSetting,
     completedSetting,
     sortMethod,
+    keywordConfig,
   );
   return flattenBlocks(blocks);
 }

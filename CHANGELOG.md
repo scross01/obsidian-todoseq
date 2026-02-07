@@ -2,6 +2,7 @@
 
 ## 0.10.0-dev
 
+- Added keyword sort option to organize tasks by keyword state Active (NOW/DOING/IN-PROGRESS), Inactive (TODO/LATER), Custom (user-defined), Waiting (WAIT/WAITING), and Completed (DONE/CANCELED/CANCELLED).
 - Added support the page properties search to filter tasks to only those that are on pages that match the property value. #26
 - Added styled rendering of priority indicators in the editor live preview mode, and reader view. #35
 - Fixed styling in the editor source mode for a more consistent source style that minimizes visualize restyling.
