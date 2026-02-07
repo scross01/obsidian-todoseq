@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.10.0-dev
+
+- Added support the page properties search to filter tasks to only those that are on pages that match the property value. #26
+
 ## 0.9.4
 
 - Fixed date parsing for consistent date normalization.
