@@ -362,6 +362,9 @@ export class PluginLifecycleManager {
     // Clean up VaultScanner resources
     this.plugin.vaultScanner?.destroy();
 
+    // Reset PropertySearchEngine singleton to prevent stale references on reload
+    PropertySearchEngine.resetInstance();
+
     // Clean up UI manager resources
     this.plugin.uiManager?.cleanup();
 

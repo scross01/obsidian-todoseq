@@ -34,13 +34,40 @@ export class PropertySearchEngine {
   private initializationPromise: Promise<void> | null = null; // Track if initialization is already queued
   private eventListenersRegistered = false; // Track if event listeners have been registered
 
+  // Store event references for proper cleanup
+  private vaultRenameEventRef: ReturnType<App['vault']['on']> | null = null;
+  private vaultDeleteEventRef: ReturnType<App['vault']['on']> | null = null;
+  private metadataCacheChangedEventRef: ReturnType<
+    App['metadataCache']['on']
+  > | null = null;
+
   private constructor(private app: App) {}
 
   public static getInstance(app: App): PropertySearchEngine {
+    // Check if the app reference has changed (plugin reload scenario)
+    if (
+      PropertySearchEngine.instance &&
+      PropertySearchEngine.instance.app !== app
+    ) {
+      // Reset the instance if the app reference has changed
+      PropertySearchEngine.resetInstance();
+    }
+
     if (!PropertySearchEngine.instance) {
       PropertySearchEngine.instance = new PropertySearchEngine(app);
     }
     return PropertySearchEngine.instance;
+  }
+
+  /**
+   * Reset the singleton instance. This should be called during plugin cleanup
+   * to prevent stale references when the plugin is reloaded.
+   */
+  public static resetInstance(): void {
+    if (PropertySearchEngine.instance) {
+      PropertySearchEngine.instance.destroy();
+      PropertySearchEngine.instance = null as unknown as PropertySearchEngine;
+    }
   }
 
   // Initialize on first use
@@ -808,25 +835,28 @@ export class PropertySearchEngine {
       return; // Already registered
     }
 
-    // Register handlers for vault events
-    this.app.vault.on('rename', (file, oldPath) => {
+    // Register handlers for vault events and store references for cleanup
+    this.vaultRenameEventRef = this.app.vault.on('rename', (file, oldPath) => {
       if (file instanceof TFile) {
         this.onFileRenamed(file, oldPath);
       }
     });
 
-    this.app.vault.on('delete', (file) => {
+    this.vaultDeleteEventRef = this.app.vault.on('delete', (file) => {
       if (file instanceof TFile) {
         this.onFileDeleted(file);
       }
     });
 
     // Only register metadata cache change handler - this is sufficient for all file content changes
-    this.app.metadataCache.on('changed', (file) => {
-      if (file instanceof TFile) {
-        this.onFileChanged(file);
-      }
-    });
+    this.metadataCacheChangedEventRef = this.app.metadataCache.on(
+      'changed',
+      (file) => {
+        if (file instanceof TFile) {
+          this.onFileChanged(file);
+        }
+      },
+    );
 
     this.eventListenersRegistered = true;
   }
@@ -837,8 +867,22 @@ export class PropertySearchEngine {
       return; // Not registered
     }
 
-    // This is a simplified implementation - in a real scenario, we'd need to track the specific listeners to remove them
-    // For now, we just set the flag to false since Obsidian will clean up listeners when the plugin unloads
+    // Remove each event listener using the stored references
+    if (this.vaultRenameEventRef) {
+      this.app.vault.offref(this.vaultRenameEventRef);
+      this.vaultRenameEventRef = null;
+    }
+
+    if (this.vaultDeleteEventRef) {
+      this.app.vault.offref(this.vaultDeleteEventRef);
+      this.vaultDeleteEventRef = null;
+    }
+
+    if (this.metadataCacheChangedEventRef) {
+      this.app.metadataCache.offref(this.metadataCacheChangedEventRef);
+      this.metadataCacheChangedEventRef = null;
+    }
+
     this.eventListenersRegistered = false;
   }
 
