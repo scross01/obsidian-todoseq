@@ -384,44 +384,85 @@ export class PropertySearchEngine {
     cache: Map<unknown, Set<string>>,
     caseSensitive = false,
   ): Promise<Set<string>> {
-    // Check if it's a comparison operator query
-    const comparisonMatch = value.match(/^([><]=?)(\d+(\.\d+)?)$/);
+    // Check if it's a comparison operator query (numeric or date)
+    const comparisonMatch = value.match(/^([><]=?)(.+)$/);
     if (comparisonMatch) {
       const operator = comparisonMatch[1];
-      const compareValue = Number(comparisonMatch[2]);
+      const compareValueStr = comparisonMatch[2];
 
-      const matchingFiles = new Set<string>();
+      // First, try to parse as date comparison
+      const compareDate = this.parseDateForComparison(compareValueStr);
+      if (compareDate) {
+        const matchingFiles = new Set<string>();
 
-      // Iterate through all property values in cache
-      cache.forEach((fileSet, propValue) => {
-        // Only perform comparison if property value is numeric
-        if (typeof propValue === 'number') {
-          let matches = false;
+        // Iterate through all property values in cache
+        cache.forEach((fileSet, propValue) => {
+          const taskDate = this.parsePropertyValueAsDate(propValue);
+          if (taskDate) {
+            let matches = false;
 
-          switch (operator) {
-            case '>':
-              matches = propValue > compareValue;
-              break;
-            case '>=':
-              matches = propValue >= compareValue;
-              break;
-            case '<':
-              matches = propValue < compareValue;
-              break;
-            case '<=':
-              matches = propValue <= compareValue;
-              break;
+            switch (operator) {
+              case '>':
+                matches = taskDate > compareDate;
+                break;
+              case '>=':
+                matches = taskDate >= compareDate;
+                break;
+              case '<':
+                matches = taskDate < compareDate;
+                break;
+              case '<=':
+                matches = taskDate <= compareDate;
+                break;
+            }
+
+            if (matches) {
+              fileSet.forEach((filePath) => {
+                matchingFiles.add(filePath);
+              });
+            }
           }
+        });
 
-          if (matches) {
-            fileSet.forEach((filePath) => {
-              matchingFiles.add(filePath);
-            });
+        return matchingFiles;
+      }
+
+      // Fall back to numeric comparison
+      const compareValue = Number(compareValueStr);
+      if (!isNaN(compareValue)) {
+        const matchingFiles = new Set<string>();
+
+        // Iterate through all property values in cache
+        cache.forEach((fileSet, propValue) => {
+          // Only perform comparison if property value is numeric
+          if (typeof propValue === 'number') {
+            let matches = false;
+
+            switch (operator) {
+              case '>':
+                matches = propValue > compareValue;
+                break;
+              case '>=':
+                matches = propValue >= compareValue;
+                break;
+              case '<':
+                matches = propValue < compareValue;
+                break;
+              case '<=':
+                matches = propValue <= compareValue;
+                break;
+            }
+
+            if (matches) {
+              fileSet.forEach((filePath) => {
+                matchingFiles.add(filePath);
+              });
+            }
           }
-        }
-      });
+        });
 
-      return matchingFiles;
+        return matchingFiles;
+      }
     }
 
     // Try to parse as date and handle date comparisons
@@ -580,6 +621,65 @@ export class PropertySearchEngine {
     }
 
     return undefined;
+  }
+
+  // Parse a date string for comparison operations
+  private parseDateForComparison(value: string): Date | null {
+    const trimmed = value.trim();
+
+    // Full date: YYYY-MM-DD
+    const fullDateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (fullDateMatch) {
+      const [, year, month, day] = fullDateMatch.map(Number);
+      return DateUtils.createDate(year, month - 1, day);
+    }
+
+    // Year-Month: YYYY-MM
+    const yearMonthMatch = trimmed.match(/^(\d{4})-(\d{2})$/);
+    if (yearMonthMatch) {
+      const [, year, month] = yearMonthMatch.map(Number);
+      return DateUtils.createDate(year, month - 1, 1);
+    }
+
+    // Year only: YYYY
+    const yearMatch = trimmed.match(/^(\d{4})$/);
+    if (yearMatch) {
+      const year = parseInt(trimmed, 10);
+      return DateUtils.createDate(year, 0, 1);
+    }
+
+    return null;
+  }
+
+  // Parse a property value as a date
+  private parsePropertyValueAsDate(propValue: unknown): Date | null {
+    if (propValue instanceof Date) {
+      return propValue;
+    }
+
+    if (typeof propValue === 'string') {
+      const parsed = this.parseDateForComparison(propValue);
+      if (parsed) {
+        return parsed;
+      }
+
+      // Try DateUtils.parseDateValue for more complex formats
+      const parsedDate = DateUtils.parseDateValue(propValue);
+      if (
+        parsedDate &&
+        parsedDate !== 'none' &&
+        !(typeof parsedDate === 'string')
+      ) {
+        if (typeof parsedDate === 'object' && 'date' in parsedDate) {
+          return parsedDate.date;
+        }
+        if (parsedDate instanceof Date) {
+          return parsedDate;
+        }
+      }
+    }
+
+    return null;
   }
 
   // Get all files with a specific property key (any value)
