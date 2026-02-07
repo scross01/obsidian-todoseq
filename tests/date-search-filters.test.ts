@@ -23,6 +23,14 @@ describe('Date Search Filters', () => {
     tomorrow.getDate(),
   );
 
+  // Helper function to format date as YYYY-MM-DD in local timezone
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const testTasks: Task[] = [
     createCheckboxTask({
       path: 'test1.md',
@@ -192,7 +200,7 @@ describe('Date Search Filters', () => {
     });
 
     it('should filter tasks with exact scheduled date', async () => {
-      const query = `scheduled:${todayMidnight.toISOString().split('T')[0]}`;
+      const query = `scheduled:${formatLocalDate(todayMidnight)}`;
       const node = SearchParser.parse(query);
 
       const results = await Promise.all(
@@ -231,7 +239,7 @@ describe('Date Search Filters', () => {
     });
 
     it('should filter tasks by specific day', async () => {
-      const query = `scheduled:${todayMidnight.toISOString().split('T')[0]}`;
+      const query = `scheduled:${formatLocalDate(todayMidnight)}`;
       const node = SearchParser.parse(query);
 
       const results = await Promise.all(
@@ -248,7 +256,7 @@ describe('Date Search Filters', () => {
       startDate.setDate(startDate.getDate() - 1);
       const endDate = new Date(today);
       endDate.setDate(endDate.getDate() + 1);
-      const query = `scheduled:${startDate.toISOString().split('T')[0]}..${endDate.toISOString().split('T')[0]}`;
+      const query = `scheduled:${formatLocalDate(startDate)}..${formatLocalDate(endDate)}`;
       const node = SearchParser.parse(query);
 
       const results = await Promise.all(
@@ -315,7 +323,7 @@ describe('Date Search Filters', () => {
     });
 
     it('should filter tasks with exact deadline date', async () => {
-      const query = `deadline:${tomorrowMidnight.toISOString().split('T')[0]}`;
+      const query = `deadline:${formatLocalDate(tomorrowMidnight)}`;
       const node = SearchParser.parse(query);
 
       const results = await Promise.all(
@@ -334,7 +342,7 @@ describe('Date Search Filters', () => {
       startDate.setDate(startDate.getDate() - 1);
       const endDate = new Date(today);
       endDate.setDate(endDate.getDate() + 1);
-      const query = `scheduled:${startDate.toISOString().split('T')[0]}..${endDate.toISOString().split('T')[0]}`;
+      const query = `scheduled:${formatLocalDate(startDate)}..${formatLocalDate(endDate)}`;
       const node = SearchParser.parse(query);
 
       const results = await Promise.all(
@@ -351,7 +359,7 @@ describe('Date Search Filters', () => {
       startDate.setDate(startDate.getDate() - 1);
       const endDate = new Date(today);
       endDate.setDate(endDate.getDate() + 1);
-      const query = `deadline:${startDate.toISOString().split('T')[0]}..${endDate.toISOString().split('T')[0]}`;
+      const query = `deadline:${formatLocalDate(startDate)}..${formatLocalDate(endDate)}`;
       const node = SearchParser.parse(query);
 
       const results = await Promise.all(
@@ -398,7 +406,7 @@ describe('Date Search Filters', () => {
       startDate.setDate(startDate.getDate() + 1);
       const endDate = new Date(today);
       endDate.setDate(endDate.getDate() + 2);
-      const query = `scheduled:${startDate.toISOString().split('T')[0]}..${endDate.toISOString().split('T')[0]}`;
+      const query = `scheduled:${formatLocalDate(startDate)}..${formatLocalDate(endDate)}`;
       const node = SearchParser.parse(query);
 
       const results = await Promise.all(
@@ -415,7 +423,7 @@ describe('Date Search Filters', () => {
       startDate.setDate(startDate.getDate() - 2);
       const endDate = new Date(today);
       endDate.setDate(endDate.getDate() - 1);
-      const query = `scheduled:${startDate.toISOString().split('T')[0]}..${endDate.toISOString().split('T')[0]}`;
+      const query = `scheduled:${formatLocalDate(startDate)}..${formatLocalDate(endDate)}`;
       const node = SearchParser.parse(query);
 
       const results = await Promise.all(

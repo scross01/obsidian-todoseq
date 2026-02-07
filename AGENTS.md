@@ -2,8 +2,16 @@
 
 This file provides guidance to agents when working with code in this repository.
 
+## IMPORTANT
+
+- **ALWAYS** consider the performance impact of any changes and prioritise performance without sacrificing functionality
+- **REMEMBER** this is an Obsidian plugin and should be treated as such, it is not a generic web app.
+- **DO NOT** use Unsafe assignment of an `any` value
+
 ## Build & Test
 
+- **Build**: `npm run build:debug`
+- **Test**: `npm test`
 - **Single test**: `npm test -- --testNamePattern="pattern"` (Jest with regex match)
 - **Coverage excludes**: `src/main.ts` excluded from coverage (line 9 in jest.config.json)
 - **Test console**: Tests mock console methods to reduce noise (lines 21-28 in tests/test-setup.ts)
