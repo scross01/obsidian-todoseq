@@ -130,7 +130,7 @@ export class SearchOptionsDropdown {
       'content:',
       'scheduled:',
       'deadline:',
-      'property:',
+      '[]', // Property search - inserts [] instead of property:
     ];
 
     // Filter options based on search term
@@ -145,6 +145,17 @@ export class SearchOptionsDropdown {
 
     await this.renderDropdown();
     this.show();
+  }
+
+  /**
+   * Get the display label for an option
+   * Property option shows as [property] with brackets
+   */
+  private getOptionLabel(option: string): string {
+    if (option === '[]') {
+      return '[property]';
+    }
+    return option;
   }
 
   private async renderDropdown(): Promise<void> {
@@ -228,8 +239,8 @@ export class SearchOptionsDropdown {
       const contentEl = itemEl.createEl('div', { cls: 'suggestion-content' });
       const titleEl = contentEl.createEl('div', { cls: 'suggestion-title' });
 
-      // Options dropdown - show prefix with description
-      titleEl.createSpan({ text: suggestion });
+      // Options dropdown - show prefix with description (use label for display)
+      titleEl.createSpan({ text: this.getOptionLabel(suggestion) });
 
       const infoText = this.getPrefixDescription(suggestion);
       if (infoText) {
@@ -283,7 +294,7 @@ export class SearchOptionsDropdown {
         return 'filter by scheduled date';
       case 'deadline:':
         return 'filter by deadline date';
-      case 'property:':
+      case '[]':
         return 'match page property';
       default:
         return '';
@@ -359,8 +370,10 @@ export class SearchOptionsDropdown {
     const currentValue = input.value;
 
     // Check if this is a prefix selection (like "path:")
+    // Property search [] is also treated as a prefix selection
     const isPrefixSelection =
-      suggestion.endsWith(':') && !suggestion.includes(' ');
+      (suggestion.endsWith(':') && !suggestion.includes(' ')) ||
+      suggestion === '[]';
 
     // Find the start of the current word/prefix
     let startPos = cursorPos;
@@ -368,23 +381,37 @@ export class SearchOptionsDropdown {
       startPos--;
     }
 
-    // Insert new prefix
+    // Insert new prefix (including [] for property search)
     const newValue =
       currentValue.substring(0, startPos) +
       suggestion +
       currentValue.substring(cursorPos);
     input.value = newValue;
-    input.selectionStart = input.selectionEnd = startPos + suggestion.length;
+
+    // For property search [], position cursor inside the brackets
+    if (suggestion === '[]') {
+      input.selectionStart = input.selectionEnd = startPos + 1; // Position between [ and ]
+    } else {
+      input.selectionStart = input.selectionEnd = startPos + suggestion.length;
+    }
 
     // For prefix selections, we need to manually show the suggestions
     // because the input handler might not catch it in time
     if (isPrefixSelection) {
+      // Hide this options dropdown first
+      this.hide();
+
       // Set flag to indicate we're handling a prefix selection
       this.isHandlingPrefixSelection = true;
 
-      // Trigger the suggestion dropdown for this prefix
+      // Also set the suggestion dropdown's flag to prevent it from being hidden on blur
       if (this.suggestionDropdown) {
-        this.suggestionDropdown.showPrefixDropdown(suggestion, '');
+        this.suggestionDropdown.isHandlingPrefixSelection = true;
+        // For property search, pass 'property:' as the prefix for the suggestion dropdown
+        // so it knows to show property suggestions
+        const prefixForDropdown =
+          suggestion === '[]' ? 'property:' : suggestion;
+        this.suggestionDropdown.showPrefixDropdown(prefixForDropdown, '');
       }
     }
 
