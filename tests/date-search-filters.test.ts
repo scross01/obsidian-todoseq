@@ -5,11 +5,13 @@ import { DateUtils } from '../src/utils/date-utils';
 import { createCheckboxTask } from './helpers/test-helper';
 
 describe('Date Search Filters', () => {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  // Use a fixed reference date (Wednesday) to ensure consistent test results
+  // regardless of which day of the week the tests are run.
+  // Using Wednesday ensures that yesterday, today, and tomorrow all fall within the same week.
+  const fixedNow = new Date(2026, 0, 14, 12, 0, 0); // Wednesday, January 14, 2026 at noon
+  const today = new Date(2026, 0, 14); // Wednesday, January 14, 2026
+  const yesterday = new Date(2026, 0, 13); // Tuesday, January 13, 2026
+  const tomorrow = new Date(2026, 0, 15); // Thursday, January 15, 2026
 
   // Create dates at midnight to avoid timezone issues
   const todayMidnight = new Date(
@@ -30,6 +32,16 @@ describe('Date Search Filters', () => {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+
+  // Mock system time for all tests in this describe block
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(fixedNow);
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
 
   const testTasks: Task[] = [
     createCheckboxTask({
