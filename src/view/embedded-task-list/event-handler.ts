@@ -17,7 +17,12 @@ export class EmbeddedTaskListEventHandler {
   // Track active code blocks
   private activeCodeBlocks: Map<
     string,
-    { element: HTMLElement; source: string; filePath: string }
+    {
+      element: HTMLElement;
+      source: string;
+      filePath: string;
+      isCollapsed?: boolean;
+    }
   > = new Map();
 
   // Debounce timers for file changes
@@ -99,14 +104,46 @@ export class EmbeddedTaskListEventHandler {
    * @param element The container element
    * @param source The code block source content
    * @param filePath The file path containing this code block
+   * @param initialCollapsed Optional initial collapsed state
    */
   trackCodeBlock(
     containerId: string,
     element: HTMLElement,
     source: string,
     filePath: string,
+    initialCollapsed?: boolean,
   ): void {
-    this.activeCodeBlocks.set(containerId, { element, source, filePath });
+    this.activeCodeBlocks.set(containerId, {
+      element,
+      source,
+      filePath,
+      isCollapsed: initialCollapsed,
+    });
+  }
+
+  /**
+   * Toggle the collapse state of a code block
+   * @param containerId ID of the code block to toggle
+   */
+  toggleCollapse(containerId: string): void {
+    const codeBlock = this.activeCodeBlocks.get(containerId);
+    if (!codeBlock) return;
+
+    // Toggle the collapse state
+    codeBlock.isCollapsed = !codeBlock.isCollapsed;
+
+    // Refresh the code block to re-render with new state
+    this.refreshCodeBlock(containerId);
+  }
+
+  /**
+   * Get the current collapse state of a code block
+   * @param containerId ID of the code block
+   * @returns The current collapse state, or undefined if not tracked
+   */
+  getCollapseState(containerId: string): boolean | undefined {
+    const codeBlock = this.activeCodeBlocks.get(containerId);
+    return codeBlock?.isCollapsed;
   }
 
   /**
@@ -271,8 +308,22 @@ export class EmbeddedTaskListEventHandler {
         params,
       );
 
-      // Re-render the task list
-      this.renderer.renderTaskList(codeBlock.element, filteredTasks, params);
+      // Get total number of tasks (before applying limit)
+      const totalTasksCount = await this.manager.getTotalTasksCount(
+        allTasks,
+        params,
+      );
+
+      // Re-render the task list with collapse state and toggle callback
+      this.renderer.renderTaskList(
+        codeBlock.element,
+        filteredTasks,
+        params,
+        totalTasksCount,
+        codeBlock.isCollapsed,
+        (id: string) => this.toggleCollapse(id),
+        containerId,
+      );
     } catch (error) {
       console.error('Error refreshing code block:', error);
       this.renderer.renderError(

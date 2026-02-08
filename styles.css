@@ -1168,3 +1168,129 @@
     color-mix(in srgb, var(--interactive-accent) 50%, transparent);
   padding-left: 5px; /* Reduce left padding to compensate for border */
 }
+
+/* ============================================================================
+   Collapsible Embedded Task List Styles
+   ============================================================================ */
+
+/* Title styling when used as collapsible toggle */
+.embedded-task-list-title[role='button'] {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-s);
+  margin: -2px -6px 0 -6px;
+  padding: 2px 6px 6px 6px;
+}
+
+.embedded-task-list-title[role='button']:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.embedded-task-list-title[role='button']:focus-visible {
+  outline: 2px solid var(--interactive-accent, #7f6df2);
+  outline-offset: 2px;
+}
+
+/* When collapsed, remove bottom border and margin from title */
+/* .embedded-task-list-collapsed .embedded-task-list-title[role="button"] {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+} */
+
+/* When expanded, keep the border on title for full-width underline */
+.embedded-task-list-expanded .embedded-task-list-title[role='button'] {
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 8px;
+}
+
+/* When embedded-task-list-header is used as collapsible toggle (no title case) */
+.embedded-task-list-header[role='button'] {
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--radius-s);
+}
+
+.embedded-task-list-header[role='button']:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.embedded-task-list-header[role='button']:focus-visible {
+  outline: 2px solid var(--interactive-accent, #7f6df2);
+  outline-offset: 2px;
+}
+
+/* Chevron icon container */
+.todoseq-collapse-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease-out;
+  vertical-align: middle;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.todoseq-collapse-toggle-icon.is-expanded {
+  transform: rotate(90deg);
+}
+
+/* When icon is inside title, adjust margin */
+.embedded-task-list-title .todoseq-collapse-toggle-icon {
+  margin-left: 6px;
+}
+
+/* When icon is in embedded-task-list-header (no title case), use same margin as title */
+.embedded-task-list-header .todoseq-collapse-toggle-icon {
+  margin-left: -10px;
+  margin-top: 2px;
+}
+
+/* Query summary in collapsed header */
+.todoseq-query-summary {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+/* Result count footer (shown when collapsed) - no border, just text */
+.todoseq-result-count-footer {
+  text-align: center;
+  padding: 8px 0 4px 0;
+  color: var(--text-muted);
+  font-size: 0.8em;
+  font-style: italic;
+}
+
+/* Collapsed container state */
+.embedded-task-list-collapsed {
+  /* No additional styles needed - state class for JS */
+}
+
+/* Expanded container state */
+.embedded-task-list-expanded {
+  /* No additional styles needed - state class for JS */
+}
+
+/* Expanded content animation */
+/* Note: Exclude header[role="button"] as it's the toggle in no-title case and shouldn't animate */
+.embedded-task-list-expanded .embedded-task-list-header:not([role='button']),
+.embedded-task-list-expanded .embedded-task-list,
+.embedded-task-list-expanded .embedded-task-list-truncated {
+  animation: todoseqFadeIn 0.15s ease-out;
+}
+
+@keyframes todoseqFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
