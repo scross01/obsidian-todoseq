@@ -464,12 +464,27 @@ export class SearchSuggestionDropdown {
     }, 100);
   }
 
+  private onVisibilityChange: ((isVisible: boolean) => void) | null = null;
+
+  /**
+   * Set a callback to be notified when dropdown visibility changes
+   * @param callback Function called with true when shown, false when hidden
+   */
+  public setOnVisibilityChange(callback: (isVisible: boolean) => void): void {
+    this.onVisibilityChange = callback;
+  }
+
   public show(): void {
     if (this.isShowing) return;
 
     this.updatePosition();
     this.containerEl.addClass('show');
     this.isShowing = true;
+
+    // Notify visibility change
+    if (this.onVisibilityChange) {
+      this.onVisibilityChange(true);
+    }
 
     // Scroll selected item into view
     const selectedItem = this.containerEl.querySelector('.is-selected');
@@ -484,6 +499,19 @@ export class SearchSuggestionDropdown {
     this.containerEl.removeClass('show');
     this.isShowing = false;
     this.selectedIndex = -1;
+
+    // Notify visibility change
+    if (this.onVisibilityChange) {
+      this.onVisibilityChange(false);
+    }
+  }
+
+  /**
+   * Check if the dropdown is currently visible
+   * @returns true if the dropdown is showing
+   */
+  public isVisible(): boolean {
+    return this.isShowing;
   }
 
   public cleanup(): void {

@@ -58,6 +58,11 @@ export class TaskListView extends ItemView {
   private ariaLiveRegion: HTMLElement | null = null;
   private unsubscribeFromStateManager: (() => void) | null = null;
 
+  // Search history debounce mechanism
+  private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
+    null;
+  private readonly SEARCH_HISTORY_DEBOUNCE_MS = 3000; // 3 seconds idle timeout
+
   constructor(
     leaf: WorkspaceLeaf,
     taskStateManager: TaskStateManager,
@@ -270,6 +275,35 @@ export class TaskListView extends ItemView {
       // Update attribute and re-render list only, preserving focus
       this.setSearchQuery(inputEl.value);
       await this.refreshVisibleList();
+      // Start debounce timer for history capture
+      this.handleSearchHistoryDebounce(inputEl.value);
+    });
+
+    // Capture search on Enter key (immediate) - only when both dropdowns are closed
+    inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        // Only capture to history if both dropdowns are not visible
+        // This prevents capturing when Enter is used to select from a dropdown
+        const suggestionVisible = this.suggestionDropdown?.isVisible() ?? false;
+        const optionsVisible = this.optionsDropdown?.isVisible() ?? false;
+        if (!suggestionVisible && !optionsVisible) {
+          this.captureSearchToHistory(inputEl.value);
+        }
+      }
+    });
+
+    // Also handle 'search' event for mobile keyboards (Android magnifying glass button)
+    // The search event fires when user presses the search button on mobile
+    inputEl.addEventListener('search', () => {
+      // Only capture if there's a non-empty query and both dropdowns are closed
+      const query = inputEl.value.trim();
+      if (query) {
+        const suggestionVisible = this.suggestionDropdown?.isVisible() ?? false;
+        const optionsVisible = this.optionsDropdown?.isVisible() ?? false;
+        if (!suggestionVisible && !optionsVisible) {
+          this.captureSearchToHistory(query);
+        }
+      }
     });
 
     // Add Settings button to the right side of the first row
@@ -555,6 +589,14 @@ export class TaskListView extends ItemView {
           this.suggestionDropdown,
         );
 
+        // Set up visibility change callbacks to manage debounce timer
+        this.suggestionDropdown.setOnVisibilityChange((isVisible) => {
+          this.handleDropdownVisibilityChange(isVisible);
+        });
+        this.optionsDropdown.setOnVisibilityChange((isVisible) => {
+          this.handleDropdownVisibilityChange(isVisible);
+        });
+
         // Input event handler for dropdown triggering
         inputEl.addEventListener('input', () => {
           this.handleSearchInputForSuggestions();
@@ -678,6 +720,63 @@ export class TaskListView extends ItemView {
       this.optionsDropdown.showOptionsDropdown();
       this.suggestionDropdown.hide();
     }
+  }
+
+  /**
+   * Handle dropdown visibility changes
+   * Clears debounce timer when dropdown opens, restarts when both close
+   */
+  private handleDropdownVisibilityChange(_isVisible: boolean): void {
+    const suggestionVisible = this.suggestionDropdown?.isVisible() ?? false;
+    const optionsVisible = this.optionsDropdown?.isVisible() ?? false;
+
+    if (suggestionVisible || optionsVisible) {
+      // A dropdown is visible - clear the debounce timer
+      if (this.searchHistoryDebounceTimer) {
+        clearTimeout(this.searchHistoryDebounceTimer);
+        this.searchHistoryDebounceTimer = null;
+      }
+    } else {
+      // Both dropdowns are closed - restart debounce timer with current query
+      const query = this.getSearchQuery();
+      if (query.trim()) {
+        this.handleSearchHistoryDebounce(query);
+      }
+    }
+  }
+
+  /**
+   * Handle search history debounce - starts/restarts idle timeout
+   * Captures search query after user stops typing
+   */
+  private handleSearchHistoryDebounce(query: string): void {
+    // Don't start debounce if either dropdown is visible
+    const suggestionVisible = this.suggestionDropdown?.isVisible() ?? false;
+    const optionsVisible = this.optionsDropdown?.isVisible() ?? false;
+    if (suggestionVisible || optionsVisible) {
+      return;
+    }
+
+    // Clear any existing timer
+    if (this.searchHistoryDebounceTimer) {
+      clearTimeout(this.searchHistoryDebounceTimer);
+      this.searchHistoryDebounceTimer = null;
+    }
+
+    // Start new timer
+    this.searchHistoryDebounceTimer = setTimeout(() => {
+      this.captureSearchToHistory(query);
+      this.searchHistoryDebounceTimer = null;
+    }, this.SEARCH_HISTORY_DEBOUNCE_MS);
+  }
+
+  /**
+   * Capture a search query to history
+   * Called after debounce timeout or immediately on Enter key
+   */
+  private captureSearchToHistory(query: string): void {
+    if (!this.optionsDropdown) return;
+    this.optionsDropdown.addToHistory(query);
   }
 
   // Cycle state via NEXT_STATE using the centralized coordinator
@@ -1754,6 +1853,12 @@ export class TaskListView extends ItemView {
     if (handler) {
       window.removeEventListener('keydown', handler);
       this._searchKeyHandler = undefined;
+    }
+
+    // Cleanup search history debounce timer
+    if (this.searchHistoryDebounceTimer) {
+      clearTimeout(this.searchHistoryDebounceTimer);
+      this.searchHistoryDebounceTimer = null;
     }
 
     // Cleanup suggestion dropdowns

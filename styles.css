@@ -482,6 +482,21 @@
   display: block;
 }
 
+/* Search history item styling */
+.todoseq-dropdown .search-suggest-history-item {
+  cursor: pointer;
+}
+
+.todoseq-dropdown .search-suggest-history-item:hover,
+.todoseq-dropdown .search-suggest-history-item.is-selected {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Ensure group headers (Search options, History) are left-aligned consistently */
+.todoseq-dropdown .search-suggest-item.mod-group {
+  padding-left: var(--size-4-2);
+}
+
 /* Status bar item styling */
 .todoseq-status-bar {
   order: -1;
