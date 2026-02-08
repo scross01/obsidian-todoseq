@@ -833,6 +833,62 @@
   text-overflow: ellipsis; /* Additional fallback for safety */
 }
 
+/* ============================================================================
+   Wrap Content Mode - Task text wrapping and file info on new row
+   ============================================================================ */
+
+/* Wrap content mode - task item stays as row but allows content to wrap */
+.embedded-task-item-wrap {
+  align-items: flex-start;
+}
+
+/* Wrap content mode - checkbox alignment with first text line */
+.embedded-task-item-wrap .embedded-task-checkbox {
+  margin-top: 4px;
+}
+
+/* Wrap content mode - content wrapper for stacked layout (text + file info) */
+.embedded-task-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0; /* Allow content to shrink */
+}
+
+/* Wrap content mode - text container uses inline flow for natural wrapping */
+.embedded-task-text-wrap {
+  display: inline;
+  min-width: 0;
+}
+
+/* Wrap content mode - keep all inline elements together */
+.embedded-task-text-wrap .embedded-task-state,
+.embedded-task-text-wrap .priority-badge,
+.embedded-task-text-wrap .embedded-task-text {
+  display: inline;
+}
+
+/* Wrap content mode - text element allows wrapping */
+.embedded-task-text-wrap .embedded-task-text {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  word-break: break-word;
+}
+
+/* Wrap content mode - file info on new row without truncation */
+.embedded-task-file-info-wrap {
+  color: var(--text-muted);
+  font-size: 0.7em;
+  font-family: var(--font-monospace);
+  opacity: 0.7;
+  margin-left: 0;
+  max-width: unset;
+  overflow: visible;
+  text-overflow: unset;
+}
+
 /* Completed task styling */
 .embedded-task-item:has(.embedded-task-checkbox:checked) {
   opacity: 0.6;

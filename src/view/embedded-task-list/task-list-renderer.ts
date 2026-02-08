@@ -483,26 +483,60 @@ export class EmbeddedTaskListRenderer {
       textContainer.appendChild(textSpan);
     }
 
-    // Create file info if show-file is not explicitly false
-    if (params.showFile !== false) {
-      const fileInfo = document.createElement('div');
-      fileInfo.className = 'embedded-task-file-info';
-      const fileName = task.path.split('/').pop() || task.path;
-      // Strip .md extension from display name
-      const displayName = fileName.replace(/\.md$/, '');
-      const displayText = `${displayName}:${task.line + 1}`;
-      // Apply middle truncation with 23 character limit
-      fileInfo.textContent = truncateMiddle(displayText, 32);
-      fileInfo.setAttribute('title', task.path);
+    // Handle wrap-content mode
+    if (params.wrapContent) {
+      // Add wrap class to list item
+      li.classList.add('embedded-task-item-wrap');
 
-      // Assemble the item
+      // Add wrap class to text container for CSS styling
+      textContainer.classList.add('embedded-task-text-wrap');
+
+      // Create content wrapper for wrapped layout
+      const contentWrapper = document.createElement('div');
+      contentWrapper.className = 'embedded-task-content-wrapper';
+
+      // Append text container to wrapper
+      contentWrapper.appendChild(textContainer);
+
+      // Create file info on new row if show-file is not explicitly false
+      if (params.showFile !== false) {
+        const fileInfo = document.createElement('div');
+        fileInfo.className = 'embedded-task-file-info-wrap';
+        const fileName = task.path.split('/').pop() || task.path;
+        // Strip .md extension from display name
+        const displayName = fileName.replace(/\.md$/, '');
+        // Full filename without truncation in wrap mode
+        fileInfo.textContent = `${displayName}:${task.line + 1}`;
+        fileInfo.setAttribute('title', task.path);
+        contentWrapper.appendChild(fileInfo);
+      }
+
+      // Assemble the item with content wrapper
       li.appendChild(checkbox);
-      li.appendChild(textContainer);
-      li.appendChild(fileInfo);
+      li.appendChild(contentWrapper);
     } else {
-      // Assemble the item without file info
-      li.appendChild(checkbox);
-      li.appendChild(textContainer);
+      // Default (truncated) mode
+      // Create file info if show-file is not explicitly false
+      if (params.showFile !== false) {
+        const fileInfo = document.createElement('div');
+        fileInfo.className = 'embedded-task-file-info';
+        const fileName = task.path.split('/').pop() || task.path;
+        // Strip .md extension from display name
+        const displayName = fileName.replace(/\.md$/, '');
+        const displayText = `${displayName}:${task.line + 1}`;
+        // Apply middle truncation with 32 character limit
+        fileInfo.textContent = truncateMiddle(displayText, 32);
+        fileInfo.setAttribute('title', task.path);
+
+        // Assemble the item
+        li.appendChild(checkbox);
+        li.appendChild(textContainer);
+        li.appendChild(fileInfo);
+      } else {
+        // Assemble the item without file info
+        li.appendChild(checkbox);
+        li.appendChild(textContainer);
+      }
     }
 
     // Add event listeners
