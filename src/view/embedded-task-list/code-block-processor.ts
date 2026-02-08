@@ -86,13 +86,32 @@ export class TodoseqCodeBlockProcessor {
         params,
       );
 
-      // Render the task list
-      this.renderer.renderTaskList(el, filteredTasks, params, totalTasksCount);
-
-      // Track this code block for real-time updates
+      // Generate unique container ID for this code block
       const containerId = `todoseq-${Math.random().toString(36).slice(2, 8)}`;
       el.id = containerId;
-      this.eventHandler.trackCodeBlock(containerId, el, source, ctx.sourcePath);
+
+      // Determine initial collapse state (collapsed if collapse: true)
+      const initialCollapsed = params.collapse === true;
+
+      // Track this code block for real-time updates with initial collapse state
+      this.eventHandler.trackCodeBlock(
+        containerId,
+        el,
+        source,
+        ctx.sourcePath,
+        initialCollapsed,
+      );
+
+      // Render the task list with collapse support
+      this.renderer.renderTaskList(
+        el,
+        filteredTasks,
+        params,
+        totalTasksCount,
+        initialCollapsed,
+        (id: string) => this.eventHandler.toggleCollapse(id),
+        containerId,
+      );
     } catch (error) {
       console.error('Error processing todoseq code block:', error);
       this.renderer.renderError(el, `Processing error: ${error.message}`);

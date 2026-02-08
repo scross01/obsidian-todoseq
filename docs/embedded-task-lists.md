@@ -28,6 +28,7 @@ Using the following parameters within the `todoseq` code block you define which 
 - `show-future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Controls how future-dated tasks are displayed. Defaults to `show-all`. (`future:` is an alternative alias for this parameter)
 - `show-query:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `show`.
 - `wrap-content:` (optional) `true`, `false`, `wrap`, or `truncate`. Controls whether task text wraps to multiple lines or truncates with ellipsis. Defaults to `false` (truncate). When enabled, file info moves to a new row with full filename.
+- `collapse:` (optional) `true` or `false`. When enabled, the task list is collapsible with a chevron toggle. Defaults to `false`. Requires either `title:` to be set OR `show-query: true`.
 
 Example:
 
@@ -194,6 +195,27 @@ wrap-content: true
 
 This is particularly useful if your tasks have long descriptions that need to be fully visible
 or if you need to display the task list on mobile devices or narrow windows where truncation would hide important context.
+
+### Collapsible Task Lists
+
+The `collapse:` parameter makes the task list collapsible, allowing you to save space in your notes:
+
+- `true` - Task list starts collapsed with a chevron toggle
+- `false` - Task list is always expanded (default)
+
+When enabled the task list initially displays in a collapsed state and chevron icon (›) indicates the expand/collapse state.
+Click the header to toggle between expanded and collapsed .When collapsed, a footer shows the count of matching tasks (e.g., "5 matching tasks")
+
+> **Note:** The `collapse` option requires either a `title:` to be set OR `show-query: true`. This ensures there's a visible header to click for toggling.
+
+````txt
+```todoseq
+title: My Tasks
+collapse: true
+search: tag:project1
+sort: priority
+```
+````
 
 ### Combined Parameters
 

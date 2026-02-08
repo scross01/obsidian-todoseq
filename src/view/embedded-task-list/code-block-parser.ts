@@ -38,6 +38,7 @@ export interface TodoseqParameters {
   title?: string;
   showQuery?: boolean;
   wrapContent?: boolean;
+  collapse?: boolean;
   error?: string;
 }
 
@@ -72,6 +73,7 @@ export class TodoseqCodeBlockParser {
       let title: string | undefined;
       let showQuery: boolean | undefined;
       let wrapContent: boolean | undefined;
+      let collapse: boolean | undefined;
 
       // Parse each line for parameters
       for (const line of lines) {
@@ -230,6 +232,20 @@ export class TodoseqCodeBlockParser {
               `Invalid wrap-content option: ${wrapValue}. Valid options: true, false, wrap, truncate`,
             );
           }
+        } else if (trimmed.startsWith('collapse:')) {
+          const collapseValue = trimmed
+            .substring('collapse:'.length)
+            .trim()
+            .toLowerCase();
+          if (collapseValue === 'false') {
+            collapse = false;
+          } else if (collapseValue === 'true') {
+            collapse = true;
+          } else {
+            throw new Error(
+              `Invalid collapse option: ${collapseValue}. Valid options: true, false`,
+            );
+          }
         }
       }
 
@@ -242,6 +258,15 @@ export class TodoseqCodeBlockParser {
         }
       }
 
+      // Validate collapse option compatibility
+      // collapse: true requires either a title or showQuery to be enabled (not explicitly false)
+      // because there must be a clickable header to expand/collapse the list
+      if (collapse === true && !title && showQuery === false) {
+        throw new Error(
+          'collapse option requires either title to be set or show-query to be enabled',
+        );
+      }
+
       return {
         searchQuery,
         sortMethod,
@@ -252,6 +277,7 @@ export class TodoseqCodeBlockParser {
         title,
         showQuery,
         wrapContent,
+        collapse,
       };
     } catch (error) {
       const errorMessage =
@@ -264,6 +290,7 @@ export class TodoseqCodeBlockParser {
         title: undefined,
         showQuery: undefined,
         wrapContent: undefined,
+        collapse: undefined,
       };
     }
   }

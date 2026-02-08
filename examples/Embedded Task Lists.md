@@ -84,7 +84,38 @@ sort: scheduled
 limit: 5
 ```
 
+
 ## Interactive Features
+
+### Collapsible lists
+
+with `collapse: true`
+
+```todoseq
+search: path:examples file:"Task Examples"
+sort:keyword
+collapse: true
+```
+
+```todoseq
+title: Test collapse
+search: path:examples file:"Task Examples"
+collapse: true
+```
+
+```todoseq
+title: Test collapse with show-query false
+search: path:examples file:"Task Examples"
+collapse: true
+show-query: false
+```
+
+```todoseq
+title: Test collapse with limit
+search: path:examples file:"Task Examples"
+collapse: true
+limit: 5
+```
 
 ### Toggle Task State
 
@@ -125,6 +156,13 @@ show-completed: invalid
 
 ```todoseq
 limit: invalid
+```
+
+```todoseq
+search: path:examples file:"Task Examples"
+sort:keyword
+show-query: false
+collapse: true
 ```
 
 The error message indicate what went wrong and suggest how to fix it.
