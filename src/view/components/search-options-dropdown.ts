@@ -1,4 +1,4 @@
-import { Vault } from 'obsidian';
+import { Vault, setIcon } from 'obsidian';
 import { Task } from '../../types/task';
 import { SearchSuggestions } from '../../search/search-suggestions';
 import { TodoTrackerSettings } from '../../settings/settings';
@@ -8,6 +8,7 @@ import { DOCS_SEARCH_URL } from '../../utils/constants';
 /**
  * Dropdown component for search prefix filter options
  * Handles the selection of search prefixes like "path:", "state:", etc.
+ * Also displays search history for quick re-execution of previous searches
  */
 export class SearchOptionsDropdown {
   private containerEl: HTMLElement;
@@ -19,6 +20,10 @@ export class SearchOptionsDropdown {
   private selectedIndex = -1;
   private isShowing = false;
   public isHandlingPrefixSelection = false;
+
+  // Search history storage (session-only)
+  private searchHistory: string[] = [];
+  private readonly MAX_HISTORY_SIZE = 10;
 
   constructor(
     inputEl: HTMLInputElement,
@@ -53,6 +58,47 @@ export class SearchOptionsDropdown {
    */
   public updateTasks(tasks: Task[]): void {
     this.tasks = tasks;
+  }
+
+  /**
+   * Add a search query to the history
+   * @param query The search query to add
+   */
+  public addToHistory(query: string): void {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    // Remove if already exists to move to top
+    const existingIndex = this.searchHistory.indexOf(trimmed);
+    if (existingIndex !== -1) {
+      this.searchHistory.splice(existingIndex, 1);
+    }
+
+    // Add to beginning
+    this.searchHistory.unshift(trimmed);
+
+    // Enforce max size
+    if (this.searchHistory.length > this.MAX_HISTORY_SIZE) {
+      this.searchHistory.pop();
+    }
+  }
+
+  /**
+   * Clear all search history
+   */
+  public clearHistory(): void {
+    this.searchHistory = [];
+    // Re-render if currently showing to update the display
+    if (this.isShowing) {
+      this.renderDropdown();
+    }
+  }
+
+  /**
+   * Get the current search history (for testing/debugging)
+   */
+  public getHistory(): string[] {
+    return [...this.searchHistory];
   }
 
   private setupEventListeners(): void {
@@ -271,9 +317,106 @@ export class SearchOptionsDropdown {
       // Add mouseover handler for selection
       itemEl.addEventListener('mouseover', () => {
         this.selectedIndex = index;
-        this.updateSelection();
+        this.updateSelectionWithHistory();
       });
     });
+
+    // Render history section if we have history items
+    if (this.searchHistory.length > 0) {
+      this.renderHistorySection(suggestionEl);
+    }
+  }
+
+  /**
+   * Render the history section with header and history items
+   */
+  private renderHistorySection(parent: HTMLElement): void {
+    // History header with clear button
+    const headerItem = parent.createEl('div', {
+      cls: 'suggestion-item mod-complex search-suggest-item mod-group',
+    });
+
+    // Prevent click from closing dropdown
+    headerItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    const headerContent = headerItem.createEl('div', {
+      cls: 'suggestion-content',
+    });
+    const headerTitle = headerContent.createEl('div', {
+      cls: 'suggestion-title list-item-part mod-extended',
+    });
+    headerTitle.createSpan({ text: 'History' });
+
+    // Clear button (X icon)
+    const auxEl = headerItem.createEl('div', { cls: 'suggestion-aux' });
+    const clearBtn = auxEl.createEl('div', {
+      cls: 'list-item-part search-suggest-icon clickable-icon',
+      attr: { 'aria-label': 'Clear history' },
+    });
+    setIcon(clearBtn, 'lucide-x');
+
+    clearBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    clearBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.clearHistory();
+    });
+
+    // History items
+    const optionsCount = this.currentSuggestions.length;
+    this.searchHistory.forEach((query, index) => {
+      const adjustedIndex = optionsCount + index;
+      const itemEl = parent.createEl('div', {
+        cls: `suggestion-item mod-complex search-suggest-item search-suggest-history-item ${adjustedIndex === this.selectedIndex ? 'is-selected' : ''}`,
+      });
+
+      const contentEl = itemEl.createEl('div', { cls: 'suggestion-content' });
+      const titleEl = contentEl.createEl('div', { cls: 'suggestion-title' });
+      titleEl.createSpan({ text: query });
+
+      itemEl.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        this.handleHistorySelection(query);
+      });
+
+      itemEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      itemEl.addEventListener('mouseover', () => {
+        this.selectedIndex = adjustedIndex;
+        this.updateSelectionWithHistory();
+      });
+    });
+  }
+
+  /**
+   * Handle selection of a history item
+   */
+  private handleHistorySelection(query: string): void {
+    // Replace entire input with the history query
+    this.inputEl.value = query;
+    this.inputEl.selectionStart = this.inputEl.selectionEnd = query.length;
+
+    // Hide dropdown
+    this.hide();
+
+    // Trigger search
+    setTimeout(() => {
+      const event = new Event('input', { bubbles: true });
+      this.inputEl.dispatchEvent(event);
+    }, 0);
+
+    // Focus input
+    this.inputEl.focus();
   }
 
   private getPrefixDescription(prefix: string): string {
@@ -301,12 +444,18 @@ export class SearchOptionsDropdown {
     }
   }
 
-  private updateSelection(): void {
-    const items = this.containerEl.querySelectorAll('.search-suggest-item');
+  /**
+   * Update selection visual state including history items
+   */
+  private updateSelectionWithHistory(): void {
+    const items = this.containerEl.querySelectorAll(
+      '.search-suggest-item:not(.mod-group)',
+    );
+
     items.forEach((item, index) => {
-      // Skip the title section (index 0)
-      const adjustedIndex = index - 1;
-      if (adjustedIndex === this.selectedIndex) {
+      // Map the DOM index to the logical index
+      // DOM order: option items first, then history items
+      if (index === this.selectedIndex) {
         item.addClass('is-selected');
       } else {
         item.removeClass('is-selected');
@@ -317,29 +466,35 @@ export class SearchOptionsDropdown {
   public handleKeyDown(event: KeyboardEvent): boolean {
     if (!this.isShowing) return false;
 
+    // Calculate total items: options + history items
+    const totalItems =
+      this.currentSuggestions.length + this.searchHistory.length;
+
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
-        this.selectedIndex = Math.min(
-          this.selectedIndex + 1,
-          this.currentSuggestions.length - 1,
-        );
-        this.updateSelection();
+        this.selectedIndex = Math.min(this.selectedIndex + 1, totalItems - 1);
+        this.updateSelectionWithHistory();
         return true;
 
       case 'ArrowUp':
         event.preventDefault();
         this.selectedIndex = Math.max(this.selectedIndex - 1, -1);
-        this.updateSelection();
+        this.updateSelectionWithHistory();
         return true;
 
       case 'Enter':
-        if (
-          this.selectedIndex >= 0 &&
-          this.selectedIndex < this.currentSuggestions.length
-        ) {
+        if (this.selectedIndex >= 0) {
           event.preventDefault();
-          this.handleSelection(this.currentSuggestions[this.selectedIndex]);
+          const optionsCount = this.currentSuggestions.length;
+          if (this.selectedIndex < optionsCount) {
+            // Selected an option
+            this.handleSelection(this.currentSuggestions[this.selectedIndex]);
+          } else {
+            // Selected a history item
+            const historyIndex = this.selectedIndex - optionsCount;
+            this.handleHistorySelection(this.searchHistory[historyIndex]);
+          }
           return true;
         }
         break;
@@ -350,12 +505,15 @@ export class SearchOptionsDropdown {
         return true;
 
       case 'Tab':
-        if (
-          this.selectedIndex >= 0 &&
-          this.selectedIndex < this.currentSuggestions.length
-        ) {
+        if (this.selectedIndex >= 0) {
           event.preventDefault();
-          this.handleSelection(this.currentSuggestions[this.selectedIndex]);
+          const optionsCount = this.currentSuggestions.length;
+          if (this.selectedIndex < optionsCount) {
+            this.handleSelection(this.currentSuggestions[this.selectedIndex]);
+          } else {
+            const historyIndex = this.selectedIndex - optionsCount;
+            this.handleHistorySelection(this.searchHistory[historyIndex]);
+          }
           return true;
         }
         break;
@@ -442,12 +600,27 @@ export class SearchOptionsDropdown {
     }
   }
 
+  private onVisibilityChange: ((isVisible: boolean) => void) | null = null;
+
+  /**
+   * Set a callback to be notified when dropdown visibility changes
+   * @param callback Function called with true when shown, false when hidden
+   */
+  public setOnVisibilityChange(callback: (isVisible: boolean) => void): void {
+    this.onVisibilityChange = callback;
+  }
+
   public show(): void {
     if (this.isShowing) return;
 
     this.updatePosition();
     this.containerEl.addClass('show');
     this.isShowing = true;
+
+    // Notify visibility change
+    if (this.onVisibilityChange) {
+      this.onVisibilityChange(true);
+    }
 
     // Scroll selected item into view
     const selectedItem = this.containerEl.querySelector('.is-selected');
@@ -462,6 +635,19 @@ export class SearchOptionsDropdown {
     this.containerEl.removeClass('show');
     this.isShowing = false;
     this.selectedIndex = -1;
+
+    // Notify visibility change
+    if (this.onVisibilityChange) {
+      this.onVisibilityChange(false);
+    }
+  }
+
+  /**
+   * Check if the dropdown is currently visible
+   * @returns true if the dropdown is showing
+   */
+  public isVisible(): boolean {
+    return this.isShowing;
   }
 
   /**
