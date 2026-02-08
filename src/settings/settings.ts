@@ -44,6 +44,8 @@ export const DefaultSettings: TodoTrackerSettings = {
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
   plugin: TodoTracker;
+  private keywordDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly KEYWORD_DEBOUNCE_MS = 500;
 
   constructor(app: App, plugin: TodoTracker) {
     super(app, plugin);
@@ -77,7 +79,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       )
       .addText((text) => {
         const current = this.plugin.settings.additionalTaskKeywords ?? [];
-        text.setValue(current.join(', ')).onChange(async (value) => {
+        text.setValue(current.join(', ')).onChange((value) => {
           // Force uppercase in the UI field immediately
           const forced = value.toUpperCase();
           if (forced !== value) {
@@ -90,91 +92,99 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             }
           }
 
-          // Parse CSV, trim, filter non-empty (already uppercased)
-          const parsed = forced
-            .split(',')
-            .map((k) => k.trim())
-            .filter((k) => k.length > 0);
-
-          // Create error display element
-          const settingContainer = text.inputEl.closest('.setting-item');
-          if (!settingContainer) {
-            console.error('Could not find setting container');
-            return;
+          // Clear any pending debounce timer
+          if (this.keywordDebounceTimer) {
+            clearTimeout(this.keywordDebounceTimer);
           }
 
-          const settingInfo =
-            settingContainer.querySelector('.setting-item-info');
-          if (!settingInfo) {
-            console.error('Could not find setting info container');
-            return;
-          }
-          // Remove any existing error display
-          const existingError = settingContainer.querySelector(
-            '.todoseq-setting-item-error',
-          );
-          if (existingError) {
-            existingError.remove();
-            text.inputEl.classList.remove('todoseq-invalid-input');
-          }
+          // Debounce the expensive operations
+          this.keywordDebounceTimer = setTimeout(async () => {
+            // Parse CSV, trim, filter non-empty (already uppercased)
+            const parsed = forced
+              .split(',')
+              .map((k) => k.trim())
+              .filter((k) => k.length > 0);
 
-          // Filter out invalid keywords and collect errors
-          const validKeywords: string[] = [];
-          const invalidKeywords: string[] = [];
-          const errorMessages: string[] = [];
-
-          for (const keyword of parsed) {
-            try {
-              // Test if this single keyword is valid by trying to create a parser with just this keyword
-              // This will throw if the keyword is invalid
-              TaskParser.validateKeywords([keyword]);
-              validKeywords.push(keyword);
-            } catch (error) {
-              invalidKeywords.push(keyword);
-              errorMessages.push(`"${keyword}": ${error.message}`);
+            // Create error display element
+            const settingContainer = text.inputEl.closest('.setting-item');
+            if (!settingContainer) {
+              console.error('Could not find setting container');
+              return;
             }
-          }
 
-          if (invalidKeywords.length > 0) {
-            // Show error under the field
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'todoseq-setting-item-error';
-            errorDiv.textContent = `Invalid keyword ${invalidKeywords.join(', ')} will be ignored.`;
-            text.inputEl.classList.add('todoseq-invalid-input');
+            const settingInfo =
+              settingContainer.querySelector('.setting-item-info');
+            if (!settingInfo) {
+              console.error('Could not find setting info container');
+              return;
+            }
+            // Remove any existing error display
+            const existingError = settingContainer.querySelector(
+              '.todoseq-setting-item-error',
+            );
+            if (existingError) {
+              existingError.remove();
+              text.inputEl.classList.remove('todoseq-invalid-input');
+            }
 
-            // Insert error after the setting description
-            settingInfo.appendChild(errorDiv);
+            // Filter out invalid keywords and collect errors
+            const validKeywords: string[] = [];
+            const invalidKeywords: string[] = [];
+            const errorMessages: string[] = [];
 
-            // Continue with valid keywords only for parsing, but keep original input for editing
-            this.plugin.settings.additionalTaskKeywords = validKeywords;
-            await this.plugin.saveSettings();
+            for (const keyword of parsed) {
+              try {
+                // Test if this single keyword is valid by trying to create a parser with just this keyword
+                // This will throw if the keyword is invalid
+                TaskParser.validateKeywords([keyword]);
+                validKeywords.push(keyword);
+              } catch (error) {
+                invalidKeywords.push(keyword);
+                errorMessages.push(`"${keyword}": ${error.message}`);
+              }
+            }
 
-            // Always recreate parser and rescan with valid keywords
-            try {
+            if (invalidKeywords.length > 0) {
+              // Show error under the field
+              const errorDiv = document.createElement('div');
+              errorDiv.className = 'todoseq-setting-item-error';
+              errorDiv.textContent = `Invalid keyword ${invalidKeywords.join(', ')} will be ignored.`;
+              text.inputEl.classList.add('todoseq-invalid-input');
+
+              // Insert error after the setting description
+              settingInfo.appendChild(errorDiv);
+
+              // Continue with valid keywords only for parsing, but keep original input for editing
+              this.plugin.settings.additionalTaskKeywords = validKeywords;
+              await this.plugin.saveSettings();
+
+              // Always recreate parser and rescan with valid keywords
+              try {
+                await this.plugin.recreateParser();
+                await this.plugin.scanVault();
+                await this.refreshAllTaskListViews();
+                // Force refresh of visible editor decorations to apply new keywords
+                this.plugin.refreshVisibleEditorDecorations();
+                this.plugin.refreshReaderViewFormatter();
+              } catch (parseError) {
+                console.error(
+                  'Failed to recreate parser with valid keywords:',
+                  parseError,
+                );
+              }
+            } else {
+              // All keywords are valid, proceed normally
+              this.plugin.settings.additionalTaskKeywords = parsed;
+              await this.plugin.saveSettings();
+              // Recreate parser according to new settings and rescan
               await this.plugin.recreateParser();
               await this.plugin.scanVault();
               await this.refreshAllTaskListViews();
               // Force refresh of visible editor decorations to apply new keywords
               this.plugin.refreshVisibleEditorDecorations();
               this.plugin.refreshReaderViewFormatter();
-            } catch (parseError) {
-              console.error(
-                'Failed to recreate parser with valid keywords:',
-                parseError,
-              );
             }
-          } else {
-            // All keywords are valid, proceed normally
-            this.plugin.settings.additionalTaskKeywords = parsed;
-            await this.plugin.saveSettings();
-            // Recreate parser according to new settings and rescan
-            await this.plugin.recreateParser();
-            await this.plugin.scanVault();
-            await this.refreshAllTaskListViews();
-            // Force refresh of visible editor decorations to apply new keywords
-            this.plugin.refreshVisibleEditorDecorations();
-            this.plugin.refreshReaderViewFormatter();
-          }
+          }, this.KEYWORD_DEBOUNCE_MS);
         });
       });
 
