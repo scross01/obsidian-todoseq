@@ -27,7 +27,7 @@ Using the following parameters within the `todoseq` code block you define which 
 - `show-file:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the source file info column. Defaults to `show` (responsive layout).
 - `show-future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Controls how future-dated tasks are displayed. Defaults to `show-all`. (`future:` is an alternative alias for this parameter)
 - `show-query:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `show`.
-- `wrap-content:` (optional) `true`, `false`, `wrap`, or `truncate`. Controls whether task text wraps to multiple lines or truncates with ellipsis. Defaults to `false` (truncate). When enabled, file info moves to a new row with full filename.
+- `wrap-content:` (optional) `true`, `false`, `wrap`, `truncate`, or `dynamic`. Controls whether task text wraps to multiple lines or truncates with ellipsis. Defaults to `dynamic` (responsive - truncates on wide screens, wraps on mobile). When wrap is enabled, file info moves to a new row with full filename.
 - `collapse:` (optional) `true` or `false`. When enabled, the task list is collapsible with a chevron toggle. Defaults to `false`. Requires either `title:` to be set OR `show-query: true`.
 
 Example:
@@ -181,10 +181,11 @@ When `show-query: false` is set without a `title:`, the task list will display w
 
 The `wrap-content:` parameter controls how task text is displayed when it exceeds the available width:
 
-- `false` or `truncate` - Truncate task text with ellipsis (default)
-- `true` or `wrap` - Wrap task text to multiple lines
+- `dynamic` - Responsive mode (default): truncates on wide screens, wraps on narrow/mobile screens (≤480px)
+- `false` or `truncate` - Always truncate task text with ellipsis
+- `true` or `wrap` - Always wrap task text to multiple lines
 
-When wrapping is enabled, the file information moves to a new row below the task text and displays the full filename without truncation.
+When wrapping is enabled (either always or dynamically on narrow screens), the file information moves to a new row below the task text and displays the full filename without truncation.
 
 ````txt
 ```todoseq
@@ -193,8 +194,14 @@ wrap-content: true
 ```
 ````
 
-This is particularly useful if your tasks have long descriptions that need to be fully visible
-or if you need to display the task list on mobile devices or narrow windows where truncation would hide important context.
+The default `dynamic` mode provides the best experience across devices. To disable this responsive behavior and always truncate:
+
+````txt
+```todoseq
+search: tag:project1
+wrap-content: false
+```
+````
 
 ### Collapsible Task Lists
 

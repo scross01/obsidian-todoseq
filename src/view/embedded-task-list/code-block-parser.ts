@@ -37,7 +37,7 @@ export interface TodoseqParameters {
   showFile?: boolean;
   title?: string;
   showQuery?: boolean;
-  wrapContent?: boolean;
+  wrapContent?: boolean | 'dynamic';
   collapse?: boolean;
   error?: string;
 }
@@ -72,7 +72,7 @@ export class TodoseqCodeBlockParser {
       let showFile: boolean | undefined;
       let title: string | undefined;
       let showQuery: boolean | undefined;
-      let wrapContent: boolean | undefined;
+      let wrapContent: boolean | 'dynamic' | undefined;
       let collapse: boolean | undefined;
 
       // Parse each line for parameters
@@ -227,9 +227,11 @@ export class TodoseqCodeBlockParser {
             wrapContent = false;
           } else if (wrapValue === 'true' || wrapValue === 'wrap') {
             wrapContent = true;
+          } else if (wrapValue === 'dynamic') {
+            wrapContent = 'dynamic';
           } else {
             throw new Error(
-              `Invalid wrap-content option: ${wrapValue}. Valid options: true, false, wrap, truncate`,
+              `Invalid wrap-content option: ${wrapValue}. Valid options: true, false, wrap, truncate, dynamic`,
             );
           }
         } else if (trimmed.startsWith('collapse:')) {

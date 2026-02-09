@@ -1079,13 +1079,26 @@ export class EmbeddedTaskListRenderer {
       textContainer.appendChild(textSpan);
     }
 
-    // Handle wrap-content mode
-    if (params.wrapContent) {
+    // Handle wrap-content mode (default is 'dynamic' when not specified)
+    // - undefined/missing: dynamic (responsive based on viewport)
+    // - true: always wrap
+    // - false: always truncate
+    // - 'dynamic': responsive based on viewport
+    const wrapMode = params.wrapContent ?? 'dynamic';
+    const isWrapMode = wrapMode === true || wrapMode === 'dynamic';
+
+    if (isWrapMode) {
       // Add wrap class to list item
       li.classList.add('embedded-task-item-wrap');
 
       // Add wrap class to text container for CSS styling
       textContainer.classList.add('embedded-task-text-wrap');
+
+      // Add dynamic class for responsive CSS handling
+      if (wrapMode === 'dynamic') {
+        li.classList.add('embedded-task-item-wrap-dynamic');
+        textContainer.classList.add('embedded-task-text-wrap-dynamic');
+      }
 
       // Create content wrapper for wrapped layout
       const contentWrapper = document.createElement('div');
