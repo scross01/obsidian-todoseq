@@ -889,6 +889,88 @@
   text-overflow: unset;
 }
 
+/* Dynamic wrap mode - default to truncated on wide screens, wrap on narrow */
+/* Override base wrap styles for dynamic mode on wide screens */
+.embedded-task-item-wrap-dynamic {
+  align-items: center;
+}
+
+.embedded-task-item-wrap-dynamic .embedded-task-checkbox {
+  margin-top: 0;
+}
+
+/* Override content wrapper to row layout on wide screens */
+.embedded-task-item-wrap-dynamic .embedded-task-content-wrapper {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.embedded-task-text-wrap-dynamic {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+}
+
+.embedded-task-text-wrap-dynamic .embedded-task-state,
+.embedded-task-text-wrap-dynamic .priority-badge,
+.embedded-task-text-wrap-dynamic .embedded-task-text {
+  display: inline;
+}
+
+.embedded-task-text-wrap-dynamic .embedded-task-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+}
+
+/* File info inline on wide screens */
+.embedded-task-item-wrap-dynamic .embedded-task-file-info-wrap {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Switch to wrap mode on narrow screens (mobile: iPhone ~375-430px, Pixel ~360-412px) */
+@media (max-width: 480px) {
+  .embedded-task-item-wrap-dynamic {
+    align-items: flex-start;
+  }
+
+  .embedded-task-item-wrap-dynamic .embedded-task-checkbox {
+    margin-top: 4px;
+  }
+
+  /* Switch to column layout on narrow screens */
+  .embedded-task-item-wrap-dynamic .embedded-task-content-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .embedded-task-text-wrap-dynamic {
+    display: inline;
+  }
+
+  .embedded-task-text-wrap-dynamic .embedded-task-text {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    word-break: break-word;
+  }
+
+  /* File info on new row on narrow screens */
+  .embedded-task-item-wrap-dynamic .embedded-task-file-info-wrap {
+    max-width: unset;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+  }
+}
+
 /* Completed task styling */
 .embedded-task-item:has(.embedded-task-checkbox:checked) {
   opacity: 0.6;
