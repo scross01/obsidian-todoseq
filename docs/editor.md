@@ -36,8 +36,8 @@ TODOseq provides several ways to interact with tasks directly in the editor:
 
 ### Clicking Task Keywords
 
-The most intuitive way to update task states is by clicking on the state keyword.
-Click on any state keyword (e.g., `TODO`) to cycle through the task states.
+The most intuitive way to update task states is by clicking on the state keyword. Click on any state keyword (e.g., `TODO`) to cycle through the task states.
+
 Tasks follow logical state sequences:
 
 - `TODO` → `DOING` → `DONE` → `TODO`
@@ -46,8 +46,7 @@ Tasks follow logical state sequences:
 
 ### Right-Click Context Menu
 
-For more control over task state transitions, right-click on any task keyword to see all available next states.
-A context menu appears showing all possible next states. Select the desired state from the menu.
+For more control over task state transitions, right-click on any task keyword to see all available next states. A context menu appears showing all possible next states. Select the desired state from the menu.
 
 This is particularly useful when you want to jump to a specific state without cycling through all intermediate states.
 
@@ -80,10 +79,9 @@ When tasks use the checkbox format, you have additional interaction options:
 
 ![Checkbox Interaction Example](./assets/todoseq-editor-checkbox-interaction.png)
 
-Clicking the checkbox toggles between empty `[ ]` and checked `[x]` states.
-The task keyword is automatically synchronized with the checkbox state.
+Clicking the checkbox toggles between empty `[ ]` and checked `[x]` states. The task keyword is automatically synchronized with the checkbox state.
 
-### Entering scheduled and deadline dates
+### Entering Scheduled and Deadline Dates
 
 When adding a `SCHEDULED:` or `DEADLINE:` date after a task, the editor will autocomplete after the keyword with the required date format, e.g. `<2026-01-01>`, with the date auto-filled to the current date and selected for easy replacement or editing.
 

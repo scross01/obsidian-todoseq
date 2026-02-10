@@ -27,8 +27,7 @@ Access TODOseq settings through Obsidian's settings interface:
 
 **Visual Effects When Enabled:**
 
-Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font.
-All task states use your Obsidian theme's accent color.See [Editor Integration](editor.md) and [Reader View](reader.md) documentation for full details.
+Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font. All task states use your Obsidian theme's accent color. See [Editor Integration](editor.md) and [Reader View](reader.md) documentation for full details.
 
 ## Task Recognition Settings
 
@@ -67,7 +66,7 @@ FIXME, HACK, REVIEW, BLOCKED, IDEA
 
 **Keyword Sort Ordering:**
 
-When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, custom keywords are sorted by the order they are defined in the setting, placed in the overall sort after the Inactive task keywords states (TODO, LATER) and before Waiting keyword states (WAIT, WAITING)
+When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, custom keywords are sorted by the order they are defined in the setting, placed in the overall sort after the Inactive task keywords states (TODO, LATER) and before Waiting keyword states (WAIT, WAITING).
 
 ### Include Tasks Inside Code Blocks
 
@@ -142,7 +141,7 @@ FIXME Handle edge cases
 
 **Description**: Enable or disable task detection in quoted lines and callout blocks.
 
-**Default**: Disabled
+**Default**: Enabled
 
 **Supported Formats:**
 
@@ -164,13 +163,13 @@ FIXME Handle edge cases
 
 ### Include Tasks Inside Comment Blocks
 
-**Setting**: "Include tasks inside comment blocks" (toggle)
+**Setting**: "Include tasks inside comments" (toggle)
 
 **Description**: Enable or disable task detection inside multiline comment blocks.
 
 **Default**: Disabled
 
-## Task list search and filter settings
+## Task List Search and Filter Settings
 
 ### Completed Tasks
 
@@ -232,55 +231,25 @@ With **Sunday start**:
 - Week 1: Sun Dec 31 - Sat Jan 6
 - "this week" on Jan 3 includes Dec 31 - Jan 6
 
-## Property Search Settings
+### Default Sort Method
 
-### Run Startup Scan
+**Setting**: "Default sort method" (dropdown)
 
-**Setting**: "Run startup scan" (toggle)
+**Description**: Choose the default sort method for the task list view.
 
-**Description**: Enable or disable automatic scanning of all vault files when TODOseq loads to build the property search index.
+**Options:**
 
-**Default**: Disabled
+- **Default (file path)**: Sort by file path and line number
+- **Scheduled date**: Sort by scheduled date
+- **Deadline date**: Sort by deadline date
+- **Priority**: Sort by priority (high → low)
+- **Urgency**: Sort by urgency score (high → low)
 
-**When Enabled:**
-
-- All vault files are scanned on plugin startup to build property search indexes
-- Property searches work immediately without waiting for files to be accessed
-- May increase startup time for large vaults
-
-**When Disabled:**
-
-- Property search indexes are built lazily as files are accessed
-- Faster startup but property searches may be slower initially
-- Property search functionality still works, just builds indexes on-demand
-
-### Startup Scan Delay
-
-**Setting**: "Startup scan delay" (number input, milliseconds)
-
-**Description**: Delay before starting the startup scan after plugin loads.
-
-**Default**: 3000 ms (3 seconds)
-
-**Purpose**: Allows time for Obsidian to fully load before scanning, improving reliability in large vaults.
-
-### Show Startup Scan Progress
-
-**Setting**: "Show startup scan progress" (toggle)
-
-**Description**: Show progress notifications during the startup scan process.
-
-**Default**: Disabled
-
-**When Enabled:**
-
-- Shows progress updates in the Obsidian status bar
-- Provides feedback during long scans
-- Helps monitor scan completion
+**Default**: Default (file path)
 
 ## Other Settings
 
-### Excluded files
+### Excluded Files
 
 TODOseq respects Obsidian's built-in file exclusion system ("Files & links" → "Excluded files"). Files and paths matching your exclusion patterns will not be scanned for tasks.
 
@@ -288,6 +257,6 @@ Obsidian does not notify plugins when the "Excluded files" setting has been modi
 
 ### Hotkeys
 
-The Toggle task state command palette action is bound the `Ctrl+Enter` by default.
+The Toggle task state command palette action is bound to `Ctrl+Enter` by default.
 
-Use the Obsidian Hotkeys setting to add or remove Hot Keys for command palette actions.
+Use the Obsidian Hotkeys setting to add or remove hotkeys for command palette actions.

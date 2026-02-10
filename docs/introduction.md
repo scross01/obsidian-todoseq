@@ -2,17 +2,17 @@
 
 ## What is TODOseq?
 
-TODOseq ("to-do-seek") is a lightweight, keyword-based task management plugin for Obsidian that brings the power of Logseq-style task tracking to your knowledge base. Unlike traditional checkbox-based task managers, TODOseq uses simple state keywords to define and manage tasks throughout your vault.
+TODOseq ("to-do-seek") is a lightweight, keyword-based task management plugin for Obsidian that brings Org-mode and Logseq-style task tracking to your knowledge base. Unlike traditional checkbox-based task managers, TODOseq uses simple state keywords to define and manage tasks throughout your vault.
 
 ## Task Management Philosophy
 
-TODOseq is inspired by the task management approaches used in [Logseq](https://docs.logseq.com/#/page/tasks) and [orgmode](https://orgmode.org/) where tasks are captured in context with the notes and journals they relate to. This allows for a more natural and flexible workflow, where tasks can be easily created, updated, and tracked without disrupting your note-taking process.
+TODOseq draws inspiration from the task management approaches in [Logseq](https://docs.logseq.com/#/page/tasks) and [orgmode](https://orgmode.org/), where tasks are captured in context with the notes and journals they relate to. This allows for a more natural workflow where tasks can be created, updated, and tracked without disrupting your note-taking process.
 
-TODOseq scans your vault for lines that begin with specific keywords, extracts them, and presents them in a dedicated Task List panel within Obsidian. This approach allows you to maintain your existing note structure while gaining powerful task management capabilities.
+TODOseq scans your vault for lines that begin with specific keywords, extracts them, and presents them in a dedicated Task List panel within Obsidian. This approach lets you maintain your existing note structure while gaining powerful task management capabilities.
 
-### 1. Natural Language Task Capture
+### Natural Language Task Capture
 
-Instead of requiring specific checkbox syntax like `- [ ]`, TODOseq allows you to capture tasks using natural language keywords:
+Instead of requiring checkbox syntax like `- [ ]`, TODOseq allows you to capture tasks using natural language keywords:
 
 ```markdown
 TODO Write documentation
@@ -20,9 +20,9 @@ DOING Update sync script
 DONE Triage customer feedback
 ```
 
-This approach is faster to type and more natural when taking notes or journaling.
+This approach is faster to type and flows naturally when taking notes or journaling.
 
-### 2. State-Based Workflow
+### State-Based Workflow
 
 Tasks progress through defined state sequences rather than just being "checked" or "unchecked":
 
@@ -30,7 +30,7 @@ Tasks progress through defined state sequences rather than just being "checked" 
 - **Deferred tasks**: LATER → NOW → DONE
 - **Waiting tasks**: WAIT → IN-PROGRESS → DONE
 
-### 3. Task priority and scheduling
+### Task Priority and Scheduling
 
 ```markdown
 TODO Simple task
@@ -47,15 +47,11 @@ DEADLINE: <2025-01-20 17:00>
 
 ### Advantages of Keyword-Based Tasks
 
-1. **Faster to type**: `TODO` is quicker than `- [ ]`
-2. **More expressive**: State keywords convey more information than just checked/unchecked
-3. **Better for note-taking**: Flows naturally in journaling and brainstorming
-4. **Easier to read**: State is immediately visible without scanning for checkboxes
-5. **More flexible**: Supports complex workflows beyond just todo/done
+Keywords offer several benefits over traditional checkboxes: `TODO` is quicker to type than `- [ ]`, state keywords convey more information than just checked/unchecked, and they flow naturally in journaling and brainstorming. The state is immediately visible without scanning for checkboxes, and the system supports complex workflows beyond simple todo/done.
 
 ### When Checkboxes Are Still Useful
 
-TODOseq supports can work with existing checkbox-based tasks when a task state keyword is added after the checkbox. For example:
+TODOseq can work with existing checkbox-based tasks when a task state keyword is added after the checkbox:
 
 ```markdown
 - [ ] TODO this is a task
@@ -65,18 +61,18 @@ TODOseq supports can work with existing checkbox-based tasks when a task state k
 
 The checkbox state is automatically synchronized with the task's completion state when updated in the task view.
 
-Checkboxes without the keywords are ignored by TODOseq. This allows you to mix traditional checkbox tasks with keyword-based tasks if desired.
+Checkboxes without keywords are ignored by TODOseq. This allows you to mix traditional checkbox tasks with keyword-based tasks if desired:
 
 ```markdown
 - [ ] DOING this task is tracked by TODOseq
-  - [ ] subtask whithout state not tracked by TODOseq
+  - [ ] subtask without state not tracked by TODOseq
   - [x] another untracked subtask
   - [ ] TODO important subtask tracked by TODOseq
 ```
 
 ## Logseq Compatibility
 
-TODOseq is designed to be compatible with Logseq's task format, making it ideal If you're migrating your Logseq markdown files Obsidian, or even if you want to use both tools together. Existing task entries should work without modification:
+TODOseq is designed to be compatible with Logseq's task format, making it ideal if you're migrating your Logseq markdown files to Obsidian, or if you want to use both tools together. Existing task entries should work without modification.
 
 ### Dual Use
 
@@ -87,7 +83,7 @@ TODOseq allows you to maintain the same task format across both Logseq and Obsid
 - **Same priority system**: `[#A]`, `[#B]`, `[#C]` tokens work the same
 - **Same date formats**: SCHEDULED and DEADLINE dates are parsed identically
 
-Some TODOseq features are not available in Logseq, the use of checkboxes before the task keyword, the use of custom state keywords, and the capture of tasks within code, quotes, and callouts blocks will not get identified as tasks if you return to Logseq.
+Some TODOseq features are not available in Logseq. The use of checkboxes before the task keyword, custom state keywords, and the capture of tasks within code, quotes, and callouts blocks will not get identified as tasks if you return to Logseq.
 
 \*Note: the Logseq import relates to the original Markdown based version of Logseq. Migration from the newer Logseq database version format has not been tested.
 

@@ -4,27 +4,21 @@ The Task List is the central interface for managing all your tasks across your O
 
 ## Opening the Task List
 
-**Note**: The Task List behavior has been updated for better user experience. - The left ribbon icon has been removed since v0.7.0. The right sidebar is now the default location for the TOODseq task list.
-
 ### Automatic Opening
 
-The Task List automatically opens in the right sidebar when the TODOseq plugin is enabled.
-
-You can drag and drop the panel to reposition it within the Obsidian interface, such as moving to different panel location, or making it a floating window.
-
-![Ribbon icon](./assets/todoseq-ribbon-icon.png)
+The Task List automatically opens in the right sidebar when the TODOseq plugin is first enabled. You can drag and drop the panel to reposition it within the Obsidian interface, such as moving to different panel locations or making it a floating window.
 
 ### Command Palette
 
 1. Open the command palette with `Ctrl/Cmd + P`
-2. Search for "**TODOseq: Show task list**"
+2. Search for "TODOseq: Show task list"
 3. Select the command to open/show the Task List in the right sidebar
 
 ![Command Palette Example](./assets/todoseq-command-palette.png)
 
 ### Keyboard Shortcut
 
-- You can assign a custom keyboard shortcut to the "**TODOseq: Show task list**" in Obsidian's Hotkeys settings.
+You can assign a custom keyboard shortcut to the "TODOseq: Show task list" command in Obsidian's Hotkeys settings.
 
 ## Task List Interface
 
@@ -49,11 +43,10 @@ The main area displays all detected tasks with the following information:
 ![Task List Example](./assets/todoseq-task-list-example.png)
 
 - **Checkbox**: Visual indicator of completion status
-- **State keyword**: Colored badge showing task state (TODO, DOING, DONE, etc.)
-  Right click the badge to see all next state options
+- **State keyword**: Colored badge showing task state (TODO, DOING, DONE, etc.). Right-click the badge to see all next state options
 - **Priority badge**: Shows `[#A]`, `[#B]`, or `[#C]` if present
 - **Task text**: The full text of the task
-- **File path**: Shows the file name and line number location of the task in your vault. Hover the mouse over it to see the full path.
+- **File path**: Shows the file name and line number location of the task in your vault. Hover the mouse over it to see the full path
 
 ## Task Interactions
 
@@ -76,11 +69,7 @@ The checkbox provides a simple toggle between completed and incomplete states:
 
 ### Right-Click Context Menu
 
-Right-click any **task keyword** to see all available state options in a popup menu:
-
-- Shows all possible states for the current task type
-- Allows direct selection of any state
-- Provides quick access to less commonly used states
+Right-click any **task keyword** to see all available state options in a popup menu. This shows all possible states for the current task type, allows direct selection of any state, and provides quick access to less commonly used states.
 
 ### Opening Source Location
 
@@ -100,37 +89,27 @@ Choose how tasks are ordered using the sort method dropdown:
 
 ### 1. Default (File Path + Line Number)
 
-- Tasks sorted alphabetically by vault file path and file name
-- Within each file, tasks sorted by line number
+Tasks sorted alphabetically by vault file path and file name. Within each file, tasks are sorted by line number.
 
 ### 2. Scheduled Date
 
-- Tasks sorted by their SCHEDULED date
-- Tasks without scheduled dates appear at the end
-- Earlier dates appear first
+Tasks sorted by their SCHEDULED date. Tasks without scheduled dates appear at the end, with earlier dates appearing first.
 
 ### 3. Deadline Date
 
-- Tasks sorted by their DEADLINE date
-- Tasks without deadline dates appear at the end
-- Earlier deadlines appear first
+Tasks sorted by their DEADLINE date. Tasks without deadline dates appear at the end, with earlier deadlines appearing first.
 
 ### 4. Priority
 
-- Tasks sorted by priority: High (`[#A]`) > Medium (`[#B]`) > Low (`[#C]`) > No priority
-- Within each priority level, tasks sorted by file path and line number
+Tasks sorted by priority: High (`[#A]`) > Medium (`[#B]`) > Low (`[#C]`) > No priority. Within each priority level, tasks are sorted by file path and line number.
 
 ### 5. Urgency
 
-- Tasks sorted by calculated urgency score (highest to lowest)
-- Urgency is calculated based on multiple factors including due dates, priority, tags, and task state
-- Tasks with no urgency score appear at the end
-- Completed tasks are not included in urgency sorting
+Tasks sorted by calculated urgency score (highest to lowest). Urgency is calculated based on multiple factors including due dates, priority, tags, and task state. Tasks with no urgency score appear at the end, and completed tasks are not included in urgency sorting.
 
 ### 6. Keyword
 
-- Tasks sorted by an implied order if the keyword states
-- Tasks are classified into 5 ordered groups based on their keyword:
+Tasks sorted by an implied order of the keyword states. Tasks are classified into 5 ordered groups based on their keyword:
 
 | Group         | Keywords                   |
 | ------------- | -------------------------- |
@@ -158,15 +137,13 @@ See [Search Functionality](search.md) for details.
 
 ### Completed Task Indicators
 
-- Tasks with DONE, CANCELED, or CANCELLED states are visually marked as completed
-- Completed tasks appear with strikethrough formatting
-- State badges show completed states in distinct colors
+Tasks with DONE, CANCELED, or CANCELLED states are visually marked as completed. Completed tasks appear with strikethrough formatting, and state badges show completed states in distinct colors.
 
 ### Priority Badges
 
-Tasks priority indicatorsare show using colors picked from the current active theme.
+Task priority indicators use colors picked from the current active theme:
 
 - `[#A]` - High priority - theme color red
 - `[#B]` - Medium priority - theme interactive accent
-- `[#C]` - Low priority - theme background modifier boarder
+- `[#C]` - Low priority - theme background modifier border
 - No priority - No badge displayed

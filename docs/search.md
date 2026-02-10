@@ -8,21 +8,21 @@ The search field in the TODOseq Task List provides a powerful search system that
 
 ### Search Field Overview
 
-The search field is located in the Task List toolbar and provides live filtering as you type. Basic search matches the entered text against task text, file path, and filename
+The search field is located in the Task List toolbar and provides live filtering as you type. Basic search matches the entered text against task text, file path, and filename.
 
 ### Search Shortcuts
 
 **Focus Search Field:**
 
-- Press `/` to focus the search field (unless already typing in another input)
+Press `/` to focus the search field (unless already typing in another input).
 
 **Clear Search:**
 
-- Press `Escape` to clear the current search and remove focus
+Press `Escape` to clear the current search and remove focus.
 
 **Toggle Case Sensitivity:**
 
-- Click the "A/a" button in the toolbar to toggle case-sensitive matching
+Click the "A/a" button in the toolbar to toggle case-sensitive matching.
 
 ## Advanced Search Syntax
 
@@ -94,7 +94,7 @@ This will match tasks containing "project" but excluding both "personal" and "ho
 "send email" (projectX OR projectY) -external
 ```
 
-Find "send email" tasks that mentions either "projectX" or "projectY" but excludes "external".
+Find "send email" tasks that mention either "projectX" or "projectY" but exclude "external".
 
 ```txt
 (meeting OR call) project -weekend
@@ -110,7 +110,7 @@ Find work tasks related to home or office, excluding phone related ones.
 
 ## Search Filters
 
-TODOseq supports filters keywords similar to Obsidians general vault search for targeted searching.
+TODOseq supports filter keywords similar to Obsidian's general vault search for targeted searching.
 
 ### Available Prefix Filters
 
@@ -126,7 +126,7 @@ TODOseq supports filters keywords similar to Obsidians general vault search for 
 | `deadline:`  | Find tasks with deadline dates          | `deadline:"this week"`    |
 | `property:`  | Find tasks based on page properties     | `property:[type:Project]` |
 
-### Using Search filters
+### Using Search Filters
 
 Search filters can be used alone or combined with other search terms:
 
@@ -140,7 +140,7 @@ Find all tasks in the "projects" folder.
 file:meeting content:project
 ```
 
-Find tasks in with "project" in the task detailns only in files containing "meeting" in the file name.
+Find tasks with "project" in the task details only in files containing "meeting" in the file name.
 
 ```txt
 state:TODO priority:high
@@ -171,7 +171,7 @@ TODOseq provides powerful date-based filtering expressions.
 | `this month` | Tasks due this month               |
 | `next month` | Tasks due next month               |
 
-\*Weeks start on Monday by default, this can be changed in the settings.
+\*Weeks start on Monday by default; this can be changed in the settings.
 
 ### Date Expression Examples
 
@@ -367,13 +367,13 @@ This type-aware comparison works with numeric values and allows for more precise
 
 ### Date Property Comparisons
 
-Comparison operators also work with date properties, enabling you to filter tasks based on page preporty date ranges. You can use `>`, `<`, `>=`, and `<=` with dates in `YYYY-MM-DD` format to find tasks with dates before or after a specific point in time.
+Comparison operators also work with date properties, enabling you to filter tasks based on page property date ranges. You can use `>`, `<`, `>=`, and `<=` with dates in `YYYY-MM-DD` format to find tasks with dates before or after a specific point in time.
 
 ```txt
 [deadline:>2026-01-15]
 ```
 
-This finds tasks on pages with a deadline property after January 15, 2024. Similarly, `[created:<2026-01-01]` would find tasks created before the start of 2026.
+This finds tasks on pages with a deadline property after January 15, 2026. Similarly, `[created:<2026-01-01]` would find tasks created before the start of 2026.
 
 ### Checkbox (Boolean) Property Search
 
@@ -397,7 +397,7 @@ This finds tasks on pages where "work" appears anywhere in the tags array.
 
 ### Property Search Cache
 
-TODOseq builds it's own index of all properties across your vault for fast, efficient searching. This approach ensures that property searches work even for files that haven't been recently accessed, providing comprehensive coverage of your entire vault.
+TODOseq builds its own index of all properties across your vault for fast, efficient searching. This approach ensures that property searches work even for files that haven't been recently accessed, providing comprehensive coverage of your entire vault.
 
 The property search engine automatically updates when files change, ensuring that your search results are always current.
 
@@ -417,7 +417,7 @@ Find urgent, high priority tasks scheduled for this week in the projects folder.
 (file:meeting OR file:notes) content:project state:TODO -tag:blocked
 ```
 
-Find TODO project tasks in meeting or notes files, excluding task with the #blocked tag.
+Find TODO project tasks in meeting or notes files, excluding tasks with the #blocked tag.
 
 ```txt
 "code review" (state:TODO OR state:DOING) deadline:"next 7 days"

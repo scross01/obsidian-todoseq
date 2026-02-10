@@ -22,7 +22,7 @@ Opens the TODOseq Task List view. By default the Task List view is opened in the
 
 Manually triggers a full vault scan to update the task list with the latest changes.
 
-A full rescan is not typically be required, unless the vault level setting for Excluded files has been updated. General file changes (create, modify, delete) trigger automatic incremental updates.
+A full rescan is not typically required, unless the vault level setting for Excluded files has been updated. General file changes (create, modify, delete) trigger automatic incremental updates.
 
 ### Toggle task state
 
