@@ -16,5 +16,8 @@ CANCELLED This is a cancelled task
 ---
 
 ```todoseq
+title: My Tasks
 search: file:"TODOseq for Obsidian"
+sort: urgency
+collapse: true
 ```
