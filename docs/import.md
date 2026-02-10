@@ -1,6 +1,6 @@
 # Import Tasks
 
-Existing markdown checkbox based tasks in the Obsidian Vault will not be recognized by TODOseq unless they already have a matching keyword after the checkbox
+Existing markdown checkbox based tasks in the Obsidian Vault will not be recognized by TODOseq unless they already have a matching keyword after the checkbox.
 
 ```markdown
 - [ ] this is not recognised as a task

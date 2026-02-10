@@ -1,31 +1,20 @@
 # TODOseq for Obsidian
 
-TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian. It scans your vault for task lines that begin with simple state keywords (e.g., TODO, DOING, DONE) and presents them in a dedicated Task List view. Inspired by the task capture styles of [Emacs Org-mode](https://orgmode.org/) and [Logseq Tasks](https://docs.logseq.com/#/page/tasks) TODOseq preserves your original Markdown formatting and does not require checkbox syntax.
+TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian. It scans your vault for task lines that begin with simple state keywords (e.g., TODO, DOING, DONE) and presents them in a dedicated Task List view. Inspired by the task capture styles of [Emacs Org-mode](https://orgmode.org/) and [Logseq Tasks](https://docs.logseq.com/#/page/tasks), TODOseq preserves your original Markdown formatting and does not require checkbox syntax.
 
 ![TODOseq Screenshot](./assets/todoseq-screenshot-dark.png)
 
 ## Key Features
 
-- **Keyword-based task management**: Use simple keywords like `TODO`, `DOING`, `DONE` instead of checkboxes
-- **Logseq compatibility**: Full support for Logseq task format including priority tokens and dates
-- **Flexible task recognition**: Works with traditional keywords and markdown checkboxes
-- **Powerful search**: Advanced search with boolean logic, prefix filters, and date expressions
-- **Task List View**: Dedicated panel showing all tasks across your vault
-- **Inline styling**: Keyword styling and interactive task state updates directly in the Markdown editor and reader views
-- **Code block support**: Extract tasks from comments in 20+ programming languages
-- **State cycling**: Click keywords to cycle through task states
-- **Priority system**: Use `[#A]`, `[#B]`, `[#C]` for high, medium, low priority
-- **Date management**: Support for SCHEDULED and DEADLINE dates
+TODOseq provides keyword-based task management with Logseq compatibility, supporting both traditional keywords and markdown checkboxes. You get powerful search with boolean logic, prefix filters, and date expressions, all presented in a dedicated Task List view. Tasks receive inline styling in both the Markdown editor and reader views, with interactive state updates available in both modes.
+
+The plugin also supports code block task extraction from 20+ programming languages, state cycling via click interactions, priority markers using `[#A]`, `[#B]`, `[#C]`, and full date management with SCHEDULED and DEADLINE dates.
 
 ## Quick Start
 
-1. **Open Task List**: The TODOseq task view automatically opens in the right sidebar when the plugin is enabled, and can also be opened via the command palette.
-2. **Create tasks**: Add lines starting with `TODO`, `DOING`, `DONE`, etc. in your notes
-3. **Manage tasks**: Click task keywords to cycle states or use checkboxes for TODO/DONE toggle
-4. **Navigate**: Click task rows to jump to source files
-5. **Search**: Use the search field to filter tasks with powerful query syntax
+The TODOseq task view automatically opens in the right sidebar when the plugin is enabled. You can also reopen it via the command palette using "TODOseq: Show task list".
 
-**Note**: The ribbon icon has been removed since v0.7.0. Use the command palette to reopen the right sidebar panel to access tasks.
+Create tasks by adding lines starting with `TODO`, `DOING`, `DONE`, or other supported keywords in your notes. Click task keywords to cycle through states, or use checkboxes for TODO/DONE toggle. Click task rows to jump to source files, and use the search field to filter tasks with powerful query syntax.
 
 ## Examples
 
@@ -43,9 +32,7 @@ DEADLINE: <2023-12-20>
 
 ### From Obsidian Community Plugins
 
-1. Open Settings → Community plugins → Browse
-2. Search for "TODOseq"
-3. Install and enable the plugin
+Open Settings → Community plugins → Browse, search for "TODOseq", then install and enable the plugin.
 
 ### Manual (development build)
 

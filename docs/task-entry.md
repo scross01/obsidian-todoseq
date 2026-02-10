@@ -1,6 +1,6 @@
 # Task Entry Structure
 
-This guide covers everything you need to know about how TODOseq recognizes, parses, and manages tasks in your Obsidian vault.
+This guide covers how TODOseq recognizes, parses, and manages tasks in your Obsidian vault.
 
 ## Task Recognition Patterns
 
@@ -73,14 +73,14 @@ Combines checkboxes with state keywords:
 
 **Checkbox State Synchronization:**
 
-TODOseq automatically syncs checkbox state with task keywords when updated from the Task List\*:
+TODOseq automatically syncs checkbox state with task keywords when updated from the Task List:
 
 - Empty checkbox `[ ]` = Incomplete task (TODO, DOING, etc.)
 - Checked checkbox `[x]` = Completed task (DONE, CANCELED, etc.)
 - When you toggle state, both keyword and checkbox are updated
 - Proper spacing is maintained (e.g., `- [x] DONE`)
 
-\*Note: If you modify the checkbox directly on the page in the Obsdian editor, the task state keyword will not be automatically updated accordingly.
+\*Note: If you modify the checkbox directly in the Obsidian editor, the task state keyword will not be automatically updated.
 
 ## Task Keywords
 
@@ -102,7 +102,7 @@ TODOseq recognizes these task state keywords by default:
 
 - `DONE` - Task is completed
 - `CANCELED` - Task was cancelled
-- `CANCELLED` - Alternative spelling of cancelled
+- `CANCELLED` - Alternative spelling
 
 ### Task State Sequences
 
@@ -150,6 +150,8 @@ HACK Temporary workaround
 REVIEW Needs code review
 ```
 
+Custom keywords appear in the Task List like default keywords and can be clicked to cycle states. When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, custom keywords are sorted by their definition order, placed after Inactive task keywords (TODO, LATER) and before Waiting keyword states (WAIT, WAITING).
+
 ## Priority System
 
 TODOseq supports Logseq-style priority tokens to indicate task importance.
@@ -174,9 +176,7 @@ DONE [#C] Documentation update
 
 TODOseq supports Logseq-style SCHEDULED and DEADLINE dates for task organization.
 
-TODOseq treats all dates and times as timezone-independent values that assume local time. This means when you schedule a task for "2026-01-31 22:00" TODOseq interprets these times in your local timezone rather than UTC or any other timezone.
-
-If your device changes timezone then "2026-01-31 22:00" represents Jan 31st 10pm in your new timezone. TODOseq does not try to make any timezone adjustments, and does not currently support timezone-aware date handling.
+TODOseq treats all dates and times as timezone-independent values that assume local time. When you schedule a task for "2026-01-31 22:00", TODOseq interprets this in your local timezone rather than UTC. If your device changes timezone, "2026-01-31 22:00" represents Jan 31st 10pm in your new timezone. TODOseq does not make timezone adjustments and does not currently support timezone-aware date handling.
 
 ### Date Formats
 

@@ -35,6 +35,7 @@ plans/
 
 # exclude kilocode files
 .kilocode/
+.kilocodemodes
 
 # ignore feature planning docs
 FEAT*.md
@@ -51,3 +52,4 @@ docs/.vitepress/cache
 # Claude Code
 CLAUDE.md
 .claude/
+.obsidian/themes/

@@ -20,15 +20,15 @@ sort: priority
 Using the following parameters within the `todoseq` code block you define which tasks are displayed.
 
 - `search:` any valid search string (see [search](/search.html))
-- `title:` (optional) adds a custom title displayed above the task list.
-- `sort:` (optional) one of `filepath`, `scheduled`, `deadline`, `priority` or `urgency`. Default is `filepath`.
-- `limit:` (optional) set the display limit to result the number of results shown.
-- `show-completed:` (optional) one of `show`, `hide`, `sort-to-end`. Controls how completed tasks are displayed. Defaults to `show`. (`completed:` is an alternative alias for this parameter)
-- `show-file:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the source file info column. Defaults to `show` (responsive layout).
-- `show-future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Controls how future-dated tasks are displayed. Defaults to `show-all`. (`future:` is an alternative alias for this parameter)
-- `show-query:` (optional) `show`, `hide`, or `true`, `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `show`.
-- `wrap-content:` (optional) `true`, `false`, `wrap`, `truncate`, or `dynamic`. Controls whether task text wraps to multiple lines or truncates with ellipsis. Defaults to `dynamic` (responsive - truncates on wide screens, wraps on mobile). When wrap is enabled, file info moves to a new row with full filename.
-- `collapse:` (optional) `true` or `false`. When enabled, the task list is collapsible with a chevron toggle. Defaults to `false`. Requires either `title:` to be set OR `show-query: true`.
+- `title:` (optional) adds a custom title displayed above the task list
+- `sort:` (optional) one of `filepath`, `scheduled`, `deadline`, `priority`, `urgency`, or `keyword`. Default is `filepath`
+- `limit:` (optional) set the display limit to restrict the number of results shown
+- `show-completed:` (optional) one of `show`, `hide`, `sort-to-end`. Controls how completed tasks are displayed. Defaults to `show`. (`completed:` is an alternative alias)
+- `show-file:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show the source file info column. Defaults to `show` (responsive layout)
+- `show-future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Controls how future-dated tasks are displayed. Defaults to `show-all`. (`future:` is an alternative alias)
+- `show-query:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `show`
+- `wrap-content:` (optional) `true`, `false`, `wrap`, `truncate`, or `dynamic`. Controls whether task text wraps to multiple lines or truncates with ellipsis. Defaults to `dynamic` (responsive - truncates on wide screens, wraps on mobile). When wrap is enabled, file info moves to a new row with full filename
+- `collapse:` (optional) `true` or `false`. When enabled, the task list is collapsible with a chevron toggle. Defaults to `false`. Requires either `title:` to be set OR `show-query: true`
 
 Example:
 
@@ -47,8 +47,6 @@ show-query: show
 ### Search Query
 
 The `search:` parameter accepts any valid TODOseq search query:
-
-Example:
 
 ````txt
 ```todoseq
@@ -73,6 +71,7 @@ The `sort:` parameter controls how tasks are ordered. Valid options are:
 - `deadline` - Sort by deadline date
 - `priority` - Sort by priority (high → low)
 - `urgency` - Sort by urgency score (high → low)
+- `keyword` - Sort by keyword state groups
 
 Example:
 
@@ -113,7 +112,7 @@ The `show-future:` parameter controls how future-dated tasks are displayed. This
 
 ````txt
 ```todoseq
-search: tag:project1 OR tag:project1
+search: tag:project1
 show-future: show-upcoming
 ```
 ````
@@ -210,8 +209,7 @@ The `collapse:` parameter makes the task list collapsible, allowing you to save 
 - `true` - Task list starts collapsed with a chevron toggle
 - `false` - Task list is always expanded (default)
 
-When enabled the task list initially displays in a collapsed state and chevron icon (›) indicates the expand/collapse state.
-Click the header to toggle between expanded and collapsed .When collapsed, a footer shows the count of matching tasks (e.g., "5 matching tasks")
+When enabled, the task list initially displays in a collapsed state and a chevron icon (›) indicates the expand/collapse state. Click the header to toggle between expanded and collapsed. When collapsed, a footer shows the count of matching tasks (e.g., "5 matching tasks").
 
 > **Note:** The `collapse` option requires either a `title:` to be set OR `show-query: true`. This ensures there's a visible header to click for toggling.
 
@@ -241,7 +239,7 @@ limit: 10
 
 ## Visual Date Indicators
 
-The task lists provides subtle visual cues to help you quickly identify task urgency based on scheduled and deadline dates. When a task has either a scheduled or deadline date, you'll see a gentle background color that indicates its time sensitivity without being distracting.
+The task lists provide subtle visual cues to help you quickly identify task urgency based on scheduled and deadline dates. When a task has either a scheduled or deadline date, you'll see a gentle background color that indicates its time sensitivity without being distracting.
 
 Tasks with dates that have passed appear with a soft red background, making it easy to spot what needs immediate attention. Tasks due today show a warm orange background, helping you focus on today's priorities. For tasks coming up within the next week, you'll see a soft green background that signals they're on your radar. Tasks with dates further out in the future maintain their default appearance, keeping your view clean and uncluttered.
 
@@ -249,18 +247,17 @@ Tasks with dates that have passed appear with a soft red background, making it e
 
 ### Toggle Task State
 
-Click the checkbox next to a task to toggle its state between TODO and DONE:
-The task will be updated in the original file, and the embedded list will refresh automatically.
+Click the checkbox next to a task to toggle its state between TODO and DONE. The task will be updated in the original file, and the embedded list will refresh automatically.
 
 ### Change Task State
 
-Right click on the task keyword to select the desired state. The task will be updated in the original file, and the embedded list will refresh automatically.
+Right-click on the task keyword to select the desired state. The task will be updated in the original file, and the embedded list will refresh automatically.
 
 ### Navigate to Task
 
 Click on the task text to navigate to the task's location in the original file.
 
-**Simple click** opens the file in the current active page or brining the existing open page into focus.
+**Simple click** opens the file in the current active page or bringing the existing open page into focus.
 
 **Shift-click** creates a new split pane and opens the file there. This is perfect for when you want to reference the task while working on something else in your main workspace.
 
@@ -270,7 +267,10 @@ In all cases, TODOseq navigates to the exact line containing the task and focuse
 
 ## Error Handling
 
-If no tasks are found of the search query is invalid  
+If no tasks are found or the search query is invalid:
+
 ![TODOseq embedded list no tasks found](/assets/todoseq-embedded-list-empty.png)
-If there's an with one of the sort or filters options, an error message will be displayed accordingly. The error message indicate what went wrong and suggest how to fix it.
-![TODOseq embedded task list errors ](./assets/todoseq-embedded-list-error.png)
+
+If there's an error with one of the sort or filter options, an error message will be displayed accordingly. The error message indicates what went wrong and suggests how to fix it.
+
+![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error.png)
