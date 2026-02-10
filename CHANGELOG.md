@@ -1,6 +1,6 @@
 # Change Log
 
-## 0.10.0-dev
+## 0.10.0
 
 - Added keyword sort option to organize tasks by keyword state Active (NOW/DOING/IN-PROGRESS), Inactive (TODO/LATER), Custom (user-defined), Waiting (WAIT/WAITING), and Completed (DONE/CANCELED/CANCELLED). #31
 - Added support the page properties search to filter tasks to only those that are on pages that match the property value. #26
