@@ -390,6 +390,7 @@
   color: var(--interactive-accent);
   font-size: 0.9em; /* reduce size slightly */
   border-radius: 2px; /* Subtle rounding */
+  cursor: pointer; /* Show hand/finger cursor like a link */
 }
 
 /* Source mode - simpler styling without bold/size */
@@ -417,8 +418,9 @@
   font-weight: var(--font-weight-normal, var(--font-normal, 400));
 }
 
-/* Hover effect for better UX */
+/* Hover effect for better UX - underline and background highlight */
 .todoseq-keyword-formatted:hover {
+  text-decoration: underline;
   background-color: color-mix(
     in srgb,
     var(--interactive-accent) 15%,

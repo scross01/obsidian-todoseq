@@ -54,6 +54,9 @@ export class UIManager {
       return;
     }
 
+    // Track which editors have had listeners attached to avoid duplicates
+    const attachedEditors = new Set<HTMLElement>();
+
     // Set up event listeners on all active markdown editors immediately
     const setupEditorListeners = () => {
       const leaves = this.plugin.app.workspace.getLeavesOfType('markdown');
@@ -63,6 +66,12 @@ export class UIManager {
           const cmEditor = (view.editor as { cm?: EditorView })?.cm;
           if (cmEditor && cmEditor.dom) {
             const editorContent = cmEditor.dom;
+
+            // Skip if we've already attached listeners to this editor
+            if (attachedEditors.has(editorContent)) {
+              return;
+            }
+            attachedEditors.add(editorContent);
 
             // Handle click events on checkboxes and task keywords
             const clickHandler = (event: MouseEvent) => {
@@ -168,6 +177,16 @@ export class UIManager {
     // Also set up listeners for newly opened editors
     this.plugin.registerEvent(
       this.plugin.app.workspace.on('layout-change', setupEditorListeners),
+    );
+
+    // Set up listeners when a new file is opened (for the first editor)
+    this.plugin.registerEvent(
+      this.plugin.app.workspace.on('file-open', () => {
+        // Small delay to allow the editor to fully initialize
+        setTimeout(() => {
+          setupEditorListeners();
+        }, 100);
+      }),
     );
   }
 
