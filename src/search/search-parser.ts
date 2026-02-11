@@ -56,18 +56,28 @@ class PrattParser {
       // Handle NOT operator as prefix (special case)
       if (currentToken.type === 'not') {
         this.position++;
-        // Parse the term that NOT applies to
-        const right = this.parseExpression(
-          SearchTokenizer.getBindingPower('not') - 1,
-        );
-        left = {
-          type: 'and',
-          children: [
-            left,
-            { type: 'not', children: [right], position: currentToken.position },
-          ],
+        // Parse the term that NOT applies to with a lower binding power
+        // to ensure it only consumes the immediate following term, not the rest
+        const right = this.parsePrefix();
+        const notNode = {
+          type: 'not' as const,
+          children: [right],
           position: currentToken.position,
         };
+
+        // If left is already an AND node, just add the NOT node to its children
+        if (left.type === 'and') {
+          if (!left.children) {
+            left.children = [];
+          }
+          left.children.push(notNode);
+        } else {
+          left = {
+            type: 'and',
+            children: [left, notNode],
+            position: currentToken.position,
+          };
+        }
         continue;
       }
 
@@ -180,9 +190,9 @@ class PrattParser {
       case 'not':
         this.position++;
         {
-          const notExpr = this.parseExpression(
-            SearchTokenizer.getBindingPower('not') - 1,
-          );
+          // Use parsePrefix() instead of parseExpression() to only consume the immediate term
+          // This prevents consecutive NOT operators from nesting incorrectly
+          const notExpr = this.parsePrefix();
           return { type: 'not', children: [notExpr], position: token.position };
         }
 

@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.10.1
+
+- Fixed issue with task keyword occationaly not clickable on new pages. #44
+- Fixed search parser to correctly handle consecutive NOT operators.
+
 ## 0.10.0
 
 - Added keyword sort option to organize tasks by keyword state Active (NOW/DOING/IN-PROGRESS), Inactive (TODO/LATER), Custom (user-defined), Waiting (WAIT/WAITING), and Completed (DONE/CANCELED/CANCELLED). #31
