@@ -378,6 +378,12 @@
   font-size: 0.7em;
 }
 
+/* Settings UI - Binary file extension warning */
+.todoseq-setting-item-warning {
+  color: var(--text-warning, var(--color-orange, #ff9500));
+  font-size: 0.7em;
+}
+
 /* Settings UI - Invalid input field highlighting */
 .setting-item .todoseq-invalid-input {
   border-color: var(--error-color, #ff0000) !important;

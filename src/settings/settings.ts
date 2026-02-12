@@ -3,6 +3,7 @@ import TodoTracker from '../main';
 import { TaskListView } from '../view/task-list/task-list-view';
 import { LanguageCommentSupportSettings } from '../parser/language-registry';
 import { TaskParser } from '../parser/task-parser';
+import { BINARY_EXTENSIONS_WITH_DOT } from '../utils/constants';
 
 export interface TodoTrackerSettings {
   additionalTaskKeywords: string[]; // capitalised keywords treated as NOT COMPLETED (e.g., FIXME, HACK)
@@ -20,6 +21,7 @@ export interface TodoTrackerSettings {
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
+  additionalFileExtensions: string[]; // additional file extensions to scan for tasks (e.g., ['.org', '.txt'])
   // Property search engine instance
   propertySearchEngine?: import('../services/property-search-engine').PropertySearchEngine; // Property search engine instance
   // Hidden setting - not exposed in UI, used to track first install
@@ -40,12 +42,16 @@ export const DefaultSettings: TodoTrackerSettings = {
   },
   weekStartsOn: 'Monday', // Default to Monday as requested
   formatTaskKeywords: true, // Default to enabled
+  additionalFileExtensions: [], // No additional extensions by default
 };
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
   plugin: TodoTracker;
   private keywordDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private fileExtensionsDebounceTimer: ReturnType<typeof setTimeout> | null =
+    null;
   private readonly KEYWORD_DEBOUNCE_MS = 500;
+  private readonly FILE_EXTENSIONS_DEBOUNCE_MS = 500;
 
   constructor(app: App, plugin: TodoTracker) {
     super(app, plugin);
@@ -66,6 +72,148 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       }
     }
   };
+
+  /**
+   * Validate and parse file extensions from user input
+   * @param input The raw user input string
+   * @returns Object with valid extensions, invalid extensions, and binary warnings
+   */
+  private validateFileExtensions(input: string): {
+    valid: string[];
+    invalid: string[];
+    binaryWarnings: string[];
+  } {
+    const valid: string[] = [];
+    const invalid: string[] = [];
+    const binaryWarnings: string[] = [];
+
+    // Parse CSV, trim whitespace
+    const parsed = input
+      .split(',')
+      .map((ext) => ext.trim().toLowerCase())
+      .filter((ext) => ext.length > 0);
+
+    for (const ext of parsed) {
+      // Must start with a dot
+      if (!ext.startsWith('.')) {
+        invalid.push(ext);
+        continue;
+      }
+
+      // Must have at least one character after the dot
+      if (ext.length < 2) {
+        invalid.push(ext);
+        continue;
+      }
+
+      // Must contain only valid characters (letters, numbers, dots, hyphens, underscores)
+      // Allow multi-level extensions like .txt.bak
+      if (!/^\.[a-zA-Z0-9._-]+$/.test(ext)) {
+        invalid.push(ext);
+        continue;
+      }
+
+      // Check for binary file warning
+      if (BINARY_EXTENSIONS_WITH_DOT.has(ext)) {
+        binaryWarnings.push(ext);
+      }
+
+      valid.push(ext);
+    }
+
+    return { valid, invalid, binaryWarnings };
+  }
+
+  /**
+   * Create the file extensions setting with validation and binary file warnings
+   */
+  private createFileExtensionsSetting(containerEl: HTMLElement): void {
+    const setting = new Setting(containerEl)
+      .setName('Additional file types')
+      .setDesc(
+        'Additional file extensions to scan for tasks (e.g., .org, .txt). Files must be text-based.',
+      );
+
+    setting.addText((text) => {
+      const current = this.plugin.settings.additionalFileExtensions ?? [];
+      text.setValue(current.join(', ')).onChange((value) => {
+        // Clear any pending debounce timer
+        if (this.fileExtensionsDebounceTimer) {
+          clearTimeout(this.fileExtensionsDebounceTimer);
+        }
+
+        // Debounce the expensive operations
+        this.fileExtensionsDebounceTimer = setTimeout(async () => {
+          const { valid, invalid, binaryWarnings } =
+            this.validateFileExtensions(value);
+
+          // Find the setting container
+          const settingContainer = text.inputEl.closest('.setting-item');
+          if (!settingContainer) {
+            console.error('Could not find setting container');
+            return;
+          }
+
+          const settingInfo =
+            settingContainer.querySelector('.setting-item-info');
+          if (!settingInfo) {
+            console.error('Could not find setting info container');
+            return;
+          }
+
+          // Remove any existing error/warning display
+          const existingError = settingContainer.querySelector(
+            '.todoseq-setting-item-error',
+          );
+          if (existingError) {
+            existingError.remove();
+            text.inputEl.classList.remove('todoseq-invalid-input');
+          }
+
+          const existingWarning = settingContainer.querySelector(
+            '.todoseq-setting-item-warning',
+          );
+          if (existingWarning) {
+            existingWarning.remove();
+          }
+
+          // Show errors if any
+          if (invalid.length > 0) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'todoseq-setting-item-error';
+            errorDiv.textContent = `Invalid extension${invalid.length > 1 ? 's' : ''}: ${invalid.join(', ')}. Extensions must start with "." and contain only letters, numbers, dots, hyphens, or underscores.`;
+            text.inputEl.classList.add('todoseq-invalid-input');
+            settingInfo.appendChild(errorDiv);
+          }
+
+          // Show binary file warnings
+          if (binaryWarnings.length > 0) {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'todoseq-setting-item-warning';
+            warningDiv.textContent = `Warning: ${binaryWarnings.join(', ')} ${binaryWarnings.length > 1 ? 'are typically binary files' : 'is typically a binary file'} and may cause performance issues.`;
+            settingInfo.appendChild(warningDiv);
+          }
+
+          // Save valid extensions and rescan
+          this.plugin.settings.additionalFileExtensions = valid;
+          await this.plugin.saveSettings();
+
+          // Rescan vault to pick up new file types
+          try {
+            await this.plugin.scanVault();
+            await this.refreshAllTaskListViews();
+            this.plugin.refreshVisibleEditorDecorations();
+            this.plugin.refreshReaderViewFormatter();
+          } catch (scanError) {
+            console.error('Failed to rescan vault:', scanError);
+          }
+        }, this.FILE_EXTENSIONS_DEBOUNCE_MS);
+      });
+
+      // Set placeholder
+      text.setPlaceholder('.org, .txt');
+    });
+  }
 
   display(): void {
     const { containerEl } = this;
@@ -328,6 +476,9 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             this.plugin.refreshReaderViewFormatter();
           }),
       );
+
+    // Additional file extensions setting
+    this.createFileExtensionsSetting(containerEl);
 
     // Task list search and filter Group
     new Setting(containerEl)

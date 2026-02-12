@@ -1,5 +1,7 @@
 # Change Log
 
+- Added setting option for scanning additional file types in the vault for tasks. e.g. `.txt`
+
 ## 0.10.1
 
 - Fixed issue with task keyword occationaly not clickable on new pages. #44
