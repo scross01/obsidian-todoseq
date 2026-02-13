@@ -44,7 +44,9 @@ graph TB
         end
 
         subgraph "Parser Layer"
-            TaskParser["TaskParser<br/>Regex Engine"]
+            TaskParser["TaskParser<br/>Markdown Engine"]
+            OrgModeParser["OrgModeTaskParser<br/>Org-mode Engine"]
+            ParserRegistry["ParserRegistry<br/>Parser Router"]
             LanguageRegistry["LanguageRegistry<br/>Multi-language Support"]
             DateParser["DateParser<br/>Date Recognition"]
         end
@@ -87,8 +89,12 @@ graph TB
     StateManager --> EmbeddedProcessor
     StateManager --> Search
 
-    VaultScanner --> TaskParser
-    VaultScanner --> LanguageRegistry
+    VaultScanner --> ParserRegistry
+    ParserRegistry --> TaskParser
+    ParserRegistry --> OrgModeParser
+    TaskParser --> LanguageRegistry
+    TaskParser --> DateParser
+    OrgModeParser --> DateParser
     VaultScanner --> FileSystem
 
     UpdateCoordinator --> StateManager
@@ -128,7 +134,7 @@ graph TB
     class Main pluginLayer
     class StateManager,VaultScanner,UpdateCoordinator serviceLayer
     class UIManager,TaskListView,TaskEditor,ReaderFormatter,EmbeddedProcessor uiLayer
-    class TaskParser,LanguageRegistry,DateParser parserLayer
+    class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
     class Search,SearchParser,SearchEvaluator searchLayer
     class ObsidianAPI,Workspace,FileSystem,Editor,DailyNotes external
 ```
@@ -213,11 +219,29 @@ graph TB
 
 ### 3. Parser Layer (Data Extraction)
 
+**ITaskParser Interface** (`src/parser/types.ts`)
+
+- **Responsibility**: Defines the contract for all task parsers
+- **Key Patterns**: Interface segregation, strategy pattern
+- **Interface**: `parseFile()`, `parseLine()`, `supportsFile()`, `getFileExtensions()`
+
+**ParserRegistry** (`src/parser/parser-registry.ts`)
+
+- **Responsibility**: Manages multiple parsers and routes files to appropriate parser
+- **Key Patterns**: Registry pattern, factory pattern, file extension routing
+- **Interface**: `registerParser()`, `getParserForFile()`, `parseFile()`
+
 **TaskParser** (`src/parser/task-parser.ts`)
 
-- **Responsibility**: Complex regex-based task extraction
+- **Responsibility**: Complex regex-based task extraction for Markdown files
 - **Key Patterns**: State machine, builder pattern, security-first design
-- **Interface**: `parseFile()`, `parseLine()`, language-aware parsing
+- **Interface**: Implements `ITaskParser`, `parseFile()`, `parseLine()`, language-aware parsing
+
+**OrgModeTaskParser** (`src/parser/org-mode-task-parser.ts`)
+
+- **Responsibility**: Parse tasks from Org-mode files (`.org` extension)
+- **Key Patterns**: Headline-based parsing, org-mode syntax support
+- **Interface**: Implements `ITaskParser`, supports priorities, scheduled/deadline dates
 
 **LanguageRegistry** (`src/parser/language-registry.ts`)
 
@@ -283,6 +307,8 @@ graph TD
 
     subgraph "Parser Dependencies"
         TaskParser[TaskParser]
+        OrgModeParser[OrgModeTaskParser]
+        ParserRegistry[ParserRegistry]
         LanguageRegistry[LanguageRegistry]
         DateParser[DateParser]
     end
@@ -349,9 +375,12 @@ graph TD
     TaskListView --> StateManager
     TaskListView --> Search
 
-    VaultScanner --> TaskParser
+    VaultScanner --> ParserRegistry
+    ParserRegistry --> TaskParser
+    ParserRegistry --> OrgModeParser
     TaskParser --> LanguageRegistry
     TaskParser --> DateParser
+    OrgModeParser --> DateParser
     TaskParser --> TaskUtils
     TaskParser --> Patterns
 
@@ -400,7 +429,7 @@ graph TD
     class Main,LifecycleManager pluginLayer
     class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter serviceLayer
     class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor uiLayer
-    class TaskParser,LanguageRegistry,DateParser parserLayer
+    class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
     class Search,SearchParser,SearchEvaluator,SearchTokenizer,SearchSuggestions searchLayer
     class TaskUtils,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils utilityLayer
     class Obsidian,DailyNotes external
@@ -569,6 +598,54 @@ graph LR
 - **File Path Validation**: Prevents path traversal attacks
 - **Type Safety**: Comprehensive TypeScript interfaces
 
+## Parser Architecture
+
+The parser layer uses a strategy pattern with a registry to support multiple file formats. This allows TODOseq to parse tasks from both Markdown and Org-mode files using a unified interface.
+
+### ITaskParser Interface
+
+All parsers implement the `ITaskParser` interface defined in [`src/parser/types.ts`](src/parser/types.ts):
+
+```typescript
+interface ITaskParser {
+  parseFile(content: string, filePath: string): Task[];
+  parseLine(line: string, lineNumber: number, filePath: string): Task | null;
+  supportsFile(filePath: string): boolean;
+  getFileExtensions(): string[];
+}
+```
+
+### ParserRegistry
+
+The [`ParserRegistry`](src/parser/parser-registry.ts) manages multiple parsers and routes files to the appropriate parser based on file extension:
+
+- **Registration**: Parsers are registered with `registerParser(parser: ITaskParser)`
+- **Routing**: `getParserForFile(filePath)` returns the appropriate parser
+- **Delegation**: `parseFile()` and `parseLine()` delegate to the correct parser
+
+### Parser Lifecycle
+
+1. **Initialization**: Parsers are created and registered during plugin lifecycle (`src/plugin-lifecycle.ts`)
+2. **Settings Updates**: When settings change, parsers are recreated with new configuration
+3. **File Scanning**: `VaultScanner` uses `ParserRegistry` to parse files based on extension
+
+### Supported Parsers
+
+| Parser              | File Extensions    | Features                                                 |
+| ------------------- | ------------------ | -------------------------------------------------------- |
+| `TaskParser`        | `.md`, `.markdown` | Markdown tasks, checkboxes, code blocks, comments        |
+| `OrgModeTaskParser` | `.org`             | Org-mode headlines, priorities, scheduled/deadline dates |
+
+> **Note**: The `OrgModeTaskParser` is registered conditionally based on the `detectOrgModeFiles` experimental feature setting. When disabled (default), `.org` files are not parsed. Enable it in Settings → TODOseq → Experimental Features.
+
+### Extending with New Parsers
+
+To add support for a new file format:
+
+1. Implement the `ITaskParser` interface
+2. Register the parser in `PluginLifecycleManager.registerParsers()`
+3. Add tests following the patterns in `tests/org-mode-parser.test.ts`
+
 ## Data Models and Type System
 
 ### Core Task Interface
@@ -627,6 +704,8 @@ interface Task {
 
 ### 4. Parser Extensions
 
+- **ITaskParser Interface**: Implement new parsers for different file formats
+- **ParserRegistry**: Register custom parsers for file extensions
 - **Format Handlers**: Support new task formats
 - **Date Parsers**: Add new date format recognition
 - **Priority Systems**: Custom priority token parsing
@@ -658,6 +737,8 @@ interface Task {
 5. **File Race Conditions**: Use atomic operations and proper error handling
 6. **Performance Testing**: Test with large vaults (1000+ files, 10000+ tasks)
 7. **Embedded Lists**: Use `TodoseqCodeBlockProcessor` with separate lifecycle from main plugin
+8. **Parser Registry**: Use `ParserRegistry` for file parsing - never call parsers directly from VaultScanner
+9. **Org-Mode Limitations**: Org-mode files support vault scanning only; editor styling is not supported
 
 ### Testing Architecture
 

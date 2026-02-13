@@ -270,4 +270,32 @@ export default class TodoTracker extends Plugin {
       }
     }
   }
+
+  /**
+   * Update org-mode parser registration based on detectOrgModeFiles setting.
+   * Called when the setting changes.
+   */
+  public async updateOrgModeParserRegistration(): Promise<void> {
+    if (!this.vaultScanner) return;
+
+    const parserRegistry = this.vaultScanner.getParserRegistry();
+
+    if (this.settings.detectOrgModeFiles) {
+      // Register org-mode parser if not already registered
+      if (!parserRegistry.getParserForExtension('org')) {
+        const { OrgModeTaskParser } =
+          await import('./parser/org-mode-task-parser');
+        const urgencyCoefficients = await parseUrgencyCoefficients(this.app);
+        const orgModeParser = OrgModeTaskParser.create(
+          this.settings.additionalTaskKeywords,
+          this.app,
+          urgencyCoefficients,
+        );
+        this.vaultScanner?.registerParser(orgModeParser);
+      }
+    } else {
+      // Unregister org-mode parser if registered
+      parserRegistry.unregister('org-mode');
+    }
+  }
 }

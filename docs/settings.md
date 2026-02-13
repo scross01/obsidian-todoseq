@@ -260,3 +260,28 @@ Obsidian does not notify plugins when the "Excluded files" setting has been modi
 The Toggle task state command palette action is bound to `Ctrl+Enter` by default.
 
 Use the Obsidian Hotkeys setting to add or remove hotkeys for command palette actions.
+
+## Experimental Features
+
+The Experimental Features section contains settings for features that are still in development or testing. These features may not be fully functional and could change or be removed in future versions.
+
+### Detect Tasks in Org Mode Files
+
+**Setting**: "Detect tasks in org mode files" (toggle)
+
+**Description**: Enable parsing of tasks from Org-mode files (`.org` extension).
+
+**Default**: Disabled
+
+**When Enabled:**
+
+- `.org` files are scanned for tasks using Org-mode headline syntax
+- Tasks appear in the Task List alongside Markdown tasks
+- Supports Org-mode priorities, scheduled dates, and deadline dates
+
+**Limitations:**
+
+- Editor styling and decorations are not supported for Org-mode files
+- Tasks are detected during vault scanning only
+
+See [Experimental Features](experimental-features.md) for detailed documentation on Org-mode support.
