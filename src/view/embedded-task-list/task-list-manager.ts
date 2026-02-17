@@ -161,9 +161,14 @@ export class EmbeddedTaskListManager {
       // Build keyword config if sorting by keyword
       let keywordConfig: KeywordSortConfig | undefined;
       if (sortMethod === 'sortByKeyword') {
-        keywordConfig = buildKeywordSortConfig(
-          this.settings?.additionalTaskKeywords ?? [],
-        );
+        // Build TaskKeywordGroups from flat settings properties
+        const keywordGroups = {
+          activeKeywords: this.settings?.additionalActiveKeywords ?? [],
+          inactiveKeywords: this.settings?.additionalTaskKeywords ?? [],
+          waitingKeywords: this.settings?.additionalWaitingKeywords ?? [],
+          completedKeywords: this.settings?.additionalCompletedKeywords ?? [],
+        };
+        keywordConfig = buildKeywordSortConfig(keywordGroups);
       }
 
       // Use the existing three-block sorting system

@@ -72,15 +72,21 @@ describe('TaskParser keyword validation', () => {
 
   describe('create method with validation', () => {
     const baseSettings: TodoTrackerSettings = {
-      refreshInterval: 60,
       additionalTaskKeywords: [],
+      additionalActiveKeywords: [],
+      additionalWaitingKeywords: [],
+      additionalCompletedKeywords: [],
       includeCodeBlocks: false,
       includeCalloutBlocks: true,
       includeCommentBlocks: false,
       taskListViewMode: 'showAll',
+      futureTaskSorting: 'showAll',
+      defaultSortMethod: 'default',
       languageCommentSupport: { enabled: true },
       weekStartsOn: 'Monday',
       formatTaskKeywords: true,
+      additionalFileExtensions: [],
+      detectOrgModeFiles: false,
     };
 
     it('should create parser with valid keywords', () => {
@@ -88,22 +94,25 @@ describe('TaskParser keyword validation', () => {
         ...baseSettings,
         additionalTaskKeywords: ['FIXME', 'HACK'],
       };
-      expect(() => TaskParser.create(settings)).not.toThrow();
-      const parser = TaskParser.create(settings);
+      expect(() => TaskParser.create(settings, null)).not.toThrow();
+      const parser = TaskParser.create(settings, null);
       expect(parser).toBeInstanceOf(TaskParser);
     });
 
     it('should throw error with invalid keywords', () => {
-      const settings = { ...baseSettings, additionalTaskKeywords: ['A*B*C'] };
-      expect(() => TaskParser.create(settings)).toThrow(
+      const settings = {
+        ...baseSettings,
+        additionalTaskKeywords: ['A*B*C'],
+      };
+      expect(() => TaskParser.create(settings, null)).toThrow(
         'dangerous regex pattern',
       );
     });
 
     it('should work with empty additional keywords', () => {
       const settings = { ...baseSettings, additionalTaskKeywords: [] };
-      expect(() => TaskParser.create(settings)).not.toThrow();
-      const parser = TaskParser.create(settings);
+      expect(() => TaskParser.create(settings, null)).not.toThrow();
+      const parser = TaskParser.create(settings, null);
       expect(parser).toBeInstanceOf(TaskParser);
     });
   });

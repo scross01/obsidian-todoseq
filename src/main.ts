@@ -132,6 +132,7 @@ export default class TodoTracker extends Plugin {
   // Obsidian lifecycle method called to settings are loaded
   async loadSettings() {
     const loaded = await this.loadData(); // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+
     this.settings = Object.assign(
       {},
       DefaultSettings,
@@ -141,10 +142,21 @@ export default class TodoTracker extends Plugin {
     // Add app instance to settings for PropertySearchEngine access
     (this.settings as TodoTrackerSettings & { app: typeof this.app }).app =
       this.app;
-    // Normalize settings shape after migration: ensure additionalTaskKeywords exists
+
+    // Normalize settings shape: ensure all keyword arrays exist
     if (!this.settings.additionalTaskKeywords) {
       this.settings.additionalTaskKeywords = [];
     }
+    if (!this.settings.additionalActiveKeywords) {
+      this.settings.additionalActiveKeywords = [];
+    }
+    if (!this.settings.additionalWaitingKeywords) {
+      this.settings.additionalWaitingKeywords = [];
+    }
+    if (!this.settings.additionalCompletedKeywords) {
+      this.settings.additionalCompletedKeywords = [];
+    }
+
     // Update VaultScanner with new settings if it exists
     if (this.vaultScanner) {
       // Parse urgency coefficients once and pass to updateSettings to avoid redundant calls
@@ -208,16 +220,18 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called to save settings
   async saveSettings() {
-    // Add app instance to settings for PropertySearchEngine access
+    // Create a clean copy of settings for saving (excluding non-serializable properties)
+    const settingsToSave = { ...this.settings } as TodoTrackerSettings & {
+      app?: typeof this.app;
+    };
+    delete settingsToSave.app; // Remove app instance before saving
+    delete settingsToSave.propertySearchEngine; // Remove non-serializable property
+
+    // Add app instance to settings for PropertySearchEngine access (kept in memory, not saved)
     (this.settings as TodoTrackerSettings & { app: typeof this.app }).app =
       this.app;
 
-    // Update property search engine with new settings
-    if (this.propertySearchEngine) {
-      // Property search engine settings are handled in initializeStartupScan
-    }
-
-    await this.saveData(this.settings);
+    await this.saveData(settingsToSave);
   }
 
   // Update task formatting in all views
@@ -287,7 +301,7 @@ export default class TodoTracker extends Plugin {
           await import('./parser/org-mode-task-parser');
         const urgencyCoefficients = await parseUrgencyCoefficients(this.app);
         const orgModeParser = OrgModeTaskParser.create(
-          this.settings.additionalTaskKeywords,
+          this.settings,
           this.app,
           urgencyCoefficients,
         );

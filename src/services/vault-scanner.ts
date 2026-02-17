@@ -12,8 +12,7 @@ import {
 import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
 import { PropertySearchEngine } from './property-search-engine';
-import { buildTaskKeywords } from '../utils/task-utils';
-import { DEFAULT_COMPLETED_STATES } from '../types/task';
+import { buildKeywordsFromGroups } from '../utils/task-utils';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -474,13 +473,12 @@ export class VaultScanner {
       await this.loadUrgencyCoefficients();
     }
 
-    // Build parser config for updating all parsers
-    const { allKeywords } = buildTaskKeywords(
-      newSettings.additionalTaskKeywords,
-    );
+    // Build parser config for updating all parsers using all keyword groups
+    const { allKeywords, completedKeywords } =
+      buildKeywordsFromGroups(newSettings);
     const config: ParserConfig = {
       keywords: allKeywords,
-      completedKeywords: DEFAULT_COMPLETED_STATES,
+      completedKeywords: completedKeywords,
       urgencyCoefficients: this.urgencyCoefficients,
     };
 

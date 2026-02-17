@@ -1,4 +1,4 @@
-import { Task } from '../../src/types/task';
+import { Task, TaskKeywordGroups } from '../../src/types/task';
 import { TodoTrackerSettings } from '../../src/settings/settings';
 
 /**
@@ -36,6 +36,16 @@ export function createCheckboxTask(overrides: Partial<Task> = {}): Task {
 }
 
 /**
+ * Default empty keyword groups for testing
+ */
+export const defaultTaskKeywordGroups: TaskKeywordGroups = {
+  activeKeywords: [],
+  inactiveKeywords: [],
+  waitingKeywords: [],
+  completedKeywords: [],
+};
+
+/**
  * Creates a baseline settings object with common properties
  */
 export function createBaseSettings(
@@ -54,6 +64,7 @@ export function createBaseSettings(
     },
     weekStartsOn: 'Monday',
     formatTaskKeywords: true,
+    taskKeywordGroups: defaultTaskKeywordGroups,
     ...overrides,
   };
 }

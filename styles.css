@@ -399,6 +399,66 @@
   cursor: pointer; /* Show hand/finger cursor like a link */
 }
 
+/* ============================================================================
+   Task Keyword Group Styling - Editor (CodeMirror)
+   ============================================================================ */
+
+/* Active tasks (DOING, NOW, IN-PROGRESS, etc.) - blue/cyan styling */
+.cm-editor .cm-task-active,
+.cm-task-active {
+  color: var(--color-cyan, #2dd4bf);
+}
+
+/* Inactive/pending tasks (TODO, LATER, etc.) - default styling */
+.cm-editor .cm-task-pending,
+.cm-task-pending {
+  color: var(--interactive-accent);
+}
+
+/* Waiting tasks (WAIT, WAITING, PAUSED, BLOCKED, etc.) - orange/yellow styling */
+.cm-editor .cm-task-waiting,
+.cm-task-waiting {
+  color: var(--color-orange, #f97316);
+}
+
+/* Completed tasks (DONE, CANCELLED, etc.) - strikethrough/grey styling */
+.cm-editor .cm-task-complete,
+.cm-task-complete {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+
+/* ============================================================================
+   Task Keyword Group Styling - Reader View
+   ============================================================================ */
+
+/* Active tasks in reader view */
+.markdown-preview-view .cm-task-active,
+.markdown-rendered .cm-task-active {
+  color: var(--color-cyan, #2dd4bf);
+}
+
+/* Inactive/pending tasks in reader view */
+.markdown-preview-view .cm-task-pending,
+.markdown-rendered .cm-task-pending {
+  color: var(--interactive-accent);
+}
+
+/* Waiting tasks in reader view */
+.markdown-preview-view .cm-task-waiting,
+.markdown-rendered .cm-task-waiting {
+  color: var(--color-orange, #f97316);
+}
+
+/* Completed tasks in reader view */
+.markdown-preview-view .cm-task-complete,
+.markdown-rendered .cm-task-complete {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+
 /* Source mode - simpler styling without bold/size */
 .markdown-source-view:not(.is-live-preview) .todoseq-keyword-formatted {
   font-weight: normal;
@@ -468,13 +528,9 @@
   text-decoration-color: var(--text-muted);
 }
 
-/* Completed task styling for DONE, CANCELLED, CANCELED keywords */
-:is(.markdown-preview-view, .cm-editor)
-  :is(
-    [data-task-keyword='DONE'],
-    [data-task-keyword='CANCELLED'],
-    [data-task-keyword='CANCELED']
-  ) {
+/* Completed task keyword styling - applies strikethrough to the keyword itself */
+/* Works for both built-in (DONE, CANCELLED, CANCELED) and custom completed keywords */
+:is(.markdown-preview-view, .cm-editor) .todoseq-completed-keyword {
   text-decoration: line-through;
   text-decoration-color: var(--text-muted);
 }

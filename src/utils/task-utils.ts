@@ -1,8 +1,10 @@
+import { KeywordGroup } from '../types/task';
 import {
-  DEFAULT_COMPLETED_STATES,
-  DEFAULT_PENDING_STATES,
-  DEFAULT_ACTIVE_STATES,
-} from '../types/task';
+  BUILTIN_ACTIVE_KEYWORDS,
+  BUILTIN_INACTIVE_KEYWORDS,
+  BUILTIN_WAITING_KEYWORDS,
+  BUILTIN_COMPLETED_KEYWORDS,
+} from './constants';
 
 /**
  * Result of building the task keyword list
@@ -21,6 +23,7 @@ export interface TaskKeywordResult {
  * Combines default pending/active/completed states with user-defined additional keywords
  * @param additionalTaskKeywords Array of additional keywords from settings
  * @returns TaskKeywordResult containing all keyword arrays
+ * @deprecated Use buildKeywordsFromGroups() instead, which supports all four keyword groups
  */
 export function buildTaskKeywords(
   additionalTaskKeywords: unknown[],
@@ -33,17 +36,19 @@ export function buildTaskKeywords(
         .filter((k) => k.length > 0)
     : [];
 
-  // Build non-completed keywords (pending + active + additional)
+  // Build non-completed keywords using new constants
+  // Note: DEFAULT_PENDING_STATES includes both inactive and waiting keywords for backward compatibility
   const nonCompletedKeywords: string[] = [
-    ...Array.from(DEFAULT_PENDING_STATES),
-    ...Array.from(DEFAULT_ACTIVE_STATES),
+    ...BUILTIN_INACTIVE_KEYWORDS,
+    ...BUILTIN_ACTIVE_KEYWORDS,
+    ...BUILTIN_WAITING_KEYWORDS,
     ...normalizedAdditional,
   ];
 
   // Build all keywords (non-completed + completed)
   const allKeywords: string[] = [
     ...nonCompletedKeywords,
-    ...Array.from(DEFAULT_COMPLETED_STATES),
+    ...BUILTIN_COMPLETED_KEYWORDS,
   ];
 
   return {
@@ -51,6 +56,281 @@ export function buildTaskKeywords(
     nonCompletedKeywords: Array.from(new Set(nonCompletedKeywords)),
     normalizedAdditional,
   };
+}
+
+/**
+ * Settings interface for keyword group access.
+ * Uses flat properties to avoid nested object serialization issues.
+ */
+export interface HasTaskKeywordGroups {
+  additionalTaskKeywords?: string[]; // Inactive keywords
+  additionalActiveKeywords?: string[]; // Active keywords
+  additionalWaitingKeywords?: string[]; // Waiting keywords
+  additionalCompletedKeywords?: string[]; // Completed keywords
+}
+
+/**
+ * Get all keywords for a specific group (built-in + custom)
+ * @param group The keyword group to get keywords for
+ * @param settings Settings object containing flat keyword properties
+ * @returns Array of all keywords for the group (built-in + custom)
+ */
+export function getKeywordsForGroup(
+  group: KeywordGroup,
+  settings: HasTaskKeywordGroups,
+): string[] {
+  switch (group) {
+    case 'activeKeywords':
+      return [
+        ...BUILTIN_ACTIVE_KEYWORDS,
+        ...(settings.additionalActiveKeywords ?? []),
+      ];
+    case 'waitingKeywords':
+      return [
+        ...BUILTIN_WAITING_KEYWORDS,
+        ...(settings.additionalWaitingKeywords ?? []),
+      ];
+    case 'completedKeywords':
+      return [
+        ...BUILTIN_COMPLETED_KEYWORDS,
+        ...(settings.additionalCompletedKeywords ?? []),
+      ];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Get all inactive keywords (built-in + additionalTaskKeywords from settings)
+ * Inactive keywords are handled separately from other groups for backward compatibility.
+ * @param settings Settings object containing additionalTaskKeywords
+ * @returns Array of all inactive keywords (built-in + custom)
+ */
+export function getInactiveKeywords(settings: HasTaskKeywordGroups): string[] {
+  const additionalKeywords = settings.additionalTaskKeywords ?? [];
+  return [...BUILTIN_INACTIVE_KEYWORDS, ...additionalKeywords];
+}
+
+/**
+ * Get all keywords across all groups
+ * @param settings Settings object containing taskKeywordGroups
+ * @returns Array of all unique keywords across all groups
+ */
+export function getAllKeywords(settings: HasTaskKeywordGroups): string[] {
+  const allKeywords = [
+    ...getKeywordsForGroup('activeKeywords', settings),
+    ...getInactiveKeywords(settings),
+    ...getKeywordsForGroup('waitingKeywords', settings),
+    ...getKeywordsForGroup('completedKeywords', settings),
+  ];
+
+  // Remove duplicates while preserving order
+  return Array.from(new Set(allKeywords));
+}
+
+/**
+ * Determine which group a keyword belongs to
+ * @param keyword The keyword to look up
+ * @param settings Settings object containing taskKeywordGroups
+ * @returns The group name if found, null if keyword is not in any group
+ */
+export function getKeywordGroup(
+  keyword: string,
+  settings: HasTaskKeywordGroups,
+): KeywordGroup | 'inactiveKeywords' | null {
+  // Check inactive keywords first (from additionalTaskKeywords)
+  const inactiveKeywords = getInactiveKeywords(settings);
+  if (inactiveKeywords.includes(keyword)) {
+    return 'inactiveKeywords';
+  }
+
+  // Check other groups
+  const groups: KeywordGroup[] = [
+    'activeKeywords',
+    'waitingKeywords',
+    'completedKeywords',
+  ];
+
+  for (const group of groups) {
+    const keywords = getKeywordsForGroup(group, settings);
+    if (keywords.includes(keyword)) {
+      return group;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Check if a keyword is a built-in keyword
+ * @param keyword The keyword to check
+ * @returns True if the keyword is a built-in keyword
+ */
+export function isBuiltinKeyword(keyword: string): boolean {
+  return (
+    BUILTIN_ACTIVE_KEYWORDS.includes(
+      keyword as (typeof BUILTIN_ACTIVE_KEYWORDS)[number],
+    ) ||
+    BUILTIN_INACTIVE_KEYWORDS.includes(
+      keyword as (typeof BUILTIN_INACTIVE_KEYWORDS)[number],
+    ) ||
+    BUILTIN_WAITING_KEYWORDS.includes(
+      keyword as (typeof BUILTIN_WAITING_KEYWORDS)[number],
+    ) ||
+    BUILTIN_COMPLETED_KEYWORDS.includes(
+      keyword as (typeof BUILTIN_COMPLETED_KEYWORDS)[number],
+    )
+  );
+}
+
+/**
+ * Validate keyword groups for duplicates
+ * Checks if any keyword appears in multiple groups
+ * @param groups The keyword groups to validate (with flat properties)
+ * @param additionalTaskKeywords Additional inactive keywords to check against (optional, for backward compatibility)
+ * @returns Array of duplicate keywords found (empty if no duplicates)
+ */
+export function validateKeywordGroups(
+  groups: {
+    activeKeywords?: string[];
+    waitingKeywords?: string[];
+    completedKeywords?: string[];
+  },
+  additionalTaskKeywords?: string[],
+): string[] {
+  const keywordCounts = new Map<string, number>();
+
+  // Count occurrences of each keyword across all groups
+  const allGroupKeywords = [
+    ...(groups.activeKeywords ?? []),
+    ...(groups.waitingKeywords ?? []),
+    ...(groups.completedKeywords ?? []),
+    ...(additionalTaskKeywords ?? []),
+  ];
+
+  for (const keyword of allGroupKeywords) {
+    keywordCounts.set(keyword, (keywordCounts.get(keyword) ?? 0) + 1);
+  }
+
+  // Also check against built-in keywords in other groups
+  // Custom keyword shouldn't duplicate a built-in keyword in a different semantic group
+  const duplicates: string[] = [];
+
+  for (const [keyword, count] of Array.from(keywordCounts)) {
+    if (count > 1) {
+      duplicates.push(keyword);
+    }
+  }
+
+  // Custom keywords duplicating built-ins are not duplicates in the error sense
+  // They just extend that group. Only report if same keyword in multiple custom groups.
+
+  return duplicates;
+}
+
+/**
+ * Result of building keywords from taskKeywordGroups setting
+ */
+export interface TaskKeywordGroupsResult {
+  /** All unique keywords across all groups */
+  allKeywords: string[];
+  /** Keywords that indicate a task is completed */
+  completedKeywords: string[];
+  /** Keywords that indicate a task is active (being worked on) */
+  activeKeywords: string[];
+  /** Keywords that indicate a task is inactive/pending */
+  inactiveKeywords: string[];
+  /** Keywords that indicate a task is waiting/blocked */
+  waitingKeywords: string[];
+}
+
+/**
+ * Build keyword lists from taskKeywordGroups setting
+ * Combines built-in keywords with custom keywords from settings
+ * @param settings Settings object containing taskKeywordGroups
+ * @returns TaskKeywordGroupsResult with all keyword arrays
+ */
+export function buildKeywordsFromGroups(
+  settings: HasTaskKeywordGroups,
+): TaskKeywordGroupsResult {
+  const activeKeywords = getKeywordsForGroup('activeKeywords', settings);
+  const inactiveKeywords = getInactiveKeywords(settings);
+  const waitingKeywords = getKeywordsForGroup('waitingKeywords', settings);
+  const completedKeywords = getKeywordsForGroup('completedKeywords', settings);
+
+  // Build all keywords, removing duplicates while preserving order
+  const allKeywords = Array.from(
+    new Set([
+      ...activeKeywords,
+      ...inactiveKeywords,
+      ...waitingKeywords,
+      ...completedKeywords,
+    ]),
+  );
+
+  return {
+    allKeywords,
+    completedKeywords,
+    activeKeywords,
+    inactiveKeywords,
+    waitingKeywords,
+  };
+}
+
+/**
+ * Determine if a keyword indicates a completed task
+ * @param keyword The task state keyword
+ * @param settings Settings object containing taskKeywordGroups
+ * @returns True if the keyword is in the completed group
+ */
+export function isCompletedKeyword(
+  keyword: string,
+  settings: HasTaskKeywordGroups,
+): boolean {
+  const completedKeywords = getKeywordsForGroup('completedKeywords', settings);
+  return completedKeywords.includes(keyword);
+}
+
+/**
+ * Determine if a keyword indicates an active task
+ * @param keyword The task state keyword
+ * @param settings Settings object containing taskKeywordGroups
+ * @returns True if the keyword is in the active group
+ */
+export function isActiveKeyword(
+  keyword: string,
+  settings: HasTaskKeywordGroups,
+): boolean {
+  const activeKeywords = getKeywordsForGroup('activeKeywords', settings);
+  return activeKeywords.includes(keyword);
+}
+
+/**
+ * Determine if a keyword indicates a waiting task
+ * @param keyword The task state keyword
+ * @param settings Settings object containing taskKeywordGroups
+ * @returns True if the keyword is in the waiting group
+ */
+export function isWaitingKeyword(
+  keyword: string,
+  settings: HasTaskKeywordGroups,
+): boolean {
+  const waitingKeywords = getKeywordsForGroup('waitingKeywords', settings);
+  return waitingKeywords.includes(keyword);
+}
+
+/**
+ * Determine if a keyword indicates an inactive/pending task
+ * @param keyword The task state keyword
+ * @param settings Settings object containing taskKeywordGroups
+ * @returns True if the keyword is in the inactive group
+ */
+export function isInactiveKeyword(
+  keyword: string,
+  settings: HasTaskKeywordGroups,
+): boolean {
+  const inactiveKeywords = getInactiveKeywords(settings);
+  return inactiveKeywords.includes(keyword);
 }
 
 /**

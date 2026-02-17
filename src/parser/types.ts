@@ -16,7 +16,13 @@ export interface ParserConfig {
   keywords: string[];
 
   /** Keywords that indicate completion (DONE, CANCELED, etc.) */
-  completedKeywords: Set<string>;
+  completedKeywords: string[];
+
+  /** Keywords that indicate active state (DOING, NOW, etc.) */
+  activeKeywords?: string[];
+
+  /** Keywords that indicate waiting state (WAIT, WAITING, etc.) */
+  waitingKeywords?: string[];
 
   /** Urgency coefficients for task scoring */
   urgencyCoefficients: UrgencyCoefficients;

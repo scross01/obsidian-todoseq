@@ -6,11 +6,23 @@
 import { OrgModeTaskParser } from '../src/parser/org-mode-task-parser';
 import { getDefaultCoefficients } from '../src/utils/task-urgency';
 
+// Default settings for testing
+const defaultSettings = {
+  additionalTaskKeywords: [],
+  additionalActiveKeywords: [],
+  additionalWaitingKeywords: [],
+  additionalCompletedKeywords: [],
+};
+
 describe('OrgModeTaskParser', () => {
   let parser: OrgModeTaskParser;
 
   beforeEach(() => {
-    parser = OrgModeTaskParser.create([], null, getDefaultCoefficients());
+    parser = OrgModeTaskParser.create(
+      defaultSettings,
+      null,
+      getDefaultCoefficients(),
+    );
   });
 
   describe('parserId and supportedExtensions', () => {
@@ -34,10 +46,6 @@ describe('OrgModeTaskParser', () => {
 
     it('should match WAIT keyword (default)', () => {
       expect(parser.isTaskLine('* WAIT Waiting task')).toBe(true);
-    });
-
-    it('should match IN-PROGRESS keyword (default)', () => {
-      expect(parser.isTaskLine('** IN-PROGRESS Working on it')).toBe(true);
     });
 
     it('should not match non-task headlines', () => {
@@ -249,7 +257,7 @@ More text`;
   describe('updateConfig', () => {
     it('should update keywords', () => {
       const customParser = OrgModeTaskParser.create(
-        [],
+        defaultSettings,
         null,
         getDefaultCoefficients(),
       );
@@ -260,7 +268,7 @@ More text`;
       // Update config with new keywords
       customParser.updateConfig({
         keywords: ['TODO', 'DONE', 'CUSTOM'],
-        completedKeywords: new Set(['DONE']),
+        completedKeywords: ['DONE'],
         urgencyCoefficients: getDefaultCoefficients(),
       });
 

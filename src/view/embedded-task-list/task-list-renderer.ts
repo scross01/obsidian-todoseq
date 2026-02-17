@@ -1,24 +1,18 @@
-import {
-  Task,
-  DEFAULT_COMPLETED_STATES,
-  DEFAULT_ACTIVE_STATES,
-  DEFAULT_PENDING_STATES,
-} from '../../types/task';
+import { Task, DEFAULT_COMPLETED_STATES } from '../../types/task';
 import { TaskWriter } from '../../services/task-writer';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import {
   MarkdownView,
-  Menu,
   WorkspaceLeaf,
   TFile,
   Platform,
   setIcon,
 } from 'obsidian';
-import { getPluginSettings } from '../../utils/settings-utils';
 import { truncateMiddle } from '../../utils/task-utils';
 import { TAG_PATTERN } from '../../utils/patterns';
 import { DateUtils } from '../../utils/date-utils';
+import { StateMenuBuilder } from '../components/state-menu-builder';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -27,10 +21,12 @@ import { DateUtils } from '../../utils/date-utils';
 export class EmbeddedTaskListRenderer {
   private plugin: TodoTracker;
   private taskEditor: TaskWriter;
+  private menuBuilder: StateMenuBuilder;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
     this.taskEditor = new TaskWriter(plugin.app);
+    this.menuBuilder = new StateMenuBuilder(plugin);
   }
 
   /**
@@ -1191,62 +1187,6 @@ export class EmbeddedTaskListRenderer {
   }
 
   /**
-   * Return default keyword sets (non-completed and completed) and additional keywords using constants from task.ts
-   */
-  private getKeywordSets(): {
-    pendingActive: string[];
-    completed: string[];
-    additional: string[];
-  } {
-    const pendingActiveDefaults = [
-      ...Array.from(DEFAULT_PENDING_STATES),
-      ...Array.from(DEFAULT_ACTIVE_STATES),
-    ];
-    const completedDefaults = Array.from(DEFAULT_COMPLETED_STATES);
-
-    const settings = getPluginSettings(this.plugin.app);
-    const configured = settings?.additionalTaskKeywords;
-    const additional = Array.isArray(configured)
-      ? configured.filter(
-          (v): v is string => typeof v === 'string' && v.length > 0,
-        )
-      : [];
-
-    return {
-      pendingActive: pendingActiveDefaults,
-      completed: completedDefaults,
-      additional,
-    };
-  }
-
-  /**
-   * Build the list of selectable states for the context menu, excluding the current state
-   * @param current Current task state
-   */
-  private getSelectableStatesForMenu(
-    current: string,
-  ): { group: string; states: string[] }[] {
-    const { pendingActive, completed, additional } = this.getKeywordSets();
-
-    const dedupe = (arr: string[]) => Array.from(new Set(arr));
-    const nonCompleted = dedupe([...pendingActive, ...additional]);
-    const completedOnly = dedupe(completed);
-
-    // Present two groups: Non-completed and Completed
-    const groups: { group: string; states: string[] }[] = [
-      {
-        group: 'Not completed',
-        states: nonCompleted.filter((s) => s && s !== current),
-      },
-      {
-        group: 'Completed',
-        states: completedOnly.filter((s) => s && s !== current),
-      },
-    ];
-    return groups.filter((g) => g.states.length > 0);
-  }
-
-  /**
    * Open Obsidian Menu at a specific screen position
    * @param task The task to update
    * @param pos The position to show the menu
@@ -1255,24 +1195,9 @@ export class EmbeddedTaskListRenderer {
     task: Task,
     pos: { x: number; y: number },
   ): void {
-    const menu = new Menu();
-    const groups = this.getSelectableStatesForMenu(task.state);
-
-    for (const g of groups) {
-      menu.addItem((item) => {
-        item.setTitle(g.group);
-        item.setDisabled(true);
-      });
-      for (const state of g.states) {
-        menu.addItem((item) => {
-          item.setTitle(state);
-          item.onClick(async () => {
-            await this.updateTaskState(task, state);
-          });
-        });
-      }
-      menu.addSeparator();
-    }
+    const menu = this.menuBuilder.buildStateMenu(task.state, async (state) => {
+      await this.updateTaskState(task, state);
+    });
     menu.showAtPosition({ x: pos.x, y: pos.y });
   }
 
@@ -1284,26 +1209,9 @@ export class EmbeddedTaskListRenderer {
   private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
     evt.preventDefault();
     evt.stopPropagation();
-    const menu = new Menu();
-    const groups = this.getSelectableStatesForMenu(task.state);
-
-    for (const g of groups) {
-      // Section header (disabled item)
-      menu.addItem((item) => {
-        item.setTitle(g.group);
-        item.setDisabled(true);
-      });
-      for (const state of g.states) {
-        menu.addItem((item) => {
-          item.setTitle(state);
-          item.onClick(async () => {
-            await this.updateTaskState(task, state);
-          });
-        });
-      }
-      // Divider between groups when both exist
-      menu.addSeparator();
-    }
+    const menu = this.menuBuilder.buildStateMenu(task.state, async (state) => {
+      await this.updateTaskState(task, state);
+    });
 
     // Prefer API helper when available; fallback to explicit coordinates
     const maybeShowAtMouseEvent = (

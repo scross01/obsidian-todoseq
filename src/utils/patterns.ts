@@ -216,6 +216,34 @@ export const TAG_PATTERN = /(?<![\w/:?#[\]])#([^\s)\]}>]+)/gu;
 export const TAG_PATTERN_SOURCE = TAG_PATTERN.source;
 
 // ============================================================================
+// Task Keyword Patterns
+// ============================================================================
+
+/**
+ * Escape keywords for use in regex patterns
+ * @param keywords Array of keywords to escape
+ * @returns Escaped keywords joined with OR operator
+ */
+export function escapeKeywordsForRegex(keywords: string[]): string {
+  return keywords
+    .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+}
+
+/**
+ * Build a task keyword pattern from an array of keywords
+ * @param keywords Array of task keywords (e.g., ['TODO', 'DOING', 'DONE'])
+ * @returns Regex pattern string that matches any of the keywords
+ */
+export function buildTaskKeywordPattern(keywords: string[]): string {
+  if (keywords.length === 0) {
+    // Return a pattern that never matches if no keywords
+    return '(?!x)x';
+  }
+  return `(${escapeKeywordsForRegex(keywords)})`;
+}
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 

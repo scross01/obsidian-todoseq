@@ -39,7 +39,7 @@ describe('Editor Controller - Task State Methods', () => {
         const lines = [
           'TODO Test task',
           'DOING Test task',
-          'LATER Test task',
+          'WAIT Test task',
           'DONE Test task',
         ];
         return lines[lineNumber] || '';
@@ -237,17 +237,16 @@ describe('Editor Controller - Task State Methods', () => {
         0,
         mockEditor as any,
         mockView as any,
-        'LATER',
+        'WAIT',
       );
 
       expect(
         mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).toHaveBeenCalledWith(expect.anything(), 'LATER', 'editor');
+      ).toHaveBeenCalledWith(expect.anything(), 'WAIT', 'editor');
     });
 
-    it('should handle custom keywords by mapping to DONE', async () => {
-      mockPlugin.settings.additionalTaskKeywords = ['REVIEW'];
-      mockEditor.getLine = () => 'REVIEW Test custom task';
+    it('should handle WAIT keyword by cycling to IN-PROGRESS', async () => {
+      mockEditor.getLine = () => 'WAIT Test waiting task';
 
       await editorController.handleUpdateTaskCycleStateAtLine(
         false,
@@ -256,9 +255,10 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
+      // WAIT -> IN-PROGRESS according to CYCLE_TASK_STATE
       expect(
         mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).toHaveBeenCalledWith(expect.anything(), 'DONE', 'editor');
+      ).toHaveBeenCalledWith(expect.anything(), 'IN-PROGRESS', 'editor');
     });
   });
 

@@ -3,9 +3,17 @@ import TodoTracker from '../main';
 import { TaskListView } from '../view/task-list/task-list-view';
 import { LanguageCommentSupportSettings } from '../parser/language-registry';
 import { TaskParser } from '../parser/task-parser';
+import {
+  parseKeywordInput,
+  formatKeywordsForInput,
+} from '../utils/settings-utils';
+import { validateKeywordGroups } from '../utils/task-utils';
 
 export interface TodoTrackerSettings {
-  additionalTaskKeywords: string[]; // capitalised keywords treated as NOT COMPLETED (e.g., FIXME, HACK)
+  additionalTaskKeywords: string[]; // Custom inactive keywords (TODO, LATER, etc.)
+  additionalActiveKeywords: string[]; // Custom active keywords (DOING, NOW, etc.)
+  additionalWaitingKeywords: string[]; // Custom waiting keywords (WAIT, WAITING, etc.)
+  additionalCompletedKeywords: string[]; // Custom completed keywords (DONE, CANCELLED, etc.)
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
   includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
   includeCommentBlocks: boolean; // when true, tasks inside multiline comment blocks ($$) are included
@@ -29,8 +37,10 @@ export interface TodoTrackerSettings {
 }
 
 export const DefaultSettings: TodoTrackerSettings = {
-  // No additional keywords by default; built-in defaults live in task.ts
-  additionalTaskKeywords: [],
+  additionalTaskKeywords: [], // Inactive keywords
+  additionalActiveKeywords: [], // Active keywords
+  additionalWaitingKeywords: [], // Waiting keywords
+  additionalCompletedKeywords: [], // Completed keywords
   includeCodeBlocks: false,
   includeCalloutBlocks: true, // Enabled by default
   includeCommentBlocks: false, // Disabled by default
@@ -48,7 +58,11 @@ export const DefaultSettings: TodoTrackerSettings = {
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
   plugin: TodoTracker;
-  private keywordDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  // Separate debounce timers for each keyword group input
+  private keywordGroupDebounceTimers: Map<
+    string,
+    ReturnType<typeof setTimeout>
+  > = new Map();
   private fileExtensionsDebounceTimer: ReturnType<typeof setTimeout> | null =
     null;
   private readonly KEYWORD_DEBOUNCE_MS = 500;
@@ -193,45 +207,102 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     });
   }
 
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-
-    // Keep these at top level (no grouping)
+  /**
+   * Create the Task Keywords settings section with sub-sections for each group
+   */
+  private createTaskKeywordsSettings(containerEl: HTMLElement): void {
+    // Task Keywords heading
     new Setting(containerEl)
-      .setName('Additional task keywords')
-      .setDesc(
-        'Capitalized list of keywords to treat as tasks (e.g. FIXME, HACK). Leave empty for none.',
-      )
-      .addText((text) => {
-        const current = this.plugin.settings.additionalTaskKeywords ?? [];
-        text.setValue(current.join(', ')).onChange((value) => {
+      .setName('Task keywords')
+      .setHeading()
+      .setDesc('Add custom keywords to extend the built-in task states.');
+
+    // Active keywords sub-section
+    this.createKeywordGroupSetting(
+      containerEl,
+      'additionalActiveKeywords',
+      'Active keywords',
+      'Keywords for tasks currently being worked on (e.g., STARTED). Built-in: DOING, NOW',
+      this.plugin.settings.additionalActiveKeywords,
+    );
+
+    // Inactive keywords sub-section (uses additionalTaskKeywords)
+    this.createKeywordGroupSetting(
+      containerEl,
+      'additionalTaskKeywords',
+      'Inactive keywords',
+      'Keywords for tasks not yet started (e.g., FIXME, HACK). Built-in: TODO, LATER',
+      this.plugin.settings.additionalTaskKeywords,
+    );
+
+    // Waiting keywords sub-section
+    this.createKeywordGroupSetting(
+      containerEl,
+      'additionalWaitingKeywords',
+      'Waiting keywords',
+      'Keywords for blocked or paused tasks (e.g., ON-HOLD). Built-in: WAIT, WAITING',
+      this.plugin.settings.additionalWaitingKeywords,
+    );
+
+    // Completed keywords sub-section
+    this.createKeywordGroupSetting(
+      containerEl,
+      'additionalCompletedKeywords',
+      'Completed keywords',
+      'Keywords for finished or abandoned tasks (e.g., NEVER). Built-in: DONE, CANCELLED',
+      this.plugin.settings.additionalCompletedKeywords,
+    );
+  }
+
+  /**
+   * Create a keyword group setting with validation
+   * Uses flat settings properties: additionalActiveKeywords, additionalTaskKeywords,
+   * additionalWaitingKeywords, additionalCompletedKeywords
+   */
+  private createKeywordGroupSetting(
+    containerEl: HTMLElement,
+    settingKey: keyof Pick<
+      TodoTrackerSettings,
+      | 'additionalActiveKeywords'
+      | 'additionalTaskKeywords'
+      | 'additionalWaitingKeywords'
+      | 'additionalCompletedKeywords'
+    >,
+    name: string,
+    description: string,
+    currentValue: string[],
+  ): void {
+    const setting = new Setting(containerEl).setName(name).setDesc(description);
+
+    setting.addText((text) => {
+      text
+        .setValue(formatKeywordsForInput(currentValue))
+        .setPlaceholder('KEYWORD')
+        .onChange((value) => {
           // Force uppercase in the UI field immediately
           const forced = value.toUpperCase();
           if (forced !== value) {
-            // Update the input control to reflect forced uppercase
             try {
-              // Obsidian's TextComponent exposes a setValue method via the same reference.
               text.setValue(forced);
             } catch {
               // no-op if API surface changes
             }
           }
 
-          // Clear any pending debounce timer
-          if (this.keywordDebounceTimer) {
-            clearTimeout(this.keywordDebounceTimer);
+          // Clear any pending debounce timer for this specific group
+          const existingTimer = this.keywordGroupDebounceTimers.get(settingKey);
+          if (existingTimer) {
+            clearTimeout(existingTimer);
           }
 
           // Debounce the expensive operations
-          this.keywordDebounceTimer = setTimeout(async () => {
-            // Parse CSV, trim, filter non-empty (already uppercased)
-            const parsed = forced
-              .split(',')
-              .map((k) => k.trim())
-              .filter((k) => k.length > 0);
+          const newTimer = setTimeout(async () => {
+            // Clear the timer from the map when it executes
+            this.keywordGroupDebounceTimers.delete(settingKey);
 
-            // Create error display element
+            const parsed = parseKeywordInput(forced);
+
+            // Find the setting container for error display
             const settingContainer = text.inputEl.closest('.setting-item');
             if (!settingContainer) {
               console.error('Could not find setting container');
@@ -244,6 +315,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               console.error('Could not find setting info container');
               return;
             }
+
             // Remove any existing error display
             const existingError = settingContainer.querySelector(
               '.todoseq-setting-item-error',
@@ -253,66 +325,89 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               text.inputEl.classList.remove('todoseq-invalid-input');
             }
 
-            // Filter out invalid keywords and collect errors
+            // Validate keywords for regex safety
             const validKeywords: string[] = [];
             const invalidKeywords: string[] = [];
-            const errorMessages: string[] = [];
 
             for (const keyword of parsed) {
               try {
-                // Test if this single keyword is valid by trying to create a parser with just this keyword
-                // This will throw if the keyword is invalid
                 TaskParser.validateKeywords([keyword]);
                 validKeywords.push(keyword);
-              } catch (error) {
+              } catch {
                 invalidKeywords.push(keyword);
-                errorMessages.push(`"${keyword}": ${error.message}`);
               }
             }
 
-            if (invalidKeywords.length > 0) {
-              // Show error under the field
+            // Check for duplicates across groups
+            // Pass the new validKeywords to the appropriate group being edited
+            const duplicates = validateKeywordGroups(
+              {
+                activeKeywords:
+                  settingKey === 'additionalActiveKeywords'
+                    ? validKeywords
+                    : this.plugin.settings.additionalActiveKeywords,
+                waitingKeywords:
+                  settingKey === 'additionalWaitingKeywords'
+                    ? validKeywords
+                    : this.plugin.settings.additionalWaitingKeywords,
+                completedKeywords:
+                  settingKey === 'additionalCompletedKeywords'
+                    ? validKeywords
+                    : this.plugin.settings.additionalCompletedKeywords,
+              },
+              settingKey === 'additionalTaskKeywords'
+                ? validKeywords
+                : undefined,
+            );
+
+            // Show errors if any
+            if (invalidKeywords.length > 0 || duplicates.length > 0) {
               const errorDiv = document.createElement('div');
               errorDiv.className = 'todoseq-setting-item-error';
-              errorDiv.textContent = `Invalid keyword ${invalidKeywords.join(', ')} will be ignored.`;
-              text.inputEl.classList.add('todoseq-invalid-input');
 
-              // Insert error after the setting description
-              settingInfo.appendChild(errorDiv);
-
-              // Continue with valid keywords only for parsing, but keep original input for editing
-              this.plugin.settings.additionalTaskKeywords = validKeywords;
-              await this.plugin.saveSettings();
-
-              // Always recreate parser and rescan with valid keywords
-              try {
-                await this.plugin.recreateParser();
-                await this.plugin.scanVault();
-                await this.refreshAllTaskListViews();
-                // Force refresh of visible editor decorations to apply new keywords
-                this.plugin.refreshVisibleEditorDecorations();
-                this.plugin.refreshReaderViewFormatter();
-              } catch (parseError) {
-                console.error(
-                  'Failed to recreate parser with valid keywords:',
-                  parseError,
+              const errorMessages: string[] = [];
+              if (invalidKeywords.length > 0) {
+                errorMessages.push(`Invalid: ${invalidKeywords.join(', ')}`);
+              }
+              if (duplicates.length > 0) {
+                errorMessages.push(
+                  `Duplicates across groups: ${duplicates.join(', ')}`,
                 );
               }
-            } else {
-              // All keywords are valid, proceed normally
-              this.plugin.settings.additionalTaskKeywords = parsed;
-              await this.plugin.saveSettings();
-              // Recreate parser according to new settings and rescan
+
+              errorDiv.textContent = errorMessages.join('. ') + '.';
+              text.inputEl.classList.add('todoseq-invalid-input');
+              settingInfo.appendChild(errorDiv);
+            }
+
+            // Update settings with valid keywords
+            this.plugin.settings[settingKey] = validKeywords;
+            await this.plugin.saveSettings();
+
+            // Recreate parser and rescan
+            try {
               await this.plugin.recreateParser();
               await this.plugin.scanVault();
               await this.refreshAllTaskListViews();
-              // Force refresh of visible editor decorations to apply new keywords
               this.plugin.refreshVisibleEditorDecorations();
               this.plugin.refreshReaderViewFormatter();
+            } catch (parseError) {
+              console.error(
+                'Failed to recreate parser with keywords:',
+                parseError,
+              );
             }
           }, this.KEYWORD_DEBOUNCE_MS);
+
+          // Store the timer in the map
+          this.keywordGroupDebounceTimers.set(settingKey, newTimer);
         });
-      });
+    });
+  }
+
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
 
     // Format task keywords in editor
     new Setting(containerEl)
@@ -331,8 +426,14 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
+    // Task Keywords section with sub-sections for each group
+    this.createTaskKeywordsSettings(containerEl);
+
     // Task detection Group
-    new Setting(containerEl).setName('Task detection').setHeading();
+    new Setting(containerEl)
+      .setName('Task detection')
+      .setHeading()
+      .setDesc('Select where task are detected in the vault content.');
 
     // Include tasks inside code blocks (parent setting)
     let languageToggleComponent: ToggleComponent | null = null;
@@ -458,11 +559,29 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     // Task list search and filter Group
     new Setting(containerEl)
       .setName('Task list search and filter')
-      .setHeading();
+      .setHeading()
+      .setDesc(
+        'Set the default search and filter settings for the task list view.',
+      );
+
+    new Setting(containerEl)
+      .setName('Week starts on')
+      .setDesc('Choose which day the week starts on for date filtering.')
+      .addDropdown((drop) => {
+        drop.addOption('Monday', 'Monday');
+        drop.addOption('Sunday', 'Sunday');
+        drop.setValue(this.plugin.settings.weekStartsOn);
+        drop.onChange(async (value: string) => {
+          const weekStart = value as 'Monday' | 'Sunday';
+          this.plugin.settings.weekStartsOn = weekStart;
+          await this.plugin.saveSettings();
+          await this.refreshAllTaskListViews();
+        });
+      });
 
     new Setting(containerEl)
       .setName('Completed tasks')
-      .setDesc('Choose how completed items are shown in the task view.')
+      .setDesc('Choose how completed items are shown in the task list.')
       .addDropdown((drop) => {
         drop.addOption('showAll', 'Show all tasks');
         drop.addOption('sortCompletedLast', 'Sort completed to end');
@@ -481,7 +600,9 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Future dated tasks')
-      .setDesc('Chooose how tasks with future dates are displayed')
+      .setDesc(
+        'Chooose how tasks with future dates are displayed in the task list.',
+      )
       .addDropdown((drop) => {
         drop.addOption('showAll', 'Show all tasks');
         drop.addOption('showUpcoming', 'Show upcoming (7 days)');
@@ -501,23 +622,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Week starts on')
-      .setDesc('Choose which day the week starts on for date filtering.')
-      .addDropdown((drop) => {
-        drop.addOption('Monday', 'Monday');
-        drop.addOption('Sunday', 'Sunday');
-        drop.setValue(this.plugin.settings.weekStartsOn);
-        drop.onChange(async (value: string) => {
-          const weekStart = value as 'Monday' | 'Sunday';
-          this.plugin.settings.weekStartsOn = weekStart;
-          await this.plugin.saveSettings();
-          await this.refreshAllTaskListViews();
-        });
-      });
-
-    new Setting(containerEl)
       .setName('Default sort method')
-      .setDesc('Choose the default sort method for the task list view.')
+      .setDesc('Choose the default sort method for the task list.')
       .addDropdown((drop) => {
         drop.addOption('default', 'Default (file path)');
         drop.addOption('sortByScheduled', 'Scheduled date');

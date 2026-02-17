@@ -12,10 +12,10 @@ The urgency score considers various aspects of your tasks:
 - **Priority**: High priority tasks (`[#A]`) are more urgent than medium (`[#B]`) or low (`[#C]`) priority tasks
 - **Scheduled dates**: Tasks with scheduled dates are more urgent than those without
 - **Deadlines**: Tasks with deadline dates are more urgent than those without
-- **Active state**: Tasks that are currently being worked on (DOING, NOW, IN-PROGRESS) are more urgent
+- **Active state**: Tasks that are currently being worked on (DOING, NOW, IN-PROGRESS, or custom active keywords) are more urgent
 - **Task age**: Older tasks in daily note pages gain urgency over time using a linear scale (0.0 to 1.0) based on days since creation, with a maximum of 365 days
 - **Tags**: Tasks with tags receive a small urgency boost based on the number of tags (0.8 for 1 tag, 0.9 for 2 tags, 1.0 for 3+ tags)
-- **Waiting state**: Tasks in WAIT or WAITING states have reduced urgency
+- **Waiting state**: Tasks in WAIT, WAITING, or custom waiting keywords have reduced urgency
 
 ## How Urgency is Calculated
 
@@ -39,10 +39,10 @@ urgency.priority.medium.coefficient = 3.9  # priority is medium [#B]
 urgency.priority.low.coefficient = 1.8     # priority is low [#C]
 urgency.scheduled.coefficient = 5.0        # task has a scheduled date that is today or in the past
 urgency.deadline.coefficient = 12.0        # deadline date is upcoming (+14 days) due (today) or overdue (-7 days)
-urgency.active.coefficient = 4.0           # state is either DOING, NOW, or IN-PROGRESS
+urgency.active.coefficient = 4.0           # state is an active keyword (DOING, NOW, IN-PROGRESS, or custom active keywords)
 urgency.age.coefficient = 2.0              # if the page is a daily notes page, weight tasks on older pages higher
 urgency.tags.coefficient = 1.0             # the task has one or more tags (multiplied by tag factor)
-urgency.waiting.coefficient = -3.0         # the task is in a WAIT or WAITING state
+urgency.waiting.coefficient = -3.0         # the task is in a waiting keyword state (WAIT, WAITING, or custom waiting keywords)
 ```
 
 The highest coefficient (12.0) is assigned to deadline dates, meaning tasks with deadlines will always appear near the top of your urgency-sorted list. High priority tasks come next with a coefficient of 6.0, while waiting tasks actually reduce urgency with a negative coefficient (-3.0).

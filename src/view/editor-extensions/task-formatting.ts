@@ -20,7 +20,7 @@ import {
   LanguageDefinition,
 } from '../../parser/language-registry';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
-import { DEFAULT_COMPLETED_STATES } from '../../types/task';
+import { isCompletedKeyword as isCompletedKeywordUtil } from '../../utils/task-utils';
 
 /**
  * Priority type definition
@@ -359,8 +359,13 @@ export class TaskKeywordDecorator {
           const startPos = line.from + keywordStart;
           const endPos = line.from + keywordEnd;
 
-          // Determine which CSS classes to apply based on context and settings
+          // All keywords use the same styling - no group-based CSS classes
           let cssClasses = 'todoseq-keyword-formatted';
+
+          // Add completed keyword class for strikethrough styling on the keyword itself
+          if (isCompletedKeywordUtil(keyword, this.settings)) {
+            cssClasses += ' todoseq-completed-keyword';
+          }
 
           if (this.inCodeBlock && this.settings.includeCodeBlocks) {
             cssClasses += ' code-block-task-keyword';
@@ -403,7 +408,7 @@ export class TaskKeywordDecorator {
           );
 
           // Add separate span for task text in completed tasks
-          if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+          if (isCompletedKeywordUtil(keyword, this.settings)) {
             // Calculate task text position (text after keyword)
             const taskTextStart = line.from + keywordEnd;
             const taskTextEnd = line.to; // End of line

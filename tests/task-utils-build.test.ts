@@ -75,7 +75,6 @@ describe('task-utils - buildTaskKeywords', () => {
         expect.arrayContaining([
           'TODO',
           'DOING',
-          'LATER',
           'DONE',
           'CANCELED',
           'CANCELLED',
@@ -89,7 +88,7 @@ describe('task-utils - buildTaskKeywords', () => {
       const result = buildTaskKeywords(['CUSTOM']);
 
       expect(result.nonCompletedKeywords).toEqual(
-        expect.arrayContaining(['TODO', 'DOING', 'LATER', 'CUSTOM']),
+        expect.arrayContaining(['TODO', 'DOING', 'CUSTOM']),
       );
       expect(result.nonCompletedKeywords).not.toEqual(
         expect.arrayContaining(['DONE', 'CANCELED', 'CANCELLED']),
