@@ -65,6 +65,12 @@ export class TaskUpdateCoordinator {
       this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
     }
 
+    // 5. Refresh editor decorations to update keyword styling in open editors
+    // This ensures the keyword span is properly updated with the new state
+    if (this.plugin.refreshVisibleEditorDecorations) {
+      this.plugin.refreshVisibleEditorDecorations();
+    }
+
     return updatedTask;
   }
 

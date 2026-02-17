@@ -23,8 +23,18 @@ export class StatusBarManager {
     }
 
     // Subscribe to TaskStateManager for task changes
+    // Use debouncing to prevent excessive updates during rapid changes
+    let statusBarTimeout: ReturnType<typeof setTimeout> | null = null;
+    const STATUS_BAR_DEBOUNCE_MS = 150;
+
     this.plugin.taskStateManager.subscribe((tasks: Task[]) => {
-      this.updateStatusBarItem(tasks);
+      if (statusBarTimeout) {
+        clearTimeout(statusBarTimeout);
+      }
+      statusBarTimeout = setTimeout(() => {
+        statusBarTimeout = null;
+        this.updateStatusBarItem(tasks);
+      }, STATUS_BAR_DEBOUNCE_MS);
     });
 
     // Update status bar item when active file changes

@@ -20,6 +20,7 @@
     "obsidian": ">=0.12.12",
     "prettier": "^3.7.4",
     "ts-jest": "^29.4.5",
+    "ts-node": "^10.9.2",
     "tslib": "2.4.0",
     "typescript": "4.7.4",
     "vitepress": "^1.6.4"
@@ -36,7 +37,8 @@
     "lint": "eslint . --ext .ts",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "generate-content": "ts-node scripts/content-generator.ts"
   },
   "dependencies": {
     "obsidian-daily-notes-interface": "^0.9.4"

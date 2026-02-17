@@ -28,9 +28,19 @@ export class TodoseqCodeBlockProcessor {
 
     // Subscribe to task state changes from the centralized state manager
     // This ensures embedded lists refresh when tasks are updated, added, or removed
+    // Use debouncing to prevent excessive re-renders during rapid changes
+    let embedRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    const EMBED_REFRESH_DEBOUNCE_MS = 150;
+
     this.unsubscribeFromStateManager = plugin.taskStateManager.subscribe(
       (tasks) => {
-        this.onTasksChanged();
+        if (embedRefreshTimeout) {
+          clearTimeout(embedRefreshTimeout);
+        }
+        embedRefreshTimeout = setTimeout(() => {
+          embedRefreshTimeout = null;
+          this.onTasksChanged();
+        }, EMBED_REFRESH_DEBOUNCE_MS);
       },
     );
   }

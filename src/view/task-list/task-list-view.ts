@@ -57,6 +57,9 @@ export class TaskListView extends ItemView {
   private taskListContainer: HTMLElement | null = null;
   private ariaLiveRegion: HTMLElement | null = null;
   private unsubscribeFromStateManager: (() => void) | null = null;
+  private cachedVisibleTasks: Task[] = [];
+  private wasPanelVisible = false;
+  private resizeObserver: ResizeObserver | null = null;
 
   // Search history debounce mechanism
   private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
@@ -75,16 +78,54 @@ export class TaskListView extends ItemView {
     this.defaultSortMethod = settings.defaultSortMethod;
 
     // Subscribe to task changes from the centralized state manager
+    // Use debouncing to prevent excessive re-renders during rapid changes (like typing)
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    const REFRESH_DEBOUNCE_MS = 150;
+
     this.unsubscribeFromStateManager = taskStateManager.subscribe((tasks) => {
       this.tasks = tasks;
-      // Always update the tasks reference and refresh the view
+      // Always update the tasks reference
       this.updateTasks(tasks);
+
       // Only refresh if the view is already open (has contentEl)
       if (this.contentEl && this.taskListContainer) {
-        // Use requestAnimationFrame for immediate visual update
-        requestAnimationFrame(async () => {
+        // Check if we should skip this refresh (smart refresh)
+        // Skip if panel is collapsed OR (no search AND active file not in view)
+
+        // Check if panel is visible (has dimensions)
+        const rect = this.contentEl.getBoundingClientRect();
+        const isPanelVisible = rect.width > 0 && rect.height > 0;
+
+        if (!isPanelVisible) {
+          // Panel is collapsed - skip refresh
+          return;
+        }
+
+        // Check if refresh is needed
+        const hasSearch = this.getSearchQuery().trim().length > 0;
+        const activeFile = this.app.workspace.getActiveFile();
+        const activePath = activeFile?.path;
+
+        // Check if active file has tasks in current cached view
+        const activeFileInView =
+          activePath &&
+          this.cachedVisibleTasks.some((t) => t.path === activePath);
+
+        // Only refresh if:
+        // - Search is active (need to show results)
+        // - OR active file's tasks are in current view
+        if (!hasSearch && !activeFileInView) {
+          return; // Skip expensive refresh
+        }
+
+        // Clear any pending refresh and schedule a new one
+        if (refreshTimeout) {
+          clearTimeout(refreshTimeout);
+        }
+        refreshTimeout = setTimeout(async () => {
+          refreshTimeout = null;
           await this.refreshVisibleList();
-        });
+        }, REFRESH_DEBOUNCE_MS);
       }
     });
   }
@@ -1226,6 +1267,9 @@ export class TaskListView extends ItemView {
   async refreshVisibleList(): Promise<void> {
     const container = this.contentEl;
 
+    // Yield to main thread to prevent blocking user typing
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
     // Sync dropdown with current sort method
     const sortDropdown = container.querySelector(
       '.sort-dropdown select',
@@ -1419,6 +1463,9 @@ export class TaskListView extends ItemView {
         list.appendChild(li);
       }
     }
+
+    // Cache visible tasks for smart refresh
+    this.cachedVisibleTasks = visible;
   }
 
   // Obsidian lifecycle methods for view open: keyed, minimal render
@@ -1450,6 +1497,9 @@ export class TaskListView extends ItemView {
 
     // Initial list render (preserves focus since toolbar/input already exists)
     await this.refreshVisibleList();
+
+    // Set up ResizeObserver to detect when panel becomes visible from collapsed
+    this.setupVisibilityObserver();
 
     // Keyboard shortcuts: Slash to focus search, Esc to clear
     const input: HTMLInputElement | null = this.searchInputEl ?? null;
@@ -1877,8 +1927,41 @@ export class TaskListView extends ItemView {
       this.unsubscribeFromStateManager = null;
     }
 
+    // Cleanup ResizeObserver
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+
     this.searchInputEl = null;
     this.taskListContainer = null;
     await super.onClose?.();
+  }
+
+  /**
+   * Set up ResizeObserver to detect when panel becomes visible from collapsed
+   */
+  private setupVisibilityObserver(): void {
+    if (!this.contentEl) return;
+
+    // Initialize visibility state
+    const rect = this.contentEl.getBoundingClientRect();
+    this.wasPanelVisible = rect.width > 0 && rect.height > 0;
+
+    this.resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        const isNowVisible = width > 0 && height > 0;
+
+        // Panel went from hidden to visible - refresh the list
+        if (isNowVisible && !this.wasPanelVisible) {
+          this.refreshVisibleList();
+        }
+
+        this.wasPanelVisible = isNowVisible;
+      }
+    });
+
+    this.resizeObserver.observe(this.contentEl);
   }
 }

@@ -53,3 +53,4 @@ docs/.vitepress/cache
 CLAUDE.md
 .claude/
 .obsidian/themes/
+examples/Test Performance/*

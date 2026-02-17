@@ -31,6 +31,8 @@ export class VaultScanner {
   > = new Map();
   private urgencyCoefficients!: UrgencyCoefficients;
   private regexCache = new RegexCache();
+  private fileChangeTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly FILE_CHANGE_DEBOUNCE_MS = 300;
 
   constructor(
     private app: App,
@@ -279,19 +281,38 @@ export class VaultScanner {
    * - Uses getAbstractFileByPath() for direct file lookup (better performance than iteration)
    * - Filters by file extension to only process .md files (avoids unnecessary processing)
    * - Checks file existence before operations to handle delete events safely
+   * - Debounces rapid changes to the same file to prevent excessive processing
    *
    * @param file The file that changed
    */
-  async handleFileChange(file: TAbstractFile): Promise<void> {
-    try {
-      // Only process Markdown files that are not excluded
-      if (
-        !(file instanceof TFile) ||
-        file.extension !== 'md' ||
-        this.isExcluded(file.path)
-      )
-        return;
+  handleFileChange(file: TAbstractFile): void {
+    // Only process Markdown files that are not excluded
+    if (
+      !(file instanceof TFile) ||
+      file.extension !== 'md' ||
+      this.isExcluded(file.path)
+    )
+      return;
 
+    // Clear any existing timeout for this file and schedule a new one
+    const existingTimeout = this.fileChangeTimeouts.get(file.path);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      this.fileChangeTimeouts.delete(file.path);
+      this.processFileChange(file as TFile);
+    }, this.FILE_CHANGE_DEBOUNCE_MS);
+
+    this.fileChangeTimeouts.set(file.path, timeout);
+  }
+
+  /**
+   * Process a file change after debouncing
+   */
+  private async processFileChange(file: TFile): Promise<void> {
+    try {
       // Get current tasks and remove existing tasks for this file
       const currentTasks = this.taskStateManager.getTasks();
       const updatedTasks = currentTasks.filter(
