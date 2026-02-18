@@ -5,8 +5,45 @@ import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings';
 
 export class Search {
+  // Cache for parsed search query ASTs
+  private static astCache = new Map<string, SearchNode>();
+  private static readonly AST_CACHE_MAX_SIZE = 50;
+
   static parse(query: string): SearchNode {
     return SearchParser.parse(query);
+  }
+
+  /**
+   * Get cached AST or parse and cache it
+   */
+  private static getCachedAst(query: string): SearchNode {
+    const cached = this.astCache.get(query);
+    if (cached) {
+      return cached;
+    }
+
+    // Parse and cache
+    const ast = this.parse(query);
+
+    // Prevent unbounded cache growth
+    if (this.astCache.size >= this.AST_CACHE_MAX_SIZE) {
+      // Clear oldest entry (first key in map)
+      const iterator = this.astCache.keys();
+      const firstResult = iterator.next();
+      if (!firstResult.done && firstResult.value) {
+        this.astCache.delete(firstResult.value);
+      }
+    }
+
+    this.astCache.set(query, ast);
+    return ast;
+  }
+
+  /**
+   * Clear the AST cache
+   */
+  static clearCache(): void {
+    this.astCache.clear();
   }
 
   static async evaluate(
@@ -16,7 +53,7 @@ export class Search {
     settings?: TodoTrackerSettings,
   ): Promise<boolean> {
     try {
-      const ast = this.parse(query);
+      const ast = this.getCachedAst(query);
       return await SearchEvaluator.evaluate(ast, task, caseSensitive, settings);
     } catch (error) {
       if (error instanceof SearchError) {

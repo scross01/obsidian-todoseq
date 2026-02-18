@@ -165,6 +165,9 @@ export class TaskListView extends ItemView {
   private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
     null;
   private readonly SEARCH_HISTORY_DEBOUNCE_MS = 3000; // 3 seconds idle timeout
+  private searchRefreshDebounceTimer: ReturnType<typeof setTimeout> | null =
+    null;
+  private readonly SEARCH_REFRESH_DEBOUNCE_MS = 200; // 200ms debounce for search refresh
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -414,11 +417,18 @@ export class TaskListView extends ItemView {
     }
     inputEl.value = this.getSearchQuery();
     inputEl.addEventListener('input', async () => {
-      // Update attribute and re-render list only, preserving focus
-      this.setSearchQuery(inputEl.value);
-      await this.refreshVisibleList();
-      // Start debounce timer for history capture
-      this.handleSearchHistoryDebounce(inputEl.value);
+      // Debounce search refresh to avoid excessive re-renders
+      if (this.searchRefreshDebounceTimer) {
+        clearTimeout(this.searchRefreshDebounceTimer);
+      }
+      this.searchRefreshDebounceTimer = setTimeout(async () => {
+        this.searchRefreshDebounceTimer = null;
+        // Update attribute and re-render list only, preserving focus
+        this.setSearchQuery(inputEl.value);
+        await this.refreshVisibleList();
+        // Start debounce timer for history capture
+        this.handleSearchHistoryDebounce(inputEl.value);
+      }, this.SEARCH_REFRESH_DEBOUNCE_MS);
     });
 
     // Capture search on Enter key (immediate) - only when both dropdowns are closed
