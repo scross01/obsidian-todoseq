@@ -27,6 +27,9 @@ export class EventCoordinator {
   private readonly FILE_DEBOUNCE_MS = 250;
   private readonly BATCH_DELAY_MS = 0;
 
+  // External callbacks for file change notifications (e.g., embedded task lists)
+  private fileChangeCallbacks: ((event: FileChangeEvent) => void)[] = [];
+
   private pendingEvents = new Map<string, FileChangeEvent>();
   private batchTimeout: ReturnType<typeof setTimeout> | null = null;
   private fileChangeTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
@@ -72,6 +75,15 @@ export class EventCoordinator {
 
   setPropertySearchEngine(engine: PropertySearchEngine): void {
     this.propertySearchEngine = engine;
+  }
+
+  /**
+   * Register a callback for file change notifications.
+   * This is used by components like EmbeddedTaskListEventHandler
+   * to receive file change notifications without their own vault listeners.
+   */
+  onFileChange(callback: (event: FileChangeEvent) => void): void {
+    this.fileChangeCallbacks.push(callback);
   }
 
   private registerVaultListeners(): void {
@@ -188,6 +200,15 @@ export class EventCoordinator {
     }
 
     this.emit('batch-complete', events);
+
+    // Notify external callbacks (e.g., embedded task lists)
+    for (const callback of this.fileChangeCallbacks) {
+      try {
+        callback(events[events.length - 1]); // Pass the most recent event
+      } catch (error) {
+        console.error('Error in EventCoordinator file change callback:', error);
+      }
+    }
 
     this.isProcessing = false;
   }

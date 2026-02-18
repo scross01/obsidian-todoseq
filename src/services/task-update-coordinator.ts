@@ -1,6 +1,7 @@
 import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
+import { TFile } from 'obsidian';
 
 /**
  * TaskUpdateCoordinator provides a centralized way to handle all task state updates
@@ -47,8 +48,8 @@ export class TaskUpdateCoordinator {
       );
       // Rollback: re-read the file to restore state
       const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
-      if (file) {
-        await this.plugin.vaultScanner?.handleFileChange(file);
+      if (file instanceof TFile) {
+        await this.plugin.vaultScanner?.processIncrementalChange(file);
       }
       throw error;
     }

@@ -43,6 +43,21 @@ export class TodoseqCodeBlockProcessor {
         }, EMBED_REFRESH_DEBOUNCE_MS);
       },
     );
+
+    // Register with EventCoordinator for file-level notifications
+    // This consolidates debouncing - EventCoordinator handles debounce (250ms)
+    // so we don't need separate debounce in eventHandler
+    if (plugin.eventCoordinator) {
+      plugin.eventCoordinator.onFileChange((event) => {
+        // Handle file deletion/rename cleanup for embedded lists
+        if (event.type === 'delete') {
+          this.eventHandler.handleFileDeleted(event.file.path);
+        } else if (event.type === 'rename' && event.oldPath) {
+          this.eventHandler.handleFileRenamed(event.oldPath, event.file.path);
+        }
+        // For modify/create, the TaskStateManager subscription will handle refresh
+      });
+    }
   }
 
   /**

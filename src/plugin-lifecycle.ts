@@ -10,7 +10,7 @@ import {
 import { TodoTrackerSettingTab } from './settings/settings';
 import { TaskParser } from './parser/task-parser';
 import { TASK_VIEW_ICON } from './main';
-import { Editor, MarkdownView, TFile, Platform } from 'obsidian';
+import { Editor, MarkdownView, Platform } from 'obsidian';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
 import { PropertySearchEngine } from './services/property-search-engine';
@@ -58,6 +58,9 @@ export class PluginLifecycleManager {
       this.plugin.propertySearchEngine,
     );
     this.eventCoordinator.initialize();
+
+    // Expose EventCoordinator on plugin for other components
+    this.plugin.eventCoordinator = this.eventCoordinator;
 
     this.plugin.taskEditor = new TaskWriter(this.plugin.app);
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
@@ -388,13 +391,6 @@ export class PluginLifecycleManager {
    */
   private async saveSettings(): Promise<void> {
     await this.plugin.saveSettings();
-  }
-
-  /**
-   * Handle file metadata changes
-   */
-  private handleMetadataChange(file: TFile): void {
-    this.plugin.vaultScanner?.handleFileChange(file);
   }
 
   /**

@@ -16,6 +16,7 @@ import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-
 import { TaskStateManager } from './services/task-state-manager';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import { PropertySearchEngine } from './services/property-search-engine';
+import { EventCoordinator } from './services/event-coordinator';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -46,6 +47,9 @@ export default class TodoTracker extends Plugin {
 
   // Property search engine
   public propertySearchEngine: PropertySearchEngine | null = null;
+
+  // Event coordinator for unified vault event handling
+  public eventCoordinator: EventCoordinator | null = null;
 
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {

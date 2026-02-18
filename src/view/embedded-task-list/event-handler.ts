@@ -25,10 +25,6 @@ export class EmbeddedTaskListEventHandler {
     }
   > = new Map();
 
-  // Debounce timers for file changes
-  private refreshTimeouts: Map<string, NodeJS.Timeout> = new Map();
-  private readonly DEBOUNCE_MS = 300;
-
   constructor(
     plugin: TodoTracker,
     renderer: EmbeddedTaskListRenderer,
@@ -40,54 +36,12 @@ export class EmbeddedTaskListEventHandler {
   }
 
   /**
-   * Register all event listeners
+   * Register event listeners
+   * Note: Vault events (modify, create, delete, rename) are now handled via EventCoordinator
+   * to avoid redundant debouncing. Task changes are handled via TaskStateManager subscription.
+   * We only keep file-open here for when users switch between files.
    */
   registerEventListeners(): void {
-    // File modification events
-    this.plugin.registerEvent(
-      this.plugin.app.vault.on('modify', (file) => {
-        if (file instanceof TFile && file.extension === 'md') {
-          this.handleFileModified(file.path);
-        }
-      }),
-    );
-
-    // File creation events
-    this.plugin.registerEvent(
-      this.plugin.app.vault.on('create', (file) => {
-        if (file instanceof TFile && file.extension === 'md') {
-          this.handleFileCreated(file.path);
-        }
-      }),
-    );
-
-    // File deletion events
-    this.plugin.registerEvent(
-      this.plugin.app.vault.on('delete', (file) => {
-        if (file instanceof TFile && file.extension === 'md') {
-          this.handleFileDeleted(file.path);
-        }
-      }),
-    );
-
-    // File rename events
-    this.plugin.registerEvent(
-      this.plugin.app.vault.on('rename', (file, oldPath) => {
-        if (file instanceof TFile && file.extension === 'md') {
-          this.handleFileRenamed(oldPath, file.path);
-        }
-      }),
-    );
-
-    // Metadata cache events (for task changes)
-    this.plugin.registerEvent(
-      this.plugin.app.metadataCache.on('changed', (file) => {
-        if (file instanceof TFile) {
-          this.handleMetadataChanged(file.path);
-        }
-      }),
-    );
-
     // Workspace events for file opening
     this.plugin.registerEvent(
       this.plugin.app.workspace.on('file-open', (file) => {
@@ -155,28 +109,10 @@ export class EmbeddedTaskListEventHandler {
   }
 
   /**
-   * Handle file modification event
-   * @param filePath Path of the modified file
-   */
-  private handleFileModified(filePath: string): void {
-    // Debounce rapid file changes
-    this.debounceRefresh(filePath);
-  }
-
-  /**
-   * Handle file creation event
-   * @param filePath Path of the created file
-   */
-  private handleFileCreated(filePath: string): void {
-    // New file might contain tasks, refresh all code blocks
-    this.refreshAllCodeBlocks();
-  }
-
-  /**
-   * Handle file deletion event
+   * Handle file deletion event - called from EventCoordinator via code-block-processor
    * @param filePath Path of the deleted file
    */
-  private handleFileDeleted(filePath: string): void {
+  public handleFileDeleted(filePath: string): void {
     // Remove code blocks from deleted files
     this.activeCodeBlocks.forEach((codeBlock, containerId) => {
       if (codeBlock.filePath === filePath) {
@@ -190,10 +126,10 @@ export class EmbeddedTaskListEventHandler {
 
   /**
    * Handle file rename event
-   * @param oldPath Old file path
-   * @param newPath New file path
+   * @param oldPath Previous path of the renamed file
+   * @param newPath New path of the renamed file
    */
-  private handleFileRenamed(oldPath: string, newPath: string): void {
+  public handleFileRenamed(oldPath: string, newPath: string): void {
     // Update tracked code blocks with new path
     this.activeCodeBlocks.forEach((codeBlock, containerId) => {
       if (codeBlock.filePath === oldPath) {
@@ -206,59 +142,12 @@ export class EmbeddedTaskListEventHandler {
   }
 
   /**
-   * Handle metadata cache change event
-   * @param filePath Path of the file with changed metadata
-   */
-  private handleMetadataChanged(filePath: string): void {
-    // Metadata changes often indicate task state changes
-    this.debounceRefresh(filePath);
-  }
-
-  /**
    * Handle file opened event
    * @param filePath Path of the opened file
    */
   private handleFileOpened(filePath: string): void {
     // Refresh code blocks in the newly opened file
     this.refreshCodeBlocksInFile(filePath);
-  }
-
-  /**
-   * Debounce refresh for a specific file
-   * @param filePath Path of the file that changed
-   */
-  private debounceRefresh(filePath: string): void {
-    // Clear existing timeout for this file
-    if (this.refreshTimeouts.has(filePath)) {
-      clearTimeout(this.refreshTimeouts.get(filePath));
-    }
-
-    // Set new timeout
-    this.refreshTimeouts.set(
-      filePath,
-      setTimeout(() => {
-        this.refreshAffectedCodeBlocks(filePath);
-        this.refreshTimeouts.delete(filePath);
-      }, this.DEBOUNCE_MS),
-    );
-  }
-
-  /**
-   * Refresh code blocks that might be affected by changes to a specific file
-   * @param changedFilePath Path of the file that changed
-   */
-  private refreshAffectedCodeBlocks(changedFilePath: string): void {
-    this.activeCodeBlocks.forEach((codeBlock, containerId) => {
-      // Check if this code block's query might include tasks from the changed file
-      if (
-        TodoseqCodeBlockParser.mightAffectCodeBlock(
-          codeBlock.source,
-          changedFilePath,
-        )
-      ) {
-        this.refreshCodeBlock(containerId);
-      }
-    });
   }
 
   /**
@@ -338,8 +227,6 @@ export class EmbeddedTaskListEventHandler {
    */
   clearAllCodeBlocks(): void {
     this.activeCodeBlocks.clear();
-    this.refreshTimeouts.forEach((timeout) => clearTimeout(timeout));
-    this.refreshTimeouts.clear();
   }
 
   /**
