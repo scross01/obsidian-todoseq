@@ -24,7 +24,6 @@ export interface VaultScannerEvents {
 export class VaultScanner {
   private _isScanning = false;
   private _isInitializing = true; // Track Obsidian initialization state
-  private _propertySearchHandlersRegistered = false; // Track if property search handlers are already registered
   private eventListeners: Map<
     keyof VaultScannerEvents,
     ((...args: unknown[]) => void)[]
@@ -32,7 +31,7 @@ export class VaultScanner {
   private urgencyCoefficients!: UrgencyCoefficients;
   private regexCache = new RegexCache();
   private fileChangeTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly FILE_CHANGE_DEBOUNCE_MS = 300;
+  private readonly FILE_CHANGE_DEBOUNCE_MS = 500;
 
   constructor(
     private app: App,
@@ -79,38 +78,9 @@ export class VaultScanner {
     }
   }
 
-  /**
-   * Register file change handlers for property search engine
-   */
-  private registerPropertySearchHandlers(): void {
-    if (!this.propertySearchEngine) return;
-
-    // Prevent duplicate listener registration
-    if (this._propertySearchHandlersRegistered) {
-      return;
-    }
-
-    // Register handlers for vault events
-    this.app.vault.on('rename', (file, oldPath) => {
-      if (file instanceof TFile && this.propertySearchEngine) {
-        this.propertySearchEngine.onFileRenamed(file, oldPath);
-      }
-    });
-
-    this.app.vault.on('delete', (file) => {
-      if (file instanceof TFile && this.propertySearchEngine) {
-        this.propertySearchEngine.onFileDeleted(file);
-      }
-    });
-
-    // Only register metadata cache change handler - this is sufficient for all file content changes
-    this.app.metadataCache.on('changed', (file) => {
-      if (file instanceof TFile && this.propertySearchEngine) {
-        this.propertySearchEngine.onFileChanged(file);
-      }
-    });
-
-    this._propertySearchHandlersRegistered = true;
+  // Set property search engine (called by EventCoordinator)
+  setPropertySearchEngine(propertySearchEngine: PropertySearchEngine): void {
+    this.propertySearchEngine = propertySearchEngine;
   }
 
   // Event management methods
@@ -359,12 +329,6 @@ export class VaultScanner {
         updatedTasks.push(...fileTasks);
       }
 
-      // If the file still exists (it should after rename), scan it at its new location
-      if (file instanceof TFile) {
-        const fileTasks = await this.scanFile(file);
-        updatedTasks.push(...fileTasks);
-      }
-
       // Keep sorted state
       updatedTasks.sort(taskComparator);
 
@@ -450,17 +414,84 @@ export class VaultScanner {
     this.parser = newParser;
   }
 
+  // Process incremental file change (called by EventCoordinator)
+  async processIncrementalChange(file: TFile): Promise<void> {
+    if (this.isExcluded(file.path)) {
+      return;
+    }
+
+    try {
+      const currentTasks = this.taskStateManager.getTasks();
+      const updatedTasks = currentTasks.filter(
+        (task) => task.path !== file.path,
+      );
+
+      const fileTasks = await this.scanFile(file);
+      updatedTasks.push(...fileTasks);
+
+      updatedTasks.sort(taskComparator);
+
+      this.taskStateManager.setTasks(updatedTasks);
+
+      this.emit('tasks-changed', updatedTasks);
+    } catch (err) {
+      console.error('VaultScanner processIncrementalChange error', err);
+      this.emit(
+        'scan-error',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+    }
+  }
+
+  // Process file deletion (called by EventCoordinator)
+  async processFileDelete(file: TFile): Promise<void> {
+    try {
+      const currentTasks = this.taskStateManager.getTasks();
+      const updatedTasks = currentTasks.filter(
+        (task) => task.path !== file.path,
+      );
+
+      updatedTasks.sort(taskComparator);
+      this.taskStateManager.setTasks(updatedTasks);
+      this.emit('tasks-changed', updatedTasks);
+    } catch (err) {
+      console.error('VaultScanner processFileDelete error', err);
+      this.emit(
+        'scan-error',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+    }
+  }
+
+  // Process file rename (called by EventCoordinator)
+  async processFileRename(file: TFile, oldPath: string): Promise<void> {
+    try {
+      const currentTasks = this.taskStateManager.getTasks();
+
+      const updatedTasks = currentTasks.filter((t) => t.path !== oldPath);
+
+      if (!this.isExcluded(file.path)) {
+        const fileTasks = await this.scanFile(file);
+        updatedTasks.push(...fileTasks);
+      }
+
+      updatedTasks.sort(taskComparator);
+      this.taskStateManager.setTasks(updatedTasks);
+      this.emit('tasks-changed', updatedTasks);
+    } catch (err) {
+      console.error('VaultScanner processFileRename error', err);
+      this.emit(
+        'scan-error',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+    }
+  }
+
   // Utility method to yield to event loop
   private async yieldToEventLoop(): Promise<void> {
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => resolve()),
     );
-  }
-
-  // Set property search engine and register handlers (can be called after initialization)
-  setPropertySearchEngine(propertySearchEngine: PropertySearchEngine): void {
-    this.propertySearchEngine = propertySearchEngine;
-    this.registerPropertySearchHandlers();
   }
 
   // Clean up resources

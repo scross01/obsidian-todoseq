@@ -31,6 +31,102 @@ import { getPluginSettings } from '../../utils/settings-utils';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TAG_PATTERN } from '../../utils/patterns';
 
+const CHUNK_BATCH_SIZE = 40;
+
+interface CachedTaskElement {
+  element: HTMLLIElement;
+  task: Task;
+  height: number;
+}
+
+class TaskElementCache {
+  private cache = new Map<string, CachedTaskElement>();
+
+  private getKey(task: Task): string {
+    return `${task.path}:${task.line}`;
+  }
+
+  get(task: Task): HTMLLIElement | null {
+    const cached = this.cache.get(this.getKey(task));
+    return cached?.element ?? null;
+  }
+
+  set(task: Task, element: HTMLLIElement): void {
+    const height = element.getBoundingClientRect().height;
+    this.cache.set(this.getKey(task), { element, task, height });
+  }
+
+  invalidate(task: Task): void {
+    this.cache.delete(this.getKey(task));
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  has(task: Task): boolean {
+    return this.cache.has(this.getKey(task));
+  }
+}
+
+class ChunkedRenderQueue {
+  private pending: Task[] = [];
+  private isProcessing = false;
+  private renderFn: ((task: Task) => HTMLLIElement) | null = null;
+  private container: Element | null = null;
+  private cache: TaskElementCache;
+
+  constructor(cache: TaskElementCache) {
+    this.cache = cache;
+  }
+
+  async enqueue(
+    tasks: Task[],
+    renderFn: (task: Task) => HTMLLIElement,
+    container: Element,
+  ): Promise<void> {
+    this.renderFn = renderFn;
+    this.container = container;
+    this.pending.push(...tasks);
+
+    if (!this.isProcessing) {
+      this.isProcessing = true;
+      await this.processQueue();
+    }
+  }
+
+  private async processQueue(): Promise<void> {
+    const renderFn = this.renderFn;
+    const container = this.container;
+    if (!renderFn || !container) return;
+
+    while (this.pending.length > 0) {
+      const batch = this.pending.splice(0, CHUNK_BATCH_SIZE);
+
+      for (const task of batch) {
+        if (!this.cache.has(task)) {
+          const element = renderFn(task);
+          this.cache.set(task, element);
+          container.appendChild(element);
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    this.isProcessing = false;
+  }
+
+  clear(): void {
+    this.pending = [];
+    this.isProcessing = false;
+  }
+
+  get isEmpty(): boolean {
+    return this.pending.length === 0 && !this.isProcessing;
+  }
+}
+
 export type TaskListViewMode =
   | 'showAll'
   | 'sortCompletedLast'
@@ -61,6 +157,10 @@ export class TaskListView extends ItemView {
   private wasPanelVisible = false;
   private resizeObserver: ResizeObserver | null = null;
 
+  // Chunked rendering for performance with large task lists
+  private taskElementCache = new TaskElementCache();
+  private renderQueue: ChunkedRenderQueue;
+
   // Search history debounce mechanism
   private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
     null;
@@ -76,6 +176,7 @@ export class TaskListView extends ItemView {
     this.tasks = taskStateManager.getTasks();
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = settings.defaultSortMethod;
+    this.renderQueue = new ChunkedRenderQueue(this.taskElementCache);
 
     // Subscribe to task changes from the centralized state manager
     // Use debouncing to prevent excessive re-renders during rapid changes (like typing)
@@ -1456,12 +1557,19 @@ export class TaskListView extends ItemView {
       if (prevEmpty) prevEmpty.detach?.();
     }
 
-    // Render visible tasks
+    // Render visible tasks using chunked rendering for performance
     if (list) {
-      for (const task of visible) {
-        const li = this.buildTaskListItem(task);
-        list.appendChild(li);
-      }
+      // Clear the list and cache when search/sort/view mode changes
+      this.taskElementCache.clear();
+      this.renderQueue.clear();
+      list.empty();
+
+      // Use chunked rendering
+      await this.renderQueue.enqueue(
+        visible,
+        (task) => this.buildTaskListItem(task),
+        list,
+      );
     }
 
     // Cache visible tasks for smart refresh

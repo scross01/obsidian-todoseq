@@ -97,8 +97,8 @@ export class PropertySearchEngine {
     const startTime = performance.now();
 
     try {
-      // Register event listeners early to capture any events during initialization
-      this.registerEventListeners();
+      // Event listeners are now handled by EventCoordinator
+      // PropertySearchEngine receives file change events via EventCoordinator calls
 
       // Get all property keys by scanning all markdown files
       await this.scanAllPropertyKeys();
@@ -949,18 +949,19 @@ export class PropertySearchEngine {
 
             // Add value to cache
             if (Array.isArray(value)) {
-              value.forEach((item) => {
-                let filePathSet = valueMap.get(item);
-                if (!filePathSet) {
-                  filePathSet = new Set<string>();
+              for (const item of value) {
+                if (item === undefined) continue;
+                const existingSet = valueMap.get(item);
+                const filePathSet = existingSet ?? new Set<string>();
+                if (!existingSet) {
                   valueMap.set(item, filePathSet);
                 }
                 filePathSet.add(filePath);
-              });
+              }
             } else {
-              let filePathSet = valueMap.get(value);
-              if (!filePathSet) {
-                filePathSet = new Set<string>();
+              const existingSet = valueMap.get(value);
+              const filePathSet = existingSet ?? new Set<string>();
+              if (!existingSet) {
                 valueMap.set(value, filePathSet);
               }
               filePathSet.add(filePath);

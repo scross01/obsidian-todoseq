@@ -14,8 +14,11 @@ import { Editor, MarkdownView, TFile, Platform } from 'obsidian';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
 import { PropertySearchEngine } from './services/property-search-engine';
+import { EventCoordinator } from './services/event-coordinator';
 
 export class PluginLifecycleManager {
+  private eventCoordinator: EventCoordinator | null = null;
+
   constructor(private plugin: TodoTracker) {}
 
   /**
@@ -44,6 +47,18 @@ export class PluginLifecycleManager {
     this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(
       this.plugin.app,
     );
+
+    // Create EventCoordinator - single source for vault events
+    this.eventCoordinator = new EventCoordinator(
+      this.plugin.app,
+      this.plugin.taskStateManager,
+    );
+    this.eventCoordinator.setVaultScanner(this.plugin.vaultScanner);
+    this.eventCoordinator.setPropertySearchEngine(
+      this.plugin.propertySearchEngine,
+    );
+    this.eventCoordinator.initialize();
+
     this.plugin.taskEditor = new TaskWriter(this.plugin.app);
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
     this.plugin.statusBarManager = new StatusBarManager(this.plugin);
@@ -286,36 +301,8 @@ export class PluginLifecycleManager {
     // Setup right-click event handlers for task keywords
     this.plugin.uiManager.setupTaskKeywordContextMenu();
 
-    // Register file change events that delegate to VaultScanner
-    this.plugin.registerEvent(
-      this.plugin.app.vault.on('modify', (file) => {
-        this.plugin.vaultScanner?.handleFileChange(file);
-        // Emit file-changed event for property search engine
-        this.plugin.vaultScanner?.emit('file-changed', file);
-      }),
-    );
-    this.plugin.registerEvent(
-      this.plugin.app.vault.on('create', (file) => {
-        this.plugin.vaultScanner?.handleFileChange(file);
-        // Emit file-changed event for property search engine
-        this.plugin.vaultScanner?.emit('file-changed', file);
-      }),
-    );
-    this.plugin.registerEvent(
-      this.plugin.app.vault.on('delete', (file) => {
-        this.plugin.vaultScanner?.handleFileChange(file);
-        // Emit file-deleted event for property search engine
-        this.plugin.vaultScanner?.emit('file-deleted', file);
-      }),
-    );
-    this.plugin.registerEvent(
-      // Obsidian passes (file, oldPath) for rename
-      this.plugin.app.vault.on('rename', (file, oldPath) => {
-        this.plugin.vaultScanner?.handleFileRename(file, oldPath);
-        // Emit file-changed event for property search engine
-        this.plugin.vaultScanner?.emit('file-changed', file);
-      }),
-    );
+    // Vault events are now handled by EventCoordinator (single source of truth)
+    // File change events are debounced and batched by the coordinator
 
     // Conditional ribbon icon - only show on mobile devices
     if (Platform.isMobile) {
@@ -359,6 +346,9 @@ export class PluginLifecycleManager {
    * Obsidian lifecycle method called when the plugin is unloaded
    */
   onunload() {
+    // Clean up EventCoordinator (removes all vault event listeners)
+    this.eventCoordinator?.destroy();
+
     // Clean up VaultScanner resources
     this.plugin.vaultScanner?.destroy();
 
