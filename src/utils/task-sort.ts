@@ -367,14 +367,6 @@ function getSortFunction(
  * @param keywordConfig Optional keyword sort configuration
  * @returns Sorted tasks
  */
-function sortCategory(
-  tasks: Task[],
-  sortMethod: SortMethod,
-  keywordConfig?: KeywordSortConfig,
-): Task[] {
-  const sortFunction = getSortFunction(sortMethod, keywordConfig);
-  return [...tasks].sort(sortFunction);
-}
 
 /**
  * Apply three-block task sorting according to PRD
@@ -399,7 +391,7 @@ export function sortTasksInBlocks(
   sortMethod: SortMethod = 'default',
   keywordConfig?: KeywordSortConfig,
 ): TaskBlock[] {
-  // Classify all tasks
+  // Classify all tasks - don't sort yet
   const classified: Record<TaskCategory, Task[]> = {
     current: [],
     upcoming: [],
@@ -412,78 +404,61 @@ export function sortTasksInBlocks(
     classified[category].push(task);
   }
 
-  // Sort each category
-  const sorted: Record<TaskCategory, Task[]> = {
-    current: sortCategory(classified.current, sortMethod, keywordConfig),
-    upcoming: sortCategory(classified.upcoming, sortMethod, keywordConfig),
-    future: sortCategory(classified.future, sortMethod, keywordConfig),
-    completed: sortCategory(classified.completed, sortMethod, keywordConfig),
-  };
+  // Get the sort function once
+  const sortFunction = getSortFunction(sortMethod, keywordConfig);
 
   const blocks: TaskBlock[] = [];
 
-  // Build Main Block
+  // Build Main Block - combine categories first, then sort ONCE
   const mainBlockTasks: Task[] = [];
 
   switch (futureSetting) {
     case 'showAll':
       // All non-completed tasks in one block
       mainBlockTasks.push(
-        ...sorted.current,
-        ...sorted.upcoming,
-        ...sorted.future,
+        ...classified.current,
+        ...classified.upcoming,
+        ...classified.future,
       );
       // Handle completed tasks based on setting
       if (completedSetting === 'showAll') {
-        mainBlockTasks.push(...sorted.completed);
+        mainBlockTasks.push(...classified.completed);
       }
-      // Sort all tasks together using the selected method
-      {
-        const sortFunction = getSortFunction(sortMethod, keywordConfig);
-        mainBlockTasks.sort(sortFunction);
-      }
+      // Sort only once
+      mainBlockTasks.sort(sortFunction);
       break;
 
     case 'showUpcoming':
       // Current + Upcoming tasks only
-      mainBlockTasks.push(...sorted.current, ...sorted.upcoming);
+      mainBlockTasks.push(...classified.current, ...classified.upcoming);
       // Handle completed tasks in main block
       if (completedSetting === 'showAll') {
-        mainBlockTasks.push(...sorted.completed);
+        mainBlockTasks.push(...classified.completed);
       }
-      // Sort the main block using the selected method
-      {
-        const sortFunction2 = getSortFunction(sortMethod, keywordConfig);
-        mainBlockTasks.sort(sortFunction2);
-      }
+      // Sort only once
+      mainBlockTasks.sort(sortFunction);
       break;
 
     case 'sortToEnd':
       // Current tasks only (future goes to separate block)
-      mainBlockTasks.push(...sorted.current);
+      mainBlockTasks.push(...classified.current);
       // Handle completed tasks in main block
       if (completedSetting === 'showAll') {
-        mainBlockTasks.push(...sorted.completed);
+        mainBlockTasks.push(...classified.completed);
       }
-      // Sort the main block using the selected method
-      {
-        const sortFunction3 = getSortFunction(sortMethod, keywordConfig);
-        mainBlockTasks.sort(sortFunction3);
-      }
+      // Sort only once
+      mainBlockTasks.sort(sortFunction);
       break;
 
     case 'hideFuture':
       // Current tasks only
-      mainBlockTasks.push(...sorted.current);
+      mainBlockTasks.push(...classified.current);
       // Handle completed tasks in main block
       if (completedSetting === 'showAll') {
-        mainBlockTasks.push(...sorted.completed);
+        mainBlockTasks.push(...classified.completed);
       }
-      // Sort the main block using the selected method
-      {
-        const sortFunction4 = getSortFunction(sortMethod, keywordConfig);
-        mainBlockTasks.sort(sortFunction4);
-      }
+      // Sort only once
+      mainBlockTasks.sort(sortFunction);
       break;
   }
 
@@ -492,26 +467,20 @@ export function sortTasksInBlocks(
     blocks.push({ type: 'main', tasks: mainBlockTasks });
   }
 
-  // Add Future Block if needed
+  // Add Future Block if needed - sort once
   if (futureSetting === 'sortToEnd') {
-    // Future block contains all future tasks (upcoming + future)
-    // Main block has: current only
-    const futureTasks = [...sorted.upcoming, ...sorted.future];
+    const futureTasks = [...classified.upcoming, ...classified.future];
     if (futureTasks.length > 0) {
-      // Sort future tasks using the selected method
-      const sortFunction = getSortFunction(sortMethod, keywordConfig);
       futureTasks.sort(sortFunction);
       blocks.push({ type: 'future', tasks: futureTasks });
     }
   }
 
-  // Add Completed Block if needed
+  // Add Completed Block if needed - sort once
   if (completedSetting === 'sortToEnd') {
-    if (sorted.completed.length > 0) {
-      // Sort completed tasks using the selected method
-      const sortFunction = getSortFunction(sortMethod, keywordConfig);
-      sorted.completed.sort(sortFunction);
-      blocks.push({ type: 'completed', tasks: sorted.completed });
+    if (classified.completed.length > 0) {
+      classified.completed.sort(sortFunction);
+      blocks.push({ type: 'completed', tasks: classified.completed });
     }
   }
 
