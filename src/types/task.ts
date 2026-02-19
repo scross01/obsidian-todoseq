@@ -8,6 +8,7 @@ export interface Task {
   listMarker: string; // the exact list marker plus trailing space if present (e.g., "- ", "1. ", "(a) ")
   footnoteMarker?: string; // footnote marker if present (e.g., "[^1]: ")
   text: string; // content after the state keyword with priority token removed
+  textDisplay?: string; // lazy-computed markdown-stripped text for display
   state: string; // state keyword, TODO, DOING, DONE etc.
   completed: boolean; // is the task considered complete
   priority: 'high' | 'med' | 'low' | null;

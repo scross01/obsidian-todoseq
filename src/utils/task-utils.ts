@@ -2,6 +2,7 @@ import {
   DEFAULT_COMPLETED_STATES,
   DEFAULT_PENDING_STATES,
   DEFAULT_ACTIVE_STATES,
+  Task,
 } from '../types/task';
 
 /**
@@ -101,4 +102,63 @@ export function truncateMiddle(str: string, maxLength: number): string {
     ellipsis +
     str.substring(str.length - endChars)
   );
+}
+
+/**
+ * Lazy-computed stripMarkdown for task text display.
+ * Computes on first access, then caches on the task object.
+ * @param task The task to get display text for
+ * @returns Markdown-stripped text for display
+ */
+export function getTaskTextDisplay(task: Task): string {
+  // Return cached value if already computed
+  if (task.textDisplay !== undefined) {
+    return task.textDisplay;
+  }
+
+  // Compute and cache
+  const textDisplay = stripMarkdownForDisplay(task.text);
+  task.textDisplay = textDisplay;
+  return textDisplay;
+}
+
+/**
+ * Strip Markdown formatting to produce display-only plain text.
+ * Used for task text display in views.
+ * @param input The text to strip
+ * @returns Plain text suitable for display
+ */
+function stripMarkdownForDisplay(input: string): string {
+  if (!input) return '';
+  let out = input;
+
+  // HTML tags - use DOMParser to safely strip HTML tags
+  const doc = new DOMParser().parseFromString(out, 'text/html');
+  out = doc.body.textContent || '';
+
+  // Images: ![alt](url) -> alt
+  out = out.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+
+  // Inline code: `code` -> code
+  out = out.replace(/`([^`]+)`/g, '$1');
+
+  // Headings
+  out = out.replace(/^\s{0,3}#{1,6}\s+/gm, '');
+
+  // Emphasis/strong
+  out = out.replace(/(\*\*|__)(.*?)\1/g, '$2');
+  out = out.replace(/(\*|_)(.*?)\1/g, '$2');
+
+  // Strike/highlight/math
+  out = out.replace(/~~(.*?)~~/g, '$1');
+  out = out.replace(/==(.*?)==/g, '$1');
+  out = out.replace(/\$\$(.*?)\$\$/g, '$1');
+
+  // Normalize whitespace
+  out = out.replace(/\r/g, '');
+  out = out.replace(/[ \t]+\n/g, '\n');
+  out = out.replace(/\n{3,}/g, '\n\n');
+  out = out.trim();
+
+  return out;
 }

@@ -30,6 +30,7 @@ import {
 import { getPluginSettings } from '../../utils/settings-utils';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TAG_PATTERN } from '../../utils/patterns';
+import { getTaskTextDisplay } from '../../utils/task-utils';
 
 const CHUNK_BATCH_SIZE = 40;
 
@@ -1324,11 +1325,10 @@ export class TaskListView extends ItemView {
       badge.setAttribute('title', `Priority ${pri}`);
     }
 
-    // Remaining text
-    const restOfText = task.text;
-    if (restOfText) {
+    // Remaining text - use lazy-computed textDisplay for better performance
+    if (task.text) {
       taskText.appendText(' ');
-      this.renderTaskTextWithLinks(restOfText, taskText);
+      this.renderTaskTextWithLinks(task, taskText);
     }
 
     taskText.toggleClass('completed', task.completed);
@@ -1809,51 +1809,16 @@ export class TaskListView extends ItemView {
     }
   }
 
-  /** Strip Markdown formatting to produce display-only plain text */
-  private stripMarkdown(input: string): string {
-    if (!input) return '';
-    let out = input;
-
-    // HTML tags - use DOMParser to safely strip HTML tags
-    const doc = new DOMParser().parseFromString(out, 'text/html');
-    out = doc.body.textContent || '';
-
-    // Images: ![alt](url) -> alt
-    out = out.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
-
-    // Inline code: `code` -> code
-    out = out.replace(/`([^`]+)`/g, '$1');
-
-    // Headings
-    out = out.replace(/^\s{0,3}#{1,6}\s+/gm, '');
-
-    // Emphasis/strong
-    out = out.replace(/(\*\*|__)(.*?)\1/g, '$2');
-    out = out.replace(/(\*|_)(.*?)\1/g, '$2');
-
-    // Strike/highlight/math
-    out = out.replace(/~~(.*?)~~/g, '$1');
-    out = out.replace(/==(.*?)==/g, '$1');
-    out = out.replace(/\$\$(.*?)\$\$/g, '$1');
-
-    // Normalize whitespace
-    out = out.replace(/\r/g, '');
-    out = out.replace(/[ \t]+\n/g, '\n');
-    out = out.replace(/\n{3,}/g, '\n\n');
-    out = out.trim();
-
-    return out;
-  }
-
   // Render Obsidian-style links and tags as non-clickable, styled spans inside task text.
   // Supports:
   //  - Wiki links: [[Note]] and [[Note|Alias]]
   //  - Markdown links: [Alias](url-or-path)
   //  - Bare URLs: http(s)://...
   //  - Tags: #tag
-  private renderTaskTextWithLinks(text: string, parent: HTMLElement) {
-    // For display only, strip any markdown formatting first
-    const textToProcess = this.stripMarkdown(text) || '';
+  // Render task text with links, using lazy-computed textDisplay
+  private renderTaskTextWithLinks(task: Task, parent: HTMLElement) {
+    // Use lazy-computed textDisplay for better performance
+    const textToProcess = getTaskTextDisplay(task);
     const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp }[] = [
       // [[Page]] or [[Page|Alias]]
       { type: 'wiki', regex: /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g },
