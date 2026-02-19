@@ -1373,21 +1373,73 @@ export class TaskListView extends ItemView {
   }
 
   // Replace only the LI subtree for the given task (state-driven, idempotent)
+  // Optimized: only update changed elements instead of rebuilding entire DOM
   private refreshTaskElement(task: Task): void {
     const container = this.taskListContainer;
     const list = container?.querySelector('ul.todo-list');
     if (!list) return;
 
     const selector = `li.todo-item[data-path="${CSS.escape(task.path)}"][data-line="${task.line}"]`;
-    const existing = list.querySelector(selector);
-    const freshLi = this.buildTaskListItem(task);
-
-    if (existing && existing.parentElement === list) {
-      list.replaceChild(freshLi, existing);
-    } else {
+    const existing = list.querySelector(selector) as HTMLLIElement;
+    if (!existing) {
       // Fallback: append if not found (shouldn't normally happen)
+      const freshLi = this.buildTaskListItem(task);
       list.appendChild(freshLi);
+      return;
     }
+
+    // 1. Update checkbox
+    const checkbox = existing.querySelector(
+      'input.todo-checkbox',
+    ) as HTMLInputElement;
+    if (checkbox) {
+      checkbox.checked = task.completed;
+      // Update checkbox active class
+      checkbox.classList.toggle(
+        'todo-checkbox-active',
+        DEFAULT_ACTIVE_STATES.has(task.state),
+      );
+    }
+
+    // 2. Update keyword button
+    const keywordBtn = existing.querySelector(
+      '.todo-keyword',
+    ) as HTMLSpanElement;
+    if (keywordBtn) {
+      keywordBtn.textContent = task.state;
+      keywordBtn.setAttribute('aria-checked', String(task.completed));
+      // Keyword button doesn't need color changes since it's based on state class
+    }
+
+    // 3. Update todo-text class for completed styling
+    const todoText = existing.querySelector('.todo-text') as HTMLElement;
+    if (todoText) {
+      todoText.classList.toggle('completed', task.completed);
+    }
+
+    // 4. Update date display (may need to add/remove)
+    const hasDates =
+      (task.scheduledDate || task.deadlineDate) && !task.completed;
+    const existingDateDisplay = existing.querySelector('.todo-date-display');
+    if (hasDates && !existingDateDisplay) {
+      // Need to add date display
+      this.buildDateDisplay(task, existing);
+    } else if (!hasDates && existingDateDisplay) {
+      // Need to remove date display
+      existingDateDisplay.remove();
+    }
+
+    // 5. Update LI classes for task state
+    existing.classList.toggle('completed', task.completed);
+    existing.classList.toggle(
+      'cancelled',
+      task.state === 'CANCELED' || task.state === 'CANCELLED',
+    );
+    existing.classList.toggle(
+      'in-progress',
+      task.state === 'DOING' || task.state === 'IN-PROGRESS',
+    );
+    existing.classList.toggle('active', DEFAULT_ACTIVE_STATES.has(task.state));
   }
 
   /** Recalculate visible tasks for current mode + search and update only the list subtree */
