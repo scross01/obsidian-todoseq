@@ -169,6 +169,10 @@ export class TaskListView extends ItemView {
     null;
   private readonly SEARCH_REFRESH_DEBOUNCE_MS = 200; // 200ms debounce for search refresh
 
+  // Keyword sort config caching
+  private cachedKeywordConfig: KeywordSortConfig | null = null;
+  private cachedKeywords: string | null = null;
+
   constructor(
     leaf: WorkspaceLeaf,
     taskStateManager: TaskStateManager,
@@ -340,9 +344,7 @@ export class TaskListView extends ItemView {
     // Build keyword config if sorting by keyword
     let keywordConfig: KeywordSortConfig | undefined;
     if (sortMethod === 'sortByKeyword') {
-      keywordConfig = buildKeywordSortConfig(
-        this.settings?.additionalTaskKeywords ?? [],
-      );
+      keywordConfig = this.getKeywordSortConfig();
     }
 
     // Apply the new sorting logic
@@ -356,6 +358,20 @@ export class TaskListView extends ItemView {
     );
 
     return sortedTasks;
+  }
+
+  /**
+   * Get cached keyword sort config, rebuilding only when keywords change
+   */
+  private getKeywordSortConfig(): KeywordSortConfig {
+    const keywords = this.settings?.additionalTaskKeywords?.join(',') ?? '';
+    if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
+      this.cachedKeywords = keywords;
+      this.cachedKeywordConfig = buildKeywordSortConfig(
+        this.settings?.additionalTaskKeywords ?? [],
+      );
+    }
+    return this.cachedKeywordConfig;
   }
 
   /** Search query (persisted on root contentEl attribute to survive re-renders) */

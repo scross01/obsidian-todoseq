@@ -20,6 +20,10 @@ export class EmbeddedTaskListManager {
   private cacheTTL = 5000; // 5 seconds cache TTL
   private cacheVersion = 0; // Version number to invalidate cache on task changes
 
+  // Keyword sort config caching
+  private cachedKeywordConfig: KeywordSortConfig | null = null;
+  private cachedKeywords: string | null = null;
+
   constructor(settings: TodoTrackerSettings) {
     this.settings = settings;
   }
@@ -161,9 +165,7 @@ export class EmbeddedTaskListManager {
       // Build keyword config if sorting by keyword
       let keywordConfig: KeywordSortConfig | undefined;
       if (sortMethod === 'sortByKeyword') {
-        keywordConfig = buildKeywordSortConfig(
-          this.settings?.additionalTaskKeywords ?? [],
-        );
+        keywordConfig = this.getKeywordSortConfig();
       }
 
       // Use the existing three-block sorting system
@@ -180,6 +182,20 @@ export class EmbeddedTaskListManager {
       // Return unsorted tasks as fallback
       return tasks;
     }
+  }
+
+  /**
+   * Get cached keyword sort config, rebuilding only when keywords change
+   */
+  private getKeywordSortConfig(): KeywordSortConfig {
+    const keywords = this.settings?.additionalTaskKeywords?.join(',') ?? '';
+    if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
+      this.cachedKeywords = keywords;
+      this.cachedKeywordConfig = buildKeywordSortConfig(
+        this.settings?.additionalTaskKeywords ?? [],
+      );
+    }
+    return this.cachedKeywordConfig;
   }
 
   /**
