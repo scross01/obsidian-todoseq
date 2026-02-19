@@ -3,7 +3,10 @@
 ## 0.10.2
 
 - Fixed performance issues with larger vaults causing lag while typing when task list is visible. #48
-- Fixed settings corruption.
+  - EventCoordinator service debounces and batches vault events to prevent excessive re-renders when typing in large vaults.
+  - Chunked task list rendering with lazy loading and scroll position preservation for better performance with large task lists.
+  - Cached keyword sort configuration to avoid rebuilding it on every render.
+- Fixed settings corruption issue causing settings to get reset on restart.
 
 ## 0.10.1
 
