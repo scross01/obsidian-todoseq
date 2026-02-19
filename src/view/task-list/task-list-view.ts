@@ -167,7 +167,7 @@ export class TaskListView extends ItemView {
   private readonly SEARCH_HISTORY_DEBOUNCE_MS = 3000; // 3 seconds idle timeout
   private searchRefreshDebounceTimer: ReturnType<typeof setTimeout> | null =
     null;
-  private readonly SEARCH_REFRESH_DEBOUNCE_MS = 200; // 200ms debounce for search refresh
+  private readonly SEARCH_REFRESH_DEBOUNCE_MS = 250; // 250ms debounce for search refresh
 
   // Keyword sort config caching
   private cachedKeywordConfig: KeywordSortConfig | null = null;

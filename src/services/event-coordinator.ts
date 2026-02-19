@@ -24,7 +24,7 @@ export class EventCoordinator {
   private vaultScanner: VaultScanner | null = null;
   private propertySearchEngine: PropertySearchEngine | null = null;
 
-  private readonly FILE_DEBOUNCE_MS = 250;
+  private readonly FILE_DEBOUNCE_MS = 150;
   private readonly BATCH_DELAY_MS = 0;
 
   // External callbacks for file change notifications (e.g., embedded task lists)
