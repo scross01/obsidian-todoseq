@@ -99,17 +99,9 @@ export class TodoseqCodeBlockProcessor {
       // Get all tasks from the vault
       const allTasks = this.plugin.getTasks();
 
-      // Filter and sort tasks based on parameters
-      const filteredTasks = await this.manager.filterAndSortTasks(
-        allTasks,
-        params,
-      );
-
-      // Get total number of tasks (before applying limit)
-      const totalTasksCount = await this.manager.getTotalTasksCount(
-        allTasks,
-        params,
-      );
+      // Filter, sort, and get count in a single operation
+      const { tasks: filteredTasks, totalCount } =
+        await this.manager.filterAndSortTasksWithCount(allTasks, params);
 
       // Generate unique container ID for this code block
       const containerId = `todoseq-${Math.random().toString(36).slice(2, 8)}`;
@@ -132,7 +124,7 @@ export class TodoseqCodeBlockProcessor {
         el,
         filteredTasks,
         params,
-        totalTasksCount,
+        totalCount,
         initialCollapsed,
         (id: string) => this.eventHandler.toggleCollapse(id),
         containerId,

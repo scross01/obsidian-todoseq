@@ -191,24 +191,16 @@ export class EmbeddedTaskListEventHandler {
       // Get all tasks
       const allTasks = this.plugin.getTasks();
 
-      // Filter and sort tasks
-      const filteredTasks = await this.manager.filterAndSortTasks(
-        allTasks,
-        params,
-      );
-
-      // Get total number of tasks (before applying limit)
-      const totalTasksCount = await this.manager.getTotalTasksCount(
-        allTasks,
-        params,
-      );
+      // Filter, sort, and get count in a single operation
+      const { tasks: filteredTasks, totalCount } =
+        await this.manager.filterAndSortTasksWithCount(allTasks, params);
 
       // Re-render the task list with collapse state and toggle callback
       this.renderer.renderTaskList(
         codeBlock.element,
         filteredTasks,
         params,
-        totalTasksCount,
+        totalCount,
         codeBlock.isCollapsed,
         (id: string) => this.toggleCollapse(id),
         containerId,

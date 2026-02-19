@@ -106,6 +106,42 @@ export class EmbeddedTaskListManager {
   }
 
   /**
+   * Filter and sort tasks with total count in a single operation.
+   * More efficient than calling filterAndSortTasks and getTotalTasksCount separately.
+   * @param tasks All tasks from the vault
+   * @param params Parsed code block parameters
+   * @returns Object containing filtered/sorted tasks and total count before limit
+   */
+  async filterAndSortTasksWithCount(
+    tasks: Task[],
+    params: TodoseqParameters,
+  ): Promise<{ tasks: Task[]; totalCount: number }> {
+    try {
+      // Filter tasks based on search query
+      let filteredTasks = tasks;
+
+      if (params.searchQuery) {
+        filteredTasks = await this.filterTasks(tasks, params.searchQuery);
+      }
+
+      const totalCount = filteredTasks.length;
+
+      // Sort tasks
+      let sortedTasks = this.sortTasks(filteredTasks, params);
+
+      // Apply limit if specified
+      if (params.limit && params.limit > 0) {
+        sortedTasks = sortedTasks.slice(0, params.limit);
+      }
+
+      return { tasks: sortedTasks, totalCount };
+    } catch (error) {
+      console.error('Error filtering/sorting tasks:', error);
+      return { tasks, totalCount: tasks.length };
+    }
+  }
+
+  /**
    * Filter tasks using the existing Search class
    * @param tasks Tasks to filter
    * @param searchQuery Search query string
