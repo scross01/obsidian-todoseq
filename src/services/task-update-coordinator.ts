@@ -33,49 +33,53 @@ export class TaskUpdateCoordinator {
     // 0. Set flag to indicate user-initiated update
     this.plugin.isUserInitiatedUpdate = true;
 
-    // 1. Optimistic UI update - update in-memory state immediately
-    this.performOptimisticUpdate(task, newState);
-
-    // 2. Update source file via TaskEditor
-    let updatedTask: Task;
-    const taskEditor = this.plugin.taskEditor;
-    if (!taskEditor) {
-      throw new Error('TaskEditor is not initialized');
-    }
     try {
-      updatedTask = await taskEditor.applyLineUpdate(task, newState);
-    } catch (error) {
-      console.error(
-        `[TODOseq] File write failed for task at line ${task.line}:`,
-        error,
-      );
-      // Rollback: re-read the file to restore state
-      const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
-      if (file instanceof TFile) {
-        await this.plugin.vaultScanner?.processIncrementalChange(file);
+      // 1. Optimistic UI update - update in-memory state immediately
+      this.performOptimisticUpdate(task, newState);
+
+      // 2. Update source file via TaskEditor
+      let updatedTask: Task;
+      const taskEditor = this.plugin.taskEditor;
+      if (!taskEditor) {
+        throw new Error('TaskEditor is not initialized');
       }
-      throw error;
+      try {
+        updatedTask = await taskEditor.applyLineUpdate(task, newState);
+      } catch (error) {
+        console.error(
+          `[TODOseq] File write failed for task at line ${task.line}:`,
+          error,
+        );
+        // Rollback: re-read the file to restore state
+        const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
+        if (file instanceof TFile) {
+          await this.plugin.vaultScanner?.processIncrementalChange(file);
+        }
+        throw error;
+      }
+
+      // 3. Perform direct DOM manipulation for embeds immediately
+      // This updates the embed display without triggering a full re-render
+      // which would cause flicker. The DOM update is synchronous and only
+      // touches the specific elements that need to change.
+      this.performDirectEmbedDOMUpdate(task, newState);
+
+      // 4. Refresh all embedded task lists (code blocks) to reflect the task change
+      // This ensures that any todoseq code blocks displaying this task are updated
+      if (this.plugin.embeddedTaskListProcessor) {
+        this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
+      }
+
+      // 5. Refresh editor decorations to update keyword styling in open editors
+      // This ensures the keyword span is properly updated with the new state
+      if (this.plugin.refreshVisibleEditorDecorations) {
+        this.plugin.refreshVisibleEditorDecorations();
+      }
+
+      return updatedTask;
+    } finally {
+      this.plugin.isUserInitiatedUpdate = false;
     }
-
-    // 3. Perform direct DOM manipulation for embeds immediately
-    // This updates the embed display without triggering a full re-render
-    // which would cause flicker. The DOM update is synchronous and only
-    // touches the specific elements that need to change.
-    this.performDirectEmbedDOMUpdate(task, newState);
-
-    // 4. Refresh all embedded task lists (code blocks) to reflect the task change
-    // This ensures that any todoseq code blocks displaying this task are updated
-    if (this.plugin.embeddedTaskListProcessor) {
-      this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
-    }
-
-    // 5. Refresh editor decorations to update keyword styling in open editors
-    // This ensures the keyword span is properly updated with the new state
-    if (this.plugin.refreshVisibleEditorDecorations) {
-      this.plugin.refreshVisibleEditorDecorations();
-    }
-
-    return updatedTask;
   }
 
   /**

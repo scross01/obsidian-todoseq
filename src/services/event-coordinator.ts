@@ -204,7 +204,7 @@ export class EventCoordinator {
     // Notify external callbacks (e.g., embedded task lists)
     for (const callback of this.fileChangeCallbacks) {
       try {
-        callback(events[events.length - 1]); // Pass the most recent event
+        events.forEach(callback);
       } catch (error) {
         console.error('Error in EventCoordinator file change callback:', error);
       }
