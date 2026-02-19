@@ -6,6 +6,7 @@ import {
   Platform,
   MarkdownView,
   setIcon,
+  Plugin,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
 import {
@@ -34,7 +35,11 @@ import { getTaskTextDisplay } from '../../utils/task-utils';
 
 const CHUNK_BATCH_SIZE = 15;
 const YIELD_EVERY_N_TASKS = 5;
-const PRIORITY_FIRST_BATCH = 10; // Render this many before first yield
+const PRIORITY_FIRST_BATCH = 10;
+
+// Lazy loading constants
+const INITIAL_LOAD_COUNT = 50;
+const LOAD_BATCH_SIZE = 30;
 
 const WIKI_LINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 const MD_LINK_REGEX = /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g;
@@ -67,6 +72,10 @@ class TaskElementCache {
     this.cache.delete(this.getKey(task));
   }
 
+  invalidateByKey(key: string): void {
+    this.cache.delete(key);
+  }
+
   clear(): void {
     this.cache.clear();
   }
@@ -82,6 +91,8 @@ class ChunkedRenderQueue {
   private renderFn: ((task: Task) => HTMLLIElement) | null = null;
   private container: Element | null = null;
   private cache: TaskElementCache;
+  private generation = 0;
+  private currentRenderPromise: Promise<void> | null = null;
 
   constructor(cache: TaskElementCache) {
     this.cache = cache;
@@ -92,25 +103,38 @@ class ChunkedRenderQueue {
     renderFn: (task: Task) => HTMLLIElement,
     container: Element,
   ): Promise<void> {
+    // Cancel old render immediately - don't wait
+    this.generation++;
+    this.pending = [];
+    this.isProcessing = false;
+
+    // Set up new render
     this.renderFn = renderFn;
     this.container = container;
-    this.pending.push(...tasks);
+    this.pending = tasks;
 
-    if (!this.isProcessing) {
-      this.isProcessing = true;
-      await this.processQueue();
-    }
+    // Force start new render (old will exit via generation check)
+    this.isProcessing = true;
+    this.currentRenderPromise = this.processQueue();
+    await this.currentRenderPromise;
+    this.currentRenderPromise = null;
   }
 
   private async processQueue(): Promise<void> {
     const renderFn = this.renderFn;
     const container = this.container;
+    const currentGeneration = this.generation;
     if (!renderFn || !container) return;
 
     let priorityRendered = 0;
     let renderedInBatch = 0;
 
     while (this.pending.length > 0) {
+      // Check generation at start of each batch - exit if cancelled
+      if (this.generation !== currentGeneration) {
+        return;
+      }
+
       const isFirstBatch = priorityRendered < PRIORITY_FIRST_BATCH;
       const batchSize = isFirstBatch
         ? Math.min(CHUNK_BATCH_SIZE, PRIORITY_FIRST_BATCH - priorityRendered)
@@ -119,11 +143,18 @@ class ChunkedRenderQueue {
       const batch = this.pending.splice(0, batchSize);
 
       for (const task of batch) {
-        if (!this.cache.has(task)) {
-          const element = renderFn(task);
-          this.cache.set(task, element);
-          container.appendChild(element);
+        // Check generation before each task - exit if cancelled
+        if (this.generation !== currentGeneration) {
+          return;
         }
+
+        // Get cached element or render new one
+        let element = this.cache.get(task);
+        if (!element) {
+          element = renderFn(task);
+          this.cache.set(task, element);
+        }
+        container.appendChild(element); // Always append (moves if already in DOM)
         priorityRendered++;
         renderedInBatch++;
 
@@ -139,6 +170,7 @@ class ChunkedRenderQueue {
   }
 
   clear(): void {
+    this.generation++;
     this.pending = [];
     this.isProcessing = false;
   }
@@ -178,6 +210,10 @@ export class TaskListView extends ItemView {
   private wasPanelVisible = false;
   private resizeObserver: ResizeObserver | null = null;
 
+  // Scroll position tracking for preserving scroll across refreshes
+  private savedScrollPosition = 0;
+  private scrollEventListener: (() => void) | null = null;
+
   // Chunked rendering for performance with large task lists
   private taskElementCache = new TaskElementCache();
   private renderQueue: ChunkedRenderQueue;
@@ -198,67 +234,124 @@ export class TaskListView extends ItemView {
   private cachedKeywordConfig: KeywordSortConfig | null = null;
   private cachedKeywords: string | null = null;
 
+  // Reference to the plugin for checking user-initiated updates
+  private plugin: Plugin | null = null;
+
+  // Lazy loading state
+  private loadedTaskCount = 0;
+  private totalTaskCount = 0;
+  private isAllTasksLoaded = false;
+  private sentinelElement: HTMLElement | null = null;
+  private sentinelObserver: IntersectionObserver | null = null;
+  private isLoadingMore = false;
+
   constructor(
     leaf: WorkspaceLeaf,
     taskStateManager: TaskStateManager,
     defaultViewMode: TaskListViewMode,
     private settings: TodoTrackerSettings,
+    plugin: Plugin,
   ) {
     super(leaf);
     this.tasks = taskStateManager.getTasks();
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = settings.defaultSortMethod;
+    this.plugin = plugin;
     this.renderQueue = new ChunkedRenderQueue(this.taskElementCache);
 
     // Subscribe to task changes from the centralized state manager
-    // Use debouncing to prevent excessive re-renders during rapid changes (like typing)
-
-    this.unsubscribeFromStateManager = taskStateManager.subscribe((tasks) => {
-      this.tasks = tasks;
-      // Always update the tasks reference
-      this.updateTasks(tasks);
-
-      // Only refresh if the view is already open (has contentEl)
-      if (this.contentEl && this.taskListContainer) {
-        // Check if we should skip this refresh (smart refresh)
-        // Skip if panel is collapsed OR (no search AND active file not in view)
-
-        // Check if panel is visible (has dimensions)
-        const rect = this.contentEl.getBoundingClientRect();
-        const isPanelVisible = rect.width > 0 && rect.height > 0;
-
-        if (!isPanelVisible) {
-          // Panel is collapsed - skip refresh
-          return;
-        }
-
-        // Check if refresh is needed
-        const hasSearch = this.getSearchQuery().trim().length > 0;
-        const activeFile = this.app.workspace.getActiveFile();
-        const activePath = activeFile?.path;
-
-        // Check if active file has tasks in current cached view
-        const activeFileInView =
-          activePath &&
-          this.cachedVisibleTasks.some((t) => t.path === activePath);
-
-        // Only refresh if:
-        // - Search is active (need to show results)
-        // - OR active file's tasks are in current view
-        if (!hasSearch && !activeFileInView) {
-          return; // Skip expensive refresh
-        }
-
-        // Clear any pending refresh and schedule a new one
+    // Uses interrupt pattern: new update cancels pending work and processes immediately
+    this.unsubscribeFromStateManager = taskStateManager.subscribe(
+      async (tasks) => {
+        // Cancel any pending debounced refresh - process immediately (interrupt pattern)
         if (this.taskRefreshTimeout) {
           clearTimeout(this.taskRefreshTimeout);
-        }
-        this.taskRefreshTimeout = setTimeout(async () => {
           this.taskRefreshTimeout = null;
-          await this.refreshVisibleList();
-        }, this.TASK_REFRESH_DEBOUNCE_MS);
-      }
-    });
+        }
+
+        // Update the tasks reference
+        this.updateTasks(tasks);
+
+        // Only refresh if the view is already open (has contentEl)
+        if (this.contentEl && this.taskListContainer) {
+          // Check if panel is visible (has dimensions)
+          const rect = this.contentEl.getBoundingClientRect();
+          const isPanelVisible = rect.width > 0 && rect.height > 0;
+
+          if (!isPanelVisible) {
+            return;
+          }
+
+          // Calculate scroll anchor BEFORE refresh (how many tasks scrolled off top)
+          const scrollAnchor = this.calculateScrollAnchor();
+
+          // Full rebuild with scroll preservation
+          await this.refreshVisibleList(false);
+
+          // Restore scroll position by task count
+          this.restoreScrollByTaskCount(scrollAnchor);
+        }
+      },
+    );
+  }
+
+  // Calculate how many tasks are scrolled off the top (scroll anchor)
+  private calculateScrollAnchor(): number {
+    if (!this.taskListContainer || !this.cachedVisibleTasks) {
+      return 0;
+    }
+
+    const list = this.taskListContainer.querySelector('ul.todo-list');
+    if (!list) return 0;
+
+    const firstVisible = list.querySelector('li.todo-item');
+    if (!firstVisible) return 0;
+
+    const firstPath = firstVisible.getAttribute('data-path');
+    const firstLine = firstVisible.getAttribute('data-line');
+
+    if (!firstPath || !firstLine) return 0;
+
+    // Find its index in cachedVisibleTasks
+    const idx = this.cachedVisibleTasks.findIndex(
+      (t) => t.path === firstPath && t.line === parseInt(firstLine, 10),
+    );
+
+    return idx >= 0 ? idx : 0;
+  }
+
+  // Restore scroll position by keeping same number of tasks scrolled off top
+  private restoreScrollByTaskCount(anchor: number): void {
+    if (!this.taskListContainer || !this.cachedVisibleTasks) {
+      return;
+    }
+
+    const list = this.taskListContainer.querySelector('ul.todo-list');
+    if (!list) return;
+
+    // Get the task at the anchor position
+    const targetTask = this.cachedVisibleTasks[anchor];
+    if (!targetTask) {
+      this.taskListContainer.scrollTop = 0;
+      return;
+    }
+
+    // Find the DOM element for that task
+    const selector = `li.todo-item[data-path="${CSS.escape(targetTask.path)}"][data-line="${targetTask.line}"]`;
+    const targetElement = list.querySelector(selector) as HTMLElement;
+
+    if (!targetElement) {
+      this.taskListContainer.scrollTop = 0;
+      return;
+    }
+
+    // Scroll so that element is at the top
+    const containerTop = this.taskListContainer.scrollTop;
+    const elementTop =
+      targetElement.offsetTop - this.taskListContainer.offsetTop;
+    const scrollDelta = elementTop - containerTop;
+
+    this.taskListContainer.scrollTop += scrollDelta;
   }
 
   /** View-mode accessors persisted on the root element to avoid cross-class coupling */
@@ -585,8 +678,8 @@ export class TaskListView extends ItemView {
       });
       window.dispatchEvent(evt);
 
-      // Refresh the visible list
-      this.refreshVisibleList();
+      // Refresh the visible list - preserve scroll position
+      this.refreshVisibleList(false);
     });
 
     // Add Future Task Sorting dropdown
@@ -652,7 +745,8 @@ export class TaskListView extends ItemView {
       });
       window.dispatchEvent(evt);
 
-      await this.refreshVisibleList(); // Re-render with new future task sorting
+      // Re-render with new future task sorting - preserve scroll position
+      await this.refreshVisibleList(false);
     });
 
     // Add search results info bar (second row)
@@ -727,7 +821,8 @@ export class TaskListView extends ItemView {
       window.dispatchEvent(evt);
 
       // Refresh the visible list (transformForView will handle the sorting)
-      this.refreshVisibleList();
+      // Reset to top since sort order changed fundamentally
+      this.refreshVisibleList(true);
     });
 
     // Keep a reference for keyboard handlers to focus later
@@ -1014,9 +1109,7 @@ export class TaskListView extends ItemView {
         this.announceTaskStateChange(task, oldState);
       }
     } catch (error) {
-      // Re-render with rolled-back state (coordinator handles rollback)
-      this.refreshTaskElement(task);
-
+      // Full refresh will be triggered by subscribe callback
       console.error('TODOseq: Failed to update task state:', error);
     }
   }
@@ -1109,7 +1202,7 @@ export class TaskListView extends ItemView {
           item.setTitle(state);
           item.onClick(async () => {
             await this.updateTaskState(task, state);
-            this.refreshTaskElement(task);
+            // Full refresh handled by subscribe callback
           });
         });
       }
@@ -1146,7 +1239,7 @@ export class TaskListView extends ItemView {
           item.setTitle(state);
           item.onClick(async () => {
             await this.updateTaskState(task, state);
-            this.refreshTaskElement(task);
+            // Full refresh handled by subscribe callback
           });
         });
       }
@@ -1181,13 +1274,7 @@ export class TaskListView extends ItemView {
     checkbox.addEventListener('change', async () => {
       const targetState = checkbox.checked ? 'DONE' : 'TODO';
       await this.updateTaskState(task, targetState);
-      const mode = this.getViewMode();
-      if (mode !== 'showAll') {
-        // Lighter refresh: recompute and redraw only the list
-        await this.refreshVisibleList();
-      } else {
-        this.refreshTaskElement(task);
-      }
+      // Full refresh handled by subscribe callback
     });
 
     return checkbox;
@@ -1203,7 +1290,7 @@ export class TaskListView extends ItemView {
     const activate = async (evt: Event) => {
       evt.stopPropagation();
       await this.updateTaskState(task, NEXT_STATE.get(task.state) ?? 'DONE');
-      this.refreshTaskElement(task);
+      // Full refresh handled by subscribe callback
     };
 
     // Click advances to next state (quick action)
@@ -1394,29 +1481,14 @@ export class TaskListView extends ItemView {
     return li;
   }
 
-  // Replace only the LI subtree for the given task (state-driven, idempotent)
-  // Optimized: only update changed elements instead of rebuilding entire DOM
-  private refreshTaskElement(task: Task): void {
-    const container = this.taskListContainer;
-    const list = container?.querySelector('ul.todo-list');
-    if (!list) return;
-
-    const selector = `li.todo-item[data-path="${CSS.escape(task.path)}"][data-line="${task.line}"]`;
-    const existing = list.querySelector(selector) as HTMLLIElement;
-    if (!existing) {
-      // Fallback: append if not found (shouldn't normally happen)
-      const freshLi = this.buildTaskListItem(task);
-      list.appendChild(freshLi);
-      return;
-    }
-
+  // Update an existing DOM element with new task data (for smart diff)
+  private updateTaskElementContent(task: Task, element: HTMLLIElement): void {
     // 1. Update checkbox
-    const checkbox = existing.querySelector(
+    const checkbox = element.querySelector(
       'input.todo-checkbox',
     ) as HTMLInputElement;
     if (checkbox) {
       checkbox.checked = task.completed;
-      // Update checkbox active class
       checkbox.classList.toggle(
         'todo-checkbox-active',
         DEFAULT_ACTIVE_STATES.has(task.state),
@@ -1424,48 +1496,213 @@ export class TaskListView extends ItemView {
     }
 
     // 2. Update keyword button
-    const keywordBtn = existing.querySelector(
+    const keywordBtn = element.querySelector(
       '.todo-keyword',
     ) as HTMLSpanElement;
     if (keywordBtn) {
       keywordBtn.textContent = task.state;
       keywordBtn.setAttribute('aria-checked', String(task.completed));
-      // Keyword button doesn't need color changes since it's based on state class
     }
 
-    // 3. Update todo-text class for completed styling
-    const todoText = existing.querySelector('.todo-text') as HTMLElement;
+    // 3. Update todo-text: rebuild the text portion (after keyword and priority)
+    const todoText = element.querySelector('.todo-text') as HTMLElement;
     if (todoText) {
+      // Get keyword info BEFORE clearing (since innerHTML='' removes it)
+      const keywordSpan = element.querySelector('.todo-keyword');
+      const keywordState = keywordSpan?.textContent || task.state;
+      const keywordAriaChecked =
+        keywordSpan?.getAttribute('aria-checked') || 'false';
+
+      // Clear existing text content
+      todoText.innerHTML = '';
+
+      // Re-add keyword span
+      const newKeywordSpan = todoText.createEl('span', { cls: 'todo-keyword' });
+      newKeywordSpan.setText(keywordState);
+      newKeywordSpan.setAttr('role', 'button');
+      newKeywordSpan.setAttr('tabindex', '0');
+      newKeywordSpan.setAttr('aria-checked', keywordAriaChecked);
+      todoText.appendText(' ');
+
+      // Rebuild priority badge (in case it changed or was added/removed)
+      if (task.priority) {
+        const priorityText =
+          task.priority === 'high' ? 'A' : task.priority === 'med' ? 'B' : 'C';
+        const badge = todoText.createEl('span', {
+          cls: ['priority-badge', `priority-${task.priority}`],
+        });
+        badge.setText(priorityText);
+        badge.setAttribute('aria-label', `Priority ${task.priority}`);
+        badge.setAttribute('title', `Priority ${task.priority}`);
+        todoText.appendText(' ');
+      }
+
+      // Re-add task text with links
+      if (task.text) {
+        this.renderTaskTextWithLinks(task, todoText);
+      }
+
       todoText.classList.toggle('completed', task.completed);
     }
 
-    // 4. Update date display (may need to add/remove)
+    // 4. Update date display (may need to add/remove/rebuild)
     const hasDates =
       (task.scheduledDate || task.deadlineDate) && !task.completed;
-    const existingDateDisplay = existing.querySelector('.todo-date-display');
-    if (hasDates && !existingDateDisplay) {
-      // Need to add date display
-      this.buildDateDisplay(task, existing);
-    } else if (!hasDates && existingDateDisplay) {
-      // Need to remove date display
-      existingDateDisplay.remove();
+    const existingDateDisplay = element.querySelector('.todo-date-container');
+    if (existingDateDisplay) {
+      if (hasDates) {
+        // Dates exist - rebuild to update the display
+        existingDateDisplay.remove();
+        this.buildDateDisplay(task, element);
+      } else {
+        // No dates but element exists - remove it
+        existingDateDisplay.remove();
+      }
+    } else if (hasDates) {
+      // No element but dates exist - add it
+      this.buildDateDisplay(task, element);
     }
 
     // 5. Update LI classes for task state
-    existing.classList.toggle('completed', task.completed);
-    existing.classList.toggle(
+    element.classList.toggle('completed', task.completed);
+    element.classList.toggle(
       'cancelled',
       task.state === 'CANCELED' || task.state === 'CANCELLED',
     );
-    existing.classList.toggle(
+    element.classList.toggle(
       'in-progress',
       task.state === 'DOING' || task.state === 'IN-PROGRESS',
     );
-    existing.classList.toggle('active', DEFAULT_ACTIVE_STATES.has(task.state));
+    element.classList.toggle('active', DEFAULT_ACTIVE_STATES.has(task.state));
   }
 
-  /** Recalculate visible tasks for current mode + search and update only the list subtree */
-  async refreshVisibleList(): Promise<void> {
+  // Set up scroll listener for lazy loading
+  private setupSentinelObserver(): void {
+    this.cleanupSentinelObserver();
+
+    const list = this.taskListContainer?.querySelector('ul.todo-list');
+    if (!list || !this.taskListContainer) return;
+
+    // Create sentinel element if not exists
+    if (!this.sentinelElement) {
+      this.sentinelElement = list.createEl('div', {
+        cls: 'todo-sentinel',
+        attr: { 'aria-hidden': 'true' },
+      });
+    }
+
+    // Use scroll event listener instead of IntersectionObserver
+    const scrollHandler = () => {
+      if (!this.taskListContainer || !this.sentinelElement) return;
+
+      const container = this.taskListContainer;
+      const sentinel = this.sentinelElement;
+
+      const scrollBottom = container.scrollTop + container.clientHeight;
+      const sentinelTop = sentinel.offsetTop;
+      const threshold = container.clientHeight + 200;
+      const isNearBottom = sentinelTop <= scrollBottom + threshold;
+
+      if (isNearBottom && !this.isLoadingMore && !this.isAllTasksLoaded) {
+        requestAnimationFrame(() => {
+          this.loadMoreTasks();
+        });
+      }
+    };
+
+    this.taskListContainer.addEventListener('scroll', scrollHandler);
+    this.scrollEventListener = scrollHandler;
+  }
+
+  private cleanupSentinelObserver(): void {
+    // Remove scroll listener (reuse existing scrollEventListener property)
+    if (this.taskListContainer && this.scrollEventListener) {
+      this.taskListContainer.removeEventListener(
+        'scroll',
+        this.scrollEventListener,
+      );
+    }
+    // Don't null out scrollEventListener as it's used for scroll position tracking
+
+    if (this.sentinelObserver) {
+      this.sentinelObserver.disconnect();
+      this.sentinelObserver = null;
+    }
+    if (this.sentinelElement) {
+      this.sentinelElement.remove();
+      this.sentinelElement = null;
+    }
+  }
+
+  private async loadMoreTasks(): Promise<void> {
+    if (this.isLoadingMore || this.isAllTasksLoaded) return;
+
+    this.isLoadingMore = true;
+    const list = this.taskListContainer?.querySelector('ul.todo-list');
+    if (!list) {
+      this.isLoadingMore = false;
+      return;
+    }
+
+    const remaining = this.totalTaskCount - this.loadedTaskCount;
+    if (remaining <= 0) {
+      this.isAllTasksLoaded = true;
+      this.isLoadingMore = false;
+      this.cleanupSentinelObserver();
+      return;
+    }
+
+    const toLoad = Math.min(remaining, LOAD_BATCH_SIZE);
+    const visibleTasks = this.cachedVisibleTasks;
+    const startIndex = this.loadedTaskCount;
+    const endIndex = startIndex + toLoad;
+    const tasksToLoad = visibleTasks.slice(startIndex, endIndex);
+
+    // Use chunked rendering for the new batch
+    await this.renderQueue.enqueue(
+      tasksToLoad,
+      (task) => this.buildTaskListItem(task),
+      list,
+    );
+
+    // Move sentinel to end so it's always after all loaded tasks
+    if (this.sentinelElement) {
+      list.appendChild(this.sentinelElement);
+    }
+
+    this.loadedTaskCount += toLoad;
+    this.isLoadingMore = false;
+
+    // Check if all tasks are now loaded
+    if (this.loadedTaskCount >= this.totalTaskCount) {
+      this.isAllTasksLoaded = true;
+      this.cleanupSentinelObserver();
+    }
+  }
+
+  private resetLazyLoading(): void {
+    this.loadedTaskCount = 0;
+    this.isAllTasksLoaded = false;
+    this.isLoadingMore = false;
+    this.cleanupSentinelObserver();
+  }
+
+  /** Recalculate visible tasks for current mode + search and update only the list subtree
+   * Always does a full rebuild to ensure correct sort order
+   * @param resetScroll If true, reset to top of list. If false, preserve scroll position.
+   */
+  async refreshVisibleList(resetScroll = false): Promise<void> {
+    // Cancel any pending debounced refresh - this call takes precedence
+    if (this.taskRefreshTimeout) {
+      clearTimeout(this.taskRefreshTimeout);
+      this.taskRefreshTimeout = null;
+    }
+
+    // Get saved scroll position (unless reset is requested)
+    // This is updated continuously via scroll event listener, so it's always accurate
+    const scrollContainer = this.taskListContainer;
+    const previousScrollTop = resetScroll ? 0 : this.savedScrollPosition;
+
     const container = this.contentEl;
 
     // Yield to main thread to prevent blocking user typing
@@ -1478,15 +1715,6 @@ export class TaskListView extends ItemView {
     if (sortDropdown) {
       const currentSortMethod = this.getSortMethod();
       sortDropdown.value = currentSortMethod;
-    }
-
-    // Ensure list container exists and is the sole place for items
-    let list = this.taskListContainer?.querySelector('ul.todo-list');
-    if (!list && this.taskListContainer) {
-      list = this.taskListContainer.createEl('ul', { cls: 'todo-list' });
-    }
-    if (list) {
-      list.empty();
     }
 
     const mode = this.getViewMode();
@@ -1658,22 +1886,102 @@ export class TaskListView extends ItemView {
     }
 
     // Render visible tasks using chunked rendering for performance
-    if (list) {
-      // Clear the list and cache when search/sort/view mode changes
-      this.taskElementCache.clear();
-      this.renderQueue.clear();
-      list.empty();
-
-      // Use chunked rendering
-      await this.renderQueue.enqueue(
-        visible,
-        (task) => this.buildTaskListItem(task),
-        list,
-      );
+    // Ensure list container exists and is the sole place for items
+    let list = this.taskListContainer?.querySelector('ul.todo-list');
+    if (!list && this.taskListContainer) {
+      list = this.taskListContainer.createEl('ul', { cls: 'todo-list' });
     }
 
-    // Cache visible tasks for smart refresh
+    if (list) {
+      // Smart diff: reuse existing DOM elements instead of full rebuild
+      // This prevents visible flicker when tasks are updated
+
+      // Get all existing elements by their stable ID (path:line)
+      const existingElements = new Map<string, HTMLElement>();
+      const existingKeys = new Set<string>();
+      list.querySelectorAll('li.todo-item').forEach((el) => {
+        const path = el.getAttribute('data-path');
+        const line = el.getAttribute('data-line');
+        if (path && line) {
+          const key = `${path}:${line}`;
+          existingElements.set(key, el as HTMLElement);
+          existingKeys.add(key);
+        }
+      });
+
+      // Determine which visible tasks to render
+      const renderCount = Math.min(visible.length, INITIAL_LOAD_COUNT);
+      const toRender = visible.slice(0, renderCount);
+
+      // Build a set of keys we're keeping
+      const keepKeys = new Set<string>();
+      toRender.forEach((t) => {
+        keepKeys.add(`${t.path}:${t.line}`);
+      });
+
+      // Track which elements we've already used this render cycle
+      const usedKeys = new Set<string>();
+
+      // Reorder/reuse existing elements, create new ones only if needed
+      for (let i = 0; i < toRender.length; i++) {
+        const task = toRender[i];
+        const key = `${task.path}:${task.line}`;
+
+        let element: HTMLLIElement;
+
+        if (existingElements.has(key)) {
+          // Reuse existing element - but update its content with new task data
+          const existingEl = existingElements.get(key);
+          if (existingEl) {
+            element = existingEl as HTMLLIElement;
+            this.updateTaskElementContent(task, element);
+            usedKeys.add(key);
+          } else {
+            element = this.buildTaskListItem(task);
+          }
+        } else {
+          // Create new element (task wasn't in DOM before)
+          element = this.buildTaskListItem(task);
+        }
+
+        // Update cache with the element (whether reused or new)
+        this.taskElementCache.set(task, element);
+
+        // Append to list in correct position
+        // If it's already in the list at a different position, appendChild moves it
+        list.appendChild(element);
+      }
+
+      // Remove elements that are no longer in visible list (lazy loaded items scrolled out)
+      existingKeys.forEach((key) => {
+        if (!keepKeys.has(key)) {
+          const el = existingElements.get(key);
+          if (el && el.parentNode && el.parentNode === list) {
+            list.removeChild(el);
+          }
+        }
+      });
+
+      // Update lazy loading state
+      this.renderQueue.clear();
+      this.resetLazyLoading();
+      this.totalTaskCount = visible.length;
+      this.isAllTasksLoaded = renderCount >= visible.length;
+      this.loadedTaskCount = renderCount;
+
+      // Set up sentinel observer for lazy loading if there are more tasks
+      if (!this.isAllTasksLoaded) {
+        this.setupSentinelObserver();
+      }
+    }
+
+    // Cache visible tasks
     this.cachedVisibleTasks = visible;
+
+    // Restore scroll position (unless reset was requested)
+    if (!resetScroll && scrollContainer) {
+      scrollContainer.scrollTop = previousScrollTop;
+    }
   }
 
   // Obsidian lifecycle methods for view open: keyed, minimal render
@@ -1689,6 +1997,15 @@ export class TaskListView extends ItemView {
     this.taskListContainer = container.createEl('div', {
       cls: 'todo-task-list-container',
     });
+
+    // Set up scroll event listener to continuously track scroll position
+    // This ensures scroll position is preserved across refreshes
+    this.scrollEventListener = () => {
+      if (this.taskListContainer) {
+        this.savedScrollPosition = this.taskListContainer.scrollTop;
+      }
+    };
+    this.taskListContainer.addEventListener('scroll', this.scrollEventListener);
 
     // Create aria-live region for screen reader announcements
     this.ariaLiveRegion = container.createEl('div', {
@@ -2112,6 +2429,15 @@ export class TaskListView extends ItemView {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
+    }
+
+    // Cleanup scroll event listener
+    if (this.scrollEventListener && this.taskListContainer) {
+      this.taskListContainer.removeEventListener(
+        'scroll',
+        this.scrollEventListener,
+      );
+      this.scrollEventListener = null;
     }
 
     this.searchInputEl = null;

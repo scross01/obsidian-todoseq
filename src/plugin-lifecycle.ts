@@ -85,6 +85,7 @@ export class PluginLifecycleManager {
           this.plugin.taskStateManager,
           this.plugin.settings.taskListViewMode,
           this.plugin.settings,
+          this.plugin,
         ),
     );
 

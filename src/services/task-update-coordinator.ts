@@ -30,6 +30,9 @@ export class TaskUpdateCoordinator {
     newState: string,
     source: 'editor' | 'reader' | 'task-list' | 'embedded' = 'editor',
   ): Promise<Task> {
+    // 0. Set flag to indicate user-initiated update
+    this.plugin.isUserInitiatedUpdate = true;
+
     // 1. Optimistic UI update - update in-memory state immediately
     this.performOptimisticUpdate(task, newState);
 
@@ -83,11 +86,8 @@ export class TaskUpdateCoordinator {
    * via CodeMirror decorations and DOM manipulation.
    */
   private performOptimisticUpdate(task: Task, newState: string): void {
-    // Update in-memory state
+    // Update in-memory state - subscriber callback will handle the refresh
     this.taskStateManager.optimisticUpdate(task, newState);
-
-    // Refresh task list views
-    this.plugin.refreshAllTaskListViews();
   }
 
   /**

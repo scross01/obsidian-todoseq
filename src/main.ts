@@ -51,6 +51,10 @@ export default class TodoTracker extends Plugin {
   // Event coordinator for unified vault event handling
   public eventCoordinator: EventCoordinator | null = null;
 
+  // Flag to track user-initiated updates (vs external file changes)
+  // Set true before updating task, false after refresh completes
+  public isUserInitiatedUpdate = false;
+
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
     return this.vaultScanner;
@@ -220,6 +224,7 @@ export default class TodoTracker extends Plugin {
 
   /**
    * Refresh all open task list views (including embedded task lists)
+   * Called for UI changes like sort, view mode, etc.
    */
   public refreshAllTaskListViews(): void {
     // Refresh main task list views

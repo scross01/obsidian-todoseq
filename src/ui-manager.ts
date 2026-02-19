@@ -658,7 +658,7 @@ export class UIManager {
       if (leaf.view instanceof TaskListView) {
         // Update the dropdown's task reference so it uses the latest tasks
         leaf.view.updateTasks(tasks);
-        // Lighter refresh: only update the visible list rather than full onOpen re-init
+        // Full refresh of the visible list
         leaf.view.refreshVisibleList();
       }
     }
