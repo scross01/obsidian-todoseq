@@ -170,6 +170,10 @@ export class TaskListView extends ItemView {
     null;
   private readonly SEARCH_REFRESH_DEBOUNCE_MS = 250; // 250ms debounce for search refresh
 
+  // Task state refresh debounce timer (class property for cleanup)
+  private taskRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
+  private readonly TASK_REFRESH_DEBOUNCE_MS = 150;
+
   // Keyword sort config caching
   private cachedKeywordConfig: KeywordSortConfig | null = null;
   private cachedKeywords: string | null = null;
@@ -188,8 +192,6 @@ export class TaskListView extends ItemView {
 
     // Subscribe to task changes from the centralized state manager
     // Use debouncing to prevent excessive re-renders during rapid changes (like typing)
-    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
-    const REFRESH_DEBOUNCE_MS = 150;
 
     this.unsubscribeFromStateManager = taskStateManager.subscribe((tasks) => {
       this.tasks = tasks;
@@ -228,13 +230,13 @@ export class TaskListView extends ItemView {
         }
 
         // Clear any pending refresh and schedule a new one
-        if (refreshTimeout) {
-          clearTimeout(refreshTimeout);
+        if (this.taskRefreshTimeout) {
+          clearTimeout(this.taskRefreshTimeout);
         }
-        refreshTimeout = setTimeout(async () => {
-          refreshTimeout = null;
+        this.taskRefreshTimeout = setTimeout(async () => {
+          this.taskRefreshTimeout = null;
           await this.refreshVisibleList();
-        }, REFRESH_DEBOUNCE_MS);
+        }, this.TASK_REFRESH_DEBOUNCE_MS);
       }
     });
   }
@@ -2060,6 +2062,18 @@ export class TaskListView extends ItemView {
     if (this.searchHistoryDebounceTimer) {
       clearTimeout(this.searchHistoryDebounceTimer);
       this.searchHistoryDebounceTimer = null;
+    }
+
+    // Cleanup search refresh debounce timer
+    if (this.searchRefreshDebounceTimer) {
+      clearTimeout(this.searchRefreshDebounceTimer);
+      this.searchRefreshDebounceTimer = null;
+    }
+
+    // Cleanup task refresh debounce timer
+    if (this.taskRefreshTimeout) {
+      clearTimeout(this.taskRefreshTimeout);
+      this.taskRefreshTimeout = null;
     }
 
     // Cleanup suggestion dropdowns
