@@ -132,8 +132,8 @@ function stripMarkdownForDisplay(input: string): string {
   if (!input) return '';
   let out = input;
 
-  // HTML tags - regex is much faster than DOMParser
-  out = out.replace(/<[^>]+>/g, '');
+  // Remove angle brackets so no HTML tags (e.g. <script>) can be formed
+  out = out.replace(/[<>]/g, '');
 
   // Images: ![alt](url) -> alt
   out = out.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
