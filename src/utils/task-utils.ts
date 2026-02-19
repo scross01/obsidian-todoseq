@@ -132,9 +132,8 @@ function stripMarkdownForDisplay(input: string): string {
   if (!input) return '';
   let out = input;
 
-  // HTML tags - use DOMParser to safely strip HTML tags
-  const doc = new DOMParser().parseFromString(out, 'text/html');
-  out = doc.body.textContent || '';
+  // HTML tags - regex is much faster than DOMParser
+  out = out.replace(/<[^>]+>/g, '');
 
   // Images: ![alt](url) -> alt
   out = out.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');

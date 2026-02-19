@@ -32,7 +32,13 @@ import { TaskStateManager } from '../../services/task-state-manager';
 import { TAG_PATTERN } from '../../utils/patterns';
 import { getTaskTextDisplay } from '../../utils/task-utils';
 
-const CHUNK_BATCH_SIZE = 40;
+const CHUNK_BATCH_SIZE = 15;
+const YIELD_EVERY_N_TASKS = 5;
+const PRIORITY_FIRST_BATCH = 10; // Render this many before first yield
+
+const WIKI_LINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+const MD_LINK_REGEX = /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g;
+const URL_REGEX = /\bhttps?:\/\/[^\s)]+/g;
 
 interface CachedTaskElement {
   element: HTMLLIElement;
@@ -101,8 +107,16 @@ class ChunkedRenderQueue {
     const container = this.container;
     if (!renderFn || !container) return;
 
+    let priorityRendered = 0;
+    let renderedInBatch = 0;
+
     while (this.pending.length > 0) {
-      const batch = this.pending.splice(0, CHUNK_BATCH_SIZE);
+      const isFirstBatch = priorityRendered < PRIORITY_FIRST_BATCH;
+      const batchSize = isFirstBatch
+        ? Math.min(CHUNK_BATCH_SIZE, PRIORITY_FIRST_BATCH - priorityRendered)
+        : CHUNK_BATCH_SIZE;
+
+      const batch = this.pending.splice(0, batchSize);
 
       for (const task of batch) {
         if (!this.cache.has(task)) {
@@ -110,9 +124,15 @@ class ChunkedRenderQueue {
           this.cache.set(task, element);
           container.appendChild(element);
         }
-      }
+        priorityRendered++;
+        renderedInBatch++;
 
-      await new Promise((resolve) => setTimeout(resolve, 0));
+        // Yield every N tasks to prevent UI blocking
+        if (renderedInBatch >= YIELD_EVERY_N_TASKS) {
+          renderedInBatch = 0;
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
     }
 
     this.isProcessing = false;
@@ -1822,14 +1842,10 @@ export class TaskListView extends ItemView {
     // Use lazy-computed textDisplay for better performance
     const textToProcess = getTaskTextDisplay(task);
     const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp }[] = [
-      // [[Page]] or [[Page|Alias]]
-      { type: 'wiki', regex: /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g },
-      // [Alias](target) - improved regex to handle brackets in link text
-      { type: 'md', regex: /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g },
-      // bare URLs
-      { type: 'url', regex: /\bhttps?:\/\/[^\s)]+/g },
-      // #tags (must come after URLs to avoid conflicts with URLs containing #)
-      { type: 'tag', regex: TAG_PATTERN },
+      { type: 'wiki', regex: new RegExp(WIKI_LINK_REGEX) },
+      { type: 'md', regex: new RegExp(MD_LINK_REGEX) },
+      { type: 'url', regex: new RegExp(URL_REGEX) },
+      { type: 'tag', regex: new RegExp(TAG_PATTERN) },
     ];
 
     let i = 0;
