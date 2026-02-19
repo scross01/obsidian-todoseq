@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.10.2
+
+- Fixed performance issues with larger vaults causing lag while typing when task list is visible. #48
+- Fixed settings corruption.
+
 ## 0.10.1
 
 - Fixed issue with task keyword occationaly not clickable on new pages. #44

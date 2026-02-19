@@ -142,9 +142,6 @@ export default class TodoTracker extends Plugin {
       loaded as Partial<TodoTrackerSettings>,
     );
 
-    // Add app instance to settings for PropertySearchEngine access
-    (this.settings as TodoTrackerSettings & { app: typeof this.app }).app =
-      this.app;
     // Normalize settings shape after migration: ensure additionalTaskKeywords exists
     if (!this.settings.additionalTaskKeywords) {
       this.settings.additionalTaskKeywords = [];
@@ -212,15 +209,6 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called to save settings
   async saveSettings() {
-    // Add app instance to settings for PropertySearchEngine access
-    (this.settings as TodoTrackerSettings & { app: typeof this.app }).app =
-      this.app;
-
-    // Update property search engine with new settings
-    if (this.propertySearchEngine) {
-      // Property search engine settings are handled in initializeStartupScan
-    }
-
     await this.saveData(this.settings);
   }
 

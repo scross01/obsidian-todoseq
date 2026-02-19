@@ -20,8 +20,6 @@ export interface TodoTrackerSettings {
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
-  // Property search engine instance
-  propertySearchEngine?: import('../services/property-search-engine').PropertySearchEngine; // Property search engine instance
   // Hidden setting - not exposed in UI, used to track first install
   _hasShownFirstInstallView?: boolean; // true after first install view has been shown
 }
