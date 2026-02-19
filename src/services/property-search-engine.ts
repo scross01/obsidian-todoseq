@@ -34,6 +34,10 @@ export class PropertySearchEngine {
   private initializationPromise: Promise<void> | null = null; // Track if initialization is already queued
   private eventListenersRegistered = false; // Track if event listeners have been registered
 
+  // Track pending update timeout for cleanup
+  private pendingUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+  private readonly PENDING_UPDATE_DEBOUNCE_MS = 100;
+
   // Store event references for proper cleanup
   private vaultRenameEventRef: ReturnType<App['vault']['on']> | null = null;
   private vaultDeleteEventRef: ReturnType<App['vault']['on']> | null = null;
@@ -766,7 +770,10 @@ export class PropertySearchEngine {
     // Debounce updates
     if (!this.isUpdating) {
       this.isUpdating = true;
-      setTimeout(() => this.processPendingUpdates(), 100);
+      this.pendingUpdateTimeout = setTimeout(
+        () => this.processPendingUpdates(),
+        this.PENDING_UPDATE_DEBOUNCE_MS,
+      );
     }
   }
 
@@ -825,7 +832,10 @@ export class PropertySearchEngine {
     // Debounce updates only if we actually added a new pending update
     if (added && !this.isUpdating) {
       this.isUpdating = true;
-      setTimeout(() => this.processPendingUpdates(), 1000); // TODO make the debouce a constant
+      this.pendingUpdateTimeout = setTimeout(
+        () => this.processPendingUpdates(),
+        1000,
+      );
     }
   }
 
@@ -1083,7 +1093,10 @@ export class PropertySearchEngine {
   destroy(): void {
     this.unregisterEventListeners();
     this.reset();
-    // Clear any pending timeouts
-    // Note: In a real implementation, you'd want to track and clear any pending timeouts
+    // Clear any pending update timeout
+    if (this.pendingUpdateTimeout) {
+      clearTimeout(this.pendingUpdateTimeout);
+      this.pendingUpdateTimeout = null;
+    }
   }
 }
