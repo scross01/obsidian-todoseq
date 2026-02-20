@@ -303,86 +303,6 @@ export class VaultScanner {
     return parsed;
   }
 
-  /**
-   * Handles file change events (create, modify, delete) with incremental updates.
-   *
-   * File Operation Strategy:
-   * - Uses getAbstractFileByPath() for direct file lookup (better performance than iteration)
-   * - Filters by file extension to only process eligible files (avoids unnecessary processing)
-   * - Checks file existence before operations to handle delete events safely
-   *
-   * @param file The file that changed
-   */
-  async handleFileChange(file: TAbstractFile): Promise<void> {
-    try {
-      // Only process eligible files
-      if (!(file instanceof TFile) || !this.shouldScanFile(file)) {
-        return;
-      }
-
-      // Get current tasks and remove existing tasks for this file
-      const currentTasks = this.taskStateManager.getTasks();
-      const updatedTasks = currentTasks.filter(
-        (task) => task.path !== file.path,
-      );
-
-      // Check if the file still exists before attempting to read it (delete events)
-      // Using getAbstractFileByPath() is more efficient than iterating all files
-      const stillExists =
-        this.app.vault.getAbstractFileByPath(file.path) instanceof TFile;
-      if (stillExists) {
-        // Re-scan the file
-        const fileTasks = await this.scanFile(file);
-        updatedTasks.push(...fileTasks);
-      }
-
-      // Maintain default sort after incremental updates
-      updatedTasks.sort(taskComparator);
-
-      // Update the centralized state manager
-      this.taskStateManager.setTasks(updatedTasks);
-
-      // Emit events for backward compatibility
-      this.emit('tasks-changed', updatedTasks);
-    } catch (err) {
-      console.error('VaultScanner handleFileChange error', err);
-      this.emit(
-        'scan-error',
-        err instanceof Error ? err : new Error(String(err)),
-      );
-    }
-  }
-
-  // Handle rename: remove tasks for the old path, then scan the new file location
-  async handleFileRename(file: TAbstractFile, oldPath: string): Promise<void> {
-    try {
-      // Get current tasks and remove existing tasks for the old path
-      const currentTasks = this.taskStateManager.getTasks();
-      const updatedTasks = currentTasks.filter((t) => t.path !== oldPath);
-
-      // If the file still exists (it should after rename), scan it at its new location
-      if (file instanceof TFile && this.shouldScanFile(file)) {
-        const fileTasks = await this.scanFile(file);
-        updatedTasks.push(...fileTasks);
-      }
-
-      // Keep sorted state
-      updatedTasks.sort(taskComparator);
-
-      // Update the centralized state manager
-      this.taskStateManager.setTasks(updatedTasks);
-
-      // Emit events for backward compatibility
-      this.emit('tasks-changed', updatedTasks);
-    } catch (err) {
-      console.error('VaultScanner handleFileRename error', err);
-      this.emit(
-        'scan-error',
-        err instanceof Error ? err : new Error(String(err)),
-      );
-    }
-  }
-
   // Get the current scanning state
   isScanning(): boolean {
     return this._isScanning;
@@ -444,12 +364,18 @@ export class VaultScanner {
     }
 
     // Build parser config for updating all parsers using all keyword groups
-    const { allKeywords, completedKeywords } =
+    const { allKeywords, completedKeywords, activeKeywords, waitingKeywords } =
       buildKeywordsFromGroups(newSettings);
     const config: ParserConfig = {
       keywords: allKeywords,
       completedKeywords: completedKeywords,
+      activeKeywords: activeKeywords,
+      waitingKeywords: waitingKeywords,
       urgencyCoefficients: this.urgencyCoefficients,
+      includeCalloutBlocks: newSettings.includeCalloutBlocks,
+      includeCodeBlocks: newSettings.includeCodeBlocks,
+      includeCommentBlocks: newSettings.includeCommentBlocks,
+      languageCommentSupport: newSettings.languageCommentSupport,
     };
 
     // Update all registered parsers with new config
