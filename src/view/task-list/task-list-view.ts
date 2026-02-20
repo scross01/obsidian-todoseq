@@ -1776,6 +1776,12 @@ export class TaskListView extends ItemView {
       // Keep toolbar enabled: do not disable or overlay; list remains empty
       return;
     } else if (visible.length === 0) {
+      // Clear all existing tasks from the list first
+      const taskList = this.taskListContainer?.querySelector('ul.todo-list');
+      if (taskList) {
+        taskList.empty();
+      }
+
       // Remove any previous empty-state
       const prevEmpty = container.querySelector('.todo-empty');
       if (prevEmpty) prevEmpty.detach?.();
