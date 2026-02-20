@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.11.0-dev
+
+- Added setting option for scanning additional file types in the vault for tasks. e.g. `.txt`
+
 ## 0.10.2
 
 - Fixed performance issues with larger vaults causing lag while typing when task list is visible. #48

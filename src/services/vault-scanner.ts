@@ -10,6 +10,42 @@ import {
 import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
 import { PropertySearchEngine } from './property-search-engine';
+import { BINARY_EXTENSIONS } from '../utils/constants';
+
+/**
+ * Check if a file extension indicates a binary file
+ * @param extension The file extension (without the leading dot)
+ * @returns true if the extension is known to be binary
+ */
+function isBinaryExtension(extension: string): boolean {
+  return BINARY_EXTENSIONS.has(extension.toLowerCase());
+}
+
+/**
+ * Check if a file is likely a text file by examining its extension
+ * Supports multi-level extensions like .txt.bak
+ * @param file The file to check
+ * @returns true if the file is likely a text file
+ */
+function isLikelyTextFile(file: TFile): boolean {
+  const extension = file.extension.toLowerCase();
+
+  // Check if the extension is a known binary type
+  if (isBinaryExtension(extension)) {
+    return false;
+  }
+
+  // For multi-level extensions, check the last part
+  // e.g., .txt.bak -> check both 'bak' and 'txt'
+  const extensionParts = extension.split('.');
+  for (const part of extensionParts) {
+    if (isBinaryExtension(part)) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -131,15 +167,23 @@ export class VaultScanner {
 
       // Yield configuration: how often to yield a frame while scanning
       const YIELD_EVERY_FILES = 20;
-      let processedMd = 0;
+      let processedFiles = 0;
 
       for (const file of files) {
-        if (file.extension === 'md' && !this.isExcluded(file.path)) {
+        if (this.shouldScanFile(file)) {
+          // Check if file is likely a text file before scanning
+          if (!isLikelyTextFile(file)) {
+            console.warn(
+              `TODOseq: skipping non-text file: ${file.path} (extension: .${file.extension})`,
+            );
+            continue;
+          }
+
           const fileTasks = await this.scanFile(file);
           newTasks.push(...fileTasks);
-          processedMd++;
+          processedFiles++;
 
-          if (processedMd % YIELD_EVERY_FILES === 0) {
+          if (processedFiles % YIELD_EVERY_FILES === 0) {
             // Yield to the event loop to keep UI responsive during large scans
             await this.yieldToEventLoop();
           }
@@ -170,6 +214,44 @@ export class VaultScanner {
     } finally {
       this._isScanning = false;
     }
+  }
+
+  /**
+   * Check if a file should be scanned based on extension and exclusion rules
+   * @param file The file to check
+   * @returns true if the file should be scanned
+   */
+  private shouldScanFile(file: TFile): boolean {
+    // Check if file is excluded by Obsidian's user ignore filters
+    if (this.isExcluded(file.path)) {
+      return false;
+    }
+
+    // Check if file is a markdown file
+    if (file.extension === 'md') {
+      return true;
+    }
+
+    // Check if file extension matches any additional extensions from settings
+    const additionalExtensions = this.settings.additionalFileExtensions ?? [];
+    if (additionalExtensions.length > 0) {
+      const fileExtension = '.' + file.extension.toLowerCase();
+      // Check for exact match (e.g., .org matches file.extension 'org')
+      if (additionalExtensions.includes(fileExtension)) {
+        return true;
+      }
+      // Check for multi-level extension match (e.g., .txt.bak matches file.bak)
+      // The file.extension in Obsidian is the last part after the last dot
+      // For multi-level extensions, we need to check the full filename
+      const fileName = file.name.toLowerCase();
+      for (const ext of additionalExtensions) {
+        if (fileName.endsWith(ext.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -242,6 +324,64 @@ export class VaultScanner {
     return parsed;
   }
 
+  /**
+   * Handles file change events (create, modify, delete) with incremental updates.
+   *
+   * File Operation Strategy:
+   * - Uses getAbstractFileByPath() for direct file lookup (better performance than iteration)
+   * - Filters by file extension to only process eligible files (avoids unnecessary processing)
+   * - Checks file existence before operations to handle delete events safely
+   *
+   * @param file The file that changed
+   */
+  async handleFileChange(file: TAbstractFile): Promise<void> {
+    try {
+      // Only process eligible files
+      if (!(file instanceof TFile) || !this.shouldScanFile(file)) {
+        return;
+      }
+
+      // Check if file is likely a text file before scanning
+      if (!isLikelyTextFile(file)) {
+        console.warn(
+          `TODOseq: skipping non-text file: ${file.path} (extension: .${file.extension})`,
+        );
+        return;
+      }
+
+      // Get current tasks and remove existing tasks for this file
+      const currentTasks = this.taskStateManager.getTasks();
+      const updatedTasks = currentTasks.filter(
+        (task) => task.path !== file.path,
+      );
+
+      // Check if the file still exists before attempting to read it (delete events)
+      // Using getAbstractFileByPath() is more efficient than iterating all files
+      const stillExists =
+        this.app.vault.getAbstractFileByPath(file.path) instanceof TFile;
+      if (stillExists) {
+        // Re-scan the file
+        const fileTasks = await this.scanFile(file);
+        updatedTasks.push(...fileTasks);
+      }
+
+      // Maintain default sort after incremental updates
+      updatedTasks.sort(taskComparator);
+
+      // Update the centralized state manager
+      this.taskStateManager.setTasks(updatedTasks);
+
+      // Emit events for backward compatibility
+      this.emit('tasks-changed', updatedTasks);
+    } catch (err) {
+      console.error('VaultScanner handleFileChange error', err);
+      this.emit(
+        'scan-error',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+    }
+  }
+
   // Handle rename: remove tasks for the old path, then scan the new file location
   async handleFileRename(file: TAbstractFile, oldPath: string): Promise<void> {
     try {
@@ -250,9 +390,16 @@ export class VaultScanner {
       const updatedTasks = currentTasks.filter((t) => t.path !== oldPath);
 
       // If the file still exists (it should after rename), scan it at its new location
-      if (file instanceof TFile && !this.isExcluded(file.path)) {
-        const fileTasks = await this.scanFile(file);
-        updatedTasks.push(...fileTasks);
+      if (file instanceof TFile && this.shouldScanFile(file)) {
+        // Check if file is likely a text file before scanning
+        if (!isLikelyTextFile(file)) {
+          console.warn(
+            `TODOseq: skipping non-text file: ${file.path} (extension: .${file.extension})`,
+          );
+        } else {
+          const fileTasks = await this.scanFile(file);
+          updatedTasks.push(...fileTasks);
+        }
       }
 
       // Keep sorted state
