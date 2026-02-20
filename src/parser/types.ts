@@ -26,6 +26,20 @@ export interface ParserConfig {
 
   /** Urgency coefficients for task scoring */
   urgencyCoefficients: UrgencyCoefficients;
+
+  /** Whether to include tasks inside callout blocks */
+  includeCalloutBlocks?: boolean;
+
+  /** Whether to include tasks inside code blocks */
+  includeCodeBlocks?: boolean;
+
+  /** Whether to include tasks inside comment blocks */
+  includeCommentBlocks?: boolean;
+
+  /** Language comment support settings */
+  languageCommentSupport?: {
+    enabled: boolean;
+  };
 }
 
 /**

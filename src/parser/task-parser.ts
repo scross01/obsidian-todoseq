@@ -546,6 +546,29 @@ export class TaskParser implements ITaskParser {
       this.waitingKeywordsSet = new Set(config.waitingKeywords);
     }
 
+    // Update task detection settings if provided
+    if (config.includeCalloutBlocks !== undefined) {
+      (
+        this as unknown as { includeCalloutBlocks: boolean }
+      ).includeCalloutBlocks = config.includeCalloutBlocks;
+    }
+    if (config.includeCodeBlocks !== undefined) {
+      (this as unknown as { includeCodeBlocks: boolean }).includeCodeBlocks =
+        config.includeCodeBlocks;
+    }
+    if (config.includeCommentBlocks !== undefined) {
+      (
+        this as unknown as { includeCommentBlocks: boolean }
+      ).includeCommentBlocks = config.includeCommentBlocks;
+    }
+    if (config.languageCommentSupport !== undefined) {
+      (
+        this as unknown as {
+          languageCommentSupport: LanguageCommentSupportSettings;
+        }
+      ).languageCommentSupport = config.languageCommentSupport;
+    }
+
     // Rebuild regex with new keywords
     const regex = TaskParser.buildRegex(config.keywords);
     (this as { testRegex: RegExp }).testRegex = regex.test;
