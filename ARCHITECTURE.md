@@ -31,6 +31,8 @@ graph TB
             UpdateCoordinator["TaskUpdateCoordinator<br/>Update Pipeline"]
             EditorController["EditorController<br/>Editor Operations"]
             TaskWriter["TaskWriter<br/>File Operations"]
+            EventCoordinator["EventCoordinator<br/>Unified Event Handling"]
+            PropertySearchEngine["PropertySearchEngine<br/>Property Search"]
         end
 
         subgraph "UI Layer"
@@ -41,10 +43,14 @@ graph TB
             EditorKeywordMenu["EditorKeywordMenu<br/>Keyword Menu"]
             StateMenuBuilder["StateMenuBuilder<br/>State Menu"]
             EmbeddedProcessor["TodoseqCodeBlockProcessor<br/>Embedded Lists"]
+            SearchOptionsDropdown["SearchOptionsDropdown<br/>Search Options"]
+            SearchSuggestionDropdown["SearchSuggestionDropdown<br/>Search Suggestions"]
         end
 
         subgraph "Parser Layer"
-            TaskParser["TaskParser<br/>Regex Engine"]
+            TaskParser["TaskParser<br/>Markdown Engine"]
+            OrgModeParser["OrgModeTaskParser<br/>Org-mode Engine"]
+            ParserRegistry["ParserRegistry<br/>Parser Router"]
             LanguageRegistry["LanguageRegistry<br/>Multi-language Support"]
             DateParser["DateParser<br/>Date Recognition"]
         end
@@ -82,39 +88,55 @@ graph TB
     Main --> VaultScanner
     Main --> UpdateCoordinator
     Main --> UIManager
+    Main --> EventCoordinator
+    Main --> PropertySearchEngine
 
     StateManager --> TaskListView
     StateManager --> EmbeddedProcessor
     StateManager --> Search
 
-    VaultScanner --> TaskParser
-    VaultScanner --> LanguageRegistry
+    VaultScanner --> ParserRegistry
+    ParserRegistry --> TaskParser
+    ParserRegistry --> OrgModeParser
+    TaskParser --> LanguageRegistry
+    TaskParser --> DateParser
+    OrgModeParser --> DateParser
     VaultScanner --> FileSystem
 
     UpdateCoordinator --> StateManager
-    UpdateCoordinator --> TaskEditor
+    UpdateCoordinator --> TaskWriter
     UpdateCoordinator --> UIManager
+
+    EventCoordinator --> VaultScanner
+    EventCoordinator --> PropertySearchEngine
+    EventCoordinator --> FileSystem
+
+    PropertySearchEngine --> Search
+    Search --> SearchParser
+    Search --> SearchEvaluator
+    Search --> StateManager
 
     UIManager --> Editor
     UIManager --> TaskListView
     UIManager --> ReaderFormatter
 
     TaskListView --> Search
-    TaskEditor --> FileSystem
-
-    Search --> SearchParser
-    Search --> SearchEvaluator
-    Search --> StateManager
+    TaskWriter --> FileSystem
 
     TaskParser --> DateParser
     TaskParser --> LanguageRegistry
     TaskParser --> TaskUtils
 
+    %% Search dropdown connections
+    TaskListView --> SearchOptionsDropdown
+    TaskListView --> SearchSuggestionDropdown
+    SearchOptionsDropdown --> SearchSuggestionDropdown
+
     %% External connections
     Main --> ObsidianAPI
     Main --> Workspace
     VaultScanner --> FileSystem
-    TaskEditor --> FileSystem
+    TaskWriter --> FileSystem
     DateUtils --> DailyNotes
 
     %% Styling
@@ -126,9 +148,9 @@ graph TB
     classDef external fill:#f5f5f5
 
     class Main pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator serviceLayer
-    class UIManager,TaskListView,TaskEditor,ReaderFormatter,EmbeddedProcessor uiLayer
-    class TaskParser,LanguageRegistry,DateParser parserLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine serviceLayer
+    class UIManager,TaskListView,TaskWriter,ReaderFormatter,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
+    class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
     class Search,SearchParser,SearchEvaluator searchLayer
     class ObsidianAPI,Workspace,FileSystem,Editor,DailyNotes external
 ```
@@ -166,6 +188,18 @@ graph TB
 - **Responsibility**: Atomic file operations, state preservation, formatting
 - **Key Patterns**: Strategy pattern, atomic operations
 - **Interface**: `updateFile()`, `generateTaskLine()`, file persistence
+
+**EventCoordinator** (`src/services/event-coordinator.ts`)
+
+- **Responsibility**: Unified vault event handling with debouncing and batching
+- **Key Patterns**: Event aggregation, debouncing, batch processing
+- **Interface**: `onFileChange()`, `initialize()`, event coordination
+
+**PropertySearchEngine** (`src/services/property-search-engine.ts`)
+
+- **Responsibility**: Property-based search with caching and optimization
+- **Key Patterns**: Singleton, caching, async initialization
+- **Interface**: `searchProperties()`, `isReady()`, `onFileChanged()`, property cache management
 
 ### 2. UI Layer (User Interaction)
 
@@ -211,13 +245,43 @@ graph TB
 - **Key Patterns**: Post-processor registration, separate lifecycle
 - **Interface**: Code block parsing, embedded list rendering
 
+**SearchOptionsDropdown** (`src/view/components/search-options-dropdown.ts`)
+
+- **Responsibility**: Search options and history management with dropdown UI
+- **Key Patterns**: Dropdown UI, search history, debounced updates
+- **Interface**: Search history management, options display, debounce control
+
+**SearchSuggestionDropdown** (`src/view/components/search-suggestion-dropdown.ts`)
+
+- **Responsibility**: Search query suggestions and autocomplete
+- **Key Patterns**: Prefix matching, suggestion ranking, dropdown UI
+- **Interface**: Suggestion generation, prefix filtering, keyboard navigation
+
 ### 3. Parser Layer (Data Extraction)
+
+**ITaskParser Interface** (`src/parser/types.ts`)
+
+- **Responsibility**: Defines the contract for all task parsers
+- **Key Patterns**: Interface segregation, strategy pattern
+- **Interface**: `parseFile()`, `parseLine()`, `supportsFile()`, `getFileExtensions()`
+
+**ParserRegistry** (`src/parser/parser-registry.ts`)
+
+- **Responsibility**: Manages multiple parsers and routes files to appropriate parser
+- **Key Patterns**: Registry pattern, factory pattern, file extension routing
+- **Interface**: `registerParser()`, `getParserForFile()`, `parseFile()`
 
 **TaskParser** (`src/parser/task-parser.ts`)
 
-- **Responsibility**: Complex regex-based task extraction
+- **Responsibility**: Complex regex-based task extraction for Markdown files
 - **Key Patterns**: State machine, builder pattern, security-first design
-- **Interface**: `parseFile()`, `parseLine()`, language-aware parsing
+- **Interface**: Implements `ITaskParser`, `parseFile()`, `parseLine()`, language-aware parsing
+
+**OrgModeTaskParser** (`src/parser/org-mode-task-parser.ts`)
+
+- **Responsibility**: Parse tasks from Org-mode files (`.org` extension)
+- **Key Patterns**: Headline-based parsing, org-mode syntax support
+- **Interface**: Implements `ITaskParser`, supports priorities, scheduled/deadline dates
 
 **LanguageRegistry** (`src/parser/language-registry.ts`)
 
@@ -237,19 +301,19 @@ graph TB
 
 - **Responsibility**: AST building from query tokens
 - **Key Patterns**: Parser combinators, syntax tree construction
-- **Interface**: Query parsing, AST generation
+- **Interface**: Query parsing, AST generation, property filter parsing
 
 **SearchEvaluator** (`src/search/search-evaluator.ts`)
 
 - **Responsibility**: Task matching and filtering based on query AST
-- **Key Patterns**: Visitor pattern, filter chain execution
-- **Interface**: Task evaluation, result filtering
+- **Key Patterns**: Visitor pattern, filter chain execution, property search integration
+- **Interface**: Task evaluation, result filtering, `evaluatePropertyFilter()`
 
 **SearchTokenizer** (`src/search/search-tokenizer.ts`)
 
 - **Responsibility**: Lexical analysis of search queries
-- **Key Patterns**: Tokenization, pattern matching
-- **Interface**: Token generation, lexical analysis
+- **Key Patterns**: Tokenization, pattern matching, property token detection
+- **Interface**: Token generation, lexical analysis, property token handling
 
 **SearchSuggestions** (`src/search/search-suggestions.ts`)
 
@@ -269,20 +333,26 @@ graph TD
         StateManager[TaskStateManager]
         VaultScanner[VaultScanner]
         UpdateCoordinator[TaskUpdateCoordinator]
+        EventCoordinator[EventCoordinator]
+        PropertySearchEngine[PropertySearchEngine]
     end
 
-    subgraph "UI Layer Dependencies"
-        UIManager[UIManager]
-        TaskListView[TaskListView]
-        ReaderFormatter[ReaderViewFormatter]
-        StatusBar[StatusBarManager]
-        EditorKeywordMenu[EditorKeywordMenu]
-        StateMenuBuilder[StateMenuBuilder]
-        EmbeddedProcessor[TodoseqCodeBlockProcessor]
-    end
+     subgraph "UI Layer Dependencies"
+         UIManager[UIManager]
+         TaskListView[TaskListView]
+         ReaderFormatter[ReaderViewFormatter]
+         StatusBar[StatusBarManager]
+         EditorKeywordMenu[EditorKeywordMenu]
+         StateMenuBuilder[StateMenuBuilder]
+         EmbeddedProcessor[TodoseqCodeBlockProcessor]
+         SearchOptionsDropdown[SearchOptionsDropdown]
+         SearchSuggestionDropdown[SearchSuggestionDropdown]
+     end
 
     subgraph "Parser Dependencies"
         TaskParser[TaskParser]
+        OrgModeParser[OrgModeTaskParser]
+        ParserRegistry[ParserRegistry]
         LanguageRegistry[LanguageRegistry]
         DateParser[DateParser]
     end
@@ -328,6 +398,8 @@ graph TD
     Main --> EditorController
     Main --> TaskWriter
     Main --> LifecycleManager
+    Main --> EventCoordinator
+    Main --> PropertySearchEngine
 
     StateManager -.-> Main
     VaultScanner -.-> Main
@@ -336,6 +408,8 @@ graph TD
     EditorController -.-> Main
     TaskWriter -.-> Main
     LifecycleManager -.-> Main
+    EventCoordinator -.-> Main
+    PropertySearchEngine -.-> Main
 
     UpdateCoordinator --> StateManager
     UpdateCoordinator --> TaskWriter
@@ -346,12 +420,18 @@ graph TD
     UIManager --> EditorKeywordMenu
     UIManager --> StateMenuBuilder
 
-    TaskListView --> StateManager
-    TaskListView --> Search
+     TaskListView --> StateManager
+     TaskListView --> Search
+     TaskListView --> SearchOptionsDropdown
+     TaskListView --> SearchSuggestionDropdown
+     SearchOptionsDropdown --> SearchSuggestionDropdown
 
-    VaultScanner --> TaskParser
+    VaultScanner --> ParserRegistry
+    ParserRegistry --> TaskParser
+    ParserRegistry --> OrgModeParser
     TaskParser --> LanguageRegistry
     TaskParser --> DateParser
+    OrgModeParser --> DateParser
     TaskParser --> TaskUtils
     TaskParser --> Patterns
 
@@ -360,6 +440,10 @@ graph TD
     SearchParser --> SearchTokenizer
     Search --> SearchSuggestions
     Search --> StateManager
+    SearchEvaluator --> PropertySearchEngine
+
+    EventCoordinator --> VaultScanner
+    EventCoordinator --> PropertySearchEngine
 
     EditorController --> TaskWriter
     EditorController --> StateManager
@@ -367,6 +451,7 @@ graph TD
     TaskWriter --> Obsidian
     VaultScanner --> Obsidian
     DateUtils --> DailyNotes
+    PropertySearchEngine --> Obsidian
 
     TaskListView --> Obsidian
     ReaderFormatter --> Obsidian
@@ -398,9 +483,9 @@ graph TD
 
     %% Class styling for component types
     class Main,LifecycleManager pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter serviceLayer
-    class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor uiLayer
-    class TaskParser,LanguageRegistry,DateParser parserLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine serviceLayer
+     class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
+    class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
     class Search,SearchParser,SearchEvaluator,SearchTokenizer,SearchSuggestions searchLayer
     class TaskUtils,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils utilityLayer
     class Obsidian,DailyNotes external
@@ -417,7 +502,9 @@ sequenceDiagram
     participant EditorCtrl as EditorController
     participant TaskWriter as TaskWriter
     participant FileSys as File System
+    participant EventCoord as EventCoordinator
     participant VaultScan as VaultScanner
+    participant PropertySearch as PropertySearchEngine
     participant Views as All Views
 
     User->>UI: Click task keyword / edit task
@@ -440,12 +527,16 @@ sequenceDiagram
     TaskWriter-->>Coordinator: Success/Failure
 
     alt File Update Success
-        Note over Coordinator: Phase 4: View Synchronization
-        Coordinator->>VaultScan: notifyFileChanged()
+        Note over Coordinator: Phase 4: Event Coordination
+        FileSys-->>EventCoord: File change event
+        EventCoord->>EventCoord: Debounce and batch
+        EventCoord->>VaultScan: processFileChange()
         VaultScan->>VaultScan: Re-parse affected file
         VaultScan->>StateMgr: updateTasks()
         StateMgr->>Views: notifySubscribers()
         Views->>Views: Refresh with confirmed state
+        EventCoord->>PropertySearch: onFileChanged()
+        PropertySearch->>PropertySearch: Update property cache
     else File Update Failure
         Coordinator->>StateMgr: rollbackUpdate()
         StateMgr->>Views: notifySubscribers()
@@ -465,6 +556,9 @@ graph LR
     subgraph "Query Input"
         UserInput[User Search Query]
         PrefixFilters[Prefix Filters<br/>title:, tag:, etc.]
+        PropertyFilters[Property Filters<br/>[key:value]]
+        SearchHistory[Search History<br/>Recent Queries]
+        SearchOptions[Search Options<br/>Case sensitivity, etc.]
     end
 
     subgraph "Parsing Pipeline"
@@ -477,26 +571,36 @@ graph LR
         Evaluator[SearchEvaluator<br/>Task Matching]
         FilterChain[Filter Chain<br/>Multi-criteria]
         SortEngine[Sort Engine<br/>Results Ordering]
+        PropertySearch[PropertySearchEngine<br/>Property Lookup]
     end
 
-    subgraph "Integration Points"
-        TaskSource[TaskStateManager<br/>Task Data Source]
+    subgraph "UI Components"
+        SearchDropdown[SearchOptionsDropdown<br/>Options & History]
+        SearchSuggestions[SearchSuggestionDropdown<br/>Autocomplete]
         ViewUpdater[TaskListView<br/>UI Updates]
         EmbeddedUpdater[EmbeddedTaskLists<br/>In-note Updates]
     end
 
     UserInput --> Tokenizer
     PrefixFilters --> Tokenizer
+    PropertyFilters --> Tokenizer
 
     Tokenizer --> Parser
     Parser --> Validator
     Validator --> Evaluator
 
-    TaskSource --> Evaluator
+    TaskSource[TaskStateManager<br/>Task Data Source] --> Evaluator
     Evaluator --> FilterChain
+    Evaluator --> PropertySearch
+    PropertySearch --> Evaluator
     FilterChain --> SortEngine
     SortEngine --> ViewUpdater
     SortEngine --> EmbeddedUpdater
+
+    SearchOptions --> Evaluator
+    SearchHistory --> SearchDropdown
+    SearchDropdown --> SearchSuggestions
+    SearchSuggestions --> UserInput
 
     subgraph "AST Node Types"
         AND[AND Operation]
@@ -507,6 +611,9 @@ graph LR
         DATE[Date Range]
         PRIORITY[Priority Filter]
         STATE[State Filter]
+        PROPERTY[Property Filter]
+        PROPERTY_OR[Property OR Operation]
+        PROPERTY_COMP[Property Comparison]
     end
 
     Parser -.-> AND
@@ -517,18 +624,23 @@ graph LR
     Parser -.-> DATE
     Parser -.-> PRIORITY
     Parser -.-> STATE
+    Parser -.-> PROPERTY
+    Parser -.-> PROPERTY_OR
+    Parser -.-> PROPERTY_COMP
 
     classDef input fill:#e3f2fd
     classDef parser fill:#f3e5f5
     classDef evaluator fill:#e8f5e8
     classDef integration fill:#fff3e0
     classDef ast fill:#fce4ec
+    classDef ui fill:#ffecb3
 
-    class UserInput,PrefixFilters input
+    class UserInput,PrefixFilters,PropertyFilters,SearchHistory,SearchOptions input
     class Tokenizer,Parser,Validator parser
-    class Evaluator,FilterChain,SortEngine evaluator
+    class Evaluator,FilterChain,SortEngine,PropertySearch evaluator
     class TaskSource,ViewUpdater,EmbeddedUpdater integration
-    class AND,OR,NOT,TEXT,TAG,DATE,PRIORITY,STATE ast
+    class AND,OR,NOT,TEXT,TAG,DATE,PRIORITY,STATE,PROPERTY,PROPERTY_OR,PROPERTY_COMP ast
+    class SearchDropdown,SearchSuggestions ui
 ```
 
 ## Core Architectural Patterns
@@ -553,6 +665,7 @@ graph LR
 - **Editor Extensions**: Pluggable CodeMirror decorations and commands
 - **Search Extensions**: Customizable search filters and evaluators
 - **Format Extensions**: Configurable task formatting options
+- **Property Search**: Extensible property-based search via `PropertySearchEngine`
 
 ### 4. Performance Patterns
 
@@ -561,6 +674,13 @@ graph LR
 - **Lazy Loading**: Components created on-demand
 - **Efficient Parsing**: Optimized regex patterns and caching
 - **Regex Caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches
+- **Property Caching**: `PropertySearchEngine` caches frontmatter properties for fast lookup with lazy initialization
+- **Event Debouncing**: `EventCoordinator` debounces file change events to avoid unnecessary processing with configurable delay
+- **Batch Processing**: `EventCoordinator` batches events for efficient handling with interrupt pattern
+- **Chunked Rendering**: TaskListView uses chunked rendering with lazy loading for large task lists
+- **Scroll Position Preservation**: TaskListView preserves scroll position across refreshes using anchor-based restoration
+- **Element Caching**: TaskListView caches DOM elements to avoid redundant re-rendering
+- **Debounced Refresh**: TaskListView uses debounced refresh to handle rapid state changes
 
 ### 5. Security Patterns
 
@@ -568,6 +688,56 @@ graph LR
 - **Regex Injection Prevention**: User input sanitized before regex compilation
 - **File Path Validation**: Prevents path traversal attacks
 - **Type Safety**: Comprehensive TypeScript interfaces
+
+## Parser Architecture
+
+The parser layer uses a strategy pattern with a registry to support multiple file formats. This allows TODOseq to parse tasks from both Markdown and Org-mode files using a unified interface.
+
+### ITaskParser Interface
+
+All parsers implement the `ITaskParser` interface defined in [`src/parser/types.ts`](src/parser/types.ts):
+
+```typescript
+interface ITaskParser {
+  parseFile(content: string, filePath: string): Task[];
+  parseLine(line: string, lineNumber: number, filePath: string): Task | null;
+  supportsFile(filePath: string): boolean;
+  getFileExtensions(): string[];
+}
+```
+
+### ParserRegistry
+
+The [`ParserRegistry`](src/parser/parser-registry.ts) manages multiple parsers and routes files to the appropriate parser based on file extension:
+
+- **Registration**: Parsers are registered with `registerParser(parser: ITaskParser)`
+- **Routing**: `getParserForFile(filePath)` returns the appropriate parser
+- **Delegation**: `parseFile()` and `parseLine()` delegate to the correct parser
+
+### Parser Lifecycle
+
+1. **Initialization**: Parsers are created and registered during plugin lifecycle (`src/plugin-lifecycle.ts`)
+2. **Settings Updates**: When settings change, parsers are recreated with new configuration via `recreateParser()`
+3. **File Scanning**: `VaultScanner` uses `ParserRegistry` to parse files based on extension
+4. **Parser Registration**: Parsers can be registered/unregistered dynamically (e.g., org-mode parser based on settings)
+5. **Parser Access**: Use `getParser()` method to access the shared parser instance from VaultScanner
+
+### Supported Parsers
+
+| Parser              | File Extensions    | Features                                                 |
+| ------------------- | ------------------ | -------------------------------------------------------- |
+| `TaskParser`        | `.md`, `.markdown` | Markdown tasks, checkboxes, code blocks, comments        |
+| `OrgModeTaskParser` | `.org`             | Org-mode headlines, priorities, scheduled/deadline dates |
+
+> **Note**: The `OrgModeTaskParser` is registered conditionally based on the `detectOrgModeFiles` experimental feature setting. When disabled (default), `.org` files are not parsed. Enable it in Settings → TODOseq → Experimental Features.
+
+### Extending with New Parsers
+
+To add support for a new file format:
+
+1. Implement the `ITaskParser` interface
+2. Register the parser in `PluginLifecycleManager.registerParsers()`
+3. Add tests following the patterns in `tests/org-mode-parser.test.ts`
 
 ## Data Models and Type System
 
@@ -582,6 +752,7 @@ interface Task {
   listMarker: string; // List marker (+ space)
   footnoteMarker?: string; // Footnote marker
   text: string; // Task content (without keywords/priority)
+  textDisplay?: string; // Lazy-computed markdown-stripped text for display
   state: string; // Current state (TODO, DOING, etc.)
   completed: boolean; // Completion status
   priority: 'high' | 'med' | 'low' | null;
@@ -595,7 +766,55 @@ interface Task {
   dailyNoteDate: Date | null;
   embedReference?: string;
   footnoteReference?: string;
+  quoteNestingLevel?: number; // Number of nested quote levels (e.g., 1 for "> ", 2 for "> > ")
 }
+```
+
+### Search Types and Interfaces
+
+```typescript
+// Search query AST node types
+interface SearchNode {
+  type:
+    | 'AND'
+    | 'OR'
+    | 'NOT'
+    | 'TEXT'
+    | 'TAG'
+    | 'DATE'
+    | 'PRIORITY'
+    | 'STATE'
+    | 'PROPERTY';
+  value?: string;
+  left?: SearchNode;
+  right?: SearchNode;
+}
+
+// Property search configuration
+interface PropertySearchQuery {
+  key: string;
+  value: string;
+  caseSensitive: boolean;
+}
+
+// Search sort methods
+type SortMethod =
+  | 'default'
+  | 'sortByScheduled'
+  | 'sortByDeadline'
+  | 'sortByPriority'
+  | 'sortByUrgency'
+  | 'sortByKeyword';
+
+// View modes for task list
+type TaskListViewMode = 'showAll' | 'sortCompletedLast' | 'hideCompleted';
+
+// Future task sorting options
+type FutureTaskSorting =
+  | 'showAll'
+  | 'showUpcoming'
+  | 'sortToEnd'
+  | 'hideFuture';
 ```
 
 ### Key Type Definitions
@@ -618,6 +837,7 @@ interface Task {
 - **Custom Filters**: Implement new search criteria
 - **AST Node Types**: Add new query syntax elements
 - **Evaluation Functions**: Custom task matching logic
+- **Property Search**: Extend property-based search capabilities via `PropertySearchEngine`
 
 ### 3. UI Extension Points
 
@@ -627,19 +847,39 @@ interface Task {
 
 ### 4. Parser Extensions
 
+- **ITaskParser Interface**: Implement new parsers for different file formats
+- **ParserRegistry**: Register custom parsers for file extensions
 - **Format Handlers**: Support new task formats
 - **Date Parsers**: Add new date format recognition
 - **Priority Systems**: Custom priority token parsing
+
+### 5. Property Search Extensions
+
+- **Property Extractors**: Add support for custom property types
+- **Search Operators**: Implement new property comparison operators
+- **Cache Strategies**: Custom property cache invalidation and refresh strategies
+- **Property Comparators**: Extend property comparison logic for dates, numbers, and strings
+- **OR Operation Support**: Implement OR operations for property values
+- **Case Insensitive Search**: Customize case sensitivity behavior for property keys and values
+
+### 6. Search UI Extensions
+
+- **Search Options**: Add new search options to SearchOptionsDropdown
+- **Search Suggestions**: Customize search suggestion generation in SearchSuggestionDropdown
+- **Search History**: Implement custom search history management
+- **Search Filters**: Extend prefix filter suggestions and behavior
 
 ## Development Guidelines
 
 ### For Developers
 
 1. **State Management**: Always use `TaskStateManager` for task data access
-2. **File Operations**: Use `TaskEditor` for atomic file updates
-3. **Event Handling**: Subscribe to state changes, don't poll
+2. **File Operations**: Use `TaskWriter` for atomic file updates
+3. **Event Handling**: Subscribe to state changes via EventCoordinator, don't poll
 4. **Error Handling**: Implement proper error boundaries and recovery
 5. **Performance**: Use `yieldToEventLoop()` for long-running operations
+6. **Property Search**: Use `PropertySearchEngine` for efficient frontmatter property searches
+7. **Event Coordination**: Use `EventCoordinator` for unified vault event handling
 
 ### For AI Coding Assistants
 
@@ -658,6 +898,17 @@ interface Task {
 5. **File Race Conditions**: Use atomic operations and proper error handling
 6. **Performance Testing**: Test with large vaults (1000+ files, 10000+ tasks)
 7. **Embedded Lists**: Use `TodoseqCodeBlockProcessor` with separate lifecycle from main plugin
+8. **Parser Registry**: Use `ParserRegistry` for file parsing - never call parsers directly from VaultScanner
+9. **Org-Mode Limitations**: Org-mode files support vault scanning only; editor styling is not supported
+10. **Property Search Initialization**: `PropertySearchEngine` initializes lazily - ensure to await `initialize()` before using
+11. **Event Debouncing**: `EventCoordinator` handles debouncing of file change events automatically
+12. **Property Cache Invalidation**: File changes automatically invalidate the property cache via EventCoordinator
+13. **Task List Performance**: TaskListView uses chunked rendering - avoid synchronous DOM updates for large task sets
+14. **Scroll Position Management**: TaskListView preserves scroll position - use anchor-based restoration for state changes
+15. **Search Debouncing**: SearchOptionsDropdown and SearchSuggestionDropdown use debounced updates - handle search history with care
+16. **Visibility Detection**: TaskListView detects panel visibility using ResizeObserver - refresh UI only when visible
+17. **Dropdown Coordination**: SearchOptionsDropdown and SearchSuggestionDropdown coordinate visibility - ensure proper cleanup
+18. **Keyword Sorting**: Keyword-based sorting requires configuration - use `buildKeywordSortConfig()` for setup
 
 ### Testing Architecture
 
@@ -678,6 +929,13 @@ interface Task {
 5. **Lazy Loading**: Components created when needed
 6. **Regex Caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches
 7. **Shared Parser**: Single parser instance reused across vault scans, recreated only when settings change
+8. **Chunked Rendering**: TaskListView uses chunked rendering with lazy loading for large task lists
+9. **Element Caching**: TaskListView caches DOM elements to avoid redundant re-rendering
+10. **Scroll Position Preservation**: Anchor-based scroll position restoration across refreshes
+11. **Debounced Updates**: Search and task refresh operations use debouncing to prevent excessive processing
+12. **Visibility Detection**: UI updates only occur when the panel is visible
+13. **Property Caching**: PropertySearchEngine caches frontmatter properties with lazy initialization
+14. **Batch Processing**: EventCoordinator batches file change events for efficient handling
 
 ### Performance Bottlenecks to Monitor
 

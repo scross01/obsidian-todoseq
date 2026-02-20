@@ -1,6 +1,8 @@
 import { App, TFile, TAbstractFile } from 'obsidian';
 import { Task } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
+import { ParserRegistry } from '../parser/parser-registry';
+import { ITaskParser, ParserConfig } from '../parser/types';
 import { TodoTrackerSettings } from '../settings/settings';
 import { taskComparator } from '../utils/task-sort';
 import {
@@ -10,42 +12,8 @@ import {
 import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
 import { PropertySearchEngine } from './property-search-engine';
-import { BINARY_EXTENSIONS } from '../utils/constants';
-
-/**
- * Check if a file extension indicates a binary file
- * @param extension The file extension (without the leading dot)
- * @returns true if the extension is known to be binary
- */
-function isBinaryExtension(extension: string): boolean {
-  return BINARY_EXTENSIONS.has(extension.toLowerCase());
-}
-
-/**
- * Check if a file is likely a text file by examining its extension
- * Supports multi-level extensions like .txt.bak
- * @param file The file to check
- * @returns true if the file is likely a text file
- */
-function isLikelyTextFile(file: TFile): boolean {
-  const extension = file.extension.toLowerCase();
-
-  // Check if the extension is a known binary type
-  if (isBinaryExtension(extension)) {
-    return false;
-  }
-
-  // For multi-level extensions, check the last part
-  // e.g., .txt.bak -> check both 'bak' and 'txt'
-  const extensionParts = extension.split('.');
-  for (const part of extensionParts) {
-    if (isBinaryExtension(part)) {
-      return false;
-    }
-  }
-
-  return true;
-}
+import { buildTaskKeywords } from '../utils/task-utils';
+import { DEFAULT_COMPLETED_STATES } from '../types/task';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -66,15 +34,20 @@ export class VaultScanner {
   > = new Map();
   private urgencyCoefficients!: UrgencyCoefficients;
   private regexCache = new RegexCache();
+  private parserRegistry: ParserRegistry;
 
   constructor(
     private app: App,
     private settings: TodoTrackerSettings,
-    private parser: TaskParser,
+    parser: TaskParser,
     private taskStateManager: TaskStateManager,
     private propertySearchEngine?: PropertySearchEngine,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
+    // Initialize parser registry and register the markdown parser
+    this.parserRegistry = new ParserRegistry();
+    this.parserRegistry.register(parser);
+
     // Initialize event listeners map
     const eventKeys: Array<keyof VaultScannerEvents> = [
       'tasks-changed',
@@ -98,6 +71,22 @@ export class VaultScanner {
 
     // NOTE: PropertySearchEngine now registers its own event listeners
     // during initialization to support lazy initialization
+  }
+
+  /**
+   * Register an additional parser with the registry.
+   * @param parser The parser to register
+   */
+  registerParser(parser: ITaskParser): void {
+    this.parserRegistry.register(parser);
+  }
+
+  /**
+   * Get the parser registry.
+   * @returns The ParserRegistry instance
+   */
+  getParserRegistry(): ParserRegistry {
+    return this.parserRegistry;
   }
 
   /**
@@ -171,14 +160,6 @@ export class VaultScanner {
 
       for (const file of files) {
         if (this.shouldScanFile(file)) {
-          // Check if file is likely a text file before scanning
-          if (!isLikelyTextFile(file)) {
-            console.warn(
-              `TODOseq: skipping non-text file: ${file.path} (extension: .${file.extension})`,
-            );
-            continue;
-          }
-
           const fileTasks = await this.scanFile(file);
           newTasks.push(...fileTasks);
           processedFiles++;
@@ -311,16 +292,15 @@ export class VaultScanner {
   async scanFile(file: TFile): Promise<Task[]> {
     const content = await this.app.vault.cachedRead(file);
 
-    if (!this.parser) {
-      // Lazily create if not already set (should be set by constructor)
-      this.parser = TaskParser.create(
-        this.settings,
-        this.app,
-        this.urgencyCoefficients,
-      );
+    // Get the appropriate parser for this file extension
+    const parser = this.parserRegistry.getParserForExtension(file.extension);
+
+    if (!parser) {
+      // No parser registered for this extension, return empty
+      return [];
     }
 
-    const parsed = this.parser.parseFile(content, file.path, file);
+    const parsed = parser.parseFile(content, file.path, file);
     return parsed;
   }
 
@@ -338,14 +318,6 @@ export class VaultScanner {
     try {
       // Only process eligible files
       if (!(file instanceof TFile) || !this.shouldScanFile(file)) {
-        return;
-      }
-
-      // Check if file is likely a text file before scanning
-      if (!isLikelyTextFile(file)) {
-        console.warn(
-          `TODOseq: skipping non-text file: ${file.path} (extension: .${file.extension})`,
-        );
         return;
       }
 
@@ -391,15 +363,8 @@ export class VaultScanner {
 
       // If the file still exists (it should after rename), scan it at its new location
       if (file instanceof TFile && this.shouldScanFile(file)) {
-        // Check if file is likely a text file before scanning
-        if (!isLikelyTextFile(file)) {
-          console.warn(
-            `TODOseq: skipping non-text file: ${file.path} (extension: .${file.extension})`,
-          );
-        } else {
-          const fileTasks = await this.scanFile(file);
-          updatedTasks.push(...fileTasks);
-        }
+        const fileTasks = await this.scanFile(file);
+        updatedTasks.push(...fileTasks);
       }
 
       // Keep sorted state
@@ -458,9 +423,10 @@ export class VaultScanner {
     return this.taskStateManager;
   }
 
-  // Get the current parser instance
+  // Get the current parser instance (backward compatibility)
   getParser(): TaskParser | null {
-    return this.parser;
+    // Return the markdown parser for backward compatibility
+    return this.parserRegistry.getParser('markdown') as TaskParser | null;
   }
 
   // Update settings and recreate parser if needed
@@ -477,14 +443,26 @@ export class VaultScanner {
     } else {
       await this.loadUrgencyCoefficients();
     }
-    this.updateParser(
-      TaskParser.create(newSettings, this.app, this.urgencyCoefficients),
+
+    // Build parser config for updating all parsers
+    const { allKeywords } = buildTaskKeywords(
+      newSettings.additionalTaskKeywords,
     );
+    const config: ParserConfig = {
+      keywords: allKeywords,
+      completedKeywords: DEFAULT_COMPLETED_STATES,
+      urgencyCoefficients: this.urgencyCoefficients,
+    };
+
+    // Update all registered parsers with new config
+    for (const parser of this.parserRegistry.getAllParsers()) {
+      parser.updateConfig(config);
+    }
   }
 
-  // Update parser instance
+  // Update parser instance (backward compatibility - updates markdown parser)
   updateParser(newParser: TaskParser): void {
-    this.parser = newParser;
+    this.parserRegistry.register(newParser);
   }
 
   // Process incremental file change (called by EventCoordinator)

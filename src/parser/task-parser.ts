@@ -5,6 +5,7 @@ import {
   LanguageDefinition,
   LanguageCommentSupportSettings,
 } from './language-registry';
+import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
 import { buildTaskKeywords } from '../utils/task-utils';
 import { TFile, App } from 'obsidian';
@@ -37,7 +38,15 @@ import {
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
-export class TaskParser {
+/**
+ * Markdown task parser for TODOseq.
+ * Parses tasks from markdown files using markdown syntax.
+ * Implements ITaskParser interface for multi-format support.
+ */
+export class TaskParser implements ITaskParser {
+  readonly parserId = 'markdown';
+  readonly supportedExtensions = ['.md'];
+
   private readonly includeCalloutBlocks: boolean;
   private readonly includeCodeBlocks: boolean;
   private readonly includeCommentBlocks: boolean;
@@ -479,6 +488,49 @@ export class TaskParser {
    */
   public updateUrgencyCoefficients(coefficients: UrgencyCoefficients): void {
     this.urgencyCoefficients = coefficients;
+  }
+
+  /**
+   * Check if a line matches task pattern.
+   * Implements ITaskParser interface.
+   * @param line Line to check
+   * @returns true if line appears to be a task
+   */
+  public isTaskLine(line: string): boolean {
+    return this.testRegex.test(line);
+  }
+
+  /**
+   * Update parser configuration.
+   * Implements ITaskParser interface.
+   * Called when settings change.
+   * @param config New configuration
+   */
+  public updateConfig(config: ParserConfig): void {
+    this.allKeywords = config.keywords;
+    this.urgencyCoefficients = config.urgencyCoefficients;
+
+    // Rebuild regex with new keywords
+    const regex = TaskParser.buildRegex(config.keywords);
+    (this as { testRegex: RegExp }).testRegex = regex.test;
+    (this as { captureRegex: RegExp }).captureRegex = regex.capture;
+  }
+
+  /**
+   * Parse a single line as a task.
+   * Implements ITaskParser interface.
+   * Alias for parseLineAsTask for interface compatibility.
+   * @param line Single line to parse
+   * @param lineNumber Line number in file (0-indexed)
+   * @param filePath File path
+   * @returns Parsed task or null if not a task
+   */
+  public parseLine(
+    line: string,
+    lineNumber: number,
+    filePath: string,
+  ): Task | null {
+    return this.parseLineAsTask(line, lineNumber, filePath);
   }
 
   /**

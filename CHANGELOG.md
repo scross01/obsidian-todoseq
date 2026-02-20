@@ -2,7 +2,8 @@
 
 ## 0.11.0-dev
 
-- Added setting option for scanning additional file types in the vault for tasks. e.g. `.txt`
+- Added a new experimental features section in the settings.
+- Added experiemental support for extracting tasks from Org Mode files within the vault. #45
 
 ## 0.10.2
 

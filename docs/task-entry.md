@@ -82,6 +82,8 @@ TODOseq automatically syncs checkbox state with task keywords when updated from 
 
 \*Note: If you modify the checkbox directly in the Obsidian editor, the task state keyword will not be automatically updated.
 
+**Additional formats** may be available through [Experimental Features](experimental-features.md).
+
 ## Task Keywords
 
 ### Default Supported Keywords

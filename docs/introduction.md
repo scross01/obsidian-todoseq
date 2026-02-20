@@ -87,6 +87,12 @@ Some TODOseq features are not available in Logseq. The use of checkboxes before 
 
 \*Note: the Logseq import relates to the original Markdown based version of Logseq. Migration from the newer Logseq database version format has not been tested.
 
+## Experimental Features
+
+TODOseq offers experimental features for advanced use cases. These features are provided for testing but may not be fully polished and could change in future versions.
+
+See [Experimental Features](experimental-features.md) for details on available experimental functionality, including Org-mode file support.
+
 ## Getting Started
 
 For detailed usage guides, see:

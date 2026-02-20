@@ -9,6 +9,7 @@ import {
 } from './view/task-list/task-list-view';
 import { TodoTrackerSettingTab } from './settings/settings';
 import { TaskParser } from './parser/task-parser';
+import { OrgModeTaskParser } from './parser/org-mode-task-parser';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, Platform } from 'obsidian';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
@@ -42,6 +43,16 @@ export class PluginLifecycleManager {
       ),
       this.plugin.taskStateManager,
     );
+
+    // Register org-mode parser for .org files only if experimental feature is enabled
+    if (this.plugin.settings.detectOrgModeFiles) {
+      const orgModeParser = OrgModeTaskParser.create(
+        this.plugin.settings.additionalTaskKeywords,
+        this.plugin.app,
+        urgencyCoefficients,
+      );
+      this.plugin.vaultScanner.registerParser(orgModeParser);
+    }
 
     // Initialize property search engine after vault scanner (we'll register listeners later)
     this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(

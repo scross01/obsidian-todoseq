@@ -3,7 +3,6 @@ import TodoTracker from '../main';
 import { TaskListView } from '../view/task-list/task-list-view';
 import { LanguageCommentSupportSettings } from '../parser/language-registry';
 import { TaskParser } from '../parser/task-parser';
-import { BINARY_EXTENSIONS_WITH_DOT } from '../utils/constants';
 
 export interface TodoTrackerSettings {
   additionalTaskKeywords: string[]; // capitalised keywords treated as NOT COMPLETED (e.g., FIXME, HACK)
@@ -21,7 +20,8 @@ export interface TodoTrackerSettings {
   languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
-  additionalFileExtensions: string[]; // additional file extensions to scan for tasks (e.g., ['.org', '.txt'])
+  additionalFileExtensions: string[]; // additional file extensions to scan for tasks (e.g., ['.org', '.txt']) - hidden from UI, managed by detectOrgModeFiles
+  detectOrgModeFiles: boolean; // experimental: when enabled, adds .org to additionalFileExtensions and registers org-mode parser
   // Property search engine instance
   propertySearchEngine?: import('../services/property-search-engine').PropertySearchEngine; // Property search engine instance
   // Hidden setting - not exposed in UI, used to track first install
@@ -42,7 +42,8 @@ export const DefaultSettings: TodoTrackerSettings = {
   },
   weekStartsOn: 'Monday', // Default to Monday as requested
   formatTaskKeywords: true, // Default to enabled
-  additionalFileExtensions: [], // No additional extensions by default
+  additionalFileExtensions: [], // No additional extensions by default - managed by detectOrgModeFiles
+  detectOrgModeFiles: false, // Experimental feature - disabled by default
 };
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
@@ -76,16 +77,14 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
   /**
    * Validate and parse file extensions from user input
    * @param input The raw user input string
-   * @returns Object with valid extensions, invalid extensions, and binary warnings
+   * @returns Object with valid extensions and invalid extensions
    */
   private validateFileExtensions(input: string): {
     valid: string[];
     invalid: string[];
-    binaryWarnings: string[];
   } {
     const valid: string[] = [];
     const invalid: string[] = [];
-    const binaryWarnings: string[] = [];
 
     // Parse CSV, trim whitespace
     const parsed = input
@@ -113,19 +112,14 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         continue;
       }
 
-      // Check for binary file warning
-      if (BINARY_EXTENSIONS_WITH_DOT.has(ext)) {
-        binaryWarnings.push(ext);
-      }
-
       valid.push(ext);
     }
 
-    return { valid, invalid, binaryWarnings };
+    return { valid, invalid };
   }
 
   /**
-   * Create the file extensions setting with validation and binary file warnings
+   * Create the file extensions setting with validation
    */
   private createFileExtensionsSetting(containerEl: HTMLElement): void {
     const setting = new Setting(containerEl)
@@ -144,8 +138,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
         // Debounce the expensive operations
         this.fileExtensionsDebounceTimer = setTimeout(async () => {
-          const { valid, invalid, binaryWarnings } =
-            this.validateFileExtensions(value);
+          const { valid, invalid } = this.validateFileExtensions(value);
 
           // Find the setting container
           const settingContainer = text.inputEl.closest('.setting-item');
@@ -161,20 +154,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             return;
           }
 
-          // Remove any existing error/warning display
+          // Remove any existing error display
           const existingError = settingContainer.querySelector(
             '.todoseq-setting-item-error',
           );
           if (existingError) {
             existingError.remove();
             text.inputEl.classList.remove('todoseq-invalid-input');
-          }
-
-          const existingWarning = settingContainer.querySelector(
-            '.todoseq-setting-item-warning',
-          );
-          if (existingWarning) {
-            existingWarning.remove();
           }
 
           // Show errors if any
@@ -184,14 +170,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             errorDiv.textContent = `Invalid extension${invalid.length > 1 ? 's' : ''}: ${invalid.join(', ')}. Extensions must start with "." and contain only letters, numbers, dots, hyphens, or underscores.`;
             text.inputEl.classList.add('todoseq-invalid-input');
             settingInfo.appendChild(errorDiv);
-          }
-
-          // Show binary file warnings
-          if (binaryWarnings.length > 0) {
-            const warningDiv = document.createElement('div');
-            warningDiv.className = 'todoseq-setting-item-warning';
-            warningDiv.textContent = `Warning: ${binaryWarnings.join(', ')} ${binaryWarnings.length > 1 ? 'are typically binary files' : 'is typically a binary file'} and may cause performance issues.`;
-            settingInfo.appendChild(warningDiv);
           }
 
           // Save valid extensions and rescan
@@ -477,9 +455,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
-    // Additional file extensions setting
-    this.createFileExtensionsSetting(containerEl);
-
     // Task list search and filter Group
     new Setting(containerEl)
       .setName('Task list search and filter')
@@ -563,5 +538,62 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           // Changing the selection in the Task view does not update this setting
         });
       });
+
+    // Experimental Features Group
+    new Setting(containerEl)
+      .setName('Experimental Features')
+      .setHeading()
+      .setDesc(
+        'Experimental features may be changed significantly or removed entirely in future versions.',
+      );
+
+    // Org-mode file detection toggle
+    new Setting(containerEl)
+      .setName('Detect org-mode files')
+      .setDesc(
+        'When enabled, scans for .org files in vault and detects tasks using org-mode syntax.',
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.detectOrgModeFiles)
+          .onChange(async (value) => {
+            this.plugin.settings.detectOrgModeFiles = value;
+
+            // Sync .org extension with additionalFileExtensions
+            const currentExtensions = [
+              ...(this.plugin.settings.additionalFileExtensions ?? []),
+            ];
+            const orgExtension = '.org';
+
+            if (value) {
+              // Add .org if not already present
+              if (!currentExtensions.includes(orgExtension)) {
+                currentExtensions.push(orgExtension);
+              }
+            } else {
+              // Remove .org if present
+              const orgIndex = currentExtensions.indexOf(orgExtension);
+              if (orgIndex !== -1) {
+                currentExtensions.splice(orgIndex, 1);
+              }
+            }
+
+            this.plugin.settings.additionalFileExtensions = currentExtensions;
+            await this.plugin.saveSettings();
+
+            // Re-register parsers based on new settings
+            await this.plugin.updateOrgModeParserRegistration();
+
+            // Rescan vault to pick up or remove .org files
+            try {
+              await this.plugin.scanVault();
+              await this.refreshAllTaskListViews();
+              this.plugin.refreshVisibleEditorDecorations();
+              this.plugin.refreshReaderViewFormatter();
+            } catch (scanError) {
+              console.error('Failed to rescan vault:', scanError);
+            }
+          }),
+      );
   }
 }
