@@ -1,72 +1,99 @@
 import { Menu } from 'obsidian';
+import TodoTracker from '../../main';
 import {
-  DEFAULT_PENDING_STATES,
-  DEFAULT_ACTIVE_STATES,
-  DEFAULT_COMPLETED_STATES,
-} from '../../types/task';
-import { TodoTrackerSettings } from '../../settings/settings';
-import { App } from 'obsidian';
-import { getPluginSettings } from '../../utils/settings-utils';
+  BUILTIN_ACTIVE_KEYWORDS,
+  BUILTIN_INACTIVE_KEYWORDS,
+  BUILTIN_WAITING_KEYWORDS,
+  BUILTIN_COMPLETED_KEYWORDS,
+} from '../../utils/constants';
 
+/**
+ * Keyword group definition for the state menu
+ */
+interface KeywordGroup {
+  name: string;
+  builtin: readonly string[];
+  custom: string[];
+}
+
+/**
+ * Centralized state menu builder for task keyword selection.
+ *
+ * This class provides a single source of truth for building state selection
+ * menus across all views (Editor, Task List, Reader View, Embedded Task Lists).
+ *
+ * It always reads from the plugin's current settings, ensuring custom keywords
+ * are always up-to-date even after settings changes.
+ */
 export class StateMenuBuilder {
-  constructor(
-    private app: App,
-    private settings: TodoTrackerSettings,
-  ) {}
+  constructor(private plugin: TodoTracker) {}
 
   /**
-   * Get the list of selectable states for the context menu, excluding the current state
+   * Get the list of selectable states for the context menu, organized by group
+   * Each group shows built-in keywords first, then custom keywords
    */
   public getSelectableStatesForMenu(
     current: string,
   ): { group: string; states: string[] }[] {
-    const { pendingActive, completed, additional } = this.getKeywordSets();
+    const groups = this.getKeywordGroups();
+    const result: { group: string; states: string[] }[] = [];
 
-    const dedupe = (arr: string[]) => Array.from(new Set(arr));
-    const nonCompleted = dedupe([...pendingActive, ...additional]);
-    const completedOnly = dedupe(completed);
+    for (const group of groups) {
+      // Combine built-in and custom keywords (built-in first, then custom)
+      const allKeywords = [...group.builtin, ...group.custom];
 
-    // Present two groups: Non-completed and Completed
-    const groups: { group: string; states: string[] }[] = [
-      {
-        group: 'Not completed',
-        states: nonCompleted.filter((s) => s && s !== current),
-      },
-      {
-        group: 'Completed',
-        states: completedOnly.filter((s) => s && s !== current),
-      },
-    ];
-    return groups.filter((g) => g.states.length > 0);
+      // Deduplicate while preserving order
+      const uniqueKeywords = Array.from(new Set(allKeywords));
+
+      // Filter out empty strings and the current state
+      const filteredStates = uniqueKeywords.filter((s) => s && s !== current);
+
+      // Only add the group if it has states
+      if (filteredStates.length > 0) {
+        result.push({
+          group: group.name,
+          states: filteredStates,
+        });
+      }
+    }
+
+    return result;
   }
 
   /**
-   * Return default keyword sets (non-completed and completed) and additional keywords
+   * Get keyword groups with built-in and custom keywords
+   * Returns groups in order: Active, Inactive, Waiting, Completed
    */
-  private getKeywordSets(): {
-    pendingActive: string[];
-    completed: string[];
-    additional: string[];
-  } {
-    const pendingActiveDefaults = [
-      ...Array.from(DEFAULT_PENDING_STATES),
-      ...Array.from(DEFAULT_ACTIVE_STATES),
+  private getKeywordGroups(): KeywordGroup[] {
+    // Get custom keywords from plugin's current settings (always fresh)
+    const settings = this.plugin.settings;
+    const customActive = settings?.additionalActiveKeywords ?? [];
+    const customInactive = settings?.additionalTaskKeywords ?? [];
+    const customWaiting = settings?.additionalWaitingKeywords ?? [];
+    const customCompleted = settings?.additionalCompletedKeywords ?? [];
+
+    return [
+      {
+        name: 'Active',
+        builtin: BUILTIN_ACTIVE_KEYWORDS,
+        custom: customActive,
+      },
+      {
+        name: 'Inactive',
+        builtin: BUILTIN_INACTIVE_KEYWORDS,
+        custom: customInactive,
+      },
+      {
+        name: 'Waiting',
+        builtin: BUILTIN_WAITING_KEYWORDS,
+        custom: customWaiting,
+      },
+      {
+        name: 'Completed',
+        builtin: BUILTIN_COMPLETED_KEYWORDS,
+        custom: customCompleted,
+      },
     ];
-    const completedDefaults = Array.from(DEFAULT_COMPLETED_STATES);
-
-    const settings = getPluginSettings(this.app);
-    const configured = settings?.additionalTaskKeywords;
-    const additional = Array.isArray(configured)
-      ? configured.filter(
-          (v): v is string => typeof v === 'string' && v.length > 0,
-        )
-      : [];
-
-    return {
-      pendingActive: pendingActiveDefaults,
-      completed: completedDefaults,
-      additional,
-    };
   }
 
   /**
@@ -95,7 +122,7 @@ export class StateMenuBuilder {
         });
       }
 
-      // Divider between groups when both exist
+      // Divider between groups
       menu.addSeparator();
     }
 

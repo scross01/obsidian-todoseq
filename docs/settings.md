@@ -31,42 +31,103 @@ Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font. All task stat
 
 ## Task Recognition Settings
 
-### Additional Task Keywords
+### Task Keywords
 
-**Setting**: "Additional Task Keywords" (comma-separated list)
+**Setting**: "Task Keywords" section with four keyword groups
 
-**Description**: Add custom keywords to be identified as tasks.
+**Description**: Define custom keywords for different task states. Keywords are organized into four groups, each with specific styling and behavior.
 
-**Format**: Comma-separated list of capitalized words (e.g., `FIXME, HACK, REVIEW`)
+#### Built-in Keywords
 
-**Rules:**
+TODOseq includes built-in keywords that are always available:
 
-- Keywords must be capitalized
-- Are additive (doesn't replace default keywords)
-- Only the active state keyword can be added - completion still uses DONE/CANCELED states
+**Active Keywords**: `DOING`, `NOW`, `IN-PROGRESS`
 
-**Examples:**
+- Styled with blue/active color
+- Highest sort priority for incomplete tasks
+- Contribute to urgency score
+
+**Inactive Keywords**: `TODO`, `LATER`
+
+- Styled with default/pending color
+- Normal sort priority
+
+**Waiting Keywords**: `WAIT`, `WAITING`
+
+- Styled with yellow/waiting color
+- Reduces urgency score
+
+**Completed Keywords**: `DONE`, `CANCELED`, `CANCELLED`
+
+- Styled with green/complete color
+- Lowest sort priority
+
+#### Custom Keyword Groups
+
+You can add custom keywords to any of the four groups:
+
+**Active Keywords**: Tasks currently being worked on
+
+- Same styling as DOING (blue/active)
+- Highest sort priority among incomplete tasks
+- Increases urgency score (same as built-in active keywords)
+- Example use cases: `ACTIVE`, `STARTED`, `FOCUS`
+
+**Inactive Keywords**: Tasks waiting to be started
+
+- Same styling as TODO (default/pending)
+- Normal sort priority
+- Example use cases: `BACKLOG`, `PLANNED`, `QUEUED`
+
+**Waiting Keywords**: Tasks blocked by external dependencies
+
+- Same styling as WAIT (yellow/waiting)
+- Reduces urgency score (same as built-in waiting keywords)
+- Example use cases: `BLOCKED`, `PAUSED`, `ON-HOLD`
+
+**Completed Keywords**: Tasks that are finished
+
+- Same styling as DONE (green/complete)
+- Lowest sort priority
+- Example use cases: `FINISHED`, `RESOLVED`, `ARCHIVED`
+
+#### Adding Custom Keywords
+
+1. Go to TODOseq settings
+2. Find the "Task Keywords" section
+3. Enter keywords in the appropriate group field (comma-separated)
+4. Keywords must be capitalized
+
+**Example Configuration:**
 
 ```txt
-FIXME, HACK, REVIEW, BLOCKED, IDEA
+Active: ACTIVE, STARTED
+Inactive: BACKLOG, PLANNED
+Waiting: BLOCKED, PAUSED
+Completed: FINISHED, RESOLVED
 ```
 
-**Suggested Use Cases:**
+#### Rules and Behavior
 
-- Software development: `FIXME`, `HACK`, `REVIEW`
-- Research: `QUESTION`, `HYPOTHESIS`, `EXPERIMENT`
-- Writing: `DRAFT`, `EDIT`, `REVISE`
-- Project management: `BLOCKED`, `DEPENDENCY`, `APPROVAL`
+- **Built-in keywords are fixed**: Default keywords cannot be removed
+- **Styling inheritance**: Custom keywords inherit the styling of their group
+- **Duplicate prevention**: The same keyword cannot be added to multiple groups
+- **State cycling**: Custom keywords follow the same state sequences as their group
 
-**Custom Keyword Behavior:**
+#### Migration from Previous Versions
 
-- Appear in Task List like default keywords
-- Can be clicked to cycle states
-- Follow same state sequences as similar default keywords
+If you had "Additional task keywords" configured in a previous version, they are automatically migrated to the **Inactive Keywords** group. You can move them to a different group if needed.
 
-**Keyword Sort Ordering:**
+#### Keyword Sort Ordering
 
-When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, custom keywords are sorted by the order they are defined in the setting, placed in the overall sort after the Inactive task keywords states (TODO, LATER) and before Waiting keyword states (WAIT, WAITING).
+When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, keywords are sorted by group:
+
+1. **Active keywords** (DOING, NOW, IN-PROGRESS, + custom active)
+2. **Inactive keywords** (TODO, LATER, + custom inactive)
+3. **Waiting keywords** (WAIT, WAITING, + custom waiting)
+4. **Completed keywords** (DONE, CANCELED, CANCELLED, + custom completed)
+
+Within each group, custom keywords are sorted by their definition order in settings.
 
 ### Include Tasks Inside Code Blocks
 

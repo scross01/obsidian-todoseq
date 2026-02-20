@@ -47,7 +47,7 @@ export class PluginLifecycleManager {
     // Register org-mode parser for .org files only if experimental feature is enabled
     if (this.plugin.settings.detectOrgModeFiles) {
       const orgModeParser = OrgModeTaskParser.create(
-        this.plugin.settings.additionalTaskKeywords,
+        this.plugin.settings,
         this.plugin.app,
         urgencyCoefficients,
       );
@@ -95,7 +95,6 @@ export class PluginLifecycleManager {
           leaf,
           this.plugin.taskStateManager,
           this.plugin.settings.taskListViewMode,
-          this.plugin.settings,
           this.plugin,
         ),
     );

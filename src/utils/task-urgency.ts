@@ -197,23 +197,47 @@ function getScheduledUrgency(task: Task): number {
 }
 
 /**
+ * Built-in active states for fallback when no keyword set is provided
+ */
+const BUILTIN_ACTIVE_STATES = [
+  'DOING',
+  'NOW',
+  'IN-PROGRESS',
+  'IN_PROGRESS',
+  'STARTED',
+];
+
+/**
+ * Built-in waiting states for fallback when no keyword set is provided
+ */
+const BUILTIN_WAITING_STATES = ['WAIT', 'WAITING', 'PAUSED', 'BLOCKED'];
+
+/**
  * Check if task is in active state
  * @param task The task to check
+ * @param activeKeywordsSet Optional set of active keywords (includes built-in + custom)
  * @returns 1 if active, 0 otherwise
  */
-function isActive(task: Task): number {
-  const activeStates = ['DOING', 'NOW', 'IN-PROGRESS'];
-  return activeStates.includes(task.state) ? 1 : 0;
+function isActive(task: Task, activeKeywordsSet?: Set<string>): number {
+  if (activeKeywordsSet) {
+    return activeKeywordsSet.has(task.state) ? 1 : 0;
+  }
+  // Fallback to built-in states for backward compatibility
+  return BUILTIN_ACTIVE_STATES.includes(task.state) ? 1 : 0;
 }
 
 /**
  * Check if task is waiting
  * @param task The task to check
+ * @param waitingKeywordsSet Optional set of waiting keywords (includes built-in + custom)
  * @returns 1 if waiting, 0 otherwise
  */
-function isWaiting(task: Task): number {
-  const waitingStates = ['WAIT', 'WAITING'];
-  return waitingStates.includes(task.state) ? 1 : 0;
+function isWaiting(task: Task, waitingKeywordsSet?: Set<string>): number {
+  if (waitingKeywordsSet) {
+    return waitingKeywordsSet.has(task.state) ? 1 : 0;
+  }
+  // Fallback to built-in states for backward compatibility
+  return BUILTIN_WAITING_STATES.includes(task.state) ? 1 : 0;
 }
 
 /**
@@ -235,14 +259,27 @@ function countTags(task: Task): number {
 }
 
 /**
+ * Context for urgency calculation including keyword sets.
+ * Provides keyword sets for determining task state groups.
+ */
+export interface UrgencyContext {
+  /** Set of keywords that indicate an active task (built-in + custom) */
+  activeKeywordsSet?: Set<string>;
+  /** Set of keywords that indicate a waiting task (built-in + custom) */
+  waitingKeywordsSet?: Set<string>;
+}
+
+/**
  * Calculate urgency score for a task
  * @param task The task to calculate urgency for
  * @param coefficients Urgency coefficients to use
+ * @param context Optional context with keyword sets for state group detection
  * @returns Urgency score or null if calculation fails
  */
 export function calculateTaskUrgency(
   task: Task,
   coefficients: UrgencyCoefficients,
+  context?: UrgencyContext,
 ): number | null {
   try {
     // Completed tasks have no urgency
@@ -268,8 +305,8 @@ export function calculateTaskUrgency(
     const scheduledUrgency = getScheduledUrgency(task);
     urgency += coefficients.scheduled * scheduledUrgency;
 
-    // Active state urgency
-    const active = isActive(task);
+    // Active state urgency - pass keyword set if available
+    const active = isActive(task, context?.activeKeywordsSet);
     urgency += coefficients.active * active;
 
     // Age urgency (only for daily notes)
@@ -292,8 +329,8 @@ export function calculateTaskUrgency(
 
     urgency += coefficients.tags * tagFactor;
 
-    // Waiting state urgency (negative)
-    const waiting = isWaiting(task);
+    // Waiting state urgency (negative) - pass keyword set if available
+    const waiting = isWaiting(task, context?.waitingKeywordsSet);
     urgency += coefficients.waiting * waiting;
 
     return urgency;

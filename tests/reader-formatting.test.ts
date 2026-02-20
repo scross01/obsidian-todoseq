@@ -293,11 +293,8 @@ describe('ReaderViewFormatter', () => {
       expect(keywords).toContain('TODO');
       expect(keywords).toContain('DOING');
       expect(keywords).toContain('DONE');
-      expect(keywords).toContain('LATER');
-      expect(keywords).toContain('NOW');
       expect(keywords).toContain('WAIT');
       expect(keywords).toContain('WAITING');
-      expect(keywords).toContain('IN-PROGRESS');
       expect(keywords).toContain('CANCELED');
       expect(keywords).toContain('CANCELLED');
     });

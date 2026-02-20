@@ -3,6 +3,7 @@ import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings';
 import { TaskListViewMode } from '../view/task-list/task-list-view';
 import { TAG_PATTERN } from '../utils/patterns';
+import { getAllKeywords } from '../utils/task-utils';
 
 /**
  * Utility class for collecting and filtering search suggestions
@@ -243,27 +244,12 @@ export class SearchSuggestions {
    * @returns Array of task states, sorted alphabetically
    */
   static getAllStates(settings?: TodoTrackerSettings): string[] {
-    // Default states plus any additional configured states
-    const defaultStates = [
-      'TODO',
-      'DOING',
-      'DONE',
-      'NOW',
-      'LATER',
-      'WAIT',
-      'WAITING',
-      'IN-PROGRESS',
-      'CANCELED',
-      'CANCELLED',
-    ];
+    // Use getAllKeywords from task-utils which correctly combines
+    // built-in and custom keywords from all groups
+    const allKeywords = getAllKeywords(settings ?? {});
 
-    // Add custom keywords from settings if provided
-    const customStates = settings?.additionalTaskKeywords || [];
-
-    // Combine and deduplicate states
-    const allStates = Array.from(new Set([...defaultStates, ...customStates]));
-
-    return allStates.sort((a, b) => a.localeCompare(b));
+    // Sort alphabetically (case-insensitive)
+    return allKeywords.sort((a, b) => a.localeCompare(b));
   }
 
   /**

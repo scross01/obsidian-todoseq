@@ -1,8 +1,11 @@
 import TodoTracker from '../../main';
-import { DEFAULT_COMPLETED_STATES, Task, NEXT_STATE } from '../../types/task';
+import { Task, NEXT_STATE } from '../../types/task';
 import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
-import { buildTaskKeywords } from '../../utils/task-utils';
+import {
+  buildKeywordsFromGroups,
+  isCompletedKeyword as isCompletedKeywordUtil,
+} from '../../utils/task-utils';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { TFile } from 'obsidian';
@@ -31,10 +34,7 @@ export class ReaderViewFormatter {
     this.settingsDetector.initialize(this.plugin.settings);
 
     // Initialize menu builder for state selection dropdown
-    this.menuBuilder = new StateMenuBuilder(
-      this.plugin.app,
-      this.plugin.settings,
-    );
+    this.menuBuilder = new StateMenuBuilder(this.plugin);
   }
 
   /**
@@ -46,11 +46,20 @@ export class ReaderViewFormatter {
 
   /**
    * Create a keyword span element with proper attributes using Obsidian DOM helpers
+   * All keywords use the same styling - no group-based CSS classes
+   * @param keyword - The keyword text to display
+   * @param isCompleted - Whether the keyword is a completed keyword (for strikethrough styling)
    */
-  private createKeywordSpan(keyword: string): HTMLSpanElement {
+  private createKeywordSpan(
+    keyword: string,
+    isCompleted = false,
+  ): HTMLSpanElement {
     const tempContainer = document.createElement('div');
+    const cssClasses = isCompleted
+      ? 'todoseq-keyword-formatted todoseq-completed-keyword'
+      : 'todoseq-keyword-formatted';
     const span = tempContainer.createSpan({
-      cls: 'todoseq-keyword-formatted',
+      cls: cssClasses,
       text: keyword,
       attr: {
         'data-task-keyword': keyword,
@@ -89,10 +98,8 @@ export class ReaderViewFormatter {
    * Get all valid task keywords (default + user-defined)
    */
   private getAllTaskKeywords(): string[] {
-    // Use the shared utility to build keyword list
-    const { allKeywords } = buildTaskKeywords(
-      this.plugin.settings?.additionalTaskKeywords,
-    );
+    // Use the shared utility to build keyword list from all groups
+    const { allKeywords } = buildKeywordsFromGroups(this.plugin.settings);
     return allKeywords;
   }
 
@@ -788,8 +795,14 @@ export class ReaderViewFormatter {
         // match[4] contains the keyword
         const keyword = match[4];
 
+        // Check if this is a completed keyword for styling
+        const isCompleted = isCompletedKeywordUtil(
+          keyword,
+          this.plugin.settings,
+        );
+
         // Create a span for the task keyword using helper method
-        const keywordSpan = this.createKeywordSpan(keyword);
+        const keywordSpan = this.createKeywordSpan(keyword, isCompleted);
 
         // Find the keyword position in the task text
         const fullMatchStart = match.index || 0;
@@ -852,7 +865,7 @@ export class ReaderViewFormatter {
         taskElement.appendChild(taskContainer);
 
         // Apply completed task text styling if needed
-        if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+        if (isCompleted) {
           this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
         }
       }
@@ -1043,8 +1056,11 @@ export class ReaderViewFormatter {
     // match[4] contains the keyword
     const keyword = match[4];
 
+    // Check if this is a completed keyword for styling
+    const isCompleted = isCompletedKeywordUtil(keyword, this.plugin.settings);
+
     // Create a span for the task keyword
-    const keywordSpan = this.createKeywordSpan(keyword);
+    const keywordSpan = this.createKeywordSpan(keyword, isCompleted);
 
     // Find the keyword position in the text
     const fullMatchStart = match.index || 0;
@@ -1104,7 +1120,7 @@ export class ReaderViewFormatter {
     listItem.appendChild(taskContainer);
 
     // Apply completed task text styling if needed
-    if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+    if (isCompleted) {
       this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
     }
   }
@@ -1250,8 +1266,14 @@ export class ReaderViewFormatter {
         // match[4] contains the keyword
         const keyword = match[4];
 
+        // Check if this is a completed keyword for styling
+        const isCompleted = isCompletedKeywordUtil(
+          keyword,
+          this.plugin.settings,
+        );
+
         // Create a span for the task keyword using helper method
-        const keywordSpan = this.createKeywordSpan(keyword);
+        const keywordSpan = this.createKeywordSpan(keyword, isCompleted);
 
         // Create a container for the entire task line using helper method
         const taskContainer = this.createTaskContainer();
@@ -1265,7 +1287,7 @@ export class ReaderViewFormatter {
         );
 
         // Apply completed task text styling if needed
-        if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+        if (isCompleted) {
           this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
         }
 

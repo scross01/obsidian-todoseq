@@ -1,4 +1,4 @@
-import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
+import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings';
 import {
   LanguageRegistry,
@@ -7,12 +7,13 @@ import {
 } from './language-registry';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
-import { buildTaskKeywords } from '../utils/task-utils';
+import { buildKeywordsFromGroups } from '../utils/task-utils';
 import { TFile, App } from 'obsidian';
 import {
   calculateTaskUrgency,
   getDefaultCoefficients,
   UrgencyCoefficients,
+  UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
 import {
@@ -53,6 +54,12 @@ export class TaskParser implements ITaskParser {
   private readonly languageCommentSupport: LanguageCommentSupportSettings;
   private readonly customKeywords: string[];
   public allKeywords: string[];
+  /** Set of keywords that indicate a completed task */
+  private completedKeywordsSet: Set<string>;
+  /** Set of keywords that indicate an active task */
+  private activeKeywordsSet: Set<string>;
+  /** Set of keywords that indicate a waiting task */
+  private waitingKeywordsSet: Set<string>;
 
   // Public access to regex patterns for editor commands
   public readonly testRegex: RegExp;
@@ -78,11 +85,17 @@ export class TaskParser implements ITaskParser {
     languageCommentSupport: LanguageCommentSupportSettings,
     customKeywords: string[],
     allKeywords: string[],
+    completedKeywords: string[],
+    activeKeywords: string[],
+    waitingKeywords: string[],
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
     this.customKeywords = customKeywords;
     this.allKeywords = allKeywords;
+    this.completedKeywordsSet = new Set(completedKeywords);
+    this.activeKeywordsSet = new Set(activeKeywords);
+    this.waitingKeywordsSet = new Set(waitingKeywords);
 
     this.testRegex = regex.test;
     this.captureRegex = regex.capture;
@@ -102,14 +115,21 @@ export class TaskParser implements ITaskParser {
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
   ): TaskParser {
-    // Build keyword lists using shared utility
-    const { allKeywords, normalizedAdditional } = buildTaskKeywords(
-      settings.additionalTaskKeywords,
-    );
+    // Build keyword lists from flat settings properties
+    const { allKeywords, completedKeywords, activeKeywords, waitingKeywords } =
+      buildKeywordsFromGroups(settings);
+
+    // Collect all custom keywords (non-built-in) for validation
+    const allCustomKeywords = [
+      ...(settings.additionalActiveKeywords ?? []),
+      ...(settings.additionalWaitingKeywords ?? []),
+      ...(settings.additionalCompletedKeywords ?? []),
+      ...(settings.additionalTaskKeywords ?? []),
+    ];
 
     // Validate user-provided keywords to prevent regex injection vulnerabilities
-    if (normalizedAdditional.length > 0) {
-      TaskParser.validateKeywords(normalizedAdditional);
+    if (allCustomKeywords.length > 0) {
+      TaskParser.validateKeywords(allCustomKeywords);
     }
 
     const regex = TaskParser.buildRegex(allKeywords);
@@ -119,8 +139,11 @@ export class TaskParser implements ITaskParser {
       settings.includeCodeBlocks,
       settings.includeCommentBlocks,
       settings.languageCommentSupport,
-      normalizedAdditional,
+      allCustomKeywords, // customKeywords
       allKeywords,
+      completedKeywords,
+      activeKeywords,
+      waitingKeywords,
       app || null,
       urgencyCoefficients,
     );
@@ -510,6 +533,19 @@ export class TaskParser implements ITaskParser {
     this.allKeywords = config.keywords;
     this.urgencyCoefficients = config.urgencyCoefficients;
 
+    // Update completed keywords set if provided
+    if (config.completedKeywords) {
+      this.completedKeywordsSet = new Set(config.completedKeywords);
+    }
+
+    // Update active and waiting keywords sets if provided
+    if (config.activeKeywords) {
+      this.activeKeywordsSet = new Set(config.activeKeywords);
+    }
+    if (config.waitingKeywords) {
+      this.waitingKeywordsSet = new Set(config.waitingKeywords);
+    }
+
     // Rebuild regex with new keywords
     const regex = TaskParser.buildRegex(config.keywords);
     (this as { testRegex: RegExp }).testRegex = regex.test;
@@ -550,7 +586,8 @@ export class TaskParser implements ITaskParser {
     listMarker: string;
   } {
     let finalState = state;
-    let finalCompleted = DEFAULT_COMPLETED_STATES.has(state);
+    // Use the completedKeywordsSet for determining completion status
+    let finalCompleted = this.completedKeywordsSet.has(state);
     let finalListMarker = listMarker;
 
     // Check if this is a markdown checkbox task and extract checkbox status
@@ -1048,7 +1085,7 @@ export class TaskParser implements ITaskParser {
       footnoteMarker: taskDetails.footnoteMarker,
       text: cleanedText,
       state: taskDetails.state,
-      completed: DEFAULT_COMPLETED_STATES.has(taskDetails.state),
+      completed: this.completedKeywordsSet.has(taskDetails.state),
       priority,
       scheduledDate: null,
       deadlineDate: null,
@@ -1073,7 +1110,15 @@ export class TaskParser implements ITaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+      const urgencyContext: UrgencyContext = {
+        activeKeywordsSet: this.activeKeywordsSet,
+        waitingKeywordsSet: this.waitingKeywordsSet,
+      };
+      task.urgency = calculateTaskUrgency(
+        task,
+        this.urgencyCoefficients,
+        urgencyContext,
+      );
     }
 
     return task;
@@ -1170,7 +1215,15 @@ export class TaskParser implements ITaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+      const urgencyContext: UrgencyContext = {
+        activeKeywordsSet: this.activeKeywordsSet,
+        waitingKeywordsSet: this.waitingKeywordsSet,
+      };
+      task.urgency = calculateTaskUrgency(
+        task,
+        this.urgencyCoefficients,
+        urgencyContext,
+      );
     }
 
     return task;
@@ -1285,7 +1338,15 @@ export class TaskParser implements ITaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+      const urgencyContext: UrgencyContext = {
+        activeKeywordsSet: this.activeKeywordsSet,
+        waitingKeywordsSet: this.waitingKeywordsSet,
+      };
+      task.urgency = calculateTaskUrgency(
+        task,
+        this.urgencyCoefficients,
+        urgencyContext,
+      );
     }
 
     return task;
@@ -1344,7 +1405,7 @@ export class TaskParser implements ITaskParser {
         footnoteMarker: taskDetails.footnoteMarker,
         text: cleanedText,
         state: taskDetails.state,
-        completed: DEFAULT_COMPLETED_STATES.has(taskDetails.state),
+        completed: this.completedKeywordsSet.has(taskDetails.state),
         priority,
         scheduledDate: null,
         deadlineDate: null,
@@ -1386,7 +1447,8 @@ export class TaskParser implements ITaskParser {
       const [, , , checkboxStatus] = checkboxMatch;
       completed = checkboxStatus === 'x';
     } else {
-      completed = new Set(['DONE', 'CANCELED', 'CANCELLED']).has(state);
+      // Use the completedKeywordsSet for determining completion status
+      completed = this.completedKeywordsSet.has(state);
     }
 
     return {

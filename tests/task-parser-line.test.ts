@@ -7,19 +7,25 @@ describe('TaskParser.parseLineAsTask', () => {
 
   beforeEach(() => {
     settings = {
-      refreshInterval: 60,
+      additionalTaskKeywords: ['FIXME'],
+      additionalActiveKeywords: [],
+      additionalWaitingKeywords: [],
+      additionalCompletedKeywords: [],
       includeCalloutBlocks: true,
       includeCodeBlocks: false,
       includeCommentBlocks: false,
+      taskListViewMode: 'showAll',
+      futureTaskSorting: 'showAll',
+      defaultSortMethod: 'default',
       languageCommentSupport: {
         enabled: false,
       },
-      additionalTaskKeywords: ['FIXME'],
-      taskListViewMode: 'showAll',
       weekStartsOn: 'Monday',
       formatTaskKeywords: true,
+      additionalFileExtensions: [],
+      detectOrgModeFiles: false,
     } as TodoTrackerSettings;
-    parser = TaskParser.create(settings);
+    parser = TaskParser.create(settings, null);
   });
 
   describe('Basic task parsing', () => {

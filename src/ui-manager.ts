@@ -525,34 +525,26 @@ export class UIManager {
         const contextMenuHandler = (evt: MouseEvent) => {
           const target = evt.target as HTMLElement;
 
-          // Check if the right-click was on a task keyword element or its parent
-          let keywordElement = target;
-          let keyword = target.getAttribute('data-task-keyword');
+          // Use .closest() to reliably find the keyword element regardless of nesting
+          // This handles cases where the click target is a child element of the keyword span
+          const keywordElement = target.closest(
+            '.todoseq-keyword-formatted',
+          ) as HTMLElement | null;
 
-          // If the target doesn't have the attribute, check parent elements
-          if (!keyword && target.parentElement) {
-            keywordElement = target.parentElement;
-            keyword = keywordElement.getAttribute('data-task-keyword');
-          }
+          if (keywordElement) {
+            const keyword = keywordElement.getAttribute('data-task-keyword');
 
-          // Also check for footnote task keywords
-          if (!keyword && target.closest('.footnote-task-keyword')) {
-            keywordElement = target.closest(
-              '.footnote-task-keyword',
-            ) as HTMLElement;
-            keyword = keywordElement.getAttribute('data-task-keyword');
-          }
+            if (keyword && activeView.file && this.plugin.editorKeywordMenu) {
+              evt.preventDefault();
+              evt.stopPropagation();
 
-          if (keyword && activeView.file && this.plugin.editorKeywordMenu) {
-            evt.preventDefault();
-            evt.stopPropagation();
-
-            // Open the context menu
-            this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
-              keyword,
-              keywordElement,
-              evt,
-            );
+              // Open the context menu
+              this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
+                keyword,
+                keywordElement,
+                evt,
+              );
+            }
           }
         };
 

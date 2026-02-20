@@ -1,34 +1,26 @@
 import {
   ItemView,
   WorkspaceLeaf,
-  Menu,
   TFile,
   Platform,
   MarkdownView,
   setIcon,
-  Plugin,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
-import {
-  Task,
-  NEXT_STATE,
-  DEFAULT_ACTIVE_STATES,
-  DEFAULT_PENDING_STATES,
-  DEFAULT_COMPLETED_STATES,
-} from '../../types/task';
+import { Task, NEXT_STATE } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
 import { Search } from '../../search/search';
 import { SearchOptionsDropdown } from '../components/search-options-dropdown';
 import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdown';
-import { TodoTrackerSettings } from '../../settings/settings';
-import { getFilename } from '../../utils/task-utils';
+import { StateMenuBuilder } from '../components/state-menu-builder';
+import TodoTracker from '../../main';
+import { getFilename, isActiveKeyword } from '../../utils/task-utils';
 import {
   sortTasksWithThreeBlockSystem,
   SortMethod as TaskSortMethod,
   buildKeywordSortConfig,
   KeywordSortConfig,
 } from '../../utils/task-sort';
-import { getPluginSettings } from '../../utils/settings-utils';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TAG_PATTERN } from '../../utils/patterns';
 import { getTaskTextDisplay } from '../../utils/task-utils';
@@ -218,6 +210,9 @@ export class TaskListView extends ItemView {
   private taskElementCache = new TaskElementCache();
   private renderQueue: ChunkedRenderQueue;
 
+  // Menu builder for state management
+  private menuBuilder: StateMenuBuilder;
+
   // Search history debounce mechanism
   private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
     null;
@@ -235,7 +230,7 @@ export class TaskListView extends ItemView {
   private cachedKeywords: string | null = null;
 
   // Reference to the plugin for checking user-initiated updates
-  private plugin: Plugin | null = null;
+  private plugin: TodoTracker;
 
   // Lazy loading state
   private loadedTaskCount = 0;
@@ -249,15 +244,15 @@ export class TaskListView extends ItemView {
     leaf: WorkspaceLeaf,
     taskStateManager: TaskStateManager,
     defaultViewMode: TaskListViewMode,
-    private settings: TodoTrackerSettings,
-    plugin: Plugin,
+    plugin: TodoTracker,
   ) {
     super(leaf);
     this.tasks = taskStateManager.getTasks();
     this.defaultViewMode = defaultViewMode;
-    this.defaultSortMethod = settings.defaultSortMethod;
-    this.plugin = plugin;
+    this.defaultSortMethod = plugin.settings.defaultSortMethod;
+    this.menuBuilder = new StateMenuBuilder(plugin);
     this.renderQueue = new ChunkedRenderQueue(this.taskElementCache);
+    this.plugin = plugin;
 
     // Subscribe to task changes from the centralized state manager
     // Uses interrupt pattern: new update cancels pending work and processes immediately
@@ -455,7 +450,7 @@ export class TaskListView extends ItemView {
     }
 
     // Use the new three-block sorting system
-    const futureSetting = this.settings.futureTaskSorting;
+    const futureSetting = this.plugin.settings.futureTaskSorting;
 
     // Build keyword config if sorting by keyword
     let keywordConfig: KeywordSortConfig | undefined;
@@ -480,13 +475,22 @@ export class TaskListView extends ItemView {
    * Get cached keyword sort config, rebuilding only when keywords change
    */
   private getKeywordSortConfig(): KeywordSortConfig {
-    const keywords = this.settings?.additionalTaskKeywords?.join(',') ?? '';
+    // Build TaskKeywordGroups from flat settings properties
+    const keywordGroups = {
+      activeKeywords: this.plugin.settings?.additionalActiveKeywords ?? [],
+      inactiveKeywords: this.plugin.settings?.additionalTaskKeywords ?? [],
+      waitingKeywords: this.plugin.settings?.additionalWaitingKeywords ?? [],
+      completedKeywords:
+        this.plugin.settings?.additionalCompletedKeywords ?? [],
+    };
+
+    const keywords = Object.values(keywordGroups).flat().join(',');
     if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
       this.cachedKeywords = keywords;
-      this.cachedKeywordConfig = buildKeywordSortConfig(
-        this.settings?.additionalTaskKeywords ?? [],
-      );
+      this.cachedKeywordConfig = buildKeywordSortConfig(keywordGroups);
     }
+
+    console.log('Main view keyword config:', this.cachedKeywordConfig);
     return this.cachedKeywordConfig;
   }
 
@@ -726,7 +730,7 @@ export class TaskListView extends ItemView {
     }
 
     // Set current future task sorting mode
-    futureDropdown.value = this.settings.futureTaskSorting;
+    futureDropdown.value = this.plugin.settings.futureTaskSorting;
 
     // Handle future task sorting changes
     futureDropdown.addEventListener('change', async () => {
@@ -737,7 +741,7 @@ export class TaskListView extends ItemView {
         | 'hideFuture';
 
       // Update settings and re-render
-      this.settings.futureTaskSorting = selectedValue;
+      this.plugin.settings.futureTaskSorting = selectedValue;
 
       // Dispatch event for persistence
       const evt = new CustomEvent('todoseq:future-task-sorting-change', {
@@ -859,7 +863,7 @@ export class TaskListView extends ItemView {
           this.app.vault,
           this.app,
           this.tasks,
-          this.settings,
+          this.plugin.settings,
           this.getViewMode(),
         );
 
@@ -871,7 +875,7 @@ export class TaskListView extends ItemView {
           inputEl,
           this.app.vault,
           this.tasks,
-          this.settings,
+          this.plugin.settings,
           this.suggestionDropdown,
         );
 
@@ -1133,82 +1137,19 @@ export class TaskListView extends ItemView {
     return TaskListView.viewType;
   }
 
-  /** Return default keyword sets (non-completed and completed) and additional keywords using constants from task.ts */
-  private getKeywordSets(): {
-    pendingActive: string[];
-    completed: string[];
-    additional: string[];
-  } {
-    const pendingActiveDefaults: string[] = [
-      ...Array.from(DEFAULT_PENDING_STATES),
-      ...Array.from(DEFAULT_ACTIVE_STATES),
-    ];
-    const completedDefaults: string[] = Array.from(DEFAULT_COMPLETED_STATES);
-
-    const settings = getPluginSettings(this.app);
-    const configured = settings?.additionalTaskKeywords;
-    const additional = Array.isArray(configured)
-      ? configured.filter(
-          (v): v is string => typeof v === 'string' && v.length > 0,
-        )
-      : [];
-
-    return {
-      pendingActive: pendingActiveDefaults,
-      completed: completedDefaults,
-      additional,
-    };
-  }
-
-  /** Build the list of selectable states for the context menu, excluding the current state */
-  private getSelectableStatesForMenu(
-    current: string,
-  ): { group: string; states: string[] }[] {
-    const { pendingActive, completed, additional } = this.getKeywordSets();
-
-    const dedupe = (arr: string[]) => Array.from(new Set(arr));
-    const nonCompleted = dedupe([...pendingActive, ...additional]);
-    const completedOnly = dedupe(completed);
-
-    // Present two groups: Non-completed and Completed
-    const groups: { group: string; states: string[] }[] = [
-      {
-        group: 'Not completed',
-        states: nonCompleted.filter((s) => s && s !== current),
-      },
-      {
-        group: 'Completed',
-        states: completedOnly.filter((s) => s && s !== current),
-      },
-    ];
-    return groups.filter((g) => g.states.length > 0);
-  }
-
   /** Open Obsidian Menu at mouse event location listing default and additional keywords (excluding current) */
   private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
     evt.preventDefault();
     evt.stopPropagation();
-    const menu = new Menu();
-    const groups = this.getSelectableStatesForMenu(task.state);
 
-    for (const g of groups) {
-      // Section header (disabled item)
-      menu.addItem((item) => {
-        item.setTitle(g.group);
-        item.setDisabled(true);
-      });
-      for (const state of g.states) {
-        menu.addItem((item) => {
-          item.setTitle(state);
-          item.onClick(async () => {
-            await this.updateTaskState(task, state);
-            // Full refresh handled by subscribe callback
-          });
-        });
-      }
-      // Divider between groups when both exist
-      menu.addSeparator();
-    }
+    // Use the shared StateMenuBuilder for consistent menu structure
+    const menu = this.menuBuilder.buildStateMenu(
+      task.state,
+      async (newState: string) => {
+        await this.updateTaskState(task, newState);
+        // Full refresh handled by subscribe callback
+      },
+    );
 
     // Prefer API helper when available; fallback to explicit coordinates
     const maybeShowAtMouseEvent = (
@@ -1226,25 +1167,15 @@ export class TaskListView extends ItemView {
     task: Task,
     pos: { x: number; y: number },
   ): void {
-    const menu = new Menu();
-    const groups = this.getSelectableStatesForMenu(task.state);
+    // Use the shared StateMenuBuilder for consistent menu structure
+    const menu = this.menuBuilder.buildStateMenu(
+      task.state,
+      async (newState: string) => {
+        await this.updateTaskState(task, newState);
+        // Full refresh handled by subscribe callback
+      },
+    );
 
-    for (const g of groups) {
-      menu.addItem((item) => {
-        item.setTitle(g.group);
-        item.setDisabled(true);
-      });
-      for (const state of g.states) {
-        menu.addItem((item) => {
-          item.setTitle(state);
-          item.onClick(async () => {
-            await this.updateTaskState(task, state);
-            // Full refresh handled by subscribe callback
-          });
-        });
-      }
-      menu.addSeparator();
-    }
     menu.showAtPosition({ x: pos.x, y: pos.y });
   }
 
@@ -1264,8 +1195,8 @@ export class TaskListView extends ItemView {
       cls: 'todo-checkbox',
     });
 
-    // Add state-specific class for styling
-    if (DEFAULT_ACTIVE_STATES.has(task.state)) {
+    // Add state-specific class for styling (includes custom active keywords)
+    if (isActiveKeyword(task.state, this.plugin.settings)) {
       checkbox.addClass('todo-checkbox-active');
     }
 
@@ -1491,7 +1422,7 @@ export class TaskListView extends ItemView {
       checkbox.checked = task.completed;
       checkbox.classList.toggle(
         'todo-checkbox-active',
-        DEFAULT_ACTIVE_STATES.has(task.state),
+        isActiveKeyword(task.state, this.plugin.settings),
       );
     }
 
@@ -1573,7 +1504,10 @@ export class TaskListView extends ItemView {
       'in-progress',
       task.state === 'DOING' || task.state === 'IN-PROGRESS',
     );
-    element.classList.toggle('active', DEFAULT_ACTIVE_STATES.has(task.state));
+    element.classList.toggle(
+      'active',
+      isActiveKeyword(task.state, this.plugin.settings),
+    );
   }
 
   // Set up scroll listener for lazy loading
@@ -1732,7 +1666,7 @@ export class TaskListView extends ItemView {
               q,
               t,
               this.isCaseSensitive,
-              this.settings,
+              this.plugin.settings,
             );
             return { task: t, matches };
           }),

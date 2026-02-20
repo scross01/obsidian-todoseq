@@ -25,17 +25,50 @@ export interface Task {
   quoteNestingLevel?: number; // number of nested quote levels (e.g., 1 for "> ", 2 for "> > ")
 }
 
+/**
+ * Task keyword groups for custom keyword support.
+ * Each group contains custom keywords that inherit the group's styling.
+ * Built-in keywords are defined separately in constants.ts.
+ */
+export interface TaskKeywordGroups {
+  activeKeywords: string[]; // Like DOING, NOW
+  inactiveKeywords: string[]; // Like TODO, LATER
+  waitingKeywords: string[]; // Like WAIT, WAITING
+  completedKeywords: string[]; // Like DONE, CANCELLED
+}
+
+/**
+ * Type for keyword group names.
+ * Use this for type-safe group references.
+ */
+export type KeywordGroup = keyof TaskKeywordGroups;
+
+/**
+ * Legacy constant for pending/inactive states.
+ * @deprecated Use BUILTIN_INACTIVE_KEYWORDS and BUILTIN_WAITING_KEYWORDS from constants.ts instead.
+ * This set combines inactive (TODO, LATER) and waiting (WAIT, WAITING) states for backward compatibility.
+ */
 export const DEFAULT_PENDING_STATES = new Set<string>([
   'TODO',
   'LATER',
   'WAIT',
   'WAITING',
 ]);
+
+/**
+ * Legacy constant for active states.
+ * @deprecated Use BUILTIN_ACTIVE_KEYWORDS from constants.ts instead.
+ */
 export const DEFAULT_ACTIVE_STATES = new Set<string>([
   'DOING',
   'NOW',
   'IN-PROGRESS',
 ]);
+
+/**
+ * Legacy constant for completed states.
+ * @deprecated Use BUILTIN_COMPLETED_KEYWORDS from constants.ts instead.
+ */
 export const DEFAULT_COMPLETED_STATES = new Set<string>([
   'DONE',
   'CANCELED',

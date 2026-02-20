@@ -33,15 +33,21 @@ export function getPluginSettings(app: App): TodoTrackerSettings | null {
 
   // Return a complete settings object with defaults for any missing properties
   return {
-    refreshInterval: 60,
     additionalTaskKeywords: [],
+    additionalActiveKeywords: [],
+    additionalWaitingKeywords: [],
+    additionalCompletedKeywords: [],
     includeCodeBlocks: false,
     includeCalloutBlocks: true,
     includeCommentBlocks: false,
     taskListViewMode: 'showAll',
+    futureTaskSorting: 'showAll',
+    defaultSortMethod: 'default',
     languageCommentSupport: { enabled: true },
     weekStartsOn: 'Monday',
     formatTaskKeywords: true,
+    additionalFileExtensions: [],
+    detectOrgModeFiles: false,
     ...settings,
   } as TodoTrackerSettings;
 }
@@ -124,6 +130,9 @@ export class SettingsChangeDetector {
         includeCommentBlocks: settings.includeCommentBlocks,
         languageCommentSupport: settings.languageCommentSupport,
         additionalTaskKeywords: settings.additionalTaskKeywords,
+        additionalActiveKeywords: settings.additionalActiveKeywords,
+        additionalWaitingKeywords: settings.additionalWaitingKeywords,
+        additionalCompletedKeywords: settings.additionalCompletedKeywords,
       });
     } catch (error) {
       console.warn('Failed to create settings fingerprint:', error);
@@ -138,4 +147,35 @@ export class SettingsChangeDetector {
  */
 export function createSettingsChangeDetector(): SettingsChangeDetector {
   return new SettingsChangeDetector();
+}
+
+/**
+ * Normalize a keyword string for storage
+ * Trims whitespace and converts to uppercase
+ * @param keyword The keyword to normalize
+ * @returns Normalized keyword or empty string if invalid
+ */
+export function normalizeKeyword(keyword: string): string {
+  return keyword.trim().toUpperCase();
+}
+
+/**
+ * Parse a comma-separated string of keywords into an array
+ * @param input The comma-separated string
+ * @returns Array of normalized, non-empty keywords
+ */
+export function parseKeywordInput(input: string): string[] {
+  return input
+    .split(',')
+    .map(normalizeKeyword)
+    .filter((k) => k.length > 0);
+}
+
+/**
+ * Format an array of keywords for display in a text input
+ * @param keywords The keywords to format
+ * @returns Comma-separated string of keywords
+ */
+export function formatKeywordsForInput(keywords: string[]): string {
+  return keywords.join(', ');
 }

@@ -350,6 +350,7 @@ export class TodoseqCodeBlockParser {
       deadline: 'sortByDeadline',
       priority: 'sortByPriority',
       urgency: 'sortByUrgency',
+      keyword: 'sortByKeyword',
     };
 
     return sortMap[params.sortMethod] || 'default';

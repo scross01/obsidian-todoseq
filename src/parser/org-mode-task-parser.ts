@@ -3,14 +3,18 @@
  * Parses tasks from org-mode files using org-mode syntax.
  */
 
-import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
+import { Task } from '../types/task';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
-import { buildTaskKeywords } from '../utils/task-utils';
+import {
+  buildKeywordsFromGroups,
+  HasTaskKeywordGroups,
+} from '../utils/task-utils';
 import {
   calculateTaskUrgency,
   getDefaultCoefficients,
   UrgencyCoefficients,
+  UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
 import { RegexCache } from '../utils/regex-cache';
@@ -48,6 +52,8 @@ export class OrgModeTaskParser implements ITaskParser {
 
   private keywords: string[];
   private completedKeywords: Set<string>;
+  private activeKeywords: Set<string>;
+  private waitingKeywords: Set<string>;
   private urgencyCoefficients: UrgencyCoefficients;
   private regexCache: RegexCache;
   private headlineRegex: RegExp;
@@ -56,12 +62,16 @@ export class OrgModeTaskParser implements ITaskParser {
   private constructor(
     keywords: string[],
     completedKeywords: Set<string>,
+    activeKeywords: Set<string>,
+    waitingKeywords: Set<string>,
     urgencyCoefficients: UrgencyCoefficients,
     regexCache: RegexCache,
     app: App | null,
   ) {
     this.keywords = keywords;
     this.completedKeywords = completedKeywords;
+    this.activeKeywords = activeKeywords;
+    this.waitingKeywords = waitingKeywords;
     this.urgencyCoefficients = urgencyCoefficients;
     this.regexCache = regexCache;
     this.app = app;
@@ -72,19 +82,25 @@ export class OrgModeTaskParser implements ITaskParser {
 
   /**
    * Create an OrgModeTaskParser from settings.
-   * Uses buildTaskKeywords() to include custom keywords.
+   * Uses buildKeywordsFromGroups() to include custom keywords from keyword groups.
+   *
+   * Backward compatible: accepts both old format (array) and new format (settings object).
+   * @param settingsOrKeywords Either a settings object with taskKeywordGroups, or an array of additional keywords (deprecated)
    */
   static create(
-    additionalKeywords: string[],
+    settings: HasTaskKeywordGroups,
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
   ): OrgModeTaskParser {
-    // Use buildTaskKeywords to get all keywords (standard + custom)
-    const { allKeywords } = buildTaskKeywords(additionalKeywords);
+    // Build keyword lists from taskKeywordGroups setting
+    const { allKeywords, completedKeywords, activeKeywords, waitingKeywords } =
+      buildKeywordsFromGroups(settings);
 
     return new OrgModeTaskParser(
       allKeywords,
-      DEFAULT_COMPLETED_STATES,
+      new Set(completedKeywords),
+      new Set(activeKeywords),
+      new Set(waitingKeywords),
       urgencyCoefficients ?? getDefaultCoefficients(),
       new RegexCache(),
       app,
@@ -97,8 +113,16 @@ export class OrgModeTaskParser implements ITaskParser {
    */
   updateConfig(config: ParserConfig): void {
     this.keywords = config.keywords;
-    this.completedKeywords = config.completedKeywords;
+    this.completedKeywords = new Set(config.completedKeywords);
     this.urgencyCoefficients = config.urgencyCoefficients;
+
+    // Update active and waiting keywords if provided
+    if (config.activeKeywords) {
+      this.activeKeywords = new Set(config.activeKeywords);
+    }
+    if (config.waitingKeywords) {
+      this.waitingKeywords = new Set(config.waitingKeywords);
+    }
 
     // Rebuild headline regex with new keywords
     this.headlineRegex = buildOrgHeadlineRegex(
@@ -224,7 +248,15 @@ export class OrgModeTaskParser implements ITaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+      const urgencyContext: UrgencyContext = {
+        activeKeywordsSet: this.activeKeywords,
+        waitingKeywordsSet: this.waitingKeywords,
+      };
+      task.urgency = calculateTaskUrgency(
+        task,
+        this.urgencyCoefficients,
+        urgencyContext,
+      );
     }
 
     return task;
