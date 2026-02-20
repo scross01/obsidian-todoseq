@@ -13,8 +13,6 @@ describe('Keyword Sort Configuration', () => {
         completedKeywords: [],
       });
 
-      console.log('Config:', config);
-
       // Verify active keywords
       expect(config.activeKeywords.has('STARTED')).toBeTruthy();
       expect(config.activeKeywords.has('DOING')).toBeTruthy();
@@ -39,8 +37,6 @@ describe('Keyword Sort Configuration', () => {
         waitingKeywords: ['ON-HOLD', 'BLOCKED', 'WAITING-ON'],
         completedKeywords: ['FINISHED', 'CLOSED', 'ARCHIVED'],
       });
-
-      console.log('Config:', config);
 
       // Verify active keywords
       expect(config.activeKeywords.has('STARTED')).toBeTruthy();

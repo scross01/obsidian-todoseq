@@ -490,7 +490,6 @@ export class TaskListView extends ItemView {
       this.cachedKeywordConfig = buildKeywordSortConfig(keywordGroups);
     }
 
-    console.log('Main view keyword config:', this.cachedKeywordConfig);
     return this.cachedKeywordConfig;
   }
 

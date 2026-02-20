@@ -202,14 +202,7 @@ export class EmbeddedTaskListManager {
       let keywordConfig: KeywordSortConfig | undefined;
       if (sortMethod === 'sortByKeyword') {
         keywordConfig = this.getKeywordSortConfig();
-        console.log('Embedded keyword config:', keywordConfig);
       }
-
-      // Log what we're about to sort
-      console.log(
-        'Sorting tasks:',
-        tasks.map((t) => t.state),
-      );
 
       // Use the existing three-block sorting system
       const sorted = sortTasksWithThreeBlockSystem(
@@ -219,11 +212,6 @@ export class EmbeddedTaskListManager {
         completedSetting,
         sortMethod,
         keywordConfig,
-      );
-
-      console.log(
-        'Sorted tasks:',
-        sorted.map((t) => t.state),
       );
 
       return sorted;
@@ -238,8 +226,6 @@ export class EmbeddedTaskListManager {
    * Get cached keyword sort config, rebuilding only when keywords change
    */
   private getKeywordSortConfig(): KeywordSortConfig {
-    console.log('Current settings:', this.settings);
-
     const keywordGroups = {
       activeKeywords: this.settings?.additionalActiveKeywords ?? [],
       inactiveKeywords: this.settings?.additionalTaskKeywords ?? [],
@@ -247,15 +233,10 @@ export class EmbeddedTaskListManager {
       completedKeywords: this.settings?.additionalCompletedKeywords ?? [],
     };
 
-    console.log('Keyword groups from settings:', keywordGroups);
-
     const keywords = Object.values(keywordGroups).flat().join(',');
     if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
       this.cachedKeywords = keywords;
       this.cachedKeywordConfig = buildKeywordSortConfig(keywordGroups);
-      console.log('New keyword config built:', this.cachedKeywordConfig);
-    } else {
-      console.log('Using cached keyword config:', this.cachedKeywordConfig);
     }
 
     return this.cachedKeywordConfig;
@@ -267,7 +248,6 @@ export class EmbeddedTaskListManager {
    * @returns Sort method compatible with task-sort utilities
    */
   private getSortMethod(params: TodoseqParameters): TaskSortMethod {
-    console.log('params.sortMethod:', params.sortMethod);
     const sortMap: Record<string, TaskSortMethod> = {
       default: 'default',
       filepath: 'default',
@@ -279,7 +259,6 @@ export class EmbeddedTaskListManager {
     };
 
     const result = sortMap[params.sortMethod] || 'default';
-    console.log('getSortMethod returning:', result);
 
     return result;
   }
