@@ -42,7 +42,7 @@ const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
 
 const WIKI_LINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-const MD_LINK_REGEX = /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g;
+const MD_LINK_REGEX = /\[([^\]\n]*)\]\(([^)]+)\)/g;
 const URL_REGEX = /\bhttps?:\/\/[^\s)]+/g;
 
 interface CachedTaskElement {
