@@ -18,6 +18,7 @@ Object.defineProperty(global, 'localStorage', {
 
 import { ReaderViewFormatter } from '../src/view/markdown-renderers/reader-formatting';
 import { TodoTrackerSettings } from '../src/settings/settings';
+import { createBaseSettings } from './helpers/test-helper';
 import { TaskParser } from '../src/parser/task-parser';
 import { VaultScanner } from '../src/services/vault-scanner';
 import { App } from 'obsidian';
@@ -90,8 +91,6 @@ const createMockVaultScanner = (parser: TaskParser | null) => ({
   emit: jest.fn(),
   scanVault: jest.fn(),
   scanFile: jest.fn(),
-  handleFileChange: jest.fn(),
-  handleFileRename: jest.fn(),
   updateSettings: jest.fn(),
   updateParser: jest.fn(),
   destroy: jest.fn(),
@@ -105,19 +104,8 @@ describe('ReaderViewFormatter', () => {
   let mockParser: TaskParser;
 
   beforeEach(() => {
-    // Setup default settings
-    mockSettings = {
-      additionalTaskKeywords: [],
-      includeCodeBlocks: false,
-      includeCalloutBlocks: true,
-      includeCommentBlocks: false,
-      taskListViewMode: 'showAll',
-      futureTaskSorting: 'showAll',
-      defaultSortMethod: 'default',
-      languageCommentSupport: { enabled: true },
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
+    // Setup default settings using createBaseSettings to ensure all properties are included
+    mockSettings = createBaseSettings();
 
     // Create mock parser
     mockParser = TaskParser.create(mockSettings, null);
