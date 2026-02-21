@@ -1,5 +1,5 @@
 import { StateMenuBuilder } from '../src/view/components/state-menu-builder';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 import {
   BUILTIN_ACTIVE_KEYWORDS,
   BUILTIN_INACTIVE_KEYWORDS,

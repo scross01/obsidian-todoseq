@@ -1,5 +1,5 @@
 import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { ParserConfig } from '../src/parser/types';
 import { getDailyNoteInfo } from '../src/utils/daily-note-utils';
 import { createBaseSettings } from './helpers/test-helper';
@@ -190,12 +190,24 @@ describe('TaskParser', () => {
         throw mockError;
       });
 
+      // Spy on console.warn
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
       const content = '[^1]: TODO Task with error';
       const tasks = parser.parseFile(content, 'test.md');
 
       expect(getDailyNoteInfo).toHaveBeenCalled();
       expect(tasks[0].isDailyNote).toBe(false);
       expect(tasks[0].dailyNoteDate).toBeNull();
+
+      // Check that console.warn was called with expected warning
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Daily note detection failed:',
+        mockError,
+      );
+
+      // Restore original console.warn
+      consoleWarnSpy.mockRestore();
     });
 
     it('should not call getDailyNoteInfo when app is null', () => {

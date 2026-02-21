@@ -1,5 +1,5 @@
 import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 import {
   DEFAULT_PENDING_STATES,
   DEFAULT_ACTIVE_STATES,

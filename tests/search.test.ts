@@ -1,6 +1,6 @@
 import { Search } from '../src/search/search';
 import { Task } from '../src/types/task';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 
 describe('Search functionality', () => {

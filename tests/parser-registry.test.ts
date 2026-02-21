@@ -89,6 +89,8 @@ describe('ParserRegistry', () => {
     });
 
     it('should overwrite extension mapping when registering new parser', () => {
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
       const parser1 = new MockParser('test1', ['.test']);
       const parser2 = new MockParser('test2', ['.test']);
 
@@ -96,6 +98,8 @@ describe('ParserRegistry', () => {
       registry.register(parser2);
 
       expect(registry.getParserForExtension('.test')).toBe(parser2);
+
+      consoleSpy.mockRestore();
     });
   });
 

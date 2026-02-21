@@ -1,5 +1,5 @@
 import { TaskParser } from '../../src/parser/task-parser';
-import { TodoTrackerSettings } from '../../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { baseCodeLanguageSettings } from '../helpers/code-language-test-helper';
 
 describe('Task parsing within C++ comments in code blocks', () => {

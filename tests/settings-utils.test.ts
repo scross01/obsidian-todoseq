@@ -4,7 +4,7 @@ import {
   SettingsChangeDetector,
   createSettingsChangeDetector,
 } from '../src/utils/settings-utils';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 
 describe('settings-utils', () => {
   describe('getPluginSettings', () => {

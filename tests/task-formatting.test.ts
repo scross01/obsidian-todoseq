@@ -1,4 +1,4 @@
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { createBaseSettings } from './helpers/test-helper';
 
 describe('Task Formatting Settings Change Detection', () => {

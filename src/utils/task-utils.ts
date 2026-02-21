@@ -407,7 +407,7 @@ export function getTaskTextDisplay(task: Task): string {
  * @param input The text to strip
  * @returns Plain text suitable for display
  */
-function stripMarkdownForDisplay(input: string): string {
+export function stripMarkdownForDisplay(input: string): string {
   if (!input) return '';
   let out = input;
 

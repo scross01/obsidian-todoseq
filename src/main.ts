@@ -311,7 +311,7 @@ export default class TodoTracker extends Plugin {
 
     if (this.settings.detectOrgModeFiles) {
       // Register org-mode parser if not already registered
-      if (!parserRegistry.getParserForExtension('org')) {
+      if (!parserRegistry.getParser('org-mode')) {
         const { OrgModeTaskParser } =
           await import('./parser/org-mode-task-parser');
         const urgencyCoefficients = await parseUrgencyCoefficients(this.app);

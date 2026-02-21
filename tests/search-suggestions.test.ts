@@ -1,7 +1,7 @@
 import { SearchSuggestions } from '../src/search/search-suggestions';
 import { Task } from '../src/types/task';
 import { Vault } from 'obsidian';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 
 describe('Search Suggestions', () => {
