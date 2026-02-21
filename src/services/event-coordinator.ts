@@ -294,9 +294,9 @@ export class EventCoordinator {
   }
 
   destroy(): void {
-    if (this.batchTimeout) {
-      clearTimeout(this.batchTimeout);
-    }
+    // Flush any pending events before clearing timeouts
+    this.flush();
+
     this.fileChangeTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.fileChangeTimeouts.clear();
 

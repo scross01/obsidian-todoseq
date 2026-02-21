@@ -2370,14 +2370,18 @@ export class TaskListView extends ItemView {
       this.resizeObserver = null;
     }
 
-    // Cleanup scroll event listener
-    if (this.scrollEventListener && this.taskListContainer) {
-      this.taskListContainer.removeEventListener(
-        'scroll',
-        this.scrollEventListener,
-      );
-      this.scrollEventListener = null;
+    // Cleanup IntersectionObserver (sentinelObserver)
+    if (this.sentinelObserver) {
+      this.sentinelObserver.disconnect();
+      this.sentinelObserver = null;
     }
+
+    // Cleanup scroll event listener and sentinel observer
+    this.cleanupSentinelObserver();
+
+    // Clear task element cache
+    this.taskElementCache.clear();
+    this.renderQueue.clear();
 
     this.searchInputEl = null;
     this.taskListContainer = null;

@@ -272,7 +272,11 @@ export class VaultScanner {
             return filePath.includes(pattern);
           }
         } catch (e) {
-          // Invalid pattern - skip it
+          // Invalid pattern - skip it and log warning
+          console.warn(
+            `TODOseq: Invalid ignore filter pattern "${pattern}"`,
+            e,
+          );
           return false;
         }
       });
