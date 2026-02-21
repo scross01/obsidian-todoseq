@@ -2,7 +2,10 @@ import { Plugin, MarkdownView } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from './types/task';
 import { TaskListView } from './view/task-list/task-list-view';
-import { TodoTrackerSettings, DefaultSettings } from './settings/settings';
+import {
+  TodoTrackerSettings,
+  DefaultSettings,
+} from './settings/settings-types';
 import { TaskWriter } from './services/task-writer';
 import { EditorKeywordMenu } from './view/editor-extensions/editor-keyword-menu';
 import { VaultScanner } from './services/vault-scanner';

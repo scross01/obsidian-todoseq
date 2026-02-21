@@ -1,4 +1,5 @@
 import { TodoTrackerSettings } from '../src/settings/settings';
+import { createBaseSettings } from './helpers/test-helper';
 
 describe('Task Formatting Settings Change Detection', () => {
   let mockSettings: TodoTrackerSettings;
@@ -6,19 +7,12 @@ describe('Task Formatting Settings Change Detection', () => {
 
   beforeEach(() => {
     // Create mock settings
-    mockSettings = {
+    mockSettings = createBaseSettings({
       refreshInterval: 60,
-      additionalTaskKeywords: [],
-      includeCodeBlocks: false,
-      includeCalloutBlocks: true,
-      includeCommentBlocks: false,
-      taskListViewMode: 'showAll',
       languageCommentSupport: {
         enabled: false,
       },
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
+    });
 
     // Initialize previous state
     prevSettingsState = JSON.stringify({

@@ -3,7 +3,7 @@ import { Task } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
 import { ParserRegistry } from '../parser/parser-registry';
 import { ITaskParser, ParserConfig } from '../parser/types';
-import { TodoTrackerSettings } from '../settings/settings';
+import { TodoTrackerSettings } from '../settings/settings-types';
 import { taskComparator } from '../utils/task-sort';
 import {
   parseUrgencyCoefficients,

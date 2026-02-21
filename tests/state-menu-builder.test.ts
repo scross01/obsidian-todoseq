@@ -6,6 +6,7 @@ import {
   BUILTIN_WAITING_KEYWORDS,
   BUILTIN_COMPLETED_KEYWORDS,
 } from '../src/utils/constants';
+import { createBaseSettings } from './helpers/test-helper';
 
 describe('StateMenuBuilder', () => {
   let mockSettings: TodoTrackerSettings;
@@ -13,23 +14,7 @@ describe('StateMenuBuilder', () => {
 
   beforeEach(() => {
     // Create default settings
-    mockSettings = {
-      additionalTaskKeywords: [],
-      additionalActiveKeywords: [],
-      additionalWaitingKeywords: [],
-      additionalCompletedKeywords: [],
-      additionalFileExtensions: [],
-      detectOrgModeFiles: false,
-      includeCodeBlocks: false,
-      includeCalloutBlocks: true,
-      includeCommentBlocks: false,
-      taskListViewMode: 'showAll',
-      futureTaskSorting: 'showAll',
-      defaultSortMethod: 'default',
-      languageCommentSupport: { enabled: true },
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
+    mockSettings = createBaseSettings();
     // Create mock plugin with settings
     mockPlugin = { settings: mockSettings };
   });

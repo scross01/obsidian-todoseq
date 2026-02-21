@@ -1,24 +1,8 @@
 import { Task, TaskKeywordGroups } from '../../src/types/task';
-import { TodoTrackerSettings } from '../../src/settings/settings';
-
-// Mock DefaultSettings locally for tests to avoid Obsidian dependency issues
-const DefaultSettings: TodoTrackerSettings = {
-  additionalTaskKeywords: [],
-  additionalActiveKeywords: [],
-  additionalWaitingKeywords: [],
-  additionalCompletedKeywords: [],
-  includeCodeBlocks: false,
-  includeCalloutBlocks: true,
-  includeCommentBlocks: false,
-  taskListViewMode: 'showAll',
-  futureTaskSorting: 'showAll',
-  defaultSortMethod: 'default',
-  languageCommentSupport: { enabled: true },
-  weekStartsOn: 'Monday',
-  formatTaskKeywords: true,
-  additionalFileExtensions: [],
-  detectOrgModeFiles: false,
-};
+import {
+  TodoTrackerSettings,
+  DefaultSettings,
+} from '../../src/settings/settings-types';
 
 /**
  * Creates a baseline task with common properties

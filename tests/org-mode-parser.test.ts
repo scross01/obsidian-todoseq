@@ -5,14 +5,10 @@
 
 import { OrgModeTaskParser } from '../src/parser/org-mode-task-parser';
 import { getDefaultCoefficients } from '../src/utils/task-urgency';
+import { createBaseSettings } from './helpers/test-helper';
 
 // Default settings for testing
-const defaultSettings = {
-  additionalTaskKeywords: [],
-  additionalActiveKeywords: [],
-  additionalWaitingKeywords: [],
-  additionalCompletedKeywords: [],
-};
+const defaultSettings = createBaseSettings();
 
 describe('OrgModeTaskParser', () => {
   let parser: OrgModeTaskParser;

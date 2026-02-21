@@ -1,5 +1,5 @@
 import { Task } from '../types/task';
-import { TodoTrackerSettings } from '../settings/settings';
+import { TodoTrackerSettings } from '../settings/settings-types';
 import {
   LanguageRegistry,
   LanguageDefinition,

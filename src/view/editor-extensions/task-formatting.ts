@@ -7,7 +7,7 @@ import {
   WidgetType,
 } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
-import { TodoTrackerSettings } from '../../settings/settings';
+import { TodoTrackerSettings } from '../../settings/settings-types';
 import { TaskParser } from '../../parser/task-parser';
 import {
   COMMENT_BLOCK_REGEX,

@@ -1,7 +1,7 @@
 import { Vault, setIcon } from 'obsidian';
 import { Task } from '../../types/task';
 import { SearchSuggestions } from '../../search/search-suggestions';
-import { TodoTrackerSettings } from '../../settings/settings';
+import { TodoTrackerSettings } from '../../settings/settings-types';
 import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
 import { DOCS_SEARCH_URL } from '../../utils/constants';
 

@@ -2,7 +2,7 @@ import { SearchSuggestions } from '../src/search/search-suggestions';
 import { Task } from '../src/types/task';
 import { Vault } from 'obsidian';
 import { TodoTrackerSettings } from '../src/settings/settings';
-import { createBaseTask } from './helpers/test-helper';
+import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 
 describe('Search Suggestions', () => {
   const mockTasks: Task[] = [
@@ -757,20 +757,9 @@ describe('Search Suggestions', () => {
 
   describe('Custom state keywords', () => {
     it('should include custom keywords from settings in getAllStates', () => {
-      const mockSettings: TodoTrackerSettings = {
+      const mockSettings: TodoTrackerSettings = createBaseSettings({
         additionalTaskKeywords: ['FIXME', 'HACK', 'REVIEW'],
-        includeCodeBlocks: false,
-        includeCalloutBlocks: true,
-        includeCommentBlocks: false,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: {
-          enabled: true,
-        },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-      };
+      });
 
       const states = SearchSuggestions.getAllStates(mockSettings);
 
@@ -802,20 +791,9 @@ describe('Search Suggestions', () => {
     });
 
     it('should deduplicate states when custom keywords overlap with defaults', () => {
-      const mockSettings: TodoTrackerSettings = {
+      const mockSettings: TodoTrackerSettings = createBaseSettings({
         additionalTaskKeywords: ['TODO', 'DOING', 'CUSTOM'],
-        includeCodeBlocks: false,
-        includeCalloutBlocks: true,
-        includeCommentBlocks: false,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: {
-          enabled: true,
-        },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-      };
+      });
 
       const states = SearchSuggestions.getAllStates(mockSettings);
 

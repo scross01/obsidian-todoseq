@@ -1,5 +1,6 @@
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings';
+import { createBaseSettings } from './helpers/test-helper';
 
 describe('TaskParser keyword validation', () => {
   describe('validateKeywords', () => {
@@ -71,23 +72,7 @@ describe('TaskParser keyword validation', () => {
   });
 
   describe('create method with validation', () => {
-    const baseSettings: TodoTrackerSettings = {
-      additionalTaskKeywords: [],
-      additionalActiveKeywords: [],
-      additionalWaitingKeywords: [],
-      additionalCompletedKeywords: [],
-      includeCodeBlocks: false,
-      includeCalloutBlocks: true,
-      includeCommentBlocks: false,
-      taskListViewMode: 'showAll',
-      futureTaskSorting: 'showAll',
-      defaultSortMethod: 'default',
-      languageCommentSupport: { enabled: true },
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-      additionalFileExtensions: [],
-      detectOrgModeFiles: false,
-    };
+    const baseSettings: TodoTrackerSettings = createBaseSettings();
 
     it('should create parser with valid keywords', () => {
       const settings = {

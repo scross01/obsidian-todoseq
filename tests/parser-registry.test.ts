@@ -176,6 +176,50 @@ describe('ParserRegistry', () => {
     });
   });
 
+  describe('unregister', () => {
+    it('should unregister a parser by ID', () => {
+      const parser = new MockParser('test', ['.test']);
+      registry.register(parser);
+
+      registry.unregister('test');
+
+      expect(registry.getParser('test')).toBeNull();
+      expect(registry.getAllParsers()).not.toContain(parser);
+    });
+
+    it('should remove extension mappings when unregistering', () => {
+      const parser = new MockParser('test', ['.test', '.tst']);
+      registry.register(parser);
+
+      registry.unregister('test');
+
+      expect(registry.getParserForExtension('.test')).toBeNull();
+      expect(registry.getParserForExtension('.tst')).toBeNull();
+      expect(registry.getSupportedExtensions()).not.toContain('.test');
+      expect(registry.getSupportedExtensions()).not.toContain('.tst');
+    });
+
+    it('should handle unregistering non-existent parser', () => {
+      expect(() => registry.unregister('nonexistent')).not.toThrow();
+      expect(registry.getAllParsers()).toHaveLength(0);
+    });
+
+    it('should only remove specified parser when multiple parsers registered', () => {
+      const parser1 = new MockParser('test1', ['.test1']);
+      const parser2 = new MockParser('test2', ['.test2']);
+      registry.register(parser1);
+      registry.register(parser2);
+
+      registry.unregister('test1');
+
+      expect(registry.getParser('test1')).toBeNull();
+      expect(registry.getParser('test2')).toBe(parser2);
+      expect(registry.getAllParsers()).toEqual([parser2]);
+      expect(registry.getParserForExtension('.test1')).toBeNull();
+      expect(registry.getParserForExtension('.test2')).toBe(parser2);
+    });
+  });
+
   describe('clear', () => {
     it('should clear all registered parsers', () => {
       const parser = new MockParser('test', ['.test']);

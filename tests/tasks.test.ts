@@ -5,6 +5,7 @@ import {
   DEFAULT_ACTIVE_STATES,
   DEFAULT_COMPLETED_STATES,
 } from '../src/types/task';
+import { createBaseSettings } from './helpers/test-helper';
 
 describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
   // @ts-ignore
@@ -12,19 +13,12 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    settings = {
+    settings = createBaseSettings({
       refreshInterval: 60,
-      includeCodeBlocks: false,
-      includeCalloutBlocks: true,
       languageCommentSupport: {
         enabled: false,
       },
-      additionalTaskKeywords: [],
-      includeCommentBlocks: false,
-      weekStartsOn: 'Monday',
-      taskListViewMode: 'showAll',
-      formatTaskKeywords: true,
-    };
+    });
     parser = TaskParser.create(settings);
   });
 
@@ -466,19 +460,12 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
     let settings: TodoTrackerSettings;
 
     beforeEach(() => {
-      settings = {
+      settings = createBaseSettings({
         refreshInterval: 60,
-        includeCodeBlocks: false,
-        includeCalloutBlocks: true,
         languageCommentSupport: {
           enabled: false,
         },
-        additionalTaskKeywords: [],
-        taskListViewMode: 'showAll',
-        includeCommentBlocks: false,
-        formatTaskKeywords: true,
-        weekStartsOn: 'Monday',
-      };
+      });
       parser = TaskParser.create(settings);
     });
 
@@ -602,19 +589,12 @@ TODO = some code
     let settings: TodoTrackerSettings;
 
     beforeEach(() => {
-      settings = {
+      settings = createBaseSettings({
         refreshInterval: 60,
-        includeCodeBlocks: false,
-        includeCalloutBlocks: true,
         languageCommentSupport: {
           enabled: false,
         },
-        additionalTaskKeywords: [],
-        includeCommentBlocks: false,
-        weekStartsOn: 'Monday',
-        taskListViewMode: 'showAll',
-        formatTaskKeywords: true,
-      };
+      });
       parser = TaskParser.create(settings);
     });
 

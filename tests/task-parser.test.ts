@@ -1,5 +1,6 @@
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings';
+import { createBaseSettings } from './helpers/test-helper';
 
 describe('TaskParser.extractPriorityFromText', () => {
   test('should extract high priority [#A] and clean text', () => {
@@ -110,25 +111,12 @@ describe('Regular task parsing', () => {
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    settings = {
+    settings = createBaseSettings({
       additionalTaskKeywords: ['FIXME'],
-      additionalActiveKeywords: [],
-      additionalWaitingKeywords: [],
-      additionalCompletedKeywords: [],
-      includeCalloutBlocks: true,
-      includeCodeBlocks: false,
-      includeCommentBlocks: false,
-      taskListViewMode: 'showAll',
-      futureTaskSorting: 'showAll',
-      defaultSortMethod: 'default',
       languageCommentSupport: {
         enabled: false,
       },
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-      additionalFileExtensions: [],
-      detectOrgModeFiles: false,
-    } as TodoTrackerSettings;
+    });
     parser = TaskParser.create(settings, null);
   });
 
@@ -497,25 +485,15 @@ TODO task text
     });
 
     test(`should match comment blocks when enabled`, () => {
-      const settingsWithCommentBlocks: TodoTrackerSettings = {
-        additionalTaskKeywords: ['FIXME'],
-        additionalActiveKeywords: [],
-        additionalWaitingKeywords: [],
-        additionalCompletedKeywords: [],
-        includeCalloutBlocks: true,
-        includeCodeBlocks: false,
-        includeCommentBlocks: true,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: {
-          enabled: false,
+      const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
+        {
+          additionalTaskKeywords: ['FIXME'],
+          includeCommentBlocks: true,
+          languageCommentSupport: {
+            enabled: false,
+          },
         },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-        additionalFileExtensions: [],
-        detectOrgModeFiles: false,
-      };
+      );
       const parserWithCommentBlocks = TaskParser.create(
         settingsWithCommentBlocks,
         null,
@@ -542,25 +520,15 @@ TODO task text
     });
 
     test(`should match comment blocks with different task states`, () => {
-      const settingsWithCommentBlocks: TodoTrackerSettings = {
-        additionalTaskKeywords: ['FIXME'],
-        additionalActiveKeywords: [],
-        additionalWaitingKeywords: [],
-        additionalCompletedKeywords: [],
-        includeCalloutBlocks: true,
-        includeCodeBlocks: false,
-        includeCommentBlocks: true,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: {
-          enabled: false,
+      const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
+        {
+          additionalTaskKeywords: ['FIXME'],
+          includeCommentBlocks: true,
+          languageCommentSupport: {
+            enabled: false,
+          },
         },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-        additionalFileExtensions: [],
-        detectOrgModeFiles: false,
-      };
+      );
       const parserWithCommentBlocks = TaskParser.create(
         settingsWithCommentBlocks,
         null,
@@ -590,25 +558,15 @@ TODO task text
     });
 
     test(`should match comment blocks with priorities`, () => {
-      const settingsWithCommentBlocks: TodoTrackerSettings = {
-        additionalTaskKeywords: ['FIXME'],
-        additionalActiveKeywords: [],
-        additionalWaitingKeywords: [],
-        additionalCompletedKeywords: [],
-        includeCalloutBlocks: true,
-        includeCodeBlocks: false,
-        includeCommentBlocks: true,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: {
-          enabled: false,
+      const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
+        {
+          additionalTaskKeywords: ['FIXME'],
+          includeCommentBlocks: true,
+          languageCommentSupport: {
+            enabled: false,
+          },
         },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-        additionalFileExtensions: [],
-        detectOrgModeFiles: false,
-      };
+      );
       const parserWithCommentBlocks = TaskParser.create(
         settingsWithCommentBlocks,
         null,
@@ -634,25 +592,15 @@ TODO task text
     });
 
     test(`should match comment blocks with dates`, () => {
-      const settingsWithCommentBlocks: TodoTrackerSettings = {
-        additionalTaskKeywords: ['FIXME'],
-        additionalActiveKeywords: [],
-        additionalWaitingKeywords: [],
-        additionalCompletedKeywords: [],
-        includeCalloutBlocks: true,
-        includeCodeBlocks: false,
-        includeCommentBlocks: true,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: {
-          enabled: false,
+      const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
+        {
+          additionalTaskKeywords: ['FIXME'],
+          includeCommentBlocks: true,
+          languageCommentSupport: {
+            enabled: false,
+          },
         },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-        additionalFileExtensions: [],
-        detectOrgModeFiles: false,
-      };
+      );
       const parserWithCommentBlocks = TaskParser.create(
         settingsWithCommentBlocks,
         null,
@@ -777,25 +725,13 @@ describe('Task parsing with code blocks', () => {
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    settings = {
+    settings = createBaseSettings({
       additionalTaskKeywords: [],
-      additionalActiveKeywords: [],
-      additionalWaitingKeywords: [],
-      additionalCompletedKeywords: [],
-      includeCalloutBlocks: true,
       includeCodeBlocks: true,
-      includeCommentBlocks: false,
-      taskListViewMode: 'showAll',
-      futureTaskSorting: 'showAll',
-      defaultSortMethod: 'default',
       languageCommentSupport: {
         enabled: false,
       },
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-      additionalFileExtensions: [],
-      detectOrgModeFiles: false,
-    };
+    });
     parser = TaskParser.create(settings, null);
   });
 
@@ -828,25 +764,13 @@ describe('Task parsing within langauge spefic comments in code blocks', () => {
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    settings = {
+    settings = createBaseSettings({
       additionalTaskKeywords: [],
-      additionalActiveKeywords: [],
-      additionalWaitingKeywords: [],
-      additionalCompletedKeywords: [],
-      includeCalloutBlocks: true,
       includeCodeBlocks: true,
-      includeCommentBlocks: false,
-      taskListViewMode: 'showAll',
-      futureTaskSorting: 'showAll',
-      defaultSortMethod: 'default',
       languageCommentSupport: {
         enabled: true,
       },
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-      additionalFileExtensions: [],
-      detectOrgModeFiles: false,
-    };
+    });
     parser = TaskParser.create(settings, null);
   });
 

@@ -1,6 +1,6 @@
 import { Task } from '../../types/task';
 import { Search } from '../../search/search';
-import { TodoTrackerSettings } from '../../settings/settings';
+import { TodoTrackerSettings } from '../../settings/settings-types';
 import {
   sortTasksWithThreeBlockSystem,
   SortMethod as TaskSortMethod,

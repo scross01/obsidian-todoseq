@@ -1,7 +1,7 @@
 import { Search } from '../src/search/search';
 import { Task } from '../src/types/task';
 import { TodoTrackerSettings } from '../src/settings/settings';
-import { createBaseTask } from './helpers/test-helper';
+import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 
 describe('Search functionality', () => {
   const testTasks: Task[] = [
@@ -266,18 +266,7 @@ describe('Search functionality', () => {
       text: 'test task with content',
     });
 
-    const mockSettings: TodoTrackerSettings = {
-      additionalTaskKeywords: [],
-      includeCodeBlocks: false,
-      includeCalloutBlocks: true,
-      includeCommentBlocks: false,
-      taskListViewMode: 'showAll',
-      futureTaskSorting: 'showAll',
-      defaultSortMethod: 'default',
-      languageCommentSupport: { enabled: true },
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
+    const mockSettings: TodoTrackerSettings = createBaseSettings();
 
     it('should evaluate with settings parameter', async () => {
       const result = await Search.evaluate(

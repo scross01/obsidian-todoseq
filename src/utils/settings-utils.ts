@@ -1,5 +1,5 @@
 import { App } from 'obsidian';
-import { TodoTrackerSettings } from '../settings/settings';
+import { TodoTrackerSettings } from '../settings/settings-types';
 
 /**
  * Structural typing for accessing Obsidian plugin system
