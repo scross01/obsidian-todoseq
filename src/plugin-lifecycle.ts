@@ -57,6 +57,11 @@ export class PluginLifecycleManager {
     // Initialize property search engine after vault scanner (we'll register listeners later)
     this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(
       this.plugin.app,
+      {
+        taskStateManager: this.plugin.taskStateManager,
+        refreshAllTaskListViews: () => this.plugin.refreshAllTaskListViews(),
+        vaultScanner: this.plugin.vaultScanner,
+      },
     );
 
     // Create EventCoordinator - single source for vault events

@@ -25,6 +25,8 @@ const createMockFile = (index: number, hasProperties = true): TFile => {
   return mockFile as unknown as TFile;
 };
 
+import { TaskStateManager } from '../src/services/task-state-manager';
+
 // Mock TaskStateManager
 const mockTaskStateManager = {
   getTasks: () => {
@@ -52,7 +54,7 @@ const mockTaskStateManager = {
     }
     return tasks;
   },
-};
+} as unknown as TaskStateManager;
 
 // Simple mock app with known files
 const mockApp = {
@@ -117,7 +119,11 @@ describe('PropertySearchEngine Simple Tests', () => {
   let propertySearchEngine: PropertySearchEngine;
 
   beforeEach(() => {
-    propertySearchEngine = PropertySearchEngine.getInstance(mockApp);
+    propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
+      taskStateManager: mockTaskStateManager,
+      refreshAllTaskListViews: jest.fn(),
+      vaultScanner: undefined,
+    });
   });
 
   test('should initialize and find property keys', async () => {

@@ -130,7 +130,11 @@ describe('PropertySearchEngine Performance', () => {
   let propertySearchEngine: PropertySearchEngine;
 
   beforeEach(() => {
-    propertySearchEngine = PropertySearchEngine.getInstance(mockApp);
+    propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
+      taskStateManager: mockTaskStateManager,
+      refreshAllTaskListViews: jest.fn(),
+      vaultScanner: undefined,
+    });
   });
 
   test('should handle file invalidation efficiently', async () => {
