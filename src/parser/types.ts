@@ -103,6 +103,15 @@ export interface ITaskParser {
   isTaskLine(line: string): boolean;
 
   /**
+   * Fast-path check to determine if the string even contains known syntax keywords.
+   * If false, the file is guaranteed to have no parseable tasks, skipping regex overhead.
+   *
+   * @param content Full content string to check
+   * @returns true if any keyword is present
+   */
+  hasAnyKeyword(content: string): boolean;
+
+  /**
    * Update parser configuration.
    * Called when settings change.
    *

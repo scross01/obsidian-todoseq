@@ -172,6 +172,19 @@ export class OrgModeTaskParser implements ITaskParser {
   }
 
   /**
+   * Fast-path check to determine if the string even contains known syntax keywords.
+   * If false, the file is guaranteed to have no parseable tasks, skipping regex overhead.
+   */
+  hasAnyKeyword(content: string): boolean {
+    for (let i = 0; i < this.keywords.length; i++) {
+      if (content.includes(this.keywords[i])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Try to parse a line as an org-mode headline task.
    */
   private tryParseHeadlineTask(

@@ -154,20 +154,38 @@ export class VaultScanner {
       const files = this.app.vault.getFiles();
 
       // Yield configuration: how often to yield a frame while scanning
-      const YIELD_EVERY_FILES = 20;
-      let processedFiles = 0;
+      const YIELD_EVERY_FILES = 50;
+      let hasEmittedInitialBatch = false;
 
-      for (const file of files) {
-        if (this.shouldScanFile(file)) {
-          const fileTasks = await this.scanFile(file);
+      // Filter files that should be scanned first
+      const filesToScan = files.filter((f) => this.shouldScanFile(f));
+
+      // Process in batches to maximize async read throughput without locking the event loop
+      for (let i = 0; i < filesToScan.length; i += YIELD_EVERY_FILES) {
+        const batch = filesToScan.slice(i, i + YIELD_EVERY_FILES);
+
+        // Execute scan asynchronously in parallel for the current batch
+        const batchResults = await Promise.all(
+          batch.map((file) => this.scanFile(file)),
+        );
+
+        // Flatten the task arrays from the batch
+        for (const fileTasks of batchResults) {
           newTasks.push(...fileTasks);
-          processedFiles++;
-
-          if (processedFiles % YIELD_EVERY_FILES === 0) {
-            // Yield to the event loop to keep UI responsive during large scans
-            await this.yieldToEventLoop();
-          }
         }
+
+        // Emit an initial chunk of tasks to the UI to unblock Largest Contentful Paint (LCP)
+        if (newTasks.length > 0 && !hasEmittedInitialBatch) {
+          const initialTasks = [...newTasks];
+          initialTasks.sort(taskComparator);
+          this.taskStateManager.setTasks(initialTasks);
+          // UI elements will now mount instantly while the rest of the vault continues
+          // to scan invisibly in the background.
+          hasEmittedInitialBatch = true;
+        }
+
+        // Yield to the event loop between batches to keep Obsidian UI responsive
+        await this.yieldToEventLoop();
       }
 
       // Default sort
@@ -293,18 +311,34 @@ export class VaultScanner {
    * @returns Array of tasks found in the file
    */
   async scanFile(file: TFile): Promise<Task[]> {
-    const content = await this.app.vault.cachedRead(file);
+    try {
+      const content = await this.app.vault.cachedRead(file);
 
-    // Get the appropriate parser for this file extension
-    const parser = this.parserRegistry.getParserForExtension(file.extension);
+      // Get the appropriate parser for this file extension
+      const parser = this.parserRegistry.getParserForExtension(file.extension);
 
-    if (!parser) {
-      // No parser registered for this extension, return empty
+      if (!parser) {
+        // No parser registered for this extension, return empty
+        return [];
+      }
+
+      // Fast-path rejection: if the file text doesn't contain any task keywords natively,
+      // skip expensive line-by-line regex parsing completely.
+      if (!parser.hasAnyKeyword(content)) {
+        return [];
+      }
+
+      // Parse tasks using the matched parser
+      const fileTasks = parser.parseFile(content, file.path, file);
+      return fileTasks;
+    } catch (err) {
+      console.error(`VaultScanner scanFile error for file ${file.path}`, err);
+      this.emit(
+        'scan-error',
+        err instanceof Error ? err : new Error(String(err)),
+      );
       return [];
     }
-
-    const parsed = parser.parseFile(content, file.path, file);
-    return parsed;
   }
 
   // Get the current scanning state
@@ -330,9 +364,13 @@ export class VaultScanner {
 
   /**
    * Check if we should show the scanning message
-   * Returns true if either the plugin is scanning or Obsidian is still initializing
+   * Returns true if either the plugin is scanning or Obsidian is still initializing,
+   * UNLESS we have already begun emitting progressive task arrays to the UI.
    */
   shouldShowScanningMessage(): boolean {
+    if (this.taskStateManager.getTasks().length > 0) {
+      return false; // Yield to TaskListView for LCP paint if progressive chunks exist
+    }
     return this._isScanning || this._isInitializing;
   }
 

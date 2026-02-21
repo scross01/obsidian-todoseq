@@ -40,7 +40,6 @@ const URL_REGEX = /\bhttps?:\/\/[^\s)]+/g;
 interface CachedTaskElement {
   element: HTMLLIElement;
   task: Task;
-  height: number;
 }
 
 class TaskElementCache {
@@ -56,8 +55,7 @@ class TaskElementCache {
   }
 
   set(task: Task, element: HTMLLIElement): void {
-    const height = element.getBoundingClientRect().height;
-    this.cache.set(this.getKey(task), { element, task, height });
+    this.cache.set(this.getKey(task), { element, task });
   }
 
   invalidate(task: Task): void {
@@ -82,13 +80,8 @@ class ChunkedRenderQueue {
   private isProcessing = false;
   private renderFn: ((task: Task) => HTMLLIElement) | null = null;
   private container: Element | null = null;
-  private cache: TaskElementCache;
   private generation = 0;
   private currentRenderPromise: Promise<void> | null = null;
-
-  constructor(cache: TaskElementCache) {
-    this.cache = cache;
-  }
 
   async enqueue(
     tasks: Task[],
@@ -140,12 +133,8 @@ class ChunkedRenderQueue {
           return;
         }
 
-        // Get cached element or render new one
-        let element = this.cache.get(task);
-        if (!element) {
-          element = renderFn(task);
-          this.cache.set(task, element);
-        }
+        // Render or retrieve cached element via the provided renderFn
+        const element = renderFn(task);
         container.appendChild(element); // Always append (moves if already in DOM)
         priorityRendered++;
         renderedInBatch++;
@@ -186,6 +175,15 @@ export type SortMethod =
 
 export class TaskListView extends ItemView {
   static viewType = 'todoseq-view';
+
+  // Cache regex patterns to avoid recreating them on every task render
+  private static LINK_PATTERNS = [
+    { type: 'wiki' as const, regex: new RegExp(WIKI_LINK_REGEX) },
+    { type: 'md' as const, regex: new RegExp(MD_LINK_REGEX) },
+    { type: 'url' as const, regex: new RegExp(URL_REGEX) },
+    { type: 'tag' as const, regex: new RegExp(TAG_PATTERN) },
+  ];
+
   tasks: Task[];
   private defaultViewMode: TaskListViewMode;
   private defaultSortMethod: SortMethod;
@@ -229,6 +227,9 @@ export class TaskListView extends ItemView {
   private cachedKeywordConfig: KeywordSortConfig | null = null;
   private cachedKeywords: string | null = null;
 
+  // Add generation counter for refreshVisibleList
+  private refreshGeneration = 0;
+
   // Reference to the plugin for checking user-initiated updates
   private plugin: TodoTracker;
 
@@ -251,7 +252,7 @@ export class TaskListView extends ItemView {
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = plugin.settings.defaultSortMethod;
     this.menuBuilder = new StateMenuBuilder(plugin);
-    this.renderQueue = new ChunkedRenderQueue(this.taskElementCache);
+    this.renderQueue = new ChunkedRenderQueue();
     this.plugin = plugin;
 
     // Subscribe to task changes from the centralized state manager
@@ -1379,6 +1380,7 @@ export class TaskListView extends ItemView {
     const li = createEl('li', { cls: 'todo-item' });
     li.setAttribute('data-path', task.path);
     li.setAttribute('data-line', String(task.line));
+    li.setAttribute('data-raw-text', task.rawText);
 
     const checkbox = this.buildCheckbox(task, li);
     this.buildText(task, li);
@@ -1435,44 +1437,69 @@ export class TaskListView extends ItemView {
     }
 
     // 3. Update todo-text: rebuild the text portion (after keyword and priority)
-    const todoText = element.querySelector('.todo-text') as HTMLElement;
-    if (todoText) {
-      // Get keyword info BEFORE clearing (since innerHTML='' removes it)
-      const keywordSpan = element.querySelector('.todo-keyword');
-      const keywordState = keywordSpan?.textContent || task.state;
-      const keywordAriaChecked =
-        keywordSpan?.getAttribute('aria-checked') || 'false';
+    // ONLY rebuild if the underlying raw text actually changed (smart diff)
+    const currentRawText = element.getAttribute('data-raw-text');
+    const textChanged = currentRawText !== task.rawText;
 
-      // Clear existing text content
-      todoText.innerHTML = '';
+    if (textChanged) {
+      element.setAttribute('data-raw-text', task.rawText);
+      const todoText = element.querySelector('.todo-text') as HTMLElement;
+      if (todoText) {
+        // Get keyword info BEFORE clearing (since innerHTML='' removes it)
+        const keywordSpan = element.querySelector('.todo-keyword');
+        const keywordState = keywordSpan?.textContent || task.state;
+        const keywordAriaChecked =
+          keywordSpan?.getAttribute('aria-checked') || 'false';
 
-      // Re-add keyword span
-      const newKeywordSpan = todoText.createEl('span', { cls: 'todo-keyword' });
-      newKeywordSpan.setText(keywordState);
-      newKeywordSpan.setAttr('role', 'button');
-      newKeywordSpan.setAttr('tabindex', '0');
-      newKeywordSpan.setAttr('aria-checked', keywordAriaChecked);
-      todoText.appendText(' ');
+        // Clear existing text content
+        todoText.innerHTML = '';
 
-      // Rebuild priority badge (in case it changed or was added/removed)
-      if (task.priority) {
-        const priorityText =
-          task.priority === 'high' ? 'A' : task.priority === 'med' ? 'B' : 'C';
-        const badge = todoText.createEl('span', {
-          cls: ['priority-badge', `priority-${task.priority}`],
+        // Re-add keyword span
+        const newKeywordSpan = todoText.createEl('span', {
+          cls: 'todo-keyword',
         });
-        badge.setText(priorityText);
-        badge.setAttribute('aria-label', `Priority ${task.priority}`);
-        badge.setAttribute('title', `Priority ${task.priority}`);
+        newKeywordSpan.setText(keywordState);
+        newKeywordSpan.setAttr('role', 'button');
+        newKeywordSpan.setAttr('tabindex', '0');
+        newKeywordSpan.setAttr('aria-checked', keywordAriaChecked);
         todoText.appendText(' ');
+
+        // Rebuild priority badge (in case it changed or was added/removed)
+        if (task.priority) {
+          const priorityText =
+            task.priority === 'high'
+              ? 'A'
+              : task.priority === 'med'
+                ? 'B'
+                : 'C';
+          const badge = todoText.createEl('span', {
+            cls: ['priority-badge', `priority-${task.priority}`],
+          });
+          badge.setText(priorityText);
+          badge.setAttribute('aria-label', `Priority ${task.priority}`);
+          badge.setAttribute('title', `Priority ${task.priority}`);
+          todoText.appendText(' ');
+        }
+
+        // Re-add task text with links
+        if (task.text) {
+          this.renderTaskTextWithLinks(task, todoText);
+        }
+
+        todoText.classList.toggle('completed', task.completed);
+      }
+    } else {
+      // Even if text didn't change, we still need to toggle the completed class
+      // on the text container and update aria attributes on the keyword button
+      const todoText = element.querySelector('.todo-text') as HTMLElement;
+      if (todoText) {
+        todoText.classList.toggle('completed', task.completed);
       }
 
-      // Re-add task text with links
-      if (task.text) {
-        this.renderTaskTextWithLinks(task, todoText);
+      const keywordSpan = element.querySelector('.todo-keyword');
+      if (keywordSpan) {
+        keywordSpan.setAttribute('aria-checked', String(task.completed));
       }
-
-      todoText.classList.toggle('completed', task.completed);
     }
 
     // 4. Update date display (may need to add/remove/rebuild)
@@ -1571,6 +1598,7 @@ export class TaskListView extends ItemView {
     if (this.isLoadingMore || this.isAllTasksLoaded) return;
 
     this.isLoadingMore = true;
+    const currentGeneration = this.refreshGeneration;
     const list = this.taskListContainer?.querySelector('ul.todo-list');
     if (!list) {
       this.isLoadingMore = false;
@@ -1594,9 +1622,22 @@ export class TaskListView extends ItemView {
     // Use chunked rendering for the new batch
     await this.renderQueue.enqueue(
       tasksToLoad,
-      (task) => this.buildTaskListItem(task),
+      (task) => {
+        let element = this.taskElementCache.get(task);
+        if (!element) {
+          element = this.buildTaskListItem(task);
+          this.taskElementCache.set(task, element);
+        }
+        return element;
+      },
       list,
     );
+
+    // Abort if another refresh was triggered while chunking lazy load
+    if (this.refreshGeneration !== currentGeneration) {
+      this.isLoadingMore = false;
+      return;
+    }
 
     // Move sentinel to end so it's always after all loaded tasks
     if (this.sentinelElement) {
@@ -1625,6 +1666,8 @@ export class TaskListView extends ItemView {
    * @param resetScroll If true, reset to top of list. If false, preserve scroll position.
    */
   async refreshVisibleList(resetScroll = false): Promise<void> {
+    const currentGeneration = ++this.refreshGeneration;
+
     // Cancel any pending debounced refresh - this call takes precedence
     if (this.taskRefreshTimeout) {
       clearTimeout(this.taskRefreshTimeout);
@@ -1640,6 +1683,11 @@ export class TaskListView extends ItemView {
 
     // Yield to main thread to prevent blocking user typing
     await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Abort if another refresh was triggered while we yielded
+    if (this.refreshGeneration !== currentGeneration) {
+      return;
+    }
 
     // Sync dropdown with current sort method
     const sortDropdown = container.querySelector(
@@ -1861,34 +1909,41 @@ export class TaskListView extends ItemView {
       // Track which elements we've already used this render cycle
       const usedKeys = new Set<string>();
 
-      // Reorder/reuse existing elements, create new ones only if needed
-      for (let i = 0; i < toRender.length; i++) {
-        const task = toRender[i];
-        const key = `${task.path}:${task.line}`;
+      // Reorder/reuse existing elements, create new ones only if needed via asynchronous chunking
+      await this.renderQueue.enqueue(
+        toRender,
+        (task) => {
+          const key = `${task.path}:${task.line}`;
+          let element: HTMLLIElement;
 
-        let element: HTMLLIElement;
-
-        if (existingElements.has(key)) {
-          // Reuse existing element - but update its content with new task data
-          const existingEl = existingElements.get(key);
-          if (existingEl) {
-            element = existingEl as HTMLLIElement;
-            this.updateTaskElementContent(task, element);
-            usedKeys.add(key);
+          if (existingElements.has(key)) {
+            // Reuse existing element - but update its content with new task data
+            const existingEl = existingElements.get(key);
+            if (existingEl) {
+              element = existingEl as HTMLLIElement;
+              this.updateTaskElementContent(task, element);
+              usedKeys.add(key);
+            } else {
+              element = this.buildTaskListItem(task);
+            }
           } else {
+            // Create new element (task wasn't in DOM before)
             element = this.buildTaskListItem(task);
           }
-        } else {
-          // Create new element (task wasn't in DOM before)
-          element = this.buildTaskListItem(task);
-        }
 
-        // Update cache with the element (whether reused or new)
-        this.taskElementCache.set(task, element);
+          // Update cache with the element (whether reused or new)
+          this.taskElementCache.set(task, element);
 
-        // Append to list in correct position
-        // If it's already in the list at a different position, appendChild moves it
-        list.appendChild(element);
+          return element;
+        },
+        list,
+      );
+
+      // Abort if another refresh superseded us while chunking!
+      // This specifically prevents the UI list from tearing itself apart traversing
+      // outdated element arrays or purging render queues if an overlapped refresh fired.
+      if (this.refreshGeneration !== currentGeneration) {
+        return;
       }
 
       // Remove elements that are no longer in visible list (lazy loaded items scrolled out)
@@ -2097,12 +2152,6 @@ export class TaskListView extends ItemView {
   private renderTaskTextWithLinks(task: Task, parent: HTMLElement) {
     // Use lazy-computed textDisplay for better performance
     const textToProcess = getTaskTextDisplay(task);
-    const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp }[] = [
-      { type: 'wiki', regex: new RegExp(WIKI_LINK_REGEX) },
-      { type: 'md', regex: new RegExp(MD_LINK_REGEX) },
-      { type: 'url', regex: new RegExp(URL_REGEX) },
-      { type: 'tag', regex: new RegExp(TAG_PATTERN) },
-    ];
 
     let i = 0;
     while (i < textToProcess.length) {
@@ -2111,7 +2160,7 @@ export class TaskListView extends ItemView {
         match: RegExpExecArray;
       } | null = null;
 
-      for (const p of patterns) {
+      for (const p of TaskListView.LINK_PATTERNS) {
         p.regex.lastIndex = i;
         const m = p.regex.exec(textToProcess);
         if (m) {

@@ -337,9 +337,13 @@ export class PluginLifecycleManager {
       // This ensures views show "Scanning vault..." before the scan starts
       this.plugin.vaultScanner?.setInitializationComplete();
 
-      // Wait for the initial vault scan to complete before showing the task view
-      // This ensures tasks are available when the view first renders
-      await this.plugin.vaultScanner?.scanVault();
+      // IMPORTANT: Run the vault scan concurrently without an 'await' lock!
+      // This is absolutely critical to achieving early Largest Contentful Paint (LCP).
+      // If we wait for the vault to scan first, the UI widget will not even mount
+      // to the screen until the 3-second block succeeds. By firing it off concurrently,
+      // the TaskListView renders immediately, and the `chunkedRenderQueue` drops the
+      // progressive LCP tasks down securely behind it!
+      const scanPromise = this.plugin.vaultScanner?.scanVault();
 
       // Set property search engine on vault scanner and register listeners (but don't initialize yet - lazy initialize)
       if (this.plugin.propertySearchEngine) {
@@ -358,6 +362,12 @@ export class PluginLifecycleManager {
         // On subsequent reloads, ensure the panel is available but don't steal focus
         this.plugin.uiManager.showTasks(false);
       }
+
+      // Allow any fatal exceptions inside the unawaited scan sequence to securely log
+      // without failing the Obsidian Workspace startup initialization.
+      scanPromise?.catch((err) => {
+        console.error('TODOseq: Fatal background scanning error:', err);
+      });
     });
   }
 

@@ -524,6 +524,19 @@ export class TaskParser implements ITaskParser {
   }
 
   /**
+   * Fast-path check to determine if the string even contains known syntax keywords.
+   * If false, the file is guaranteed to have no parseable tasks, skipping regex overhead.
+   */
+  public hasAnyKeyword(content: string): boolean {
+    for (let i = 0; i < this.allKeywords.length; i++) {
+      if (content.includes(this.allKeywords[i])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Update parser configuration.
    * Implements ITaskParser interface.
    * Called when settings change.
