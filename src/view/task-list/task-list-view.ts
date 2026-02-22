@@ -15,195 +15,23 @@ import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdo
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import TodoTracker from '../../main';
 import { getFilename, isActiveKeyword } from '../../utils/task-utils';
-import {
-  sortTasksWithThreeBlockSystem,
-  SortMethod as TaskSortMethod,
-  buildKeywordSortConfig,
-  KeywordSortConfig,
-} from '../../utils/task-sort';
 import { TaskStateManager } from '../../services/task-state-manager';
-import { TAG_PATTERN } from '../../utils/patterns';
-import { getTaskTextDisplay } from '../../utils/task-utils';
+import { TaskElementCache } from './task-element-cache';
+import { ChunkedRenderQueue } from './chunked-render-queue';
+import { TaskRenderer } from './task-renderer';
+import {
+  TaskListFilter,
+  TaskListViewMode,
+  SortMethod,
+} from './task-list-filter';
 
-const CHUNK_BATCH_SIZE = 15;
-const YIELD_EVERY_N_TASKS = 5;
-const PRIORITY_FIRST_BATCH = 10;
-
-// Lazy loading constants
 const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
 
-const WIKI_LINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-const MD_LINK_REGEX = /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g;
-const URL_REGEX = /\bhttps?:\/\/[^\s)]+/g;
-
-interface CachedTaskElement {
-  element: HTMLLIElement;
-  task: Task;
-}
-
-class TaskElementCache {
-  private cache = new Map<string, CachedTaskElement>();
-
-  private getKey(task: Task): string {
-    return `${task.path}:${task.line}`;
-  }
-
-  get(task: Task): HTMLLIElement | null {
-    const cached = this.cache.get(this.getKey(task));
-    return cached?.element ?? null;
-  }
-
-  set(task: Task, element: HTMLLIElement): void {
-    this.cache.set(this.getKey(task), { element, task });
-  }
-
-  invalidate(task: Task): void {
-    this.cache.delete(this.getKey(task));
-  }
-
-  invalidateByKey(key: string): void {
-    this.cache.delete(key);
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-
-  has(task: Task): boolean {
-    return this.cache.has(this.getKey(task));
-  }
-}
-
-class ChunkedRenderQueue {
-  private pending: Task[] = [];
-  private isProcessing = false;
-  private renderFn: ((task: Task) => HTMLLIElement) | null = null;
-  private container: Element | null = null;
-  private generation = 0;
-  private currentRenderPromise: Promise<void> | null = null;
-
-  async enqueue(
-    tasks: Task[],
-    renderFn: (task: Task) => HTMLLIElement,
-    container: Element,
-  ): Promise<void> {
-    // Cancel old render immediately - don't wait
-    this.generation++;
-    this.pending = [];
-    this.isProcessing = false;
-
-    // Set up new render
-    this.renderFn = renderFn;
-    this.container = container;
-    this.pending = tasks;
-
-    // Force start new render (old will exit via generation check)
-    this.isProcessing = true;
-    this.currentRenderPromise = this.processQueue();
-    await this.currentRenderPromise;
-    this.currentRenderPromise = null;
-  }
-
-  private async processQueue(): Promise<void> {
-    const renderFn = this.renderFn;
-    const container = this.container;
-    const currentGeneration = this.generation;
-    if (!renderFn || !container) return;
-
-    let priorityRendered = 0;
-    let renderedInBatch = 0;
-
-    while (this.pending.length > 0) {
-      // Check generation at start of each batch - exit if cancelled
-      if (this.generation !== currentGeneration) {
-        return;
-      }
-
-      const isFirstBatch = priorityRendered < PRIORITY_FIRST_BATCH;
-      const batchSize = isFirstBatch
-        ? Math.min(CHUNK_BATCH_SIZE, PRIORITY_FIRST_BATCH - priorityRendered)
-        : CHUNK_BATCH_SIZE;
-
-      const batch = this.pending.splice(0, batchSize);
-
-      for (const task of batch) {
-        // Check generation before each task - exit if cancelled
-        if (this.generation !== currentGeneration) {
-          return;
-        }
-
-        // Render or retrieve cached element via the provided renderFn
-        const element = renderFn(task);
-        container.appendChild(element); // Always append (moves if already in DOM)
-        priorityRendered++;
-        renderedInBatch++;
-
-        // Yield every N tasks to prevent UI blocking
-        if (renderedInBatch >= YIELD_EVERY_N_TASKS) {
-          renderedInBatch = 0;
-          await new Promise((resolve) => setTimeout(resolve, 0));
-        }
-      }
-    }
-
-    this.isProcessing = false;
-  }
-
-  clear(): void {
-    this.generation++;
-    this.pending = [];
-    this.isProcessing = false;
-  }
-
-  get isEmpty(): boolean {
-    return this.pending.length === 0 && !this.isProcessing;
-  }
-
-  async renderToFragment(
-    tasks: Task[],
-    renderFn: (task: Task) => HTMLLIElement,
-    yieldDuringRender = true,
-  ): Promise<DocumentFragment> {
-    const fragment = document.createDocumentFragment();
-
-    for (let i = 0; i < tasks.length; i++) {
-      const element = renderFn(tasks[i]);
-      fragment.appendChild(element);
-
-      // Yield every N tasks to prevent UI blocking during element creation
-      // Skip yielding for incremental refreshes (not needed, adds flicker)
-      if (yieldDuringRender && i > 0 && i % YIELD_EVERY_N_TASKS === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-    }
-
-    return fragment;
-  }
-}
-
-export type TaskListViewMode =
-  | 'showAll'
-  | 'sortCompletedLast'
-  | 'hideCompleted';
-export type SortMethod =
-  | 'default'
-  | 'sortByScheduled'
-  | 'sortByDeadline'
-  | 'sortByPriority'
-  | 'sortByUrgency'
-  | 'sortByKeyword';
+export type { TaskListViewMode, SortMethod } from './task-list-filter';
 
 export class TaskListView extends ItemView {
   static viewType = 'todoseq-view';
-
-  // Cache regex patterns to avoid recreating them on every task render
-  private static LINK_PATTERNS = [
-    { type: 'wiki' as const, regex: new RegExp(WIKI_LINK_REGEX) },
-    { type: 'md' as const, regex: new RegExp(MD_LINK_REGEX) },
-    { type: 'url' as const, regex: new RegExp(URL_REGEX) },
-    { type: 'tag' as const, regex: new RegExp(TAG_PATTERN) },
-  ];
 
   tasks: Task[];
   private defaultViewMode: TaskListViewMode;
@@ -232,6 +60,9 @@ export class TaskListView extends ItemView {
   // Menu builder for state management
   private menuBuilder: StateMenuBuilder;
 
+  // Task renderer for building DOM elements
+  private taskRenderer: TaskRenderer;
+
   // Search history debounce mechanism
   private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
     null;
@@ -244,9 +75,8 @@ export class TaskListView extends ItemView {
   private taskRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly TASK_REFRESH_DEBOUNCE_MS = 150;
 
-  // Keyword sort config caching
-  private cachedKeywordConfig: KeywordSortConfig | null = null;
-  private cachedKeywords: string | null = null;
+  // Task list filter for filtering and sorting
+  private taskListFilter: TaskListFilter;
 
   // Add generation counter for refreshVisibleList
   private refreshGeneration = 0;
@@ -273,6 +103,8 @@ export class TaskListView extends ItemView {
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = plugin.settings.defaultSortMethod;
     this.menuBuilder = new StateMenuBuilder(plugin);
+    this.taskRenderer = new TaskRenderer(plugin, this.menuBuilder);
+    this.taskListFilter = new TaskListFilter(plugin);
     this.renderQueue = new ChunkedRenderQueue();
     this.plugin = plugin;
 
@@ -453,67 +285,8 @@ export class TaskListView extends ItemView {
 
   /** Non-mutating transform for rendering */
   private transformForView(tasks: Task[], mode: TaskListViewMode): Task[] {
-    const now = new Date();
-    const sortMethod = this.getSortMethod() as TaskSortMethod;
-
-    // Map TaskListViewMode to CompletedTaskSetting
-    let completedSetting: 'showAll' | 'sortToEnd' | 'hide';
-    switch (mode) {
-      case 'hideCompleted':
-        completedSetting = 'hide';
-        break;
-      case 'sortCompletedLast':
-        completedSetting = 'sortToEnd';
-        break;
-      case 'showAll':
-      default:
-        completedSetting = 'showAll';
-        break;
-    }
-
-    // Use the new three-block sorting system
-    const futureSetting = this.plugin.settings.futureTaskSorting;
-
-    // Build keyword config if sorting by keyword
-    let keywordConfig: KeywordSortConfig | undefined;
-    if (sortMethod === 'sortByKeyword') {
-      keywordConfig = this.getKeywordSortConfig();
-    }
-
-    // Apply the new sorting logic
-    const sortedTasks = sortTasksWithThreeBlockSystem(
-      tasks,
-      now,
-      futureSetting,
-      completedSetting,
-      sortMethod,
-      keywordConfig,
-    );
-
-    return sortedTasks;
-  }
-
-  /**
-   * Get cached keyword sort config, rebuilding only when keywords change
-   */
-  private getKeywordSortConfig(): KeywordSortConfig {
-    // Build TaskKeywordGroups from flat settings properties
-    const keywordGroups = {
-      activeKeywords: this.plugin.settings?.additionalActiveKeywords ?? [],
-      inactiveKeywords: this.plugin.settings?.additionalTaskKeywords ?? [],
-      waitingKeywords: this.plugin.settings?.additionalWaitingKeywords ?? [],
-      completedKeywords:
-        this.plugin.settings?.additionalCompletedKeywords ?? [],
-      archivedKeywords: this.plugin.settings?.additionalArchivedKeywords ?? [],
-    };
-
-    const keywords = Object.values(keywordGroups).flat().join(',');
-    if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
-      this.cachedKeywords = keywords;
-      this.cachedKeywordConfig = buildKeywordSortConfig(keywordGroups);
-    }
-
-    return this.cachedKeywordConfig;
+    const sortMethod = this.getSortMethod();
+    return this.taskListFilter.transformForView(tasks, mode, sortMethod);
   }
 
   /** Search query (persisted on root contentEl attribute to survive re-renders) */
@@ -2161,76 +1934,8 @@ export class TaskListView extends ItemView {
     }
   }
 
-  // Render Obsidian-style links and tags as non-clickable, styled spans inside task text.
-  // Supports:
-  //  - Wiki links: [[Note]] and [[Note|Alias]]
-  //  - Markdown links: [Alias](url-or-path)
-  //  - Bare URLs: http(s)://...
-  //  - Tags: #tag
-  // Render task text with links, using lazy-computed textDisplay
-  private renderTaskTextWithLinks(task: Task, parent: HTMLElement) {
-    // Use lazy-computed textDisplay for better performance
-    const textToProcess = getTaskTextDisplay(task);
-
-    let i = 0;
-    while (i < textToProcess.length) {
-      let nextMatch: {
-        type: 'wiki' | 'md' | 'url' | 'tag';
-        match: RegExpExecArray;
-      } | null = null;
-
-      for (const p of TaskListView.LINK_PATTERNS) {
-        p.regex.lastIndex = i;
-        const m = p.regex.exec(textToProcess);
-        if (m) {
-          if (!nextMatch || m.index < nextMatch.match.index) {
-            nextMatch = { type: p.type, match: m };
-          }
-        }
-      }
-
-      if (!nextMatch) {
-        // Append any remaining text
-        parent.appendText(textToProcess.slice(i));
-        break;
-      }
-
-      // Append plain text preceding the match
-      if (nextMatch.match.index > i) {
-        parent.appendText(textToProcess.slice(i, nextMatch.match.index));
-      }
-
-      // Create appropriate styled element based on type
-      if (nextMatch.type === 'tag') {
-        // Create a tag-like span
-        const span = parent.createEl('span', { cls: 'todo-tag' });
-        const tagName = nextMatch.match[0]; // Full #tag text including #
-        span.setText(tagName);
-        span.setAttribute('title', tagName);
-      } else {
-        // Create a non-interactive, link-like span for other types
-        const span = parent.createEl('span', { cls: 'todo-link-like' });
-
-        if (nextMatch.type === 'wiki') {
-          const target = nextMatch.match[1];
-          const alias = nextMatch.match[2];
-          span.setText(alias ?? target);
-          span.setAttribute('title', target);
-        } else if (nextMatch.type === 'md') {
-          const label = nextMatch.match[1];
-          const url = nextMatch.match[2];
-          span.setText(label);
-          span.setAttribute('title', url);
-        } else {
-          const url = nextMatch.match[0];
-          span.setText(url);
-          span.setAttribute('title', url);
-        }
-      }
-
-      // Advance past the match
-      i = nextMatch.match.index + nextMatch.match[0].length;
-    }
+  private renderTaskTextWithLinks(task: Task, parent: HTMLElement): void {
+    this.taskRenderer.renderTaskTextWithLinks(task, parent);
   }
 
   // Open the source file in the vault where the task is declared, honoring Obsidian default-like modifiers.
