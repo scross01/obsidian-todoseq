@@ -159,6 +159,27 @@ class ChunkedRenderQueue {
   get isEmpty(): boolean {
     return this.pending.length === 0 && !this.isProcessing;
   }
+
+  async renderToFragment(
+    tasks: Task[],
+    renderFn: (task: Task) => HTMLLIElement,
+    yieldDuringRender = true,
+  ): Promise<DocumentFragment> {
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 0; i < tasks.length; i++) {
+      const element = renderFn(tasks[i]);
+      fragment.appendChild(element);
+
+      // Yield every N tasks to prevent UI blocking during element creation
+      // Skip yielding for incremental refreshes (not needed, adds flicker)
+      if (yieldDuringRender && i > 0 && i % YIELD_EVERY_N_TASKS === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+
+    return fragment;
+  }
 }
 
 export type TaskListViewMode =
@@ -1909,8 +1930,9 @@ export class TaskListView extends ItemView {
       // Track which elements we've already used this render cycle
       const usedKeys = new Set<string>();
 
-      // Reorder/reuse existing elements, create new ones only if needed via asynchronous chunking
-      await this.renderQueue.enqueue(
+      // Double-buffer: build all elements in a DocumentFragment first (no yields for refresh),
+      // then swap into DOM in a single operation to prevent flicker
+      const fragment = await this.renderQueue.renderToFragment(
         toRender,
         (task) => {
           const key = `${task.path}:${task.line}`;
@@ -1936,25 +1958,21 @@ export class TaskListView extends ItemView {
 
           return element;
         },
-        list,
+        false, // skip yielding during incremental refresh
       );
 
-      // Abort if another refresh superseded us while chunking!
-      // This specifically prevents the UI list from tearing itself apart traversing
-      // outdated element arrays or purging render queues if an overlapped refresh fired.
+      // Abort if another refresh superseded us while building!
       if (this.refreshGeneration !== currentGeneration) {
         return;
       }
 
-      // Remove elements that are no longer in visible list (lazy loaded items scrolled out)
-      existingKeys.forEach((key) => {
-        if (!keepKeys.has(key)) {
-          const el = existingElements.get(key);
-          if (el && el.parentNode && el.parentNode === list) {
-            list.removeChild(el);
-          }
-        }
-      });
+      // No-clear swap: create new list element, populate it, then replace old with new
+      // This prevents the brief empty flash from innerHTML = ''
+      const newList = list.cloneNode(false) as HTMLElement;
+      newList.appendChild(fragment);
+      list.parentNode?.replaceChild(newList, list);
+
+      // Note: We don't need to manually remove old elements - they're gone with the detached old list
 
       // Update lazy loading state
       this.renderQueue.clear();

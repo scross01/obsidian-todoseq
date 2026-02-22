@@ -439,11 +439,20 @@ export class VaultScanner {
 
     try {
       const currentTasks = this.taskStateManager.getTasks();
-      const updatedTasks = currentTasks.filter(
-        (task) => task.path !== file.path,
+      const fileTasksBefore = currentTasks.filter(
+        (task) => task.path === file.path,
       );
 
       const fileTasks = await this.scanFile(file);
+
+      // Skip update if tasks haven't actually changed (identity comparison by path, line, rawText)
+      if (this.tasksIdentical(fileTasksBefore, fileTasks)) {
+        return;
+      }
+
+      const updatedTasks = currentTasks.filter(
+        (task) => task.path !== file.path,
+      );
       updatedTasks.push(...fileTasks);
 
       updatedTasks.sort(taskComparator);
@@ -458,6 +467,21 @@ export class VaultScanner {
         err instanceof Error ? err : new Error(String(err)),
       );
     }
+  }
+
+  // Compare two task arrays for equality (path, line, rawText)
+  private tasksIdentical(before: Task[], after: Task[]): boolean {
+    if (before.length !== after.length) {
+      return false;
+    }
+    for (let i = 0; i < before.length; i++) {
+      const b = before[i];
+      const a = after[i];
+      if (b.path !== a.path || b.line !== a.line || b.rawText !== a.rawText) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // Process file deletion (called by EventCoordinator)
