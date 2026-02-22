@@ -5,6 +5,7 @@ import {
   BUILTIN_INACTIVE_KEYWORDS,
   BUILTIN_WAITING_KEYWORDS,
   BUILTIN_COMPLETED_KEYWORDS,
+  BUILTIN_ARCHIVED_KEYWORDS,
 } from '../src/utils/constants';
 import { createBaseSettings } from './helpers/test-helper';
 
@@ -27,7 +28,7 @@ describe('StateMenuBuilder', () => {
   });
 
   describe('getKeywordGroups', () => {
-    test('should return four keyword groups with correct built-in keywords', () => {
+    test('should return five keyword groups with correct built-in keywords', () => {
       // Arrange
       const builder = new StateMenuBuilder(mockPlugin as any);
 
@@ -35,9 +36,9 @@ describe('StateMenuBuilder', () => {
       const result = (builder as any).getKeywordGroups();
 
       // Assert
-      expect(result).toHaveLength(4);
+      expect(result).toHaveLength(5);
 
-      const [active, inactive, waiting, completed] = result;
+      const [active, inactive, waiting, completed, archived] = result;
 
       expect(active.name).toBe('Active');
       expect(active.builtin).toEqual([...BUILTIN_ACTIVE_KEYWORDS]);
@@ -54,6 +55,10 @@ describe('StateMenuBuilder', () => {
       expect(completed.name).toBe('Completed');
       expect(completed.builtin).toEqual([...BUILTIN_COMPLETED_KEYWORDS]);
       expect(completed.custom).toEqual([]);
+
+      expect(archived.name).toBe('Archived');
+      expect(archived.builtin).toEqual([...BUILTIN_ARCHIVED_KEYWORDS]);
+      expect(archived.custom).toEqual([]);
     });
 
     test('should include custom keywords from settings', () => {
@@ -82,7 +87,7 @@ describe('StateMenuBuilder', () => {
   });
 
   describe('getSelectableStatesForMenu', () => {
-    test('should return four groups with all states when current state is unknown', () => {
+    test('should return five groups with all states when current state is unknown', () => {
       // Arrange
       const builder = new StateMenuBuilder(mockPlugin as any);
 
@@ -90,9 +95,15 @@ describe('StateMenuBuilder', () => {
       const groups = builder.getSelectableStatesForMenu('UNKNOWN');
 
       // Assert
-      expect(groups).toHaveLength(4);
+      expect(groups).toHaveLength(5);
 
-      const [activeGroup, inactiveGroup, waitingGroup, completedGroup] = groups;
+      const [
+        activeGroup,
+        inactiveGroup,
+        waitingGroup,
+        completedGroup,
+        archivedGroup,
+      ] = groups;
 
       expect(activeGroup.group).toBe('Active');
       expect(activeGroup.states).toEqual([...BUILTIN_ACTIVE_KEYWORDS]);
@@ -105,6 +116,9 @@ describe('StateMenuBuilder', () => {
 
       expect(completedGroup.group).toBe('Completed');
       expect(completedGroup.states).toEqual([...BUILTIN_COMPLETED_KEYWORDS]);
+
+      expect(archivedGroup.group).toBe('Archived');
+      expect(archivedGroup.states).toEqual([...BUILTIN_ARCHIVED_KEYWORDS]);
     });
 
     test('should exclude current state from menu options', () => {

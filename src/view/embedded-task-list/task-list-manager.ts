@@ -231,6 +231,7 @@ export class EmbeddedTaskListManager {
       inactiveKeywords: this.settings?.additionalTaskKeywords ?? [],
       waitingKeywords: this.settings?.additionalWaitingKeywords ?? [],
       completedKeywords: this.settings?.additionalCompletedKeywords ?? [],
+      archivedKeywords: this.settings?.additionalArchivedKeywords ?? [],
     };
 
     const keywords = Object.values(keywordGroups).flat().join(',');

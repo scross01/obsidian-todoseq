@@ -1,12 +1,12 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
-import {
-  Task,
-  DEFAULT_COMPLETED_STATES,
-  NEXT_STATE,
-  CYCLE_TASK_STATE,
-} from '../types/task';
+import { Task, NEXT_STATE, CYCLE_TASK_STATE } from '../types/task';
 import { PRIORITY_TOKEN_REGEX, CHECKBOX_REGEX } from '../utils/patterns';
 import { getPluginSettings } from '../utils/settings-utils';
+import {
+  isCompletedKeyword,
+  isArchivedKeyword,
+  HasTaskKeywordGroups,
+} from '../utils/task-utils';
 
 /**
  * Handles writing task state changes to files.
@@ -23,7 +23,9 @@ export class TaskWriter {
     task: Task,
     newState: string,
     keepPriority = true,
+    keywordSettings?: HasTaskKeywordGroups,
   ): { newLine: string; completed: boolean } {
+    const settings = keywordSettings ?? {};
     const priToken =
       keepPriority && task.priority
         ? task.priority === 'high'
@@ -44,6 +46,12 @@ export class TaskWriter {
       ? rawText.substring(quotePrefix.length)
       : rawText;
     const isCheckbox = textWithoutQuote.match(CHECKBOX_REGEX);
+    // Extract current checkbox state (x for checked, space for unchecked)
+    // This preserves the checkbox state when changing to archived states
+    const currentCheckboxMatch = textWithoutQuote.match(/- \[([ x])\]/);
+    const currentCheckboxState = currentCheckboxMatch
+      ? currentCheckboxMatch[1]
+      : ' ';
     let newLine: string;
 
     // Get the indent without the quote prefix (task.indent already includes the quote prefix for quoted tasks)
@@ -72,7 +80,15 @@ export class TaskWriter {
       }
     } else if (isCheckbox) {
       // Generate markdown checkbox format with proper spacing
-      const checkboxStatus = DEFAULT_COMPLETED_STATES.has(newState) ? 'x' : ' ';
+      // For archived states, preserve the existing checkbox state
+      // For other states, use the default logic (check if it's a completed state)
+      const isArchived = isArchivedKeyword(newState, settings);
+      const isCompleted = isCompletedKeyword(newState, settings);
+      const checkboxStatus = isArchived
+        ? currentCheckboxState
+        : isCompleted
+          ? 'x'
+          : ' ';
       const textPart = task.text ? ` ${task.text}` : '';
       newLine = `${indentWithoutQuote}${quotePrefix}- [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
     } else {
@@ -115,7 +131,7 @@ export class TaskWriter {
       newLine += originalSpacing + task.footnoteReference;
     }
 
-    const completed = DEFAULT_COMPLETED_STATES.has(newState);
+    const completed = isCompletedKeyword(newState, settings);
     return { newLine, completed };
   }
 
@@ -133,10 +149,12 @@ export class TaskWriter {
     keepPriority = true,
     forceVaultApi = false,
   ): Promise<Task> {
+    const settings = getPluginSettings(this.app);
     const { newLine, completed } = TaskWriter.generateTaskLine(
       task,
       newState,
       keepPriority,
+      settings ?? undefined,
     );
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -266,10 +284,12 @@ export class TaskWriter {
     task: Task,
     newPriority: 'high' | 'med' | 'low',
   ): Promise<Task> {
+    const settings = getPluginSettings(this.app);
     const { newLine } = TaskWriter.generateTaskLine(
       task,
       task.state,
       false, // Don't keep existing priority
+      settings ?? undefined,
     );
 
     // Add the new priority to the task line

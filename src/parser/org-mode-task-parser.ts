@@ -54,6 +54,7 @@ export class OrgModeTaskParser implements ITaskParser {
   private completedKeywords: Set<string>;
   private activeKeywords: Set<string>;
   private waitingKeywords: Set<string>;
+  private archivedKeywords: Set<string>;
   private urgencyCoefficients: UrgencyCoefficients;
   private regexCache: RegexCache;
   private headlineRegex: RegExp;
@@ -64,6 +65,7 @@ export class OrgModeTaskParser implements ITaskParser {
     completedKeywords: Set<string>,
     activeKeywords: Set<string>,
     waitingKeywords: Set<string>,
+    archivedKeywords: Set<string>,
     urgencyCoefficients: UrgencyCoefficients,
     regexCache: RegexCache,
     app: App | null,
@@ -72,6 +74,7 @@ export class OrgModeTaskParser implements ITaskParser {
     this.completedKeywords = completedKeywords;
     this.activeKeywords = activeKeywords;
     this.waitingKeywords = waitingKeywords;
+    this.archivedKeywords = archivedKeywords;
     this.urgencyCoefficients = urgencyCoefficients;
     this.regexCache = regexCache;
     this.app = app;
@@ -93,14 +96,20 @@ export class OrgModeTaskParser implements ITaskParser {
     urgencyCoefficients?: UrgencyCoefficients,
   ): OrgModeTaskParser {
     // Build keyword lists from taskKeywordGroups setting
-    const { allKeywords, completedKeywords, activeKeywords, waitingKeywords } =
-      buildKeywordsFromGroups(settings);
+    const {
+      allKeywords,
+      completedKeywords,
+      activeKeywords,
+      waitingKeywords,
+      archivedKeywords,
+    } = buildKeywordsFromGroups(settings);
 
     return new OrgModeTaskParser(
       allKeywords,
       new Set(completedKeywords),
       new Set(activeKeywords),
       new Set(waitingKeywords),
+      new Set(archivedKeywords),
       urgencyCoefficients ?? getDefaultCoefficients(),
       new RegexCache(),
       app,
@@ -110,6 +119,10 @@ export class OrgModeTaskParser implements ITaskParser {
   /**
    * Update parser configuration.
    * Called when settings change.
+   *
+   * NOTE: Archived keywords are not supported for org-mode tasks,
+   * so we don't update the archivedKeywords property here.
+   * Archived tasks are filtered out at the vault scanner level.
    */
   updateConfig(config: ParserConfig): void {
     this.keywords = config.keywords;

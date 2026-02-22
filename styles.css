@@ -535,6 +535,22 @@
   text-decoration-color: var(--text-muted);
 }
 
+/* Archived task styling - muted/dimmed appearance without strikethrough */
+/* Works for both built-in (ARCHIVED) and custom archived keywords */
+:is(.markdown-preview-view, .cm-editor) .todoseq-archived-keyword {
+  color: var(--interactive-accent);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Archived task text styling */
+:is(.markdown-preview-view, .cm-editor)
+  :is(.todoseq-archived-task-container, .todoseq-archived-task-text) {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
 /* Dropdown containers for search suggestions and options */
 .todoseq-dropdown {
   position: absolute;

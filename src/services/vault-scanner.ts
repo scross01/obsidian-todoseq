@@ -12,7 +12,10 @@ import {
 import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
 import { PropertySearchEngine } from './property-search-engine';
-import { buildKeywordsFromGroups } from '../utils/task-utils';
+import {
+  buildKeywordsFromGroups,
+  isArchivedKeyword,
+} from '../utils/task-utils';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -171,7 +174,13 @@ export class VaultScanner {
 
         // Flatten the task arrays from the batch
         for (const fileTasks of batchResults) {
-          newTasks.push(...fileTasks);
+          // Filter out archived tasks - they are styled but NOT collected
+          // Note: Archived tasks are identified using isArchivedKeyword() instead
+          // of being tracked by individual parsers for consistency across all formats
+          const nonArchivedTasks = fileTasks.filter(
+            (task) => !isArchivedKeyword(task.state, this.settings),
+          );
+          newTasks.push(...nonArchivedTasks);
         }
 
         // Emit an initial chunk of tasks to the UI to unblock Largest Contentful Paint (LCP)
@@ -406,13 +415,19 @@ export class VaultScanner {
     }
 
     // Build parser config for updating all parsers using all keyword groups
-    const { allKeywords, completedKeywords, activeKeywords, waitingKeywords } =
-      buildKeywordsFromGroups(newSettings);
+    const {
+      allKeywords,
+      completedKeywords,
+      activeKeywords,
+      waitingKeywords,
+      archivedKeywords,
+    } = buildKeywordsFromGroups(newSettings);
     const config: ParserConfig = {
       keywords: allKeywords,
       completedKeywords: completedKeywords,
       activeKeywords: activeKeywords,
       waitingKeywords: waitingKeywords,
+      archivedKeywords: archivedKeywords,
       urgencyCoefficients: this.urgencyCoefficients,
       includeCalloutBlocks: newSettings.includeCalloutBlocks,
       includeCodeBlocks: newSettings.includeCodeBlocks,
@@ -445,15 +460,22 @@ export class VaultScanner {
 
       const fileTasks = await this.scanFile(file);
 
+      // Filter out archived tasks - they are styled but NOT collected
+      // Note: Archived tasks are identified using isArchivedKeyword() instead
+      // of being tracked by individual parsers for consistency across all formats
+      const nonArchivedTasks = fileTasks.filter(
+        (task) => !isArchivedKeyword(task.state, this.settings),
+      );
+
       // Skip update if tasks haven't actually changed (identity comparison by path, line, rawText)
-      if (this.tasksIdentical(fileTasksBefore, fileTasks)) {
+      if (this.tasksIdentical(fileTasksBefore, nonArchivedTasks)) {
         return;
       }
 
       const updatedTasks = currentTasks.filter(
         (task) => task.path !== file.path,
       );
-      updatedTasks.push(...fileTasks);
+      updatedTasks.push(...nonArchivedTasks);
 
       updatedTasks.sort(taskComparator);
 

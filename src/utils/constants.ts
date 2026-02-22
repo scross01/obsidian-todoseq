@@ -56,6 +56,13 @@ export const BUILTIN_COMPLETED_KEYWORDS = [
 ] as const;
 
 /**
+ * Built-in keywords for archived tasks.
+ * These keywords indicate a task that has been archived.
+ * Archived tasks are styled but NOT collected during vault scans.
+ */
+export const BUILTIN_ARCHIVED_KEYWORDS = ['ARCHIVED'] as const;
+
+/**
  * Type for built-in keyword arrays.
  * Used for type-safe access to built-in keyword constants.
  */
@@ -63,4 +70,5 @@ export type BuiltinKeywordArray =
   | typeof BUILTIN_ACTIVE_KEYWORDS
   | typeof BUILTIN_INACTIVE_KEYWORDS
   | typeof BUILTIN_WAITING_KEYWORDS
-  | typeof BUILTIN_COMPLETED_KEYWORDS;
+  | typeof BUILTIN_COMPLETED_KEYWORDS
+  | typeof BUILTIN_ARCHIVED_KEYWORDS;

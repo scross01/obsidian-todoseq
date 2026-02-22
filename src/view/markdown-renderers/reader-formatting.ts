@@ -4,7 +4,8 @@ import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
 import {
   buildKeywordsFromGroups,
-  isCompletedKeyword as isCompletedKeywordUtil,
+  isCompletedKeyword,
+  isArchivedKeyword,
 } from '../../utils/task-utils';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
@@ -49,15 +50,20 @@ export class ReaderViewFormatter {
    * All keywords use the same styling - no group-based CSS classes
    * @param keyword - The keyword text to display
    * @param isCompleted - Whether the keyword is a completed keyword (for strikethrough styling)
+   * @param isArchived - Whether the keyword is an archived keyword (for muted styling)
    */
   private createKeywordSpan(
     keyword: string,
     isCompleted = false,
+    isArchived = false,
   ): HTMLSpanElement {
     const tempContainer = document.createElement('div');
-    const cssClasses = isCompleted
-      ? 'todoseq-keyword-formatted todoseq-completed-keyword'
-      : 'todoseq-keyword-formatted';
+    let cssClasses = 'todoseq-keyword-formatted';
+    if (isArchived) {
+      cssClasses += ' todoseq-archived-keyword';
+    } else if (isCompleted) {
+      cssClasses += ' todoseq-completed-keyword';
+    }
     const span = tempContainer.createSpan({
       cls: cssClasses,
       text: keyword,
@@ -89,6 +95,20 @@ export class ReaderViewFormatter {
       cls: 'todoseq-completed-task-text',
       attr: {
         'data-completed-task': 'true',
+      },
+    });
+    return container;
+  }
+
+  /**
+   * Create an archived task container span element using Obsidian DOM helpers
+   */
+  private createArchivedTaskContainer(): HTMLSpanElement {
+    const tempContainer = document.createElement('div');
+    const container = tempContainer.createSpan({
+      cls: 'todoseq-archived-task-text',
+      attr: {
+        'data-archived-task': 'true',
       },
     });
     return container;
@@ -796,13 +816,17 @@ export class ReaderViewFormatter {
         const keyword = match[4];
 
         // Check if this is a completed keyword for styling
-        const isCompleted = isCompletedKeywordUtil(
-          keyword,
-          this.plugin.settings,
-        );
+        const isCompleted = isCompletedKeyword(keyword, this.plugin.settings);
+
+        // Check if this is an archived keyword for styling
+        const isArchived = isArchivedKeyword(keyword, this.plugin.settings);
 
         // Create a span for the task keyword using helper method
-        const keywordSpan = this.createKeywordSpan(keyword, isCompleted);
+        const keywordSpan = this.createKeywordSpan(
+          keyword,
+          isCompleted,
+          isArchived,
+        );
 
         // Find the keyword position in the task text
         const fullMatchStart = match.index || 0;
@@ -1057,10 +1081,17 @@ export class ReaderViewFormatter {
     const keyword = match[4];
 
     // Check if this is a completed keyword for styling
-    const isCompleted = isCompletedKeywordUtil(keyword, this.plugin.settings);
+    const isCompleted = isCompletedKeyword(keyword, this.plugin.settings);
+
+    // Check if this is an archived keyword for styling
+    const isArchived = isArchivedKeyword(keyword, this.plugin.settings);
 
     // Create a span for the task keyword
-    const keywordSpan = this.createKeywordSpan(keyword, isCompleted);
+    const keywordSpan = this.createKeywordSpan(
+      keyword,
+      isCompleted,
+      isArchived,
+    );
 
     // Find the keyword position in the text
     const fullMatchStart = match.index || 0;
@@ -1267,13 +1298,17 @@ export class ReaderViewFormatter {
         const keyword = match[4];
 
         // Check if this is a completed keyword for styling
-        const isCompleted = isCompletedKeywordUtil(
-          keyword,
-          this.plugin.settings,
-        );
+        const isCompleted = isCompletedKeyword(keyword, this.plugin.settings);
+
+        // Check if this is an archived keyword for styling
+        const isArchived = isArchivedKeyword(keyword, this.plugin.settings);
 
         // Create a span for the task keyword using helper method
-        const keywordSpan = this.createKeywordSpan(keyword, isCompleted);
+        const keywordSpan = this.createKeywordSpan(
+          keyword,
+          isCompleted,
+          isArchived,
+        );
 
         // Create a container for the entire task line using helper method
         const taskContainer = this.createTaskContainer();
@@ -1289,6 +1324,11 @@ export class ReaderViewFormatter {
         // Apply completed task text styling if needed
         if (isCompleted) {
           this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
+        }
+
+        // Apply archived task text styling if needed
+        if (isArchived) {
+          this.applyArchivedTaskStylingToTaskContainer(taskContainer);
         }
 
         // Replace all line nodes with the task container
@@ -1429,6 +1469,60 @@ export class ReaderViewFormatter {
         keywordSpan,
         completedContainer.firstChild,
       );
+    }
+  }
+
+  /**
+   * Apply archived task styling to a task container
+   */
+  private applyArchivedTaskStylingToTaskContainer(
+    taskContainer: HTMLElement,
+  ): void {
+    // Find all keyword spans within the task container
+    const keywordSpans = taskContainer.querySelectorAll(
+      '.todoseq-keyword-formatted',
+    );
+
+    for (const keywordSpan of keywordSpans) {
+      // Check if this is an archived keyword
+      const keyword = keywordSpan.getAttribute('data-task-keyword');
+      if (!keyword) continue;
+
+      if (!isArchivedKeyword(keyword, this.plugin.settings)) continue;
+
+      // Verify the keyword span is actually a child of the task container
+      if (keywordSpan.parentNode !== taskContainer) {
+        continue;
+      }
+
+      // Get all nodes after the keyword span (store references to original nodes)
+      const nodesAfterKeyword: Node[] = [];
+      let currentNode = keywordSpan.nextSibling;
+
+      while (currentNode) {
+        nodesAfterKeyword.push(currentNode);
+        currentNode = currentNode.nextSibling;
+      }
+
+      // Wrap both the keyword and the text after it in archived task styling
+      if (nodesAfterKeyword.length > 0 || keywordSpan) {
+        // Create a container for the archived task using helper method
+        const archivedContainer = this.createArchivedTaskContainer();
+
+        // Move all nodes after keyword to the container (not clone)
+        nodesAfterKeyword.forEach((node) => {
+          archivedContainer.appendChild(node);
+        });
+
+        // Replace the keyword span with the archived container
+        taskContainer.replaceChild(archivedContainer, keywordSpan);
+
+        // Now move the keyword span into the archived container at the beginning
+        archivedContainer.insertBefore(
+          keywordSpan,
+          archivedContainer.firstChild,
+        );
+      }
     }
   }
 

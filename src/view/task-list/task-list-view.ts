@@ -504,6 +504,7 @@ export class TaskListView extends ItemView {
       waitingKeywords: this.plugin.settings?.additionalWaitingKeywords ?? [],
       completedKeywords:
         this.plugin.settings?.additionalCompletedKeywords ?? [],
+      archivedKeywords: this.plugin.settings?.additionalArchivedKeywords ?? [],
     };
 
     const keywords = Object.values(keywordGroups).flat().join(',');

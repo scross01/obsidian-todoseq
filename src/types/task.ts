@@ -35,6 +35,7 @@ export interface TaskKeywordGroups {
   inactiveKeywords: string[]; // Like TODO, LATER
   waitingKeywords: string[]; // Like WAIT, WAITING
   completedKeywords: string[]; // Like DONE, CANCELLED
+  archivedKeywords: string[]; // Like ARCHIVED - styled but not collected
 }
 
 /**

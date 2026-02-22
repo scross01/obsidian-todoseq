@@ -30,7 +30,11 @@ ON-HOLD this is a custom **waiting** keyword for a on-hold tasks
 NEVER this is a custom **completed** keyword for a never do task
 ##### Archived task keywords
 
-ARCHIVED this is a custom **completed** keyword for an archived task
+*Archived tasks do not appear in the task list or task search*
+
+- [ ] ARCHIVED this is a custom **completed** keyword for an archived task
+- [x] OLD out of date task
+
 #### Not a keyword
 
 BOGUS this is not a custom keyword

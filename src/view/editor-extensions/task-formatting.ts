@@ -20,7 +20,7 @@ import {
   LanguageDefinition,
 } from '../../parser/language-registry';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
-import { isCompletedKeyword as isCompletedKeywordUtil } from '../../utils/task-utils';
+import { isCompletedKeyword, isArchivedKeyword } from '../../utils/task-utils';
 
 /**
  * Priority type definition
@@ -363,8 +363,13 @@ export class TaskKeywordDecorator {
           let cssClasses = 'todoseq-keyword-formatted';
 
           // Add completed keyword class for strikethrough styling on the keyword itself
-          if (isCompletedKeywordUtil(keyword, this.settings)) {
+          if (isCompletedKeyword(keyword, this.settings)) {
             cssClasses += ' todoseq-completed-keyword';
+          }
+
+          // Add archived keyword class for muted styling on the keyword itself
+          if (isArchivedKeyword(keyword, this.settings)) {
+            cssClasses += ' todoseq-archived-keyword';
           }
 
           if (this.inCodeBlock && this.settings.includeCodeBlocks) {
@@ -408,7 +413,7 @@ export class TaskKeywordDecorator {
           );
 
           // Add separate span for task text in completed tasks
-          if (isCompletedKeywordUtil(keyword, this.settings)) {
+          if (isCompletedKeyword(keyword, this.settings)) {
             // Calculate task text position (text after keyword)
             const taskTextStart = line.from + keywordEnd;
             const taskTextEnd = line.to; // End of line
@@ -422,6 +427,27 @@ export class TaskKeywordDecorator {
                   class: 'todoseq-completed-task-text',
                   attributes: {
                     'data-completed-task-text': 'true',
+                  },
+                }),
+              );
+            }
+          }
+
+          // Add separate span for task text in archived tasks
+          if (isArchivedKeyword(keyword, this.settings)) {
+            // Calculate task text position (text after keyword)
+            const taskTextStart = line.from + keywordEnd;
+            const taskTextEnd = line.to; // End of line
+
+            // Only create task text decoration if there's actual text after keyword
+            if (taskTextStart < taskTextEnd) {
+              builder.add(
+                taskTextStart,
+                taskTextEnd,
+                Decoration.mark({
+                  class: 'todoseq-archived-task-text',
+                  attributes: {
+                    'data-archived-task-text': 'true',
                   },
                 }),
               );

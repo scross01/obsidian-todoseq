@@ -5,6 +5,7 @@ export interface TodoTrackerSettings {
   additionalActiveKeywords: string[]; // Custom active keywords (DOING, NOW, etc.)
   additionalWaitingKeywords: string[]; // Custom waiting keywords (WAIT, WAITING, etc.)
   additionalCompletedKeywords: string[]; // Custom completed keywords (DONE, CANCELLED, etc.)
+  additionalArchivedKeywords: string[]; // Custom archived keywords (ARCHIVED, etc.) - styled but not collected
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
   includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
   includeCommentBlocks: boolean; // when true, tasks inside multiline comment blocks ($$) are included
@@ -32,6 +33,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   additionalActiveKeywords: [], // Active keywords
   additionalWaitingKeywords: [], // Waiting keywords
   additionalCompletedKeywords: [], // Completed keywords
+  additionalArchivedKeywords: [], // Archived keywords
   includeCodeBlocks: false,
   includeCalloutBlocks: true, // Enabled by default
   includeCommentBlocks: false, // Disabled by default

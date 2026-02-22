@@ -5,6 +5,7 @@ import {
   BUILTIN_INACTIVE_KEYWORDS,
   BUILTIN_WAITING_KEYWORDS,
   BUILTIN_COMPLETED_KEYWORDS,
+  BUILTIN_ARCHIVED_KEYWORDS,
 } from '../../utils/constants';
 
 /**
@@ -62,7 +63,7 @@ export class StateMenuBuilder {
 
   /**
    * Get keyword groups with built-in and custom keywords
-   * Returns groups in order: Active, Inactive, Waiting, Completed
+   * Returns groups in order: Active, Inactive, Waiting, Completed, Archived
    */
   private getKeywordGroups(): KeywordGroup[] {
     // Get custom keywords from plugin's current settings (always fresh)
@@ -71,6 +72,7 @@ export class StateMenuBuilder {
     const customInactive = settings?.additionalTaskKeywords ?? [];
     const customWaiting = settings?.additionalWaitingKeywords ?? [];
     const customCompleted = settings?.additionalCompletedKeywords ?? [];
+    const customArchived = settings?.additionalArchivedKeywords ?? [];
 
     return [
       {
@@ -92,6 +94,11 @@ export class StateMenuBuilder {
         name: 'Completed',
         builtin: BUILTIN_COMPLETED_KEYWORDS,
         custom: customCompleted,
+      },
+      {
+        name: 'Archived',
+        builtin: BUILTIN_ARCHIVED_KEYWORDS,
+        custom: customArchived,
       },
     ];
   }

@@ -61,6 +61,12 @@ export class TaskParser implements ITaskParser {
   /** Set of keywords that indicate a waiting task */
   private waitingKeywordsSet: Set<string>;
 
+  /**
+   * NOTE: We don't track archived keywords as a separate property here because
+   * archived tasks are explicitly filtered out at the vault scanner level using
+   * isArchivedKeyword() function, not at the parser level.
+   */
+
   // Public access to regex patterns for editor commands
   public readonly testRegex: RegExp;
   public readonly captureRegex: RegExp;
@@ -125,6 +131,7 @@ export class TaskParser implements ITaskParser {
       ...(settings.additionalWaitingKeywords ?? []),
       ...(settings.additionalCompletedKeywords ?? []),
       ...(settings.additionalTaskKeywords ?? []),
+      ...(settings.additionalArchivedKeywords ?? []),
     ];
 
     // Validate user-provided keywords to prevent regex injection vulnerabilities

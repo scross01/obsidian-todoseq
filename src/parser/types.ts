@@ -24,6 +24,9 @@ export interface ParserConfig {
   /** Keywords that indicate waiting state (WAIT, WAITING, etc.) */
   waitingKeywords?: string[];
 
+  /** Keywords that indicate archived state (ARCHIVED, etc.) - styled but not collected */
+  archivedKeywords?: string[];
+
   /** Urgency coefficients for task scoring */
   urgencyCoefficients: UrgencyCoefficients;
 

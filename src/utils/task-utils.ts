@@ -4,6 +4,7 @@ import {
   BUILTIN_INACTIVE_KEYWORDS,
   BUILTIN_WAITING_KEYWORDS,
   BUILTIN_COMPLETED_KEYWORDS,
+  BUILTIN_ARCHIVED_KEYWORDS,
 } from './constants';
 
 /**
@@ -67,6 +68,7 @@ export interface HasTaskKeywordGroups {
   additionalActiveKeywords?: string[]; // Active keywords
   additionalWaitingKeywords?: string[]; // Waiting keywords
   additionalCompletedKeywords?: string[]; // Completed keywords
+  additionalArchivedKeywords?: string[]; // Archived keywords - styled but not collected
 }
 
 /**
@@ -95,6 +97,11 @@ export function getKeywordsForGroup(
         ...BUILTIN_COMPLETED_KEYWORDS,
         ...(settings.additionalCompletedKeywords ?? []),
       ];
+    case 'archivedKeywords':
+      return [
+        ...BUILTIN_ARCHIVED_KEYWORDS,
+        ...(settings.additionalArchivedKeywords ?? []),
+      ];
     default:
       return [];
   }
@@ -122,6 +129,7 @@ export function getAllKeywords(settings: HasTaskKeywordGroups): string[] {
     ...getInactiveKeywords(settings),
     ...getKeywordsForGroup('waitingKeywords', settings),
     ...getKeywordsForGroup('completedKeywords', settings),
+    ...getKeywordsForGroup('archivedKeywords', settings),
   ];
 
   // Remove duplicates while preserving order
@@ -149,6 +157,7 @@ export function getKeywordGroup(
     'activeKeywords',
     'waitingKeywords',
     'completedKeywords',
+    'archivedKeywords',
   ];
 
   for (const group of groups) {
@@ -179,6 +188,9 @@ export function isBuiltinKeyword(keyword: string): boolean {
     ) ||
     BUILTIN_COMPLETED_KEYWORDS.includes(
       keyword as (typeof BUILTIN_COMPLETED_KEYWORDS)[number],
+    ) ||
+    BUILTIN_ARCHIVED_KEYWORDS.includes(
+      keyword as (typeof BUILTIN_ARCHIVED_KEYWORDS)[number],
     )
   );
 }
@@ -195,6 +207,7 @@ export function validateKeywordGroups(
     activeKeywords?: string[];
     waitingKeywords?: string[];
     completedKeywords?: string[];
+    archivedKeywords?: string[];
   },
   additionalTaskKeywords?: string[],
 ): string[] {
@@ -205,6 +218,7 @@ export function validateKeywordGroups(
     ...(groups.activeKeywords ?? []),
     ...(groups.waitingKeywords ?? []),
     ...(groups.completedKeywords ?? []),
+    ...(groups.archivedKeywords ?? []),
     ...(additionalTaskKeywords ?? []),
   ];
 
@@ -242,6 +256,8 @@ export interface TaskKeywordGroupsResult {
   inactiveKeywords: string[];
   /** Keywords that indicate a task is waiting/blocked */
   waitingKeywords: string[];
+  /** Keywords that indicate a task is archived (styled but not collected) */
+  archivedKeywords: string[];
 }
 
 /**
@@ -257,6 +273,7 @@ export function buildKeywordsFromGroups(
   const inactiveKeywords = getInactiveKeywords(settings);
   const waitingKeywords = getKeywordsForGroup('waitingKeywords', settings);
   const completedKeywords = getKeywordsForGroup('completedKeywords', settings);
+  const archivedKeywords = getKeywordsForGroup('archivedKeywords', settings);
 
   // Build all keywords, removing duplicates while preserving order
   const allKeywords = Array.from(
@@ -265,6 +282,7 @@ export function buildKeywordsFromGroups(
       ...inactiveKeywords,
       ...waitingKeywords,
       ...completedKeywords,
+      ...archivedKeywords,
     ]),
   );
 
@@ -274,6 +292,7 @@ export function buildKeywordsFromGroups(
     activeKeywords,
     inactiveKeywords,
     waitingKeywords,
+    archivedKeywords,
   };
 }
 
@@ -289,6 +308,21 @@ export function isCompletedKeyword(
 ): boolean {
   const completedKeywords = getKeywordsForGroup('completedKeywords', settings);
   return completedKeywords.includes(keyword);
+}
+
+/**
+ * Determine if a keyword indicates an archived task
+ * Archived tasks are styled but NOT collected during vault scans
+ * @param keyword The task state keyword
+ * @param settings Settings object containing taskKeywordGroups
+ * @returns True if the keyword is in the archived group
+ */
+export function isArchivedKeyword(
+  keyword: string,
+  settings: HasTaskKeywordGroups,
+): boolean {
+  const archivedKeywords = getKeywordsForGroup('archivedKeywords', settings);
+  return archivedKeywords.includes(keyword);
 }
 
 /**

@@ -480,9 +480,11 @@ describe('Search Suggestions', () => {
       expect(states).toContain('IN-PROGRESS');
       expect(states).toContain('CANCELED');
       expect(states).toContain('CANCELLED');
+      expect(states).toContain('ARCHIVED');
 
       // Should be sorted alphabetically
       expect(states).toEqual([
+        'ARCHIVED',
         'CANCELED',
         'CANCELLED',
         'DOING',

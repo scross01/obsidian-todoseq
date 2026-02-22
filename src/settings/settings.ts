@@ -206,12 +206,21 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       'Keywords for finished or abandoned tasks (e.g., NEVER). Built-in: DONE, CANCELLED',
       this.plugin.settings.additionalCompletedKeywords,
     );
+
+    // Archived keywords sub-section
+    this.createKeywordGroupSetting(
+      containerEl,
+      'additionalArchivedKeywords',
+      'Archived keywords',
+      'Keywords for archived tasks (e.g., OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED',
+      this.plugin.settings.additionalArchivedKeywords,
+    );
   }
 
   /**
    * Create a keyword group setting with validation
    * Uses flat settings properties: additionalActiveKeywords, additionalTaskKeywords,
-   * additionalWaitingKeywords, additionalCompletedKeywords
+   * additionalWaitingKeywords, additionalCompletedKeywords, additionalArchivedKeywords
    */
   private createKeywordGroupSetting(
     containerEl: HTMLElement,
@@ -221,6 +230,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       | 'additionalTaskKeywords'
       | 'additionalWaitingKeywords'
       | 'additionalCompletedKeywords'
+      | 'additionalArchivedKeywords'
     >,
     name: string,
     description: string,
@@ -308,6 +318,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
                   settingKey === 'additionalCompletedKeywords'
                     ? validKeywords
                     : this.plugin.settings.additionalCompletedKeywords,
+                archivedKeywords:
+                  settingKey === 'additionalArchivedKeywords'
+                    ? validKeywords
+                    : this.plugin.settings.additionalArchivedKeywords,
               },
               settingKey === 'additionalTaskKeywords'
                 ? validKeywords
