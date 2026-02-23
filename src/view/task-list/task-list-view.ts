@@ -1021,13 +1021,23 @@ export class TaskListView extends ItemView {
     todoSpan.setAttr('tabindex', '0');
     todoSpan.setAttr('aria-checked', String(task.completed));
 
+    this.attachKeywordHandlers(todoSpan, task);
+
+    return todoSpan;
+  }
+
+  /**
+   * Attach event handlers to a keyword span for click, keyboard, contextmenu, and touch events.
+   * This is extracted into a separate method so it can be called when rebuilding keyword spans
+   * during content updates (e.g., after state changes).
+   */
+  private attachKeywordHandlers(todoSpan: HTMLSpanElement, task: Task): void {
     const activate = async (evt: Event) => {
       evt.stopPropagation();
       await this.updateTaskState(
         task,
         this.stateManager.getNextState(task.state),
       );
-      // Full refresh handled by subscribe callback
     };
 
     // Click advances to next state (quick action)
@@ -1138,8 +1148,6 @@ export class TaskListView extends ItemView {
       },
       true,
     ); // capture to intercept before activate handler
-
-    return todoSpan;
   }
 
   /**
@@ -1268,6 +1276,7 @@ export class TaskListView extends ItemView {
         newKeywordSpan.setAttr('role', 'button');
         newKeywordSpan.setAttr('tabindex', '0');
         newKeywordSpan.setAttr('aria-checked', keywordAriaChecked);
+        this.attachKeywordHandlers(newKeywordSpan, task);
         todoText.appendText(' ');
 
         // Rebuild priority badge (in case it changed or was added/removed)

@@ -98,6 +98,17 @@ export class TaskRenderer {
     todoSpan.setAttr('tabindex', '0');
     todoSpan.setAttr('aria-checked', String(task.completed));
 
+    this.attachKeywordHandlers(todoSpan, task);
+
+    return todoSpan;
+  }
+
+  /**
+   * Attach event handlers to a keyword span for click, keyboard, contextmenu, and touch events.
+   * This is extracted into a separate method so it can be called when rebuilding keyword spans
+   * during content updates (e.g., after state changes).
+   */
+  attachKeywordHandlers(todoSpan: HTMLSpanElement, task: Task): void {
     const activate = async (evt: Event) => {
       evt.stopPropagation();
       await this.updateTaskState(
@@ -200,8 +211,6 @@ export class TaskRenderer {
       },
       true,
     );
-
-    return todoSpan;
   }
 
   private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
@@ -326,6 +335,7 @@ export class TaskRenderer {
         newKeywordSpan.setAttr('role', 'button');
         newKeywordSpan.setAttr('tabindex', '0');
         newKeywordSpan.setAttr('aria-checked', keywordAriaChecked);
+        this.attachKeywordHandlers(newKeywordSpan, task);
         todoText.appendText(' ');
 
         if (task.priority) {
