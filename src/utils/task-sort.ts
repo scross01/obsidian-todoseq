@@ -333,18 +333,48 @@ function getSortFunction(
   switch (sortMethod) {
     case 'sortByScheduled':
       return (a, b) => {
-        if (!a.scheduledDate && !b.scheduledDate) return taskComparator(a, b);
+        if (!a.scheduledDate && !b.scheduledDate) {
+          if (keywordConfig) {
+            return keywordSortComparator(a, b, keywordConfig);
+          }
+          return taskComparator(a, b);
+        }
         if (!a.scheduledDate) return 1;
         if (!b.scheduledDate) return -1;
-        return a.scheduledDate.getTime() - b.scheduledDate.getTime();
+
+        const dateDiff = a.scheduledDate.getTime() - b.scheduledDate.getTime();
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
+
+        // If scheduled dates are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
+        return taskComparator(a, b);
       };
 
     case 'sortByDeadline':
       return (a, b) => {
-        if (!a.deadlineDate && !b.deadlineDate) return taskComparator(a, b);
+        if (!a.deadlineDate && !b.deadlineDate) {
+          if (keywordConfig) {
+            return keywordSortComparator(a, b, keywordConfig);
+          }
+          return taskComparator(a, b);
+        }
         if (!a.deadlineDate) return 1;
         if (!b.deadlineDate) return -1;
-        return a.deadlineDate.getTime() - b.deadlineDate.getTime();
+
+        const dateDiff = a.deadlineDate.getTime() - b.deadlineDate.getTime();
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
+
+        // If deadline dates are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
+        return taskComparator(a, b);
       };
 
     case 'sortByPriority':
@@ -357,7 +387,10 @@ function getSortFunction(
           return bPriority - aPriority; // Higher priority first
         }
 
-        // If priorities are equal, fall back to default sorting
+        // If priorities are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
         return taskComparator(a, b);
       };
 
@@ -375,7 +408,10 @@ function getSortFunction(
           return b.urgency - a.urgency;
         }
 
-        // If urgencies are equal, fall back to default sorting
+        // If urgencies are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
         return taskComparator(a, b);
       };
 

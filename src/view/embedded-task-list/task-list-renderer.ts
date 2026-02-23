@@ -1046,20 +1046,15 @@ export class EmbeddedTaskListRenderer {
     // - false: always truncate
     // - 'dynamic': responsive based on viewport
     const wrapMode = params.wrapContent ?? 'dynamic';
-    const isWrapMode = wrapMode === true || wrapMode === 'dynamic';
+    const isTrueWrapMode = wrapMode === true;
+    const isDynamicMode = wrapMode === 'dynamic';
 
-    if (isWrapMode) {
+    if (isTrueWrapMode) {
       // Add wrap class to list item
       li.classList.add('embedded-task-item-wrap');
 
       // Add wrap class to text container for CSS styling
       textContainer.classList.add('embedded-task-text-wrap');
-
-      // Add dynamic class for responsive CSS handling
-      if (wrapMode === 'dynamic') {
-        li.classList.add('embedded-task-item-wrap-dynamic');
-        textContainer.classList.add('embedded-task-text-wrap-dynamic');
-      }
 
       // Create content wrapper for wrapped layout
       const contentWrapper = document.createElement('div');
@@ -1068,17 +1063,100 @@ export class EmbeddedTaskListRenderer {
       // Append text container to wrapper
       contentWrapper.appendChild(textContainer);
 
-      // Create file info on new row if show-file is not explicitly false
-      if (params.showFile !== false) {
-        const fileInfo = document.createElement('div');
-        fileInfo.className = 'embedded-task-file-info-wrap';
-        const fileName = task.path.split('/').pop() || task.path;
-        // Strip .md extension from display name
-        const displayName = fileName.replace(/\.md$/, '');
-        // Full filename without truncation in wrap mode
-        fileInfo.textContent = `${displayName}:${task.line + 1}`;
-        fileInfo.setAttribute('title', task.path);
-        contentWrapper.appendChild(fileInfo);
+      // Handle file info and urgency display
+      const urgencyValue = task.urgency;
+      const showUrgency =
+        params.showUrgency === true &&
+        urgencyValue !== null &&
+        urgencyValue !== undefined;
+      const showFile = params.showFile !== false;
+
+      if (showFile || showUrgency) {
+        const fileInfoRow = document.createElement('div');
+        fileInfoRow.className = 'embedded-task-file-info-row';
+
+        if (showFile) {
+          const fileInfo = document.createElement('span');
+          fileInfo.className = 'embedded-task-file-info-wrap';
+          const fileName = task.path.split('/').pop() || task.path;
+          const displayName = fileName.replace(/\.md$/, '');
+          fileInfo.textContent = `${displayName}:${task.line + 1}`;
+          fileInfo.setAttribute('title', task.path);
+          fileInfoRow.appendChild(fileInfo);
+        }
+
+        if (
+          showUrgency &&
+          urgencyValue !== null &&
+          urgencyValue !== undefined
+        ) {
+          const urgencyInfo = document.createElement('span');
+          urgencyInfo.className = 'embedded-task-urgency-wrap';
+          urgencyInfo.textContent = `${urgencyValue.toFixed(2)}`;
+          urgencyInfo.setAttribute(
+            'title',
+            `Urgency: ${urgencyValue.toFixed(2)}`,
+          );
+          fileInfoRow.appendChild(urgencyInfo);
+        }
+
+        contentWrapper.appendChild(fileInfoRow);
+      }
+
+      // Assemble the item with content wrapper
+      li.appendChild(checkbox);
+      li.appendChild(contentWrapper);
+    } else if (isDynamicMode) {
+      // Dynamic mode: truncated on wide screens, wrap on narrow
+      // Use dynamic classes for media query behavior
+      li.classList.add('embedded-task-item-wrap-dynamic');
+      textContainer.classList.add('embedded-task-text-wrap-dynamic');
+
+      // Create content wrapper (will be styled by CSS based on viewport width)
+      const contentWrapper = document.createElement('div');
+      contentWrapper.className = 'embedded-task-content-wrapper';
+
+      // Append text container to wrapper
+      contentWrapper.appendChild(textContainer);
+
+      // Handle file info and urgency display
+      const urgencyValue = task.urgency;
+      const showUrgency =
+        params.showUrgency === true &&
+        urgencyValue !== null &&
+        urgencyValue !== undefined;
+      const showFile = params.showFile !== false;
+
+      if (showFile || showUrgency) {
+        const fileInfoRow = document.createElement('div');
+        fileInfoRow.className = 'embedded-task-file-info-row';
+
+        if (showFile) {
+          const fileInfo = document.createElement('span');
+          fileInfo.className = 'embedded-task-file-info-wrap';
+          const fileName = task.path.split('/').pop() || task.path;
+          const displayName = fileName.replace(/\.md$/, '');
+          fileInfo.textContent = `${displayName}:${task.line + 1}`;
+          fileInfo.setAttribute('title', task.path);
+          fileInfoRow.appendChild(fileInfo);
+        }
+
+        if (
+          showUrgency &&
+          urgencyValue !== null &&
+          urgencyValue !== undefined
+        ) {
+          const urgencyInfo = document.createElement('span');
+          urgencyInfo.className = 'embedded-task-urgency-dynamic';
+          urgencyInfo.textContent = `${urgencyValue.toFixed(2)}`;
+          urgencyInfo.setAttribute(
+            'title',
+            `Urgency: ${urgencyValue.toFixed(2)}`,
+          );
+          fileInfoRow.appendChild(urgencyInfo);
+        }
+
+        contentWrapper.appendChild(fileInfoRow);
       }
 
       // Assemble the item with content wrapper
@@ -1102,10 +1180,42 @@ export class EmbeddedTaskListRenderer {
         li.appendChild(checkbox);
         li.appendChild(textContainer);
         li.appendChild(fileInfo);
+
+        // Show urgency value if showUrgency is enabled
+        if (
+          params.showUrgency === true &&
+          task.urgency !== null &&
+          task.urgency !== undefined
+        ) {
+          const urgencyInfo = document.createElement('span');
+          urgencyInfo.className = 'embedded-task-urgency';
+          urgencyInfo.textContent = `${task.urgency.toFixed(2)}`;
+          urgencyInfo.setAttribute(
+            'title',
+            `Urgency: ${task.urgency.toFixed(2)}`,
+          );
+          li.appendChild(urgencyInfo);
+        }
       } else {
         // Assemble the item without file info
         li.appendChild(checkbox);
         li.appendChild(textContainer);
+
+        // Show urgency value if showUrgency is enabled
+        if (
+          params.showUrgency === true &&
+          task.urgency !== null &&
+          task.urgency !== undefined
+        ) {
+          const urgencyInfo = document.createElement('span');
+          urgencyInfo.className = 'embedded-task-urgency';
+          urgencyInfo.textContent = `${task.urgency.toFixed(2)}`;
+          urgencyInfo.setAttribute(
+            'title',
+            `Urgency: ${task.urgency.toFixed(2)}`,
+          );
+          li.appendChild(urgencyInfo);
+        }
       }
     }
 

@@ -113,7 +113,13 @@ export class TaskListFilter {
     const futureSetting = this.plugin.settings.futureTaskSorting;
 
     let keywordConfig: KeywordSortConfig | undefined;
-    if (sortMethod === 'sortByKeyword') {
+    if (
+      sortMethod === 'sortByKeyword' ||
+      sortMethod === 'sortByUrgency' ||
+      sortMethod === 'sortByPriority' ||
+      sortMethod === 'sortByScheduled' ||
+      sortMethod === 'sortByDeadline'
+    ) {
       keywordConfig = this.getKeywordSortConfig();
     }
 

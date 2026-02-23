@@ -2,6 +2,7 @@
 
 ## 0.11.0-dev
 
+- Changed the sort algorithms to use the task keyword state as secondary sorting criteria. #51
 - Added a special Archived state that is used to highlight tasks in the editor, but does not appear in the task lists. #37
 - Added support for custom keywords by keyword groupings for Active, Inactive, Waiting, Completed, and Archived tasks. #43
 - Added a new experimental features section in the settings.

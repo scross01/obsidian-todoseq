@@ -137,6 +137,18 @@ To use urgency sorting:
 
 Your tasks will now be ordered from highest to lowest urgency. Tasks with no urgency factors (no dates, no priority, no tags) will appear at the end of the list, followed by completed tasks which are not included in urgency calculations.
 
+## Secondary Sorting with Keywords
+
+When two tasks have the same urgency score, TODOseq uses the keyword sort algorithm as a secondary sort to determine their order. This means:
+
+1. **Different keyword groups**: Tasks with active keywords (NOW, DOING, IN-PROGRESS) come before inactive keywords (TODO, LATER), which come before waiting keywords (WAIT, WAITING), which come before completed keywords (DONE, CANCELED).
+
+2. **Same keyword group**: Within the same group, tasks are sorted by their keyword position (e.g., NOW comes before DOING).
+
+3. **Same keyword**: If two tasks have the same urgency score AND the same keyword, they are sorted by file path and line number.
+
+This provides a consistent and predictable ordering when tasks have equal urgency scores.
+
 ## Customizing Urgency (Advanced)
 
 For advanced users who want to fine-tune the urgency calculation, you can modify the urgency coefficients by creating or editing an `urgency.ini` file in the plugin directory:

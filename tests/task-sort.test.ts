@@ -402,6 +402,186 @@ describe('Task Sorting System', () => {
       expect(texts).toEqual(['Earlier', 'Middle', 'Later']);
     });
 
+    it('uses keyword sort as secondary when deadline dates are equal', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        deadlineDate: pastDate,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        deadlineDate: pastDate,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByDeadline',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('uses keyword sort as secondary when both tasks have no deadline date', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        deadlineDate: null,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        deadlineDate: null,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByDeadline',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('falls back to path/line when deadline dates equal and same keyword', () => {
+      const config = createMockKeywordConfig();
+      const task1 = createMockTaskWithKeyword('NOW', false, {
+        deadlineDate: pastDate,
+        path: 'b.md',
+        line: 1,
+      });
+      const task2 = createMockTaskWithKeyword('NOW', false, {
+        deadlineDate: pastDate,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByDeadline',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // Same keyword - should sort by path
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('uses keyword sort as secondary when scheduled dates are equal', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        scheduledDate: pastDate,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        scheduledDate: pastDate,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByScheduled',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('uses keyword sort as secondary when both tasks have no scheduled date', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        scheduledDate: null,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        scheduledDate: null,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByScheduled',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('falls back to path/line when scheduled dates equal and same keyword', () => {
+      const config = createMockKeywordConfig();
+      const task1 = createMockTaskWithKeyword('NOW', false, {
+        scheduledDate: pastDate,
+        path: 'b.md',
+        line: 1,
+      });
+      const task2 = createMockTaskWithKeyword('NOW', false, {
+        scheduledDate: pastDate,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByScheduled',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // Same keyword - should sort by path
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
     it('sorts by priority when selected', () => {
       const task1 = createTask({ priority: 'low', text: 'Low' });
       const task2 = createTask({ priority: 'high', text: 'High' });
@@ -424,6 +604,89 @@ describe('Task Sorting System', () => {
     });
 
     it('falls back to default sorting when priorities are equal', () => {
+      const task1 = createTask({ priority: 'high', path: 'b.md', line: 1 });
+      const task2 = createTask({ priority: 'high', path: 'a.md', line: 1 });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByPriority',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('uses keyword sort as secondary when priorities are equal and keywordConfig provided', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        priority: 'high',
+        path: 'z.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        priority: 'high',
+        path: 'a.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByPriority',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('falls back to path/line when priorities are equal and same keyword', () => {
+      const config = createMockKeywordConfig();
+      const task1 = createMockTaskWithKeyword('NOW', false, {
+        priority: 'high',
+        path: 'b.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+      const task2 = createMockTaskWithKeyword('NOW', false, {
+        priority: 'high',
+        path: 'a.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByPriority',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // Same keyword - should sort by path
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('falls back to taskComparator when no keywordConfig provided', () => {
       const task1 = createTask({ priority: 'high', path: 'b.md', line: 1 });
       const task2 = createTask({ priority: 'high', path: 'a.md', line: 1 });
 
@@ -504,6 +767,89 @@ describe('Task Sorting System', () => {
     it('handles all null urgency values with default sorting', () => {
       const task1 = createTask({ urgency: null, path: 'b.md', line: 1 });
       const task2 = createTask({ urgency: null, path: 'a.md', line: 1 });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('uses keyword sort as secondary when urgencies are equal and keywordConfig provided', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        urgency: 10.0,
+        path: 'z.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        urgency: 10.0,
+        path: 'a.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('falls back to path/line when urgencies are equal and same keyword', () => {
+      const config = createMockKeywordConfig();
+      const task1 = createMockTaskWithKeyword('NOW', false, {
+        urgency: 10.0,
+        path: 'b.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+      const task2 = createMockTaskWithKeyword('NOW', false, {
+        urgency: 10.0,
+        path: 'a.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // Same keyword - should sort by path
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('falls back to taskComparator when no keywordConfig provided', () => {
+      const task1 = createTask({ urgency: 10.0, path: 'b.md', line: 1 });
+      const task2 = createTask({ urgency: 10.0, path: 'a.md', line: 1 });
 
       const blocks = sortTasksInBlocks(
         [task1, task2],

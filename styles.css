@@ -913,6 +913,17 @@
   text-overflow: ellipsis; /* Additional fallback for safety */
 }
 
+/* Urgency value */
+.embedded-task-urgency {
+  color: var(--text-muted);
+  font-size: 0.7em;
+  font-family: var(--font-monospace);
+  opacity: 0.7;
+  margin-left: 8px;
+  flex-shrink: 0;
+  display: inline;
+}
+
 /* ============================================================================
    Wrap Content Mode - Task text wrapping and file info on new row
    ============================================================================ */
@@ -967,6 +978,42 @@
   max-width: unset;
   overflow: visible;
   text-overflow: unset;
+}
+
+/* Wrap content mode - file info row (holds file path and urgency aligned right) */
+.embedded-task-file-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* Dynamic mode - file info row inline on wide screens */
+.embedded-task-item-wrap-dynamic .embedded-task-file-info-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+}
+
+/* Wrap content mode - urgency value */
+.embedded-task-urgency-wrap {
+  color: var(--text-muted);
+  font-size: 0.7em;
+  font-family: var(--font-monospace);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* Dynamic mode - urgency value (inline on wide screens) */
+.embedded-task-urgency-dynamic {
+  color: var(--text-muted);
+  font-size: 0.7em;
+  font-family: var(--font-monospace);
+  opacity: 0.7;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* Dynamic wrap mode - default to truncated on wide screens, wrap on narrow */
