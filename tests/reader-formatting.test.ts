@@ -86,11 +86,13 @@ const createMockPlugin = (settings: TodoTrackerSettings) => ({
   getKeywordManager: () => createTestKeywordManager(settings),
 });
 
-// Mock VaultScanner
+// Mock VaultScanner - uses dynamic settings from mockPlugin
+let mockPluginRef: ReturnType<typeof createMockPlugin> | null = null;
 const createMockVaultScanner = (parser: TaskParser | null) => ({
   getParser: jest.fn().mockReturnValue(parser),
   getTasks: jest.fn().mockReturnValue([]),
-  getKeywordManager: () => createTestKeywordManager(createBaseSettings()),
+  getKeywordManager: () =>
+    createTestKeywordManager(mockPluginRef?.settings ?? createBaseSettings()),
   on: jest.fn(),
   off: jest.fn(),
   emit: jest.fn(),
@@ -118,8 +120,9 @@ describe('ReaderViewFormatter', () => {
       null,
     );
 
-    // Create mocks
+    // Create mocks - plugin first so VaultScanner can reference it
     mockPlugin = createMockPlugin(mockSettings);
+    mockPluginRef = mockPlugin;
     mockVaultScanner = createMockVaultScanner(mockParser);
 
     // Create formatter instance

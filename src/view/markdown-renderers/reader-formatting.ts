@@ -2,11 +2,7 @@ import TodoTracker from '../../main';
 import { Task } from '../../types/task';
 import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
-import {
-  buildKeywordsFromGroups,
-  isCompletedKeyword,
-  isArchivedKeyword,
-} from '../../utils/task-utils';
+import { isCompletedKeyword, isArchivedKeyword } from '../../utils/task-utils';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { TFile } from 'obsidian';
@@ -117,11 +113,13 @@ export class ReaderViewFormatter {
 
   /**
    * Get all valid task keywords (default + user-defined)
+   * Uses the KeywordManager from VaultScanner to ensure consistency
+   * between rendering and task-finding operations.
    */
   private getAllTaskKeywords(): string[] {
-    // Use the shared utility to build keyword list from all groups
-    const { allKeywords } = buildKeywordsFromGroups(this.plugin.settings);
-    return allKeywords;
+    // Use the KeywordManager from VaultScanner to ensure consistency
+    const keywordManager = this.vaultScanner.getKeywordManager();
+    return keywordManager.getAllKeywords();
   }
 
   /**
@@ -2027,6 +2025,12 @@ export class ReaderViewFormatter {
     keywordElement: HTMLElement,
     sourcePath: string,
   ): Promise<Task | null> {
+    // Get the keyword from the element
+    const keyword = keywordElement.getAttribute('data-task-keyword');
+    if (!keyword) {
+      return null;
+    }
+
     // Get the file
     const file = this.plugin.app.vault.getAbstractFileByPath(sourcePath);
     if (!(file instanceof TFile)) {
@@ -2046,42 +2050,107 @@ export class ReaderViewFormatter {
     // Parse all tasks in the file
     const allTasks = taskParser.parseFile(content, file.path, file);
 
-    // Find the task list item or paragraph containing this keyword
-    const taskContainer = keywordElement.closest(
-      '.task-list-item, .todoseq-task, p, li',
-    );
+    // Get the raw text content from the task container (contains the full task)
+    const taskContainer = keywordElement.closest('.todoseq-task');
     if (!taskContainer) {
       return null;
     }
 
-    // Get the text content of the task container
-    const taskText = taskContainer.textContent || '';
+    // Get the full task text from DOM and normalize it for comparison
+    // Strip markdown formatting that might have been rendered to HTML
+    const domTaskText = this.normalizeTaskText(taskContainer.textContent || '');
 
-    // Normalize the task text by removing leading/trailing whitespace
-    const normalizedTaskText = taskText.trim().replace(/\s+/g, ' ');
+    // Also get just the text after the keyword for more precise matching
+    const keywordSpan = keywordElement;
+    const afterKeyword = keywordSpan.nextSibling?.textContent || '';
+    const domTaskTextAfterKeyword = this.normalizeTaskText(afterKeyword);
 
-    // Find the line that matches this task
+    // Escape the keyword for regex
+    const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Find the line that contains this keyword and matches the task text
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      if (taskParser.testRegex.test(line)) {
-        // Normalize the line for comparison
-        const normalizedLine = line
-          .trim()
-          .replace(/\s+/g, ' ')
-          .replace(/\s*\^[a-zA-Z0-9-]+$/, '');
+      // Check if this line contains the keyword
+      if (line.includes(keyword)) {
+        // Get the task text from the source line (after the keyword)
+        const sourceTaskTextAfterKeyword = line
+          .replace(new RegExp(`^.*?${escapedKeyword}\\s*`, ''), '')
+          .trim();
 
-        // Check if the line ends with the task text
-        if (normalizedLine.endsWith(normalizedTaskText)) {
-          const matchingTask = allTasks.find((t) => t.line === i);
+        const normalizedSourceText = this.normalizeTaskText(
+          sourceTaskTextAfterKeyword,
+        );
+
+        // Check if the DOM text (after keyword) is contained in the source text
+        // This handles cases where DOM has rendered markdown but source has raw markdown
+        if (
+          normalizedSourceText.includes(domTaskTextAfterKeyword) ||
+          domTaskTextAfterKeyword.length === 0 ||
+          normalizedSourceText.length === 0
+        ) {
+          // Also verify the full task text matches
+          const fullNormalizedSource = this.normalizeTaskText(
+            line.replace(new RegExp(`^.*?${escapedKeyword}\\s*`, ''), ''),
+          );
+
+          // Find matching task from parsed tasks
+          const matchingTask = allTasks.find(
+            (t) =>
+              t.line === i ||
+              (t.state === keyword &&
+                (fullNormalizedSource.includes(domTaskText) ||
+                  domTaskText.length === 0)),
+          );
+
           if (matchingTask) {
             return matchingTask;
+          }
+
+          // If no parsed task found, return a minimal task for this line
+          if (normalizedSourceText || domTaskTextAfterKeyword) {
+            return {
+              path: file.path,
+              line: i,
+              rawText: line,
+              indent: '',
+              listMarker: '',
+              text: sourceTaskTextAfterKeyword,
+              state: keyword,
+              completed: false,
+              priority: null,
+              scheduledDate: null,
+              deadlineDate: null,
+              urgency: null,
+              isDailyNote: false,
+              dailyNoteDate: null,
+            };
           }
         }
       }
     }
 
     return null;
+  }
+
+  /**
+   * Normalize task text for comparison by stripping markdown formatting
+   */
+  private normalizeTaskText(text: string): string {
+    return text
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/\*\*([^*]+)\*\*/g, '$1') // **bold**
+      .replace(/\*([^*]+)\*/g, '$1') // *italic*
+      .replace(/__([^_]+)__/g, '$1') // __underline__
+      .replace(/_([^_]+)_/g, '$1') // _italic_
+      .replace(/~~([^~]+)~~/g, '$1') // ~~strikethrough~~
+      .replace(/`([^`]+)`/g, '$1') // `code`
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [text](url)
+      .replace(/^[-*+]\s+/gm, '') // List markers
+      .replace(/^\d+\.\s+/gm, '') // Numbered list markers
+      .replace(/^\[\s*[xX]\s*\]\s*/gm, ''); // Checkboxes
   }
 
   /**
