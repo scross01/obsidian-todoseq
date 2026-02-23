@@ -103,10 +103,10 @@ export class StateMenuBuilder {
 
     for (const g of groups) {
       // Section header (disabled item)
-      menu.addItem((item) => {
-        item.setTitle(g.group);
-        item.setDisabled(true);
-      });
+      // menu.addItem((item) => {
+      //   item.setTitle(g.group);
+      //   item.setDisabled(true);
+      // });
 
       for (const state of g.states) {
         menu.addItem((item) => {
