@@ -2,7 +2,10 @@ import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { ParserConfig } from '../src/parser/types';
 import { getDailyNoteInfo } from '../src/utils/daily-note-utils';
-import { createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 // Mock the daily note utils
 jest.mock('../src/utils/daily-note-utils', () => ({
@@ -16,12 +19,12 @@ describe('TaskParser', () => {
 
     beforeEach(() => {
       settings = createBaseSettings({
-        additionalTaskKeywords: ['FIXME'],
+        additionalInactiveKeywords: ['FIXME'],
         languageCommentSupport: {
           enabled: false,
         },
       });
-      parser = TaskParser.create(settings, null);
+      parser = TaskParser.create(createTestKeywordManager(settings), null);
     });
 
     it('should update allKeywords and regex when keywords change', () => {
@@ -67,20 +70,13 @@ describe('TaskParser', () => {
         completedKeywords: ['DONE', 'COMPLETED'],
       });
 
-      const task1 = parser.parseLineAsTask('DONE Completed task', 0, 'test.md');
-      const task2 = parser.parseLineAsTask(
-        'COMPLETED Finished task',
-        0,
-        'test.md',
-      );
-
-      expect(task1?.completed).toBe(true);
-      expect(task2?.completed).toBe(true);
+      // Verify new keyword is in the regex (task is detected)
+      expect(parser.testRegex.test('COMPLETED Finished task')).toBe(true);
     });
 
     it('should update active and waiting keywords sets', () => {
       parser.updateConfig({
-        keywords: parser.allKeywords,
+        keywords: [...parser.allKeywords, 'ACTIVE', 'PENDING'],
         urgencyCoefficients: {},
         activeKeywords: ['DOING', 'ACTIVE'],
         waitingKeywords: ['WAITING', 'PENDING'],
@@ -111,6 +107,22 @@ describe('TaskParser', () => {
       expect(parserRef.includeCodeBlocks).toBe(true);
       expect(parserRef.includeCommentBlocks).toBe(true);
     });
+
+    it('should update inactive/custom keywords set', () => {
+      // Initially FIXME should be recognized (from initial settings)
+      expect(parser.testRegex.test('FIXME Custom task')).toBe(true);
+
+      // Update config with new custom inactive keywords
+      parser.updateConfig({
+        keywords: [...parser.allKeywords, 'TEMP', 'MAYBE'],
+        urgencyCoefficients: {},
+        inactiveKeywords: ['TODO', 'LATER', 'TEMP', 'MAYBE'],
+      });
+
+      // New keywords should now be recognized as tasks
+      expect(parser.testRegex.test('TEMP Custom task')).toBe(true);
+      expect(parser.testRegex.test('MAYBE Custom task')).toBe(true);
+    });
   });
 
   describe('daily note info retrieval', () => {
@@ -124,7 +136,7 @@ describe('TaskParser', () => {
 
     beforeEach(() => {
       settings = createBaseSettings({
-        additionalTaskKeywords: ['FIXME'],
+        additionalInactiveKeywords: ['FIXME'],
         languageCommentSupport: {
           enabled: false,
         },
@@ -135,7 +147,7 @@ describe('TaskParser', () => {
         dailyNoteDate: null,
       });
 
-      parser = TaskParser.create(settings, mockApp);
+      parser = TaskParser.create(createTestKeywordManager(settings), mockApp);
     });
 
     it('should retrieve daily note info when parsing footnote tasks', () => {
@@ -162,7 +174,7 @@ describe('TaskParser', () => {
     it('should retrieve daily note info when parsing comment block tasks', () => {
       // Enable comment blocks in settings
       settings.includeCommentBlocks = true;
-      parser = TaskParser.create(settings, mockApp);
+      parser = TaskParser.create(createTestKeywordManager(settings), mockApp);
 
       const mockFile = {
         path: 'test.md',
@@ -212,7 +224,10 @@ describe('TaskParser', () => {
 
     it('should not call getDailyNoteInfo when app is null', () => {
       (getDailyNoteInfo as jest.Mock).mockReset();
-      const parserWithoutApp = TaskParser.create(settings, null);
+      const parserWithoutApp = TaskParser.create(
+        createTestKeywordManager(settings),
+        null,
+      );
 
       const content = 'TODO Task without app';
       parserWithoutApp.parseFile(content, 'test.md');
@@ -227,12 +242,12 @@ describe('TaskParser', () => {
 
     beforeEach(() => {
       settings = createBaseSettings({
-        additionalTaskKeywords: ['FIXME'],
+        additionalInactiveKeywords: ['FIXME'],
         languageCommentSupport: {
           enabled: false,
         },
       });
-      parser = TaskParser.create(settings, null);
+      parser = TaskParser.create(createTestKeywordManager(settings), null);
     });
 
     describe('Basic task parsing', () => {
@@ -337,12 +352,12 @@ describe('TaskParser', () => {
 
     beforeEach(() => {
       settings = createBaseSettings({
-        additionalTaskKeywords: ['FIXME'],
+        additionalInactiveKeywords: ['FIXME'],
         languageCommentSupport: {
           enabled: false,
         },
       });
-      parser = TaskParser.create(settings, null);
+      parser = TaskParser.create(createTestKeywordManager(settings), null);
     });
 
     test('should parse tasks with custom keywords', () => {

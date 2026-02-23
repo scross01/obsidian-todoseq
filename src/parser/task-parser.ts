@@ -1,5 +1,4 @@
 import { Task } from '../types/task';
-import { TodoTrackerSettings } from '../settings/settings-types';
 import {
   LanguageRegistry,
   LanguageDefinition,
@@ -7,7 +6,7 @@ import {
 } from './language-registry';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
-import { buildKeywordsFromGroups } from '../utils/task-utils';
+import { KeywordManager } from '../utils/keyword-manager';
 import { TFile, App } from 'obsidian';
 import {
   calculateTaskUrgency,
@@ -52,14 +51,8 @@ export class TaskParser implements ITaskParser {
   private readonly includeCodeBlocks: boolean;
   private readonly includeCommentBlocks: boolean;
   private readonly languageCommentSupport: LanguageCommentSupportSettings;
-  private readonly customKeywords: string[];
+  private keywordManager: KeywordManager;
   public allKeywords: string[];
-  /** Set of keywords that indicate a completed task */
-  private completedKeywordsSet: Set<string>;
-  /** Set of keywords that indicate an active task */
-  private activeKeywordsSet: Set<string>;
-  /** Set of keywords that indicate a waiting task */
-  private waitingKeywordsSet: Set<string>;
 
   /**
    * NOTE: We don't track archived keywords as a separate property here because
@@ -89,19 +82,12 @@ export class TaskParser implements ITaskParser {
     includeCodeBlocks: boolean,
     includeCommentBlocks: boolean,
     languageCommentSupport: LanguageCommentSupportSettings,
-    customKeywords: string[],
-    allKeywords: string[],
-    completedKeywords: string[],
-    activeKeywords: string[],
-    waitingKeywords: string[],
+    keywordManager: KeywordManager,
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
-    this.customKeywords = customKeywords;
-    this.allKeywords = allKeywords;
-    this.completedKeywordsSet = new Set(completedKeywords);
-    this.activeKeywordsSet = new Set(activeKeywords);
-    this.waitingKeywordsSet = new Set(waitingKeywords);
+    this.keywordManager = keywordManager;
+    this.allKeywords = keywordManager.getAllKeywords();
 
     this.testRegex = regex.test;
     this.captureRegex = regex.capture;
@@ -116,41 +102,34 @@ export class TaskParser implements ITaskParser {
     this.urgencyCoefficients = urgencyCoefficients || getDefaultCoefficients();
   }
 
+  /**
+   * Create a TaskParser.
+   * @param keywordManager KeywordManager instance (single source of truth for keywords)
+   * @param app Obsidian app instance
+   * @param urgencyCoefficients Optional urgency coefficients
+   * @param parserSettings Optional parser settings (for tests)
+   */
   static create(
-    settings: TodoTrackerSettings,
+    keywordManager: KeywordManager,
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
+    parserSettings?: {
+      includeCalloutBlocks?: boolean;
+      includeCodeBlocks?: boolean;
+      includeCommentBlocks?: boolean;
+      languageCommentSupport?: { enabled: boolean };
+    },
   ): TaskParser {
-    // Build keyword lists from flat settings properties
-    const { allKeywords, completedKeywords, activeKeywords, waitingKeywords } =
-      buildKeywordsFromGroups(settings);
-
-    // Collect all custom keywords (non-built-in) for validation
-    const allCustomKeywords = [
-      ...(settings.additionalActiveKeywords ?? []),
-      ...(settings.additionalWaitingKeywords ?? []),
-      ...(settings.additionalCompletedKeywords ?? []),
-      ...(settings.additionalTaskKeywords ?? []),
-      ...(settings.additionalArchivedKeywords ?? []),
-    ];
-
-    // Validate user-provided keywords to prevent regex injection vulnerabilities
-    if (allCustomKeywords.length > 0) {
-      TaskParser.validateKeywords(allCustomKeywords);
-    }
-
+    const allKeywords = keywordManager.getAllKeywords();
     const regex = TaskParser.buildRegex(allKeywords);
+
     return new TaskParser(
       regex,
-      settings.includeCalloutBlocks,
-      settings.includeCodeBlocks,
-      settings.includeCommentBlocks,
-      settings.languageCommentSupport,
-      allCustomKeywords, // customKeywords
-      allKeywords,
-      completedKeywords,
-      activeKeywords,
-      waitingKeywords,
+      parserSettings?.includeCalloutBlocks ?? true,
+      parserSettings?.includeCodeBlocks ?? true,
+      parserSettings?.includeCommentBlocks ?? true,
+      parserSettings?.languageCommentSupport ?? { enabled: false },
+      keywordManager,
       app || null,
       urgencyCoefficients,
     );
@@ -550,21 +529,16 @@ export class TaskParser implements ITaskParser {
    * @param config New configuration
    */
   public updateConfig(config: ParserConfig): void {
-    this.allKeywords = config.keywords;
+    // Use keywords from config if provided, otherwise from KeywordManager
+    // This allows dynamic keyword updates while maintaining shared KeywordManager
+    this.allKeywords = config.keywords ?? this.keywordManager.getAllKeywords();
+
+    // Rebuild regex with new keywords
+    const regex = TaskParser.buildRegex(this.allKeywords);
+    (this as { testRegex: RegExp }).testRegex = regex.test;
+    (this as { captureRegex: RegExp }).captureRegex = regex.capture;
+
     this.urgencyCoefficients = config.urgencyCoefficients;
-
-    // Update completed keywords set if provided
-    if (config.completedKeywords) {
-      this.completedKeywordsSet = new Set(config.completedKeywords);
-    }
-
-    // Update active and waiting keywords sets if provided
-    if (config.activeKeywords) {
-      this.activeKeywordsSet = new Set(config.activeKeywords);
-    }
-    if (config.waitingKeywords) {
-      this.waitingKeywordsSet = new Set(config.waitingKeywords);
-    }
 
     // Update task detection settings if provided
     if (config.includeCalloutBlocks !== undefined) {
@@ -588,11 +562,6 @@ export class TaskParser implements ITaskParser {
         }
       ).languageCommentSupport = config.languageCommentSupport;
     }
-
-    // Rebuild regex with new keywords
-    const regex = TaskParser.buildRegex(config.keywords);
-    (this as { testRegex: RegExp }).testRegex = regex.test;
-    (this as { captureRegex: RegExp }).captureRegex = regex.capture;
   }
 
   /**
@@ -629,8 +598,8 @@ export class TaskParser implements ITaskParser {
     listMarker: string;
   } {
     let finalState = state;
-    // Use the completedKeywordsSet for determining completion status
-    let finalCompleted = this.completedKeywordsSet.has(state);
+    // Use the keywordManager for determining completion status
+    let finalCompleted = this.keywordManager.isCompleted(state);
     let finalListMarker = listMarker;
 
     // Check if this is a markdown checkbox task and extract checkbox status
@@ -1128,7 +1097,7 @@ export class TaskParser implements ITaskParser {
       footnoteMarker: taskDetails.footnoteMarker,
       text: cleanedText,
       state: taskDetails.state,
-      completed: this.completedKeywordsSet.has(taskDetails.state),
+      completed: this.keywordManager.isCompleted(taskDetails.state),
       priority,
       scheduledDate: null,
       deadlineDate: null,
@@ -1154,8 +1123,8 @@ export class TaskParser implements ITaskParser {
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
       const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.activeKeywordsSet,
-        waitingKeywordsSet: this.waitingKeywordsSet,
+        activeKeywordsSet: this.keywordManager.getActiveSet(),
+        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
       };
       task.urgency = calculateTaskUrgency(
         task,
@@ -1259,8 +1228,8 @@ export class TaskParser implements ITaskParser {
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
       const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.activeKeywordsSet,
-        waitingKeywordsSet: this.waitingKeywordsSet,
+        activeKeywordsSet: this.keywordManager.getActiveSet(),
+        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
       };
       task.urgency = calculateTaskUrgency(
         task,
@@ -1382,8 +1351,8 @@ export class TaskParser implements ITaskParser {
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
       const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.activeKeywordsSet,
-        waitingKeywordsSet: this.waitingKeywordsSet,
+        activeKeywordsSet: this.keywordManager.getActiveSet(),
+        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
       };
       task.urgency = calculateTaskUrgency(
         task,
@@ -1448,7 +1417,7 @@ export class TaskParser implements ITaskParser {
         footnoteMarker: taskDetails.footnoteMarker,
         text: cleanedText,
         state: taskDetails.state,
-        completed: this.completedKeywordsSet.has(taskDetails.state),
+        completed: this.keywordManager.isCompleted(taskDetails.state),
         priority,
         scheduledDate: null,
         deadlineDate: null,
@@ -1490,8 +1459,8 @@ export class TaskParser implements ITaskParser {
       const [, , , checkboxStatus] = checkboxMatch;
       completed = checkboxStatus === 'x';
     } else {
-      // Use the completedKeywordsSet for determining completion status
-      completed = this.completedKeywordsSet.has(state);
+      // Use the keywordManager for determining completion status
+      completed = this.keywordManager.isCompleted(state);
     }
 
     return {

@@ -1,17 +1,11 @@
 import { Menu } from 'obsidian';
 import TodoTracker from '../../main';
-import {
-  BUILTIN_ACTIVE_KEYWORDS,
-  BUILTIN_INACTIVE_KEYWORDS,
-  BUILTIN_WAITING_KEYWORDS,
-  BUILTIN_COMPLETED_KEYWORDS,
-  BUILTIN_ARCHIVED_KEYWORDS,
-} from '../../utils/constants';
+import { KeywordManager } from '../../utils/keyword-manager';
 
 /**
  * Keyword group definition for the state menu
  */
-interface KeywordGroup {
+interface KeywordGroupDefinition {
   name: string;
   builtin: readonly string[];
   custom: string[];
@@ -65,40 +59,34 @@ export class StateMenuBuilder {
    * Get keyword groups with built-in and custom keywords
    * Returns groups in order: Active, Inactive, Waiting, Completed, Archived
    */
-  private getKeywordGroups(): KeywordGroup[] {
-    // Get custom keywords from plugin's current settings (always fresh)
-    const settings = this.plugin.settings;
-    const customActive = settings?.additionalActiveKeywords ?? [];
-    const customInactive = settings?.additionalTaskKeywords ?? [];
-    const customWaiting = settings?.additionalWaitingKeywords ?? [];
-    const customCompleted = settings?.additionalCompletedKeywords ?? [];
-    const customArchived = settings?.additionalArchivedKeywords ?? [];
+  private getKeywordGroups(): KeywordGroupDefinition[] {
+    const keywordManager = new KeywordManager(this.plugin.settings ?? {});
 
     return [
       {
         name: 'Active',
-        builtin: BUILTIN_ACTIVE_KEYWORDS,
-        custom: customActive,
+        builtin: Array.from(KeywordManager.getBuiltinActiveSet()),
+        custom: Array.from(keywordManager.getCustomActiveSet()),
       },
       {
         name: 'Inactive',
-        builtin: BUILTIN_INACTIVE_KEYWORDS,
-        custom: customInactive,
+        builtin: Array.from(KeywordManager.getBuiltinInactiveSet()),
+        custom: Array.from(keywordManager.getCustomInactiveSet()),
       },
       {
         name: 'Waiting',
-        builtin: BUILTIN_WAITING_KEYWORDS,
-        custom: customWaiting,
+        builtin: Array.from(KeywordManager.getBuiltinWaitingSet()),
+        custom: Array.from(keywordManager.getCustomWaitingSet()),
       },
       {
         name: 'Completed',
-        builtin: BUILTIN_COMPLETED_KEYWORDS,
-        custom: customCompleted,
+        builtin: Array.from(KeywordManager.getBuiltinCompletedSet()),
+        custom: Array.from(keywordManager.getCustomCompletedSet()),
       },
       {
         name: 'Archived',
-        builtin: BUILTIN_ARCHIVED_KEYWORDS,
-        custom: customArchived,
+        builtin: Array.from(KeywordManager.getBuiltinArchivedSet()),
+        custom: Array.from(keywordManager.getCustomArchivedSet()),
       },
     ];
   }

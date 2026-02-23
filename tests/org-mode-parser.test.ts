@@ -5,17 +5,21 @@
 
 import { OrgModeTaskParser } from '../src/parser/org-mode-task-parser';
 import { getDefaultCoefficients } from '../src/utils/task-urgency';
-import { createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 // Default settings for testing
 const defaultSettings = createBaseSettings();
+const defaultKeywordManager = createTestKeywordManager(defaultSettings);
 
 describe('OrgModeTaskParser', () => {
   let parser: OrgModeTaskParser;
 
   beforeEach(() => {
     parser = OrgModeTaskParser.create(
-      defaultSettings,
+      defaultKeywordManager,
       null,
       getDefaultCoefficients(),
     );
@@ -253,7 +257,7 @@ More text`;
   describe('updateConfig', () => {
     it('should update keywords', () => {
       const customParser = OrgModeTaskParser.create(
-        defaultSettings,
+        defaultKeywordManager,
         null,
         getDefaultCoefficients(),
       );
@@ -270,6 +274,31 @@ More text`;
 
       // Now should match CUSTOM
       expect(customParser.isTaskLine('* CUSTOM Task')).toBe(true);
+    });
+
+    it('should update inactive/custom keywords set', () => {
+      const customParser = OrgModeTaskParser.create(
+        defaultKeywordManager,
+        null,
+        getDefaultCoefficients(),
+      );
+
+      // Initially should not match TEMP or MAYBE keywords
+      expect(customParser.isTaskLine('* TEMP Custom task')).toBe(false);
+      expect(customParser.isTaskLine('* MAYBE Custom task')).toBe(false);
+
+      // Update config with custom inactive keywords
+      // The keywords array contains both built-in and custom keywords
+      // Parser should derive custom inactive keywords from keywords not in any built-in group
+      customParser.updateConfig({
+        keywords: ['TODO', 'DONE', 'TEMP', 'MAYBE'],
+        completedKeywords: ['DONE'],
+        urgencyCoefficients: getDefaultCoefficients(),
+      });
+
+      // New keywords should now be recognized as tasks
+      expect(customParser.isTaskLine('* TEMP Custom task')).toBe(true);
+      expect(customParser.isTaskLine('* MAYBE Custom task')).toBe(true);
     });
   });
 });

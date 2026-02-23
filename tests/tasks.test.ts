@@ -1,11 +1,14 @@
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import {
-  DEFAULT_PENDING_STATES,
-  DEFAULT_ACTIVE_STATES,
-  DEFAULT_COMPLETED_STATES,
-} from '../src/types/task';
-import { createBaseSettings } from './helpers/test-helper';
+  BUILTIN_INACTIVE_KEYWORDS,
+  BUILTIN_ACTIVE_KEYWORDS,
+  BUILTIN_COMPLETED_KEYWORDS,
+} from '../src/utils/constants';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
   // @ts-ignore
@@ -14,12 +17,16 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
 
   beforeEach(() => {
     settings = createBaseSettings({
-      refreshInterval: 60,
       languageCommentSupport: {
         enabled: false,
       },
     });
-    parser = TaskParser.create(settings);
+    parser = TaskParser.create(
+      createTestKeywordManager(settings),
+      null,
+      undefined,
+      settings,
+    );
   });
 
   describe('Priorities', () => {
@@ -61,7 +68,7 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
   });
 
   describe('Default Pending States', () => {
-    const pendingStates = Array.from(DEFAULT_PENDING_STATES);
+    const pendingStates = BUILTIN_INACTIVE_KEYWORDS;
 
     pendingStates.forEach((state) => {
       test(`should parse ${state} task with basic list marker`, () => {
@@ -143,7 +150,7 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
   });
 
   describe('Default Active States', () => {
-    const activeStates = Array.from(DEFAULT_ACTIVE_STATES);
+    const activeStates = BUILTIN_ACTIVE_KEYWORDS;
 
     activeStates.forEach((state) => {
       test(`should parse ${state} task with basic list marker`, () => {
@@ -175,7 +182,7 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
   });
 
   describe('Default Completed States', () => {
-    const completedStates = Array.from(DEFAULT_COMPLETED_STATES);
+    const completedStates = BUILTIN_COMPLETED_KEYWORDS;
 
     completedStates.forEach((state) => {
       test(`should parse ${state} task with basic list marker`, () => {
@@ -461,12 +468,16 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
 
     beforeEach(() => {
       settings = createBaseSettings({
-        refreshInterval: 60,
         languageCommentSupport: {
           enabled: false,
         },
       });
-      parser = TaskParser.create(settings);
+      parser = TaskParser.create(
+        createTestKeywordManager(settings),
+        null,
+        undefined,
+        settings,
+      );
     });
 
     test('should ignore task items inside math blocks', () => {
@@ -590,12 +601,16 @@ TODO = some code
 
     beforeEach(() => {
       settings = createBaseSettings({
-        refreshInterval: 60,
         languageCommentSupport: {
           enabled: false,
         },
       });
-      parser = TaskParser.create(settings);
+      parser = TaskParser.create(
+        createTestKeywordManager(settings),
+        null,
+        undefined,
+        settings,
+      );
     });
 
     describe('Simple quote blocks', () => {
@@ -856,7 +871,12 @@ TODO = some code
     describe('Disabled callout blocks', () => {
       beforeEach(() => {
         settings.includeCalloutBlocks = false;
-        parser = TaskParser.create(settings);
+        parser = TaskParser.create(
+          createTestKeywordManager(settings),
+          null,
+          undefined,
+          settings,
+        );
       });
 
       test('should not parse tasks in callout blocks when disabled', () => {
@@ -887,7 +907,12 @@ TODO = some code
       beforeEach(() => {
         settings.includeCodeBlocks = true;
         settings.languageCommentSupport.enabled = false;
-        parser = TaskParser.create(settings);
+        parser = TaskParser.create(
+          createTestKeywordManager(settings),
+          null,
+          undefined,
+          settings,
+        );
       });
 
       test('should only match regular task format in code block without language comments', () => {
@@ -925,7 +950,12 @@ TODO task in language code block for unsupported language
       beforeEach(() => {
         settings.includeCodeBlocks = true;
         settings.languageCommentSupport.enabled = true;
-        parser = TaskParser.create(settings);
+        parser = TaskParser.create(
+          createTestKeywordManager(settings),
+          null,
+          undefined,
+          settings,
+        );
       });
 
       test('should parse mixed content in code block language comments', () => {

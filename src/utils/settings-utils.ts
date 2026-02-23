@@ -33,7 +33,7 @@ export function getPluginSettings(app: App): TodoTrackerSettings | null {
 
   // Return a complete settings object with defaults for any missing properties
   return {
-    additionalTaskKeywords: [],
+    additionalInactiveKeywords: [],
     additionalActiveKeywords: [],
     additionalWaitingKeywords: [],
     additionalCompletedKeywords: [],
@@ -129,7 +129,7 @@ export class SettingsChangeDetector {
         includeCalloutBlocks: settings.includeCalloutBlocks,
         includeCommentBlocks: settings.includeCommentBlocks,
         languageCommentSupport: settings.languageCommentSupport,
-        additionalTaskKeywords: settings.additionalTaskKeywords,
+        additionalInactiveKeywords: settings.additionalInactiveKeywords,
         additionalActiveKeywords: settings.additionalActiveKeywords,
         additionalWaitingKeywords: settings.additionalWaitingKeywords,
         additionalCompletedKeywords: settings.additionalCompletedKeywords,

@@ -17,6 +17,7 @@ import { PluginLifecycleManager } from './plugin-lifecycle';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 import { TaskStateManager } from './services/task-state-manager';
+import { KeywordManager } from './utils/keyword-manager';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
@@ -92,7 +93,8 @@ export default class TodoTracker extends Plugin {
     await this.loadSettings();
 
     // Initialize centralized state manager first
-    this.taskStateManager = new TaskStateManager();
+    const keywordManager = new KeywordManager(this.settings);
+    this.taskStateManager = new TaskStateManager(keywordManager);
 
     // Initialize task update coordinator
     this.taskUpdateCoordinator = new TaskUpdateCoordinator(
@@ -147,10 +149,14 @@ export default class TodoTracker extends Plugin {
   async loadSettings() {
     const loaded = await this.loadData(); // eslint-disable-line @typescript-eslint/no-unsafe-assignment
 
+    // Apply migrations to handle settings from older versions
+    const { migrateSettings } = await import('./utils/settings-migration');
+    const migrated = migrateSettings(loaded as Record<string, unknown>);
+
     this.settings = Object.assign(
       {},
       DefaultSettings,
-      loaded as Partial<TodoTrackerSettings>,
+      migrated as Partial<TodoTrackerSettings>,
     );
 
     // Add app instance to settings for PropertySearchEngine access
@@ -158,8 +164,8 @@ export default class TodoTracker extends Plugin {
       this.app;
 
     // Normalize settings shape: ensure all keyword arrays exist
-    if (!this.settings.additionalTaskKeywords) {
-      this.settings.additionalTaskKeywords = [];
+    if (!this.settings.additionalInactiveKeywords) {
+      this.settings.additionalInactiveKeywords = [];
     }
     if (!this.settings.additionalActiveKeywords) {
       this.settings.additionalActiveKeywords = [];
@@ -315,8 +321,9 @@ export default class TodoTracker extends Plugin {
         const { OrgModeTaskParser } =
           await import('./parser/org-mode-task-parser');
         const urgencyCoefficients = await parseUrgencyCoefficients(this.app);
+        const keywordManager = this.vaultScanner.getKeywordManager();
         const orgModeParser = OrgModeTaskParser.create(
-          this.settings,
+          keywordManager,
           this.app,
           urgencyCoefficients,
         );

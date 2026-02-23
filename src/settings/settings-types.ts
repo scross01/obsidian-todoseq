@@ -1,7 +1,7 @@
 import { LanguageCommentSupportSettings } from '../parser/language-registry';
 
 export interface TodoTrackerSettings {
-  additionalTaskKeywords: string[]; // Custom inactive keywords (TODO, LATER, etc.)
+  additionalInactiveKeywords: string[]; // Custom inactive keywords (TODO, LATER, FIXME, etc.)
   additionalActiveKeywords: string[]; // Custom active keywords (DOING, NOW, etc.)
   additionalWaitingKeywords: string[]; // Custom waiting keywords (WAIT, WAITING, etc.)
   additionalCompletedKeywords: string[]; // Custom completed keywords (DONE, CANCELLED, etc.)
@@ -29,11 +29,11 @@ export interface TodoTrackerSettings {
 }
 
 export const DefaultSettings: TodoTrackerSettings = {
-  additionalTaskKeywords: [], // Inactive keywords
-  additionalActiveKeywords: [], // Active keywords
-  additionalWaitingKeywords: [], // Waiting keywords
-  additionalCompletedKeywords: [], // Completed keywords
-  additionalArchivedKeywords: [], // Archived keywords
+  additionalInactiveKeywords: [],
+  additionalActiveKeywords: [],
+  additionalWaitingKeywords: [],
+  additionalCompletedKeywords: [],
+  additionalArchivedKeywords: [],
   includeCodeBlocks: false,
   includeCalloutBlocks: true, // Enabled by default
   includeCommentBlocks: false, // Disabled by default

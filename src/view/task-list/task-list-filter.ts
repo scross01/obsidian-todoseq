@@ -6,6 +6,7 @@ import {
 } from '../../utils/task-sort';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
+import { KeywordManager } from '../../utils/keyword-manager';
 
 export type TaskListViewMode =
   | 'showAll'
@@ -129,19 +130,12 @@ export class TaskListFilter {
   }
 
   getKeywordSortConfig(): KeywordSortConfig {
-    const keywordGroups = {
-      activeKeywords: this.plugin.settings?.additionalActiveKeywords ?? [],
-      inactiveKeywords: this.plugin.settings?.additionalTaskKeywords ?? [],
-      waitingKeywords: this.plugin.settings?.additionalWaitingKeywords ?? [],
-      completedKeywords:
-        this.plugin.settings?.additionalCompletedKeywords ?? [],
-      archivedKeywords: this.plugin.settings?.additionalArchivedKeywords ?? [],
-    };
+    const keywordManager = new KeywordManager(this.plugin.settings ?? {});
 
-    const keywords = Object.values(keywordGroups).flat().join(',');
+    const keywords = keywordManager.getAllKeywords().join(',');
     if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
       this.cachedKeywords = keywords;
-      this.cachedKeywordConfig = buildKeywordSortConfig(keywordGroups);
+      this.cachedKeywordConfig = buildKeywordSortConfig(keywordManager);
     }
 
     return this.cachedKeywordConfig;

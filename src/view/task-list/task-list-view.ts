@@ -7,14 +7,16 @@ import {
   setIcon,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
-import { Task, NEXT_STATE } from '../../types/task';
+import { Task } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
 import { Search } from '../../search/search';
 import { SearchOptionsDropdown } from '../components/search-options-dropdown';
 import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdown';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import TodoTracker from '../../main';
-import { getFilename, isActiveKeyword } from '../../utils/task-utils';
+import { getFilename } from '../../utils/task-utils';
+import { KeywordManager } from '../../utils/keyword-manager';
+import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TaskElementCache } from './task-element-cache';
 import { ChunkedRenderQueue } from './chunked-render-queue';
@@ -84,6 +86,10 @@ export class TaskListView extends ItemView {
   // Reference to the plugin for checking user-initiated updates
   private plugin: TodoTracker;
 
+  // Keyword and state management
+  private keywordManager: KeywordManager;
+  private stateManager: TaskStateTransitionManager;
+
   // Lazy loading state
   private loadedTaskCount = 0;
   private totalTaskCount = 0;
@@ -107,6 +113,8 @@ export class TaskListView extends ItemView {
     this.taskListFilter = new TaskListFilter(plugin);
     this.renderQueue = new ChunkedRenderQueue();
     this.plugin = plugin;
+    this.keywordManager = new KeywordManager(plugin.settings ?? {});
+    this.stateManager = new TaskStateTransitionManager(this.keywordManager);
 
     // Subscribe to task changes from the centralized state manager
     // Uses interrupt pattern: new update cancels pending work and processes immediately
@@ -991,7 +999,7 @@ export class TaskListView extends ItemView {
     });
 
     // Add state-specific class for styling (includes custom active keywords)
-    if (isActiveKeyword(task.state, this.plugin.settings)) {
+    if (this.keywordManager.isActive(task.state)) {
       checkbox.addClass('todo-checkbox-active');
     }
 
@@ -1015,7 +1023,10 @@ export class TaskListView extends ItemView {
 
     const activate = async (evt: Event) => {
       evt.stopPropagation();
-      await this.updateTaskState(task, NEXT_STATE.get(task.state) ?? 'DONE');
+      await this.updateTaskState(
+        task,
+        this.stateManager.getNextState(task.state),
+      );
       // Full refresh handled by subscribe callback
     };
 
@@ -1218,7 +1229,7 @@ export class TaskListView extends ItemView {
       checkbox.checked = task.completed;
       checkbox.classList.toggle(
         'todo-checkbox-active',
-        isActiveKeyword(task.state, this.plugin.settings),
+        this.keywordManager.isActive(task.state),
       );
     }
 
@@ -1319,15 +1330,15 @@ export class TaskListView extends ItemView {
     element.classList.toggle('completed', task.completed);
     element.classList.toggle(
       'cancelled',
-      task.state === 'CANCELED' || task.state === 'CANCELLED',
+      this.keywordManager.isCompleted(task.state),
     );
     element.classList.toggle(
       'in-progress',
-      task.state === 'DOING' || task.state === 'IN-PROGRESS',
+      this.keywordManager.isActive(task.state),
     );
     element.classList.toggle(
       'active',
-      isActiveKeyword(task.state, this.plugin.settings),
+      this.keywordManager.isActive(task.state),
     );
   }
 

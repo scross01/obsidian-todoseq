@@ -33,6 +33,8 @@ graph TB
             TaskWriter["TaskWriter<br/>File Operations"]
             EventCoordinator["EventCoordinator<br/>Unified Event Handling"]
             PropertySearchEngine["PropertySearchEngine<br/>Property Search"]
+            KeywordManager["KeywordManager<br/>Keyword Classification"]
+            StateTransitionManager["TaskStateTransitionManager<br/>State Transitions"]
         end
 
         subgraph "UI Layer"
@@ -65,6 +67,8 @@ graph TB
 
         subgraph "Utilities"
             TaskUtils["Task Utilities"]
+            KeywordManager["KeywordManager<br/>Keyword Classification"]
+            SettingsMigration["SettingsMigration<br/>Settings Migration"]
             DateUtils["Date Utilities"]
             SettingsUtils["Settings Utils"]
             RegexCache["RegexCache<br/>Pattern Caching"]
@@ -126,6 +130,14 @@ graph TB
     TaskParser --> DateParser
     TaskParser --> LanguageRegistry
     TaskParser --> TaskUtils
+    TaskParser --> KeywordManager
+    TaskWriter --> KeywordManager
+    EditorController --> KeywordManager
+
+    %% Keyword and State Management
+    KeywordManager --> TaskStateTransitionManager
+    TaskStateTransitionManager --> TaskWriter
+    TaskStateTransitionManager --> EditorController
 
     %% Search dropdown connections
     TaskListView --> SearchOptionsDropdown
@@ -148,7 +160,7 @@ graph TB
     classDef external fill:#f5f5f5
 
     class Main pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine serviceLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager serviceLayer
     class UIManager,TaskListView,TaskWriter,ReaderFormatter,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
     class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
     class Search,SearchParser,SearchEvaluator searchLayer
@@ -167,9 +179,10 @@ graph TB
 
 **VaultScanner** (`src/services/vault-scanner.ts`)
 
-- **Responsibility**: File system monitoring and incremental scanning
+- **Responsibility**: File system monitoring, incremental scanning, owns KeywordManager and parsers
 - **Key Patterns**: Event-driven architecture, performance optimization, yielding to event loop
-- **Interface**: `scanVault()`, `updateSettings()`, event emission
+- **Interface**: `scanVault()`, `updateSettings()`, `getKeywordManager()`, `getParser()`, event emission
+- **Ownership**: Creates and owns KeywordManager instance; creates TaskParser internally; registers additional parsers (e.g., OrgModeTaskParser)
 
 **TaskUpdateCoordinator** (`src/services/task-update-coordinator.ts`)
 
@@ -200,6 +213,21 @@ graph TB
 - **Responsibility**: Property-based search with caching and optimization
 - **Key Patterns**: Singleton, caching, async initialization
 - **Interface**: `searchProperties()`, `isReady()`, `onFileChanged()`, property cache management
+
+**KeywordManager** (`src/utils/keyword-manager.ts`)
+
+- **Responsibility**: Single source of truth for keyword classification and detection
+- **Key Patterns**: Reads directly from settings (no caching), static builtin sets
+- **Interface**: `isCompleted()`, `isActive()`, `isWaiting()`, `isInactive()`, `isArchived()`, `getGroup()`, `getAllKeywords()`, `getKeywordsForGroup()`, `getBuiltinActiveKeywords()`, `getBuiltinInactiveKeywords()`, `getBuiltinWaitingKeywords()`, `getBuiltinCompletedKeywords()`, `getBuiltinArchivedKeywords()`
+- **Used by**: TaskParser, OrgModeTaskParser, VaultScanner (owns instance), TaskWriter, EditorController, UI components (task-list-view, task-renderer), task-sort, task-urgency
+- **Ownership**: VaultScanner creates and owns the KeywordManager instance; components get it via `vaultScanner.getKeywordManager()`
+
+**TaskStateTransitionManager** (`src/services/task-state-transition-manager.ts`)
+
+- **Responsibility**: State transition logic for task cycling and toggling
+- **Key Patterns**: State machine, immutable archived states
+- **Interface**: `getNextState()`, `getCycleState()`, `canTransition()`, `isArchivedState()`
+- **Used by**: TaskWriter, EditorController, UI components
 
 ### 2. UI Layer (User Interaction)
 
@@ -276,12 +304,14 @@ graph TB
 - **Responsibility**: Complex regex-based task extraction for Markdown files
 - **Key Patterns**: State machine, builder pattern, security-first design
 - **Interface**: Implements `ITaskParser`, `parseFile()`, `parseLine()`, language-aware parsing
+- **Creation**: TaskParser.create(keywordManager, app, urgencyCoefficients, parserSettings) - first parameter must be KeywordManager
 
 **OrgModeTaskParser** (`src/parser/org-mode-task-parser.ts`)
 
 - **Responsibility**: Parse tasks from Org-mode files (`.org` extension)
 - **Key Patterns**: Headline-based parsing, org-mode syntax support
 - **Interface**: Implements `ITaskParser`, supports priorities, scheduled/deadline dates
+- **Creation**: OrgModeTaskParser.create(keywordManager, app, urgencyCoefficients) - first parameter must be KeywordManager
 
 **LanguageRegistry** (`src/parser/language-registry.ts`)
 
@@ -367,6 +397,7 @@ graph TD
 
     subgraph "Utility Dependencies"
         TaskUtils[TaskUtils]
+        KeywordManager[KeywordManager]
         DateUtils[DateUtils]
         SettingsUtils[SettingsUtils]
         Patterns[Patterns]
@@ -483,11 +514,11 @@ graph TD
 
     %% Class styling for component types
     class Main,LifecycleManager pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine serviceLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager serviceLayer
      class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
     class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
     class Search,SearchParser,SearchEvaluator,SearchTokenizer,SearchSuggestions searchLayer
-    class TaskUtils,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils utilityLayer
+    class TaskUtils,KeywordManager,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils utilityLayer
     class Obsidian,DailyNotes external
 ```
 
@@ -716,11 +747,11 @@ The [`ParserRegistry`](src/parser/parser-registry.ts) manages multiple parsers a
 
 ### Parser Lifecycle
 
-1. **Initialization**: Parsers are created and registered during plugin lifecycle (`src/plugin-lifecycle.ts`)
-2. **Settings Updates**: When settings change, parsers are recreated with new configuration via `recreateParser()`
+1. **Initialization**: VaultScanner creates KeywordManager and TaskParser internally during construction. TaskParser.create() receives KeywordManager as the first argument.
+2. **Settings Updates**: When settings change, VaultScanner creates a new KeywordManager and updates parsers via `updateConfig()`
 3. **File Scanning**: `VaultScanner` uses `ParserRegistry` to parse files based on extension
-4. **Parser Registration**: Parsers can be registered/unregistered dynamically (e.g., org-mode parser based on settings)
-5. **Parser Access**: Use `getParser()` method to access the shared parser instance from VaultScanner
+4. **Parser Registration**: Additional parsers (e.g., OrgModeTaskParser) are created with KeywordManager via `OrgModeTaskParser.create(keywordManager, app, coefficients)` and registered via `vaultScanner.registerParser()`
+5. **Parser Access**: Use `vaultScanner.getParser()` to access the shared parser instance
 
 ### Supported Parsers
 
@@ -819,7 +850,7 @@ type FutureTaskSorting =
 
 ### Key Type Definitions
 
-- **State Transitions**: `NEXT_STATE` and `CYCLE_TASK_STATE` maps
+- **State Transitions**: `TaskStateTransitionManager` class handles all state transitions (see `src/services/task-state-transition-manager.ts`)
 - **Search AST**: `SearchNode` interface for query representation
 - **Event Types**: Typed event interfaces for file changes and state updates
 - **Configuration**: `TodoTrackerSettings` with validation
@@ -909,6 +940,12 @@ type FutureTaskSorting =
 16. **Visibility Detection**: TaskListView detects panel visibility using ResizeObserver - refresh UI only when visible
 17. **Dropdown Coordination**: SearchOptionsDropdown and SearchSuggestionDropdown coordinate visibility - ensure proper cleanup
 18. **Keyword Sorting**: Keyword-based sorting requires configuration - use `buildKeywordSortConfig()` for setup
+19. **Keyword Classification**: Use `KeywordManager` for all keyword detection - do not check keywords directly in components
+20. **State Transitions**: Use `TaskStateTransitionManager` for state cycling - handles custom keywords and archived states correctly
+21. **KeywordManager Ownership**: Components should get KeywordManager from `vaultScanner.getKeywordManager()` rather than creating new instances
+22. **Parser Keyword Parameter**: TaskParser.create() and OrgModeTaskParser.create() require KeywordManager as first argument - never pass settings object
+23. **Keyword Group Access**: Use `getKeywordsForGroup('groupName', settings)` for all keyword groups - do not use separate getInactiveKeywords()
+24. **Urgency Calculation**: task-urgency functions require keyword sets to be passed via UrgencyContext - no fallback defaults
 
 ### Testing Architecture
 

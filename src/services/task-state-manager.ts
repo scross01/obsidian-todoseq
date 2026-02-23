@@ -1,5 +1,6 @@
-import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
+import { Task } from '../types/task';
 import { TaskWriter } from './task-writer';
+import { KeywordManager } from '../utils/keyword-manager';
 
 /**
  * TaskStateManager provides centralized state management for tasks.
@@ -11,6 +12,11 @@ export class TaskStateManager {
   private subscribers = new Set<(tasks: Task[]) => void>();
   private isNotifying = false;
   private pendingNotification = false;
+  private keywordManager: KeywordManager;
+
+  constructor(keywordManager: KeywordManager) {
+    this.keywordManager = keywordManager;
+  }
 
   /**
    * Subscribe to task changes. The callback is called immediately with current tasks.
@@ -107,7 +113,7 @@ export class TaskStateManager {
       const updatedTask = {
         ...existingTask,
         state: newState as Task['state'],
-        completed: DEFAULT_COMPLETED_STATES.has(newState),
+        completed: this.keywordManager.isCompleted(newState),
         rawText: newLine,
       };
       const index = this._tasks.indexOf(existingTask);
@@ -119,7 +125,7 @@ export class TaskStateManager {
       // Fallback: try to update by reference
       this.updateTask(task, {
         state: newState as Task['state'],
-        completed: DEFAULT_COMPLETED_STATES.has(newState),
+        completed: this.keywordManager.isCompleted(newState),
         rawText: newLine,
       });
     }

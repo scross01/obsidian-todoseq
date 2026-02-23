@@ -1,5 +1,5 @@
 import TodoTracker from '../../main';
-import { Task, NEXT_STATE } from '../../types/task';
+import { Task } from '../../types/task';
 import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
 import {
@@ -11,6 +11,7 @@ import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { TFile } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
+import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 
 /**
  * Handles task keyword formatting in the reader view
@@ -1988,11 +1989,9 @@ export class ReaderViewFormatter {
       return;
     }
 
-    // Get the next state from the NEXT_STATE map
-    const nextState = NEXT_STATE.get(currentState);
-    if (!nextState) {
-      return;
-    }
+    const keywordManager = this.vaultScanner.getKeywordManager();
+    const transitionManager = new TaskStateTransitionManager(keywordManager);
+    const nextState = transitionManager.getNextState(currentState);
 
     await this.updateTaskState(keywordElement, sourcePath, nextState);
   }

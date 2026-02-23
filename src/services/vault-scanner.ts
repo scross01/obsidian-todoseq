@@ -12,10 +12,7 @@ import {
 import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
 import { PropertySearchEngine } from './property-search-engine';
-import {
-  buildKeywordsFromGroups,
-  isArchivedKeyword,
-} from '../utils/task-utils';
+import { KeywordManager } from '../utils/keyword-manager';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -37,18 +34,28 @@ export class VaultScanner {
   private urgencyCoefficients!: UrgencyCoefficients;
   private regexCache = new RegexCache();
   private parserRegistry: ParserRegistry;
+  private keywordManager: KeywordManager;
+  private propertySearchEngine?: PropertySearchEngine;
 
   constructor(
     private app: App,
     private settings: TodoTrackerSettings,
-    parser: TaskParser,
     private taskStateManager: TaskStateManager,
-    private propertySearchEngine?: PropertySearchEngine,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
-    // Initialize parser registry and register the markdown parser
+    // Create KeywordManager - single source for this VaultScanner
+    this.keywordManager = new KeywordManager(settings);
+
+    // Initialize parser registry
     this.parserRegistry = new ParserRegistry();
-    this.parserRegistry.register(parser);
+
+    // Create TaskParser with this KeywordManager
+    const taskParser = TaskParser.create(
+      this.keywordManager,
+      app,
+      urgencyCoefficients,
+    );
+    this.parserRegistry.register(taskParser);
 
     // Initialize event listeners map
     const eventKeys: Array<keyof VaultScannerEvents> = [
@@ -89,6 +96,22 @@ export class VaultScanner {
    */
   getParserRegistry(): ParserRegistry {
     return this.parserRegistry;
+  }
+
+  /**
+   * Get the shared KeywordManager instance.
+   * Used by parsers to get the same KeywordManager reference.
+   */
+  getKeywordManager(): KeywordManager {
+    return this.keywordManager;
+  }
+
+  /**
+   * Replace the markdown parser with a new one.
+   * Used when creating parsers with shared KeywordManager after VaultScanner creation.
+   */
+  replaceParser(newParser: TaskParser): void {
+    this.parserRegistry.register(newParser);
   }
 
   /**
@@ -175,10 +198,10 @@ export class VaultScanner {
         // Flatten the task arrays from the batch
         for (const fileTasks of batchResults) {
           // Filter out archived tasks - they are styled but NOT collected
-          // Note: Archived tasks are identified using isArchivedKeyword() instead
+          // Note: Archived tasks are identified using KeywordManager instead
           // of being tracked by individual parsers for consistency across all formats
           const nonArchivedTasks = fileTasks.filter(
-            (task) => !isArchivedKeyword(task.state, this.settings),
+            (task) => !this.keywordManager.isArchived(task.state),
           );
           newTasks.push(...nonArchivedTasks);
         }
@@ -414,20 +437,20 @@ export class VaultScanner {
       await this.loadUrgencyCoefficients();
     }
 
-    // Build parser config for updating all parsers using all keyword groups
-    const {
-      allKeywords,
-      completedKeywords,
-      activeKeywords,
-      waitingKeywords,
-      archivedKeywords,
-    } = buildKeywordsFromGroups(newSettings);
+    // Create a new KeywordManager with the updated settings
+    // KeywordManager reads directly from settings, so we just need to create a new one
+    this.keywordManager = new KeywordManager(newSettings);
+
+    // Update parsers with new settings - they will read fresh keywords from KeywordManager
     const config: ParserConfig = {
-      keywords: allKeywords,
-      completedKeywords: completedKeywords,
-      activeKeywords: activeKeywords,
-      waitingKeywords: waitingKeywords,
-      archivedKeywords: archivedKeywords,
+      keywords: this.keywordManager.getAllKeywords(),
+      completedKeywords:
+        this.keywordManager.getKeywordsForGroup('completedKeywords'),
+      activeKeywords: this.keywordManager.getKeywordsForGroup('activeKeywords'),
+      waitingKeywords:
+        this.keywordManager.getKeywordsForGroup('waitingKeywords'),
+      archivedKeywords:
+        this.keywordManager.getKeywordsForGroup('archivedKeywords'),
       urgencyCoefficients: this.urgencyCoefficients,
       includeCalloutBlocks: newSettings.includeCalloutBlocks,
       includeCodeBlocks: newSettings.includeCodeBlocks,
@@ -461,10 +484,10 @@ export class VaultScanner {
       const fileTasks = await this.scanFile(file);
 
       // Filter out archived tasks - they are styled but NOT collected
-      // Note: Archived tasks are identified using isArchivedKeyword() instead
+      // Note: Archived tasks are identified using KeywordManager instead
       // of being tracked by individual parsers for consistency across all formats
       const nonArchivedTasks = fileTasks.filter(
-        (task) => !isArchivedKeyword(task.state, this.settings),
+        (task) => !this.keywordManager.isArchived(task.state),
       );
 
       // Skip update if tasks haven't actually changed (identity comparison by path, line, rawText)

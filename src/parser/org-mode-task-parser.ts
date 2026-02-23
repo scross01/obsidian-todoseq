@@ -6,10 +6,7 @@
 import { Task } from '../types/task';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
-import {
-  buildKeywordsFromGroups,
-  HasTaskKeywordGroups,
-} from '../utils/task-utils';
+import { KeywordManager } from '../utils/keyword-manager';
 import {
   calculateTaskUrgency,
   getDefaultCoefficients,
@@ -51,10 +48,7 @@ export class OrgModeTaskParser implements ITaskParser {
   readonly supportedExtensions = ['.org'];
 
   private keywords: string[];
-  private completedKeywords: Set<string>;
-  private activeKeywords: Set<string>;
-  private waitingKeywords: Set<string>;
-  private archivedKeywords: Set<string>;
+  private keywordManager: KeywordManager;
   private urgencyCoefficients: UrgencyCoefficients;
   private regexCache: RegexCache;
   private headlineRegex: RegExp;
@@ -62,19 +56,13 @@ export class OrgModeTaskParser implements ITaskParser {
 
   private constructor(
     keywords: string[],
-    completedKeywords: Set<string>,
-    activeKeywords: Set<string>,
-    waitingKeywords: Set<string>,
-    archivedKeywords: Set<string>,
+    keywordManager: KeywordManager,
     urgencyCoefficients: UrgencyCoefficients,
     regexCache: RegexCache,
     app: App | null,
   ) {
     this.keywords = keywords;
-    this.completedKeywords = completedKeywords;
-    this.activeKeywords = activeKeywords;
-    this.waitingKeywords = waitingKeywords;
-    this.archivedKeywords = archivedKeywords;
+    this.keywordManager = keywordManager;
     this.urgencyCoefficients = urgencyCoefficients;
     this.regexCache = regexCache;
     this.app = app;
@@ -84,32 +72,21 @@ export class OrgModeTaskParser implements ITaskParser {
   }
 
   /**
-   * Create an OrgModeTaskParser from settings.
-   * Uses buildKeywordsFromGroups() to include custom keywords from keyword groups.
-   *
-   * Backward compatible: accepts both old format (array) and new format (settings object).
-   * @param settingsOrKeywords Either a settings object with taskKeywordGroups, or an array of additional keywords (deprecated)
+   * Create an OrgModeTaskParser.
+   * @param keywordManager KeywordManager instance (single source of truth for keywords)
+   * @param app Obsidian app instance
+   * @param urgencyCoefficients Optional urgency coefficients
    */
   static create(
-    settings: HasTaskKeywordGroups,
+    keywordManager: KeywordManager,
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
   ): OrgModeTaskParser {
-    // Build keyword lists from taskKeywordGroups setting
-    const {
-      allKeywords,
-      completedKeywords,
-      activeKeywords,
-      waitingKeywords,
-      archivedKeywords,
-    } = buildKeywordsFromGroups(settings);
+    const keywords = keywordManager.getAllKeywords();
 
     return new OrgModeTaskParser(
-      allKeywords,
-      new Set(completedKeywords),
-      new Set(activeKeywords),
-      new Set(waitingKeywords),
-      new Set(archivedKeywords),
+      keywords,
+      keywordManager,
       urgencyCoefficients ?? getDefaultCoefficients(),
       new RegexCache(),
       app,
@@ -119,29 +96,16 @@ export class OrgModeTaskParser implements ITaskParser {
   /**
    * Update parser configuration.
    * Called when settings change.
-   *
-   * NOTE: Archived keywords are not supported for org-mode tasks,
-   * so we don't update the archivedKeywords property here.
-   * Archived tasks are filtered out at the vault scanner level.
    */
   updateConfig(config: ParserConfig): void {
-    this.keywords = config.keywords;
-    this.completedKeywords = new Set(config.completedKeywords);
-    this.urgencyCoefficients = config.urgencyCoefficients;
-
-    // Update active and waiting keywords if provided
-    if (config.activeKeywords) {
-      this.activeKeywords = new Set(config.activeKeywords);
-    }
-    if (config.waitingKeywords) {
-      this.waitingKeywords = new Set(config.waitingKeywords);
-    }
+    // Use keywords from config if provided, otherwise from KeywordManager
+    // This allows dynamic keyword updates while maintaining shared KeywordManager
+    this.keywords = config.keywords ?? this.keywordManager.getAllKeywords();
 
     // Rebuild headline regex with new keywords
-    this.headlineRegex = buildOrgHeadlineRegex(
-      config.keywords,
-      this.regexCache,
-    );
+    this.headlineRegex = buildOrgHeadlineRegex(this.keywords, this.regexCache);
+
+    this.urgencyCoefficients = config.urgencyCoefficients;
   }
 
   /**
@@ -224,7 +188,7 @@ export class OrgModeTaskParser implements ITaskParser {
     const { priority, cleanedText } = extractOrgPriority(headlineText);
 
     // Determine completion status
-    const completed = this.completedKeywords.has(state);
+    const completed = this.keywordManager.isCompleted(state);
 
     // Detect daily note information
     let isDailyNote = false;
@@ -275,8 +239,8 @@ export class OrgModeTaskParser implements ITaskParser {
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
       const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.activeKeywords,
-        waitingKeywordsSet: this.waitingKeywords,
+        activeKeywordsSet: this.keywordManager.getActiveSet(),
+        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
       };
       task.urgency = calculateTaskUrgency(
         task,

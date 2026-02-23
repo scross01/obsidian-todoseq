@@ -103,7 +103,7 @@ function createMockVault(): Record<string, unknown> {
 
 // Minimal mock settings interface (avoids importing from settings.ts which has circular deps)
 interface MockSettings {
-  additionalTaskKeywords: string[];
+  additionalInactiveKeywords: string[];
   includeCodeBlocks: boolean;
   includeCalloutBlocks: boolean;
   includeCommentBlocks: boolean;
@@ -123,7 +123,7 @@ interface MockSettings {
 // Helper to create mock settings
 function createMockSettings(): MockSettings {
   return {
-    additionalTaskKeywords: [],
+    additionalInactiveKeywords: [],
     includeCodeBlocks: false,
     includeCalloutBlocks: true,
     includeCommentBlocks: false,

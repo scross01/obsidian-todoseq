@@ -8,7 +8,6 @@ import {
   TaskListViewMode,
 } from './view/task-list/task-list-view';
 import { TodoTrackerSettingTab } from './settings/settings';
-import { TaskParser } from './parser/task-parser';
 import { OrgModeTaskParser } from './parser/org-mode-task-parser';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, Platform } from 'obsidian';
@@ -28,33 +27,29 @@ export class PluginLifecycleManager {
   async onload() {
     await this.loadSettings();
 
-    // Initialize services
     // Load urgency coefficients on startup
     const urgencyCoefficients = await parseUrgencyCoefficients(this.plugin.app);
 
-    // VaultScanner now uses the centralized TaskStateManager
+    // VaultScanner creates KeywordManager and TaskParser internally
     this.plugin.vaultScanner = new VaultScanner(
       this.plugin.app,
       this.plugin.settings,
-      TaskParser.create(
-        this.plugin.settings,
-        this.plugin.app,
-        urgencyCoefficients,
-      ),
       this.plugin.taskStateManager,
+      urgencyCoefficients,
     );
 
-    // Register org-mode parser for .org files only if experimental feature is enabled
+    // Register org-mode parser if experimental feature is enabled
     if (this.plugin.settings.detectOrgModeFiles) {
+      const keywordManager = this.plugin.vaultScanner.getKeywordManager();
       const orgModeParser = OrgModeTaskParser.create(
-        this.plugin.settings,
+        keywordManager,
         this.plugin.app,
         urgencyCoefficients,
       );
       this.plugin.vaultScanner.registerParser(orgModeParser);
     }
 
-    // Initialize property search engine after vault scanner (we'll register listeners later)
+    // Initialize property search engine after vault scanner
     this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(
       this.plugin.app,
       {
@@ -84,7 +79,6 @@ export class PluginLifecycleManager {
     this.plugin.statusBarManager.setupStatusBarItem();
 
     // Initialize reader view formatter with vaultScanner
-    // Note: ReaderViewFormatter now uses the shared parser from VaultScanner
     this.plugin.readerViewFormatter = new ReaderViewFormatter(
       this.plugin,
       this.plugin.vaultScanner,

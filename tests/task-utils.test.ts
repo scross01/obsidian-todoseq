@@ -4,7 +4,6 @@ import {
   getCheckboxStatus,
   truncateMiddle,
   getKeywordsForGroup,
-  getInactiveKeywords,
   getAllKeywords,
   getKeywordGroup,
   isBuiltinKeyword,
@@ -184,10 +183,10 @@ describe('task-utils', () => {
       });
     });
 
-    describe('getInactiveKeywords', () => {
+    describe('getKeywordsForGroup - inactiveKeywords', () => {
       test('should return inactive keywords with custom additions', () => {
-        const settings = { additionalTaskKeywords: ['PENDING'] };
-        const result = getInactiveKeywords(settings);
+        const settings = { additionalInactiveKeywords: ['PENDING'] };
+        const result = getKeywordsForGroup('inactiveKeywords', settings);
         expect(result).toEqual(
           expect.arrayContaining([...BUILTIN_INACTIVE_KEYWORDS, 'PENDING']),
         );
@@ -195,7 +194,7 @@ describe('task-utils', () => {
 
       test('should return default inactive keywords when no custom', () => {
         const settings = {};
-        const result = getInactiveKeywords(settings);
+        const result = getKeywordsForGroup('inactiveKeywords', settings);
         expect(result).toEqual(
           expect.arrayContaining(BUILTIN_INACTIVE_KEYWORDS),
         );
@@ -205,7 +204,7 @@ describe('task-utils', () => {
     describe('getAllKeywords', () => {
       test('should return all keywords from all groups', () => {
         const settings = {
-          additionalTaskKeywords: ['PENDING'],
+          additionalInactiveKeywords: ['PENDING'],
           additionalActiveKeywords: ['WORKING'],
           additionalWaitingKeywords: ['BLOCKED'],
           additionalCompletedKeywords: ['FINISHED'],
@@ -227,7 +226,7 @@ describe('task-utils', () => {
 
       test('should remove duplicates', () => {
         const settings = {
-          additionalTaskKeywords: ['TODO'], // Duplicate of built-in
+          additionalInactiveKeywords: ['TODO'], // Duplicate of built-in
           additionalActiveKeywords: ['DOING'], // Duplicate of built-in
         };
         const result = getAllKeywords(settings);
@@ -258,7 +257,7 @@ describe('task-utils', () => {
       });
 
       test('should return inactive group for custom additional keywords', () => {
-        const settings = { additionalTaskKeywords: ['PENDING'] };
+        const settings = { additionalInactiveKeywords: ['PENDING'] };
         expect(getKeywordGroup('PENDING', settings)).toBe('inactiveKeywords');
       });
 
@@ -320,23 +319,13 @@ describe('task-utils', () => {
         expect(result).toEqual([]);
       });
 
-      test('should check additionalTaskKeywords for duplicates', () => {
-        const groups = {
-          activeKeywords: ['CUSTOM'],
-          waitingKeywords: ['BLOCKED'],
-          completedKeywords: ['FINISHED'],
-        };
-        const result = validateKeywordGroups(groups, ['CUSTOM']);
-        expect(result).toEqual(['CUSTOM']);
-      });
-
       test('should handle empty groups', () => {
         const groups = {
           activeKeywords: [],
           waitingKeywords: [],
           completedKeywords: [],
         };
-        const result = validateKeywordGroups(groups, []);
+        const result = validateKeywordGroups(groups);
         expect(result).toEqual([]);
       });
     });
@@ -344,7 +333,7 @@ describe('task-utils', () => {
     describe('buildKeywordsFromGroups', () => {
       test('should build all keyword groups correctly', () => {
         const settings = {
-          additionalTaskKeywords: ['PENDING'],
+          additionalInactiveKeywords: ['PENDING'],
           additionalActiveKeywords: ['WORKING'],
           additionalWaitingKeywords: ['BLOCKED'],
           additionalCompletedKeywords: ['FINISHED'],
@@ -432,7 +421,7 @@ describe('task-utils', () => {
 
       test('should detect custom additional keywords', () => {
         const settings = {
-          additionalTaskKeywords: ['PENDING'],
+          additionalInactiveKeywords: ['PENDING'],
           additionalActiveKeywords: ['WORKING'],
           additionalWaitingKeywords: ['BLOCKED'],
           additionalCompletedKeywords: ['FINISHED'],

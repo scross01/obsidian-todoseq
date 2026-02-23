@@ -1,11 +1,9 @@
-import { Task, NEXT_STATE } from '../../types/task';
+import { Task } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
 import { TAG_PATTERN } from '../../utils/patterns';
-import {
-  getFilename,
-  getTaskTextDisplay,
-  isActiveKeyword,
-} from '../../utils/task-utils';
+import { getFilename, getTaskTextDisplay } from '../../utils/task-utils';
+import { KeywordManager } from '../../utils/keyword-manager';
+import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import TodoTracker from '../../main';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 
@@ -28,10 +26,14 @@ const LINK_PATTERNS: LinkPattern[] = [
 export class TaskRenderer {
   private plugin: TodoTracker;
   private menuBuilder: StateMenuBuilder;
+  private keywordManager: KeywordManager;
+  private stateManager: TaskStateTransitionManager;
 
   constructor(plugin: TodoTracker, menuBuilder: StateMenuBuilder) {
     this.plugin = plugin;
     this.menuBuilder = menuBuilder;
+    this.keywordManager = new KeywordManager(plugin.settings ?? {});
+    this.stateManager = new TaskStateTransitionManager(this.keywordManager);
   }
 
   buildCheckbox(task: Task, container: HTMLElement): HTMLInputElement {
@@ -40,7 +42,7 @@ export class TaskRenderer {
       cls: 'todo-checkbox',
     });
 
-    if (isActiveKeyword(task.state, this.plugin.settings)) {
+    if (this.keywordManager.isActive(task.state)) {
       checkbox.addClass('todo-checkbox-active');
     }
 
@@ -98,7 +100,10 @@ export class TaskRenderer {
 
     const activate = async (evt: Event) => {
       evt.stopPropagation();
-      await this.updateTaskState(task, NEXT_STATE.get(task.state) ?? 'DONE');
+      await this.updateTaskState(
+        task,
+        this.stateManager.getNextState(task.state),
+      );
     };
 
     todoSpan.addEventListener('click', (evt) => activate(evt));
@@ -288,7 +293,7 @@ export class TaskRenderer {
       checkbox.checked = task.completed;
       checkbox.classList.toggle(
         'todo-checkbox-active',
-        isActiveKeyword(task.state, this.plugin.settings),
+        this.keywordManager.isActive(task.state),
       );
     }
 
@@ -374,15 +379,15 @@ export class TaskRenderer {
     element.classList.toggle('completed', task.completed);
     element.classList.toggle(
       'cancelled',
-      task.state === 'CANCELED' || task.state === 'CANCELLED',
+      this.keywordManager.isCompleted(task.state),
     );
     element.classList.toggle(
       'in-progress',
-      task.state === 'DOING' || task.state === 'IN-PROGRESS',
+      this.keywordManager.isActive(task.state),
     );
     element.classList.toggle(
       'active',
-      isActiveKeyword(task.state, this.plugin.settings),
+      this.keywordManager.isActive(task.state),
     );
   }
 

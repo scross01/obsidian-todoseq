@@ -435,7 +435,7 @@ describe('Property Search Tokenizer', () => {
       // Create complete settings object
       const settings: any = {
         app: mockApp,
-        additionalTaskKeywords: [],
+        additionalInactiveKeywords: [],
         includeCodeBlocks: false,
         includeCalloutBlocks: false,
         includeCommentBlocks: false,
@@ -1024,7 +1024,7 @@ describe('Property Search Tokenizer', () => {
 
           const settings: any = {
             app: mockApp,
-            additionalTaskKeywords: [],
+            additionalInactiveKeywords: [],
             includeCodeBlocks: false,
             includeCalloutBlocks: false,
             includeCommentBlocks: false,
@@ -1053,7 +1053,7 @@ describe('Property Search Tokenizer', () => {
 
           const settings: any = {
             app: mockApp,
-            additionalTaskKeywords: [],
+            additionalInactiveKeywords: [],
             includeCodeBlocks: false,
             includeCalloutBlocks: false,
             includeCommentBlocks: false,
@@ -1082,7 +1082,7 @@ describe('Property Search Tokenizer', () => {
 
           const settings: any = {
             app: mockApp,
-            additionalTaskKeywords: [],
+            additionalInactiveKeywords: [],
             includeCodeBlocks: false,
             includeCalloutBlocks: false,
             includeCommentBlocks: false,

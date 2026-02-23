@@ -3,7 +3,7 @@ import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings-types';
 import { TaskListViewMode } from '../view/task-list/task-list-view';
 import { TAG_PATTERN } from '../utils/patterns';
-import { getAllKeywords } from '../utils/task-utils';
+import { getAllKeywords, getKeywordsForGroup } from '../utils/task-utils';
 
 /**
  * Utility class for collecting and filtering search suggestions
@@ -244,12 +244,21 @@ export class SearchSuggestions {
    * @returns Array of task states, sorted alphabetically
    */
   static getAllStates(settings?: TodoTrackerSettings): string[] {
-    // Use getAllKeywords from task-utils which correctly combines
-    // built-in and custom keywords from all groups
+    // Get all keywords but exclude archived - archived tasks are never collected
+    // during vault scans and cannot be searched for
     const allKeywords = getAllKeywords(settings ?? {});
+    const archivedKeywords = getKeywordsForGroup(
+      'archivedKeywords',
+      settings ?? {},
+    );
+
+    // Filter out archived keywords
+    const searchableKeywords = allKeywords.filter(
+      (k) => !archivedKeywords.includes(k),
+    );
 
     // Sort alphabetically (case-insensitive)
-    return allKeywords.sort((a, b) => a.localeCompare(b));
+    return searchableKeywords.sort((a, b) => a.localeCompare(b));
   }
 
   /**

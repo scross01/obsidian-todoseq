@@ -7,6 +7,7 @@ import {
   calculateTaskUrgency,
   getDefaultCoefficients,
   needsUrgencyRecalculation,
+  UrgencyContext,
 } from '../src/utils/task-urgency';
 import { Task } from '../src/types/task';
 import { App, Vault, DataAdapter } from 'obsidian';
@@ -393,7 +394,10 @@ describe('Urgency Calculation', () => {
       dailyNoteDate: null,
     });
 
-    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    const context: UrgencyContext = {
+      activeKeywordsSet: new Set(['DOING', 'NOW', 'IN-PROGRESS']),
+    };
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
     // active (4.0) + age factor (1.0) * age coefficient (2.0) = 6.0
     expect(urgency).toBe(6.0);
   });
@@ -434,7 +438,10 @@ describe('Urgency Calculation', () => {
       dailyNoteDate: null,
     });
 
-    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    const context: UrgencyContext = {
+      waitingKeywordsSet: new Set(['WAIT', 'WAITING']),
+    };
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
     // waiting (-3.0) + age factor (1.0) * age coefficient (2.0) = -1.0
     expect(urgency).toBe(-1.0);
   });
@@ -453,7 +460,10 @@ describe('Urgency Calculation', () => {
       dailyNoteDate: null,
     });
 
-    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    const context: UrgencyContext = {
+      activeKeywordsSet: new Set(['DOING', 'NOW', 'IN-PROGRESS']),
+    };
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
     // getDeadlineUrgency = ~0.733, * 12.0 ≈ 8.8
     // + priorityHigh (6.0) + active (4.0) + tags (0.8)
     // + age factor (1.0) * age coefficient (2.0) = 2.0

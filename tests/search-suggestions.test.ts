@@ -480,11 +480,12 @@ describe('Search Suggestions', () => {
       expect(states).toContain('IN-PROGRESS');
       expect(states).toContain('CANCELED');
       expect(states).toContain('CANCELLED');
-      expect(states).toContain('ARCHIVED');
+      // ARCHIVED is excluded - archived tasks are never collected during vault scans
+      // and cannot be searched for
+      expect(states).not.toContain('ARCHIVED');
 
       // Should be sorted alphabetically
       expect(states).toEqual([
-        'ARCHIVED',
         'CANCELED',
         'CANCELLED',
         'DOING',
@@ -760,7 +761,7 @@ describe('Search Suggestions', () => {
   describe('Custom state keywords', () => {
     it('should include custom keywords from settings in getAllStates', () => {
       const mockSettings: TodoTrackerSettings = createBaseSettings({
-        additionalTaskKeywords: ['FIXME', 'HACK', 'REVIEW'],
+        additionalInactiveKeywords: ['FIXME', 'HACK', 'REVIEW'],
       });
 
       const states = SearchSuggestions.getAllStates(mockSettings);
@@ -794,7 +795,7 @@ describe('Search Suggestions', () => {
 
     it('should deduplicate states when custom keywords overlap with defaults', () => {
       const mockSettings: TodoTrackerSettings = createBaseSettings({
-        additionalTaskKeywords: ['TODO', 'DOING', 'CUSTOM'],
+        additionalInactiveKeywords: ['TODO', 'DOING', 'CUSTOM'],
       });
 
       const states = SearchSuggestions.getAllStates(mockSettings);

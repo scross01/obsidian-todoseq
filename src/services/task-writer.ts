@@ -1,12 +1,9 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
-import { Task, NEXT_STATE, CYCLE_TASK_STATE } from '../types/task';
+import { Task } from '../types/task';
 import { PRIORITY_TOKEN_REGEX, CHECKBOX_REGEX } from '../utils/patterns';
 import { getPluginSettings } from '../utils/settings-utils';
-import {
-  isCompletedKeyword,
-  isArchivedKeyword,
-  HasTaskKeywordGroups,
-} from '../utils/task-utils';
+import { KeywordManager } from '../utils/keyword-manager';
+import { TaskStateTransitionManager } from './task-state-transition-manager';
 
 /**
  * Handles writing task state changes to files.
@@ -23,9 +20,9 @@ export class TaskWriter {
     task: Task,
     newState: string,
     keepPriority = true,
-    keywordSettings?: HasTaskKeywordGroups,
+    keywordManager?: KeywordManager,
   ): { newLine: string; completed: boolean } {
-    const settings = keywordSettings ?? {};
+    const keywordManagerInstance = keywordManager ?? new KeywordManager({});
     const priToken =
       keepPriority && task.priority
         ? task.priority === 'high'
@@ -82,8 +79,8 @@ export class TaskWriter {
       // Generate markdown checkbox format with proper spacing
       // For archived states, preserve the existing checkbox state
       // For other states, use the default logic (check if it's a completed state)
-      const isArchived = isArchivedKeyword(newState, settings);
-      const isCompleted = isCompletedKeyword(newState, settings);
+      const isArchived = keywordManagerInstance.isArchived(newState);
+      const isCompleted = keywordManagerInstance.isCompleted(newState);
       const checkboxStatus = isArchived
         ? currentCheckboxState
         : isCompleted
@@ -131,7 +128,7 @@ export class TaskWriter {
       newLine += originalSpacing + task.footnoteReference;
     }
 
-    const completed = isCompletedKeyword(newState, settings);
+    const completed = keywordManagerInstance.isCompleted(newState);
     return { newLine, completed };
   }
 
@@ -150,11 +147,12 @@ export class TaskWriter {
     forceVaultApi = false,
   ): Promise<Task> {
     const settings = getPluginSettings(this.app);
+    const keywordManagerInstance = new KeywordManager(settings ?? {});
     const { newLine, completed } = TaskWriter.generateTaskLine(
       task,
       newState,
       keepPriority,
-      settings ?? undefined,
+      keywordManagerInstance,
     );
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -228,7 +226,7 @@ export class TaskWriter {
     };
   }
 
-  // Cycles a task to its next state according to NEXT_STATE and persists change
+  // Cycles a task to its next state using TaskStateTransitionManager and persists change
   async updateTaskState(
     task: Task,
     nextState: string | null = null,
@@ -236,17 +234,12 @@ export class TaskWriter {
   ): Promise<Task> {
     let state: string;
     if (nextState == null) {
-      // Check if current state is a custom keyword
       const settings = getPluginSettings(this.app);
-      const customKeywords = settings?.additionalTaskKeywords || [];
-
-      if (customKeywords.includes(task.state)) {
-        // If it's a custom keyword, cycle to DONE
-        state = 'DONE';
-      } else {
-        // Otherwise use the standard NEXT_STATE mapping
-        state = NEXT_STATE.get(task.state) || 'TODO';
-      }
+      const keywordManagerInstance = new KeywordManager(settings ?? {});
+      const stateManager = new TaskStateTransitionManager(
+        keywordManagerInstance,
+      );
+      state = stateManager.getNextState(task.state);
     } else {
       state = nextState;
     }
@@ -261,18 +254,12 @@ export class TaskWriter {
   ): Promise<Task> {
     let state: string;
     if (nextState == null) {
-      // Check if current state is a custom keyword
       const settings = getPluginSettings(this.app);
-      const customKeywords = settings?.additionalTaskKeywords || [];
-
-      if (customKeywords.includes(task.state)) {
-        // If it's a custom keyword, cycle to DONE
-        state = 'DONE';
-      } else {
-        // Otherwise use the cycle bullet state mapping
-        const nextState = CYCLE_TASK_STATE.get(task.state);
-        state = nextState !== undefined ? nextState : 'TODO';
-      }
+      const keywordManagerInstance = new KeywordManager(settings ?? {});
+      const stateManager = new TaskStateTransitionManager(
+        keywordManagerInstance,
+      );
+      state = stateManager.getCycleState(task.state);
     } else {
       state = nextState;
     }
@@ -285,11 +272,12 @@ export class TaskWriter {
     newPriority: 'high' | 'med' | 'low',
   ): Promise<Task> {
     const settings = getPluginSettings(this.app);
+    const keywordManagerInstance = new KeywordManager(settings ?? {});
     const { newLine } = TaskWriter.generateTaskLine(
       task,
       task.state,
       false, // Don't keep existing priority
-      settings ?? undefined,
+      keywordManagerInstance,
     );
 
     // Add the new priority to the task line

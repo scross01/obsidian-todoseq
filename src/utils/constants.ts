@@ -30,29 +30,33 @@ export const DOCS_INDEX_URL = `${DOCS_BASE_URL}/index.html`;
 /**
  * Built-in keywords for active tasks.
  * These keywords indicate a task is currently being worked on.
+ * Order: NOW, DOING, IN-PROGRESS (for sort order).
  */
-export const BUILTIN_ACTIVE_KEYWORDS = ['DOING', 'NOW', 'IN-PROGRESS'] as const;
+export const BUILTIN_ACTIVE_KEYWORDS = ['NOW', 'DOING', 'IN-PROGRESS'] as const;
 
 /**
  * Built-in keywords for inactive/pending tasks.
  * These keywords indicate a task that has not been started yet.
+ * Order: TODO, LATER (for sort order).
  */
 export const BUILTIN_INACTIVE_KEYWORDS = ['TODO', 'LATER'] as const;
 
 /**
  * Built-in keywords for waiting tasks.
  * These keywords indicate a task that is blocked or paused.
+ * Order: WAIT, WAITING (for sort order).
  */
 export const BUILTIN_WAITING_KEYWORDS = ['WAIT', 'WAITING'] as const;
 
 /**
  * Built-in keywords for completed tasks.
  * These keywords indicate a task that is finished or abandoned.
+ * Order: DONE, CANCELED, CANCELLED (for sort order).
  */
 export const BUILTIN_COMPLETED_KEYWORDS = [
   'DONE',
-  'CANCELLED',
   'CANCELED',
+  'CANCELLED',
 ] as const;
 
 /**

@@ -69,10 +69,12 @@ describe('settings-utils', () => {
 
     test('should return complete settings without modification', () => {
       const completeSettings: TodoTrackerSettings = {
-        additionalTaskKeywords: ['FIXME', 'HACK'],
+        additionalInactiveKeywords: ['FIXME', 'HACK'],
+        additionalInactiveKeywords: ['FIXME', 'HACK'],
         additionalActiveKeywords: ['STARTED'],
         additionalWaitingKeywords: ['PAUSED'],
         additionalCompletedKeywords: ['ABANDONED'],
+        additionalArchivedKeywords: [],
         includeCodeBlocks: true,
         includeCalloutBlocks: false,
         includeCommentBlocks: true,
@@ -107,10 +109,12 @@ describe('settings-utils', () => {
     beforeEach(() => {
       detector = new SettingsChangeDetector();
       baseSettings = {
-        additionalTaskKeywords: [],
+        additionalInactiveKeywords: [],
+        additionalInactiveKeywords: [],
         additionalActiveKeywords: [],
         additionalWaitingKeywords: [],
         additionalCompletedKeywords: [],
+        additionalArchivedKeywords: [],
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
@@ -171,10 +175,10 @@ describe('settings-utils', () => {
         );
       });
 
-      test('should detect changes in additionalTaskKeywords', () => {
+      test('should detect changes in additionalInactiveKeywords', () => {
         const changedSettings = {
           ...baseSettings,
-          additionalTaskKeywords: ['FIXME', 'HACK'],
+          additionalInactiveKeywords: ['FIXME', 'HACK'],
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
           true,
@@ -350,10 +354,12 @@ describe('settings-utils', () => {
       const detector2 = createSettingsChangeDetector();
 
       const settings: TodoTrackerSettings = {
-        additionalTaskKeywords: [],
+        additionalInactiveKeywords: [],
+        additionalInactiveKeywords: [],
         additionalActiveKeywords: [],
         additionalWaitingKeywords: [],
         additionalCompletedKeywords: [],
+        additionalArchivedKeywords: [],
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,

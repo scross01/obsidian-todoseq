@@ -1,5 +1,6 @@
-import { Task, TaskKeywordGroups } from '../types/task';
+import { Task } from '../types/task';
 import { DateUtils } from './date-utils';
+import { KeywordManager } from './keyword-manager';
 
 /**
  * Task Classification Types
@@ -210,44 +211,48 @@ export function keywordSortComparator(
 }
 
 /**
- * Build keyword sort configuration from settings
+ * Build keyword sort configuration from KeywordManager
  *
- * @param keywordGroups The keyword groups from settings (taskKeywordGroups)
+ * @param keywordManager KeywordManager instance containing all keywords
  * @returns Complete KeywordSortConfig object
  */
 export function buildKeywordSortConfig(
-  keywordGroups: TaskKeywordGroups,
+  keywordManager: KeywordManager,
 ): KeywordSortConfig {
-  // Define the sort order for built-in keywords within each group
-  // This is the order used for intra-group sorting, which may differ from
-  // the order in BUILTIN_*_KEYWORDS constants (which are for recognition)
-  const builtinActiveOrder = ['NOW', 'DOING', 'IN-PROGRESS'];
-  const builtinInactiveOrder = ['TODO', 'LATER'];
-  const builtinWaitingOrder = ['WAIT', 'WAITING'];
-  const builtinCompletedOrder = ['DONE', 'CANCELED', 'CANCELLED'];
+  // Get built-in keywords from KeywordManager (single source of truth)
+  const builtinActiveOrder = keywordManager.getBuiltinActiveKeywords();
+  const builtinInactiveOrder = keywordManager.getBuiltinInactiveKeywords();
+  const builtinWaitingOrder = keywordManager.getBuiltinWaitingKeywords();
+  const builtinCompletedOrder = keywordManager.getBuiltinCompletedKeywords();
+
+  // Get custom keywords from KeywordManager
+  const customActive = keywordManager.getCustomActiveSet();
+  const customInactive = keywordManager.getCustomInactiveSet();
+  const customWaiting = keywordManager.getCustomWaitingSet();
+  const customCompleted = keywordManager.getCustomCompletedSet();
 
   // Build active keywords: built-in + custom (preserving order)
   const activeKeywordsOrder = [
     ...builtinActiveOrder,
-    ...(keywordGroups.activeKeywords ?? []).map((k) => k.toUpperCase()),
+    ...Array.from(customActive),
   ];
 
   // Build inactive keywords: built-in + custom
   const inactiveKeywordsOrder = [
     ...builtinInactiveOrder,
-    ...(keywordGroups.inactiveKeywords ?? []).map((k) => k.toUpperCase()),
+    ...Array.from(customInactive),
   ];
 
   // Build waiting keywords: built-in + custom
   const waitingKeywordsOrder = [
     ...builtinWaitingOrder,
-    ...(keywordGroups.waitingKeywords ?? []).map((k) => k.toUpperCase()),
+    ...Array.from(customWaiting),
   ];
 
   // Build completed keywords: built-in + custom
   const completedKeywordsOrder = [
     ...builtinCompletedOrder,
-    ...(keywordGroups.completedKeywords ?? []).map((k) => k.toUpperCase()),
+    ...Array.from(customCompleted),
   ];
 
   return {

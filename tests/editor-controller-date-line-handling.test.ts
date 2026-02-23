@@ -1,7 +1,10 @@
 import { EditorController } from '../src/services/editor-controller';
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
-import { createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('Editor Controller - Date Line Handling', () => {
   let editorController: EditorController;
@@ -19,7 +22,10 @@ describe('Editor Controller - Date Line Handling', () => {
     mockPlugin = {
       getVaultScanner: () => ({
         getParser: () => {
-          const parser = TaskParser.create(settings, null);
+          const parser = TaskParser.create(
+            createTestKeywordManager(settings),
+            null,
+          );
           return parser;
         },
       }),

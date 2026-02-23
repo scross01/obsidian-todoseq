@@ -2,16 +2,18 @@ import {
   buildKeywordSortConfig,
   getKeywordGroup,
 } from '../src/utils/task-sort';
+import { KeywordManager } from '../src/utils/keyword-manager';
 
 describe('Keyword Sort Configuration', () => {
   describe('buildKeywordSortConfig', () => {
     test('should build correct config with custom active keyword', () => {
-      const config = buildKeywordSortConfig({
-        activeKeywords: ['STARTED'],
-        inactiveKeywords: [],
-        waitingKeywords: ['ON-HOLD'],
-        completedKeywords: [],
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['STARTED'],
+        additionalInactiveKeywords: [],
+        additionalWaitingKeywords: ['ON-HOLD'],
+        additionalCompletedKeywords: [],
       });
+      const config = buildKeywordSortConfig(keywordManager);
 
       // Verify active keywords
       expect(config.activeKeywords.has('STARTED')).toBeTruthy();
@@ -31,12 +33,13 @@ describe('Keyword Sort Configuration', () => {
     });
 
     test('should build correct config with multiple custom keywords in all groups', () => {
-      const config = buildKeywordSortConfig({
-        activeKeywords: ['STARTED', 'WORKING', 'ASSIGNED'],
-        inactiveKeywords: ['PENDING', 'BACKLOG', 'DEFERRED'],
-        waitingKeywords: ['ON-HOLD', 'BLOCKED', 'WAITING-ON'],
-        completedKeywords: ['FINISHED', 'CLOSED', 'ARCHIVED'],
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['STARTED', 'WORKING', 'ASSIGNED'],
+        additionalInactiveKeywords: ['PENDING', 'BACKLOG', 'DEFERRED'],
+        additionalWaitingKeywords: ['ON-HOLD', 'BLOCKED', 'WAITING-ON'],
+        additionalCompletedKeywords: ['FINISHED', 'CLOSED', 'ARCHIVED'],
       });
+      const config = buildKeywordSortConfig(keywordManager);
 
       // Verify active keywords
       expect(config.activeKeywords.has('STARTED')).toBeTruthy();
@@ -106,12 +109,13 @@ describe('Keyword Sort Configuration', () => {
 
   describe('getKeywordGroup', () => {
     test('should assign custom active keyword to group 1', () => {
-      const config = buildKeywordSortConfig({
-        activeKeywords: ['STARTED'],
-        inactiveKeywords: [],
-        waitingKeywords: ['ON-HOLD'],
-        completedKeywords: [],
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['STARTED'],
+        additionalInactiveKeywords: [],
+        additionalWaitingKeywords: ['ON-HOLD'],
+        additionalCompletedKeywords: [],
       });
+      const config = buildKeywordSortConfig(keywordManager);
 
       const task1 = { state: 'STARTED', completed: false };
       const task2 = { state: 'ON-HOLD', completed: false };
@@ -123,12 +127,13 @@ describe('Keyword Sort Configuration', () => {
     });
 
     test('should assign custom keywords to appropriate groups with multiple keywords', () => {
-      const config = buildKeywordSortConfig({
-        activeKeywords: ['STARTED', 'WORKING'],
-        inactiveKeywords: ['PENDING', 'BACKLOG'],
-        waitingKeywords: ['ON-HOLD', 'BLOCKED'],
-        completedKeywords: ['FINISHED', 'CLOSED'],
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['STARTED', 'WORKING'],
+        additionalInactiveKeywords: ['PENDING', 'BACKLOG'],
+        additionalWaitingKeywords: ['ON-HOLD', 'BLOCKED'],
+        additionalCompletedKeywords: ['FINISHED', 'CLOSED'],
       });
+      const config = buildKeywordSortConfig(keywordManager);
 
       // Active group tests
       expect(

@@ -1,4 +1,5 @@
-import { Task, DEFAULT_COMPLETED_STATES } from '../../types/task';
+import { Task } from '../../types/task';
+import { isCompletedKeyword } from '../../utils/task-utils';
 import { TaskWriter } from '../../services/task-writer';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
@@ -1378,7 +1379,7 @@ export class EmbeddedTaskListRenderer {
       // Update the task via the centralized TaskStateManager
       this.plugin.taskStateManager.updateTask(taskToUpdate, {
         state: newState,
-        completed: DEFAULT_COMPLETED_STATES.has(newState),
+        completed: isCompletedKeyword(newState, this.plugin.settings),
       });
 
       // Trigger refresh of all task list views, including embedded ones

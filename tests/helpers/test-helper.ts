@@ -1,8 +1,18 @@
-import { Task, TaskKeywordGroups } from '../../src/types/task';
+import { Task } from '../../src/types/task';
 import {
   TodoTrackerSettings,
   DefaultSettings,
 } from '../../src/settings/settings-types';
+import { KeywordManager } from '../../src/utils/keyword-manager';
+import { TaskParser } from '../../src/parser/task-parser';
+
+type TaskKeywordGroups = {
+  activeKeywords: string[];
+  inactiveKeywords: string[];
+  waitingKeywords: string[];
+  completedKeywords: string[];
+  archivedKeywords: string[];
+};
 
 /**
  * Creates a baseline task with common properties
@@ -46,6 +56,7 @@ export const defaultTaskKeywordGroups: TaskKeywordGroups = {
   inactiveKeywords: [],
   waitingKeywords: [],
   completedKeywords: [],
+  archivedKeywords: [],
 };
 
 /**
@@ -58,4 +69,27 @@ export function createBaseSettings(
     ...DefaultSettings,
     ...overrides,
   };
+}
+
+/**
+ * Creates a KeywordManager for testing.
+ * This is the preferred way to create KeywordManager in tests.
+ * @param settings Settings with custom keywords
+ * @throws Error if keywords contain dangerous regex patterns
+ */
+export function createTestKeywordManager(
+  settings: Partial<TodoTrackerSettings> = {},
+): KeywordManager {
+  // Validate custom keywords before creating KeywordManager
+  const allCustomKeywords = [
+    ...(settings.additionalActiveKeywords ?? []),
+    ...(settings.additionalWaitingKeywords ?? []),
+    ...(settings.additionalCompletedKeywords ?? []),
+    ...(settings.additionalInactiveKeywords ?? []),
+    ...(settings.additionalArchivedKeywords ?? []),
+  ];
+  if (allCustomKeywords.length > 0) {
+    TaskParser.validateKeywords(allCustomKeywords);
+  }
+  return new KeywordManager(settings);
 }

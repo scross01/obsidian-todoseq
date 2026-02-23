@@ -180,13 +180,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       this.plugin.settings.additionalActiveKeywords,
     );
 
-    // Inactive keywords sub-section (uses additionalTaskKeywords)
+    // Inactive keywords sub-section
     this.createKeywordGroupSetting(
       containerEl,
-      'additionalTaskKeywords',
+      'additionalInactiveKeywords',
       'Inactive keywords',
       'Keywords for tasks not yet started (e.g., FIXME, HACK). Built-in: TODO, LATER',
-      this.plugin.settings.additionalTaskKeywords,
+      this.plugin.settings.additionalInactiveKeywords,
     );
 
     // Waiting keywords sub-section
@@ -219,7 +219,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
   /**
    * Create a keyword group setting with validation
-   * Uses flat settings properties: additionalActiveKeywords, additionalTaskKeywords,
+   * Uses flat settings properties: additionalActiveKeywords, additionalInactiveKeywords,
    * additionalWaitingKeywords, additionalCompletedKeywords, additionalArchivedKeywords
    */
   private createKeywordGroupSetting(
@@ -227,7 +227,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     settingKey: keyof Pick<
       TodoTrackerSettings,
       | 'additionalActiveKeywords'
-      | 'additionalTaskKeywords'
+      | 'additionalInactiveKeywords'
       | 'additionalWaitingKeywords'
       | 'additionalCompletedKeywords'
       | 'additionalArchivedKeywords'
@@ -303,30 +303,28 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             }
 
             // Check for duplicates across groups
-            // Pass the new validKeywords to the appropriate group being edited
-            const duplicates = validateKeywordGroups(
-              {
-                activeKeywords:
-                  settingKey === 'additionalActiveKeywords'
-                    ? validKeywords
-                    : this.plugin.settings.additionalActiveKeywords,
-                waitingKeywords:
-                  settingKey === 'additionalWaitingKeywords'
-                    ? validKeywords
-                    : this.plugin.settings.additionalWaitingKeywords,
-                completedKeywords:
-                  settingKey === 'additionalCompletedKeywords'
-                    ? validKeywords
-                    : this.plugin.settings.additionalCompletedKeywords,
-                archivedKeywords:
-                  settingKey === 'additionalArchivedKeywords'
-                    ? validKeywords
-                    : this.plugin.settings.additionalArchivedKeywords,
-              },
-              settingKey === 'additionalTaskKeywords'
-                ? validKeywords
-                : undefined,
-            );
+            const duplicates = validateKeywordGroups({
+              activeKeywords:
+                settingKey === 'additionalActiveKeywords'
+                  ? validKeywords
+                  : this.plugin.settings.additionalActiveKeywords,
+              inactiveKeywords:
+                settingKey === 'additionalInactiveKeywords'
+                  ? validKeywords
+                  : this.plugin.settings.additionalInactiveKeywords,
+              waitingKeywords:
+                settingKey === 'additionalWaitingKeywords'
+                  ? validKeywords
+                  : this.plugin.settings.additionalWaitingKeywords,
+              completedKeywords:
+                settingKey === 'additionalCompletedKeywords'
+                  ? validKeywords
+                  : this.plugin.settings.additionalCompletedKeywords,
+              archivedKeywords:
+                settingKey === 'additionalArchivedKeywords'
+                  ? validKeywords
+                  : this.plugin.settings.additionalArchivedKeywords,
+            });
 
             // Show errors if any
             if (invalidKeywords.length > 0 || duplicates.length > 0) {

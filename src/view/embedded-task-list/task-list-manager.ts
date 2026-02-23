@@ -8,6 +8,7 @@ import {
   KeywordSortConfig,
 } from '../../utils/task-sort';
 import { TodoseqParameters, TodoseqCodeBlockParser } from './code-block-parser';
+import { KeywordManager } from '../../utils/keyword-manager';
 
 /**
  * Manages task filtering and sorting for embedded task lists.
@@ -226,18 +227,12 @@ export class EmbeddedTaskListManager {
    * Get cached keyword sort config, rebuilding only when keywords change
    */
   private getKeywordSortConfig(): KeywordSortConfig {
-    const keywordGroups = {
-      activeKeywords: this.settings?.additionalActiveKeywords ?? [],
-      inactiveKeywords: this.settings?.additionalTaskKeywords ?? [],
-      waitingKeywords: this.settings?.additionalWaitingKeywords ?? [],
-      completedKeywords: this.settings?.additionalCompletedKeywords ?? [],
-      archivedKeywords: this.settings?.additionalArchivedKeywords ?? [],
-    };
+    const keywordManager = new KeywordManager(this.settings);
 
-    const keywords = Object.values(keywordGroups).flat().join(',');
+    const keywords = keywordManager.getAllKeywords().join(',');
     if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
       this.cachedKeywords = keywords;
-      this.cachedKeywordConfig = buildKeywordSortConfig(keywordGroups);
+      this.cachedKeywordConfig = buildKeywordSortConfig(keywordManager);
     }
 
     return this.cachedKeywordConfig;

@@ -1,6 +1,9 @@
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
-import { createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('TaskParser keyword validation', () => {
   describe('validateKeywords', () => {
@@ -77,27 +80,37 @@ describe('TaskParser keyword validation', () => {
     it('should create parser with valid keywords', () => {
       const settings = {
         ...baseSettings,
-        additionalTaskKeywords: ['FIXME', 'HACK'],
+        additionalInactiveKeywords: ['FIXME', 'HACK'],
       };
-      expect(() => TaskParser.create(settings, null)).not.toThrow();
-      const parser = TaskParser.create(settings, null);
+      expect(() =>
+        TaskParser.create(createTestKeywordManager(settings), null),
+      ).not.toThrow();
+      const parser = TaskParser.create(
+        createTestKeywordManager(settings),
+        null,
+      );
       expect(parser).toBeInstanceOf(TaskParser);
     });
 
     it('should throw error with invalid keywords', () => {
       const settings = {
         ...baseSettings,
-        additionalTaskKeywords: ['A*B*C'],
+        additionalInactiveKeywords: ['A*B*C'],
       };
-      expect(() => TaskParser.create(settings, null)).toThrow(
-        'dangerous regex pattern',
-      );
+      expect(() =>
+        TaskParser.create(createTestKeywordManager(settings), null),
+      ).toThrow('dangerous regex pattern');
     });
 
     it('should work with empty additional keywords', () => {
-      const settings = { ...baseSettings, additionalTaskKeywords: [] };
-      expect(() => TaskParser.create(settings, null)).not.toThrow();
-      const parser = TaskParser.create(settings, null);
+      const settings = { ...baseSettings, additionalInactiveKeywords: [] };
+      expect(() =>
+        TaskParser.create(createTestKeywordManager(settings), null),
+      ).not.toThrow();
+      const parser = TaskParser.create(
+        createTestKeywordManager(settings),
+        null,
+      );
       expect(parser).toBeInstanceOf(TaskParser);
     });
   });

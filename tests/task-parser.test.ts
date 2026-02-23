@@ -1,6 +1,9 @@
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
-import { createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('TaskParser.extractPriorityFromText', () => {
   test('should extract high priority [#A] and clean text', () => {
@@ -112,12 +115,17 @@ describe('Regular task parsing', () => {
 
   beforeEach(() => {
     settings = createBaseSettings({
-      additionalTaskKeywords: ['FIXME'],
+      additionalInactiveKeywords: ['FIXME'],
       languageCommentSupport: {
         enabled: false,
       },
     });
-    parser = TaskParser.create(settings, null);
+    parser = TaskParser.create(
+      createTestKeywordManager(settings),
+      null,
+      undefined,
+      settings,
+    );
   });
 
   describe('Task prefixes', () => {
@@ -487,7 +495,7 @@ TODO task text
     test(`should match comment blocks when enabled`, () => {
       const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
         {
-          additionalTaskKeywords: ['FIXME'],
+          additionalInactiveKeywords: ['FIXME'],
           includeCommentBlocks: true,
           languageCommentSupport: {
             enabled: false,
@@ -495,7 +503,7 @@ TODO task text
         },
       );
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks,
+        createTestKeywordManager(settingsWithCommentBlocks),
         null,
       );
 
@@ -522,7 +530,7 @@ TODO task text
     test(`should match comment blocks with different task states`, () => {
       const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
         {
-          additionalTaskKeywords: ['FIXME'],
+          additionalInactiveKeywords: ['FIXME'],
           includeCommentBlocks: true,
           languageCommentSupport: {
             enabled: false,
@@ -530,7 +538,7 @@ TODO task text
         },
       );
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks,
+        createTestKeywordManager(settingsWithCommentBlocks),
         null,
       );
 
@@ -560,7 +568,7 @@ TODO task text
     test(`should match comment blocks with priorities`, () => {
       const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
         {
-          additionalTaskKeywords: ['FIXME'],
+          additionalInactiveKeywords: ['FIXME'],
           includeCommentBlocks: true,
           languageCommentSupport: {
             enabled: false,
@@ -568,7 +576,7 @@ TODO task text
         },
       );
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks,
+        createTestKeywordManager(settingsWithCommentBlocks),
         null,
       );
 
@@ -594,7 +602,7 @@ TODO task text
     test(`should match comment blocks with dates`, () => {
       const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
         {
-          additionalTaskKeywords: ['FIXME'],
+          additionalInactiveKeywords: ['FIXME'],
           includeCommentBlocks: true,
           languageCommentSupport: {
             enabled: false,
@@ -602,7 +610,7 @@ TODO task text
         },
       );
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks,
+        createTestKeywordManager(settingsWithCommentBlocks),
         null,
       );
 
@@ -726,13 +734,18 @@ describe('Task parsing with code blocks', () => {
 
   beforeEach(() => {
     settings = createBaseSettings({
-      additionalTaskKeywords: [],
+      additionalInactiveKeywords: [],
       includeCodeBlocks: true,
       languageCommentSupport: {
         enabled: false,
       },
     });
-    parser = TaskParser.create(settings, null);
+    parser = TaskParser.create(
+      createTestKeywordManager(settings),
+      null,
+      undefined,
+      settings,
+    );
   });
 
   describe('Tasks in code blocks when enabled (no language processing)', () => {
@@ -765,13 +778,18 @@ describe('Task parsing within langauge spefic comments in code blocks', () => {
 
   beforeEach(() => {
     settings = createBaseSettings({
-      additionalTaskKeywords: [],
+      additionalInactiveKeywords: [],
       includeCodeBlocks: true,
       languageCommentSupport: {
         enabled: true,
       },
     });
-    parser = TaskParser.create(settings, null);
+    parser = TaskParser.create(
+      createTestKeywordManager(settings),
+      null,
+      undefined,
+      settings,
+    );
   });
 
   describe('Tasks in code blocks', () => {

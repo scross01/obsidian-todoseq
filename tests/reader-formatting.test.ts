@@ -18,7 +18,10 @@ Object.defineProperty(global, 'localStorage', {
 
 import { ReaderViewFormatter } from '../src/view/markdown-renderers/reader-formatting';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
-import { createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 import { TaskParser } from '../src/parser/task-parser';
 import { VaultScanner } from '../src/services/vault-scanner';
 import { App, TFile } from 'obsidian';
@@ -80,12 +83,14 @@ const createMockPlugin = (settings: TodoTrackerSettings) => ({
   scanVault: jest.fn(),
   saveSettings: jest.fn(),
   updateTaskFormatting: jest.fn(),
+  getKeywordManager: () => createTestKeywordManager(settings),
 });
 
 // Mock VaultScanner
 const createMockVaultScanner = (parser: TaskParser | null) => ({
   getParser: jest.fn().mockReturnValue(parser),
   getTasks: jest.fn().mockReturnValue([]),
+  getKeywordManager: () => createTestKeywordManager(createBaseSettings()),
   on: jest.fn(),
   off: jest.fn(),
   emit: jest.fn(),
@@ -108,7 +113,10 @@ describe('ReaderViewFormatter', () => {
     mockSettings = createBaseSettings();
 
     // Create mock parser
-    mockParser = TaskParser.create(mockSettings, null);
+    mockParser = TaskParser.create(
+      createTestKeywordManager(mockSettings),
+      null,
+    );
 
     // Create mocks
     mockPlugin = createMockPlugin(mockSettings);
@@ -288,7 +296,7 @@ describe('ReaderViewFormatter', () => {
     });
 
     test('should include additional keywords from settings', () => {
-      mockPlugin.settings.additionalTaskKeywords = ['FIXME', 'HACK'];
+      mockPlugin.settings.additionalInactiveKeywords = ['FIXME', 'HACK'];
       const getAllTaskKeywords = (
         formatter as unknown as { getAllTaskKeywords: () => string[] }
       ).getAllTaskKeywords;

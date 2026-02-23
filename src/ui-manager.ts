@@ -1,7 +1,7 @@
 import { MarkdownView, WorkspaceLeaf, TFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import TodoTracker from './main';
-import { DEFAULT_COMPLETED_STATES } from './types/task';
+import { isCompletedKeyword } from './utils/task-utils';
 import { taskKeywordPlugin } from './view/editor-extensions/task-formatting';
 import { dateAutocompleteExtension } from './view/editor-extensions/date-autocomplete';
 import { TaskListView } from './view/task-list/task-list-view';
@@ -218,12 +218,15 @@ export class UIManager {
     // Determine new state based on checkbox state
     let newKeyword = currentKeyword;
     // Only change state if there's a mismatch between current state and checkbox
-    if (checkbox.checked && !DEFAULT_COMPLETED_STATES.has(currentKeyword)) {
+    if (
+      checkbox.checked &&
+      !isCompletedKeyword(currentKeyword, this.plugin.settings)
+    ) {
       // Checkbox checked but current state is not completed -> change to DONE
       newKeyword = 'DONE';
     } else if (
       !checkbox.checked &&
-      DEFAULT_COMPLETED_STATES.has(currentKeyword)
+      isCompletedKeyword(currentKeyword, this.plugin.settings)
     ) {
       // Checkbox unchecked but current state is completed -> change to TODO
       newKeyword = 'TODO';

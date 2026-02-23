@@ -66,7 +66,7 @@ describe('StateMenuBuilder', () => {
       const settingsWithCustom = {
         ...mockSettings,
         additionalActiveKeywords: ['STARTED'],
-        additionalTaskKeywords: ['PLANNED'],
+        additionalInactiveKeywords: ['PLANNED'],
         additionalWaitingKeywords: ['BLOCKED'],
         additionalCompletedKeywords: ['ARCHIVED'],
       };
@@ -158,7 +158,7 @@ describe('StateMenuBuilder', () => {
       const settingsWithCustom = {
         ...mockSettings,
         additionalActiveKeywords: ['STARTED'],
-        additionalTaskKeywords: ['PLANNED'],
+        additionalInactiveKeywords: ['PLANNED'],
         additionalWaitingKeywords: ['BLOCKED'],
         additionalCompletedKeywords: ['ARCHIVED'],
       };
@@ -219,7 +219,7 @@ describe('StateMenuBuilder', () => {
       const duplicateKeywords = ['TODO', 'PLANNED'];
       const settingsWithDuplicates = {
         ...mockSettings,
-        additionalTaskKeywords: duplicateKeywords,
+        additionalInactiveKeywords: duplicateKeywords,
       };
       const pluginWithDuplicates = { settings: settingsWithDuplicates };
       const builder = new StateMenuBuilder(pluginWithDuplicates as any);
@@ -242,7 +242,7 @@ describe('StateMenuBuilder', () => {
       // Arrange
       const settingsWithEmpty = {
         ...mockSettings,
-        additionalTaskKeywords: ['', 'PLANNED', ''],
+        additionalInactiveKeywords: ['', 'PLANNED', ''],
       };
       const pluginWithEmpty = { settings: settingsWithEmpty };
       const builder = new StateMenuBuilder(pluginWithEmpty as any);

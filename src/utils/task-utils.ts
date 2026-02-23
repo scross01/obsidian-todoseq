@@ -1,4 +1,5 @@
 import { KeywordGroup, Task } from '../types/task';
+import { KeywordManager } from './keyword-manager';
 import {
   BUILTIN_ACTIVE_KEYWORDS,
   BUILTIN_INACTIVE_KEYWORDS,
@@ -6,6 +7,14 @@ import {
   BUILTIN_COMPLETED_KEYWORDS,
   BUILTIN_ARCHIVED_KEYWORDS,
 } from './constants';
+
+type KeywordSettings = {
+  additionalInactiveKeywords?: string[];
+  additionalActiveKeywords?: string[];
+  additionalWaitingKeywords?: string[];
+  additionalCompletedKeywords?: string[];
+  additionalArchivedKeywords?: string[];
+};
 
 /**
  * Result of building the task keyword list
@@ -60,18 +69,6 @@ export function buildTaskKeywords(
 }
 
 /**
- * Settings interface for keyword group access.
- * Uses flat properties to avoid nested object serialization issues.
- */
-export interface HasTaskKeywordGroups {
-  additionalTaskKeywords?: string[]; // Inactive keywords
-  additionalActiveKeywords?: string[]; // Active keywords
-  additionalWaitingKeywords?: string[]; // Waiting keywords
-  additionalCompletedKeywords?: string[]; // Completed keywords
-  additionalArchivedKeywords?: string[]; // Archived keywords - styled but not collected
-}
-
-/**
  * Get all keywords for a specific group (built-in + custom)
  * @param group The keyword group to get keywords for
  * @param settings Settings object containing flat keyword properties
@@ -79,43 +76,10 @@ export interface HasTaskKeywordGroups {
  */
 export function getKeywordsForGroup(
   group: KeywordGroup,
-  settings: HasTaskKeywordGroups,
+  settings: KeywordSettings,
 ): string[] {
-  switch (group) {
-    case 'activeKeywords':
-      return [
-        ...BUILTIN_ACTIVE_KEYWORDS,
-        ...(settings.additionalActiveKeywords ?? []),
-      ];
-    case 'waitingKeywords':
-      return [
-        ...BUILTIN_WAITING_KEYWORDS,
-        ...(settings.additionalWaitingKeywords ?? []),
-      ];
-    case 'completedKeywords':
-      return [
-        ...BUILTIN_COMPLETED_KEYWORDS,
-        ...(settings.additionalCompletedKeywords ?? []),
-      ];
-    case 'archivedKeywords':
-      return [
-        ...BUILTIN_ARCHIVED_KEYWORDS,
-        ...(settings.additionalArchivedKeywords ?? []),
-      ];
-    default:
-      return [];
-  }
-}
-
-/**
- * Get all inactive keywords (built-in + additionalTaskKeywords from settings)
- * Inactive keywords are handled separately from other groups for backward compatibility.
- * @param settings Settings object containing additionalTaskKeywords
- * @returns Array of all inactive keywords (built-in + custom)
- */
-export function getInactiveKeywords(settings: HasTaskKeywordGroups): string[] {
-  const additionalKeywords = settings.additionalTaskKeywords ?? [];
-  return [...BUILTIN_INACTIVE_KEYWORDS, ...additionalKeywords];
+  const keywordManager = new KeywordManager(settings);
+  return keywordManager.getKeywordsForGroup(group);
 }
 
 /**
@@ -123,10 +87,10 @@ export function getInactiveKeywords(settings: HasTaskKeywordGroups): string[] {
  * @param settings Settings object containing taskKeywordGroups
  * @returns Array of all unique keywords across all groups
  */
-export function getAllKeywords(settings: HasTaskKeywordGroups): string[] {
+export function getAllKeywords(settings: KeywordSettings): string[] {
   const allKeywords = [
     ...getKeywordsForGroup('activeKeywords', settings),
-    ...getInactiveKeywords(settings),
+    ...getKeywordsForGroup('inactiveKeywords', settings),
     ...getKeywordsForGroup('waitingKeywords', settings),
     ...getKeywordsForGroup('completedKeywords', settings),
     ...getKeywordsForGroup('archivedKeywords', settings),
@@ -144,10 +108,10 @@ export function getAllKeywords(settings: HasTaskKeywordGroups): string[] {
  */
 export function getKeywordGroup(
   keyword: string,
-  settings: HasTaskKeywordGroups,
+  settings: KeywordSettings,
 ): KeywordGroup | 'inactiveKeywords' | null {
   // Check inactive keywords first (from additionalTaskKeywords)
-  const inactiveKeywords = getInactiveKeywords(settings);
+  const inactiveKeywords = getKeywordsForGroup('inactiveKeywords', settings);
   if (inactiveKeywords.includes(keyword)) {
     return 'inactiveKeywords';
   }
@@ -196,30 +160,26 @@ export function isBuiltinKeyword(keyword: string): boolean {
 }
 
 /**
- * Validate keyword groups for duplicates
  * Checks if any keyword appears in multiple groups
  * @param groups The keyword groups to validate (with flat properties)
- * @param additionalTaskKeywords Additional inactive keywords to check against (optional, for backward compatibility)
  * @returns Array of duplicate keywords found (empty if no duplicates)
  */
-export function validateKeywordGroups(
-  groups: {
-    activeKeywords?: string[];
-    waitingKeywords?: string[];
-    completedKeywords?: string[];
-    archivedKeywords?: string[];
-  },
-  additionalTaskKeywords?: string[],
-): string[] {
+export function validateKeywordGroups(groups: {
+  activeKeywords?: string[];
+  inactiveKeywords?: string[];
+  waitingKeywords?: string[];
+  completedKeywords?: string[];
+  archivedKeywords?: string[];
+}): string[] {
   const keywordCounts = new Map<string, number>();
 
   // Count occurrences of each keyword across all groups
   const allGroupKeywords = [
     ...(groups.activeKeywords ?? []),
+    ...(groups.inactiveKeywords ?? []),
     ...(groups.waitingKeywords ?? []),
     ...(groups.completedKeywords ?? []),
     ...(groups.archivedKeywords ?? []),
-    ...(additionalTaskKeywords ?? []),
   ];
 
   for (const keyword of allGroupKeywords) {
@@ -267,10 +227,10 @@ export interface TaskKeywordGroupsResult {
  * @returns TaskKeywordGroupsResult with all keyword arrays
  */
 export function buildKeywordsFromGroups(
-  settings: HasTaskKeywordGroups,
+  settings: KeywordSettings,
 ): TaskKeywordGroupsResult {
   const activeKeywords = getKeywordsForGroup('activeKeywords', settings);
-  const inactiveKeywords = getInactiveKeywords(settings);
+  const inactiveKeywords = getKeywordsForGroup('inactiveKeywords', settings);
   const waitingKeywords = getKeywordsForGroup('waitingKeywords', settings);
   const completedKeywords = getKeywordsForGroup('completedKeywords', settings);
   const archivedKeywords = getKeywordsForGroup('archivedKeywords', settings);
@@ -304,7 +264,7 @@ export function buildKeywordsFromGroups(
  */
 export function isCompletedKeyword(
   keyword: string,
-  settings: HasTaskKeywordGroups,
+  settings: KeywordSettings,
 ): boolean {
   const completedKeywords = getKeywordsForGroup('completedKeywords', settings);
   return completedKeywords.includes(keyword);
@@ -319,7 +279,7 @@ export function isCompletedKeyword(
  */
 export function isArchivedKeyword(
   keyword: string,
-  settings: HasTaskKeywordGroups,
+  settings: KeywordSettings,
 ): boolean {
   const archivedKeywords = getKeywordsForGroup('archivedKeywords', settings);
   return archivedKeywords.includes(keyword);
@@ -333,7 +293,7 @@ export function isArchivedKeyword(
  */
 export function isActiveKeyword(
   keyword: string,
-  settings: HasTaskKeywordGroups,
+  settings: KeywordSettings,
 ): boolean {
   const activeKeywords = getKeywordsForGroup('activeKeywords', settings);
   return activeKeywords.includes(keyword);
@@ -347,7 +307,7 @@ export function isActiveKeyword(
  */
 export function isWaitingKeyword(
   keyword: string,
-  settings: HasTaskKeywordGroups,
+  settings: KeywordSettings,
 ): boolean {
   const waitingKeywords = getKeywordsForGroup('waitingKeywords', settings);
   return waitingKeywords.includes(keyword);
@@ -361,9 +321,9 @@ export function isWaitingKeyword(
  */
 export function isInactiveKeyword(
   keyword: string,
-  settings: HasTaskKeywordGroups,
+  settings: KeywordSettings,
 ): boolean {
-  const inactiveKeywords = getInactiveKeywords(settings);
+  const inactiveKeywords = getKeywordsForGroup('inactiveKeywords', settings);
   return inactiveKeywords.includes(keyword);
 }
 

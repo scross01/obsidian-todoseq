@@ -12,6 +12,7 @@ import {
 } from '../src/utils/task-sort';
 import { Task } from '../src/types/task';
 import { createBaseTask } from './helpers/test-helper';
+import { KeywordManager } from '../src/utils/keyword-manager';
 
 describe('Task Sorting System', () => {
   const now = new Date('2024-01-15T12:00:00Z');
@@ -1339,13 +1340,13 @@ describe('Keyword Sort Feature', () => {
 
   describe('buildKeywordSortConfig()', () => {
     it('builds config from settings with custom keywords', () => {
-      const keywordGroups = {
-        activeKeywords: ['REVIEW'],
-        inactiveKeywords: [],
-        waitingKeywords: ['BLOCKED'],
-        completedKeywords: ['ARCHIVED'],
-      };
-      const config = buildKeywordSortConfig(keywordGroups);
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['REVIEW'],
+        additionalInactiveKeywords: [],
+        additionalWaitingKeywords: ['BLOCKED'],
+        additionalCompletedKeywords: ['ARCHIVED'],
+      });
+      const config = buildKeywordSortConfig(keywordManager);
 
       expect(config.activeKeywords.has('REVIEW')).toBe(true);
       expect(config.waitingKeywords.has('BLOCKED')).toBe(true);
@@ -1356,12 +1357,8 @@ describe('Keyword Sort Feature', () => {
     });
 
     it('handles empty keyword groups', () => {
-      const config = buildKeywordSortConfig({
-        activeKeywords: [],
-        waitingKeywords: [],
-        inactiveKeywords: [],
-        completedKeywords: [],
-      });
+      const keywordManager = new KeywordManager({});
+      const config = buildKeywordSortConfig(keywordManager);
 
       expect(config.activeKeywords).toBeInstanceOf(Set);
       expect(config.waitingKeywords).toBeInstanceOf(Set);
@@ -1370,12 +1367,8 @@ describe('Keyword Sort Feature', () => {
     });
 
     it('includes all default keyword sets', () => {
-      const config = buildKeywordSortConfig({
-        activeKeywords: [],
-        waitingKeywords: [],
-        inactiveKeywords: [],
-        completedKeywords: [],
-      });
+      const keywordManager = new KeywordManager({});
+      const config = buildKeywordSortConfig(keywordManager);
 
       // Active keywords
       expect(config.activeKeywords.has('NOW')).toBe(true);

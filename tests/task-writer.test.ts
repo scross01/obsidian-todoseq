@@ -1,5 +1,9 @@
 import { TaskWriter } from '../src/services/task-writer';
-import { createBaseTask, createCheckboxTask } from './helpers/test-helper';
+import {
+  createBaseTask,
+  createCheckboxTask,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('TaskWriter.generateTaskLine', () => {
   describe('Basic task formatting', () => {
@@ -282,10 +286,15 @@ describe('TaskWriter.generateTaskLine', () => {
     test('should handle custom completed state', () => {
       const task = createBaseTask();
 
-      // Pass custom completed state via settings object
-      const result = TaskWriter.generateTaskLine(task, 'CUSTOM', true, {
-        additionalCompletedKeywords: ['CUSTOM'],
-      });
+      // Pass custom completed state via KeywordManager
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'CUSTOM',
+        true,
+        createTestKeywordManager({
+          additionalCompletedKeywords: ['CUSTOM'],
+        }),
+      );
       expect(result.newLine).toBe('CUSTOM Task text');
       expect(result.completed).toBe(true);
     });
