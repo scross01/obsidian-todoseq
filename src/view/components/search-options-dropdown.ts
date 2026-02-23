@@ -25,6 +25,11 @@ export class SearchOptionsDropdown {
   private searchHistory: string[] = [];
   private readonly MAX_HISTORY_SIZE = 10;
 
+  private documentClickHandler: (e: MouseEvent) => void;
+  private blurHandler: () => void;
+  private resizeHandler: () => void;
+  private scrollHandler: () => void;
+
   constructor(
     inputEl: HTMLInputElement,
     vault: Vault,
@@ -102,52 +107,44 @@ export class SearchOptionsDropdown {
   }
 
   private setupEventListeners(): void {
-    // Click outside to close - but be careful not to interfere with suggestion clicks
-    document.addEventListener('click', (e) => {
+    this.documentClickHandler = (e: MouseEvent) => {
       const target = e.target as Node;
 
-      // Don't hide if clicking on a suggestion item
       if (this.containerEl.contains(target)) {
         return;
       }
 
-      // Don't hide if clicking on the input
       if (target === this.inputEl) {
         return;
       }
 
-      // Don't hide if we're currently handling a prefix selection
       if (this.isHandlingPrefixSelection) {
         return;
       }
 
-      // Hide the dropdown for clicks outside
       this.hide();
-    });
+    };
 
-    // Focus loss handling - hide when input loses focus
-    this.inputEl.addEventListener('blur', () => {
-      // Use requestAnimationFrame to allow click events to process first
+    this.blurHandler = () => {
       requestAnimationFrame(() => {
         if (!this.isHandlingPrefixSelection) {
           this.hide();
         }
       });
-    });
+    };
 
-    // Window resize
-    window.addEventListener('resize', () => {
+    this.resizeHandler = () => {
       this.updateWidth();
-    });
+    };
 
-    // Scroll handling
-    window.addEventListener(
-      'scroll',
-      () => {
-        this.updatePosition();
-      },
-      { passive: true },
-    );
+    this.scrollHandler = () => {
+      this.updatePosition();
+    };
+
+    document.addEventListener('click', this.documentClickHandler);
+    this.inputEl.addEventListener('blur', this.blurHandler);
+    window.addEventListener('resize', this.resizeHandler);
+    window.addEventListener('scroll', this.scrollHandler, { passive: true });
   }
 
   private updateWidth(): void {
@@ -715,6 +712,11 @@ export class SearchOptionsDropdown {
   }
 
   public cleanup(): void {
+    document.removeEventListener('click', this.documentClickHandler);
+    this.inputEl.removeEventListener('blur', this.blurHandler);
+    window.removeEventListener('resize', this.resizeHandler);
+    window.removeEventListener('scroll', this.scrollHandler);
+
     if (this.containerEl && this.containerEl.parentNode) {
       this.containerEl.remove();
     }
