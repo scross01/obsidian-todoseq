@@ -132,8 +132,9 @@ function stripMarkdownForDisplay(input: string): string {
   if (!input) return '';
   let out = input;
 
-  // Remove angle brackets so no HTML tags (e.g. <script>) can be formed
-  out = out.replace(/[<>]/g, '');
+  // HTML tags - use DOMParser to safely strip HTML tags
+  const doc = new DOMParser().parseFromString(out, 'text/html');
+  out = doc.body.textContent || '';
 
   // Images: ![alt](url) -> alt
   out = out.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
