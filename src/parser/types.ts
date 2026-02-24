@@ -40,9 +40,7 @@ export interface ParserConfig {
   includeCommentBlocks?: boolean;
 
   /** Language comment support settings */
-  languageCommentSupport?: {
-    enabled: boolean;
-  };
+  languageCommentSupport?: boolean;
 }
 
 /**

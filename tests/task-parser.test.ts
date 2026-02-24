@@ -736,9 +736,7 @@ describe('Task parsing with code blocks', () => {
     settings = createBaseSettings({
       additionalInactiveKeywords: [],
       includeCodeBlocks: true,
-      languageCommentSupport: {
-        enabled: false,
-      },
+      languageCommentSupport: false,
     });
     parser = TaskParser.create(
       createTestKeywordManager(settings),
@@ -780,9 +778,7 @@ describe('Task parsing within langauge spefic comments in code blocks', () => {
     settings = createBaseSettings({
       additionalInactiveKeywords: [],
       includeCodeBlocks: true,
-      languageCommentSupport: {
-        enabled: true,
-      },
+      languageCommentSupport: true,
     });
     parser = TaskParser.create(
       createTestKeywordManager(settings),

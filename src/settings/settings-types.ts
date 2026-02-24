@@ -1,5 +1,3 @@
-import { LanguageCommentSupportSettings } from '../parser/language-registry';
-
 export interface TodoTrackerSettings {
   additionalInactiveKeywords: string[]; // Custom inactive keywords (TODO, LATER, FIXME, etc.)
   additionalActiveKeywords: string[]; // Custom active keywords (DOING, NOW, etc.)
@@ -17,7 +15,7 @@ export interface TodoTrackerSettings {
     | 'sortByDeadline'
     | 'sortByPriority'
     | 'sortByUrgency'; // default sort method for task list view
-  languageCommentSupport: LanguageCommentSupportSettings; // language-specific comment support settings
+  languageCommentSupport: boolean; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
   additionalFileExtensions: string[]; // additional file extensions to scan for tasks (e.g., ['.org', '.txt']) - hidden from UI, managed by detectOrgModeFiles
@@ -40,9 +38,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   taskListViewMode: 'showAll',
   futureTaskSorting: 'showAll',
   defaultSortMethod: 'default', // Default to file path sorting
-  languageCommentSupport: {
-    enabled: true,
-  },
+  languageCommentSupport: false,
   weekStartsOn: 'Monday', // Default to Monday as requested
   formatTaskKeywords: true, // Default to enabled
   additionalFileExtensions: [], // No additional extensions by default - managed by detectOrgModeFiles

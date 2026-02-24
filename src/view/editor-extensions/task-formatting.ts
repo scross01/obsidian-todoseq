@@ -242,7 +242,7 @@ export class TaskKeywordDecorator {
           this.inCodeBlock &&
           this.settings.includeCodeBlocks &&
           this.currentLanguage &&
-          this.settings.languageCommentSupport.enabled
+          this.settings.languageCommentSupport
         ) {
           // Use language-specific regex for code blocks when language comment support is enabled
           const codeRegex = TaskParser.buildCodeRegex(
@@ -256,8 +256,7 @@ export class TaskKeywordDecorator {
         } else if (
           this.inCodeBlock &&
           this.settings.includeCodeBlocks &&
-          (!this.currentLanguage ||
-            !this.settings.languageCommentSupport.enabled)
+          (!this.currentLanguage || !this.settings.languageCommentSupport)
         ) {
           // Use standard regex for code blocks when language comment support is disabled or no language detected
           if (this.parser.testRegex.test(lineText)) {
@@ -330,7 +329,7 @@ export class TaskKeywordDecorator {
           if (
             useCodeRegex &&
             this.currentLanguage &&
-            this.settings.languageCommentSupport.enabled
+            this.settings.languageCommentSupport
           ) {
             // Try to find the keyword more precisely in code context
             const commentPatterns = (this.currentLanguage as LanguageDefinition)
@@ -375,10 +374,7 @@ export class TaskKeywordDecorator {
           if (this.inCodeBlock && this.settings.includeCodeBlocks) {
             cssClasses += ' code-block-task-keyword';
 
-            if (
-              this.settings.languageCommentSupport.enabled &&
-              this.currentLanguage
-            ) {
+            if (this.settings.languageCommentSupport && this.currentLanguage) {
               cssClasses += ' code-comment-task-keyword';
             }
           } else if (

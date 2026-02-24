@@ -1,0 +1,33 @@
+{
+  "additionalInactiveKeywords": [
+    "FIXME",
+    "HACK",
+    "课题",
+    "🤔"
+  ],
+  "additionalActiveKeywords": [
+    "STARTED"
+  ],
+  "additionalWaitingKeywords": [
+    "ON-HOLD"
+  ],
+  "additionalCompletedKeywords": [
+    "NEVER"
+  ],
+  "additionalArchivedKeywords": [
+    "OLD"
+  ],
+  "includeCodeBlocks": false,
+  "includeCalloutBlocks": true,
+  "includeCommentBlocks": false,
+  "taskListViewMode": "showAll",
+  "futureTaskSorting": "showAll",
+  "defaultSortMethod": "default",
+  "languageCommentSupport": false,
+  "weekStartsOn": "Monday",
+  "formatTaskKeywords": true,
+  "additionalFileExtensions": [],
+  "detectOrgModeFiles": false,
+  "_hasShownFirstInstallView": true,
+  "settingsVersion": 2
+}

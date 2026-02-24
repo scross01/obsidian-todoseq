@@ -87,81 +87,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
   }
 
   /**
-   * Create the file extensions setting with validation
-   */
-  private createFileExtensionsSetting(containerEl: HTMLElement): void {
-    const setting = new Setting(containerEl)
-      .setName('Additional file types')
-      .setDesc(
-        'Additional file extensions to scan for tasks (e.g., .org, .txt). Files must be text-based.',
-      );
-
-    setting.addText((text) => {
-      const current = this.plugin.settings.additionalFileExtensions ?? [];
-      text.setValue(current.join(', ')).onChange((value) => {
-        // Clear any pending debounce timer
-        if (this.fileExtensionsDebounceTimer) {
-          clearTimeout(this.fileExtensionsDebounceTimer);
-        }
-
-        // Debounce the expensive operations
-        this.fileExtensionsDebounceTimer = setTimeout(async () => {
-          const { valid, invalid } = this.validateFileExtensions(value);
-
-          // Find the setting container
-          const settingContainer = text.inputEl.closest('.setting-item');
-          if (!settingContainer) {
-            console.error('Could not find setting container');
-            return;
-          }
-
-          const settingInfo =
-            settingContainer.querySelector('.setting-item-info');
-          if (!settingInfo) {
-            console.error('Could not find setting info container');
-            return;
-          }
-
-          // Remove any existing error display
-          const existingError = settingContainer.querySelector(
-            '.todoseq-setting-item-error',
-          );
-          if (existingError) {
-            existingError.remove();
-            text.inputEl.classList.remove('todoseq-invalid-input');
-          }
-
-          // Show errors if any
-          if (invalid.length > 0) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'todoseq-setting-item-error';
-            errorDiv.textContent = `Invalid extension${invalid.length > 1 ? 's' : ''}: ${invalid.join(', ')}. Extensions must start with "." and contain only letters, numbers, dots, hyphens, or underscores.`;
-            text.inputEl.classList.add('todoseq-invalid-input');
-            settingInfo.appendChild(errorDiv);
-          }
-
-          // Save valid extensions and rescan
-          this.plugin.settings.additionalFileExtensions = valid;
-          await this.plugin.saveSettings();
-
-          // Rescan vault to pick up new file types
-          try {
-            await this.plugin.scanVault();
-            await this.refreshAllTaskListViews();
-            this.plugin.refreshVisibleEditorDecorations();
-            this.plugin.refreshReaderViewFormatter();
-          } catch (scanError) {
-            console.error('Failed to rescan vault:', scanError);
-          }
-        }, this.FILE_EXTENSIONS_DEBOUNCE_MS);
-      });
-
-      // Set placeholder
-      text.setPlaceholder('.org, .txt');
-    });
-  }
-
-  /**
    * Create the Task Keywords settings section with sub-sections for each group
    */
   private createTaskKeywordsSettings(containerEl: HTMLElement): void {
@@ -176,7 +101,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       containerEl,
       'additionalActiveKeywords',
       'Active keywords',
-      'Keywords for tasks currently being worked on (e.g., STARTED). Built-in: DOING, NOW',
+      'Keywords for tasks currently being worked on (e.g. STARTED). Built-in: DOING, NOW.',
       this.plugin.settings.additionalActiveKeywords,
     );
 
@@ -185,7 +110,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       containerEl,
       'additionalInactiveKeywords',
       'Inactive keywords',
-      'Keywords for tasks not yet started (e.g., FIXME, HACK). Built-in: TODO, LATER',
+      'Keywords for tasks not yet started (e.g. FIXME, HACK). Built-in: TODO, LATER.',
       this.plugin.settings.additionalInactiveKeywords,
     );
 
@@ -194,7 +119,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       containerEl,
       'additionalWaitingKeywords',
       'Waiting keywords',
-      'Keywords for blocked or paused tasks (e.g., ON-HOLD). Built-in: WAIT, WAITING',
+      'Keywords for blocked or paused tasks (e.g. ON-HOLD). Built-in: WAIT, WAITING.',
       this.plugin.settings.additionalWaitingKeywords,
     );
 
@@ -203,7 +128,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       containerEl,
       'additionalCompletedKeywords',
       'Completed keywords',
-      'Keywords for finished or abandoned tasks (e.g., NEVER). Built-in: DONE, CANCELLED',
+      'Keywords for finished or abandoned tasks (e.g. NEVER). Built-in: DONE, CANCELLED.',
       this.plugin.settings.additionalCompletedKeywords,
     );
 
@@ -212,7 +137,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       containerEl,
       'additionalArchivedKeywords',
       'Archived keywords',
-      'Keywords for archived tasks (e.g., OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED',
+      'Keywords for archived tasks (e.g. OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED.',
       this.plugin.settings.additionalArchivedKeywords,
     );
   }
@@ -371,118 +296,20 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     });
   }
 
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-
-    // Format task keywords in editor
-    new Setting(containerEl)
-      .setName('Format task keywords')
-      .setDesc(
-        'Highlight task keywords (TODO, DOING, etc.) in bold with accent color in the editor',
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.formatTaskKeywords)
-          .onChange(async (value) => {
-            this.plugin.settings.formatTaskKeywords = value;
-            await this.plugin.saveSettings();
-            // Trigger formatting updates
-            this.plugin.updateTaskFormatting();
-          }),
-      );
-
-    // Task Keywords section with sub-sections for each group
-    this.createTaskKeywordsSettings(containerEl);
-
-    // Task detection Group
+  /**
+   * Creates the task detection settings section.
+   */
+  private createTaskDetectionSettings(containerEl: HTMLElement) {
     new Setting(containerEl)
       .setName('Task detection')
       .setHeading()
       .setDesc('Select where task are detected in the vault content.');
 
-    // Include tasks inside code blocks (parent setting)
-    let languageToggleComponent: ToggleComponent | null = null;
-
-    new Setting(containerEl)
-      .setName('Include tasks inside code blocks')
-      .setDesc(
-        'When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.',
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.includeCodeBlocks)
-          .onChange(async (value) => {
-            this.plugin.settings.includeCodeBlocks = value;
-            // If disabling code blocks, also disable language comment support
-            if (!value) {
-              this.plugin.settings.languageCommentSupport.enabled = false;
-            }
-            await this.plugin.saveSettings();
-            // Update language toggle visual state by recreating it
-            if (languageToggleComponent) {
-              languageToggleComponent.setValue(
-                this.plugin.settings.languageCommentSupport.enabled,
-              );
-            }
-            languageSetting.setDisabled(!value);
-            // Recreate parser to reflect includeCodeBlocks change and rescan
-            await this.plugin.recreateParser();
-            await this.plugin.scanVault();
-            await this.refreshAllTaskListViews();
-            // Force refresh of visible editor decorations to apply new CSS classes
-            this.plugin.refreshVisibleEditorDecorations();
-            // Force refresh of reader view to apply new formatting
-            this.plugin.refreshReaderViewFormatter();
-          }),
-      );
-
-    // Language comment support settings (dependent on includeCodeBlocks)
-    const languageSettingContainer = containerEl.createDiv();
-    const languageSetting = new Setting(languageSettingContainer)
-      .setName('Enable language comment support')
-      .setDesc(
-        'When enabled, tasks inside code blocks will be detected using language-specific comment patterns e.g. `// TODO`',
-      )
-      .addToggle((toggle) => {
-        languageToggleComponent = toggle;
-        return toggle
-          .setValue(this.plugin.settings.languageCommentSupport.enabled)
-          .onChange(async (value) => {
-            this.plugin.settings.languageCommentSupport.enabled = value;
-            await this.plugin.saveSettings();
-            await this.plugin.recreateParser();
-            await this.plugin.scanVault();
-            await this.refreshAllTaskListViews();
-            // Force refresh of visible editor decorations to apply new CSS classes
-            this.plugin.refreshVisibleEditorDecorations();
-            // Force refresh of reader view to apply new formatting
-            this.plugin.refreshReaderViewFormatter();
-          });
-      });
-
-    // Set initial disabled state based on includeCodeBlocks setting
-    languageSetting.setDisabled(!this.plugin.settings.includeCodeBlocks);
-
-    // Update language toggle when includeCodeBlocks changes
-    const updateLanguageToggle = (enabled: boolean) => {
-      const languageToggle = languageSetting.settingEl.querySelector(
-        'input[type="checkbox"]',
-      ) as HTMLInputElement;
-      if (languageToggle) {
-        languageToggle.checked = enabled;
-      }
-      languageSetting.setDisabled(!enabled);
-    };
-
-    // Listen for includeCodeBlocks changes and update language toggle accordingly
-    updateLanguageToggle(this.plugin.settings.includeCodeBlocks);
-
     // Include tasks inside callout blocks
     new Setting(containerEl)
       .setName('Include tasks inside quote and callout blocks')
       .setDesc(
-        'When enabled, include tasks inside quote and callout blocks (>, >[!info], >[!todo], etc.)',
+        'When enabled, include tasks inside quote and callout blocks (>, >[!info], >[!todo], etc.).',
       )
       .addToggle((toggle) =>
         toggle
@@ -522,7 +349,90 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
-    // Task list search and filter Group
+    // Include tasks inside code blocks
+
+    // Include tasks inside code blocks (parent setting)
+    let languageToggleComponent: ToggleComponent | null = null;
+
+    new Setting(containerEl)
+      .setName('Include tasks inside code blocks')
+      .setDesc(
+        'When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.',
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.includeCodeBlocks)
+          .onChange(async (value) => {
+            this.plugin.settings.includeCodeBlocks = value;
+            // If disabling code blocks, also disable language comment support
+            if (!value) {
+              this.plugin.settings.languageCommentSupport = false;
+            }
+            await this.plugin.saveSettings();
+            // Update language toggle visual state by recreating it
+            if (languageToggleComponent) {
+              languageToggleComponent.setValue(
+                this.plugin.settings.languageCommentSupport,
+              );
+            }
+            languageSetting.setDisabled(!value);
+            // Recreate parser to reflect includeCodeBlocks change and rescan
+            await this.plugin.recreateParser();
+            await this.plugin.scanVault();
+            await this.refreshAllTaskListViews();
+            // Force refresh of visible editor decorations to apply new CSS classes
+            this.plugin.refreshVisibleEditorDecorations();
+            // Force refresh of reader view to apply new formatting
+            this.plugin.refreshReaderViewFormatter();
+          }),
+      );
+
+    // Language comment support settings (dependent on includeCodeBlocks)
+    const languageSettingContainer = containerEl.createDiv();
+    const languageSetting = new Setting(languageSettingContainer)
+      .setName('Enable language comment support')
+      .setDesc(
+        'When enabled, tasks inside code blocks will be detected using language-specific comment patterns e.g. `// TODO`',
+      )
+      .addToggle((toggle) => {
+        languageToggleComponent = toggle;
+        return toggle
+          .setValue(this.plugin.settings.languageCommentSupport)
+          .onChange(async (value) => {
+            this.plugin.settings.languageCommentSupport = value;
+            await this.plugin.saveSettings();
+            await this.plugin.recreateParser();
+            await this.plugin.scanVault();
+            await this.refreshAllTaskListViews();
+            // Force refresh of visible editor decorations to apply new CSS classes
+            this.plugin.refreshVisibleEditorDecorations();
+            // Force refresh of reader view to apply new formatting
+            this.plugin.refreshReaderViewFormatter();
+          });
+      });
+
+    // Set initial disabled state based on includeCodeBlocks setting
+    languageSetting.setDisabled(!this.plugin.settings.includeCodeBlocks);
+
+    // Update language toggle when includeCodeBlocks changes
+    const updateLanguageToggle = (enabled: boolean) => {
+      const languageToggle = languageSetting.settingEl.querySelector(
+        'input[type="checkbox"]',
+      ) as HTMLInputElement;
+      if (languageToggle) {
+        languageToggle.checked = enabled;
+      }
+      languageSetting.setDisabled(!enabled);
+    };
+
+    // Listen for includeCodeBlocks changes and update language toggle accordingly
+    updateLanguageToggle(this.plugin.settings.includeCodeBlocks);
+  }
+
+  /**
+   * Creates the settings for task list search and filter options
+   */
+  private createTaskSearchFilterSettings(containerEl: HTMLElement) {
     new Setting(containerEl)
       .setName('Task list search and filter')
       .setHeading()
@@ -606,17 +516,49 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             | 'sortByUrgency';
           this.plugin.settings.defaultSortMethod = sortMethod;
           await this.plugin.saveSettings();
-          // Note: This setting only applies when the plugin is started/reloaded
-          // Changing the selection in the Task view does not update this setting
         });
       });
+  }
+
+  /**
+   * Creates main settings
+   */
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+
+    // Format task keywords in editor
+    new Setting(containerEl)
+      .setName('Format task keywords')
+      .setDesc(
+        'Highlight task keywords (TODO, DOING, etc.) in bold with accent color in the editor.',
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.formatTaskKeywords)
+          .onChange(async (value) => {
+            this.plugin.settings.formatTaskKeywords = value;
+            await this.plugin.saveSettings();
+            // Trigger formatting updates
+            this.plugin.updateTaskFormatting();
+          }),
+      );
+
+    // Task detection Group
+    this.createTaskDetectionSettings(containerEl);
+
+    // Task list search and filter Group
+    this.createTaskSearchFilterSettings(containerEl);
+
+    // Task Keywords section with sub-sections for each group
+    this.createTaskKeywordsSettings(containerEl);
 
     // Experimental Features Group
     new Setting(containerEl)
       .setName('Experimental Features')
       .setHeading()
       .setDesc(
-        'Experimental features may be changed significantly or removed entirely in future versions.',
+        '⚠︎ Experimental features may be changed significantly or removed entirely in future versions.',
       );
 
     // Org-mode file detection toggle

@@ -1,9 +1,5 @@
 import { Task } from '../types/task';
-import {
-  LanguageRegistry,
-  LanguageDefinition,
-  LanguageCommentSupportSettings,
-} from './language-registry';
+import { LanguageRegistry, LanguageDefinition } from './language-registry';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
 import { KeywordManager } from '../utils/keyword-manager';
@@ -50,7 +46,7 @@ export class TaskParser implements ITaskParser {
   private readonly includeCalloutBlocks: boolean;
   private readonly includeCodeBlocks: boolean;
   private readonly includeCommentBlocks: boolean;
-  private readonly languageCommentSupport: LanguageCommentSupportSettings;
+  private readonly languageCommentSupport: boolean;
   private keywordManager: KeywordManager;
   public allKeywords: string[];
 
@@ -81,7 +77,7 @@ export class TaskParser implements ITaskParser {
     includeCalloutBlocks: boolean,
     includeCodeBlocks: boolean,
     includeCommentBlocks: boolean,
-    languageCommentSupport: LanguageCommentSupportSettings,
+    languageCommentSupport: boolean,
     keywordManager: KeywordManager,
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
@@ -117,7 +113,7 @@ export class TaskParser implements ITaskParser {
       includeCalloutBlocks?: boolean;
       includeCodeBlocks?: boolean;
       includeCommentBlocks?: boolean;
-      languageCommentSupport?: { enabled: boolean };
+      languageCommentSupport?: boolean;
     },
   ): TaskParser {
     const allKeywords = keywordManager.getAllKeywords();
@@ -128,7 +124,7 @@ export class TaskParser implements ITaskParser {
       parserSettings?.includeCalloutBlocks ?? true,
       parserSettings?.includeCodeBlocks ?? true,
       parserSettings?.includeCommentBlocks ?? true,
-      parserSettings?.languageCommentSupport ?? { enabled: false },
+      parserSettings?.languageCommentSupport ?? false,
       keywordManager,
       app || null,
       urgencyCoefficients,
@@ -558,7 +554,7 @@ export class TaskParser implements ITaskParser {
     if (config.languageCommentSupport !== undefined) {
       (
         this as unknown as {
-          languageCommentSupport: LanguageCommentSupportSettings;
+          languageCommentSupport: boolean;
         }
       ).languageCommentSupport = config.languageCommentSupport;
     }
@@ -835,6 +831,7 @@ export class TaskParser implements ITaskParser {
         inBlock &&
         this.includeCodeBlocks &&
         blockMarker === 'code' &&
+        this.languageCommentSupport &&
         this.currentLanguage &&
         codeRegex;
       if (
@@ -951,7 +948,7 @@ export class TaskParser implements ITaskParser {
       if (transition.entering) {
         inBlock = true;
         blockMarker = 'code';
-        if (this.includeCodeBlocks && this.languageCommentSupport.enabled) {
+        if (this.includeCodeBlocks && this.languageCommentSupport) {
           const line = lines[index];
           const m = CODE_BLOCK_REGEX.exec(line);
           const language = m ? m[2] : '';

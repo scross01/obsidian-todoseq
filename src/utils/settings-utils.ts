@@ -43,7 +43,7 @@ export function getPluginSettings(app: App): TodoTrackerSettings | null {
     taskListViewMode: 'showAll',
     futureTaskSorting: 'showAll',
     defaultSortMethod: 'default',
-    languageCommentSupport: { enabled: true },
+    languageCommentSupport: true,
     weekStartsOn: 'Monday',
     formatTaskKeywords: true,
     additionalFileExtensions: [],

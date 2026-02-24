@@ -23,6 +23,28 @@ const MIGRATIONS: SettingsMigrations[] = [
       return migrated;
     },
   },
+  {
+    version: 2,
+    migrate: (settings: Record<string, unknown>): Record<string, unknown> => {
+      const migrated = { ...settings };
+
+      if ('languageCommentSupport' in migrated) {
+        const oldValue = migrated['languageCommentSupport'];
+        if (
+          typeof oldValue === 'object' &&
+          oldValue !== null &&
+          'enabled' in oldValue &&
+          typeof (oldValue as { enabled: unknown }).enabled === 'boolean'
+        ) {
+          migrated['languageCommentSupport'] = (
+            oldValue as { enabled: boolean }
+          ).enabled;
+        }
+      }
+
+      return migrated;
+    },
+  },
 ];
 
 export function migrateSettings(

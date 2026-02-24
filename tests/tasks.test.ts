@@ -17,9 +17,7 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
 
   beforeEach(() => {
     settings = createBaseSettings({
-      languageCommentSupport: {
-        enabled: false,
-      },
+      languageCommentSupport: false,
     });
     parser = TaskParser.create(
       createTestKeywordManager(settings),
@@ -468,9 +466,7 @@ describe('Regular Task Parsing (Non-Code Block Tasks)', () => {
 
     beforeEach(() => {
       settings = createBaseSettings({
-        languageCommentSupport: {
-          enabled: false,
-        },
+        languageCommentSupport: false,
       });
       parser = TaskParser.create(
         createTestKeywordManager(settings),
@@ -601,9 +597,7 @@ TODO = some code
 
     beforeEach(() => {
       settings = createBaseSettings({
-        languageCommentSupport: {
-          enabled: false,
-        },
+        languageCommentSupport: false,
       });
       parser = TaskParser.create(
         createTestKeywordManager(settings),
@@ -906,7 +900,7 @@ TODO = some code
     describe('Complex scenarios with tasks in code block', () => {
       beforeEach(() => {
         settings.includeCodeBlocks = true;
-        settings.languageCommentSupport.enabled = false;
+        settings.languageCommentSupport = false;
         parser = TaskParser.create(
           createTestKeywordManager(settings),
           null,
@@ -949,7 +943,7 @@ TODO task in language code block for unsupported language
     describe('Complex scenarios with tasks in code block comments', () => {
       beforeEach(() => {
         settings.includeCodeBlocks = true;
-        settings.languageCommentSupport.enabled = true;
+        settings.languageCommentSupport = true;
         parser = TaskParser.create(
           createTestKeywordManager(settings),
           null,
