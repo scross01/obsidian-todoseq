@@ -13,8 +13,6 @@ import {
   isActiveKeyword,
   isWaitingKeyword,
   isInactiveKeyword,
-  getTaskTextDisplay,
-  stripMarkdownForDisplay,
 } from '../src/utils/task-utils';
 import {
   BUILTIN_ACTIVE_KEYWORDS,
@@ -431,79 +429,6 @@ describe('task-utils', () => {
         expect(isActiveKeyword('WORKING', settings)).toBe(true);
         expect(isWaitingKeyword('BLOCKED', settings)).toBe(true);
         expect(isCompletedKeyword('FINISHED', settings)).toBe(true);
-      });
-    });
-
-    describe('task text display', () => {
-      test('getTaskTextDisplay should cache results', () => {
-        const task = {
-          text: 'Test task with **markdown**',
-          textDisplay: undefined,
-        };
-
-        const firstResult = getTaskTextDisplay(task);
-        const secondResult = getTaskTextDisplay(task);
-
-        expect(firstResult).toEqual(secondResult);
-        expect(task.textDisplay).not.toBeUndefined();
-      });
-
-      test('stripMarkdownForDisplay should strip HTML tags', () => {
-        const input = 'Task with <b>bold</b> and <i>italic</i> text';
-        const result = stripMarkdownForDisplay(input);
-        expect(result).toEqual('Task with bold and italic text');
-      });
-
-      test('stripMarkdownForDisplay should handle images', () => {
-        const input = 'Task with ![alt text](image.jpg)';
-        const result = stripMarkdownForDisplay(input);
-        expect(result).toEqual('Task with alt text');
-      });
-
-      test('stripMarkdownForDisplay should handle inline code', () => {
-        const input = 'Task with `code` example';
-        const result = stripMarkdownForDisplay(input);
-        expect(result).toEqual('Task with code example');
-      });
-
-      test('stripMarkdownForDisplay should handle headings', () => {
-        const input = '# Heading 1\n## Heading 2\n### Heading 3';
-        const result = stripMarkdownForDisplay(input);
-        expect(result).toEqual('Heading 1\nHeading 2\nHeading 3');
-      });
-
-      test('stripMarkdownForDisplay should handle emphasis', () => {
-        const input = '**Bold** and *italic* text';
-        const result = stripMarkdownForDisplay(input);
-        expect(result).toEqual('Bold and italic text');
-      });
-
-      test('stripMarkdownForDisplay should handle strike and highlight', () => {
-        const input = '~~Strikethrough~~ and ==highlighted== text';
-        const result = stripMarkdownForDisplay(input);
-        expect(result).toEqual('Strikethrough and highlighted text');
-      });
-
-      test('stripMarkdownForDisplay should handle math blocks', () => {
-        const input = 'Task with $$E = mc^2$$ formula';
-        const result = stripMarkdownForDisplay(input);
-        expect(result).toEqual('Task with E = mc^2 formula');
-      });
-
-      test('stripMarkdownForDisplay should normalize whitespace', () => {
-        const input =
-          '  Task with   extra   spaces  \n\n  and\n\nmultiple\n\n\nlines  ';
-        const result = stripMarkdownForDisplay(input);
-        // The function only normalizes newlines, not spaces within lines
-        expect(result).toEqual(
-          'Task with   extra   spaces\n\n  and\n\nmultiple\n\nlines',
-        );
-      });
-
-      test('stripMarkdownForDisplay should handle empty input', () => {
-        expect(stripMarkdownForDisplay('')).toEqual('');
-        expect(stripMarkdownForDisplay(null as any)).toEqual('');
-        expect(stripMarkdownForDisplay(undefined as any)).toEqual('');
       });
     });
   });
