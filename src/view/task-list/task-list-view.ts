@@ -30,7 +30,12 @@ import {
 } from '../../utils/task-sort';
 import { getPluginSettings } from '../../utils/settings-utils';
 import { TaskStateManager } from '../../services/task-state-manager';
-import { TAG_PATTERN } from '../../utils/patterns';
+import {
+  TAG_PATTERN,
+  WIKI_LINK_REGEX,
+  MD_LINK_REGEX,
+  URL_REGEX,
+} from '../../utils/patterns';
 import { getTaskTextDisplay } from '../../utils/task-utils';
 
 const CHUNK_BATCH_SIZE = 15;
@@ -40,10 +45,6 @@ const PRIORITY_FIRST_BATCH = 10;
 // Lazy loading constants
 const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
-
-const WIKI_LINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-const MD_LINK_REGEX = /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g;
-const URL_REGEX = /\bhttps?:\/\/[^\s)]+/g;
 
 interface CachedTaskElement {
   element: HTMLLIElement;

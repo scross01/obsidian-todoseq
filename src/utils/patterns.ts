@@ -216,6 +216,40 @@ export const TAG_PATTERN = /(?<![\w/:?#[\]])#([^\s)\]}>]+)/gu;
 export const TAG_PATTERN_SOURCE = TAG_PATTERN.source;
 
 // ============================================================================
+// Link Patterns (for task list view rendering)
+// ============================================================================
+
+/**
+ * Wiki link regex for matching Obsidian-style wiki links
+ * Matches: [[Note]] and [[Note|Alias]]
+ *
+ * Capture groups:
+ * 1: Note name/path
+ * 2: Optional alias
+ */
+export const WIKI_LINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+export const WIKI_LINK_REGEX_SOURCE = WIKI_LINK_REGEX.source;
+
+/**
+ * Markdown link regex for matching standard markdown links
+ * Matches: [text](url) and handles nested square brackets in label
+ *
+ * Capture groups:
+ * 1: Link label (may contain nested square brackets)
+ * 2: URL
+ */
+export const MD_LINK_REGEX =
+  /\[([^[\]]*(?:\[[^[\]]*\][^[\]]*)*)?\]\(([^)]+)\)/g;
+export const MD_LINK_REGEX_SOURCE = MD_LINK_REGEX.source;
+
+/**
+ * URL regex for matching bare URLs
+ * Matches: http://... and https://...
+ */
+export const URL_REGEX = /\bhttps?:\/\/[^\s)]+/g;
+export const URL_REGEX_SOURCE = URL_REGEX.source;
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 
