@@ -196,22 +196,32 @@ export class PropertySearchEngine {
 
       // Only scan files that contain tasks if we found any tasks
       if (taskFiles.size > 0) {
-        taskFiles.forEach((filePath) => {
-          const file = this.app.vault.getAbstractFileByPath(filePath);
-          // Check if it's a markdown file - type narrow from TAbstractFile to TFile
-          // TFile has extension, TFolder has children
-          const tfile = file as TFile | undefined;
-          const isMarkdownFile = tfile && tfile.extension === 'md';
+        const taskFilesArray = Array.from(taskFiles);
+        const batchSize = 100; // Process 100 files per batch
 
-          if (isMarkdownFile && tfile) {
-            const cache = this.app.metadataCache.getFileCache(tfile);
-            if (cache?.frontmatter) {
-              Object.keys(cache.frontmatter).forEach((key) => {
-                this.propertyKeys.add(key);
-              });
+        for (let i = 0; i < taskFilesArray.length; i += batchSize) {
+          const batch = taskFilesArray.slice(i, i + batchSize);
+
+          for (const filePath of batch) {
+            const file = this.app.vault.getAbstractFileByPath(filePath);
+            // Check if it's a markdown file - type narrow from TAbstractFile to TFile
+            // TFile has extension, TFolder has children
+            const tfile = file as TFile | undefined;
+            const isMarkdownFile = tfile && tfile.extension === 'md';
+
+            if (isMarkdownFile && tfile) {
+              const cache = this.app.metadataCache.getFileCache(tfile);
+              if (cache?.frontmatter) {
+                Object.keys(cache.frontmatter).forEach((key) => {
+                  this.propertyKeys.add(key);
+                });
+              }
             }
           }
-        });
+
+          // Yield to event loop to keep UI responsive
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
 
         return;
       } else {
