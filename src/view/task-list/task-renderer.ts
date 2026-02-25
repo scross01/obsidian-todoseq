@@ -1,15 +1,16 @@
 import { Task } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
-import { TAG_PATTERN } from '../../utils/patterns';
+import {
+  TAG_PATTERN,
+  WIKI_LINK_REGEX,
+  MD_LINK_REGEX,
+  URL_REGEX,
+} from '../../utils/patterns';
 import { getFilename, getTaskTextDisplay } from '../../utils/task-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import TodoTracker from '../../main';
 import { StateMenuBuilder } from '../components/state-menu-builder';
-
-const WIKI_LINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-const MD_LINK_REGEX = /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g;
-const URL_REGEX = /\bhttps?:\/\/[^\s)]+/g;
 
 interface LinkPattern {
   type: 'wiki' | 'md' | 'url' | 'tag';

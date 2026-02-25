@@ -260,14 +260,14 @@ export const WIKI_LINK_REGEX_SOURCE = WIKI_LINK_REGEX.source;
 
 /**
  * Markdown link regex for matching standard markdown links
- * Matches: [text](url) and handles nested square brackets in label
+ * Matches: [text](url) and handles up to 1 level of nested square brackets in label
+ * This pattern uses explicit nesting to avoid exponential backtracking
  *
  * Capture groups:
- * 1: Link label (may contain nested square brackets)
+ * 1: Link label (may contain up to 1 level of nested square brackets)
  * 2: URL
  */
-export const MD_LINK_REGEX =
-  /\[([^[\]]*(?:\[[^[\]]*\][^[\]]*)*)?\]\(([^)]+)\)/g;
+export const MD_LINK_REGEX = /\[([^[\]]*(?:\[[^[\]]*\][^[\]]*)*)\]\(([^)]+)\)/g;
 export const MD_LINK_REGEX_SOURCE = MD_LINK_REGEX.source;
 
 /**
