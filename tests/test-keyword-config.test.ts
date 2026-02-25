@@ -105,6 +105,64 @@ describe('Keyword Sort Configuration', () => {
         config.completedKeywordsOrder.indexOf('CLOSED'),
       );
     });
+
+    test('should allow built-in keyword redeclaration in same group to control sort order', () => {
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['URGENT', 'NOW'],
+      });
+      const config = buildKeywordSortConfig(keywordManager);
+
+      // NOW should be treated as re-declared and moved after URGENT
+      expect(config.activeKeywords.has('NOW')).toBe(true);
+      expect(config.activeKeywordsOrder.indexOf('URGENT')).toBeGreaterThan(-1);
+      expect(config.activeKeywordsOrder.indexOf('NOW')).toBeGreaterThan(
+        config.activeKeywordsOrder.indexOf('URGENT'),
+      );
+
+      // NOW should only appear once in effective order
+      expect(
+        config.activeKeywordsOrder.filter((k) => k === 'NOW'),
+      ).toHaveLength(1);
+    });
+
+    test('should allow built-in keyword redeclaration across groups to control group placement and sort order', () => {
+      const keywordManager = new KeywordManager({
+        additionalWaitingKeywords: ['HOLD', 'LATER'],
+      });
+      const config = buildKeywordSortConfig(keywordManager);
+
+      // LATER should move from inactive to waiting group
+      expect(config.inactiveKeywords.has('LATER')).toBe(false);
+      expect(config.waitingKeywords.has('LATER')).toBe(true);
+
+      // LATER should be sorted after HOLD in waiting order
+      expect(config.waitingKeywordsOrder.indexOf('HOLD')).toBeGreaterThan(-1);
+      expect(config.waitingKeywordsOrder.indexOf('LATER')).toBeGreaterThan(
+        config.waitingKeywordsOrder.indexOf('HOLD'),
+      );
+    });
+
+    test('should support removing built-in keywords with -KEYWORD syntax', () => {
+      const keywordManager = new KeywordManager({
+        additionalInactiveKeywords: ['SOON', '-LATER'],
+      });
+      const config = buildKeywordSortConfig(keywordManager);
+
+      expect(config.inactiveKeywords.has('LATER')).toBe(false);
+      expect(config.inactiveKeywords.has('SOON')).toBe(true);
+      expect(keywordManager.getAllKeywords()).not.toContain('LATER');
+    });
+
+    test('should allow groups to become empty when all built-ins are removed', () => {
+      const keywordManager = new KeywordManager({
+        additionalWaitingKeywords: ['-WAIT', '-WAITING'],
+      });
+      const config = buildKeywordSortConfig(keywordManager);
+
+      expect(config.waitingKeywords.has('WAIT')).toBe(false);
+      expect(config.waitingKeywords.has('WAITING')).toBe(false);
+      expect(config.waitingKeywordsOrder).toEqual([]);
+    });
   });
 
   describe('getKeywordGroup', () => {

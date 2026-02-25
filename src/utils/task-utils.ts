@@ -8,6 +8,14 @@ import {
   BUILTIN_ARCHIVED_KEYWORDS,
 } from './constants';
 
+type KeywordGroupValidationInput = {
+  activeKeywords?: string[];
+  inactiveKeywords?: string[];
+  waitingKeywords?: string[];
+  completedKeywords?: string[];
+  archivedKeywords?: string[];
+};
+
 type KeywordSettings = {
   additionalInactiveKeywords?: string[];
   additionalActiveKeywords?: string[];
@@ -171,35 +179,30 @@ export function validateKeywordGroups(groups: {
   completedKeywords?: string[];
   archivedKeywords?: string[];
 }): string[] {
-  const keywordCounts = new Map<string, number>();
+  return Array.from(
+    new Set(
+      validateKeywordGroupsDetailed(groups).errors.map(
+        (issue) => issue.keyword,
+      ),
+    ),
+  );
+}
 
-  // Count occurrences of each keyword across all groups
-  const allGroupKeywords = [
-    ...(groups.activeKeywords ?? []),
-    ...(groups.inactiveKeywords ?? []),
-    ...(groups.waitingKeywords ?? []),
-    ...(groups.completedKeywords ?? []),
-    ...(groups.archivedKeywords ?? []),
-  ];
+/**
+ * Detailed validation result for settings UI.
+ */
+export function validateKeywordGroupsDetailed(
+  groups: KeywordGroupValidationInput,
+) {
+  const keywordManager = new KeywordManager({
+    additionalActiveKeywords: groups.activeKeywords ?? [],
+    additionalInactiveKeywords: groups.inactiveKeywords ?? [],
+    additionalWaitingKeywords: groups.waitingKeywords ?? [],
+    additionalCompletedKeywords: groups.completedKeywords ?? [],
+    additionalArchivedKeywords: groups.archivedKeywords ?? [],
+  });
 
-  for (const keyword of allGroupKeywords) {
-    keywordCounts.set(keyword, (keywordCounts.get(keyword) ?? 0) + 1);
-  }
-
-  // Also check against built-in keywords in other groups
-  // Custom keyword shouldn't duplicate a built-in keyword in a different semantic group
-  const duplicates: string[] = [];
-
-  for (const [keyword, count] of Array.from(keywordCounts)) {
-    if (count > 1) {
-      duplicates.push(keyword);
-    }
-  }
-
-  // Custom keywords duplicating built-ins are not duplicates in the error sense
-  // They just extend that group. Only report if same keyword in multiple custom groups.
-
-  return duplicates;
+  return keywordManager.getValidationResult();
 }
 
 /**

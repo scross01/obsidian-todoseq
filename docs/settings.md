@@ -33,13 +33,13 @@ Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font. All task stat
 
 ### Task Keywords
 
-**Setting**: "Task Keywords" section with four keyword groups
+**Setting**: "Task keywords" section with five keyword groups
 
-**Description**: Define custom keywords for different task states. Keywords are organized into four groups, each with specific styling and behavior.
+**Description**: Define task state keywords for Active, Inactive, Waiting, Completed, and Archived groups. The group controls styling, sorting, search suggestions, and urgency behavior.
 
-#### Built-in Keywords
+#### Built-in keywords
 
-TODOseq includes built-in keywords that are always available:
+TODOseq starts with built-in keywords in each group:
 
 **Active Keywords**: `DOING`, `NOW`, `IN-PROGRESS`
 
@@ -62,57 +62,87 @@ TODOseq includes built-in keywords that are always available:
 - Styled with green/complete color
 - Lowest sort priority
 
-#### Custom Keyword Groups
+**Archived Keywords**: `ARCHIVED`
 
-You can add custom keywords to any of the four groups:
+- Styled as archived
+- Excluded from vault task collection and state search suggestions
+
+#### Adding custom keywords
+
+The normal workflow is to add your own keywords to the group that matches your process. Custom keywords inherit the behavior of that group. For example, custom active states increase urgency, custom waiting states reduce urgency, and custom completed states are treated as done.
+
+Enter comma-separated, capitalized values in the group field. A small setup might look like this:
+
+```txt
+Active: STARTED
+Inactive: BACKLOG
+Waiting: BLOCKED
+Completed: FINISHED
+```
+
+#### Group behavior
+
+You can add custom keywords to any group:
 
 **Active Keywords**: Tasks currently being worked on
 
-- Same styling as DOING (blue/active)
 - Highest sort priority among incomplete tasks
 - Increases urgency score (same as built-in active keywords)
 - Example use cases: `ACTIVE`, `STARTED`, `FOCUS`
 
 **Inactive Keywords**: Tasks waiting to be started
 
-- Same styling as TODO (default/pending)
 - Normal sort priority
 - Example use cases: `BACKLOG`, `PLANNED`, `QUEUED`
 
 **Waiting Keywords**: Tasks blocked by external dependencies
 
-- Same styling as WAIT (yellow/waiting)
 - Reduces urgency score (same as built-in waiting keywords)
 - Example use cases: `BLOCKED`, `PAUSED`, `ON-HOLD`
 
 **Completed Keywords**: Tasks that are finished
 
-- Same styling as DONE (green/complete)
 - Lowest sort priority
-- Example use cases: `FINISHED`, `RESOLVED`, `ARCHIVED`
 
-#### Adding Custom Keywords
-
-1. Go to TODOseq settings
-2. Find the "Task Keywords" section
-3. Enter keywords in the appropriate group field (comma-separated)
-4. Keywords must be capitalized
-
-**Example Configuration:**
-
-```txt
-Active: ACTIVE, STARTED
-Inactive: BACKLOG, PLANNED
-Waiting: BLOCKED, PAUSED
-Completed: FINISHED, RESOLVED
-```
+- Example use cases: `FINISHED`, `RESOLVED`
 
 #### Rules and Behavior
 
-- **Built-in keywords are fixed**: Default keywords cannot be removed
 - **Styling inheritance**: Custom keywords inherit the styling of their group
 - **Duplicate prevention**: The same keyword cannot be added to multiple groups
 - **State cycling**: Custom keywords follow the same state sequences as their group
+
+#### Advanced: overriding built-in keywords
+
+Advanced users can also override built-in placement and ordering directly in the custom fields.
+
+If you redeclare a built-in keyword in the same group, it is treated as user-defined for ordering in that group. For example:
+
+```txt
+Active: URGENT, NOW
+```
+
+In this case, `NOW` stays active but is sorted after `URGENT`.
+
+If you redeclare a built-in keyword in a different group, the keyword moves to that group and uses the position where you declared it. For example:
+
+```txt
+Waiting: HOLD, LATER
+```
+
+Here, `LATER` moves from Inactive to Waiting and is sorted after `HOLD`.
+
+You can remove a built-in keyword from its default group with `-KEYWORD` syntax:
+
+```txt
+Inactive: SOMEDAY, -LATER
+```
+
+Removed built-ins are not used for scanning, styling, keyword search suggestions, or state selection menus.
+
+When a keyword changes groups, urgency is recalculated using the new group behavior. For example, moving a keyword from Active to Waiting changes its urgency contribution from active bonus to waiting penalty.
+
+Validation rules for advanced syntax are strict. A keyword cannot be duplicated in one group, cannot appear across multiple groups, and a built-in cannot be both added and removed at the same time. Removal is only valid for built-ins that belong to that specific group. Invalid entries are ignored and shown as errors in settings; valid built-in overrides and removals are shown as warnings so the behavior is explicit.
 
 #### Migration from Previous Versions
 
@@ -127,7 +157,7 @@ When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, k
 3. **Waiting keywords** (WAIT, WAITING, + custom waiting)
 4. **Completed keywords** (DONE, CANCELED, CANCELLED, + custom completed)
 
-Within each group, custom keywords are sorted by their definition order in settings.
+Within each group, keywords are sorted by effective definition order in settings, including built-in overrides.
 
 ### Include Tasks Inside Code Blocks
 

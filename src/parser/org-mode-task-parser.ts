@@ -98,6 +98,10 @@ export class OrgModeTaskParser implements ITaskParser {
    * Called when settings change.
    */
   updateConfig(config: ParserConfig): void {
+    if (config.keywordManager) {
+      this.keywordManager = config.keywordManager;
+    }
+
     // Use keywords from config if provided, otherwise from KeywordManager
     // This allows dynamic keyword updates while maintaining shared KeywordManager
     this.keywords = config.keywords ?? this.keywordManager.getAllKeywords();

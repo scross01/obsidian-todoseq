@@ -5,9 +5,25 @@ import {
   parseKeywordInput,
   formatKeywordsForInput,
 } from '../utils/settings-utils';
-import { validateKeywordGroups } from '../utils/task-utils';
+import { validateKeywordGroupsDetailed } from '../utils/task-utils';
 import { TodoTrackerSettings } from './settings-types';
 import { TaskListView } from '../view/task-list/task-list-view';
+import { KeywordGroup } from '../types/task';
+
+type KeywordSettingKey = keyof Pick<
+  TodoTrackerSettings,
+  | 'additionalActiveKeywords'
+  | 'additionalInactiveKeywords'
+  | 'additionalWaitingKeywords'
+  | 'additionalCompletedKeywords'
+  | 'additionalArchivedKeywords'
+>;
+
+interface KeywordFieldBinding {
+  settingKey: KeywordSettingKey;
+  inputEl: HTMLInputElement;
+  settingEl: HTMLElement;
+}
 
 export class TodoTrackerSettingTab extends PluginSettingTab {
   plugin: TodoTracker;
@@ -20,6 +36,21 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     null;
   private readonly KEYWORD_DEBOUNCE_MS = 500;
   private readonly FILE_EXTENSIONS_DEBOUNCE_MS = 500;
+  private readonly keywordFieldBindings = new Map<
+    KeywordSettingKey,
+    KeywordFieldBinding
+  >();
+
+  private readonly keywordSettingToGroup: Record<
+    KeywordSettingKey,
+    KeywordGroup
+  > = {
+    additionalActiveKeywords: 'activeKeywords',
+    additionalInactiveKeywords: 'inactiveKeywords',
+    additionalWaitingKeywords: 'waitingKeywords',
+    additionalCompletedKeywords: 'completedKeywords',
+    additionalArchivedKeywords: 'archivedKeywords',
+  };
 
   constructor(app: App, plugin: TodoTracker) {
     super(app, plugin);
@@ -101,7 +132,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       containerEl,
       'additionalActiveKeywords',
       'Active keywords',
-      'Keywords for tasks currently being worked on (e.g. STARTED). Built-in: DOING, NOW.',
+      'Keywords for tasks currently being worked on (e.g. STARTED). Built-in: DOING, NOW, IN-PROGRESS.',
       this.plugin.settings.additionalActiveKeywords,
     );
 
@@ -128,7 +159,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       containerEl,
       'additionalCompletedKeywords',
       'Completed keywords',
-      'Keywords for finished or abandoned tasks (e.g. NEVER). Built-in: DONE, CANCELLED.',
+      'Keywords for finished or abandoned tasks (e.g. NEVER). Built-in: DONE, CANCELLED, CANCELED.',
       this.plugin.settings.additionalCompletedKeywords,
     );
 
@@ -140,6 +171,22 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       'Keywords for archived tasks (e.g. OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED.',
       this.plugin.settings.additionalArchivedKeywords,
     );
+
+    // Run initial validation on open so existing warnings/errors are visible
+    const parsedBySetting = this.parseKeywordInputsFromUI();
+    const regexValidation =
+      this.validateKeywordRegexForAllGroups(parsedBySetting);
+    const groupsForValidation = this.toGroupKeywordInput(
+      regexValidation.validBySetting,
+    );
+    const keywordValidation =
+      validateKeywordGroupsDetailed(groupsForValidation);
+
+    this.renderKeywordValidationState(
+      regexValidation.errorsByGroup,
+      keywordValidation.errors,
+      keywordValidation.warnings,
+    );
   }
 
   /**
@@ -149,14 +196,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
    */
   private createKeywordGroupSetting(
     containerEl: HTMLElement,
-    settingKey: keyof Pick<
-      TodoTrackerSettings,
-      | 'additionalActiveKeywords'
-      | 'additionalInactiveKeywords'
-      | 'additionalWaitingKeywords'
-      | 'additionalCompletedKeywords'
-      | 'additionalArchivedKeywords'
-    >,
+    settingKey: KeywordSettingKey,
     name: string,
     description: string,
     currentValue: string[],
@@ -168,6 +208,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         .setValue(formatKeywordsForInput(currentValue))
         .setPlaceholder('KEYWORD')
         .onChange((value) => {
+          this.keywordFieldBindings.set(settingKey, {
+            settingKey,
+            inputEl: text.inputEl,
+            settingEl: setting.settingEl,
+          });
+
           // Force uppercase in the UI field immediately
           const forced = value.toUpperCase();
           if (forced !== value) {
@@ -189,90 +235,29 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             // Clear the timer from the map when it executes
             this.keywordGroupDebounceTimers.delete(settingKey);
 
-            const parsed = parseKeywordInput(forced);
-
-            // Find the setting container for error display
-            const settingContainer = text.inputEl.closest('.setting-item');
-            if (!settingContainer) {
-              console.error('Could not find setting container');
-              return;
-            }
-
-            const settingInfo =
-              settingContainer.querySelector('.setting-item-info');
-            if (!settingInfo) {
-              console.error('Could not find setting info container');
-              return;
-            }
-
-            // Remove any existing error display
-            const existingError = settingContainer.querySelector(
-              '.todoseq-setting-item-error',
+            // Parse and validate all keyword fields so all groups get updated warnings/errors
+            const parsedBySetting = this.parseKeywordInputsFromUI();
+            const regexValidation =
+              this.validateKeywordRegexForAllGroups(parsedBySetting);
+            const groupsForValidation = this.toGroupKeywordInput(
+              regexValidation.validBySetting,
             );
-            if (existingError) {
-              existingError.remove();
-              text.inputEl.classList.remove('todoseq-invalid-input');
+            const keywordValidation =
+              validateKeywordGroupsDetailed(groupsForValidation);
+
+            this.renderKeywordValidationState(
+              regexValidation.errorsByGroup,
+              keywordValidation.errors,
+              keywordValidation.warnings,
+            );
+
+            // Persist parsed values that pass regex safety. KeywordManager handles
+            // semantic validation for duplicates/group placement conflicts.
+            for (const [key, values] of Object.entries(
+              regexValidation.validBySetting,
+            )) {
+              this.plugin.settings[key as KeywordSettingKey] = values;
             }
-
-            // Validate keywords for regex safety
-            const validKeywords: string[] = [];
-            const invalidKeywords: string[] = [];
-
-            for (const keyword of parsed) {
-              try {
-                TaskParser.validateKeywords([keyword]);
-                validKeywords.push(keyword);
-              } catch {
-                invalidKeywords.push(keyword);
-              }
-            }
-
-            // Check for duplicates across groups
-            const duplicates = validateKeywordGroups({
-              activeKeywords:
-                settingKey === 'additionalActiveKeywords'
-                  ? validKeywords
-                  : this.plugin.settings.additionalActiveKeywords,
-              inactiveKeywords:
-                settingKey === 'additionalInactiveKeywords'
-                  ? validKeywords
-                  : this.plugin.settings.additionalInactiveKeywords,
-              waitingKeywords:
-                settingKey === 'additionalWaitingKeywords'
-                  ? validKeywords
-                  : this.plugin.settings.additionalWaitingKeywords,
-              completedKeywords:
-                settingKey === 'additionalCompletedKeywords'
-                  ? validKeywords
-                  : this.plugin.settings.additionalCompletedKeywords,
-              archivedKeywords:
-                settingKey === 'additionalArchivedKeywords'
-                  ? validKeywords
-                  : this.plugin.settings.additionalArchivedKeywords,
-            });
-
-            // Show errors if any
-            if (invalidKeywords.length > 0 || duplicates.length > 0) {
-              const errorDiv = document.createElement('div');
-              errorDiv.className = 'todoseq-setting-item-error';
-
-              const errorMessages: string[] = [];
-              if (invalidKeywords.length > 0) {
-                errorMessages.push(`Invalid: ${invalidKeywords.join(', ')}`);
-              }
-              if (duplicates.length > 0) {
-                errorMessages.push(
-                  `Duplicates across groups: ${duplicates.join(', ')}`,
-                );
-              }
-
-              errorDiv.textContent = errorMessages.join('. ') + '.';
-              text.inputEl.classList.add('todoseq-invalid-input');
-              settingInfo.appendChild(errorDiv);
-            }
-
-            // Update settings with valid keywords
-            this.plugin.settings[settingKey] = validKeywords;
             await this.plugin.saveSettings();
 
             // Recreate parser and rescan
@@ -293,7 +278,177 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           // Store the timer in the map
           this.keywordGroupDebounceTimers.set(settingKey, newTimer);
         });
+
+      this.keywordFieldBindings.set(settingKey, {
+        settingKey,
+        inputEl: text.inputEl,
+        settingEl: setting.settingEl,
+      });
     });
+  }
+
+  private parseKeywordInputsFromUI(): Record<KeywordSettingKey, string[]> {
+    const fallback: Record<KeywordSettingKey, string[]> = {
+      additionalActiveKeywords: [
+        ...(this.plugin.settings.additionalActiveKeywords ?? []),
+      ],
+      additionalInactiveKeywords: [
+        ...(this.plugin.settings.additionalInactiveKeywords ?? []),
+      ],
+      additionalWaitingKeywords: [
+        ...(this.plugin.settings.additionalWaitingKeywords ?? []),
+      ],
+      additionalCompletedKeywords: [
+        ...(this.plugin.settings.additionalCompletedKeywords ?? []),
+      ],
+      additionalArchivedKeywords: [
+        ...(this.plugin.settings.additionalArchivedKeywords ?? []),
+      ],
+    };
+
+    for (const [settingKey, binding] of this.keywordFieldBindings.entries()) {
+      fallback[settingKey] = parseKeywordInput(
+        binding.inputEl.value.toUpperCase(),
+      );
+    }
+
+    return fallback;
+  }
+
+  private validateKeywordRegexForAllGroups(
+    parsedBySetting: Record<KeywordSettingKey, string[]>,
+  ): {
+    validBySetting: Record<KeywordSettingKey, string[]>;
+    errorsByGroup: Record<KeywordGroup, string[]>;
+  } {
+    const validBySetting: Record<KeywordSettingKey, string[]> = {
+      additionalActiveKeywords: [],
+      additionalInactiveKeywords: [],
+      additionalWaitingKeywords: [],
+      additionalCompletedKeywords: [],
+      additionalArchivedKeywords: [],
+    };
+
+    const errorsByGroup: Record<KeywordGroup, string[]> = {
+      activeKeywords: [],
+      inactiveKeywords: [],
+      waitingKeywords: [],
+      completedKeywords: [],
+      archivedKeywords: [],
+    };
+
+    for (const settingKey of Object.keys(
+      parsedBySetting,
+    ) as KeywordSettingKey[]) {
+      const group = this.keywordSettingToGroup[settingKey];
+      for (const token of parsedBySetting[settingKey]) {
+        const keywordToValidate = token.startsWith('-')
+          ? token.slice(1)
+          : token;
+        try {
+          TaskParser.validateKeywords([keywordToValidate]);
+          validBySetting[settingKey].push(token);
+        } catch {
+          errorsByGroup[group].push(`Invalid keyword syntax: ${token}`);
+        }
+      }
+    }
+
+    return { validBySetting, errorsByGroup };
+  }
+
+  private toGroupKeywordInput(bySetting: Record<KeywordSettingKey, string[]>): {
+    activeKeywords: string[];
+    inactiveKeywords: string[];
+    waitingKeywords: string[];
+    completedKeywords: string[];
+    archivedKeywords: string[];
+  } {
+    return {
+      activeKeywords: bySetting.additionalActiveKeywords,
+      inactiveKeywords: bySetting.additionalInactiveKeywords,
+      waitingKeywords: bySetting.additionalWaitingKeywords,
+      completedKeywords: bySetting.additionalCompletedKeywords,
+      archivedKeywords: bySetting.additionalArchivedKeywords,
+    };
+  }
+
+  private renderKeywordValidationState(
+    regexErrorsByGroup: Record<KeywordGroup, string[]>,
+    keywordErrors: Array<{ group: KeywordGroup; message: string }>,
+    keywordWarnings: Array<{ group: KeywordGroup; message: string }>,
+  ): void {
+    const errorsByGroup: Record<KeywordGroup, string[]> = {
+      activeKeywords: [...regexErrorsByGroup.activeKeywords],
+      inactiveKeywords: [...regexErrorsByGroup.inactiveKeywords],
+      waitingKeywords: [...regexErrorsByGroup.waitingKeywords],
+      completedKeywords: [...regexErrorsByGroup.completedKeywords],
+      archivedKeywords: [...regexErrorsByGroup.archivedKeywords],
+    };
+    const warningsByGroup: Record<KeywordGroup, string[]> = {
+      activeKeywords: [],
+      inactiveKeywords: [],
+      waitingKeywords: [],
+      completedKeywords: [],
+      archivedKeywords: [],
+    };
+
+    for (const issue of keywordErrors) {
+      errorsByGroup[issue.group].push(issue.message);
+    }
+
+    for (const issue of keywordWarnings) {
+      warningsByGroup[issue.group].push(issue.message);
+    }
+
+    for (const binding of this.keywordFieldBindings.values()) {
+      binding.inputEl.classList.remove('todoseq-invalid-input');
+
+      const existingErrors = binding.settingEl.querySelectorAll(
+        '.todoseq-setting-item-error',
+      );
+      for (const el of Array.from(existingErrors)) {
+        el.remove();
+      }
+
+      const existingWarnings = binding.settingEl.querySelectorAll(
+        '.todoseq-setting-item-warning',
+      );
+      for (const el of Array.from(existingWarnings)) {
+        el.remove();
+      }
+
+      const group = this.keywordSettingToGroup[binding.settingKey];
+      const groupErrors = Array.from(new Set(errorsByGroup[group]));
+      const groupWarnings = Array.from(new Set(warningsByGroup[group]));
+      const settingInfo = binding.settingEl.querySelector('.setting-item-info');
+      if (!settingInfo) {
+        continue;
+      }
+
+      if (groupErrors.length > 0) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'todoseq-setting-item-error';
+        for (const message of groupErrors) {
+          const row = document.createElement('div');
+          row.textContent = message;
+          errorDiv.appendChild(row);
+        }
+        settingInfo.appendChild(errorDiv);
+        binding.inputEl.classList.add('todoseq-invalid-input');
+      }
+
+      if (groupWarnings.length > 0) {
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'todoseq-setting-item-warning';
+        for (const message of groupWarnings) {
+          const row = document.createElement('div');
+          row.textContent = message;
+          warningDiv.appendChild(row);
+        }
+        settingInfo.appendChild(warningDiv);
+      }
+    }
   }
 
   /**

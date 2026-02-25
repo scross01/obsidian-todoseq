@@ -446,6 +446,7 @@ export class VaultScanner {
       keywords: this.keywordManager.getAllKeywords(),
       completedKeywords:
         this.keywordManager.getKeywordsForGroup('completedKeywords'),
+      keywordManager: this.keywordManager,
       activeKeywords: this.keywordManager.getKeywordsForGroup('activeKeywords'),
       waitingKeywords:
         this.keywordManager.getKeywordsForGroup('waitingKeywords'),

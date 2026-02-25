@@ -525,6 +525,10 @@ export class TaskParser implements ITaskParser {
    * @param config New configuration
    */
   public updateConfig(config: ParserConfig): void {
+    if (config.keywordManager) {
+      this.keywordManager = config.keywordManager;
+    }
+
     // Use keywords from config if provided, otherwise from KeywordManager
     // This allows dynamic keyword updates while maintaining shared KeywordManager
     this.allKeywords = config.keywords ?? this.keywordManager.getAllKeywords();

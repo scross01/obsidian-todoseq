@@ -148,6 +148,8 @@ state:TODO priority:high
 
 Find high priority tasks that are in TODO state.
 
+The `state:` filter and state autocomplete suggestions follow the effective keyword configuration from settings. This includes custom keywords and advanced built-in overrides. Archived keywords are excluded from state search suggestions because archived tasks are not collected into the task index.
+
 ```txt
 [type:Project]
 ```

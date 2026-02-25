@@ -109,15 +109,16 @@ Tasks sorted by calculated urgency score (highest to lowest). Urgency is calcula
 
 ### 6. Keyword
 
-Tasks sorted by an implied order of the keyword states. Tasks are classified into 5 ordered groups based on their keyword:
+Tasks are sorted by effective keyword group and keyword order from your settings. That means custom keywords and advanced built-in overrides both affect this sort.
 
-| Group         | Keywords                   |
-| ------------- | -------------------------- |
-| 1 - Active    | NOW, DOING, IN-PROGRESS    |
-| 2 - Inactive  | TODO, LATER                |
-| 3 - Custom    | User-defined from settings |
-| 4 - Waiting   | WAIT, WAITING              |
-| 5 - Completed | DONE, CANCELED, CANCELLED  |
+Tasks are classified into 4 ordered groups:
+
+| Group         | Keywords                 |
+| ------------- | ------------------------ |
+| 1 - Active    | Active group keywords    |
+| 2 - Inactive  | Inactive group keywords  |
+| 3 - Waiting   | Waiting group keywords   |
+| 4 - Completed | Completed group keywords |
 
 **Example:**
 
@@ -125,7 +126,9 @@ If you have current tasks with keywords DOING, TODO, and WAIT, they will be orde
 
 1. DOING tasks (Group 1 - Active)
 2. TODO tasks (Group 2 - Inactive)
-3. WAIT tasks (Group 4 - Waiting)
+3. WAIT tasks (Group 3 - Waiting)
+
+Within each group, tasks follow the keyword order currently defined in settings.
 
 ## Search Functionality
 

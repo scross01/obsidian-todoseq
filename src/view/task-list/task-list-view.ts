@@ -1752,7 +1752,7 @@ export class TaskListView extends ItemView {
 
           return element;
         },
-        false, // skip yielding during incremental refresh
+        false, // skip yielding during incremental refresh to prevent flicker
       );
 
       // Abort if another refresh superseded us while building!

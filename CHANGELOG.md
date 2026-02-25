@@ -5,8 +5,14 @@
 - Changed the sort algorithms to use the task keyword state as secondary sorting criteria. #51
 - Added a special Archived state that is used to highlight tasks in the editor, but does not appear in the task lists. #37
 - Added support for custom keywords by keyword groupings for Active, Inactive, Waiting, Completed, and Archived tasks. #43
+  - Custom active keywords now contribute to urgency score, and custom waiting keywords reduce urgency score.
+  - Existing custom keywords from previous versions are automatically migrated to the Inactive group.
+  - Built-in keywords can be removed using `-KEYWORD` syntax in the settings
+  - Built-in keywords can be redeclared in the same group to change sort order, or moved to a different group.
+- Reorganized the right-click keyword state menu into five groups (Active, Inactive, Waiting, Completed, Archived) with dividers between groups.
+- Added `sort: keyword` option to embedded task lists for keyword-based sorting.
 - Added a new experimental features section in the settings.
-- Added experiemental support for extracting tasks from Org Mode files within the vault. #45
+- Added experimental support for extracting tasks from Org Mode files within the vault. #45
 
 ## 0.10.2
 

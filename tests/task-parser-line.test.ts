@@ -2,6 +2,7 @@ import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { ParserConfig } from '../src/parser/types';
 import { getDailyNoteInfo } from '../src/utils/daily-note-utils';
+import { getDefaultCoefficients } from '../src/utils/task-urgency';
 import {
   createBaseSettings,
   createTestKeywordManager,
@@ -20,9 +21,7 @@ describe('TaskParser', () => {
     beforeEach(() => {
       settings = createBaseSettings({
         additionalInactiveKeywords: ['FIXME'],
-        languageCommentSupport: {
-          enabled: false,
-        },
+        languageCommentSupport: false,
       });
       parser = TaskParser.create(createTestKeywordManager(settings), null);
     });
@@ -31,7 +30,8 @@ describe('TaskParser', () => {
       const originalKeywords = parser.allKeywords;
       const newConfig: ParserConfig = {
         keywords: [...originalKeywords, 'CUSTOM'],
-        urgencyCoefficients: {},
+        completedKeywords: ['DONE', 'CANCELED', 'CANCELLED'],
+        urgencyCoefficients: getDefaultCoefficients(),
       };
 
       parser.updateConfig(newConfig);
@@ -44,17 +44,19 @@ describe('TaskParser', () => {
 
     it('should update urgency coefficients', () => {
       const newCoefficients = {
-        overDue: 10,
-        dueToday: 5,
-        dueTomorrow: 3,
-        dueThisWeek: 2,
-        dueThisMonth: 1,
-        activeBonus: 2,
-        waitingPenalty: 0.5,
+        ...getDefaultCoefficients(),
+        priorityHigh: 10,
+        priorityMedium: 5,
+        priorityLow: 3,
+        scheduled: 2,
+        deadline: 1,
+        active: 2,
+        waiting: -0.5,
       };
 
       parser.updateConfig({
         keywords: parser.allKeywords,
+        completedKeywords: ['DONE', 'CANCELED', 'CANCELLED'],
         urgencyCoefficients: newCoefficients,
       });
 
@@ -66,7 +68,7 @@ describe('TaskParser', () => {
     it('should update completed keywords set', () => {
       parser.updateConfig({
         keywords: [...parser.allKeywords, 'COMPLETED'],
-        urgencyCoefficients: {},
+        urgencyCoefficients: getDefaultCoefficients(),
         completedKeywords: ['DONE', 'COMPLETED'],
       });
 
@@ -77,7 +79,8 @@ describe('TaskParser', () => {
     it('should update active and waiting keywords sets', () => {
       parser.updateConfig({
         keywords: [...parser.allKeywords, 'ACTIVE', 'PENDING'],
-        urgencyCoefficients: {},
+        completedKeywords: ['DONE', 'CANCELED', 'CANCELLED'],
+        urgencyCoefficients: getDefaultCoefficients(),
         activeKeywords: ['DOING', 'ACTIVE'],
         waitingKeywords: ['WAITING', 'PENDING'],
       });
@@ -90,7 +93,8 @@ describe('TaskParser', () => {
     it('should update task detection settings', () => {
       parser.updateConfig({
         keywords: parser.allKeywords,
-        urgencyCoefficients: {},
+        completedKeywords: ['DONE', 'CANCELED', 'CANCELLED'],
+        urgencyCoefficients: getDefaultCoefficients(),
         includeCalloutBlocks: false,
         includeCodeBlocks: true,
         includeCommentBlocks: true,
@@ -115,13 +119,38 @@ describe('TaskParser', () => {
       // Update config with new custom inactive keywords
       parser.updateConfig({
         keywords: [...parser.allKeywords, 'TEMP', 'MAYBE'],
-        urgencyCoefficients: {},
+        completedKeywords: ['DONE', 'CANCELED', 'CANCELLED'],
+        urgencyCoefficients: getDefaultCoefficients(),
         inactiveKeywords: ['TODO', 'LATER', 'TEMP', 'MAYBE'],
       });
 
       // New keywords should now be recognized as tasks
       expect(parser.testRegex.test('TEMP Custom task')).toBe(true);
       expect(parser.testRegex.test('MAYBE Custom task')).toBe(true);
+    });
+
+    it('should recalculate urgency using updated keyword manager groups', () => {
+      const line = 'DOING Keyword group urgency test';
+
+      const before = parser.parseFile(line, 'test.md');
+      expect(before).toHaveLength(1);
+      expect(before[0].urgency).toBe(6);
+
+      const movedKeywordManager = createTestKeywordManager(
+        createBaseSettings({ additionalWaitingKeywords: ['DOING'] }),
+      );
+
+      parser.updateConfig({
+        keywords: movedKeywordManager.getAllKeywords(),
+        completedKeywords:
+          movedKeywordManager.getKeywordsForGroup('completedKeywords'),
+        urgencyCoefficients: getDefaultCoefficients(),
+        keywordManager: movedKeywordManager,
+      });
+
+      const after = parser.parseFile(line, 'test.md');
+      expect(after).toHaveLength(1);
+      expect(after[0].urgency).toBe(-1);
     });
   });
 
@@ -137,9 +166,7 @@ describe('TaskParser', () => {
     beforeEach(() => {
       settings = createBaseSettings({
         additionalInactiveKeywords: ['FIXME'],
-        languageCommentSupport: {
-          enabled: false,
-        },
+        languageCommentSupport: false,
       });
 
       (getDailyNoteInfo as jest.Mock).mockReturnValue({
@@ -243,9 +270,7 @@ describe('TaskParser', () => {
     beforeEach(() => {
       settings = createBaseSettings({
         additionalInactiveKeywords: ['FIXME'],
-        languageCommentSupport: {
-          enabled: false,
-        },
+        languageCommentSupport: false,
       });
       parser = TaskParser.create(createTestKeywordManager(settings), null);
     });
@@ -353,9 +378,7 @@ describe('TaskParser', () => {
     beforeEach(() => {
       settings = createBaseSettings({
         additionalInactiveKeywords: ['FIXME'],
-        languageCommentSupport: {
-          enabled: false,
-        },
+        languageCommentSupport: false,
       });
       parser = TaskParser.create(createTestKeywordManager(settings), null);
     });

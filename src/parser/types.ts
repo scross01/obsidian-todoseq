@@ -6,6 +6,7 @@
 import { Task } from '../types/task';
 import { TFile } from 'obsidian';
 import { UrgencyCoefficients } from '../utils/task-urgency';
+import type { KeywordManager } from '../utils/keyword-manager';
 
 /**
  * Parser configuration passed from settings.
@@ -24,6 +25,9 @@ export interface ParserConfig {
   /** Keywords that indicate waiting state (WAIT, WAITING, etc.) */
   waitingKeywords?: string[];
 
+  /** Keywords that indicate inactive state (TODO, LATER, etc.) */
+  inactiveKeywords?: string[];
+
   /** Keywords that indicate archived state (ARCHIVED, etc.) - styled but not collected */
   archivedKeywords?: string[];
 
@@ -41,6 +45,13 @@ export interface ParserConfig {
 
   /** Language comment support settings */
   languageCommentSupport?: boolean;
+
+  /**
+   * Shared keyword manager instance.
+   * When settings change, parsers should replace their keyword manager reference
+   * so completion checks and urgency context use the latest effective keyword groups.
+   */
+  keywordManager?: KeywordManager;
 }
 
 /**

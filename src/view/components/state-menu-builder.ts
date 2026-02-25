@@ -7,8 +7,7 @@ import { KeywordManager } from '../../utils/keyword-manager';
  */
 interface KeywordGroupDefinition {
   name: string;
-  builtin: readonly string[];
-  custom: string[];
+  states: string[];
 }
 
 /**
@@ -34,11 +33,8 @@ export class StateMenuBuilder {
     const result: { group: string; states: string[] }[] = [];
 
     for (const group of groups) {
-      // Combine built-in and custom keywords (built-in first, then custom)
-      const allKeywords = [...group.builtin, ...group.custom];
-
-      // Deduplicate while preserving order
-      const uniqueKeywords = Array.from(new Set(allKeywords));
+      // Deduplicate while preserving effective keyword order
+      const uniqueKeywords = Array.from(new Set(group.states));
 
       // Filter out empty strings and the current state
       const filteredStates = uniqueKeywords.filter((s) => s && s !== current);
@@ -65,28 +61,23 @@ export class StateMenuBuilder {
     return [
       {
         name: 'Active',
-        builtin: Array.from(KeywordManager.getBuiltinActiveSet()),
-        custom: Array.from(keywordManager.getCustomActiveSet()),
+        states: keywordManager.getKeywordsForGroup('activeKeywords'),
       },
       {
         name: 'Inactive',
-        builtin: Array.from(KeywordManager.getBuiltinInactiveSet()),
-        custom: Array.from(keywordManager.getCustomInactiveSet()),
+        states: keywordManager.getKeywordsForGroup('inactiveKeywords'),
       },
       {
         name: 'Waiting',
-        builtin: Array.from(KeywordManager.getBuiltinWaitingSet()),
-        custom: Array.from(keywordManager.getCustomWaitingSet()),
+        states: keywordManager.getKeywordsForGroup('waitingKeywords'),
       },
       {
         name: 'Completed',
-        builtin: Array.from(KeywordManager.getBuiltinCompletedSet()),
-        custom: Array.from(keywordManager.getCustomCompletedSet()),
+        states: keywordManager.getKeywordsForGroup('completedKeywords'),
       },
       {
         name: 'Archived',
-        builtin: Array.from(KeywordManager.getBuiltinArchivedSet()),
-        custom: Array.from(keywordManager.getCustomArchivedSet()),
+        states: keywordManager.getKeywordsForGroup('archivedKeywords'),
       },
     ];
   }

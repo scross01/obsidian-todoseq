@@ -28,7 +28,7 @@ describe('StateMenuBuilder', () => {
   });
 
   describe('getKeywordGroups', () => {
-    test('should return five keyword groups with correct built-in keywords', () => {
+    test('should return five keyword groups with correct effective keywords', () => {
       // Arrange
       const builder = new StateMenuBuilder(mockPlugin as any);
 
@@ -41,24 +41,19 @@ describe('StateMenuBuilder', () => {
       const [active, inactive, waiting, completed, archived] = result;
 
       expect(active.name).toBe('Active');
-      expect(active.builtin).toEqual([...BUILTIN_ACTIVE_KEYWORDS]);
-      expect(active.custom).toEqual([]);
+      expect(active.states).toEqual([...BUILTIN_ACTIVE_KEYWORDS]);
 
       expect(inactive.name).toBe('Inactive');
-      expect(inactive.builtin).toEqual([...BUILTIN_INACTIVE_KEYWORDS]);
-      expect(inactive.custom).toEqual([]);
+      expect(inactive.states).toEqual([...BUILTIN_INACTIVE_KEYWORDS]);
 
       expect(waiting.name).toBe('Waiting');
-      expect(waiting.builtin).toEqual([...BUILTIN_WAITING_KEYWORDS]);
-      expect(waiting.custom).toEqual([]);
+      expect(waiting.states).toEqual([...BUILTIN_WAITING_KEYWORDS]);
 
       expect(completed.name).toBe('Completed');
-      expect(completed.builtin).toEqual([...BUILTIN_COMPLETED_KEYWORDS]);
-      expect(completed.custom).toEqual([]);
+      expect(completed.states).toEqual([...BUILTIN_COMPLETED_KEYWORDS]);
 
       expect(archived.name).toBe('Archived');
-      expect(archived.builtin).toEqual([...BUILTIN_ARCHIVED_KEYWORDS]);
-      expect(archived.custom).toEqual([]);
+      expect(archived.states).toEqual([...BUILTIN_ARCHIVED_KEYWORDS]);
     });
 
     test('should include custom keywords from settings', () => {
@@ -79,10 +74,10 @@ describe('StateMenuBuilder', () => {
       // Assert
       const [active, inactive, waiting, completed] = result;
 
-      expect(active.custom).toContain('STARTED');
-      expect(inactive.custom).toContain('PLANNED');
-      expect(waiting.custom).toContain('BLOCKED');
-      expect(completed.custom).toContain('ARCHIVED');
+      expect(active.states).toContain('STARTED');
+      expect(inactive.states).toContain('PLANNED');
+      expect(waiting.states).toContain('BLOCKED');
+      expect(completed.states).toContain('ARCHIVED');
     });
   });
 

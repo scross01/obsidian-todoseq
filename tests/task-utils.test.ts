@@ -326,6 +326,15 @@ describe('task-utils', () => {
         const result = validateKeywordGroups(groups);
         expect(result).toEqual([]);
       });
+
+      test('should allow built-in keywords to be redeclared across groups', () => {
+        const groups = {
+          activeKeywords: ['TODO'], // TODO is built-in inactive
+          waitingKeywords: ['DONE'], // DONE is built-in completed
+        };
+        const result = validateKeywordGroups(groups);
+        expect(result).toEqual([]);
+      });
     });
 
     describe('buildKeywordsFromGroups', () => {

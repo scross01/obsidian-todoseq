@@ -219,41 +219,15 @@ export function keywordSortComparator(
 export function buildKeywordSortConfig(
   keywordManager: KeywordManager,
 ): KeywordSortConfig {
-  // Get built-in keywords from KeywordManager (single source of truth)
-  const builtinActiveOrder = keywordManager.getBuiltinActiveKeywords();
-  const builtinInactiveOrder = keywordManager.getBuiltinInactiveKeywords();
-  const builtinWaitingOrder = keywordManager.getBuiltinWaitingKeywords();
-  const builtinCompletedOrder = keywordManager.getBuiltinCompletedKeywords();
-
-  // Get custom keywords from KeywordManager
-  const customActive = keywordManager.getCustomActiveSet();
-  const customInactive = keywordManager.getCustomInactiveSet();
-  const customWaiting = keywordManager.getCustomWaitingSet();
-  const customCompleted = keywordManager.getCustomCompletedSet();
-
-  // Build active keywords: built-in + custom (preserving order)
-  const activeKeywordsOrder = [
-    ...builtinActiveOrder,
-    ...Array.from(customActive),
-  ];
-
-  // Build inactive keywords: built-in + custom
-  const inactiveKeywordsOrder = [
-    ...builtinInactiveOrder,
-    ...Array.from(customInactive),
-  ];
-
-  // Build waiting keywords: built-in + custom
-  const waitingKeywordsOrder = [
-    ...builtinWaitingOrder,
-    ...Array.from(customWaiting),
-  ];
-
-  // Build completed keywords: built-in + custom
-  const completedKeywordsOrder = [
-    ...builtinCompletedOrder,
-    ...Array.from(customCompleted),
-  ];
+  // Use KeywordManager effective ordering (includes built-in overrides/removals)
+  const activeKeywordsOrder =
+    keywordManager.getKeywordsForGroup('activeKeywords');
+  const inactiveKeywordsOrder =
+    keywordManager.getKeywordsForGroup('inactiveKeywords');
+  const waitingKeywordsOrder =
+    keywordManager.getKeywordsForGroup('waitingKeywords');
+  const completedKeywordsOrder =
+    keywordManager.getKeywordsForGroup('completedKeywords');
 
   return {
     // Sets for fast O(1) lookup
