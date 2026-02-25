@@ -5,8 +5,16 @@ import {
   createSettingsChangeDetector,
 } from '../src/utils/settings-utils';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
+import { migrateSettings } from '../src/utils/settings-migration';
 
 describe('settings-utils', () => {
+  describe('migrateSettings', () => {
+    test('should return an empty object when settings are null', () => {
+      const result = migrateSettings(null);
+      expect(result).toEqual({});
+    });
+  });
+
   describe('getPluginSettings', () => {
     const mockApp: Partial<App> = {};
 

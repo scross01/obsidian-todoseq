@@ -48,8 +48,12 @@ const MIGRATIONS: SettingsMigrations[] = [
 ];
 
 export function migrateSettings(
-  settings: Record<string, unknown>,
+  settings: Record<string, unknown> | null,
 ): Record<string, unknown> {
+  if (!settings) {
+    return {};
+  }
+
   const currentVersion = (settings['settingsVersion'] as number) ?? 0;
 
   let migratedSettings = { ...settings };
