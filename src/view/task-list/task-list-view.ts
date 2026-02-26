@@ -114,7 +114,10 @@ export class TaskListView extends ItemView {
     this.renderQueue = new ChunkedRenderQueue();
     this.plugin = plugin;
     this.keywordManager = new KeywordManager(plugin.settings ?? {});
-    this.stateManager = new TaskStateTransitionManager(this.keywordManager);
+    this.stateManager = new TaskStateTransitionManager(
+      this.keywordManager,
+      plugin.settings?.stateTransitions,
+    );
 
     // Subscribe to task changes from the centralized state manager
     // Uses interrupt pattern: new update cancels pending work and processes immediately

@@ -19,6 +19,13 @@ describe('Editor Controller - Task State Methods', () => {
         enabled: false,
       },
       additionalInactiveKeywords: [],
+      // Add transition settings to ensure proper state transitions
+      stateTransitions: {
+        defaultInactive: 'TODO',
+        defaultActive: 'DOING',
+        defaultCompleted: 'DONE',
+        transitionStatements: ['WAIT -> IN-PROGRESS'],
+      },
     });
 
     mockPlugin = {

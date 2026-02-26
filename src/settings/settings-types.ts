@@ -1,3 +1,13 @@
+export interface StateTransitionSettings {
+  // Default states for each category
+  defaultInactive: string; // e.g., "TODO"
+  defaultActive: string; // e.g., "DOING"
+  defaultCompleted: string; // e.g., "DONE"
+
+  // Multiline transition declarations
+  transitionStatements: string[];
+}
+
 export interface TodoTrackerSettings {
   additionalInactiveKeywords: string[]; // Custom inactive keywords (TODO, LATER, FIXME, etc.)
   additionalActiveKeywords: string[]; // Custom active keywords (DOING, NOW, etc.)
@@ -24,7 +34,16 @@ export interface TodoTrackerSettings {
   propertySearchEngine?: import('../services/property-search-engine').PropertySearchEngine; // Property search engine instance
   // Hidden setting - not exposed in UI, used to track first install
   _hasShownFirstInstallView?: boolean; // true after first install view has been shown
+  // State transition settings
+  stateTransitions: StateTransitionSettings;
 }
+
+export const DefaultStateTransitionSettings: StateTransitionSettings = {
+  defaultInactive: '',
+  defaultActive: '',
+  defaultCompleted: '',
+  transitionStatements: [],
+};
 
 export const DefaultSettings: TodoTrackerSettings = {
   additionalInactiveKeywords: [],
@@ -43,4 +62,5 @@ export const DefaultSettings: TodoTrackerSettings = {
   formatTaskKeywords: true, // Default to enabled
   additionalFileExtensions: [], // No additional extensions by default - managed by detectOrgModeFiles
   detectOrgModeFiles: false, // Experimental feature - disabled by default
+  stateTransitions: DefaultStateTransitionSettings,
 };

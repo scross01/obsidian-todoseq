@@ -112,7 +112,15 @@ describe('ReaderViewFormatter', () => {
 
   beforeEach(() => {
     // Setup default settings using createBaseSettings to ensure all properties are included
-    mockSettings = createBaseSettings();
+    mockSettings = createBaseSettings({
+      // Add transition settings to ensure proper state transitions
+      stateTransitions: {
+        defaultInactive: 'TODO',
+        defaultActive: 'DOING',
+        defaultCompleted: 'DONE',
+        transitionStatements: ['TODO -> DOING'],
+      },
+    });
 
     // Create mock parser
     mockParser = TaskParser.create(

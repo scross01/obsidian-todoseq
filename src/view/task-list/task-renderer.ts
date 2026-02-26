@@ -34,7 +34,10 @@ export class TaskRenderer {
     this.plugin = plugin;
     this.menuBuilder = menuBuilder;
     this.keywordManager = new KeywordManager(plugin.settings ?? {});
-    this.stateManager = new TaskStateTransitionManager(this.keywordManager);
+    this.stateManager = new TaskStateTransitionManager(
+      this.keywordManager,
+      plugin.settings?.stateTransitions,
+    );
   }
 
   buildCheckbox(task: Task, container: HTMLElement): HTMLInputElement {

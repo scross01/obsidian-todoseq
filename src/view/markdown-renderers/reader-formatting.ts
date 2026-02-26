@@ -1988,7 +1988,10 @@ export class ReaderViewFormatter {
     }
 
     const keywordManager = this.vaultScanner.getKeywordManager();
-    const transitionManager = new TaskStateTransitionManager(keywordManager);
+    const transitionManager = new TaskStateTransitionManager(
+      keywordManager,
+      this.plugin.settings?.stateTransitions,
+    );
     const nextState = transitionManager.getNextState(currentState);
 
     await this.updateTaskState(keywordElement, sourcePath, nextState);

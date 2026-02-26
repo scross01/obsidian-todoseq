@@ -28,6 +28,12 @@
   "formatTaskKeywords": true,
   "additionalFileExtensions": [],
   "detectOrgModeFiles": false,
+  "stateTransitions": {
+    "defaultInactive": "",
+    "defaultActive": "",
+    "defaultCompleted": "",
+    "transitionStatements": []
+  },
   "_hasShownFirstInstallView": true,
   "settingsVersion": 2
 }

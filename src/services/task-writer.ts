@@ -238,6 +238,7 @@ export class TaskWriter {
       const keywordManagerInstance = new KeywordManager(settings ?? {});
       const stateManager = new TaskStateTransitionManager(
         keywordManagerInstance,
+        settings?.stateTransitions,
       );
       state = stateManager.getNextState(task.state);
     } else {
@@ -258,6 +259,7 @@ export class TaskWriter {
       const keywordManagerInstance = new KeywordManager(settings ?? {});
       const stateManager = new TaskStateTransitionManager(
         keywordManagerInstance,
+        settings?.stateTransitions,
       );
       state = stateManager.getCycleState(task.state);
     } else {

@@ -384,10 +384,24 @@
   font-size: 0.7em;
 }
 
+/* Settings UI - Info message */
+.todoseq-setting-item-info,
+.setting-item-info .todoseq-info-message {
+  color: var(--text-muted, #999);
+  font-size: 0.7em;
+}
+
 /* Settings UI - Invalid input field highlighting */
 .setting-item .todoseq-invalid-input {
   border-color: var(--error-color, #ff0000) !important;
   border-width: 2px !important;
+}
+
+/* Settings UI - Invalid textarea highlighting */
+.setting-item textarea.todoseq-invalid-input {
+  border-color: var(--error-color, #ff0000) !important;
+  border-width: 2px !important;
+  border-style: solid !important;
 }
 
 /* Task keyword formatting in editor and reading view */

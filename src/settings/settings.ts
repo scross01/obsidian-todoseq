@@ -9,6 +9,8 @@ import { validateKeywordGroupsDetailed } from '../utils/task-utils';
 import { TodoTrackerSettings } from './settings-types';
 import { TaskListView } from '../view/task-list/task-list-view';
 import { KeywordGroup } from '../types/task';
+import { TransitionParser } from '../services/transition-parser';
+import { KeywordManager } from '../utils/keyword-manager';
 
 type KeywordSettingKey = keyof Pick<
   TodoTrackerSettings,
@@ -34,12 +36,30 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
   > = new Map();
   private fileExtensionsDebounceTimer: ReturnType<typeof setTimeout> | null =
     null;
+  private transitionValidationDebounceTimer: ReturnType<
+    typeof setTimeout
+  > | null = null;
   private readonly KEYWORD_DEBOUNCE_MS = 500;
   private readonly FILE_EXTENSIONS_DEBOUNCE_MS = 500;
+  private readonly TRANSITION_VALIDATION_DEBOUNCE_MS = 500;
   private readonly keywordFieldBindings = new Map<
     KeywordSettingKey,
     KeywordFieldBinding
   >();
+  // Store dropdown components for default state settings to update when keywords change
+  private defaultStateDropdowns: {
+    inactive?: import('obsidian').DropdownComponent;
+    active?: import('obsidian').DropdownComponent;
+    completed?: import('obsidian').DropdownComponent;
+  } = {};
+
+  // Store Setting instances for transition settings to attach validation errors
+  private transitionSettings: {
+    inactive?: import('obsidian').Setting;
+    active?: import('obsidian').Setting;
+    completed?: import('obsidian').Setting;
+    transitions?: import('obsidian').Setting;
+  } = {};
 
   private readonly keywordSettingToGroup: Record<
     KeywordSettingKey,
@@ -127,15 +147,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       .setHeading()
       .setDesc('Add custom keywords to extend the built-in task states.');
 
-    // Active keywords sub-section
-    this.createKeywordGroupSetting(
-      containerEl,
-      'additionalActiveKeywords',
-      'Active keywords',
-      'Keywords for tasks currently being worked on (e.g. STARTED). Built-in: DOING, NOW, IN-PROGRESS.',
-      this.plugin.settings.additionalActiveKeywords,
-    );
-
     // Inactive keywords sub-section
     this.createKeywordGroupSetting(
       containerEl,
@@ -143,6 +154,15 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       'Inactive keywords',
       'Keywords for tasks not yet started (e.g. FIXME, HACK). Built-in: TODO, LATER.',
       this.plugin.settings.additionalInactiveKeywords,
+    );
+
+    // Active keywords sub-section
+    this.createKeywordGroupSetting(
+      containerEl,
+      'additionalActiveKeywords',
+      'Active keywords',
+      'Keywords for tasks currently being worked on (e.g. STARTED). Built-in: DOING, NOW, IN-PROGRESS.',
+      this.plugin.settings.additionalActiveKeywords,
     );
 
     // Waiting keywords sub-section
@@ -259,6 +279,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               this.plugin.settings[key as KeywordSettingKey] = values;
             }
             await this.plugin.saveSettings();
+
+            // Update default state dropdowns when keywords change
+            await this.updateDefaultStateDropdowns();
+
+            // Re-validate transition settings when keywords change
+            this.validateTransitionSettings();
 
             // Recreate parser and rescan
             try {
@@ -448,6 +474,412 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         }
         settingInfo.appendChild(warningDiv);
       }
+    }
+  }
+
+  /**
+   * Creates the task state transitions settings section.
+   */
+  private createStateTransitionsSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName('Task state transitions')
+      .setHeading()
+      .setDesc('Configure how task states transition when clicked or cycled.');
+
+    // Get keyword manager to populate dropdown options
+    const keywordManager = new KeywordManager(this.plugin.settings);
+
+    // Transition declarations
+    const transitionsSetting = new Setting(containerEl);
+    this.transitionSettings.transitions = transitionsSetting;
+    transitionsSetting
+      .setName('State transitions')
+      .setDesc(
+        'Define how states transition. Each line: STATE -> NEXT_STATE. Use (A | B) to define multiple initial states.',
+      )
+      .addTextArea((textArea) => {
+        // Set the size of the textarea directly on the underlying element
+        textArea.inputEl.cols = 48;
+        textArea.inputEl.rows = 4;
+        textArea
+          .setValue(
+            this.plugin.settings.stateTransitions.transitionStatements.join(
+              '\n',
+            ),
+          )
+          .setPlaceholder(
+            'TODO -> DOING -> DONE\n(WAIT | WAITING) -> IN-PROGRESS\nLATER -> NOW -> DONE',
+          )
+          .onChange(async (value: string) => {
+            const statements = value
+              .split('\n')
+              .map((s: string) => s.trim())
+              .filter((s: string) => s.length > 0);
+            this.plugin.settings.stateTransitions.transitionStatements =
+              statements;
+            await this.plugin.saveSettings();
+
+            // Debounce validation to allow user to finish typing
+            if (this.transitionValidationDebounceTimer) {
+              clearTimeout(this.transitionValidationDebounceTimer);
+            }
+            this.transitionValidationDebounceTimer = setTimeout(() => {
+              this.transitionValidationDebounceTimer = null;
+              this.validateTransitionSettings();
+            }, this.TRANSITION_VALIDATION_DEBOUNCE_MS);
+          });
+      });
+
+    // Default inactive state
+    const inactiveSetting = new Setting(containerEl);
+    this.transitionSettings.inactive = inactiveSetting;
+    // Compute default value for inactive state
+    const defaultInactive = this.getDefaultForGroup(
+      keywordManager,
+      'inactiveKeywords',
+      'TODO',
+    );
+    inactiveSetting
+      .setName('Default inactive state')
+      .setDesc(
+        'The default state for inactive tasks when no explicit transition is defined.',
+      )
+      .addDropdown((dropdown) => {
+        this.defaultStateDropdowns.inactive = dropdown;
+        this.populateDefaultStateDropdown(
+          dropdown,
+          keywordManager.getInactiveSet(),
+        );
+        dropdown.setValue(
+          this.plugin.settings.stateTransitions.defaultInactive ||
+            defaultInactive,
+        );
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.stateTransitions.defaultInactive = value;
+          await this.plugin.saveSettings();
+          this.validateTransitionSettings();
+        });
+      });
+
+    // Compute default value for active state
+    const defaultActive = this.getDefaultForGroup(
+      keywordManager,
+      'activeKeywords',
+      'DOING',
+    );
+    // Default active state
+    const activeSetting = new Setting(containerEl);
+    this.transitionSettings.active = activeSetting;
+    activeSetting
+      .setName('Default active state')
+      .setDesc(
+        'The default state for active tasks when no explicit transition is defined.',
+      )
+      .addDropdown((dropdown) => {
+        this.defaultStateDropdowns.active = dropdown;
+        this.populateDefaultStateDropdown(
+          dropdown,
+          keywordManager.getActiveSet(),
+        );
+        dropdown.setValue(
+          this.plugin.settings.stateTransitions.defaultActive || defaultActive,
+        );
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.stateTransitions.defaultActive = value;
+          await this.plugin.saveSettings();
+          this.validateTransitionSettings();
+        });
+      });
+
+    // Compute default value for completed state
+    const defaultCompleted = this.getDefaultForGroup(
+      keywordManager,
+      'completedKeywords',
+      'DONE',
+    );
+    // Default completed state
+    const completedSetting = new Setting(containerEl);
+    this.transitionSettings.completed = completedSetting;
+    completedSetting
+      .setName('Default completed state')
+      .setDesc(
+        'The default state for completed tasks when no explicit transition is defined.',
+      )
+      .addDropdown((dropdown) => {
+        this.defaultStateDropdowns.completed = dropdown;
+        this.populateDefaultStateDropdown(
+          dropdown,
+          keywordManager.getCompletedSet(),
+        );
+        dropdown.setValue(
+          this.plugin.settings.stateTransitions.defaultCompleted ||
+            defaultCompleted,
+        );
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.stateTransitions.defaultCompleted = value;
+          await this.plugin.saveSettings();
+          this.validateTransitionSettings();
+        });
+      });
+
+    // Initial validation
+    this.validateTransitionSettings();
+  }
+
+  /**
+   * Populate a default state dropdown with keywords from the specified group.
+   */
+  private populateDefaultStateDropdown(
+    dropdown: import('obsidian').DropdownComponent,
+    keywords: Set<string>,
+  ): void {
+    // Clear existing options
+    dropdown.selectEl.innerHTML = '';
+
+    // Add keywords in sorted order
+    const sortedKeywords = Array.from(keywords).sort();
+    for (const keyword of sortedKeywords) {
+      const option = document.createElement('option');
+      option.value = keyword;
+      option.textContent = keyword;
+      dropdown.selectEl.appendChild(option);
+    }
+  }
+
+  /**
+   * Get the default value for a keyword group.
+   * Uses the preferred default (TODO/DOING/DONE) if it exists in the keyword set,
+   * otherwise uses the first keyword from the ordered list for that group.
+   */
+  private getDefaultForGroup(
+    keywordManager: KeywordManager,
+    group: 'inactiveKeywords' | 'activeKeywords' | 'completedKeywords',
+    preferredDefault: string,
+  ): string {
+    const keywordSet = keywordManager.getKeywordsForGroup(group);
+    if (keywordSet.length === 0) {
+      return preferredDefault;
+    }
+    if (keywordSet.includes(preferredDefault)) {
+      return preferredDefault;
+    }
+    return keywordSet[0];
+  }
+
+  /**
+   * Update all default state dropdowns when keywords change.
+   */
+  private async updateDefaultStateDropdowns(): Promise<void> {
+    const keywordManager = new KeywordManager(this.plugin.settings);
+    let needsSave = false;
+
+    if (this.defaultStateDropdowns.inactive) {
+      const currentValue = this.defaultStateDropdowns.inactive.getValue();
+      this.populateDefaultStateDropdown(
+        this.defaultStateDropdowns.inactive,
+        keywordManager.getInactiveSet(),
+      );
+      // Restore current value if it still exists, otherwise use computed default
+      if (currentValue && keywordManager.getInactiveSet().has(currentValue)) {
+        this.defaultStateDropdowns.inactive.setValue(currentValue);
+      } else {
+        const defaultInactive = this.getDefaultForGroup(
+          keywordManager,
+          'inactiveKeywords',
+          'TODO',
+        );
+        this.defaultStateDropdowns.inactive.setValue(defaultInactive);
+        this.plugin.settings.stateTransitions.defaultInactive = defaultInactive;
+        needsSave = true;
+      }
+    }
+
+    if (this.defaultStateDropdowns.active) {
+      const currentValue = this.defaultStateDropdowns.active.getValue();
+      this.populateDefaultStateDropdown(
+        this.defaultStateDropdowns.active,
+        keywordManager.getActiveSet(),
+      );
+      if (currentValue && keywordManager.getActiveSet().has(currentValue)) {
+        this.defaultStateDropdowns.active.setValue(currentValue);
+      } else {
+        const defaultActive = this.getDefaultForGroup(
+          keywordManager,
+          'activeKeywords',
+          'DOING',
+        );
+        this.defaultStateDropdowns.active.setValue(defaultActive);
+        this.plugin.settings.stateTransitions.defaultActive = defaultActive;
+        needsSave = true;
+      }
+    }
+
+    if (this.defaultStateDropdowns.completed) {
+      const currentValue = this.defaultStateDropdowns.completed.getValue();
+      this.populateDefaultStateDropdown(
+        this.defaultStateDropdowns.completed,
+        keywordManager.getCompletedSet(),
+      );
+      if (currentValue && keywordManager.getCompletedSet().has(currentValue)) {
+        this.defaultStateDropdowns.completed.setValue(currentValue);
+      } else {
+        const defaultCompleted = this.getDefaultForGroup(
+          keywordManager,
+          'completedKeywords',
+          'DONE',
+        );
+        this.defaultStateDropdowns.completed.setValue(defaultCompleted);
+        this.plugin.settings.stateTransitions.defaultCompleted =
+          defaultCompleted;
+        needsSave = true;
+      }
+    }
+
+    if (needsSave) {
+      await this.plugin.saveSettings();
+    }
+  }
+
+  /**
+   * Validate and display transition settings errors.
+   * Attaches errors to individual settings using the same pattern as keyword errors.
+   */
+  private validateTransitionSettings(): void {
+    const keywordManager = new KeywordManager(this.plugin.settings);
+    const parser = new TransitionParser(keywordManager);
+    const result = parser.parse(
+      this.plugin.settings.stateTransitions.transitionStatements,
+    );
+
+    // Clear previous errors from all transition settings
+    this.clearTransitionSettingErrors();
+
+    // Check for default state errors (only if value is not empty)
+    const allKeywords = keywordManager.getAllKeywords();
+
+    // Validate inactive default
+    const inactive = this.plugin.settings.stateTransitions.defaultInactive;
+    if (inactive && !allKeywords.includes(inactive)) {
+      this.attachInfoToSetting(
+        this.transitionSettings.inactive,
+        `Default inactive state '${inactive}' not found in keywords.`,
+      );
+    }
+
+    // Validate active default
+    const active = this.plugin.settings.stateTransitions.defaultActive;
+    if (active && !allKeywords.includes(active)) {
+      this.attachInfoToSetting(
+        this.transitionSettings.active,
+        `Default active state '${active}' not found in keywords.`,
+      );
+    }
+
+    // Validate completed default
+    const completed = this.plugin.settings.stateTransitions.defaultCompleted;
+    if (completed && !allKeywords.includes(completed)) {
+      this.attachInfoToSetting(
+        this.transitionSettings.completed,
+        `Default completed state '${completed}' not found in keywords.`,
+      );
+    }
+
+    // Display transition errors - use same styling as keyword errors
+    if (result.errors.length > 0) {
+      this.attachErrorsToSetting(
+        this.transitionSettings.transitions,
+        result.errors.map((e) => e.message),
+      );
+    }
+  }
+
+  /**
+   * Clear previous error/warning elements from transition settings.
+   */
+  private clearTransitionSettingErrors(): void {
+    const settings = [
+      this.transitionSettings.inactive,
+      this.transitionSettings.active,
+      this.transitionSettings.completed,
+      this.transitionSettings.transitions,
+    ];
+
+    for (const setting of settings) {
+      if (!setting) continue;
+
+      // Clear error divs
+      const existingErrors = setting.settingEl.querySelectorAll(
+        '.todoseq-setting-item-error',
+      );
+      for (const el of Array.from(existingErrors)) {
+        el.remove();
+      }
+
+      // Clear info/warning divs
+      const existingInfos = setting.settingEl.querySelectorAll(
+        '.todoseq-setting-item-info',
+      );
+      for (const el of Array.from(existingInfos)) {
+        el.remove();
+      }
+
+      // Clear invalid input highlighting
+      const textArea = setting.settingEl.querySelector('textarea');
+      if (textArea) {
+        textArea.classList.remove('todoseq-invalid-input');
+      }
+    }
+  }
+
+  /**
+   * Attach info messages to a setting's info area.
+   */
+  private attachInfoToSetting(
+    setting: import('obsidian').Setting | undefined,
+    message: string,
+  ): void {
+    if (!setting) return;
+
+    const settingInfo = setting.settingEl.querySelector('.setting-item-info');
+    if (!settingInfo) return;
+
+    let infoDiv = settingInfo.querySelector('.todoseq-info-message');
+    if (!infoDiv) {
+      infoDiv = document.createElement('div');
+      infoDiv.className = 'todoseq-setting-item-warning';
+      settingInfo.appendChild(infoDiv);
+    }
+
+    const row = document.createElement('div');
+    row.textContent = `${message}`;
+    infoDiv.appendChild(row);
+  }
+
+  /**
+   * Attach error messages to a setting, similar to keyword errors.
+   */
+  private attachErrorsToSetting(
+    setting: import('obsidian').Setting | undefined,
+    messages: string[],
+  ): void {
+    if (!setting || messages.length === 0) return;
+
+    const settingInfo = setting.settingEl.querySelector('.setting-item-info');
+    if (!settingInfo) return;
+
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'todoseq-setting-item-error';
+    for (const message of messages) {
+      const row = document.createElement('div');
+      row.textContent = message;
+      errorDiv.appendChild(row);
+    }
+    settingInfo.appendChild(errorDiv);
+
+    // Highlight the input field
+    const textArea = setting.settingEl.querySelector('textarea');
+    if (textArea) {
+      textArea.classList.add('todoseq-invalid-input');
     }
   }
 
@@ -707,6 +1139,9 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     // Task Keywords section with sub-sections for each group
     this.createTaskKeywordsSettings(containerEl);
+
+    // Task state transitions section
+    this.createStateTransitionsSettings(containerEl);
 
     // Experimental Features Group
     new Setting(containerEl)

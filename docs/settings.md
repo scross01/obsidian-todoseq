@@ -159,6 +159,126 @@ When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, k
 
 Within each group, keywords are sorted by effective definition order in settings, including built-in overrides.
 
+## Task State Transitions
+
+**Setting**: "Task state transitions" section with default states and transition declarations
+
+**Description**: Configure how task states transition when clicked or cycled. This section allows you to define custom state sequences for your workflow.
+
+### Default States
+
+Default states are used when no explicit transition is defined for a keyword. Each category has its own default:
+
+- **Default inactive state**: The default state for inactive tasks when no explicit transition is defined
+  - **Default**: `TODO`
+  - **Purpose**: Provides a fallback for inactive keywords without explicit transitions
+  - **Validation**: If the default state is removed from keywords, it automatically recovers to the built-in default (`TODO`)
+
+- **Default active state**: The default state for active tasks when no explicit transition is defined
+  - **Default**: `DOING`
+  - **Purpose**: Provides a fallback for active keywords without explicit transitions
+  - **Validation**: If the default state is removed from keywords, it automatically recovers to the built-in default (`DOING`)
+
+- **Default completed state**: The default state for completed tasks when no explicit transition is defined
+  - **Default**: `DONE`
+  - **Purpose**: Provides a fallback for completed keywords without explicit transitions
+  - **Validation**: If the default state is removed from keywords, it automatically recovers to the built-in default (`DONE`)
+
+### Transition Declarations
+
+Transition declarations define how states transition when clicked. Each line represents one or more transitions.
+
+#### Syntax
+
+The transition syntax supports several patterns:
+
+- **Simple chain**: `STATE -> NEXT_STATE -> NEXT_STATE`
+  - Creates a linear sequence of transitions
+  - Example: `TODO -> DOING -> DONE`
+
+- **Group alternatives**: `(STATE1 | STATE2 | STATE3) -> NEXT_STATE`
+  - Multiple states share the same next state
+  - Example: `(WAIT | WAITING) -> IN-PROGRESS`
+
+- **Terminal state**: `STATE -> [FINAL_STATE]`
+  - Shorthand for declaring a terminal state
+  - Equivalent to: `STATE -> FINAL_STATE -> FINAL_STATE`
+  - Terminal states cannot transition further (clicking has no effect)
+  - Example: `TODO -> [DONE]`
+
+- **Explicit terminal**: `STATE -> FINAL_STATE -> FINAL_STATE`
+  - Explicitly declares a terminal state
+  - Example: `TODO -> DONE -> DONE`
+
+#### Default Configuration
+
+The plugin ships with these default transitions:
+
+```txt
+TODO -> DOING -> DONE
+(WAIT | WAITING) -> IN-PROGRESS
+LATER -> NOW -> DONE
+```
+
+#### Examples
+
+**Simple workflow**:
+
+```txt
+TODO -> DOING -> DONE
+```
+
+**Complex workflow with alternatives**:
+
+```txt
+TODO -> DOING -> DONE
+(WAIT | WAITING) -> IN-PROGRESS
+LATER -> NOW -> [DONE]
+```
+
+**Custom keywords**:
+
+```txt
+BACKLOG -> IN_PROGRESS -> [DONE]
+IDEA -> BACKLOG
+(REVIEW | TESTING) -> DONE
+```
+
+### Validation and Error Handling
+
+The settings include real-time validation:
+
+- **Invalid keywords**: If a transition includes a keyword that doesn't exist in any keyword group, the line is marked as an error and ignored
+- **Conflicting declarations**: If a state appears in multiple transition declarations, the second declaration is marked as an error and ignored
+- **Invalid default states**: If a default state is removed from keywords, the plugin automatically recovers to the built-in default and displays an info message
+
+### Special Cycle Behavior
+
+The **Cycle** command (vs. click action) has special behavior:
+
+- **Completed states** → Always transition to `""` (blank/clears the state)
+- **Blank state** (`""`) → Always transition to the default inactive state
+- **Other states** → Use the same logic as click action
+
+### Behavior with Removed Keywords
+
+If you remove a built-in keyword that appears in your transition declarations:
+
+1. The transition line is marked as an error and ignored
+2. Other valid transitions continue to work
+3. The state will use its group's default for transitions
+
+This ensures that your workflow remains functional even if you remove keywords, with automatic fallback to defaults.
+
+### Terminal States
+
+Terminal states are keywords that transition to themselves. When you click on a terminal state no transition occurs (the state remains unchanged)
+
+Common use cases for terminal states:
+
+- Marking a task as "done" and preventing further changes
+- Creating a "final" state that requires manual intervention to change
+
 ### Include Tasks Inside Code Blocks
 
 **Setting**: "Include tasks inside code blocks" (toggle)

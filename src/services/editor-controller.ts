@@ -108,7 +108,10 @@ export class EditorController {
         // Cycle to next state
         const settings = this.plugin.settings;
         const keywordManager = new KeywordManager(settings ?? {});
-        const stateManager = new TaskStateTransitionManager(keywordManager);
+        const stateManager = new TaskStateTransitionManager(
+          keywordManager,
+          settings?.stateTransitions,
+        );
         targetState = stateManager.getNextState(task.state);
       }
 
@@ -206,11 +209,20 @@ export class EditorController {
       if (task) {
         const settings = this.plugin.settings;
         const keywordManager = new KeywordManager(settings ?? {});
-        const stateManager = new TaskStateTransitionManager(keywordManager);
+        const stateManager = new TaskStateTransitionManager(
+          keywordManager,
+          settings?.stateTransitions,
+        );
         targetState = stateManager.getCycleState(task.state);
       } else {
-        // For lines without existing task keywords, start with TODO
-        targetState = 'TODO';
+        // For lines without existing task keywords, use the default inactive from settings
+        const settings = this.plugin.settings;
+        const keywordManager = new KeywordManager(settings ?? {});
+        const stateManager = new TaskStateTransitionManager(
+          keywordManager,
+          settings?.stateTransitions,
+        );
+        targetState = stateManager.getCycleState('');
       }
     }
 
