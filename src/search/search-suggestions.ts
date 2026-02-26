@@ -1,8 +1,9 @@
 import { Vault, App } from 'obsidian';
 import { Task } from '../types/task';
-import { TodoTrackerSettings } from '../settings/settings';
+import { TodoTrackerSettings } from '../settings/settings-types';
 import { TaskListViewMode } from '../view/task-list/task-list-view';
 import { TAG_PATTERN } from '../utils/patterns';
+import { getAllKeywords, getKeywordsForGroup } from '../utils/task-utils';
 
 /**
  * Utility class for collecting and filtering search suggestions
@@ -243,27 +244,21 @@ export class SearchSuggestions {
    * @returns Array of task states, sorted alphabetically
    */
   static getAllStates(settings?: TodoTrackerSettings): string[] {
-    // Default states plus any additional configured states
-    const defaultStates = [
-      'TODO',
-      'DOING',
-      'DONE',
-      'NOW',
-      'LATER',
-      'WAIT',
-      'WAITING',
-      'IN-PROGRESS',
-      'CANCELED',
-      'CANCELLED',
-    ];
+    // Get all keywords but exclude archived - archived tasks are never collected
+    // during vault scans and cannot be searched for
+    const allKeywords = getAllKeywords(settings ?? {});
+    const archivedKeywords = getKeywordsForGroup(
+      'archivedKeywords',
+      settings ?? {},
+    );
 
-    // Add custom keywords from settings if provided
-    const customStates = settings?.additionalTaskKeywords || [];
+    // Filter out archived keywords
+    const searchableKeywords = allKeywords.filter(
+      (k) => !archivedKeywords.includes(k),
+    );
 
-    // Combine and deduplicate states
-    const allStates = Array.from(new Set([...defaultStates, ...customStates]));
-
-    return allStates.sort((a, b) => a.localeCompare(b));
+    // Sort alphabetically (case-insensitive)
+    return searchableKeywords.sort((a, b) => a.localeCompare(b));
   }
 
   /**

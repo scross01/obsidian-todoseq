@@ -43,7 +43,7 @@ describe('TaskWriter Instance Methods', () => {
 
     // Mock settings
     (getPluginSettings as jest.Mock).mockReturnValue({
-      additionalTaskKeywords: ['CUSTOM'],
+      additionalInactiveKeywords: ['CUSTOM'],
     });
 
     taskWriter = new TaskWriter(mockApp);
@@ -191,9 +191,10 @@ describe('TaskWriter Instance Methods', () => {
 
       await taskWriter.updateTaskState(task);
 
+      // CUSTOM is inactive keyword, should transition to default Active (DOING)
       expect(applyLineUpdateSpy).toHaveBeenCalledWith(
         task,
-        'DONE',
+        'DOING',
         true,
         false,
       );
@@ -254,9 +255,10 @@ describe('TaskWriter Instance Methods', () => {
 
       await taskWriter.updateTaskCycleState(task);
 
+      // CUSTOM is inactive keyword, should transition to default Active (DOING)
       expect(applyLineUpdateSpy).toHaveBeenCalledWith(
         task,
-        'DONE',
+        'DOING',
         true,
         false,
       );

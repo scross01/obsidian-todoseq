@@ -1,17 +1,14 @@
-import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
-import { TodoTrackerSettings } from '../settings/settings';
-import {
-  LanguageRegistry,
-  LanguageDefinition,
-  LanguageCommentSupportSettings,
-} from './language-registry';
+import { Task } from '../types/task';
+import { LanguageRegistry, LanguageDefinition } from './language-registry';
+import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
-import { buildTaskKeywords } from '../utils/task-utils';
+import { KeywordManager } from '../utils/keyword-manager';
 import { TFile, App } from 'obsidian';
 import {
   calculateTaskUrgency,
   getDefaultCoefficients,
   UrgencyCoefficients,
+  UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
 import {
@@ -37,13 +34,27 @@ import {
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
-export class TaskParser {
+/**
+ * Markdown task parser for TODOseq.
+ * Parses tasks from markdown files using markdown syntax.
+ * Implements ITaskParser interface for multi-format support.
+ */
+export class TaskParser implements ITaskParser {
+  readonly parserId = 'markdown';
+  readonly supportedExtensions = ['.md'];
+
   private readonly includeCalloutBlocks: boolean;
   private readonly includeCodeBlocks: boolean;
   private readonly includeCommentBlocks: boolean;
-  private readonly languageCommentSupport: LanguageCommentSupportSettings;
-  private readonly customKeywords: string[];
+  private readonly languageCommentSupport: boolean;
+  private keywordManager: KeywordManager;
   public allKeywords: string[];
+
+  /**
+   * NOTE: We don't track archived keywords as a separate property here because
+   * archived tasks are explicitly filtered out at the vault scanner level using
+   * isArchivedKeyword() function, not at the parser level.
+   */
 
   // Public access to regex patterns for editor commands
   public readonly testRegex: RegExp;
@@ -66,14 +77,13 @@ export class TaskParser {
     includeCalloutBlocks: boolean,
     includeCodeBlocks: boolean,
     includeCommentBlocks: boolean,
-    languageCommentSupport: LanguageCommentSupportSettings,
-    customKeywords: string[],
-    allKeywords: string[],
+    languageCommentSupport: boolean,
+    keywordManager: KeywordManager,
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
-    this.customKeywords = customKeywords;
-    this.allKeywords = allKeywords;
+    this.keywordManager = keywordManager;
+    this.allKeywords = keywordManager.getAllKeywords();
 
     this.testRegex = regex.test;
     this.captureRegex = regex.capture;
@@ -88,30 +98,34 @@ export class TaskParser {
     this.urgencyCoefficients = urgencyCoefficients || getDefaultCoefficients();
   }
 
+  /**
+   * Create a TaskParser.
+   * @param keywordManager KeywordManager instance (single source of truth for keywords)
+   * @param app Obsidian app instance
+   * @param urgencyCoefficients Optional urgency coefficients
+   * @param parserSettings Optional parser settings (for tests)
+   */
   static create(
-    settings: TodoTrackerSettings,
+    keywordManager: KeywordManager,
     app: App | null,
     urgencyCoefficients?: UrgencyCoefficients,
+    parserSettings?: {
+      includeCalloutBlocks?: boolean;
+      includeCodeBlocks?: boolean;
+      includeCommentBlocks?: boolean;
+      languageCommentSupport?: boolean;
+    },
   ): TaskParser {
-    // Build keyword lists using shared utility
-    const { allKeywords, normalizedAdditional } = buildTaskKeywords(
-      settings.additionalTaskKeywords,
-    );
-
-    // Validate user-provided keywords to prevent regex injection vulnerabilities
-    if (normalizedAdditional.length > 0) {
-      TaskParser.validateKeywords(normalizedAdditional);
-    }
-
+    const allKeywords = keywordManager.getAllKeywords();
     const regex = TaskParser.buildRegex(allKeywords);
+
     return new TaskParser(
       regex,
-      settings.includeCalloutBlocks,
-      settings.includeCodeBlocks,
-      settings.includeCommentBlocks,
-      settings.languageCommentSupport,
-      normalizedAdditional,
-      allKeywords,
+      parserSettings?.includeCalloutBlocks ?? true,
+      parserSettings?.includeCodeBlocks ?? true,
+      parserSettings?.includeCommentBlocks ?? true,
+      parserSettings?.languageCommentSupport ?? false,
+      keywordManager,
       app || null,
       urgencyCoefficients,
     );
@@ -482,6 +496,92 @@ export class TaskParser {
   }
 
   /**
+   * Check if a line matches task pattern.
+   * Implements ITaskParser interface.
+   * @param line Line to check
+   * @returns true if line appears to be a task
+   */
+  public isTaskLine(line: string): boolean {
+    return this.testRegex.test(line);
+  }
+
+  /**
+   * Fast-path check to determine if the string even contains known syntax keywords.
+   * If false, the file is guaranteed to have no parseable tasks, skipping regex overhead.
+   */
+  public hasAnyKeyword(content: string): boolean {
+    for (let i = 0; i < this.allKeywords.length; i++) {
+      if (content.includes(this.allKeywords[i])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Update parser configuration.
+   * Implements ITaskParser interface.
+   * Called when settings change.
+   * @param config New configuration
+   */
+  public updateConfig(config: ParserConfig): void {
+    if (config.keywordManager) {
+      this.keywordManager = config.keywordManager;
+    }
+
+    // Use keywords from config if provided, otherwise from KeywordManager
+    // This allows dynamic keyword updates while maintaining shared KeywordManager
+    this.allKeywords = config.keywords ?? this.keywordManager.getAllKeywords();
+
+    // Rebuild regex with new keywords
+    const regex = TaskParser.buildRegex(this.allKeywords);
+    (this as { testRegex: RegExp }).testRegex = regex.test;
+    (this as { captureRegex: RegExp }).captureRegex = regex.capture;
+
+    this.urgencyCoefficients = config.urgencyCoefficients;
+
+    // Update task detection settings if provided
+    if (config.includeCalloutBlocks !== undefined) {
+      (
+        this as unknown as { includeCalloutBlocks: boolean }
+      ).includeCalloutBlocks = config.includeCalloutBlocks;
+    }
+    if (config.includeCodeBlocks !== undefined) {
+      (this as unknown as { includeCodeBlocks: boolean }).includeCodeBlocks =
+        config.includeCodeBlocks;
+    }
+    if (config.includeCommentBlocks !== undefined) {
+      (
+        this as unknown as { includeCommentBlocks: boolean }
+      ).includeCommentBlocks = config.includeCommentBlocks;
+    }
+    if (config.languageCommentSupport !== undefined) {
+      (
+        this as unknown as {
+          languageCommentSupport: boolean;
+        }
+      ).languageCommentSupport = config.languageCommentSupport;
+    }
+  }
+
+  /**
+   * Parse a single line as a task.
+   * Implements ITaskParser interface.
+   * Alias for parseLineAsTask for interface compatibility.
+   * @param line Single line to parse
+   * @param lineNumber Line number in file (0-indexed)
+   * @param filePath File path
+   * @returns Parsed task or null if not a task
+   */
+  public parseLine(
+    line: string,
+    lineNumber: number,
+    filePath: string,
+  ): Task | null {
+    return this.parseLineAsTask(line, lineNumber, filePath);
+  }
+
+  /**
    * Extract checkbox state from task line
    * @param line The task line to parse
    * @param state The current state
@@ -498,7 +598,8 @@ export class TaskParser {
     listMarker: string;
   } {
     let finalState = state;
-    let finalCompleted = DEFAULT_COMPLETED_STATES.has(state);
+    // Use the keywordManager for determining completion status
+    let finalCompleted = this.keywordManager.isCompleted(state);
     let finalListMarker = listMarker;
 
     // Check if this is a markdown checkbox task and extract checkbox status
@@ -734,6 +835,7 @@ export class TaskParser {
         inBlock &&
         this.includeCodeBlocks &&
         blockMarker === 'code' &&
+        this.languageCommentSupport &&
         this.currentLanguage &&
         codeRegex;
       if (
@@ -850,7 +952,7 @@ export class TaskParser {
       if (transition.entering) {
         inBlock = true;
         blockMarker = 'code';
-        if (this.includeCodeBlocks && this.languageCommentSupport.enabled) {
+        if (this.includeCodeBlocks && this.languageCommentSupport) {
           const line = lines[index];
           const m = CODE_BLOCK_REGEX.exec(line);
           const language = m ? m[2] : '';
@@ -996,7 +1098,7 @@ export class TaskParser {
       footnoteMarker: taskDetails.footnoteMarker,
       text: cleanedText,
       state: taskDetails.state,
-      completed: DEFAULT_COMPLETED_STATES.has(taskDetails.state),
+      completed: this.keywordManager.isCompleted(taskDetails.state),
       priority,
       scheduledDate: null,
       deadlineDate: null,
@@ -1021,7 +1123,15 @@ export class TaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+      const urgencyContext: UrgencyContext = {
+        activeKeywordsSet: this.keywordManager.getActiveSet(),
+        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
+      };
+      task.urgency = calculateTaskUrgency(
+        task,
+        this.urgencyCoefficients,
+        urgencyContext,
+      );
     }
 
     return task;
@@ -1118,7 +1228,15 @@ export class TaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+      const urgencyContext: UrgencyContext = {
+        activeKeywordsSet: this.keywordManager.getActiveSet(),
+        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
+      };
+      task.urgency = calculateTaskUrgency(
+        task,
+        this.urgencyCoefficients,
+        urgencyContext,
+      );
     }
 
     return task;
@@ -1233,7 +1351,15 @@ export class TaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      task.urgency = calculateTaskUrgency(task, this.urgencyCoefficients);
+      const urgencyContext: UrgencyContext = {
+        activeKeywordsSet: this.keywordManager.getActiveSet(),
+        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
+      };
+      task.urgency = calculateTaskUrgency(
+        task,
+        this.urgencyCoefficients,
+        urgencyContext,
+      );
     }
 
     return task;
@@ -1292,7 +1418,7 @@ export class TaskParser {
         footnoteMarker: taskDetails.footnoteMarker,
         text: cleanedText,
         state: taskDetails.state,
-        completed: DEFAULT_COMPLETED_STATES.has(taskDetails.state),
+        completed: this.keywordManager.isCompleted(taskDetails.state),
         priority,
         scheduledDate: null,
         deadlineDate: null,
@@ -1334,7 +1460,8 @@ export class TaskParser {
       const [, , , checkboxStatus] = checkboxMatch;
       completed = checkboxStatus === 'x';
     } else {
-      completed = new Set(['DONE', 'CANCELED', 'CANCELLED']).has(state);
+      // Use the keywordManager for determining completion status
+      completed = this.keywordManager.isCompleted(state);
     }
 
     return {

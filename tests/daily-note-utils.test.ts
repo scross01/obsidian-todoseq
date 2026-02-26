@@ -80,7 +80,7 @@ describe('daily-note-utils', () => {
       expect(result.isDailyNote).toBe(false);
       expect(result.dailyNoteDate).toBeNull();
       expect(warnSpy).toHaveBeenCalledWith(
-        'Error checking daily note status:',
+        'Daily note detection failed:',
         mockError,
       );
 

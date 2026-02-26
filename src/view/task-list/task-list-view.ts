@@ -1,200 +1,40 @@
 import {
   ItemView,
   WorkspaceLeaf,
-  Menu,
   TFile,
   Platform,
   MarkdownView,
   setIcon,
-  Plugin,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
-import {
-  Task,
-  NEXT_STATE,
-  DEFAULT_ACTIVE_STATES,
-  DEFAULT_PENDING_STATES,
-  DEFAULT_COMPLETED_STATES,
-} from '../../types/task';
+import { Task } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
 import { Search } from '../../search/search';
 import { SearchOptionsDropdown } from '../components/search-options-dropdown';
 import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdown';
-import { TodoTrackerSettings } from '../../settings/settings';
+import { StateMenuBuilder } from '../components/state-menu-builder';
+import TodoTracker from '../../main';
 import { getFilename } from '../../utils/task-utils';
-import {
-  sortTasksWithThreeBlockSystem,
-  SortMethod as TaskSortMethod,
-  buildKeywordSortConfig,
-  KeywordSortConfig,
-} from '../../utils/task-sort';
-import { getPluginSettings } from '../../utils/settings-utils';
+import { KeywordManager } from '../../utils/keyword-manager';
+import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { TaskStateManager } from '../../services/task-state-manager';
+import { TaskElementCache } from './task-element-cache';
+import { ChunkedRenderQueue } from './chunked-render-queue';
+import { TaskRenderer } from './task-renderer';
 import {
-  TAG_PATTERN,
-  WIKI_LINK_REGEX,
-  MD_LINK_REGEX,
-  URL_REGEX,
-} from '../../utils/patterns';
-import { getTaskTextDisplay } from '../../utils/task-utils';
+  TaskListFilter,
+  TaskListViewMode,
+  SortMethod,
+} from './task-list-filter';
 
-const CHUNK_BATCH_SIZE = 15;
-const YIELD_EVERY_N_TASKS = 5;
-const PRIORITY_FIRST_BATCH = 10;
-
-// Lazy loading constants
 const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
 
-interface CachedTaskElement {
-  element: HTMLLIElement;
-  task: Task;
-  height: number;
-}
-
-class TaskElementCache {
-  private cache = new Map<string, CachedTaskElement>();
-
-  private getKey(task: Task): string {
-    return `${task.path}:${task.line}`;
-  }
-
-  get(task: Task): HTMLLIElement | null {
-    const cached = this.cache.get(this.getKey(task));
-    return cached?.element ?? null;
-  }
-
-  set(task: Task, element: HTMLLIElement): void {
-    const height = element.getBoundingClientRect().height;
-    this.cache.set(this.getKey(task), { element, task, height });
-  }
-
-  invalidate(task: Task): void {
-    this.cache.delete(this.getKey(task));
-  }
-
-  invalidateByKey(key: string): void {
-    this.cache.delete(key);
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-
-  has(task: Task): boolean {
-    return this.cache.has(this.getKey(task));
-  }
-}
-
-class ChunkedRenderQueue {
-  private pending: Task[] = [];
-  private isProcessing = false;
-  private renderFn: ((task: Task) => HTMLLIElement) | null = null;
-  private container: Element | null = null;
-  private cache: TaskElementCache;
-  private generation = 0;
-  private currentRenderPromise: Promise<void> | null = null;
-
-  constructor(cache: TaskElementCache) {
-    this.cache = cache;
-  }
-
-  async enqueue(
-    tasks: Task[],
-    renderFn: (task: Task) => HTMLLIElement,
-    container: Element,
-  ): Promise<void> {
-    // Cancel old render immediately - don't wait
-    this.generation++;
-    this.pending = [];
-    this.isProcessing = false;
-
-    // Set up new render
-    this.renderFn = renderFn;
-    this.container = container;
-    this.pending = tasks;
-
-    // Force start new render (old will exit via generation check)
-    this.isProcessing = true;
-    this.currentRenderPromise = this.processQueue();
-    await this.currentRenderPromise;
-    this.currentRenderPromise = null;
-  }
-
-  private async processQueue(): Promise<void> {
-    const renderFn = this.renderFn;
-    const container = this.container;
-    const currentGeneration = this.generation;
-    if (!renderFn || !container) return;
-
-    let priorityRendered = 0;
-    let renderedInBatch = 0;
-
-    while (this.pending.length > 0) {
-      // Check generation at start of each batch - exit if cancelled
-      if (this.generation !== currentGeneration) {
-        return;
-      }
-
-      const isFirstBatch = priorityRendered < PRIORITY_FIRST_BATCH;
-      const batchSize = isFirstBatch
-        ? Math.min(CHUNK_BATCH_SIZE, PRIORITY_FIRST_BATCH - priorityRendered)
-        : CHUNK_BATCH_SIZE;
-
-      const batch = this.pending.splice(0, batchSize);
-
-      for (const task of batch) {
-        // Check generation before each task - exit if cancelled
-        if (this.generation !== currentGeneration) {
-          return;
-        }
-
-        // Get cached element or render new one
-        let element = this.cache.get(task);
-        if (!element) {
-          element = renderFn(task);
-          this.cache.set(task, element);
-        }
-        container.appendChild(element); // Always append (moves if already in DOM)
-        priorityRendered++;
-        renderedInBatch++;
-
-        // Yield every N tasks to prevent UI blocking
-        if (renderedInBatch >= YIELD_EVERY_N_TASKS) {
-          renderedInBatch = 0;
-          await new Promise((resolve) => setTimeout(resolve, 0));
-        }
-      }
-    }
-
-    this.isProcessing = false;
-  }
-
-  clear(): void {
-    this.generation++;
-    this.pending = [];
-    this.isProcessing = false;
-  }
-
-  get isEmpty(): boolean {
-    return this.pending.length === 0 && !this.isProcessing;
-  }
-}
-
-export type TaskListViewMode =
-  | 'showAll'
-  | 'sortCompletedLast'
-  | 'hideCompleted';
-export type SortMethod =
-  | 'default'
-  | 'sortByScheduled'
-  | 'sortByDeadline'
-  | 'sortByPriority'
-  | 'sortByUrgency'
-  | 'sortByKeyword';
+export type { TaskListViewMode, SortMethod } from './task-list-filter';
 
 export class TaskListView extends ItemView {
   static viewType = 'todoseq-view';
+
   tasks: Task[];
   private defaultViewMode: TaskListViewMode;
   private defaultSortMethod: SortMethod;
@@ -219,6 +59,12 @@ export class TaskListView extends ItemView {
   private taskElementCache = new TaskElementCache();
   private renderQueue: ChunkedRenderQueue;
 
+  // Menu builder for state management
+  private menuBuilder: StateMenuBuilder;
+
+  // Task renderer for building DOM elements
+  private taskRenderer: TaskRenderer;
+
   // Search history debounce mechanism
   private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
     null;
@@ -231,12 +77,18 @@ export class TaskListView extends ItemView {
   private taskRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly TASK_REFRESH_DEBOUNCE_MS = 150;
 
-  // Keyword sort config caching
-  private cachedKeywordConfig: KeywordSortConfig | null = null;
-  private cachedKeywords: string | null = null;
+  // Task list filter for filtering and sorting
+  private taskListFilter: TaskListFilter;
+
+  // Add generation counter for refreshVisibleList
+  private refreshGeneration = 0;
 
   // Reference to the plugin for checking user-initiated updates
-  private plugin: Plugin | null = null;
+  private plugin: TodoTracker;
+
+  // Keyword and state management
+  private keywordManager: KeywordManager;
+  private stateManager: TaskStateTransitionManager;
 
   // Lazy loading state
   private loadedTaskCount = 0;
@@ -250,15 +102,22 @@ export class TaskListView extends ItemView {
     leaf: WorkspaceLeaf,
     taskStateManager: TaskStateManager,
     defaultViewMode: TaskListViewMode,
-    private settings: TodoTrackerSettings,
-    plugin: Plugin,
+    plugin: TodoTracker,
   ) {
     super(leaf);
     this.tasks = taskStateManager.getTasks();
     this.defaultViewMode = defaultViewMode;
-    this.defaultSortMethod = settings.defaultSortMethod;
+    this.defaultSortMethod = plugin.settings.defaultSortMethod;
+    this.menuBuilder = new StateMenuBuilder(plugin);
+    this.taskRenderer = new TaskRenderer(plugin, this.menuBuilder);
+    this.taskListFilter = new TaskListFilter(plugin);
+    this.renderQueue = new ChunkedRenderQueue();
     this.plugin = plugin;
-    this.renderQueue = new ChunkedRenderQueue(this.taskElementCache);
+    this.keywordManager = new KeywordManager(plugin.settings ?? {});
+    this.stateManager = new TaskStateTransitionManager(
+      this.keywordManager,
+      plugin.settings?.stateTransitions,
+    );
 
     // Subscribe to task changes from the centralized state manager
     // Uses interrupt pattern: new update cancels pending work and processes immediately
@@ -437,58 +296,8 @@ export class TaskListView extends ItemView {
 
   /** Non-mutating transform for rendering */
   private transformForView(tasks: Task[], mode: TaskListViewMode): Task[] {
-    const now = new Date();
-    const sortMethod = this.getSortMethod() as TaskSortMethod;
-
-    // Map TaskListViewMode to CompletedTaskSetting
-    let completedSetting: 'showAll' | 'sortToEnd' | 'hide';
-    switch (mode) {
-      case 'hideCompleted':
-        completedSetting = 'hide';
-        break;
-      case 'sortCompletedLast':
-        completedSetting = 'sortToEnd';
-        break;
-      case 'showAll':
-      default:
-        completedSetting = 'showAll';
-        break;
-    }
-
-    // Use the new three-block sorting system
-    const futureSetting = this.settings.futureTaskSorting;
-
-    // Build keyword config if sorting by keyword
-    let keywordConfig: KeywordSortConfig | undefined;
-    if (sortMethod === 'sortByKeyword') {
-      keywordConfig = this.getKeywordSortConfig();
-    }
-
-    // Apply the new sorting logic
-    const sortedTasks = sortTasksWithThreeBlockSystem(
-      tasks,
-      now,
-      futureSetting,
-      completedSetting,
-      sortMethod,
-      keywordConfig,
-    );
-
-    return sortedTasks;
-  }
-
-  /**
-   * Get cached keyword sort config, rebuilding only when keywords change
-   */
-  private getKeywordSortConfig(): KeywordSortConfig {
-    const keywords = this.settings?.additionalTaskKeywords?.join(',') ?? '';
-    if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
-      this.cachedKeywords = keywords;
-      this.cachedKeywordConfig = buildKeywordSortConfig(
-        this.settings?.additionalTaskKeywords ?? [],
-      );
-    }
-    return this.cachedKeywordConfig;
+    const sortMethod = this.getSortMethod();
+    return this.taskListFilter.transformForView(tasks, mode, sortMethod);
   }
 
   /** Search query (persisted on root contentEl attribute to survive re-renders) */
@@ -727,7 +536,7 @@ export class TaskListView extends ItemView {
     }
 
     // Set current future task sorting mode
-    futureDropdown.value = this.settings.futureTaskSorting;
+    futureDropdown.value = this.plugin.settings.futureTaskSorting;
 
     // Handle future task sorting changes
     futureDropdown.addEventListener('change', async () => {
@@ -738,7 +547,7 @@ export class TaskListView extends ItemView {
         | 'hideFuture';
 
       // Update settings and re-render
-      this.settings.futureTaskSorting = selectedValue;
+      this.plugin.settings.futureTaskSorting = selectedValue;
 
       // Dispatch event for persistence
       const evt = new CustomEvent('todoseq:future-task-sorting-change', {
@@ -860,7 +669,7 @@ export class TaskListView extends ItemView {
           this.app.vault,
           this.app,
           this.tasks,
-          this.settings,
+          this.plugin.settings,
           this.getViewMode(),
         );
 
@@ -872,7 +681,7 @@ export class TaskListView extends ItemView {
           inputEl,
           this.app.vault,
           this.tasks,
-          this.settings,
+          this.plugin.settings,
           this.suggestionDropdown,
         );
 
@@ -1134,82 +943,19 @@ export class TaskListView extends ItemView {
     return TaskListView.viewType;
   }
 
-  /** Return default keyword sets (non-completed and completed) and additional keywords using constants from task.ts */
-  private getKeywordSets(): {
-    pendingActive: string[];
-    completed: string[];
-    additional: string[];
-  } {
-    const pendingActiveDefaults: string[] = [
-      ...Array.from(DEFAULT_PENDING_STATES),
-      ...Array.from(DEFAULT_ACTIVE_STATES),
-    ];
-    const completedDefaults: string[] = Array.from(DEFAULT_COMPLETED_STATES);
-
-    const settings = getPluginSettings(this.app);
-    const configured = settings?.additionalTaskKeywords;
-    const additional = Array.isArray(configured)
-      ? configured.filter(
-          (v): v is string => typeof v === 'string' && v.length > 0,
-        )
-      : [];
-
-    return {
-      pendingActive: pendingActiveDefaults,
-      completed: completedDefaults,
-      additional,
-    };
-  }
-
-  /** Build the list of selectable states for the context menu, excluding the current state */
-  private getSelectableStatesForMenu(
-    current: string,
-  ): { group: string; states: string[] }[] {
-    const { pendingActive, completed, additional } = this.getKeywordSets();
-
-    const dedupe = (arr: string[]) => Array.from(new Set(arr));
-    const nonCompleted = dedupe([...pendingActive, ...additional]);
-    const completedOnly = dedupe(completed);
-
-    // Present two groups: Non-completed and Completed
-    const groups: { group: string; states: string[] }[] = [
-      {
-        group: 'Not completed',
-        states: nonCompleted.filter((s) => s && s !== current),
-      },
-      {
-        group: 'Completed',
-        states: completedOnly.filter((s) => s && s !== current),
-      },
-    ];
-    return groups.filter((g) => g.states.length > 0);
-  }
-
   /** Open Obsidian Menu at mouse event location listing default and additional keywords (excluding current) */
   private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
     evt.preventDefault();
     evt.stopPropagation();
-    const menu = new Menu();
-    const groups = this.getSelectableStatesForMenu(task.state);
 
-    for (const g of groups) {
-      // Section header (disabled item)
-      menu.addItem((item) => {
-        item.setTitle(g.group);
-        item.setDisabled(true);
-      });
-      for (const state of g.states) {
-        menu.addItem((item) => {
-          item.setTitle(state);
-          item.onClick(async () => {
-            await this.updateTaskState(task, state);
-            // Full refresh handled by subscribe callback
-          });
-        });
-      }
-      // Divider between groups when both exist
-      menu.addSeparator();
-    }
+    // Use the shared StateMenuBuilder for consistent menu structure
+    const menu = this.menuBuilder.buildStateMenu(
+      task.state,
+      async (newState: string) => {
+        await this.updateTaskState(task, newState);
+        // Full refresh handled by subscribe callback
+      },
+    );
 
     // Prefer API helper when available; fallback to explicit coordinates
     const maybeShowAtMouseEvent = (
@@ -1227,25 +973,15 @@ export class TaskListView extends ItemView {
     task: Task,
     pos: { x: number; y: number },
   ): void {
-    const menu = new Menu();
-    const groups = this.getSelectableStatesForMenu(task.state);
+    // Use the shared StateMenuBuilder for consistent menu structure
+    const menu = this.menuBuilder.buildStateMenu(
+      task.state,
+      async (newState: string) => {
+        await this.updateTaskState(task, newState);
+        // Full refresh handled by subscribe callback
+      },
+    );
 
-    for (const g of groups) {
-      menu.addItem((item) => {
-        item.setTitle(g.group);
-        item.setDisabled(true);
-      });
-      for (const state of g.states) {
-        menu.addItem((item) => {
-          item.setTitle(state);
-          item.onClick(async () => {
-            await this.updateTaskState(task, state);
-            // Full refresh handled by subscribe callback
-          });
-        });
-      }
-      menu.addSeparator();
-    }
     menu.showAtPosition({ x: pos.x, y: pos.y });
   }
 
@@ -1265,8 +1001,8 @@ export class TaskListView extends ItemView {
       cls: 'todo-checkbox',
     });
 
-    // Add state-specific class for styling
-    if (DEFAULT_ACTIVE_STATES.has(task.state)) {
+    // Add state-specific class for styling (includes custom active keywords)
+    if (this.keywordManager.isActive(task.state)) {
       checkbox.addClass('todo-checkbox-active');
     }
 
@@ -1288,10 +1024,23 @@ export class TaskListView extends ItemView {
     todoSpan.setAttr('tabindex', '0');
     todoSpan.setAttr('aria-checked', String(task.completed));
 
+    this.attachKeywordHandlers(todoSpan, task);
+
+    return todoSpan;
+  }
+
+  /**
+   * Attach event handlers to a keyword span for click, keyboard, contextmenu, and touch events.
+   * This is extracted into a separate method so it can be called when rebuilding keyword spans
+   * during content updates (e.g., after state changes).
+   */
+  private attachKeywordHandlers(todoSpan: HTMLSpanElement, task: Task): void {
     const activate = async (evt: Event) => {
       evt.stopPropagation();
-      await this.updateTaskState(task, NEXT_STATE.get(task.state) ?? 'DONE');
-      // Full refresh handled by subscribe callback
+      await this.updateTaskState(
+        task,
+        this.stateManager.getNextState(task.state),
+      );
     };
 
     // Click advances to next state (quick action)
@@ -1402,8 +1151,6 @@ export class TaskListView extends ItemView {
       },
       true,
     ); // capture to intercept before activate handler
-
-    return todoSpan;
   }
 
   /**
@@ -1450,6 +1197,7 @@ export class TaskListView extends ItemView {
     const li = createEl('li', { cls: 'todo-item' });
     li.setAttribute('data-path', task.path);
     li.setAttribute('data-line', String(task.line));
+    li.setAttribute('data-raw-text', task.rawText);
 
     const checkbox = this.buildCheckbox(task, li);
     this.buildText(task, li);
@@ -1492,7 +1240,7 @@ export class TaskListView extends ItemView {
       checkbox.checked = task.completed;
       checkbox.classList.toggle(
         'todo-checkbox-active',
-        DEFAULT_ACTIVE_STATES.has(task.state),
+        this.keywordManager.isActive(task.state),
       );
     }
 
@@ -1506,44 +1254,70 @@ export class TaskListView extends ItemView {
     }
 
     // 3. Update todo-text: rebuild the text portion (after keyword and priority)
-    const todoText = element.querySelector('.todo-text') as HTMLElement;
-    if (todoText) {
-      // Get keyword info BEFORE clearing (since innerHTML='' removes it)
-      const keywordSpan = element.querySelector('.todo-keyword');
-      const keywordState = keywordSpan?.textContent || task.state;
-      const keywordAriaChecked =
-        keywordSpan?.getAttribute('aria-checked') || 'false';
+    // ONLY rebuild if the underlying raw text actually changed (smart diff)
+    const currentRawText = element.getAttribute('data-raw-text');
+    const textChanged = currentRawText !== task.rawText;
 
-      // Clear existing text content
-      todoText.innerHTML = '';
+    if (textChanged) {
+      element.setAttribute('data-raw-text', task.rawText);
+      const todoText = element.querySelector('.todo-text') as HTMLElement;
+      if (todoText) {
+        // Get keyword info BEFORE clearing (since innerHTML='' removes it)
+        const keywordSpan = element.querySelector('.todo-keyword');
+        const keywordState = keywordSpan?.textContent || task.state;
+        const keywordAriaChecked =
+          keywordSpan?.getAttribute('aria-checked') || 'false';
 
-      // Re-add keyword span
-      const newKeywordSpan = todoText.createEl('span', { cls: 'todo-keyword' });
-      newKeywordSpan.setText(keywordState);
-      newKeywordSpan.setAttr('role', 'button');
-      newKeywordSpan.setAttr('tabindex', '0');
-      newKeywordSpan.setAttr('aria-checked', keywordAriaChecked);
-      todoText.appendText(' ');
+        // Clear existing text content
+        todoText.innerHTML = '';
 
-      // Rebuild priority badge (in case it changed or was added/removed)
-      if (task.priority) {
-        const priorityText =
-          task.priority === 'high' ? 'A' : task.priority === 'med' ? 'B' : 'C';
-        const badge = todoText.createEl('span', {
-          cls: ['priority-badge', `priority-${task.priority}`],
+        // Re-add keyword span
+        const newKeywordSpan = todoText.createEl('span', {
+          cls: 'todo-keyword',
         });
-        badge.setText(priorityText);
-        badge.setAttribute('aria-label', `Priority ${task.priority}`);
-        badge.setAttribute('title', `Priority ${task.priority}`);
+        newKeywordSpan.setText(keywordState);
+        newKeywordSpan.setAttr('role', 'button');
+        newKeywordSpan.setAttr('tabindex', '0');
+        newKeywordSpan.setAttr('aria-checked', keywordAriaChecked);
+        this.attachKeywordHandlers(newKeywordSpan, task);
         todoText.appendText(' ');
+
+        // Rebuild priority badge (in case it changed or was added/removed)
+        if (task.priority) {
+          const priorityText =
+            task.priority === 'high'
+              ? 'A'
+              : task.priority === 'med'
+                ? 'B'
+                : 'C';
+          const badge = todoText.createEl('span', {
+            cls: ['priority-badge', `priority-${task.priority}`],
+          });
+          badge.setText(priorityText);
+          badge.setAttribute('aria-label', `Priority ${task.priority}`);
+          badge.setAttribute('title', `Priority ${task.priority}`);
+          todoText.appendText(' ');
+        }
+
+        // Re-add task text with links
+        if (task.text) {
+          this.renderTaskTextWithLinks(task, todoText);
+        }
+
+        todoText.classList.toggle('completed', task.completed);
+      }
+    } else {
+      // Even if text didn't change, we still need to toggle the completed class
+      // on the text container and update aria attributes on the keyword button
+      const todoText = element.querySelector('.todo-text') as HTMLElement;
+      if (todoText) {
+        todoText.classList.toggle('completed', task.completed);
       }
 
-      // Re-add task text with links
-      if (task.text) {
-        this.renderTaskTextWithLinks(task, todoText);
+      const keywordSpan = element.querySelector('.todo-keyword');
+      if (keywordSpan) {
+        keywordSpan.setAttribute('aria-checked', String(task.completed));
       }
-
-      todoText.classList.toggle('completed', task.completed);
     }
 
     // 4. Update date display (may need to add/remove/rebuild)
@@ -1568,13 +1342,16 @@ export class TaskListView extends ItemView {
     element.classList.toggle('completed', task.completed);
     element.classList.toggle(
       'cancelled',
-      task.state === 'CANCELED' || task.state === 'CANCELLED',
+      this.keywordManager.isCompleted(task.state),
     );
     element.classList.toggle(
       'in-progress',
-      task.state === 'DOING' || task.state === 'IN-PROGRESS',
+      this.keywordManager.isActive(task.state),
     );
-    element.classList.toggle('active', DEFAULT_ACTIVE_STATES.has(task.state));
+    element.classList.toggle(
+      'active',
+      this.keywordManager.isActive(task.state),
+    );
   }
 
   // Set up scroll listener for lazy loading
@@ -1639,6 +1416,7 @@ export class TaskListView extends ItemView {
     if (this.isLoadingMore || this.isAllTasksLoaded) return;
 
     this.isLoadingMore = true;
+    const currentGeneration = this.refreshGeneration;
     const list = this.taskListContainer?.querySelector('ul.todo-list');
     if (!list) {
       this.isLoadingMore = false;
@@ -1662,9 +1440,22 @@ export class TaskListView extends ItemView {
     // Use chunked rendering for the new batch
     await this.renderQueue.enqueue(
       tasksToLoad,
-      (task) => this.buildTaskListItem(task),
+      (task) => {
+        let element = this.taskElementCache.get(task);
+        if (!element) {
+          element = this.buildTaskListItem(task);
+          this.taskElementCache.set(task, element);
+        }
+        return element;
+      },
       list,
     );
+
+    // Abort if another refresh was triggered while chunking lazy load
+    if (this.refreshGeneration !== currentGeneration) {
+      this.isLoadingMore = false;
+      return;
+    }
 
     // Move sentinel to end so it's always after all loaded tasks
     if (this.sentinelElement) {
@@ -1693,6 +1484,8 @@ export class TaskListView extends ItemView {
    * @param resetScroll If true, reset to top of list. If false, preserve scroll position.
    */
   async refreshVisibleList(resetScroll = false): Promise<void> {
+    const currentGeneration = ++this.refreshGeneration;
+
     // Cancel any pending debounced refresh - this call takes precedence
     if (this.taskRefreshTimeout) {
       clearTimeout(this.taskRefreshTimeout);
@@ -1708,6 +1501,11 @@ export class TaskListView extends ItemView {
 
     // Yield to main thread to prevent blocking user typing
     await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Abort if another refresh was triggered while we yielded
+    if (this.refreshGeneration !== currentGeneration) {
+      return;
+    }
 
     // Sync dropdown with current sort method
     const sortDropdown = container.querySelector(
@@ -1733,7 +1531,7 @@ export class TaskListView extends ItemView {
               q,
               t,
               this.isCaseSensitive,
-              this.settings,
+              this.plugin.settings,
             );
             return { task: t, matches };
           }),
@@ -1844,6 +1642,12 @@ export class TaskListView extends ItemView {
       // Keep toolbar enabled: do not disable or overlay; list remains empty
       return;
     } else if (visible.length === 0) {
+      // Clear all existing tasks from the list first
+      const taskList = this.taskListContainer?.querySelector('ul.todo-list');
+      if (taskList) {
+        taskList.empty();
+      }
+
       // Remove any previous empty-state
       const prevEmpty = container.querySelector('.todo-empty');
       if (prevEmpty) prevEmpty.detach?.();
@@ -1923,45 +1727,49 @@ export class TaskListView extends ItemView {
       // Track which elements we've already used this render cycle
       const usedKeys = new Set<string>();
 
-      // Reorder/reuse existing elements, create new ones only if needed
-      for (let i = 0; i < toRender.length; i++) {
-        const task = toRender[i];
-        const key = `${task.path}:${task.line}`;
+      // Double-buffer: build all elements in a DocumentFragment first (no yields for refresh),
+      // then swap into DOM in a single operation to prevent flicker
+      const fragment = await this.renderQueue.renderToFragment(
+        toRender,
+        (task) => {
+          const key = `${task.path}:${task.line}`;
+          let element: HTMLLIElement;
 
-        let element: HTMLLIElement;
-
-        if (existingElements.has(key)) {
-          // Reuse existing element - but update its content with new task data
-          const existingEl = existingElements.get(key);
-          if (existingEl) {
-            element = existingEl as HTMLLIElement;
-            this.updateTaskElementContent(task, element);
-            usedKeys.add(key);
+          if (existingElements.has(key)) {
+            // Reuse existing element - but update its content with new task data
+            const existingEl = existingElements.get(key);
+            if (existingEl) {
+              element = existingEl as HTMLLIElement;
+              this.updateTaskElementContent(task, element);
+              usedKeys.add(key);
+            } else {
+              element = this.buildTaskListItem(task);
+            }
           } else {
+            // Create new element (task wasn't in DOM before)
             element = this.buildTaskListItem(task);
           }
-        } else {
-          // Create new element (task wasn't in DOM before)
-          element = this.buildTaskListItem(task);
-        }
 
-        // Update cache with the element (whether reused or new)
-        this.taskElementCache.set(task, element);
+          // Update cache with the element (whether reused or new)
+          this.taskElementCache.set(task, element);
 
-        // Append to list in correct position
-        // If it's already in the list at a different position, appendChild moves it
-        list.appendChild(element);
+          return element;
+        },
+        false, // skip yielding during incremental refresh to prevent flicker
+      );
+
+      // Abort if another refresh superseded us while building!
+      if (this.refreshGeneration !== currentGeneration) {
+        return;
       }
 
-      // Remove elements that are no longer in visible list (lazy loaded items scrolled out)
-      existingKeys.forEach((key) => {
-        if (!keepKeys.has(key)) {
-          const el = existingElements.get(key);
-          if (el && el.parentNode && el.parentNode === list) {
-            list.removeChild(el);
-          }
-        }
-      });
+      // No-clear swap: create new list element, populate it, then replace old with new
+      // This prevents the brief empty flash from innerHTML = ''
+      const newList = list.cloneNode(false) as HTMLElement;
+      newList.appendChild(fragment);
+      list.parentNode?.replaceChild(newList, list);
+
+      // Note: We don't need to manually remove old elements - they're gone with the detached old list
 
       // Update lazy loading state
       this.renderQueue.clear();
@@ -2149,82 +1957,8 @@ export class TaskListView extends ItemView {
     }
   }
 
-  // Render Obsidian-style links and tags as non-clickable, styled spans inside task text.
-  // Supports:
-  //  - Wiki links: [[Note]] and [[Note|Alias]]
-  //  - Markdown links: [Alias](url-or-path)
-  //  - Bare URLs: http(s)://...
-  //  - Tags: #tag
-  // Render task text with links, using lazy-computed textDisplay
-  private renderTaskTextWithLinks(task: Task, parent: HTMLElement) {
-    // Use lazy-computed textDisplay for better performance
-    const textToProcess = getTaskTextDisplay(task);
-    const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp }[] = [
-      { type: 'wiki', regex: new RegExp(WIKI_LINK_REGEX) },
-      { type: 'md', regex: new RegExp(MD_LINK_REGEX) },
-      { type: 'url', regex: new RegExp(URL_REGEX) },
-      { type: 'tag', regex: new RegExp(TAG_PATTERN) },
-    ];
-
-    let i = 0;
-    while (i < textToProcess.length) {
-      let nextMatch: {
-        type: 'wiki' | 'md' | 'url' | 'tag';
-        match: RegExpExecArray;
-      } | null = null;
-
-      for (const p of patterns) {
-        p.regex.lastIndex = i;
-        const m = p.regex.exec(textToProcess);
-        if (m) {
-          if (!nextMatch || m.index < nextMatch.match.index) {
-            nextMatch = { type: p.type, match: m };
-          }
-        }
-      }
-
-      if (!nextMatch) {
-        // Append any remaining text
-        parent.appendText(textToProcess.slice(i));
-        break;
-      }
-
-      // Append plain text preceding the match
-      if (nextMatch.match.index > i) {
-        parent.appendText(textToProcess.slice(i, nextMatch.match.index));
-      }
-
-      // Create appropriate styled element based on type
-      if (nextMatch.type === 'tag') {
-        // Create a tag-like span
-        const span = parent.createEl('span', { cls: 'todo-tag' });
-        const tagName = nextMatch.match[0]; // Full #tag text including #
-        span.setText(tagName);
-        span.setAttribute('title', tagName);
-      } else {
-        // Create a non-interactive, link-like span for other types
-        const span = parent.createEl('span', { cls: 'todo-link-like' });
-
-        if (nextMatch.type === 'wiki') {
-          const target = nextMatch.match[1];
-          const alias = nextMatch.match[2];
-          span.setText(alias ?? target);
-          span.setAttribute('title', target);
-        } else if (nextMatch.type === 'md') {
-          const label = nextMatch.match[1];
-          const url = nextMatch.match[2];
-          span.setText(label);
-          span.setAttribute('title', url);
-        } else {
-          const url = nextMatch.match[0];
-          span.setText(url);
-          span.setAttribute('title', url);
-        }
-      }
-
-      // Advance past the match
-      i = nextMatch.match.index + nextMatch.match[0].length;
-    }
+  private renderTaskTextWithLinks(task: Task, parent: HTMLElement): void {
+    this.taskRenderer.renderTaskTextWithLinks(task, parent);
   }
 
   // Open the source file in the vault where the task is declared, honoring Obsidian default-like modifiers.
@@ -2432,14 +2166,18 @@ export class TaskListView extends ItemView {
       this.resizeObserver = null;
     }
 
-    // Cleanup scroll event listener
-    if (this.scrollEventListener && this.taskListContainer) {
-      this.taskListContainer.removeEventListener(
-        'scroll',
-        this.scrollEventListener,
-      );
-      this.scrollEventListener = null;
+    // Cleanup IntersectionObserver (sentinelObserver)
+    if (this.sentinelObserver) {
+      this.sentinelObserver.disconnect();
+      this.sentinelObserver = null;
     }
+
+    // Cleanup scroll event listener and sentinel observer
+    this.cleanupSentinelObserver();
+
+    // Clear task element cache
+    this.taskElementCache.clear();
+    this.renderQueue.clear();
 
     this.searchInputEl = null;
     this.taskListContainer = null;

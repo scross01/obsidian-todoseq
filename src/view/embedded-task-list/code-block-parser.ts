@@ -35,6 +35,7 @@ export interface TodoseqParameters {
   future?: FutureOption;
   limit?: number;
   showFile?: boolean;
+  showUrgency?: boolean; // undocumented option for debugging
   title?: string;
   showQuery?: boolean;
   wrapContent?: boolean | 'dynamic';
@@ -70,6 +71,7 @@ export class TodoseqCodeBlockParser {
       let future: FutureOption | undefined;
       let limit: number | undefined;
       let showFile: boolean | undefined;
+      let showUrgency: boolean | undefined; // undocumented option
       let title: string | undefined;
       let showQuery: boolean | undefined;
       let wrapContent: boolean | 'dynamic' | undefined;
@@ -202,6 +204,23 @@ export class TodoseqCodeBlockParser {
               `Invalid show-file option: ${showFileValue}. Valid options: true, false, show, hide`,
             );
           }
+        } else if (trimmed.startsWith('show-urgency:')) {
+          const showUrgencyValue = trimmed
+            .substring('show-urgency:'.length)
+            .trim()
+            .toLowerCase();
+          if (showUrgencyValue === 'false' || showUrgencyValue === 'hide') {
+            showUrgency = false;
+          } else if (
+            showUrgencyValue === 'true' ||
+            showUrgencyValue === 'show'
+          ) {
+            showUrgency = true;
+          } else {
+            throw new Error(
+              `Invalid show-urgency option: ${showUrgencyValue}. Valid options: true, false, show, hide`,
+            );
+          }
         } else if (trimmed.startsWith('title:')) {
           title = trimmed.substring('title:'.length).trim();
         } else if (trimmed.startsWith('show-query:')) {
@@ -276,6 +295,7 @@ export class TodoseqCodeBlockParser {
         future,
         limit,
         showFile,
+        showUrgency,
         title,
         showQuery,
         wrapContent,
@@ -289,6 +309,7 @@ export class TodoseqCodeBlockParser {
         sortMethod: 'default',
         error: errorMessage,
         showFile: undefined,
+        showUrgency: undefined,
         title: undefined,
         showQuery: undefined,
         wrapContent: undefined,
@@ -350,6 +371,7 @@ export class TodoseqCodeBlockParser {
       deadline: 'sortByDeadline',
       priority: 'sortByPriority',
       urgency: 'sortByUrgency',
+      keyword: 'sortByKeyword',
     };
 
     return sortMap[params.sortMethod] || 'default';

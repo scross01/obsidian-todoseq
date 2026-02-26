@@ -1,6 +1,6 @@
 import { Task } from '../../types/task';
 import { Search } from '../../search/search';
-import { TodoTrackerSettings } from '../../settings/settings';
+import { TodoTrackerSettings } from '../../settings/settings-types';
 import {
   sortTasksWithThreeBlockSystem,
   SortMethod as TaskSortMethod,
@@ -8,6 +8,7 @@ import {
   KeywordSortConfig,
 } from '../../utils/task-sort';
 import { TodoseqParameters, TodoseqCodeBlockParser } from './code-block-parser';
+import { KeywordManager } from '../../utils/keyword-manager';
 
 /**
  * Manages task filtering and sorting for embedded task lists.
@@ -198,14 +199,20 @@ export class EmbeddedTaskListManager {
           ? TodoseqCodeBlockParser.getCompletedSetting(params.completed)
           : 'showAll'; // Default embedded lists to show all unless overridden
 
-      // Build keyword config if sorting by keyword
+      // Build keyword config if sorting by keyword, priority, urgency, scheduled, or deadline
       let keywordConfig: KeywordSortConfig | undefined;
-      if (sortMethod === 'sortByKeyword') {
+      if (
+        sortMethod === 'sortByKeyword' ||
+        sortMethod === 'sortByUrgency' ||
+        sortMethod === 'sortByPriority' ||
+        sortMethod === 'sortByScheduled' ||
+        sortMethod === 'sortByDeadline'
+      ) {
         keywordConfig = this.getKeywordSortConfig();
       }
 
       // Use the existing three-block sorting system
-      return sortTasksWithThreeBlockSystem(
+      const sorted = sortTasksWithThreeBlockSystem(
         tasks,
         now,
         futureSetting,
@@ -213,6 +220,8 @@ export class EmbeddedTaskListManager {
         sortMethod,
         keywordConfig,
       );
+
+      return sorted;
     } catch (error) {
       console.error('Error sorting tasks:', error);
       // Return unsorted tasks as fallback
@@ -224,13 +233,14 @@ export class EmbeddedTaskListManager {
    * Get cached keyword sort config, rebuilding only when keywords change
    */
   private getKeywordSortConfig(): KeywordSortConfig {
-    const keywords = this.settings?.additionalTaskKeywords?.join(',') ?? '';
+    const keywordManager = new KeywordManager(this.settings);
+
+    const keywords = keywordManager.getAllKeywords().join(',');
     if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
       this.cachedKeywords = keywords;
-      this.cachedKeywordConfig = buildKeywordSortConfig(
-        this.settings?.additionalTaskKeywords ?? [],
-      );
+      this.cachedKeywordConfig = buildKeywordSortConfig(keywordManager);
     }
+
     return this.cachedKeywordConfig;
   }
 
@@ -250,7 +260,9 @@ export class EmbeddedTaskListManager {
       keyword: 'sortByKeyword',
     };
 
-    return sortMap[params.sortMethod] || 'default';
+    const result = sortMap[params.sortMethod] || 'default';
+
+    return result;
   }
 
   /**
@@ -321,5 +333,7 @@ export class EmbeddedTaskListManager {
   updateSettings(settings: TodoTrackerSettings): void {
     this.settings = settings;
     this.clearCache();
+    this.cachedKeywordConfig = null; // Invalidate keyword config cache
+    this.cachedKeywords = null;
   }
 }

@@ -6,12 +6,16 @@ This file provides guidance to agents when working with code in this repository.
 
 - **ALWAYS** consider the performance impact of any changes and prioritise performance without sacrificing functionality
 - **REMEMBER** this is an Obsidian plugin and should be treated as such, it is not a generic web app.
-- **DO NOT** use Unsafe assignment of an `any` value
+- **DO NOT** use Unsafe assignment of an `any` value.
+- **TEST DRIVEN DEVELOPMENT** write or update unit tests before making changes to the codebase.
+- **DO NOT** use `console.log` for debugging, use `console.debug` instead.
 
 ## Build & Test
 
-- **Build**: `npm run build:debug`
+- **Build**: `npm run build`
 - **Test**: `npm test`
+- **Format**: `npm run format` - runs prettier on all files.
+- **Lint**: `npm run lint` - run format first to reduce lint errors.
 - **Single test**: `npm test -- --testNamePattern="pattern"` (Jest with regex match)
 - **Coverage excludes**: `src/main.ts` excluded from coverage (line 9 in jest.config.json)
 - **Test console**: Tests mock console methods to reduce noise (lines 21-28 in tests/test-setup.ts)

@@ -7,7 +7,7 @@ import {
   WidgetType,
 } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
-import { TodoTrackerSettings } from '../../settings/settings';
+import { TodoTrackerSettings } from '../../settings/settings-types';
 import { TaskParser } from '../../parser/task-parser';
 import {
   COMMENT_BLOCK_REGEX,
@@ -20,7 +20,7 @@ import {
   LanguageDefinition,
 } from '../../parser/language-registry';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
-import { DEFAULT_COMPLETED_STATES } from '../../types/task';
+import { isCompletedKeyword, isArchivedKeyword } from '../../utils/task-utils';
 
 /**
  * Priority type definition
@@ -242,7 +242,7 @@ export class TaskKeywordDecorator {
           this.inCodeBlock &&
           this.settings.includeCodeBlocks &&
           this.currentLanguage &&
-          this.settings.languageCommentSupport.enabled
+          this.settings.languageCommentSupport
         ) {
           // Use language-specific regex for code blocks when language comment support is enabled
           const codeRegex = TaskParser.buildCodeRegex(
@@ -256,8 +256,7 @@ export class TaskKeywordDecorator {
         } else if (
           this.inCodeBlock &&
           this.settings.includeCodeBlocks &&
-          (!this.currentLanguage ||
-            !this.settings.languageCommentSupport.enabled)
+          (!this.currentLanguage || !this.settings.languageCommentSupport)
         ) {
           // Use standard regex for code blocks when language comment support is disabled or no language detected
           if (this.parser.testRegex.test(lineText)) {
@@ -330,7 +329,7 @@ export class TaskKeywordDecorator {
           if (
             useCodeRegex &&
             this.currentLanguage &&
-            this.settings.languageCommentSupport.enabled
+            this.settings.languageCommentSupport
           ) {
             // Try to find the keyword more precisely in code context
             const commentPatterns = (this.currentLanguage as LanguageDefinition)
@@ -359,16 +358,23 @@ export class TaskKeywordDecorator {
           const startPos = line.from + keywordStart;
           const endPos = line.from + keywordEnd;
 
-          // Determine which CSS classes to apply based on context and settings
+          // All keywords use the same styling - no group-based CSS classes
           let cssClasses = 'todoseq-keyword-formatted';
+
+          // Add completed keyword class for strikethrough styling on the keyword itself
+          if (isCompletedKeyword(keyword, this.settings)) {
+            cssClasses += ' todoseq-completed-keyword';
+          }
+
+          // Add archived keyword class for muted styling on the keyword itself
+          if (isArchivedKeyword(keyword, this.settings)) {
+            cssClasses += ' todoseq-archived-keyword';
+          }
 
           if (this.inCodeBlock && this.settings.includeCodeBlocks) {
             cssClasses += ' code-block-task-keyword';
 
-            if (
-              this.settings.languageCommentSupport.enabled &&
-              this.currentLanguage
-            ) {
+            if (this.settings.languageCommentSupport && this.currentLanguage) {
               cssClasses += ' code-comment-task-keyword';
             }
           } else if (
@@ -403,7 +409,7 @@ export class TaskKeywordDecorator {
           );
 
           // Add separate span for task text in completed tasks
-          if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+          if (isCompletedKeyword(keyword, this.settings)) {
             // Calculate task text position (text after keyword)
             const taskTextStart = line.from + keywordEnd;
             const taskTextEnd = line.to; // End of line
@@ -417,6 +423,27 @@ export class TaskKeywordDecorator {
                   class: 'todoseq-completed-task-text',
                   attributes: {
                     'data-completed-task-text': 'true',
+                  },
+                }),
+              );
+            }
+          }
+
+          // Add separate span for task text in archived tasks
+          if (isArchivedKeyword(keyword, this.settings)) {
+            // Calculate task text position (text after keyword)
+            const taskTextStart = line.from + keywordEnd;
+            const taskTextEnd = line.to; // End of line
+
+            // Only create task text decoration if there's actual text after keyword
+            if (taskTextStart < taskTextEnd) {
+              builder.add(
+                taskTextStart,
+                taskTextEnd,
+                Decoration.mark({
+                  class: 'todoseq-archived-task-text',
+                  attributes: {
+                    'data-archived-task-text': 'true',
                   },
                 }),
               );

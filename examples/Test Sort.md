@@ -21,7 +21,7 @@ search: file:"Test Sort"
 sort: filepath
 ```
 
-`priority` sort A, B, C at top then remaining tasks in filepath order 
+`priority` sort A, B, C at top then remaining tasks in keyword order 
 ```todoseq
 search: file:"Test Sort"
 sort: priority
@@ -33,3 +33,4 @@ show-completed: sort-to-end
 search: file:"Test Sort"
 sort: urgency
 ```
+

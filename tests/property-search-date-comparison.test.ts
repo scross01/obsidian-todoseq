@@ -121,9 +121,17 @@ describe('PropertySearchEngine Date Comparison Operators', () => {
   let propertySearchEngine: PropertySearchEngine;
 
   beforeEach(() => {
-    // Reset singleton
-    PropertySearchEngine.getInstance(mockApp).reset();
-    propertySearchEngine = PropertySearchEngine.getInstance(mockApp);
+    // Reset singleton - first get instance with dependencies to call reset
+    PropertySearchEngine.getInstance(mockApp, {
+      taskStateManager: mockTaskStateManager,
+      refreshAllTaskListViews: jest.fn(),
+      vaultScanner: undefined,
+    }).reset();
+    propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
+      taskStateManager: mockTaskStateManager,
+      refreshAllTaskListViews: jest.fn(),
+      vaultScanner: undefined,
+    });
   });
 
   describe('Greater than (>) operator', () => {

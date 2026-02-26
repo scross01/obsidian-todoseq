@@ -216,6 +216,34 @@ export const TAG_PATTERN = /(?<![\w/:?#[\]])#([^\s)\]}>]+)/gu;
 export const TAG_PATTERN_SOURCE = TAG_PATTERN.source;
 
 // ============================================================================
+// Task Keyword Patterns
+// ============================================================================
+
+/**
+ * Escape keywords for use in regex patterns
+ * @param keywords Array of keywords to escape
+ * @returns Escaped keywords joined with OR operator
+ */
+export function escapeKeywordsForRegex(keywords: string[]): string {
+  return keywords
+    .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+}
+
+/**
+ * Build a task keyword pattern from an array of keywords
+ * @param keywords Array of task keywords (e.g., ['TODO', 'DOING', 'DONE'])
+ * @returns Regex pattern string that matches any of the keywords
+ */
+export function buildTaskKeywordPattern(keywords: string[]): string {
+  if (keywords.length === 0) {
+    // Return a pattern that never matches if no keywords
+    return '(?!x)x';
+  }
+  return `(${escapeKeywordsForRegex(keywords)})`;
+}
+
+// ============================================================================
 // Link Patterns (for task list view rendering)
 // ============================================================================
 
@@ -232,14 +260,14 @@ export const WIKI_LINK_REGEX_SOURCE = WIKI_LINK_REGEX.source;
 
 /**
  * Markdown link regex for matching standard markdown links
- * Matches: [text](url) and handles nested square brackets in label
+ * Matches: [text](url) and handles up to 1 level of nested square brackets in label
+ * This pattern uses explicit nesting to avoid exponential backtracking
  *
  * Capture groups:
- * 1: Link label (may contain nested square brackets)
+ * 1: Link label (may contain up to 1 level of nested square brackets)
  * 2: URL
  */
-export const MD_LINK_REGEX =
-  /\[([^[\]]*(?:\[[^[\]]*\][^[\]]*)*)?\]\(([^)]+)\)/g;
+export const MD_LINK_REGEX = /\[([^[\]]*(?:\[[^[\]]*\][^[\]]*)*)\]\(([^)]+)\)/g;
 export const MD_LINK_REGEX_SOURCE = MD_LINK_REGEX.source;
 
 /**

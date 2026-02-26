@@ -1,4 +1,5 @@
-import { Task, DEFAULT_COMPLETED_STATES } from '../types/task';
+import { Task } from '../types/task';
+import { isCompletedKeyword } from '../utils/task-utils';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 import { TFile } from 'obsidian';
@@ -133,8 +134,8 @@ export class TaskUpdateCoordinator {
       keywordEl.setAttribute('aria-label', `Task keyword: ${newState}`);
 
       // Handle completed task styling
-      const wasCompleted = DEFAULT_COMPLETED_STATES.has(oldState);
-      const isNowCompleted = DEFAULT_COMPLETED_STATES.has(newState);
+      const wasCompleted = isCompletedKeyword(oldState, this.plugin.settings);
+      const isNowCompleted = isCompletedKeyword(newState, this.plugin.settings);
 
       if (wasCompleted && !isNowCompleted) {
         // Transitioning from completed to non-completed: remove strikethrough

@@ -7,10 +7,12 @@ import {
   calculateTaskUrgency,
   getDefaultCoefficients,
   needsUrgencyRecalculation,
+  UrgencyContext,
 } from '../src/utils/task-urgency';
 import { Task } from '../src/types/task';
 import { App, Vault, DataAdapter } from 'obsidian';
 import { createBaseTask } from './helpers/test-helper';
+import { KeywordManager } from '../src/utils/keyword-manager';
 
 // Mock Obsidian app for testing
 const createMockApp = (): App => {
@@ -393,7 +395,10 @@ describe('Urgency Calculation', () => {
       dailyNoteDate: null,
     });
 
-    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    const context: UrgencyContext = {
+      activeKeywordsSet: new Set(['DOING', 'NOW', 'IN-PROGRESS']),
+    };
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
     // active (4.0) + age factor (1.0) * age coefficient (2.0) = 6.0
     expect(urgency).toBe(6.0);
   });
@@ -434,9 +439,56 @@ describe('Urgency Calculation', () => {
       dailyNoteDate: null,
     });
 
-    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    const context: UrgencyContext = {
+      waitingKeywordsSet: new Set(['WAIT', 'WAITING']),
+    };
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
     // waiting (-3.0) + age factor (1.0) * age coefficient (2.0) = -1.0
     expect(urgency).toBe(-1.0);
+  });
+
+  it('should apply waiting urgency when built-in DOING is moved from active to waiting', () => {
+    const task = createTestTask({
+      state: 'DOING',
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const keywordManager = new KeywordManager({
+      additionalWaitingKeywords: ['DOING'],
+    });
+
+    const context: UrgencyContext = {
+      activeKeywordsSet: keywordManager.getActiveSet(),
+      waitingKeywordsSet: keywordManager.getWaitingSet(),
+    };
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
+    // moved DOING is waiting (-3.0) + age factor (1.0) * age coefficient (2.0) = -1.0
+    expect(urgency).toBe(-1.0);
+  });
+
+  it('should apply active urgency when built-in WAIT is moved from waiting to active', () => {
+    const task = createTestTask({
+      state: 'WAIT',
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const keywordManager = new KeywordManager({
+      additionalActiveKeywords: ['WAIT'],
+    });
+
+    const context: UrgencyContext = {
+      activeKeywordsSet: keywordManager.getActiveSet(),
+      waitingKeywordsSet: keywordManager.getWaitingSet(),
+    };
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
+    // moved WAIT is active (4.0) + age factor (1.0) * age coefficient (2.0) = 6.0
+    expect(urgency).toBe(6.0);
   });
 
   it('should calculate combined urgency correctly', () => {
@@ -453,7 +505,10 @@ describe('Urgency Calculation', () => {
       dailyNoteDate: null,
     });
 
-    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    const context: UrgencyContext = {
+      activeKeywordsSet: new Set(['DOING', 'NOW', 'IN-PROGRESS']),
+    };
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
     // getDeadlineUrgency = ~0.733, * 12.0 ≈ 8.8
     // + priorityHigh (6.0) + active (4.0) + tags (0.8)
     // + age factor (1.0) * age coefficient (2.0) = 2.0

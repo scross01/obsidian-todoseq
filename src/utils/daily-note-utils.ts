@@ -36,7 +36,7 @@ export function getDailyNoteInfo(
   } catch (error) {
     // If there's any error (e.g., daily notes plugin not available),
     // fall back to not being a daily note
-    console.warn('Error checking daily note status:', error);
+    console.warn('Daily note detection failed:', error);
     return {
       isDailyNote: false,
       dailyNoteDate: null,

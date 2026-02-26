@@ -1,6 +1,9 @@
 import { TaskWriter } from '../src/services/task-writer';
-import { DEFAULT_COMPLETED_STATES } from '../src/types/task';
-import { createBaseTask, createCheckboxTask } from './helpers/test-helper';
+import {
+  createBaseTask,
+  createCheckboxTask,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('TaskWriter.generateTaskLine', () => {
   describe('Basic task formatting', () => {
@@ -283,19 +286,17 @@ describe('TaskWriter.generateTaskLine', () => {
     test('should handle custom completed state', () => {
       const task = createBaseTask();
 
-      // Add custom completed state to DEFAULT_COMPLETED_STATES for this test
-      const originalCompletedStates = new Set(DEFAULT_COMPLETED_STATES);
-      DEFAULT_COMPLETED_STATES.add('CUSTOM');
-
-      const result = TaskWriter.generateTaskLine(task, 'CUSTOM');
+      // Pass custom completed state via KeywordManager
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'CUSTOM',
+        true,
+        createTestKeywordManager({
+          additionalCompletedKeywords: ['CUSTOM'],
+        }),
+      );
       expect(result.newLine).toBe('CUSTOM Task text');
       expect(result.completed).toBe(true);
-
-      // Restore original state
-      DEFAULT_COMPLETED_STATES.clear();
-      originalCompletedStates.forEach((state) =>
-        DEFAULT_COMPLETED_STATES.add(state),
-      );
     });
   });
 

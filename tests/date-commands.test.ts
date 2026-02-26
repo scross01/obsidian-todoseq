@@ -1,8 +1,11 @@
 import { EditorController } from '../src/services/editor-controller';
 import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { Editor, MarkdownView } from 'obsidian';
-import { createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('Date Commands', () => {
   let editorController: EditorController;
@@ -23,7 +26,10 @@ describe('Date Commands', () => {
     mockPlugin = {
       getVaultScanner: () => ({
         getParser: () => {
-          const parser = TaskParser.create(settings, null);
+          const parser = TaskParser.create(
+            createTestKeywordManager(settings),
+            null,
+          );
           return parser;
         },
       }),

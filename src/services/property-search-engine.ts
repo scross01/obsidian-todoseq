@@ -1,26 +1,15 @@
 import { App, TFile } from 'obsidian';
 import { DateUtils } from '../utils/date-utils';
+import { TaskStateManager } from './task-state-manager';
 
-// Interface for the plugin instance accessed via window
-interface TodoSeqPlugin {
-  taskStateManager?: {
-    getTasks: () => Array<{
-      path: string;
-      text: string;
-      completed: boolean;
-      state: string;
-    }>;
-  };
+// Interface for dependencies needed by PropertySearchEngine
+interface PropertySearchEngineDependencies {
+  taskStateManager: TaskStateManager;
+  refreshAllTaskListViews: () => void;
   vaultScanner?: {
     isScanning: () => boolean;
     isObsidianInitializing: () => boolean;
   };
-  refreshAllTaskListViews?: () => void;
-}
-
-// Interface for window with plugin reference
-interface WindowWithPlugin extends Window {
-  todoSeqPlugin?: TodoSeqPlugin;
 }
 
 export class PropertySearchEngine {
@@ -45,9 +34,27 @@ export class PropertySearchEngine {
     App['metadataCache']['on']
   > | null = null;
 
-  private constructor(private app: App) {}
+  // Dependencies
+  private taskStateManager: TaskStateManager;
+  private refreshAllTaskListViews: () => void;
+  private vaultScanner?: {
+    isScanning: () => boolean;
+    isObsidianInitializing: () => boolean;
+  };
 
-  public static getInstance(app: App): PropertySearchEngine {
+  private constructor(
+    private app: App,
+    dependencies: PropertySearchEngineDependencies,
+  ) {
+    this.taskStateManager = dependencies.taskStateManager;
+    this.refreshAllTaskListViews = dependencies.refreshAllTaskListViews;
+    this.vaultScanner = dependencies.vaultScanner;
+  }
+
+  public static getInstance(
+    app: App,
+    dependencies: PropertySearchEngineDependencies,
+  ): PropertySearchEngine {
     // Check if the app reference has changed (plugin reload scenario)
     if (
       PropertySearchEngine.instance &&
@@ -58,7 +65,10 @@ export class PropertySearchEngine {
     }
 
     if (!PropertySearchEngine.instance) {
-      PropertySearchEngine.instance = new PropertySearchEngine(app);
+      PropertySearchEngine.instance = new PropertySearchEngine(
+        app,
+        dependencies,
+      );
     }
     return PropertySearchEngine.instance;
   }
@@ -98,7 +108,6 @@ export class PropertySearchEngine {
     await this.waitForVaultScan();
 
     this.isUpdating = true;
-    const startTime = performance.now();
 
     try {
       // Event listeners are now handled by EventCoordinator
@@ -111,11 +120,6 @@ export class PropertySearchEngine {
       await this.buildCacheInBatches();
 
       this.isInitialized = true;
-
-      const duration = performance.now() - startTime;
-      console.log(
-        `TODOseq: PropertySearchEngine initialize completed in ${duration.toFixed(2)}ms`,
-      );
 
       // Refresh all visible task list views after initialization completes
       // Delay to prevent recursion
@@ -135,14 +139,13 @@ export class PropertySearchEngine {
 
   // Wait for vault scan to complete if it's in progress
   private async waitForVaultScan(): Promise<void> {
-    // Check if we have access to the plugin and vault scanner
+    // Check if we have access to the vault scanner
     try {
-      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
-      if (plugin?.vaultScanner) {
+      if (this.vaultScanner) {
         // Wait for vault scan to complete if it's in progress
         while (
-          plugin.vaultScanner.isScanning() ||
-          plugin.vaultScanner.isObsidianInitializing()
+          this.vaultScanner.isScanning() ||
+          this.vaultScanner.isObsidianInitializing()
         ) {
           await new Promise((resolve) => setTimeout(resolve, 50));
         }
@@ -156,11 +159,7 @@ export class PropertySearchEngine {
   // Refresh all visible task list views
   private refreshVisibleTaskListViews(): void {
     try {
-      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
-      if (plugin?.refreshAllTaskListViews) {
-        // Refresh all open task list views
-        plugin.refreshAllTaskListViews();
-      }
+      this.refreshAllTaskListViews();
     } catch (error) {
       console.error('TODOseq: Failed to refresh task list views:', error);
     }
@@ -185,23 +184,25 @@ export class PropertySearchEngine {
 
   // Scan all markdown files that contain tasks to get property keys
   private async scanAllPropertyKeys(): Promise<void> {
-    // Get files with tasks from vault scanner
-    // First, try to get tasks from TaskStateManager (faster if available)
+    // Get files with tasks from TaskStateManager
     try {
-      // This is a hack to get tasks from the plugin instance
-      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
-      if (plugin?.taskStateManager) {
-        const tasks = plugin.taskStateManager.getTasks();
-        const taskFiles = new Set<string>();
+      const tasks = this.taskStateManager.getTasks();
+      const taskFiles = new Set<string>();
 
-        // Collect all unique file paths from tasks
-        tasks.forEach((task) => {
-          taskFiles.add(task.path);
-        });
+      // Collect all unique file paths from tasks
+      tasks.forEach((task) => {
+        taskFiles.add(task.path);
+      });
 
-        // Only scan files that contain tasks if we found any tasks
-        if (taskFiles.size > 0) {
-          taskFiles.forEach((filePath) => {
+      // Only scan files that contain tasks if we found any tasks
+      if (taskFiles.size > 0) {
+        const taskFilesArray = Array.from(taskFiles);
+        const batchSize = 100; // Process 100 files per batch
+
+        for (let i = 0; i < taskFilesArray.length; i += batchSize) {
+          const batch = taskFilesArray.slice(i, i + batchSize);
+
+          for (const filePath of batch) {
             const file = this.app.vault.getAbstractFileByPath(filePath);
             // Check if it's a markdown file - type narrow from TAbstractFile to TFile
             // TFile has extension, TFolder has children
@@ -216,15 +217,15 @@ export class PropertySearchEngine {
                 });
               }
             }
-          });
+          }
 
-          console.log(
-            `TODOseq: PropertySearchEngine scanning ${taskFiles.size} task-containing files`,
-          );
-          return;
-        } else {
-          return; // Skip initialization if no tasks found
+          // Yield to event loop to keep UI responsive
+          await new Promise((resolve) => setTimeout(resolve, 0));
         }
+
+        return;
+      } else {
+        return; // Skip initialization if no tasks found
       }
     } catch (error) {
       console.error(
@@ -238,29 +239,26 @@ export class PropertySearchEngine {
   private async buildPropertyCache(key: string): Promise<void> {
     const cache = new Map<unknown, Set<string>>();
 
-    // Get files with tasks from vault scanner
+    // Get files with tasks from TaskStateManager
     let filesToScan: TFile[] = [];
     try {
-      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
-      if (plugin?.taskStateManager) {
-        const tasks = plugin.taskStateManager.getTasks();
-        const taskFiles = new Set<string>();
+      const tasks = this.taskStateManager.getTasks();
+      const taskFiles = new Set<string>();
 
-        tasks.forEach((task) => {
-          taskFiles.add(task.path);
-        });
+      tasks.forEach((task) => {
+        taskFiles.add(task.path);
+      });
 
-        filesToScan = Array.from(taskFiles)
-          .map((filePath) => {
-            const file = this.app.vault.getAbstractFileByPath(filePath);
-            // Check if it's a markdown file - type narrow from TAbstractFile to TFile
-            // TFile has extension, TFolder has children
-            const tfile = file as TFile | undefined;
-            const isMarkdownFile = tfile && tfile.extension === 'md';
-            return isMarkdownFile ? tfile : null;
-          })
-          .filter(Boolean) as TFile[];
-      }
+      filesToScan = Array.from(taskFiles)
+        .map((filePath) => {
+          const file = this.app.vault.getAbstractFileByPath(filePath);
+          // Check if it's a markdown file - type narrow from TAbstractFile to TFile
+          // TFile has extension, TFolder has children
+          const tfile = file as TFile | undefined;
+          const isMarkdownFile = tfile && tfile.extension === 'md';
+          return isMarkdownFile ? tfile : null;
+        })
+        .filter(Boolean) as TFile[];
     } catch (error) {
       console.error(
         'TODOseq: Failed to get task files for property cache:',
@@ -780,11 +778,8 @@ export class PropertySearchEngine {
   // Check if a file contains any tasks
   private fileContainsTasks(file: TFile): boolean {
     try {
-      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
-      if (plugin?.taskStateManager) {
-        const tasks = plugin.taskStateManager.getTasks();
-        return tasks.some((task) => task.path === file.path);
-      }
+      const tasks = this.taskStateManager.getTasks();
+      return tasks.some((task) => task.path === file.path);
     } catch (error) {
       console.error('TODOseq: Failed to check if file contains tasks:', error);
     }
@@ -899,11 +894,8 @@ export class PropertySearchEngine {
   // Check if a file path contains any tasks
   private filePathContainsTasks(filePath: string): boolean {
     try {
-      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
-      if (plugin?.taskStateManager) {
-        const tasks = plugin.taskStateManager.getTasks();
-        return tasks.some((task) => task.path === filePath);
-      }
+      const tasks = this.taskStateManager.getTasks();
+      return tasks.some((task) => task.path === filePath);
     } catch (error) {
       console.error(
         'TODOseq: Failed to check if file path contains tasks:',
@@ -1033,9 +1025,6 @@ export class PropertySearchEngine {
       } finally {
         // After rebuild completes, check if there are pending updates
         if (this.pendingUpdates.size > 0) {
-          console.log(
-            'TODOseq: PropertySearchEngine has pending updates, processing...',
-          );
           this.pendingUpdates.clear();
           await this.rebuildAll(); // Recursively call to process pending updates
         } else {

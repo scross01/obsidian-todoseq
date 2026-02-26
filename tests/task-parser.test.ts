@@ -1,5 +1,9 @@
 import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('TaskParser.extractPriorityFromText', () => {
   test('should extract high priority [#A] and clean text', () => {
@@ -110,20 +114,18 @@ describe('Regular task parsing', () => {
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    settings = {
-      refreshInterval: 60,
-      includeCalloutBlocks: true,
-      includeCodeBlocks: false,
-      includeCommentBlocks: false,
+    settings = createBaseSettings({
+      additionalInactiveKeywords: ['FIXME'],
       languageCommentSupport: {
         enabled: false,
       },
-      additionalTaskKeywords: ['FIXME'],
-      taskListViewMode: 'showAll',
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    } as TodoTrackerSettings;
-    parser = TaskParser.create(settings);
+    });
+    parser = TaskParser.create(
+      createTestKeywordManager(settings),
+      null,
+      undefined,
+      settings,
+    );
   });
 
   describe('Task prefixes', () => {
@@ -250,9 +252,6 @@ TODO task text
       TODO task text
       DOING task text
       DONE task text
-      NOW task text
-      LATER task text
-      IN-PROGRESS task text
       WAIT task text
       WAITING task text
       CANCELED task text
@@ -260,7 +259,7 @@ TODO task text
       `;
       const tasks = parser.parseFile(lines, 'test.md');
 
-      expect(tasks).toHaveLength(10);
+      expect(tasks).toHaveLength(7);
       expect(tasks[0].state).toBe('TODO');
       expect(tasks[0].text).toBe('task text');
       expect(tasks[0].completed).toBe(false);
@@ -268,20 +267,14 @@ TODO task text
       expect(tasks[1].completed).toBe(false);
       expect(tasks[2].state).toBe('DONE');
       expect(tasks[2].completed).toBe(true);
-      expect(tasks[3].state).toBe('NOW');
+      expect(tasks[3].state).toBe('WAIT');
       expect(tasks[3].completed).toBe(false);
-      expect(tasks[4].state).toBe('LATER');
+      expect(tasks[4].state).toBe('WAITING');
       expect(tasks[4].completed).toBe(false);
-      expect(tasks[5].state).toBe('IN-PROGRESS');
-      expect(tasks[5].completed).toBe(false);
-      expect(tasks[6].state).toBe('WAIT');
-      expect(tasks[6].completed).toBe(false);
-      expect(tasks[7].state).toBe('WAITING');
-      expect(tasks[7].completed).toBe(false);
-      expect(tasks[8].state).toBe('CANCELED');
-      expect(tasks[8].completed).toBe(true);
-      expect(tasks[9].state).toBe('CANCELLED');
-      expect(tasks[9].completed).toBe(true);
+      expect(tasks[5].state).toBe('CANCELED');
+      expect(tasks[5].completed).toBe(true);
+      expect(tasks[6].state).toBe('CANCELLED');
+      expect(tasks[6].completed).toBe(true);
     });
 
     test(`should match custom keywords`, () => {
@@ -500,21 +493,18 @@ TODO task text
     });
 
     test(`should match comment blocks when enabled`, () => {
-      const settingsWithCommentBlocks: TodoTrackerSettings = {
-        refreshInterval: 60,
-        includeCalloutBlocks: true,
-        includeCodeBlocks: false,
-        includeCommentBlocks: true,
-        languageCommentSupport: {
-          enabled: false,
+      const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
+        {
+          additionalInactiveKeywords: ['FIXME'],
+          includeCommentBlocks: true,
+          languageCommentSupport: {
+            enabled: false,
+          },
         },
-        additionalTaskKeywords: ['FIXME'],
-        taskListViewMode: 'showAll',
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-      };
+      );
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks,
+        createTestKeywordManager(settingsWithCommentBlocks),
+        null,
       );
 
       const lines = `
@@ -538,21 +528,18 @@ TODO task text
     });
 
     test(`should match comment blocks with different task states`, () => {
-      const settingsWithCommentBlocks: TodoTrackerSettings = {
-        refreshInterval: 60,
-        includeCalloutBlocks: true,
-        includeCodeBlocks: false,
-        includeCommentBlocks: true,
-        languageCommentSupport: {
-          enabled: false,
+      const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
+        {
+          additionalInactiveKeywords: ['FIXME'],
+          includeCommentBlocks: true,
+          languageCommentSupport: {
+            enabled: false,
+          },
         },
-        additionalTaskKeywords: ['FIXME'],
-        taskListViewMode: 'showAll',
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-      };
+      );
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks,
+        createTestKeywordManager(settingsWithCommentBlocks),
+        null,
       );
 
       const lines = `
@@ -579,21 +566,18 @@ TODO task text
     });
 
     test(`should match comment blocks with priorities`, () => {
-      const settingsWithCommentBlocks: TodoTrackerSettings = {
-        refreshInterval: 60,
-        includeCalloutBlocks: true,
-        includeCodeBlocks: false,
-        includeCommentBlocks: true,
-        languageCommentSupport: {
-          enabled: false,
+      const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
+        {
+          additionalInactiveKeywords: ['FIXME'],
+          includeCommentBlocks: true,
+          languageCommentSupport: {
+            enabled: false,
+          },
         },
-        additionalTaskKeywords: ['FIXME'],
-        taskListViewMode: 'showAll',
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-      };
+      );
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks,
+        createTestKeywordManager(settingsWithCommentBlocks),
+        null,
       );
 
       const lines = `
@@ -616,21 +600,18 @@ TODO task text
     });
 
     test(`should match comment blocks with dates`, () => {
-      const settingsWithCommentBlocks: TodoTrackerSettings = {
-        refreshInterval: 60,
-        includeCalloutBlocks: true,
-        includeCodeBlocks: false,
-        includeCommentBlocks: true,
-        languageCommentSupport: {
-          enabled: false,
+      const settingsWithCommentBlocks: TodoTrackerSettings = createBaseSettings(
+        {
+          additionalInactiveKeywords: ['FIXME'],
+          includeCommentBlocks: true,
+          languageCommentSupport: {
+            enabled: false,
+          },
         },
-        additionalTaskKeywords: ['FIXME'],
-        taskListViewMode: 'showAll',
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-      };
+      );
       const parserWithCommentBlocks = TaskParser.create(
-        settingsWithCommentBlocks,
+        createTestKeywordManager(settingsWithCommentBlocks),
+        null,
       );
 
       const lines = `
@@ -752,20 +733,17 @@ describe('Task parsing with code blocks', () => {
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    settings = {
-      refreshInterval: 60,
-      includeCalloutBlocks: true,
+    settings = createBaseSettings({
+      additionalInactiveKeywords: [],
       includeCodeBlocks: true,
-      includeCommentBlocks: false,
-      languageCommentSupport: {
-        enabled: false,
-      },
-      additionalTaskKeywords: [],
-      taskListViewMode: 'showAll',
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
-    parser = TaskParser.create(settings);
+      languageCommentSupport: false,
+    });
+    parser = TaskParser.create(
+      createTestKeywordManager(settings),
+      null,
+      undefined,
+      settings,
+    );
   });
 
   describe('Tasks in code blocks when enabled (no language processing)', () => {
@@ -797,20 +775,17 @@ describe('Task parsing within langauge spefic comments in code blocks', () => {
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    settings = {
-      refreshInterval: 60,
-      includeCalloutBlocks: true,
+    settings = createBaseSettings({
+      additionalInactiveKeywords: [],
       includeCodeBlocks: true,
-      includeCommentBlocks: false,
-      languageCommentSupport: {
-        enabled: true,
-      },
-      additionalTaskKeywords: [],
-      taskListViewMode: 'showAll',
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
-    parser = TaskParser.create(settings);
+      languageCommentSupport: true,
+    });
+    parser = TaskParser.create(
+      createTestKeywordManager(settings),
+      null,
+      undefined,
+      settings,
+    );
   });
 
   describe('Tasks in code blocks', () => {

@@ -120,8 +120,19 @@
   cursor: pointer; /* visually like a link, does not intercept clicks */
 }
 
-/* Priority badge */
-.todo-view .priority-badge {
+/* ============================================================================
+   Priority Badges - Consolidated
+   Used in TodoView, Reader View, and Embedded Task Lists
+   ============================================================================ */
+
+/* Base priority badge styles */
+:is(
+    .todo-view,
+    .markdown-preview-view,
+    .markdown-rendered,
+    .embedded-task-list-container
+  )
+  .priority-badge {
   display: inline-block;
   margin-left: var(--size-2-2);
   padding: 0 var(--size-2-2);
@@ -134,63 +145,42 @@
   font-weight: var(--font-weight-medium, var(--font-medium));
   font-size: 0.7em;
   line-height: 1.6;
+  vertical-align: baseline;
 }
 
 /* High priority (A): stronger, urgent tint */
-.todo-view .priority-badge.priority-high {
+:is(
+    .todo-view,
+    .markdown-preview-view,
+    .markdown-rendered,
+    .embedded-task-list-container
+  )
+  .priority-badge.priority-high {
   background-color: var(--color-red);
   color: var(--text-on-accent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-red) 40%, transparent);
 }
 
 /* Medium priority (B): default accent */
-.todo-view .priority-badge.priority-med {
+:is(
+    .todo-view,
+    .markdown-preview-view,
+    .markdown-rendered,
+    .embedded-task-list-container
+  )
+  .priority-badge.priority-med {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
 /* Low priority (C): muted tone */
-.todo-view .priority-badge.priority-low {
-  background-color: var(--background-modifier-border);
-  color: var(--text-muted);
-  box-shadow: inset 0 0 0 1px var(--background-modifier-border);
-}
-
-/* ============================================================================
-   Priority Pills - Reader View
-   ============================================================================ */
-
-/* Reader view priority pills - scoped to markdown preview containers */
-.markdown-preview-view .priority-badge,
-.markdown-rendered .priority-badge {
-  display: inline-block;
-  margin-left: var(--size-2-2);
-  padding: 0 var(--size-2-2);
-  border-radius: var(--radius-s);
-  font-weight: var(--font-weight-medium, var(--font-medium));
-  font-size: 0.7em;
-  line-height: 1.6;
-  vertical-align: baseline;
-}
-
-/* High priority (A) in reader view */
-.markdown-preview-view .priority-badge.priority-high,
-.markdown-rendered .priority-badge.priority-high {
-  background-color: var(--color-red);
-  color: var(--text-on-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-red) 40%, transparent);
-}
-
-/* Medium priority (B) in reader view */
-.markdown-preview-view .priority-badge.priority-med,
-.markdown-rendered .priority-badge.priority-med {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-/* Low priority (C) in reader view */
-.markdown-preview-view .priority-badge.priority-low,
-.markdown-rendered .priority-badge.priority-low {
+:is(
+    .todo-view,
+    .markdown-preview-view,
+    .markdown-rendered,
+    .embedded-task-list-container
+  )
+  .priority-badge.priority-low {
   background-color: var(--background-modifier-border);
   color: var(--text-muted);
   box-shadow: inset 0 0 0 1px var(--background-modifier-border);
@@ -378,10 +368,30 @@
   font-size: 0.7em;
 }
 
+/* Settings UI - Binary file extension warning */
+.todoseq-setting-item-warning {
+  color: var(--text-warning, var(--color-orange, #ff9500));
+  font-size: 0.7em;
+}
+
+/* Settings UI - Info message */
+.todoseq-setting-item-info,
+.setting-item-info .todoseq-info-message {
+  color: var(--text-muted, #999);
+  font-size: 0.7em;
+}
+
 /* Settings UI - Invalid input field highlighting */
 .setting-item .todoseq-invalid-input {
   border-color: var(--error-color, #ff0000) !important;
   border-width: 2px !important;
+}
+
+/* Settings UI - Invalid textarea highlighting */
+.setting-item textarea.todoseq-invalid-input {
+  border-color: var(--error-color, #ff0000) !important;
+  border-width: 2px !important;
+  border-style: solid !important;
 }
 
 /* Task keyword formatting in editor and reading view */
@@ -391,6 +401,66 @@
   font-size: 0.9em; /* reduce size slightly */
   border-radius: 2px; /* Subtle rounding */
   cursor: pointer; /* Show hand/finger cursor like a link */
+}
+
+/* ============================================================================
+   Task Keyword Group Styling - Editor (CodeMirror)
+   ============================================================================ */
+
+/* Active tasks (DOING, NOW, IN-PROGRESS, etc.) - blue/cyan styling */
+.cm-editor .cm-task-active,
+.cm-task-active {
+  color: var(--color-cyan, #2dd4bf);
+}
+
+/* Inactive/pending tasks (TODO, LATER, etc.) - default styling */
+.cm-editor .cm-task-pending,
+.cm-task-pending {
+  color: var(--interactive-accent);
+}
+
+/* Waiting tasks (WAIT, WAITING, PAUSED, BLOCKED, etc.) - orange/yellow styling */
+.cm-editor .cm-task-waiting,
+.cm-task-waiting {
+  color: var(--color-orange, #f97316);
+}
+
+/* Completed tasks (DONE, CANCELLED, etc.) - strikethrough/grey styling */
+.cm-editor .cm-task-complete,
+.cm-task-complete {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+
+/* ============================================================================
+   Task Keyword Group Styling - Reader View
+   ============================================================================ */
+
+/* Active tasks in reader view */
+.markdown-preview-view .cm-task-active,
+.markdown-rendered .cm-task-active {
+  color: var(--color-cyan, #2dd4bf);
+}
+
+/* Inactive/pending tasks in reader view */
+.markdown-preview-view .cm-task-pending,
+.markdown-rendered .cm-task-pending {
+  color: var(--interactive-accent);
+}
+
+/* Waiting tasks in reader view */
+.markdown-preview-view .cm-task-waiting,
+.markdown-rendered .cm-task-waiting {
+  color: var(--color-orange, #f97316);
+}
+
+/* Completed tasks in reader view */
+.markdown-preview-view .cm-task-complete,
+.markdown-rendered .cm-task-complete {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
 }
 
 /* Source mode - simpler styling without bold/size */
@@ -462,15 +532,27 @@
   text-decoration-color: var(--text-muted);
 }
 
-/* Completed task styling for DONE, CANCELLED, CANCELED keywords */
-:is(.markdown-preview-view, .cm-editor)
-  :is(
-    [data-task-keyword='DONE'],
-    [data-task-keyword='CANCELLED'],
-    [data-task-keyword='CANCELED']
-  ) {
+/* Completed task keyword styling - applies strikethrough to the keyword itself */
+/* Works for both built-in (DONE, CANCELLED, CANCELED) and custom completed keywords */
+:is(.markdown-preview-view, .cm-editor) .todoseq-completed-keyword {
   text-decoration: line-through;
   text-decoration-color: var(--text-muted);
+}
+
+/* Archived task styling - muted/dimmed appearance without strikethrough */
+/* Works for both built-in (ARCHIVED) and custom archived keywords */
+:is(.markdown-preview-view, .cm-editor) .todoseq-archived-keyword {
+  color: var(--interactive-accent);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Archived task text styling */
+:is(.markdown-preview-view, .cm-editor)
+  :is(.todoseq-archived-task-container, .todoseq-archived-task-text) {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.7;
 }
 
 /* Dropdown containers for search suggestions and options */
@@ -503,139 +585,6 @@
 .todoseq-status-bar {
   order: -1;
   margin-right: auto;
-}
-
-/* Embedded Task List Styles */
-.todoseq-embedded-task-list {
-  margin: 1em 0;
-  padding: 0.5em;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  background-color: var(--background-secondary);
-}
-
-.todoseq-embedded-task-list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5em 0;
-  border-bottom: 1px solid var(--background-modifier-border);
-  margin-bottom: 0.5em;
-}
-
-.todoseq-embedded-task-list-title {
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
-  color: var(--text-normal);
-  font-size: 0.9em;
-}
-
-.todoseq-embedded-task-list-info {
-  font-size: 0.75em;
-  color: var(--text-muted);
-}
-
-.todoseq-embedded-task-list-items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.todoseq-embedded-task-list-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 0.4em 0;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.todoseq-embedded-task-list-item:last-child {
-  border-bottom: none;
-}
-
-.todoseq-embedded-task-list-item:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-.todoseq-embedded-task-list-checkbox {
-  margin-right: 0.5em;
-  margin-top: 0.1em;
-  flex-shrink: 0;
-}
-
-.todoseq-embedded-task-list-text {
-  flex: 1;
-  line-height: var(--line-height-tight, 1.4);
-}
-
-.todoseq-embedded-task-list-text.completed {
-  color: var(--text-muted);
-  text-decoration: line-through;
-}
-
-.todoseq-embedded-task-list-keyword {
-  color: var(--interactive-accent);
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
-  font-size: 0.85em;
-  cursor: pointer;
-  margin-right: 0.3em;
-}
-
-.todoseq-embedded-task-list-keyword:hover {
-  text-decoration: underline;
-}
-
-.todoseq-embedded-task-list-keyword:focus-visible {
-  outline: 2px solid var(--interactive-accent, #7f6df2);
-  outline-offset: 2px;
-  border-radius: 3px;
-}
-
-.todoseq-embedded-task-list-priority {
-  display: inline-block;
-  margin-left: 0.3em;
-  padding: 0 0.3em;
-  border-radius: var(--radius-s);
-  background-color: var(
-    --background-modifier-accent,
-    var(--interactive-accent)
-  );
-  color: var(--text-on-accent);
-  font-weight: var(--font-weight-medium, var(--font-medium));
-  font-size: 0.7em;
-  line-height: 1.6;
-}
-
-.todoseq-embedded-task-list-priority.high {
-  background-color: var(--color-red);
-  color: var(--text-on-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-red) 40%, transparent);
-}
-
-.todoseq-embedded-task-list-priority.med {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-.todoseq-embedded-task-list-priority.low {
-  background-color: var(--background-modifier-border);
-  color: var(--text-muted);
-  box-shadow: inset 0 0 0 1px var(--background-modifier-border);
-}
-
-.todoseq-embedded-task-list-tag {
-  display: inline-block;
-  padding: 1px 6px;
-  margin: 0 2px;
-  border-radius: var(--tag-radius);
-  color: var(--tag-color);
-  background-color: var(--tag-background);
-  border: var(--tag-border-width) solid var(--tag-border-color);
-  font-size: var(--tag-size);
-  font-weight: var(--tag-weight);
-  vertical-align: baseline;
-  border-inline-start: none;
-  border-inline-end: none;
-  padding-top: var(--tag-padding-y);
-  padding-bottom: var(--tag-padding-y);
 }
 
 /* Embedded Task List Styles - New Implementation */
@@ -787,42 +736,6 @@
   padding-bottom: var(--tag-padding-y);
 }
 
-/* Priority badge - reused from todo-view for consistency */
-.embedded-task-list-container .priority-badge {
-  display: inline-block;
-  margin-left: var(--size-2-2);
-  padding: 0 var(--size-2-2);
-  border-radius: var(--radius-s);
-  background-color: var(
-    --background-modifier-accent,
-    var(--interactive-accent)
-  );
-  color: var(--text-on-accent);
-  font-weight: var(--font-weight-medium, var(--font-medium));
-  font-size: 0.7em;
-  line-height: 1.6;
-}
-
-/* High priority (A): stronger, urgent tint */
-.embedded-task-list-container .priority-badge.priority-high {
-  background-color: var(--color-red);
-  color: var(--text-on-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-red) 40%, transparent);
-}
-
-/* Medium priority (B): default accent */
-.embedded-task-list-container .priority-badge.priority-med {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-/* Low priority (C): muted tone */
-.embedded-task-list-container .priority-badge.priority-low {
-  background-color: var(--background-modifier-border);
-  color: var(--text-muted);
-  box-shadow: inset 0 0 0 1px var(--background-modifier-border);
-}
-
 /* File info */
 .embedded-task-file-info {
   color: var(--text-muted);
@@ -833,6 +746,17 @@
   max-width: 32ch; /* Fallback: ensure max width of 23 monospace characters */
   overflow: hidden;
   text-overflow: ellipsis; /* Additional fallback for safety */
+}
+
+/* Urgency value */
+.embedded-task-urgency {
+  color: var(--text-muted);
+  font-size: 0.7em;
+  font-family: var(--font-monospace);
+  opacity: 0.7;
+  margin-left: 8px;
+  flex-shrink: 0;
+  display: inline;
 }
 
 /* ============================================================================
@@ -889,6 +813,42 @@
   max-width: unset;
   overflow: visible;
   text-overflow: unset;
+}
+
+/* Wrap content mode - file info row (holds file path and urgency aligned right) */
+.embedded-task-file-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* Dynamic mode - file info row inline on wide screens */
+.embedded-task-item-wrap-dynamic .embedded-task-file-info-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+}
+
+/* Wrap content mode - urgency value */
+.embedded-task-urgency-wrap {
+  color: var(--text-muted);
+  font-size: 0.7em;
+  font-family: var(--font-monospace);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* Dynamic mode - urgency value (inline on wide screens) */
+.embedded-task-urgency-dynamic {
+  color: var(--text-muted);
+  font-size: 0.7em;
+  font-family: var(--font-monospace);
+  opacity: 0.7;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* Dynamic wrap mode - default to truncated on wide screens, wrap on narrow */
@@ -1072,74 +1032,6 @@
   animation: task-update 0.5s ease;
 }
 
-/* Old embedded task list styles (for backward compatibility) */
-.todoseq-embedded-task-list-file-info {
-  color: var(--text-muted);
-  font-size: 0.7em;
-  margin-top: 0.3em;
-}
-
-.todoseq-embedded-task-list-empty {
-  padding: 1em;
-  text-align: center;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.todoseq-embedded-task-list-error {
-  padding: 1em;
-  background-color: color-mix(in srgb, var(--color-red) 10%, transparent);
-  border: 1px solid var(--color-red);
-  border-radius: 4px;
-  color: var(--color-red);
-  font-size: 0.9em;
-}
-
-.todoseq-embedded-task-list-loading {
-  padding: 1em;
-  text-align: center;
-  color: var(--text-muted);
-}
-
-.todoseq-embedded-task-list-loading::after {
-  content: '...';
-  animation: dots 1.5s steps(4, end) infinite;
-}
-
-@keyframes dots {
-  0%,
-  20% {
-    content: '.';
-  }
-  40% {
-    content: '..';
-  }
-  60%,
-  100% {
-    content: '...';
-  }
-}
-
-.todoseq-embedded-task-list-refresh-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-size: 0.8em;
-}
-
-.todoseq-embedded-task-list-refresh-btn:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.todoseq-embedded-task-list-refresh-btn:focus-visible {
-  outline: 2px solid var(--interactive-accent, #7f6df2);
-  outline-offset: 2px;
-}
-
 /* Embedded Task List Date Background Styling */
 .embedded-task-item-date-overdue {
   background-color: color-mix(in srgb, var(--color-red) 5%, transparent);
@@ -1171,56 +1063,10 @@
   );
 }
 
-/* Nested quote task keyword styling */
-/* Level 1: > TODO task */
-.cm-editor .quote-block-task-keyword-1 {
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
-  color: var(--interactive-accent);
-  font-size: 0.9em;
-  border-radius: 2px;
-}
-
-.cm-editor .quote-block-task-keyword-1:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 15%,
-    transparent
-  );
-}
-
-/* Level 2: > > TODO task */
-.cm-editor .quote-block-task-keyword-2 {
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
-  color: var(--interactive-accent);
-  font-size: 0.9em;
-  border-radius: 2px;
-}
-
-.cm-editor .quote-block-task-keyword-2:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 15%,
-    transparent
-  );
-}
-
-/* Level 3: > > > TODO task */
-.cm-editor .quote-block-task-keyword-3 {
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
-  color: var(--interactive-accent);
-  font-size: 0.9em;
-  border-radius: 2px;
-}
-
-.cm-editor .quote-block-task-keyword-3:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 15%,
-    transparent
-  );
-}
-
-/* Level 4+ nested quote task keyword styling */
+/* Nested quote task keyword styling - consolidated for all nesting levels */
+.cm-editor .quote-block-task-keyword-1,
+.cm-editor .quote-block-task-keyword-2,
+.cm-editor .quote-block-task-keyword-3,
 .cm-editor .quote-block-task-keyword-n {
   font-weight: var(--font-weight-bold, var(--font-bold, 600));
   color: var(--interactive-accent);
@@ -1228,6 +1074,9 @@
   border-radius: 2px;
 }
 
+.cm-editor .quote-block-task-keyword-1:hover,
+.cm-editor .quote-block-task-keyword-2:hover,
+.cm-editor .quote-block-task-keyword-3:hover,
 .cm-editor .quote-block-task-keyword-n:hover {
   background-color: color-mix(
     in srgb,

@@ -1,0 +1,36 @@
+#+TITLE: TODOseq Test Suite
+#+AUTHOR: Stephen
+#+OPTIONS: todo:t
+
+* TODO org mode first level task 
+
+* Project Alpha: Workflow Transitions
+** TODO Initial Task
+   SCHEDULED: <2026-02-12 Thu>
+   This is a basic task to check the "TODO" starting state.
+** NEXT Active Task
+   This represents a task currently in progress.
+** DONE Completed Task
+   CLOSED: [2026-02-12 Thu 08:00]
+   A task that has reached the terminal state.
+** WAIT Waiting on External
+   Used to test transitions that aren't "active" or "done."
+
+* Project Beta: Nested Dependencies
+** TODO Parent Task
+*** TODO Child Task 1
+*** DONE Child Task 2
+    :PROPERTIES:
+    :EFFORT: 2h
+    :END:
+
+* System Checks
+** TODO Check Weather in Ottawa
+   Check if it is still below 0°C outside today.
+** TODO Weekly Log [0/2]
+   - [ ] Run `todoseq` audit
+   - [ ] Export results to CSV
+
+* Notes & References
+  This section has no TODO keywords to test how your parser handles 
+  regular headers and body text.

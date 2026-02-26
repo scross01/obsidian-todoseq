@@ -1,8 +1,8 @@
 import { SearchSuggestions } from '../src/search/search-suggestions';
 import { Task } from '../src/types/task';
 import { Vault } from 'obsidian';
-import { TodoTrackerSettings } from '../src/settings/settings';
-import { createBaseTask } from './helpers/test-helper';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
+import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 
 describe('Search Suggestions', () => {
   const mockTasks: Task[] = [
@@ -480,6 +480,9 @@ describe('Search Suggestions', () => {
       expect(states).toContain('IN-PROGRESS');
       expect(states).toContain('CANCELED');
       expect(states).toContain('CANCELLED');
+      // ARCHIVED is excluded - archived tasks are never collected during vault scans
+      // and cannot be searched for
+      expect(states).not.toContain('ARCHIVED');
 
       // Should be sorted alphabetically
       expect(states).toEqual([
@@ -757,20 +760,9 @@ describe('Search Suggestions', () => {
 
   describe('Custom state keywords', () => {
     it('should include custom keywords from settings in getAllStates', () => {
-      const mockSettings: TodoTrackerSettings = {
-        additionalTaskKeywords: ['FIXME', 'HACK', 'REVIEW'],
-        includeCodeBlocks: false,
-        includeCalloutBlocks: true,
-        includeCommentBlocks: false,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: {
-          enabled: true,
-        },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-      };
+      const mockSettings: TodoTrackerSettings = createBaseSettings({
+        additionalInactiveKeywords: ['FIXME', 'HACK', 'REVIEW'],
+      });
 
       const states = SearchSuggestions.getAllStates(mockSettings);
 
@@ -802,20 +794,9 @@ describe('Search Suggestions', () => {
     });
 
     it('should deduplicate states when custom keywords overlap with defaults', () => {
-      const mockSettings: TodoTrackerSettings = {
-        additionalTaskKeywords: ['TODO', 'DOING', 'CUSTOM'],
-        includeCodeBlocks: false,
-        includeCalloutBlocks: true,
-        includeCommentBlocks: false,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: {
-          enabled: true,
-        },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-      };
+      const mockSettings: TodoTrackerSettings = createBaseSettings({
+        additionalInactiveKeywords: ['TODO', 'DOING', 'CUSTOM'],
+      });
 
       const states = SearchSuggestions.getAllStates(mockSettings);
 

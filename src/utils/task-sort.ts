@@ -1,5 +1,6 @@
 import { Task } from '../types/task';
 import { DateUtils } from './date-utils';
+import { KeywordManager } from './keyword-manager';
 
 /**
  * Task Classification Types
@@ -16,17 +17,23 @@ export type KeywordGroup = 1 | 2 | 3 | 4 | 5;
 /**
  * Configuration for keyword-based sorting
  * Each group has both a Set for fast lookup and an ordered array for intra-group sorting
+ *
+ * Group Priority (1 = highest, 5 = lowest):
+ * - Group 1: Active keywords (built-in + custom active)
+ * - Group 2: Inactive keywords (built-in + custom inactive)
+ * - Group 3: Unknown/empty states (fallback only)
+ * - Group 4: Waiting keywords (built-in + custom waiting)
+ * - Group 5: Completed keywords (built-in + custom completed)
  */
 export interface KeywordSortConfig {
-  activeStates: Set<string>; // Group 1 - highest priority (fast lookup)
-  activeStatesOrder: string[]; // Group 1 - ordered: NOW, DOING, IN-PROGRESS
-  pendingStates: Set<string>; // Group 2 - inactive/pending (fast lookup)
-  pendingStatesOrder: string[]; // Group 2 - ordered: TODO, LATER
-  customKeywords: string[]; // Group 3 - user-defined keywords (already ordered)
-  waitingStates: Set<string>; // Group 4 - waiting states (fast lookup)
-  waitingStatesOrder: string[]; // Group 4 - ordered: WAIT, WAITING
-  completedStates: Set<string>; // Group 5 - lowest priority (fast lookup)
-  completedStatesOrder: string[]; // Group 5 - ordered: DONE, CANCELED, CANCELLED
+  activeKeywords: Set<string>; // Group 1 - highest priority (fast lookup)
+  activeKeywordsOrder: string[]; // Group 1 - ordered for intra-group sorting
+  inactiveKeywords: Set<string>; // Group 2 - inactive/pending (fast lookup)
+  inactiveKeywordsOrder: string[]; // Group 2 - ordered for intra-group sorting
+  waitingKeywords: Set<string>; // Group 4 - waiting/blocked (fast lookup)
+  waitingKeywordsOrder: string[]; // Group 4 - ordered for intra-group sorting
+  completedKeywords: Set<string>; // Group 5 - lowest priority (fast lookup)
+  completedKeywordsOrder: string[]; // Group 5 - ordered for intra-group sorting
 }
 
 /**
@@ -83,11 +90,11 @@ export const taskComparator = (a: Task, b: Task): number => {
  * Classify a task into a keyword group for sorting
  *
  * Group Priority (1 = highest, 5 = lowest):
- * - Group 1: Active states (NOW, DOING, IN-PROGRESS)
- * - Group 2: Inactive/Pending states (TODO, LATER)
- * - Group 3: Custom keywords or unknown/empty states
- * - Group 4: Waiting states (WAIT, WAITING)
- * - Group 5: Completed states (DONE, CANCELED, CANCELLED)
+ * - Group 1: Active keywords (built-in + custom active)
+ * - Group 2: Inactive keywords (built-in + custom inactive)
+ * - Group 3: Unknown/empty states (fallback only)
+ * - Group 4: Waiting keywords (built-in + custom waiting)
+ * - Group 5: Completed keywords (built-in + custom completed)
  *
  * @param task The task to classify
  * @param config Keyword sort configuration
@@ -104,27 +111,27 @@ export function getKeywordGroup(
 
   const stateUpper = task.state.toUpperCase();
 
-  // Group 1: Active states
-  if (config.activeStates.has(stateUpper)) {
+  // Group 1: Active keywords (highest priority for incomplete tasks)
+  if (config.activeKeywords.has(stateUpper)) {
     return 1;
   }
 
-  // Group 2: Pending/Inactive states
-  if (config.pendingStates.has(stateUpper)) {
+  // Group 2: Inactive keywords
+  if (config.inactiveKeywords.has(stateUpper)) {
     return 2;
   }
 
-  // Group 4: Waiting states (check before custom to prioritize)
-  if (config.waitingStates.has(stateUpper)) {
+  // Group 4: Waiting keywords (check before completed to prioritize correctly)
+  if (config.waitingKeywords.has(stateUpper)) {
     return 4;
   }
 
   // Group 5: Completed keyword states (for tasks with DONE/CANCELED keyword but completed: false)
-  if (config.completedStates.has(stateUpper)) {
+  if (config.completedKeywords.has(stateUpper)) {
     return 5;
   }
 
-  // Group 3: Custom keywords or unknown/empty states (default)
+  // Group 3: Unknown/empty states (default)
   return 3;
 }
 
@@ -152,16 +159,16 @@ function getKeywordPosition(
 ): number {
   switch (group) {
     case 1:
-      return config.activeStatesOrder.indexOf(stateUpper);
+      return config.activeKeywordsOrder.indexOf(stateUpper);
     case 2:
-      return config.pendingStatesOrder.indexOf(stateUpper);
+      return config.inactiveKeywordsOrder.indexOf(stateUpper);
     case 3:
-      // For custom keywords, use the customKeywords array directly
-      return config.customKeywords.indexOf(stateUpper);
+      // Group 3 is for unknown/empty states - no specific order
+      return -1;
     case 4:
-      return config.waitingStatesOrder.indexOf(stateUpper);
+      return config.waitingKeywordsOrder.indexOf(stateUpper);
     case 5:
-      return config.completedStatesOrder.indexOf(stateUpper);
+      return config.completedKeywordsOrder.indexOf(stateUpper);
     default:
       return -1;
   }
@@ -204,36 +211,35 @@ export function keywordSortComparator(
 }
 
 /**
- * Build keyword sort configuration from settings
+ * Build keyword sort configuration from KeywordManager
  *
- * @param additionalKeywords Custom keywords from user settings (order is preserved)
+ * @param keywordManager KeywordManager instance containing all keywords
  * @returns Complete KeywordSortConfig object
  */
 export function buildKeywordSortConfig(
-  additionalKeywords: string[],
+  keywordManager: KeywordManager,
 ): KeywordSortConfig {
-  // Define ordered keyword arrays for each group
-  // These arrays define both the keywords in the group AND their sort order
-  const activeStatesOrder = ['NOW', 'DOING', 'IN-PROGRESS'];
-  const pendingStatesOrder = ['TODO', 'LATER'];
-  const waitingStatesOrder = ['WAIT', 'WAITING'];
-  const completedStatesOrder = ['DONE', 'CANCELED', 'CANCELLED'];
-
-  // Normalize custom keywords to uppercase, preserving order from settings
-  const customKeywords = (additionalKeywords ?? []).map((k) => k.toUpperCase());
+  // Use KeywordManager effective ordering (includes built-in overrides/removals)
+  const activeKeywordsOrder =
+    keywordManager.getKeywordsForGroup('activeKeywords');
+  const inactiveKeywordsOrder =
+    keywordManager.getKeywordsForGroup('inactiveKeywords');
+  const waitingKeywordsOrder =
+    keywordManager.getKeywordsForGroup('waitingKeywords');
+  const completedKeywordsOrder =
+    keywordManager.getKeywordsForGroup('completedKeywords');
 
   return {
     // Sets for fast O(1) lookup
-    activeStates: new Set(activeStatesOrder),
-    pendingStates: new Set(pendingStatesOrder),
-    waitingStates: new Set(waitingStatesOrder),
-    completedStates: new Set(completedStatesOrder),
+    activeKeywords: new Set(activeKeywordsOrder),
+    inactiveKeywords: new Set(inactiveKeywordsOrder),
+    waitingKeywords: new Set(waitingKeywordsOrder),
+    completedKeywords: new Set(completedKeywordsOrder),
     // Ordered arrays for intra-group sorting
-    activeStatesOrder,
-    pendingStatesOrder,
-    customKeywords,
-    waitingStatesOrder,
-    completedStatesOrder,
+    activeKeywordsOrder,
+    inactiveKeywordsOrder,
+    waitingKeywordsOrder,
+    completedKeywordsOrder,
   };
 }
 
@@ -301,18 +307,48 @@ function getSortFunction(
   switch (sortMethod) {
     case 'sortByScheduled':
       return (a, b) => {
-        if (!a.scheduledDate && !b.scheduledDate) return taskComparator(a, b);
+        if (!a.scheduledDate && !b.scheduledDate) {
+          if (keywordConfig) {
+            return keywordSortComparator(a, b, keywordConfig);
+          }
+          return taskComparator(a, b);
+        }
         if (!a.scheduledDate) return 1;
         if (!b.scheduledDate) return -1;
-        return a.scheduledDate.getTime() - b.scheduledDate.getTime();
+
+        const dateDiff = a.scheduledDate.getTime() - b.scheduledDate.getTime();
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
+
+        // If scheduled dates are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
+        return taskComparator(a, b);
       };
 
     case 'sortByDeadline':
       return (a, b) => {
-        if (!a.deadlineDate && !b.deadlineDate) return taskComparator(a, b);
+        if (!a.deadlineDate && !b.deadlineDate) {
+          if (keywordConfig) {
+            return keywordSortComparator(a, b, keywordConfig);
+          }
+          return taskComparator(a, b);
+        }
         if (!a.deadlineDate) return 1;
         if (!b.deadlineDate) return -1;
-        return a.deadlineDate.getTime() - b.deadlineDate.getTime();
+
+        const dateDiff = a.deadlineDate.getTime() - b.deadlineDate.getTime();
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
+
+        // If deadline dates are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
+        return taskComparator(a, b);
       };
 
     case 'sortByPriority':
@@ -325,7 +361,10 @@ function getSortFunction(
           return bPriority - aPriority; // Higher priority first
         }
 
-        // If priorities are equal, fall back to default sorting
+        // If priorities are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
         return taskComparator(a, b);
       };
 
@@ -343,7 +382,10 @@ function getSortFunction(
           return b.urgency - a.urgency;
         }
 
-        // If urgencies are equal, fall back to default sorting
+        // If urgencies are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
         return taskComparator(a, b);
       };
 

@@ -1,25 +1,20 @@
-import {
-  Task,
-  DEFAULT_COMPLETED_STATES,
-  DEFAULT_ACTIVE_STATES,
-  DEFAULT_PENDING_STATES,
-} from '../../types/task';
+import { Task } from '../../types/task';
+import { isCompletedKeyword } from '../../utils/task-utils';
 import { TaskWriter } from '../../services/task-writer';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import { getTaskTextDisplay } from '../../utils/task-utils';
 import {
   MarkdownView,
-  Menu,
   WorkspaceLeaf,
   TFile,
   Platform,
   setIcon,
 } from 'obsidian';
-import { getPluginSettings } from '../../utils/settings-utils';
 import { truncateMiddle } from '../../utils/task-utils';
 import { TAG_PATTERN } from '../../utils/patterns';
 import { DateUtils } from '../../utils/date-utils';
+import { StateMenuBuilder } from '../components/state-menu-builder';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -28,10 +23,12 @@ import { DateUtils } from '../../utils/date-utils';
 export class EmbeddedTaskListRenderer {
   private plugin: TodoTracker;
   private taskEditor: TaskWriter;
+  private menuBuilder: StateMenuBuilder;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
     this.taskEditor = new TaskWriter(plugin.app);
+    this.menuBuilder = new StateMenuBuilder(plugin);
   }
 
   /**
@@ -1049,20 +1046,15 @@ export class EmbeddedTaskListRenderer {
     // - false: always truncate
     // - 'dynamic': responsive based on viewport
     const wrapMode = params.wrapContent ?? 'dynamic';
-    const isWrapMode = wrapMode === true || wrapMode === 'dynamic';
+    const isTrueWrapMode = wrapMode === true;
+    const isDynamicMode = wrapMode === 'dynamic';
 
-    if (isWrapMode) {
+    if (isTrueWrapMode) {
       // Add wrap class to list item
       li.classList.add('embedded-task-item-wrap');
 
       // Add wrap class to text container for CSS styling
       textContainer.classList.add('embedded-task-text-wrap');
-
-      // Add dynamic class for responsive CSS handling
-      if (wrapMode === 'dynamic') {
-        li.classList.add('embedded-task-item-wrap-dynamic');
-        textContainer.classList.add('embedded-task-text-wrap-dynamic');
-      }
 
       // Create content wrapper for wrapped layout
       const contentWrapper = document.createElement('div');
@@ -1071,17 +1063,100 @@ export class EmbeddedTaskListRenderer {
       // Append text container to wrapper
       contentWrapper.appendChild(textContainer);
 
-      // Create file info on new row if show-file is not explicitly false
-      if (params.showFile !== false) {
-        const fileInfo = document.createElement('div');
-        fileInfo.className = 'embedded-task-file-info-wrap';
-        const fileName = task.path.split('/').pop() || task.path;
-        // Strip .md extension from display name
-        const displayName = fileName.replace(/\.md$/, '');
-        // Full filename without truncation in wrap mode
-        fileInfo.textContent = `${displayName}:${task.line + 1}`;
-        fileInfo.setAttribute('title', task.path);
-        contentWrapper.appendChild(fileInfo);
+      // Handle file info and urgency display
+      const urgencyValue = task.urgency;
+      const showUrgency =
+        params.showUrgency === true &&
+        urgencyValue !== null &&
+        urgencyValue !== undefined;
+      const showFile = params.showFile !== false;
+
+      if (showFile || showUrgency) {
+        const fileInfoRow = document.createElement('div');
+        fileInfoRow.className = 'embedded-task-file-info-row';
+
+        if (showFile) {
+          const fileInfo = document.createElement('span');
+          fileInfo.className = 'embedded-task-file-info-wrap';
+          const fileName = task.path.split('/').pop() || task.path;
+          const displayName = fileName.replace(/\.md$/, '');
+          fileInfo.textContent = `${displayName}:${task.line + 1}`;
+          fileInfo.setAttribute('title', task.path);
+          fileInfoRow.appendChild(fileInfo);
+        }
+
+        if (
+          showUrgency &&
+          urgencyValue !== null &&
+          urgencyValue !== undefined
+        ) {
+          const urgencyInfo = document.createElement('span');
+          urgencyInfo.className = 'embedded-task-urgency-wrap';
+          urgencyInfo.textContent = `${urgencyValue.toFixed(2)}`;
+          urgencyInfo.setAttribute(
+            'title',
+            `Urgency: ${urgencyValue.toFixed(2)}`,
+          );
+          fileInfoRow.appendChild(urgencyInfo);
+        }
+
+        contentWrapper.appendChild(fileInfoRow);
+      }
+
+      // Assemble the item with content wrapper
+      li.appendChild(checkbox);
+      li.appendChild(contentWrapper);
+    } else if (isDynamicMode) {
+      // Dynamic mode: truncated on wide screens, wrap on narrow
+      // Use dynamic classes for media query behavior
+      li.classList.add('embedded-task-item-wrap-dynamic');
+      textContainer.classList.add('embedded-task-text-wrap-dynamic');
+
+      // Create content wrapper (will be styled by CSS based on viewport width)
+      const contentWrapper = document.createElement('div');
+      contentWrapper.className = 'embedded-task-content-wrapper';
+
+      // Append text container to wrapper
+      contentWrapper.appendChild(textContainer);
+
+      // Handle file info and urgency display
+      const urgencyValue = task.urgency;
+      const showUrgency =
+        params.showUrgency === true &&
+        urgencyValue !== null &&
+        urgencyValue !== undefined;
+      const showFile = params.showFile !== false;
+
+      if (showFile || showUrgency) {
+        const fileInfoRow = document.createElement('div');
+        fileInfoRow.className = 'embedded-task-file-info-row';
+
+        if (showFile) {
+          const fileInfo = document.createElement('span');
+          fileInfo.className = 'embedded-task-file-info-wrap';
+          const fileName = task.path.split('/').pop() || task.path;
+          const displayName = fileName.replace(/\.md$/, '');
+          fileInfo.textContent = `${displayName}:${task.line + 1}`;
+          fileInfo.setAttribute('title', task.path);
+          fileInfoRow.appendChild(fileInfo);
+        }
+
+        if (
+          showUrgency &&
+          urgencyValue !== null &&
+          urgencyValue !== undefined
+        ) {
+          const urgencyInfo = document.createElement('span');
+          urgencyInfo.className = 'embedded-task-urgency-dynamic';
+          urgencyInfo.textContent = `${urgencyValue.toFixed(2)}`;
+          urgencyInfo.setAttribute(
+            'title',
+            `Urgency: ${urgencyValue.toFixed(2)}`,
+          );
+          fileInfoRow.appendChild(urgencyInfo);
+        }
+
+        contentWrapper.appendChild(fileInfoRow);
       }
 
       // Assemble the item with content wrapper
@@ -1105,10 +1180,42 @@ export class EmbeddedTaskListRenderer {
         li.appendChild(checkbox);
         li.appendChild(textContainer);
         li.appendChild(fileInfo);
+
+        // Show urgency value if showUrgency is enabled
+        if (
+          params.showUrgency === true &&
+          task.urgency !== null &&
+          task.urgency !== undefined
+        ) {
+          const urgencyInfo = document.createElement('span');
+          urgencyInfo.className = 'embedded-task-urgency';
+          urgencyInfo.textContent = `${task.urgency.toFixed(2)}`;
+          urgencyInfo.setAttribute(
+            'title',
+            `Urgency: ${task.urgency.toFixed(2)}`,
+          );
+          li.appendChild(urgencyInfo);
+        }
       } else {
         // Assemble the item without file info
         li.appendChild(checkbox);
         li.appendChild(textContainer);
+
+        // Show urgency value if showUrgency is enabled
+        if (
+          params.showUrgency === true &&
+          task.urgency !== null &&
+          task.urgency !== undefined
+        ) {
+          const urgencyInfo = document.createElement('span');
+          urgencyInfo.className = 'embedded-task-urgency';
+          urgencyInfo.textContent = `${task.urgency.toFixed(2)}`;
+          urgencyInfo.setAttribute(
+            'title',
+            `Urgency: ${task.urgency.toFixed(2)}`,
+          );
+          li.appendChild(urgencyInfo);
+        }
       }
     }
 
@@ -1155,62 +1262,6 @@ export class EmbeddedTaskListRenderer {
   }
 
   /**
-   * Return default keyword sets (non-completed and completed) and additional keywords using constants from task.ts
-   */
-  private getKeywordSets(): {
-    pendingActive: string[];
-    completed: string[];
-    additional: string[];
-  } {
-    const pendingActiveDefaults = [
-      ...Array.from(DEFAULT_PENDING_STATES),
-      ...Array.from(DEFAULT_ACTIVE_STATES),
-    ];
-    const completedDefaults = Array.from(DEFAULT_COMPLETED_STATES);
-
-    const settings = getPluginSettings(this.plugin.app);
-    const configured = settings?.additionalTaskKeywords;
-    const additional = Array.isArray(configured)
-      ? configured.filter(
-          (v): v is string => typeof v === 'string' && v.length > 0,
-        )
-      : [];
-
-    return {
-      pendingActive: pendingActiveDefaults,
-      completed: completedDefaults,
-      additional,
-    };
-  }
-
-  /**
-   * Build the list of selectable states for the context menu, excluding the current state
-   * @param current Current task state
-   */
-  private getSelectableStatesForMenu(
-    current: string,
-  ): { group: string; states: string[] }[] {
-    const { pendingActive, completed, additional } = this.getKeywordSets();
-
-    const dedupe = (arr: string[]) => Array.from(new Set(arr));
-    const nonCompleted = dedupe([...pendingActive, ...additional]);
-    const completedOnly = dedupe(completed);
-
-    // Present two groups: Non-completed and Completed
-    const groups: { group: string; states: string[] }[] = [
-      {
-        group: 'Not completed',
-        states: nonCompleted.filter((s) => s && s !== current),
-      },
-      {
-        group: 'Completed',
-        states: completedOnly.filter((s) => s && s !== current),
-      },
-    ];
-    return groups.filter((g) => g.states.length > 0);
-  }
-
-  /**
    * Open Obsidian Menu at a specific screen position
    * @param task The task to update
    * @param pos The position to show the menu
@@ -1219,24 +1270,9 @@ export class EmbeddedTaskListRenderer {
     task: Task,
     pos: { x: number; y: number },
   ): void {
-    const menu = new Menu();
-    const groups = this.getSelectableStatesForMenu(task.state);
-
-    for (const g of groups) {
-      menu.addItem((item) => {
-        item.setTitle(g.group);
-        item.setDisabled(true);
-      });
-      for (const state of g.states) {
-        menu.addItem((item) => {
-          item.setTitle(state);
-          item.onClick(async () => {
-            await this.updateTaskState(task, state);
-          });
-        });
-      }
-      menu.addSeparator();
-    }
+    const menu = this.menuBuilder.buildStateMenu(task.state, async (state) => {
+      await this.updateTaskState(task, state);
+    });
     menu.showAtPosition({ x: pos.x, y: pos.y });
   }
 
@@ -1248,26 +1284,9 @@ export class EmbeddedTaskListRenderer {
   private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
     evt.preventDefault();
     evt.stopPropagation();
-    const menu = new Menu();
-    const groups = this.getSelectableStatesForMenu(task.state);
-
-    for (const g of groups) {
-      // Section header (disabled item)
-      menu.addItem((item) => {
-        item.setTitle(g.group);
-        item.setDisabled(true);
-      });
-      for (const state of g.states) {
-        menu.addItem((item) => {
-          item.setTitle(state);
-          item.onClick(async () => {
-            await this.updateTaskState(task, state);
-          });
-        });
-      }
-      // Divider between groups when both exist
-      menu.addSeparator();
-    }
+    const menu = this.menuBuilder.buildStateMenu(task.state, async (state) => {
+      await this.updateTaskState(task, state);
+    });
 
     // Prefer API helper when available; fallback to explicit coordinates
     const maybeShowAtMouseEvent = (
@@ -1470,7 +1489,7 @@ export class EmbeddedTaskListRenderer {
       // Update the task via the centralized TaskStateManager
       this.plugin.taskStateManager.updateTask(taskToUpdate, {
         state: newState,
-        completed: DEFAULT_COMPLETED_STATES.has(newState),
+        completed: isCompletedKeyword(newState, this.plugin.settings),
       });
 
       // Trigger refresh of all task list views, including embedded ones

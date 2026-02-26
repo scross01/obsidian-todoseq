@@ -2,7 +2,7 @@ import { SearchParser } from './search-parser';
 import { SearchEvaluator } from './search-evaluator';
 import { SearchNode, SearchError } from './search-types';
 import { Task } from '../types/task';
-import { TodoTrackerSettings } from '../settings/settings';
+import { TodoTrackerSettings } from '../settings/settings-types';
 
 export class Search {
   // Cache for parsed search query ASTs

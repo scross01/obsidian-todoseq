@@ -43,7 +43,7 @@ describe('TaskWriter Remaining Lines', () => {
 
     // Mock settings
     (getPluginSettings as jest.Mock).mockReturnValue({
-      additionalTaskKeywords: ['CUSTOM'],
+      additionalInactiveKeywords: ['CUSTOM'],
     });
 
     taskWriter = new TaskWriter(mockApp);
@@ -93,12 +93,13 @@ describe('TaskWriter Remaining Lines', () => {
         state: 'CUSTOM',
       });
 
+      // CUSTOM is inactive keyword, should transition to default Active (DOING)
       const result = await taskWriter.updateTaskCycleState(task);
-      expect(result.state).toBe('DONE');
-      expect(result.completed).toBe(true);
+      expect(result.state).toBe('DOING');
+      expect(result.completed).toBe(false);
     });
 
-    it('should fall back to TODO for unknown states in cycle', async () => {
+    it('should stay on same state for unknown states in cycle', async () => {
       const task: Task = createBaseTask({
         rawText: 'UNKNOWN Task text',
         text: 'Task text',
@@ -106,7 +107,8 @@ describe('TaskWriter Remaining Lines', () => {
       });
 
       const result = await taskWriter.updateTaskCycleState(task);
-      expect(result.state).toBe('TODO');
+      // Unknown states don't transition - stay on the same state
+      expect(result.state).toBe('UNKNOWN');
       expect(result.completed).toBe(false);
     });
   });

@@ -28,6 +28,8 @@ Most task managers force you into a separate system. TODOseq meets you where you
 
 **Logseq Compatible** — Use the same task format across both tools. Existing Logseq tasks work without modification. Dual-use your vault or migrate at your own pace.
 
+**Experimental Features** — Additional capabilities including Org-mode file support are available as experimental features. See [documentation](docs/experimental-features.md) for details.
+
 ## Quick Start
 
 ```markdown
@@ -104,6 +106,20 @@ SCHEDULED: <2025-03-15>
 # FIXME Handle edge case when user is null
 def process_user(user):
     pass
+```
+
+### In Org-Mode Files _(Experimental)_
+
+> **Note**: Org-mode support is an experimental feature. Enable it in Settings → TODOseq → Experimental Features.
+
+```org
+* TODO [#A] Critical security patch
+  DEADLINE: <2025-03-12>
+
+** DOING [#B] Update documentation
+   SCHEDULED: <2025-03-15>
+
+*** DONE Submit expense report
 ```
 
 ### Embedded Task List

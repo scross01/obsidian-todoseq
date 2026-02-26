@@ -25,47 +25,9 @@ export interface Task {
   quoteNestingLevel?: number; // number of nested quote levels (e.g., 1 for "> ", 2 for "> > ")
 }
 
-export const DEFAULT_PENDING_STATES = new Set<string>([
-  'TODO',
-  'LATER',
-  'WAIT',
-  'WAITING',
-]);
-export const DEFAULT_ACTIVE_STATES = new Set<string>([
-  'DOING',
-  'NOW',
-  'IN-PROGRESS',
-]);
-export const DEFAULT_COMPLETED_STATES = new Set<string>([
-  'DONE',
-  'CANCELED',
-  'CANCELLED',
-]);
-
-export const NEXT_STATE = new Map<string, string>([
-  ['TODO', 'DOING'],
-  ['DOING', 'DONE'],
-  ['DONE', 'TODO'],
-  ['LATER', 'NOW'],
-  ['NOW', 'DONE'],
-  ['WAIT', 'IN-PROGRESS'],
-  ['WAITING', 'IN-PROGRESS'],
-  ['IN-PROGRESS', 'DONE'],
-  ['CANCELED', 'TODO'],
-  ['CANCELLED', 'TODO'],
-]);
-
-// State transitions for cycle task state
-export const CYCLE_TASK_STATE = new Map<string, string>([
-  ['TODO', 'DOING'],
-  ['DOING', 'DONE'],
-  ['DONE', ''], // DONE goes back to no task keyword (empty state)
-  ['LATER', 'NOW'],
-  ['NOW', 'DONE'],
-  ['WAIT', 'IN-PROGRESS'],
-  ['WAITING', 'IN-PROGRESS'],
-  ['IN-PROGRESS', 'DONE'],
-  ['CANCELED', 'TODO'],
-  ['CANCELLED', 'TODO'],
-  ['', 'TODO'], // No task keyword goes to TODO
-]);
+export type KeywordGroup =
+  | 'activeKeywords'
+  | 'inactiveKeywords'
+  | 'waitingKeywords'
+  | 'completedKeywords'
+  | 'archivedKeywords';

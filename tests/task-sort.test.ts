@@ -12,6 +12,7 @@ import {
 } from '../src/utils/task-sort';
 import { Task } from '../src/types/task';
 import { createBaseTask } from './helpers/test-helper';
+import { KeywordManager } from '../src/utils/keyword-manager';
 
 describe('Task Sorting System', () => {
   const now = new Date('2024-01-15T12:00:00Z');
@@ -401,6 +402,186 @@ describe('Task Sorting System', () => {
       expect(texts).toEqual(['Earlier', 'Middle', 'Later']);
     });
 
+    it('uses keyword sort as secondary when deadline dates are equal', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        deadlineDate: pastDate,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        deadlineDate: pastDate,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByDeadline',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('uses keyword sort as secondary when both tasks have no deadline date', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        deadlineDate: null,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        deadlineDate: null,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByDeadline',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('falls back to path/line when deadline dates equal and same keyword', () => {
+      const config = createMockKeywordConfig();
+      const task1 = createMockTaskWithKeyword('NOW', false, {
+        deadlineDate: pastDate,
+        path: 'b.md',
+        line: 1,
+      });
+      const task2 = createMockTaskWithKeyword('NOW', false, {
+        deadlineDate: pastDate,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByDeadline',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // Same keyword - should sort by path
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('uses keyword sort as secondary when scheduled dates are equal', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        scheduledDate: pastDate,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        scheduledDate: pastDate,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByScheduled',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('uses keyword sort as secondary when both tasks have no scheduled date', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        scheduledDate: null,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        scheduledDate: null,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByScheduled',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('falls back to path/line when scheduled dates equal and same keyword', () => {
+      const config = createMockKeywordConfig();
+      const task1 = createMockTaskWithKeyword('NOW', false, {
+        scheduledDate: pastDate,
+        path: 'b.md',
+        line: 1,
+      });
+      const task2 = createMockTaskWithKeyword('NOW', false, {
+        scheduledDate: pastDate,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByScheduled',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // Same keyword - should sort by path
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
     it('sorts by priority when selected', () => {
       const task1 = createTask({ priority: 'low', text: 'Low' });
       const task2 = createTask({ priority: 'high', text: 'High' });
@@ -423,6 +604,89 @@ describe('Task Sorting System', () => {
     });
 
     it('falls back to default sorting when priorities are equal', () => {
+      const task1 = createTask({ priority: 'high', path: 'b.md', line: 1 });
+      const task2 = createTask({ priority: 'high', path: 'a.md', line: 1 });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByPriority',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('uses keyword sort as secondary when priorities are equal and keywordConfig provided', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        priority: 'high',
+        path: 'z.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        priority: 'high',
+        path: 'a.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByPriority',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('falls back to path/line when priorities are equal and same keyword', () => {
+      const config = createMockKeywordConfig();
+      const task1 = createMockTaskWithKeyword('NOW', false, {
+        priority: 'high',
+        path: 'b.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+      const task2 = createMockTaskWithKeyword('NOW', false, {
+        priority: 'high',
+        path: 'a.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByPriority',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // Same keyword - should sort by path
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('falls back to taskComparator when no keywordConfig provided', () => {
       const task1 = createTask({ priority: 'high', path: 'b.md', line: 1 });
       const task2 = createTask({ priority: 'high', path: 'a.md', line: 1 });
 
@@ -503,6 +767,89 @@ describe('Task Sorting System', () => {
     it('handles all null urgency values with default sorting', () => {
       const task1 = createTask({ urgency: null, path: 'b.md', line: 1 });
       const task2 = createTask({ urgency: null, path: 'a.md', line: 1 });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('uses keyword sort as secondary when urgencies are equal and keywordConfig provided', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        urgency: 10.0,
+        path: 'z.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        urgency: 10.0,
+        path: 'a.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // NOW (group 1) should come before TODO (group 2) even though TODO has earlier path
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('falls back to path/line when urgencies are equal and same keyword', () => {
+      const config = createMockKeywordConfig();
+      const task1 = createMockTaskWithKeyword('NOW', false, {
+        urgency: 10.0,
+        path: 'b.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+      const task2 = createMockTaskWithKeyword('NOW', false, {
+        urgency: 10.0,
+        path: 'a.md',
+        line: 1,
+        scheduledDate: pastDate,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      // Same keyword - should sort by path
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('falls back to taskComparator when no keywordConfig provided', () => {
+      const task1 = createTask({ urgency: 10.0, path: 'b.md', line: 1 });
+      const task2 = createTask({ urgency: 10.0, path: 'a.md', line: 1 });
 
       const blocks = sortTasksInBlocks(
         [task1, task2],
@@ -807,24 +1154,62 @@ function createMockTaskWithKeyword(
   });
 }
 
+/**
+ * Create a mock KeywordSortConfig for testing
+ * Uses the correct group structure:
+ * - Group 1: Active keywords
+ * - Group 2: Inactive keywords
+ * - Group 3: Unknown/empty (fallback)
+ * - Group 4: Waiting keywords
+ * - Group 5: Completed keywords
+ */
 function createMockKeywordConfig(
-  customKeywords: string[] = [],
+  customKeywordsByGroup: {
+    activeKeywords?: string[];
+    waitingKeywords?: string[];
+    inactiveKeywords?: string[];
+    completedKeywords?: string[];
+  } = {},
 ): KeywordSortConfig {
-  const activeStatesOrder = ['NOW', 'DOING', 'IN-PROGRESS'];
-  const pendingStatesOrder = ['TODO', 'LATER'];
-  const waitingStatesOrder = ['WAIT', 'WAITING'];
-  const completedStatesOrder = ['DONE', 'CANCELED', 'CANCELLED'];
+  // Sort order for built-in keywords (matches task-sort.ts buildKeywordSortConfig)
+  const builtinActiveOrder = ['NOW', 'DOING', 'IN-PROGRESS'];
+  const builtinInactiveOrder = ['TODO', 'LATER'];
+  const builtinWaitingOrder = ['WAIT', 'WAITING'];
+  const builtinCompletedOrder = ['DONE', 'CANCELED', 'CANCELLED'];
+
+  // Combine built-in with custom keywords
+  const activeKeywordsOrder = [
+    ...builtinActiveOrder,
+    ...(customKeywordsByGroup.activeKeywords ?? []).map((k) => k.toUpperCase()),
+  ];
+  const inactiveKeywordsOrder = [
+    ...builtinInactiveOrder,
+    ...(customKeywordsByGroup.inactiveKeywords ?? []).map((k) =>
+      k.toUpperCase(),
+    ),
+  ];
+  const waitingKeywordsOrder = [
+    ...builtinWaitingOrder,
+    ...(customKeywordsByGroup.waitingKeywords ?? []).map((k) =>
+      k.toUpperCase(),
+    ),
+  ];
+  const completedKeywordsOrder = [
+    ...builtinCompletedOrder,
+    ...(customKeywordsByGroup.completedKeywords ?? []).map((k) =>
+      k.toUpperCase(),
+    ),
+  ];
 
   return {
-    customKeywords: customKeywords.map((k) => k.toUpperCase()),
-    activeStates: new Set(activeStatesOrder),
-    activeStatesOrder,
-    pendingStates: new Set(pendingStatesOrder),
-    pendingStatesOrder,
-    waitingStates: new Set(waitingStatesOrder),
-    waitingStatesOrder,
-    completedStates: new Set(completedStatesOrder),
-    completedStatesOrder,
+    activeKeywords: new Set(activeKeywordsOrder),
+    activeKeywordsOrder,
+    inactiveKeywords: new Set(inactiveKeywordsOrder),
+    inactiveKeywordsOrder,
+    waitingKeywords: new Set(waitingKeywordsOrder),
+    waitingKeywordsOrder,
+    completedKeywords: new Set(completedKeywordsOrder),
+    completedKeywordsOrder,
   };
 }
 
@@ -870,7 +1255,7 @@ describe('Keyword Sort Feature', () => {
       });
     });
 
-    describe('Group 2 - Inactive/Pending States', () => {
+    describe('Group 2 - Inactive Keywords', () => {
       it('returns group 2 for TODO keyword', () => {
         const task = createMockTaskWithKeyword('TODO');
         expect(getKeywordGroup(task, defaultConfig)).toBe(2);
@@ -881,7 +1266,7 @@ describe('Keyword Sort Feature', () => {
         expect(getKeywordGroup(task, defaultConfig)).toBe(2);
       });
 
-      it('handles case-insensitive matching for pending states', () => {
+      it('handles case-insensitive matching for inactive states', () => {
         const taskLower = createMockTaskWithKeyword('todo');
         const taskMixed = createMockTaskWithKeyword('LaTeR');
 
@@ -890,13 +1275,7 @@ describe('Keyword Sort Feature', () => {
       });
     });
 
-    describe('Group 3 - Custom Keywords', () => {
-      it('returns group 3 for custom keywords defined in config', () => {
-        const config = createMockKeywordConfig(['REVIEW', 'BLOCKED']);
-        const task = createMockTaskWithKeyword('REVIEW');
-        expect(getKeywordGroup(task, config)).toBe(3);
-      });
-
+    describe('Group 3 - Unknown/Empty States', () => {
       it('returns group 3 for unknown keywords (default treatment)', () => {
         const task = createMockTaskWithKeyword('UNKNOWN_KEYWORD');
         expect(getKeywordGroup(task, defaultConfig)).toBe(3);
@@ -906,18 +1285,9 @@ describe('Keyword Sort Feature', () => {
         const task = createMockTaskWithKeyword('');
         expect(getKeywordGroup(task, defaultConfig)).toBe(3);
       });
-
-      it('handles case-insensitive matching for custom keywords', () => {
-        const config = createMockKeywordConfig(['REVIEW']);
-        const taskLower = createMockTaskWithKeyword('review');
-        const taskMixed = createMockTaskWithKeyword('ReViEw');
-
-        expect(getKeywordGroup(taskLower, config)).toBe(3);
-        expect(getKeywordGroup(taskMixed, config)).toBe(3);
-      });
     });
 
-    describe('Group 4 - Waiting States', () => {
+    describe('Group 4 - Waiting Keywords', () => {
       it('returns group 4 for WAIT keyword', () => {
         const task = createMockTaskWithKeyword('WAIT');
         expect(getKeywordGroup(task, defaultConfig)).toBe(4);
@@ -983,7 +1353,7 @@ describe('Keyword Sort Feature', () => {
     let config: KeywordSortConfig;
 
     beforeEach(() => {
-      config = createMockKeywordConfig(['REVIEW']);
+      config = createMockKeywordConfig({ activeKeywords: ['REVIEW'] });
     });
 
     describe('Group Priority Ordering', () => {
@@ -995,19 +1365,19 @@ describe('Keyword Sort Feature', () => {
         expect(result).toBeLessThan(0);
       });
 
-      it('sorts Group 2 (Inactive) before Group 3 (Custom)', () => {
+      it('sorts Group 2 (Inactive) before Group 3 (Unknown)', () => {
         const inactiveTask = createMockTaskWithKeyword('TODO');
-        const customTask = createMockTaskWithKeyword('REVIEW');
+        const unknownTask = createMockTaskWithKeyword('UNKNOWN');
 
-        const result = keywordSortComparator(inactiveTask, customTask, config);
+        const result = keywordSortComparator(inactiveTask, unknownTask, config);
         expect(result).toBeLessThan(0);
       });
 
-      it('sorts Group 3 (Custom) before Group 4 (Waiting)', () => {
-        const customTask = createMockTaskWithKeyword('REVIEW');
+      it('sorts Group 3 (Unknown) before Group 4 (Waiting)', () => {
+        const unknownTask = createMockTaskWithKeyword('UNKNOWN');
         const waitingTask = createMockTaskWithKeyword('WAIT');
 
-        const result = keywordSortComparator(customTask, waitingTask, config);
+        const result = keywordSortComparator(unknownTask, waitingTask, config);
         expect(result).toBeLessThan(0);
       });
 
@@ -1026,7 +1396,7 @@ describe('Keyword Sort Feature', () => {
       it('sorts all groups in correct priority order (1 > 2 > 3 > 4 > 5)', () => {
         const group1 = createMockTaskWithKeyword('NOW');
         const group2 = createMockTaskWithKeyword('TODO');
-        const group3 = createMockTaskWithKeyword('REVIEW');
+        const group3 = createMockTaskWithKeyword('UNKNOWN');
         const group4 = createMockTaskWithKeyword('WAIT');
         const group5 = createMockTaskWithKeyword('DONE');
 
@@ -1235,33 +1605,34 @@ describe('Keyword Sort Feature', () => {
         expect(sorted[1]).toBe(cancelled); // CANCELLED comes third
       });
 
-      it('sorts custom keywords in settings array order', () => {
-        const customConfig = createMockKeywordConfig([
-          'REVIEW',
-          'BLOCKED',
-          'EPIC',
-        ]);
-        const epic = createMockTaskWithKeyword('EPIC', false, {
-          path: 'a.md',
-          line: 1,
+      it('sorts custom keywords within their assigned group', () => {
+        // Custom keywords assigned to specific groups
+        const customConfig = createMockKeywordConfig({
+          activeKeywords: ['REVIEW'], // Group 1
+          inactiveKeywords: ['PLANNED'], // Group 2
         });
         const review = createMockTaskWithKeyword('REVIEW', false, {
           path: 'a.md',
+          line: 1,
+        });
+        const planned = createMockTaskWithKeyword('PLANNED', false, {
+          path: 'a.md',
           line: 2,
         });
-        const blocked = createMockTaskWithKeyword('BLOCKED', false, {
+        const todo = createMockTaskWithKeyword('TODO', false, {
           path: 'a.md',
           line: 3,
         });
 
-        const tasks = [epic, review, blocked];
+        const tasks = [todo, planned, review];
         const sorted = tasks.sort((a, b) =>
           keywordSortComparator(a, b, customConfig),
         );
 
-        expect(sorted[0]).toBe(review); // REVIEW first (index 0 in custom keywords)
-        expect(sorted[1]).toBe(blocked); // BLOCKED second (index 1)
-        expect(sorted[2]).toBe(epic); // EPIC third (index 2)
+        // REVIEW (Group 1 - active) > TODO (Group 2 - inactive, built-in, position 0) > PLANNED (Group 2 - inactive, custom, position 2)
+        expect(sorted[0]).toBe(review);
+        expect(sorted[1]).toBe(todo);
+        expect(sorted[2]).toBe(planned);
       });
 
       it('falls back to path/line when keywords have same position in order', () => {
@@ -1293,10 +1664,11 @@ describe('Keyword Sort Feature', () => {
     describe('Tasks Without Keywords', () => {
       it('works with tasks that have no keyword (empty state)', () => {
         const noKeyword = createMockTaskWithKeyword('');
-        const todoTask = createMockTaskWithKeyword('TODO');
+        const waitTask = createMockTaskWithKeyword('WAIT');
 
-        // Empty state defaults to group 3, TODO is group 2
-        const result = keywordSortComparator(todoTask, noKeyword, config);
+        // Empty state defaults to group 3, WAIT is group 4 (waiting)
+        // So empty state should come before WAIT
+        const result = keywordSortComparator(noKeyword, waitTask, config);
         expect(result).toBeLessThan(0);
       });
 
@@ -1304,8 +1676,8 @@ describe('Keyword Sort Feature', () => {
         const unknown1 = createMockTaskWithKeyword('UNKNOWN');
         const waitTask = createMockTaskWithKeyword('WAIT');
 
-        // Unknown keywords should be group 3, WAIT is group 4
-        // So unknown should come before wait
+        // Unknown keywords should be group 3, WAIT is group 4 (waiting)
+        // So unknown should come before WAIT
         const result = keywordSortComparator(unknown1, waitTask, config);
         expect(result).toBeLessThan(0);
       });
@@ -1314,57 +1686,53 @@ describe('Keyword Sort Feature', () => {
 
   describe('buildKeywordSortConfig()', () => {
     it('builds config from settings with custom keywords', () => {
-      const customKeywords = ['REVIEW', 'BLOCKED', 'EPIC'];
-      const config = buildKeywordSortConfig(customKeywords);
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['REVIEW'],
+        additionalInactiveKeywords: [],
+        additionalWaitingKeywords: ['BLOCKED'],
+        additionalCompletedKeywords: ['ARCHIVED'],
+      });
+      const config = buildKeywordSortConfig(keywordManager);
 
-      expect(config.customKeywords).toEqual(['REVIEW', 'BLOCKED', 'EPIC']);
-      expect(config.activeStates).toBeInstanceOf(Set);
-      expect(config.activeStates.has('NOW')).toBe(true);
-      expect(config.activeStates.has('DOING')).toBe(true);
-      expect(config.activeStates.has('IN-PROGRESS')).toBe(true);
+      expect(config.activeKeywords.has('REVIEW')).toBe(true);
+      expect(config.waitingKeywords.has('BLOCKED')).toBe(true);
+      expect(config.completedKeywords.has('ARCHIVED')).toBe(true);
+      // Built-in keywords should still be present
+      expect(config.activeKeywords.has('NOW')).toBe(true);
+      expect(config.activeKeywords.has('DOING')).toBe(true);
     });
 
-    it('handles empty custom keywords list', () => {
-      const config = buildKeywordSortConfig([]);
+    it('handles empty keyword groups', () => {
+      const keywordManager = new KeywordManager({});
+      const config = buildKeywordSortConfig(keywordManager);
 
-      expect(config.customKeywords).toEqual([]);
-      expect(config.activeStates).toBeInstanceOf(Set);
-      expect(config.pendingStates).toBeInstanceOf(Set);
+      expect(config.activeKeywords).toBeInstanceOf(Set);
+      expect(config.waitingKeywords).toBeInstanceOf(Set);
+      expect(config.inactiveKeywords).toBeInstanceOf(Set);
+      expect(config.completedKeywords).toBeInstanceOf(Set);
     });
 
-    it('handles missing settings gracefully (undefined)', () => {
-      const config = buildKeywordSortConfig(undefined as unknown as string[]);
+    it('includes all default keyword sets', () => {
+      const keywordManager = new KeywordManager({});
+      const config = buildKeywordSortConfig(keywordManager);
 
-      expect(config.customKeywords).toEqual([]);
-    });
+      // Active keywords
+      expect(config.activeKeywords.has('NOW')).toBe(true);
+      expect(config.activeKeywords.has('DOING')).toBe(true);
+      expect(config.activeKeywords.has('IN-PROGRESS')).toBe(true);
 
-    it('normalizes keywords to uppercase', () => {
-      const customKeywords = ['review', 'Blocked', 'EPIC'];
-      const config = buildKeywordSortConfig(customKeywords);
+      // Waiting keywords
+      expect(config.waitingKeywords.has('WAIT')).toBe(true);
+      expect(config.waitingKeywords.has('WAITING')).toBe(true);
 
-      expect(config.customKeywords).toEqual(['REVIEW', 'BLOCKED', 'EPIC']);
-    });
+      // Inactive keywords
+      expect(config.inactiveKeywords.has('TODO')).toBe(true);
+      expect(config.inactiveKeywords.has('LATER')).toBe(true);
 
-    it('includes all default state sets', () => {
-      const config = buildKeywordSortConfig([]);
-
-      // Active states
-      expect(config.activeStates.has('NOW')).toBe(true);
-      expect(config.activeStates.has('DOING')).toBe(true);
-      expect(config.activeStates.has('IN-PROGRESS')).toBe(true);
-
-      // Pending states
-      expect(config.pendingStates.has('TODO')).toBe(true);
-      expect(config.pendingStates.has('LATER')).toBe(true);
-
-      // Waiting states
-      expect(config.waitingStates.has('WAIT')).toBe(true);
-      expect(config.waitingStates.has('WAITING')).toBe(true);
-
-      // Completed states
-      expect(config.completedStates.has('DONE')).toBe(true);
-      expect(config.completedStates.has('CANCELED')).toBe(true);
-      expect(config.completedStates.has('CANCELLED')).toBe(true);
+      // Completed keywords
+      expect(config.completedKeywords.has('DONE')).toBe(true);
+      expect(config.completedKeywords.has('CANCELED')).toBe(true);
+      expect(config.completedKeywords.has('CANCELLED')).toBe(true);
     });
   });
 
@@ -1375,7 +1743,7 @@ describe('Keyword Sort Feature', () => {
     let config: KeywordSortConfig;
 
     beforeEach(() => {
-      config = createMockKeywordConfig(['REVIEW']);
+      config = createMockKeywordConfig({ activeKeywords: ['REVIEW'] });
     });
 
     /**
@@ -1481,6 +1849,7 @@ describe('Keyword Sort Feature', () => {
         if (!futureBlock) throw new Error('Future block should exist');
 
         // Should be sorted by keyword group within future block
+        // NOW (1) > TODO (2) > WAIT (4)
         const texts = futureBlock.tasks.map((t) => t.text);
         expect(texts).toEqual(['NOW task', 'TODO task', 'WAIT task']);
       });
@@ -1670,12 +2039,15 @@ describe('Keyword Sort Feature', () => {
       });
 
       it('handles custom keywords in keyword sort', () => {
-        const configWithCustom = createMockKeywordConfig(['REVIEW', 'BLOCKED']);
+        const configWithCustom = createMockKeywordConfig({
+          activeKeywords: ['REVIEW'],
+          inactiveKeywords: ['PLANNED'],
+        });
 
         const tasks = [
           createIntegrationTask('TODO', { scheduledDate: pastDate, line: 1 }),
           createIntegrationTask('REVIEW', { scheduledDate: pastDate, line: 2 }),
-          createIntegrationTask('BLOCKED', {
+          createIntegrationTask('PLANNED', {
             scheduledDate: pastDate,
             line: 3,
           }),
@@ -1691,13 +2063,12 @@ describe('Keyword Sort Feature', () => {
           configWithCustom,
         );
 
-        // Expected order: NOW (1) > TODO (2) > REVIEW (3) > BLOCKED (3)
-        // Within group 3, custom keywords maintain their defined order
+        // Expected order: NOW (1) > REVIEW (1 - custom active) > TODO (2) > PLANNED (2 - custom inactive)
         expect(blocks[0].tasks.map((t) => t.state)).toEqual([
           'NOW',
-          'TODO',
           'REVIEW',
-          'BLOCKED',
+          'TODO',
+          'PLANNED',
         ]);
       });
     });

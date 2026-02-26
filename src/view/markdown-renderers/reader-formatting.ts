@@ -1,12 +1,13 @@
 import TodoTracker from '../../main';
-import { DEFAULT_COMPLETED_STATES, Task, NEXT_STATE } from '../../types/task';
+import { Task } from '../../types/task';
 import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
-import { buildTaskKeywords } from '../../utils/task-utils';
+import { isCompletedKeyword, isArchivedKeyword } from '../../utils/task-utils';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { TFile } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
+import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 
 /**
  * Handles task keyword formatting in the reader view
@@ -31,10 +32,7 @@ export class ReaderViewFormatter {
     this.settingsDetector.initialize(this.plugin.settings);
 
     // Initialize menu builder for state selection dropdown
-    this.menuBuilder = new StateMenuBuilder(
-      this.plugin.app,
-      this.plugin.settings,
-    );
+    this.menuBuilder = new StateMenuBuilder(this.plugin);
   }
 
   /**
@@ -46,11 +44,25 @@ export class ReaderViewFormatter {
 
   /**
    * Create a keyword span element with proper attributes using Obsidian DOM helpers
+   * All keywords use the same styling - no group-based CSS classes
+   * @param keyword - The keyword text to display
+   * @param isCompleted - Whether the keyword is a completed keyword (for strikethrough styling)
+   * @param isArchived - Whether the keyword is an archived keyword (for muted styling)
    */
-  private createKeywordSpan(keyword: string): HTMLSpanElement {
+  private createKeywordSpan(
+    keyword: string,
+    isCompleted = false,
+    isArchived = false,
+  ): HTMLSpanElement {
     const tempContainer = document.createElement('div');
+    let cssClasses = 'todoseq-keyword-formatted';
+    if (isArchived) {
+      cssClasses += ' todoseq-archived-keyword';
+    } else if (isCompleted) {
+      cssClasses += ' todoseq-completed-keyword';
+    }
     const span = tempContainer.createSpan({
-      cls: 'todoseq-keyword-formatted',
+      cls: cssClasses,
       text: keyword,
       attr: {
         'data-task-keyword': keyword,
@@ -86,14 +98,28 @@ export class ReaderViewFormatter {
   }
 
   /**
+   * Create an archived task container span element using Obsidian DOM helpers
+   */
+  private createArchivedTaskContainer(): HTMLSpanElement {
+    const tempContainer = document.createElement('div');
+    const container = tempContainer.createSpan({
+      cls: 'todoseq-archived-task-text',
+      attr: {
+        'data-archived-task': 'true',
+      },
+    });
+    return container;
+  }
+
+  /**
    * Get all valid task keywords (default + user-defined)
+   * Uses the KeywordManager from VaultScanner to ensure consistency
+   * between rendering and task-finding operations.
    */
   private getAllTaskKeywords(): string[] {
-    // Use the shared utility to build keyword list
-    const { allKeywords } = buildTaskKeywords(
-      this.plugin.settings?.additionalTaskKeywords,
-    );
-    return allKeywords;
+    // Use the KeywordManager from VaultScanner to ensure consistency
+    const keywordManager = this.vaultScanner.getKeywordManager();
+    return keywordManager.getAllKeywords();
   }
 
   /**
@@ -788,8 +814,18 @@ export class ReaderViewFormatter {
         // match[4] contains the keyword
         const keyword = match[4];
 
+        // Check if this is a completed keyword for styling
+        const isCompleted = isCompletedKeyword(keyword, this.plugin.settings);
+
+        // Check if this is an archived keyword for styling
+        const isArchived = isArchivedKeyword(keyword, this.plugin.settings);
+
         // Create a span for the task keyword using helper method
-        const keywordSpan = this.createKeywordSpan(keyword);
+        const keywordSpan = this.createKeywordSpan(
+          keyword,
+          isCompleted,
+          isArchived,
+        );
 
         // Find the keyword position in the task text
         const fullMatchStart = match.index || 0;
@@ -852,7 +888,7 @@ export class ReaderViewFormatter {
         taskElement.appendChild(taskContainer);
 
         // Apply completed task text styling if needed
-        if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+        if (isCompleted) {
           this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
         }
       }
@@ -1043,8 +1079,18 @@ export class ReaderViewFormatter {
     // match[4] contains the keyword
     const keyword = match[4];
 
+    // Check if this is a completed keyword for styling
+    const isCompleted = isCompletedKeyword(keyword, this.plugin.settings);
+
+    // Check if this is an archived keyword for styling
+    const isArchived = isArchivedKeyword(keyword, this.plugin.settings);
+
     // Create a span for the task keyword
-    const keywordSpan = this.createKeywordSpan(keyword);
+    const keywordSpan = this.createKeywordSpan(
+      keyword,
+      isCompleted,
+      isArchived,
+    );
 
     // Find the keyword position in the text
     const fullMatchStart = match.index || 0;
@@ -1104,7 +1150,7 @@ export class ReaderViewFormatter {
     listItem.appendChild(taskContainer);
 
     // Apply completed task text styling if needed
-    if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+    if (isCompleted) {
       this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
     }
   }
@@ -1250,8 +1296,18 @@ export class ReaderViewFormatter {
         // match[4] contains the keyword
         const keyword = match[4];
 
+        // Check if this is a completed keyword for styling
+        const isCompleted = isCompletedKeyword(keyword, this.plugin.settings);
+
+        // Check if this is an archived keyword for styling
+        const isArchived = isArchivedKeyword(keyword, this.plugin.settings);
+
         // Create a span for the task keyword using helper method
-        const keywordSpan = this.createKeywordSpan(keyword);
+        const keywordSpan = this.createKeywordSpan(
+          keyword,
+          isCompleted,
+          isArchived,
+        );
 
         // Create a container for the entire task line using helper method
         const taskContainer = this.createTaskContainer();
@@ -1265,8 +1321,13 @@ export class ReaderViewFormatter {
         );
 
         // Apply completed task text styling if needed
-        if (DEFAULT_COMPLETED_STATES.has(keyword)) {
+        if (isCompleted) {
           this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
+        }
+
+        // Apply archived task text styling if needed
+        if (isArchived) {
+          this.applyArchivedTaskStylingToTaskContainer(taskContainer);
         }
 
         // Replace all line nodes with the task container
@@ -1407,6 +1468,60 @@ export class ReaderViewFormatter {
         keywordSpan,
         completedContainer.firstChild,
       );
+    }
+  }
+
+  /**
+   * Apply archived task styling to a task container
+   */
+  private applyArchivedTaskStylingToTaskContainer(
+    taskContainer: HTMLElement,
+  ): void {
+    // Find all keyword spans within the task container
+    const keywordSpans = taskContainer.querySelectorAll(
+      '.todoseq-keyword-formatted',
+    );
+
+    for (const keywordSpan of keywordSpans) {
+      // Check if this is an archived keyword
+      const keyword = keywordSpan.getAttribute('data-task-keyword');
+      if (!keyword) continue;
+
+      if (!isArchivedKeyword(keyword, this.plugin.settings)) continue;
+
+      // Verify the keyword span is actually a child of the task container
+      if (keywordSpan.parentNode !== taskContainer) {
+        continue;
+      }
+
+      // Get all nodes after the keyword span (store references to original nodes)
+      const nodesAfterKeyword: Node[] = [];
+      let currentNode = keywordSpan.nextSibling;
+
+      while (currentNode) {
+        nodesAfterKeyword.push(currentNode);
+        currentNode = currentNode.nextSibling;
+      }
+
+      // Wrap both the keyword and the text after it in archived task styling
+      if (nodesAfterKeyword.length > 0 || keywordSpan) {
+        // Create a container for the archived task using helper method
+        const archivedContainer = this.createArchivedTaskContainer();
+
+        // Move all nodes after keyword to the container (not clone)
+        nodesAfterKeyword.forEach((node) => {
+          archivedContainer.appendChild(node);
+        });
+
+        // Replace the keyword span with the archived container
+        taskContainer.replaceChild(archivedContainer, keywordSpan);
+
+        // Now move the keyword span into the archived container at the beginning
+        archivedContainer.insertBefore(
+          keywordSpan,
+          archivedContainer.firstChild,
+        );
+      }
     }
   }
 
@@ -1872,11 +1987,12 @@ export class ReaderViewFormatter {
       return;
     }
 
-    // Get the next state from the NEXT_STATE map
-    const nextState = NEXT_STATE.get(currentState);
-    if (!nextState) {
-      return;
-    }
+    const keywordManager = this.vaultScanner.getKeywordManager();
+    const transitionManager = new TaskStateTransitionManager(
+      keywordManager,
+      this.plugin.settings?.stateTransitions,
+    );
+    const nextState = transitionManager.getNextState(currentState);
 
     await this.updateTaskState(keywordElement, sourcePath, nextState);
   }
@@ -1912,6 +2028,12 @@ export class ReaderViewFormatter {
     keywordElement: HTMLElement,
     sourcePath: string,
   ): Promise<Task | null> {
+    // Get the keyword from the element
+    const keyword = keywordElement.getAttribute('data-task-keyword');
+    if (!keyword) {
+      return null;
+    }
+
     // Get the file
     const file = this.plugin.app.vault.getAbstractFileByPath(sourcePath);
     if (!(file instanceof TFile)) {
@@ -1931,42 +2053,107 @@ export class ReaderViewFormatter {
     // Parse all tasks in the file
     const allTasks = taskParser.parseFile(content, file.path, file);
 
-    // Find the task list item or paragraph containing this keyword
-    const taskContainer = keywordElement.closest(
-      '.task-list-item, .todoseq-task, p, li',
-    );
+    // Get the raw text content from the task container (contains the full task)
+    const taskContainer = keywordElement.closest('.todoseq-task');
     if (!taskContainer) {
       return null;
     }
 
-    // Get the text content of the task container
-    const taskText = taskContainer.textContent || '';
+    // Get the full task text from DOM and normalize it for comparison
+    // Strip markdown formatting that might have been rendered to HTML
+    const domTaskText = this.normalizeTaskText(taskContainer.textContent || '');
 
-    // Normalize the task text by removing leading/trailing whitespace
-    const normalizedTaskText = taskText.trim().replace(/\s+/g, ' ');
+    // Also get just the text after the keyword for more precise matching
+    const keywordSpan = keywordElement;
+    const afterKeyword = keywordSpan.nextSibling?.textContent || '';
+    const domTaskTextAfterKeyword = this.normalizeTaskText(afterKeyword);
 
-    // Find the line that matches this task
+    // Escape the keyword for regex
+    const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Find the line that contains this keyword and matches the task text
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      if (taskParser.testRegex.test(line)) {
-        // Normalize the line for comparison
-        const normalizedLine = line
-          .trim()
-          .replace(/\s+/g, ' ')
-          .replace(/\s*\^[a-zA-Z0-9-]+$/, '');
+      // Check if this line contains the keyword
+      if (line.includes(keyword)) {
+        // Get the task text from the source line (after the keyword)
+        const sourceTaskTextAfterKeyword = line
+          .replace(new RegExp(`^.*?${escapedKeyword}\\s*`, ''), '')
+          .trim();
 
-        // Check if the line ends with the task text
-        if (normalizedLine.endsWith(normalizedTaskText)) {
-          const matchingTask = allTasks.find((t) => t.line === i);
+        const normalizedSourceText = this.normalizeTaskText(
+          sourceTaskTextAfterKeyword,
+        );
+
+        // Check if the DOM text (after keyword) is contained in the source text
+        // This handles cases where DOM has rendered markdown but source has raw markdown
+        if (
+          normalizedSourceText.includes(domTaskTextAfterKeyword) ||
+          domTaskTextAfterKeyword.length === 0 ||
+          normalizedSourceText.length === 0
+        ) {
+          // Also verify the full task text matches
+          const fullNormalizedSource = this.normalizeTaskText(
+            line.replace(new RegExp(`^.*?${escapedKeyword}\\s*`, ''), ''),
+          );
+
+          // Find matching task from parsed tasks
+          const matchingTask = allTasks.find(
+            (t) =>
+              t.line === i ||
+              (t.state === keyword &&
+                (fullNormalizedSource.includes(domTaskText) ||
+                  domTaskText.length === 0)),
+          );
+
           if (matchingTask) {
             return matchingTask;
+          }
+
+          // If no parsed task found, return a minimal task for this line
+          if (normalizedSourceText || domTaskTextAfterKeyword) {
+            return {
+              path: file.path,
+              line: i,
+              rawText: line,
+              indent: '',
+              listMarker: '',
+              text: sourceTaskTextAfterKeyword,
+              state: keyword,
+              completed: false,
+              priority: null,
+              scheduledDate: null,
+              deadlineDate: null,
+              urgency: null,
+              isDailyNote: false,
+              dailyNoteDate: null,
+            };
           }
         }
       }
     }
 
     return null;
+  }
+
+  /**
+   * Normalize task text for comparison by stripping markdown formatting
+   */
+  private normalizeTaskText(text: string): string {
+    return text
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/\*\*([^*]+)\*\*/g, '$1') // **bold**
+      .replace(/\*([^*]+)\*/g, '$1') // *italic*
+      .replace(/__([^_]+)__/g, '$1') // __underline__
+      .replace(/_([^_]+)_/g, '$1') // _italic_
+      .replace(/~~([^~]+)~~/g, '$1') // ~~strikethrough~~
+      .replace(/`([^`]+)`/g, '$1') // `code`
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [text](url)
+      .replace(/^[-*+]\s+/gm, '') // List markers
+      .replace(/^\d+\.\s+/gm, '') // Numbered list markers
+      .replace(/^\[\s*[xX]\s*\]\s*/gm, ''); // Checkboxes
   }
 
   /**

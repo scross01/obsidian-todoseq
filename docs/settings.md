@@ -31,42 +31,253 @@ Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font. All task stat
 
 ## Task Recognition Settings
 
-### Additional Task Keywords
+### Task Keywords
 
-**Setting**: "Additional Task Keywords" (comma-separated list)
+**Setting**: "Task keywords" section with five keyword groups
 
-**Description**: Add custom keywords to be identified as tasks.
+**Description**: Define task state keywords for Active, Inactive, Waiting, Completed, and Archived groups. The group controls styling, sorting, search suggestions, and urgency behavior.
 
-**Format**: Comma-separated list of capitalized words (e.g., `FIXME, HACK, REVIEW`)
+#### Built-in keywords
 
-**Rules:**
+TODOseq starts with built-in keywords in each group:
 
-- Keywords must be capitalized
-- Are additive (doesn't replace default keywords)
-- Only the active state keyword can be added - completion still uses DONE/CANCELED states
+**Active Keywords**: `DOING`, `NOW`, `IN-PROGRESS`
 
-**Examples:**
+- Styled with blue/active color
+- Highest sort priority for incomplete tasks
+- Contribute to urgency score
+
+**Inactive Keywords**: `TODO`, `LATER`
+
+- Styled with default/pending color
+- Normal sort priority
+
+**Waiting Keywords**: `WAIT`, `WAITING`
+
+- Styled with yellow/waiting color
+- Reduces urgency score
+
+**Completed Keywords**: `DONE`, `CANCELED`, `CANCELLED`
+
+- Styled with green/complete color
+- Lowest sort priority
+
+**Archived Keywords**: `ARCHIVED`
+
+- Styled as archived
+- Excluded from vault task collection and state search suggestions
+
+#### Adding custom keywords
+
+The normal workflow is to add your own keywords to the group that matches your process. Custom keywords inherit the behavior of that group. For example, custom active states increase urgency, custom waiting states reduce urgency, and custom completed states are treated as done.
+
+Enter comma-separated, capitalized values in the group field. A small setup might look like this:
 
 ```txt
-FIXME, HACK, REVIEW, BLOCKED, IDEA
+Active: STARTED
+Inactive: BACKLOG
+Waiting: BLOCKED
+Completed: FINISHED
 ```
 
-**Suggested Use Cases:**
+#### Group behavior
 
-- Software development: `FIXME`, `HACK`, `REVIEW`
-- Research: `QUESTION`, `HYPOTHESIS`, `EXPERIMENT`
-- Writing: `DRAFT`, `EDIT`, `REVISE`
-- Project management: `BLOCKED`, `DEPENDENCY`, `APPROVAL`
+You can add custom keywords to any group:
 
-**Custom Keyword Behavior:**
+**Active Keywords**: Tasks currently being worked on
 
-- Appear in Task List like default keywords
-- Can be clicked to cycle states
-- Follow same state sequences as similar default keywords
+- Highest sort priority among incomplete tasks
+- Increases urgency score (same as built-in active keywords)
+- Example use cases: `ACTIVE`, `STARTED`, `FOCUS`
 
-**Keyword Sort Ordering:**
+**Inactive Keywords**: Tasks waiting to be started
 
-When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, custom keywords are sorted by the order they are defined in the setting, placed in the overall sort after the Inactive task keywords states (TODO, LATER) and before Waiting keyword states (WAIT, WAITING).
+- Normal sort priority
+- Example use cases: `BACKLOG`, `PLANNED`, `QUEUED`
+
+**Waiting Keywords**: Tasks blocked by external dependencies
+
+- Reduces urgency score (same as built-in waiting keywords)
+- Example use cases: `BLOCKED`, `PAUSED`, `ON-HOLD`
+
+**Completed Keywords**: Tasks that are finished
+
+- Lowest sort priority
+
+- Example use cases: `FINISHED`, `RESOLVED`
+
+#### Rules and Behavior
+
+- **Styling inheritance**: Custom keywords inherit the styling of their group
+- **Duplicate prevention**: The same keyword cannot be added to multiple groups
+- **State cycling**: Custom keywords follow the same state sequences as their group
+
+#### Advanced: overriding built-in keywords
+
+Advanced users can also override built-in placement and ordering directly in the custom fields.
+
+If you redeclare a built-in keyword in the same group, it is treated as user-defined for ordering in that group. For example:
+
+```txt
+Active: URGENT, NOW
+```
+
+In this case, `NOW` stays active but is sorted after `URGENT`.
+
+If you redeclare a built-in keyword in a different group, the keyword moves to that group and uses the position where you declared it. For example:
+
+```txt
+Waiting: HOLD, LATER
+```
+
+Here, `LATER` moves from Inactive to Waiting and is sorted after `HOLD`.
+
+You can remove a built-in keyword from its default group with `-KEYWORD` syntax:
+
+```txt
+Inactive: SOMEDAY, -LATER
+```
+
+Removed built-ins are not used for scanning, styling, keyword search suggestions, or state selection menus.
+
+When a keyword changes groups, urgency is recalculated using the new group behavior. For example, moving a keyword from Active to Waiting changes its urgency contribution from active bonus to waiting penalty.
+
+Validation rules for advanced syntax are strict. A keyword cannot be duplicated in one group, cannot appear across multiple groups, and a built-in cannot be both added and removed at the same time. Removal is only valid for built-ins that belong to that specific group. Invalid entries are ignored and shown as errors in settings; valid built-in overrides and removals are shown as warnings so the behavior is explicit.
+
+#### Migration from Previous Versions
+
+If you had "Additional task keywords" configured in a previous version, they are automatically migrated to the **Inactive Keywords** group. You can move them to a different group if needed.
+
+#### Keyword Sort Ordering
+
+When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, keywords are sorted by group:
+
+1. **Active keywords** (DOING, NOW, IN-PROGRESS, + custom active)
+2. **Inactive keywords** (TODO, LATER, + custom inactive)
+3. **Waiting keywords** (WAIT, WAITING, + custom waiting)
+4. **Completed keywords** (DONE, CANCELED, CANCELLED, + custom completed)
+
+Within each group, keywords are sorted by effective definition order in settings, including built-in overrides.
+
+## Task State Transitions
+
+**Setting**: "Task state transitions" section with default states and transition declarations
+
+**Description**: Configure how task states transition when clicked or cycled. This section allows you to define custom state sequences for your workflow.
+
+### Default States
+
+Default states are used when no explicit transition is defined for a keyword. Each category has its own default:
+
+- **Default inactive state**: The default state for inactive tasks when no explicit transition is defined
+  - **Default**: `TODO`
+  - **Purpose**: Provides a fallback for inactive keywords without explicit transitions
+  - **Validation**: If the default state is removed from keywords, it automatically recovers to the built-in default (`TODO`)
+
+- **Default active state**: The default state for active tasks when no explicit transition is defined
+  - **Default**: `DOING`
+  - **Purpose**: Provides a fallback for active keywords without explicit transitions
+  - **Validation**: If the default state is removed from keywords, it automatically recovers to the built-in default (`DOING`)
+
+- **Default completed state**: The default state for completed tasks when no explicit transition is defined
+  - **Default**: `DONE`
+  - **Purpose**: Provides a fallback for completed keywords without explicit transitions
+  - **Validation**: If the default state is removed from keywords, it automatically recovers to the built-in default (`DONE`)
+
+### Transition Declarations
+
+Transition declarations define how states transition when clicked. Each line represents one or more transitions.
+
+#### Syntax
+
+The transition syntax supports several patterns:
+
+- **Simple chain**: `STATE -> NEXT_STATE -> NEXT_STATE`
+  - Creates a linear sequence of transitions
+  - Example: `TODO -> DOING -> DONE`
+
+- **Group alternatives**: `(STATE1 | STATE2 | STATE3) -> NEXT_STATE`
+  - Multiple states share the same next state
+  - Example: `(WAIT | WAITING) -> IN-PROGRESS`
+
+- **Terminal state**: `STATE -> [FINAL_STATE]`
+  - Shorthand for declaring a terminal state
+  - Equivalent to: `STATE -> FINAL_STATE -> FINAL_STATE`
+  - Terminal states cannot transition further (clicking has no effect)
+  - Example: `TODO -> [DONE]`
+
+- **Explicit terminal**: `STATE -> FINAL_STATE -> FINAL_STATE`
+  - Explicitly declares a terminal state
+  - Example: `TODO -> DONE -> DONE`
+
+#### Default Configuration
+
+The plugin ships with these default transitions:
+
+```txt
+TODO -> DOING -> DONE
+(WAIT | WAITING) -> IN-PROGRESS
+LATER -> NOW -> DONE
+```
+
+#### Examples
+
+**Simple workflow**:
+
+```txt
+TODO -> DOING -> DONE
+```
+
+**Complex workflow with alternatives**:
+
+```txt
+TODO -> DOING -> DONE
+(WAIT | WAITING) -> IN-PROGRESS
+LATER -> NOW -> [DONE]
+```
+
+**Custom keywords**:
+
+```txt
+BACKLOG -> IN_PROGRESS -> [DONE]
+IDEA -> BACKLOG
+(REVIEW | TESTING) -> DONE
+```
+
+### Validation and Error Handling
+
+The settings include real-time validation:
+
+- **Invalid keywords**: If a transition includes a keyword that doesn't exist in any keyword group, the line is marked as an error and ignored
+- **Conflicting declarations**: If a state appears in multiple transition declarations, the second declaration is marked as an error and ignored
+- **Invalid default states**: If a default state is removed from keywords, the plugin automatically recovers to the built-in default and displays an info message
+
+### Special Cycle Behavior
+
+The **Cycle** command (vs. click action) has special behavior:
+
+- **Completed states** → Always transition to `""` (blank/clears the state)
+- **Blank state** (`""`) → Always transition to the default inactive state
+- **Other states** → Use the same logic as click action
+
+### Behavior with Removed Keywords
+
+If you remove a built-in keyword that appears in your transition declarations:
+
+1. The transition line is marked as an error and ignored
+2. Other valid transitions continue to work
+3. The state will use its group's default for transitions
+
+This ensures that your workflow remains functional even if you remove keywords, with automatic fallback to defaults.
+
+### Terminal States
+
+Terminal states are keywords that transition to themselves. When you click on a terminal state no transition occurs (the state remains unchanged)
+
+Common use cases for terminal states:
+
+- Marking a task as "done" and preventing further changes
+- Creating a "final" state that requires manual intervention to change
 
 ### Include Tasks Inside Code Blocks
 
@@ -260,3 +471,28 @@ Obsidian does not notify plugins when the "Excluded files" setting has been modi
 The Toggle task state command palette action is bound to `Ctrl+Enter` by default.
 
 Use the Obsidian Hotkeys setting to add or remove hotkeys for command palette actions.
+
+## Experimental Features
+
+The Experimental Features section contains settings for features that are still in development or testing. These features may not be fully functional and could change or be removed in future versions.
+
+### Detect Tasks in Org Mode Files
+
+**Setting**: "Detect tasks in org mode files" (toggle)
+
+**Description**: Enable parsing of tasks from Org-mode files (`.org` extension).
+
+**Default**: Disabled
+
+**When Enabled:**
+
+- `.org` files are scanned for tasks using Org-mode headline syntax
+- Tasks appear in the Task List alongside Markdown tasks
+- Supports Org-mode priorities, scheduled dates, and deadline dates
+
+**Limitations:**
+
+- Editor styling and decorations are not supported for Org-mode files
+- Tasks are detected during vault scanning only
+
+See [Experimental Features](experimental-features.md) for detailed documentation on Org-mode support.

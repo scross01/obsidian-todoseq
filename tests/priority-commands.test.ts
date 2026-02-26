@@ -1,7 +1,11 @@
 import { EditorController } from '../src/services/editor-controller';
 import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { Task } from '../src/types/task';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('Priority Commands', () => {
   let editorController: EditorController;
@@ -9,26 +13,19 @@ describe('Priority Commands', () => {
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
-    // Create settings manually to avoid importing DefaultSettings
-    settings = {
-      refreshInterval: 60,
-      includeCalloutBlocks: true,
-      includeCodeBlocks: false,
-      includeCommentBlocks: false,
-      languageCommentSupport: {
-        enabled: false,
-      },
-      additionalTaskKeywords: [],
-      taskListViewMode: 'showAll',
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
+    // Use createBaseSettings to ensure all properties are included
+    settings = createBaseSettings({
+      languageCommentSupport: { enabled: false },
+    });
 
     // Mock plugin with necessary properties
     mockPlugin = {
       getVaultScanner: () => ({
         getParser: () => {
-          const parser = TaskParser.create(settings);
+          const parser = TaskParser.create(
+            createTestKeywordManager(settings),
+            null,
+          );
           return parser;
         },
       }),

@@ -4,9 +4,17 @@ import {
   SettingsChangeDetector,
   createSettingsChangeDetector,
 } from '../src/utils/settings-utils';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
+import { migrateSettings } from '../src/utils/settings-migration';
 
 describe('settings-utils', () => {
+  describe('migrateSettings', () => {
+    test('should return an empty object when settings are null', () => {
+      const result = migrateSettings(null);
+      expect(result).toEqual({});
+    });
+  });
+
   describe('getPluginSettings', () => {
     const mockApp: Partial<App> = {};
 
@@ -64,21 +72,28 @@ describe('settings-utils', () => {
       expect(result?.formatTaskKeywords).toBe(false);
       expect(result?.includeCodeBlocks).toBe(true);
       // Default values should be applied for missing properties
-      expect(result?.refreshInterval).toBe(60);
       expect(result?.weekStartsOn).toBe('Monday');
     });
 
     test('should return complete settings without modification', () => {
       const completeSettings: TodoTrackerSettings = {
-        refreshInterval: 30,
-        additionalTaskKeywords: ['FIXME', 'HACK'],
+        additionalInactiveKeywords: ['FIXME', 'HACK'],
+        additionalInactiveKeywords: ['FIXME', 'HACK'],
+        additionalActiveKeywords: ['STARTED'],
+        additionalWaitingKeywords: ['PAUSED'],
+        additionalCompletedKeywords: ['ABANDONED'],
+        additionalArchivedKeywords: [],
         includeCodeBlocks: true,
         includeCalloutBlocks: false,
         includeCommentBlocks: true,
         taskListViewMode: 'hideCompleted',
+        futureTaskSorting: 'showAll',
+        defaultSortMethod: 'default',
         languageCommentSupport: { enabled: false },
         weekStartsOn: 'Sunday',
         formatTaskKeywords: false,
+        additionalFileExtensions: [],
+        detectOrgModeFiles: false,
       };
 
       (mockApp as any).plugins = {
@@ -102,15 +117,23 @@ describe('settings-utils', () => {
     beforeEach(() => {
       detector = new SettingsChangeDetector();
       baseSettings = {
-        refreshInterval: 60,
-        additionalTaskKeywords: [],
+        additionalInactiveKeywords: [],
+        additionalInactiveKeywords: [],
+        additionalActiveKeywords: [],
+        additionalWaitingKeywords: [],
+        additionalCompletedKeywords: [],
+        additionalArchivedKeywords: [],
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
         taskListViewMode: 'showAll',
+        futureTaskSorting: 'showAll',
+        defaultSortMethod: 'default',
         languageCommentSupport: { enabled: true },
         weekStartsOn: 'Monday',
         formatTaskKeywords: true,
+        additionalFileExtensions: [],
+        detectOrgModeFiles: false,
       };
     });
 
@@ -160,18 +183,21 @@ describe('settings-utils', () => {
         );
       });
 
-      test('should detect changes in additionalTaskKeywords', () => {
+      test('should detect changes in additionalInactiveKeywords', () => {
         const changedSettings = {
           ...baseSettings,
-          additionalTaskKeywords: ['FIXME', 'HACK'],
+          additionalInactiveKeywords: ['FIXME', 'HACK'],
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
           true,
         );
       });
 
-      test('should NOT detect changes in refreshInterval', () => {
-        const changedSettings = { ...baseSettings, refreshInterval: 30 };
+      test('should NOT detect changes in defaultSortMethod', () => {
+        const changedSettings = {
+          ...baseSettings,
+          defaultSortMethod: 'sortByPriority' as const,
+        };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
           false,
         );
@@ -212,7 +238,7 @@ describe('settings-utils', () => {
       test('should not detect changes when only non-formatting settings change', () => {
         const changedSettings: TodoTrackerSettings = {
           ...baseSettings,
-          refreshInterval: 30,
+          defaultSortMethod: 'sortByPriority',
           taskListViewMode: 'sortCompletedLast',
           weekStartsOn: 'Sunday',
         };
@@ -336,15 +362,23 @@ describe('settings-utils', () => {
       const detector2 = createSettingsChangeDetector();
 
       const settings: TodoTrackerSettings = {
-        refreshInterval: 60,
-        additionalTaskKeywords: [],
+        additionalInactiveKeywords: [],
+        additionalInactiveKeywords: [],
+        additionalActiveKeywords: [],
+        additionalWaitingKeywords: [],
+        additionalCompletedKeywords: [],
+        additionalArchivedKeywords: [],
         includeCodeBlocks: false,
         includeCalloutBlocks: true,
         includeCommentBlocks: false,
         taskListViewMode: 'showAll',
+        futureTaskSorting: 'showAll',
+        defaultSortMethod: 'default',
         languageCommentSupport: { enabled: true },
         weekStartsOn: 'Monday',
         formatTaskKeywords: true,
+        additionalFileExtensions: [],
+        detectOrgModeFiles: false,
       };
 
       detector1.initialize(settings);

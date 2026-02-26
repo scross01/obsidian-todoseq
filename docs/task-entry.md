@@ -82,6 +82,8 @@ TODOseq automatically syncs checkbox state with task keywords when updated from 
 
 \*Note: If you modify the checkbox directly in the Obsidian editor, the task state keyword will not be automatically updated.
 
+**Additional formats** may be available through [Experimental Features](experimental-features.md).
+
 ## Task Keywords
 
 ### Default Supported Keywords
@@ -136,21 +138,48 @@ CANCELLED → TODO
 
 ### Adding Custom Keywords
 
-You can add additional task keywords in the plugin settings:
+You can add custom task keywords in the plugin settings. Keywords are organized into four groups, each with specific styling and behavior:
 
 1. Go to TODOseq settings
-2. Find "Additional Task Keywords" field
-3. Enter comma-separated capitalized keywords (e.g., `FIXME, HACK, REVIEW`)
+2. Find the "Task Keywords" section
+3. Enter comma-separated capitalized keywords in the appropriate group field
+
+**Keyword Groups:**
+
+- **Active Keywords**: Tasks currently being worked on (e.g., `ACTIVE`, `STARTED`, `FOCUS`)
+  - Styled with blue/active color like DOING
+  - Highest sort priority among incomplete tasks
+  - Increases urgency score
+
+- **Inactive Keywords**: Tasks waiting to be started (e.g., `BACKLOG`, `PLANNED`, `QUEUED`)
+  - Styled with default/pending color like TODO
+  - Normal sort priority
+
+- **Waiting Keywords**: Tasks blocked by external dependencies (e.g., `BLOCKED`, `PAUSED`, `ON-HOLD`)
+  - Styled with yellow/waiting color like WAIT
+  - Reduces urgency score
+
+- **Completed Keywords**: Tasks that are finished (e.g., `FINISHED`, `RESOLVED`, `ARCHIVED`)
+  - Styled with green/complete color like DONE
+  - Lowest sort priority
 
 **Examples:**
 
 ```markdown
-FIXME Broken functionality
-HACK Temporary workaround
-REVIEW Needs code review
+ACTIVE Currently working on this
+BACKLOG Task for later
+BLOCKED Waiting for review
+FINISHED All done
 ```
 
-Custom keywords appear in the Task List like default keywords and can be clicked to cycle states. When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, custom keywords are sorted by their definition order, placed after Inactive task keywords (TODO, LATER) and before Waiting keyword states (WAIT, WAITING).
+**Rules:**
+
+- Keywords must be capitalized
+- Built-in keywords (TODO, DOING, DONE, etc.) are always available
+- Custom keywords inherit the styling and behavior of their group
+- The same keyword cannot be added to multiple groups
+
+Custom keywords appear in the Task List like default keywords and can be clicked to cycle states. When using the [Keyword sort option](task-list.md#6-keyword) in the Task List, keywords are sorted by group (Active → Inactive → Waiting → Completed), with custom keywords sorted by definition order within each group.
 
 ## Priority System
 

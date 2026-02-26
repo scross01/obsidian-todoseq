@@ -269,7 +269,7 @@ In all cases, TODOseq navigates to the exact line containing the task and focuse
 
 If no tasks are found or the search query is invalid:
 
-![TODOseq embedded list no tasks found](/assets/todoseq-embedded-list-empty.png)
+![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty.png)
 
 If there's an error with one of the sort or filter options, an error message will be displayed accordingly. The error message indicates what went wrong and suggests how to fix it.
 

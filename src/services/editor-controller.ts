@@ -1,7 +1,9 @@
 import { Editor, MarkdownView } from 'obsidian';
-import { Task, CYCLE_TASK_STATE } from '../types/task';
+import { Task } from '../types/task';
 import TodoTracker from '../main';
 import { detectListMarker } from '../utils/patterns';
+import { KeywordManager } from '../utils/keyword-manager';
+import { TaskStateTransitionManager } from './task-state-transition-manager';
 
 /**
  * EditorController handles operations related to modifying tasks in the editor
@@ -101,18 +103,16 @@ export class EditorController {
 
     if (task) {
       // Determine the target state
-      let targetState = newState;
-      if (!targetState) {
+      let targetState: string = newState ?? '';
+      if (!newState) {
         // Cycle to next state
         const settings = this.plugin.settings;
-        const customKeywords = settings?.additionalTaskKeywords || [];
-        if (customKeywords.includes(task.state)) {
-          targetState = 'DONE';
-        } else {
-          // Import NEXT_STATE dynamically to avoid circular dependency
-          const { NEXT_STATE } = await import('../types/task');
-          targetState = NEXT_STATE.get(task.state) || 'TODO';
-        }
+        const keywordManager = new KeywordManager(settings ?? {});
+        const stateManager = new TaskStateTransitionManager(
+          keywordManager,
+          settings?.stateTransitions,
+        );
+        targetState = stateManager.getNextState(task.state);
       }
 
       // Use the centralized coordinator for the update
@@ -204,20 +204,25 @@ export class EditorController {
     );
 
     // Determine the target state using cycle task state logic
-    let targetState = newState;
-    if (!targetState) {
+    let targetState: string = newState ?? '';
+    if (!newState) {
       if (task) {
-        // Use CYCLE_TASK_STATE mapping for existing tasks
         const settings = this.plugin.settings;
-        const customKeywords = settings?.additionalTaskKeywords || [];
-        if (customKeywords.includes(task.state)) {
-          targetState = 'DONE';
-        } else {
-          targetState = CYCLE_TASK_STATE.get(task.state) ?? 'TODO';
-        }
+        const keywordManager = new KeywordManager(settings ?? {});
+        const stateManager = new TaskStateTransitionManager(
+          keywordManager,
+          settings?.stateTransitions,
+        );
+        targetState = stateManager.getCycleState(task.state);
       } else {
-        // For lines without existing task keywords, start with TODO
-        targetState = 'TODO';
+        // For lines without existing task keywords, use the default inactive from settings
+        const settings = this.plugin.settings;
+        const keywordManager = new KeywordManager(settings ?? {});
+        const stateManager = new TaskStateTransitionManager(
+          keywordManager,
+          settings?.stateTransitions,
+        );
+        targetState = stateManager.getCycleState('');
       }
     }
 

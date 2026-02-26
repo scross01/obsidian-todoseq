@@ -6,7 +6,7 @@ export class EditorKeywordMenu {
   private menuBuilder: StateMenuBuilder;
 
   constructor(private plugin: TodoTracker) {
-    this.menuBuilder = new StateMenuBuilder(plugin.app, plugin.settings);
+    this.menuBuilder = new StateMenuBuilder(plugin);
   }
 
   /**

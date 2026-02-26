@@ -1,5 +1,6 @@
 import { TaskParser } from '../../src/parser/task-parser';
-import { TodoTrackerSettings } from '../../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
+import { createTestKeywordManager } from '../helpers/test-helper';
 import { baseCodeLanguageSettings } from '../helpers/code-language-test-helper';
 
 describe('Task parsing within Python comments in code blocks', () => {
@@ -8,7 +9,12 @@ describe('Task parsing within Python comments in code blocks', () => {
 
   beforeEach(() => {
     settings = baseCodeLanguageSettings;
-    parser = TaskParser.create(settings, null);
+    parser = TaskParser.create(
+      createTestKeywordManager(settings),
+      null,
+      undefined,
+      settings,
+    );
   });
 
   describe('Tasks in python code blocks', () => {

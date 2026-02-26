@@ -1,7 +1,7 @@
 import { MarkdownView, WorkspaceLeaf, TFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import TodoTracker from './main';
-import { DEFAULT_COMPLETED_STATES } from './types/task';
+import { isCompletedKeyword } from './utils/task-utils';
 import { taskKeywordPlugin } from './view/editor-extensions/task-formatting';
 import { dateAutocompleteExtension } from './view/editor-extensions/date-autocomplete';
 import { TaskListView } from './view/task-list/task-list-view';
@@ -218,12 +218,15 @@ export class UIManager {
     // Determine new state based on checkbox state
     let newKeyword = currentKeyword;
     // Only change state if there's a mismatch between current state and checkbox
-    if (checkbox.checked && !DEFAULT_COMPLETED_STATES.has(currentKeyword)) {
+    if (
+      checkbox.checked &&
+      !isCompletedKeyword(currentKeyword, this.plugin.settings)
+    ) {
       // Checkbox checked but current state is not completed -> change to DONE
       newKeyword = 'DONE';
     } else if (
       !checkbox.checked &&
-      DEFAULT_COMPLETED_STATES.has(currentKeyword)
+      isCompletedKeyword(currentKeyword, this.plugin.settings)
     ) {
       // Checkbox unchecked but current state is completed -> change to TODO
       newKeyword = 'TODO';
@@ -525,34 +528,26 @@ export class UIManager {
         const contextMenuHandler = (evt: MouseEvent) => {
           const target = evt.target as HTMLElement;
 
-          // Check if the right-click was on a task keyword element or its parent
-          let keywordElement = target;
-          let keyword = target.getAttribute('data-task-keyword');
+          // Use .closest() to reliably find the keyword element regardless of nesting
+          // This handles cases where the click target is a child element of the keyword span
+          const keywordElement = target.closest(
+            '.todoseq-keyword-formatted',
+          ) as HTMLElement | null;
 
-          // If the target doesn't have the attribute, check parent elements
-          if (!keyword && target.parentElement) {
-            keywordElement = target.parentElement;
-            keyword = keywordElement.getAttribute('data-task-keyword');
-          }
+          if (keywordElement) {
+            const keyword = keywordElement.getAttribute('data-task-keyword');
 
-          // Also check for footnote task keywords
-          if (!keyword && target.closest('.footnote-task-keyword')) {
-            keywordElement = target.closest(
-              '.footnote-task-keyword',
-            ) as HTMLElement;
-            keyword = keywordElement.getAttribute('data-task-keyword');
-          }
+            if (keyword && activeView.file && this.plugin.editorKeywordMenu) {
+              evt.preventDefault();
+              evt.stopPropagation();
 
-          if (keyword && activeView.file && this.plugin.editorKeywordMenu) {
-            evt.preventDefault();
-            evt.stopPropagation();
-
-            // Open the context menu
-            this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
-              keyword,
-              keywordElement,
-              evt,
-            );
+              // Open the context menu
+              this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
+                keyword,
+                keywordElement,
+                evt,
+              );
+            }
           }
         };
 

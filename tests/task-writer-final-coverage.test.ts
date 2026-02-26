@@ -29,7 +29,7 @@ describe('TaskWriter Final Coverage for Remaining Lines', () => {
 
     // Mock settings
     (getPluginSettings as jest.Mock).mockReturnValue({
-      additionalTaskKeywords: ['CUSTOM'],
+      additionalInactiveKeywords: ['CUSTOM'],
     });
 
     taskWriter = new TaskWriter(mockApp);

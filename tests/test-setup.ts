@@ -1,21 +1,11 @@
 // Test setup file for Jest
 import { LanguageRegistry } from '../src/parser/language-registry';
-import {
-  DEFAULT_PENDING_STATES,
-  DEFAULT_ACTIVE_STATES,
-  DEFAULT_COMPLETED_STATES,
-} from '../src/types/task';
 
 // Create a global registry instance for all tests
 const registry = new LanguageRegistry();
 
 // Export test utilities
-export {
-  registry,
-  DEFAULT_PENDING_STATES,
-  DEFAULT_ACTIVE_STATES,
-  DEFAULT_COMPLETED_STATES,
-};
+export { registry };
 
 // Mock console methods to reduce noise during tests
 global.console = {

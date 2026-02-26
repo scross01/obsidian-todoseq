@@ -8,7 +8,7 @@ import {
   TaskListViewMode,
 } from './view/task-list/task-list-view';
 import { TodoTrackerSettingTab } from './settings/settings';
-import { TaskParser } from './parser/task-parser';
+import { OrgModeTaskParser } from './parser/org-mode-task-parser';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, Platform } from 'obsidian';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
@@ -27,25 +27,36 @@ export class PluginLifecycleManager {
   async onload() {
     await this.loadSettings();
 
-    // Initialize services
     // Load urgency coefficients on startup
     const urgencyCoefficients = await parseUrgencyCoefficients(this.plugin.app);
 
-    // VaultScanner now uses the centralized TaskStateManager
+    // VaultScanner creates KeywordManager and TaskParser internally
     this.plugin.vaultScanner = new VaultScanner(
       this.plugin.app,
       this.plugin.settings,
-      TaskParser.create(
-        this.plugin.settings,
-        this.plugin.app,
-        urgencyCoefficients,
-      ),
       this.plugin.taskStateManager,
+      urgencyCoefficients,
     );
 
-    // Initialize property search engine after vault scanner (we'll register listeners later)
+    // Register org-mode parser if experimental feature is enabled
+    if (this.plugin.settings.detectOrgModeFiles) {
+      const keywordManager = this.plugin.vaultScanner.getKeywordManager();
+      const orgModeParser = OrgModeTaskParser.create(
+        keywordManager,
+        this.plugin.app,
+        urgencyCoefficients,
+      );
+      this.plugin.vaultScanner.registerParser(orgModeParser);
+    }
+
+    // Initialize property search engine after vault scanner
     this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(
       this.plugin.app,
+      {
+        taskStateManager: this.plugin.taskStateManager,
+        refreshAllTaskListViews: () => this.plugin.refreshAllTaskListViews(),
+        vaultScanner: this.plugin.vaultScanner,
+      },
     );
 
     // Create EventCoordinator - single source for vault events
@@ -68,7 +79,6 @@ export class PluginLifecycleManager {
     this.plugin.statusBarManager.setupStatusBarItem();
 
     // Initialize reader view formatter with vaultScanner
-    // Note: ReaderViewFormatter now uses the shared parser from VaultScanner
     this.plugin.readerViewFormatter = new ReaderViewFormatter(
       this.plugin,
       this.plugin.vaultScanner,
@@ -84,7 +94,6 @@ export class PluginLifecycleManager {
           leaf,
           this.plugin.taskStateManager,
           this.plugin.settings.taskListViewMode,
-          this.plugin.settings,
           this.plugin,
         ),
     );
@@ -322,9 +331,13 @@ export class PluginLifecycleManager {
       // This ensures views show "Scanning vault..." before the scan starts
       this.plugin.vaultScanner?.setInitializationComplete();
 
-      // Wait for the initial vault scan to complete before showing the task view
-      // This ensures tasks are available when the view first renders
-      await this.plugin.vaultScanner?.scanVault();
+      // IMPORTANT: Run the vault scan concurrently without an 'await' lock!
+      // This is absolutely critical to achieving early Largest Contentful Paint (LCP).
+      // If we wait for the vault to scan first, the UI widget will not even mount
+      // to the screen until the 3-second block succeeds. By firing it off concurrently,
+      // the TaskListView renders immediately, and the `chunkedRenderQueue` drops the
+      // progressive LCP tasks down securely behind it!
+      const scanPromise = this.plugin.vaultScanner?.scanVault();
 
       // Set property search engine on vault scanner and register listeners (but don't initialize yet - lazy initialize)
       if (this.plugin.propertySearchEngine) {
@@ -343,6 +356,12 @@ export class PluginLifecycleManager {
         // On subsequent reloads, ensure the panel is available but don't steal focus
         this.plugin.uiManager.showTasks(false);
       }
+
+      // Allow any fatal exceptions inside the unawaited scan sequence to securely log
+      // without failing the Obsidian Workspace startup initialization.
+      scanPromise?.catch((err) => {
+        console.error('TODOseq: Fatal background scanning error:', err);
+      });
     });
   }
 

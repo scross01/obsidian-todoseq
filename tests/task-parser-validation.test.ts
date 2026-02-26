@@ -1,5 +1,9 @@
 import { TaskParser } from '../src/parser/task-parser';
-import { TodoTrackerSettings } from '../src/settings/settings';
+import { TodoTrackerSettings } from '../src/settings/settings-types';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 describe('TaskParser keyword validation', () => {
   describe('validateKeywords', () => {
@@ -71,39 +75,42 @@ describe('TaskParser keyword validation', () => {
   });
 
   describe('create method with validation', () => {
-    const baseSettings: TodoTrackerSettings = {
-      refreshInterval: 60,
-      additionalTaskKeywords: [],
-      includeCodeBlocks: false,
-      includeCalloutBlocks: true,
-      includeCommentBlocks: false,
-      taskListViewMode: 'showAll',
-      languageCommentSupport: { enabled: true },
-      weekStartsOn: 'Monday',
-      formatTaskKeywords: true,
-    };
+    const baseSettings: TodoTrackerSettings = createBaseSettings();
 
     it('should create parser with valid keywords', () => {
       const settings = {
         ...baseSettings,
-        additionalTaskKeywords: ['FIXME', 'HACK'],
+        additionalInactiveKeywords: ['FIXME', 'HACK'],
       };
-      expect(() => TaskParser.create(settings)).not.toThrow();
-      const parser = TaskParser.create(settings);
+      expect(() =>
+        TaskParser.create(createTestKeywordManager(settings), null),
+      ).not.toThrow();
+      const parser = TaskParser.create(
+        createTestKeywordManager(settings),
+        null,
+      );
       expect(parser).toBeInstanceOf(TaskParser);
     });
 
     it('should throw error with invalid keywords', () => {
-      const settings = { ...baseSettings, additionalTaskKeywords: ['A*B*C'] };
-      expect(() => TaskParser.create(settings)).toThrow(
-        'dangerous regex pattern',
-      );
+      const settings = {
+        ...baseSettings,
+        additionalInactiveKeywords: ['A*B*C'],
+      };
+      expect(() =>
+        TaskParser.create(createTestKeywordManager(settings), null),
+      ).toThrow('dangerous regex pattern');
     });
 
     it('should work with empty additional keywords', () => {
-      const settings = { ...baseSettings, additionalTaskKeywords: [] };
-      expect(() => TaskParser.create(settings)).not.toThrow();
-      const parser = TaskParser.create(settings);
+      const settings = { ...baseSettings, additionalInactiveKeywords: [] };
+      expect(() =>
+        TaskParser.create(createTestKeywordManager(settings), null),
+      ).not.toThrow();
+      const parser = TaskParser.create(
+        createTestKeywordManager(settings),
+        null,
+      );
       expect(parser).toBeInstanceOf(TaskParser);
     });
   });

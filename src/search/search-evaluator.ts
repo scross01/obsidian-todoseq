@@ -1,7 +1,7 @@
 import { SearchNode } from './search-types';
 import { Task } from '../types/task';
 import { DateUtils } from '../utils/date-utils';
-import { TodoTrackerSettings } from '../settings/settings';
+import { TodoTrackerSettings } from '../settings/settings-types';
 import { getFilename } from '../utils/task-utils';
 import { RegexCache } from '../utils/regex-cache';
 import { TAG_PATTERN } from '../utils/patterns';

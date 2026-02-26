@@ -1,12 +1,18 @@
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { Task } from '../src/types/task';
-import { createBaseTask, createCheckboxTask } from './helpers/test-helper';
+import {
+  createBaseTask,
+  createCheckboxTask,
+  createTestKeywordManager,
+  createBaseSettings,
+} from './helpers/test-helper';
 
 describe('TaskStateManager.optimisticUpdate', () => {
   let stateManager: TaskStateManager;
 
   beforeEach(() => {
-    stateManager = new TaskStateManager();
+    const keywordManager = createTestKeywordManager(createBaseSettings());
+    stateManager = new TaskStateManager(keywordManager);
   });
 
   describe('Optimistic updates', () => {

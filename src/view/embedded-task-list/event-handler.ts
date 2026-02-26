@@ -3,7 +3,7 @@ import TodoTracker from '../../main';
 import { EmbeddedTaskListRenderer } from './task-list-renderer';
 import { EmbeddedTaskListManager } from './task-list-manager';
 import { TodoseqCodeBlockParser } from './code-block-parser';
-import { TodoTrackerSettings } from '../../settings/settings';
+import { TodoTrackerSettings } from '../../settings/settings-types';
 
 /**
  * Handles real-time updates for embedded task lists.
