@@ -1,6 +1,6 @@
 # Change Log
 
-## 0.11.0-dev
+## 0.11.0
 
 - Changed the sort algorithms to use the task keyword state as secondary sorting criteria. #51
 - Added a special Archived state that is used to highlight tasks in the editor, but does not appear in the task lists. #37
