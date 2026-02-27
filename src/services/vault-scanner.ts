@@ -515,7 +515,7 @@ export class VaultScanner {
     }
   }
 
-  // Compare two task arrays for equality (path, line, rawText)
+  // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate)
   private tasksIdentical(before: Task[], after: Task[]): boolean {
     if (before.length !== after.length) {
       return false;
@@ -523,7 +523,15 @@ export class VaultScanner {
     for (let i = 0; i < before.length; i++) {
       const b = before[i];
       const a = after[i];
-      if (b.path !== a.path || b.line !== a.line || b.rawText !== a.rawText) {
+      if (
+        b.path !== a.path ||
+        b.line !== a.line ||
+        b.rawText !== a.rawText ||
+        (b.scheduledDate?.getTime() ?? null) !==
+          (a.scheduledDate?.getTime() ?? null) ||
+        (b.deadlineDate?.getTime() ?? null) !==
+          (a.deadlineDate?.getTime() ?? null)
+      ) {
         return false;
       }
     }

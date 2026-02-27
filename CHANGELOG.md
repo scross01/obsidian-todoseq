@@ -1,8 +1,12 @@
 # Change Log
 
+## 0.11.2
+
+- Fixed issue with task list not updated immediately when scheduled or deadline dates are added/changed/removed. #56
+
 ## 0.11.1
 
-- Added command pallette icons
+- Added command pallette icons. #55
 
 ## 0.11.0
 
