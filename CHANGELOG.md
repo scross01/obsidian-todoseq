@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.11.1
+
+- Added command pallette icons
+
 ## 0.11.0
 
 - Changed the sort algorithms to use the task keyword state as secondary sorting criteria. #51

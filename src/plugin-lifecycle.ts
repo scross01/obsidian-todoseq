@@ -141,6 +141,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'show-task-list',
       name: 'Show task list',
+      icon: 'list-todo',
       callback: () => this.plugin.uiManager.showTasks(),
     });
 
@@ -148,6 +149,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'rescan-vault',
       name: 'Rescan vault',
+      icon: 'refresh-cw',
       callback: async () => {
         await this.plugin.vaultScanner?.scanVault();
       },
@@ -157,6 +159,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'toggle-task-state',
       name: 'Toggle task state',
+      icon: 'square-check',
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
@@ -180,6 +183,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'cycle-task-state',
       name: 'Cycle task state',
+      icon: 'circle-check',
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
@@ -197,6 +201,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'add-scheduled-date',
       name: 'Add scheduled date',
+      icon: 'calendar-clock',
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
@@ -214,6 +219,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'add-deadline-date',
       name: 'Add deadline date',
+      icon: 'calendar-range',
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
@@ -231,6 +237,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'set-priority-high',
       name: 'Set priority high',
+      icon: 'chevrons-up',
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
@@ -248,6 +255,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'set-priority-medium',
       name: 'Set priority medium',
+      icon: 'equal',
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
@@ -265,6 +273,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'set-priority-low',
       name: 'Set priority low',
+      icon: 'chevrons-down',
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
