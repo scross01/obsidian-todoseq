@@ -150,3 +150,9 @@ Task priority indicators use colors picked from the current active theme:
 - `[#B]` - Medium priority - theme interactive accent
 - `[#C]` - Low priority - theme background modifier border
 - No priority - No badge displayed
+
+### Subtask Indicators
+
+Tasks can contain subtasks represented by indented checkbox items. TODOseq detects these subtasks and displays a progress indicator in the task list showing how many have been completed.
+
+The subtask indicator appears as `[x/y]` where `x` is the number of completed subtasks and `y` is the total number of subtasks. For example, `[1/3]` means one of three subtasks is complete.

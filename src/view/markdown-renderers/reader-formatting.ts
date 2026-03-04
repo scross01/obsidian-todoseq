@@ -2128,6 +2128,8 @@ export class ReaderViewFormatter {
               urgency: null,
               isDailyNote: false,
               dailyNoteDate: null,
+              subtaskCount: 0,
+              subtaskCompletedCount: 0,
             };
           }
         }

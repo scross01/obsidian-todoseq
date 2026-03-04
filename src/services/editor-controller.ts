@@ -259,6 +259,8 @@ export class EditorController {
           urgency: null,
           isDailyNote: false,
           dailyNoteDate: null,
+          subtaskCount: 0,
+          subtaskCompletedCount: 0,
         };
 
         // Use coordinator to update the task state

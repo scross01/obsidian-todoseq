@@ -371,6 +371,75 @@ TODOseq supports extracting tasks from comments in 20+ programming languages:
 ; FIXME Broken config
 ```
 
+## Subtasks
+
+TODOseq supports subtasks by detecting indented checkbox items under a task line. Subtasks are displayed in the task list with a progress indicator showing completed and total count.
+
+### How Subtasks Work
+
+A subtask is a checkbox item that is indented more than its parent task. The minimum indentation difference is one space or tab:
+
+```markdown
+TODO Parent task
+  - [ ] subtask 1
+  - [ ] subtask 2
+```
+
+The parent task displays the subtask count: `TODO Parent task [0/2]`
+
+### Subtask Completion
+
+When you check a subtask checkbox from the task list, the parent's subtask count updates automatically:
+
+```markdown
+TODO Parent task
+  - [x] subtask 1 (completed)
+  - [ ] subtask 2
+```
+
+Now displays as: `TODO Parent task [1/2]`
+
+### Subtasks with Keywords
+
+If a subtask contains its own task keyword, it becomes an independent task that appears in the task list separately. The parent task still counts it:
+
+```markdown
+TODO Parent task
+  - [ ] regular subtask
+  - [ ] TODO this becomes a task
+```
+
+- Parent shows: `TODO Parent task [0/2]`
+- "this becomes a task" also appears as its own task
+
+### Tasks with Dates and Subtasks
+
+Subtasks work with scheduled and deadline dates. The date must appear immediately after the task line:
+
+```markdown
+TODO Project task
+SCHEDULED: <2025-03-15>
+  - [ ] initial step
+  - [ ] final step
+```
+
+### What Doesn't Count as a Subtask
+
+Checkboxes at the same indentation level as the task are not subtasks:
+
+```markdown
+TODO Not a parent
+- [ ] not a subtask
+- [ ] also not a subtask
+```
+
+Quoted tasks do not support subtasks:
+
+```markdown
+> TODO Not supported
+>   - [ ] not detected
+```
+
 ## Task Updates and Preservation
 
 When a task state is updated, TODOseq preserves:

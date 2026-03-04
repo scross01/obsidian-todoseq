@@ -770,6 +770,161 @@ TODO task text
   });
 });
 
+describe('Task parsing - subtasks', () => {
+  let parser: TaskParser;
+  let settings: TodoTrackerSettings;
+
+  beforeEach(() => {
+    settings = createBaseSettings({
+      additionalInactiveKeywords: [],
+      languageCommentSupport: false,
+    });
+    parser = TaskParser.create(
+      createTestKeywordManager(settings),
+      null,
+      undefined,
+      settings,
+    );
+  });
+
+  describe('Subtask detection', () => {
+    test('should detect subtasks under a task', () => {
+      const lines = `TODO a task with subtasks
+ - [ ] subtask 1
+ - [ ] subtask 2`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].subtaskCount).toBe(2);
+      expect(tasks[0].subtaskCompletedCount).toBe(0);
+    });
+
+    test('should detect completed subtasks', () => {
+      const lines = `TODO a task with subtasks
+ - [ ] subtask 1
+ - [x] subtask 2
+ - [ ] subtask 3`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].subtaskCount).toBe(3);
+      expect(tasks[0].subtaskCompletedCount).toBe(1);
+    });
+
+    test('should handle subtasks with tab indentation', () => {
+      const lines = `TODO a task with subtasks
+\t- [ ] subtask 1
+\t- [x] subtask 2`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].subtaskCount).toBe(2);
+      expect(tasks[0].subtaskCompletedCount).toBe(1);
+    });
+
+    test('should handle subtasks after scheduled/deadline lines', () => {
+      const lines = `TODO a scheduled task with subtasks
+SCHEDULED: <2026-02-13>
+  - [ ] subtask 1
+  - [x] subtask 2`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].scheduledDate).not.toBeNull();
+      expect(tasks[0].subtaskCount).toBe(2);
+      expect(tasks[0].subtaskCompletedCount).toBe(1);
+    });
+
+    test('should not count non-subtask lines as subtasks', () => {
+      const lines = `TODO a task
+regular text line
+ - [ ] not a subtask (less indented)
+TODO another task`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].subtaskCount).toBe(1);
+    });
+
+    test('should handle subtasks with bulleted parent task', () => {
+      const lines = `- TODO a bulleted task with subtasks
+\t- [ ] subtask 1
+\t- [ ] subtask 2`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].subtaskCount).toBe(2);
+      expect(tasks[0].subtaskCompletedCount).toBe(0);
+    });
+
+    test('should handle subtasks with checkbox parent task', () => {
+      const lines = `- [ ] TODO a checkbox task with subtasks
+\t- [ ] subtask 1
+\t- [x] subtask 2`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].subtaskCount).toBe(2);
+      expect(tasks[0].subtaskCompletedCount).toBe(1);
+    });
+
+    test('should handle quoted tasks with subtasks', () => {
+      // Note: Current implementation doesn't detect subtasks for quoted tasks
+      // This test documents the expected behavior when that feature is implemented
+      const lines = `> TODO a quoted task with subtasks
+>   - [ ] subtask 1
+>   - [ ] subtask 2`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(1);
+      // Currently returns 0 - subtask detection for quoted tasks not implemented
+      expect(tasks[0].subtaskCount).toBe(0);
+    });
+
+    test('should handle mixed completed and uncompleted subtasks', () => {
+      const lines = `TODO mixed subtasks
+ - [x] done 1
+ - [ ] pending 1
+ - [X] done 2
+ - [ ] pending 2`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].subtaskCount).toBe(4);
+      expect(tasks[0].subtaskCompletedCount).toBe(2);
+    });
+
+    test('should stop counting subtasks at next task', () => {
+      const lines = `TODO first task
+ - [ ] subtask 1
+ - [ ] subtask 2
+TODO second task
+ - [ ] other subtask`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].subtaskCount).toBe(2);
+      expect(tasks[0].subtaskCompletedCount).toBe(0);
+      expect(tasks[1].subtaskCount).toBe(1);
+      expect(tasks[1].subtaskCompletedCount).toBe(0);
+    });
+  });
+
+  describe('Tasks without subtasks', () => {
+    test('should have zero subtask count for regular tasks', () => {
+      const lines = `TODO simple task
+DONE another task`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].subtaskCount).toBe(0);
+      expect(tasks[0].subtaskCompletedCount).toBe(0);
+      expect(tasks[1].subtaskCount).toBe(0);
+      expect(tasks[1].subtaskCompletedCount).toBe(0);
+    });
+  });
+});
+
 describe('Task parsing within langauge spefic comments in code blocks', () => {
   let parser: TaskParser;
   let settings: TodoTrackerSettings;

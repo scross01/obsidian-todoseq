@@ -228,6 +228,8 @@ export class OrgModeTaskParser implements ITaskParser {
       isDailyNote,
       dailyNoteDate,
       quoteNestingLevel: nestingLevel, // Store nesting level here
+      subtaskCount: 0,
+      subtaskCompletedCount: 0,
     };
 
     // Extract dates from following lines

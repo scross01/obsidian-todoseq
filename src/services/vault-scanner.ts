@@ -515,7 +515,7 @@ export class VaultScanner {
     }
   }
 
-  // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate)
+  // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate, subtask counts)
   private tasksIdentical(before: Task[], after: Task[]): boolean {
     if (before.length !== after.length) {
       return false;
@@ -530,7 +530,9 @@ export class VaultScanner {
         (b.scheduledDate?.getTime() ?? null) !==
           (a.scheduledDate?.getTime() ?? null) ||
         (b.deadlineDate?.getTime() ?? null) !==
-          (a.deadlineDate?.getTime() ?? null)
+          (a.deadlineDate?.getTime() ?? null) ||
+        b.subtaskCount !== a.subtaskCount ||
+        b.subtaskCompletedCount !== a.subtaskCompletedCount
       ) {
         return false;
       }

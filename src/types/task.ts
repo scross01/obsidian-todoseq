@@ -23,6 +23,8 @@ export interface Task {
   embedReference?: string; // Obsidian embed reference like ^abc123
   footnoteReference?: string; // footnote reference like [^2]
   quoteNestingLevel?: number; // number of nested quote levels (e.g., 1 for "> ", 2 for "> > ")
+  subtaskCount: number; // total number of subtasks (checkbox lines indented under this task)
+  subtaskCompletedCount: number; // number of completed subtasks
 }
 
 export type KeywordGroup =

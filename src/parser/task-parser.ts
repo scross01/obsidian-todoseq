@@ -752,6 +752,124 @@ export class TaskParser implements ITaskParser {
     return { scheduledDate, deadlineDate };
   }
 
+  /**
+   * Check if a line is a subtask (checkbox line indented under a parent task)
+   * @param line The line to check
+   * @param parentIndent The indent level of the parent task
+   * @returns Object with subtask info if line is a subtask
+   */
+  private isSubtaskLine(
+    line: string,
+    parentIndent: string,
+  ): { isSubtask: boolean; completed: boolean } {
+    const trimmedLine = line.trim();
+
+    // Check if line is a checkbox line
+    const checkboxMatch = CHECKBOX_REGEX.exec(trimmedLine);
+    if (!checkboxMatch) {
+      return { isSubtask: false, completed: false };
+    }
+
+    // Get the checkbox status
+    const checkboxStatus = checkboxMatch[3];
+    const completed = checkboxStatus === 'x' || checkboxStatus === 'X';
+
+    // Check indentation - subtask must be more indented than parent
+    const lineIndent = line.substring(0, line.length - trimmedLine.length);
+
+    // Subtask must have more indentation than the parent
+    // Handle both space and tab indentation
+    const parentIndentLength = this.getIndentLength(parentIndent);
+    const lineIndentLength = this.getIndentLength(lineIndent);
+
+    if (lineIndentLength > parentIndentLength) {
+      return { isSubtask: true, completed };
+    }
+
+    return { isSubtask: false, completed: false };
+  }
+
+  /**
+   * Calculate the total indentation length (treating tabs as equivalent to spaces)
+   * @param indent The indent string
+   * @returns The effective indent length
+   */
+  private getIndentLength(indent: string): number {
+    // Count tabs as 2 spaces (common convention)
+    let length = 0;
+    for (const char of indent) {
+      if (char === '\t') {
+        length += 2;
+      } else {
+        length += 1;
+      }
+    }
+    return length;
+  }
+
+  /**
+   * Extract subtasks from lines following a task
+   * @param lines Array of lines in the file
+   * @param startIndex Index to start searching from (after date lines)
+   * @param indent Task indent level
+   * @returns Subtask counts
+   */
+  private extractSubtasks(
+    lines: string[],
+    startIndex: number,
+    indent: string,
+  ): { subtaskCount: number; subtaskCompletedCount: number } {
+    let subtaskCount = 0;
+    let subtaskCompletedCount = 0;
+
+    for (let i = startIndex; i < lines.length; i++) {
+      const nextLine = lines[i];
+      const trimmedLine = nextLine.trim();
+
+      // Skip empty lines
+      if (trimmedLine === '') {
+        continue;
+      }
+
+      // Check if this is a date line - skip it
+      const dateLineType = this.getDateLineType(nextLine, indent);
+      if (dateLineType !== null) {
+        continue;
+      }
+
+      // Check if this line is another task (at same or less indentation)
+      // If it's a task at same/less indent, stop counting subtasks
+      const lineIndent = nextLine.substring(
+        0,
+        nextLine.length - trimmedLine.length,
+      );
+      const parentIndentLength = this.getIndentLength(indent);
+      const lineIndentLength = this.getIndentLength(lineIndent);
+
+      // If this line is at same or less indentation than parent, check if it's a task
+      if (lineIndentLength <= parentIndentLength) {
+        // Check if this line matches a task pattern
+        if (this.testRegex.test(nextLine)) {
+          // This is another task, stop counting subtasks
+          break;
+        }
+        // Not a task, continue (might be regular text, skip)
+        continue;
+      }
+
+      // Check if this is a subtask
+      const { isSubtask, completed } = this.isSubtaskLine(nextLine, indent);
+      if (isSubtask) {
+        subtaskCount++;
+        if (completed) {
+          subtaskCompletedCount++;
+        }
+      }
+    }
+
+    return { subtaskCount, subtaskCompletedCount };
+  }
+
   // Parse a single file content into Task[], pure and stateless w.r.t. external app
   parseFile(content: string, path: string, file?: TFile): Task[] {
     const lines = content.split('\n');
@@ -1109,6 +1227,8 @@ export class TaskParser implements ITaskParser {
       dailyNoteDate,
       embedReference,
       footnoteReference,
+      subtaskCount: 0,
+      subtaskCompletedCount: 0,
     };
 
     // Extract dates from following lines
@@ -1120,6 +1240,15 @@ export class TaskParser implements ITaskParser {
 
     task.scheduledDate = scheduledDate;
     task.deadlineDate = deadlineDate;
+
+    // Extract subtasks from lines following date lines
+    const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
+      lines,
+      index + 1,
+      taskDetails.indent,
+    );
+    task.subtaskCount = subtaskCount;
+    task.subtaskCompletedCount = subtaskCompletedCount;
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
@@ -1214,6 +1343,8 @@ export class TaskParser implements ITaskParser {
       dailyNoteDate,
       embedReference,
       footnoteReference,
+      subtaskCount: 0,
+      subtaskCompletedCount: 0,
     };
 
     // Extract dates from following lines
@@ -1225,6 +1356,15 @@ export class TaskParser implements ITaskParser {
 
     task.scheduledDate = scheduledDate;
     task.deadlineDate = deadlineDate;
+
+    // Extract subtasks from lines following date lines
+    const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
+      lines,
+      index + 1,
+      taskDetails.indent,
+    );
+    task.subtaskCount = subtaskCount;
+    task.subtaskCompletedCount = subtaskCompletedCount;
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
@@ -1337,6 +1477,8 @@ export class TaskParser implements ITaskParser {
       embedReference,
       footnoteReference,
       quoteNestingLevel: taskDetails.quoteNestingLevel,
+      subtaskCount: 0,
+      subtaskCompletedCount: 0,
     };
 
     // Extract dates from following lines
@@ -1348,6 +1490,15 @@ export class TaskParser implements ITaskParser {
 
     task.scheduledDate = scheduledDate;
     task.deadlineDate = deadlineDate;
+
+    // Extract subtasks from lines following date lines
+    const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
+      lines,
+      index + 1,
+      taskDetails.indent,
+    );
+    task.subtaskCount = subtaskCount;
+    task.subtaskCompletedCount = subtaskCompletedCount;
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
@@ -1429,6 +1580,8 @@ export class TaskParser implements ITaskParser {
         embedReference,
         footnoteReference,
         quoteNestingLevel: 0, // Footnotes don't have quote nesting
+        subtaskCount: 0,
+        subtaskCompletedCount: 0,
       };
 
       return task;
@@ -1484,6 +1637,8 @@ export class TaskParser implements ITaskParser {
       isDailyNote: false,
       dailyNoteDate: null,
       quoteNestingLevel,
+      subtaskCount: 0,
+      subtaskCompletedCount: 0,
     };
   }
 

@@ -305,6 +305,7 @@ graph TB
 - **Key Patterns**: State machine, builder pattern, security-first design
 - **Interface**: Implements `ITaskParser`, `parseFile()`, `parseLine()`, language-aware parsing
 - **Creation**: TaskParser.create(keywordManager, app, urgencyCoefficients, parserSettings) - first parameter must be KeywordManager
+- **Subtasks**: Supports subtask detection via indented checkbox lines (see [Subtasks](#subtasks) section)
 
 **OrgModeTaskParser** (`src/parser/org-mode-task-parser.ts`)
 
@@ -798,6 +799,8 @@ interface Task {
   embedReference?: string;
   footnoteReference?: string;
   quoteNestingLevel?: number; // Number of nested quote levels (e.g., 1 for "> ", 2 for "> > ")
+  subtaskCount: number; // Total number of subtasks (checkbox lines indented under this task)
+  subtaskCompletedCount: number; // Number of completed subtasks
 }
 ```
 
@@ -856,6 +859,37 @@ type FutureTaskSorting =
 - **Configuration**: `TodoTrackerSettings` with validation
 
 ## Extension Points and Plugin Architecture
+
+### Subtasks
+
+TODOseq supports subtasks through indented checkbox detection. When a task has checkbox items immediately indented below it (one level deeper), those are treated as subtasks.
+
+#### Subtask Detection Rules
+
+1. **Indentation**: Subtasks must be indented from the parent task by at least one space or tab (one level deeper)
+2. **Checkbox only**: Only markdown checkbox items (`- [ ]`, `- [x]`, `- [X]`) are considered subtasks
+3. **Same file**: Subtasks are detected within the same file as the parent task
+4. **Date lines**: Subtasks can appear after SCHEDULED/DEADLINE lines
+5. **Nested tasks stop detection**: When another task keyword appears at the same or lesser indentation, subtask detection stops
+
+#### Display Format
+
+Tasks with subtasks display a subtask count indicator in the format `[x/y]` where:
+
+- `x` = number of completed subtasks
+- `y` = total number of subtasks
+
+Example: `TODO my task [1/3]`
+
+The indicator uses monospace font and appears in both the main task list and embedded task lists.
+
+#### Implementation
+
+- **Task interface** ([`src/types/task.ts`](src/types/task.ts)): Added `subtaskCount` and `subtaskCompletedCount` fields
+- **TaskParser** ([`src/parser/task-parser.ts`](src/parser/task-parser.ts)): Added `isSubtaskLine()` and `extractSubtasks()` methods
+- **TaskUtils** ([`src/utils/task-utils.ts`](src/utils/task-utils.ts)): Added `hasSubtasks()` and `getSubtaskDisplayText()` functions
+- **TaskRenderer** ([`src/view/task-list/task-renderer.ts`](src/view/task-list/task-renderer.ts)): Added `buildSubtaskIndicator()` method
+- **Embedded lists** ([`src/view/embedded-task-list/task-list-renderer.ts`](src/view/embedded-task-list/task-list-renderer.ts)): Added subtask indicator rendering
 
 ### 1. Language Support Extensions
 
@@ -946,6 +980,7 @@ type FutureTaskSorting =
 22. **Parser Keyword Parameter**: TaskParser.create() and OrgModeTaskParser.create() require KeywordManager as first argument - never pass settings object
 23. **Keyword Group Access**: Use `getKeywordsForGroup('groupName', settings)` for all keyword groups - do not use separate getInactiveKeywords()
 24. **Urgency Calculation**: task-urgency functions require keyword sets to be passed via UrgencyContext - no fallback defaults
+25. **Subtask Detection**: Subtasks are only detected when indented one level deeper than the parent task; deeper nesting is not supported
 
 ### Testing Architecture
 

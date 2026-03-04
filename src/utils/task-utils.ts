@@ -438,3 +438,24 @@ export function stripMarkdownForDisplay(input: string): string {
 
   return out;
 }
+
+/**
+ * Check if a task has subtasks
+ * @param task The task to check
+ * @returns True if the task has one or more subtasks
+ */
+export function hasSubtasks(task: Task): boolean {
+  return task.subtaskCount > 0;
+}
+
+/**
+ * Get the subtask display text for a task
+ * @param task The task to get subtask display text for
+ * @returns Formatted string like "[1/3]" or empty string if no subtasks
+ */
+export function getSubtaskDisplayText(task: Task): string {
+  if (!hasSubtasks(task)) {
+    return '';
+  }
+  return `[${task.subtaskCompletedCount}/${task.subtaskCount}]`;
+}

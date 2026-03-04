@@ -14,7 +14,11 @@ import { SearchOptionsDropdown } from '../components/search-options-dropdown';
 import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdown';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import TodoTracker from '../../main';
-import { getFilename } from '../../utils/task-utils';
+import {
+  getFilename,
+  getSubtaskDisplayText,
+  hasSubtasks,
+} from '../../utils/task-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { TaskStateManager } from '../../services/task-state-manager';
@@ -1202,6 +1206,11 @@ export class TaskListView extends ItemView {
     const checkbox = this.buildCheckbox(task, li);
     this.buildText(task, li);
 
+    // Add subtask indicator if task has subtasks (before dates, on same line as task text)
+    if (hasSubtasks(task)) {
+      this.buildSubtaskIndicator(task, li);
+    }
+
     // Add date display if scheduled or deadline dates exist and task is not completed
     if ((task.scheduledDate || task.deadlineDate) && !task.completed) {
       this.buildDateDisplay(task, li);
@@ -1320,25 +1329,54 @@ export class TaskListView extends ItemView {
       }
     }
 
-    // 4. Update date display (may need to add/remove/rebuild)
+    // 4. Handle subtask indicator updates (before dates, on same line as task text)
+    const existingIndicator = element.querySelector('.todo-subtask-indicator');
+    if (hasSubtasks(task)) {
+      if (existingIndicator) {
+        // Update existing indicator
+        existingIndicator.textContent = getSubtaskDisplayText(task);
+      } else {
+        // Add new indicator
+        this.buildSubtaskIndicator(task, element);
+      }
+    } else if (existingIndicator) {
+      // Remove indicator if no subtasks
+      existingIndicator.remove();
+    }
+
+    // 5. Update date display (may need to add/remove/rebuild)
+    // IMPORTANT: Insert date display BEFORE file info, not after
     const hasDates =
       (task.scheduledDate || task.deadlineDate) && !task.completed;
     const existingDateDisplay = element.querySelector('.todo-date-container');
+    const fileInfoElement = element.querySelector('.todo-file-info');
     if (existingDateDisplay) {
       if (hasDates) {
         // Dates exist - rebuild to update the display
         existingDateDisplay.remove();
-        this.buildDateDisplay(task, element);
+        if (fileInfoElement) {
+          // Insert before file info
+          const newDateContainer = this.buildDateDisplay(task, element);
+          element.insertBefore(newDateContainer, fileInfoElement);
+        } else {
+          this.buildDateDisplay(task, element);
+        }
       } else {
         // No dates but element exists - remove it
         existingDateDisplay.remove();
       }
     } else if (hasDates) {
       // No element but dates exist - add it
-      this.buildDateDisplay(task, element);
+      if (fileInfoElement) {
+        // Insert before file info
+        const newDateContainer = this.buildDateDisplay(task, element);
+        element.insertBefore(newDateContainer, fileInfoElement);
+      } else {
+        this.buildDateDisplay(task, element);
+      }
     }
 
-    // 5. Update LI classes for task state
+    // 6. Update LI classes for task state
     element.classList.toggle('completed', task.completed);
     element.classList.toggle(
       'cancelled',
@@ -1918,8 +1956,9 @@ export class TaskListView extends ItemView {
    * Build date display element for a task
    * @param task The task to display dates for
    * @param parent The parent element to append to
+   * @returns The created date container element
    */
-  private buildDateDisplay(task: Task, parent: HTMLElement): void {
+  private buildDateDisplay(task: Task, parent: HTMLElement): HTMLElement {
     const dateContainer = parent.createEl('div', {
       cls: 'todo-date-container',
     });
@@ -1955,6 +1994,24 @@ export class TaskListView extends ItemView {
       const deadlineValue = deadlineDiv.createEl('span', { cls: 'date-value' });
       deadlineValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
     }
+
+    return dateContainer;
+  }
+
+  /**
+   * Build subtask indicator element showing completed/total count
+   * @param task The task to build indicator for
+   * @param parent The parent element to append to
+   */
+  private buildSubtaskIndicator(task: Task, parent: HTMLElement): void {
+    const indicator = parent.createEl('span', {
+      cls: 'todo-subtask-indicator',
+    });
+    indicator.setText(getSubtaskDisplayText(task));
+    indicator.setAttribute(
+      'title',
+      `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
+    );
   }
 
   private renderTaskTextWithLinks(task: Task, parent: HTMLElement): void {

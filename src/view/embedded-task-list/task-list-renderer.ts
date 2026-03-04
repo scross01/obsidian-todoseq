@@ -1,5 +1,9 @@
 import { Task } from '../../types/task';
-import { isCompletedKeyword } from '../../utils/task-utils';
+import {
+  isCompletedKeyword,
+  getSubtaskDisplayText,
+  hasSubtasks,
+} from '../../utils/task-utils';
 import { TaskWriter } from '../../services/task-writer';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
@@ -1038,6 +1042,18 @@ export class EmbeddedTaskListRenderer {
       }
       this.renderTaskTextWithLinks(task, textSpan);
       textContainer.appendChild(textSpan);
+    }
+
+    // Add subtask indicator if task has subtasks
+    if (hasSubtasks(task)) {
+      const subtaskSpan = document.createElement('span');
+      subtaskSpan.className = 'todo-subtask-indicator';
+      subtaskSpan.textContent = getSubtaskDisplayText(task);
+      subtaskSpan.setAttribute(
+        'title',
+        `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
+      );
+      textContainer.appendChild(subtaskSpan);
     }
 
     // Handle wrap-content mode (default is 'dynamic' when not specified)

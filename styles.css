@@ -332,6 +332,14 @@
   margin-left: 4px;
 }
 
+/* Subtask indicator styling */
+.todo-subtask-indicator {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--text-muted);
+  margin-left: var(--size-2-1);
+  font-size: 0.8em;
+}
+
 /* Scheduled and Deadline date styling */
 .todo-view .todo-date-overdue {
   background-color: color-mix(in srgb, var(--color-red) 5%, transparent);
