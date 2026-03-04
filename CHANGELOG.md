@@ -1,5 +1,7 @@
 # Change Log
 
+## 0.12.0-dev
+
 - Added support for subtasks. #47
 - Fixed console violation warning for non-passive touchstart event listener.
 
