@@ -148,7 +148,7 @@ export class UIManager {
                 target: editorContent,
                 type: 'touchstart',
                 handler: touchHandler,
-                options: { capture: true },
+                options: { capture: true, passive: true },
               },
               {
                 target: editorContent,
@@ -163,6 +163,7 @@ export class UIManager {
             });
             editorContent.addEventListener('touchstart', touchHandler, {
               capture: true,
+              passive: true,
             });
             editorContent.addEventListener('touchend', touchHandler, {
               capture: true,

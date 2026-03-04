@@ -1,5 +1,7 @@
 # Change Log
 
+- Fixed console violation warning for non-passive touchstart event listener.
+
 ## 0.11.2
 
 - Fixed issue with task list not updated immediately when scheduled or deadline dates are added/changed/removed. #56
