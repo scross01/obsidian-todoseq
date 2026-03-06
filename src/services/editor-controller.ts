@@ -42,6 +42,19 @@ export class EditorController {
     lineNumber: number,
     filePath: string,
   ): Task | null {
+    // First try to get the task from state manager (has full date info)
+    // This ensures we have access to scheduled/deadline dates for recurring tasks
+    if (this.plugin.taskStateManager) {
+      const existingTask = this.plugin.taskStateManager.findTaskByPathAndLine(
+        filePath,
+        lineNumber,
+      );
+      if (existingTask) {
+        return existingTask;
+      }
+    }
+
+    // Fall back to parsing from line (won't have dates for following lines)
     if (!this.plugin.getVaultScanner()) {
       return null;
     }

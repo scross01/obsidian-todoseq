@@ -1,5 +1,5 @@
 import { App, TFile, TAbstractFile } from 'obsidian';
-import { Task } from '../types/task';
+import { Task, DateRepeatInfo } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
 import { ParserRegistry } from '../parser/parser-registry';
 import { ITaskParser, ParserConfig } from '../parser/types';
@@ -13,6 +13,8 @@ import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
 import { PropertySearchEngine } from './property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
+import { calculateNextRepeatDate } from '../utils/date-repeater';
+import { getPluginSettings } from '../utils/settings-utils';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -506,6 +508,24 @@ export class VaultScanner {
       this.taskStateManager.setTasks(updatedTasks);
 
       this.emit('tasks-changed', updatedTasks);
+
+      // Skip recovery if this was triggered by a recurrence update
+      // (The recurrence update already handles resetting the task)
+      const obsidianApp = this.app as unknown as {
+        plugins: {
+          getPlugin: (id: string) => { isRecurrenceUpdate?: boolean } | null;
+        };
+      };
+      const recurrencePlugin = obsidianApp.plugins.getPlugin('todoseq');
+      const isRecurrenceUpdate = recurrencePlugin?.isRecurrenceUpdate ?? false;
+
+      if (!isRecurrenceUpdate) {
+        await this.processRecurringCompletedTasks(updatedTasks);
+      } else {
+        console.debug(
+          '[TODOseq] Skipping recurrence recovery - was triggered by recurrence update',
+        );
+      }
     } catch (err) {
       console.error('VaultScanner processIncrementalChange error', err);
       this.emit(
@@ -589,6 +609,243 @@ export class VaultScanner {
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => resolve()),
     );
+  }
+
+  /**
+   * Process completed recurring tasks - recovery on vault reload.
+   * Finds tasks in completed state with recurrence dates and updates them
+   * to inactive state with the next recurrence date.
+   */
+  private async processRecurringCompletedTasks(tasks: Task[]): Promise<void> {
+    const settings = getPluginSettings(this.app);
+    const keywordManager = new KeywordManager(settings ?? {});
+    const defaultInactive =
+      settings?.stateTransitions?.defaultInactive || 'TODO';
+
+    // Find completed tasks with recurrence dates
+    const completedRecurringTasks = tasks.filter(
+      (task) =>
+        keywordManager.isCompleted(task.state) &&
+        ((task.scheduledDateRepeat != null && task.scheduledDate != null) ||
+          (task.deadlineDateRepeat != null && task.deadlineDate != null)),
+    );
+
+    if (completedRecurringTasks.length === 0) {
+      return;
+    }
+
+    const parser = this.getParser();
+    if (!parser) {
+      return;
+    }
+
+    const filesToRescan: Set<string> = new Set();
+
+    // Process each completed recurring task
+    for (const task of completedRecurringTasks) {
+      const file = this.app.vault.getAbstractFileByPath(task.path);
+      if (!file || !(file instanceof TFile)) {
+        continue;
+      }
+
+      let content: string;
+      try {
+        content = await this.app.vault.read(file);
+      } catch {
+        continue;
+      }
+
+      const lines = content.split('\n');
+      if (task.line >= lines.length) {
+        continue;
+      }
+
+      // Get task indent level to properly identify date lines for this task
+      const taskIndent = lines[task.line].match(/^(\s*)/)?.[1] ?? '';
+
+      const now = new Date();
+      let scheduledUpdated = false;
+      let deadlineUpdated = false;
+      let newScheduledDate: Date | null = null;
+      let newDeadlineDate: Date | null = null;
+
+      // Scan lines after the task line (max 8 levels of nesting)
+      for (
+        let i = task.line + 1;
+        i < Math.min(task.line + 9, lines.length);
+        i++
+      ) {
+        const line = lines[i];
+
+        // Use parser's getDateLineType to properly detect date lines
+        const dateType = parser.getDateLineType(line, taskIndent);
+
+        // Stop if this is not a date line (indicates we've moved past the task's date lines)
+        if (dateType === null) {
+          break;
+        }
+
+        // Only process the first SCHEDULED and first DEADLINE
+        if (
+          dateType === 'scheduled' &&
+          !scheduledUpdated &&
+          task.scheduledDateRepeat != null
+        ) {
+          const date = parser.parseDateFromLine(line);
+          if (date) {
+            newScheduledDate = calculateNextRepeatDate(
+              date,
+              task.scheduledDateRepeat,
+              now,
+            );
+            scheduledUpdated = true;
+          }
+        } else if (
+          dateType === 'deadline' &&
+          !deadlineUpdated &&
+          task.deadlineDateRepeat != null
+        ) {
+          const date = parser.parseDateFromLine(line);
+          if (date) {
+            newDeadlineDate = calculateNextRepeatDate(
+              date,
+              task.deadlineDateRepeat,
+              now,
+            );
+            deadlineUpdated = true;
+          }
+        }
+
+        // Stop if we've found both dates
+        if (scheduledUpdated && deadlineUpdated) {
+          break;
+        }
+      }
+
+      // If no dates need updating, skip
+      if (!newScheduledDate && !newDeadlineDate) {
+        continue;
+      }
+
+      // Now update the date lines in the file
+      scheduledUpdated = false;
+      deadlineUpdated = false;
+      let lineUpdated = false;
+
+      for (
+        let i = task.line + 1;
+        i < Math.min(task.line + 9, lines.length);
+        i++
+      ) {
+        const line = lines[i];
+        const dateType = parser.getDateLineType(line, taskIndent);
+
+        if (dateType === null) {
+          break;
+        }
+
+        // Update scheduled date line
+        if (dateType === 'scheduled' && !scheduledUpdated && newScheduledDate) {
+          lines[i] = this.formatDateLineForRecurrence(
+            line,
+            newScheduledDate,
+            task.scheduledDateRepeat,
+          );
+          scheduledUpdated = true;
+          lineUpdated = true;
+        }
+        // Update deadline date line
+        else if (
+          dateType === 'deadline' &&
+          !deadlineUpdated &&
+          newDeadlineDate
+        ) {
+          lines[i] = this.formatDateLineForRecurrence(
+            line,
+            newDeadlineDate,
+            task.deadlineDateRepeat,
+          );
+          deadlineUpdated = true;
+          lineUpdated = true;
+        }
+
+        if (scheduledUpdated && deadlineUpdated) {
+          break;
+        }
+      }
+
+      if (!lineUpdated) {
+        continue;
+      }
+
+      // Update the task keyword to inactive state
+      const taskLine = lines[task.line];
+      const allKeywords = keywordManager.getAllKeywords();
+
+      for (const keyword of allKeywords) {
+        if (taskLine.includes(keyword)) {
+          lines[task.line] = taskLine.replace(keyword, defaultInactive);
+          lineUpdated = true;
+          break;
+        }
+      }
+
+      await this.app.vault.modify(file, lines.join('\n'));
+      filesToRescan.add(file.path);
+
+      console.debug(
+        `[TODOseq] Recovered recurring task: ${task.path}:${task.line} -> ${defaultInactive}`,
+      );
+    }
+
+    // Trigger rescan of modified files
+    for (const filePath of filesToRescan) {
+      const file = this.app.vault.getAbstractFileByPath(filePath);
+      if (file instanceof TFile) {
+        await this.processIncrementalChange(file);
+      }
+    }
+  }
+
+  /**
+   * Format a date line with a new date, preserving the original line's prefix and repeater
+   */
+  private formatDateLineForRecurrence(
+    line: string,
+    newDate: Date,
+    repeat: DateRepeatInfo | null | undefined,
+  ): string {
+    const year = newDate.getFullYear();
+    const month = String(newDate.getMonth() + 1).padStart(2, '0');
+    const day = String(newDate.getDate()).padStart(2, '0');
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayName = days[newDate.getDay()];
+
+    // Extract the date content from the angle brackets
+    const dateContentMatch = line.match(/<(.[^>]*)>/);
+    if (!dateContentMatch) {
+      return line;
+    }
+
+    const oldDateContent = dateContentMatch[1];
+
+    // Check for time in old date - time can appear in various positions:
+    // - <2008-02-08 20:00 Fri ++1d> (time before DOW)
+    // - <2008-02-08 Fri 20:00 ++1d> (time after DOW)
+    // - <2008-02-08 20:00 ++1d> (time before repeater)
+    // - <2008-02-08 20:00> (just time)
+    const timeMatch = oldDateContent.match(/(\d{2}:\d{2})/);
+    const timeStr = timeMatch ? ` ${timeMatch[1]}` : '';
+
+    // Build new date content: always DOW before time
+    let newDateContent = `${year}-${month}-${day} ${dayName}${timeStr}`;
+
+    // Add repeater if present
+    if (repeat) {
+      newDateContent += ` ${repeat.raw}`;
+    }
+
+    return line.replace(/<.[^>]*>/, `<${newDateContent}>`);
   }
 
   // Clean up resources

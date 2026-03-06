@@ -270,6 +270,87 @@ SCHEDULED: <2025-01-16> # Only first SCHEDULED is used
 - Time component is optional
 - Day of week is optional but must be valid if present
 
+### Repeating Dates (Org-Mode Repeaters)
+
+TODOseq supports org-mode compatible repeating date syntax for SCHEDULED and DEADLINE dates. When you mark a repeating task as DONE, the date automatically advances to the next occurrence.
+
+#### Repeater Syntax
+
+Repeaters use the format `<type><value><unit>` appended to the date:
+
+```markdown
+SCHEDULED: <2026-03-05 Wed 07:00 .+1d>
+DEADLINE: <2026-03-01 Sun ++1w>
+```
+
+#### Repeater Types
+
+| Type | Symbol | Behavior |
+|------|--------|----------|
+| Plain repeat | `+` | Adds interval to original date |
+| Shift from now | `.+` | Adds interval from current date/time |
+| Catch-up | `++` | Adds intervals until date is in the future |
+
+#### Time Units
+
+| Unit | Meaning |
+|------|--------|
+| `y` | Year |
+| `m` | Month |
+| `w` | Week |
+| `d` | Day |
+| `h` | Hour |
+
+#### Examples
+
+**Daily exercise (.+1d):**
+```markdown
+TODO Daily exercise routine
+SCHEDULED: <2026-03-05 Wed 07:00 .+1d>
+```
+- Marks as DONE → Scheduled advances to next day
+
+**Weekly meeting (++1w):**
+```markdown
+TODO Team standup
+DEADLINE: <2026-03-01 Sun ++1w>
+```
+- Preserves day of week (Sunday)
+- Advances to next Sunday in the future
+
+**Monthly rent (+1m):**
+```markdown
+TODO Pay the rent
+DEADLINE: <2005-10-01 Sat +1m>
+```
+- Adds one month to original date
+- Keeps same day of month
+
+**Hourly check (.+1h):**
+```markdown
+TODO Check smoke detector batteries
+SCHEDULED: <2019-04-05 08:00 Fri .+1h>
+```
+- Adds one hour from current time
+
+**Daily catch-up (++1d):**
+```markdown
+TODO Empty kitchen trash
+DEADLINE: <2008-02-08 Fri 20:00 ++1d>
+```
+- If completed before 20:00, stays on today's date
+- If completed after 20:00, advances to tomorrow
+
+#### Auto-Advance Behavior
+
+When you mark a task with a repeating date as completed (default completed state, i.e. DONE):
+
+1. The date automatically advances to the next occurrence
+2. The new date is written back to the file
+3. The task is reset to an inactive state (default inactive state, i.e. TODO)
+
+Tasks with repeating dates display a repeat icon in the task list to indicate they will advance when completed.
+
 ## Tasks in Different Contexts
 
 ### Tasks in Lists

@@ -3,7 +3,7 @@
  * Parses tasks from org-mode files using org-mode syntax.
  */
 
-import { Task } from '../types/task';
+import { Task, DateRepeatInfo } from '../types/task';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
 import { KeywordManager } from '../utils/keyword-manager';
@@ -221,7 +221,9 @@ export class OrgModeTaskParser implements ITaskParser {
       completed,
       priority,
       scheduledDate: null,
+      scheduledDateRepeat: null,
       deadlineDate: null,
+      deadlineDateRepeat: null,
       tail: '',
       urgency: null,
       file: taskFile,
@@ -234,12 +236,16 @@ export class OrgModeTaskParser implements ITaskParser {
 
     // Extract dates from following lines
     if (lines.length > 0) {
-      const { scheduledDate, deadlineDate } = this.extractTaskDates(
-        lines,
-        index + 1,
-      );
+      const {
+        scheduledDate,
+        deadlineDate,
+        scheduledDateRepeat,
+        deadlineDateRepeat,
+      } = this.extractTaskDates(lines, index + 1);
       task.scheduledDate = scheduledDate;
+      task.scheduledDateRepeat = scheduledDateRepeat;
       task.deadlineDate = deadlineDate;
+      task.deadlineDateRepeat = deadlineDateRepeat;
     }
 
     // Calculate urgency for non-completed tasks
@@ -264,9 +270,16 @@ export class OrgModeTaskParser implements ITaskParser {
   private extractTaskDates(
     lines: string[],
     startIndex: number,
-  ): { scheduledDate: Date | null; deadlineDate: Date | null } {
+  ): {
+    scheduledDate: Date | null;
+    deadlineDate: Date | null;
+    scheduledDateRepeat: DateRepeatInfo | null;
+    deadlineDateRepeat: DateRepeatInfo | null;
+  } {
     let scheduledDate: Date | null = null;
+    let scheduledDateRepeat: DateRepeatInfo | null = null;
     let deadlineDate: Date | null = null;
+    let deadlineDateRepeat: DateRepeatInfo | null = null;
     let inPropertiesDrawer = false;
 
     for (let i = startIndex; i < lines.length; i++) {
@@ -302,9 +315,10 @@ export class OrgModeTaskParser implements ITaskParser {
       const scheduledMatch = ORG_SCHEDULED_LINE_PATTERN.exec(line);
       if (scheduledMatch && !scheduledDate) {
         const dateContent = scheduledMatch[1];
-        const date = this.parseOrgDate(dateContent);
+        const { date, repeat } = this.parseOrgDateWithRepeater(dateContent);
         if (date) {
           scheduledDate = date;
+          scheduledDateRepeat = repeat;
         }
         continue;
       }
@@ -313,9 +327,10 @@ export class OrgModeTaskParser implements ITaskParser {
       const deadlineMatch = ORG_DEADLINE_LINE_PATTERN.exec(line);
       if (deadlineMatch && !deadlineDate) {
         const dateContent = deadlineMatch[1];
-        const date = this.parseOrgDate(dateContent);
+        const { date, repeat } = this.parseOrgDateWithRepeater(dateContent);
         if (date) {
           deadlineDate = date;
+          deadlineDateRepeat = repeat;
         }
         continue;
       }
@@ -329,14 +344,22 @@ export class OrgModeTaskParser implements ITaskParser {
       }
     }
 
-    return { scheduledDate, deadlineDate };
+    return {
+      scheduledDate,
+      deadlineDate,
+      scheduledDateRepeat,
+      deadlineDateRepeat,
+    };
   }
 
   /**
-   * Parse an org-mode date string.
+   * Parse an org-mode date string with repeater support.
    * Handles both active <...> and inactive [...] dates.
    */
-  private parseOrgDate(dateContent: string): Date | null {
+  private parseOrgDateWithRepeater(dateContent: string): {
+    date: Date | null;
+    repeat: DateRepeatInfo | null;
+  } {
     // Org-mode uses <...> for active dates and [...] for inactive dates
     // The DateParser expects <...> format, so convert [...] to <...>
     let normalizedContent = dateContent;
@@ -346,6 +369,6 @@ export class OrgModeTaskParser implements ITaskParser {
       normalizedContent = '<' + normalizedContent.slice(1, -1) + '>';
     }
 
-    return DateParser.parseDate(normalizedContent);
+    return DateParser.parseDateWithRepeater(normalizedContent);
   }
 }

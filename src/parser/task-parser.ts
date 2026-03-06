@@ -1,4 +1,4 @@
-import { Task } from '../types/task';
+import { Task, DateRepeatInfo } from '../types/task';
 import { LanguageRegistry, LanguageDefinition } from './language-registry';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
@@ -692,20 +692,47 @@ export class TaskParser implements ITaskParser {
   }
 
   /**
+   * Parse a date from a line containing SCHEDULED: or DEADLINE: prefix with repeater support
+   * @param line The line to parse
+   * @returns Object with parsed Date and optional repeater info
+   */
+  parseDateFromLineWithRepeater(line: string): {
+    date: Date | null;
+    repeat: DateRepeatInfo | null;
+  } {
+    // Remove the SCHEDULED: or DEADLINE: prefix and trim
+    // The regex needs to account for leading whitespace and callout blocks (>)
+    const content = line
+      .replace(/^\s*>\s*(SCHEDULED|DEADLINE):\s*/, '')
+      .replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '')
+      .trim();
+
+    // Use the DateParser to parse the date content with repeater
+    return DateParser.parseDateWithRepeater(content);
+  }
+
+  /**
    * Extract scheduled and deadline dates from lines following a task
    * @param lines Array of lines in the file
    * @param startIndex Index to start searching from
    * @param indent Task indent level
    * @param inCalloutBlock Whether we're in a callout block
-   * @returns Date information
+   * @returns Date information including repeater info
    */
   private extractTaskDates(
     lines: string[],
     startIndex: number,
     indent: string,
-  ): { scheduledDate: Date | null; deadlineDate: Date | null } {
+  ): {
+    scheduledDate: Date | null;
+    deadlineDate: Date | null;
+    scheduledDateRepeat: DateRepeatInfo | null;
+    deadlineDateRepeat: DateRepeatInfo | null;
+  } {
     let scheduledDate: Date | null = null;
+    let scheduledDateRepeat: DateRepeatInfo | null = null;
     let deadlineDate: Date | null = null;
+    let deadlineDateRepeat: DateRepeatInfo | null = null;
     let scheduledFound = false;
     let deadlineFound = false;
 
@@ -721,9 +748,10 @@ export class TaskParser implements ITaskParser {
       const dateLineType = this.getDateLineType(nextLine, indent);
 
       if (dateLineType === 'scheduled' && !scheduledFound) {
-        const date = this.parseDateFromLine(nextLine);
+        const { date, repeat } = this.parseDateFromLineWithRepeater(nextLine);
         if (date) {
           scheduledDate = date;
+          scheduledDateRepeat = repeat;
           scheduledFound = true;
         } else {
           console.warn(
@@ -731,9 +759,10 @@ export class TaskParser implements ITaskParser {
           );
         }
       } else if (dateLineType === 'deadline' && !deadlineFound) {
-        const date = this.parseDateFromLine(nextLine);
+        const { date, repeat } = this.parseDateFromLineWithRepeater(nextLine);
         if (date) {
           deadlineDate = date;
+          deadlineDateRepeat = repeat;
           deadlineFound = true;
         } else {
           console.warn(
@@ -749,7 +778,12 @@ export class TaskParser implements ITaskParser {
       }
     }
 
-    return { scheduledDate, deadlineDate };
+    return {
+      scheduledDate,
+      deadlineDate,
+      scheduledDateRepeat,
+      deadlineDateRepeat,
+    };
   }
 
   /**
@@ -1232,14 +1266,17 @@ export class TaskParser implements ITaskParser {
     };
 
     // Extract dates from following lines
-    const { scheduledDate, deadlineDate } = this.extractTaskDates(
-      lines,
-      index + 1,
-      taskDetails.indent,
-    );
+    const {
+      scheduledDate,
+      deadlineDate,
+      scheduledDateRepeat,
+      deadlineDateRepeat,
+    } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
+    task.scheduledDateRepeat = scheduledDateRepeat;
     task.deadlineDate = deadlineDate;
+    task.deadlineDateRepeat = deadlineDateRepeat;
 
     // Extract subtasks from lines following date lines
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
@@ -1348,14 +1385,17 @@ export class TaskParser implements ITaskParser {
     };
 
     // Extract dates from following lines
-    const { scheduledDate, deadlineDate } = this.extractTaskDates(
-      lines,
-      index + 1,
-      taskDetails.indent,
-    );
+    const {
+      scheduledDate,
+      deadlineDate,
+      scheduledDateRepeat,
+      deadlineDateRepeat,
+    } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
+    task.scheduledDateRepeat = scheduledDateRepeat;
     task.deadlineDate = deadlineDate;
+    task.deadlineDateRepeat = deadlineDateRepeat;
 
     // Extract subtasks from lines following date lines
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
@@ -1482,14 +1522,17 @@ export class TaskParser implements ITaskParser {
     };
 
     // Extract dates from following lines
-    const { scheduledDate, deadlineDate } = this.extractTaskDates(
-      lines,
-      index + 1,
-      taskDetails.indent,
-    );
+    const {
+      scheduledDate,
+      deadlineDate,
+      scheduledDateRepeat,
+      deadlineDateRepeat,
+    } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
+    task.scheduledDateRepeat = scheduledDateRepeat;
     task.deadlineDate = deadlineDate;
+    task.deadlineDateRepeat = deadlineDateRepeat;
 
     // Extract subtasks from lines following date lines
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(

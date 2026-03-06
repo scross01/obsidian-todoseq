@@ -59,6 +59,9 @@ export default class TodoTracker extends Plugin {
   // Set true before updating task, false after refresh completes
   public isUserInitiatedUpdate = false;
 
+  // Flag to track recurrence updates - prevents recovery from running immediately after
+  public isRecurrenceUpdate = false;
+
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
     return this.vaultScanner;

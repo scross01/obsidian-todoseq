@@ -28,6 +28,8 @@ Most task managers force you into a separate system. TODOseq meets you where you
 
 **Subtasks** — Break down complex tasks with indented checkbox items. The Task List shows subtask progress as `[1/3]` indicating completed and total subtasks.
 
+**Repeating Tasks** — Automatically advance scheduled and deadline dates when completed. Use `.+1d`, `++1w`, or `+1m` syntax to create recurring tasks.
+
 **Logseq Compatible** — Use the same task format across both tools. Existing Logseq tasks work without modification. Dual-use your vault or migrate at your own pace.
 
 **Experimental Features** — Additional capabilities including Org-mode file support are available as experimental features. See [documentation](docs/experimental-features.md) for details.

@@ -5,6 +5,8 @@ TODO a task with subtasks
  - [ ] subtask 1
  - [ ] subtask 2
  - [ ] TODO subtask 3 is also a task
+ - [ ] TODO subtask 4 has subtasks
+	 - [ ] next level subtask
 
 TODO a task with some completed subtasks
  - [x] subtask 1 (completed)
@@ -56,4 +58,5 @@ TODO another task after subtask
 
 ```todoseq
 search: file:"Test Subtasks"
+wrap-content: false
 ```

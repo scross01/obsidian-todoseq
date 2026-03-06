@@ -16,6 +16,7 @@ import { KeywordManager } from '../../utils/keyword-manager';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import TodoTracker from '../../main';
 import { StateMenuBuilder } from '../components/state-menu-builder';
+import { setIcon } from 'obsidian';
 
 interface LinkPattern {
   type: 'wiki' | 'md' | 'url' | 'tag';
@@ -34,6 +35,8 @@ export class TaskRenderer {
   private menuBuilder: StateMenuBuilder;
   private keywordManager: KeywordManager;
   private stateManager: TaskStateTransitionManager;
+  private defaultCompleted: string;
+  private defaultInactive: string;
 
   constructor(plugin: TodoTracker, menuBuilder: StateMenuBuilder) {
     this.plugin = plugin;
@@ -43,6 +46,11 @@ export class TaskRenderer {
       this.keywordManager,
       plugin.settings?.stateTransitions,
     );
+    // Store default states from settings for use in checkbox handling
+    this.defaultCompleted =
+      plugin.settings?.stateTransitions?.defaultCompleted ?? 'DONE';
+    this.defaultInactive =
+      plugin.settings?.stateTransitions?.defaultInactive ?? 'TODO';
   }
 
   buildCheckbox(task: Task, container: HTMLElement): HTMLInputElement {
@@ -58,7 +66,9 @@ export class TaskRenderer {
     checkbox.checked = task.completed;
 
     checkbox.addEventListener('change', async () => {
-      const targetState = checkbox.checked ? 'DONE' : 'TODO';
+      const targetState = checkbox.checked
+        ? this.defaultCompleted
+        : this.defaultInactive;
       await this.updateTaskState(task, targetState);
     });
 
@@ -506,17 +516,38 @@ export class TaskRenderer {
         cls: this.getDateStatusClasses(task.scheduledDate, false),
       });
 
-      const scheduledLabel = scheduledDiv.createEl('span', {
+      const dateRow = scheduledDiv.createEl('div', { cls: 'todo-date-row' });
+
+      const dateLabel = dateRow.createEl('span', {
         cls: 'date-label',
       });
-      scheduledLabel.setText('Scheduled: ');
+      dateLabel.setText('Scheduled: ');
 
-      const scheduledValue = scheduledDiv.createEl('span', {
+      const dateValue = dateRow.createEl('span', {
         cls: 'date-value',
       });
-      scheduledValue.setText(
-        this.formatDateForDisplay(task.scheduledDate, true),
-      );
+      dateValue.setText(this.formatDateForDisplay(task.scheduledDate, true));
+
+      const repeatCell = dateRow.createEl('span', {
+        cls: 'todo-date-repeat-cell',
+      });
+
+      if (task.scheduledDateRepeat) {
+        const repeatIcon = repeatCell.createEl('span', {
+          cls: 'todo-date-repeat-icon',
+        });
+        setIcon(repeatIcon, 'repeat-2');
+        // Remove inline width/height to allow CSS to control size
+        const svg = repeatIcon.querySelector('svg');
+        if (svg) {
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+        }
+        repeatIcon.setAttribute(
+          'title',
+          `Repeats ${task.scheduledDateRepeat.raw}`,
+        );
+      }
     }
 
     if (task.deadlineDate) {
@@ -524,11 +555,34 @@ export class TaskRenderer {
         cls: this.getDateStatusClasses(task.deadlineDate, true),
       });
 
-      const deadlineLabel = deadlineDiv.createEl('span', { cls: 'date-label' });
-      deadlineLabel.setText('Deadline: ');
+      const dateRow = deadlineDiv.createEl('div', { cls: 'todo-date-row' });
 
-      const deadlineValue = deadlineDiv.createEl('span', { cls: 'date-value' });
-      deadlineValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
+      const dateLabel = dateRow.createEl('span', { cls: 'date-label' });
+      dateLabel.setText('Deadline: ');
+
+      const dateValue = dateRow.createEl('span', { cls: 'date-value' });
+      dateValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
+
+      const repeatCell = dateRow.createEl('span', {
+        cls: 'todo-date-repeat-cell',
+      });
+
+      if (task.deadlineDateRepeat) {
+        const repeatIcon = repeatCell.createEl('span', {
+          cls: 'todo-date-repeat-icon',
+        });
+        setIcon(repeatIcon, 'repeat-2');
+        // Remove inline width/height to allow CSS to control size
+        const svg = repeatIcon.querySelector('svg');
+        if (svg) {
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+        }
+        repeatIcon.setAttribute(
+          'title',
+          `Repeats ${task.deadlineDateRepeat.raw}`,
+        );
+      }
     }
 
     return dateContainer;

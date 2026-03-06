@@ -4,7 +4,6 @@ import {
   getSubtaskDisplayText,
   hasSubtasks,
 } from '../../utils/task-utils';
-import { TaskWriter } from '../../services/task-writer';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import { getTaskTextDisplay } from '../../utils/task-utils';
@@ -19,6 +18,7 @@ import { truncateMiddle } from '../../utils/task-utils';
 import { TAG_PATTERN } from '../../utils/patterns';
 import { DateUtils } from '../../utils/date-utils';
 import { StateMenuBuilder } from '../components/state-menu-builder';
+import { TaskUpdateCoordinator } from '../../services/task-update-coordinator';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -26,12 +26,12 @@ import { StateMenuBuilder } from '../components/state-menu-builder';
  */
 export class EmbeddedTaskListRenderer {
   private plugin: TodoTracker;
-  private taskEditor: TaskWriter;
+  private taskUpdateCoordinator: TaskUpdateCoordinator;
   private menuBuilder: StateMenuBuilder;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
-    this.taskEditor = new TaskWriter(plugin.app);
+    this.taskUpdateCoordinator = plugin.taskUpdateCoordinator;
     this.menuBuilder = new StateMenuBuilder(plugin);
   }
 
@@ -926,6 +926,41 @@ export class EmbeddedTaskListRenderer {
   }
 
   /**
+   * Build repeat icon element for a task (only the icon, no date labels/values)
+   * Shows the repeat icon at the end of the task details line
+   * @param task The task to display repeat icon for
+   * @param parent The parent element to append to
+   */
+  buildRepeatIcon(task: Task, parent: HTMLElement): void {
+    // Check if there's any repeat (from scheduled or deadline)
+    const scheduledRepeat = task.scheduledDateRepeat;
+    const deadlineRepeat = task.deadlineDateRepeat;
+
+    if (!scheduledRepeat && !deadlineRepeat) {
+      return;
+    }
+
+    // Use the first available repeat for the tooltip
+    const repeatInfo = scheduledRepeat ?? deadlineRepeat;
+
+    if (!repeatInfo) {
+      return;
+    }
+
+    const repeatIcon = parent.createEl('span', {
+      cls: 'todo-date-repeat-icon',
+    });
+    setIcon(repeatIcon, 'repeat-2');
+    // Remove inline width/height to allow CSS to control size
+    const svg = repeatIcon.querySelector('svg');
+    if (svg) {
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+    }
+    repeatIcon.setAttribute('title', `Repeats ${repeatInfo.raw}`);
+  }
+
+  /**
    * Create a single task list item element
    * @param task The task to render
    * @param index The index of the task in the list
@@ -1054,6 +1089,12 @@ export class EmbeddedTaskListRenderer {
         `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
       );
       textContainer.appendChild(subtaskSpan);
+    }
+
+    // Add repeat icon only (no date labels/values) at the end of task details
+    // Shows after subtask count if present
+    if (!task.completed) {
+      this.buildRepeatIcon(task, textContainer);
     }
 
     // Handle wrap-content mode (default is 'dynamic' when not specified)
@@ -1322,12 +1363,12 @@ export class EmbeddedTaskListRenderer {
    */
   private async updateTaskState(task: Task, newState: string): Promise<void> {
     try {
-      // Update task state using existing TaskEditor
-      // Use forceVaultApi=true to prevent focus from jumping to the source task
-      await this.taskEditor.updateTaskState(task, newState, true);
-
-      // Update the task in the plugin's task list
-      this.updateTaskInPlugin(task, newState);
+      // Update task state using TaskUpdateCoordinator (handles recurrence logic)
+      await this.taskUpdateCoordinator.updateTaskState(
+        task,
+        newState,
+        'embedded',
+      );
     } catch (error) {
       console.error('Error updating task state:', error);
     }

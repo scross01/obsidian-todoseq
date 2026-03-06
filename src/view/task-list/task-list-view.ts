@@ -1969,17 +1969,38 @@ export class TaskListView extends ItemView {
         cls: this.getDateStatusClasses(task.scheduledDate, false),
       });
 
-      const scheduledLabel = scheduledDiv.createEl('span', {
+      const dateRow = scheduledDiv.createEl('div', { cls: 'todo-date-row' });
+
+      const dateLabel = dateRow.createEl('span', {
         cls: 'date-label',
       });
-      scheduledLabel.setText('Scheduled: ');
+      dateLabel.setText('Scheduled: ');
 
-      const scheduledValue = scheduledDiv.createEl('span', {
+      const dateValue = dateRow.createEl('span', {
         cls: 'date-value',
       });
-      scheduledValue.setText(
-        this.formatDateForDisplay(task.scheduledDate, true),
-      );
+      dateValue.setText(this.formatDateForDisplay(task.scheduledDate, true));
+
+      const repeatCell = dateRow.createEl('span', {
+        cls: 'todo-date-repeat-cell',
+      });
+
+      if (task.scheduledDateRepeat) {
+        const repeatIcon = repeatCell.createEl('span', {
+          cls: 'todo-date-repeat-icon',
+        });
+        setIcon(repeatIcon, 'repeat-2');
+        // Remove inline width/height to allow CSS to control size
+        const svg = repeatIcon.querySelector('svg');
+        if (svg) {
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+        }
+        repeatIcon.setAttribute(
+          'title',
+          `Repeats ${task.scheduledDateRepeat.raw}`,
+        );
+      }
     }
 
     // Display deadline date
@@ -1988,11 +2009,34 @@ export class TaskListView extends ItemView {
         cls: this.getDateStatusClasses(task.deadlineDate, true),
       });
 
-      const deadlineLabel = deadlineDiv.createEl('span', { cls: 'date-label' });
-      deadlineLabel.setText('Deadline: ');
+      const dateRow = deadlineDiv.createEl('div', { cls: 'todo-date-row' });
 
-      const deadlineValue = deadlineDiv.createEl('span', { cls: 'date-value' });
-      deadlineValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
+      const dateLabel = dateRow.createEl('span', { cls: 'date-label' });
+      dateLabel.setText('Deadline: ');
+
+      const dateValue = dateRow.createEl('span', { cls: 'date-value' });
+      dateValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
+
+      const repeatCell = dateRow.createEl('span', {
+        cls: 'todo-date-repeat-cell',
+      });
+
+      if (task.deadlineDateRepeat) {
+        const repeatIcon = repeatCell.createEl('span', {
+          cls: 'todo-date-repeat-icon',
+        });
+        setIcon(repeatIcon, 'repeat-2');
+        // Remove inline width/height to allow CSS to control size
+        const svg = repeatIcon.querySelector('svg');
+        if (svg) {
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+        }
+        repeatIcon.setAttribute(
+          'title',
+          `Repeats ${task.deadlineDateRepeat.raw}`,
+        );
+      }
     }
 
     return dateContainer;

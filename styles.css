@@ -320,6 +320,41 @@
     var(--interactive-accent) 50%,
     transparent
   );
+  position: relative;
+}
+
+/* This works in both Flex and Inline-Block */
+.embedded-task-text-container > span:not(:last-child) {
+  margin-right: 6px;
+}
+
+/* Date row with right-aligned repeat icon */
+.todo-view .todo-date-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.todo-view .todo-date-repeat-cell {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.embedded-task-text-container .todo-date-repeat-icon,
+.todo-view .todo-date-repeat-icon {
+  right: 4px;
+  opacity: 0.8;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.embedded-task-text-container .todo-date-repeat-icon,
+.todo-view .todo-date-repeat-icon svg {
+  font-size: 1rem;
+  width: 0.9em !important;
+  height: 0.9em !important;
 }
 
 .todo-view .todo-date .date-label {
@@ -336,8 +371,7 @@
 .todo-subtask-indicator {
   font-family: var(--font-mono, ui-monospace, monospace);
   color: var(--text-muted);
-  margin-left: var(--size-2-1);
-  font-size: 0.8em;
+  font-size: 0.8rem;
 }
 
 /* Scheduled and Deadline date styling */
@@ -704,8 +738,15 @@
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
   min-width: 0; /* Allow text to truncate */
+  font-size: 0; /* prevent ghost gap */
+}
+
+/* Ensure all direct children are vertically centered */
+.embedded-task-text-container > * {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
 }
 
 /* Task state */
@@ -713,7 +754,7 @@
   font-weight: 600;
   color: var(--text-normal);
   font-family: var(--font-monospace);
-  font-size: 0.9em;
+  font-size: 0.9rem;
   white-space: nowrap; /* Prevent keyword wrapping */
 }
 
@@ -723,7 +764,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.95em;
+  font-size: 0.95rem;
 }
 
 /* Tag styling (#tag) - reused from todo-view for consistency */
@@ -794,6 +835,7 @@
 .embedded-task-text-wrap {
   display: inline;
   min-width: 0;
+  align-items: center;
 }
 
 /* Wrap content mode - keep all inline elements together */
@@ -801,6 +843,14 @@
 .embedded-task-text-wrap .priority-badge,
 .embedded-task-text-wrap .embedded-task-text {
   display: inline;
+}
+
+/* Ensure repeat icon stays centered even in inline context */
+.embedded-task-text-wrap-dynamic .todo-date-repeat-icon {
+  margin-left: 0px;
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
 }
 
 /* Wrap content mode - text element allows wrapping */
@@ -880,12 +930,20 @@
   display: flex;
   min-width: 0;
   flex: 1;
+  align-items: center;
 }
 
 .embedded-task-text-wrap-dynamic .embedded-task-state,
 .embedded-task-text-wrap-dynamic .priority-badge,
 .embedded-task-text-wrap-dynamic .embedded-task-text {
   display: inline;
+}
+
+/* Ensure repeat icon stays centered even in inline context */
+.embedded-task-text-wrap-dynamic .todo-date-repeat-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
 }
 
 .embedded-task-text-wrap-dynamic .embedded-task-text {

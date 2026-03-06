@@ -8,7 +8,7 @@ TODOseq ("to-do-seek") is a lightweight, keyword-based task tracker for Obsidian
 
 TODOseq provides keyword-based task management with Logseq compatibility, supporting both traditional keywords and markdown checkboxes. You get powerful search with boolean logic, prefix filters, and date expressions, all presented in a dedicated Task List view. Tasks receive inline styling in both the Markdown editor and reader views, with interactive state updates available in both modes.
 
-The plugin also supports code block task extraction from 20+ programming languages, state cycling via click interactions, priority markers using `[#A]`, `[#B]`, `[#C]`, and full date management with SCHEDULED and DEADLINE dates.
+The plugin also supports code block task extraction from 20+ programming languages, state cycling via click interactions, priority markers using `[#A]`, `[#B]`, `[#C]`, full date management with SCHEDULED and DEADLINE dates, and repeating tasks that automatically advance dates when completed.
 
 ## Quick Start
 

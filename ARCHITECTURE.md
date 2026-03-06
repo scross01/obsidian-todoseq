@@ -691,6 +691,14 @@ graph LR
 - **UI Events**: `UIManager` coordinates user interactions
 - **Error Events**: Graceful error handling and recovery
 
+### 3. Repeating Task System
+
+- **Delayed Updates**: Recurring tasks use 3-second delay via `TaskUpdateCoordinator` before advancing dates
+- **Recovery Processing**: `VaultScanner` identifies completed recurring tasks on vault reload and processes them
+- **Date Repeater Logic**: Supports three types: `+` (plain), `.+` (delay from now), `++` (catch-up) with units h, d, w, m, y
+- **Time Preservation**: Always writes day of week before time; supports quoted, indented, checkbox, and callout blocks
+- **First-Only Updates**: Only first SCHEDULED and first DEADLINE lines are updated; subsequent occurrences are ignored
+
 ### 3. Plugin Architecture
 
 - **Language Registry**: Extensible language support via `LanguageRegistry`
