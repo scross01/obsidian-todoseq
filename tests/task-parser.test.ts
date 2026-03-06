@@ -843,7 +843,7 @@ TODO another task`;
       const tasks = parser.parseFile(lines, 'test.md');
 
       expect(tasks).toHaveLength(2);
-      expect(tasks[0].subtaskCount).toBe(1);
+      expect(tasks[0].subtaskCount).toBe(0);
     });
 
     test('should handle subtasks with bulleted parent task', () => {

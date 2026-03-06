@@ -880,15 +880,9 @@ export class TaskParser implements ITaskParser {
       const parentIndentLength = this.getIndentLength(indent);
       const lineIndentLength = this.getIndentLength(lineIndent);
 
-      // If this line is at same or less indentation than parent, check if it's a task
+      // If this line is at same or less indentation than parent, stop collecting subtasks
       if (lineIndentLength <= parentIndentLength) {
-        // Check if this line matches a task pattern
-        if (this.testRegex.test(nextLine)) {
-          // This is another task, stop counting subtasks
-          break;
-        }
-        // Not a task, continue (might be regular text, skip)
-        continue;
+        break;
       }
 
       // Check if this is a subtask
