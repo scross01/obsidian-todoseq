@@ -8,23 +8,17 @@ import {
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
 import { Task } from '../../types/task';
-import { DateUtils } from '../../utils/date-utils';
 import { Search } from '../../search/search';
 import { SearchOptionsDropdown } from '../components/search-options-dropdown';
 import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdown';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import TodoTracker from '../../main';
-import {
-  getFilename,
-  getSubtaskDisplayText,
-  hasSubtasks,
-} from '../../utils/task-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TaskElementCache } from './task-element-cache';
 import { ChunkedRenderQueue } from './chunked-render-queue';
-import { TaskRenderer } from './task-renderer';
+import { TaskItemRenderer } from './task-item-renderer';
 import {
   TaskListFilter,
   TaskListViewMode,
@@ -66,8 +60,8 @@ export class TaskListView extends ItemView {
   // Menu builder for state management
   private menuBuilder: StateMenuBuilder;
 
-  // Task renderer for building DOM elements
-  private taskRenderer: TaskRenderer;
+  // Task item renderer for single task DOM elements
+  private taskItemRenderer: TaskItemRenderer;
 
   // Search history debounce mechanism
   private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
@@ -112,16 +106,24 @@ export class TaskListView extends ItemView {
     this.tasks = taskStateManager.getTasks();
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = plugin.settings.defaultSortMethod;
-    this.menuBuilder = new StateMenuBuilder(plugin);
-    this.taskRenderer = new TaskRenderer(plugin, this.menuBuilder);
-    this.taskListFilter = new TaskListFilter(plugin);
-    this.renderQueue = new ChunkedRenderQueue();
-    this.plugin = plugin;
     this.keywordManager = new KeywordManager(plugin.settings ?? {});
     this.stateManager = new TaskStateTransitionManager(
       this.keywordManager,
       plugin.settings?.stateTransitions,
     );
+    this.menuBuilder = new StateMenuBuilder(plugin);
+    this.taskItemRenderer = new TaskItemRenderer(
+      this.keywordManager,
+      this.stateManager,
+      this.menuBuilder,
+      (task, newState) => this.updateTaskState(task, newState),
+      (task) => this.openTaskLocationForRenderer(task),
+      (plugin.settings?.stateTransitions?.defaultCompleted as 'DONE') ?? 'DONE',
+      (plugin.settings?.stateTransitions?.defaultInactive as 'TODO') ?? 'TODO',
+    );
+    this.taskListFilter = new TaskListFilter(plugin);
+    this.renderQueue = new ChunkedRenderQueue();
+    this.plugin = plugin;
 
     // Subscribe to task changes from the centralized state manager
     // Uses interrupt pattern: new update cancels pending work and processes immediately
@@ -947,48 +949,6 @@ export class TaskListView extends ItemView {
     return TaskListView.viewType;
   }
 
-  /** Open Obsidian Menu at mouse event location listing default and additional keywords (excluding current) */
-  private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
-    evt.preventDefault();
-    evt.stopPropagation();
-
-    // Use the shared StateMenuBuilder for consistent menu structure
-    const menu = this.menuBuilder.buildStateMenu(
-      task.state,
-      async (newState: string) => {
-        await this.updateTaskState(task, newState);
-        // Full refresh handled by subscribe callback
-      },
-    );
-
-    // Prefer API helper when available; fallback to explicit coordinates
-    const maybeShowAtMouseEvent = (
-      menu as unknown as { showAtMouseEvent?: (e: MouseEvent) => void }
-    ).showAtMouseEvent;
-    if (typeof maybeShowAtMouseEvent === 'function') {
-      maybeShowAtMouseEvent.call(menu, evt);
-    } else {
-      menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
-    }
-  }
-
-  /** Open Obsidian Menu at a specific screen position */
-  private openStateMenuAtPosition(
-    task: Task,
-    pos: { x: number; y: number },
-  ): void {
-    // Use the shared StateMenuBuilder for consistent menu structure
-    const menu = this.menuBuilder.buildStateMenu(
-      task.state,
-      async (newState: string) => {
-        await this.updateTaskState(task, newState);
-        // Full refresh handled by subscribe callback
-      },
-    );
-
-    menu.showAtPosition({ x: pos.x, y: pos.y });
-  }
-
   getDisplayText() {
     return 'TODOseq';
   }
@@ -998,163 +958,15 @@ export class TaskListView extends ItemView {
     return TASK_VIEW_ICON;
   }
 
-  // Build helpers for a single task's subtree (idempotent, single responsibility)
-  private buildCheckbox(task: Task, container: HTMLElement): HTMLInputElement {
-    const checkbox = container.createEl('input', {
-      type: 'checkbox',
-      cls: 'todo-checkbox',
+  // Wrapper for TaskItemRenderer to open task location
+  private openTaskLocationForRenderer(task: Task): void {
+    // Create a synthetic click event for the existing openTaskLocation method
+    const syntheticEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      view: window,
     });
-
-    // Add state-specific class for styling (includes custom active keywords)
-    if (this.keywordManager.isActive(task.state)) {
-      checkbox.addClass('todo-checkbox-active');
-    }
-
-    checkbox.checked = task.completed;
-
-    checkbox.addEventListener('change', async () => {
-      const targetState = checkbox.checked ? 'DONE' : 'TODO';
-      await this.updateTaskState(task, targetState);
-      // Full refresh handled by subscribe callback
-    });
-
-    return checkbox;
-  }
-
-  private buildKeyword(task: Task, parent: HTMLElement): HTMLSpanElement {
-    const todoSpan = parent.createEl('span', { cls: 'todo-keyword' });
-    todoSpan.setText(task.state);
-    todoSpan.setAttr('role', 'button');
-    todoSpan.setAttr('tabindex', '0');
-    todoSpan.setAttr('aria-checked', String(task.completed));
-
-    this.attachKeywordHandlers(todoSpan, task);
-
-    return todoSpan;
-  }
-
-  /**
-   * Attach event handlers to a keyword span for click, keyboard, contextmenu, and touch events.
-   * This is extracted into a separate method so it can be called when rebuilding keyword spans
-   * during content updates (e.g., after state changes).
-   */
-  private attachKeywordHandlers(todoSpan: HTMLSpanElement, task: Task): void {
-    const activate = async (evt: Event) => {
-      evt.stopPropagation();
-      await this.updateTaskState(
-        task,
-        this.stateManager.getNextState(task.state),
-      );
-    };
-
-    // Click advances to next state (quick action)
-    todoSpan.addEventListener('click', (evt) => activate(evt));
-
-    // Keyboard support: Enter/Space and menu keys
-    todoSpan.addEventListener('keydown', (evt: KeyboardEvent) => {
-      const key = evt.key;
-      if (key === 'Enter' || key === ' ') {
-        evt.preventDefault();
-        evt.stopPropagation();
-        activate(evt);
-      }
-      if (key === 'F10' && evt.shiftKey) {
-        evt.preventDefault();
-        evt.stopPropagation();
-        const rect = todoSpan.getBoundingClientRect();
-        this.openStateMenuAtPosition(task, { x: rect.left, y: rect.bottom });
-      }
-      if (key === 'ContextMenu') {
-        evt.preventDefault();
-        evt.stopPropagation();
-        const rect = todoSpan.getBoundingClientRect();
-        this.openStateMenuAtPosition(task, { x: rect.left, y: rect.bottom });
-      }
-    });
-
-    // Prevent duplicate context menu on Android: contextmenu + long-press both firing
-    let suppressNextContextMenu = false;
-    // Also guard re-entrancy so we never open two menus within a short window
-    let lastMenuOpenTs = 0;
-    const MENU_DEBOUNCE_MS = 350;
-
-    const openMenuAtMouseEventOnce = (evt: MouseEvent) => {
-      const now = Date.now();
-      if (now - lastMenuOpenTs < MENU_DEBOUNCE_MS) {
-        evt.preventDefault();
-        evt.stopPropagation();
-        return;
-      }
-      lastMenuOpenTs = now;
-      this.openStateMenuAtMouseEvent(task, evt);
-    };
-
-    const openMenuAtPositionOnce = (x: number, y: number) => {
-      const now = Date.now();
-      if (now - lastMenuOpenTs < MENU_DEBOUNCE_MS) return;
-      lastMenuOpenTs = now;
-      this.openStateMenuAtPosition(task, { x, y });
-    };
-
-    // Right-click to open selection menu (Obsidian style)
-    todoSpan.addEventListener('contextmenu', (evt: MouseEvent) => {
-      // If a long-press just opened the menu, ignore the subsequent contextmenu
-      if (suppressNextContextMenu) {
-        evt.preventDefault();
-        evt.stopPropagation();
-        // do not immediately clear; allow a micro-window to absorb chained events
-        return;
-      }
-      openMenuAtMouseEventOnce(evt);
-    });
-
-    // Long-press for mobile
-    let touchTimer: number | null = null;
-    todoSpan.addEventListener(
-      'touchstart',
-      (evt: TouchEvent) => {
-        if (evt.touches.length !== 1) return;
-        const touch = evt.touches[0];
-        // Many Android browsers will still emit a contextmenu after long press.
-        // We mark suppression immediately on touchstart so the later contextmenu is eaten.
-        suppressNextContextMenu = true;
-        touchTimer = window.setTimeout(() => {
-          // Re-read last known coordinates in case the user moved a bit during press
-          const x = touch.clientX;
-          const y = touch.clientY;
-          openMenuAtPositionOnce(x, y);
-        }, 450);
-      },
-      { passive: true },
-    );
-
-    const clearTouch = () => {
-      if (touchTimer) {
-        window.clearTimeout(touchTimer);
-        touchTimer = null;
-      }
-      // Keep suppression for a short grace period to absorb the trailing native contextmenu
-      window.setTimeout(() => {
-        suppressNextContextMenu = false;
-      }, 250);
-    };
-    todoSpan.addEventListener('touchend', clearTouch, { passive: true });
-    todoSpan.addEventListener('touchcancel', clearTouch, { passive: true });
-
-    // Additionally, ignore a click that may be synthesized after contextmenu on mobile
-    todoSpan.addEventListener(
-      'click',
-      (evt) => {
-        const now = Date.now();
-        if (now - lastMenuOpenTs < MENU_DEBOUNCE_MS) {
-          // a menu was just opened; prevent accidental state toggle
-          evt.preventDefault();
-          evt.stopPropagation();
-          return;
-        }
-      },
-      true,
-    ); // capture to intercept before activate handler
+    this.openTaskLocation(syntheticEvent, task);
   }
 
   /**
@@ -1170,226 +982,17 @@ export class TaskListView extends ItemView {
   }
 
   private buildText(task: Task, container: HTMLElement): HTMLSpanElement {
-    const taskText = container.createEl('span', { cls: 'todo-text' });
-
-    // Keyword button
-    this.buildKeyword(task, taskText);
-
-    // Priority badge
-    if (task.priority) {
-      const pri = task.priority; // 'high' | 'med' | 'low'
-      const badge = taskText.createEl('span', {
-        cls: ['priority-badge', `priority-${pri}`],
-      });
-      badge.setText(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C');
-      badge.setAttribute('aria-label', `Priority ${pri}`);
-      badge.setAttribute('title', `Priority ${pri}`);
-    }
-
-    // Remaining text - use lazy-computed textDisplay for better performance
-    if (task.text) {
-      taskText.appendText(' ');
-      this.renderTaskTextWithLinks(task, taskText);
-    }
-
-    taskText.toggleClass('completed', task.completed);
-    return taskText;
+    return this.taskItemRenderer.buildText(task, container);
   }
 
   // Build a complete LI for a task (used by initial render and refresh)
   private buildTaskListItem(task: Task): HTMLLIElement {
-    const li = createEl('li', { cls: 'todo-item' });
-    li.setAttribute('data-path', task.path);
-    li.setAttribute('data-line', String(task.line));
-    li.setAttribute('data-raw-text', task.rawText);
-
-    const checkbox = this.buildCheckbox(task, li);
-    this.buildText(task, li);
-
-    // Add subtask indicator if task has subtasks (before dates, on same line as task text)
-    if (hasSubtasks(task)) {
-      this.buildSubtaskIndicator(task, li);
-    }
-
-    // Add date display if scheduled or deadline dates exist and task is not completed
-    if ((task.scheduledDate || task.deadlineDate) && !task.completed) {
-      this.buildDateDisplay(task, li);
-    }
-
-    // File info
-    const fileInfo = li.createEl('div', { cls: 'todo-file-info' });
-    const fileName = getFilename(task.path);
-    // Strip .md extension from display name
-    const displayName = fileName.replace(/\.md$/, '');
-    fileInfo.setText(`${displayName}:${task.line + 1}`);
-    fileInfo.setAttribute('title', task.path);
-
-    // Click to open source (avoid checkbox and keyword)
-    li.addEventListener('click', (evt) => {
-      const target = evt.target;
-      if (
-        target !== checkbox &&
-        target instanceof HTMLElement &&
-        !target.hasClass('todo-keyword')
-      ) {
-        this.openTaskLocation(evt, task);
-      }
-    });
-
-    return li;
+    return this.taskItemRenderer.buildTaskListItem(task);
   }
 
   // Update an existing DOM element with new task data (for smart diff)
   private updateTaskElementContent(task: Task, element: HTMLLIElement): void {
-    // 1. Update checkbox
-    const checkbox = element.querySelector(
-      'input.todo-checkbox',
-    ) as HTMLInputElement;
-    if (checkbox) {
-      checkbox.checked = task.completed;
-      checkbox.classList.toggle(
-        'todo-checkbox-active',
-        this.keywordManager.isActive(task.state),
-      );
-    }
-
-    // 2. Update keyword button
-    const keywordBtn = element.querySelector(
-      '.todo-keyword',
-    ) as HTMLSpanElement;
-    if (keywordBtn) {
-      keywordBtn.textContent = task.state;
-      keywordBtn.setAttribute('aria-checked', String(task.completed));
-    }
-
-    // 3. Update todo-text: rebuild the text portion (after keyword and priority)
-    // ONLY rebuild if the underlying raw text actually changed (smart diff)
-    const currentRawText = element.getAttribute('data-raw-text');
-    const textChanged = currentRawText !== task.rawText;
-
-    if (textChanged) {
-      element.setAttribute('data-raw-text', task.rawText);
-      const todoText = element.querySelector('.todo-text') as HTMLElement;
-      if (todoText) {
-        // Get keyword info BEFORE clearing (since innerHTML='' removes it)
-        const keywordSpan = element.querySelector('.todo-keyword');
-        const keywordState = keywordSpan?.textContent || task.state;
-        const keywordAriaChecked =
-          keywordSpan?.getAttribute('aria-checked') || 'false';
-
-        // Clear existing text content
-        todoText.innerHTML = '';
-
-        // Re-add keyword span
-        const newKeywordSpan = todoText.createEl('span', {
-          cls: 'todo-keyword',
-        });
-        newKeywordSpan.setText(keywordState);
-        newKeywordSpan.setAttr('role', 'button');
-        newKeywordSpan.setAttr('tabindex', '0');
-        newKeywordSpan.setAttr('aria-checked', keywordAriaChecked);
-        this.attachKeywordHandlers(newKeywordSpan, task);
-        todoText.appendText(' ');
-
-        // Rebuild priority badge (in case it changed or was added/removed)
-        if (task.priority) {
-          const priorityText =
-            task.priority === 'high'
-              ? 'A'
-              : task.priority === 'med'
-                ? 'B'
-                : 'C';
-          const badge = todoText.createEl('span', {
-            cls: ['priority-badge', `priority-${task.priority}`],
-          });
-          badge.setText(priorityText);
-          badge.setAttribute('aria-label', `Priority ${task.priority}`);
-          badge.setAttribute('title', `Priority ${task.priority}`);
-          todoText.appendText(' ');
-        }
-
-        // Re-add task text with links
-        if (task.text) {
-          this.renderTaskTextWithLinks(task, todoText);
-        }
-
-        todoText.classList.toggle('completed', task.completed);
-      }
-    } else {
-      // Even if text didn't change, we still need to toggle the completed class
-      // on the text container and update aria attributes on the keyword button
-      const todoText = element.querySelector('.todo-text') as HTMLElement;
-      if (todoText) {
-        todoText.classList.toggle('completed', task.completed);
-      }
-
-      const keywordSpan = element.querySelector('.todo-keyword');
-      if (keywordSpan) {
-        keywordSpan.setAttribute('aria-checked', String(task.completed));
-      }
-    }
-
-    // 4. Handle subtask indicator updates (before dates, on same line as task text)
-    const existingIndicator = element.querySelector('.todo-subtask-indicator');
-    if (hasSubtasks(task)) {
-      if (existingIndicator) {
-        // Update existing indicator
-        existingIndicator.textContent = getSubtaskDisplayText(task);
-      } else {
-        // Add new indicator
-        this.buildSubtaskIndicator(task, element);
-      }
-    } else if (existingIndicator) {
-      // Remove indicator if no subtasks
-      existingIndicator.remove();
-    }
-
-    // 5. Update date display (may need to add/remove/rebuild)
-    // IMPORTANT: Insert date display BEFORE file info, not after
-    const hasDates =
-      (task.scheduledDate || task.deadlineDate) && !task.completed;
-    const existingDateDisplay = element.querySelector('.todo-date-container');
-    const fileInfoElement = element.querySelector('.todo-file-info');
-    if (existingDateDisplay) {
-      if (hasDates) {
-        // Dates exist - rebuild to update the display
-        existingDateDisplay.remove();
-        if (fileInfoElement) {
-          // Insert before file info
-          const newDateContainer = this.buildDateDisplay(task, element);
-          element.insertBefore(newDateContainer, fileInfoElement);
-        } else {
-          this.buildDateDisplay(task, element);
-        }
-      } else {
-        // No dates but element exists - remove it
-        existingDateDisplay.remove();
-      }
-    } else if (hasDates) {
-      // No element but dates exist - add it
-      if (fileInfoElement) {
-        // Insert before file info
-        const newDateContainer = this.buildDateDisplay(task, element);
-        element.insertBefore(newDateContainer, fileInfoElement);
-      } else {
-        this.buildDateDisplay(task, element);
-      }
-    }
-
-    // 6. Update LI classes for task state
-    element.classList.toggle('completed', task.completed);
-    element.classList.toggle(
-      'cancelled',
-      this.keywordManager.isCompleted(task.state),
-    );
-    element.classList.toggle(
-      'in-progress',
-      this.keywordManager.isActive(task.state),
-    );
-    element.classList.toggle(
-      'active',
-      this.keywordManager.isActive(task.state),
-    );
+    this.taskItemRenderer.updateTaskElementContent(task, element);
   }
 
   // Set up scroll listener for lazy loading
@@ -1908,158 +1511,8 @@ export class TaskListView extends ItemView {
     window.addEventListener('keydown', keyHandler);
   }
 
-  /**
-   * Format a date for display with relative time indicators
-   * @param date The date to format
-   * @param includeTime Whether to include time if available
-   * @returns Formatted date string
-   */
-  private formatDateForDisplay(date: Date | null, includeTime = false): string {
-    if (!date) return '';
-    return DateUtils.formatDateForDisplay(date, includeTime);
-  }
-
-  /**
-   * Get CSS classes for date display based on deadline status
-   * @param date The date to check
-   * @param isDeadline Whether this is a deadline date
-   * @returns Array of CSS classes
-   */
-  private getDateStatusClasses(
-    date: Date | null,
-    isDeadline = false,
-  ): string[] {
-    if (!date) return [];
-
-    const today = DateUtils.getDateOnly(new Date());
-    const taskDate = DateUtils.getDateOnly(date);
-
-    const diffTime = taskDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
-
-    const classes = ['todo-date'];
-
-    classes.push('todo-date');
-
-    if (diffDays < 0) {
-      classes.push('todo-date-overdue');
-    } else if (diffDays === 0) {
-      classes.push('todo-date-today');
-    } else if (diffDays <= 3) {
-      classes.push('todo-date-soon');
-    }
-
-    return classes;
-  }
-
-  /**
-   * Build date display element for a task
-   * @param task The task to display dates for
-   * @param parent The parent element to append to
-   * @returns The created date container element
-   */
-  private buildDateDisplay(task: Task, parent: HTMLElement): HTMLElement {
-    const dateContainer = parent.createEl('div', {
-      cls: 'todo-date-container',
-    });
-
-    // Display scheduled date
-    if (task.scheduledDate) {
-      const scheduledDiv = dateContainer.createEl('div', {
-        cls: this.getDateStatusClasses(task.scheduledDate, false),
-      });
-
-      const dateRow = scheduledDiv.createEl('div', { cls: 'todo-date-row' });
-
-      const dateLabel = dateRow.createEl('span', {
-        cls: 'date-label',
-      });
-      dateLabel.setText('Scheduled: ');
-
-      const dateValue = dateRow.createEl('span', {
-        cls: 'date-value',
-      });
-      dateValue.setText(this.formatDateForDisplay(task.scheduledDate, true));
-
-      const repeatCell = dateRow.createEl('span', {
-        cls: 'todo-date-repeat-cell',
-      });
-
-      if (task.scheduledDateRepeat) {
-        const repeatIcon = repeatCell.createEl('span', {
-          cls: 'todo-date-repeat-icon',
-        });
-        setIcon(repeatIcon, 'repeat-2');
-        // Remove inline width/height to allow CSS to control size
-        const svg = repeatIcon.querySelector('svg');
-        if (svg) {
-          svg.removeAttribute('width');
-          svg.removeAttribute('height');
-        }
-        repeatIcon.setAttribute(
-          'title',
-          `Repeats ${task.scheduledDateRepeat.raw}`,
-        );
-      }
-    }
-
-    // Display deadline date
-    if (task.deadlineDate) {
-      const deadlineDiv = dateContainer.createEl('div', {
-        cls: this.getDateStatusClasses(task.deadlineDate, true),
-      });
-
-      const dateRow = deadlineDiv.createEl('div', { cls: 'todo-date-row' });
-
-      const dateLabel = dateRow.createEl('span', { cls: 'date-label' });
-      dateLabel.setText('Deadline: ');
-
-      const dateValue = dateRow.createEl('span', { cls: 'date-value' });
-      dateValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
-
-      const repeatCell = dateRow.createEl('span', {
-        cls: 'todo-date-repeat-cell',
-      });
-
-      if (task.deadlineDateRepeat) {
-        const repeatIcon = repeatCell.createEl('span', {
-          cls: 'todo-date-repeat-icon',
-        });
-        setIcon(repeatIcon, 'repeat-2');
-        // Remove inline width/height to allow CSS to control size
-        const svg = repeatIcon.querySelector('svg');
-        if (svg) {
-          svg.removeAttribute('width');
-          svg.removeAttribute('height');
-        }
-        repeatIcon.setAttribute(
-          'title',
-          `Repeats ${task.deadlineDateRepeat.raw}`,
-        );
-      }
-    }
-
-    return dateContainer;
-  }
-
-  /**
-   * Build subtask indicator element showing completed/total count
-   * @param task The task to build indicator for
-   * @param parent The parent element to append to
-   */
-  private buildSubtaskIndicator(task: Task, parent: HTMLElement): void {
-    const indicator = parent.createEl('span', {
-      cls: 'todo-subtask-indicator',
-    });
-    indicator.setText(getSubtaskDisplayText(task));
-    indicator.setAttribute(
-      'title',
-      `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
-    );
-  }
-
   private renderTaskTextWithLinks(task: Task, parent: HTMLElement): void {
-    this.taskRenderer.renderTaskTextWithLinks(task, parent);
+    this.taskItemRenderer.renderTaskTextWithLinks(task, parent);
   }
 
   // Open the source file in the vault where the task is declared, honoring Obsidian default-like modifiers.
