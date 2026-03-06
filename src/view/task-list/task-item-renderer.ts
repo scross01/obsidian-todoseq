@@ -309,12 +309,21 @@ export class TaskItemRenderer {
     li.setAttribute('data-line', String(task.line));
     li.setAttribute('data-raw-text', task.rawText);
 
-    const checkbox = this.buildCheckbox(task, li);
-    this.buildText(task, li);
+    // Create a flex container for checkbox + text + indicator (all on same row)
+    const mainContent = li.createEl('div', { cls: 'todo-main-content' });
 
-    // Add subtask indicator if task has subtasks
+    const checkbox = this.buildCheckbox(task, mainContent);
+
+    // Create wrapper div for checkbox + text (they stay together)
+    const textWrapper = mainContent.createEl('div', {
+      cls: 'todo-text-wrapper',
+    });
+    textWrapper.appendChild(checkbox);
+    this.buildText(task, textWrapper);
+
+    // Add subtask indicator inside the flex container (right-aligned)
     if (hasSubtasks(task)) {
-      this.buildSubtaskIndicator(task, li);
+      this.buildSubtaskIndicator(task, mainContent);
     }
 
     // Add date display if scheduled or deadline dates exist and task is not completed
@@ -436,12 +445,38 @@ export class TaskItemRenderer {
     }
 
     // 4. Handle subtask indicator updates
+    // Find the content wrapper (now uses todo-main-content)
+    const contentWrapper = element.querySelector(
+      '.todo-main-content',
+    ) as HTMLElement | null;
     const existingIndicator = element.querySelector('.todo-subtask-indicator');
     if (hasSubtasks(task)) {
       if (existingIndicator) {
         existingIndicator.textContent = getSubtaskDisplayText(task);
+      } else if (contentWrapper) {
+        this.buildSubtaskIndicator(task, contentWrapper);
       } else {
-        this.buildSubtaskIndicator(task, element);
+        // Fallback: create main content wrapper and add indicator
+        const newWrapper = element.createEl('div', {
+          cls: 'todo-main-content',
+        });
+        const todoText = element.querySelector('.todo-text');
+        if (todoText && todoText instanceof HTMLElement) {
+          // Insert newWrapper before the text wrapper
+          const textWrapper = element.querySelector('.todo-text-wrapper');
+          if (textWrapper) {
+            element.insertBefore(newWrapper, textWrapper);
+          } else {
+            element.insertBefore(newWrapper, todoText);
+          }
+          // Move checkbox and text to the new wrapper
+          const checkbox = element.querySelector('.todo-checkbox');
+          if (checkbox) {
+            newWrapper.appendChild(checkbox);
+            newWrapper.appendChild(todoText);
+          }
+        }
+        this.buildSubtaskIndicator(task, newWrapper);
       }
     } else if (existingIndicator) {
       existingIndicator.remove();

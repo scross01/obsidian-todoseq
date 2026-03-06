@@ -1079,24 +1079,6 @@ export class EmbeddedTaskListRenderer {
       textContainer.appendChild(textSpan);
     }
 
-    // Add subtask indicator if task has subtasks
-    if (hasSubtasks(task)) {
-      const subtaskSpan = document.createElement('span');
-      subtaskSpan.className = 'todo-subtask-indicator';
-      subtaskSpan.textContent = getSubtaskDisplayText(task);
-      subtaskSpan.setAttribute(
-        'title',
-        `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
-      );
-      textContainer.appendChild(subtaskSpan);
-    }
-
-    // Add repeat icon only (no date labels/values) at the end of task details
-    // Shows after subtask count if present
-    if (!task.completed) {
-      this.buildRepeatIcon(task, textContainer);
-    }
-
     // Handle wrap-content mode (default is 'dynamic' when not specified)
     // - undefined/missing: dynamic (responsive based on viewport)
     // - true: always wrap
@@ -1106,6 +1088,17 @@ export class EmbeddedTaskListRenderer {
     const isTrueWrapMode = wrapMode === true;
     const isDynamicMode = wrapMode === 'dynamic';
 
+    // Check if we need floating indicators (in wrap mode with subtasks or repeat)
+    const hasSubtask = hasSubtasks(task);
+    const hasRepeat =
+      !task.completed && (task.scheduledDateRepeat || task.deadlineDateRepeat);
+    const needsFloatingIndicators =
+      (isTrueWrapMode || isDynamicMode) && (hasSubtask || hasRepeat);
+
+    // Create content wrapper variable for wrap modes
+    let contentWrapper: HTMLElement | null = null;
+    let fileInfoRow: HTMLElement | null = null;
+
     if (isTrueWrapMode) {
       // Add wrap class to list item
       li.classList.add('embedded-task-item-wrap');
@@ -1114,11 +1107,43 @@ export class EmbeddedTaskListRenderer {
       textContainer.classList.add('embedded-task-text-wrap');
 
       // Create content wrapper for wrapped layout
-      const contentWrapper = document.createElement('div');
+      contentWrapper = document.createElement('div');
       contentWrapper.className = 'embedded-task-content-wrapper';
 
-      // Append text container to wrapper
-      contentWrapper.appendChild(textContainer);
+      // Create a text row that holds text + floating indicators side by side
+      const textRow = document.createElement('div');
+      textRow.className = 'embedded-task-text-row';
+
+      // Append text container to text row
+      textRow.appendChild(textContainer);
+
+      // Add floating indicators to text row (before file info)
+      if (needsFloatingIndicators) {
+        const floatingIndicators = document.createElement('div');
+        floatingIndicators.className = 'embedded-task-floating-indicators';
+
+        // Add subtask indicator to floating div
+        if (hasSubtask) {
+          const subtaskSpan = document.createElement('span');
+          subtaskSpan.className = 'todo-subtask-indicator';
+          subtaskSpan.textContent = getSubtaskDisplayText(task);
+          subtaskSpan.setAttribute(
+            'title',
+            `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
+          );
+          floatingIndicators.appendChild(subtaskSpan);
+        }
+
+        // Add repeat icon to floating div (after subtask count if present)
+        if (hasRepeat) {
+          this.buildRepeatIcon(task, floatingIndicators);
+        }
+
+        textRow.appendChild(floatingIndicators);
+      }
+
+      // Append text row to content wrapper
+      contentWrapper.appendChild(textRow);
 
       // Handle file info and urgency display
       const urgencyValue = task.urgency;
@@ -1129,7 +1154,7 @@ export class EmbeddedTaskListRenderer {
       const showFile = params.showFile !== false;
 
       if (showFile || showUrgency) {
-        const fileInfoRow = document.createElement('div');
+        fileInfoRow = document.createElement('div');
         fileInfoRow.className = 'embedded-task-file-info-row';
 
         if (showFile) {
@@ -1170,11 +1195,43 @@ export class EmbeddedTaskListRenderer {
       textContainer.classList.add('embedded-task-text-wrap-dynamic');
 
       // Create content wrapper (will be styled by CSS based on viewport width)
-      const contentWrapper = document.createElement('div');
+      contentWrapper = document.createElement('div');
       contentWrapper.className = 'embedded-task-content-wrapper';
 
-      // Append text container to wrapper
-      contentWrapper.appendChild(textContainer);
+      // Create a text row that holds text + floating indicators side by side
+      const textRow = document.createElement('div');
+      textRow.className = 'embedded-task-text-row';
+
+      // Append text container to text row
+      textRow.appendChild(textContainer);
+
+      // Add floating indicators to text row (before file info)
+      if (needsFloatingIndicators) {
+        const floatingIndicators = document.createElement('div');
+        floatingIndicators.className = 'embedded-task-floating-indicators';
+
+        // Add subtask indicator to floating div
+        if (hasSubtask) {
+          const subtaskSpan = document.createElement('span');
+          subtaskSpan.className = 'todo-subtask-indicator';
+          subtaskSpan.textContent = getSubtaskDisplayText(task);
+          subtaskSpan.setAttribute(
+            'title',
+            `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
+          );
+          floatingIndicators.appendChild(subtaskSpan);
+        }
+
+        // Add repeat icon to floating div (after subtask count if present)
+        if (hasRepeat) {
+          this.buildRepeatIcon(task, floatingIndicators);
+        }
+
+        textRow.appendChild(floatingIndicators);
+      }
+
+      // Append text row to content wrapper
+      contentWrapper.appendChild(textRow);
 
       // Handle file info and urgency display
       const urgencyValue = task.urgency;
@@ -1184,8 +1241,11 @@ export class EmbeddedTaskListRenderer {
         urgencyValue !== undefined;
       const showFile = params.showFile !== false;
 
+      // In dynamic mode, we create both inline (wide screens) and wrapped (narrow screens) elements
+      // CSS will toggle visibility based on viewport width
       if (showFile || showUrgency) {
-        const fileInfoRow = document.createElement('div');
+        // Create file info row for narrow screens (wrapped)
+        fileInfoRow = document.createElement('div');
         fileInfoRow.className = 'embedded-task-file-info-row';
 
         if (showFile) {
@@ -1214,6 +1274,37 @@ export class EmbeddedTaskListRenderer {
         }
 
         contentWrapper.appendChild(fileInfoRow);
+
+        // Also create inline file info for wide screens (truncated style)
+        // This is shown via CSS at >768px and hidden at <=768px
+        // Add it as a sibling of textRow in contentWrapper (like wrap-content:false mode)
+        if (showFile) {
+          const inlineFileInfo = document.createElement('div');
+          inlineFileInfo.className = 'embedded-task-file-info';
+          const fileName = task.path.split('/').pop() || task.path;
+          const displayName = fileName.replace(/\.md$/, '');
+          const displayText = `${displayName}:${task.line + 1}`;
+          inlineFileInfo.textContent = truncateMiddle(displayText, 32);
+          inlineFileInfo.setAttribute('title', task.path);
+          // Add after textRow in contentWrapper
+          contentWrapper.appendChild(inlineFileInfo);
+        }
+
+        // Add inline urgency for wide screens (after textRow)
+        if (
+          showUrgency &&
+          urgencyValue !== null &&
+          urgencyValue !== undefined
+        ) {
+          const urgencyInline = document.createElement('span');
+          urgencyInline.className = 'embedded-task-urgency';
+          urgencyInline.textContent = `${urgencyValue.toFixed(2)}`;
+          urgencyInline.setAttribute(
+            'title',
+            `Urgency: ${urgencyValue.toFixed(2)}`,
+          );
+          contentWrapper.appendChild(urgencyInline);
+        }
       }
 
       // Assemble the item with content wrapper
@@ -1273,6 +1364,24 @@ export class EmbeddedTaskListRenderer {
           );
           li.appendChild(urgencyInfo);
         }
+      }
+
+      // Add inline subtask indicator and repeat icon for non-wrap mode
+      if (hasSubtask) {
+        const subtaskSpan = document.createElement('span');
+        subtaskSpan.className = 'todo-subtask-indicator';
+        subtaskSpan.textContent = getSubtaskDisplayText(task);
+        subtaskSpan.setAttribute(
+          'title',
+          `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
+        );
+        textContainer.appendChild(subtaskSpan);
+      }
+
+      // Add repeat icon only (no date labels/values) at the end of task details
+      // Shows after subtask count if present
+      if (!task.completed) {
+        this.buildRepeatIcon(task, textContainer);
       }
     }
 

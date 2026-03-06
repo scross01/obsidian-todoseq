@@ -457,5 +457,5 @@ export function getSubtaskDisplayText(task: Task): string {
   if (!hasSubtasks(task)) {
     return '';
   }
-  return `[${task.subtaskCompletedCount}/${task.subtaskCount}]`;
+  return `${task.subtaskCompletedCount}/${task.subtaskCount}`;
 }

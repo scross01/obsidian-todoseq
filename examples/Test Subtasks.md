@@ -58,5 +58,5 @@ TODO another task after subtask
 
 ```todoseq
 search: file:"Test Subtasks"
-wrap-content: false
+wrap-content: dynamic
 ```

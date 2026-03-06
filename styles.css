@@ -341,7 +341,15 @@
   margin-left: auto;
 }
 
-.embedded-task-text-container .todo-date-repeat-icon,
+/* Embedded task list repeat icon - baseline aligned */
+.embedded-task-text-container .todo-date-repeat-icon {
+  right: 4px;
+  opacity: 0.8;
+  display: inline-flex;
+  align-self: center;
+}
+
+/* Main todo-view repeat icon - center aligned */
 .todo-view .todo-date-repeat-icon {
   right: 4px;
   opacity: 0.8;
@@ -352,9 +360,7 @@
 
 .embedded-task-text-container .todo-date-repeat-icon,
 .todo-view .todo-date-repeat-icon svg {
-  font-size: 1rem;
-  width: 0.9em !important;
-  height: 0.9em !important;
+  width: 0.9rem;
 }
 
 .todo-view .todo-date .date-label {
@@ -367,11 +373,33 @@
   margin-left: 4px;
 }
 
-/* Subtask indicator styling */
+/* Main content container - holds checkbox+text and indicator on same row */
+.todo-main-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* Task text wrapper - contains checkbox and text */
+.todo-text-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Subtask indicator styling - positioned as right-aligned cell */
 .todo-subtask-indicator {
   font-family: var(--font-mono, ui-monospace, monospace);
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  align-self: baseline;
+  vertical-align: baseline;
+}
+
+.todo-view .todo-subtask-indicator {
+  margin-top: 2px;
+  margin-left: 4px;
 }
 
 /* Scheduled and Deadline date styling */
@@ -737,16 +765,16 @@
 .embedded-task-text-container {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   min-width: 0; /* Allow text to truncate */
   font-size: 0; /* prevent ghost gap */
 }
 
-/* Ensure all direct children are vertically centered */
+/* Ensure all direct children are baseline aligned */
 .embedded-task-text-container > * {
   display: inline-flex;
-  align-items: center;
-  vertical-align: middle;
+  align-items: baseline;
+  vertical-align: baseline;
 }
 
 /* Task state */
@@ -831,11 +859,20 @@
   min-width: 0; /* Allow content to shrink */
 }
 
+/* Text row - holds text and floating indicators side by side */
+.embedded-task-text-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
 /* Wrap content mode - text container uses inline flow for natural wrapping */
 .embedded-task-text-wrap {
   display: inline;
   min-width: 0;
-  align-items: center;
+  align-items: baseline;
 }
 
 /* Wrap content mode - keep all inline elements together */
@@ -845,12 +882,9 @@
   display: inline;
 }
 
-/* Ensure repeat icon stays centered even in inline context */
+/* Ensure repeat icon stays baseline aligned in inline context */
 .embedded-task-text-wrap-dynamic .todo-date-repeat-icon {
   margin-left: 0px;
-  display: inline-flex !important;
-  align-items: center !important;
-  vertical-align: middle !important;
 }
 
 /* Wrap content mode - text element allows wrapping */
@@ -883,11 +917,13 @@
 
 /* Dynamic mode - file info row inline on wide screens */
 .embedded-task-item-wrap-dynamic .embedded-task-file-info-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  width: auto;
+  display: none;
+}
+
+/* Dynamic mode - inline file info shown on wide screens */
+.embedded-task-item-wrap-dynamic .embedded-task-file-info {
+  display: inline;
+  margin-left: auto;
 }
 
 /* Wrap content mode - urgency value */
@@ -930,20 +966,13 @@
   display: flex;
   min-width: 0;
   flex: 1;
-  align-items: center;
+  align-items: baseline;
 }
 
 .embedded-task-text-wrap-dynamic .embedded-task-state,
 .embedded-task-text-wrap-dynamic .priority-badge,
 .embedded-task-text-wrap-dynamic .embedded-task-text {
   display: inline;
-}
-
-/* Ensure repeat icon stays centered even in inline context */
-.embedded-task-text-wrap-dynamic .todo-date-repeat-icon {
-  display: inline-flex !important;
-  align-items: center !important;
-  vertical-align: middle !important;
 }
 
 .embedded-task-text-wrap-dynamic .embedded-task-text {
@@ -972,6 +1001,16 @@
     margin-top: 4px;
   }
 
+  /* Text row fills available space on narrow screens */
+  .embedded-task-item-wrap-dynamic .embedded-task-text-row {
+    width: 100%;
+  }
+
+  /* Floating indicators align to right on narrow screens */
+  .embedded-task-item-wrap-dynamic .embedded-task-floating-indicators {
+    margin-left: auto;
+  }
+
   /* Switch to column layout on narrow screens */
   .embedded-task-item-wrap-dynamic .embedded-task-content-wrapper {
     flex-direction: column;
@@ -990,6 +1029,37 @@
     word-break: break-word;
   }
 
+  /* Show file info row on narrow screens */
+  .embedded-task-item-wrap-dynamic .embedded-task-file-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  /* Hide inline file info on narrow screens */
+  .embedded-task-item-wrap-dynamic .embedded-task-file-info {
+    display: none;
+  }
+
+  /* Hide inline subtask and repeat indicators on narrow screens, show floating at top-right */
+  .embedded-task-item-wrap-dynamic
+    .embedded-task-text-container
+    .todo-subtask-indicator,
+  .embedded-task-item-wrap-dynamic
+    .embedded-task-text-container
+    .todo-date-repeat-icon {
+    display: none;
+  }
+
+  /* Ensure floating indicators are visible at top-right on narrow screens */
+  .embedded-task-item-wrap-dynamic .embedded-task-floating-indicators {
+    display: flex;
+    align-self: flex-start;
+    margin-top: 2px;
+    margin-left: auto;
+  }
+
   /* File info on new row on narrow screens */
   .embedded-task-item-wrap-dynamic .embedded-task-file-info-wrap {
     max-width: unset;
@@ -997,6 +1067,51 @@
     text-overflow: unset;
     white-space: normal;
   }
+}
+
+/* ============================================================================
+   Floating Indicators - Subtask count and repeat icon on top-right
+   ============================================================================ */
+
+/* Floating indicators container - positioned at top-right of task line */
+.embedded-task-floating-indicators {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  /* Position at top-right of the content wrapper */
+  margin-left: auto;
+}
+
+/* Wrap mode - position floating indicators at top-right */
+.embedded-task-item-wrap .embedded-task-floating-indicators {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* Dynamic mode - floating indicators position depends on viewport */
+.embedded-task-item-wrap-dynamic .embedded-task-floating-indicators {
+  align-self: baseline;
+}
+
+/* Ensure subtask indicator in floating div has correct styling */
+.embedded-task-floating-indicators .todo-subtask-indicator {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* Ensure repeat icon in floating div has correct styling */
+.embedded-task-floating-indicators .todo-date-repeat-icon {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.8;
+}
+
+.embedded-task-floating-indicators .todo-date-repeat-icon svg {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 /* Completed task styling */
@@ -1056,20 +1171,13 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .embedded-task-list-container {
-    padding: 6px 8px;
-  }
-
-  .embedded-task-item {
-    padding: 4px 6px;
-  }
-
   .embedded-task-file-info {
     display: none; /* Hide file info on mobile */
   }
 
-  .embedded-task-list-header {
-    font-size: 0.8em;
+  /* Dynamic mode - hide inline file info at <=768px (same as wrap-content:false) */
+  .embedded-task-item-wrap-dynamic .embedded-task-file-info {
+    display: none;
   }
 }
 
