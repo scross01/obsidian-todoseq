@@ -487,8 +487,43 @@ export class EditorController {
     );
 
     if (task) {
-      // Update the task priority
-      taskEditor.updateTaskPriority(task, priority);
+      // Clean the task text to remove any slash command
+      // This handles the case where user types a slash command like /high /med /low
+      // The slash command can be at the end or in the middle of the task text
+      const cleanedTask = { ...task };
+
+      // Get the cursor position to find where the slash command is
+      const cursor = editor.getCursor();
+      const currentLine = editor.getLine(lineNumber);
+
+      // Find the slash command before the cursor position
+      // Look for / followed by letters before the cursor
+      const textBeforeCursor = currentLine.substring(0, cursor.ch);
+
+      // Find the last slash command before the cursor position
+      // This handles cases where user types /high, /med, /low, /pri, etc.
+      // The slash command can be at the end or anywhere in the text before the cursor
+      const slashCommandMatch = textBeforeCursor.match(/\s+\/([a-zA-Z]+)\s*$/);
+
+      if (slashCommandMatch) {
+        // Remove the slash command from the task text
+        // The slash command is in the middle of the text, so we need to remove it
+        cleanedTask.text = cleanedTask.text
+          .replace(new RegExp(`\\s+/${slashCommandMatch[1]}\\s*`), ' ')
+          .trim();
+      } else {
+        // Fallback: remove any slash command followed by letters anywhere in the text
+        // This handles cases where the slash command is not at the end of the text before cursor
+        const anySlashCommandMatch = cleanedTask.text.match(/\s+\/([a-zA-Z]+)/);
+        if (anySlashCommandMatch) {
+          cleanedTask.text = cleanedTask.text
+            .replace(new RegExp(`\\s+/${anySlashCommandMatch[1]}\\s*`), ' ')
+            .trim();
+        }
+      }
+
+      // Update the task priority with cleaned text
+      taskEditor.updateTaskPriority(cleanedTask, priority);
     }
 
     return true;

@@ -119,6 +119,7 @@ describe('Priority Commands', () => {
         getLine: (lineNumber: number) => {
           return 'TODO Test task without priority';
         },
+        getCursor: () => ({ line: 0, ch: 0 }),
       };
 
       const mockView = {
@@ -142,6 +143,7 @@ describe('Priority Commands', () => {
         getLine: (lineNumber: number) => {
           return 'TODO Test task without priority';
         },
+        getCursor: () => ({ line: 0, ch: 0 }),
       };
 
       const mockView = {
@@ -165,6 +167,7 @@ describe('Priority Commands', () => {
         getLine: (lineNumber: number) => {
           return 'TODO Test task without priority';
         },
+        getCursor: () => ({ line: 0, ch: 0 }),
       };
 
       const mockView = {
@@ -188,6 +191,7 @@ describe('Priority Commands', () => {
         getLine: (lineNumber: number) => {
           return 'This is not a task line';
         },
+        getCursor: () => ({ line: 0, ch: 0 }),
       };
 
       const mockView = {
@@ -211,6 +215,7 @@ describe('Priority Commands', () => {
         getLine: (lineNumber: number) => {
           return 'TODO Test task without priority';
         },
+        getCursor: () => ({ line: 0, ch: 0 }),
       };
 
       const mockView = {
