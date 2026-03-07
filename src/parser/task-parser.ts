@@ -28,6 +28,7 @@ import {
   CODE_PREFIX_SOURCE,
   TASK_TEXT_SOURCE,
   CHECKBOX_REGEX,
+  CHECKBOX_DETECTION_REGEX,
   PRIORITY_TOKEN_REGEX,
   SINGLE_LINE_COMMENT_REGEX,
 } from '../utils/patterns';
@@ -795,29 +796,61 @@ export class TaskParser implements ITaskParser {
   private isSubtaskLine(
     line: string,
     parentIndent: string,
+    parentHasCheckbox: boolean,
   ): { isSubtask: boolean; completed: boolean } {
-    const trimmedLine = line.trim();
+    // Handle quoted lines specially
+    let contentLine = line;
+    let quotePrefix = '';
 
-    // Check if line is a checkbox line
-    const checkboxMatch = CHECKBOX_REGEX.exec(trimmedLine);
+    if (line.startsWith('>')) {
+      // Extract quote prefix
+      const quoteMatch = line.match(/^(>\s*)/);
+      if (quoteMatch) {
+        quotePrefix = quoteMatch[1];
+        contentLine = line.substring(quotePrefix.length);
+      }
+    }
+
+    // Find actual indentation (only whitespace) before any content
+    let lineIndent = quotePrefix;
+    let contentAfterIndent = contentLine;
+    const indentMatch = contentAfterIndent.match(/^(\s*)(.*)$/);
+    if (indentMatch) {
+      lineIndent += indentMatch[1];
+      contentAfterIndent = indentMatch[2];
+    }
+
+    // Check if line is a checkbox line using simpler detection regex
+    const checkboxMatch = contentAfterIndent.match(CHECKBOX_DETECTION_REGEX);
     if (!checkboxMatch) {
       return { isSubtask: false, completed: false };
     }
 
     // Get the checkbox status
-    const checkboxStatus = checkboxMatch[3];
-    const completed = checkboxStatus === 'x' || checkboxStatus === 'X';
+    const completed = /\[x\]|\[X\]/.test(contentAfterIndent);
 
-    // Check indentation - subtask must be more indented than parent
-    const lineIndent = line.substring(0, line.length - trimmedLine.length);
-
-    // Subtask must have more indentation than the parent
-    // Handle both space and tab indentation
     const parentIndentLength = this.getIndentLength(parentIndent);
     const lineIndentLength = this.getIndentLength(lineIndent);
 
-    if (lineIndentLength > parentIndentLength) {
-      return { isSubtask: true, completed };
+    console.debug('isSubtaskLine debug:', {
+      line: line,
+      parentIndent,
+      parentHasCheckbox,
+      lineIndent,
+      parentIndentLength,
+      lineIndentLength,
+    });
+
+    // If parent has a checkbox, subtask must be more indented
+    // If parent doesn't have a checkbox, subtask can be at same or greater indentation
+    if (parentHasCheckbox) {
+      if (lineIndentLength > parentIndentLength) {
+        return { isSubtask: true, completed };
+      }
+    } else {
+      if (lineIndentLength >= parentIndentLength) {
+        return { isSubtask: true, completed };
+      }
     }
 
     return { isSubtask: false, completed: false };
@@ -852,17 +885,55 @@ export class TaskParser implements ITaskParser {
     lines: string[],
     startIndex: number,
     indent: string,
+    parentHasCheckbox: boolean,
+    processedLines: Set<number>,
   ): { subtaskCount: number; subtaskCompletedCount: number } {
     let subtaskCount = 0;
     let subtaskCompletedCount = 0;
 
     for (let i = startIndex; i < lines.length; i++) {
       const nextLine = lines[i];
-      const trimmedLine = nextLine.trim();
 
-      // Skip empty lines
-      if (trimmedLine === '') {
-        continue;
+      // Handle quoted lines specially for indent calculation
+      let contentLine = nextLine;
+      let quotePrefix = '';
+
+      if (nextLine.startsWith('>')) {
+        // Extract quote prefix
+        const quoteMatch = nextLine.match(/^(>\s*)/);
+        if (quoteMatch) {
+          quotePrefix = quoteMatch[1];
+          contentLine = nextLine.substring(quotePrefix.length);
+        }
+      }
+
+      const trimmedContent = contentLine.trim();
+
+      // Stop at empty lines - this breaks the subtask chain
+      if (trimmedContent === '') {
+        break;
+      }
+
+      // Check if this line contains a task keyword but is still a valid subtask
+      // A line with a task keyword can still be a subtask if it's a checkbox line indented properly
+      if (this.testRegex.test(nextLine)) {
+        // Check if it's a valid subtask
+        const isSubtaskResult = this.isSubtaskLine(
+          nextLine,
+          indent,
+          parentHasCheckbox,
+        );
+        if (!isSubtaskResult.isSubtask) {
+          // If not a valid subtask, break collection
+          break;
+        } else {
+          // If it is a valid subtask, count it as a subtask even though it also matches the task regex
+          subtaskCount++;
+          if (isSubtaskResult.completed) {
+            subtaskCompletedCount++;
+          }
+          continue;
+        }
       }
 
       // Check if this is a date line - skip it
@@ -871,22 +942,49 @@ export class TaskParser implements ITaskParser {
         continue;
       }
 
-      // Check if this line is another task (at same or less indentation)
-      // If it's a task at same/less indent, stop counting subtasks
-      const lineIndent = nextLine.substring(
-        0,
-        nextLine.length - trimmedLine.length,
-      );
-      const parentIndentLength = this.getIndentLength(indent);
-      const lineIndentLength = this.getIndentLength(lineIndent);
+      // Check if this line should break the subtask collection
+      // For quoted lines specifically:
+      // if parent line is quoted, and child line is also quoted,
+      // don't break based on indent calculation - continue to check isSubtaskLine
+      let shouldBreak = false;
 
-      // If this line is at same or less indentation than parent, stop collecting subtasks
-      if (lineIndentLength <= parentIndentLength) {
+      if (indent.includes('>') && quotePrefix) {
+        // Both are quoted, continue to check isSubtask
+      } else {
+        const lineIndent =
+          quotePrefix +
+          contentLine.substring(0, contentLine.length - trimmedContent.length);
+        const parentIndentLength = this.getIndentLength(indent);
+        const lineIndentLength = this.getIndentLength(lineIndent);
+
+        if (lineIndentLength < parentIndentLength) {
+          shouldBreak = true;
+        } else if (lineIndentLength === parentIndentLength) {
+          // Same indent as parent
+          if (parentHasCheckbox) {
+            // If parent has checkbox, any line at same indent breaks subtasks
+            shouldBreak = true;
+          } else {
+            // If parent doesn't have checkbox, check if it's a non-checkbox line
+            const isCheckboxLine =
+              CHECKBOX_DETECTION_REGEX.test(trimmedContent);
+            if (!isCheckboxLine) {
+              shouldBreak = true;
+            }
+          }
+        }
+      }
+
+      if (shouldBreak) {
         break;
       }
 
       // Check if this is a subtask
-      const { isSubtask, completed } = this.isSubtaskLine(nextLine, indent);
+      const { isSubtask, completed } = this.isSubtaskLine(
+        nextLine,
+        indent,
+        parentHasCheckbox,
+      );
       if (isSubtask) {
         subtaskCount++;
         if (completed) {
@@ -908,6 +1006,7 @@ export class TaskParser implements ITaskParser {
     let codeRegex: RegExp | null = null;
 
     const tasks: Task[] = [];
+    const processedLines = new Set<number>();
 
     for (let index = 0; index < lines.length; index++) {
       const line = lines[index];
@@ -924,6 +1023,7 @@ export class TaskParser implements ITaskParser {
           path,
           index,
           lines,
+          processedLines,
         );
         if (footnoteTask) {
           tasks.push(footnoteTask);
@@ -963,6 +1063,7 @@ export class TaskParser implements ITaskParser {
             path,
             index,
             lines,
+            processedLines,
           );
           if (commentTask) {
             tasks.push(commentTask);
@@ -1002,6 +1103,7 @@ export class TaskParser implements ITaskParser {
         index,
         taskDetails,
         lines,
+        processedLines,
         file,
       );
 
@@ -1202,6 +1304,7 @@ export class TaskParser implements ITaskParser {
     path: string,
     index: number,
     lines: string[],
+    processedLines: Set<number>,
   ): Task | null {
     const footnoteRegex = TaskParser.buildFootnoteRegex(this.allKeywords);
     if (!footnoteRegex.test.test(line)) {
@@ -1273,10 +1376,13 @@ export class TaskParser implements ITaskParser {
     task.deadlineDateRepeat = deadlineDateRepeat;
 
     // Extract subtasks from lines following date lines
+    // Footnote tasks don't have checkboxes
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
       lines,
       index + 1,
       taskDetails.indent,
+      false,
+      processedLines,
     );
     task.subtaskCount = subtaskCount;
     task.subtaskCompletedCount = subtaskCompletedCount;
@@ -1310,6 +1416,7 @@ export class TaskParser implements ITaskParser {
     path: string,
     index: number,
     lines: string[],
+    processedLines: Set<number>,
   ): Task | null {
     if (!this.includeCommentBlocks) {
       return null;
@@ -1392,14 +1499,19 @@ export class TaskParser implements ITaskParser {
     task.deadlineDateRepeat = deadlineDateRepeat;
 
     // Extract subtasks from lines following date lines
+    // Footnote tasks don't have checkboxes
+    // Extract subtasks from lines following date lines
+    // Check if parent task has a checkbox
+    const parentHasCheckbox = CHECKBOX_REGEX.test(content);
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
       lines,
       index + 1,
       taskDetails.indent,
+      parentHasCheckbox,
+      processedLines,
     );
     task.subtaskCount = subtaskCount;
     task.subtaskCompletedCount = subtaskCompletedCount;
-
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
       const urgencyContext: UrgencyContext = {
@@ -1453,6 +1565,7 @@ export class TaskParser implements ITaskParser {
       quoteNestingLevel: number;
     },
     lines: string[],
+    processedLines: Set<number>,
     file?: TFile,
   ): Task {
     // Extract priority and embed reference
@@ -1529,14 +1642,19 @@ export class TaskParser implements ITaskParser {
     task.deadlineDateRepeat = deadlineDateRepeat;
 
     // Extract subtasks from lines following date lines
+    // Footnote tasks don't have checkboxes
+    // Extract subtasks from lines following date lines
+    // Check if parent task has a checkbox
+    const parentHasCheckbox = CHECKBOX_REGEX.test(line);
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
       lines,
       index + 1,
       taskDetails.indent,
+      parentHasCheckbox,
+      processedLines,
     );
     task.subtaskCount = subtaskCount;
     task.subtaskCompletedCount = subtaskCompletedCount;
-
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
       const urgencyContext: UrgencyContext = {

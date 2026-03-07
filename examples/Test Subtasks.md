@@ -25,7 +25,7 @@ TODO a task with all completed subtasks
 	- [ ] subtask 1
 	- [ ] subtask 2
 
-> TODO a quoted task with subtasks (not supported)
+> TODO a quoted task with subtasks
 >   - [ ] subtask 1
 >   - [ ] subtask 2 
 
@@ -46,12 +46,12 @@ DEADLINE: <2026-02-25>
   - [x] subtask 2
   - [ ] subtask 3
 
-TODO task with checkbox items not indented (should not show subtasks)
-- [ ] not a subtask 1
-- [ ] not a subtask 2
+TODO task with checkbox items not indented
+- [ ] subtask 1
+- [ ] subtask 2
 
 TODO task that should stop subtask detection (next task)
- - [ ] subtask 1
+- [ ] subtask 1
 TODO another task after subtask
 
 ---

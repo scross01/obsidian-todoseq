@@ -4,7 +4,9 @@ SCHEDULED: <2026-01-01 Sun +1m>
 
 - TODO recurring example 2
   DEADLINE: <2026-01-01 Sun +1m>
-  
+    - [ ] subtask 1
+	- [ ] subtask 2
+
 + TODO recurring example 3
 	SCHEDULED: <2026-01-01 .+1d>
 
@@ -16,14 +18,30 @@ TODO recurring example 5
 
 TODO recurring example 6
   DEADLINE: <2026-01-01 ++1w>
-  - [ ] subtask 1
-  - [ ] subtask 2
+
 
 ---
-
+wrap-content:dynamic
 ```todoseq
 search: file:"Test Recurring Dates"
+wrap-content: dynamic
+limit: 5
 ```
+
+wrap-content:false
+```todoseq
+search: file:"Test Recurring Dates"
+wrap-content: false
+limit: 5
+```
+
+wrap-content:true
+```todoseq
+search: file:"Test Recurring Dates"
+wrap-content: true
+limit: 5
+```
+
 
 ---
 

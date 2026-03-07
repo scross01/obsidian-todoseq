@@ -869,16 +869,13 @@ TODO another task`;
     });
 
     test('should handle quoted tasks with subtasks', () => {
-      // Note: Current implementation doesn't detect subtasks for quoted tasks
-      // This test documents the expected behavior when that feature is implemented
       const lines = `> TODO a quoted task with subtasks
 >   - [ ] subtask 1
 >   - [ ] subtask 2`;
       const tasks = parser.parseFile(lines, 'test.md');
 
       expect(tasks).toHaveLength(1);
-      // Currently returns 0 - subtask detection for quoted tasks not implemented
-      expect(tasks[0].subtaskCount).toBe(0);
+      expect(tasks[0].subtaskCount).toBe(2);
     });
 
     test('should handle mixed completed and uncompleted subtasks', () => {
