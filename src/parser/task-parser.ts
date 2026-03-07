@@ -832,15 +832,6 @@ export class TaskParser implements ITaskParser {
     const parentIndentLength = this.getIndentLength(parentIndent);
     const lineIndentLength = this.getIndentLength(lineIndent);
 
-    console.debug('isSubtaskLine debug:', {
-      line: line,
-      parentIndent,
-      parentHasCheckbox,
-      lineIndent,
-      parentIndentLength,
-      lineIndentLength,
-    });
-
     // If parent has a checkbox, subtask must be more indented
     // If parent doesn't have a checkbox, subtask can be at same or greater indentation
     if (parentHasCheckbox) {

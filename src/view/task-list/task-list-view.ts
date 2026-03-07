@@ -112,14 +112,18 @@ export class TaskListView extends ItemView {
       plugin.settings?.stateTransitions,
     );
     this.menuBuilder = new StateMenuBuilder(plugin);
+    const defaultCompleted =
+      (plugin.settings?.stateTransitions?.defaultCompleted as 'DONE') || 'DONE';
+    const defaultInactive =
+      (plugin.settings?.stateTransitions?.defaultInactive as 'TODO') || 'TODO';
     this.taskItemRenderer = new TaskItemRenderer(
       this.keywordManager,
       this.stateManager,
       this.menuBuilder,
       (task, newState) => this.updateTaskState(task, newState),
       (task) => this.openTaskLocationForRenderer(task),
-      (plugin.settings?.stateTransitions?.defaultCompleted as 'DONE') ?? 'DONE',
-      (plugin.settings?.stateTransitions?.defaultInactive as 'TODO') ?? 'TODO',
+      defaultCompleted,
+      defaultInactive,
     );
     this.taskListFilter = new TaskListFilter(plugin);
     this.renderQueue = new ChunkedRenderQueue();

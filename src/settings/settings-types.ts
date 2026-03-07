@@ -39,9 +39,9 @@ export interface TodoTrackerSettings {
 }
 
 export const DefaultStateTransitionSettings: StateTransitionSettings = {
-  defaultInactive: '',
-  defaultActive: '',
-  defaultCompleted: '',
+  defaultInactive: 'TODO',
+  defaultActive: 'DOING',
+  defaultCompleted: 'DONE',
   transitionStatements: [],
 };
 
