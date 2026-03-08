@@ -247,6 +247,283 @@ export class TaskUpdateCoordinator {
   }
 
   /**
+   * Update a task's priority from any view.
+   * This provides optimistic UI updates similar to updateTaskState.
+   *
+   * @param task - The task to update
+   * @param newPriority - The new priority to set (null to remove)
+   * @returns Promise resolving to the updated task
+   */
+  async updateTaskPriority(
+    task: Task,
+    newPriority: 'high' | 'med' | 'low' | null,
+  ): Promise<Task> {
+    // 0. Set flag to indicate user-initiated update
+    this.plugin.isUserInitiatedUpdate = true;
+
+    try {
+      // 1. Get the current task from state manager BEFORE optimistic update
+      // This is critical because removeTaskPriority checks if priority exists
+      // and we need the task with its original priority value
+      let currentTask = this.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      if (!currentTask) {
+        currentTask = task; // Fallback to original if not found
+      }
+
+      // 2. Optimistic UI update - update in-memory state immediately
+      this.performOptimisticPriorityUpdate(task, newPriority);
+
+      // 3. Update source file via TaskEditor
+      let updatedTask: Task;
+      const taskEditor = this.plugin.taskEditor;
+      if (!taskEditor) {
+        throw new Error('TaskEditor is not initialized');
+      }
+
+      try {
+        if (newPriority === null) {
+          updatedTask = await taskEditor.removeTaskPriority(currentTask);
+        } else {
+          updatedTask = await taskEditor.updateTaskPriority(
+            currentTask,
+            newPriority,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[TODOseq] File write failed for priority change at line ${task.line}:`,
+          error,
+        );
+        // Rollback: re-read the file to restore state
+        const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
+        if (file instanceof TFile) {
+          await this.plugin.vaultScanner?.processIncrementalChange(file);
+        }
+        throw error;
+      }
+
+      // 4. Perform direct DOM manipulation for embeds immediately
+      // This updates the embed display without triggering a full re-render
+      this.performDirectEmbedPriorityDOMUpdate(currentTask, newPriority);
+
+      // 5. Update the TaskStateManager with the final task state
+      this.taskStateManager.updateTask(currentTask, {
+        rawText: updatedTask.rawText,
+        priority: updatedTask.priority,
+      });
+
+      // 6. Refresh all embedded task lists (code blocks) to reflect the task change
+      if (this.plugin.embeddedTaskListProcessor) {
+        this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
+      }
+
+      // 7. Refresh editor decorations to update priority styling in open editors
+      if (this.plugin.refreshVisibleEditorDecorations) {
+        this.plugin.refreshVisibleEditorDecorations();
+      }
+
+      return updatedTask;
+    } finally {
+      this.plugin.isUserInitiatedUpdate = false;
+    }
+  }
+
+  /**
+   * Perform optimistic UI updates immediately for priority changes.
+   * This updates in-memory state and refreshes task list views.
+   */
+  private performOptimisticPriorityUpdate(
+    task: Task,
+    newPriority: 'high' | 'med' | 'low' | null,
+  ): void {
+    // Update in-memory state - subscriber callback will handle the refresh
+    this.taskStateManager.updateTask(task, {
+      priority: newPriority,
+    });
+  }
+
+  /**
+   * Perform direct DOM manipulation on embeds to update the task priority display.
+   * This updates the embed display without triggering a full re-render.
+   */
+  private performDirectEmbedPriorityDOMUpdate(
+    task: Task,
+    newPriority: 'high' | 'med' | 'low' | null,
+  ): void {
+    // Get the filename from the task path
+    const fileName = task.path.split('/').pop()?.replace('.md', '');
+    if (!fileName) return;
+
+    // Find all embeds that reference this file
+    const embeds = document.querySelectorAll('.internal-embed');
+
+    embeds.forEach((embed) => {
+      const src = embed.getAttribute('src');
+      if (!src || !src.includes(fileName)) return;
+
+      // If there's a specific embed reference, check if it matches
+      if (task.embedReference) {
+        const blockRef = task.embedReference.replace('^', '');
+        if (!src.includes(blockRef)) return;
+      }
+
+      // Find all task items in this embed
+      const taskItems = embed.querySelectorAll('.embedded-task-item');
+
+      taskItems.forEach((item) => {
+        const itemPath = item.getAttribute('data-path');
+        const itemLine = item.getAttribute('data-line');
+
+        // Check if this is the task we're updating
+        if (itemPath !== task.path || itemLine !== String(task.line)) return;
+
+        // Find the priority badge in this task item
+        const priorityBadge = item.querySelector('.priority-badge');
+        const textContainer = item.querySelector(
+          '.embedded-task-text-container',
+        );
+
+        if (!textContainer) return;
+
+        if (newPriority === null) {
+          // Remove priority badge
+          if (priorityBadge) {
+            priorityBadge.remove();
+          }
+        } else {
+          // Update or add priority badge
+          const priorityLabel =
+            newPriority === 'high' ? 'A' : newPriority === 'med' ? 'B' : 'C';
+
+          if (priorityBadge) {
+            // Update existing badge
+            priorityBadge.textContent = priorityLabel;
+            priorityBadge.className = [
+              'priority-badge',
+              `priority-${newPriority}`,
+            ].join(' ');
+            priorityBadge.setAttribute('aria-label', `Priority ${newPriority}`);
+            priorityBadge.setAttribute('title', `Priority ${newPriority}`);
+          } else {
+            // Create new badge
+            const newBadge = document.createElement('span');
+            newBadge.className = [
+              'priority-badge',
+              `priority-${newPriority}`,
+            ].join(' ');
+            newBadge.textContent = priorityLabel;
+            newBadge.setAttribute('aria-label', `Priority ${newPriority}`);
+            newBadge.setAttribute('title', `Priority ${newPriority}`);
+
+            // Insert after state span
+            const stateSpan = textContainer.querySelector(
+              '.embedded-task-state',
+            );
+            if (stateSpan && stateSpan.nextSibling) {
+              textContainer.insertBefore(newBadge, stateSpan.nextSibling);
+            } else {
+              textContainer.appendChild(newBadge);
+            }
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Update a task's scheduled date from any view.
+   * This provides optimistic UI updates similar to updateTaskState.
+   *
+   * @param task - The task to update
+   * @param date - The new scheduled date (null to remove)
+   * @returns Promise resolving to the updated task
+   */
+  async updateTaskScheduledDate(task: Task, date: Date | null): Promise<Task> {
+    // 0. Set flag to indicate user-initiated update
+    this.plugin.isUserInitiatedUpdate = true;
+
+    try {
+      // 1. Optimistic UI update - update in-memory state immediately
+      this.performOptimisticScheduledDateUpdate(task, date);
+
+      // 2. Get the current task from state manager (after optimistic update, it's a new object)
+      let currentTask = this.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      if (!currentTask) {
+        currentTask = task; // Fallback to original if not found
+      }
+
+      // 3. Update source file via TaskEditor
+      let updatedTask: Task;
+      const taskEditor = this.plugin.taskEditor;
+      if (!taskEditor) {
+        throw new Error('TaskEditor is not initialized');
+      }
+
+      try {
+        if (date === null) {
+          updatedTask = await taskEditor.removeTaskScheduledDate(currentTask);
+        } else {
+          updatedTask = await taskEditor.updateTaskScheduledDate(
+            currentTask,
+            date,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[TODOseq] File write failed for scheduled date change at line ${task.line}:`,
+          error,
+        );
+        // Rollback: re-read the file to restore state
+        const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
+        if (file instanceof TFile) {
+          await this.plugin.vaultScanner?.processIncrementalChange(file);
+        }
+        throw error;
+      }
+
+      // 4. Update the TaskStateManager with the final task state
+      this.taskStateManager.updateTask(currentTask, {
+        rawText: updatedTask.rawText,
+        scheduledDate: updatedTask.scheduledDate,
+      });
+
+      // 5. Refresh all embedded task lists (code blocks) to reflect the task change
+      if (this.plugin.embeddedTaskListProcessor) {
+        this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
+      }
+
+      // 6. Refresh editor decorations to update date styling in open editors
+      if (this.plugin.refreshVisibleEditorDecorations) {
+        this.plugin.refreshVisibleEditorDecorations();
+      }
+
+      return updatedTask;
+    } finally {
+      this.plugin.isUserInitiatedUpdate = false;
+    }
+  }
+
+  /**
+   * Perform optimistic UI updates immediately for scheduled date changes.
+   * This updates in-memory state and refreshes task list views.
+   */
+  private performOptimisticScheduledDateUpdate(
+    task: Task,
+    date: Date | null,
+  ): void {
+    // Update in-memory state - subscriber callback will handle the refresh
+    this.taskStateManager.updateTask(task, {
+      scheduledDate: date,
+    });
+  }
+
+  /**
    * Schedule a delayed recurrence update for a completed recurring task.
    * Cancels any existing pending update for this task.
    */

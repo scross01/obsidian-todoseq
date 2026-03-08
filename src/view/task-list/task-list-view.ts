@@ -942,30 +942,35 @@ export class TaskListView extends ItemView {
 
   /**
    * Handle priority change from context menu.
-   * Delegates to TaskWriter via the plugin's taskEditor.
+   * Uses TaskUpdateCoordinator for optimistic UI updates.
    */
   private async handleContextMenuPriorityChange(
     task: Task,
     priority: 'high' | 'med' | 'low' | null,
   ): Promise<void> {
-    const taskEditor = this.plugin.taskEditor;
-    if (!taskEditor) {
-      console.error('TODOseq: TaskEditor not available for priority change');
+    // Get the TaskUpdateCoordinator from the plugin
+    const plugin = (
+      window as unknown as {
+        todoSeqPlugin?: {
+          taskUpdateCoordinator?: {
+            updateTaskPriority: (
+              task: Task,
+              priority: 'high' | 'med' | 'low' | null,
+            ) => Promise<Task>;
+          };
+        };
+      }
+    ).todoSeqPlugin;
+
+    if (!plugin?.taskUpdateCoordinator) {
+      console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
     }
 
     try {
-      if (priority === null) {
-        await taskEditor.removeTaskPriority(task);
-      } else {
-        await taskEditor.updateTaskPriority(task, priority);
-      }
-
-      // Trigger a rescan of the file to update in-memory state
-      const file = this.app.vault.getAbstractFileByPath(task.path);
-      if (file instanceof TFile) {
-        await this.plugin.vaultScanner?.processIncrementalChange(file);
-      }
+      // Use the centralized coordinator for the update
+      // This handles optimistic updates, file writes, and embed refreshes
+      await plugin.taskUpdateCoordinator.updateTaskPriority(task, priority);
     } catch (error) {
       console.error('TODOseq: Failed to update task priority:', error);
     }
@@ -973,32 +978,35 @@ export class TaskListView extends ItemView {
 
   /**
    * Handle scheduled date change from context menu.
-   * Delegates to TaskWriter via the plugin's taskEditor.
+   * Uses TaskUpdateCoordinator for optimistic UI updates.
    */
   private async handleContextMenuScheduledDateChange(
     task: Task,
     date: Date | null,
   ): Promise<void> {
-    const taskEditor = this.plugin.taskEditor;
-    if (!taskEditor) {
-      console.error(
-        'TODOseq: TaskEditor not available for scheduled date change',
-      );
+    // Get the TaskUpdateCoordinator from the plugin
+    const plugin = (
+      window as unknown as {
+        todoSeqPlugin?: {
+          taskUpdateCoordinator?: {
+            updateTaskScheduledDate: (
+              task: Task,
+              date: Date | null,
+            ) => Promise<Task>;
+          };
+        };
+      }
+    ).todoSeqPlugin;
+
+    if (!plugin?.taskUpdateCoordinator) {
+      console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
     }
 
     try {
-      if (date === null) {
-        await taskEditor.removeTaskScheduledDate(task);
-      } else {
-        await taskEditor.updateTaskScheduledDate(task, date);
-      }
-
-      // Trigger a rescan of the file to update in-memory state
-      const file = this.app.vault.getAbstractFileByPath(task.path);
-      if (file instanceof TFile) {
-        await this.plugin.vaultScanner?.processIncrementalChange(file);
-      }
+      // Use the centralized coordinator for the update
+      // This handles optimistic updates, file writes, and embed refreshes
+      await plugin.taskUpdateCoordinator.updateTaskScheduledDate(task, date);
     } catch (error) {
       console.error('TODOseq: Failed to update scheduled date:', error);
     }

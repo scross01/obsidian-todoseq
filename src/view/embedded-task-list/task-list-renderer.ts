@@ -13,12 +13,19 @@ import {
   TFile,
   Platform,
   setIcon,
+  Notice,
 } from 'obsidian';
 import { truncateMiddle } from '../../utils/task-utils';
 import { TAG_PATTERN } from '../../utils/patterns';
 import { DateUtils } from '../../utils/date-utils';
 import { StateMenuBuilder } from '../components/state-menu-builder';
+import { TaskContextMenu } from '../components/task-context-menu';
 import { TaskUpdateCoordinator } from '../../services/task-update-coordinator';
+import {
+  formatTaskForDailyNote,
+  getTodayDailyNote,
+  isTaskOnTodayDailyNote,
+} from '../../utils/daily-note-utils';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -28,11 +35,193 @@ export class EmbeddedTaskListRenderer {
   private plugin: TodoTracker;
   private taskUpdateCoordinator: TaskUpdateCoordinator;
   private menuBuilder: StateMenuBuilder;
+  private taskContextMenu: TaskContextMenu;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
     this.taskUpdateCoordinator = plugin.taskUpdateCoordinator;
     this.menuBuilder = new StateMenuBuilder(plugin);
+
+    // Create task context menu for right-click actions
+    this.taskContextMenu = new TaskContextMenu(
+      {
+        onGoToTask: (task) => this.navigateToTask(task),
+        onCopyTask: (task) => this.copyTaskToClipboard(task),
+        onCopyTaskToToday: async (task) => await this.copyTaskToToday(task),
+        onMoveTaskToToday: async (task) => await this.moveTaskToToday(task),
+        onPriorityChange: (task, priority) =>
+          this.handlePriorityChange(task, priority),
+        onScheduledDateChange: (task, date) =>
+          this.handleScheduledDateChange(task, date),
+        onDeadlineClick: (_task) => {
+          new Notice('Date picker coming soon');
+        },
+      },
+      { weekStartsOn: plugin.settings.weekStartsOn },
+      plugin.app,
+    );
+  }
+
+  /**
+   * Copy task to clipboard in Org mode format
+   */
+  private copyTaskToClipboard(task: Task): void {
+    const lines: string[] = [];
+
+    // Build the main task line: KEYWORD [#priority] text
+    let taskLine = task.state;
+    if (task.priority) {
+      const priorityMap: Record<string, string> = {
+        high: 'A',
+        med: 'B',
+        low: 'C',
+      };
+      taskLine += ` [#${priorityMap[task.priority]}]`;
+    }
+    taskLine += ` ${task.text}`;
+    lines.push(taskLine);
+
+    // Add scheduled date if present
+    if (task.scheduledDate) {
+      const scheduledStr = this.formatDateForClipboard(task.scheduledDate);
+      lines.push(`SCHEDULED: ${scheduledStr}`);
+    }
+
+    // Add deadline date if present
+    if (task.deadlineDate) {
+      const deadlineStr = this.formatDateForClipboard(task.deadlineDate);
+      lines.push(`DEADLINE: ${deadlineStr}`);
+    }
+
+    // Copy to clipboard
+    const textToCopy = lines.join('\n');
+    navigator.clipboard.writeText(textToCopy).then(
+      () => {
+        new Notice('Task copied to clipboard');
+      },
+      () => {
+        new Notice('Failed to copy task');
+      },
+    );
+  }
+
+  /**
+   * Format date for clipboard in Org mode format: <2026-03-07 Sat>
+   */
+  private formatDateForClipboard(date: Date): string {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const dayOfWeek = date.toLocaleDateString(undefined, { weekday: 'short' });
+    return `<${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${dayOfWeek}>`;
+  }
+
+  /**
+   * Copy task to today's daily note
+   */
+  private async copyTaskToToday(task: Task): Promise<void> {
+    const todayNote = await getTodayDailyNote(this.plugin.app);
+    if (!todayNote) {
+      new Notice('Failed to get or create today daily note');
+      return;
+    }
+
+    if (isTaskOnTodayDailyNote(task, todayNote)) {
+      new Notice('Task is already on today daily note');
+      return;
+    }
+
+    const taskLines = formatTaskForDailyNote(task);
+    const currentContent = await this.plugin.app.vault.read(todayNote);
+    const newContent =
+      currentContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+    await this.plugin.app.vault.modify(todayNote, newContent);
+    new Notice('Task copied to today daily note');
+  }
+
+  /**
+   * Move task to today's daily note
+   */
+  private async moveTaskToToday(task: Task): Promise<void> {
+    const todayNote = await getTodayDailyNote(this.plugin.app);
+    if (!todayNote) {
+      new Notice('Failed to get or create today daily note');
+      return;
+    }
+
+    if (isTaskOnTodayDailyNote(task, todayNote)) {
+      new Notice('Task is already on today daily note');
+      return;
+    }
+
+    const taskLines = formatTaskForDailyNote(task);
+    const todayContent = await this.plugin.app.vault.read(todayNote);
+    const newTodayContent =
+      todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+    await this.plugin.app.vault.modify(todayNote, newTodayContent);
+
+    // Remove task from source file
+    const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
+    if (!(sourceFile instanceof TFile)) {
+      new Notice('Failed to find source file');
+      return;
+    }
+
+    const sourceContent = await this.plugin.app.vault.read(sourceFile);
+    const sourceLines = sourceContent.split('\n');
+    const startLine = task.line;
+    let endLine = startLine;
+
+    for (let i = startLine + 1; i < sourceLines.length; i++) {
+      const nextLine = sourceLines[i].trim();
+      if (
+        nextLine.startsWith('SCHEDULED:') ||
+        nextLine.startsWith('DEADLINE:')
+      ) {
+        endLine = i;
+      } else {
+        break;
+      }
+    }
+
+    const newSourceLines = [
+      ...sourceLines.slice(0, startLine),
+      ...sourceLines.slice(endLine + 1),
+    ];
+    await this.plugin.app.vault.modify(sourceFile, newSourceLines.join('\n'));
+    new Notice('Task moved to today daily note');
+  }
+
+  /**
+   * Handle priority change from context menu
+   * Uses optimistic UI updates via TaskUpdateCoordinator for immediate feedback
+   */
+  private async handlePriorityChange(
+    task: Task,
+    priority: 'high' | 'med' | 'low' | null,
+  ): Promise<void> {
+    try {
+      // Use TaskUpdateCoordinator for optimistic UI updates
+      await this.taskUpdateCoordinator.updateTaskPriority(task, priority);
+    } catch (error) {
+      console.error('TODOseq: Failed to update task priority:', error);
+    }
+  }
+
+  /**
+   * Handle scheduled date change from context menu
+   * Uses TaskUpdateCoordinator for optimistic UI updates
+   */
+  private async handleScheduledDateChange(
+    task: Task,
+    date: Date | null,
+  ): Promise<void> {
+    try {
+      // Use TaskUpdateCoordinator for optimistic UI updates
+      await this.taskUpdateCoordinator.updateTaskScheduledDate(task, date);
+    } catch (error) {
+      console.error('TODOseq: Failed to update scheduled date:', error);
+    }
   }
 
   /**
@@ -1423,6 +1612,102 @@ export class EmbeddedTaskListRenderer {
     li.addEventListener('click', (e) => {
       if (e.target !== checkbox) {
         this.navigateToTask(task, e);
+      }
+    });
+
+    // Right-click context menu handler
+    li.addEventListener('contextmenu', (evt: MouseEvent) => {
+      // Don't intercept right-clicks on the checkbox or state span (they have their own menus)
+      const target = evt.target;
+      if (
+        target === checkbox ||
+        (target instanceof HTMLElement &&
+          (target.hasClass('embedded-task-state') ||
+            target.closest('.embedded-task-state') !== null))
+      ) {
+        return;
+      }
+
+      evt.preventDefault();
+      evt.stopPropagation();
+      this.taskContextMenu.showAtMouseEvent(task, evt);
+    });
+
+    // Long-press for mobile (matching main task list pattern)
+    let touchTimer: number | null = null;
+    let suppressNextContextMenu = false;
+    let initialTouchX = 0;
+    let initialTouchY = 0;
+    const LONG_PRESS_MS = 450;
+    const TOUCH_MOVE_THRESHOLD = 10;
+
+    li.addEventListener(
+      'touchstart',
+      (evt: TouchEvent) => {
+        if (evt.touches.length !== 1) return;
+
+        // Don't intercept touches on checkbox or state span
+        const target = evt.target;
+        if (
+          target === checkbox ||
+          (target instanceof HTMLElement &&
+            (target.hasClass('embedded-task-state') ||
+              target.closest('.embedded-task-state') !== null))
+        ) {
+          return;
+        }
+
+        const touch = evt.touches[0];
+        initialTouchX = touch.clientX;
+        initialTouchY = touch.clientY;
+        suppressNextContextMenu = true;
+        touchTimer = window.setTimeout(() => {
+          // Create a synthetic MouseEvent for positioning
+          const syntheticEvt = new MouseEvent('contextmenu', {
+            clientX: touch.clientX,
+            clientY: touch.clientY,
+            bubbles: true,
+          });
+          this.taskContextMenu.showAtMouseEvent(task, syntheticEvt);
+        }, LONG_PRESS_MS);
+      },
+      { passive: true },
+    );
+
+    const clearTouch = () => {
+      if (touchTimer) {
+        window.clearTimeout(touchTimer);
+        touchTimer = null;
+      }
+      window.setTimeout(() => {
+        suppressNextContextMenu = false;
+      }, 250);
+    };
+    li.addEventListener('touchend', clearTouch, { passive: true });
+    li.addEventListener('touchcancel', clearTouch, { passive: true });
+
+    // Only clear the long-press timer if touch moves beyond threshold
+    li.addEventListener(
+      'touchmove',
+      (evt: TouchEvent) => {
+        if (!touchTimer) return;
+
+        const touch = evt.touches[0];
+        const deltaX = Math.abs(touch.clientX - initialTouchX);
+        const deltaY = Math.abs(touch.clientY - initialTouchY);
+
+        if (deltaX > TOUCH_MOVE_THRESHOLD || deltaY > TOUCH_MOVE_THRESHOLD) {
+          clearTouch();
+        }
+      },
+      { passive: true },
+    );
+
+    // Suppress contextmenu event after long-press on mobile
+    li.addEventListener('contextmenu', (evt: MouseEvent) => {
+      if (suppressNextContextMenu) {
+        evt.preventDefault();
+        evt.stopPropagation();
       }
     });
   }
