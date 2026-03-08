@@ -1,7 +1,7 @@
 **TODOseq** allows you to capture tasks using natural language keywords:
 
 TODO Write documentation
-DOING Update sync script  
+DOING Update sync script
 DONE Triage customer feedback
 
 This approach is faster to type and more natural when taking notes or journaling. Click on a task keyword or use the hotkey `Ctrl-Enter` to cycle the state TODO -> DOING -> DONE. Right-click on the keyword to select from the full list of available task states. 

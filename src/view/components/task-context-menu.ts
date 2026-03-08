@@ -1,7 +1,10 @@
-import { setIcon, Notice, App } from 'obsidian';
+import { setIcon, App } from 'obsidian';
 import { Task } from '../../types/task';
+import { DateRepeatInfo } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
 import { isDailyNotesPluginEnabled } from '../../utils/daily-note-utils';
+import { DatePicker, DatePickerMode } from './date-picker-menu';
+import { TaskStateManager } from '../../services/task-state-manager';
 
 /**
  * Callback types for context menu actions
@@ -15,7 +18,16 @@ export type TaskContextMenuCallbacks = {
     task: Task,
     priority: 'high' | 'med' | 'low' | null,
   ) => void;
-  onScheduledDateChange: (task: Task, date: Date | null) => void;
+  onScheduledDateChange: (
+    task: Task,
+    date: Date | null,
+    repeat?: DateRepeatInfo | null,
+  ) => void;
+  onDeadlineDateChange: (
+    task: Task,
+    date: Date | null,
+    repeat?: DateRepeatInfo | null,
+  ) => void;
   onDeadlineClick: (task: Task) => void;
 };
 
@@ -33,6 +45,7 @@ interface ScheduledDateOption {
   icon: string;
   label: string;
   getDate: () => Date | null;
+  isDatePicker?: boolean; // True for "Pick date..." option
 }
 
 /**
@@ -72,15 +85,19 @@ export class TaskContextMenu {
   private documentClickHandler: ((e: MouseEvent) => void) | null = null;
   private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
   private scrollHandler: (() => void) | null = null;
+  private datePicker: DatePicker | null = null;
+  private taskStateManager: TaskStateManager | null = null;
 
   constructor(
     callbacks: TaskContextMenuCallbacks,
     config: TaskContextMenuConfig,
     app: App,
+    taskStateManager: TaskStateManager | null = null,
   ) {
     this.callbacks = callbacks;
     this.config = config;
     this.app = app;
+    this.taskStateManager = taskStateManager;
   }
 
   /**
@@ -93,10 +110,16 @@ export class TaskContextMenu {
   /**
    * Show the context menu at the given position for the given task.
    * If already showing, hides the previous menu first.
+   * Also closes any open date picker.
    */
   async show(task: Task, position: { x: number; y: number }): Promise<void> {
     if (this.isShowing) {
       this.hide();
+    }
+
+    // Close any open date picker
+    if (this.datePicker && this.datePicker.isVisible()) {
+      this.datePicker.hide();
     }
 
     this.task = task;
@@ -146,6 +169,10 @@ export class TaskContextMenu {
    */
   cleanup(): void {
     this.hide();
+    if (this.datePicker) {
+      this.datePicker.cleanup();
+      this.datePicker = null;
+    }
   }
 
   // ─── DOM Building ──────────────────────────────────────────────
@@ -292,10 +319,44 @@ export class TaskContextMenu {
         evt.preventDefault();
         evt.stopPropagation();
         if (this.task) {
-          const date = option.getDate();
-          this.callbacks.onScheduledDateChange(this.task, date);
+          if (option.isDatePicker) {
+            // "Pick date..." option - show date picker and hide menu
+            // The date picker will handle the callback when a date is selected
+            this.showDatePicker('scheduled');
+            this.hide();
+          } else {
+            // Regular date option (Today, Tomorrow, No date, etc.)
+            const date = option.getDate();
+
+            // Preserve existing time if the task already has a scheduled date with a time component
+            if (date && this.task.scheduledDate) {
+              const existingDate = this.task.scheduledDate;
+              const hasTime =
+                existingDate.getHours() !== 0 ||
+                existingDate.getMinutes() !== 0;
+
+              if (hasTime) {
+                date.setHours(
+                  existingDate.getHours(),
+                  existingDate.getMinutes(),
+                  0,
+                  0,
+                );
+              }
+            }
+
+            // Preserve existing repeat component
+            const repeat = this.task.scheduledDateRepeat;
+
+            // Only pass repeat argument if it exists
+            if (repeat) {
+              this.callbacks.onScheduledDateChange(this.task, date, repeat);
+            } else {
+              this.callbacks.onScheduledDateChange(this.task, date);
+            }
+            this.hide();
+          }
         }
-        this.hide();
       });
 
       this.focusableItems.push(btn);
@@ -351,9 +412,11 @@ export class TaskContextMenu {
     if (!this.containerEl || !this.task) return;
 
     const row = this.createMenuRow('Deadline', 'target', () => {
+      // Show date picker for deadline
       if (this.task) {
-        this.callbacks.onDeadlineClick(this.task);
+        this.showDatePicker('deadline');
       }
+      // Hide the context menu - the date picker will be shown at the same position
       this.hide();
     });
     row.setAttribute('role', 'menuitem');
@@ -444,16 +507,82 @@ export class TaskContextMenu {
         getDate: () => null,
       },
       {
-        icon: 'ellipsis',
+        icon: 'calendar',
         label: 'Pick date...',
-        getDate: () => {
-          // Stub: show notice that date picker is coming soon
-          new Notice('Date picker coming soon');
-          // Return a special sentinel to signal no change should be made
-          return null;
-        },
+        getDate: () => null, // Return null, but the isDatePicker flag will handle the special case
+        isDatePicker: true,
       },
     ];
+  }
+
+  /**
+   * Show the date picker dialog
+   */
+  private showDatePicker(mode: DatePickerMode = 'scheduled'): void {
+    if (!this.containerEl) return;
+
+    // Get position of the context menu to overlay the date picker
+    const rect = this.containerEl.getBoundingClientRect();
+    const position = {
+      x: rect.left,
+      y: rect.top,
+    };
+
+    // Store task reference before hiding the menu (hide() sets this.task = null)
+    const task = this.task;
+    this.hide();
+
+    // Get the current task from state manager to ensure we have the latest data
+    // The stored task reference might be stale if the task was updated previously
+    let currentTask = task;
+    if (task && this.taskStateManager) {
+      const freshTask = this.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      if (freshTask) {
+        currentTask = freshTask;
+      }
+    }
+
+    // Get the existing date based on mode
+    const initialDate = currentTask
+      ? mode === 'deadline'
+        ? currentTask.deadlineDate
+        : currentTask.scheduledDate
+      : null;
+    const initialRepeat = currentTask
+      ? mode === 'deadline'
+        ? (currentTask.deadlineDateRepeat ?? null)
+        : (currentTask.scheduledDateRepeat ?? null)
+      : null;
+
+    this.datePicker = new DatePicker(
+      {
+        onDateSelected: (date, repeat, mode) => {
+          if (currentTask) {
+            if (mode === 'deadline') {
+              this.callbacks.onDeadlineDateChange(
+                currentTask,
+                date,
+                repeat ?? null,
+              );
+            } else {
+              this.callbacks.onScheduledDateChange(
+                currentTask,
+                date,
+                repeat ?? null,
+              );
+            }
+          }
+        },
+      },
+      {
+        weekStartsOn: this.config.weekStartsOn,
+      },
+    );
+
+    this.datePicker.show(position, mode, initialDate, initialRepeat);
   }
 
   private getPriorityOptions(): PriorityOption[] {

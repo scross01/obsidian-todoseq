@@ -124,8 +124,12 @@ describe('TaskContextMenu', () => {
 
     callbacks = {
       onGoToTask: jest.fn(),
+      onCopyTask: jest.fn(),
+      onCopyTaskToToday: jest.fn(),
+      onMoveTaskToToday: jest.fn(),
       onPriorityChange: jest.fn(),
       onScheduledDateChange: jest.fn(),
+      onDeadlineDateChange: jest.fn(),
       onDeadlineClick: jest.fn(),
     };
 
@@ -412,10 +416,130 @@ describe('TaskContextMenu', () => {
 
       expect(callbacks.onScheduledDateChange).toHaveBeenCalledWith(task, null);
     });
+
+    it('should preserve existing time when choosing Tomorrow', async () => {
+      // Create a task with a scheduled date that has a time component
+      const taskWithTime = createBaseTask({
+        rawText: 'TODO Task text',
+        priority: null,
+        scheduledDate: new Date(2026, 2, 8, 9, 30, 0, 0), // March 8, 2026 at 09:30
+      });
+
+      await menu.show(taskWithTime, { x: 100, y: 100 });
+      const iconRows = document.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const scheduledRow = iconRows[1];
+      const buttons = scheduledRow.querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[1] as HTMLElement).click(); // Tomorrow
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const callArgs = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0];
+      expect(callArgs[0]).toBe(taskWithTime);
+      expect(callArgs[1]).toBeInstanceOf(Date);
+
+      const newDate = callArgs[1] as Date;
+      expect(newDate.getHours()).toBe(9);
+      expect(newDate.getMinutes()).toBe(30);
+      // Date should be March 9 (tomorrow relative to March 8)
+      expect(newDate.getDate()).toBe(9);
+    });
+
+    it('should preserve existing time when choosing Today', async () => {
+      // Create a task with a scheduled date that has a time component
+      const taskWithTime = createBaseTask({
+        rawText: 'TODO Task text',
+        priority: null,
+        scheduledDate: new Date(2026, 2, 8, 14, 45, 0, 0), // March 8, 2026 at 14:45
+      });
+
+      await menu.show(taskWithTime, { x: 100, y: 100 });
+      const iconRows = document.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const scheduledRow = iconRows[1];
+      const buttons = scheduledRow.querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[0] as HTMLElement).click(); // Today
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const callArgs = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0];
+      expect(callArgs[0]).toBe(taskWithTime);
+      expect(callArgs[1]).toBeInstanceOf(Date);
+
+      const newDate = callArgs[1] as Date;
+      expect(newDate.getHours()).toBe(14);
+      expect(newDate.getMinutes()).toBe(45);
+    });
+
+    it('should not preserve time when task has no existing scheduled date', async () => {
+      // Task with no scheduled date
+      const taskNoDate = createBaseTask({
+        rawText: 'TODO Task text',
+        priority: null,
+        scheduledDate: null,
+      });
+
+      await menu.show(taskNoDate, { x: 100, y: 100 });
+      const iconRows = document.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const scheduledRow = iconRows[1];
+      const buttons = scheduledRow.querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[0] as HTMLElement).click(); // Today
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const callArgs = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0];
+      expect(callArgs[0]).toBe(taskNoDate);
+      expect(callArgs[1]).toBeInstanceOf(Date);
+
+      const newDate = callArgs[1] as Date;
+      // Should be midnight (no time component)
+      expect(newDate.getHours()).toBe(0);
+      expect(newDate.getMinutes()).toBe(0);
+    });
+
+    it('should not preserve time when existing scheduled date is at midnight', async () => {
+      // Task with a scheduled date at midnight (no time component)
+      const taskMidnight = createBaseTask({
+        rawText: 'TODO Task text',
+        priority: null,
+        scheduledDate: new Date(2026, 2, 8, 0, 0, 0, 0), // March 8, 2026 at 00:00
+      });
+
+      await menu.show(taskMidnight, { x: 100, y: 100 });
+      const iconRows = document.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const scheduledRow = iconRows[1];
+      const buttons = scheduledRow.querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[1] as HTMLElement).click(); // Tomorrow
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const callArgs = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0];
+      expect(callArgs[0]).toBe(taskMidnight);
+      expect(callArgs[1]).toBeInstanceOf(Date);
+
+      const newDate = callArgs[1] as Date;
+      // Should be midnight (no time component preserved)
+      expect(newDate.getHours()).toBe(0);
+      expect(newDate.getMinutes()).toBe(0);
+    });
   });
 
   describe('Deadline action', () => {
-    it('should call onDeadlineClick when Deadline row clicked', async () => {
+    it('should hide menu when Deadline row clicked (date picker will be shown)', async () => {
       await menu.show(task, { x: 100, y: 100 });
       const rows = document.querySelectorAll('.todoseq-context-menu-row');
       const deadlineRow = Array.from(rows).find((r) => {
@@ -424,7 +548,10 @@ describe('TaskContextMenu', () => {
       }) as HTMLElement;
       deadlineRow.click();
 
-      expect(callbacks.onDeadlineClick).toHaveBeenCalledWith(task);
+      // The menu should be hidden after clicking Deadline
+      expect(menu.isVisible()).toBe(false);
+      // onDeadlineClick is no longer called - the date picker is shown instead
+      expect(callbacks.onDeadlineClick).not.toHaveBeenCalled();
     });
   });
 
@@ -462,6 +589,55 @@ describe('TaskContextMenu', () => {
       const container = document.querySelector('.todoseq-task-context-menu');
       expect(container).toBeNull();
       expect(menu.isVisible()).toBe(false);
+    });
+  });
+
+  describe('date picker interaction', () => {
+    it('should close date picker when showing a new context menu', async () => {
+      // Create a mock DatePicker with hide, isVisible, and cleanup methods
+      const mockDatePicker = {
+        hide: jest.fn(),
+        isVisible: jest.fn().mockReturnValue(true),
+        cleanup: jest.fn(),
+      };
+
+      // Set the datePicker property on the menu instance
+      (menu as any).datePicker = mockDatePicker;
+
+      // Show a new context menu - this should close the date picker
+      await menu.show(task, { x: 100, y: 100 });
+
+      // Verify that the date picker's hide method was called
+      expect(mockDatePicker.hide).toHaveBeenCalled();
+    });
+
+    it('should not call hide on date picker if it is not visible', async () => {
+      // Create a mock DatePicker that is not visible
+      const mockDatePicker = {
+        hide: jest.fn(),
+        isVisible: jest.fn().mockReturnValue(false),
+        cleanup: jest.fn(),
+      };
+
+      // Set the datePicker property on the menu instance
+      (menu as any).datePicker = mockDatePicker;
+
+      // Show a new context menu
+      await menu.show(task, { x: 100, y: 100 });
+
+      // Verify that the date picker's hide method was NOT called
+      expect(mockDatePicker.hide).not.toHaveBeenCalled();
+    });
+
+    it('should handle null date picker gracefully when showing context menu', async () => {
+      // Ensure datePicker is null
+      (menu as any).datePicker = null;
+
+      // Show a new context menu - should not throw
+      await expect(menu.show(task, { x: 100, y: 100 })).resolves.not.toThrow();
+
+      // Verify menu is shown
+      expect(menu.isVisible()).toBe(true);
     });
   });
 });

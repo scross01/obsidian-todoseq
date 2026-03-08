@@ -1,4 +1,4 @@
-import { Task } from '../../types/task';
+import { Task, DateRepeatInfo } from '../../types/task';
 import {
   isCompletedKeyword,
   getSubtaskDisplayText,
@@ -51,14 +51,17 @@ export class EmbeddedTaskListRenderer {
         onMoveTaskToToday: async (task) => await this.moveTaskToToday(task),
         onPriorityChange: (task, priority) =>
           this.handlePriorityChange(task, priority),
-        onScheduledDateChange: (task, date) =>
-          this.handleScheduledDateChange(task, date),
+        onScheduledDateChange: (task, date, repeat) =>
+          this.handleScheduledDateChange(task, date, repeat),
+        onDeadlineDateChange: (task, date, repeat) =>
+          this.handleDeadlineDateChange(task, date, repeat),
         onDeadlineClick: (_task) => {
           new Notice('Date picker coming soon');
         },
       },
       { weekStartsOn: plugin.settings.weekStartsOn },
       plugin.app,
+      this.plugin.taskStateManager,
     );
   }
 
@@ -215,12 +218,38 @@ export class EmbeddedTaskListRenderer {
   private async handleScheduledDateChange(
     task: Task,
     date: Date | null,
+    repeat?: DateRepeatInfo | null,
   ): Promise<void> {
     try {
       // Use TaskUpdateCoordinator for optimistic UI updates
-      await this.taskUpdateCoordinator.updateTaskScheduledDate(task, date);
+      await this.taskUpdateCoordinator.updateTaskScheduledDate(
+        task,
+        date,
+        repeat,
+      );
     } catch (error) {
       console.error('TODOseq: Failed to update scheduled date:', error);
+    }
+  }
+
+  /**
+   * Handle deadline date change from context menu
+   * Uses TaskUpdateCoordinator for optimistic UI updates
+   */
+  private async handleDeadlineDateChange(
+    task: Task,
+    date: Date | null,
+    repeat?: DateRepeatInfo | null,
+  ): Promise<void> {
+    try {
+      // Use TaskUpdateCoordinator for optimistic UI updates
+      await this.taskUpdateCoordinator.updateTaskDeadlineDate(
+        task,
+        date,
+        repeat,
+      );
+    } catch (error) {
+      console.error('TODOseq: Failed to update deadline date:', error);
     }
   }
 

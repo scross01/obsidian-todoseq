@@ -439,15 +439,20 @@ export class TaskUpdateCoordinator {
    *
    * @param task - The task to update
    * @param date - The new scheduled date (null to remove)
+   * @param repeat - The repeat pattern to apply (optional)
    * @returns Promise resolving to the updated task
    */
-  async updateTaskScheduledDate(task: Task, date: Date | null): Promise<Task> {
+  async updateTaskScheduledDate(
+    task: Task,
+    date: Date | null,
+    repeat?: DateRepeatInfo | null,
+  ): Promise<Task> {
     // 0. Set flag to indicate user-initiated update
     this.plugin.isUserInitiatedUpdate = true;
 
     try {
       // 1. Optimistic UI update - update in-memory state immediately
-      this.performOptimisticScheduledDateUpdate(task, date);
+      this.performOptimisticScheduledDateUpdate(task, date, repeat);
 
       // 2. Get the current task from state manager (after optimistic update, it's a new object)
       let currentTask = this.taskStateManager.findTaskByPathAndLine(
@@ -472,6 +477,7 @@ export class TaskUpdateCoordinator {
           updatedTask = await taskEditor.updateTaskScheduledDate(
             currentTask,
             date,
+            repeat,
           );
         }
       } catch (error) {
@@ -491,6 +497,7 @@ export class TaskUpdateCoordinator {
       this.taskStateManager.updateTask(currentTask, {
         rawText: updatedTask.rawText,
         scheduledDate: updatedTask.scheduledDate,
+        scheduledDateRepeat: updatedTask.scheduledDateRepeat,
       });
 
       // 5. Refresh all embedded task lists (code blocks) to reflect the task change
@@ -516,10 +523,111 @@ export class TaskUpdateCoordinator {
   private performOptimisticScheduledDateUpdate(
     task: Task,
     date: Date | null,
+    repeat?: DateRepeatInfo | null,
   ): void {
     // Update in-memory state - subscriber callback will handle the refresh
     this.taskStateManager.updateTask(task, {
       scheduledDate: date,
+      scheduledDateRepeat: repeat,
+    });
+  }
+
+  /**
+   * Update a task's deadline date from any view.
+   * This provides optimistic UI updates similar to updateTaskState.
+   *
+   * @param task - The task to update
+   * @param date - The new deadline date (null to remove)
+   * @param repeat - The repeat pattern to apply (optional)
+   * @returns Promise resolving to the updated task
+   */
+  async updateTaskDeadlineDate(
+    task: Task,
+    date: Date | null,
+    repeat?: DateRepeatInfo | null,
+  ): Promise<Task> {
+    // 0. Set flag to indicate user-initiated update
+    this.plugin.isUserInitiatedUpdate = true;
+
+    try {
+      // 1. Optimistic UI update - update in-memory state immediately
+      this.performOptimisticDeadlineDateUpdate(task, date, repeat);
+
+      // 2. Get the current task from state manager (after optimistic update, it's a new object)
+      let currentTask = this.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      if (!currentTask) {
+        currentTask = task; // Fallback to original if not found
+      }
+
+      // 3. Update source file via TaskEditor
+      let updatedTask: Task;
+      const taskEditor = this.plugin.taskEditor;
+      if (!taskEditor) {
+        throw new Error('TaskEditor is not initialized');
+      }
+
+      try {
+        if (date === null) {
+          updatedTask = await taskEditor.removeTaskDeadlineDate(currentTask);
+        } else {
+          updatedTask = await taskEditor.updateTaskDeadlineDate(
+            currentTask,
+            date,
+            repeat,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[TODOseq] File write failed for deadline date change at line ${task.line}:`,
+          error,
+        );
+        // Rollback: re-read the file to restore state
+        const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
+        if (file instanceof TFile) {
+          await this.plugin.vaultScanner?.processIncrementalChange(file);
+        }
+        throw error;
+      }
+
+      // 4. Update the TaskStateManager with the final task state
+      this.taskStateManager.updateTask(currentTask, {
+        rawText: updatedTask.rawText,
+        deadlineDate: updatedTask.deadlineDate,
+        deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+      });
+
+      // 5. Refresh all embedded task lists (code blocks) to reflect the task change
+      if (this.plugin.embeddedTaskListProcessor) {
+        this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
+      }
+
+      // 6. Refresh editor decorations to update date styling in open editors
+      if (this.plugin.refreshVisibleEditorDecorations) {
+        this.plugin.refreshVisibleEditorDecorations();
+      }
+
+      return updatedTask;
+    } finally {
+      this.plugin.isUserInitiatedUpdate = false;
+    }
+  }
+
+  /**
+   * Perform optimistic UI updates immediately for deadline date changes.
+   * This updates in-memory state and refreshes task list views.
+   */
+  private performOptimisticDeadlineDateUpdate(
+    task: Task,
+    date: Date | null,
+    repeat?: DateRepeatInfo | null,
+  ): void {
+    // Update in-memory state - subscriber callback will handle the refresh
+    this.taskStateManager.updateTask(task, {
+      deadlineDate: date,
+      deadlineDateRepeat: repeat,
     });
   }
 

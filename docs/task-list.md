@@ -88,11 +88,12 @@ The context menu includes several sections:
 - This weekend
 - Next week
 - Next month
+- Pick date... - Opens the Date Picker for custom date, time, and repeat options
 - Clear scheduled date
 
-These shortcuts help you quickly reschedule tasks without manually editing dates.
+These shortcuts help you quickly reschedule tasks without manually editing dates. The new Date Picker provides a calendar view, time picker, and repeat options for more precise scheduling.
 
-**Deadline** - Access deadline options (date picker coming soon).
+**Deadline** - Access deadline options using the new Date Picker. The date picker provides quick date selections, calendar view, time picker, and repeat options.
 
 **Copy Task** - Copy the task text to your clipboard. This includes the task keyword, priority, and task text, making it easy to paste the task elsewhere.
 
@@ -101,6 +102,17 @@ These shortcuts help you quickly reschedule tasks without manually editing dates
 **Move to Today** - Move the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is removed from its original location and appended to today's daily note. This is useful when you want to consolidate tasks for the current day.
 
 The context menu supports keyboard navigation with arrow keys and Enter to select options, and can be dismissed with Escape. On mobile devices, long-press on a task row opens the context menu.
+
+### Date Picker
+
+Use the Date Picker for selecting and managing task dates. The Date Picker provides:
+
+- **Quick select options**: Today, Tomorrow, Next weekend, Next week
+- **Calendar view**: Visual calendar for selecting specific dates
+- **Time picker**: 30-minute increment time selection (optional)
+- **Repeat options**: Built-in and custom repeat patterns (daily, weekly, monthly, yearly, custom)
+
+The Date Picker can be accessed from the task context menu by selecting "Pick date..." for either scheduled or deadline dates.
 
 ### Opening Source Location
 

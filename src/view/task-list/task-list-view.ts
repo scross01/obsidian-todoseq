@@ -8,7 +8,7 @@ import {
   Notice,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
-import { Task } from '../../types/task';
+import { Task, DateRepeatInfo } from '../../types/task';
 import { Search } from '../../search/search';
 import { SearchOptionsDropdown } from '../components/search-options-dropdown';
 import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdown';
@@ -97,6 +97,7 @@ export class TaskListView extends ItemView {
   // Keyword and state management
   private keywordManager: KeywordManager;
   private stateManager: TaskStateTransitionManager;
+  private taskStateManager: TaskStateManager;
 
   // Lazy loading state
   private loadedTaskCount = 0;
@@ -113,6 +114,7 @@ export class TaskListView extends ItemView {
     plugin: TodoTracker,
   ) {
     super(leaf);
+    this.taskStateManager = taskStateManager;
     this.tasks = taskStateManager.getTasks();
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = plugin.settings.defaultSortMethod;
@@ -159,8 +161,10 @@ export class TaskListView extends ItemView {
         },
         onPriorityChange: (task, priority) =>
           this.handleContextMenuPriorityChange(task, priority),
-        onScheduledDateChange: (task, date) =>
-          this.handleContextMenuScheduledDateChange(task, date),
+        onScheduledDateChange: (task, date, repeat) =>
+          this.handleContextMenuScheduledDateChange(task, date, repeat ?? null),
+        onDeadlineDateChange: (task, date, repeat) =>
+          this.handleContextMenuDeadlineDateChange(task, date, repeat ?? null),
         onDeadlineClick: (_task) => {
           // Stub: date picker not yet implemented
           new Notice('Date picker coming soon');
@@ -168,6 +172,7 @@ export class TaskListView extends ItemView {
       },
       { weekStartsOn: plugin.settings.weekStartsOn },
       plugin.app,
+      this.taskStateManager,
     );
 
     this.taskItemRenderer = new TaskItemRenderer(
@@ -983,6 +988,7 @@ export class TaskListView extends ItemView {
   private async handleContextMenuScheduledDateChange(
     task: Task,
     date: Date | null,
+    repeat?: DateRepeatInfo | null,
   ): Promise<void> {
     // Get the TaskUpdateCoordinator from the plugin
     const plugin = (
@@ -992,6 +998,7 @@ export class TaskListView extends ItemView {
             updateTaskScheduledDate: (
               task: Task,
               date: Date | null,
+              repeat?: DateRepeatInfo | null,
             ) => Promise<Task>;
           };
         };
@@ -1004,11 +1011,79 @@ export class TaskListView extends ItemView {
     }
 
     try {
+      // Get the current task from state manager to ensure we have the latest data
+      // The task parameter might be stale if the task was updated previously
+      const currentTask = this.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      if (!currentTask) {
+        console.error('TODOseq: Task not found in state manager');
+        return;
+      }
+
       // Use the centralized coordinator for the update
       // This handles optimistic updates, file writes, and embed refreshes
-      await plugin.taskUpdateCoordinator.updateTaskScheduledDate(task, date);
+      await plugin.taskUpdateCoordinator.updateTaskScheduledDate(
+        currentTask,
+        date,
+        repeat,
+      );
     } catch (error) {
       console.error('TODOseq: Failed to update scheduled date:', error);
+    }
+  }
+
+  /**
+   * Handle deadline date change from context menu.
+   * Uses TaskUpdateCoordinator for optimistic UI updates.
+   */
+  private async handleContextMenuDeadlineDateChange(
+    task: Task,
+    date: Date | null,
+    repeat?: DateRepeatInfo | null,
+  ): Promise<void> {
+    // Get the TaskUpdateCoordinator from the plugin
+    const plugin = (
+      window as unknown as {
+        todoSeqPlugin?: {
+          taskUpdateCoordinator?: {
+            updateTaskDeadlineDate: (
+              task: Task,
+              date: Date | null,
+              repeat?: DateRepeatInfo | null,
+            ) => Promise<Task>;
+          };
+        };
+      }
+    ).todoSeqPlugin;
+
+    if (!plugin?.taskUpdateCoordinator) {
+      console.error('TODOseq: TaskUpdateCoordinator not available');
+      return;
+    }
+
+    try {
+      // Get the current task from state manager to ensure we have the latest data
+      // The task parameter might be stale if the task was updated previously
+      const currentTask = this.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      if (!currentTask) {
+        console.error('TODOseq: Task not found in state manager');
+        return;
+      }
+
+      // Use the centralized coordinator for the update
+      // This handles optimistic updates, file writes, and embed refreshes
+      await plugin.taskUpdateCoordinator.updateTaskDeadlineDate(
+        currentTask,
+        date,
+        repeat,
+      );
+    } catch (error) {
+      console.error('TODOseq: Failed to update deadline date:', error);
     }
   }
 
@@ -2014,6 +2089,53 @@ export class TaskListView extends ItemView {
       defaultCompleted,
       defaultInactive,
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
+    );
+
+    // Recreate context menu with updated task state manager reference
+    this.taskContextMenu = new TaskContextMenu(
+      {
+        onGoToTask: (task) => this.openTaskLocationForRenderer(task),
+        onCopyTask: (task) => {
+          // Look up the fresh task from the current tasks array to get the latest state
+          const freshTask = this.tasks.find(
+            (t) => t.path === task.path && t.line === task.line,
+          );
+          if (freshTask) {
+            this.copyTaskToClipboard(freshTask);
+          }
+        },
+        onCopyTaskToToday: async (task) => {
+          // Look up the fresh task from the current tasks array to get the latest state
+          const freshTask = this.tasks.find(
+            (t) => t.path === task.path && t.line === task.line,
+          );
+          if (freshTask) {
+            await this.copyTaskToToday(freshTask);
+          }
+        },
+        onMoveTaskToToday: async (task) => {
+          // Look up the fresh task from the current tasks array to get the latest state
+          const freshTask = this.tasks.find(
+            (t) => t.path === task.path && t.line === task.line,
+          );
+          if (freshTask) {
+            await this.moveTaskToToday(freshTask);
+          }
+        },
+        onPriorityChange: (task, priority) =>
+          this.handleContextMenuPriorityChange(task, priority),
+        onScheduledDateChange: (task, date, repeat) =>
+          this.handleContextMenuScheduledDateChange(task, date, repeat ?? null),
+        onDeadlineDateChange: (task, date, repeat) =>
+          this.handleContextMenuDeadlineDateChange(task, date, repeat ?? null),
+        onDeadlineClick: (_task) => {
+          // Stub: date picker not yet implemented
+          new Notice('Date picker coming soon');
+        },
+      },
+      { weekStartsOn: this.plugin.settings.weekStartsOn },
+      this.plugin.app,
+      this.taskStateManager,
     );
 
     // Update context menu configuration
