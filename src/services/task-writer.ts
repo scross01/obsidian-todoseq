@@ -278,7 +278,7 @@ export class TaskWriter {
     const { newLine } = TaskWriter.generateTaskLine(
       task,
       task.state,
-      false, // Don't keep existing priority
+      true, // Keep existing priority
       keywordManagerInstance,
     );
 
@@ -371,32 +371,15 @@ export class TaskWriter {
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
-      // Check if target is the active file in a MarkdownView
-      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
-      const isActive = md?.file?.path === task.path;
-      const editor = md?.editor;
-
-      if (isActive && editor) {
-        // Replace only the specific line using Editor API to preserve editor state
-        const currentLine = editor.getLine(task.line);
-        if (typeof currentLine === 'string') {
-          const from: EditorPosition = { line: task.line, ch: 0 };
-          const to: EditorPosition = {
-            line: task.line,
-            ch: currentLine.length,
-          };
-          editor.replaceRange(newTaskLine, from, to);
+      // Always use vault.process() for atomic background edits
+      // This ensures the file is updated correctly in all modes (editor, reader, etc.)
+      await this.app.vault.process(file, (data) => {
+        const lines = data.split('\n');
+        if (task.line < lines.length) {
+          lines[task.line] = newTaskLine;
         }
-      } else {
-        // Not active: use atomic background edit
-        await this.app.vault.process(file, (data) => {
-          const lines = data.split('\n');
-          if (task.line < lines.length) {
-            lines[task.line] = newTaskLine;
-          }
-          return lines.join('\n');
-        });
-      }
+        return lines.join('\n');
+      });
     }
 
     // Return an updated Task snapshot (do not mutate original)

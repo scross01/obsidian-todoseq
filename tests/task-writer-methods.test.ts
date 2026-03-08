@@ -301,7 +301,7 @@ describe('TaskWriter Instance Methods', () => {
       expect(mockApp.vault.process).toHaveBeenCalled();
     });
 
-    it('should update task priority using editor API for active file', async () => {
+    it('should update task priority using vault.process for all files', async () => {
       const task: Task = createBaseTask();
       const mockEditor = {
         getLine: jest.fn().mockReturnValue('TODO Task text'),
@@ -322,7 +322,9 @@ describe('TaskWriter Instance Methods', () => {
 
       await taskWriter.updateTaskPriority(task, 'med');
 
-      expect(mockEditor.replaceRange).toHaveBeenCalled();
+      // Always uses vault.process() regardless of whether file is active
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      expect(mockEditor.replaceRange).not.toHaveBeenCalled();
     });
 
     it('should remove existing priority before adding new one', async () => {

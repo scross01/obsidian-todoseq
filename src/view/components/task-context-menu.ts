@@ -399,7 +399,19 @@ export class TaskContextMenu {
         evt.preventDefault();
         evt.stopPropagation();
         if (this.task) {
-          this.callbacks.onPriorityChange(this.task, option.priority);
+          // Get the current task from state manager to ensure we have the latest data
+          // The stored task reference might be stale if the task was updated previously
+          let currentTask = this.task;
+          if (this.taskStateManager) {
+            const freshTask = this.taskStateManager.findTaskByPathAndLine(
+              this.task.path,
+              this.task.line,
+            );
+            if (freshTask) {
+              currentTask = freshTask;
+            }
+          }
+          this.callbacks.onPriorityChange(currentTask, option.priority);
         }
         this.hide();
       });

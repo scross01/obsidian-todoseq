@@ -43,7 +43,7 @@ export class TaskUpdateCoordinator {
       // 1. Optimistic UI update - update in-memory state immediately
       this.performOptimisticUpdate(task, newState);
 
-      // 2. Get the current task from state manager (after optimistic update, it's a new object)
+      // 2. Get the current task from the state manager (after optimistic update, it's a new object)
       let currentTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
@@ -76,7 +76,7 @@ export class TaskUpdateCoordinator {
       // 3. Perform direct DOM manipulation for embeds immediately
       // This updates the embed display without triggering a full re-render
       // which would cause flicker. The DOM update is synchronous and only
-      // touches the specific elements that need to change.
+      // touches specific elements that need to change.
       // Use updatedTask.state for recurring tasks where the final state differs from newState
       this.performDirectEmbedDOMUpdate(currentTask, updatedTask.state);
 
@@ -100,7 +100,7 @@ export class TaskUpdateCoordinator {
       }
 
       // 5. Refresh editor decorations to update keyword styling in open editors
-      // This ensures the keyword span is properly updated with the new state
+      // This ensures that the keyword span is properly updated with the new state
       if (this.plugin.refreshVisibleEditorDecorations) {
         this.plugin.refreshVisibleEditorDecorations();
       }
@@ -117,12 +117,12 @@ export class TaskUpdateCoordinator {
         (updatedTask.deadlineDateRepeat != null &&
           updatedTask.deadlineDate != null);
 
-      // Cancel pending recurrence if task is no longer completed
+      // Cancel pending recurrence if the task is no longer completed
       if (wasCompleted && !isNowCompleted && hasRepeatingDates) {
         this.cancelRecurrenceUpdate(currentTask);
       }
 
-      // Schedule new recurrence if task is now completed and has repeating dates
+      // Schedule new recurrence if the task is now completed and has repeating dates
       if (isNowCompleted && hasRepeatingDates) {
         this.scheduleRecurrenceUpdate(updatedTask);
       }
@@ -149,7 +149,7 @@ export class TaskUpdateCoordinator {
    * Perform direct DOM manipulation on embeds to update the task state display.
    * This updates the embed display without triggering a full re-render
    * which would cause flicker. The DOM update is synchronous and only
-   * touches the specific elements that need to change.
+   * touches specific elements that need to change.
    */
   private performDirectEmbedDOMUpdate(task: Task, newState: string): void {
     // Get the filename from the task path
@@ -212,12 +212,12 @@ export class TaskUpdateCoordinator {
         // Find the task container
         const taskContainer = keywordEl.closest('.todoseq-task');
         if (taskContainer) {
-          // Create completed container
+          // Create a completed container
           const completedContainer = document.createElement('span');
           completedContainer.className = 'todoseq-completed-task-text';
           completedContainer.setAttribute('data-completed-task', 'true');
 
-          // Move keyword and all siblings after it into the completed container
+          // Move the keyword and all siblings after it into the completed container
           let currentNode = keywordEl.nextSibling;
           const nodesToMove: Node[] = [];
           while (currentNode) {
@@ -225,18 +225,18 @@ export class TaskUpdateCoordinator {
             currentNode = currentNode.nextSibling;
           }
 
-          // Add nodes to completed container
+          // Add nodes to the completed container
           nodesToMove.forEach((node) => {
             completedContainer.appendChild(node);
           });
 
-          // Insert completed container after keyword
+          // Insert the completed container after the keyword
           keywordEl.parentNode?.insertBefore(
             completedContainer,
             keywordEl.nextSibling,
           );
 
-          // Move keyword into completed container at the beginning
+          // Move the keyword into the completed container at the beginning
           completedContainer.insertBefore(
             keywordEl,
             completedContainer.firstChild,
@@ -262,7 +262,7 @@ export class TaskUpdateCoordinator {
     this.plugin.isUserInitiatedUpdate = true;
 
     try {
-      // 1. Get the current task from state manager BEFORE optimistic update
+      // 1. Get the current task from the state manager BEFORE optimistic update
       // This is critical because removeTaskPriority checks if priority exists
       // and we need the task with its original priority value
       let currentTask = this.taskStateManager.findTaskByPathAndLine(
@@ -305,22 +305,18 @@ export class TaskUpdateCoordinator {
         throw error;
       }
 
-      // 4. Perform direct DOM manipulation for embeds immediately
-      // This updates the embed display without triggering a full re-render
-      this.performDirectEmbedPriorityDOMUpdate(currentTask, newPriority);
-
-      // 5. Update the TaskStateManager with the final task state
+      // 4. Update the TaskStateManager with the final task state
       this.taskStateManager.updateTask(currentTask, {
         rawText: updatedTask.rawText,
         priority: updatedTask.priority,
       });
 
-      // 6. Refresh all embedded task lists (code blocks) to reflect the task change
+      // 5. Refresh all embedded task lists (code blocks) to reflect the task change
       if (this.plugin.embeddedTaskListProcessor) {
         this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
       }
 
-      // 7. Refresh editor decorations to update priority styling in open editors
+      // 6. Refresh editor decorations to update priority styling in open editors
       if (this.plugin.refreshVisibleEditorDecorations) {
         this.plugin.refreshVisibleEditorDecorations();
       }
@@ -454,7 +450,7 @@ export class TaskUpdateCoordinator {
       // 1. Optimistic UI update - update in-memory state immediately
       this.performOptimisticScheduledDateUpdate(task, date, repeat);
 
-      // 2. Get the current task from state manager (after optimistic update, it's a new object)
+      // 2. Get the current task from the state manager (after optimistic update, it's a new object)
       let currentTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
@@ -553,7 +549,7 @@ export class TaskUpdateCoordinator {
       // 1. Optimistic UI update - update in-memory state immediately
       this.performOptimisticDeadlineDateUpdate(task, date, repeat);
 
-      // 2. Get the current task from state manager (after optimistic update, it's a new object)
+      // 2. Get the current task from the state manager (after optimistic update, it's a new object)
       let currentTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
@@ -666,7 +662,7 @@ export class TaskUpdateCoordinator {
   }
 
   /**
-   * Perform the recurrence update: advance dates and reset to inactive state.
+   * Perform recurrence update: advance dates and reset to inactive state.
    */
   private async performRecurrenceUpdate(task: Task): Promise<void> {
     const settings = getPluginSettings(this.plugin.app);
@@ -818,7 +814,7 @@ export class TaskUpdateCoordinator {
           break;
         }
 
-        // Update scheduled date line
+        // Update the scheduled date line
         if (dateType === 'scheduled' && !scheduledUpdated && newScheduledDate) {
           lines[i] = this.formatDateLine(
             line,
@@ -828,7 +824,7 @@ export class TaskUpdateCoordinator {
           scheduledUpdated = true;
           lineUpdated = true;
         }
-        // Update deadline date line
+        // Update the deadline date line
         else if (
           dateType === 'deadline' &&
           !deadlineUpdated &&
