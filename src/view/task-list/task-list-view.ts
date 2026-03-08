@@ -5,6 +5,7 @@ import {
   Platform,
   MarkdownView,
   setIcon,
+  Notice,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
 import { Task } from '../../types/task';
@@ -12,6 +13,7 @@ import { Search } from '../../search/search';
 import { SearchOptionsDropdown } from '../components/search-options-dropdown';
 import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdown';
 import { StateMenuBuilder } from '../components/state-menu-builder';
+import { TaskContextMenu } from '../components/task-context-menu';
 import TodoTracker from '../../main';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
@@ -24,6 +26,11 @@ import {
   TaskListViewMode,
   SortMethod,
 } from './task-list-filter';
+import {
+  formatTaskForDailyNote,
+  getTodayDailyNote,
+  isTaskOnTodayDailyNote,
+} from '../../utils/daily-note-utils';
 
 const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
@@ -59,6 +66,9 @@ export class TaskListView extends ItemView {
 
   // Menu builder for state management
   private menuBuilder: StateMenuBuilder;
+
+  // Task context menu (right-click on task items)
+  private taskContextMenu: TaskContextMenu;
 
   // Task item renderer for single task DOM elements
   private taskItemRenderer: TaskItemRenderer;
@@ -116,6 +126,50 @@ export class TaskListView extends ItemView {
       (plugin.settings?.stateTransitions?.defaultCompleted as 'DONE') || 'DONE';
     const defaultInactive =
       (plugin.settings?.stateTransitions?.defaultInactive as 'TODO') || 'TODO';
+    // Create context menu for task items (right-click actions)
+    this.taskContextMenu = new TaskContextMenu(
+      {
+        onGoToTask: (task) => this.openTaskLocationForRenderer(task),
+        onCopyTask: (task) => {
+          // Look up the fresh task from the current tasks array to get the latest state
+          const freshTask = this.tasks.find(
+            (t) => t.path === task.path && t.line === task.line,
+          );
+          if (freshTask) {
+            this.copyTaskToClipboard(freshTask);
+          }
+        },
+        onCopyTaskToToday: async (task) => {
+          // Look up the fresh task from the current tasks array to get the latest state
+          const freshTask = this.tasks.find(
+            (t) => t.path === task.path && t.line === task.line,
+          );
+          if (freshTask) {
+            await this.copyTaskToToday(freshTask);
+          }
+        },
+        onMoveTaskToToday: async (task) => {
+          // Look up the fresh task from the current tasks array to get the latest state
+          const freshTask = this.tasks.find(
+            (t) => t.path === task.path && t.line === task.line,
+          );
+          if (freshTask) {
+            await this.moveTaskToToday(freshTask);
+          }
+        },
+        onPriorityChange: (task, priority) =>
+          this.handleContextMenuPriorityChange(task, priority),
+        onScheduledDateChange: (task, date) =>
+          this.handleContextMenuScheduledDateChange(task, date),
+        onDeadlineClick: (_task) => {
+          // Stub: date picker not yet implemented
+          new Notice('Date picker coming soon');
+        },
+      },
+      { weekStartsOn: plugin.settings.weekStartsOn },
+      plugin.app,
+    );
+
     this.taskItemRenderer = new TaskItemRenderer(
       this.keywordManager,
       this.stateManager,
@@ -124,6 +178,7 @@ export class TaskListView extends ItemView {
       (task) => this.openTaskLocationForRenderer(task),
       defaultCompleted,
       defaultInactive,
+      (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
     );
     this.taskListFilter = new TaskListFilter(plugin);
     this.renderQueue = new ChunkedRenderQueue();
@@ -885,6 +940,70 @@ export class TaskListView extends ItemView {
     this.optionsDropdown.addToHistory(query);
   }
 
+  /**
+   * Handle priority change from context menu.
+   * Delegates to TaskWriter via the plugin's taskEditor.
+   */
+  private async handleContextMenuPriorityChange(
+    task: Task,
+    priority: 'high' | 'med' | 'low' | null,
+  ): Promise<void> {
+    const taskEditor = this.plugin.taskEditor;
+    if (!taskEditor) {
+      console.error('TODOseq: TaskEditor not available for priority change');
+      return;
+    }
+
+    try {
+      if (priority === null) {
+        await taskEditor.removeTaskPriority(task);
+      } else {
+        await taskEditor.updateTaskPriority(task, priority);
+      }
+
+      // Trigger a rescan of the file to update in-memory state
+      const file = this.app.vault.getAbstractFileByPath(task.path);
+      if (file instanceof TFile) {
+        await this.plugin.vaultScanner?.processIncrementalChange(file);
+      }
+    } catch (error) {
+      console.error('TODOseq: Failed to update task priority:', error);
+    }
+  }
+
+  /**
+   * Handle scheduled date change from context menu.
+   * Delegates to TaskWriter via the plugin's taskEditor.
+   */
+  private async handleContextMenuScheduledDateChange(
+    task: Task,
+    date: Date | null,
+  ): Promise<void> {
+    const taskEditor = this.plugin.taskEditor;
+    if (!taskEditor) {
+      console.error(
+        'TODOseq: TaskEditor not available for scheduled date change',
+      );
+      return;
+    }
+
+    try {
+      if (date === null) {
+        await taskEditor.removeTaskScheduledDate(task);
+      } else {
+        await taskEditor.updateTaskScheduledDate(task, date);
+      }
+
+      // Trigger a rescan of the file to update in-memory state
+      const file = this.app.vault.getAbstractFileByPath(task.path);
+      if (file instanceof TFile) {
+        await this.plugin.vaultScanner?.processIncrementalChange(file);
+      }
+    } catch (error) {
+      console.error('TODOseq: Failed to update scheduled date:', error);
+    }
+  }
+
   // Cycle state via NEXT_STATE using the centralized coordinator
   private async updateTaskState(task: Task, nextState: string): Promise<void> {
     // Store old state for announcement
@@ -971,6 +1090,172 @@ export class TaskListView extends ItemView {
       view: window,
     });
     this.openTaskLocation(syntheticEvent, task);
+  }
+
+  /**
+   * Copy task to clipboard in Org mode format (no indentation, bullets, or checkbox)
+   * Format: TODO [#B] task text\nSCHEDULED <2026-03-07 Sat>\nDEADLINE <2026-03-07 Sat>
+   */
+  private copyTaskToClipboard(task: Task): void {
+    const lines: string[] = [];
+
+    // Build the main task line: KEYWORD [#priority] text
+    let taskLine = task.state;
+    if (task.priority) {
+      const priorityMap: Record<string, string> = {
+        high: 'A',
+        med: 'B',
+        low: 'C',
+      };
+      taskLine += ` [#${priorityMap[task.priority]}]`;
+    }
+    taskLine += ` ${task.text}`;
+    lines.push(taskLine);
+
+    // Add scheduled date if present
+    if (task.scheduledDate) {
+      const scheduledStr = this.formatDateForClipboard(task.scheduledDate);
+      lines.push(`SCHEDULED: ${scheduledStr}`);
+    }
+
+    // Add deadline date if present
+    if (task.deadlineDate) {
+      const deadlineStr = this.formatDateForClipboard(task.deadlineDate);
+      lines.push(`DEADLINE: ${deadlineStr}`);
+    }
+
+    // Copy to clipboard
+    const textToCopy = lines.join('\n');
+    navigator.clipboard.writeText(textToCopy).then(
+      () => {
+        new Notice('Task copied to clipboard');
+      },
+      () => {
+        new Notice('Failed to copy task');
+      },
+    );
+  }
+
+  /**
+   * Format date for clipboard in Org mode format: <2026-03-07 Sat>
+   */
+  private formatDateForClipboard(date: Date): string {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const dayOfWeek = date.toLocaleDateString(undefined, { weekday: 'short' });
+    return `<${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${dayOfWeek}>`;
+  }
+
+  /**
+   * Copy task to today's daily note
+   * @param task The task to copy
+   */
+  private async copyTaskToToday(task: Task): Promise<void> {
+    // Get today's daily note
+    const todayNote = await getTodayDailyNote(this.plugin.app);
+    if (!todayNote) {
+      new Notice('Failed to get or create today daily note');
+      return;
+    }
+
+    // Check if task is already on today's daily note
+    if (isTaskOnTodayDailyNote(task, todayNote)) {
+      new Notice('Task is already on today daily note');
+      return;
+    }
+
+    // Format the task for daily note
+    const taskLines = formatTaskForDailyNote(task);
+
+    // Read the current content of today's daily note
+    const currentContent = await this.plugin.app.vault.read(todayNote);
+
+    // Append the task to the end of the file
+    // Add two newlines before the task to separate from existing content
+    const newContent =
+      currentContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+
+    // Write the updated content back to the file
+    await this.plugin.app.vault.modify(todayNote, newContent);
+
+    // Show notification
+    new Notice('Task copied to today daily note');
+  }
+
+  /**
+   * Move task to today's daily note
+   * @param task The task to move
+   */
+  private async moveTaskToToday(task: Task): Promise<void> {
+    // Get today's daily note
+    const todayNote = await getTodayDailyNote(this.plugin.app);
+    if (!todayNote) {
+      new Notice('Failed to get or create today daily note');
+      return;
+    }
+
+    // Check if task is already on today's daily note
+    if (isTaskOnTodayDailyNote(task, todayNote)) {
+      new Notice('Task is already on today daily note');
+      return;
+    }
+
+    // Format the task for daily note
+    const taskLines = formatTaskForDailyNote(task);
+
+    // Read the current content of today's daily note
+    const todayContent = await this.plugin.app.vault.read(todayNote);
+
+    // Append the task to the end of today's daily note
+    // Add two newlines before the task to separate from existing content
+    const newTodayContent =
+      todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+
+    // Write the updated content to today's daily note
+    await this.plugin.app.vault.modify(todayNote, newTodayContent);
+
+    // Remove the task from the source file
+    // Get the source file
+    const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
+    if (!(sourceFile instanceof TFile)) {
+      new Notice('Failed to find source file');
+      return;
+    }
+
+    // Read the source file content
+    const sourceContent = await this.plugin.app.vault.read(sourceFile);
+    const sourceLines = sourceContent.split('\n');
+
+    // Find the task line and any subsequent date lines
+    const startLine = task.line;
+    let endLine = startLine;
+
+    // Look for SCHEDULED and DEADLINE lines immediately after the task
+    for (let i = startLine + 1; i < sourceLines.length; i++) {
+      const nextLine = sourceLines[i].trim();
+      if (
+        nextLine.startsWith('SCHEDULED:') ||
+        nextLine.startsWith('DEADLINE:')
+      ) {
+        endLine = i;
+      } else {
+        // Stop at the first non-date line
+        break;
+      }
+    }
+
+    // Remove the task and its date lines from the source file
+    const newSourceLines = [
+      ...sourceLines.slice(0, startLine),
+      ...sourceLines.slice(endLine + 1),
+    ];
+
+    // Write the updated content back to the source file
+    await this.plugin.app.vault.modify(sourceFile, newSourceLines.join('\n'));
+
+    // Show notification
+    new Notice('Task moved to today daily note');
   }
 
   /**
@@ -1672,6 +1957,59 @@ export class TaskListView extends ItemView {
     if (targetLeaf) {
       await workspace.revealLeaf(targetLeaf);
     }
+
+    // Collapse right side panel on mobile after opening task
+    if (Platform.isMobile) {
+      workspace.rightSplit.collapse();
+    }
+  }
+
+  /**
+   * Update the context menu configuration when settings change.
+   */
+  updateContextMenuConfig(): void {
+    if (this.taskContextMenu) {
+      this.taskContextMenu.updateConfig({
+        weekStartsOn: this.plugin.settings.weekStartsOn,
+      });
+    }
+  }
+
+  /**
+   * Update settings when plugin settings change.
+   * This ensures the task list view uses the latest keyword and state transition settings.
+   */
+  updateSettings(): void {
+    // Update keyword manager with new settings
+    this.keywordManager = new KeywordManager(this.plugin.settings ?? {});
+
+    // Update state manager with new state transition settings
+    this.stateManager = new TaskStateTransitionManager(
+      this.keywordManager,
+      this.plugin.settings?.stateTransitions,
+    );
+
+    // Update task item renderer with new keyword manager and state manager
+    const defaultCompleted =
+      (this.plugin.settings?.stateTransitions?.defaultCompleted as 'DONE') ||
+      'DONE';
+    const defaultInactive =
+      (this.plugin.settings?.stateTransitions?.defaultInactive as 'TODO') ||
+      'TODO';
+
+    this.taskItemRenderer = new TaskItemRenderer(
+      this.keywordManager,
+      this.stateManager,
+      this.menuBuilder,
+      (task, newState) => this.updateTaskState(task, newState),
+      (task) => this.openTaskLocationForRenderer(task),
+      defaultCompleted,
+      defaultInactive,
+      (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
+    );
+
+    // Update context menu configuration
+    this.updateContextMenuConfig();
   }
 
   // Cleanup listeners
@@ -1710,6 +2048,11 @@ export class TaskListView extends ItemView {
     if (this.suggestionDropdown) {
       this.suggestionDropdown.cleanup();
       this.suggestionDropdown = null;
+    }
+
+    // Cleanup task context menu
+    if (this.taskContextMenu) {
+      this.taskContextMenu.cleanup();
     }
 
     // Unsubscribe from state manager

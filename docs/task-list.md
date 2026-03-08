@@ -71,6 +71,37 @@ The checkbox provides a simple toggle between completed and incomplete states:
 
 Right-click any **task keyword** to see all available state options in a popup menu. This shows all possible states for the current task type, allows direct selection of any state, and provides quick access to less commonly used states.
 
+### Task Context Menu
+
+Right-click anywhere on a task row in the Task List to open a comprehensive context menu with quick actions for task management. This menu provides fast access to common operations without needing to navigate to the source file.
+
+The context menu includes several sections:
+
+**Go to Task** - Navigate directly to the task's location in its source file. This opens the file and positions your cursor on the exact line containing the task.
+
+**Priority Selection** - Quickly set or change the task priority using flag icons. Choose from high priority `[#A]`, medium priority `[#B]`, low priority `[#C]`, or remove priority entirely. The priority is updated immediately in the source file.
+
+**Scheduled Date Shortcuts** - Set or modify the task's scheduled date with convenient options:
+
+- Today
+- Tomorrow
+- This weekend
+- Next week
+- Next month
+- Clear scheduled date
+
+These shortcuts help you quickly reschedule tasks without manually editing dates.
+
+**Deadline** - Access deadline options (date picker coming soon).
+
+**Copy Task** - Copy the task text to your clipboard. This includes the task keyword, priority, and task text, making it easy to paste the task elsewhere.
+
+**Copy to Today** - Copy the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is appended to the end of today's daily note while keeping the original task in place.
+
+**Move to Today** - Move the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is removed from its original location and appended to today's daily note. This is useful when you want to consolidate tasks for the current day.
+
+The context menu supports keyboard navigation with arrow keys and Enter to select options, and can be dismissed with Escape. On mobile devices, long-press on a task row opens the context menu.
+
 ### Opening Source Location
 
 Clicking on a task row opens the source file in a smart, intuitive way that adapts to your workflow. The behavior varies based on how you click:

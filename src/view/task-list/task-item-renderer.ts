@@ -36,6 +36,8 @@ export type TaskStateChangeCallback = (
 
 export type TaskLocationOpenCallback = (task: Task) => void;
 
+export type TaskContextMenuCallback = (task: Task, evt: MouseEvent) => void;
+
 /**
  * TaskItemRenderer - Handles rendering individual task items for the Task List View.
  * This class encapsulates all DOM building logic for tasks, including:
@@ -51,6 +53,7 @@ export class TaskItemRenderer {
   private menuBuilder: StateMenuBuilder;
   private onStateChange: TaskStateChangeCallback;
   private onLocationOpen: TaskLocationOpenCallback;
+  private onContextMenu: TaskContextMenuCallback | null;
   private defaultCompleted: string;
   private defaultInactive: string;
 
@@ -62,14 +65,23 @@ export class TaskItemRenderer {
     onLocationOpen: TaskLocationOpenCallback,
     defaultCompleted: 'DONE',
     defaultInactive: 'TODO',
+    onContextMenu: TaskContextMenuCallback | null = null,
   ) {
     this.keywordManager = keywordManager;
     this.stateManager = stateManager;
     this.menuBuilder = menuBuilder;
     this.onStateChange = onStateChange;
     this.onLocationOpen = onLocationOpen;
+    this.onContextMenu = onContextMenu;
     this.defaultCompleted = defaultCompleted;
     this.defaultInactive = defaultInactive;
+  }
+
+  /**
+   * Set the context menu callback (can be set after construction)
+   */
+  setContextMenuCallback(callback: TaskContextMenuCallback | null): void {
+    this.onContextMenu = callback;
   }
 
   /**
@@ -271,6 +283,111 @@ export class TaskItemRenderer {
   }
 
   /**
+   * Attach contextmenu and long-press handlers to a task LI element.
+   * Excludes clicks on the keyword span (which has its own state menu).
+   */
+  private attachTaskContextMenuHandlers(li: HTMLLIElement, task: Task): void {
+    // Right-click context menu
+    li.addEventListener('contextmenu', (evt: MouseEvent) => {
+      // Don't intercept right-clicks on the keyword (it has its own state menu)
+      const target = evt.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.hasClass('todo-keyword') ||
+          target.closest('.todo-keyword') !== null)
+      ) {
+        return;
+      }
+
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (this.onContextMenu) {
+        this.onContextMenu(task, evt);
+      }
+    });
+
+    // Long-press for mobile (matching keyword long-press pattern)
+    let touchTimer: number | null = null;
+    let suppressNextContextMenu = false;
+    let initialTouchX = 0;
+    let initialTouchY = 0;
+    const LONG_PRESS_MS = 450;
+    // Touch movement threshold (in pixels) - only cancel long-press if moved beyond this
+    const TOUCH_MOVE_THRESHOLD = 10;
+
+    li.addEventListener(
+      'touchstart',
+      (evt: TouchEvent) => {
+        if (evt.touches.length !== 1) return;
+
+        // Don't intercept touches on the keyword
+        const target = evt.target;
+        if (
+          target instanceof HTMLElement &&
+          (target.hasClass('todo-keyword') ||
+            target.closest('.todo-keyword') !== null)
+        ) {
+          return;
+        }
+
+        const touch = evt.touches[0];
+        initialTouchX = touch.clientX;
+        initialTouchY = touch.clientY;
+        suppressNextContextMenu = true;
+        touchTimer = window.setTimeout(() => {
+          if (this.onContextMenu) {
+            // Create a synthetic MouseEvent for positioning
+            const syntheticEvt = new MouseEvent('contextmenu', {
+              clientX: touch.clientX,
+              clientY: touch.clientY,
+              bubbles: true,
+            });
+            this.onContextMenu(task, syntheticEvt);
+          }
+        }, LONG_PRESS_MS);
+      },
+      { passive: true },
+    );
+
+    const clearTouch = () => {
+      if (touchTimer) {
+        window.clearTimeout(touchTimer);
+        touchTimer = null;
+      }
+      window.setTimeout(() => {
+        suppressNextContextMenu = false;
+      }, 250);
+    };
+    li.addEventListener('touchend', clearTouch, { passive: true });
+    li.addEventListener('touchcancel', clearTouch, { passive: true });
+    // Only clear the long-press timer if touch moves beyond threshold (important for iPad)
+    li.addEventListener(
+      'touchmove',
+      (evt: TouchEvent) => {
+        if (!touchTimer) return;
+
+        const touch = evt.touches[0];
+        const deltaX = Math.abs(touch.clientX - initialTouchX);
+        const deltaY = Math.abs(touch.clientY - initialTouchY);
+
+        // Only cancel long-press if moved beyond threshold
+        if (deltaX > TOUCH_MOVE_THRESHOLD || deltaY > TOUCH_MOVE_THRESHOLD) {
+          clearTouch();
+        }
+      },
+      { passive: true },
+    );
+
+    // Suppress contextmenu event after long-press on mobile
+    li.addEventListener('contextmenu', (evt: MouseEvent) => {
+      if (suppressNextContextMenu) {
+        evt.preventDefault();
+        evt.stopPropagation();
+      }
+    });
+  }
+
+  /**
    * Build text content (keyword + priority + task text) for a task
    */
   buildText(task: Task, container: HTMLElement): HTMLSpanElement {
@@ -349,6 +466,11 @@ export class TaskItemRenderer {
         this.onLocationOpen(task);
       }
     });
+
+    // Right-click context menu (exclude keyword which has its own state menu)
+    if (this.onContextMenu) {
+      this.attachTaskContextMenuHandlers(li, task);
+    }
 
     return li;
   }

@@ -87,6 +87,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         // Sync each view's mode from settings before render
         const mode = this.plugin.settings.taskListViewMode;
         taskListView.setViewMode(mode);
+        // Update context menu config for settings changes
+        taskListView.updateContextMenuConfig();
         // Use lighter refresh instead of full onOpen rebuild
         taskListView.refreshVisibleList();
       }
@@ -526,6 +528,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             this.transitionValidationDebounceTimer = setTimeout(() => {
               this.transitionValidationDebounceTimer = null;
               this.validateTransitionSettings();
+              // Update task list views with new state transition settings
+              this.plugin.updateTaskListViewSettings();
             }, this.TRANSITION_VALIDATION_DEBOUNCE_MS);
           });
       });
@@ -558,6 +562,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.stateTransitions.defaultInactive = value;
           await this.plugin.saveSettings();
           this.validateTransitionSettings();
+          // Update task list views with new state transition settings
+          this.plugin.updateTaskListViewSettings();
         });
       });
 
@@ -588,6 +594,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.stateTransitions.defaultActive = value;
           await this.plugin.saveSettings();
           this.validateTransitionSettings();
+          // Update task list views with new state transition settings
+          this.plugin.updateTaskListViewSettings();
         });
       });
 
@@ -619,6 +627,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.plugin.settings.stateTransitions.defaultCompleted = value;
           await this.plugin.saveSettings();
           this.validateTransitionSettings();
+          // Update task list views with new state transition settings
+          this.plugin.updateTaskListViewSettings();
         });
       });
 

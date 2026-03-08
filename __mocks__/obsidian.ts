@@ -57,6 +57,14 @@ export class Plugin {
 
 export class MarkdownView {}
 
+export class Notice {
+  constructor(_message: string, _timeout?: number) {}
+}
+
+export function setIcon(_el: HTMLElement, _iconId: string): void {
+  // no-op in tests
+}
+
 export function requireApiVersion(version: string): boolean {
   return true;
 }

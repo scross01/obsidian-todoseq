@@ -134,7 +134,6 @@
   )
   .priority-badge {
   display: inline-block;
-  margin-left: var(--size-2-2);
   padding: 0 var(--size-2-2);
   border-radius: var(--radius-s);
   background-color: var(
@@ -143,9 +142,13 @@
   );
   color: var(--text-on-accent);
   font-weight: var(--font-weight-medium, var(--font-medium));
-  font-size: 0.7em;
+  font-size: 0.7rem;
   line-height: 1.6;
   vertical-align: baseline;
+}
+
+:is(.todo-view, ) .priority-badge {
+  margin-left: var(--size-2-2);
 }
 
 /* High priority (A): stronger, urgent tint */
@@ -158,7 +161,6 @@
   .priority-badge.priority-high {
   background-color: var(--color-red);
   color: var(--text-on-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-red) 40%, transparent);
 }
 
 /* Medium priority (B): default accent */
@@ -818,11 +820,12 @@
   color: var(--text-muted);
   font-size: 0.7em;
   font-family: var(--font-monospace);
-  margin-left: 8px;
+  margin-left: auto; /* Push to right side of text row */
   opacity: 0.7;
   max-width: 32ch; /* Fallback: ensure max width of 23 monospace characters */
   overflow: hidden;
   text-overflow: ellipsis; /* Additional fallback for safety */
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 /* Urgency value */
@@ -863,7 +866,7 @@
 .embedded-task-text-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
 }
@@ -877,9 +880,13 @@
 
 /* Wrap content mode - keep all inline elements together */
 .embedded-task-text-wrap .embedded-task-state,
-.embedded-task-text-wrap .priority-badge,
 .embedded-task-text-wrap .embedded-task-text {
   display: inline;
+}
+
+/* Priority badge needs inline-block to maintain dimensions */
+.embedded-task-text-wrap .priority-badge {
+  display: inline-block;
 }
 
 /* Ensure repeat icon stays baseline aligned in inline context */
@@ -970,9 +977,13 @@
 }
 
 .embedded-task-text-wrap-dynamic .embedded-task-state,
-.embedded-task-text-wrap-dynamic .priority-badge,
 .embedded-task-text-wrap-dynamic .embedded-task-text {
   display: inline;
+}
+
+/* Priority badge needs inline-block to maintain dimensions */
+.embedded-task-text-wrap-dynamic .priority-badge {
+  display: inline-block;
 }
 
 .embedded-task-text-wrap-dynamic .embedded-task-text {
@@ -1400,4 +1411,161 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ============================================================
+   Task Context Menu
+   ============================================================ */
+
+.todoseq-task-context-menu {
+  position: fixed;
+  z-index: var(--layer-menu);
+  min-width: 200px;
+  max-width: 280px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-s);
+  padding: var(--size-4-1) 0;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  user-select: none;
+}
+
+/* Section headers (Scheduled, Priority) */
+.todoseq-context-menu-header {
+  padding: var(--size-4-1) var(--size-4-3);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.02em;
+}
+
+/* Text rows (Go to task, Deadline) */
+.todoseq-context-menu-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-4-1) var(--size-4-3);
+  cursor: pointer;
+  border-radius: 0;
+  min-height: 32px;
+}
+
+.todoseq-context-menu-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.todoseq-context-menu-row:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.todoseq-context-menu-row.is-focused {
+  background: var(--background-modifier-hover);
+}
+
+.todoseq-context-menu-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.todoseq-context-menu-row-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.todoseq-context-menu-row-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Icon rows (date shortcuts, priority flags) */
+.todoseq-context-menu-icon-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  padding: var(--size-4-1) var(--size-4-3);
+}
+
+.todoseq-context-menu-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  border-radius: var(--radius-s);
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  transition: background-color 100ms ease;
+  background-color: var(--background-primary) !important;
+  box-shadow: none !important;
+}
+
+.todoseq-context-menu-icon-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.todoseq-context-menu-icon-btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.todoseq-context-menu-icon-btn.is-focused {
+  background: var(--background-modifier-hover);
+}
+
+.todoseq-context-menu-icon-btn.is-active {
+  background: var(--background-modifier-hover);
+  border-radius: var(--radius-s);
+  box-shadow: inset 0 0 0 1.5px var(--interactive-accent);
+}
+
+.todoseq-context-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.todoseq-context-menu-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Priority flag colors */
+.todoseq-context-menu-icon-btn.todoseq-priority-high {
+  color: var(--color-red);
+}
+
+.todoseq-context-menu-icon-btn.todoseq-priority-med {
+  color: var(--interactive-accent);
+}
+
+.todoseq-context-menu-icon-btn.todoseq-priority-low {
+  color: var(--text-faint);
+}
+
+.todoseq-context-menu-icon-btn.todoseq-priority-none {
+  color: var(--text-faint);
+}
+
+/* Separator */
+.todoseq-context-menu-separator {
+  height: 1px;
+  margin: var(--size-4-1) 0;
+  background: var(--background-modifier-border);
 }

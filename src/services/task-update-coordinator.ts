@@ -319,7 +319,34 @@ export class TaskUpdateCoordinator {
       }
 
       // Get task indent level to properly identify date lines for this task
-      const taskIndent = lines[task.line].match(/^(\s*)/)?.[1] ?? '';
+      // This must include quote prefix, bullet marker, or checkbox marker for proper date line detection
+      const currentLine = lines[task.line];
+      let taskIndent = '';
+
+      if (currentLine) {
+        // Check for quote block tasks: > TODO task or > > TODO task
+        const quotePrefixMatch = currentLine.match(/^(\s*)(>\s*)+/);
+        if (quotePrefixMatch) {
+          taskIndent = quotePrefixMatch[0];
+        } else {
+          // Check for checkbox tasks: - [ ] TODO task
+          // For checkbox tasks, use 2-space indent (aligning with task text)
+          const checkboxMatch = currentLine.match(/^(\s*)- \[([ x])\] /);
+          if (checkboxMatch) {
+            // Use leading whitespace + 2 spaces (aligning with task text)
+            taskIndent = checkboxMatch[1] + '  ';
+          } else {
+            // Check for bulleted tasks: - TODO task or + TODO task or * TODO task
+            const bulletMatch = currentLine.match(/^([-*+])\s+(.*)/);
+            if (bulletMatch) {
+              const leadingWhitespace = currentLine.match(/^(\s*)/)?.[1] ?? '';
+              taskIndent = leadingWhitespace + '  ';
+            } else {
+              taskIndent = currentLine.match(/^(\s*)/)?.[1] ?? '';
+            }
+          }
+        }
+      }
 
       const now = new Date();
       let scheduledUpdated = false;

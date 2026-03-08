@@ -2,6 +2,7 @@
 
 ## 0.12.0-dev
 
+- Added task context menu with quick actions for priority, scheduled date, and copy/move tasks. #34
 - Added support for repeating tasks. When marked as done, recurring tasks advance their scheduled/deadline dates after a short delay. #38
 - Added support for subtasks. #47
 - Fixed console violation warning for non-passive touchstart event listener.

@@ -327,16 +327,44 @@ export class TaskWriter {
           newTaskLine = `${indent}${bullet} ${rest} ${priorityToken}`;
         }
       } else {
-        // For non-checkbox, non-bulleted tasks: TODO task text
-        // Insert priority after the state with proper spacing
-        const taskParts = cleanedLine.split(' ');
-        if (taskParts.length >= 2) {
-          const state = taskParts[0];
-          const rest = taskParts.slice(1).join(' ');
-          newTaskLine = `${state} ${priorityToken} ${rest}`;
+        // Check for quote block tasks: > TODO task text or > > TODO task text
+        // For nested quotes like "> >", we need to handle spaces between > characters
+        const quoteMatch = /^(\s*)(>\s*)+(.+)$/.exec(cleanedLine);
+        if (quoteMatch) {
+          // For quote block tasks: > TODO task text or > > TODO task text
+          // Insert priority after the state with proper spacing
+          const indent = quoteMatch[1];
+          // quoteMatch[2] will be the last > in the chain (e.g., ">" or "> ")
+          // We need to reconstruct the full quote prefix
+          const fullMatch = quoteMatch[0].substring(indent.length);
+          const quotePrefixMatch = /^(\s*)(>\s*)+/.exec(fullMatch);
+          const quotePrefix = quotePrefixMatch
+            ? quotePrefixMatch[0].trimEnd()
+            : '>';
+          const rest = quoteMatch[3]; // Already starts after the quote prefix
+
+          // Split the rest (after quote prefix) into state and description
+          const restParts = rest.trim().split(' ');
+          if (restParts.length >= 2) {
+            const state = restParts[0];
+            const description = restParts.slice(1).join(' ');
+            newTaskLine = `${indent}${quotePrefix} ${state} ${priorityToken} ${description}`;
+          } else {
+            // Fallback for malformed quote tasks
+            newTaskLine = `${indent}${quotePrefix} ${rest} ${priorityToken}`;
+          }
         } else {
-          // Fallback for malformed tasks
-          newTaskLine = `${cleanedLine} ${priorityToken}`;
+          // For non-checkbox, non-bulleted, non-quote tasks: TODO task text
+          // Insert priority after the state with proper spacing
+          const taskParts = cleanedLine.split(' ');
+          if (taskParts.length >= 2) {
+            const state = taskParts[0];
+            const rest = taskParts.slice(1).join(' ');
+            newTaskLine = `${state} ${priorityToken} ${rest}`;
+          } else {
+            // Fallback for malformed tasks
+            newTaskLine = `${cleanedLine} ${priorityToken}`;
+          }
         }
       }
     }
@@ -377,5 +405,280 @@ export class TaskWriter {
       rawText: newTaskLine,
       priority: newPriority,
     };
+  }
+
+  /**
+   * Removes the priority token from a task and persists the change.
+   * If the task has no priority, returns the task unchanged without writing.
+   */
+  async removeTaskPriority(task: Task): Promise<Task> {
+    if (!task.priority) {
+      // No priority to remove — return unchanged
+      return { ...task };
+    }
+
+    // Strip the priority token from the raw text
+    // Replace with a single space to preserve spacing between task keyword and text
+    const newTaskLine = task.rawText
+      .replace(PRIORITY_TOKEN_REGEX, ' ')
+      .replace(/  +/g, ' ') // collapse double spaces left by removal
+      .trim(); // trim any leading/trailing whitespace
+
+    await this.writeLineToFile(task, newTaskLine);
+
+    return {
+      ...task,
+      rawText: newTaskLine,
+      priority: null,
+    };
+  }
+
+  /**
+   * Updates or adds a SCHEDULED date line below the task.
+   * If a SCHEDULED line already exists, it is updated in place.
+   * If no SCHEDULED line exists, a new one is inserted after the task line.
+   */
+  async updateTaskScheduledDate(task: Task, newDate: Date): Promise<Task> {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const year = newDate.getFullYear();
+    const month = String(newDate.getMonth() + 1).padStart(2, '0');
+    const day = String(newDate.getDate()).toString().padStart(2, '0');
+    const dayName = days[newDate.getDay()];
+    const dateStr = `<${year}-${month}-${day} ${dayName}>`;
+
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file && file instanceof TFile) {
+      await this.app.vault.process(file, (data) => {
+        const lines = data.split('\n');
+        const currentLine = lines[task.line];
+
+        // Get the proper indent including quote prefix, bullet, or checkbox marker
+        // This ensures SCHEDULED lines are properly indented under their parent tasks
+        let taskIndent = '';
+
+        if (currentLine) {
+          // Check for quote block tasks: > TODO task or > > TODO task
+          const quotePrefixMatch = currentLine.match(/^(\s*)(>\s*)+/);
+          if (quotePrefixMatch) {
+            // Use the full quote prefix as indent (e.g., "> " or "> > ")
+            taskIndent = quotePrefixMatch[0];
+          } else {
+            // Check for checkbox tasks: - [ ] TODO task
+            // For checkbox tasks, use 2-space indent (aligning with task text)
+            const checkboxMatch = currentLine.match(/^(\s*)- \[([ x])\] /);
+            if (checkboxMatch) {
+              // Use leading whitespace + 2 spaces (aligning with task text)
+              taskIndent = checkboxMatch[1] + '  ';
+            } else {
+              // Check for bulleted tasks: - TODO task or + TODO task or * TODO task
+              // The indent should be the position where task text starts (after bullet and space)
+              const bulletMatch = currentLine.match(/^([-*+])\s+(.*)/);
+              if (bulletMatch) {
+                // Calculate indent: bullet (1 char) + space (1) = 2 chars
+                // So indent is 2 spaces for simple cases, or more if there's leading whitespace
+                const leadingWhitespace =
+                  currentLine.match(/^(\s*)/)?.[1] ?? '';
+                taskIndent = leadingWhitespace + '  '; // 2 spaces to align with task text
+              } else {
+                // Regular task: just use whitespace indent
+                taskIndent = currentLine.match(/^(\s*)/)?.[1] ?? '';
+              }
+            }
+          }
+        }
+
+        // Look for existing SCHEDULED line after the task
+        let scheduledLineIndex = -1;
+        let existingScheduledIndent = '';
+        for (
+          let i = task.line + 1;
+          i < Math.min(task.line + 9, lines.length);
+          i++
+        ) {
+          const line = lines[i];
+          const trimmedLine = line.trimStart();
+          // Check if this is a SCHEDULED line (with any indent or quote prefix)
+          // Handle both regular SCHEDULED:, > SCHEDULED:, and > > SCHEDULED: (nested quotes)
+          const isScheduledLine =
+            trimmedLine.startsWith('SCHEDULED:') ||
+            /^(>\s*)+SCHEDULED:/.test(trimmedLine);
+          if (isScheduledLine) {
+            scheduledLineIndex = i;
+            // Preserve the existing indentation of the SCHEDULED line
+            // Include quote prefix if present (including nested quotes)
+            const lineIndent = line.match(/^(\s*)/)?.[1] ?? '';
+            const lineQuotePrefix = line.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
+            existingScheduledIndent = lineQuotePrefix || lineIndent;
+            break;
+          }
+          // Stop if we hit a non-date, non-empty line that isn't indented under the task
+          // Calculate the effective indent including quote prefix (including nested quotes)
+          const lineIndent = line.match(/^(\s*)/)?.[1] ?? '';
+          const lineQuotePrefix = line.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
+          const effectiveLineIndent = lineQuotePrefix || lineIndent;
+          const taskQuotePrefix = taskIndent.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
+          const effectiveTaskIndent = taskQuotePrefix || taskIndent;
+          // Also check for DEADLINE with quote prefix (including nested quotes)
+          const isDeadlineLine =
+            trimmedLine.startsWith('DEADLINE:') ||
+            /^(>\s*)+DEADLINE:/.test(trimmedLine);
+          if (
+            line.trim() !== '' &&
+            !isDeadlineLine &&
+            !isScheduledLine &&
+            effectiveLineIndent.length <= effectiveTaskIndent.length
+          ) {
+            break;
+          }
+        }
+
+        // Use existing indent if updating, otherwise use task indent (aligned to keyword start)
+        const scheduledIndent = existingScheduledIndent || taskIndent;
+
+        if (scheduledLineIndex >= 0) {
+          // Update existing SCHEDULED line, preserving its indentation
+          lines[scheduledLineIndex] = `${scheduledIndent}SCHEDULED: ${dateStr}`;
+        } else {
+          // Insert new SCHEDULED line after the task line
+          lines.splice(
+            task.line + 1,
+            0,
+            `${scheduledIndent}SCHEDULED: ${dateStr}`,
+          );
+        }
+
+        return lines.join('\n');
+      });
+    }
+
+    return {
+      ...task,
+      scheduledDate: newDate,
+    };
+  }
+
+  /**
+   * Removes the SCHEDULED date line below the task.
+   * If no SCHEDULED line exists in the file, returns the task unchanged.
+   * Note: This method attempts to remove the SCHEDULED line regardless of whether
+   * the task.scheduledDate property is set, as there may be a discrepancy between
+   * the parsed property and what exists in the file.
+   */
+  async removeTaskScheduledDate(task: Task): Promise<Task> {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file && file instanceof TFile) {
+      await this.app.vault.process(file, (data) => {
+        const lines = data.split('\n');
+        const currentLine = lines[task.line];
+
+        // Get the proper indent including quote prefix, bullet, or checkbox marker
+        // This ensures we correctly identify date lines under their parent tasks
+        let taskIndent = '';
+
+        if (currentLine) {
+          // Check for quote block tasks: > TODO task or > > TODO task
+          const quotePrefixMatch = currentLine.match(/^(\s*)(>\s*)+/);
+          if (quotePrefixMatch) {
+            taskIndent = quotePrefixMatch[0];
+          } else {
+            // Check for checkbox tasks: - [ ] TODO task
+            // For checkbox tasks, use 2-space indent (aligning with task text)
+            const checkboxMatch = currentLine.match(/^(\s*)- \[([ x])\] /);
+            if (checkboxMatch) {
+              // Use leading whitespace + 2 spaces (aligning with task text)
+              taskIndent = checkboxMatch[1] + '  ';
+            } else {
+              // Check for bulleted tasks: - TODO task or + TODO task or * TODO task
+              const bulletMatch = currentLine.match(/^([-*+])\s+(.*)/);
+              if (bulletMatch) {
+                const leadingWhitespace =
+                  currentLine.match(/^(\s*)/)?.[1] ?? '';
+                taskIndent = leadingWhitespace + '  ';
+              } else {
+                taskIndent = currentLine.match(/^(\s*)/)?.[1] ?? '';
+              }
+            }
+          }
+        }
+
+        // Look for existing SCHEDULED line after the task
+        for (
+          let i = task.line + 1;
+          i < Math.min(task.line + 9, lines.length);
+          i++
+        ) {
+          const line = lines[i];
+          const trimmedLine = line.trimStart();
+          // Check if this is a SCHEDULED line (with any indent or quote prefix)
+          // Handle both regular SCHEDULED:, > SCHEDULED:, and > > SCHEDULED: (nested quotes)
+          const isScheduledLine =
+            trimmedLine.startsWith('SCHEDULED:') ||
+            /^(>\s*)+SCHEDULED:/.test(trimmedLine);
+          if (isScheduledLine) {
+            lines.splice(i, 1); // Remove the SCHEDULED line
+            break;
+          }
+          // Stop if we hit a non-date line that isn't indented under the task
+          // Calculate the effective indent including quote prefix (including nested quotes)
+          const lineIndent = line.match(/^(\s*)/)?.[1] ?? '';
+          const lineQuotePrefix = line.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
+          const effectiveLineIndent = lineQuotePrefix || lineIndent;
+          const taskQuotePrefix = taskIndent.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
+          const effectiveTaskIndent = taskQuotePrefix || taskIndent;
+          // Also check for DEADLINE with quote prefix (including nested quotes)
+          const isDeadlineLine =
+            trimmedLine.startsWith('DEADLINE:') ||
+            /^(>\s*)+DEADLINE:/.test(trimmedLine);
+          if (
+            line.trim() !== '' &&
+            !isDeadlineLine &&
+            !isScheduledLine &&
+            effectiveLineIndent.length <= effectiveTaskIndent.length
+          ) {
+            break;
+          }
+        }
+
+        return lines.join('\n');
+      });
+    }
+
+    return {
+      ...task,
+      scheduledDate: null,
+    };
+  }
+
+  /**
+   * Helper: write a single line replacement to the file, using Editor API
+   * for active files or Vault.process for background files.
+   */
+  private async writeLineToFile(task: Task, newLine: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file && file instanceof TFile) {
+      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const isActive = md?.file?.path === task.path;
+      const editor = md?.editor;
+
+      if (isActive && editor) {
+        const currentLine = editor.getLine(task.line);
+        if (typeof currentLine === 'string') {
+          const from: EditorPosition = { line: task.line, ch: 0 };
+          const to: EditorPosition = {
+            line: task.line,
+            ch: currentLine.length,
+          };
+          editor.replaceRange(newLine, from, to);
+        }
+      } else {
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          if (task.line < lines.length) {
+            lines[task.line] = newLine;
+          }
+          return lines.join('\n');
+        });
+      }
+    }
   }
 }

@@ -287,6 +287,42 @@ export class PluginLifecycleManager {
       },
     });
 
+    // Add editor command to copy task to today's daily note
+    this.plugin.addCommand({
+      id: 'copy-task-to-today',
+      name: 'Copy task to today',
+      icon: 'copy',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.editorController.handleCopyTaskToTodayAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
+    // Add editor command to move task to today's daily note
+    this.plugin.addCommand({
+      id: 'move-task-to-today',
+      name: 'Move task to today',
+      icon: 'arrow-right',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.editorController.handleMoveTaskToTodayAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
     // Listen to VaultScanner events for task updates
     // Note: TaskListView now subscribes directly to TaskStateManager,
     // but we still refresh UI components that need updates

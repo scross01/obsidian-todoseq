@@ -1,9 +1,15 @@
-import { Editor, MarkdownView } from 'obsidian';
+import { Editor, MarkdownView, Notice } from 'obsidian';
 import { Task } from '../types/task';
 import TodoTracker from '../main';
 import { detectListMarker } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
+import {
+  formatTaskForDailyNote,
+  getTodayDailyNote,
+  isDailyNotesPluginEnabledSync,
+  isTaskOnTodayDailyNote,
+} from '../utils/daily-note-utils';
 
 /**
  * EditorController handles operations related to modifying tasks in the editor
@@ -65,6 +71,52 @@ export class EditorController {
     }
 
     return parser.parseLineAsTask(line, lineNumber, filePath);
+  }
+
+  /**
+   * Clean the task text to remove any slash command before the cursor position
+   * This handles the case where user types a slash command like /copy, /move, /high, /med, /low
+   * @param taskText - The task text to clean
+   * @param editor - The editor instance to get cursor position
+   * @param lineNumber - The line number of the task
+   * @returns The cleaned task text
+   */
+  private cleanTaskTextFromSlashCommand(
+    taskText: string,
+    editor: Editor,
+    lineNumber: number,
+  ): string {
+    const cursor = editor.getCursor();
+    const currentLine = editor.getLine(lineNumber);
+
+    // Find the slash command before the cursor position
+    // Look for / followed by letters before the cursor
+    const textBeforeCursor = currentLine.substring(0, cursor.ch);
+
+    // Find the last slash command before the cursor position
+    // This handles cases where user types /copy, /move, /high, /med, /low, etc.
+    // The slash command can be at the end or anywhere in the text before the cursor
+    const slashCommandMatch = textBeforeCursor.match(/\s+\/([a-zA-Z]+)\s*$/);
+
+    if (slashCommandMatch) {
+      // Remove the slash command from the task text
+      // The slash command is in the middle of the text, so we need to remove it
+      const cleanedText = taskText
+        .replace(new RegExp(`\\s+/${slashCommandMatch[1]}\\s*$`), '')
+        .trim();
+      return cleanedText;
+    }
+
+    // Fallback: remove any slash command followed by letters anywhere in the text
+    // This handles cases where the slash command is not at the end of the text before cursor
+    const anySlashCommandMatch = taskText.match(/\s+\/([a-zA-Z]+)/);
+    if (anySlashCommandMatch) {
+      return taskText
+        .replace(new RegExp(`\\s+/${anySlashCommandMatch[1]}\\s*`), ' ')
+        .trim();
+    }
+
+    return taskText;
   }
 
   /**
@@ -763,5 +815,234 @@ export class EditorController {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Handle copying task at cursor to today's daily note
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  handleCopyTaskToTodayAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    // Check if daily notes plugin is enabled
+    if (!isDailyNotesPluginEnabledSync(this.plugin.app)) {
+      return false;
+    }
+
+    const vaultScanner = this.plugin.getVaultScanner();
+    if (!vaultScanner) {
+      return false;
+    }
+
+    // Get the cursor position
+    const cursor = editor.getCursor();
+    const lineNumber = cursor.line;
+
+    // Get the line from the editor
+    const line = editor.getLine(lineNumber);
+
+    // Check if this line contains a valid task using VaultScanner's parser
+    const parser = vaultScanner.getParser();
+    if (!parser?.testRegex.test(line)) {
+      return false;
+    }
+
+    if (checking) {
+      return true;
+    }
+
+    // Parse the task from the line
+    const task = this.parseTaskFromLine(
+      line,
+      lineNumber,
+      view.file?.path || '',
+    );
+
+    if (!task) {
+      return false;
+    }
+
+    // Perform the async operation without waiting
+    void (async () => {
+      try {
+        // Get today's daily note
+        const todayNote = await getTodayDailyNote(this.plugin.app);
+        if (!todayNote) {
+          new Notice('Failed to get or create today daily note');
+          return;
+        }
+
+        // Check if task is already on today's daily note
+        if (isTaskOnTodayDailyNote(task, todayNote)) {
+          new Notice('Task is already on today daily note');
+          return;
+        }
+
+        // Clean the task text to remove any slash command
+        // This handles the case where user types a slash command like /copy, /move, /high, /med, /low
+        const cleanedTask = { ...task };
+        cleanedTask.text = this.cleanTaskTextFromSlashCommand(
+          task.text,
+          editor,
+          lineNumber,
+        );
+
+        // Format the task for daily note
+        const taskLines = formatTaskForDailyNote(cleanedTask);
+
+        // Read the current content of today's daily note
+        const currentContent = await this.plugin.app.vault.read(todayNote);
+
+        // Append the task to the end of the file
+        // Add two newlines before the task to separate from existing content
+        const newContent =
+          currentContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+
+        // Write the updated content back to the file
+        await this.plugin.app.vault.modify(todayNote, newContent);
+
+        // Show notification
+        new Notice('Task copied to today daily note');
+      } catch (error) {
+        console.error('[TODOseq] Failed to copy task to today:', error);
+        new Notice('Failed to copy task to today');
+      }
+    })();
+
+    return true;
+  }
+
+  /**
+   * Handle moving task at cursor to today's daily note
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  handleMoveTaskToTodayAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    // Check if daily notes plugin is enabled
+    if (!isDailyNotesPluginEnabledSync(this.plugin.app)) {
+      return false;
+    }
+
+    const vaultScanner = this.plugin.getVaultScanner();
+    if (!vaultScanner) {
+      return false;
+    }
+
+    // Get the cursor position
+    const cursor = editor.getCursor();
+    const lineNumber = cursor.line;
+
+    // Get the line from the editor
+    const line = editor.getLine(lineNumber);
+
+    // Check if this line contains a valid task using VaultScanner's parser
+    const parser = vaultScanner.getParser();
+    if (!parser?.testRegex.test(line)) {
+      return false;
+    }
+
+    if (checking) {
+      return true;
+    }
+
+    // Parse the task from the line
+    const task = this.parseTaskFromLine(
+      line,
+      lineNumber,
+      view.file?.path || '',
+    );
+
+    if (!task) {
+      return false;
+    }
+
+    // Perform the async operation without waiting
+    void (async () => {
+      try {
+        // Get today's daily note
+        const todayNote = await getTodayDailyNote(this.plugin.app);
+        if (!todayNote) {
+          new Notice('Failed to get or create today daily note');
+          return;
+        }
+
+        // Check if task is already on today's daily note
+        if (isTaskOnTodayDailyNote(task, todayNote)) {
+          new Notice('Task is already on today daily note');
+          return;
+        }
+
+        // Clean the task text to remove any slash command
+        // This handles the case where user types a slash command like /copy, /move, /high, /med, /low
+        const cleanedTask = { ...task };
+        cleanedTask.text = this.cleanTaskTextFromSlashCommand(
+          task.text,
+          editor,
+          lineNumber,
+        );
+
+        // Format the task for daily note
+        const taskLines = formatTaskForDailyNote(cleanedTask);
+
+        // Read the current content of today's daily note
+        const todayContent = await this.plugin.app.vault.read(todayNote);
+
+        // Append the task to the end of today's daily note
+        // Add two newlines before the task to separate from existing content
+        const newTodayContent =
+          todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+
+        // Write the updated content to today's daily note
+        await this.plugin.app.vault.modify(todayNote, newTodayContent);
+
+        // Remove the task from the source file using the editor API
+        // Get the full line range of the task (including any date lines)
+        const startLine = lineNumber;
+        let endLine = lineNumber;
+
+        // Check if there are scheduled/deadline dates on the following lines
+        const fileContent = editor.getValue();
+        const lines = fileContent.split('\n');
+
+        // Look for SCHEDULED and DEADLINE lines immediately after the task
+        for (let i = lineNumber + 1; i < lines.length; i++) {
+          const nextLine = lines[i].trim();
+          if (
+            nextLine.startsWith('SCHEDULED:') ||
+            nextLine.startsWith('DEADLINE:')
+          ) {
+            endLine = i;
+          } else {
+            // Stop at the first non-date line
+            break;
+          }
+        }
+
+        // Remove the task and its date lines
+        // We need to delete from endLine to startLine (reverse order to maintain line numbers)
+        for (let i = endLine; i >= startLine; i--) {
+          editor.replaceRange('', { line: i, ch: 0 }, { line: i + 1, ch: 0 });
+        }
+
+        // Show notification
+        new Notice('Task moved to today daily note');
+      } catch (error) {
+        console.error('[TODOseq] Failed to move task to today:', error);
+        new Notice('Failed to move task to today');
+      }
+    })();
+
+    return true;
   }
 }

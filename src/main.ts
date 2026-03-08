@@ -210,6 +210,14 @@ export default class TodoTracker extends Plugin {
       this.embeddedTaskListProcessor.updateSettings();
     }
 
+    // Update task list views with new settings
+    const leaves = this.app.workspace.getLeavesOfType(TaskListView.viewType);
+    for (const leaf of leaves) {
+      if (leaf.view instanceof TaskListView) {
+        leaf.view.updateSettings();
+      }
+    }
+
     // Rebuild property search engine when settings change
     if (this.propertySearchEngine) {
       await this.propertySearchEngine.rebuildAll();
@@ -274,6 +282,19 @@ export default class TodoTracker extends Plugin {
     // Refresh embedded task lists
     if (this.embeddedTaskListProcessor) {
       this.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
+    }
+  }
+
+  /**
+   * Update task list views with new settings without triggering a vault scan.
+   * Called when state transition settings change.
+   */
+  public updateTaskListViewSettings(): void {
+    const leaves = this.app.workspace.getLeavesOfType(TaskListView.viewType);
+    for (const leaf of leaves) {
+      if (leaf.view instanceof TaskListView) {
+        leaf.view.updateSettings();
+      }
     }
   }
 
