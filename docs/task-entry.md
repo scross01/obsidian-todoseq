@@ -309,9 +309,9 @@ DEADLINE: <2026-03-01 Sun ++1w>
 
 | Type | Symbol | Behavior |
 |------|--------|----------|
-| Plain repeat | `+` | Adds interval to original date |
-| Shift from now | `.+` | Adds interval from current date/time |
-| Catch-up | `++` | Adds intervals until date is in the future |
+| Strict repeat | `+` | If you finish a task late, it still schedules the next one based on the original date |
+| From done | `.+` | Schedules the next instance exactly one interval from the moment you hit "DONE" |
+| Catch up | `++` | If you missed several intervals, it will jump to the next future date from today so you don't have a massive backlog |
 
 #### Time Units
 
@@ -323,45 +323,33 @@ DEADLINE: <2026-03-01 Sun ++1w>
 | `d` | Day |
 | `h` | Hour |
 
-#### Examples
+#### Practical Examples
 
-**Daily exercise (.+1d):**
-```markdown
-TODO Daily exercise routine
-SCHEDULED: <2026-03-05 Wed 07:00 .+1d>
-```
-- Marks as DONE → Scheduled advances to next day
+The type of repeater you use affects how the next date is calculated after you "close" the current one:
 
-**Weekly meeting (++1w):**
+**Strict repeat (+1w):**
 ```markdown
-TODO Team standup
-DEADLINE: <2026-03-01 Sun ++1w>
+TODO Weekly team meeting
+SCHEDULED: <2026-03-05 Wed 10:00 +1w>
 ```
-- Preserves day of week (Sunday)
-- Advances to next Sunday in the future
+- If you finish a task late, it still schedules the next one based on the original date
+- Example: If you complete the task on March 8 (3 days late), the next occurrence will be March 12 (original date + 1 week)
 
-**Monthly rent (+1m):**
+**Catch up (++1w):**
 ```markdown
-TODO Pay the rent
-DEADLINE: <2005-10-01 Sat +1m>
+TODO Weekly team meeting
+SCHEDULED: <2026-03-05 Wed 10:00 ++1w>
 ```
-- Adds one month to original date
-- Keeps same day of month
+- If you missed several weeks, it will jump to the next future date from today so you don't have a massive backlog
+- Example: If you complete the task on March 20 (2 weeks late), the next occurrence will be March 22 (next Wednesday from today)
 
-**Hourly check (.+1h):**
+**From done (.+1w):**
 ```markdown
-TODO Check smoke detector batteries
-SCHEDULED: <2019-04-05 08:00 Fri .+1h>
+TODO Weekly team meeting
+SCHEDULED: <2026-03-05 Wed 10:00 .+1w>
 ```
-- Adds one hour from current time
-
-**Daily catch-up (++1d):**
-```markdown
-TODO Empty kitchen trash
-DEADLINE: <2008-02-08 Fri 20:00 ++1d>
-```
-- If completed before 20:00, stays on today's date
-- If completed after 20:00, advances to tomorrow
+- It schedules the next instance exactly one week from the moment you hit "DONE"
+- Example: If you complete the task on March 8 (3 days late), the next occurrence will be March 15 (completion date + 1 week)
 
 #### Auto-Advance Behavior
 
