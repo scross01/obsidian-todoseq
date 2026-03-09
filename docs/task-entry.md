@@ -233,12 +233,34 @@ SCHEDULED: <2025-01-15 Wed 14:30>
 DEADLINE: <2025-01-20 Mon 17:00>
 ```
 
-### Date Usage Rules
+### CLOSED Date
+
+TODOseq supports a CLOSED date that records when a task was marked as completed, following Org-mode syntax.
+
+#### CLOSED Date Format
+
+```markdown
+TODO Write documentation
+SCHEDULED: <2025-01-15>
+DEADLINE: <2025-01-20>
+CLOSED: [2025-01-18 Fri 14:30]
+```
+
+The CLOSED date uses square brackets `[]` instead of angle brackets `<>` to distinguish it from scheduled and deadline dates. It includes the date, day of week, and time when the task was completed.
+
+#### CLOSED Date Behavior
+
+- **Automatic Addition**: When you mark a task as completed (e.g., transition from TODO to DONE), a CLOSED date is automatically added if the "Track closed date" setting is enabled.
+- **Automatic Removal**: When you reactivate a completed task (e.g., transition from DONE to TODO), the CLOSED date is automatically removed.
+- **Recurring Tasks**: CLOSED dates are not removed from recurring tasks when they are reactivated, as they preserve a record of when the task was last completed.
+- **Manual Editing**: You can manually add or remove CLOSED dates directly in your notes.
+
+#### Date Usage Rules
 
 1. **Placement**: Date lines must be immediately after the task line
 2. **Indentation**: Must match or be more indented than the task
-3. **Format**: Must use angle brackets `<>` with valid date format
-4. **Limit**: Only first occurrence of each type (SCHEDULED/DEADLINE) is recognized
+3. **Format**: Must use angle brackets `<>` for SCHEDULED/DEADLINE or square brackets `[]` for CLOSED
+4. **Limit**: Only first occurrence of each type (SCHEDULED/DEADLINE/CLOSED) is recognized
 
 **Correct Date Usage:**
 

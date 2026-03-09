@@ -622,6 +622,23 @@ export class VaultScanner {
     const defaultInactive =
       settings?.stateTransitions?.defaultInactive || 'TODO';
 
+    // Skip processing if this was triggered by a user-initiated update
+    // The TaskUpdateCoordinator handles recurrence for user-initiated updates
+    const obsidianApp = this.app as unknown as {
+      plugins: {
+        getPlugin: (id: string) => { isUserInitiatedUpdate?: boolean } | null;
+      };
+    };
+    const recurrencePlugin = obsidianApp.plugins.getPlugin('todoseq');
+    const isUserInitiatedUpdate =
+      recurrencePlugin?.isUserInitiatedUpdate ?? false;
+    if (isUserInitiatedUpdate) {
+      console.debug(
+        '[TODOseq] Skipping recurrence recovery - was triggered by user-initiated update',
+      );
+      return;
+    }
+
     // Find completed tasks with recurrence dates
     const completedRecurringTasks = tasks.filter(
       (task) =>

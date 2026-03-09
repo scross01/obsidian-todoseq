@@ -544,19 +544,22 @@
 
 /* Source mode - simpler styling without size for date lines */
 .markdown-source-view:not(.is-live-preview) .todoseq-scheduled-line,
-.markdown-source-view:not(.is-live-preview) .todoseq-deadline-line {
+.markdown-source-view:not(.is-live-preview) .todoseq-deadline-line,
+.markdown-source-view:not(.is-live-preview) .todoseq-closed-line {
   font-size: inherit;
 }
 
-/* Scheduled and Deadline line styling - editor only */
+/* Scheduled, Deadline, and Closed line styling - editor only */
 .cm-editor .todoseq-scheduled-line,
-.cm-editor .todoseq-deadline-line {
+.cm-editor .todoseq-deadline-line,
+.cm-editor .todoseq-closed-line {
   font-size: 0.9em; /* reduce font size of entire line */
   color: var(--text-muted);
 }
 
 .cm-editor .todoseq-scheduled-keyword,
-.cm-editor .todoseq-deadline-keyword {
+.cm-editor .todoseq-deadline-keyword,
+.cm-editor .todoseq-closed-keyword {
   font-weight: var(--font-weight-normal, var(--font-normal, 400));
 }
 
@@ -576,22 +579,26 @@
     color-mix(in srgb, var(--interactive-accent) 50%, transparent);
 }
 
-/* Reader view specific styling for scheduled and deadline lines */
+/* Reader view specific styling for scheduled, deadline, and closed lines */
 .markdown-preview-view .todoseq-scheduled-line,
-.markdown-preview-view .todoseq-deadline-line {
+.markdown-preview-view .todoseq-deadline-line,
+.markdown-preview-view .todoseq-closed-line {
   font-size: 0.9em;
   color: var(--text-muted);
   display: inline-block; /* Ensure it doesn't affect the entire paragraph */
 }
 
 .markdown-preview-view .todoseq-scheduled-keyword,
-.markdown-preview-view .todoseq-deadline-keyword {
+.markdown-preview-view .todoseq-deadline-keyword,
+.markdown-preview-view .todoseq-closed-keyword {
   font-weight: var(--font-weight-normal, var(--font-normal, 400));
 }
 
 /* Ensure paragraphs containing date lines don't inherit date styling */
 .markdown-preview-view
-  p:not(.todoseq-scheduled-line):not(.todoseq-deadline-line) {
+  p:not(.todoseq-scheduled-line):not(.todoseq-deadline-line):not(
+    .todoseq-closed-line
+  ) {
   font-size: var(--font-text-size);
   color: var(--text-normal);
 }

@@ -73,7 +73,7 @@ export class TaskUpdateCoordinator {
         throw error;
       }
 
-      // 3. Perform direct DOM manipulation for embeds immediately
+      // 3.2. Perform direct DOM manipulation for embeds immediately
       // This updates the embed display without triggering a full re-render
       // which would cause flicker. The DOM update is synchronous and only
       // touches specific elements that need to change.
@@ -91,6 +91,7 @@ export class TaskUpdateCoordinator {
         deadlineDate: updatedTask.deadlineDate,
         scheduledDateRepeat: updatedTask.scheduledDateRepeat,
         deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+        closedDate: updatedTask.closedDate,
       });
 
       // 5. Refresh all embedded task lists (code blocks) to reflect the task change
@@ -125,6 +126,53 @@ export class TaskUpdateCoordinator {
       // Schedule new recurrence if the task is now completed and has repeating dates
       if (isNowCompleted && hasRepeatingDates) {
         this.scheduleRecurrenceUpdate(updatedTask);
+      }
+
+      // 7. Handle CLOSED date tracking
+      if (settings && settings.trackClosedDate) {
+        const oldIsCompleted = keywordManager.isCompleted(task.state);
+        const newIsCompleted = keywordManager.isCompleted(updatedTask.state);
+        const newIsArchived = keywordManager.isArchived(updatedTask.state);
+
+        // Only manage CLOSED date if not transitioning to archived state
+        if (!newIsArchived) {
+          // Not-done → Done: add/update CLOSED date
+          if (!oldIsCompleted && newIsCompleted) {
+            const closedDate = new Date();
+            try {
+              updatedTask = await taskEditor.updateTaskClosedDate(
+                updatedTask,
+                closedDate,
+              );
+            } catch (error) {
+              console.error(
+                `[TODOseq] Failed to add CLOSED date for task at line ${task.line}:`,
+                error,
+              );
+            }
+          }
+          // Done → Not-done: remove CLOSED date
+          else if (oldIsCompleted && !newIsCompleted) {
+            // Special case: recurring task reset (DONE → TODO via recurrence)
+            // Don't remove CLOSED date for recurring tasks
+            const isRecurringReset =
+              (updatedTask.scheduledDateRepeat != null &&
+                updatedTask.scheduledDate != null) ||
+              (updatedTask.deadlineDateRepeat != null &&
+                updatedTask.deadlineDate != null);
+            if (!isRecurringReset) {
+              try {
+                updatedTask =
+                  await taskEditor.removeTaskClosedDate(updatedTask);
+              } catch (error) {
+                console.error(
+                  `[TODOseq] Failed to remove CLOSED date for task at line ${task.line}:`,
+                  error,
+                );
+              }
+            }
+          }
+        }
       }
 
       return updatedTask;

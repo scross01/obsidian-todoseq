@@ -372,6 +372,26 @@ FIXME Handle edge cases
 - Track action items in callout blocks
 - Manage tasks in collapsible sections
 
+### Track Closed Date
+
+**Setting**: "Track closed date" (toggle)
+
+**Description**: Enable or disable automatic CLOSED date tracking for completed tasks.
+
+**Default**: Disabled
+
+**When Enabled:**
+
+- Adds a CLOSED date when tasks are marked as completed
+- CLOSED date uses Org-mode syntax with square brackets: `CLOSED: [2025-01-18 Fri 14:30]`
+- Records the date and time when the task was completed
+- Removes CLOSED date when completed tasks are reactivated
+
+**When Disabled:**
+
+- No CLOSED date is added or removed automatically
+- Manual CLOSED dates in notes are still recognized and parsed
+
 ### Include Tasks Inside Comment Blocks
 
 **Setting**: "Include tasks inside comments" (toggle)

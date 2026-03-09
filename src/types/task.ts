@@ -16,6 +16,7 @@ export interface Task {
   scheduledDateRepeat?: DateRepeatInfo | null; // repeater info for scheduled date (optional for backward compat)
   deadlineDate: Date | null; // deadline date from DEADLINE: line
   deadlineDateRepeat?: DateRepeatInfo | null; // repeater info for deadline date (optional for backward compat)
+  closedDate: Date | null; // closed date from CLOSED: line (when task was marked as completed)
   tail?: string; // trailing end characters after the task text (e.g., " */")
   urgency: number | null; // calculated urgency score
   file?: TFile; // reference to the file for daily notes detection

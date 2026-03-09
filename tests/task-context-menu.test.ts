@@ -536,6 +536,90 @@ describe('TaskContextMenu', () => {
       expect(newDate.getHours()).toBe(0);
       expect(newDate.getMinutes()).toBe(0);
     });
+
+    it('should preserve existing repeat when choosing Today', async () => {
+      // Create a task with a scheduled date that has a repeat component
+      const taskWithRepeat = createBaseTask({
+        rawText: 'TODO Task text',
+        priority: null,
+        scheduledDate: new Date(2026, 2, 8, 10, 30, 0, 0), // March 8, 2026 at 10:30
+        scheduledDateRepeat: {
+          type: '.+',
+          unit: 'd',
+          value: 1,
+          raw: '.+1d',
+        },
+      });
+
+      await menu.show(taskWithRepeat, { x: 100, y: 100 });
+      const iconRows = document.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const scheduledRow = iconRows[1];
+      const buttons = scheduledRow.querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[0] as HTMLElement).click(); // Today
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const callArgs = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0];
+      expect(callArgs[0]).toBe(taskWithRepeat);
+      expect(callArgs[1]).toBeInstanceOf(Date);
+      expect(callArgs[2]).toEqual({
+        type: '.+',
+        unit: 'd',
+        value: 1,
+        raw: '.+1d',
+      });
+
+      const newDate = callArgs[1] as Date;
+      expect(newDate.getHours()).toBe(10);
+      expect(newDate.getMinutes()).toBe(30);
+    });
+
+    it('should preserve existing repeat when choosing Tomorrow', async () => {
+      // Create a task with a scheduled date that has a repeat component
+      const taskWithRepeat = createBaseTask({
+        rawText: 'TODO Task text',
+        priority: null,
+        scheduledDate: new Date(2026, 2, 8, 14, 0, 0, 0), // March 8, 2026 at 14:00
+        scheduledDateRepeat: {
+          type: '.+',
+          unit: 'w',
+          value: 1,
+          raw: '.+1w',
+        },
+      });
+
+      await menu.show(taskWithRepeat, { x: 100, y: 100 });
+      const iconRows = document.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const scheduledRow = iconRows[1];
+      const buttons = scheduledRow.querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[1] as HTMLElement).click(); // Tomorrow
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const callArgs = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0];
+      expect(callArgs[0]).toBe(taskWithRepeat);
+      expect(callArgs[1]).toBeInstanceOf(Date);
+      expect(callArgs[2]).toEqual({
+        type: '.+',
+        unit: 'w',
+        value: 1,
+        raw: '.+1w',
+      });
+
+      const newDate = callArgs[1] as Date;
+      expect(newDate.getHours()).toBe(14);
+      expect(newDate.getMinutes()).toBe(0);
+      // Date should be March 9 (tomorrow relative to March 8)
+      expect(newDate.getDate()).toBe(9);
+    });
   });
 
   describe('Deadline action', () => {

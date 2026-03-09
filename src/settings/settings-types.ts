@@ -36,6 +36,8 @@ export interface TodoTrackerSettings {
   _hasShownFirstInstallView?: boolean; // true after first install view has been shown
   // State transition settings
   stateTransitions: StateTransitionSettings;
+  // Task completion settings
+  trackClosedDate: boolean; // when true, adds CLOSED: timestamp when tasks are marked as completed
 }
 
 export const DefaultStateTransitionSettings: StateTransitionSettings = {
@@ -63,4 +65,5 @@ export const DefaultSettings: TodoTrackerSettings = {
   additionalFileExtensions: [], // No additional extensions by default - managed by detectOrgModeFiles
   detectOrgModeFiles: false, // Experimental feature - disabled by default
   stateTransitions: DefaultStateTransitionSettings,
+  trackClosedDate: false, // Disabled by default
 };

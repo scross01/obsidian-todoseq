@@ -2,6 +2,7 @@
 
 ## 0.12.0-dev
 
+- Added optional CLOSED: date on completed tasks, matching org mode syntax.
 - Added task context menu with quick actions for priority, scheduled date, and copy/move tasks. #34
 - Added support for repeating tasks. When marked as done, recurring tasks advance their scheduled/deadline dates after a short delay. #38
 - Added support for subtasks. #47

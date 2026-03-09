@@ -1141,6 +1141,25 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
+    // Task completion Group
+    new Setting(containerEl)
+      .setName('Task completion')
+      .setHeading()
+      .setDesc('Settings for task completion behavior.');
+
+    // Track closed date toggle
+    new Setting(containerEl)
+      .setName('Track closed date')
+      .setDesc('Add CLOSED: timestamp when tasks are marked as completed.')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.trackClosedDate)
+          .onChange(async (value) => {
+            this.plugin.settings.trackClosedDate = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
     // Task detection Group
     this.createTaskDetectionSettings(containerEl);
 

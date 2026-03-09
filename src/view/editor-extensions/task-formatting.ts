@@ -535,7 +535,7 @@ export class TaskKeywordDecorator {
   }
 
   /**
-   * Check if a line contains SCHEDULED: or DEADLINE: and apply appropriate decorations
+   * Check if a line contains SCHEDULED:, DEADLINE:, or CLOSED: and apply appropriate decorations
    * if it follows a task line at the same indent level
    */
   private checkAndDecorateDateLine(
@@ -560,9 +560,9 @@ export class TaskKeywordDecorator {
       return;
     }
 
-    // Check if this line contains SCHEDULED: or DEADLINE:
+    // Check if this line contains SCHEDULED:, DEADLINE:, or CLOSED:
     const trimmedLine = lineText.trim();
-    let dateLineType: 'scheduled' | 'deadline' | null = null;
+    let dateLineType: 'scheduled' | 'deadline' | 'closed' | null = null;
 
     // Handle callout blocks (lines starting with >)
     if (lineText.startsWith('>')) {
@@ -571,11 +571,15 @@ export class TaskKeywordDecorator {
         dateLineType = 'scheduled';
       } else if (contentAfterArrow.startsWith('DEADLINE:')) {
         dateLineType = 'deadline';
+      } else if (contentAfterArrow.startsWith('CLOSED:')) {
+        dateLineType = 'closed';
       }
     } else if (trimmedLine.startsWith('SCHEDULED:')) {
       dateLineType = 'scheduled';
     } else if (trimmedLine.startsWith('DEADLINE:')) {
       dateLineType = 'deadline';
+    } else if (trimmedLine.startsWith('CLOSED:')) {
+      dateLineType = 'closed';
     }
 
     // If this is a date line, check if it matches the indent level of the previous task
@@ -598,11 +602,15 @@ export class TaskKeywordDecorator {
         const lineClass =
           dateLineType === 'scheduled'
             ? 'todoseq-scheduled-line'
-            : 'todoseq-deadline-line';
+            : dateLineType === 'deadline'
+              ? 'todoseq-deadline-line'
+              : 'todoseq-closed-line';
         const keywordClass =
           dateLineType === 'scheduled'
             ? 'todoseq-scheduled-keyword'
-            : 'todoseq-deadline-keyword';
+            : dateLineType === 'deadline'
+              ? 'todoseq-deadline-keyword'
+              : 'todoseq-closed-keyword';
 
         // Apply decoration to the entire line
         builder.add(
@@ -620,7 +628,11 @@ export class TaskKeywordDecorator {
 
         // Apply specific styling to the keyword itself
         const keyword =
-          dateLineType === 'scheduled' ? 'SCHEDULED:' : 'DEADLINE:';
+          dateLineType === 'scheduled'
+            ? 'SCHEDULED:'
+            : dateLineType === 'deadline'
+              ? 'DEADLINE:'
+              : 'CLOSED:';
         const keywordStart = trimmedLine.indexOf(keyword);
         // const keywordEnd = keywordStart + keyword.length;
         const keywordStartPos =
@@ -640,7 +652,7 @@ export class TaskKeywordDecorator {
           }),
         );
 
-        // Continue tracking for additional date lines (both SCHEDULED and DEADLINE)
+        // Continue tracking for additional date lines (both SCHEDULED, DEADLINE, and CLOSED)
         // Don't reset tracking here, allow finding multiple date lines after a single task
       }
     } else if (linesSinceTask > 1 && !trimmedLine) {

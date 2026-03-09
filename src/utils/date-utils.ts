@@ -693,4 +693,20 @@ export class DateUtils {
 
     return date;
   }
+
+  /**
+   * Format a date for CLOSED timestamp in Org mode format: [YYYY-MM-DD DOW HH:mm]
+   * @param date The date to format
+   * @returns Formatted date string
+   */
+  static formatClosedDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weekday = weekdays[date.getDay()];
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `[${year}-${month}-${day} ${weekday} ${hours}:${minutes}]`;
+  }
 }

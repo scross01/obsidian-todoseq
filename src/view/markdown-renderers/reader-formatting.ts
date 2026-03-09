@@ -1541,18 +1541,22 @@ export class ReaderViewFormatter {
   }
 
   /**
-   * Process SCHEDULED and DEADLINE lines in the rendered HTML
+   * Process SCHEDULED, DEADLINE, and CLOSED lines in the rendered HTML
    * Applies appropriate styling to date-related lines
    */
   private processDateLines(element: HTMLElement): void {
-    // Find all paragraphs that might contain SCHEDULED or DEADLINE
+    // Find all paragraphs that might contain SCHEDULED, DEADLINE, or CLOSED
     const paragraphs = element.querySelectorAll('p');
 
     paragraphs.forEach((paragraph) => {
       const text = paragraph.textContent || '';
 
       // Quick check: skip paragraphs without date keywords
-      if (!text.includes('SCHEDULED:') && !text.includes('DEADLINE:')) {
+      if (
+        !text.includes('SCHEDULED:') &&
+        !text.includes('DEADLINE:') &&
+        !text.includes('CLOSED:')
+      ) {
         return;
       }
 
@@ -1623,12 +1627,21 @@ export class ReaderViewFormatter {
         // Check if this text node contains a date keyword
         const scheduledIndex = nodeText.indexOf('SCHEDULED:');
         const deadlineIndex = nodeText.indexOf('DEADLINE:');
+        const closedIndex = nodeText.indexOf('CLOSED:');
         const dateIndex =
           scheduledIndex >= 0
             ? deadlineIndex >= 0
-              ? Math.min(scheduledIndex, deadlineIndex)
-              : scheduledIndex
-            : deadlineIndex;
+              ? closedIndex >= 0
+                ? Math.min(scheduledIndex, deadlineIndex, closedIndex)
+                : Math.min(scheduledIndex, deadlineIndex)
+              : closedIndex >= 0
+                ? Math.min(scheduledIndex, closedIndex)
+                : scheduledIndex
+            : deadlineIndex >= 0
+              ? closedIndex >= 0
+                ? Math.min(deadlineIndex, closedIndex)
+                : deadlineIndex
+              : closedIndex;
 
         if (dateIndex >= 0) {
           // Found the date line - check text before it
@@ -1651,12 +1664,21 @@ export class ReaderViewFormatter {
         // Check if this element contains a date keyword
         const scheduledIndex = elementText.indexOf('SCHEDULED:');
         const deadlineIndex = elementText.indexOf('DEADLINE:');
+        const closedIndex = elementText.indexOf('CLOSED:');
         const dateIndex =
           scheduledIndex >= 0
             ? deadlineIndex >= 0
-              ? Math.min(scheduledIndex, deadlineIndex)
-              : scheduledIndex
-            : deadlineIndex;
+              ? closedIndex >= 0
+                ? Math.min(scheduledIndex, deadlineIndex, closedIndex)
+                : Math.min(scheduledIndex, deadlineIndex)
+              : closedIndex >= 0
+                ? Math.min(scheduledIndex, closedIndex)
+                : scheduledIndex
+            : deadlineIndex >= 0
+              ? closedIndex >= 0
+                ? Math.min(deadlineIndex, closedIndex)
+                : deadlineIndex
+              : closedIndex;
 
         if (dateIndex >= 0) {
           // Found the date line - check text before it
@@ -1687,7 +1709,7 @@ export class ReaderViewFormatter {
   }
 
   /**
-   * Process SCHEDULED: and DEADLINE: keywords in a paragraph
+   * Process SCHEDULED:, DEADLINE:, and CLOSED: keywords in a paragraph
    */
   private processDateKeywordsInParagraph(
     paragraph: HTMLParagraphElement,
@@ -1695,6 +1717,7 @@ export class ReaderViewFormatter {
     const dateKeywords = [
       { keyword: 'SCHEDULED:', type: 'scheduled' as const },
       { keyword: 'DEADLINE:', type: 'deadline' as const },
+      { keyword: 'CLOSED:', type: 'closed' as const },
     ];
 
     const text = paragraph.textContent || '';
@@ -1741,7 +1764,7 @@ export class ReaderViewFormatter {
     keywordNode: Text,
     keywordIndex: number,
     keyword: string,
-    type: 'scheduled' | 'deadline',
+    type: 'scheduled' | 'deadline' | 'closed',
   ): void {
     // Create a date container
     const dateContainer = document.createElement('span');
@@ -2125,6 +2148,7 @@ export class ReaderViewFormatter {
               priority: null,
               scheduledDate: null,
               deadlineDate: null,
+              closedDate: null,
               urgency: null,
               isDailyNote: false,
               dailyNoteDate: null,

@@ -321,6 +321,7 @@ export class EditorController {
           priority: null,
           scheduledDate: null,
           deadlineDate: null,
+          closedDate: null,
           urgency: null,
           isDailyNote: false,
           dailyNoteDate: null,

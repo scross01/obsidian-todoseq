@@ -634,7 +634,7 @@ export class TaskParser implements ITaskParser {
   }
 
   /**
-   * Check if a line contains SCHEDULED: or DEADLINE: at the same indent level
+   * Check if a line contains SCHEDULED:, DEADLINE:, or CLOSED: at the same indent level
    * @param line The line to check
    * @param indent The expected indent level
    * @returns The type of date line found or null
@@ -642,26 +642,30 @@ export class TaskParser implements ITaskParser {
   getDateLineType(
     line: string,
     taskIndent: string,
-  ): 'scheduled' | 'deadline' | null {
+  ): 'scheduled' | 'deadline' | 'closed' | null {
     const trimmedLine = line.trim();
 
-    // For quoted lines, check if the line starts with > and the rest starts with SCHEDULED: or DEADLINE:
+    // For quoted lines, check if the line starts with > and the rest starts with SCHEDULED:, DEADLINE:, or CLOSED:
     if (line.startsWith('>')) {
       const contentAfterArrow = trimmedLine.substring(1).trim();
       if (
         contentAfterArrow.startsWith('SCHEDULED:') ||
-        contentAfterArrow.startsWith('DEADLINE:')
+        contentAfterArrow.startsWith('DEADLINE:') ||
+        contentAfterArrow.startsWith('CLOSED:')
       ) {
         return contentAfterArrow.startsWith('SCHEDULED:')
           ? 'scheduled'
-          : 'deadline';
+          : contentAfterArrow.startsWith('DEADLINE:')
+            ? 'deadline'
+            : 'closed';
       }
     }
 
-    // For regular tasks, check if the trimmed line starts with SCHEDULED: or DEADLINE:
+    // For regular tasks, check if the trimmed line starts with SCHEDULED:, DEADLINE:, or CLOSED:
     if (
       !trimmedLine.startsWith('SCHEDULED:') &&
-      !trimmedLine.startsWith('DEADLINE:')
+      !trimmedLine.startsWith('DEADLINE:') &&
+      !trimmedLine.startsWith('CLOSED:')
     ) {
       return null;
     }
@@ -672,7 +676,11 @@ export class TaskParser implements ITaskParser {
       return null;
     }
 
-    return trimmedLine.startsWith('SCHEDULED:') ? 'scheduled' : 'deadline';
+    return trimmedLine.startsWith('SCHEDULED:')
+      ? 'scheduled'
+      : trimmedLine.startsWith('DEADLINE:')
+        ? 'deadline'
+        : 'closed';
   }
 
   /**
@@ -727,6 +735,7 @@ export class TaskParser implements ITaskParser {
   ): {
     scheduledDate: Date | null;
     deadlineDate: Date | null;
+    closedDate: Date | null;
     scheduledDateRepeat: DateRepeatInfo | null;
     deadlineDateRepeat: DateRepeatInfo | null;
   } {
@@ -734,8 +743,10 @@ export class TaskParser implements ITaskParser {
     let scheduledDateRepeat: DateRepeatInfo | null = null;
     let deadlineDate: Date | null = null;
     let deadlineDateRepeat: DateRepeatInfo | null = null;
+    let closedDate: Date | null = null;
     let scheduledFound = false;
     let deadlineFound = false;
+    let closedFound = false;
 
     for (let i = startIndex; i < lines.length; i++) {
       const nextLine = lines[i];
@@ -770,10 +781,23 @@ export class TaskParser implements ITaskParser {
             `Invalid deadline date format at line ${i + 1}: "${nextLine.trim()}"`,
           );
         }
+      } else if (dateLineType === 'closed' && !closedFound) {
+        const { date } = this.parseDateFromLineWithRepeater(nextLine);
+        if (date) {
+          closedDate = date;
+          closedFound = true;
+        } else {
+          console.warn(
+            `Invalid closed date format at line ${i + 1}: "${nextLine.trim()}"`,
+          );
+        }
       } else {
         // Stop looking for date lines if we encounter a non-empty line that's not a date line
-        // or if we've already found both scheduled and deadline dates
-        if (dateLineType === null || (scheduledFound && deadlineFound)) {
+        // or if we've already found scheduled, deadline, and closed dates
+        if (
+          dateLineType === null ||
+          (scheduledFound && deadlineFound && closedFound)
+        ) {
           break;
         }
       }
@@ -782,6 +806,7 @@ export class TaskParser implements ITaskParser {
     return {
       scheduledDate,
       deadlineDate,
+      closedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
     };
@@ -1342,6 +1367,7 @@ export class TaskParser implements ITaskParser {
       priority,
       scheduledDate: null,
       deadlineDate: null,
+      closedDate: null,
       tail: taskDetails.tail,
       urgency: null,
       file: taskFile,
@@ -1357,6 +1383,7 @@ export class TaskParser implements ITaskParser {
     const {
       scheduledDate,
       deadlineDate,
+      closedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
@@ -1365,6 +1392,7 @@ export class TaskParser implements ITaskParser {
     task.scheduledDateRepeat = scheduledDateRepeat;
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
+    task.closedDate = closedDate;
 
     // Extract subtasks from lines following date lines
     // Footnote tasks don't have checkboxes
@@ -1465,6 +1493,7 @@ export class TaskParser implements ITaskParser {
       listMarker: finalListMarker,
       scheduledDate: null,
       deadlineDate: null,
+      closedDate: null,
       tail: taskDetails.tail,
       urgency: null,
       file: taskFile,
@@ -1480,6 +1509,7 @@ export class TaskParser implements ITaskParser {
     const {
       scheduledDate,
       deadlineDate,
+      closedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
@@ -1488,6 +1518,7 @@ export class TaskParser implements ITaskParser {
     task.scheduledDateRepeat = scheduledDateRepeat;
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
+    task.closedDate = closedDate;
 
     // Extract subtasks from lines following date lines
     // Footnote tasks don't have checkboxes
@@ -1606,6 +1637,7 @@ export class TaskParser implements ITaskParser {
       priority,
       scheduledDate: null,
       deadlineDate: null,
+      closedDate: null,
       tail: taskDetails.tail,
       urgency: null,
       file: taskFile,
@@ -1623,6 +1655,7 @@ export class TaskParser implements ITaskParser {
     const {
       scheduledDate,
       deadlineDate,
+      closedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
@@ -1631,6 +1664,7 @@ export class TaskParser implements ITaskParser {
     task.scheduledDateRepeat = scheduledDateRepeat;
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
+    task.closedDate = closedDate;
 
     // Extract subtasks from lines following date lines
     // Footnote tasks don't have checkboxes
@@ -1719,6 +1753,7 @@ export class TaskParser implements ITaskParser {
         priority,
         scheduledDate: null,
         deadlineDate: null,
+        closedDate: null,
         tail: taskDetails.tail,
         urgency: null,
         isDailyNote: false,
@@ -1775,6 +1810,7 @@ export class TaskParser implements ITaskParser {
       priority,
       scheduledDate: null,
       deadlineDate: null,
+      closedDate: null,
       tail,
       urgency: null,
       file: undefined,

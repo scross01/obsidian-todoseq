@@ -224,6 +224,7 @@ export class OrgModeTaskParser implements ITaskParser {
       scheduledDateRepeat: null,
       deadlineDate: null,
       deadlineDateRepeat: null,
+      closedDate: null,
       tail: '',
       urgency: null,
       file: taskFile,
