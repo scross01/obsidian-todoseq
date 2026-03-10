@@ -35,6 +35,8 @@ graph TB
             PropertySearchEngine["PropertySearchEngine<br/>Property Search"]
             KeywordManager["KeywordManager<br/>Keyword Classification"]
             StateTransitionManager["TaskStateTransitionManager<br/>State Transitions"]
+            ChangeTracker["ChangeTracker<br/>Expected Change Tracking"]
+            RecurrenceCoordinator["RecurrenceCoordinator<br/>Recurrence Coordination"]
         end
 
         subgraph "UI Layer"
@@ -94,6 +96,8 @@ graph TB
     Main --> UIManager
     Main --> EventCoordinator
     Main --> PropertySearchEngine
+    Main --> ChangeTracker
+    Main --> RecurrenceCoordinator
 
     StateManager --> TaskListView
     StateManager --> EmbeddedProcessor
@@ -110,6 +114,8 @@ graph TB
     UpdateCoordinator --> StateManager
     UpdateCoordinator --> TaskWriter
     UpdateCoordinator --> UIManager
+    UpdateCoordinator --> ChangeTracker
+    UpdateCoordinator --> RecurrenceCoordinator
 
     EventCoordinator --> VaultScanner
     EventCoordinator --> PropertySearchEngine
@@ -160,7 +166,7 @@ graph TB
     classDef external fill:#f5f5f5
 
     class Main pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager serviceLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator serviceLayer
     class UIManager,TaskListView,TaskWriter,ReaderFormatter,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
     class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
     class Search,SearchParser,SearchEvaluator searchLayer
@@ -187,8 +193,10 @@ graph TB
 **TaskUpdateCoordinator** (`src/services/task-update-coordinator.ts`)
 
 - **Responsibility**: Centralized update pipeline with optimistic UI
-- **Key Patterns**: Command pattern, optimistic updates
-- **Interface**: `updateTaskState()`, `createTask()`, coordinate updates
+- **Key Patterns**: Command pattern, optimistic updates, race condition prevention
+- **Interface**: `updateTaskState()`, `updateTaskPriority()`, `updateTaskScheduledDate()`, `updateTaskDeadlineDate()`, coordinate updates
+- **Change Tracking**: Uses `ChangeTracker` to register expected file changes with content hashing
+- **Recurrence Coordination**: Uses `RecurrenceCoordinator` for centralized recurrence management
 
 **EditorController** (`src/services/editor-controller.ts`)
 
@@ -228,6 +236,20 @@ graph TB
 - **Key Patterns**: State machine, immutable archived states
 - **Interface**: `getNextState()`, `getCycleState()`, `canTransition()`, `isArchivedState()`
 - **Used by**: TaskWriter, EditorController, UI components
+
+**ChangeTracker** (`src/services/change-tracker.ts`)
+
+- **Responsibility**: Track expected file changes to prevent race conditions
+- **Key Patterns**: Content hashing, automatic expiration, per-file tracking
+- **Interface**: `registerExpectedChange()`, `isExpectedChange()`, `cleanup()`, `destroy()`
+- **Used by**: TaskUpdateCoordinator, VaultScanner
+
+**RecurrenceCoordinator** (`src/services/recurrence-coordinator.ts`)
+
+- **Responsibility**: Centralized coordination for recurrence updates
+- **Key Patterns**: Per-task tracking, recovery coordination, delayed updates
+- **Interface**: `scheduleRecurrence()`, `cancelRecurrence()`, `shouldProcessRecovery()`, `performRecurrenceUpdate()`, `destroy()`
+- **Used by**: TaskUpdateCoordinator, VaultScanner
 
 ### 2. UI Layer (User Interaction)
 
@@ -361,12 +383,14 @@ graph TD
     end
 
     subgraph "Service Layer Dependencies"
-        StateManager[TaskStateManager]
-        VaultScanner[VaultScanner]
-        UpdateCoordinator[TaskUpdateCoordinator]
-        EventCoordinator[EventCoordinator]
-        PropertySearchEngine[PropertySearchEngine]
-    end
+    StateManager[TaskStateManager]
+    VaultScanner[VaultScanner]
+    UpdateCoordinator[TaskUpdateCoordinator]
+    EventCoordinator[EventCoordinator]
+    PropertySearchEngine[PropertySearchEngine]
+    ChangeTracker[ChangeTracker]
+    RecurrenceCoordinator[RecurrenceCoordinator]
+end
 
      subgraph "UI Layer Dependencies"
          UIManager[UIManager]
@@ -432,6 +456,8 @@ graph TD
     Main --> LifecycleManager
     Main --> EventCoordinator
     Main --> PropertySearchEngine
+    Main --> ChangeTracker
+    Main --> RecurrenceCoordinator
 
     StateManager -.-> Main
     VaultScanner -.-> Main
@@ -445,6 +471,8 @@ graph TD
 
     UpdateCoordinator --> StateManager
     UpdateCoordinator --> TaskWriter
+    UpdateCoordinator --> ChangeTracker
+    UpdateCoordinator --> RecurrenceCoordinator
 
     UIManager --> TaskListView
     UIManager --> ReaderFormatter
@@ -515,7 +543,7 @@ graph TD
 
     %% Class styling for component types
     class Main,LifecycleManager pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager serviceLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator serviceLayer
      class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
     class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
     class Search,SearchParser,SearchEvaluator,SearchTokenizer,SearchSuggestions searchLayer
@@ -530,6 +558,8 @@ sequenceDiagram
     participant User
     participant UI as UI Component
     participant Coordinator as TaskUpdateCoordinator
+    participant ChangeTrack as ChangeTracker
+    participant RecurCoord as RecurrenceCoordinator
     participant StateMgr as TaskStateManager
     participant EditorCtrl as EditorController
     participant TaskWriter as TaskWriter
@@ -538,47 +568,67 @@ sequenceDiagram
     participant VaultScan as VaultScanner
     participant PropertySearch as PropertySearchEngine
     participant Views as All Views
+User->>UI: Click task keyword / edit task
+UI->>Coordinator: requestTaskUpdate()
 
-    User->>UI: Click task keyword / edit task
-    UI->>Coordinator: requestTaskUpdate()
+Note over Coordinator: Phase 1: Intent Detection
+Coordinator->>EditorCtrl: detectIntent()
+EditorCtrl->>StateMgr: findTaskByPathAndLine()
 
-    Note over Coordinator: Phase 1: Intent Detection
-    Coordinator->>EditorCtrl: detectIntent()
-    EditorCtrl->>StateMgr: findTaskByPathAndLine()
-    Note over Coordinator: Phase 2: Optimistic Update
-    Coordinator->>StateMgr: optimisticUpdate()
-    StateMgr->>StateMgr: Update internal state
-    StateMgr->>Views: notifySubscribers()
-    Views->>Views: Update UI immediately
-    Coordinator->>UI: Return success (optimistic)
+Note over Coordinator: Phase 2: Register Expected Change
+Coordinator->>ChangeTrack: registerExpectedChange()
+ChangeTrack->>ChangeTrack: Store expected content hash
 
-    Note over Coordinator: Phase 3: File Persistence
-    Coordinator->>TaskWriter: updateFile()
-    TaskWriter->>FileSys: Write changes to disk
-    FileSys-->>TaskWriter: Success/Failure
-    TaskWriter-->>Coordinator: Success/Failure
+Note over Coordinator: Phase 3: Optimistic Update
+Coordinator->>StateMgr: optimisticUpdate()
+StateMgr->>StateMgr: Update internal state
+StateMgr->>Views: notifySubscribers()
+Views->>Views: Update UI immediately
+Coordinator->>UI: Return success (optimistic)
 
-    alt File Update Success
-        Note over Coordinator: Phase 4: Event Coordination
-        FileSys-->>EventCoord: File change event
-        EventCoord->>EventCoord: Debounce and batch
-        EventCoord->>VaultScan: processFileChange()
+Note over Coordinator: Phase 4: File Persistence
+Coordinator->>TaskWriter: updateFile()
+TaskWriter->>FileSys: Write changes to disk
+FileSys-->>TaskWriter: Success/Failure
+TaskWriter-->>Coordinator: Success/Failure
+
+alt File Update Success
+    Note over Coordinator: Phase 5: Event Coordination
+    FileSys-->>EventCoord: File change event
+    EventCoord->>EventCoord: Debounce and batch
+    EventCoord->>VaultScan: processFileChange()
+    VaultScan->>ChangeTrack: isExpectedChange()
+    ChangeTrack->>VaultScan: Return expected status
+    alt Expected Change
+        VaultScan->>VaultScan: Skip processing (already handled)
+    else Unexpected Change
         VaultScan->>VaultScan: Re-parse affected file
         VaultScan->>StateMgr: updateTasks()
         StateMgr->>Views: notifySubscribers()
         Views->>Views: Refresh with confirmed state
         EventCoord->>PropertySearch: onFileChanged()
         PropertySearch->>PropertySearch: Update property cache
-    else File Update Failure
-        Coordinator->>StateMgr: rollbackUpdate()
-        StateMgr->>Views: notifySubscribers()
-        Views->>Views: Revert to original state
-        Coordinator->>UI: Return error
     end
+else File Update Failure
+    Coordinator->>StateMgr: rollbackUpdate()
+    StateMgr->>Views: notifySubscribers()
+    Views->>Views: Revert to original state
+    Coordinator->>UI: Return error
+end
 
-    Note over Coordinator: Additional Updates
-    Coordinator->>Views: refreshEmbeddedTaskLists()
-    Coordinator->>UI: refreshEditorDecorations()
+Note over Coordinator: Recurrence Handling
+Coordinator->>RecurCoord: scheduleRecurrence()
+RecurCoord->>RecurCoord: Schedule delayed update
+Note over Recurrence: After delay, perform update
+RecurCoord->>TaskWriter: updateTaskState()
+TaskWriter->>FileSys: Write changes to disk
+FileSys-->>TaskWriter: Success/Failure
+TaskWriter-->>RecurCoord: Success/Failure
+RecurCoord->>RecurCoord: Remove from pending set
+
+Note over Coordinator: Additional Updates
+Coordinator->>Views: refreshEmbeddedTaskLists()
+Coordinator->>UI: refreshEditorDecorations()
 ```
 
 ## Search System Architecture
@@ -693,11 +743,13 @@ graph LR
 
 ### 3. Repeating Task System
 
-- **Delayed Updates**: Recurring tasks use 3-second delay via `TaskUpdateCoordinator` before advancing dates
-- **Recovery Processing**: `VaultScanner` identifies completed recurring tasks on vault reload and processes them
+- **Delayed Updates**: Recurring tasks use 3-second delay via `RecurrenceCoordinator` before advancing dates
+- **Recovery Processing**: `VaultScanner` identifies completed recurring tasks on vault reload and coordinates with `RecurrenceCoordinator` to prevent duplicate updates
 - **Date Repeater Logic**: Supports three types: `+` (plain), `.+` (delay from now), `++` (catch-up) with units h, d, w, m, y
 - **Time Preservation**: Always writes day of week before time; supports quoted, indented, checkbox, and callout blocks
 - **First-Only Updates**: Only first SCHEDULED and first DEADLINE lines are updated; subsequent occurrences are ignored
+- **Race Condition Prevention**: `RecurrenceCoordinator` tracks pending recurrence updates per task to prevent duplicate processing
+- **Change Tracking**: `ChangeTracker` uses SHA-256 content hashing to track expected file changes and prevent race conditions between plugin-initiated changes and file system watchers
 
 ### 3. Plugin Architecture
 
@@ -968,7 +1020,7 @@ The indicator uses monospace font and appears in both the main task list and emb
 2. **Parser Recreation**: Call `recreateParser()` when settings change via `src/main.ts`
 3. **State Consistency**: Use `TaskUpdateCoordinator` for all state changes
 4. **Editor Operations**: Use `EditorController` for intent detection and `TaskWriter` for file operations
-5. **File Race Conditions**: Use atomic operations and proper error handling
+5. **File Race Conditions**: Use `ChangeTracker` to track expected file changes with content hashing; use `RecurrenceCoordinator` for centralized recurrence management
 6. **Performance Testing**: Test with large vaults (1000+ files, 10000+ tasks)
 7. **Embedded Lists**: Use `TodoseqCodeBlockProcessor` with separate lifecycle from main plugin
 8. **Parser Registry**: Use `ParserRegistry` for file parsing - never call parsers directly from VaultScanner

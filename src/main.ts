@@ -58,13 +58,6 @@ export default class TodoTracker extends Plugin {
   // Event coordinator for unified vault event handling
   public eventCoordinator: EventCoordinator | null = null;
 
-  // Flag to track user-initiated updates (vs external file changes)
-  // Set true before updating task, false after refresh completes
-  public isUserInitiatedUpdate = false;
-
-  // Flag to track recurrence updates - prevents recovery from running immediately after
-  public isRecurrenceUpdate = false;
-
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
     return this.vaultScanner;

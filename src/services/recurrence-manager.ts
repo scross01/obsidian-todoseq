@@ -32,7 +32,7 @@ export interface RecurrenceUpdateResult {
 /**
  * Parser interface for date line detection.
  */
-interface DateLineParser {
+export interface DateLineParser {
   getDateLineType: (
     line: string,
     indent: string,

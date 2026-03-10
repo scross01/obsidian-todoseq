@@ -22,6 +22,8 @@ import {
   findDateLineWithParser,
   getTaskIndent,
 } from '../utils/task-line-utils';
+import { ChangeTracker } from './change-tracker';
+import { RecurrenceCoordinator } from './recurrence-coordinator';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -45,6 +47,8 @@ export class VaultScanner {
   private parserRegistry: ParserRegistry;
   private keywordManager: KeywordManager;
   private propertySearchEngine?: PropertySearchEngine;
+  private changeTracker: ChangeTracker;
+  private recurrenceCoordinator: RecurrenceCoordinator;
 
   constructor(
     private app: App,
@@ -89,6 +93,19 @@ export class VaultScanner {
 
     // NOTE: PropertySearchEngine now registers its own event listeners
     // during initialization to support lazy initialization
+
+    // Initialize ChangeTracker with default options
+    this.changeTracker = new ChangeTracker({
+      defaultTimeoutMs: 5000,
+      debug: false,
+    });
+
+    // Initialize RecurrenceCoordinator
+    this.recurrenceCoordinator = new RecurrenceCoordinator(
+      this.app,
+      this.taskStateManager,
+      { debug: false },
+    );
   }
 
   /**
@@ -500,6 +517,21 @@ export class VaultScanner {
         (task) => !this.keywordManager.isArchived(task.state),
       );
 
+      // Check if this is an expected change using ChangeTracker
+      const fileContent = await this.app.vault.read(file);
+      const checkResult = this.changeTracker.isExpectedChange(
+        file.path,
+        fileContent,
+      );
+
+      // Skip update if this is an expected change (plugin-initiated)
+      if (checkResult.isExpected) {
+        console.debug(
+          `[VaultScanner] Skipping expected change for ${file.path}`,
+        );
+        return;
+      }
+
       // Skip update if tasks haven't actually changed (identity comparison by path, line, rawText)
       if (this.tasksIdentical(fileTasksBefore, nonArchivedTasks)) {
         return;
@@ -516,19 +548,9 @@ export class VaultScanner {
 
       this.emit('tasks-changed', updatedTasks);
 
-      // Skip recovery if this was triggered by a recurrence update
-      // (The recurrence update already handles resetting the task)
-      const obsidianApp = this.app as unknown as {
-        plugins: {
-          getPlugin: (id: string) => { isRecurrenceUpdate?: boolean } | null;
-        };
-      };
-      const recurrencePlugin = obsidianApp.plugins.getPlugin('todoseq');
-      const isRecurrenceUpdate = recurrencePlugin?.isRecurrenceUpdate ?? false;
-
-      if (!isRecurrenceUpdate) {
-        await this.processRecurringCompletedTasks(updatedTasks);
-      }
+      // Process recovery using RecurrenceCoordinator
+      // Check if recovery should be skipped for each task
+      await this.processRecurringCompletedTasks(updatedTasks);
     } catch (err) {
       console.error('VaultScanner processIncrementalChange error', err);
       this.emit(
@@ -625,20 +647,6 @@ export class VaultScanner {
     const defaultInactive =
       settings?.stateTransitions?.defaultInactive || 'TODO';
 
-    // Skip processing if this was triggered by a user-initiated update
-    // The TaskUpdateCoordinator handles recurrence for user-initiated updates
-    const obsidianApp = this.app as unknown as {
-      plugins: {
-        getPlugin: (id: string) => { isUserInitiatedUpdate?: boolean } | null;
-      };
-    };
-    const recurrencePlugin = obsidianApp.plugins.getPlugin('todoseq');
-    const isUserInitiatedUpdate =
-      recurrencePlugin?.isUserInitiatedUpdate ?? false;
-    if (isUserInitiatedUpdate) {
-      return;
-    }
-
     // Find completed tasks with recurrence dates
     const completedRecurringTasks = tasks.filter(
       (task) =>
@@ -660,6 +668,14 @@ export class VaultScanner {
 
     // Process each completed recurring task
     for (const task of completedRecurringTasks) {
+      // Check if recovery should be skipped for this task
+      // (RecurrenceCoordinator handles it if there's a pending recurrence update)
+      if (!this.recurrenceCoordinator.shouldProcessRecovery(task)) {
+        console.debug(
+          `[VaultScanner] Skipping recovery for task with pending recurrence: ${task.path}:${task.line}`,
+        );
+        continue;
+      }
       const file = this.app.vault.getAbstractFileByPath(task.path);
       if (!file || !(file instanceof TFile)) {
         continue;
