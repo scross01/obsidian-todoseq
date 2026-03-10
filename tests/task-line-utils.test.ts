@@ -41,6 +41,15 @@ describe('task-line-utils', () => {
       expect(getTaskIndent('  TODO task')).toBe('  ');
       expect(getTaskIndent('    TODO task')).toBe('    ');
     });
+
+    it('should not treat date-like lines as bullet tasks', () => {
+      expect(getTaskIndent('- SCHEDULED: <2026-03-10>')).toBe('  ');
+      expect(getTaskIndent('- DEADLINE: <2026-03-10>')).toBe('  ');
+      expect(getTaskIndent('- CLOSED: <2026-03-10>')).toBe('  ');
+      expect(getTaskIndent('  - SCHEDULED: <2026-03-10>')).toBe('    ');
+      expect(getTaskIndent('+ SCHEDULED: <2026-03-10>')).toBe('  ');
+      expect(getTaskIndent('* DEADLINE: <2026-03-10>')).toBe('  ');
+    });
   });
 
   describe('findDateLine', () => {
@@ -144,6 +153,60 @@ describe('task-line-utils', () => {
         '  SCHEDULED: <2026-03-06 Thu>',
       ];
       const result = findDateLine(nestedLines, 1, 'SCHEDULED', '');
+      expect(result).toBe(1);
+    });
+
+    it('should not find date line that is a separate bullet', () => {
+      const lines = ['- TODO task a', '- SCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      expect(result).toBe(-1);
+    });
+
+    it('should not find date line with nested bullet marker', () => {
+      const lines = ['+ TODO task b', '  + SCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      expect(result).toBe(-1);
+    });
+
+    it('should not find date line at wrong quote level', () => {
+      const lines = ['> TODO task c', '  SCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '> ');
+      expect(result).toBe(-1);
+    });
+
+    it('should not find date line at lower indent than task', () => {
+      const lines = ['  TODO task d', 'SCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      expect(result).toBe(-1);
+    });
+
+    it('should not find date line without indent for bullet task', () => {
+      const lines = ['- TODO task e', 'SCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      expect(result).toBe(-1);
+    });
+
+    it('should find CLOSED date line', () => {
+      const lines = ['TODO task', 'CLOSED: [2026-03-05 Thu 10:00]'];
+      const result = findDateLine(lines, 1, 'CLOSED', '');
+      expect(result).toBe(1);
+    });
+
+    it('should find CLOSED date line with proper indent', () => {
+      const lines = ['  TODO task', '  CLOSED: [2026-03-05 Thu 10:00]'];
+      const result = findDateLine(lines, 1, 'CLOSED', '  ');
+      expect(result).toBe(1);
+    });
+
+    it('should find CLOSED in quoted task', () => {
+      const lines = ['> TODO task', '> CLOSED: [2026-03-05 Thu 10:00]'];
+      const result = findDateLine(lines, 1, 'CLOSED', '> ');
+      expect(result).toBe(1);
+    });
+
+    it('should find CLOSED at nested indent', () => {
+      const lines = ['TODO task', '  CLOSED: [2026-03-05 Thu 10:00]'];
+      const result = findDateLine(lines, 1, 'CLOSED', '');
       expect(result).toBe(1);
     });
   });

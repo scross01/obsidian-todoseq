@@ -40,9 +40,14 @@ export function findDateLine(
         .substring(quotePrefix.length)
         .trim();
       if (contentAfterQuotes.startsWith(keyword)) {
-        // Verify indent matches (or is nested under task indent)
-        const lineIndent = line.substring(0, line.length - trimmedLine.length);
-        if (lineIndent === taskIndent || lineIndent.startsWith(taskIndent)) {
+        // For quoted lines, compare the quote prefix (not the whitespace indent)
+        const effectiveLineIndent = quotePrefix;
+        const effectiveTaskIndent =
+          taskIndent.match(/^(>\s*)+/)?.[1] ?? taskIndent;
+        if (
+          effectiveLineIndent === effectiveTaskIndent ||
+          effectiveLineIndent.startsWith(effectiveTaskIndent)
+        ) {
           return i;
         }
       }

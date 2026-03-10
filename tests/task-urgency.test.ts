@@ -151,7 +151,8 @@ describe('Urgency Calculation', () => {
   const defaultCoefficients = getDefaultCoefficients();
 
   // Use a fixed reference date for all date-dependent tests (timezone-independent)
-  const referenceDate = createUTCDate(2026, 3, 10); // March 10, 2026 UTC
+  // Using April 15, 2026 to avoid DST boundaries
+  const referenceDate = createUTCDate(2026, 4, 15); // April 15, 2026 UTC
 
   beforeEach(() => {
     // Mock DateUtils.getStartOfDay to return a fixed date
@@ -169,7 +170,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate urgency with deadline date (7 days overdue)', () => {
-    const sevenDaysAgo = createUTCDate(2026, 3, 3); // March 3, 2026 UTC (7 days before reference)
+    const sevenDaysAgo = createUTCDate(2026, 4, 8); // April 8, 2026 UTC (7 days before reference)
 
     const task = createTestTask({
       deadlineDate: sevenDaysAgo,
@@ -186,7 +187,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate urgency with deadline date (today)', () => {
-    const today = createUTCDate(2026, 3, 10); // March 10, 2026 UTC (same as reference)
+    const today = createUTCDate(2026, 4, 15); // April 15, 2026 UTC (same as reference)
 
     const task = createTestTask({
       deadlineDate: today,
@@ -203,7 +204,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should add urgency for future deadline dates', () => {
-    const tomorrow = createUTCDate(2026, 3, 11); // March 11, 2026 UTC (1 day after reference)
+    const tomorrow = createUTCDate(2026, 4, 16); // April 16, 2026 UTC (1 day after reference)
 
     const task = createTestTask({
       deadlineDate: tomorrow,
@@ -272,8 +273,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should add urgency for scheduled date (today)', () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = createUTCDate(2026, 4, 15); // April 15, 2026 UTC (same as reference)
 
     const task = createTestTask({
       scheduledDate: today,
@@ -290,9 +290,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should add urgency for scheduled date (past)', () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
+    const yesterday = createUTCDate(2026, 4, 14); // April 14, 2026 UTC (1 day before reference)
 
     const task = createTestTask({
       scheduledDate: yesterday,
@@ -309,9 +307,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should NOT add urgency for future scheduled dates', () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
+    const tomorrow = createUTCDate(2026, 4, 16); // April 16, 2026 UTC (1 day after reference)
 
     const task = createTestTask({
       scheduledDate: tomorrow,
@@ -327,9 +323,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should add urgency for deadline date', () => {
-    const future = new Date();
-    future.setDate(future.getDate() + 5);
-    future.setHours(0, 0, 0, 0);
+    const future = createUTCDate(2026, 4, 20); // April 20, 2026 UTC (5 days after reference)
 
     const task = createTestTask({
       deadlineDate: future,
@@ -346,13 +340,8 @@ describe('Urgency Calculation', () => {
   });
 
   it('should use both scheduled and deadline when both exist', () => {
-    const soon = new Date();
-    soon.setDate(soon.getDate() + 2);
-    soon.setHours(0, 0, 0, 0);
-
-    const later = new Date();
-    later.setDate(later.getDate() + 5);
-    later.setHours(0, 0, 0, 0);
+    const soon = createUTCDate(2026, 4, 17); // April 17, 2026 UTC (2 days after reference)
+    const later = createUTCDate(2026, 4, 20); // April 20, 2026 UTC (5 days after reference)
 
     const task = createTestTask({
       scheduledDate: soon,
@@ -371,13 +360,8 @@ describe('Urgency Calculation', () => {
   });
 
   it('should use both scheduled and deadline when both exist (scheduled is past)', () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-
-    const later = new Date();
-    later.setDate(later.getDate() + 5);
-    later.setHours(0, 0, 0, 0);
+    const yesterday = createUTCDate(2026, 4, 14); // April 14, 2026 UTC (1 day before reference)
+    const later = createUTCDate(2026, 4, 20); // April 20, 2026 UTC (5 days after reference)
 
     const task = createTestTask({
       scheduledDate: yesterday,
@@ -500,8 +484,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate combined urgency correctly', () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = createUTCDate(2026, 4, 15); // April 15, 2026 UTC (same as reference)
 
     const task = createTestTask({
       priority: 'high',
@@ -532,7 +515,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate age factor for daily note tasks', () => {
-    const tenDaysAgo = createUTCDate(2026, 2, 28); // Feb 28, 2026 UTC (10 days before reference)
+    const tenDaysAgo = createUTCDate(2026, 4, 5); // April 5, 2026 UTC (10 days before reference)
 
     const task = createTestTask({
       isDailyNote: true,
@@ -580,13 +563,13 @@ describe('Urgency Recalculation Logic', () => {
   });
 
   it('should require recalculation when scheduled date changes', () => {
-    const task = createTestTask({ scheduledDate: new Date() });
+    const task = createTestTask({ scheduledDate: createUTCDate(2026, 4, 15) });
     const changed = needsUrgencyRecalculation(task, ['scheduledDate']);
     expect(changed).toBe(true);
   });
 
   it('should require recalculation when deadline date changes', () => {
-    const task = createTestTask({ deadlineDate: new Date() });
+    const task = createTestTask({ deadlineDate: createUTCDate(2026, 4, 15) });
     const changed = needsUrgencyRecalculation(task, ['deadlineDate']);
     expect(changed).toBe(true);
   });

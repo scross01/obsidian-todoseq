@@ -18,6 +18,7 @@ import {
   formatDateLine,
 } from '../utils/date-repeater';
 import { getPluginSettings } from '../utils/settings-utils';
+import { getTaskIndent } from '../utils/task-line-utils';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -681,7 +682,8 @@ export class VaultScanner {
       }
 
       // Get task indent level to properly identify date lines for this task
-      const taskIndent = lines[task.line].match(/^(\s*)/)?.[1] ?? '';
+      // This must include quote prefix, bullet marker, or checkbox marker for proper date line detection
+      const taskIndent = getTaskIndent(lines[task.line]);
 
       const now = new Date();
       let scheduledUpdated = false;
