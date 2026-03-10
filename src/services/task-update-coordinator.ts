@@ -3,13 +3,9 @@ import { isCompletedKeyword } from '../utils/task-utils';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 import { TFile } from 'obsidian';
-import {
-  calculateNextRepeatDate,
-  formatDateLine,
-} from '../utils/date-repeater';
 import { KeywordManager } from '../utils/keyword-manager';
 import { getPluginSettings } from '../utils/settings-utils';
-import { getTaskIndent } from '../utils/task-line-utils';
+import { RecurrenceManager } from './recurrence-manager';
 
 /**
  * TaskUpdateCoordinator provides a centralized way to handle all task state updates
@@ -20,6 +16,7 @@ import { getTaskIndent } from '../utils/task-line-utils';
  */
 export class TaskUpdateCoordinator {
   private pendingRecurrenceTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private recurrenceManager = new RecurrenceManager();
 
   constructor(
     private plugin: TodoTracker,
@@ -718,7 +715,6 @@ export class TaskUpdateCoordinator {
    */
   private async performRecurrenceUpdate(task: Task): Promise<void> {
     const settings = getPluginSettings(this.plugin.app);
-    const keywordManager = new KeywordManager(settings ?? {});
     const defaultInactive =
       settings?.stateTransitions?.defaultInactive || 'TODO';
 
@@ -751,164 +747,50 @@ export class TaskUpdateCoordinator {
         return;
       }
 
-      // Get task indent level to properly identify date lines for this task
-      // This must include quote prefix, bullet marker, or checkbox marker for proper date line detection
-      const currentLine = lines[task.line];
-      const taskIndent = getTaskIndent(currentLine);
+      // Calculate next recurrence dates using RecurrenceManager
+      const dateResult = this.recurrenceManager.calculateNextDates(
+        task,
+        lines,
+        parser,
+        defaultInactive,
+      );
 
-      const now = new Date();
-      let scheduledUpdated = false;
-      let deadlineUpdated = false;
-      let newScheduledDate: Date | null = null;
-      let newDeadlineDate: Date | null = null;
-
-      // Scan lines after the task line (max 8 levels of nesting)
-      const scheduledRepeat = task.scheduledDateRepeat;
-      const deadlineRepeat = task.deadlineDateRepeat;
-      for (
-        let i = task.line + 1;
-        i < Math.min(task.line + 9, lines.length);
-        i++
-      ) {
-        const line = lines[i];
-
-        // Use parser's getDateLineType to properly detect date lines
-        const dateType = parser.getDateLineType(line, taskIndent);
-
-        // Stop if this is not a date line (indicates we've moved past the task's date lines)
-        if (dateType === null) {
-          break;
-        }
-
-        // Only process the first SCHEDULED and first DEADLINE
-        if (
-          dateType === 'scheduled' &&
-          !scheduledUpdated &&
-          hasScheduledRepeat &&
-          scheduledRepeat
-        ) {
-          const date = parser.parseDateFromLine(line);
-          if (date) {
-            newScheduledDate = calculateNextRepeatDate(
-              date,
-              scheduledRepeat,
-              now,
-            );
-            scheduledUpdated = true;
-          }
-        } else if (
-          dateType === 'deadline' &&
-          !deadlineUpdated &&
-          hasDeadlineRepeat &&
-          deadlineRepeat
-        ) {
-          const date = parser.parseDateFromLine(line);
-          if (date) {
-            newDeadlineDate = calculateNextRepeatDate(
-              date,
-              deadlineRepeat,
-              now,
-            );
-            deadlineUpdated = true;
-          }
-        }
-
-        // Stop if we've found both dates
-        if (scheduledUpdated && deadlineUpdated) {
-          break;
-        }
-      }
-
-      // If no dates need updating, return
-      if (!newScheduledDate && !newDeadlineDate) {
+      if (!dateResult.updated) {
         return;
       }
 
-      // Now update the date lines in the file
-      scheduledUpdated = false;
-      deadlineUpdated = false;
-      let lineUpdated = false;
+      // Update the task keyword to inactive state
+      const updatedLines = this.recurrenceManager.updateTaskKeyword(
+        dateResult.lines,
+        task.line,
+        defaultInactive,
+      );
 
-      for (
-        let i = task.line + 1;
-        i < Math.min(task.line + 9, lines.length);
-        i++
-      ) {
-        const line = lines[i];
-        const dateType = parser.getDateLineType(line, taskIndent);
+      this.plugin.isRecurrenceUpdate = true;
 
-        if (dateType === null) {
-          break;
-        }
+      await this.plugin.app.vault.modify(file, updatedLines.join('\n'));
+      console.debug(
+        `[TODOseq] Recurrence update: ${task.path}:${task.line} -> ${defaultInactive}`,
+      );
 
-        // Update the scheduled date line
-        if (dateType === 'scheduled' && !scheduledUpdated && newScheduledDate) {
-          lines[i] = formatDateLine(
-            line,
-            newScheduledDate,
-            task.scheduledDateRepeat,
-          );
-          scheduledUpdated = true;
-          lineUpdated = true;
-        }
-        // Update the deadline date line
-        else if (
-          dateType === 'deadline' &&
-          !deadlineUpdated &&
-          newDeadlineDate
-        ) {
-          lines[i] = formatDateLine(
-            line,
-            newDeadlineDate,
-            task.deadlineDateRepeat,
-          );
-          deadlineUpdated = true;
-          lineUpdated = true;
-        }
-
-        if (scheduledUpdated && deadlineUpdated) {
-          break;
-        }
+      const currentTask = this.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      if (currentTask) {
+        this.taskStateManager.updateTask(currentTask, {
+          rawText: updatedLines[task.line],
+          state: defaultInactive,
+          completed: false,
+          scheduledDate:
+            dateResult.newScheduledDate ?? currentTask.scheduledDate,
+          deadlineDate: dateResult.newDeadlineDate ?? currentTask.deadlineDate,
+        });
       }
 
-      // Update the task line state keyword to inactive
-      const taskLine = lines[task.line];
-      const allKeywords = keywordManager.getAllKeywords();
-
-      for (const keyword of allKeywords) {
-        if (taskLine.includes(keyword)) {
-          lines[task.line] = taskLine.replace(keyword, defaultInactive);
-          lineUpdated = true;
-          break;
-        }
-      }
-
-      if (lineUpdated) {
-        this.plugin.isRecurrenceUpdate = true;
-
-        await this.plugin.app.vault.modify(file, lines.join('\n'));
-        console.debug(
-          `[TODOseq] Recurrence update: ${task.path}:${task.line} -> ${defaultInactive}`,
-        );
-
-        const currentTask = this.taskStateManager.findTaskByPathAndLine(
-          task.path,
-          task.line,
-        );
-        if (currentTask) {
-          this.taskStateManager.updateTask(currentTask, {
-            rawText: lines[task.line],
-            state: defaultInactive,
-            completed: false,
-            scheduledDate: newScheduledDate ?? currentTask.scheduledDate,
-            deadlineDate: newDeadlineDate ?? currentTask.deadlineDate,
-          });
-        }
-
-        setTimeout(() => {
-          this.plugin.isRecurrenceUpdate = false;
-        }, 100);
-      }
+      setTimeout(() => {
+        this.plugin.isRecurrenceUpdate = false;
+      }, 100);
 
       if (this.plugin.embeddedTaskListProcessor) {
         this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();

@@ -87,6 +87,63 @@ export function findDateLine(
 }
 
 /**
+ * Find a date line using optional parser for enhanced detection.
+ * If parser is provided, uses parser.getDateLineType() for more accurate detection.
+ * Otherwise, falls back to regex-based detection.
+ *
+ * @param lines - Array of lines to search
+ * @param startIndex - Starting line index (typically task.line + 1)
+ * @param dateType - Type of date to find ('SCHEDULED', 'DEADLINE', or 'CLOSED')
+ * @param taskIndent - The task's indent level (for proper nesting detection)
+ * @param parser - Optional TaskParser for enhanced date line detection
+ * @returns Line index of found date line, or -1 if not found
+ *
+ * @example
+ * findDateLineWithParser(lines, 5, 'SCHEDULED', '  ', parser)
+ * // Returns: 7 if SCHEDULED line found at index 7, -1 otherwise
+ */
+export function findDateLineWithParser(
+  lines: string[],
+  startIndex: number,
+  dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED',
+  taskIndent: string,
+  parser?: {
+    getDateLineType: (
+      line: string,
+      indent: string,
+    ) => 'scheduled' | 'deadline' | 'closed' | null;
+  } | null,
+): number {
+  // If parser is provided, use it for detection
+  if (parser) {
+    const maxLines = Math.min(startIndex + 9, lines.length);
+    const targetDateType = dateType.toLowerCase() as
+      | 'scheduled'
+      | 'deadline'
+      | 'closed';
+
+    for (let i = startIndex; i < maxLines; i++) {
+      const line = lines[i];
+      const detectedType = parser.getDateLineType(line, taskIndent);
+
+      if (detectedType === targetDateType) {
+        return i;
+      }
+
+      // Stop if this is not a date line (indicates we've moved past the task's date lines)
+      if (detectedType === null && line.trim() !== '') {
+        break;
+      }
+    }
+
+    return -1;
+  }
+
+  // Fall back to regex-based detection
+  return findDateLine(lines, startIndex, dateType, taskIndent);
+}
+
+/**
  * Get the proper indent for date lines under a task.
  * Handles quote prefix, checkbox, bullet, and plain tasks.
  *

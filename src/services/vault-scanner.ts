@@ -18,7 +18,10 @@ import {
   formatDateLine,
 } from '../utils/date-repeater';
 import { getPluginSettings } from '../utils/settings-utils';
-import { getTaskIndent } from '../utils/task-line-utils';
+import {
+  findDateLineWithParser,
+  getTaskIndent,
+} from '../utils/task-line-utils';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -686,61 +689,54 @@ export class VaultScanner {
       const taskIndent = getTaskIndent(lines[task.line]);
 
       const now = new Date();
-      let scheduledUpdated = false;
-      let deadlineUpdated = false;
       let newScheduledDate: Date | null = null;
       let newDeadlineDate: Date | null = null;
 
-      // Scan lines after the task line (max 8 levels of nesting)
-      for (
-        let i = task.line + 1;
-        i < Math.min(task.line + 9, lines.length);
-        i++
-      ) {
-        const line = lines[i];
+      // Find the SCHEDULED and DEADLINE line indices using the shared utility
+      const scheduledLineIndex =
+        task.scheduledDateRepeat != null
+          ? findDateLineWithParser(
+              lines,
+              task.line + 1,
+              'SCHEDULED',
+              taskIndent,
+              parser,
+            )
+          : -1;
+      const deadlineLineIndex =
+        task.deadlineDateRepeat != null
+          ? findDateLineWithParser(
+              lines,
+              task.line + 1,
+              'DEADLINE',
+              taskIndent,
+              parser,
+            )
+          : -1;
 
-        // Use parser's getDateLineType to properly detect date lines
-        const dateType = parser.getDateLineType(line, taskIndent);
-
-        // Stop if this is not a date line (indicates we've moved past the task's date lines)
-        if (dateType === null) {
-          break;
+      // Parse and calculate next dates for SCHEDULED line
+      if (scheduledLineIndex >= 0 && task.scheduledDateRepeat != null) {
+        const line = lines[scheduledLineIndex];
+        const date = parser.parseDateFromLine(line);
+        if (date) {
+          newScheduledDate = calculateNextRepeatDate(
+            date,
+            task.scheduledDateRepeat,
+            now,
+          );
         }
+      }
 
-        // Only process the first SCHEDULED and first DEADLINE
-        if (
-          dateType === 'scheduled' &&
-          !scheduledUpdated &&
-          task.scheduledDateRepeat != null
-        ) {
-          const date = parser.parseDateFromLine(line);
-          if (date) {
-            newScheduledDate = calculateNextRepeatDate(
-              date,
-              task.scheduledDateRepeat,
-              now,
-            );
-            scheduledUpdated = true;
-          }
-        } else if (
-          dateType === 'deadline' &&
-          !deadlineUpdated &&
-          task.deadlineDateRepeat != null
-        ) {
-          const date = parser.parseDateFromLine(line);
-          if (date) {
-            newDeadlineDate = calculateNextRepeatDate(
-              date,
-              task.deadlineDateRepeat,
-              now,
-            );
-            deadlineUpdated = true;
-          }
-        }
-
-        // Stop if we've found both dates
-        if (scheduledUpdated && deadlineUpdated) {
-          break;
+      // Parse and calculate next dates for DEADLINE line
+      if (deadlineLineIndex >= 0 && task.deadlineDateRepeat != null) {
+        const line = lines[deadlineLineIndex];
+        const date = parser.parseDateFromLine(line);
+        if (date) {
+          newDeadlineDate = calculateNextRepeatDate(
+            date,
+            task.deadlineDateRepeat,
+            now,
+          );
         }
       }
 
@@ -750,51 +746,23 @@ export class VaultScanner {
       }
 
       // Now update the date lines in the file
-      scheduledUpdated = false;
-      deadlineUpdated = false;
-      let lineUpdated = false;
-
-      for (
-        let i = task.line + 1;
-        i < Math.min(task.line + 9, lines.length);
-        i++
-      ) {
-        const line = lines[i];
-        const dateType = parser.getDateLineType(line, taskIndent);
-
-        if (dateType === null) {
-          break;
-        }
-
-        // Update scheduled date line
-        if (dateType === 'scheduled' && !scheduledUpdated && newScheduledDate) {
-          lines[i] = formatDateLine(
-            line,
-            newScheduledDate,
-            task.scheduledDateRepeat,
-          );
-          scheduledUpdated = true;
-          lineUpdated = true;
-        }
-        // Update deadline date line
-        else if (
-          dateType === 'deadline' &&
-          !deadlineUpdated &&
-          newDeadlineDate
-        ) {
-          lines[i] = formatDateLine(
-            line,
-            newDeadlineDate,
-            task.deadlineDateRepeat,
-          );
-          deadlineUpdated = true;
-          lineUpdated = true;
-        }
-
-        if (scheduledUpdated && deadlineUpdated) {
-          break;
-        }
+      if (scheduledLineIndex >= 0 && newScheduledDate) {
+        lines[scheduledLineIndex] = formatDateLine(
+          lines[scheduledLineIndex],
+          newScheduledDate,
+          task.scheduledDateRepeat,
+        );
       }
+
+      if (deadlineLineIndex >= 0 && newDeadlineDate) {
+        lines[deadlineLineIndex] = formatDateLine(
+          lines[deadlineLineIndex],
+          newDeadlineDate,
+          task.deadlineDateRepeat,
+        );
+      }
+
+      let lineUpdated = scheduledLineIndex >= 0 || deadlineLineIndex >= 0;
 
       if (!lineUpdated) {
         continue;

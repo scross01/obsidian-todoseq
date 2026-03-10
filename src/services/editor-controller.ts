@@ -10,6 +10,7 @@ import {
   isDailyNotesPluginEnabledSync,
   isTaskOnTodayDailyNote,
 } from '../utils/daily-note-utils';
+import { findDateLine, getTaskIndent } from '../utils/task-line-utils';
 
 /**
  * EditorController handles operations related to modifying tasks in the editor
@@ -648,33 +649,23 @@ export class EditorController {
     dateType: 'SCHEDULED' | 'DEADLINE',
   ): number | null {
     const totalLines = editor.lineCount();
-    const keyword = `${dateType}:`;
+    const taskLine = editor.getLine(taskLineNumber);
+    const taskIndent = getTaskIndent(taskLine);
 
-    // Look through the lines after the task line
-    for (let i = taskLineNumber + 1; i <= totalLines; i++) {
-      const line = editor.getLine(i);
-
-      // Skip empty lines
-      if (line.trim() === '') {
-        continue;
-      }
-
-      // Check if this line starts with the date keyword
-      if (line.trim().startsWith(keyword)) {
-        return i;
-      }
-
-      // If we hit a line that doesn't start with a date keyword and isn't empty,
-      // we've gone past the date lines for this task
-      if (
-        !line.trim().startsWith('SCHEDULED:') &&
-        !line.trim().startsWith('DEADLINE:')
-      ) {
-        break;
-      }
+    // Build lines array from editor.getLine()
+    const lines: string[] = [];
+    for (let i = 0; i < totalLines; i++) {
+      lines.push(editor.getLine(i));
     }
 
-    return null;
+    const dateLineIndex = findDateLine(
+      lines,
+      taskLineNumber + 1,
+      dateType,
+      taskIndent,
+    );
+
+    return dateLineIndex >= 0 ? dateLineIndex : null;
   }
 
   /**
@@ -693,41 +684,33 @@ export class EditorController {
 
     // Start by inserting immediately after the task line
     let insertLine = taskLineNumber + 1;
+
     const totalLines = editor.lineCount();
+    const taskLine = editor.getLine(taskLineNumber);
+    const taskIndent = getTaskIndent(taskLine);
+
+    // Build lines array from editor.getLine()
+    const lines: string[] = [];
+    for (let i = 0; i < totalLines; i++) {
+      lines.push(editor.getLine(i));
+    }
 
     // Check if there are existing date lines to determine insertion order
-    let hasScheduled = false;
-    let firstDateLine = -1;
-
-    // Scan for existing date lines
-    for (let i = taskLineNumber + 1; i <= totalLines; i++) {
-      const line = editor.getLine(i);
-
-      // Skip empty lines
-      if (line.trim() === '') {
-        continue;
-      }
-
-      // Check for date lines
-      if (line.trim().startsWith('SCHEDULED:')) {
-        hasScheduled = true;
-        if (firstDateLine === -1) firstDateLine = i;
-      } else if (line.trim().startsWith('DEADLINE:')) {
-        if (firstDateLine === -1) firstDateLine = i;
-      } else {
-        // We've hit a non-date line, stop scanning
-        break;
-      }
-    }
+    const scheduledLineIndex = findDateLine(
+      lines,
+      taskLineNumber + 1,
+      'SCHEDULED',
+      taskIndent,
+    );
 
     // Determine the correct insertion position
     if (dateType === 'SCHEDULED') {
       // Insert scheduled date immediately after task line (before any existing dates)
       insertLine = taskLineNumber + 1;
     } else if (dateType === 'DEADLINE') {
-      if (hasScheduled) {
+      if (scheduledLineIndex >= 0) {
         // Insert deadline after scheduled date
-        insertLine = firstDateLine + 1;
+        insertLine = scheduledLineIndex + 1;
       } else {
         // Insert deadline immediately after task line
         insertLine = taskLineNumber + 1;

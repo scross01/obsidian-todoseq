@@ -2,7 +2,11 @@
  * Tests for task-line-utils.ts
  */
 
-import { getTaskIndent, findDateLine } from '../src/utils/task-line-utils';
+import {
+  getTaskIndent,
+  findDateLine,
+  findDateLineWithParser,
+} from '../src/utils/task-line-utils';
 
 describe('task-line-utils', () => {
   describe('getTaskIndent', () => {
@@ -207,6 +211,63 @@ describe('task-line-utils', () => {
     it('should find CLOSED at nested indent', () => {
       const lines = ['TODO task', '  CLOSED: [2026-03-05 Thu 10:00]'];
       const result = findDateLine(lines, 1, 'CLOSED', '');
+      expect(result).toBe(1);
+    });
+  });
+
+  describe('findDateLineWithParser', () => {
+    it('should use parser when provided', () => {
+      const mockParser = {
+        getDateLineType: jest.fn().mockReturnValue('scheduled'),
+      };
+      const lines = ['TODO task', '  SCHEDULED: <2026-03-10>'];
+      const result = findDateLineWithParser(
+        lines,
+        1,
+        'SCHEDULED',
+        '  ',
+        mockParser,
+      );
+      expect(result).toBe(1);
+      expect(mockParser.getDateLineType).toHaveBeenCalledWith(
+        '  SCHEDULED: <2026-03-10>',
+        '  ',
+      );
+    });
+
+    it('should fall back to regex when parser is null', () => {
+      const lines = ['TODO task', '  SCHEDULED: <2026-03-10>'];
+      const result = findDateLineWithParser(lines, 1, 'SCHEDULED', '  ', null);
+      expect(result).toBe(1);
+    });
+
+    it('should fall back to regex when parser is undefined', () => {
+      const lines = ['TODO task', '  SCHEDULED: <2026-03-10>'];
+      const result = findDateLineWithParser(
+        lines,
+        1,
+        'SCHEDULED',
+        '  ',
+        undefined,
+      );
+      expect(result).toBe(1);
+    });
+
+    it('should stop at non-date line when using parser', () => {
+      const mockParser = {
+        getDateLineType: jest
+          .fn()
+          .mockReturnValueOnce('scheduled')
+          .mockReturnValueOnce(null),
+      };
+      const lines = ['TODO task', '  SCHEDULED: <2026-03-10>', '  Other line'];
+      const result = findDateLineWithParser(
+        lines,
+        1,
+        'SCHEDULED',
+        '  ',
+        mockParser,
+      );
       expect(result).toBe(1);
     });
   });
