@@ -11,8 +11,9 @@ import {
 } from '../src/utils/task-urgency';
 import { Task } from '../src/types/task';
 import { App, Vault, DataAdapter } from 'obsidian';
-import { createBaseTask } from './helpers/test-helper';
+import { createBaseTask, createUTCDate } from './helpers/test-helper';
 import { KeywordManager } from '../src/utils/keyword-manager';
+import { DateUtils } from '../src/utils/date-utils';
 
 // Mock Obsidian app for testing
 const createMockApp = (): App => {
@@ -149,6 +150,18 @@ urgency.waiting.coefficient = -3.0
 describe('Urgency Calculation', () => {
   const defaultCoefficients = getDefaultCoefficients();
 
+  // Use a fixed reference date for all date-dependent tests (timezone-independent)
+  const referenceDate = createUTCDate(2026, 3, 10); // March 10, 2026 UTC
+
+  beforeEach(() => {
+    // Mock DateUtils.getStartOfDay to return a fixed date
+    jest.spyOn(DateUtils, 'getStartOfDay').mockReturnValue(referenceDate);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('should return null for completed tasks', () => {
     const task = createTestTask({ completed: true });
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
@@ -156,9 +169,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate urgency with deadline date (7 days overdue)', () => {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = createUTCDate(2026, 3, 3); // March 3, 2026 UTC (7 days before reference)
 
     const task = createTestTask({
       deadlineDate: sevenDaysAgo,
@@ -175,8 +186,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate urgency with deadline date (today)', () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = createUTCDate(2026, 3, 10); // March 10, 2026 UTC (same as reference)
 
     const task = createTestTask({
       deadlineDate: today,
@@ -193,9 +203,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should add urgency for future deadline dates', () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
+    const tomorrow = createUTCDate(2026, 3, 11); // March 11, 2026 UTC (1 day after reference)
 
     const task = createTestTask({
       deadlineDate: tomorrow,
@@ -524,9 +532,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate age factor for daily note tasks', () => {
-    const tenDaysAgo = new Date();
-    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
-    tenDaysAgo.setHours(0, 0, 0, 0);
+    const tenDaysAgo = createUTCDate(2026, 2, 28); // Feb 28, 2026 UTC (10 days before reference)
 
     const task = createTestTask({
       isDailyNote: true,
@@ -540,9 +546,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should return maximum age factor for very old daily note tasks', () => {
-    const twoYearsAgo = new Date();
-    twoYearsAgo.setDate(twoYearsAgo.getDate() - 730); // 2 years
-    twoYearsAgo.setHours(0, 0, 0, 0);
+    const twoYearsAgo = createUTCDate(2024, 3, 10); // March 10, 2024 UTC (2 years before reference)
 
     const task = createTestTask({
       isDailyNote: true,

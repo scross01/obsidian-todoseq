@@ -9,5 +9,8 @@
   "collectCoverageFrom": ["src/**/*.ts", "!src/main.ts", "!tests/**"],
   "moduleNameMapper": {
     "^obsidian$": "<rootDir>/__mocks__/obsidian.ts"
+  },
+  "testEnvironmentOptions": {
+    "timezone": "UTC"
   }
 }

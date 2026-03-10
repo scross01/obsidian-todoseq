@@ -6,6 +6,31 @@ import {
 import { KeywordManager } from '../../src/utils/keyword-manager';
 import { TaskParser } from '../../src/parser/task-parser';
 
+/**
+ * Creates a date in UTC timezone (timezone-independent)
+ * @param year Full year (e.g., 2026)
+ * @param month Month (1-12)
+ * @param day Day of month (1-31)
+ * @param hours Hours (0-23, default 0)
+ * @param minutes Minutes (0-59, default 0)
+ * @param seconds Seconds (0-59, default 0)
+ * @param milliseconds Milliseconds (0-999, default 0)
+ * @returns Date object in UTC timezone
+ */
+export function createUTCDate(
+  year: number,
+  month: number,
+  day: number,
+  hours = 0,
+  minutes = 0,
+  seconds = 0,
+  milliseconds = 0,
+): Date {
+  return new Date(
+    Date.UTC(year, month - 1, day, hours, minutes, seconds, milliseconds),
+  );
+}
+
 type TaskKeywordGroups = {
   activeKeywords: string[];
   inactiveKeywords: string[];

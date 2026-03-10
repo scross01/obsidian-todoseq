@@ -34,6 +34,7 @@
     "defaultCompleted": "",
     "transitionStatements": []
   },
+  "trackClosedDate": true,
   "_hasShownFirstInstallView": true,
   "settingsVersion": 2
 }

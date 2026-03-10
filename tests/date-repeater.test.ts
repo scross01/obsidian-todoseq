@@ -4,6 +4,7 @@ import {
   calculateNextRepeatDate,
   hasRepeater,
   getEffectiveDate,
+  formatDateLine,
 } from '../src/utils/date-repeater';
 
 describe('date-repeater', () => {
@@ -568,6 +569,175 @@ describe('date-repeater', () => {
       const result = getEffectiveDate(baseDate, repeat);
       // .+ uses current date as reference, so result should be in the future relative to baseDate
       expect(result?.getTime()).toBeGreaterThan(baseDate.getTime());
+    });
+  });
+
+  describe('formatDateLine', () => {
+    it('should format a date line with new date and day of week', () => {
+      const line = 'SCHEDULED: <2026-03-05 Wed>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const result = formatDateLine(line, newDate, null);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri>');
+    });
+
+    it('should preserve time from old date', () => {
+      const line = 'SCHEDULED: <2026-03-05 Wed 07:00>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const result = formatDateLine(line, newDate, null);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 07:00>');
+    });
+
+    it('should preserve time when it appears before DOW', () => {
+      const line = 'SCHEDULED: <2008-02-08 20:00 Fri>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const result = formatDateLine(line, newDate, null);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 20:00>');
+    });
+
+    it('should preserve time when it appears after DOW', () => {
+      const line = 'SCHEDULED: <2008-02-08 Fri 20:00>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const result = formatDateLine(line, newDate, null);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 20:00>');
+    });
+
+    it('should preserve repeater', () => {
+      const line = 'SCHEDULED: <2026-03-05 Wed 07:00 .+1d>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const repeat = {
+        type: '.+' as const,
+        unit: 'd' as const,
+        value: 1,
+        raw: '.+1d',
+      };
+      const result = formatDateLine(line, newDate, repeat);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 07:00 .+1d>');
+    });
+
+    it('should preserve repeater when time appears before DOW', () => {
+      const line = 'SCHEDULED: <2008-02-08 20:00 Fri ++1d>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const repeat = {
+        type: '++' as const,
+        unit: 'd' as const,
+        value: 1,
+        raw: '++1d',
+      };
+      const result = formatDateLine(line, newDate, repeat);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 20:00 ++1d>');
+    });
+
+    it('should preserve repeater when time appears after DOW', () => {
+      const line = 'SCHEDULED: <2008-02-08 Fri 20:00 ++1d>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const repeat = {
+        type: '++' as const,
+        unit: 'd' as const,
+        value: 1,
+        raw: '++1d',
+      };
+      const result = formatDateLine(line, newDate, repeat);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 20:00 ++1d>');
+    });
+
+    it('should preserve repeater when time appears before repeater', () => {
+      const line = 'SCHEDULED: <2008-02-08 20:00 ++1d>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const repeat = {
+        type: '++' as const,
+        unit: 'd' as const,
+        value: 1,
+        raw: '++1d',
+      };
+      const result = formatDateLine(line, newDate, repeat);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 20:00 ++1d>');
+    });
+
+    it('should handle date without time with repeater', () => {
+      const line = 'SCHEDULED: <2026-03-05 +1m>';
+      const newDate = new Date('2026-04-01T00:00:00');
+      const repeat = {
+        type: '+' as const,
+        unit: 'm' as const,
+        value: 1,
+        raw: '+1m',
+      };
+      const result = formatDateLine(line, newDate, repeat);
+      expect(result).toBe('SCHEDULED: <2026-04-01 Wed +1m>');
+    });
+
+    it('should return original line if no date brackets found', () => {
+      const line = 'This is just a regular line without any date';
+      const newDate = new Date('2026-03-06T00:00:00');
+      const result = formatDateLine(line, newDate, null);
+      expect(result).toBe('This is just a regular line without any date');
+    });
+
+    it('should handle undefined repeater', () => {
+      const line = 'SCHEDULED: <2026-03-05 Wed 07:00 .+1d>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const result = formatDateLine(line, newDate, undefined);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 07:00>');
+    });
+
+    it('should handle null repeater', () => {
+      const line = 'SCHEDULED: <2026-03-05 Wed 07:00 .+1d>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const result = formatDateLine(line, newDate, null);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 07:00>');
+    });
+
+    it('should pad month and day with zeros', () => {
+      const line = 'SCHEDULED: <2026-03-05 Wed>';
+      const newDate = new Date('2026-01-09T00:00:00'); // January 9th
+      const result = formatDateLine(line, newDate, null);
+      expect(result).toBe('SCHEDULED: <2026-01-09 Fri>');
+    });
+
+    it('should handle single-digit month and day correctly', () => {
+      const line = 'SCHEDULED: <2026-12-31 Fri>';
+      const newDate = new Date('2026-02-03T00:00:00'); // February 3rd
+      const result = formatDateLine(line, newDate, null);
+      expect(result).toBe('SCHEDULED: <2026-02-03 Tue>');
+    });
+
+    it('should handle weekly repeater', () => {
+      const line = 'SCHEDULED: <2026-03-05 Wed +1w>';
+      const newDate = new Date('2026-03-12T00:00:00');
+      const repeat = {
+        type: '+' as const,
+        unit: 'w' as const,
+        value: 1,
+        raw: '+1w',
+      };
+      const result = formatDateLine(line, newDate, repeat);
+      expect(result).toBe('SCHEDULED: <2026-03-12 Thu +1w>');
+    });
+
+    it('should handle hourly repeater', () => {
+      const line = 'SCHEDULED: <2026-03-05 Wed 08:00 .+1h>';
+      const newDate = new Date('2026-03-06T00:00:00'); // March 6, 2026 is Friday
+      const repeat = {
+        type: '.+' as const,
+        unit: 'h' as const,
+        value: 1,
+        raw: '.+1h',
+      };
+      const result = formatDateLine(line, newDate, repeat);
+      expect(result).toBe('SCHEDULED: <2026-03-06 Fri 08:00 .+1h>');
+    });
+
+    it('should handle yearly repeater', () => {
+      const line = 'SCHEDULED: <2026-03-05 Wed +1y>';
+      const newDate = new Date('2027-03-05T00:00:00');
+      const repeat = {
+        type: '+' as const,
+        unit: 'y' as const,
+        value: 1,
+        raw: '+1y',
+      };
+      const result = formatDateLine(line, newDate, repeat);
+      expect(result).toBe('SCHEDULED: <2027-03-05 Fri +1y>');
     });
   });
 });

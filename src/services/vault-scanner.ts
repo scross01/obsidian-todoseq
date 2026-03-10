@@ -1,5 +1,5 @@
 import { App, TFile, TAbstractFile } from 'obsidian';
-import { Task, DateRepeatInfo } from '../types/task';
+import { Task } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
 import { ParserRegistry } from '../parser/parser-registry';
 import { ITaskParser, ParserConfig } from '../parser/types';
@@ -13,7 +13,10 @@ import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
 import { PropertySearchEngine } from './property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
-import { calculateNextRepeatDate } from '../utils/date-repeater';
+import {
+  calculateNextRepeatDate,
+  formatDateLine,
+} from '../utils/date-repeater';
 import { getPluginSettings } from '../utils/settings-utils';
 
 // Define the event types that VaultScanner will emit
@@ -763,7 +766,7 @@ export class VaultScanner {
 
         // Update scheduled date line
         if (dateType === 'scheduled' && !scheduledUpdated && newScheduledDate) {
-          lines[i] = this.formatDateLineForRecurrence(
+          lines[i] = formatDateLine(
             line,
             newScheduledDate,
             task.scheduledDateRepeat,
@@ -777,7 +780,7 @@ export class VaultScanner {
           !deadlineUpdated &&
           newDeadlineDate
         ) {
-          lines[i] = this.formatDateLineForRecurrence(
+          lines[i] = formatDateLine(
             line,
             newDeadlineDate,
             task.deadlineDateRepeat,
@@ -822,47 +825,6 @@ export class VaultScanner {
         await this.processIncrementalChange(file);
       }
     }
-  }
-
-  /**
-   * Format a date line with a new date, preserving the original line's prefix and repeater
-   */
-  private formatDateLineForRecurrence(
-    line: string,
-    newDate: Date,
-    repeat: DateRepeatInfo | null | undefined,
-  ): string {
-    const year = newDate.getFullYear();
-    const month = String(newDate.getMonth() + 1).padStart(2, '0');
-    const day = String(newDate.getDate()).padStart(2, '0');
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayName = days[newDate.getDay()];
-
-    // Extract the date content from the angle brackets
-    const dateContentMatch = line.match(/<(.[^>]*)>/);
-    if (!dateContentMatch) {
-      return line;
-    }
-
-    const oldDateContent = dateContentMatch[1];
-
-    // Check for time in old date - time can appear in various positions:
-    // - <2008-02-08 20:00 Fri ++1d> (time before DOW)
-    // - <2008-02-08 Fri 20:00 ++1d> (time after DOW)
-    // - <2008-02-08 20:00 ++1d> (time before repeater)
-    // - <2008-02-08 20:00> (just time)
-    const timeMatch = oldDateContent.match(/(\d{2}:\d{2})/);
-    const timeStr = timeMatch ? ` ${timeMatch[1]}` : '';
-
-    // Build new date content: always DOW before time
-    let newDateContent = `${year}-${month}-${day} ${dayName}${timeStr}`;
-
-    // Add repeater if present
-    if (repeat) {
-      newDateContent += ` ${repeat.raw}`;
-    }
-
-    return line.replace(/<.[^>]*>/, `<${newDateContent}>`);
   }
 
   // Clean up resources

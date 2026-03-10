@@ -3,9 +3,13 @@ import { isCompletedKeyword } from '../utils/task-utils';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 import { TFile } from 'obsidian';
-import { calculateNextRepeatDate } from '../utils/date-repeater';
+import {
+  calculateNextRepeatDate,
+  formatDateLine,
+} from '../utils/date-repeater';
 import { KeywordManager } from '../utils/keyword-manager';
 import { getPluginSettings } from '../utils/settings-utils';
+import { getTaskIndent } from '../utils/task-line-utils';
 
 /**
  * TaskUpdateCoordinator provides a centralized way to handle all task state updates
@@ -750,32 +754,7 @@ export class TaskUpdateCoordinator {
       // Get task indent level to properly identify date lines for this task
       // This must include quote prefix, bullet marker, or checkbox marker for proper date line detection
       const currentLine = lines[task.line];
-      let taskIndent = '';
-
-      if (currentLine) {
-        // Check for quote block tasks: > TODO task or > > TODO task
-        const quotePrefixMatch = currentLine.match(/^(\s*)(>\s*)+/);
-        if (quotePrefixMatch) {
-          taskIndent = quotePrefixMatch[0];
-        } else {
-          // Check for checkbox tasks: - [ ] TODO task
-          // For checkbox tasks, use 2-space indent (aligning with task text)
-          const checkboxMatch = currentLine.match(/^(\s*)- \[([ x])\] /);
-          if (checkboxMatch) {
-            // Use leading whitespace + 2 spaces (aligning with task text)
-            taskIndent = checkboxMatch[1] + '  ';
-          } else {
-            // Check for bulleted tasks: - TODO task or + TODO task or * TODO task
-            const bulletMatch = currentLine.match(/^([-*+])\s+(.*)/);
-            if (bulletMatch) {
-              const leadingWhitespace = currentLine.match(/^(\s*)/)?.[1] ?? '';
-              taskIndent = leadingWhitespace + '  ';
-            } else {
-              taskIndent = currentLine.match(/^(\s*)/)?.[1] ?? '';
-            }
-          }
-        }
-      }
+      const taskIndent = getTaskIndent(currentLine);
 
       const now = new Date();
       let scheduledUpdated = false;
@@ -864,7 +843,7 @@ export class TaskUpdateCoordinator {
 
         // Update the scheduled date line
         if (dateType === 'scheduled' && !scheduledUpdated && newScheduledDate) {
-          lines[i] = this.formatDateLine(
+          lines[i] = formatDateLine(
             line,
             newScheduledDate,
             task.scheduledDateRepeat,
@@ -878,7 +857,7 @@ export class TaskUpdateCoordinator {
           !deadlineUpdated &&
           newDeadlineDate
         ) {
-          lines[i] = this.formatDateLine(
+          lines[i] = formatDateLine(
             line,
             newDeadlineDate,
             task.deadlineDateRepeat,
@@ -941,46 +920,5 @@ export class TaskUpdateCoordinator {
     } catch (error) {
       console.error('[TODOseq] Failed to perform recurrence update:', error);
     }
-  }
-
-  /**
-   * Format a date line with a new date, preserving the original line's prefix and repeater
-   */
-  private formatDateLine(
-    line: string,
-    newDate: Date,
-    repeat: DateRepeatInfo | null | undefined,
-  ): string {
-    const year = newDate.getFullYear();
-    const month = String(newDate.getMonth() + 1).padStart(2, '0');
-    const day = String(newDate.getDate()).padStart(2, '0');
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayName = days[newDate.getDay()];
-
-    // Extract the date content from the angle brackets
-    const dateContentMatch = line.match(/<(.[^>]*)>/);
-    if (!dateContentMatch) {
-      return line;
-    }
-
-    const oldDateContent = dateContentMatch[1];
-
-    // Check for time in old date - time can appear in various positions:
-    // - <2008-02-08 20:00 Fri ++1d> (time before DOW)
-    // - <2008-02-08 Fri 20:00 ++1d> (time after DOW)
-    // - <2008-02-08 20:00 ++1d> (time before repeater)
-    // - <2008-02-08 20:00> (just time)
-    const timeMatch = oldDateContent.match(/(\d{2}:\d{2})/);
-    const timeStr = timeMatch ? ` ${timeMatch[1]}` : '';
-
-    // Build new date content: always DOW before time
-    let newDateContent = `${year}-${month}-${day} ${dayName}${timeStr}`;
-
-    // Add repeater if present
-    if (repeat) {
-      newDateContent += ` ${repeat.raw}`;
-    }
-
-    return line.replace(/<.[^>]*>/, `<${newDateContent}>`);
   }
 }

@@ -326,11 +326,24 @@ export class TaskContextMenu {
             this.hide();
           } else {
             // Regular date option (Today, Tomorrow, No date, etc.)
+            // Get the current task from state manager to ensure we have the latest data
+            // The stored task reference might be stale if the task was updated previously
+            let currentTask = this.task;
+            if (this.taskStateManager && this.task) {
+              const freshTask = this.taskStateManager.findTaskByPathAndLine(
+                this.task.path,
+                this.task.line,
+              );
+              if (freshTask) {
+                currentTask = freshTask;
+              }
+            }
+
             const date = option.getDate();
 
             // Preserve existing time if the task already has a scheduled date with a time component
-            if (date && this.task.scheduledDate) {
-              const existingDate = this.task.scheduledDate;
+            if (date && currentTask?.scheduledDate) {
+              const existingDate = currentTask.scheduledDate;
               const hasTime =
                 existingDate.getHours() !== 0 ||
                 existingDate.getMinutes() !== 0;
@@ -346,13 +359,13 @@ export class TaskContextMenu {
             }
 
             // Preserve existing repeat component
-            const repeat = this.task.scheduledDateRepeat;
+            const repeat = currentTask?.scheduledDateRepeat;
 
             // Only pass repeat argument if it exists
             if (repeat) {
-              this.callbacks.onScheduledDateChange(this.task, date, repeat);
+              this.callbacks.onScheduledDateChange(currentTask, date, repeat);
             } else {
-              this.callbacks.onScheduledDateChange(this.task, date);
+              this.callbacks.onScheduledDateChange(currentTask, date);
             }
             this.hide();
           }
