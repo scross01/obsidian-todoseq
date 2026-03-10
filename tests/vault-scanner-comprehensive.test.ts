@@ -43,7 +43,14 @@ describe('VaultScanner', () => {
       },
     } as unknown as jest.Mocked<App>;
 
-    vaultScanner = new VaultScanner(mockApp, settings, taskStateManager);
+    const urgencyCoefficients = {}; // Mock urgency coefficients
+    vaultScanner = new VaultScanner(
+      mockApp,
+      settings,
+      taskStateManager,
+      urgencyCoefficients,
+      createTestKeywordManager(settings),
+    );
   });
 
   afterEach(() => {
@@ -202,10 +209,13 @@ describe('VaultScanner', () => {
       // Create a new vault scanner without any parsers
       const keywordManager = createTestKeywordManager(settings);
       const newTaskStateManager = new TaskStateManager(keywordManager);
+      const urgencyCoefficients = {}; // Mock urgency coefficients
       const newVaultScanner = new VaultScanner(
         mockApp,
         settings,
         newTaskStateManager,
+        urgencyCoefficients,
+        createTestKeywordManager(settings),
       );
 
       // Clear the parser registry

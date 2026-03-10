@@ -21,6 +21,7 @@ export class TaskUpdateCoordinator {
   constructor(
     private plugin: TodoTracker,
     private taskStateManager: TaskStateManager,
+    private keywordManager: KeywordManager,
   ) {}
 
   /**
@@ -110,9 +111,8 @@ export class TaskUpdateCoordinator {
       // 6. Handle recurrence updates
       // Check if the task was marked as completed and has repeating dates
       const settings = getPluginSettings(this.plugin.app);
-      const keywordManager = new KeywordManager(settings ?? {});
-      const isNowCompleted = keywordManager.isCompleted(updatedTask.state);
-      const wasCompleted = keywordManager.isCompleted(currentTask.state);
+      const isNowCompleted = this.keywordManager.isCompleted(updatedTask.state);
+      const wasCompleted = this.keywordManager.isCompleted(currentTask.state);
       const hasRepeatingDates =
         (updatedTask.scheduledDateRepeat != null &&
           updatedTask.scheduledDate != null) ||
@@ -131,9 +131,11 @@ export class TaskUpdateCoordinator {
 
       // 7. Handle CLOSED date tracking
       if (settings && settings.trackClosedDate) {
-        const oldIsCompleted = keywordManager.isCompleted(task.state);
-        const newIsCompleted = keywordManager.isCompleted(updatedTask.state);
-        const newIsArchived = keywordManager.isArchived(updatedTask.state);
+        const oldIsCompleted = this.keywordManager.isCompleted(task.state);
+        const newIsCompleted = this.keywordManager.isCompleted(
+          updatedTask.state,
+        );
+        const newIsArchived = this.keywordManager.isArchived(updatedTask.state);
 
         // Only manage CLOSED date if not transitioning to archived state
         if (!newIsArchived) {
@@ -769,9 +771,6 @@ export class TaskUpdateCoordinator {
       this.plugin.isRecurrenceUpdate = true;
 
       await this.plugin.app.vault.modify(file, updatedLines.join('\n'));
-      console.debug(
-        `[TODOseq] Recurrence update: ${task.path}:${task.line} -> ${defaultInactive}`,
-      );
 
       const currentTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,

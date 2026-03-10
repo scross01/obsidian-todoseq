@@ -3,6 +3,7 @@ import { createBaseTask } from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { getPluginSettings } from '../src/utils/settings-utils';
 import { TFile } from 'obsidian';
+import { KeywordManager } from '../src/utils/keyword-manager';
 
 // Mock the settings utility
 jest.mock('../src/utils/settings-utils', () => ({
@@ -46,7 +47,11 @@ describe('TaskWriter Remaining Lines', () => {
       additionalInactiveKeywords: ['CUSTOM'],
     });
 
-    taskWriter = new TaskWriter(mockApp);
+    // Create keyword manager for TaskWriter
+    const keywordManager = new KeywordManager({
+      additionalInactiveKeywords: ['CUSTOM'],
+    });
+    taskWriter = new TaskWriter(mockApp, keywordManager);
   });
 
   describe('priority handling', () => {
@@ -143,7 +148,12 @@ describe('TaskWriter Remaining Lines', () => {
         priority: 'high',
       });
 
-      const result = TaskWriter.generateTaskLine(task, 'TODO');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        true,
+        taskWriter['keywordManager'],
+      );
       expect(result.newLine).toBe('TODO [#A] Task text');
     });
 
@@ -155,7 +165,12 @@ describe('TaskWriter Remaining Lines', () => {
         priority: 'med',
       });
 
-      const result = TaskWriter.generateTaskLine(task, 'DOING');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DOING',
+        true,
+        taskWriter['keywordManager'],
+      );
       expect(result.newLine).toBe('> DOING [#B] Task text');
     });
   });
@@ -164,14 +179,24 @@ describe('TaskWriter Remaining Lines', () => {
     it('should handle tasks without priority markers', async () => {
       const task: Task = createBaseTask({ priority: null });
 
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        taskWriter['keywordManager'],
+      );
       expect(result.newLine).not.toContain('[#');
     });
 
     it('should preserve priority when keepPriority true', async () => {
       const task: Task = createBaseTask({ priority: 'high' });
 
-      const result = TaskWriter.generateTaskLine(task, 'DOING', true);
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DOING',
+        true,
+        taskWriter['keywordManager'],
+      );
       expect(result.newLine).toContain('[#A]');
     });
   });
@@ -185,7 +210,12 @@ describe('TaskWriter Remaining Lines', () => {
         priority: 'high',
       });
 
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        taskWriter['keywordManager'],
+      );
       expect(result.newLine).toContain('[#A]');
       expect(result.newLine).toContain('^12345');
     });
@@ -200,7 +230,12 @@ describe('TaskWriter Remaining Lines', () => {
         priority: 'med',
       });
 
-      const result = TaskWriter.generateTaskLine(task, 'DOING');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DOING',
+        true,
+        taskWriter['keywordManager'],
+      );
       expect(result.newLine).toContain('[#B]');
       expect(result.newLine).toContain('[^1]');
     });

@@ -86,6 +86,7 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
     taskUpdateCoordinator = new TaskUpdateCoordinator(
       mockPlugin as any,
       taskStateManager,
+      keywordManager,
     );
 
     // Mock the task editor methods to return the task
@@ -374,6 +375,7 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskUpdateCoordinator = new TaskUpdateCoordinator(
         mockPlugin as any,
         taskStateManager,
+        keywordManager,
       );
     });
 

@@ -8,16 +8,23 @@ import {
   BUILTIN_ARCHIVED_KEYWORDS,
 } from '../src/utils/constants';
 import { createBaseSettings } from './helpers/test-helper';
+import { KeywordManager } from '../src/utils/keyword-manager';
 
 describe('StateMenuBuilder', () => {
   let mockSettings: TodoTrackerSettings;
-  let mockPlugin: { settings: TodoTrackerSettings };
+  let mockPlugin: {
+    settings: TodoTrackerSettings;
+    keywordManager: KeywordManager;
+  };
+  let keywordManager: KeywordManager;
 
   beforeEach(() => {
     // Create default settings
     mockSettings = createBaseSettings();
-    // Create mock plugin with settings
-    mockPlugin = { settings: mockSettings };
+    // Create keyword manager
+    keywordManager = new KeywordManager(mockSettings);
+    // Create mock plugin with settings and keyword manager
+    mockPlugin = { settings: mockSettings, keywordManager };
   });
 
   describe('constructor', () => {
@@ -65,7 +72,11 @@ describe('StateMenuBuilder', () => {
         additionalWaitingKeywords: ['BLOCKED'],
         additionalCompletedKeywords: ['ARCHIVED'],
       };
-      const pluginWithCustom = { settings: settingsWithCustom };
+      const customKeywordManager = new KeywordManager(settingsWithCustom);
+      const pluginWithCustom = {
+        settings: settingsWithCustom,
+        keywordManager: customKeywordManager,
+      };
       const builder = new StateMenuBuilder(pluginWithCustom as any);
 
       // Act
@@ -157,7 +168,11 @@ describe('StateMenuBuilder', () => {
         additionalWaitingKeywords: ['BLOCKED'],
         additionalCompletedKeywords: ['ARCHIVED'],
       };
-      const pluginWithCustom = { settings: settingsWithCustom };
+      const customKeywordManager = new KeywordManager(settingsWithCustom);
+      const pluginWithCustom = {
+        settings: settingsWithCustom,
+        keywordManager: customKeywordManager,
+      };
       const builder = new StateMenuBuilder(pluginWithCustom as any);
 
       // Act
@@ -183,7 +198,11 @@ describe('StateMenuBuilder', () => {
         ...mockSettings,
         additionalActiveKeywords: ['AAA', 'ZZZ'], // Alphabetically before/after built-ins
       };
-      const pluginWithCustom = { settings: settingsWithCustom };
+      const customKeywordManager = new KeywordManager(settingsWithCustom);
+      const pluginWithCustom = {
+        settings: settingsWithCustom,
+        keywordManager: customKeywordManager,
+      };
       const builder = new StateMenuBuilder(pluginWithCustom as any);
 
       // Act
@@ -216,7 +235,11 @@ describe('StateMenuBuilder', () => {
         ...mockSettings,
         additionalInactiveKeywords: duplicateKeywords,
       };
-      const pluginWithDuplicates = { settings: settingsWithDuplicates };
+      const customKeywordManager = new KeywordManager(settingsWithDuplicates);
+      const pluginWithDuplicates = {
+        settings: settingsWithDuplicates,
+        keywordManager: customKeywordManager,
+      };
       const builder = new StateMenuBuilder(pluginWithDuplicates as any);
 
       // Act
@@ -239,7 +262,11 @@ describe('StateMenuBuilder', () => {
         ...mockSettings,
         additionalInactiveKeywords: ['', 'PLANNED', ''],
       };
-      const pluginWithEmpty = { settings: settingsWithEmpty };
+      const customKeywordManager = new KeywordManager(settingsWithEmpty);
+      const pluginWithEmpty = {
+        settings: settingsWithEmpty,
+        keywordManager: customKeywordManager,
+      };
       const builder = new StateMenuBuilder(pluginWithEmpty as any);
 
       // Act
@@ -270,7 +297,11 @@ describe('StateMenuBuilder', () => {
         ...mockSettings,
         additionalWaitingKeywords: ['WAIT'], // Add WAIT as custom too
       };
-      const pluginSingleWaiting = { settings: settingsSingleWaiting };
+      const customKeywordManager = new KeywordManager(settingsSingleWaiting);
+      const pluginSingleWaiting = {
+        settings: settingsSingleWaiting,
+        keywordManager: customKeywordManager,
+      };
       const builderSingle = new StateMenuBuilder(pluginSingleWaiting as any);
       const groupsEmpty = builderSingle.getSelectableStatesForMenu('WAIT');
 

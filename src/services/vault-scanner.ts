@@ -50,10 +50,10 @@ export class VaultScanner {
     private app: App,
     private settings: TodoTrackerSettings,
     private taskStateManager: TaskStateManager,
-    urgencyCoefficients?: UrgencyCoefficients,
+    urgencyCoefficients: UrgencyCoefficients,
+    keywordManager: KeywordManager,
   ) {
-    // Create KeywordManager - single source for this VaultScanner
-    this.keywordManager = new KeywordManager(settings);
+    this.keywordManager = keywordManager;
 
     // Initialize parser registry
     this.parserRegistry = new ParserRegistry();
@@ -528,10 +528,6 @@ export class VaultScanner {
 
       if (!isRecurrenceUpdate) {
         await this.processRecurringCompletedTasks(updatedTasks);
-      } else {
-        console.debug(
-          '[TODOseq] Skipping recurrence recovery - was triggered by recurrence update',
-        );
       }
     } catch (err) {
       console.error('VaultScanner processIncrementalChange error', err);
@@ -625,7 +621,7 @@ export class VaultScanner {
    */
   private async processRecurringCompletedTasks(tasks: Task[]): Promise<void> {
     const settings = getPluginSettings(this.app);
-    const keywordManager = new KeywordManager(settings ?? {});
+    const keywordManager = this.keywordManager;
     const defaultInactive =
       settings?.stateTransitions?.defaultInactive || 'TODO';
 
@@ -640,9 +636,6 @@ export class VaultScanner {
     const isUserInitiatedUpdate =
       recurrencePlugin?.isUserInitiatedUpdate ?? false;
     if (isUserInitiatedUpdate) {
-      console.debug(
-        '[TODOseq] Skipping recurrence recovery - was triggered by user-initiated update',
-      );
       return;
     }
 
@@ -782,10 +775,6 @@ export class VaultScanner {
 
       await this.app.vault.modify(file, lines.join('\n'));
       filesToRescan.add(file.path);
-
-      console.debug(
-        `[TODOseq] Recovered recurring task: ${task.path}:${task.line} -> ${defaultInactive}`,
-      );
     }
 
     // Trigger rescan of modified files

@@ -30,12 +30,13 @@ export class PluginLifecycleManager {
     // Load urgency coefficients on startup
     const urgencyCoefficients = await parseUrgencyCoefficients(this.plugin.app);
 
-    // VaultScanner creates KeywordManager and TaskParser internally
+    // VaultScanner - use shared KeywordManager from main.ts
     this.plugin.vaultScanner = new VaultScanner(
       this.plugin.app,
       this.plugin.settings,
       this.plugin.taskStateManager,
       urgencyCoefficients,
+      this.plugin.keywordManager,
     );
 
     // Register org-mode parser if experimental feature is enabled
@@ -73,7 +74,10 @@ export class PluginLifecycleManager {
     // Expose EventCoordinator on plugin for other components
     this.plugin.eventCoordinator = this.eventCoordinator;
 
-    this.plugin.taskEditor = new TaskWriter(this.plugin.app);
+    this.plugin.taskEditor = new TaskWriter(
+      this.plugin.app,
+      this.plugin.vaultScanner.getKeywordManager(),
+    );
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);
     this.plugin.statusBarManager = new StatusBarManager(this.plugin);
     this.plugin.statusBarManager.setupStatusBarItem();
@@ -95,6 +99,7 @@ export class PluginLifecycleManager {
           this.plugin.taskStateManager,
           this.plugin.settings.taskListViewMode,
           this.plugin,
+          this.plugin.taskStateManager.getKeywordManager(),
         ),
     );
 

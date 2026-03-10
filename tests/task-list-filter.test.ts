@@ -2,16 +2,19 @@ import { TaskListFilter } from '../src/view/task-list/task-list-filter';
 import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import TodoTracker from '../src/main';
+import { KeywordManager } from '../src/utils/keyword-manager';
 
 describe('TaskListFilter', () => {
   const createPluginMock = (
     settings: Partial<TodoTrackerSettings> = {},
   ): TodoTracker => {
+    const fullSettings = {
+      ...createBaseSettings(),
+      ...settings,
+    };
     return {
-      settings: {
-        ...createBaseSettings(),
-        ...settings,
-      },
+      settings: fullSettings,
+      keywordManager: new KeywordManager(fullSettings),
     } as unknown as TodoTracker;
   };
 
@@ -34,20 +37,29 @@ describe('TaskListFilter', () => {
 
   describe('filterTasksByViewMode', () => {
     it('should return all tasks for showAll', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const result = filter.filterTasksByViewMode(tasks, 'showAll');
       expect(result).toHaveLength(3);
     });
 
     it('should filter completed tasks for hideCompleted', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const result = filter.filterTasksByViewMode(tasks, 'hideCompleted');
       expect(result).toHaveLength(2);
       expect(result.every((t) => !t.completed)).toBe(true);
     });
 
     it('should return copy for sortCompletedLast', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const result = filter.filterTasksByViewMode(tasks, 'sortCompletedLast');
       expect(result).toHaveLength(3);
     });
@@ -55,19 +67,28 @@ describe('TaskListFilter', () => {
 
   describe('getViewMode/setViewMode', () => {
     it('should read view mode from element attribute', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const el = mockElement({ 'data-view-mode': 'hideCompleted' });
       expect(filter.getViewMode(el)).toBe('hideCompleted');
     });
 
     it('should default to showAll for invalid attribute', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const el = mockElement();
       expect(filter.getViewMode(el)).toBe('showAll');
     });
 
     it('should handle legacy mode names', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
 
       let el = mockElement({ 'data-view-mode': 'default' });
       expect(filter.getViewMode(el)).toBe('showAll');
@@ -77,7 +98,10 @@ describe('TaskListFilter', () => {
     });
 
     it('should write view mode to element attribute', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const el = mockElement();
 
       filter.setViewMode(el, 'hideCompleted');
@@ -87,19 +111,28 @@ describe('TaskListFilter', () => {
 
   describe('getSortMethod/setSortMethod', () => {
     it('should read sort method from element attribute', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const el = mockElement({ 'data-sort-method': 'sortByPriority' });
       expect(filter.getSortMethod(el, 'default')).toBe('sortByPriority');
     });
 
     it('should fallback to default when attribute missing', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const el = mockElement();
       expect(filter.getSortMethod(el, 'sortByDeadline')).toBe('sortByDeadline');
     });
 
     it('should handle all valid sort method values', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
 
       const methods = [
         'default',
@@ -117,7 +150,10 @@ describe('TaskListFilter', () => {
     });
 
     it('should write sort method to element attribute', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const el = mockElement();
 
       filter.setSortMethod(el, 'sortByDeadline');
@@ -127,14 +163,19 @@ describe('TaskListFilter', () => {
 
   describe('transformForView', () => {
     it('should transform tasks with showAll mode', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
       const result = filter.transformForView(tasks, 'showAll', 'default');
       expect(result).toHaveLength(3);
     });
 
     it('should transform tasks with sortByKeyword', () => {
+      const pluginMock = createPluginMock({ futureTaskSorting: 'showAll' });
       const filter = new TaskListFilter(
-        createPluginMock({ futureTaskSorting: 'showAll' }),
+        pluginMock,
+        (pluginMock as any).keywordManager,
       );
       const result = filter.transformForView(tasks, 'showAll', 'sortByKeyword');
       expect(result).toHaveLength(3);
@@ -143,7 +184,10 @@ describe('TaskListFilter', () => {
 
   describe('getKeywordSortConfig', () => {
     it('should cache keyword config', () => {
-      const filter = new TaskListFilter(createPluginMock());
+      const filter = new TaskListFilter(
+        createPluginMock(),
+        (createPluginMock() as any).keywordManager,
+      );
 
       const config1 = filter.getKeywordSortConfig();
       const config2 = filter.getKeywordSortConfig();

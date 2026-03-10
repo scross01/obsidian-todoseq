@@ -19,7 +19,10 @@ export class TodoseqCodeBlockProcessor {
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
     this.renderer = new EmbeddedTaskListRenderer(plugin);
-    this.manager = new EmbeddedTaskListManager(plugin.settings);
+    this.manager = new EmbeddedTaskListManager(
+      plugin.settings,
+      plugin.keywordManager,
+    );
     this.eventHandler = new EmbeddedTaskListEventHandler(
       plugin,
       this.renderer,
@@ -139,8 +142,16 @@ export class TodoseqCodeBlockProcessor {
    * Update settings when plugin settings change
    */
   updateSettings(): void {
-    this.manager.updateSettings(this.plugin.settings);
+    // Recreate manager with new settings and keywordManager reference
+    this.manager = new EmbeddedTaskListManager(
+      this.plugin.settings,
+      this.plugin.keywordManager,
+    );
+    // Update event handler's manager reference
+    this.eventHandler.setManager(this.manager);
     this.eventHandler.updateSettings(this.plugin.settings);
+    // Update renderer's menu builder with new keyword manager
+    this.renderer.updateSettings();
     // Refresh all embedded task lists to reflect new settings
     this.refreshAllEmbeddedTaskLists();
   }

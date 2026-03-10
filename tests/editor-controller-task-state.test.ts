@@ -28,13 +28,12 @@ describe('Editor Controller - Task State Methods', () => {
       },
     });
 
+    const keywordManager = createTestKeywordManager(settings);
+
     mockPlugin = {
       getVaultScanner: () => ({
         getParser: () => {
-          const parser = TaskParser.create(
-            createTestKeywordManager(settings),
-            null,
-          );
+          const parser = TaskParser.create(keywordManager, null);
           return parser;
         },
       }),
@@ -45,7 +44,7 @@ describe('Editor Controller - Task State Methods', () => {
       settings,
     };
 
-    editorController = new EditorController(mockPlugin);
+    editorController = new EditorController(mockPlugin, keywordManager);
 
     mockEditor = {
       getLine: (lineNumber: number) => {

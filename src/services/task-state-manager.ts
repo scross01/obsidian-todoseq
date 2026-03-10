@@ -18,6 +18,14 @@ export class TaskStateManager {
     this.keywordManager = keywordManager;
   }
 
+  getKeywordManager(): KeywordManager {
+    return this.keywordManager;
+  }
+
+  setKeywordManager(keywordManager: KeywordManager): void {
+    this.keywordManager = keywordManager;
+  }
+
   /**
    * Subscribe to task changes. The callback is called immediately with current tasks.
    * @param callback Function to call when tasks change
@@ -104,7 +112,12 @@ export class TaskStateManager {
    */
   optimisticUpdate(task: Task, newState: string): string {
     // Generate the new rawText first
-    const { newLine } = TaskWriter.generateTaskLine(task, newState);
+    const { newLine } = TaskWriter.generateTaskLine(
+      task,
+      newState,
+      true,
+      this.keywordManager,
+    );
 
     // Find the task in our array by path and line to ensure we're updating the right object
     const existingTask = this.findTaskByPathAndLine(task.path, task.line);

@@ -18,6 +18,8 @@ describe('VaultScanner.tasksIdentical', () => {
       {} as any, // mock app
       settings,
       taskStateManager,
+      {} as any, // mock urgency coefficients
+      keywordManager,
     );
   });
 

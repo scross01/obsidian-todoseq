@@ -48,9 +48,9 @@ export type TaskContextMenuCallback = (task: Task, evt: MouseEvent) => void;
  * - Text with links rendering
  */
 export class TaskItemRenderer {
-  private keywordManager: KeywordManager;
-  private stateManager: TaskStateTransitionManager;
-  private menuBuilder: StateMenuBuilder;
+  private getKeywordManager: () => KeywordManager;
+  private getStateManager: () => TaskStateTransitionManager;
+  private getMenuBuilder: () => StateMenuBuilder;
   private onStateChange: TaskStateChangeCallback;
   private onLocationOpen: TaskLocationOpenCallback;
   private onContextMenu: TaskContextMenuCallback | null;
@@ -58,23 +58,35 @@ export class TaskItemRenderer {
   private defaultInactive: string;
 
   constructor(
-    keywordManager: KeywordManager,
-    stateManager: TaskStateTransitionManager,
-    menuBuilder: StateMenuBuilder,
+    getKeywordManager: () => KeywordManager,
+    getStateManager: () => TaskStateTransitionManager,
+    getMenuBuilder: () => StateMenuBuilder,
     onStateChange: TaskStateChangeCallback,
     onLocationOpen: TaskLocationOpenCallback,
     defaultCompleted: 'DONE',
     defaultInactive: 'TODO',
     onContextMenu: TaskContextMenuCallback | null = null,
   ) {
-    this.keywordManager = keywordManager;
-    this.stateManager = stateManager;
-    this.menuBuilder = menuBuilder;
+    this.getKeywordManager = getKeywordManager;
+    this.getStateManager = getStateManager;
+    this.getMenuBuilder = getMenuBuilder;
     this.onStateChange = onStateChange;
     this.onLocationOpen = onLocationOpen;
     this.onContextMenu = onContextMenu;
     this.defaultCompleted = defaultCompleted;
     this.defaultInactive = defaultInactive;
+  }
+
+  private get keywordManager(): KeywordManager {
+    return this.getKeywordManager();
+  }
+
+  private get stateManager(): TaskStateTransitionManager {
+    return this.getStateManager();
+  }
+
+  private get menuBuilder(): StateMenuBuilder {
+    return this.getMenuBuilder();
   }
 
   /**

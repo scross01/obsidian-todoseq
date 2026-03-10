@@ -2004,4 +2004,11 @@ export class EmbeddedTaskListRenderer {
       text: 'Check your search and sort parameters for syntax errors.',
     });
   }
+
+  /**
+   * Update settings - no longer need to refresh menu builder since it now directly accesses the plugin's keyword manager
+   */
+  public updateSettings(): void {
+    // Menu builder now directly accesses the plugin's keyword manager, so no need to recreate it
+  }
 }

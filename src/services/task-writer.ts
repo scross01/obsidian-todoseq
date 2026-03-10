@@ -15,16 +15,19 @@ export class TaskWriter {
    * Prefer Editor API for the active file to preserve cursor/selection/folds and UX.
    * Prefer Vault.process for background edits to perform atomic writes.
    */
-  constructor(private readonly app: App) {}
+  constructor(
+    private readonly app: App,
+    private readonly keywordManager: KeywordManager,
+  ) {}
 
   // Pure formatter of a task line given a new state and optional priority retention
   static generateTaskLine(
     task: Task,
     newState: string,
     keepPriority = true,
-    keywordManager?: KeywordManager,
+    keywordManager: KeywordManager,
   ): { newLine: string; completed: boolean } {
-    const keywordManagerInstance = keywordManager ?? new KeywordManager({});
+    const keywordManagerInstance = keywordManager;
     const priToken =
       keepPriority && task.priority
         ? task.priority === 'high'
@@ -149,12 +152,11 @@ export class TaskWriter {
     forceVaultApi = false,
   ): Promise<Task> {
     const settings = getPluginSettings(this.app);
-    const keywordManagerInstance = new KeywordManager(settings ?? {});
     const { newLine, completed } = TaskWriter.generateTaskLine(
       task,
       newState,
       keepPriority,
-      keywordManagerInstance,
+      this.keywordManager,
     );
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -244,9 +246,8 @@ export class TaskWriter {
     let state: string;
     if (nextState == null) {
       const settings = getPluginSettings(this.app);
-      const keywordManagerInstance = new KeywordManager(settings ?? {});
       const stateManager = new TaskStateTransitionManager(
-        keywordManagerInstance,
+        this.keywordManager,
         settings?.stateTransitions,
       );
       state = stateManager.getNextState(task.state);
@@ -265,9 +266,8 @@ export class TaskWriter {
     let state: string;
     if (nextState == null) {
       const settings = getPluginSettings(this.app);
-      const keywordManagerInstance = new KeywordManager(settings ?? {});
       const stateManager = new TaskStateTransitionManager(
-        keywordManagerInstance,
+        this.keywordManager,
         settings?.stateTransitions,
       );
       state = stateManager.getCycleState(task.state);
@@ -282,13 +282,11 @@ export class TaskWriter {
     task: Task,
     newPriority: 'high' | 'med' | 'low',
   ): Promise<Task> {
-    const settings = getPluginSettings(this.app);
-    const keywordManagerInstance = new KeywordManager(settings ?? {});
     const { newLine } = TaskWriter.generateTaskLine(
       task,
       task.state,
       true, // Keep existing priority
-      keywordManagerInstance,
+      this.keywordManager,
     );
 
     // Add the new priority to the task line

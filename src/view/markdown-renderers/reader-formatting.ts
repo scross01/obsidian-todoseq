@@ -2183,6 +2183,14 @@ export class ReaderViewFormatter {
   }
 
   /**
+   * Update settings when plugin settings change
+   * This ensures reader view formatter uses the latest keyword manager
+   */
+  public updateSettings(): void {
+    // Menu builder now directly accesses the plugin's keyword manager, so no need to recreate it
+  }
+
+  /**
    * Clean up any resources
    */
   cleanup(): void {

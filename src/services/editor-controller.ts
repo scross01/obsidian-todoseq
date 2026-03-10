@@ -19,7 +19,10 @@ import { findDateLine, getTaskIndent } from '../utils/task-line-utils';
  * It bridges the gap between the Editor UI and the Service Layer
  */
 export class EditorController {
-  constructor(private plugin: TodoTracker) {}
+  constructor(
+    private plugin: TodoTracker,
+    private keywordManager: KeywordManager,
+  ) {}
 
   /**
    * Find a task in the in-memory task list by file path and line number
@@ -173,9 +176,8 @@ export class EditorController {
       if (!newState) {
         // Cycle to next state
         const settings = this.plugin.settings;
-        const keywordManager = new KeywordManager(settings ?? {});
         const stateManager = new TaskStateTransitionManager(
-          keywordManager,
+          this.keywordManager,
           settings?.stateTransitions,
         );
         targetState = stateManager.getNextState(task.state);
@@ -274,18 +276,16 @@ export class EditorController {
     if (!newState) {
       if (task) {
         const settings = this.plugin.settings;
-        const keywordManager = new KeywordManager(settings ?? {});
         const stateManager = new TaskStateTransitionManager(
-          keywordManager,
+          this.keywordManager,
           settings?.stateTransitions,
         );
         targetState = stateManager.getCycleState(task.state);
       } else {
         // For lines without existing task keywords, use the default inactive from settings
         const settings = this.plugin.settings;
-        const keywordManager = new KeywordManager(settings ?? {});
         const stateManager = new TaskStateTransitionManager(
-          keywordManager,
+          this.keywordManager,
           settings?.stateTransitions,
         );
         targetState = stateManager.getCycleState('');

@@ -16,6 +16,7 @@ import { KeywordManager } from '../../utils/keyword-manager';
  */
 export class EmbeddedTaskListManager {
   private settings: TodoTrackerSettings;
+  private keywordManager: KeywordManager;
   private taskCache: Map<string, { tasks: Task[]; timestamp: number }> =
     new Map();
   private cacheTTL = 5000; // 5 seconds cache TTL
@@ -25,8 +26,9 @@ export class EmbeddedTaskListManager {
   private cachedKeywordConfig: KeywordSortConfig | null = null;
   private cachedKeywords: string | null = null;
 
-  constructor(settings: TodoTrackerSettings) {
+  constructor(settings: TodoTrackerSettings, keywordManager: KeywordManager) {
     this.settings = settings;
+    this.keywordManager = keywordManager;
   }
 
   /**
@@ -233,12 +235,10 @@ export class EmbeddedTaskListManager {
    * Get cached keyword sort config, rebuilding only when keywords change
    */
   private getKeywordSortConfig(): KeywordSortConfig {
-    const keywordManager = new KeywordManager(this.settings);
-
-    const keywords = keywordManager.getAllKeywords().join(',');
+    const keywords = this.keywordManager.getAllKeywords().join(',');
     if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
       this.cachedKeywords = keywords;
-      this.cachedKeywordConfig = buildKeywordSortConfig(keywordManager);
+      this.cachedKeywordConfig = buildKeywordSortConfig(this.keywordManager);
     }
 
     return this.cachedKeywordConfig;

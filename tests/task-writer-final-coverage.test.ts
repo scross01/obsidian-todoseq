@@ -1,5 +1,9 @@
 import { TaskWriter } from '../src/services/task-writer';
-import { createBaseTask, createCheckboxTask } from './helpers/test-helper';
+import {
+  createBaseTask,
+  createCheckboxTask,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { getPluginSettings } from '../src/utils/settings-utils';
 import { TFile } from 'obsidian';
@@ -32,7 +36,10 @@ describe('TaskWriter Final Coverage for Remaining Lines', () => {
       additionalInactiveKeywords: ['CUSTOM'],
     });
 
-    taskWriter = new TaskWriter(mockApp);
+    const keywordManager = createTestKeywordManager({
+      additionalInactiveKeywords: ['CUSTOM'],
+    });
+    taskWriter = new TaskWriter(mockApp, keywordManager);
   });
 
   describe('Task tail handling (line 71)', () => {
@@ -44,7 +51,12 @@ describe('TaskWriter Final Coverage for Remaining Lines', () => {
         priority: null,
       });
 
-      const result = TaskWriter.generateTaskLine(task, '');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        '',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toContain('Task with tail */');
     });
 
@@ -56,7 +68,12 @@ describe('TaskWriter Final Coverage for Remaining Lines', () => {
         priority: null,
       });
 
-      const result = TaskWriter.generateTaskLine(task, '');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        '',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toContain('Task with tail */');
     });
 
@@ -68,7 +85,12 @@ describe('TaskWriter Final Coverage for Remaining Lines', () => {
         priority: 'high',
       });
 
-      const result = TaskWriter.generateTaskLine(task, '');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        '',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toContain('Task with tail */');
     });
   });

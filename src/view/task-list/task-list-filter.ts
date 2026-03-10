@@ -22,11 +22,13 @@ export type SortMethod =
 
 export class TaskListFilter {
   private plugin: TodoTracker;
+  private keywordManager: KeywordManager;
   private cachedKeywordConfig: KeywordSortConfig | null = null;
   private cachedKeywords: string | null = null;
 
-  constructor(plugin: TodoTracker) {
+  constructor(plugin: TodoTracker, keywordManager: KeywordManager) {
     this.plugin = plugin;
+    this.keywordManager = keywordManager;
   }
 
   getViewMode(contentEl: HTMLElement): TaskListViewMode {
@@ -136,12 +138,10 @@ export class TaskListFilter {
   }
 
   getKeywordSortConfig(): KeywordSortConfig {
-    const keywordManager = new KeywordManager(this.plugin.settings ?? {});
-
-    const keywords = keywordManager.getAllKeywords().join(',');
+    const keywords = this.keywordManager.getAllKeywords().join(',');
     if (!this.cachedKeywordConfig || this.cachedKeywords !== keywords) {
       this.cachedKeywords = keywords;
-      this.cachedKeywordConfig = buildKeywordSortConfig(keywordManager);
+      this.cachedKeywordConfig = buildKeywordSortConfig(this.keywordManager);
     }
 
     return this.cachedKeywordConfig;

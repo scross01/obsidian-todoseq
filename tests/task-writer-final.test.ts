@@ -1,5 +1,8 @@
 import { TaskWriter } from '../src/services/task-writer';
-import { createBaseTask } from './helpers/test-helper';
+import {
+  createBaseTask,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { getPluginSettings } from '../src/utils/settings-utils';
 import { TFile } from 'obsidian';
@@ -46,7 +49,10 @@ describe('TaskWriter Final Coverage', () => {
       additionalInactiveKeywords: ['CUSTOM'],
     });
 
-    taskWriter = new TaskWriter(mockApp);
+    const keywordManager = createTestKeywordManager({
+      additionalInactiveKeywords: ['CUSTOM'],
+    });
+    taskWriter = new TaskWriter(mockApp, keywordManager);
   });
 
   describe('specific patterns for uncovered lines', () => {
@@ -70,7 +76,12 @@ describe('TaskWriter Final Coverage', () => {
         priority: null,
       });
 
-      const result = TaskWriter.generateTaskLine(task, 'DONE', true);
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        taskWriter['keywordManager'],
+      );
       expect(result.newLine).toContain('DONE');
       expect(result.newLine).toContain('^123');
     });

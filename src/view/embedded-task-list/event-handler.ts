@@ -222,10 +222,18 @@ export class EmbeddedTaskListEventHandler {
   }
 
   /**
-   * Update the task list manager with new settings
+   * Update task list manager with new settings
    * @param settings New settings
    */
   updateSettings(settings: TodoTrackerSettings): void {
     this.manager.updateSettings(settings);
+  }
+
+  /**
+   * Update the task list manager reference
+   * @param manager The new manager instance
+   */
+  setManager(manager: EmbeddedTaskListManager): void {
+    this.manager = manager;
   }
 }

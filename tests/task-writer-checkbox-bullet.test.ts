@@ -1,5 +1,9 @@
 import { TaskWriter } from '../src/services/task-writer';
-import { createBaseTask, createCheckboxTask } from './helpers/test-helper';
+import {
+  createBaseTask,
+  createCheckboxTask,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { getPluginSettings } from '../src/utils/settings-utils';
 import { TFile } from 'obsidian';
@@ -32,7 +36,10 @@ describe('TaskWriter Checkbox and Bullet Task Priority Handling', () => {
       additionalInactiveKeywords: ['CUSTOM'],
     });
 
-    taskWriter = new TaskWriter(mockApp);
+    const keywordManager = createTestKeywordManager({
+      additionalInactiveKeywords: ['CUSTOM'],
+    });
+    taskWriter = new TaskWriter(mockApp, keywordManager);
   });
 
   describe('Checkbox task priority handling (lines 294-298)', () => {

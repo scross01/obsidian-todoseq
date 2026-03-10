@@ -3,6 +3,7 @@ import { createBaseTask } from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { getPluginSettings } from '../src/utils/settings-utils';
 import { TFile } from 'obsidian';
+import { KeywordManager } from '../src/utils/keyword-manager';
 
 // Mock the settings utility
 jest.mock('../src/utils/settings-utils', () => ({
@@ -46,7 +47,11 @@ describe('TaskWriter Instance Methods', () => {
       additionalInactiveKeywords: ['CUSTOM'],
     });
 
-    taskWriter = new TaskWriter(mockApp);
+    // Create keyword manager for TaskWriter
+    const keywordManager = new KeywordManager({
+      additionalInactiveKeywords: ['CUSTOM'],
+    });
+    taskWriter = new TaskWriter(mockApp, keywordManager);
   });
 
   describe('applyLineUpdate', () => {

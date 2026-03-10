@@ -6,7 +6,14 @@ export class EditorKeywordMenu {
   private menuBuilder: StateMenuBuilder;
 
   constructor(private plugin: TodoTracker) {
-    this.menuBuilder = new StateMenuBuilder(plugin);
+    this.refreshMenuBuilder();
+  }
+
+  /**
+   * Refresh menu builder when settings change
+   */
+  private refreshMenuBuilder(): void {
+    this.menuBuilder = new StateMenuBuilder(this.plugin);
   }
 
   /**
@@ -56,5 +63,12 @@ export class EditorKeywordMenu {
         );
       }
     }
+  }
+
+  /**
+   * Update settings - refresh menu builder with current keyword manager
+   */
+  public updateSettings(): void {
+    this.refreshMenuBuilder();
   }
 }

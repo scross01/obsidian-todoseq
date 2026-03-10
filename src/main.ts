@@ -30,6 +30,9 @@ export default class TodoTracker extends Plugin {
   // Centralized state manager - single source of truth for tasks
   public taskStateManager: TaskStateManager;
 
+  // Centralized keyword manager - single source of truth for keywords
+  public keywordManager: KeywordManager;
+
   // Centralized task update coordinator
   public taskUpdateCoordinator: TaskUpdateCoordinator;
 
@@ -96,17 +99,18 @@ export default class TodoTracker extends Plugin {
     await this.loadSettings();
 
     // Initialize centralized state manager first
-    const keywordManager = new KeywordManager(this.settings);
-    this.taskStateManager = new TaskStateManager(keywordManager);
+    this.keywordManager = new KeywordManager(this.settings);
+    this.taskStateManager = new TaskStateManager(this.keywordManager);
 
     // Initialize task update coordinator
     this.taskUpdateCoordinator = new TaskUpdateCoordinator(
       this,
       this.taskStateManager,
+      this.keywordManager,
     );
 
     // Initialize managers
-    this.editorController = new EditorController(this);
+    this.editorController = new EditorController(this, this.keywordManager);
     this.uiManager = new UIManager(this);
     this.lifecycleManager = new PluginLifecycleManager(this);
 
@@ -201,6 +205,11 @@ export default class TodoTracker extends Plugin {
         urgencyCoefficients,
       );
 
+      // Sync KeywordManager reference from VaultScanner to main.ts
+      this.keywordManager = this.vaultScanner.getKeywordManager();
+      // Also sync to TaskStateManager
+      this.taskStateManager.setKeywordManager(this.keywordManager);
+
       // Wait for the parser to be fully created
       await this.vaultScanner.getParser();
     }
@@ -218,6 +227,11 @@ export default class TodoTracker extends Plugin {
       }
     }
 
+    // Update editor keyword menu with new settings
+    if (this.editorKeywordMenu) {
+      this.editorKeywordMenu.updateSettings();
+    }
+
     // Rebuild property search engine when settings change
     if (this.propertySearchEngine) {
       await this.propertySearchEngine.rebuildAll();
@@ -226,6 +240,11 @@ export default class TodoTracker extends Plugin {
 
   // Public method to update reader view formatter with current settings
   public refreshReaderViewFormatter(): void {
+    // Update reader view formatter's menu builder with current keyword manager
+    if (this.readerViewFormatter) {
+      this.readerViewFormatter.updateSettings();
+    }
+
     // Force a refresh of all open markdown views to reprocess with new settings
     const leaves = this.app.workspace.getLeavesOfType('markdown');
     leaves.forEach((leaf) => {

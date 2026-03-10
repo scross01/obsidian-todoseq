@@ -112,13 +112,14 @@ export class TaskListView extends ItemView {
     taskStateManager: TaskStateManager,
     defaultViewMode: TaskListViewMode,
     plugin: TodoTracker,
+    keywordManager: KeywordManager,
   ) {
     super(leaf);
     this.taskStateManager = taskStateManager;
     this.tasks = taskStateManager.getTasks();
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = plugin.settings.defaultSortMethod;
-    this.keywordManager = new KeywordManager(plugin.settings ?? {});
+    this.keywordManager = keywordManager;
     this.stateManager = new TaskStateTransitionManager(
       this.keywordManager,
       plugin.settings?.stateTransitions,
@@ -176,16 +177,16 @@ export class TaskListView extends ItemView {
     );
 
     this.taskItemRenderer = new TaskItemRenderer(
-      this.keywordManager,
-      this.stateManager,
-      this.menuBuilder,
+      () => this.keywordManager,
+      () => this.stateManager,
+      () => this.menuBuilder,
       (task, newState) => this.updateTaskState(task, newState),
       (task) => this.openTaskLocationForRenderer(task),
       defaultCompleted,
       defaultInactive,
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
     );
-    this.taskListFilter = new TaskListFilter(plugin);
+    this.taskListFilter = new TaskListFilter(plugin, this.keywordManager);
     this.renderQueue = new ChunkedRenderQueue();
     this.plugin = plugin;
 
@@ -2063,14 +2064,19 @@ export class TaskListView extends ItemView {
    * This ensures the task list view uses the latest keyword and state transition settings.
    */
   updateSettings(): void {
-    // Update keyword manager with new settings
-    this.keywordManager = new KeywordManager(this.plugin.settings ?? {});
+    // Get keyword manager from plugin (single source of truth)
+    this.keywordManager = this.plugin.keywordManager;
 
     // Update state manager with new state transition settings
     this.stateManager = new TaskStateTransitionManager(
       this.keywordManager,
       this.plugin.settings?.stateTransitions,
     );
+
+    // Menu builder now directly accesses the plugin's keyword manager, so no need to recreate it
+
+    // Update task list filter with new keyword manager
+    this.taskListFilter = new TaskListFilter(this.plugin, this.keywordManager);
 
     // Update task item renderer with new keyword manager and state manager
     const defaultCompleted =
@@ -2081,9 +2087,9 @@ export class TaskListView extends ItemView {
       'TODO';
 
     this.taskItemRenderer = new TaskItemRenderer(
-      this.keywordManager,
-      this.stateManager,
-      this.menuBuilder,
+      () => this.keywordManager,
+      () => this.stateManager,
+      () => this.menuBuilder,
       (task, newState) => this.updateTaskState(task, newState),
       (task) => this.openTaskLocationForRenderer(task),
       defaultCompleted,
@@ -2137,6 +2143,9 @@ export class TaskListView extends ItemView {
       this.plugin.app,
       this.taskStateManager,
     );
+
+    // Refresh visible list to ensure all elements are using the updated settings
+    this.refreshVisibleList();
 
     // Update context menu configuration
     this.updateContextMenuConfig();

@@ -9,35 +9,60 @@ describe('TaskWriter.generateTaskLine', () => {
   describe('Basic task formatting', () => {
     test('should format TODO task without priority', () => {
       const task = createBaseTask();
-      const result = TaskWriter.generateTaskLine(task, 'TODO');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('TODO Task text');
       expect(result.completed).toBe(false);
     });
 
     test('should format TODO task with high priority', () => {
       const task = createBaseTask({ priority: 'high' });
-      const result = TaskWriter.generateTaskLine(task, 'TODO');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('TODO [#A] Task text');
       expect(result.completed).toBe(false);
     });
 
     test('should format TODO task with medium priority', () => {
       const task = createBaseTask({ priority: 'med' });
-      const result = TaskWriter.generateTaskLine(task, 'TODO');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('TODO [#B] Task text');
       expect(result.completed).toBe(false);
     });
 
     test('should format TODO task with low priority', () => {
       const task = createBaseTask({ priority: 'low' });
-      const result = TaskWriter.generateTaskLine(task, 'TODO');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('TODO [#C] Task text');
       expect(result.completed).toBe(false);
     });
 
     test('should format DONE task and mark as completed', () => {
       const task = createBaseTask();
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -47,7 +72,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: 'TODO [#A] Task text',
         priority: 'high',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('DONE [#A] Task text');
       expect(result.completed).toBe(true);
     });
@@ -56,28 +86,48 @@ describe('TaskWriter.generateTaskLine', () => {
   describe('Checkbox task formatting', () => {
     test('should format checkbox TODO task', () => {
       const task = createCheckboxTask();
-      const result = TaskWriter.generateTaskLine(task, 'TODO');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('- [ ] TODO Task text');
       expect(result.completed).toBe(false);
     });
 
     test('should format checkbox DONE task with checked box', () => {
       const task = createCheckboxTask();
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('- [x] DONE Task text');
       expect(result.completed).toBe(true);
     });
 
     test('should format checkbox DOING task with unchecked box', () => {
       const task = createCheckboxTask();
-      const result = TaskWriter.generateTaskLine(task, 'DOING');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DOING',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('- [ ] DOING Task text');
       expect(result.completed).toBe(false);
     });
 
     test('should format checkbox task with priority', () => {
       const task = createCheckboxTask({ priority: 'high' });
-      const result = TaskWriter.generateTaskLine(task, 'TODO');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('- [ ] TODO [#A] Task text');
       expect(result.completed).toBe(false);
     });
@@ -86,21 +136,36 @@ describe('TaskWriter.generateTaskLine', () => {
   describe('Empty state handling', () => {
     test('should remove task keyword for empty state on regular task', () => {
       const task = createBaseTask();
-      const result = TaskWriter.generateTaskLine(task, '');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        '',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('Task text');
       expect(result.completed).toBe(false);
     });
 
     test('should keep checkbox format for empty state on checkbox task', () => {
       const task = createCheckboxTask();
-      const result = TaskWriter.generateTaskLine(task, '');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        '',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('- [ ] Task text');
       expect(result.completed).toBe(false);
     });
 
     test('should handle empty task text with empty state', () => {
       const task = createBaseTask({ rawText: 'TODO', text: '' });
-      const result = TaskWriter.generateTaskLine(task, '');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        '',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('');
       expect(result.completed).toBe(false);
     });
@@ -112,7 +177,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: 'TODO [#A] Task text',
         priority: 'high',
       });
-      const result = TaskWriter.generateTaskLine(task, 'TODO', false);
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        false,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('TODO Task text');
       expect(result.completed).toBe(false);
     });
@@ -122,14 +192,24 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: 'TODO [#A] Task text',
         priority: 'high',
       });
-      const result = TaskWriter.generateTaskLine(task, 'TODO', true);
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('TODO [#A] Task text');
       expect(result.completed).toBe(false);
     });
 
     test('should add priority when changing state and keepPriority is true', () => {
       const task = createBaseTask({ priority: 'high' });
-      const result = TaskWriter.generateTaskLine(task, 'DOING', true);
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DOING',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('DOING [#A] Task text');
       expect(result.completed).toBe(false);
     });
@@ -142,7 +222,12 @@ describe('TaskWriter.generateTaskLine', () => {
         text: 'Task text',
         tail: ' */',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('DONE Task text */');
       expect(result.completed).toBe(true);
     });
@@ -152,7 +237,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: '[^1]: TODO Task text',
         footnoteMarker: '[^1]: ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('[^1]: DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -162,7 +252,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: 'TODO Task text ^abc123',
         embedReference: '^abc123',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('DONE Task text ^abc123');
       expect(result.completed).toBe(true);
     });
@@ -172,7 +267,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: 'TODO Task text [^2]',
         footnoteReference: '[^2]',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('DONE Task text [^2]');
       expect(result.completed).toBe(true);
     });
@@ -183,7 +283,12 @@ describe('TaskWriter.generateTaskLine', () => {
         embedReference: '^abc123',
         footnoteReference: '[^2]',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('DONE Task textxt ^abc123 ^abc123 [^2]');
       expect(result.completed).toBe(true);
     });
@@ -195,7 +300,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: '  TODO Task text',
         indent: '  ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('  DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -205,7 +315,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: '  - [ ] TODO Task text',
         indent: '  ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('  - [x] DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -217,7 +332,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: '> TODO Task text',
         indent: '> ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('> DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -227,7 +347,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: '> - [ ] TODO Task text',
         indent: '> ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('> - [x] DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -237,7 +362,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: '> > TODO Task text',
         indent: '> > ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('> > DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -249,7 +379,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: '- TODO Task text',
         listMarker: '- ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('- DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -259,7 +394,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: '1. TODO Task text',
         listMarker: '1. ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('1. DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -269,7 +409,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: 'a. TODO Task text',
         listMarker: 'a. ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('a. DONE Task text');
       expect(result.completed).toBe(true);
     });
@@ -278,7 +423,12 @@ describe('TaskWriter.generateTaskLine', () => {
   describe('Custom state handling', () => {
     test('should handle custom non-completed state', () => {
       const task = createBaseTask();
-      const result = TaskWriter.generateTaskLine(task, 'CUSTOM');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'CUSTOM',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('CUSTOM Task text');
       expect(result.completed).toBe(false);
     });
@@ -306,7 +456,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: 'TODO   ',
         text: '  ',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('DONE   ');
       expect(result.completed).toBe(true);
     });
@@ -316,7 +471,12 @@ describe('TaskWriter.generateTaskLine', () => {
         rawText: 'TODO Task with @tags and #hashtags',
         text: 'Task with @tags and #hashtags',
       });
-      const result = TaskWriter.generateTaskLine(task, 'DONE');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'DONE',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('DONE Task with @tags and #hashtags');
       expect(result.completed).toBe(true);
     });
@@ -327,7 +487,12 @@ describe('TaskWriter.generateTaskLine', () => {
         text: '',
         state: '',
       });
-      const result = TaskWriter.generateTaskLine(task, 'TODO');
+      const result = TaskWriter.generateTaskLine(
+        task,
+        'TODO',
+        true,
+        createTestKeywordManager(),
+      );
       expect(result.newLine).toBe('TODO');
       expect(result.completed).toBe(false);
     });

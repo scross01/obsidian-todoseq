@@ -27,9 +27,9 @@ describe('TaskItemRenderer', () => {
     stateManager = new TaskStateTransitionManager(keywordManager, undefined);
 
     taskItemRenderer = new TaskItemRenderer(
-      keywordManager,
-      stateManager,
-      mockMenuBuilder,
+      () => keywordManager,
+      () => stateManager,
+      () => mockMenuBuilder,
       mockOnStateChange,
       mockOnLocationOpen,
       defaultCompleted,
@@ -128,9 +128,9 @@ describe('TaskItemRenderer', () => {
     it('should use custom state values from constructor parameters', async () => {
       // Create renderer with custom state values
       const customRenderer = new TaskItemRenderer(
-        keywordManager,
-        stateManager,
-        mockMenuBuilder,
+        () => keywordManager,
+        () => stateManager,
+        () => mockMenuBuilder,
         mockOnStateChange,
         mockOnLocationOpen,
         'COMPLETED',
@@ -178,9 +178,9 @@ describe('TaskItemRenderer', () => {
     it('should use default values when not provided', () => {
       // Create renderer without explicit default values
       const rendererWithDefaults = new TaskItemRenderer(
-        keywordManager,
-        stateManager,
-        mockMenuBuilder,
+        () => keywordManager,
+        () => stateManager,
+        () => mockMenuBuilder,
         mockOnStateChange,
         mockOnLocationOpen,
       );

@@ -23,6 +23,13 @@ export class StateMenuBuilder {
   constructor(private plugin: TodoTracker) {}
 
   /**
+   * Get the current keyword manager from the plugin
+   */
+  private get keywordManager(): KeywordManager {
+    return this.plugin.keywordManager;
+  }
+
+  /**
    * Get the list of selectable states for the context menu, organized by group
    * Each group shows built-in keywords first, then custom keywords
    */
@@ -56,28 +63,26 @@ export class StateMenuBuilder {
    * Returns groups in order: Active, Inactive, Waiting, Completed, Archived
    */
   private getKeywordGroups(): KeywordGroupDefinition[] {
-    const keywordManager = new KeywordManager(this.plugin.settings ?? {});
-
     return [
       {
         name: 'Active',
-        states: keywordManager.getKeywordsForGroup('activeKeywords'),
+        states: this.keywordManager.getKeywordsForGroup('activeKeywords'),
       },
       {
         name: 'Inactive',
-        states: keywordManager.getKeywordsForGroup('inactiveKeywords'),
+        states: this.keywordManager.getKeywordsForGroup('inactiveKeywords'),
       },
       {
         name: 'Waiting',
-        states: keywordManager.getKeywordsForGroup('waitingKeywords'),
+        states: this.keywordManager.getKeywordsForGroup('waitingKeywords'),
       },
       {
         name: 'Completed',
-        states: keywordManager.getKeywordsForGroup('completedKeywords'),
+        states: this.keywordManager.getKeywordsForGroup('completedKeywords'),
       },
       {
         name: 'Archived',
-        states: keywordManager.getKeywordsForGroup('archivedKeywords'),
+        states: this.keywordManager.getKeywordsForGroup('archivedKeywords'),
       },
     ];
   }
