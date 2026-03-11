@@ -60,6 +60,9 @@ export class TaskListView extends ItemView {
   private savedScrollPosition = 0;
   private scrollEventListener: (() => void) | null = null;
 
+  // Lazy loading scroll handler (separate from scroll position tracking)
+  private lazyLoadScrollHandler: (() => void) | null = null;
+
   // Chunked rendering for performance with large task lists
   private taskElementCache = new TaskElementCache();
   private renderQueue: ChunkedRenderQueue;
@@ -213,14 +216,8 @@ export class TaskListView extends ItemView {
             return;
           }
 
-          // Calculate scroll anchor BEFORE refresh (how many tasks scrolled off top)
-          const scrollAnchor = this.calculateScrollAnchor();
-
           // Full rebuild with scroll preservation
           await this.refreshVisibleList(false);
-
-          // Restore scroll position by task count
-          this.restoreScrollByTaskCount(scrollAnchor);
         }
       },
     );
@@ -1403,18 +1400,18 @@ export class TaskListView extends ItemView {
     };
 
     this.taskListContainer.addEventListener('scroll', scrollHandler);
-    this.scrollEventListener = scrollHandler;
+    this.lazyLoadScrollHandler = scrollHandler;
   }
 
   private cleanupSentinelObserver(): void {
-    // Remove scroll listener (reuse existing scrollEventListener property)
-    if (this.taskListContainer && this.scrollEventListener) {
+    // Remove scroll listener (reuse existing lazyLoadScrollHandler property)
+    if (this.taskListContainer && this.lazyLoadScrollHandler) {
       this.taskListContainer.removeEventListener(
         'scroll',
-        this.scrollEventListener,
+        this.lazyLoadScrollHandler,
       );
     }
-    // Don't null out scrollEventListener as it's used for scroll position tracking
+    // Don't null out lazyLoadScrollHandler as it's used for scroll position tracking
 
     if (this.sentinelObserver) {
       this.sentinelObserver.disconnect();
@@ -2214,6 +2211,16 @@ export class TaskListView extends ItemView {
 
     // Cleanup scroll event listener and sentinel observer
     this.cleanupSentinelObserver();
+
+    // Cleanup scroll position tracking listener
+    if (this.taskListContainer && this.scrollEventListener) {
+      this.taskListContainer.removeEventListener(
+        'scroll',
+        this.scrollEventListener,
+      );
+    }
+    this.scrollEventListener = null;
+    this.lazyLoadScrollHandler = null;
 
     // Clear task element cache
     this.taskElementCache.clear();
