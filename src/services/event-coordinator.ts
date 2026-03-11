@@ -250,12 +250,12 @@ export class EventCoordinator {
     }
   }
 
-  flush(): void {
+  async flush(): Promise<void> {
     if (this.batchTimeout) {
       clearTimeout(this.batchTimeout);
       this.batchTimeout = null;
     }
-    this.processBatch();
+    await this.processBatch();
   }
 
   on<T extends keyof EventCoordinatorEvents>(
@@ -293,9 +293,9 @@ export class EventCoordinator {
     });
   }
 
-  destroy(): void {
+  async destroy(): Promise<void> {
     // Flush any pending events before clearing timeouts
-    this.flush();
+    await this.flush();
 
     this.fileChangeTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.fileChangeTimeouts.clear();

@@ -130,7 +130,7 @@ export default class TodoTracker extends Plugin {
   }
 
   // Obsidian lifecycle method called when the plugin is unloaded
-  onunload() {
+  async onunload() {
     // Clean up embedded task list processor
     if (this.embeddedTaskListProcessor) {
       this.embeddedTaskListProcessor.cleanup();
@@ -142,7 +142,7 @@ export default class TodoTracker extends Plugin {
     }
 
     // Delegate cleanup to lifecycle manager to centralize cleanup logic
-    this.lifecycleManager?.onunload();
+    await this.lifecycleManager?.onunload();
   }
 
   // Obsidian lifecycle method called to settings are loaded

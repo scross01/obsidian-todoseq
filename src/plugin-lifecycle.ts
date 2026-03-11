@@ -418,9 +418,9 @@ export class PluginLifecycleManager {
   /**
    * Obsidian lifecycle method called when the plugin is unloaded
    */
-  onunload() {
+  async onunload() {
     // Clean up EventCoordinator (removes all vault event listeners)
-    this.eventCoordinator?.destroy();
+    await this.eventCoordinator?.destroy();
 
     // Clean up VaultScanner resources
     this.plugin.vaultScanner?.destroy();
