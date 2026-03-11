@@ -10,6 +10,15 @@ import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 
 /**
+ * Cached regex for priority tokens with global flag.
+ * Created once at module load time to avoid repeated compilation.
+ */
+const PRIORITY_TOKEN_REGEX_GLOBAL = new RegExp(
+  PRIORITY_TOKEN_REGEX.source,
+  'g',
+);
+
+/**
  * Handles task keyword formatting in the reader view
  * Applies styling to task keywords, SCHEDULED, and DEADLINE lines
  */
@@ -695,8 +704,8 @@ export class ReaderViewFormatter {
   private processPriorityPillsInTextNode(textNode: Node): void {
     const text = textNode.textContent || '';
 
-    // Create a regex with global flag to find all matches
-    const regex = new RegExp(PRIORITY_TOKEN_REGEX.source, 'g');
+    // Use cached regex with global flag to find all matches
+    const regex = PRIORITY_TOKEN_REGEX_GLOBAL;
     let match: RegExpExecArray | null;
 
     // Collect all matches first (since we'll be modifying the DOM)
@@ -2094,6 +2103,9 @@ export class ReaderViewFormatter {
     // Escape the keyword for regex
     const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+    // Create the regex once before the loop (optimization: avoid repeated compilation)
+    const keywordPrefixRegex = new RegExp(`^.*?${escapedKeyword}\\s*`);
+
     // Find the line that contains this keyword and matches the task text
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -2102,7 +2114,7 @@ export class ReaderViewFormatter {
       if (line.includes(keyword)) {
         // Get the task text from the source line (after the keyword)
         const sourceTaskTextAfterKeyword = line
-          .replace(new RegExp(`^.*?${escapedKeyword}\\s*`, ''), '')
+          .replace(keywordPrefixRegex, '')
           .trim();
 
         const normalizedSourceText = this.normalizeTaskText(
@@ -2118,7 +2130,7 @@ export class ReaderViewFormatter {
         ) {
           // Also verify the full task text matches
           const fullNormalizedSource = this.normalizeTaskText(
-            line.replace(new RegExp(`^.*?${escapedKeyword}\\s*`, ''), ''),
+            line.replace(keywordPrefixRegex, ''),
           );
 
           // Find matching task from parsed tasks

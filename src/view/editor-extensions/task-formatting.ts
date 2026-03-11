@@ -23,6 +23,15 @@ import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { isCompletedKeyword, isArchivedKeyword } from '../../utils/task-utils';
 
 /**
+ * Cached regex for priority tokens with global flag.
+ * Created once at module load time to avoid repeated compilation.
+ */
+const PRIORITY_TOKEN_REGEX_GLOBAL = new RegExp(
+  PRIORITY_TOKEN_REGEX.source,
+  'g',
+);
+
+/**
  * Priority type definition
  */
 type PriorityLevel = 'high' | 'med' | 'low';
@@ -726,8 +735,8 @@ export class TaskKeywordDecorator {
       return;
     }
 
-    // Create a regex with global flag to find all matches
-    const regex = new RegExp(PRIORITY_TOKEN_REGEX.source, 'g');
+    // Use cached regex with global flag to find all matches
+    const regex = PRIORITY_TOKEN_REGEX_GLOBAL;
     let match: RegExpExecArray | null;
 
     while ((match = regex.exec(lineText)) !== null) {
