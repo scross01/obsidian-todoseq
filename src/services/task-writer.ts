@@ -7,6 +7,11 @@ import { TaskStateTransitionManager } from './task-state-transition-manager';
 import { DateUtils } from '../utils/date-utils';
 import { findDateLine, getTaskIndent } from '../utils/task-line-utils';
 
+export interface DateLineUpdateResult {
+  task: Task;
+  lineDelta: number;
+}
+
 /**
  * Handles writing task state changes to files.
  */
@@ -222,19 +227,32 @@ export class TaskWriter {
     }
 
     // Handle CLOSED date for completed tasks
+    // Calculate line delta: +1 if new line inserted, -1 if removed, 0 if updated or no change
+    let lineDelta = 0;
+    let updatedClosedDate = task.closedDate;
     if (completed && settings?.trackClosedDate) {
-      await this.updateTaskClosedDate(task, new Date());
+      const closedResult = await this.updateTaskClosedDate(task, new Date());
+      lineDelta += closedResult.lineDelta;
+      updatedClosedDate = closedResult.task.closedDate;
     } else if (!completed && task.closedDate) {
-      await this.removeTaskClosedDate(task);
+      const closedResult = await this.removeTaskClosedDate(task);
+      lineDelta += closedResult.lineDelta;
+      updatedClosedDate = closedResult.task.closedDate;
     }
 
     // Return an updated Task snapshot (do not mutate original)
-    return {
+    // Include lineDelta for the coordinator to adjust subsequent task indices
+    const result: Task & { lineDelta?: number } = {
       ...task,
       rawText: newLine,
       state: newState as Task['state'],
       completed,
+      closedDate: updatedClosedDate,
     };
+    if (lineDelta !== 0) {
+      result.lineDelta = lineDelta;
+    }
+    return result;
   }
 
   // Cycles a task to its next state using TaskStateTransitionManager and persists change
@@ -724,26 +742,72 @@ export class TaskWriter {
    * Updates or adds a CLOSED date line below the task.
    * If a CLOSED line already exists, it is updated in place.
    * If no CLOSED line exists, a new one is inserted after DEADLINE (or after task if no DEADLINE).
+   * Returns both the updated task and the line delta (+1 if new line inserted, 0 if updated in place).
    */
-  async updateTaskClosedDate(task: Task, closedDate: Date): Promise<Task> {
+  async updateTaskClosedDate(
+    task: Task,
+    closedDate: Date,
+  ): Promise<DateLineUpdateResult> {
     const dateStr = DateUtils.formatClosedDate(closedDate);
+    let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
-      await this.app.vault.process(file, (data) => {
-        const lines = data.split('\n');
+      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const isActive = md?.file?.path === task.path;
+      const editor = md?.editor;
+
+      if (isActive && editor) {
+        // Use Editor API when file is open in editor to avoid triggering file watcher
+        const lines = Array.from({ length: editor.lineCount() }, (_, i) =>
+          editor.getLine(i),
+        );
         const currentLine = lines[task.line];
 
         // Get the proper indent including quote prefix, bullet, or checkbox marker
         const taskIndent = getTaskIndent(currentLine);
 
-        // Look for existing CLOSED line after the task
-        const closedLineIndex = findDateLine(
+        // If task doesn't have a closedDate, always insert new line
+        // Don't search for existing CLOSED line to avoid finding lines from other tasks
+        let closedLineIndex = -1;
+
+        if (task.closedDate) {
+          // Only search for existing CLOSED line if task had one before
+          closedLineIndex = findDateLine(
+            lines,
+            task.line + 1,
+            'CLOSED',
+            taskIndent,
+          );
+        }
+
+        // Find insert position (after DEADLINE/SCHEDULED if present, otherwise after task)
+        // findDateLine now properly stops at task lines, so we can use the result directly
+        const deadlineLineIndex = findDateLine(
           lines,
           task.line + 1,
-          'CLOSED',
+          'DEADLINE',
           taskIndent,
         );
+
+        // Calculate insert index - default to right after task
+        let insertIndex = task.line + 1;
+
+        // If DEADLINE found, insert after it
+        if (deadlineLineIndex !== -1) {
+          insertIndex = deadlineLineIndex + 1;
+        } else {
+          // Search for SCHEDULED
+          const scheduledLineIndex = findDateLine(
+            lines,
+            task.line + 1,
+            'SCHEDULED',
+            taskIndent,
+          );
+          if (scheduledLineIndex !== -1) {
+            insertIndex = scheduledLineIndex + 1;
+          }
+        }
 
         // Preserve the existing indentation of the CLOSED line if found
         let existingClosedIndent = '';
@@ -759,13 +823,45 @@ export class TaskWriter {
 
         if (closedLineIndex >= 0) {
           // Update existing CLOSED line, preserving its indentation
-          lines[closedLineIndex] = `${closedIndent}CLOSED: ${dateStr}`;
+          const from: EditorPosition = { line: closedLineIndex, ch: 0 };
+          const to: EditorPosition = {
+            line: closedLineIndex,
+            ch: lines[closedLineIndex].length,
+          };
+          editor.replaceRange(`${closedIndent}CLOSED: ${dateStr}`, from, to);
+          lineDelta = 0; // Updated in place, no line count change
         } else {
-          // Insert new CLOSED line
-          // Insert after DEADLINE if present, otherwise after SCHEDULED, otherwise after task
-          let insertIndex: number;
+          // Insert new CLOSED line at calculated position
+          const from: EditorPosition = { line: insertIndex, ch: 0 };
+          const to: EditorPosition = { line: insertIndex, ch: 0 };
+          editor.replaceRange(`${closedIndent}CLOSED: ${dateStr}\n`, from, to);
+          lineDelta = 1; // New line inserted
+        }
+      } else {
+        // Use Vault API for background edits
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          const currentLine = lines[task.line];
 
-          // First, look for DEADLINE line
+          // Get the proper indent including quote prefix, bullet, or checkbox marker
+          const taskIndent = getTaskIndent(currentLine);
+
+          // If task doesn't have a closedDate, always insert new line
+          // Don't search for existing CLOSED line to avoid finding lines from other tasks
+          let closedLineIndex = -1;
+
+          if (task.closedDate) {
+            // Only search for existing CLOSED line if task had one before
+            closedLineIndex = findDateLine(
+              lines,
+              task.line + 1,
+              'CLOSED',
+              taskIndent,
+            );
+          }
+
+          // Find insert position (after DEADLINE/SCHEDULED if present, otherwise after task)
+          // findDateLine now properly stops at task lines
           const deadlineLineIndex = findDateLine(
             lines,
             task.line + 1,
@@ -773,31 +869,59 @@ export class TaskWriter {
             taskIndent,
           );
 
-          // If no DEADLINE, look for SCHEDULED line
-          if (deadlineLineIndex === -1) {
+          // Calculate insert index - default to right after task
+          let insertIndex = task.line + 1;
+
+          // If DEADLINE found, insert after it
+          if (deadlineLineIndex !== -1) {
+            insertIndex = deadlineLineIndex + 1;
+          } else {
+            // Search for SCHEDULED
             const scheduledLineIndex = findDateLine(
               lines,
               task.line + 1,
               'SCHEDULED',
               taskIndent,
             );
-            insertIndex =
-              scheduledLineIndex >= 0 ? scheduledLineIndex + 1 : task.line + 1;
-          } else {
-            // Insert after DEADLINE line
-            insertIndex = deadlineLineIndex + 1;
+            if (scheduledLineIndex !== -1) {
+              insertIndex = scheduledLineIndex + 1;
+            }
           }
 
-          lines.splice(insertIndex, 0, `${closedIndent}CLOSED: ${dateStr}`);
-        }
+          // Preserve the existing indentation of the CLOSED line if found
+          let existingClosedIndent = '';
+          if (closedLineIndex >= 0) {
+            const line = lines[closedLineIndex];
+            const lineIndent = line.match(/^(\s*)/)?.[1] ?? '';
+            const lineQuotePrefix = line.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
+            existingClosedIndent = lineQuotePrefix || lineIndent;
+          }
 
-        return lines.join('\n');
-      });
+          // Use existing indent if updating, otherwise use task indent (aligned to keyword start)
+          const closedIndent = existingClosedIndent || taskIndent;
+
+          if (closedLineIndex >= 0) {
+            // Update existing CLOSED line, preserving its indentation
+            lines[closedLineIndex] = `${closedIndent}CLOSED: ${dateStr}`;
+          } else {
+            // Insert new CLOSED line at calculated position
+            lines.splice(insertIndex, 0, `${closedIndent}CLOSED: ${dateStr}`);
+          }
+
+          return lines.join('\n');
+        });
+        // For Vault API, assume new line if task didn't have closedDate before
+        lineDelta = task.closedDate ? 0 : 1;
+        lineDelta = task.closedDate ? 0 : 1;
+      }
     }
 
     return {
-      ...task,
-      closedDate: closedDate,
+      task: {
+        ...task,
+        closedDate: closedDate,
+      },
+      lineDelta,
     };
   }
 
@@ -807,36 +931,83 @@ export class TaskWriter {
    * Note: This method attempts to remove the CLOSED line regardless of whether
    * the task.closedDate property is set, as there may be a discrepancy between
    * the parsed property and what exists in the file.
+   * Returns both the updated task and the line delta (-1 if line removed, 0 if no line found).
    */
-  async removeTaskClosedDate(task: Task): Promise<Task> {
+  async removeTaskClosedDate(task: Task): Promise<DateLineUpdateResult> {
+    let lineDelta = 0;
+
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
-      await this.app.vault.process(file, (data) => {
-        const lines = data.split('\n');
-        const currentLine = lines[task.line];
+      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const isActive = md?.file?.path === task.path;
+      const editor = md?.editor;
 
-        // Get the proper indent including quote prefix, bullet, or checkbox marker
+      if (isActive && editor) {
+        // Use Editor API when file is open in editor to avoid triggering file watcher
+        const currentLine = editor.getLine(task.line);
         const taskIndent = getTaskIndent(currentLine);
 
         // Look for existing CLOSED line after the task
         const closedLineIndex = findDateLine(
-          lines,
+          Array.from({ length: editor.lineCount() }, (_, i) =>
+            editor.getLine(i),
+          ),
           task.line + 1,
           'CLOSED',
           taskIndent,
         );
 
         if (closedLineIndex >= 0) {
-          lines.splice(closedLineIndex, 1); // Remove the CLOSED line
+          // Remove the CLOSED line using Editor API
+          const from: EditorPosition = { line: closedLineIndex, ch: 0 };
+          const to: EditorPosition = {
+            line: closedLineIndex,
+            ch: editor.getLine(closedLineIndex).length,
+          };
+          // Replace with empty string to remove the line
+          editor.replaceRange('', from, to);
+          // Remove the newline as well by extending to the next line
+          const nextLineFrom: EditorPosition = { line: closedLineIndex, ch: 0 };
+          const nextLineTo: EditorPosition = {
+            line: closedLineIndex + 1,
+            ch: 0,
+          };
+          editor.replaceRange('', nextLineFrom, nextLineTo);
+          lineDelta = -1; // Line was removed
         }
+      } else {
+        // Use Vault API for background edits
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          const currentLine = lines[task.line];
 
-        return lines.join('\n');
-      });
+          // Get the proper indent including quote prefix, bullet, or checkbox marker
+          const taskIndent = getTaskIndent(currentLine);
+
+          // Look for existing CLOSED line after the task
+          const closedLineIndex = findDateLine(
+            lines,
+            task.line + 1,
+            'CLOSED',
+            taskIndent,
+          );
+
+          if (closedLineIndex >= 0) {
+            lines.splice(closedLineIndex, 1); // Remove the CLOSED line
+            lineDelta = -1; // Line was removed
+          }
+
+          return lines.join('\n');
+        });
+      }
     }
 
     return {
-      ...task,
-      closedDate: null,
+      task: {
+        ...task,
+        closedDate: null,
+      },
+      lineDelta,
     };
   }
 }

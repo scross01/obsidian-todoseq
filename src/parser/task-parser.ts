@@ -684,24 +684,30 @@ export class TaskParser implements ITaskParser {
   }
 
   /**
-   * Parse a date from a line containing SCHEDULED: or DEADLINE: prefix
+   * Parse a date from a line containing SCHEDULED:, DEADLINE:, or CLOSED: prefix
    * @param line The line to parse
    * @returns Parsed Date object or null if parsing fails
    */
   parseDateFromLine(line: string): Date | null {
-    // Remove the SCHEDULED: or DEADLINE: prefix and trim
+    // Remove the SCHEDULED:, DEADLINE:, or CLOSED: prefix and trim
     // The regex needs to account for leading whitespace and callout blocks (>)
-    const content = line
-      .replace(/^\s*>\s*(SCHEDULED|DEADLINE):\s*/, '')
-      .replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '')
+    let content = line
+      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED):\s*/, '')
+      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/, '')
       .trim();
+
+    // CLOSED dates use [...] format, convert to <...> for DateParser compatibility
+    // (org-mode uses <...> for active dates and [...] for inactive/closed dates)
+    if (content.startsWith('[') && content.endsWith(']')) {
+      content = '<' + content.slice(1, -1) + '>';
+    }
 
     // Use the DateParser to parse the date content
     return DateParser.parseDate(content);
   }
 
   /**
-   * Parse a date from a line containing SCHEDULED: or DEADLINE: prefix with repeater support
+   * Parse a date from a line containing SCHEDULED:, DEADLINE:, or CLOSED: prefix with repeater support
    * @param line The line to parse
    * @returns Object with parsed Date and optional repeater info
    */
@@ -709,12 +715,18 @@ export class TaskParser implements ITaskParser {
     date: Date | null;
     repeat: DateRepeatInfo | null;
   } {
-    // Remove the SCHEDULED: or DEADLINE: prefix and trim
+    // Remove the SCHEDULED:, DEADLINE:, or CLOSED: prefix and trim
     // The regex needs to account for leading whitespace and callout blocks (>)
-    const content = line
-      .replace(/^\s*>\s*(SCHEDULED|DEADLINE):\s*/, '')
-      .replace(/^\s*(SCHEDULED|DEADLINE):\s*/, '')
+    let content = line
+      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED):\s*/, '')
+      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/, '')
       .trim();
+
+    // CLOSED dates use [...] format, convert to <...> for DateParser compatibility
+    // (org-mode uses <...> for active dates and [...] for inactive/closed dates)
+    if (content.startsWith('[') && content.endsWith(']')) {
+      content = '<' + content.slice(1, -1) + '>';
+    }
 
     // Use the DateParser to parse the date content with repeater
     return DateParser.parseDateWithRepeater(content);

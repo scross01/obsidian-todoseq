@@ -95,13 +95,66 @@ export class TaskStateManager {
   }
 
   /**
+   * Adjust line indices for all tasks in a file starting from a given line.
+   * Used when date lines (SCHEDULED/DEADLINE/CLOSED) are added/removed.
+   * This ensures subsequent task updates use correct line indices.
+   * @param path - File path
+   * @param fromLine - Starting line index (inclusive)
+   * @param delta - Number of lines to add (positive) or remove (negative)
+   */
+  adjustLineIndices(path: string, fromLine: number, delta: number): void {
+    if (delta === 0) return;
+
+    let adjusted = false;
+    for (const task of this._tasks) {
+      if (task.path === path && task.line >= fromLine) {
+        task.line += delta;
+        adjusted = true;
+      }
+    }
+
+    if (adjusted) {
+      this.notifySubscribers();
+    }
+  }
+
+  /**
    * Find a task by file path and line number.
    * @param path File path
    * @param line Line number (0-indexed)
    * @returns Task or null if not found
    */
   findTaskByPathAndLine(path: string, line: number): Task | null {
-    return this._tasks.find((t) => t.path === path && t.line === line) || null;
+    const foundTask =
+      this._tasks.find((t) => t.path === path && t.line === line) || null;
+
+    return foundTask;
+  }
+
+  /**
+   * Find task by content match, searching near expected line.
+   * Used to correct line index when file has changed (e.g., date lines added).
+   * @param path - File path
+   * @param task - Task to find (uses rawText for matching)
+   * @param searchRange - Lines to search above/below expected line (default: 2)
+   * @returns Task with corrected line index, or null if not found
+   */
+  findTaskByContent(path: string, task: Task, searchRange = 2): Task | null {
+    const tasksInFile = this._tasks.filter((t) => t.path === path);
+
+    for (let offset = -searchRange; offset <= searchRange; offset++) {
+      const lineToCheck = task.line + offset;
+      if (lineToCheck < 0) continue;
+
+      const match = tasksInFile.find(
+        (t) => t.line === lineToCheck && t.rawText === task.rawText,
+      );
+      if (match) {
+        return match;
+      }
+    }
+
+    return null;
   }
 
   /**

@@ -62,6 +62,12 @@ export function findDateLine(
       }
     }
 
+    // Check if this is a task line (we should stop searching if we find one)
+    if (isTaskLine(trimmedLine)) {
+      // Found another task - stop searching
+      break;
+    }
+
     // Stop if we hit a non-date, non-empty line at same or lower indent
     // Check for both regular and quoted date lines
     const isDateLine =
@@ -84,6 +90,40 @@ export function findDateLine(
   }
 
   return -1;
+}
+
+/**
+ * Check if a line is a task line.
+ * Looks for common task patterns like TODO, DONE, LATER, IN_PROGRESS, or checkboxes.
+ * @param line - The line to check
+ * @returns true if the line appears to be a task
+ */
+function isTaskLine(line: string): boolean {
+  // Check for checkbox pattern: - [ ] or - [x]
+  if (/^[\s]*- \[[ x]\]/i.test(line)) {
+    return true;
+  }
+
+  // Check for task keywords at the start
+  // Common keywords: TODO, DONE, LATER, IN_PROGRESS, WAITING, CANCELLED, etc.
+  if (
+    /^[\s]*(TODO|DONE|LATER|IN_PROGRESS|WAITING|CANCELLED|ARCHIVED|NEXT)\b/i.test(
+      line,
+    )
+  ) {
+    return true;
+  }
+
+  // Check for quoted task lines: > TODO, > DONE, etc.
+  if (
+    /^>+\s+(TODO|DONE|LATER|IN_PROGRESS|WAITING|CANCELLED|ARCHIVED|NEXT)\b/i.test(
+      line,
+    )
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**

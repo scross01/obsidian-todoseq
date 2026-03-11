@@ -15,6 +15,7 @@ export class TodoseqCodeBlockProcessor {
   private manager: EmbeddedTaskListManager;
   private eventHandler: EmbeddedTaskListEventHandler;
   private unsubscribeFromStateManager: (() => void) | null = null;
+  private skipNextRefresh = false;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
@@ -37,6 +38,11 @@ export class TodoseqCodeBlockProcessor {
 
     this.unsubscribeFromStateManager = plugin.taskStateManager.subscribe(
       (tasks) => {
+        // Skip refresh if it was triggered by an embedded task list update
+        if (this.skipNextRefresh) {
+          this.skipNextRefresh = false;
+          return;
+        }
         if (embedRefreshTimeout) {
           clearTimeout(embedRefreshTimeout);
         }
@@ -161,6 +167,8 @@ export class TodoseqCodeBlockProcessor {
    * This is called when tasks are updated directly in views (not via file changes)
    */
   refreshAllEmbeddedTaskLists(): void {
+    // Set flag to skip the next subscriber refresh (to avoid double refresh)
+    this.skipNextRefresh = true;
     // Invalidate the cache to ensure we get fresh results
     // This increments the version number to force cache miss
     this.manager.invalidateCache();

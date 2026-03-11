@@ -70,8 +70,6 @@ export interface ChangeCheckResult {
 export interface ChangeTrackerOptions {
   /** Default timeout for expected changes in milliseconds (default: 5000) */
   defaultTimeoutMs?: number;
-  /** Whether to enable debug logging (default: false) */
-  debug?: boolean;
 }
 
 /**
@@ -106,12 +104,10 @@ export interface ChangeTrackerOptions {
 export class ChangeTracker {
   private pendingChanges: Map<string, PendingChange> = new Map();
   private readonly defaultTimeoutMs: number;
-  private readonly debug: boolean;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(options: ChangeTrackerOptions = {}) {
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 5000;
-    this.debug = options.debug ?? false;
 
     // Periodically clean up expired changes
     this.startCleanup();
@@ -143,12 +139,6 @@ export class ChangeTracker {
 
     this.pendingChanges.set(path, pendingChange);
 
-    if (this.debug) {
-      console.debug(
-        `[ChangeTracker] Registered expected change for ${path} (hash: ${hash.substring(0, 8)}..., timeout: ${timeoutMs}ms)`,
-      );
-    }
-
     return hash;
   }
 
@@ -164,11 +154,6 @@ export class ChangeTracker {
 
     // No pending change for this path
     if (!pendingChange) {
-      if (this.debug) {
-        console.debug(
-          `[ChangeTracker] No pending change for ${path}, treating as external`,
-        );
-      }
       return {
         isExpected: false,
         contentMatches: false,
@@ -179,11 +164,6 @@ export class ChangeTracker {
     // Check if the change has expired
     if (pendingChange.isExpired()) {
       this.pendingChanges.delete(path);
-      if (this.debug) {
-        console.debug(
-          `[ChangeTracker] Pending change for ${path} expired, treating as external`,
-        );
-      }
       return {
         isExpected: false,
         contentMatches: false,
@@ -194,12 +174,6 @@ export class ChangeTracker {
     // Check if the content matches the expected hash
     const actualHash = this.hashContent(actualContent);
     const contentMatches = actualHash === pendingChange.expectedHash;
-
-    if (this.debug) {
-      console.debug(
-        `[ChangeTracker] Checking change for ${path}: expected=${pendingChange.expectedHash.substring(0, 8)}..., actual=${actualHash.substring(0, 8)}..., matches=${contentMatches}`,
-      );
-    }
 
     // Clean up the pending change after checking
     // This ensures we only match once
@@ -220,9 +194,6 @@ export class ChangeTracker {
   cleanup(path: string): void {
     if (this.pendingChanges.has(path)) {
       this.pendingChanges.delete(path);
-      if (this.debug) {
-        console.debug(`[ChangeTracker] Cleaned up pending change for ${path}`);
-      }
     }
   }
 
@@ -240,9 +211,6 @@ export class ChangeTracker {
 
     for (const path of expiredPaths) {
       this.pendingChanges.delete(path);
-      if (this.debug) {
-        console.debug(`[ChangeTracker] Cleaned up expired change for ${path}`);
-      }
     }
   }
 

@@ -64,7 +64,6 @@ export class RecurrenceCoordinator {
   private pendingRecurrenceTasks: Set<string> = new Set();
   private recurrenceTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private readonly defaultDelayMs: number;
-  private readonly debug: boolean;
   private recurrenceManager = new RecurrenceManager();
 
   constructor(
@@ -73,7 +72,6 @@ export class RecurrenceCoordinator {
     options: RecurrenceCoordinatorOptions = {},
   ) {
     this.defaultDelayMs = options.defaultDelayMs ?? 3000;
-    this.debug = options.debug ?? false;
   }
 
   /**
@@ -91,22 +89,10 @@ export class RecurrenceCoordinator {
     // Add to pending set
     this.pendingRecurrenceTasks.add(key);
 
-    if (this.debug) {
-      console.debug(
-        `[RecurrenceCoordinator] Scheduled recurrence for ${key} in ${delayMs}ms`,
-      );
-    }
-
     // Schedule the update
     const timeout = setTimeout(async () => {
       this.pendingRecurrenceTasks.delete(key);
       this.recurrenceTimeouts.delete(key);
-
-      if (this.debug) {
-        console.debug(
-          `[RecurrenceCoordinator] Executing recurrence for ${key}`,
-        );
-      }
 
       await this.performRecurrenceUpdate(task);
     }, delayMs);
@@ -127,12 +113,6 @@ export class RecurrenceCoordinator {
       clearTimeout(timeout);
       this.recurrenceTimeouts.delete(key);
       this.pendingRecurrenceTasks.delete(key);
-
-      if (this.debug) {
-        console.debug(
-          `[RecurrenceCoordinator] Cancelled recurrence for ${key}`,
-        );
-      }
     }
   }
 
@@ -148,12 +128,6 @@ export class RecurrenceCoordinator {
   shouldProcessRecovery(task: Task): boolean {
     const key = this.getTaskKey(task);
     const shouldProcess = !this.pendingRecurrenceTasks.has(key);
-
-    if (this.debug) {
-      console.debug(
-        `[RecurrenceCoordinator] shouldProcessRecovery for ${key}: ${shouldProcess}`,
-      );
-    }
 
     return shouldProcess;
   }

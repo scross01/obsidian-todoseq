@@ -22,7 +22,7 @@ describe('ChangeTracker', () => {
   let tracker: ChangeTracker;
 
   beforeEach(() => {
-    tracker = new ChangeTracker({ debug: true });
+    tracker = new ChangeTracker();
   });
 
   afterEach(() => {

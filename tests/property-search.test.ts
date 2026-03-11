@@ -445,7 +445,6 @@ describe('Property Search Tokenizer', () => {
         enableRecurringTasks: false,
         enableUrgencyCalculation: false,
         enablePropertySearch: true,
-        enablePropertySearchDebug: false,
       };
 
       // Test various property searches
@@ -1034,7 +1033,6 @@ describe('Property Search Tokenizer', () => {
             enableRecurringTasks: false,
             enableUrgencyCalculation: false,
             enablePropertySearch: true,
-            enablePropertySearchDebug: false,
           };
           const result = await Search.evaluate(
             '[type:project]',
@@ -1063,7 +1061,6 @@ describe('Property Search Tokenizer', () => {
             enableRecurringTasks: false,
             enableUrgencyCalculation: false,
             enablePropertySearch: true,
-            enablePropertySearchDebug: false,
           };
           const result = await Search.evaluate(
             '[type:PROJECT]',
@@ -1092,7 +1089,6 @@ describe('Property Search Tokenizer', () => {
             enableRecurringTasks: false,
             enableUrgencyCalculation: false,
             enablePropertySearch: true,
-            enablePropertySearchDebug: false,
           };
           const result = await Search.evaluate(
             '[type:Project]',

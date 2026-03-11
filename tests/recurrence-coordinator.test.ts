@@ -86,9 +86,7 @@ describe('RecurrenceCoordinator', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    coordinator = new RecurrenceCoordinator(mockApp, mockTaskStateManager, {
-      debug: true,
-    });
+    coordinator = new RecurrenceCoordinator(mockApp, mockTaskStateManager, {});
     mockTask = createMockTask();
   });
 

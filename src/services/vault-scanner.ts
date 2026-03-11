@@ -49,6 +49,7 @@ export class VaultScanner {
   private propertySearchEngine?: PropertySearchEngine;
   private changeTracker: ChangeTracker;
   private recurrenceCoordinator: RecurrenceCoordinator;
+  private skipIncrementalChanges = new Set<string>();
 
   constructor(
     private app: App,
@@ -97,14 +98,12 @@ export class VaultScanner {
     // Initialize ChangeTracker with default options
     this.changeTracker = new ChangeTracker({
       defaultTimeoutMs: 5000,
-      debug: false,
     });
 
     // Initialize RecurrenceCoordinator
     this.recurrenceCoordinator = new RecurrenceCoordinator(
       this.app,
       this.taskStateManager,
-      { debug: false },
     );
   }
 
@@ -502,6 +501,15 @@ export class VaultScanner {
       return;
     }
 
+    // Skip processing if this file path is in the skip set (plugin-initiated file write)
+    if (this.skipIncrementalChanges.has(file.path)) {
+      // Keep in skip set for 1 second to allow multiple checks for same file
+      setTimeout(() => {
+        this.skipIncrementalChanges.delete(file.path);
+      }, 1000);
+      return;
+    }
+
     try {
       const currentTasks = this.taskStateManager.getTasks();
       const fileTasksBefore = currentTasks.filter(
@@ -526,9 +534,6 @@ export class VaultScanner {
 
       // Skip update if this is an expected change (plugin-initiated)
       if (checkResult.isExpected) {
-        console.debug(
-          `[VaultScanner] Skipping expected change for ${file.path}`,
-        );
         return;
       }
 
@@ -558,6 +563,17 @@ export class VaultScanner {
         err instanceof Error ? err : new Error(String(err)),
       );
     }
+  }
+
+  /**
+   * Add a file path to the skip set for incremental change processing.
+   * This is used to prevent vault scanner from processing
+   * file changes that were initiated by the plugin itself.
+   *
+   * @param filePath - The file path to skip
+   */
+  addSkipIncrementalChange(filePath: string): void {
+    this.skipIncrementalChanges.add(filePath);
   }
 
   // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate, subtask counts)
@@ -671,9 +687,6 @@ export class VaultScanner {
       // Check if recovery should be skipped for this task
       // (RecurrenceCoordinator handles it if there's a pending recurrence update)
       if (!this.recurrenceCoordinator.shouldProcessRecovery(task)) {
-        console.debug(
-          `[VaultScanner] Skipping recovery for task with pending recurrence: ${task.path}:${task.line}`,
-        );
         continue;
       }
       const file = this.app.vault.getAbstractFileByPath(task.path);

@@ -1,9 +1,5 @@
 import { Task, DateRepeatInfo } from '../../types/task';
-import {
-  isCompletedKeyword,
-  getSubtaskDisplayText,
-  hasSubtasks,
-} from '../../utils/task-utils';
+import { getSubtaskDisplayText, hasSubtasks } from '../../utils/task-utils';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import { getTaskTextDisplay } from '../../utils/task-utils';
@@ -20,7 +16,6 @@ import { TAG_PATTERN } from '../../utils/patterns';
 import { DateUtils } from '../../utils/date-utils';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
-import { TaskUpdateCoordinator } from '../../services/task-update-coordinator';
 import {
   formatTaskForDailyNote,
   getTodayDailyNote,
@@ -33,13 +28,11 @@ import {
  */
 export class EmbeddedTaskListRenderer {
   private plugin: TodoTracker;
-  private taskUpdateCoordinator: TaskUpdateCoordinator;
   private menuBuilder: StateMenuBuilder;
   private taskContextMenu: TaskContextMenu;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
-    this.taskUpdateCoordinator = plugin.taskUpdateCoordinator;
     this.menuBuilder = new StateMenuBuilder(plugin);
 
     // Create task context menu for right-click actions
@@ -205,7 +198,10 @@ export class EmbeddedTaskListRenderer {
   ): Promise<void> {
     try {
       // Use TaskUpdateCoordinator for optimistic UI updates
-      await this.taskUpdateCoordinator.updateTaskPriority(task, priority);
+      await this.plugin.taskUpdateCoordinator.updateTaskPriority(
+        task,
+        priority,
+      );
     } catch (error) {
       console.error('TODOseq: Failed to update task priority:', error);
     }
@@ -222,7 +218,7 @@ export class EmbeddedTaskListRenderer {
   ): Promise<void> {
     try {
       // Use TaskUpdateCoordinator for optimistic UI updates
-      await this.taskUpdateCoordinator.updateTaskScheduledDate(
+      await this.plugin.taskUpdateCoordinator.updateTaskScheduledDate(
         task,
         date,
         repeat,
@@ -243,7 +239,7 @@ export class EmbeddedTaskListRenderer {
   ): Promise<void> {
     try {
       // Use TaskUpdateCoordinator for optimistic UI updates
-      await this.taskUpdateCoordinator.updateTaskDeadlineDate(
+      await this.plugin.taskUpdateCoordinator.updateTaskDeadlineDate(
         task,
         date,
         repeat,
@@ -1628,8 +1624,15 @@ export class EmbeddedTaskListRenderer {
         const newCompleted = checkbox.checked;
         const newState = newCompleted ? 'DONE' : 'TODO';
 
+        // Find the current task from TaskStateManager to get the latest line number
+        // This ensures we use the correct task object after CLOSED date insertion
+        const currentTask = this.plugin.taskStateManager.findTaskByPathAndLine(
+          task.path,
+          task.line,
+        );
+
         // Update task state using existing TaskEditor
-        await this.updateTaskState(task, newState);
+        await this.updateTaskState(currentTask || task, newState);
       } catch (error) {
         console.error('Error updating task state:', error);
         // Revert checkbox on error
@@ -1787,7 +1790,7 @@ export class EmbeddedTaskListRenderer {
   private async updateTaskState(task: Task, newState: string): Promise<void> {
     try {
       // Update task state using TaskUpdateCoordinator (handles recurrence logic)
-      await this.taskUpdateCoordinator.updateTaskState(
+      await this.plugin.taskUpdateCoordinator.updateTaskState(
         task,
         newState,
         'embedded',
@@ -1958,22 +1961,46 @@ export class EmbeddedTaskListRenderer {
    * @param task The task to update
    * @param newState The new state for the task
    */
-  private updateTaskInPlugin(task: Task, newState: string): void {
-    // Find the task in the plugin's task list and update it via TaskStateManager
-    const tasks = this.plugin.getTasks();
-    const taskToUpdate = tasks.find(
-      (t) => t.path === task.path && t.line === task.line,
-    );
+  private async updateTaskInPlugin(
+    task: Task,
+    newState: string,
+  ): Promise<void> {
+    // Use TaskUpdateCoordinator to ensure proper queue coordination, index adjustments,
+    // and synchronization with all views (including embedded task lists)
+    const coordinator = this.plugin.taskUpdateCoordinator;
 
-    if (taskToUpdate) {
-      // Update the task via the centralized TaskStateManager
-      this.plugin.taskStateManager.updateTask(taskToUpdate, {
-        state: newState,
-        completed: isCompletedKeyword(newState, this.plugin.settings),
-      });
+    if (!coordinator) {
+      console.error('TODOseq: TaskUpdateCoordinator not available');
+      return;
+    }
 
-      // Trigger refresh of all task list views, including embedded ones
-      this.plugin.refreshAllTaskListViews();
+    try {
+      // Validate task location before update - find correct task by content
+      // This handles cases where line indices are stale
+      let taskToUpdate = this.plugin.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+
+      // If not found at expected line or content doesn't match, search by content
+      if (!taskToUpdate || taskToUpdate.rawText !== task.rawText) {
+        taskToUpdate = this.plugin.taskStateManager.findTaskByContent(
+          task.path,
+          task,
+          2,
+        );
+      }
+
+      if (!taskToUpdate) {
+        console.error('TODOseq: Task not found for update');
+        return;
+      }
+
+      // Use the coordinator for proper update handling
+      // This ensures: queue coordination, index adjustments, and embed refresh
+      await coordinator.updateTaskState(taskToUpdate, newState, 'embedded');
+    } catch (error) {
+      console.error('TODOseq: Failed to update task state:', error);
     }
   }
 
