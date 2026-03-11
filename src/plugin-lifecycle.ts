@@ -32,7 +32,7 @@ export class PluginLifecycleManager {
 
     // VaultScanner - use shared KeywordManager from main.ts
     this.plugin.vaultScanner = new VaultScanner(
-      this.plugin.app,
+      this.plugin,
       this.plugin.settings,
       this.plugin.taskStateManager,
       urgencyCoefficients,
@@ -75,7 +75,7 @@ export class PluginLifecycleManager {
     this.plugin.eventCoordinator = this.eventCoordinator;
 
     this.plugin.taskEditor = new TaskWriter(
-      this.plugin.app,
+      this.plugin,
       this.plugin.vaultScanner.getKeywordManager(),
     );
     this.plugin.editorKeywordMenu = new EditorKeywordMenu(this.plugin);

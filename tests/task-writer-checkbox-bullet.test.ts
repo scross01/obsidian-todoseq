@@ -5,16 +5,11 @@ import {
   createTestKeywordManager,
 } from './helpers/test-helper';
 import { Task } from '../src/types/task';
-import { getPluginSettings } from '../src/utils/settings-utils';
 import { TFile } from 'obsidian';
-
-// Mock the settings utility
-jest.mock('../src/utils/settings-utils', () => ({
-  getPluginSettings: jest.fn(),
-}));
 
 describe('TaskWriter Checkbox and Bullet Task Priority Handling', () => {
   let mockApp: any;
+  let mockPlugin: any;
   let taskWriter: TaskWriter;
 
   beforeEach(() => {
@@ -31,15 +26,25 @@ describe('TaskWriter Checkbox and Bullet Task Priority Handling', () => {
       },
     };
 
-    // Mock settings
-    (getPluginSettings as jest.Mock).mockReturnValue({
-      additionalInactiveKeywords: ['CUSTOM'],
-    });
+    // Create a mock plugin with settings
+    mockPlugin = {
+      app: mockApp,
+      settings: {
+        additionalInactiveKeywords: ['CUSTOM'],
+        trackClosedDate: false,
+        stateTransitions: {
+          defaultInactive: 'TODO',
+          defaultActive: 'DOING',
+          defaultCompleted: 'DONE',
+          transitionStatements: [],
+        },
+      },
+    };
 
     const keywordManager = createTestKeywordManager({
       additionalInactiveKeywords: ['CUSTOM'],
     });
-    taskWriter = new TaskWriter(mockApp, keywordManager);
+    taskWriter = new TaskWriter(mockPlugin, keywordManager);
   });
 
   describe('Checkbox task priority handling (lines 294-298)', () => {

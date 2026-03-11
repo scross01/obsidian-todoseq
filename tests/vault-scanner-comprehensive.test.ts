@@ -315,6 +315,98 @@ describe('VaultScanner', () => {
 
       expect(updateConfigSpy).toHaveBeenCalled();
     });
+
+    it('should respect default settings for includeCodeBlocks and includeCommentBlocks during initialization', async () => {
+      // Create settings with code blocks and comment blocks disabled (default values)
+      const settingsWithDefaultsDisabled = createBaseSettings({
+        includeCodeBlocks: false,
+        includeCommentBlocks: false,
+      });
+
+      const keywordManager = createTestKeywordManager(
+        settingsWithDefaultsDisabled,
+      );
+      const newTaskStateManager = new TaskStateManager(keywordManager);
+      const urgencyCoefficients = {}; // Mock urgency coefficients
+      const newVaultScanner = new VaultScanner(
+        mockApp,
+        settingsWithDefaultsDisabled,
+        newTaskStateManager,
+        urgencyCoefficients,
+        createTestKeywordManager(settingsWithDefaultsDisabled),
+      );
+
+      // Get the parser and verify it has the correct settings
+      const parser = newVaultScanner.getParser();
+      if (!parser) {
+        throw new Error('Parser not available');
+      }
+
+      // Parse content with tasks in code blocks and comment blocks
+      const content = `
+\`\`\`
+TODO task in code block
+\`\`\`
+
+%% TODO task in comment block %%
+
+TODO task outside blocks
+`;
+
+      const tasks = parser.parseFile(content, 'test.md');
+
+      // Should only collect the task outside blocks (not in code or comment blocks)
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].text).toBe('task outside blocks');
+
+      newVaultScanner.destroy();
+    });
+
+    it('should respect enabled settings for includeCodeBlocks and includeCommentBlocks during initialization', async () => {
+      // Create settings with code blocks and comment blocks enabled
+      const settingsWithEnabled = createBaseSettings({
+        includeCodeBlocks: true,
+        includeCommentBlocks: true,
+      });
+
+      const keywordManager = createTestKeywordManager(settingsWithEnabled);
+      const newTaskStateManager = new TaskStateManager(keywordManager);
+      const urgencyCoefficients = {}; // Mock urgency coefficients
+      const newVaultScanner = new VaultScanner(
+        mockApp,
+        settingsWithEnabled,
+        newTaskStateManager,
+        urgencyCoefficients,
+        createTestKeywordManager(settingsWithEnabled),
+      );
+
+      // Get the parser and verify it has the correct settings
+      const parser = newVaultScanner.getParser();
+      if (!parser) {
+        throw new Error('Parser not available');
+      }
+
+      // Parse content with tasks in code blocks and comment blocks
+      const content = `
+\`\`\`
+TODO task in code block
+\`\`\`
+
+%% TODO task in comment block %%
+
+TODO task outside blocks
+`;
+
+      const tasks = parser.parseFile(content, 'test.md');
+
+      // Should collect all three tasks (code block, comment block, and outside)
+      expect(tasks).toHaveLength(3);
+      expect(tasks[0].text).toBe('task in code block');
+      expect(tasks[1].text).toBe('task in comment block');
+      expect(tasks[2].text).toBe('task outside blocks');
+
+      newVaultScanner.destroy();
+    });
   });
 
   describe('Property Search Engine', () => {

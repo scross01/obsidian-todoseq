@@ -1,11 +1,11 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
 import { Task, DateRepeatInfo } from '../types/task';
 import { PRIORITY_TOKEN_REGEX, CHECKBOX_REGEX } from '../utils/patterns';
-import { getPluginSettings } from '../utils/settings-utils';
 import { KeywordManager } from '../utils/keyword-manager';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
 import { DateUtils } from '../utils/date-utils';
 import { findDateLine, getTaskIndent } from '../utils/task-line-utils';
+import TodoTracker from '../main';
 
 export interface DateLineUpdateResult {
   task: Task;
@@ -21,9 +21,17 @@ export class TaskWriter {
    * Prefer Vault.process for background edits to perform atomic writes.
    */
   constructor(
-    private readonly app: App,
+    private readonly plugin: TodoTracker,
     private readonly keywordManager: KeywordManager,
   ) {}
+
+  private get app(): App {
+    return this.plugin.app;
+  }
+
+  private get settings() {
+    return this.plugin.settings;
+  }
 
   // Pure formatter of a task line given a new state and optional priority retention
   static generateTaskLine(
@@ -156,7 +164,7 @@ export class TaskWriter {
     keepPriority = true,
     forceVaultApi = false,
   ): Promise<Task> {
-    const settings = getPluginSettings(this.app);
+    const settings = this.settings;
     const { newLine, completed } = TaskWriter.generateTaskLine(
       task,
       newState,
@@ -263,7 +271,7 @@ export class TaskWriter {
   ): Promise<Task> {
     let state: string;
     if (nextState == null) {
-      const settings = getPluginSettings(this.app);
+      const settings = this.settings;
       const stateManager = new TaskStateTransitionManager(
         this.keywordManager,
         settings?.stateTransitions,
@@ -283,7 +291,7 @@ export class TaskWriter {
   ): Promise<Task> {
     let state: string;
     if (nextState == null) {
-      const settings = getPluginSettings(this.app);
+      const settings = this.settings;
       const stateManager = new TaskStateTransitionManager(
         this.keywordManager,
         settings?.stateTransitions,

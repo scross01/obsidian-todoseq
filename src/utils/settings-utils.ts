@@ -1,4 +1,3 @@
-import { App } from 'obsidian';
 import { TodoTrackerSettings } from '../settings/settings-types';
 
 /**
@@ -16,41 +15,6 @@ export type AppWithPlugins = {
 export type HasPluginSettings = {
   settings?: Partial<TodoTrackerSettings>;
 };
-
-/**
- * Get the plugin settings from the Obsidian app instance
- * @param app The Obsidian app instance
- * @returns The plugin settings or null if not found
- */
-export function getPluginSettings(app: App): TodoTrackerSettings | null {
-  const appWithPlugins = app as unknown as AppWithPlugins;
-  // Avoid importing TodoTracker type just to read settings; keep structural typing
-  const maybePlugin = appWithPlugins.plugins?.plugins?.[
-    'todoseq'
-  ] as unknown as HasPluginSettings | undefined;
-  const settings = maybePlugin?.settings;
-  if (!settings) return null;
-
-  // Return a complete settings object with defaults for any missing properties
-  return {
-    additionalInactiveKeywords: [],
-    additionalActiveKeywords: [],
-    additionalWaitingKeywords: [],
-    additionalCompletedKeywords: [],
-    includeCodeBlocks: false,
-    includeCalloutBlocks: true,
-    includeCommentBlocks: false,
-    taskListViewMode: 'showAll',
-    futureTaskSorting: 'showAll',
-    defaultSortMethod: 'default',
-    languageCommentSupport: true,
-    weekStartsOn: 'Monday',
-    formatTaskKeywords: true,
-    additionalFileExtensions: [],
-    detectOrgModeFiles: false,
-    ...settings,
-  } as TodoTrackerSettings;
-}
 
 /**
  * Utility class for managing settings change detection

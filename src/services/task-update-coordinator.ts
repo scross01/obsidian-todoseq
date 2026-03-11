@@ -31,7 +31,7 @@ export class TaskUpdateCoordinator {
 
     // Initialize RecurrenceCoordinator
     this.recurrenceCoordinator = new RecurrenceCoordinator(
-      this.plugin.app,
+      this.plugin,
       this.taskStateManager,
     );
   }

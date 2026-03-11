@@ -1,10 +1,11 @@
-import { App, TFile, TAbstractFile } from 'obsidian';
+import { TFile, TAbstractFile } from 'obsidian';
 import { Task } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
 import { ParserRegistry } from '../parser/parser-registry';
 import { ITaskParser, ParserConfig } from '../parser/types';
 import { TodoTrackerSettings } from '../settings/settings-types';
 import { taskComparator } from '../utils/task-sort';
+import TodoTracker from '../main';
 import {
   parseUrgencyCoefficients,
   UrgencyCoefficients,
@@ -17,7 +18,6 @@ import {
   calculateNextRepeatDate,
   formatDateLine,
 } from '../utils/date-repeater';
-import { getPluginSettings } from '../utils/settings-utils';
 import {
   findDateLineWithParser,
   getTaskIndent,
@@ -52,7 +52,7 @@ export class VaultScanner {
   private skipIncrementalChanges = new Set<string>();
 
   constructor(
-    private app: App,
+    private plugin: TodoTracker,
     private settings: TodoTrackerSettings,
     private taskStateManager: TaskStateManager,
     urgencyCoefficients: UrgencyCoefficients,
@@ -63,11 +63,17 @@ export class VaultScanner {
     // Initialize parser registry
     this.parserRegistry = new ParserRegistry();
 
-    // Create TaskParser with this KeywordManager
+    // Create TaskParser with this KeywordManager and settings
     const taskParser = TaskParser.create(
       this.keywordManager,
-      app,
+      this.plugin.app,
       urgencyCoefficients,
+      {
+        includeCalloutBlocks: this.settings.includeCalloutBlocks,
+        includeCodeBlocks: this.settings.includeCodeBlocks,
+        includeCommentBlocks: this.settings.includeCommentBlocks,
+        languageCommentSupport: this.settings.languageCommentSupport,
+      },
     );
     this.parserRegistry.register(taskParser);
 
@@ -102,7 +108,7 @@ export class VaultScanner {
 
     // Initialize RecurrenceCoordinator
     this.recurrenceCoordinator = new RecurrenceCoordinator(
-      this.app,
+      this.plugin,
       this.taskStateManager,
     );
   }
@@ -144,7 +150,9 @@ export class VaultScanner {
    */
   private async loadUrgencyCoefficients(): Promise<void> {
     try {
-      this.urgencyCoefficients = await parseUrgencyCoefficients(this.app);
+      this.urgencyCoefficients = await parseUrgencyCoefficients(
+        this.plugin.app,
+      );
     } catch (error) {
       // Failed to load urgency coefficients
       // Fallback to defaults handled in parseUrgencyCoefficients
@@ -202,7 +210,7 @@ export class VaultScanner {
     try {
       this.emit('scan-started');
       const newTasks: Task[] = [];
-      const files = this.app.vault.getFiles();
+      const files = this.plugin.app.vault.getFiles();
 
       // Yield configuration: how often to yield a frame while scanning
       const YIELD_EVERY_FILES = 50;
@@ -320,7 +328,9 @@ export class VaultScanner {
       // Use type assertion since getConfig is not part of the public Obsidian API
       // but is available in practice (undocumented)
       const rawPatterns = (
-        this.app.vault as unknown as { getConfig: (key: string) => unknown }
+        this.plugin.app.vault as unknown as {
+          getConfig: (key: string) => unknown;
+        }
       ).getConfig('userIgnoreFilters');
       const excludedPatterns = Array.isArray(rawPatterns)
         ? rawPatterns.map(String)
@@ -369,7 +379,7 @@ export class VaultScanner {
    */
   async scanFile(file: TFile): Promise<Task[]> {
     try {
-      const content = await this.app.vault.cachedRead(file);
+      const content = await this.plugin.app.vault.cachedRead(file);
 
       // Get the appropriate parser for this file extension
       const parser = this.parserRegistry.getParserForExtension(file.extension);
@@ -526,7 +536,7 @@ export class VaultScanner {
       );
 
       // Check if this is an expected change using ChangeTracker
-      const fileContent = await this.app.vault.read(file);
+      const fileContent = await this.plugin.app.vault.read(file);
       const checkResult = this.changeTracker.isExpectedChange(
         file.path,
         fileContent,
@@ -658,7 +668,7 @@ export class VaultScanner {
    * to inactive state with the next recurrence date.
    */
   private async processRecurringCompletedTasks(tasks: Task[]): Promise<void> {
-    const settings = getPluginSettings(this.app);
+    const settings = this.settings;
     const keywordManager = this.keywordManager;
     const defaultInactive =
       settings?.stateTransitions?.defaultInactive || 'TODO';
@@ -689,14 +699,14 @@ export class VaultScanner {
       if (!this.recurrenceCoordinator.shouldProcessRecovery(task)) {
         continue;
       }
-      const file = this.app.vault.getAbstractFileByPath(task.path);
+      const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
       if (!file || !(file instanceof TFile)) {
         continue;
       }
 
       let content: string;
       try {
-        content = await this.app.vault.read(file);
+        content = await this.plugin.app.vault.read(file);
       } catch {
         continue;
       }
@@ -802,13 +812,13 @@ export class VaultScanner {
         }
       }
 
-      await this.app.vault.modify(file, lines.join('\n'));
+      await this.plugin.app.vault.modify(file, lines.join('\n'));
       filesToRescan.add(file.path);
     }
 
     // Trigger rescan of modified files
     for (const filePath of filesToRescan) {
-      const file = this.app.vault.getAbstractFileByPath(filePath);
+      const file = this.plugin.app.vault.getAbstractFileByPath(filePath);
       if (file instanceof TFile) {
         await this.processIncrementalChange(file);
       }

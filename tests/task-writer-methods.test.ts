@@ -1,14 +1,8 @@
 import { TaskWriter } from '../src/services/task-writer';
 import { createBaseTask } from './helpers/test-helper';
 import { Task } from '../src/types/task';
-import { getPluginSettings } from '../src/utils/settings-utils';
 import { TFile } from 'obsidian';
 import { KeywordManager } from '../src/utils/keyword-manager';
-
-// Mock the settings utility
-jest.mock('../src/utils/settings-utils', () => ({
-  getPluginSettings: jest.fn(),
-}));
 
 // Extend the prototype of our mock file to make it an instance of TFile
 class MockTFile extends TFile {
@@ -26,6 +20,7 @@ class MockTFile extends TFile {
 
 describe('TaskWriter Instance Methods', () => {
   let mockApp: any;
+  let mockPlugin: any;
   let taskWriter: TaskWriter;
 
   beforeEach(() => {
@@ -42,16 +37,26 @@ describe('TaskWriter Instance Methods', () => {
       },
     };
 
-    // Mock settings
-    (getPluginSettings as jest.Mock).mockReturnValue({
-      additionalInactiveKeywords: ['CUSTOM'],
-    });
+    // Create a mock plugin with settings
+    mockPlugin = {
+      app: mockApp,
+      settings: {
+        additionalInactiveKeywords: ['CUSTOM'],
+        trackClosedDate: false,
+        stateTransitions: {
+          defaultInactive: 'TODO',
+          defaultActive: 'DOING',
+          defaultCompleted: 'DONE',
+          transitionStatements: [],
+        },
+      },
+    };
 
     // Create keyword manager for TaskWriter
     const keywordManager = new KeywordManager({
       additionalInactiveKeywords: ['CUSTOM'],
     });
-    taskWriter = new TaskWriter(mockApp, keywordManager);
+    taskWriter = new TaskWriter(mockPlugin, keywordManager);
   });
 
   describe('applyLineUpdate', () => {

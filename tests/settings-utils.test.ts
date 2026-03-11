@@ -1,6 +1,4 @@
-import { App } from 'obsidian';
 import {
-  getPluginSettings,
   SettingsChangeDetector,
   createSettingsChangeDetector,
 } from '../src/utils/settings-utils';
@@ -9,6 +7,7 @@ import {
   migrateSettings,
   getLatestSettingsVersion,
 } from '../src/utils/settings-migration';
+import { createBaseSettings } from './helpers/test-helper';
 
 describe('settings-utils', () => {
   describe('migrateSettings', () => {
@@ -394,126 +393,13 @@ describe('settings-utils', () => {
     });
   });
 
-  describe('getPluginSettings', () => {
-    const mockApp: Partial<App> = {};
-
-    beforeEach(() => {
-      // Reset mock app before each test
-      Object.assign(mockApp, {});
-    });
-
-    test('should return null when plugin settings are not found', () => {
-      const result = getPluginSettings(mockApp as App);
-      expect(result).toBeNull();
-    });
-
-    test('should return null when plugin is not found', () => {
-      (mockApp as any).plugins = {};
-      const result = getPluginSettings(mockApp as App);
-      expect(result).toBeNull();
-    });
-
-    test('should return null when todoseq plugin is not found', () => {
-      (mockApp as any).plugins = {
-        plugins: {
-          'other-plugin': {},
-        },
-      };
-      const result = getPluginSettings(mockApp as App);
-      expect(result).toBeNull();
-    });
-
-    test('should return null when plugin exists but has no settings', () => {
-      (mockApp as any).plugins = {
-        plugins: {
-          todoseq: {},
-        },
-      };
-
-      const result = getPluginSettings(mockApp as App);
-      expect(result).toBeNull();
-    });
-
-    test('should merge partial settings with defaults', () => {
-      (mockApp as any).plugins = {
-        plugins: {
-          todoseq: {
-            settings: {
-              formatTaskKeywords: false,
-              includeCodeBlocks: true,
-            },
-          },
-        },
-      };
-
-      const result = getPluginSettings(mockApp as App);
-      expect(result).not.toBeNull();
-      expect(result?.formatTaskKeywords).toBe(false);
-      expect(result?.includeCodeBlocks).toBe(true);
-      // Default values should be applied for missing properties
-      expect(result?.weekStartsOn).toBe('Monday');
-    });
-
-    test('should return complete settings without modification', () => {
-      const completeSettings: TodoTrackerSettings = {
-        additionalInactiveKeywords: ['FIXME', 'HACK'],
-        additionalInactiveKeywords: ['FIXME', 'HACK'],
-        additionalActiveKeywords: ['STARTED'],
-        additionalWaitingKeywords: ['PAUSED'],
-        additionalCompletedKeywords: ['ABANDONED'],
-        additionalArchivedKeywords: [],
-        includeCodeBlocks: true,
-        includeCalloutBlocks: false,
-        includeCommentBlocks: true,
-        taskListViewMode: 'hideCompleted',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: { enabled: false },
-        weekStartsOn: 'Sunday',
-        formatTaskKeywords: false,
-        additionalFileExtensions: [],
-        detectOrgModeFiles: false,
-      };
-
-      (mockApp as any).plugins = {
-        plugins: {
-          todoseq: {
-            settings: completeSettings,
-          },
-        },
-      };
-
-      const result = getPluginSettings(mockApp as App);
-      expect(result).not.toBeNull();
-      expect(result).toEqual(completeSettings);
-    });
-  });
-
   describe('SettingsChangeDetector', () => {
     let detector: SettingsChangeDetector;
     let baseSettings: TodoTrackerSettings;
 
     beforeEach(() => {
       detector = new SettingsChangeDetector();
-      baseSettings = {
-        additionalInactiveKeywords: [],
-        additionalInactiveKeywords: [],
-        additionalActiveKeywords: [],
-        additionalWaitingKeywords: [],
-        additionalCompletedKeywords: [],
-        additionalArchivedKeywords: [],
-        includeCodeBlocks: false,
-        includeCalloutBlocks: true,
-        includeCommentBlocks: false,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: { enabled: true },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-        additionalFileExtensions: [],
-        detectOrgModeFiles: false,
-      };
+      baseSettings = createBaseSettings({ languageCommentSupport: true });
     });
 
     describe('formatting settings detection', () => {
@@ -555,7 +441,7 @@ describe('settings-utils', () => {
       test('should detect changes in languageCommentSupport', () => {
         const changedSettings = {
           ...baseSettings,
-          languageCommentSupport: { enabled: false },
+          languageCommentSupport: false,
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
           true,
@@ -607,7 +493,7 @@ describe('settings-utils', () => {
           ...baseSettings,
           formatTaskKeywords: false,
           includeCodeBlocks: true,
-          languageCommentSupport: { enabled: false },
+          languageCommentSupport: false,
         };
         expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
           true,
@@ -672,7 +558,7 @@ describe('settings-utils', () => {
         // Third change
         currentSettings = {
           ...currentSettings,
-          languageCommentSupport: { enabled: false },
+          languageCommentSupport: false,
         };
         expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
           true,
@@ -740,25 +626,7 @@ describe('settings-utils', () => {
       const detector1 = createSettingsChangeDetector();
       const detector2 = createSettingsChangeDetector();
 
-      const settings: TodoTrackerSettings = {
-        additionalInactiveKeywords: [],
-        additionalInactiveKeywords: [],
-        additionalActiveKeywords: [],
-        additionalWaitingKeywords: [],
-        additionalCompletedKeywords: [],
-        additionalArchivedKeywords: [],
-        includeCodeBlocks: false,
-        includeCalloutBlocks: true,
-        includeCommentBlocks: false,
-        taskListViewMode: 'showAll',
-        futureTaskSorting: 'showAll',
-        defaultSortMethod: 'default',
-        languageCommentSupport: { enabled: true },
-        weekStartsOn: 'Monday',
-        formatTaskKeywords: true,
-        additionalFileExtensions: [],
-        detectOrgModeFiles: false,
-      };
+      const settings: TodoTrackerSettings = createBaseSettings();
 
       detector1.initialize(settings);
       detector2.initialize(settings);

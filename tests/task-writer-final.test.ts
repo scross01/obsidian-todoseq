@@ -4,13 +4,7 @@ import {
   createTestKeywordManager,
 } from './helpers/test-helper';
 import { Task } from '../src/types/task';
-import { getPluginSettings } from '../src/utils/settings-utils';
 import { TFile } from 'obsidian';
-
-// Mock the settings utility
-jest.mock('../src/utils/settings-utils', () => ({
-  getPluginSettings: jest.fn(),
-}));
 
 // Extend the prototype of our mock file to make it an instance of TFile
 class MockTFile extends TFile {
@@ -28,6 +22,7 @@ class MockTFile extends TFile {
 
 describe('TaskWriter Final Coverage', () => {
   let mockApp: any;
+  let mockPlugin: any;
   let taskWriter: TaskWriter;
 
   beforeEach(() => {
@@ -44,15 +39,25 @@ describe('TaskWriter Final Coverage', () => {
       },
     };
 
-    // Mock settings
-    (getPluginSettings as jest.Mock).mockReturnValue({
-      additionalInactiveKeywords: ['CUSTOM'],
-    });
+    // Create a mock plugin with settings
+    mockPlugin = {
+      app: mockApp,
+      settings: {
+        additionalInactiveKeywords: ['CUSTOM'],
+        trackClosedDate: false,
+        stateTransitions: {
+          defaultInactive: 'TODO',
+          defaultActive: 'DOING',
+          defaultCompleted: 'DONE',
+          transitionStatements: [],
+        },
+      },
+    };
 
     const keywordManager = createTestKeywordManager({
       additionalInactiveKeywords: ['CUSTOM'],
     });
-    taskWriter = new TaskWriter(mockApp, keywordManager);
+    taskWriter = new TaskWriter(mockPlugin, keywordManager);
   });
 
   describe('specific patterns for uncovered lines', () => {

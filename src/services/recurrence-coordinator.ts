@@ -9,9 +9,9 @@
 import { Task } from '../types/task';
 import { TaskStateManager } from './task-state-manager';
 import { RecurrenceManager, DateLineParser } from './recurrence-manager';
-import { getPluginSettings } from '../utils/settings-utils';
 import { TFile } from 'obsidian';
 import { App } from 'obsidian';
+import TodoTracker from '../main';
 
 /**
  * Result of a recurrence update operation.
@@ -67,11 +67,19 @@ export class RecurrenceCoordinator {
   private recurrenceManager = new RecurrenceManager();
 
   constructor(
-    private app: App,
+    private plugin: TodoTracker,
     private taskStateManager: TaskStateManager,
     options: RecurrenceCoordinatorOptions = {},
   ) {
     this.defaultDelayMs = options.defaultDelayMs ?? 3000;
+  }
+
+  private get app(): App {
+    return this.plugin.app;
+  }
+
+  private get settings() {
+    return this.plugin.settings;
   }
 
   /**
@@ -139,7 +147,7 @@ export class RecurrenceCoordinator {
    * @returns Promise resolving to the update result
    */
   async performRecurrenceUpdate(task: Task): Promise<RecurrenceUpdateResult> {
-    const settings = getPluginSettings(this.app);
+    const settings = this.settings;
     const defaultInactive =
       settings?.stateTransitions?.defaultInactive || 'TODO';
 
