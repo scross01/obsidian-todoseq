@@ -2,10 +2,12 @@
 export class TFile {
   path: string;
   name: string;
+  extension: string;
 
-  constructor(path: string, name: string) {
+  constructor(path: string, name: string, extension = '') {
     this.path = path;
     this.name = name;
+    this.extension = extension;
   }
 }
 

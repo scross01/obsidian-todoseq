@@ -117,6 +117,16 @@ export class EventCoordinator {
 
     const tFile = file as TFile;
 
+    // Don't debounce delete events - file won't receive further changes
+    if (type === 'delete') {
+      this.queueFileEvent({
+        type,
+        file: tFile,
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
     const existingTimeout = this.fileChangeTimeouts.get(tFile.path);
     if (existingTimeout) {
       clearTimeout(existingTimeout);
