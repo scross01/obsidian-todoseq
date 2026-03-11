@@ -419,8 +419,8 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
       stateManager.addTask(parentTask);
       stateManager.addTask(subtask);
 
-      // Mark subtask as done via updateTask
-      stateManager.updateTask(subtask, {
+      // Mark subtask as done via updateTaskByPathAndLine
+      stateManager.updateTaskByPathAndLine('test.md', 1, {
         state: 'DONE',
         completed: true,
         rawText: '  - [x] DONE Subtask',
@@ -454,8 +454,8 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
       stateManager.addTask(parentTask);
       stateManager.addTask(subtask);
 
-      // Mark subtask as not done via updateTask
-      stateManager.updateTask(subtask, {
+      // Mark subtask as not done via updateTaskByPathAndLine
+      stateManager.updateTaskByPathAndLine('test.md', 1, {
         state: 'TODO',
         completed: false,
         rawText: '  - [ ] TODO Subtask',
@@ -488,7 +488,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
       stateManager.addTask(subtask);
 
       // Update without changing completed status
-      stateManager.updateTask(subtask, {
+      stateManager.updateTaskByPathAndLine('test.md', 1, {
         rawText: '  - [ ] TODO Updated subtask',
       });
 

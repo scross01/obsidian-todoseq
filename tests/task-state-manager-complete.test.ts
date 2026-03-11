@@ -93,7 +93,7 @@ describe('TaskStateManager - Complete Coverage', () => {
       const task = createBaseTask();
       stateManager.addTask(task);
 
-      stateManager.updateTask(task, {
+      stateManager.updateTaskByPathAndLine('test.md', 0, {
         priority: 'high',
         completed: true,
       });

@@ -137,26 +137,24 @@ export class TaskUpdateCoordinator {
         // 4. Update the TaskStateManager with the final task state
         // This is important for recurring tasks where the final state may differ
         // from the initial state (e.g., DONE -> TODO after completing a recurring task)
-        this.taskStateManager.updateTask(currentTask, {
-          rawText: updatedTask.rawText,
-          state: updatedTask.state,
-          completed: updatedTask.completed,
-          scheduledDate: updatedTask.scheduledDate,
-          deadlineDate: updatedTask.deadlineDate,
-          scheduledDateRepeat: updatedTask.scheduledDateRepeat,
-          deadlineDateRepeat: updatedTask.deadlineDateRepeat,
-          closedDate: updatedTask.closedDate,
-        });
+        // Use updatedTask.path and updatedTask.line since they reflect the authoritative
+        // state after the file write (line index may have changed due to date line additions)
+        this.taskStateManager.updateTaskByPathAndLine(
+          updatedTask.path,
+          updatedTask.line,
+          {
+            rawText: updatedTask.rawText,
+            state: updatedTask.state,
+            completed: updatedTask.completed,
+            scheduledDate: updatedTask.scheduledDate,
+            deadlineDate: updatedTask.deadlineDate,
+            scheduledDateRepeat: updatedTask.scheduledDateRepeat,
+            deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+            closedDate: updatedTask.closedDate,
+          },
+        );
 
-        // 5. Refresh all embedded task lists (code blocks) to reflect the task change
-        // This ensures that any todoseq code blocks displaying this task are updated
-        // Note: We skip this when source is 'embedded' because the TaskStateManager subscriber
-        // will handle the refresh automatically. Calling it here would cause a double refresh.
-        if (this.plugin.embeddedTaskListProcessor && source !== 'embedded') {
-          this.plugin.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
-        }
-
-        // 6. Refresh editor decorations to show the updated task state
+        // 5. Refresh editor decorations to show the updated task state
         if (this.plugin.refreshVisibleEditorDecorations) {
           this.plugin.refreshVisibleEditorDecorations();
         }

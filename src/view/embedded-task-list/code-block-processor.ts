@@ -168,12 +168,16 @@ export class TodoseqCodeBlockProcessor {
    */
   refreshAllEmbeddedTaskLists(): void {
     // Set flag to skip the next subscriber refresh (to avoid double refresh)
+    // This is needed because we call refreshAllEmbeddedTaskLists() from multiple places
+    // and each call would trigger a subscriber notification
     this.skipNextRefresh = true;
     // Invalidate the cache to ensure we get fresh results
     // This increments the version number to force cache miss
     this.manager.invalidateCache();
     // Refresh all active code blocks
     this.eventHandler.refreshAllCodeBlocks();
+    // Reset the flag after refresh is complete, allowing the next update to proceed
+    this.skipNextRefresh = false;
   }
 
   /**

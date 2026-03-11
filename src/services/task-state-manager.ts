@@ -83,30 +83,6 @@ export class TaskStateManager {
   }
 
   /**
-   * Update a specific task by reference.
-   * @param task Task to update
-   * @param updates Partial task properties to update
-   */
-  updateTask(task: Task, updates: Partial<Task>): void {
-    const index = this._tasks.indexOf(task);
-    if (index !== -1) {
-      // Track completion status before update
-      const wasCompleted = task.completed;
-      const isCompleted =
-        updates.completed !== undefined ? updates.completed : wasCompleted;
-
-      this._tasks[index] = { ...task, ...updates };
-
-      // Update parent subtask counts if completion status changed
-      if (wasCompleted !== isCompleted) {
-        this.updateParentSubtaskCountsForTask(task, wasCompleted, isCompleted);
-      }
-
-      this.notifySubscribers();
-    }
-  }
-
-  /**
    * Adjust line indices for all tasks in a file starting from a given line.
    * Used when date lines (SCHEDULED/DEADLINE/CLOSED) are added/removed.
    * This ensures subsequent task updates use correct line indices.
@@ -170,14 +146,58 @@ export class TaskStateManager {
   }
 
   /**
+   * Update a task by file path and line number.
+   * This is safer than updateTask() which uses reference-based lookup.
+   * @param path File path
+   * @param line Line number (0-indexed)
+   * @param updates Partial task properties to update
+   * @returns true if task was found and updated, false otherwise
+   *
+   * Note: This is an internal utility method. It does NOT notify subscribers.
+   * Callers must call notifySubscribers() explicitly to control when notifications happen.
+   * This prevents double notifications when this method is called from updateTaskState().
+   */
+  updateTaskByPathAndLine(
+    path: string,
+    line: number,
+    updates: Partial<Task>,
+  ): boolean {
+    const existingTask = this.findTaskByPathAndLine(path, line);
+    if (!existingTask) {
+      return false;
+    }
+
+    const index = this._tasks.indexOf(existingTask);
+    if (index === -1) {
+      return false;
+    }
+
+    // Track completion status before update
+    const wasCompleted = existingTask.completed;
+    const isCompleted =
+      updates.completed !== undefined ? updates.completed : wasCompleted;
+
+    this._tasks[index] = { ...existingTask, ...updates };
+
+    // Update parent subtask counts if completion status changed
+    if (wasCompleted !== isCompleted) {
+      this.updateParentSubtaskCountsForTask(
+        existingTask,
+        wasCompleted,
+        isCompleted,
+      );
+    }
+
+    return true;
+  }
+
+  /**
    * Perform an optimistic update on a task.
    * @param task The task to update
    * @param newState The new state to set
    * @returns The updated task line content
    */
   optimisticUpdate(task: Task, newState: string): string {
-    // Track completion status before update
-    const wasCompleted = task.completed;
     const isCompleted = this.keywordManager.isCompleted(newState);
 
     // Generate the new rawText first
@@ -188,35 +208,15 @@ export class TaskStateManager {
       this.keywordManager,
     );
 
-    // Find the task in our array by path and line to ensure we're updating the right object
-    const existingTask = this.findTaskByPathAndLine(task.path, task.line);
-    if (existingTask) {
-      // Update the existing task object in place to maintain reference equality
-      const updatedTask = {
-        ...existingTask,
-        state: newState as Task['state'],
-        completed: isCompleted,
-        rawText: newLine,
-      };
-      const index = this._tasks.indexOf(existingTask);
-      if (index !== -1) {
-        this._tasks[index] = updatedTask;
-      }
-    } else {
-      // Fallback: try to update by reference
-      this.updateTask(task, {
-        state: newState as Task['state'],
-        completed: isCompleted,
-        rawText: newLine,
-      });
-    }
+    // Update using path+line lookup for safety
+    // Note: updateTaskByPathAndLine already handles parent subtask count updates
+    this.updateTaskByPathAndLine(task.path, task.line, {
+      state: newState as Task['state'],
+      completed: isCompleted,
+      rawText: newLine,
+    });
 
-    // Update parent subtask counts if completion status changed
-    if (wasCompleted !== isCompleted) {
-      this.updateParentSubtaskCountsForTask(task, wasCompleted, isCompleted);
-    }
-
-    // Notify subscribers after all updates are complete
+    // Notify subscribers of the change
     this.notifySubscribers();
 
     return newLine;

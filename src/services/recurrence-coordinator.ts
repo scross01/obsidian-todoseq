@@ -225,25 +225,32 @@ export class RecurrenceCoordinator {
       // Write the updated file
       await this.app.vault.modify(file, updatedLines.join('\n'));
 
-      // Update the task state manager
+      // Update the task state manager using path+line lookup for safety
       const currentTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
       );
       if (currentTask) {
-        this.taskStateManager.updateTask(currentTask, {
-          rawText: updatedLines[task.line],
-          state: defaultInactive,
-          completed: false,
-          scheduledDate:
-            dateResult.newScheduledDate ?? currentTask.scheduledDate,
-          deadlineDate: dateResult.newDeadlineDate ?? currentTask.deadlineDate,
-        });
+        const updated = this.taskStateManager.updateTaskByPathAndLine(
+          task.path,
+          task.line,
+          {
+            rawText: updatedLines[task.line],
+            state: defaultInactive,
+            completed: false,
+            scheduledDate:
+              dateResult.newScheduledDate ?? currentTask.scheduledDate,
+            deadlineDate:
+              dateResult.newDeadlineDate ?? currentTask.deadlineDate,
+          },
+        );
 
-        return {
-          success: true,
-          task: currentTask,
-        };
+        if (updated) {
+          return {
+            success: true,
+            task: currentTask,
+          };
+        }
       }
 
       return {
