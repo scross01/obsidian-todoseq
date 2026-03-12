@@ -1,20 +1,77 @@
 import { SearchNode } from './search-types';
 import { Task } from '../types/task';
 import { DateUtils } from '../utils/date-utils';
+import { PropertyEvaluator } from '../utils/property-evaluator';
 import { TodoTrackerSettings } from '../settings/settings-types';
 import { getFilename } from '../utils/task-utils';
 import { RegexCache } from '../utils/regex-cache';
 import { TAG_PATTERN } from '../utils/patterns';
 import { PropertySearchEngine } from '../services/property-search-engine';
+import { App, TFile } from 'obsidian';
 
 export class SearchEvaluator {
   private static regexCache = new RegexCache();
+
+  /**
+   * Get the app instance from settings or global window
+   * Used as fallback when PropertySearchEngine is not available
+   */
+  private static getApp(settings?: TodoTrackerSettings): App | undefined {
+    type SettingsWithApp = TodoTrackerSettings & {
+      app: App;
+    };
+    type WindowWithPlugin = Window & {
+      todoSeqPlugin?: {
+        app: App;
+      };
+    };
+
+    if (settings && (settings as SettingsWithApp).app) {
+      return (settings as SettingsWithApp).app;
+    } else if (
+      typeof window !== 'undefined' &&
+      (window as WindowWithPlugin).todoSeqPlugin
+    ) {
+      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
+      if (plugin) {
+        return plugin.app;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Get the file for a task, using the app instance from settings or global window
+   * Used as fallback when PropertySearchEngine is not available
+   */
+  private static getFileForTask(
+    task: Task,
+    settings?: TodoTrackerSettings,
+  ): TFile | null {
+    const app = this.getApp(settings);
+    if (!app) {
+      return null;
+    }
+
+    const abstractFile = app.vault.getAbstractFileByPath(task.path);
+    if (
+      abstractFile &&
+      abstractFile instanceof TFile &&
+      abstractFile.extension === 'md'
+    ) {
+      return abstractFile;
+    }
+
+    return null;
+  }
 
   static async evaluate(
     node: SearchNode,
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
+    propertySearchEngine?: PropertySearchEngine,
   ): Promise<boolean> {
     switch (node.type) {
       case 'term':
@@ -30,18 +87,42 @@ export class SearchEvaluator {
       case 'range_filter':
         return this.evaluateRangeFilter(node, task, caseSensitive);
       case 'property_filter':
-        return this.evaluatePropertyFilter(node, task, caseSensitive, settings);
+        return this.evaluatePropertyFilter(
+          node,
+          task,
+          caseSensitive,
+          settings,
+          propertySearchEngine,
+        );
       case 'and':
         return node.children
-          ? this.evaluateAnd(node.children, task, caseSensitive, settings)
+          ? this.evaluateAnd(
+              node.children,
+              task,
+              caseSensitive,
+              settings,
+              propertySearchEngine,
+            )
           : false;
       case 'or':
         return node.children
-          ? this.evaluateOr(node.children, task, caseSensitive, settings)
+          ? this.evaluateOr(
+              node.children,
+              task,
+              caseSensitive,
+              settings,
+              propertySearchEngine,
+            )
           : false;
       case 'not':
         return node.children && node.children[0]
-          ? this.evaluateNot(node.children[0], task, caseSensitive, settings)
+          ? this.evaluateNot(
+              node.children[0],
+              task,
+              caseSensitive,
+              settings,
+              propertySearchEngine,
+            )
           : false;
       default:
         return false;
@@ -90,10 +171,19 @@ export class SearchEvaluator {
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
+    propertySearchEngine?: PropertySearchEngine,
   ): Promise<boolean> {
     // Short-circuit: return false on first false
     for (const node of nodes) {
-      if (!(await this.evaluate(node, task, caseSensitive, settings))) {
+      if (
+        !(await this.evaluate(
+          node,
+          task,
+          caseSensitive,
+          settings,
+          propertySearchEngine,
+        ))
+      ) {
         return false;
       }
     }
@@ -105,10 +195,19 @@ export class SearchEvaluator {
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
+    propertySearchEngine?: PropertySearchEngine,
   ): Promise<boolean> {
     // Short-circuit: return true on first true
     for (const node of nodes) {
-      if (await this.evaluate(node, task, caseSensitive, settings)) {
+      if (
+        await this.evaluate(
+          node,
+          task,
+          caseSensitive,
+          settings,
+          propertySearchEngine,
+        )
+      ) {
         return true;
       }
     }
@@ -120,8 +219,15 @@ export class SearchEvaluator {
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
+    propertySearchEngine?: PropertySearchEngine,
   ): Promise<boolean> {
-    return !(await this.evaluate(node, task, caseSensitive, settings));
+    return !(await this.evaluate(
+      node,
+      task,
+      caseSensitive,
+      settings,
+      propertySearchEngine,
+    ));
   }
 
   private static evaluatePrefixFilter(
@@ -629,6 +735,7 @@ export class SearchEvaluator {
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
+    propertySearchEngine?: PropertySearchEngine,
   ): Promise<boolean> {
     const field = node.field;
     const value = node.value;
@@ -657,52 +764,6 @@ export class SearchEvaluator {
       propertyValue = null;
     }
 
-    // Get the app instance from settings or global
-    type SettingsWithApp = TodoTrackerSettings & {
-      app: import('obsidian').App;
-    };
-    type WindowWithPlugin = Window & {
-      todoSeqPlugin?: {
-        app: import('obsidian').App;
-        propertySearchEngine: PropertySearchEngine | null;
-      };
-    };
-    let app: import('obsidian').App | undefined;
-    if (settings && (settings as SettingsWithApp).app) {
-      app = (settings as SettingsWithApp).app;
-    } else if (
-      typeof window !== 'undefined' &&
-      (window as WindowWithPlugin).todoSeqPlugin
-    ) {
-      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
-      if (plugin) {
-        app = plugin.app;
-      }
-    }
-    if (!app) {
-      // In test environment, return false since we can't access the app
-      return false;
-    }
-
-    // Get the PropertySearchEngine instance from settings
-    let propertySearchEngine: PropertySearchEngine | null = null;
-    type SettingsWithEngine = TodoTrackerSettings & {
-      propertySearchEngine: PropertySearchEngine;
-    };
-    if (settings && (settings as SettingsWithEngine).propertySearchEngine) {
-      propertySearchEngine = (settings as SettingsWithEngine)
-        .propertySearchEngine;
-    } else if (
-      typeof window !== 'undefined' &&
-      (window as WindowWithPlugin).todoSeqPlugin
-    ) {
-      // Fallback to global plugin instance for backward compatibility
-      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
-      if (plugin) {
-        propertySearchEngine = plugin.propertySearchEngine;
-      }
-    }
-
     // When exact flag is true (quoted values), force case sensitivity
     const effectiveCaseSensitive = node.exact ? true : caseSensitive;
 
@@ -729,13 +790,19 @@ export class SearchEvaluator {
       }
     }
 
-    // Fall back to direct metadata access
+    // Fall back to direct metadata access (simplified, no global state access)
     // Get file cache and frontmatter
-    const file = app.vault.getAbstractFileByPath(task.path);
-    const fileCache =
-      file && 'extension' in file
-        ? app.metadataCache.getFileCache(file as import('obsidian').TFile)
-        : null;
+    const file = this.getFileForTask(task, settings);
+    if (!file) {
+      return false;
+    }
+
+    const app = this.getApp(settings);
+    if (!app) {
+      return false;
+    }
+
+    const fileCache = app.metadataCache.getFileCache(file);
     if (!fileCache || !fileCache.frontmatter) {
       return false;
     }
@@ -861,66 +928,13 @@ export class SearchEvaluator {
     const parsedDate = DateUtils.parseDateValue(value);
 
     if (parsedDate) {
-      // Try to parse property value as date
-      let taskDate: Date | null = null;
-
-      if (propertyValue instanceof Date) {
-        taskDate = propertyValue;
-      } else if (typeof propertyValue === 'string') {
-        // Try to parse string as date
-        const parsedPropDate = DateUtils.parseDateValue(propertyValue);
-        if (
-          parsedPropDate &&
-          parsedPropDate !== 'none' &&
-          !(typeof parsedPropDate === 'string')
-        ) {
-          if (typeof parsedPropDate === 'object' && 'date' in parsedPropDate) {
-            taskDate = parsedPropDate.date;
-          } else if (parsedPropDate instanceof Date) {
-            taskDate = parsedPropDate;
-          }
-        }
-      }
+      // Try to parse property value as date using PropertyEvaluator
+      const taskDate =
+        PropertyEvaluator.parsePropertyValueAsDate(propertyValue);
 
       if (taskDate) {
-        // Handle date comparisons similar to evaluateDateFilter
-        if (typeof parsedDate === 'string') {
-          // Relative date expressions like 'today', 'tomorrow'
-          return this.evaluateDateExpression(parsedDate, taskDate);
-        } else if (typeof parsedDate === 'object' && parsedDate !== null) {
-          if ('start' in parsedDate && 'end' in parsedDate) {
-            // Date range
-            return DateUtils.isDateInRange(
-              taskDate,
-              parsedDate.start,
-              parsedDate.end,
-            );
-          } else if ('date' in parsedDate && 'format' in parsedDate) {
-            // Exact date with format information
-            const searchDate = parsedDate.date;
-            const format = parsedDate.format;
-
-            switch (format) {
-              case 'year':
-                // Year-only search (e.g., 2025)
-                return searchDate.getFullYear() === taskDate.getFullYear();
-              case 'year-month':
-                // Year-month search (e.g., 2025-11)
-                return (
-                  searchDate.getFullYear() === taskDate.getFullYear() &&
-                  searchDate.getMonth() === taskDate.getMonth()
-                );
-              case 'full':
-                // Full date search (e.g., 2025-11-30)
-                return DateUtils.compareDates(taskDate, searchDate);
-              default:
-                return false;
-            }
-          } else if (parsedDate instanceof Date) {
-            // Date object (from natural language parsing)
-            return DateUtils.compareDates(taskDate, parsedDate);
-          }
-        }
+        // Use PropertyEvaluator for date comparison
+        return PropertyEvaluator.compareDate(taskDate, parsedDate);
       }
     }
 

@@ -1543,6 +1543,7 @@ export class TaskListView extends ItemView {
               t,
               this.isCaseSensitive,
               this.plugin.settings,
+              this.plugin.propertySearchEngine ?? undefined,
             );
             return { task: t, matches };
           }),

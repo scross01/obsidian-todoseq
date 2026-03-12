@@ -1,5 +1,6 @@
 import { App, TFile } from 'obsidian';
 import { DateUtils } from '../utils/date-utils';
+import { PropertyEvaluator } from '../utils/property-evaluator';
 import { TaskStateManager } from './task-state-manager';
 
 // Interface for dependencies needed by PropertySearchEngine
@@ -113,11 +114,8 @@ export class PropertySearchEngine {
       // Event listeners are now handled by EventCoordinator
       // PropertySearchEngine receives file change events via EventCoordinator calls
 
-      // Get all property keys by scanning all markdown files
-      await this.scanAllPropertyKeys();
-
-      // Build cache for each property key with batch processing
-      await this.buildCacheInBatches();
+      // Initialize property cache in a single pass (O(N) instead of O(N*M))
+      await this.initializePropertyCacheSinglePass();
 
       this.isInitialized = true;
 
@@ -165,25 +163,10 @@ export class PropertySearchEngine {
     }
   }
 
-  // Build cache in batches with yield to prevent UI lockup
-  private async buildCacheInBatches(): Promise<void> {
-    const propertyKeysArray = Array.from(this.propertyKeys);
-    const batchSize = 10; // Process 10 properties per batch
-
-    for (let i = 0; i < propertyKeysArray.length; i += batchSize) {
-      const batch = propertyKeysArray.slice(i, i + batchSize);
-
-      for (const key of batch) {
-        await this.buildPropertyCache(key);
-      }
-
-      // Yield to event loop to keep UI responsive
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-  }
-
-  // Scan all markdown files that contain tasks to get property keys
-  private async scanAllPropertyKeys(): Promise<void> {
+  // Initialize property cache in a single pass through all task files
+  // This replaces the two-pass approach (scanAllPropertyKeys + buildCacheInBatches)
+  // with a more efficient O(N) single pass
+  private async initializePropertyCacheSinglePass(): Promise<void> {
     // Get files with tasks from TaskStateManager
     try {
       const tasks = this.taskStateManager.getTasks();
@@ -212,8 +195,36 @@ export class PropertySearchEngine {
             if (isMarkdownFile && tfile) {
               const cache = this.app.metadataCache.getFileCache(tfile);
               if (cache?.frontmatter) {
-                Object.keys(cache.frontmatter).forEach((key) => {
+                // Single pass: collect keys AND build cache
+                Object.entries(cache.frontmatter).forEach(([key, value]) => {
                   this.propertyKeys.add(key);
+
+                  // Get or create cache for this property
+                  let valueMap = this.propertyCache.get(key);
+                  if (!valueMap) {
+                    valueMap = new Map<unknown, Set<string>>();
+                    this.propertyCache.set(key, valueMap);
+                  }
+
+                  // Add value to cache
+                  if (Array.isArray(value)) {
+                    for (const item of value) {
+                      if (item === undefined) continue;
+                      const existingSet = valueMap.get(item);
+                      const filePathSet = existingSet ?? new Set<string>();
+                      if (!existingSet) {
+                        valueMap.set(item, filePathSet);
+                      }
+                      filePathSet.add(filePath);
+                    }
+                  } else {
+                    const existingSet = valueMap.get(value);
+                    const filePathSet = existingSet ?? new Set<string>();
+                    if (!existingSet) {
+                      valueMap.set(value, filePathSet);
+                    }
+                    filePathSet.add(filePath);
+                  }
                 });
               }
             }
@@ -228,89 +239,8 @@ export class PropertySearchEngine {
         return; // Skip initialization if no tasks found
       }
     } catch (error) {
-      console.error(
-        'TODOseq: Failed to get task files from TaskStateManager:',
-        error,
-      );
+      console.error('TODOseq: Failed to initialize property cache:', error);
     }
-  }
-
-  // Build cache for a specific property key
-  private async buildPropertyCache(key: string): Promise<void> {
-    const cache = new Map<unknown, Set<string>>();
-
-    // Get files with tasks from TaskStateManager
-    let filesToScan: TFile[] = [];
-    try {
-      const tasks = this.taskStateManager.getTasks();
-      const taskFiles = new Set<string>();
-
-      tasks.forEach((task) => {
-        taskFiles.add(task.path);
-      });
-
-      filesToScan = Array.from(taskFiles)
-        .map((filePath) => {
-          const file = this.app.vault.getAbstractFileByPath(filePath);
-          // Check if it's a markdown file - type narrow from TAbstractFile to TFile
-          // TFile has extension, TFolder has children
-          const tfile = file as TFile | undefined;
-          const isMarkdownFile = tfile && tfile.extension === 'md';
-          return isMarkdownFile ? tfile : null;
-        })
-        .filter(Boolean) as TFile[];
-    } catch (error) {
-      console.error(
-        'TODOseq: Failed to get task files for property cache:',
-        error,
-      );
-    }
-
-    // Skip building cache if no task files found
-    if (filesToScan.length === 0) {
-      this.propertyCache.set(key, cache);
-      return;
-    }
-
-    // Process files in batches to prevent UI lockup
-    const batchSize = 50;
-    for (let i = 0; i < filesToScan.length; i += batchSize) {
-      const batch = filesToScan.slice(i, i + batchSize);
-
-      for (const file of batch) {
-        const fileCache = this.app.metadataCache.getFileCache(file);
-        if (fileCache?.frontmatter && key in fileCache.frontmatter) {
-          const value: unknown = fileCache.frontmatter[key];
-
-          if (Array.isArray(value)) {
-            // For arrays, add each element as a separate key in the cache
-            value.forEach((item) => {
-              if (!cache.has(item)) {
-                cache.set(item, new Set());
-              }
-              const filePathSet = cache.get(item);
-              if (filePathSet) {
-                filePathSet.add(file.path);
-              }
-            });
-          } else {
-            // For non-array values, add directly to cache
-            if (!cache.has(value)) {
-              cache.set(value, new Set());
-            }
-            const filePathSet = cache.get(value);
-            if (filePathSet) {
-              filePathSet.add(file.path);
-            }
-          }
-        }
-      }
-
-      // Yield to event loop to keep UI responsive
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-
-    this.propertyCache.set(key, cache);
   }
 
   // Search for files matching property query
@@ -420,30 +350,21 @@ export class PropertySearchEngine {
       const compareValueStr = comparisonMatch[2];
 
       // First, try to parse as date comparison
-      const compareDate = this.parseDateForComparison(compareValueStr);
+      const compareDate =
+        PropertyEvaluator.parseDateForComparison(compareValueStr);
       if (compareDate) {
         const matchingFiles = new Set<string>();
 
         // Iterate through all property values in cache
         cache.forEach((fileSet, propValue) => {
-          const taskDate = this.parsePropertyValueAsDate(propValue);
+          const taskDate =
+            PropertyEvaluator.parsePropertyValueAsDate(propValue);
           if (taskDate) {
-            let matches = false;
-
-            switch (operator) {
-              case '>':
-                matches = taskDate > compareDate;
-                break;
-              case '>=':
-                matches = taskDate >= compareDate;
-                break;
-              case '<':
-                matches = taskDate < compareDate;
-                break;
-              case '<=':
-                matches = taskDate <= compareDate;
-                break;
-            }
+            const matches = PropertyEvaluator.evaluateDateComparison(
+              taskDate,
+              operator,
+              compareDate,
+            );
 
             if (matches) {
               fileSet.forEach((filePath) => {
@@ -503,94 +424,12 @@ export class PropertySearchEngine {
       // Iterate through all property values in cache
       cache.forEach((fileSet, propValue) => {
         // Try to parse property value as date
-        let taskDate: Date | null = null;
-
-        if (propValue instanceof Date) {
-          taskDate = propValue;
-        } else if (typeof propValue === 'string') {
-          const parsedPropDate = DateUtils.parseDateValue(propValue);
-          if (
-            parsedPropDate &&
-            parsedPropDate !== 'none' &&
-            !(typeof parsedPropDate === 'string')
-          ) {
-            if (
-              typeof parsedPropDate === 'object' &&
-              'date' in parsedPropDate
-            ) {
-              taskDate = parsedPropDate.date;
-            } else if (parsedPropDate instanceof Date) {
-              taskDate = parsedPropDate;
-            }
-          }
-        }
+        const taskDate = PropertyEvaluator.parsePropertyValueAsDate(propValue);
 
         if (taskDate) {
-          // Handle date comparisons similar to SearchEvaluator
-          if (typeof parsedDate === 'string') {
-            // Relative date expressions like 'today', 'tomorrow'
-            // We need to implement simple version since we don't have access to settings
-            const now = new Date();
-            switch (parsedDate) {
-              case 'today':
-                if (DateUtils.isDateDueToday(taskDate, now)) {
-                  fileSet.forEach((filePath) => matchingFiles.add(filePath));
-                }
-                break;
-              case 'tomorrow':
-                if (DateUtils.isDateDueTomorrow(taskDate, now)) {
-                  fileSet.forEach((filePath) => matchingFiles.add(filePath));
-                }
-                break;
-              case 'overdue':
-                if (DateUtils.isDateOverdue(taskDate, now)) {
-                  fileSet.forEach((filePath) => matchingFiles.add(filePath));
-                }
-                break;
-            }
-          } else if (typeof parsedDate === 'object' && parsedDate !== null) {
-            if ('start' in parsedDate && 'end' in parsedDate) {
-              // Date range
-              if (
-                DateUtils.isDateInRange(
-                  taskDate,
-                  parsedDate.start,
-                  parsedDate.end,
-                )
-              ) {
-                fileSet.forEach((filePath) => matchingFiles.add(filePath));
-              }
-            } else if ('date' in parsedDate && 'format' in parsedDate) {
-              // Exact date with format information
-              const searchDate = parsedDate.date;
-              const format = parsedDate.format;
-
-              switch (format) {
-                case 'year':
-                  if (searchDate.getFullYear() === taskDate.getFullYear()) {
-                    fileSet.forEach((filePath) => matchingFiles.add(filePath));
-                  }
-                  break;
-                case 'year-month':
-                  if (
-                    searchDate.getFullYear() === taskDate.getFullYear() &&
-                    searchDate.getMonth() === taskDate.getMonth()
-                  ) {
-                    fileSet.forEach((filePath) => matchingFiles.add(filePath));
-                  }
-                  break;
-                case 'full':
-                  if (DateUtils.compareDates(taskDate, searchDate)) {
-                    fileSet.forEach((filePath) => matchingFiles.add(filePath));
-                  }
-                  break;
-              }
-            } else if (parsedDate instanceof Date) {
-              // Date object (from natural language parsing)
-              if (DateUtils.compareDates(taskDate, parsedDate)) {
-                fileSet.forEach((filePath) => matchingFiles.add(filePath));
-              }
-            }
+          // Use PropertyEvaluator for date comparison
+          if (PropertyEvaluator.compareDate(taskDate, parsedDate)) {
+            fileSet.forEach((filePath) => matchingFiles.add(filePath));
           }
         }
       });
@@ -650,65 +489,6 @@ export class PropertySearchEngine {
     }
 
     return undefined;
-  }
-
-  // Parse a date string for comparison operations
-  private parseDateForComparison(value: string): Date | null {
-    const trimmed = value.trim();
-
-    // Full date: YYYY-MM-DD
-    const fullDateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (fullDateMatch) {
-      const [, year, month, day] = fullDateMatch.map(Number);
-      return DateUtils.createDate(year, month - 1, day);
-    }
-
-    // Year-Month: YYYY-MM
-    const yearMonthMatch = trimmed.match(/^(\d{4})-(\d{2})$/);
-    if (yearMonthMatch) {
-      const [, year, month] = yearMonthMatch.map(Number);
-      return DateUtils.createDate(year, month - 1, 1);
-    }
-
-    // Year only: YYYY
-    const yearMatch = trimmed.match(/^(\d{4})$/);
-    if (yearMatch) {
-      const year = parseInt(trimmed, 10);
-      return DateUtils.createDate(year, 0, 1);
-    }
-
-    return null;
-  }
-
-  // Parse a property value as a date
-  private parsePropertyValueAsDate(propValue: unknown): Date | null {
-    if (propValue instanceof Date) {
-      return propValue;
-    }
-
-    if (typeof propValue === 'string') {
-      const parsed = this.parseDateForComparison(propValue);
-      if (parsed) {
-        return parsed;
-      }
-
-      // Try DateUtils.parseDateValue for more complex formats
-      const parsedDate = DateUtils.parseDateValue(propValue);
-      if (
-        parsedDate &&
-        parsedDate !== 'none' &&
-        !(typeof parsedDate === 'string')
-      ) {
-        if (typeof parsedDate === 'object' && 'date' in parsedDate) {
-          return parsedDate.date;
-        }
-        if (parsedDate instanceof Date) {
-          return parsedDate;
-        }
-      }
-    }
-
-    return null;
   }
 
   // Get all files with a specific property key (any value)
@@ -1014,11 +794,10 @@ export class PropertySearchEngine {
     this.propertyCache.clear();
     this.propertyKeys.clear();
 
-    // Re-build cache directly instead of calling initialize() which resets isInitialized
+    // Re-build cache directly using single-pass initialization
     if (this.startupScanEnabled) {
       try {
-        await this.scanAllPropertyKeys();
-        await this.buildCacheInBatches();
+        await this.initializePropertyCacheSinglePass();
         this.isInitialized = true;
       } catch (error) {
         console.error('TODOseq: PropertySearchEngine rebuild failed:', error);

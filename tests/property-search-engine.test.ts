@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import { PropertySearchEngine } from '../src/services/property-search-engine';
+import { PropertyEvaluator } from '../src/utils/property-evaluator';
 import { TFile } from 'obsidian';
 
 // Create mock files
@@ -456,44 +457,41 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
 
   describe('Data Parsing', () => {
     test('should parse date for comparison', () => {
-      const engine = PropertySearchEngine.getInstance(mockApp, {
-        taskStateManager: mockTaskStateManager,
-        refreshAllTaskListViews,
-        vaultScanner: mockVaultScanner,
-      });
-
-      // Test date parsing
-      const fullDate = (engine as any).parseDateForComparison('2026-02-21');
+      // Test date parsing using PropertyEvaluator
+      const fullDate = PropertyEvaluator.parseDateForComparison('2026-02-21');
+      expect(fullDate).not.toBeNull();
       expect(fullDate).toBeInstanceOf(Date);
-      expect(fullDate.getFullYear()).toBe(2026);
-      expect(fullDate.getMonth()).toBe(1); // February is 1
-      expect(fullDate.getDate()).toBe(21);
+      if (fullDate) {
+        expect(fullDate.getFullYear()).toBe(2026);
+        expect(fullDate.getMonth()).toBe(1); // February is 1
+        expect(fullDate.getDate()).toBe(21);
+      }
 
-      const yearMonth = (engine as any).parseDateForComparison('2026-02');
+      const yearMonth = PropertyEvaluator.parseDateForComparison('2026-02');
+      expect(yearMonth).not.toBeNull();
       expect(yearMonth).toBeInstanceOf(Date);
-      expect(yearMonth.getFullYear()).toBe(2026);
-      expect(yearMonth.getMonth()).toBe(1);
-      expect(yearMonth.getDate()).toBe(1);
+      if (yearMonth) {
+        expect(yearMonth.getFullYear()).toBe(2026);
+        expect(yearMonth.getMonth()).toBe(1);
+        expect(yearMonth.getDate()).toBe(1);
+      }
 
-      const year = (engine as any).parseDateForComparison('2026');
+      const year = PropertyEvaluator.parseDateForComparison('2026');
+      expect(year).not.toBeNull();
       expect(year).toBeInstanceOf(Date);
-      expect(year.getFullYear()).toBe(2026);
-      expect(year.getMonth()).toBe(0); // January
-      expect(year.getDate()).toBe(1);
+      if (year) {
+        expect(year.getFullYear()).toBe(2026);
+        expect(year.getMonth()).toBe(0); // January
+        expect(year.getDate()).toBe(1);
+      }
     });
 
     test('should parse property value as date', () => {
-      const engine = PropertySearchEngine.getInstance(mockApp, {
-        taskStateManager: mockTaskStateManager,
-        refreshAllTaskListViews,
-        vaultScanner: mockVaultScanner,
-      });
-
-      // Test various date formats
-      const dateStr = (engine as any).parsePropertyValueAsDate('2026-02-21');
+      // Test various date formats using PropertyEvaluator
+      const dateStr = PropertyEvaluator.parsePropertyValueAsDate('2026-02-21');
       expect(dateStr).toBeInstanceOf(Date);
 
-      const dateObj = (engine as any).parsePropertyValueAsDate(
+      const dateObj = PropertyEvaluator.parsePropertyValueAsDate(
         new Date(2026, 1, 21),
       );
       expect(dateObj).toBeInstanceOf(Date);

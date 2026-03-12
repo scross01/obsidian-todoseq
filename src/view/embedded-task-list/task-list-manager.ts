@@ -163,6 +163,7 @@ export class EmbeddedTaskListManager {
             task,
             false,
             this.settings,
+            this.settings.propertySearchEngine,
           );
           return { task, matches };
         }),

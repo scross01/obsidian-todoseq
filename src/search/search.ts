@@ -3,6 +3,7 @@ import { SearchEvaluator } from './search-evaluator';
 import { SearchNode, SearchError } from './search-types';
 import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings-types';
+import { PropertySearchEngine } from '../services/property-search-engine';
 
 export class Search {
   // Cache for parsed search query ASTs
@@ -51,10 +52,17 @@ export class Search {
     task: Task,
     caseSensitive = false,
     settings?: TodoTrackerSettings,
+    propertySearchEngine?: PropertySearchEngine,
   ): Promise<boolean> {
     try {
       const ast = this.getCachedAst(query);
-      return await SearchEvaluator.evaluate(ast, task, caseSensitive, settings);
+      return await SearchEvaluator.evaluate(
+        ast,
+        task,
+        caseSensitive,
+        settings,
+        propertySearchEngine,
+      );
     } catch (error) {
       if (error instanceof SearchError) {
         // If there's a parse error, return false (don't match)
