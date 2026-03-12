@@ -1,6 +1,8 @@
 import { KeywordManager } from '../src/utils/keyword-manager';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { VaultScanner } from '../src/services/vault-scanner';
+import { TaskParser } from '../src/parser/task-parser';
+import { ParserRegistry } from '../src/parser/parser-registry';
 import {
   TodoTrackerSettings,
   DefaultSettings,
@@ -38,16 +40,42 @@ describe('KeywordManager flow through recreateParser', () => {
       additionalInactiveKeywords: ['UPDATED'],
     };
 
-    taskStateManager = new TaskStateManager(
-      new KeywordManager(initialSettings),
+    const keywordManager = new KeywordManager(initialSettings);
+    taskStateManager = new TaskStateManager(keywordManager);
+
+    // Create parser registry and parsers
+    const parserRegistry = new ParserRegistry();
+    const urgencyCoefficients = {
+      priorityHigh: 6,
+      priorityMedium: 4,
+      priorityLow: 2,
+      scheduled: 8,
+      deadline: 12,
+      active: 4,
+      age: 2,
+      tags: 1,
+      waiting: -3,
+    };
+    const taskParser = TaskParser.create(
+      keywordManager,
+      app,
+      urgencyCoefficients,
+      {
+        includeCalloutBlocks: initialSettings.includeCalloutBlocks,
+        includeCodeBlocks: initialSettings.includeCodeBlocks,
+        includeCommentBlocks: initialSettings.includeCommentBlocks,
+        languageCommentSupport: initialSettings.languageCommentSupport,
+      },
     );
+    parserRegistry.register(taskParser);
 
     vaultScanner = new VaultScanner(
       app,
       initialSettings,
       taskStateManager,
-      {},
-      taskStateManager.getKeywordManager(),
+      urgencyCoefficients,
+      keywordManager,
+      parserRegistry,
     );
   });
 

@@ -8,7 +8,9 @@ import {
   TaskListViewMode,
 } from './view/task-list/task-list-view';
 import { TodoTrackerSettingTab } from './settings/settings';
+import { TaskParser } from './parser/task-parser';
 import { OrgModeTaskParser } from './parser/org-mode-task-parser';
+import { ParserRegistry } from './parser/parser-registry';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, Platform } from 'obsidian';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
@@ -30,6 +32,33 @@ export class PluginLifecycleManager {
     // Load urgency coefficients on startup
     const urgencyCoefficients = await parseUrgencyCoefficients(this.plugin.app);
 
+    // Create parser registry and parsers
+    const parserRegistry = new ParserRegistry();
+
+    // Create and register TaskParser
+    const taskParser = TaskParser.create(
+      this.plugin.keywordManager,
+      this.plugin.app,
+      urgencyCoefficients,
+      {
+        includeCalloutBlocks: this.plugin.settings.includeCalloutBlocks,
+        includeCodeBlocks: this.plugin.settings.includeCodeBlocks,
+        includeCommentBlocks: this.plugin.settings.includeCommentBlocks,
+        languageCommentSupport: this.plugin.settings.languageCommentSupport,
+      },
+    );
+    parserRegistry.register(taskParser);
+
+    // Create and register OrgModeTaskParser if enabled
+    if (this.plugin.settings.detectOrgModeFiles) {
+      const orgModeParser = OrgModeTaskParser.create(
+        this.plugin.keywordManager,
+        this.plugin.app,
+        urgencyCoefficients,
+      );
+      parserRegistry.register(orgModeParser);
+    }
+
     // VaultScanner - use shared KeywordManager from main.ts
     this.plugin.vaultScanner = new VaultScanner(
       this.plugin,
@@ -37,18 +66,8 @@ export class PluginLifecycleManager {
       this.plugin.taskStateManager,
       urgencyCoefficients,
       this.plugin.keywordManager,
+      parserRegistry,
     );
-
-    // Register org-mode parser if experimental feature is enabled
-    if (this.plugin.settings.detectOrgModeFiles) {
-      const keywordManager = this.plugin.vaultScanner.getKeywordManager();
-      const orgModeParser = OrgModeTaskParser.create(
-        keywordManager,
-        this.plugin.app,
-        urgencyCoefficients,
-      );
-      this.plugin.vaultScanner.registerParser(orgModeParser);
-    }
 
     // Initialize property search engine after vault scanner
     this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(

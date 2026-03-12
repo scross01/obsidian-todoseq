@@ -185,10 +185,10 @@ graph TB
 
 **VaultScanner** (`src/services/vault-scanner.ts`)
 
-- **Responsibility**: File system monitoring, incremental scanning, owns KeywordManager and parsers
+- **Responsibility**: File system monitoring, incremental scanning, owns KeywordManager
 - **Key Patterns**: Event-driven architecture, performance optimization, yielding to event loop
 - **Interface**: `scanVault()`, `updateSettings()`, `getKeywordManager()`, `getParser()`, event emission
-- **Ownership**: Creates and owns KeywordManager instance; creates TaskParser internally; registers additional parsers (e.g., OrgModeTaskParser)
+- **Ownership**: Receives and uses KeywordManager instance; receives fully configured ParserRegistry via constructor
 
 **TaskUpdateCoordinator** (`src/services/task-update-coordinator.ts`)
 
@@ -1017,13 +1017,13 @@ The indicator uses monospace font and appears in both the main task list and emb
 ### Critical Gotchas
 
 1. **Circular Dependencies**: Avoid importing components that depend on each other
-2. **Parser Recreation**: Call `recreateParser()` when settings change via `src/main.ts`
+2. **Parser Recreation**: When settings change, `VaultScanner.updateSettings()` updates all registered parsers via `parser.updateConfig()` without recreating them.
 3. **State Consistency**: Use `TaskUpdateCoordinator` for all state changes
 4. **Editor Operations**: Use `EditorController` for intent detection and `TaskWriter` for file operations
 5. **File Race Conditions**: Use `ChangeTracker` to track expected file changes with content hashing; use `RecurrenceCoordinator` for centralized recurrence management
 6. **Performance Testing**: Test with large vaults (1000+ files, 10000+ tasks)
 7. **Embedded Lists**: Use `TodoseqCodeBlockProcessor` with separate lifecycle from main plugin
-8. **Parser Registry**: Use `ParserRegistry` for file parsing - never call parsers directly from VaultScanner
+8. **Parser Registry**: All parsers are created and registered in `PluginLifecycleManager` before `VaultScanner` creation; `VaultScanner` receives fully configured `ParserRegistry` via constructor
 9. **Org-Mode Limitations**: Org-mode files support vault scanning only; editor styling is not supported
 10. **Property Search Initialization**: `PropertySearchEngine` initializes lazily - ensure to await `initialize()` before using
 11. **Event Debouncing**: `EventCoordinator` handles debouncing of file change events automatically

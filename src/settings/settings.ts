@@ -1214,8 +1214,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             this.plugin.settings.additionalFileExtensions = currentExtensions;
             await this.plugin.saveSettings();
 
-            // Re-register parsers based on new settings
-            await this.plugin.updateOrgModeParserRegistration();
+            // Re-create parser with new settings
+            await this.plugin.recreateParser();
 
             // Rescan vault to pick up or remove .org files
             try {

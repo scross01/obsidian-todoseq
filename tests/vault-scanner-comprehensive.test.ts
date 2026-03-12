@@ -1,6 +1,7 @@
 import { VaultScanner } from '../src/services/vault-scanner';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { TaskParser } from '../src/parser/task-parser';
+import { ParserRegistry } from '../src/parser/parser-registry';
 import { PropertySearchEngine } from '../src/services/property-search-engine';
 import {
   createBaseSettings,
@@ -9,6 +10,7 @@ import {
 } from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { App, TFile } from 'obsidian';
+import TodoTracker from '../src/main';
 
 /**
  * Helper function to create a TFile instance for testing
@@ -43,13 +45,48 @@ describe('VaultScanner', () => {
       },
     } as unknown as jest.Mocked<App>;
 
-    const urgencyCoefficients = {}; // Mock urgency coefficients
-    vaultScanner = new VaultScanner(
+    // Create a minimal mock plugin
+    const mockPlugin = {
+      app: mockApp,
+      settings,
+      taskStateManager,
+      keywordManager,
+    } as unknown as TodoTracker;
+
+    const urgencyCoefficients = {
+      priorityHigh: 6,
+      priorityMedium: 4,
+      priorityLow: 2,
+      scheduled: 8,
+      deadline: 12,
+      active: 4,
+      age: 2,
+      tags: 1,
+      waiting: -3,
+    };
+
+    // Create parser registry and parsers
+    const parserRegistry = new ParserRegistry();
+    const taskParser = TaskParser.create(
+      keywordManager,
       mockApp,
+      urgencyCoefficients,
+      {
+        includeCalloutBlocks: settings.includeCalloutBlocks,
+        includeCodeBlocks: settings.includeCodeBlocks,
+        includeCommentBlocks: settings.includeCommentBlocks,
+        languageCommentSupport: settings.languageCommentSupport,
+      },
+    );
+    parserRegistry.register(taskParser);
+
+    vaultScanner = new VaultScanner(
+      mockPlugin,
       settings,
       taskStateManager,
       urgencyCoefficients,
-      createTestKeywordManager(settings),
+      keywordManager,
+      parserRegistry,
     );
   });
 
@@ -209,19 +246,32 @@ describe('VaultScanner', () => {
       // Create a new vault scanner without any parsers
       const keywordManager = createTestKeywordManager(settings);
       const newTaskStateManager = new TaskStateManager(keywordManager);
-      const urgencyCoefficients = {}; // Mock urgency coefficients
+      const newMockPlugin = {
+        app: mockApp,
+        settings,
+        taskStateManager: newTaskStateManager,
+        keywordManager,
+      } as unknown as TodoTracker;
+      const newUrgencyCoefficients = {
+        priorityHigh: 6,
+        priorityMedium: 4,
+        priorityLow: 2,
+        scheduled: 8,
+        deadline: 12,
+        active: 4,
+        age: 2,
+        tags: 1,
+        waiting: -3,
+      };
+      const newParserRegistry = new ParserRegistry();
       const newVaultScanner = new VaultScanner(
-        mockApp,
+        newMockPlugin,
         settings,
         newTaskStateManager,
-        urgencyCoefficients,
-        createTestKeywordManager(settings),
+        newUrgencyCoefficients,
+        keywordManager,
+        newParserRegistry,
       );
-
-      // Clear the parser registry
-      const registry = newVaultScanner.getParserRegistry();
-      // @ts-ignore - Accessing private property for testing
-      registry.parsers.clear();
 
       const parser = newVaultScanner.getParser();
 
@@ -232,24 +282,6 @@ describe('VaultScanner', () => {
   });
 
   describe('Parser Registry', () => {
-    it('should register additional parser with registerParser()', () => {
-      const mockParser = {
-        parserId: 'test-parser',
-        supportedExtensions: ['.test'],
-        parseFile: jest.fn(),
-        updateConfig: jest.fn(),
-        hasAnyKeyword: jest.fn(),
-        parseLine: jest.fn(),
-        isTaskLine: jest.fn(),
-      };
-
-      vaultScanner.registerParser(mockParser);
-
-      const registry = vaultScanner.getParserRegistry();
-      // @ts-ignore - Accessing private property for testing
-      expect(registry.parsers.has('test-parser')).toBe(true);
-    });
-
     it('should get parser registry with getParserRegistry()', () => {
       const registry = vaultScanner.getParserRegistry();
 
@@ -262,18 +294,6 @@ describe('VaultScanner', () => {
 
       expect(keywordManager).toBeDefined();
       expect(keywordManager.getAllKeywords()).toBeDefined();
-    });
-
-    it('should replace parser with replaceParser()', () => {
-      const newParser = TaskParser.create(
-        vaultScanner.getKeywordManager(),
-        mockApp,
-      );
-
-      vaultScanner.replaceParser(newParser);
-
-      const parser = vaultScanner.getParser();
-      expect(parser).toBe(newParser);
     });
   });
 
@@ -327,13 +347,47 @@ describe('VaultScanner', () => {
         settingsWithDefaultsDisabled,
       );
       const newTaskStateManager = new TaskStateManager(keywordManager);
-      const urgencyCoefficients = {}; // Mock urgency coefficients
-      const newVaultScanner = new VaultScanner(
+      const newMockPlugin = {
+        app: mockApp,
+        settings: settingsWithDefaultsDisabled,
+        taskStateManager: newTaskStateManager,
+        keywordManager,
+      } as unknown as TodoTracker;
+      const newUrgencyCoefficients = {
+        priorityHigh: 6,
+        priorityMedium: 4,
+        priorityLow: 2,
+        scheduled: 8,
+        deadline: 12,
+        active: 4,
+        age: 2,
+        tags: 1,
+        waiting: -3,
+      };
+      const newParserRegistry = new ParserRegistry();
+      // Register TaskParser with the new registry
+      const taskParser = TaskParser.create(
+        keywordManager,
         mockApp,
+        newUrgencyCoefficients,
+        {
+          includeCalloutBlocks:
+            settingsWithDefaultsDisabled.includeCalloutBlocks,
+          includeCodeBlocks: settingsWithDefaultsDisabled.includeCodeBlocks,
+          includeCommentBlocks:
+            settingsWithDefaultsDisabled.includeCommentBlocks,
+          languageCommentSupport:
+            settingsWithDefaultsDisabled.languageCommentSupport,
+        },
+      );
+      newParserRegistry.register(taskParser);
+      const newVaultScanner = new VaultScanner(
+        newMockPlugin,
         settingsWithDefaultsDisabled,
         newTaskStateManager,
-        urgencyCoefficients,
-        createTestKeywordManager(settingsWithDefaultsDisabled),
+        newUrgencyCoefficients,
+        keywordManager,
+        newParserRegistry,
       );
 
       // Get the parser and verify it has the correct settings
@@ -371,13 +425,44 @@ TODO task outside blocks
 
       const keywordManager = createTestKeywordManager(settingsWithEnabled);
       const newTaskStateManager = new TaskStateManager(keywordManager);
-      const urgencyCoefficients = {}; // Mock urgency coefficients
-      const newVaultScanner = new VaultScanner(
+      const newMockPlugin = {
+        app: mockApp,
+        settings: settingsWithEnabled,
+        taskStateManager: newTaskStateManager,
+        keywordManager,
+      } as unknown as TodoTracker;
+      const newUrgencyCoefficients = {
+        priorityHigh: 6,
+        priorityMedium: 4,
+        priorityLow: 2,
+        scheduled: 8,
+        deadline: 12,
+        active: 4,
+        age: 2,
+        tags: 1,
+        waiting: -3,
+      };
+      const newParserRegistry = new ParserRegistry();
+      // Register TaskParser with the new registry
+      const taskParser = TaskParser.create(
+        keywordManager,
         mockApp,
+        newUrgencyCoefficients,
+        {
+          includeCalloutBlocks: settingsWithEnabled.includeCalloutBlocks,
+          includeCodeBlocks: settingsWithEnabled.includeCodeBlocks,
+          includeCommentBlocks: settingsWithEnabled.includeCommentBlocks,
+          languageCommentSupport: settingsWithEnabled.languageCommentSupport,
+        },
+      );
+      newParserRegistry.register(taskParser);
+      const newVaultScanner = new VaultScanner(
+        newMockPlugin,
         settingsWithEnabled,
         newTaskStateManager,
-        urgencyCoefficients,
-        createTestKeywordManager(settingsWithEnabled),
+        newUrgencyCoefficients,
+        keywordManager,
+        newParserRegistry,
       );
 
       // Get the parser and verify it has the correct settings

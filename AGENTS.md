@@ -23,7 +23,7 @@ This file provides guidance to agents when working with code in this repository.
 ## Architecture
 
 - **Single source of truth**: `TaskStateManager` maintains tasks; all views subscribe to changes
-- **Parser lifecycle**: Parser created once in `VaultScanner` and reused; `recreateParser()` only called when settings change (lines 147-158 in src/main.ts)
+- **Parser lifecycle**: All parsers created in `PluginLifecycleManager` and registered with `ParserRegistry`; `VaultScanner` receives fully configured `ParserRegistry` via constructor (lines 27-51 in src/plugin-lifecycle.ts)
 - **Event-driven**: `VaultScannerEvents` interface defines events; listeners stored in Map (lines 12-18 in src/services/vault-scanner.ts)
 - **Embedded lists**: `TodoseqCodeBlockProcessor` registers as markdown processor; separate from main plugin lifecycle
 - **Update coordination**: `TaskUpdateCoordinator` provides single entry point for all state updates with optimistic UI updates (lines 27-50 in src/services/task-update-coordinator.ts)

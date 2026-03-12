@@ -192,6 +192,29 @@ export default class TodoTracker extends Plugin {
   public async recreateParser(): Promise<void> {
     if (this.vaultScanner) {
       const urgencyCoefficients = await parseUrgencyCoefficients(this.app);
+
+      // Handle dynamic registration/unregistration of OrgModeTaskParser
+      const parserRegistry = this.vaultScanner.getParserRegistry();
+      const orgModeParserId = 'org-mode';
+      const hasOrgModeParser =
+        parserRegistry.getParser(orgModeParserId) !== null;
+
+      if (this.settings.detectOrgModeFiles && !hasOrgModeParser) {
+        // Register org-mode parser if setting enabled and not already registered
+        const { OrgModeTaskParser } =
+          await import('./parser/org-mode-task-parser');
+        const keywordManager = this.vaultScanner.getKeywordManager();
+        const orgModeParser = OrgModeTaskParser.create(
+          keywordManager,
+          this.app,
+          urgencyCoefficients,
+        );
+        parserRegistry.register(orgModeParser);
+      } else if (!this.settings.detectOrgModeFiles && hasOrgModeParser) {
+        // Unregister org-mode parser if setting disabled and currently registered
+        parserRegistry.unregister(orgModeParserId);
+      }
+
       // Update settings with urgency coefficients to avoid redundant parsing
       await this.vaultScanner.updateSettings(
         this.settings,
@@ -339,35 +362,6 @@ export default class TodoTracker extends Plugin {
           }, 0);
         }
       }
-    }
-  }
-
-  /**
-   * Update org-mode parser registration based on detectOrgModeFiles setting.
-   * Called when the setting changes.
-   */
-  public async updateOrgModeParserRegistration(): Promise<void> {
-    if (!this.vaultScanner) return;
-
-    const parserRegistry = this.vaultScanner.getParserRegistry();
-
-    if (this.settings.detectOrgModeFiles) {
-      // Register org-mode parser if not already registered
-      if (!parserRegistry.getParser('org-mode')) {
-        const { OrgModeTaskParser } =
-          await import('./parser/org-mode-task-parser');
-        const urgencyCoefficients = await parseUrgencyCoefficients(this.app);
-        const keywordManager = this.vaultScanner.getKeywordManager();
-        const orgModeParser = OrgModeTaskParser.create(
-          keywordManager,
-          this.app,
-          urgencyCoefficients,
-        );
-        this.vaultScanner?.registerParser(orgModeParser);
-      }
-    } else {
-      // Unregister org-mode parser if registered
-      parserRegistry.unregister('org-mode');
     }
   }
 }

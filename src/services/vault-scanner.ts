@@ -2,7 +2,7 @@ import { TFile, TAbstractFile } from 'obsidian';
 import { Task } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
 import { ParserRegistry } from '../parser/parser-registry';
-import { ITaskParser, ParserConfig } from '../parser/types';
+import { ParserConfig } from '../parser/types';
 import { TodoTrackerSettings } from '../settings/settings-types';
 import { taskComparator } from '../utils/task-sort';
 import TodoTracker from '../main';
@@ -57,25 +57,10 @@ export class VaultScanner {
     private taskStateManager: TaskStateManager,
     urgencyCoefficients: UrgencyCoefficients,
     keywordManager: KeywordManager,
+    parserRegistry: ParserRegistry,
   ) {
     this.keywordManager = keywordManager;
-
-    // Initialize parser registry
-    this.parserRegistry = new ParserRegistry();
-
-    // Create TaskParser with this KeywordManager and settings
-    const taskParser = TaskParser.create(
-      this.keywordManager,
-      this.plugin.app,
-      urgencyCoefficients,
-      {
-        includeCalloutBlocks: this.settings.includeCalloutBlocks,
-        includeCodeBlocks: this.settings.includeCodeBlocks,
-        includeCommentBlocks: this.settings.includeCommentBlocks,
-        languageCommentSupport: this.settings.languageCommentSupport,
-      },
-    );
-    this.parserRegistry.register(taskParser);
+    this.parserRegistry = parserRegistry;
 
     // Initialize event listeners map
     const eventKeys: Array<keyof VaultScannerEvents> = [
@@ -114,14 +99,6 @@ export class VaultScanner {
   }
 
   /**
-   * Register an additional parser with the registry.
-   * @param parser The parser to register
-   */
-  registerParser(parser: ITaskParser): void {
-    this.parserRegistry.register(parser);
-  }
-
-  /**
    * Get the parser registry.
    * @returns The ParserRegistry instance
    */
@@ -135,14 +112,6 @@ export class VaultScanner {
    */
   getKeywordManager(): KeywordManager {
     return this.keywordManager;
-  }
-
-  /**
-   * Replace the markdown parser with a new one.
-   * Used when creating parsers with shared KeywordManager after VaultScanner creation.
-   */
-  replaceParser(newParser: TaskParser): void {
-    this.parserRegistry.register(newParser);
   }
 
   /**
@@ -498,11 +467,6 @@ export class VaultScanner {
     for (const parser of this.parserRegistry.getAllParsers()) {
       parser.updateConfig(config);
     }
-  }
-
-  // Update parser instance (backward compatibility - updates markdown parser)
-  updateParser(newParser: TaskParser): void {
-    this.parserRegistry.register(newParser);
   }
 
   // Process incremental file change (called by EventCoordinator)
