@@ -793,5 +793,8 @@ export class VaultScanner {
   destroy(): void {
     // Clear all event listeners
     this.eventListeners.clear();
+
+    // Clean up ChangeTracker to prevent open handles in tests
+    this.changeTracker.destroy();
   }
 }

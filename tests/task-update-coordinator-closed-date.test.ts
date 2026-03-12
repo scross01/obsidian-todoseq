@@ -7,12 +7,6 @@ import {
   createBaseSettings,
 } from './helpers/test-helper';
 import { TFile } from 'obsidian';
-import { getPluginSettings } from '../src/utils/settings-utils';
-
-// Mock the settings utility
-jest.mock('../src/utils/settings-utils', () => ({
-  getPluginSettings: jest.fn(),
-}));
 
 // Mock document for DOM operations
 global.document = {
@@ -34,6 +28,7 @@ const mockApp = {
 // Mock the TodoTracker plugin
 const mockPlugin = {
   app: mockApp,
+  settings: createBaseSettings(),
   isUserInitiatedUpdate: false,
   taskEditor: {
     updateTaskState: jest.fn(),
@@ -81,8 +76,8 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       additionalArchivedKeywords: ['ARCHIVED'],
     });
 
-    // Mock getPluginSettings to return our settings
-    (getPluginSettings as jest.Mock).mockReturnValue(settings);
+    // Add settings to mock plugin
+    mockPlugin.settings = settings;
 
     // Create keyword manager
     keywordManager = createTestKeywordManager(settings);
@@ -180,6 +175,13 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
         };
       },
     );
+  });
+
+  afterEach(() => {
+    // Clean up TaskUpdateCoordinator to prevent open handles
+    if (taskUpdateCoordinator) {
+      taskUpdateCoordinator.destroy();
+    }
   });
 
   describe('DONE -> TODO transition (non-recurring)', () => {
@@ -442,13 +444,18 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
 
   describe('trackClosedDate setting disabled', () => {
     beforeEach(() => {
+      // Destroy existing TaskUpdateCoordinator before creating a new one
+      if (taskUpdateCoordinator) {
+        taskUpdateCoordinator.destroy();
+      }
+
       // Create settings with trackClosedDate disabled
       const settings = createBaseSettings({
         trackClosedDate: false,
       });
 
-      // Update the mock for getPluginSettings to return the new settings
-      (getPluginSettings as jest.Mock).mockReturnValue(settings);
+      // Update the mock plugin settings
+      mockPlugin.settings = settings;
 
       keywordManager = createTestKeywordManager(settings);
       taskStateManager = new TaskStateManager(keywordManager);
@@ -487,6 +494,11 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
           };
         },
       );
+    });
+
+    afterEach(() => {
+      // Clean up TaskUpdateCoordinator to prevent open handles
+      taskUpdateCoordinator.destroy();
     });
 
     it('should NOT add CLOSED date when trackClosedDate is false', async () => {

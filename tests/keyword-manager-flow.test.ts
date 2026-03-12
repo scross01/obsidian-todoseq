@@ -79,6 +79,11 @@ describe('KeywordManager flow through recreateParser', () => {
     );
   });
 
+  afterEach(() => {
+    // Clean up VaultScanner to prevent open handles
+    vaultScanner.destroy();
+  });
+
   it('should update keyword manager through vault scanner', async () => {
     const initialKeywordManager = vaultScanner.getKeywordManager();
     expect(

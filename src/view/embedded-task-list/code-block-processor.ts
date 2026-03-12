@@ -1,5 +1,6 @@
 import { MarkdownPostProcessorContext } from 'obsidian';
 import TodoTracker from '../../main';
+import { VaultScanner } from '../../services/vault-scanner';
 import { EmbeddedTaskListRenderer } from './task-list-renderer';
 import { EmbeddedTaskListManager } from './task-list-manager';
 import { EmbeddedTaskListEventHandler } from './event-handler';
@@ -151,7 +152,9 @@ export class TodoseqCodeBlockProcessor {
     // Recreate manager with new settings and keywordManager reference
     this.manager = new EmbeddedTaskListManager(
       this.plugin.settings,
-      this.plugin.keywordManager,
+      (
+        this.plugin as TodoTracker & { vaultScanner: VaultScanner }
+      ).vaultScanner.getKeywordManager(),
     );
     // Update event handler's manager reference
     this.eventHandler.setManager(this.manager);

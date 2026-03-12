@@ -1,6 +1,7 @@
 import { Menu } from 'obsidian';
 import TodoTracker from '../../main';
 import { KeywordManager } from '../../utils/keyword-manager';
+import { VaultScanner } from '../../services/vault-scanner';
 
 /**
  * Keyword group definition for the state menu
@@ -26,7 +27,9 @@ export class StateMenuBuilder {
    * Get the current keyword manager from the plugin
    */
   private get keywordManager(): KeywordManager {
-    return this.plugin.keywordManager;
+    return (
+      this.plugin as TodoTracker & { vaultScanner: VaultScanner }
+    ).vaultScanner.getKeywordManager();
   }
 
   /**

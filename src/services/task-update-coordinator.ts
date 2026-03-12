@@ -537,4 +537,13 @@ export class TaskUpdateCoordinator {
       );
     }
   }
+
+  /**
+   * Clean up resources.
+   * Call this when the coordinator is no longer needed to prevent open handles in tests.
+   */
+  destroy(): void {
+    // Clean up ChangeTracker to prevent open handles in tests
+    this.changeTracker.destroy();
+  }
 }

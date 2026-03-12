@@ -23,6 +23,11 @@ describe('VaultScanner.tasksIdentical', () => {
     );
   });
 
+  afterEach(() => {
+    // Clean up VaultScanner to prevent open handles
+    vaultScanner.destroy();
+  });
+
   describe('tasksIdentical method', () => {
     test('should return true for identical tasks', () => {
       const date = new Date(2024, 0, 15);

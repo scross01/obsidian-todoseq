@@ -55,9 +55,12 @@ export function createBaseTask(overrides: Partial<Task> = {}): Task {
     priority: null,
     scheduledDate: null,
     deadlineDate: null,
+    closedDate: null,
     urgency: null,
     isDailyNote: false,
     dailyNoteDate: null,
+    subtaskCount: 0,
+    subtaskCompletedCount: 0,
     ...overrides,
   };
 }

@@ -16,6 +16,7 @@ import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
 import TodoTracker from '../../main';
 import { KeywordManager } from '../../utils/keyword-manager';
+import { VaultScanner } from '../../services/vault-scanner';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TaskElementCache } from './task-element-cache';
@@ -2062,8 +2063,10 @@ export class TaskListView extends ItemView {
    * This ensures the task list view uses the latest keyword and state transition settings.
    */
   updateSettings(): void {
-    // Get keyword manager from plugin (single source of truth)
-    this.keywordManager = this.plugin.keywordManager;
+    // Get keyword manager from vaultScanner (single source of truth)
+    this.keywordManager = (
+      this.plugin as TodoTracker & { vaultScanner: VaultScanner }
+    ).vaultScanner.getKeywordManager();
 
     // Update state manager with new state transition settings
     this.stateManager = new TaskStateTransitionManager(

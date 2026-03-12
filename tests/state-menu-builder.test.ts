@@ -15,6 +15,7 @@ describe('StateMenuBuilder', () => {
   let mockPlugin: {
     settings: TodoTrackerSettings;
     keywordManager: KeywordManager;
+    vaultScanner: { getKeywordManager: () => KeywordManager };
   };
   let keywordManager: KeywordManager;
 
@@ -23,8 +24,12 @@ describe('StateMenuBuilder', () => {
     mockSettings = createBaseSettings();
     // Create keyword manager
     keywordManager = new KeywordManager(mockSettings);
-    // Create mock plugin with settings and keyword manager
-    mockPlugin = { settings: mockSettings, keywordManager };
+    // Create mock plugin with settings, keyword manager, and vaultScanner
+    mockPlugin = {
+      settings: mockSettings,
+      keywordManager,
+      vaultScanner: { getKeywordManager: () => keywordManager },
+    };
   });
 
   describe('constructor', () => {
@@ -76,6 +81,7 @@ describe('StateMenuBuilder', () => {
       const pluginWithCustom = {
         settings: settingsWithCustom,
         keywordManager: customKeywordManager,
+        vaultScanner: { getKeywordManager: () => customKeywordManager },
       };
       const builder = new StateMenuBuilder(pluginWithCustom as any);
 
@@ -172,6 +178,7 @@ describe('StateMenuBuilder', () => {
       const pluginWithCustom = {
         settings: settingsWithCustom,
         keywordManager: customKeywordManager,
+        vaultScanner: { getKeywordManager: () => customKeywordManager },
       };
       const builder = new StateMenuBuilder(pluginWithCustom as any);
 
@@ -202,6 +209,7 @@ describe('StateMenuBuilder', () => {
       const pluginWithCustom = {
         settings: settingsWithCustom,
         keywordManager: customKeywordManager,
+        vaultScanner: { getKeywordManager: () => customKeywordManager },
       };
       const builder = new StateMenuBuilder(pluginWithCustom as any);
 
@@ -239,6 +247,7 @@ describe('StateMenuBuilder', () => {
       const pluginWithDuplicates = {
         settings: settingsWithDuplicates,
         keywordManager: customKeywordManager,
+        vaultScanner: { getKeywordManager: () => customKeywordManager },
       };
       const builder = new StateMenuBuilder(pluginWithDuplicates as any);
 
@@ -266,6 +275,7 @@ describe('StateMenuBuilder', () => {
       const pluginWithEmpty = {
         settings: settingsWithEmpty,
         keywordManager: customKeywordManager,
+        vaultScanner: { getKeywordManager: () => customKeywordManager },
       };
       const builder = new StateMenuBuilder(pluginWithEmpty as any);
 
@@ -301,6 +311,7 @@ describe('StateMenuBuilder', () => {
       const pluginSingleWaiting = {
         settings: settingsSingleWaiting,
         keywordManager: customKeywordManager,
+        vaultScanner: { getKeywordManager: () => customKeywordManager },
       };
       const builderSingle = new StateMenuBuilder(pluginSingleWaiting as any);
       const groupsEmpty = builderSingle.getSelectableStatesForMenu('WAIT');
