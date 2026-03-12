@@ -25,19 +25,20 @@ graph TB
     subgraph "TODOseq Plugin"
         Main[Main Plugin Class<br/>TodoTracker]
 
-        subgraph "Service Layer"
-            StateManager["TaskStateManager<br/>Central State"]
-            VaultScanner["VaultScanner<br/>File Monitoring"]
-            UpdateCoordinator["TaskUpdateCoordinator<br/>Update Pipeline"]
-            EditorController["EditorController<br/>Editor Operations"]
-            TaskWriter["TaskWriter<br/>File Operations"]
-            EventCoordinator["EventCoordinator<br/>Unified Event Handling"]
-            PropertySearchEngine["PropertySearchEngine<br/>Property Search"]
-            KeywordManager["KeywordManager<br/>Keyword Classification"]
-            StateTransitionManager["TaskStateTransitionManager<br/>State Transitions"]
-            ChangeTracker["ChangeTracker<br/>Expected Change Tracking"]
-            RecurrenceCoordinator["RecurrenceCoordinator<br/>Recurrence Coordination"]
-        end
+         subgraph "Service Layer"
+             StateManager["TaskStateManager<br/>Central State"]
+             VaultScanner["VaultScanner<br/>File Monitoring"]
+             UpdateCoordinator["TaskUpdateCoordinator<br/>Update Pipeline"]
+             EditorController["EditorController<br/>Editor Operations"]
+             TaskWriter["TaskWriter<br/>File Operations"]
+             EventCoordinator["EventCoordinator<br/>Unified Event Handling"]
+             PropertySearchEngine["PropertySearchEngine<br/>Property Search"]
+             StateTransitionManager["TaskStateTransitionManager<br/>State Transitions"]
+             ChangeTracker["ChangeTracker<br/>Expected Change Tracking"]
+             RecurrenceCoordinator["RecurrenceCoordinator<br/>Recurrence Coordination"]
+             RecurrenceManager["RecurrenceManager<br/>Recurrence Logic"]
+             TransitionParser["TransitionParser<br/>State Transition Syntax"]
+         end
 
         subgraph "UI Layer"
             UIManager["UIManager<br/>UI Coordination"]
@@ -222,6 +223,22 @@ graph TB
 - **Key Patterns**: Singleton, caching, async initialization
 - **Interface**: `searchProperties()`, `isReady()`, `onFileChanged()`, property cache management
 
+**RecurrenceManager** (`src/services/recurrence-manager.ts`)
+
+- **Responsibility**: Handles all recurrence-related logic for tasks, providing centralized calculation and update of recurring task dates
+- **Key Patterns**: Date calculation, recurrence detection, date line formatting
+- **Interface**: `calculateNextDates()`, `updateTaskKeyword()`, `parseDateFromLine()`
+- **Used by**: RecurrenceCoordinator, VaultScanner
+- **Output**: Returns `RecurrenceUpdateResult` with updated lines and new dates
+
+**TransitionParser** (`src/services/transition-parser.ts`)
+
+- **Responsibility**: Parser for declarative state transition syntax, supporting chain transitions, group alternatives, and terminal states
+- **Key Patterns**: Parser combinators, syntax tree construction, error handling
+- **Interface**: `parse()`, `parseStatement()`, `isTerminalState()`, supports syntax like `TODO -> DOING -> DONE` or `(WAIT | WAITING) -> IN-PROGRESS`
+- **Used by**: TaskStateTransitionManager
+- **Output**: Returns `ParsedTransitionResult` with transitions map and errors
+
 **KeywordManager** (`src/utils/keyword-manager.ts`)
 
 - **Responsibility**: Single source of truth for keyword classification and detection
@@ -306,6 +323,14 @@ graph TB
 - **Responsibility**: Search query suggestions and autocomplete
 - **Key Patterns**: Prefix matching, suggestion ranking, dropdown UI
 - **Interface**: Suggestion generation, prefix filtering, keyboard navigation
+
+**TaskContextMenu** (`src/view/components/task-context-menu.ts`)
+
+- **Responsibility**: Right-click context menu for tasks in the main task list, providing quick access to common actions
+- **Key Patterns**: Single-instance pattern, keyboard navigation, mobile long-press support
+- **Interface**: `show()`, `showAtMouseEvent()`, `hide()`, `isVisible()`, `cleanup()`
+- **Features**: Go to task, priority selection, scheduled date shortcuts, deadline date picker, copy/move to today
+- **Used by**: TaskListView
 
 ### 3. Parser Layer (Data Extraction)
 

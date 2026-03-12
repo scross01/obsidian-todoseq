@@ -22,19 +22,23 @@ This file provides guidance to agents when working with code in this repository.
 
 ## Architecture
 
+- **REVIEW ARCHITECTURE.md** before making changes significant changes the codebase.
 - **Single source of truth**: `TaskStateManager` maintains tasks; all views subscribe to changes
-- **Parser lifecycle**: All parsers created in `PluginLifecycleManager` and registered with `ParserRegistry`; `VaultScanner` receives fully configured `ParserRegistry` via constructor (lines 27-51 in src/plugin-lifecycle.ts)
-- **Event-driven**: `VaultScannerEvents` interface defines events; listeners stored in Map (lines 12-18 in src/services/vault-scanner.ts)
+- **Parser lifecycle**: All parsers created in `PluginLifecycleManager` and registered with `ParserRegistry`; `VaultScanner` receives fully configured `ParserRegistry` via constructor
+- **Event-driven**: `VaultScannerEvents` interface defines events; listeners stored in Map
 - **Embedded lists**: `TodoseqCodeBlockProcessor` registers as markdown processor; separate from main plugin lifecycle
-- **Update coordination**: `TaskUpdateCoordinator` provides single entry point for all state updates with optimistic UI updates (lines 27-50 in src/services/task-update-coordinator.ts)
+- **Update coordination**: `TaskUpdateCoordinator` provides single entry point for all state updates with optimistic UI updates
+- **Recurrence management**: `RecurrenceCoordinator` coordinates delayed recurrence updates (3-second delay); `RecurrenceManager` handles recurrence date calculations
+- **State transitions**: `TransitionParser` parses declarative state transition syntax; `TaskStateTransitionManager` manages state cycling
+- **Context menus**: `TaskContextMenu` provides right-click task actions (priority, scheduled date, deadline, copy/move to today)
 
 ## Critical Patterns
 
-- **Yield to event loop**: `yieldToEventLoop()` called during vault scans to prevent UI freezing (lines 125-126 in src/services/vault-scanner.ts)
-- **Task ordering**: `taskComparator` sorts by path then line; used consistently across all views (lines 173-176 in src/utils/task-sort.ts)
-- **Editor refresh**: `refreshVisibleEditorDecorations()` uses `requestMeasure()` + `dispatch()` + `setTimeout` sequence to force decoration updates (lines 243-260 in src/main.ts)
-- **Reader view refresh**: `refreshReaderViewFormatter()` iterates leaves and calls `previewMode.rerender(true)` (lines 167-182 in src/main.ts)
-- **Regex caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches (src/utils/regex-cache.ts)
+- **Yield to event loop**: `yieldToEventLoop()` called during vault scans to prevent UI freezing
+- **Task ordering**: `taskComparator` sorts by path then line; used consistently across all views
+- **Editor refresh**: `refreshVisibleEditorDecorations()` uses `requestMeasure()` + `dispatch()` + `setTimeout` sequence to force decoration updates
+- **Reader view refresh**: `refreshReaderViewFormatter()` iterates leaves and calls `previewMode.rerender(true)`
+- **Regex caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches
 
 ## Code Style
 
