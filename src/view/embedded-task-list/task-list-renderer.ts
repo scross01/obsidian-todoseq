@@ -1789,12 +1789,16 @@ export class EmbeddedTaskListRenderer {
    */
   private async updateTaskState(task: Task, newState: string): Promise<void> {
     try {
-      // Update task state using TaskUpdateCoordinator (handles recurrence logic)
-      await this.plugin.taskUpdateCoordinator.updateTaskState(
-        task,
-        newState,
-        'embedded',
-      );
+      // CRITICAL: Do optimistic update FIRST, synchronously
+      // This ensures UI updates even if mobile context is destroyed
+      if (this.plugin.taskStateManager) {
+        this.plugin.taskStateManager.optimisticUpdate(task, newState);
+      }
+
+      // Use TaskEditor directly (bypass coordinator's ChangeTracker)
+      if (this.plugin.taskEditor) {
+        await this.plugin.taskEditor.updateTaskState(task, newState);
+      }
     } catch (error) {
       console.error('Error updating task state:', error);
     }

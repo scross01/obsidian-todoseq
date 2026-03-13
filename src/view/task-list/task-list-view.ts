@@ -1086,7 +1086,7 @@ export class TaskListView extends ItemView {
     }
   }
 
-  // Cycle state via NEXT_STATE using the centralized coordinator
+  // Cycle state via NEXT_STATE - use optimistic update + taskEditor directly
   private async updateTaskState(task: Task, nextState: string): Promise<void> {
     // Store old state for announcement
     const oldState = task.state;
@@ -1095,6 +1095,12 @@ export class TaskListView extends ItemView {
     const plugin = (
       window as unknown as {
         todoSeqPlugin?: {
+          taskStateManager?: {
+            optimisticUpdate: (task: Task, newState: string) => string;
+          };
+          taskEditor?: {
+            updateTaskState: (task: Task, newState: string) => Promise<Task>;
+          };
           taskUpdateCoordinator?: {
             updateTaskState: (
               task: Task,
@@ -1106,19 +1112,18 @@ export class TaskListView extends ItemView {
       }
     ).todoSeqPlugin;
 
-    if (!plugin?.taskUpdateCoordinator) {
-      console.error('TODOseq: TaskUpdateCoordinator not available');
+    if (!plugin?.taskStateManager || !plugin?.taskEditor) {
+      console.error('TODOseq: TaskStateManager or TaskEditor not available');
       return;
     }
 
     try {
-      // Use the centralized coordinator for the update
-      // This handles optimistic updates, file writes, and embed refreshes
-      const updated = await plugin.taskUpdateCoordinator.updateTaskState(
-        task,
-        nextState,
-        'task-list',
-      );
+      // CRITICAL: Do optimistic update FIRST, synchronously
+      // This ensures UI updates even if mobile context is destroyed
+      plugin.taskStateManager.optimisticUpdate(task, nextState);
+
+      // Use TaskEditor directly (bypass coordinator's ChangeTracker)
+      const updated = await plugin.taskEditor.updateTaskState(task, nextState);
 
       // Sync in-memory task from returned snapshot
       task.rawText = updated.rawText;

@@ -76,7 +76,8 @@ const createMockPlugin = (settings: TodoTrackerSettings) => ({
   app: new App(),
   registerMarkdownPostProcessor: jest.fn(),
   registerDomEvent: jest.fn(),
-  taskEditor: null as unknown,
+  taskEditor: { updateTaskState: jest.fn() },
+  taskStateManager: { optimisticUpdate: jest.fn() },
   refreshVisibleEditorDecorations: jest.fn(),
   refreshReaderViewFormatter: jest.fn(),
   recreateParser: jest.fn(),
@@ -1056,8 +1057,8 @@ describe('ReaderViewFormatter', () => {
         .spyOn(formatter as any, 'findTaskForCheckbox')
         .mockResolvedValue(mockTask);
 
-      const taskUpdateCoordinator = { updateTaskState: jest.fn() };
-      (formatter as any).plugin.taskUpdateCoordinator = taskUpdateCoordinator;
+      const taskEditor = { updateTaskState: jest.fn() };
+      (formatter as any).plugin.taskEditor = taskEditor;
 
       const handleCheckboxClick = (
         formatter as unknown as {
@@ -1072,11 +1073,7 @@ describe('ReaderViewFormatter', () => {
       checkbox.checked = true;
       await handleCheckboxClick.call(formatter, clickEvent, 'test.md');
 
-      expect(taskUpdateCoordinator.updateTaskState).toHaveBeenCalledWith(
-        mockTask,
-        'DONE',
-        'reader',
-      );
+      expect(taskEditor.updateTaskState).toHaveBeenCalledWith(mockTask, 'DONE');
 
       document.body.removeChild(container);
     });
@@ -1211,7 +1208,7 @@ describe('ReaderViewFormatter', () => {
   });
 
   describe('updateTaskState', () => {
-    test('should call taskUpdateCoordinator.updateTaskState', async () => {
+    test('should call taskEditor.updateTaskState', async () => {
       const container = document.createElement('div');
       const keywordSpan = document.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
@@ -1224,8 +1221,8 @@ describe('ReaderViewFormatter', () => {
       const findTaskForKeyword = jest
         .spyOn(formatter as any, 'findTaskForKeyword')
         .mockResolvedValue(mockTask);
-      const updateTaskState = jest.fn();
-      (formatter as any).plugin.taskUpdateCoordinator = { updateTaskState };
+      const taskEditor = { updateTaskState: jest.fn() };
+      (formatter as any).plugin.taskEditor = taskEditor;
 
       const updateTaskStateMethod = (
         formatter as unknown as {
@@ -1245,7 +1242,7 @@ describe('ReaderViewFormatter', () => {
       );
 
       expect(findTaskForKeyword).toHaveBeenCalledWith(keywordSpan, 'test.md');
-      expect(updateTaskState).toHaveBeenCalledWith(mockTask, 'DONE', 'reader');
+      expect(taskEditor.updateTaskState).toHaveBeenCalledWith(mockTask, 'DONE');
 
       document.body.removeChild(container);
     });

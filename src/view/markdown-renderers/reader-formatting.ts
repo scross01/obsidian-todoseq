@@ -243,13 +243,15 @@ export class ReaderViewFormatter {
     // Determine the new state based on checkbox state
     const newState = isChecked ? 'DONE' : 'TODO';
 
-    // Use the centralized coordinator for the update
-    if (this.plugin.taskUpdateCoordinator) {
-      await this.plugin.taskUpdateCoordinator.updateTaskState(
-        task,
-        newState,
-        'reader',
-      );
+    // CRITICAL: Do optimistic update FIRST, synchronously
+    // This ensures UI updates even if mobile context is destroyed
+    if (this.plugin.taskStateManager) {
+      this.plugin.taskStateManager.optimisticUpdate(task, newState);
+    }
+
+    // Use TaskEditor directly (bypass coordinator's ChangeTracker)
+    if (this.plugin.taskEditor) {
+      await this.plugin.taskEditor.updateTaskState(task, newState);
     }
   }
 
@@ -2043,13 +2045,15 @@ export class ReaderViewFormatter {
       return;
     }
 
-    // Use the centralized coordinator for the update
-    if (this.plugin.taskUpdateCoordinator) {
-      await this.plugin.taskUpdateCoordinator.updateTaskState(
-        task,
-        newState,
-        'reader',
-      );
+    // CRITICAL: Do optimistic update FIRST, synchronously
+    // This ensures UI updates even if mobile context is destroyed
+    if (this.plugin.taskStateManager) {
+      this.plugin.taskStateManager.optimisticUpdate(task, newState);
+    }
+
+    // Use TaskEditor directly (bypass coordinator's ChangeTracker)
+    if (this.plugin.taskEditor) {
+      await this.plugin.taskEditor.updateTaskState(task, newState);
     }
   }
 
