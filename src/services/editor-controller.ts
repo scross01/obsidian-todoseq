@@ -132,13 +132,13 @@ export class EditorController {
    * @param newState - Optional new state to set (if not provided, will cycle to next state)
    * @returns boolean indicating if the operation was successful
    */
-  async handleUpdateTaskStateAtLine(
+  handleUpdateTaskStateAtLine(
     checking: boolean,
     lineNumber: number,
     editor: Editor,
     view: MarkdownView,
     newState?: string,
-  ): Promise<boolean> {
+  ): boolean {
     const vaultScanner = this.plugin.getVaultScanner();
 
     if (!vaultScanner) {
@@ -183,18 +183,22 @@ export class EditorController {
         targetState = stateManager.getNextState(task.state);
       }
 
-      // Use the centralized coordinator for the update
-      try {
-        await this.plugin.taskUpdateCoordinator.updateTaskState(
-          task,
-          targetState,
-          'editor',
-        );
-      } catch (error) {
-        console.error(
-          `[TODOseq] Failed to update task at line ${lineNumber}:`,
-          error,
-        );
+      // CRITICAL: Do optimistic update FIRST, synchronously
+      // This ensures UI updates even if mobile command palette closes before async completes
+      if (this.plugin.taskStateManager) {
+        this.plugin.taskStateManager.optimisticUpdate(task, targetState);
+      }
+
+      // Use TaskEditor directly for file write (bypass coordinator's ChangeTracker)
+      // This is the same pattern as priority which works on mobile
+      const taskEditor = this.plugin.taskEditor;
+      if (taskEditor) {
+        taskEditor.updateTaskState(task, targetState).catch((error) => {
+          console.error(
+            `[TODOseq] Failed to update task at line ${lineNumber}:`,
+            error,
+          );
+        });
       }
 
       // Refresh editor decorations to show the updated task state
@@ -222,15 +226,7 @@ export class EditorController {
     const cursor = editor.getCursor();
 
     // Use the extracted method to handle the line-based logic
-    // Note: handleUpdateTaskCycleStateAtLine is now async, but we can't await here
-    // because the editorCheckCallback expects a synchronous return
-    // The UI update will happen asynchronously
-    void this.handleUpdateTaskCycleStateAtLine(
-      checking,
-      cursor.line,
-      editor,
-      view,
-    );
+    this.handleUpdateTaskCycleStateAtLine(checking, cursor.line, editor, view);
     return true;
   }
 
@@ -243,13 +239,13 @@ export class EditorController {
    * @param newState - Optional specific state to set
    * @returns boolean indicating if the command is available
    */
-  async handleUpdateTaskCycleStateAtLine(
+  handleUpdateTaskCycleStateAtLine(
     checking: boolean,
     lineNumber: number,
     editor: Editor,
     view: MarkdownView,
     newState?: string,
-  ): Promise<boolean> {
+  ): boolean {
     const vaultScanner = this.plugin.getVaultScanner();
 
     if (!vaultScanner) {
@@ -292,31 +288,34 @@ export class EditorController {
       }
     }
 
-    // Use the centralized coordinator for the update
-    try {
+    // CRITICAL: Do optimistic update FIRST, synchronously
+    // This ensures UI updates even if mobile command palette closes before async completes
+    if (task && this.plugin.taskStateManager) {
+      this.plugin.taskStateManager.optimisticUpdate(task, targetState);
+    }
+
+    // Use TaskEditor directly for file write (bypass coordinator's ChangeTracker)
+    // This is the same pattern as priority which works on mobile
+    const taskEditor = this.plugin.taskEditor;
+    if (taskEditor) {
       if (task) {
-        // Update existing task using coordinator
-        await this.plugin.taskUpdateCoordinator.updateTaskState(
-          task,
-          targetState,
-          'editor',
-        );
+        // Update existing task
+        taskEditor.updateTaskState(task, targetState).catch((error) => {
+          console.error(
+            `[TODOseq] Failed to update task cycle state at line ${lineNumber}:`,
+            error,
+          );
+        });
       } else {
         // For lines without existing task keywords, create a basic task and update it
-        // Properly parse the line structure to maintain bullets/indentation
         const markerInfo = detectListMarker(line);
-        const indent = markerInfo.indent;
-        const listMarker = markerInfo.marker;
-        const text = markerInfo.text;
-
-        // Create a proper task structure
         const basicTask: Task = {
           path: view.file?.path || '',
           line: lineNumber,
           rawText: line,
-          indent: indent,
-          listMarker: listMarker,
-          text: text,
+          indent: markerInfo.indent,
+          listMarker: markerInfo.marker,
+          text: markerInfo.text,
           state: '',
           completed: false,
           priority: null,
@@ -330,18 +329,13 @@ export class EditorController {
           subtaskCompletedCount: 0,
         };
 
-        // Use coordinator to update the task state
-        await this.plugin.taskUpdateCoordinator.updateTaskState(
-          basicTask,
-          targetState,
-          'editor',
-        );
+        taskEditor.updateTaskState(basicTask, targetState).catch((error) => {
+          console.error(
+            `[TODOseq] Failed to update task cycle state at line ${lineNumber}:`,
+            error,
+          );
+        });
       }
-    } catch (error) {
-      console.error(
-        `[TODOseq] Failed to update task cycle state at line ${lineNumber}:`,
-        error,
-      );
     }
 
     // Refresh editor decorations to show the updated task state
@@ -368,10 +362,7 @@ export class EditorController {
     const cursor = editor.getCursor();
 
     // Use the extracted method to handle the line-based logic
-    // Note: handleUpdateTaskStateAtLine is now async, but we can't await here
-    // because the editorCheckCallback expects a synchronous return
-    // The UI update will happen asynchronously
-    void this.handleUpdateTaskStateAtLine(checking, cursor.line, editor, view);
+    this.handleUpdateTaskStateAtLine(checking, cursor.line, editor, view);
     return true;
   }
 

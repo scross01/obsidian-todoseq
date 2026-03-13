@@ -38,7 +38,10 @@ describe('Editor Controller - Task State Methods', () => {
         },
       }),
       taskUpdateCoordinator: {
-        updateTaskState: jest.fn(),
+        updateTaskState: jest.fn().mockResolvedValue({}),
+      },
+      taskEditor: {
+        updateTaskState: jest.fn().mockResolvedValue({}),
       },
       refreshVisibleEditorDecorations: jest.fn(),
       settings,
@@ -131,26 +134,22 @@ describe('Editor Controller - Task State Methods', () => {
       );
 
       expect(result).toBe(true);
-      expect(
-        mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).not.toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.updateTaskState).not.toHaveBeenCalled();
     });
 
-    it('should cycle task state using NEXT_STATE when no new state provided', async () => {
-      await editorController.handleUpdateTaskStateAtLine(
+    it('should cycle task state using NEXT_STATE when no new state provided', () => {
+      editorController.handleUpdateTaskStateAtLine(
         false,
         0,
         mockEditor as any,
         mockView as any,
       );
 
-      expect(
-        mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
     });
 
-    it('should set specific task state when newState is provided', async () => {
-      await editorController.handleUpdateTaskStateAtLine(
+    it('should set specific task state when newState is provided', () => {
+      editorController.handleUpdateTaskStateAtLine(
         false,
         0,
         mockEditor as any,
@@ -158,9 +157,10 @@ describe('Editor Controller - Task State Methods', () => {
         'DOING',
       );
 
-      expect(
-        mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).toHaveBeenCalledWith(expect.anything(), 'DOING', 'editor');
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalledWith(
+        expect.anything(),
+        'DOING',
+      );
     });
 
     it('should handle footnote tasks correctly', async () => {
@@ -173,9 +173,7 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      expect(
-        mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
     });
 
     it('should call refresh decorations after updating task state', async () => {
@@ -223,9 +221,7 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      expect(
-        mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
     });
 
     it('should create new task with TODO state for non-task lines', async () => {
@@ -238,9 +234,7 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      expect(
-        mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
     });
 
     it('should set specific state when newState parameter is provided', async () => {
@@ -252,9 +246,10 @@ describe('Editor Controller - Task State Methods', () => {
         'WAIT',
       );
 
-      expect(
-        mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).toHaveBeenCalledWith(expect.anything(), 'WAIT', 'editor');
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalledWith(
+        expect.anything(),
+        'WAIT',
+      );
     });
 
     it('should handle WAIT keyword by cycling to IN-PROGRESS', async () => {
@@ -268,9 +263,10 @@ describe('Editor Controller - Task State Methods', () => {
       );
 
       // WAIT -> IN-PROGRESS according to CYCLE_TASK_STATE
-      expect(
-        mockPlugin.taskUpdateCoordinator.updateTaskState,
-      ).toHaveBeenCalledWith(expect.anything(), 'IN-PROGRESS', 'editor');
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalledWith(
+        expect.anything(),
+        'IN-PROGRESS',
+      );
     });
   });
 
