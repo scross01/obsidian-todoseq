@@ -40,6 +40,12 @@ This file provides guidance to agents when working with code in this repository.
 - **Reader view refresh**: `refreshReaderViewFormatter()` iterates leaves and calls `previewMode.rerender(true)`
 - **Regex caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches
 
+## Mobile Compatibility
+
+- **Optimistic update first**: When updating task state, always call `taskStateManager.optimisticUpdate()` SYNCHRONOUSLY before any async operations. This ensures UI updates even if mobile context is destroyed (e.g., command palette closes).
+- **Bypass coordinator for mobile**: Use `taskEditor.updateTaskState()` directly instead of `taskUpdateCoordinator.updateTaskState()` for mobile-compatible state updates. The coordinator has a ChangeTracker that reads file content BEFORE the optimistic update - this await breaks on mobile.
+- **Pattern to follow**: Use the same pattern as `handleSetPriorityAtLine` - synchronous optimistic update + async TaskEditor call.
+
 ## Code Style
 
 - **ESLint exceptions**: `@typescript-eslint/no-explicit-any` is "warn" (not error) for all files (line 48 in .eslintrc)

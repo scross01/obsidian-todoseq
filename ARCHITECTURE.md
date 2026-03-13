@@ -198,6 +198,7 @@ graph TB
 - **Interface**: `updateTaskState()`, `updateTaskPriority()`, `updateTaskScheduledDate()`, `updateTaskDeadlineDate()`, coordinate updates
 - **Change Tracking**: Uses `ChangeTracker` to register expected file changes with content hashing
 - **Recurrence Coordination**: Uses `RecurrenceCoordinator` for centralized recurrence management
+- **Mobile Note**: The ChangeTracker requires reading file content before optimistic update, which is not compatible with mobile contexts. For mobile, call `taskEditor.updateTaskState()` directly instead.
 
 **EditorController** (`src/services/editor-controller.ts`)
 
@@ -1066,6 +1067,7 @@ The indicator uses monospace font and appears in both the main task list and emb
 23. **Keyword Group Access**: Use `getKeywordsForGroup('groupName', settings)` for all keyword groups - do not use separate getInactiveKeywords()
 24. **Urgency Calculation**: task-urgency functions require keyword sets to be passed via UrgencyContext - no fallback defaults
 25. **Subtask Detection**: Subtasks are only detected when indented one level deeper than the parent task; deeper nesting is not supported
+26. **Mobile Async Context**: On mobile (Android/iPad), async contexts may be destroyed after UI elements close (command palette, menus). Avoid awaits before critical operations like optimistic updates. Use `taskStateManager.optimisticUpdate()` synchronously first, then `taskEditor.updateTaskState()` for async file writes.
 
 ### Testing Architecture
 
