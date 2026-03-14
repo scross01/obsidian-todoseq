@@ -377,7 +377,7 @@ export class ReaderViewFormatter {
 
     taskElements.forEach((taskElement) => {
       // Skip if element is inside an embedded task list container
-      if (taskElement.closest('.embedded-task-list-container')) {
+      if (taskElement.closest('.todoseq-embedded-task-list-container')) {
         return;
       }
 
@@ -413,7 +413,7 @@ export class ReaderViewFormatter {
 
     paragraphs.forEach((paragraph) => {
       // Skip if element is inside an embedded task list container
-      if (paragraph.closest('.embedded-task-list-container')) {
+      if (paragraph.closest('.todoseq-embedded-task-list-container')) {
         return;
       }
 
@@ -443,7 +443,7 @@ export class ReaderViewFormatter {
 
     listItems.forEach((listItem) => {
       // Skip if element is inside an embedded task list container
-      if (listItem.closest('.embedded-task-list-container')) {
+      if (listItem.closest('.todoseq-embedded-task-list-container')) {
         return;
       }
 
@@ -493,7 +493,7 @@ export class ReaderViewFormatter {
 
     taskItems.forEach((taskItem) => {
       // Skip if element is inside an embedded task list container
-      if (taskItem.closest('.embedded-task-list-container')) {
+      if (taskItem.closest('.todoseq-embedded-task-list-container')) {
         return;
       }
 
@@ -519,7 +519,7 @@ export class ReaderViewFormatter {
 
     listItems.forEach((listItem) => {
       // Skip if element is inside an embedded task list container
-      if (listItem.closest('.embedded-task-list-container')) {
+      if (listItem.closest('.todoseq-embedded-task-list-container')) {
         return;
       }
 
@@ -545,7 +545,7 @@ export class ReaderViewFormatter {
 
     paragraphs.forEach((paragraph) => {
       // Skip if element is inside an embedded task list container
-      if (paragraph.closest('.embedded-task-list-container')) {
+      if (paragraph.closest('.todoseq-embedded-task-list-container')) {
         return;
       }
 
@@ -790,7 +790,7 @@ export class ReaderViewFormatter {
 
     const container = document.createElement('div');
     const span = container.createSpan({
-      cls: `priority-badge ${priorityClass}`,
+      cls: `todoseq-priority-badge ${priorityClass}`,
       attr: {
         'data-priority': letter,
         'aria-label': `Priority ${letter}`,

@@ -824,7 +824,7 @@ describe('ReaderViewFormatter', () => {
 
       processPriorityPillsInTextNode.call(formatter, textNode);
 
-      const pill = paragraph.querySelector('.priority-badge');
+      const pill = paragraph.querySelector('.todoseq-priority-badge');
       expect(pill).not.toBeNull();
       expect(pill?.textContent).toBe('A');
       expect(pill?.classList.contains('priority-high')).toBe(true);
@@ -847,7 +847,7 @@ describe('ReaderViewFormatter', () => {
 
       processPriorityPillsInTextNode.call(formatter, textNode);
 
-      const pills = paragraph.querySelectorAll('.priority-badge');
+      const pills = paragraph.querySelectorAll('.todoseq-priority-badge');
       expect(pills.length).toBe(3);
       expect(pills[0].textContent).toBe('C');
       expect(pills[0].classList.contains('priority-low')).toBe(true);
@@ -1620,7 +1620,7 @@ describe('ReaderViewFormatter', () => {
 
       processPriorityTagLinks.call(formatter, paragraph);
 
-      const pill = paragraph.querySelector('.priority-badge');
+      const pill = paragraph.querySelector('.todoseq-priority-badge');
       expect(pill).not.toBeNull();
       expect(pill?.textContent).toBe('A');
       expect(pill?.classList.contains('priority-high')).toBe(true);
@@ -1729,7 +1729,7 @@ describe('ReaderViewFormatter', () => {
 
       processPriorityPills.call(formatter, container);
 
-      const pill = taskItem.querySelector('.priority-badge');
+      const pill = taskItem.querySelector('.todoseq-priority-badge');
       expect(pill).not.toBeNull();
       expect(pill?.textContent).toBe('A');
       expect(pill?.classList.contains('priority-high')).toBe(true);
@@ -1752,7 +1752,7 @@ describe('ReaderViewFormatter', () => {
 
       processPriorityPills.call(formatter, container);
 
-      const pill = listItem.querySelector('.priority-badge');
+      const pill = listItem.querySelector('.todoseq-priority-badge');
       expect(pill).not.toBeNull();
       expect(pill?.textContent).toBe('B');
       expect(pill?.classList.contains('priority-med')).toBe(true);
@@ -1778,7 +1778,7 @@ describe('ReaderViewFormatter', () => {
 
       processPriorityPills.call(formatter, container);
 
-      const pill = taskItem.querySelector('.priority-badge');
+      const pill = taskItem.querySelector('.todoseq-priority-badge');
       expect(pill).toBeNull();
 
       document.body.removeChild(container);
@@ -1795,7 +1795,7 @@ describe('ReaderViewFormatter', () => {
       ).createPriorityPill;
       const pill = createPriorityPill.call(formatter, 'A');
 
-      expect(pill.classList.contains('priority-badge')).toBe(true);
+      expect(pill.classList.contains('todoseq-priority-badge')).toBe(true);
       expect(pill.classList.contains('priority-high')).toBe(true);
       expect(pill.getAttribute('data-priority')).toBe('A');
       expect(pill.getAttribute('aria-label')).toBe('Priority A');
@@ -1811,7 +1811,7 @@ describe('ReaderViewFormatter', () => {
       ).createPriorityPill;
       const pill = createPriorityPill.call(formatter, 'B');
 
-      expect(pill.classList.contains('priority-badge')).toBe(true);
+      expect(pill.classList.contains('todoseq-priority-badge')).toBe(true);
       expect(pill.classList.contains('priority-med')).toBe(true);
       expect(pill.getAttribute('data-priority')).toBe('B');
       expect(pill.getAttribute('aria-label')).toBe('Priority B');
@@ -1827,7 +1827,7 @@ describe('ReaderViewFormatter', () => {
       ).createPriorityPill;
       const pill = createPriorityPill.call(formatter, 'C');
 
-      expect(pill.classList.contains('priority-badge')).toBe(true);
+      expect(pill.classList.contains('todoseq-priority-badge')).toBe(true);
       expect(pill.classList.contains('priority-low')).toBe(true);
       expect(pill.getAttribute('data-priority')).toBe('C');
       expect(pill.getAttribute('aria-label')).toBe('Priority C');

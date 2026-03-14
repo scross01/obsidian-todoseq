@@ -102,12 +102,12 @@ export class TaskItemRenderer {
   buildCheckbox(task: Task, container: HTMLElement): HTMLInputElement {
     const checkbox = container.createEl('input', {
       type: 'checkbox',
-      cls: 'todo-checkbox',
+      cls: 'todoseq-task-checkbox',
     });
 
     // Add state-specific class for styling (includes custom active keywords)
     if (this.keywordManager.isActive(task.state)) {
-      checkbox.addClass('todo-checkbox-active');
+      checkbox.addClass('todoseq-task-checkbox-active');
     }
 
     checkbox.checked = task.completed;
@@ -126,7 +126,7 @@ export class TaskItemRenderer {
    * Build keyword span element for a task
    */
   buildKeyword(task: Task, parent: HTMLElement): HTMLSpanElement {
-    const todoSpan = parent.createEl('span', { cls: 'todo-keyword' });
+    const todoSpan = parent.createEl('span', { cls: 'todo-task-keyword' });
     todoSpan.setText(task.state);
     todoSpan.setAttr('role', 'button');
     todoSpan.setAttr('tabindex', '0');
@@ -305,8 +305,8 @@ export class TaskItemRenderer {
       const target = evt.target;
       if (
         target instanceof HTMLElement &&
-        (target.hasClass('todo-keyword') ||
-          target.closest('.todo-keyword') !== null)
+        (target.hasClass('todo-task-keyword') ||
+          target.closest('.todo-task-keyword') !== null)
       ) {
         return;
       }
@@ -336,8 +336,8 @@ export class TaskItemRenderer {
         const target = evt.target;
         if (
           target instanceof HTMLElement &&
-          (target.hasClass('todo-keyword') ||
-            target.closest('.todo-keyword') !== null)
+          (target.hasClass('todo-task-keyword') ||
+            target.closest('.todo-task-keyword') !== null)
         ) {
           return;
         }
@@ -403,7 +403,7 @@ export class TaskItemRenderer {
    * Build text content (keyword + priority + task text) for a task
    */
   buildText(task: Task, container: HTMLElement): HTMLSpanElement {
-    const taskText = container.createEl('span', { cls: 'todo-text' });
+    const taskText = container.createEl('span', { cls: 'todoseq-task-text' });
 
     // Keyword button
     this.buildKeyword(task, taskText);
@@ -412,7 +412,7 @@ export class TaskItemRenderer {
     if (task.priority) {
       const pri = task.priority;
       const badge = taskText.createEl('span', {
-        cls: ['priority-badge', `priority-${pri}`],
+        cls: ['todoseq-priority-badge', `priority-${pri}`],
       });
       badge.setText(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C');
       badge.setAttribute('aria-label', `Priority ${pri}`);
@@ -433,7 +433,7 @@ export class TaskItemRenderer {
    * Build a complete LI for a task (used by initial render and refresh)
    */
   buildTaskListItem(task: Task): HTMLLIElement {
-    const li = createEl('li', { cls: 'todo-item' });
+    const li = createEl('li', { cls: 'todoseq-task-item' });
     li.setAttribute('data-path', task.path);
     li.setAttribute('data-line', String(task.line));
     li.setAttribute('data-raw-text', task.rawText);
@@ -445,7 +445,7 @@ export class TaskItemRenderer {
 
     // Create wrapper div for checkbox + text (they stay together)
     const textWrapper = mainContent.createEl('div', {
-      cls: 'todo-text-wrapper',
+      cls: 'todoseq-task-text-wrapper',
     });
     textWrapper.appendChild(checkbox);
     this.buildText(task, textWrapper);
@@ -461,7 +461,7 @@ export class TaskItemRenderer {
     }
 
     // File info
-    const fileInfo = li.createEl('div', { cls: 'todo-file-info' });
+    const fileInfo = li.createEl('div', { cls: 'todoseq-task-file-info' });
     const fileName = getFilename(task.path);
     const displayName = fileName.replace(/\.md$/, '');
     fileInfo.setText(`${displayName}:${task.line + 1}`);
@@ -473,7 +473,7 @@ export class TaskItemRenderer {
       if (
         target !== checkbox &&
         target instanceof HTMLElement &&
-        !target.hasClass('todo-keyword')
+        !target.hasClass('todo-task-keyword')
       ) {
         this.onLocationOpen(task);
       }
@@ -493,36 +493,38 @@ export class TaskItemRenderer {
   updateTaskElementContent(task: Task, element: HTMLLIElement): void {
     // 1. Update checkbox
     const checkbox = element.querySelector(
-      'input.todo-checkbox',
+      'input.todoseq-task-checkbox',
     ) as HTMLInputElement;
     if (checkbox) {
       checkbox.checked = task.completed;
       checkbox.classList.toggle(
-        'todo-checkbox-active',
+        'todoseq-task-checkbox-active',
         this.keywordManager.isActive(task.state),
       );
     }
 
     // 2. Update keyword button
     const keywordBtn = element.querySelector(
-      '.todo-keyword',
+      '.todo-task-keyword',
     ) as HTMLSpanElement;
     if (keywordBtn) {
       keywordBtn.textContent = task.state;
       keywordBtn.setAttribute('aria-checked', String(task.completed));
     }
 
-    // 3. Update todo-text: rebuild the text portion (after keyword and priority)
+    // 3. Update todoseq-task-text: rebuild the text portion (after keyword and priority)
     // ONLY rebuild if the underlying raw text actually changed (smart diff)
     const currentRawText = element.getAttribute('data-raw-text');
     const textChanged = currentRawText !== task.rawText;
 
     if (textChanged) {
       element.setAttribute('data-raw-text', task.rawText);
-      const todoText = element.querySelector('.todo-text') as HTMLElement;
+      const todoText = element.querySelector(
+        '.todoseq-task-text',
+      ) as HTMLElement;
       if (todoText) {
         // Get keyword info BEFORE clearing
-        const keywordSpan = element.querySelector('.todo-keyword');
+        const keywordSpan = element.querySelector('.todo-task-keyword');
         const keywordState = keywordSpan?.textContent || task.state;
         const keywordAriaChecked =
           keywordSpan?.getAttribute('aria-checked') || 'false';
@@ -532,7 +534,7 @@ export class TaskItemRenderer {
 
         // Re-add keyword span
         const newKeywordSpan = todoText.createEl('span', {
-          cls: 'todo-keyword',
+          cls: 'todo-task-keyword',
         });
         newKeywordSpan.setText(keywordState);
         newKeywordSpan.setAttr('role', 'button');
@@ -550,7 +552,7 @@ export class TaskItemRenderer {
                 ? 'B'
                 : 'C';
           const badge = todoText.createEl('span', {
-            cls: ['priority-badge', `priority-${task.priority}`],
+            cls: ['todoseq-priority-badge', `priority-${task.priority}`],
           });
           badge.setText(priorityText);
           badge.setAttribute('aria-label', `Priority ${task.priority}`);
@@ -567,12 +569,14 @@ export class TaskItemRenderer {
       }
     } else {
       // Even if text didn't change, we still need to toggle the completed class
-      const todoText = element.querySelector('.todo-text') as HTMLElement;
+      const todoText = element.querySelector(
+        '.todoseq-task-text',
+      ) as HTMLElement;
       if (todoText) {
         todoText.classList.toggle('completed', task.completed);
       }
 
-      const keywordSpan = element.querySelector('.todo-keyword');
+      const keywordSpan = element.querySelector('.todo-task-keyword');
       if (keywordSpan) {
         keywordSpan.setAttribute('aria-checked', String(task.completed));
       }
@@ -583,7 +587,9 @@ export class TaskItemRenderer {
     const contentWrapper = element.querySelector(
       '.todo-main-content',
     ) as HTMLElement | null;
-    const existingIndicator = element.querySelector('.todo-subtask-indicator');
+    const existingIndicator = element.querySelector(
+      '.todoseq-subtask-indicator',
+    );
     if (hasSubtasks(task)) {
       if (existingIndicator) {
         existingIndicator.textContent = getSubtaskDisplayText(task);
@@ -594,17 +600,19 @@ export class TaskItemRenderer {
         const newWrapper = element.createEl('div', {
           cls: 'todo-main-content',
         });
-        const todoText = element.querySelector('.todo-text');
+        const todoText = element.querySelector('.todoseq-task-text');
         if (todoText && todoText instanceof HTMLElement) {
           // Insert newWrapper before the text wrapper
-          const textWrapper = element.querySelector('.todo-text-wrapper');
+          const textWrapper = element.querySelector(
+            '.todoseq-task-text-wrapper',
+          );
           if (textWrapper) {
             element.insertBefore(newWrapper, textWrapper);
           } else {
             element.insertBefore(newWrapper, todoText);
           }
           // Move checkbox and text to the new wrapper
-          const checkbox = element.querySelector('.todo-checkbox');
+          const checkbox = element.querySelector('.todoseq-task-checkbox');
           if (checkbox) {
             newWrapper.appendChild(checkbox);
             newWrapper.appendChild(todoText);
@@ -619,8 +627,10 @@ export class TaskItemRenderer {
     // 5. Update date display
     const hasDates =
       (task.scheduledDate || task.deadlineDate) && !task.completed;
-    const existingDateDisplay = element.querySelector('.todo-date-container');
-    const fileInfoElement = element.querySelector('.todo-file-info');
+    const existingDateDisplay = element.querySelector(
+      '.todoseq-task-date-container',
+    );
+    const fileInfoElement = element.querySelector('.todoseq-task-file-info');
     if (existingDateDisplay) {
       if (hasDates) {
         existingDateDisplay.remove();
@@ -678,14 +688,14 @@ export class TaskItemRenderer {
     const diffTime = taskDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
 
-    const classes = ['todo-date'];
+    const classes = ['todoseq-task-date'];
 
     if (diffDays < 0) {
-      classes.push('todo-date-overdue');
+      classes.push('todoseq-task-date-overdue');
     } else if (diffDays === 0) {
-      classes.push('todo-date-today');
+      classes.push('todoseq-task-date-today');
     } else if (diffDays <= 3) {
-      classes.push('todo-date-soon');
+      classes.push('todoseq-task-date-soon');
     }
 
     return classes;
@@ -696,7 +706,7 @@ export class TaskItemRenderer {
    */
   buildDateDisplay(task: Task, parent: HTMLElement): HTMLElement {
     const dateContainer = parent.createEl('div', {
-      cls: 'todo-date-container',
+      cls: 'todoseq-task-date-container',
     });
 
     // Display scheduled date
@@ -705,25 +715,27 @@ export class TaskItemRenderer {
         cls: this.getDateStatusClasses(task.scheduledDate, false),
       });
 
-      const dateRow = scheduledDiv.createEl('div', { cls: 'todo-date-row' });
+      const dateRow = scheduledDiv.createEl('div', {
+        cls: 'todoseq-task-date-row',
+      });
 
       const dateLabel = dateRow.createEl('span', {
-        cls: 'date-label',
+        cls: 'todoseq-task-date-label',
       });
       dateLabel.setText('Scheduled: ');
 
       const dateValue = dateRow.createEl('span', {
-        cls: 'date-value',
+        cls: 'todoseq-task-date-value',
       });
       dateValue.setText(this.formatDateForDisplay(task.scheduledDate, true));
 
       const repeatCell = dateRow.createEl('span', {
-        cls: 'todo-date-repeat-cell',
+        cls: 'todoseq-task-date-repeat-cell',
       });
 
       if (task.scheduledDateRepeat) {
         const repeatIcon = repeatCell.createEl('span', {
-          cls: 'todo-date-repeat-icon',
+          cls: 'todoseq-task-date-repeat-icon',
         });
         setIcon(repeatIcon, 'repeat-2');
         const svg = repeatIcon.querySelector('svg');
@@ -744,21 +756,27 @@ export class TaskItemRenderer {
         cls: this.getDateStatusClasses(task.deadlineDate, true),
       });
 
-      const dateRow = deadlineDiv.createEl('div', { cls: 'todo-date-row' });
+      const dateRow = deadlineDiv.createEl('div', {
+        cls: 'todoseq-task-date-row',
+      });
 
-      const dateLabel = dateRow.createEl('span', { cls: 'date-label' });
+      const dateLabel = dateRow.createEl('span', {
+        cls: 'todoseq-task-date-label',
+      });
       dateLabel.setText('Deadline: ');
 
-      const dateValue = dateRow.createEl('span', { cls: 'date-value' });
+      const dateValue = dateRow.createEl('span', {
+        cls: 'todoseq-task-date-value',
+      });
       dateValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
 
       const repeatCell = dateRow.createEl('span', {
-        cls: 'todo-date-repeat-cell',
+        cls: 'todoseq-task-date-repeat-cell',
       });
 
       if (task.deadlineDateRepeat) {
         const repeatIcon = repeatCell.createEl('span', {
-          cls: 'todo-date-repeat-icon',
+          cls: 'todoseq-task-date-repeat-icon',
         });
         setIcon(repeatIcon, 'repeat-2');
         const svg = repeatIcon.querySelector('svg');
@@ -781,7 +799,7 @@ export class TaskItemRenderer {
    */
   buildSubtaskIndicator(task: Task, parent: HTMLElement): void {
     const indicator = parent.createEl('span', {
-      cls: 'todo-subtask-indicator',
+      cls: 'todoseq-subtask-indicator',
     });
     indicator.setText(getSubtaskDisplayText(task));
     indicator.setAttribute(
@@ -826,12 +844,12 @@ export class TaskItemRenderer {
       }
 
       if (nextMatch.type === 'tag') {
-        const span = parent.createEl('span', { cls: 'todo-tag' });
+        const span = parent.createEl('span', { cls: 'todoseq-task-tag' });
         const tagName = nextMatch.match[0];
         span.setText(tagName);
         span.setAttribute('title', tagName);
       } else {
-        const span = parent.createEl('span', { cls: 'todo-link-like' });
+        const span = parent.createEl('span', { cls: 'todoseq-task-link' });
 
         if (nextMatch.type === 'wiki') {
           const target = nextMatch.match[1];

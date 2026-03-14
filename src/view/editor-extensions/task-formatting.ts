@@ -54,7 +54,7 @@ class PriorityWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     const container = document.createElement('span');
-    container.className = `cm-priority-pill priority-badge priority-${this.priority}`;
+    container.className = `todoseq-cm-priority-pill todoseq-priority-badge priority-${this.priority}`;
     container.textContent = this.letter;
     container.setAttribute('data-priority', this.letter);
     container.setAttribute('aria-label', `Priority ${this.letter}`);
@@ -392,15 +392,15 @@ export class TaskKeywordDecorator {
           ) {
             cssClasses += ' comment-block-task-keyword';
           } else if (this.inQuoteBlock && this.settings.includeCalloutBlocks) {
-            // Add nesting level to CSS class (e.g., quote-block-task-keyword-2 for > > TODO)
-            cssClasses += ` quote-block-task-keyword-${this.quoteNestingLevel}`;
+            // Add nesting level to CSS class (e.g., todoseq-quote-block-task-keyword-2 for > > TODO)
+            cssClasses += ` todoseq-quote-block-task-keyword-${this.quoteNestingLevel}`;
           } else if (
             this.inCalloutBlock &&
             this.settings.includeCalloutBlocks
           ) {
             cssClasses += ' callout-block-task-keyword';
           } else if (this.inFootnote) {
-            cssClasses += ' footnote-task-keyword';
+            cssClasses += ' todoseq-footnote-task-keyword';
           }
 
           builder.add(
@@ -763,7 +763,7 @@ export class TaskKeywordDecorator {
           pillStart,
           pillEnd,
           Decoration.mark({
-            class: `cm-priority-raw cm-priority-${letter.toLowerCase()}`,
+            class: `todoseq-cm-priority-raw todoseq-cm-priority-${letter.toLowerCase()}`,
             attributes: {
               'data-priority': letter,
             },

@@ -272,7 +272,7 @@ export class EmbeddedTaskListRenderer {
     if (params.collapse) {
       const hasTitle = !!params.title;
       const taskListContainer = container.querySelector(
-        '.embedded-task-list-container',
+        '.todoseq-embedded-task-list-container',
       ) as HTMLElement | null;
 
       // Check if we can do an incremental update (container exists with correct structure)
@@ -296,14 +296,14 @@ export class EmbeddedTaskListRenderer {
 
       // Create task list container
       const newContainer = container.createEl('div', {
-        cls: 'embedded-task-list-container',
+        cls: 'todoseq-embedded-task-list-container',
       });
 
       // Add collapse state class
       newContainer.addClass(
         isCollapsed
-          ? 'embedded-task-list-collapsed'
-          : 'embedded-task-list-expanded',
+          ? 'todoseq-embedded-task-list-collapsed'
+          : 'todoseq-embedded-task-list-expanded',
       );
 
       if (hasTitle) {
@@ -366,7 +366,7 @@ export class EmbeddedTaskListRenderer {
 
       // Create task list container
       const taskListContainer = container.createEl('div', {
-        cls: 'embedded-task-list-container',
+        cls: 'todoseq-embedded-task-list-container',
       });
 
       this.renderStandardContent(
@@ -393,12 +393,12 @@ export class EmbeddedTaskListRenderer {
     containerId?: string,
   ): void {
     // Update collapse state class
-    container.removeClass('embedded-task-list-collapsed');
-    container.removeClass('embedded-task-list-expanded');
+    container.removeClass('todoseq-embedded-task-list-collapsed');
+    container.removeClass('todoseq-embedded-task-list-expanded');
     container.addClass(
       isCollapsed
-        ? 'embedded-task-list-collapsed'
-        : 'embedded-task-list-expanded',
+        ? 'todoseq-embedded-task-list-collapsed'
+        : 'todoseq-embedded-task-list-expanded',
     );
 
     // Update chevron direction in header
@@ -421,12 +421,16 @@ export class EmbeddedTaskListRenderer {
 
     // Remove old content elements (footer, task list, truncated indicator, empty state)
     const oldFooter = container.querySelector('.todoseq-result-count-footer');
-    const oldTaskList = container.querySelector('.embedded-task-list');
+    const oldTaskList = container.querySelector('.todoseq-embedded-task-list');
     const oldTruncated = container.querySelector(
-      '.embedded-task-list-truncated',
+      '.todoseq-embedded-task-list-truncated',
     );
-    const oldEmpty = container.querySelector('.embedded-task-list-empty');
-    const oldHeader = container.querySelector('.embedded-task-list-header');
+    const oldEmpty = container.querySelector(
+      '.todoseq-embedded-task-list-empty',
+    );
+    const oldHeader = container.querySelector(
+      '.todoseq-embedded-task-list-header',
+    );
 
     if (oldFooter) oldFooter.remove();
     if (oldTaskList) oldTaskList.remove();
@@ -471,7 +475,7 @@ export class EmbeddedTaskListRenderer {
 
   /**
    * Render the title row as a collapsible toggle
-   * Uses the existing embedded-task-list-title element with chevron icon
+   * Uses the existing todoseq-embedded-task-list-title element with chevron icon
    */
   private renderCollapsibleTitle(
     container: HTMLElement,
@@ -482,7 +486,7 @@ export class EmbeddedTaskListRenderer {
     containerId?: string,
   ): HTMLElement {
     const titleEl = container.createEl('div', {
-      cls: 'embedded-task-list-title',
+      cls: 'todoseq-embedded-task-list-title',
       text: params.title,
       attr: {
         role: 'button',
@@ -565,7 +569,7 @@ export class EmbeddedTaskListRenderer {
     containerId?: string,
   ): HTMLElement {
     const header = container.createEl('div', {
-      cls: 'embedded-task-list-header',
+      cls: 'todoseq-embedded-task-list-header',
       attr: {
         role: 'button',
         tabindex: '0',
@@ -595,7 +599,7 @@ export class EmbeddedTaskListRenderer {
     // Show search query using the same format for both states
     if (params.showQuery !== false && params.searchQuery) {
       header.createEl('span', {
-        cls: 'embedded-task-list-search',
+        cls: 'todoseq-embedded-task-list-search',
         text: `Search: ${params.searchQuery}`,
       });
     }
@@ -603,7 +607,7 @@ export class EmbeddedTaskListRenderer {
     // Show sort method if specified
     if (params.sortMethod !== 'default') {
       header.createEl('span', {
-        cls: 'embedded-task-list-sort',
+        cls: 'todoseq-embedded-task-list-sort',
         text: `Sort: ${params.sortMethod}`,
       });
     }
@@ -611,7 +615,7 @@ export class EmbeddedTaskListRenderer {
     // Show completed filter if specified
     if (params.completed !== undefined) {
       header.createEl('span', {
-        cls: 'embedded-task-list-completed',
+        cls: 'todoseq-embedded-task-list-completed',
         text: `Completed: ${params.completed}`,
       });
     }
@@ -619,7 +623,7 @@ export class EmbeddedTaskListRenderer {
     // Show future filter if specified
     if (params.future !== undefined) {
       header.createEl('span', {
-        cls: 'embedded-task-list-future',
+        cls: 'todoseq-embedded-task-list-future',
         text: `Future: ${params.future}`,
       });
     }
@@ -627,7 +631,7 @@ export class EmbeddedTaskListRenderer {
     // Show limit if specified
     if (params.limit !== undefined) {
       header.createEl('span', {
-        cls: 'embedded-task-list-limit',
+        cls: 'todoseq-embedded-task-list-limit',
         text: `Limit: ${params.limit}`,
       });
     }
@@ -657,7 +661,7 @@ export class EmbeddedTaskListRenderer {
   ): void {
     // Create task list
     const taskList = container.createEl('ul', {
-      cls: 'embedded-task-list',
+      cls: 'todoseq-embedded-task-list',
     });
 
     // Render each task
@@ -673,7 +677,7 @@ export class EmbeddedTaskListRenderer {
       totalTasksCount > params.limit
     ) {
       const truncatedIndicator = container.createEl('div', {
-        cls: 'embedded-task-list-truncated',
+        cls: 'todoseq-embedded-task-list-truncated',
       });
       const moreTasksCount = totalTasksCount - params.limit;
       truncatedIndicator.textContent = `${moreTasksCount} more task${moreTasksCount > 1 ? 's' : ''} not shown`;
@@ -728,35 +732,35 @@ export class EmbeddedTaskListRenderer {
   ): void {
     if (params.searchQuery) {
       header.createEl('span', {
-        cls: 'embedded-task-list-search',
+        cls: 'todoseq-embedded-task-list-search',
         text: `Search: ${params.searchQuery}`,
       });
     }
 
     if (params.sortMethod !== 'default') {
       header.createEl('span', {
-        cls: 'embedded-task-list-sort',
+        cls: 'todoseq-embedded-task-list-sort',
         text: `Sort: ${params.sortMethod}`,
       });
     }
 
     if (params.completed !== undefined) {
       header.createEl('span', {
-        cls: 'embedded-task-list-completed',
+        cls: 'todoseq-embedded-task-list-completed',
         text: `Completed: ${params.completed}`,
       });
     }
 
     if (params.future !== undefined) {
       header.createEl('span', {
-        cls: 'embedded-task-list-future',
+        cls: 'todoseq-embedded-task-list-future',
         text: `Future: ${params.future}`,
       });
     }
 
     if (params.limit !== undefined) {
       header.createEl('span', {
-        cls: 'embedded-task-list-limit',
+        cls: 'todoseq-embedded-task-list-limit',
         text: `Limit: ${params.limit}`,
       });
     }
@@ -771,7 +775,7 @@ export class EmbeddedTaskListRenderer {
     params: TodoseqParameters,
   ): void {
     const header = container.createEl('div', {
-      cls: 'embedded-task-list-header',
+      cls: 'todoseq-embedded-task-list-header',
     });
     this.renderHeaderContentSpans(header, params);
   }
@@ -788,7 +792,7 @@ export class EmbeddedTaskListRenderer {
     isCollapsed: boolean,
   ): void {
     const header = container.createEl('div', {
-      cls: 'embedded-task-list-header',
+      cls: 'todoseq-embedded-task-list-header',
       attr: {
         role: 'button',
         tabindex: '0',
@@ -862,7 +866,7 @@ export class EmbeddedTaskListRenderer {
 
     // Create task list
     const taskList = container.createEl('ul', {
-      cls: 'embedded-task-list',
+      cls: 'todoseq-embedded-task-list',
     });
 
     // Render each task
@@ -878,7 +882,7 @@ export class EmbeddedTaskListRenderer {
       totalTasksCount > params.limit
     ) {
       const truncatedIndicator = container.createEl('div', {
-        cls: 'embedded-task-list-truncated',
+        cls: 'todoseq-embedded-task-list-truncated',
       });
       const moreTasksCount = totalTasksCount - params.limit;
       truncatedIndicator.textContent = `${moreTasksCount} more task${moreTasksCount > 1 ? 's' : ''} not shown`;
@@ -902,7 +906,7 @@ export class EmbeddedTaskListRenderer {
     // Add title if provided
     if (params.title) {
       container.createEl('div', {
-        cls: 'embedded-task-list-title',
+        cls: 'todoseq-embedded-task-list-title',
         text: params.title,
       });
     }
@@ -915,15 +919,17 @@ export class EmbeddedTaskListRenderer {
 
     // Add bottom border to title if there's no header and no task list border will be added
     if (params.title && !hasContent) {
-      const titleEl = container.querySelector('.embedded-task-list-title');
+      const titleEl = container.querySelector(
+        '.todoseq-embedded-task-list-title',
+      );
       if (titleEl) {
-        titleEl.addClass('embedded-task-list-title-bordered');
+        titleEl.addClass('todoseq-embedded-task-list-title-bordered');
       }
     }
 
     // Create task list
     const taskList = container.createEl('ul', {
-      cls: 'embedded-task-list',
+      cls: 'todoseq-embedded-task-list',
     });
 
     // Render each task
@@ -939,7 +945,7 @@ export class EmbeddedTaskListRenderer {
       totalTasksCount > params.limit
     ) {
       const truncatedIndicator = container.createEl('div', {
-        cls: 'embedded-task-list-truncated',
+        cls: 'todoseq-embedded-task-list-truncated',
       });
       const moreTasksCount = totalTasksCount - params.limit;
       truncatedIndicator.textContent = `${moreTasksCount} more task${moreTasksCount > 1 ? 's' : ''} not shown`;
@@ -956,7 +962,7 @@ export class EmbeddedTaskListRenderer {
    */
   private renderEmptyState(container: HTMLElement): void {
     const emptyState = container.createEl('div', {
-      cls: 'embedded-task-list-empty',
+      cls: 'todoseq-embedded-task-list-empty',
     });
 
     // Check if we should show scanning message
@@ -971,22 +977,22 @@ export class EmbeddedTaskListRenderer {
 
     if (isScanning || isInitialLoad) {
       emptyState.createEl('div', {
-        cls: 'embedded-task-list-empty-title',
+        cls: 'todoseq-embedded-task-list-empty-title',
         text: isScanning ? 'Scanning vault...' : 'Loading tasks...',
       });
       emptyState.createEl('div', {
-        cls: 'embedded-task-list-empty-subtitle',
+        cls: 'todoseq-embedded-task-list-empty-subtitle',
         text: isScanning
           ? 'Please wait while your tasks are being indexed'
           : 'Please wait while your vault is being indexed',
       });
     } else {
       emptyState.createEl('div', {
-        cls: 'embedded-task-list-empty-title',
+        cls: 'todoseq-embedded-task-list-empty-title',
         text: 'No tasks found',
       });
       emptyState.createEl('div', {
-        cls: 'embedded-task-list-empty-subtitle',
+        cls: 'todoseq-embedded-task-list-empty-subtitle',
         text: 'Try adjusting your search or sort parameters',
       });
     }
@@ -1044,7 +1050,9 @@ export class EmbeddedTaskListRenderer {
       // Create appropriate styled element based on type
       if (nextMatch.type === 'tag') {
         // Create a tag-like span using our custom tag styling
-        const span = parent.createEl('span', { cls: 'embedded-task-tag' });
+        const span = parent.createEl('span', {
+          cls: 'todoseq-embedded-task-tag',
+        });
         const tagName = nextMatch.match[0]; // Full #tag text including #
         span.setText(tagName);
         span.setAttribute('title', tagName);
@@ -1162,7 +1170,7 @@ export class EmbeddedTaskListRenderer {
     }
 
     const repeatIcon = parent.createEl('span', {
-      cls: 'todo-date-repeat-icon',
+      cls: 'todoseq-task-date-repeat-icon',
     });
     setIcon(repeatIcon, 'repeat-2');
     // Remove inline width/height to allow CSS to control size
@@ -1187,12 +1195,12 @@ export class EmbeddedTaskListRenderer {
     params: TodoseqParameters,
   ): HTMLLIElement {
     const li = document.createElement('li');
-    li.className = 'embedded-task-item';
+    li.className = 'todoseq-embedded-task-item';
 
     // Apply date-based background styling if the task has scheduled or deadline dates
     const dateCategory = this.getDateCategory(task);
     if (dateCategory !== 'none') {
-      li.classList.add(`embedded-task-item-date-${dateCategory}`);
+      li.classList.add(`todoseq-embedded-task-item-date-${dateCategory}`);
     }
 
     li.setAttribute('data-path', task.path);
@@ -1202,7 +1210,7 @@ export class EmbeddedTaskListRenderer {
     // Create checkbox
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.className = 'embedded-task-checkbox';
+    checkbox.className = 'todoseq-embedded-task-checkbox';
     checkbox.checked = task.completed;
     checkbox.setAttribute(
       'aria-label',
@@ -1211,11 +1219,11 @@ export class EmbeddedTaskListRenderer {
 
     // Create task text container
     const textContainer = document.createElement('div');
-    textContainer.className = 'embedded-task-text-container';
+    textContainer.className = 'todoseq-embedded-task-text-container';
 
     // Create task state
     const stateSpan = document.createElement('span');
-    stateSpan.className = 'embedded-task-state';
+    stateSpan.className = 'todoseq-embedded-task-state';
     stateSpan.textContent = task.state;
     stateSpan.setAttribute('role', 'button');
     stateSpan.setAttribute('tabindex', '0');
@@ -1274,7 +1282,10 @@ export class EmbeddedTaskListRenderer {
     if (task.priority) {
       const pri = task.priority; // 'high' | 'med' | 'low'
       const prioritySpan = document.createElement('span');
-      prioritySpan.className = ['priority-badge', `priority-${pri}`].join(' ');
+      prioritySpan.className = [
+        'todoseq-priority-badge',
+        `priority-${pri}`,
+      ].join(' ');
       prioritySpan.textContent =
         pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C';
       prioritySpan.setAttribute('aria-label', `Priority ${pri}`);
@@ -1285,7 +1296,7 @@ export class EmbeddedTaskListRenderer {
     // Create task text if present
     if (task.text) {
       const textSpan = document.createElement('span');
-      textSpan.className = 'embedded-task-text';
+      textSpan.className = 'todoseq-embedded-task-text';
       if (textContainer.children.length > 0) {
         textSpan.appendText(' ');
       }
@@ -1315,18 +1326,18 @@ export class EmbeddedTaskListRenderer {
 
     if (isTrueWrapMode) {
       // Add wrap class to list item
-      li.classList.add('embedded-task-item-wrap');
+      li.classList.add('todoseq-embedded-task-item-wrap');
 
       // Add wrap class to text container for CSS styling
-      textContainer.classList.add('embedded-task-text-wrap');
+      textContainer.classList.add('todoseq-embedded-task-text-wrap');
 
       // Create content wrapper for wrapped layout
       contentWrapper = document.createElement('div');
-      contentWrapper.className = 'embedded-task-content-wrapper';
+      contentWrapper.className = 'todoseq-embedded-task-content-wrapper';
 
       // Create a text row that holds text + floating indicators side by side
       const textRow = document.createElement('div');
-      textRow.className = 'embedded-task-text-row';
+      textRow.className = 'todoseq-embedded-task-text-row';
 
       // Append text container to text row
       textRow.appendChild(textContainer);
@@ -1334,12 +1345,13 @@ export class EmbeddedTaskListRenderer {
       // Add floating indicators to text row (before file info)
       if (needsFloatingIndicators) {
         const floatingIndicators = document.createElement('div');
-        floatingIndicators.className = 'embedded-task-floating-indicators';
+        floatingIndicators.className =
+          'todoseq-embedded-task-floating-indicators';
 
         // Add subtask indicator to floating div
         if (hasSubtask) {
           const subtaskSpan = document.createElement('span');
-          subtaskSpan.className = 'todo-subtask-indicator';
+          subtaskSpan.className = 'todoseq-subtask-indicator';
           subtaskSpan.textContent = getSubtaskDisplayText(task);
           subtaskSpan.setAttribute(
             'title',
@@ -1369,11 +1381,11 @@ export class EmbeddedTaskListRenderer {
 
       if (showFile || showUrgency) {
         fileInfoRow = document.createElement('div');
-        fileInfoRow.className = 'embedded-task-file-info-row';
+        fileInfoRow.className = 'todoseq-embedded-task-file-info-row';
 
         if (showFile) {
           const fileInfo = document.createElement('span');
-          fileInfo.className = 'embedded-task-file-info-wrap';
+          fileInfo.className = 'todoseq-embedded-task-file-info-wrap';
           const fileName = task.path.split('/').pop() || task.path;
           const displayName = fileName.replace(/\.md$/, '');
           fileInfo.textContent = `${displayName}:${task.line + 1}`;
@@ -1387,7 +1399,7 @@ export class EmbeddedTaskListRenderer {
           urgencyValue !== undefined
         ) {
           const urgencyInfo = document.createElement('span');
-          urgencyInfo.className = 'embedded-task-urgency-wrap';
+          urgencyInfo.className = 'todoseq-embedded-task-urgency-wrap';
           urgencyInfo.textContent = `${urgencyValue.toFixed(2)}`;
           urgencyInfo.setAttribute(
             'title',
@@ -1405,16 +1417,16 @@ export class EmbeddedTaskListRenderer {
     } else if (isDynamicMode) {
       // Dynamic mode: truncated on wide screens, wrap on narrow
       // Use dynamic classes for media query behavior
-      li.classList.add('embedded-task-item-wrap-dynamic');
-      textContainer.classList.add('embedded-task-text-wrap-dynamic');
+      li.classList.add('todoseq-embedded-task-item-wrap-dynamic');
+      textContainer.classList.add('todoseq-embedded-task-text-wrap-dynamic');
 
       // Create content wrapper (will be styled by CSS based on viewport width)
       contentWrapper = document.createElement('div');
-      contentWrapper.className = 'embedded-task-content-wrapper';
+      contentWrapper.className = 'todoseq-embedded-task-content-wrapper';
 
       // Create a text row that holds text + floating indicators side by side
       const textRow = document.createElement('div');
-      textRow.className = 'embedded-task-text-row';
+      textRow.className = 'todoseq-embedded-task-text-row';
 
       // Append text container to text row
       textRow.appendChild(textContainer);
@@ -1422,12 +1434,13 @@ export class EmbeddedTaskListRenderer {
       // Add floating indicators to text row (before file info)
       if (needsFloatingIndicators) {
         const floatingIndicators = document.createElement('div');
-        floatingIndicators.className = 'embedded-task-floating-indicators';
+        floatingIndicators.className =
+          'todoseq-embedded-task-floating-indicators';
 
         // Add subtask indicator to floating div
         if (hasSubtask) {
           const subtaskSpan = document.createElement('span');
-          subtaskSpan.className = 'todo-subtask-indicator';
+          subtaskSpan.className = 'todoseq-subtask-indicator';
           subtaskSpan.textContent = getSubtaskDisplayText(task);
           subtaskSpan.setAttribute(
             'title',
@@ -1460,11 +1473,11 @@ export class EmbeddedTaskListRenderer {
       if (showFile || showUrgency) {
         // Create file info row for narrow screens (wrapped)
         fileInfoRow = document.createElement('div');
-        fileInfoRow.className = 'embedded-task-file-info-row';
+        fileInfoRow.className = 'todoseq-embedded-task-file-info-row';
 
         if (showFile) {
           const fileInfo = document.createElement('span');
-          fileInfo.className = 'embedded-task-file-info-wrap';
+          fileInfo.className = 'todoseq-embedded-task-file-info-wrap';
           const fileName = task.path.split('/').pop() || task.path;
           const displayName = fileName.replace(/\.md$/, '');
           fileInfo.textContent = `${displayName}:${task.line + 1}`;
@@ -1478,7 +1491,7 @@ export class EmbeddedTaskListRenderer {
           urgencyValue !== undefined
         ) {
           const urgencyInfo = document.createElement('span');
-          urgencyInfo.className = 'embedded-task-urgency-dynamic';
+          urgencyInfo.className = 'todoseq-embedded-task-urgency-dynamic';
           urgencyInfo.textContent = `${urgencyValue.toFixed(2)}`;
           urgencyInfo.setAttribute(
             'title',
@@ -1494,7 +1507,7 @@ export class EmbeddedTaskListRenderer {
         // Add it as a sibling of textRow in contentWrapper (like wrap-content:false mode)
         if (showFile) {
           const inlineFileInfo = document.createElement('div');
-          inlineFileInfo.className = 'embedded-task-file-info';
+          inlineFileInfo.className = 'todoseq-embedded-task-file-info';
           const fileName = task.path.split('/').pop() || task.path;
           const displayName = fileName.replace(/\.md$/, '');
           const displayText = `${displayName}:${task.line + 1}`;
@@ -1511,7 +1524,7 @@ export class EmbeddedTaskListRenderer {
           urgencyValue !== undefined
         ) {
           const urgencyInline = document.createElement('span');
-          urgencyInline.className = 'embedded-task-urgency';
+          urgencyInline.className = 'todoseq-embedded-task-urgency';
           urgencyInline.textContent = `${urgencyValue.toFixed(2)}`;
           urgencyInline.setAttribute(
             'title',
@@ -1529,7 +1542,7 @@ export class EmbeddedTaskListRenderer {
       // Create file info if show-file is not explicitly false
       if (params.showFile !== false) {
         const fileInfo = document.createElement('div');
-        fileInfo.className = 'embedded-task-file-info';
+        fileInfo.className = 'todoseq-embedded-task-file-info';
         const fileName = task.path.split('/').pop() || task.path;
         // Strip .md extension from display name
         const displayName = fileName.replace(/\.md$/, '');
@@ -1550,7 +1563,7 @@ export class EmbeddedTaskListRenderer {
           task.urgency !== undefined
         ) {
           const urgencyInfo = document.createElement('span');
-          urgencyInfo.className = 'embedded-task-urgency';
+          urgencyInfo.className = 'todoseq-embedded-task-urgency';
           urgencyInfo.textContent = `${task.urgency.toFixed(2)}`;
           urgencyInfo.setAttribute(
             'title',
@@ -1570,7 +1583,7 @@ export class EmbeddedTaskListRenderer {
           task.urgency !== undefined
         ) {
           const urgencyInfo = document.createElement('span');
-          urgencyInfo.className = 'embedded-task-urgency';
+          urgencyInfo.className = 'todoseq-embedded-task-urgency';
           urgencyInfo.textContent = `${task.urgency.toFixed(2)}`;
           urgencyInfo.setAttribute(
             'title',
@@ -1583,7 +1596,7 @@ export class EmbeddedTaskListRenderer {
       // Add inline subtask indicator and repeat icon for non-wrap mode
       if (hasSubtask) {
         const subtaskSpan = document.createElement('span');
-        subtaskSpan.className = 'todo-subtask-indicator';
+        subtaskSpan.className = 'todoseq-subtask-indicator';
         subtaskSpan.textContent = getSubtaskDisplayText(task);
         subtaskSpan.setAttribute(
           'title',
@@ -1654,8 +1667,8 @@ export class EmbeddedTaskListRenderer {
       if (
         target === checkbox ||
         (target instanceof HTMLElement &&
-          (target.hasClass('embedded-task-state') ||
-            target.closest('.embedded-task-state') !== null))
+          (target.hasClass('todoseq-embedded-task-state') ||
+            target.closest('.todoseq-embedded-task-state') !== null))
       ) {
         return;
       }
@@ -1683,8 +1696,8 @@ export class EmbeddedTaskListRenderer {
         if (
           target === checkbox ||
           (target instanceof HTMLElement &&
-            (target.hasClass('embedded-task-state') ||
-              target.closest('.embedded-task-state') !== null))
+            (target.hasClass('todoseq-embedded-task-state') ||
+              target.closest('.todoseq-embedded-task-state') !== null))
         ) {
           return;
         }
@@ -2017,21 +2030,21 @@ export class EmbeddedTaskListRenderer {
     container.empty();
 
     const errorContainer = container.createEl('div', {
-      cls: 'embedded-task-list-error',
+      cls: 'todoseq-embedded-task-list-error',
     });
 
     errorContainer.createEl('div', {
-      cls: 'embedded-task-list-error-title',
+      cls: 'todoseq-embedded-task-list-error-title',
       text: 'Error rendering task list',
     });
 
     errorContainer.createEl('div', {
-      cls: 'embedded-task-list-error-message',
+      cls: 'todoseq-embedded-task-list-error-message',
       text: errorMessage,
     });
 
     errorContainer.createEl('div', {
-      cls: 'embedded-task-list-error-help',
+      cls: 'todoseq-embedded-task-list-error-help',
       text: 'Check your search and sort parameters for syntax errors.',
     });
   }

@@ -230,10 +230,10 @@ export class TaskListView extends ItemView {
       return 0;
     }
 
-    const list = this.taskListContainer.querySelector('ul.todo-list');
+    const list = this.taskListContainer.querySelector('ul.todoseq-task-list');
     if (!list) return 0;
 
-    const firstVisible = list.querySelector('li.todo-item');
+    const firstVisible = list.querySelector('li.todoseq-task-item');
     if (!firstVisible) return 0;
 
     const firstPath = firstVisible.getAttribute('data-path');
@@ -255,7 +255,7 @@ export class TaskListView extends ItemView {
       return;
     }
 
-    const list = this.taskListContainer.querySelector('ul.todo-list');
+    const list = this.taskListContainer.querySelector('ul.todoseq-task-list');
     if (!list) return;
 
     // Get the task at the anchor position
@@ -266,7 +266,7 @@ export class TaskListView extends ItemView {
     }
 
     // Find the DOM element for that task
-    const selector = `li.todo-item[data-path="${CSS.escape(targetTask.path)}"][data-line="${targetTask.line}"]`;
+    const selector = `li.todoseq-task-item[data-path="${CSS.escape(targetTask.path)}"][data-line="${targetTask.line}"]`;
     const targetElement = list.querySelector(selector) as HTMLElement;
 
     if (!targetElement) {
@@ -380,7 +380,7 @@ export class TaskListView extends ItemView {
 
   /** Build toolbar with icon-only mode buttons plus right-aligned search; dispatch event for persistence */
   private buildToolbar(container: HTMLElement) {
-    const toolbar = container.createEl('div', { cls: 'todo-toolbar' });
+    const toolbar = container.createEl('div', { cls: 'todoseq-toolbar' });
 
     // First row: search input with mode icons on the right
     const firstRow = toolbar.createEl('div', { cls: 'search-row' });
@@ -1375,7 +1375,7 @@ export class TaskListView extends ItemView {
   private setupSentinelObserver(): void {
     this.cleanupSentinelObserver();
 
-    const list = this.taskListContainer?.querySelector('ul.todo-list');
+    const list = this.taskListContainer?.querySelector('ul.todoseq-task-list');
     if (!list || !this.taskListContainer) return;
 
     // Create sentinel element if not exists
@@ -1434,7 +1434,7 @@ export class TaskListView extends ItemView {
 
     this.isLoadingMore = true;
     const currentGeneration = this.refreshGeneration;
-    const list = this.taskListContainer?.querySelector('ul.todo-list');
+    const list = this.taskListContainer?.querySelector('ul.todoseq-task-list');
     if (!list) {
       this.isLoadingMore = false;
       return;
@@ -1636,15 +1636,19 @@ export class TaskListView extends ItemView {
 
     if (isScanning || isInitialLoad) {
       // Remove any previous empty-state
-      const prevEmpty = container.querySelector('.todo-empty');
+      const prevEmpty = container.querySelector('.todoseq-panel-empty');
       if (prevEmpty) prevEmpty.detach?.();
 
       // Build empty message container (below toolbar, above list)
       const emptyContainer = this.taskListContainer || container;
-      const empty = emptyContainer.createEl('div', { cls: 'todo-empty' });
+      const empty = emptyContainer.createEl('div', {
+        cls: 'todoseq-panel-empty',
+      });
 
-      const title = empty.createEl('div', { cls: 'todo-empty-title' });
-      const subtitle = empty.createEl('div', { cls: 'todo-empty-subtitle' });
+      const title = empty.createEl('div', { cls: 'todoseq-panel-empty-title' });
+      const subtitle = empty.createEl('div', {
+        cls: 'todoseq-panel-empty-subtitle',
+      });
 
       // Show appropriate message based on state
       if (isScanning) {
@@ -1661,21 +1665,27 @@ export class TaskListView extends ItemView {
       return;
     } else if (visible.length === 0) {
       // Clear all existing tasks from the list first
-      const taskList = this.taskListContainer?.querySelector('ul.todo-list');
+      const taskList = this.taskListContainer?.querySelector(
+        'ul.todoseq-task-list',
+      );
       if (taskList) {
         taskList.empty();
       }
 
       // Remove any previous empty-state
-      const prevEmpty = container.querySelector('.todo-empty');
+      const prevEmpty = container.querySelector('.todoseq-panel-empty');
       if (prevEmpty) prevEmpty.detach?.();
 
       // Build empty message container (below toolbar, above list)
       const emptyContainer = this.taskListContainer || container;
-      const empty = emptyContainer.createEl('div', { cls: 'todo-empty' });
+      const empty = emptyContainer.createEl('div', {
+        cls: 'todoseq-panel-empty',
+      });
 
-      const title = empty.createEl('div', { cls: 'todo-empty-title' });
-      const subtitle = empty.createEl('div', { cls: 'todo-empty-subtitle' });
+      const title = empty.createEl('div', { cls: 'todoseq-panel-empty-title' });
+      const subtitle = empty.createEl('div', {
+        cls: 'todoseq-panel-empty-subtitle',
+      });
 
       // Determine scenario
       const hasAnyTasks = allTasks.length > 0;
@@ -1704,15 +1714,17 @@ export class TaskListView extends ItemView {
       return;
     } else {
       // Remove any empty-state if present
-      const prevEmpty = container.querySelector('.todo-empty');
+      const prevEmpty = container.querySelector('.todoseq-panel-empty');
       if (prevEmpty) prevEmpty.detach?.();
     }
 
     // Render visible tasks using chunked rendering for performance
     // Ensure list container exists and is the sole place for items
-    let list = this.taskListContainer?.querySelector('ul.todo-list');
+    let list = this.taskListContainer?.querySelector('ul.todoseq-task-list');
     if (!list && this.taskListContainer) {
-      list = this.taskListContainer.createEl('ul', { cls: 'todo-list' });
+      list = this.taskListContainer.createEl('ul', {
+        cls: 'todoseq-task-list',
+      });
     }
 
     if (list) {
@@ -1722,7 +1734,7 @@ export class TaskListView extends ItemView {
       // Get all existing elements by their stable ID (path:line)
       const existingElements = new Map<string, HTMLElement>();
       const existingKeys = new Set<string>();
-      list.querySelectorAll('li.todo-item').forEach((el) => {
+      list.querySelectorAll('li.todoseq-task-item').forEach((el) => {
         const path = el.getAttribute('data-path');
         const line = el.getAttribute('data-line');
         if (path && line) {
@@ -1815,14 +1827,14 @@ export class TaskListView extends ItemView {
   async onOpen() {
     const container = this.contentEl;
     container.empty();
-    container.addClass('todo-view');
+    container.addClass('todoseq-panel');
 
     // Toolbar
     this.buildToolbar(container);
 
     // Create scrollable container for task list
     this.taskListContainer = container.createEl('div', {
-      cls: 'todo-task-list-container',
+      cls: 'todoseq-task-list-container',
     });
 
     // Set up scroll event listener to continuously track scroll position
