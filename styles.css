@@ -64,7 +64,7 @@
   color: var(--interactive-accent);
   cursor: pointer;
   font-weight: var(--font-weight-bold, var(--font-bold, 600));
-  font-size: 0.85em;
+  font-size: 0.85rem;
 }
 
 /* Hover hint */
@@ -196,7 +196,7 @@
   padding: 0 var(--size-2-2);
   border-radius: var(--radius-s);
   font-weight: var(--font-weight-medium, var(--font-medium));
-  font-size: 0.7em;
+  font-size: 0.7rem;
   line-height: 1.6;
   vertical-align: baseline;
   position: relative;
@@ -243,26 +243,25 @@
 /* Tag styling (#tag) - consolidated for todo-view and embedded task lists */
 :is(.todo-view, .embedded-task-list-container)
   :is(.todo-tag, .embedded-task-tag) {
-  display: inline-block;
-  padding: 1px 6px;
-  margin: 0 2px;
-  border-radius: var(--tag-radius);
-  color: var(--tag-color);
+  /* display: inline-block; */
   background-color: var(--tag-background);
   border: var(--tag-border-width) solid var(--tag-border-color);
+  border-radius: var(--tag-radius);
+  corner-shape: var(--tag-corner-shape);
+  color: var(--tag-color);
   font-size: var(--tag-size);
   font-weight: var(--tag-weight);
-  vertical-align: baseline;
-  border-inline-start: none;
-  border-inline-end: none;
+  text-decoration: var(--tag-decoration);
+  padding: var(--tag-padding-y) var(--tag-padding-x);
   padding-top: var(--tag-padding-y);
   padding-bottom: var(--tag-padding-y);
+  line-height: 1;
 }
 
 /* File info (path:line) */
 .todo-view .todo-file-info {
   color: var(--text-muted);
-  font-size: 0.75em;
+  font-size: 0.75rem;
   margin-top: var(--size-2-2);
 }
 
@@ -272,11 +271,11 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 10px;
-  padding: 24px 16px;
-  margin: 12px 12px 0;
+  gap: var(--size-4-2);
+  padding: var(--size-4-6) var(--size-4-4);
+  margin: var(--size-4-3) var(--size-4-3) 0;
   border: 1px dashed var(--background-modifier-border);
-  border-radius: 12px;
+  border-radius: var(--radius-l);
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--background-secondary) 90%, transparent),
@@ -302,13 +301,13 @@
 /* Date display styling */
 .todo-view .todo-date-container {
   margin-top: var(--size-2-2);
-  font-size: 0.8em;
+  font-size: 0.8rem;
   color: var(--text-muted);
 }
 
 .todo-view .todo-date {
-  padding: 2px 6px;
-  margin: 2px 0;
+  padding: var(--size-2-1) var(--size-2-3);
+  margin: var(--size-2-1) 0;
   border-radius: var(--radius-s);
   border-left: 3px solid;
   background-color: color-mix(
@@ -326,7 +325,7 @@
 
 /* This works in both Flex and Inline-Block */
 .embedded-task-text-container > span:not(:last-child) {
-  margin-right: 6px;
+  margin-right: var(--size-2-3);
 }
 
 /* Date row with right-aligned repeat icon */
@@ -334,7 +333,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: var(--size-4-2);
 }
 
 .todo-view .todo-date-repeat-cell {
@@ -371,7 +370,7 @@
 
 .todo-view .todo-date .date-value {
   font-weight: var(--font-weight-normal);
-  margin-left: 4px;
+  margin-left: var(--size-2-2);
 }
 
 /* Main content container - holds checkbox+text and indicator on same row */
@@ -398,8 +397,8 @@
 }
 
 .todo-view .todo-subtask-indicator {
-  margin-top: 2px;
-  margin-left: 4px;
+  margin-top: var(--size-2-1);
+  margin-left: var(--size-2-2);
 }
 
 /* Scheduled and Deadline date styling */
@@ -437,7 +436,7 @@
 .todoseq-setting-item-warning,
 .todoseq-setting-item-info,
 .setting-item-info .todoseq-info-message {
-  font-size: 0.7em;
+  font-size: 0.7rem;
 }
 
 /* Settings UI - Keyword validation error */
@@ -467,7 +466,7 @@
 .todoseq-keyword-formatted {
   font-weight: var(--font-weight-bold, var(--font-bold, 600));
   color: var(--interactive-accent);
-  font-size: 0.9em; /* reduce size slightly */
+  font-size: 0.9rem; /* reduce size slightly */
   border-radius: 2px; /* Subtle rounding */
   cursor: pointer; /* Show hand/finger cursor like a link */
 }
@@ -490,7 +489,7 @@
 :is(.cm-editor, .markdown-preview-view) .todoseq-scheduled-line,
 :is(.cm-editor, .markdown-preview-view) .todoseq-deadline-line,
 :is(.cm-editor, .markdown-preview-view) .todoseq-closed-line {
-  font-size: 0.9em;
+  font-size: 0.9rem;
   color: var(--text-muted);
 }
 
@@ -595,41 +594,41 @@
 
 /* Main container */
 .embedded-task-list-container {
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: var(--size-4-1) var(--size-4-3);
+  border-radius: var(--code-radius);
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
 }
 
 .markdown-reading-view .embedded-task-list-container {
-  margin: 16px 0;
+  margin: var(--size-4-4) 0;
 }
 
 /* Title styling */
 .embedded-task-list-title {
   font-weight: var(--font-weight-bold, var(--font-bold, 600));
-  font-size: 1em;
+  font-size: 1rem;
   color: var(--text-normal);
-  padding: 2px 6px 6px 6px;
+  padding: var(--size-2-1) var(--size-2-3) var(--size-2-3) var(--size-2-3);
   border-bottom: 1px solid var(--background-modifier-border);
-  margin-bottom: 8px;
+  margin-bottom: var(--size-4-2);
 }
 
 /* Title with border when no header follows */
 .embedded-task-list-title-bordered {
   border-bottom: 1px solid var(--background-modifier-border);
-  margin-bottom: 8px;
+  margin-bottom: var(--size-4-2);
 }
 
 /* Header with search/sort info */
 .embedded-task-list-header {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 4px 0 8px 0;
+  gap: var(--size-4-2);
+  padding: var(--size-4-1) 0 var(--size-4-2) 0;
   border-bottom: 1px solid var(--background-modifier-border);
-  margin-bottom: 8px;
-  font-size: 0.75em;
+  margin-bottom: var(--size-4-2);
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -644,20 +643,20 @@
 .embedded-task-list-future,
 .embedded-task-list-limit {
   background-color: var(--background-modifier-selection);
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: var(--size-2-1) var(--size-2-3);
+  border-radius: var(--radius-s);
   font-family: var(--font-monospace);
 }
 
 /* Truncated results indicator */
 .embedded-task-list-truncated {
   text-align: center;
-  padding: 8px 0 4px 0;
+  padding: var(--size-4-2) 0 var(--size-4-1) 0;
   color: var(--text-muted);
-  font-size: 0.8em;
+  font-size: 0.8rem;
   font-style: italic;
   border-top: 1px solid var(--background-modifier-border);
-  margin-top: 8px;
+  margin-top: var(--size-4-2);
 }
 
 /* Task list */
@@ -672,9 +671,9 @@
 .embedded-task-item {
   display: flex;
   align-items: center;
-  padding: 6px 8px;
-  border-radius: 4px;
-  margin-bottom: 2px;
+  padding: var(--size-2-3) var(--size-4-2);
+  border-radius: var(--radius-s);
+  margin-bottom: var(--size-2-1);
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -689,7 +688,7 @@
 
 /* Checkbox */
 .embedded-task-checkbox {
-  margin-right: 8px;
+  margin-right: var(--size-4-2);
   cursor: pointer;
   width: 16px;
   height: 16px;
@@ -731,7 +730,7 @@
 /* File info */
 .embedded-task-file-info {
   color: var(--text-muted);
-  font-size: 0.7em;
+  font-size: 0.7rem;
   font-family: var(--font-monospace);
   margin-left: auto; /* Push to right side of text row */
   opacity: 0.7;
@@ -744,10 +743,10 @@
 /* Urgency value */
 .embedded-task-urgency {
   color: var(--text-muted);
-  font-size: 0.7em;
+  font-size: 0.7rem;
   font-family: var(--font-monospace);
   opacity: 0.7;
-  margin-left: 8px;
+  margin-left: var(--size-4-2);
   flex-shrink: 0;
   display: inline;
 }
@@ -763,7 +762,7 @@
 
 /* Wrap content mode - checkbox alignment with first text line */
 .embedded-task-item-wrap .embedded-task-checkbox {
-  margin-top: 4px;
+  margin-top: var(--size-4-1);
 }
 
 /* Wrap content mode - content wrapper for stacked layout (text + file info) */
@@ -780,7 +779,7 @@
   display: flex;
   align-items: baseline;
   justify-content: flex-start;
-  gap: 8px;
+  gap: var(--size-4-2);
   min-width: 0;
 }
 
@@ -817,7 +816,7 @@
 /* Wrap content mode - file info on new row without truncation */
 .embedded-task-file-info-wrap {
   color: var(--text-muted);
-  font-size: 0.7em;
+  font-size: 0.7rem;
   font-family: var(--font-monospace);
   opacity: 0.7;
   margin-left: 0;
@@ -848,7 +847,7 @@
 /* Wrap content mode - urgency value */
 .embedded-task-urgency-wrap {
   color: var(--text-muted);
-  font-size: 0.7em;
+  font-size: 0.7rem;
   font-family: var(--font-monospace);
   opacity: 0.7;
   flex-shrink: 0;
@@ -857,7 +856,7 @@
 /* Dynamic mode - urgency value (inline on wide screens) */
 .embedded-task-urgency-dynamic {
   color: var(--text-muted);
-  font-size: 0.7em;
+  font-size: 0.7rem;
   font-family: var(--font-monospace);
   opacity: 0.7;
   flex-shrink: 0;
@@ -878,7 +877,7 @@
 .embedded-task-item-wrap-dynamic .embedded-task-content-wrapper {
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: var(--size-4-2);
 }
 
 .embedded-task-text-wrap-dynamic {
@@ -920,7 +919,7 @@
   }
 
   .embedded-task-item-wrap-dynamic .embedded-task-checkbox {
-    margin-top: 4px;
+    margin-top: var(--size-4-1);
   }
 
   /* Text row fills available space on narrow screens */
@@ -978,7 +977,7 @@
   .embedded-task-item-wrap-dynamic .embedded-task-floating-indicators {
     display: flex;
     align-self: flex-start;
-    margin-top: 2px;
+    margin-top: var(--size-2-1);
     margin-left: auto;
   }
 
@@ -1008,7 +1007,7 @@
 /* Wrap mode - position floating indicators at top-right */
 .embedded-task-item-wrap .embedded-task-floating-indicators {
   align-self: flex-start;
-  margin-top: 2px;
+  margin-top: var(--size-2-1);
 }
 
 /* Dynamic mode - floating indicators position depends on viewport */
@@ -1047,46 +1046,46 @@
 
 /* Empty state */
 .embedded-task-list-empty {
-  padding: 16px;
+  padding: var(--size-4-4);
   text-align: center;
   color: var(--text-muted);
 }
 
 .embedded-task-list-empty-title {
   font-weight: 600;
-  margin-bottom: 4px;
-  font-size: 0.95em;
+  margin-bottom: var(--size-4-1);
+  font-size: 0.95rem;
 }
 
 .embedded-task-list-empty-subtitle {
-  font-size: 0.85em;
+  font-size: 0.85rem;
   opacity: 0.8;
 }
 
 /* Error state */
 .embedded-task-list-error {
-  padding: 12px;
+  padding: var(--size-4-3);
   background-color: var(--background-modifier-error);
-  border-radius: 6px;
+  border-radius: var(--radius-s);
   border: 1px solid var(--background-modifier-border);
 }
 
 .embedded-task-list-error-title {
   font-weight: 600;
   color: var(--text-error);
-  margin-bottom: 4px;
-  font-size: 0.95em;
+  margin-bottom: var(--size-4-1);
+  font-size: 0.95rem;
 }
 
 .embedded-task-list-error-message {
   font-family: var(--font-monospace);
-  font-size: 0.85em;
-  margin-bottom: 8px;
+  font-size: 0.85rem;
+  margin-bottom: var(--size-4-2);
   color: var(--text-normal);
 }
 
 .embedded-task-list-error-help {
-  font-size: 0.8em;
+  font-size: 0.8rem;
   color: var(--text-muted);
   opacity: 0.8;
 }
@@ -1151,7 +1150,7 @@
 .cm-editor .footnote-task-keyword {
   font-weight: var(--font-weight-bold, var(--font-bold, 600));
   color: var(--interactive-accent);
-  font-size: 0.9em;
+  font-size: 0.9em; /* use em for relative its immediate parent */
   border-radius: 2px;
 }
 
@@ -1168,7 +1167,7 @@
 .cm-editor [class^='quote-block-task-keyword-'] {
   font-weight: var(--font-weight-bold, var(--font-bold, 600));
   color: var(--interactive-accent);
-  font-size: 0.9em;
+  font-size: 0.9rem;
   border-radius: 2px;
 }
 
@@ -1210,7 +1209,7 @@
   align-items: center;
   border-radius: var(--radius-s);
   margin: -2px -6px 0 -6px;
-  padding: 2px 6px 6px 6px;
+  padding: var(--size-2-1) var(--size-2-3) var(--size-2-3) var(--size-2-3);
 }
 
 .embedded-task-list-title[role='button']:hover {
@@ -1225,7 +1224,7 @@
 /* When expanded, keep the border on title for full-width underline */
 .embedded-task-list-expanded .embedded-task-list-title[role='button'] {
   border-bottom: 1px solid var(--background-modifier-border);
-  margin-bottom: 8px;
+  margin-bottom: var(--size-4-2);
 }
 
 /* When embedded-task-list-header is used as collapsible toggle (no title case) */
@@ -1253,7 +1252,7 @@
   height: 16px;
   color: var(--text-muted);
   transition: transform 0.15s ease-out;
-  margin-left: 6px;
+  margin-left: var(--size-2-3);
   flex-shrink: 0;
 }
 
@@ -1263,27 +1262,27 @@
 
 /* When icon is inside title, adjust margin */
 .embedded-task-list-title .todoseq-collapse-toggle-icon {
-  margin-left: 6px;
+  margin-left: var(--size-2-3);
 }
 
 /* When icon is in embedded-task-list-header (no title case), use same margin as title */
 .embedded-task-list-header .todoseq-collapse-toggle-icon {
   margin-left: -10px;
-  margin-top: 2px;
+  margin-top: var(--size-2-1);
 }
 
 /* Query summary in collapsed header */
 .todoseq-query-summary {
   color: var(--text-muted);
-  font-size: 0.9em;
+  font-size: 0.9rem;
 }
 
 /* Result count footer (shown when collapsed) - no border, just text */
 .todoseq-result-count-footer {
   text-align: center;
-  padding: 8px 0 4px 0;
+  padding: var(--size-4-2) 0 var(--size-4-1) 0;
   color: var(--text-muted);
-  font-size: 0.8em;
+  font-size: 0.8rem;
   font-style: italic;
 }
 
@@ -1389,7 +1388,7 @@
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   font-weight: var(--font-semibold);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.02em; /* em for reletive spacing */
 }
 
 /* Text rows (Go to task, Deadline) */
