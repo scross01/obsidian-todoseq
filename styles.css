@@ -63,7 +63,7 @@
 .todo-view .todo-keyword {
   color: var(--interactive-accent);
   cursor: pointer;
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  font-weight: var(--font-bold);
   font-size: 0.85rem;
 }
 
@@ -141,7 +141,7 @@
     var(--interactive-accent)
   );
   color: var(--text-on-accent);
-  font-weight: var(--font-weight-medium, var(--font-medium));
+  font-weight: var(--font-medium);
   font-size: 0.7rem;
   line-height: 1.6;
   vertical-align: baseline;
@@ -195,7 +195,7 @@
   display: inline-block;
   padding: 0 var(--size-2-2);
   border-radius: var(--radius-s);
-  font-weight: var(--font-weight-medium, var(--font-medium));
+  font-weight: var(--font-medium);
   font-size: 0.7rem;
   line-height: 1.6;
   vertical-align: baseline;
@@ -285,7 +285,7 @@
 
 .todo-view .todo-empty-title {
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: var(--font-bold);
   color: var(--text-normal);
 }
 
@@ -364,12 +364,12 @@
 }
 
 .todo-view .todo-date .date-label {
-  font-weight: var(--font-weight-medium, var(--font-medium));
+  font-weight: var(--font-medium);
   opacity: 0.8;
 }
 
 .todo-view .todo-date .date-value {
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--font-normal);
   margin-left: var(--size-2-2);
 }
 
@@ -409,7 +409,7 @@
 
 .todo-view .todo-date-overdue .date-value {
   color: var(--color-red);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-semibold);
 }
 
 .todo-view .todo-date-today {
@@ -419,7 +419,7 @@
 
 .todo-view .todo-date-today .date-value {
   color: var(--text-accent);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-semibold);
 }
 
 .todo-view .todo-date-soon {
@@ -464,7 +464,7 @@
 
 /* Task keyword formatting in editor and reading view */
 .todoseq-keyword-formatted {
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  font-weight: var(--font-bold);
   color: var(--interactive-accent);
   font-size: 0.9rem; /* reduce size slightly */
   border-radius: 2px; /* Subtle rounding */
@@ -502,7 +502,7 @@
 :is(.cm-editor, .markdown-preview-view) .todoseq-scheduled-keyword,
 :is(.cm-editor, .markdown-preview-view) .todoseq-deadline-keyword,
 :is(.cm-editor, .markdown-preview-view) .todoseq-closed-keyword {
-  font-weight: var(--font-weight-normal, var(--font-normal, 400));
+  font-weight: var(--font-normal);
 }
 
 /* Hover effect for better UX - underline and background highlight */
@@ -561,7 +561,7 @@
 /* Dropdown containers for search suggestions and options */
 .todoseq-dropdown {
   position: absolute;
-  z-index: 1000;
+  z-index: var(--layer-menu);
   display: none;
 }
 
@@ -606,7 +606,7 @@
 
 /* Title styling */
 .embedded-task-list-title {
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  font-weight: var(--font-bold);
   font-size: 1rem;
   color: var(--text-normal);
   padding: var(--size-2-1) var(--size-2-3) var(--size-2-3) var(--size-2-3);
@@ -711,7 +711,7 @@
 
 /* Task state */
 .embedded-task-state {
-  font-weight: 600;
+  font-weight: var(--font-semibold);
   color: var(--text-normal);
   font-family: var(--font-monospace);
   font-size: 0.9rem;
@@ -976,7 +976,7 @@
   /* Ensure floating indicators are visible at top-right on narrow screens */
   .embedded-task-item-wrap-dynamic .embedded-task-floating-indicators {
     display: flex;
-    align-self: flex-start;
+    align-self: anchor-center;
     margin-top: var(--size-2-1);
     margin-left: auto;
   }
@@ -1052,7 +1052,7 @@
 }
 
 .embedded-task-list-empty-title {
-  font-weight: 600;
+  font-weight: var(--font-semibold);
   margin-bottom: var(--size-4-1);
   font-size: 0.95rem;
 }
@@ -1071,7 +1071,7 @@
 }
 
 .embedded-task-list-error-title {
-  font-weight: 600;
+  font-weight: var(--font-semibold);
   color: var(--text-error);
   margin-bottom: var(--size-4-1);
   font-size: 0.95rem;
@@ -1148,7 +1148,7 @@
 
 /* Footnote task keyword styling */
 .cm-editor .footnote-task-keyword {
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  font-weight: var(--font-bold);
   color: var(--interactive-accent);
   font-size: 0.9em; /* use em for relative its immediate parent */
   border-radius: 2px;
@@ -1165,7 +1165,7 @@
 
 /* Nested quote task keyword styling - consolidated using attribute selector */
 .cm-editor [class^='quote-block-task-keyword-'] {
-  font-weight: var(--font-weight-bold, var(--font-bold, 600));
+  font-weight: var(--font-bold);
   color: var(--interactive-accent);
   font-size: 0.9rem;
   border-radius: 2px;
@@ -1248,8 +1248,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: var(--icon-s);
+  height: var(--icon-s);
   color: var(--text-muted);
   transition: transform 0.15s ease-out;
   margin-left: var(--size-2-3);
@@ -1342,6 +1342,7 @@
 .todoseq-date-picker-submenu-row:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: -2px;
+  border-radius: var(--radius-s);
 }
 
 .todoseq-context-menu-row.is-focused,
@@ -1358,17 +1359,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  color: var(--text-muted);
+  width: calc(var(--icon-s + 2));
+  height: calc(var(--icon-s + 2));
+  color: var(--icon-color);
   flex-shrink: 0;
 }
 
 .todoseq-context-menu-row-icon svg,
 .todoseq-date-picker-quick-select-icon svg,
 .todoseq-date-picker-menu-row-icon svg {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-s);
+  height: var(--icon-s);
 }
 
 /* Labels for all menu rows (consolidated) */
@@ -1451,13 +1452,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: calc(var(--icon-m + 2));
+  height: calc(var(--icon-m + 2));
 }
 
 .todoseq-context-menu-icon svg {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-m);
+  height: var(--icon-m);
 }
 
 /* Priority flag colors */
