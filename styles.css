@@ -126,13 +126,7 @@
    ============================================================================ */
 
 /* Base priority badge styles */
-:is(
-    .todoseq-panel,
-    .markdown-preview-view,
-    .markdown-rendered,
-    .todoseq-embedded-task-list-container
-  )
-  .todoseq-priority-badge {
+.todoseq-priority-badge {
   display: inline-block;
   padding: 0 var(--size-2-2);
   border-radius: var(--radius-s);
@@ -152,91 +146,38 @@
 }
 
 /* High priority (A): stronger, urgent tint */
-:is(
-    .todoseq-panel,
-    .markdown-preview-view,
-    .markdown-rendered,
-    .todoseq-embedded-task-list-container
-  )
-  .todoseq-priority-badge.priority-high {
+.todoseq-priority-badge.priority-high {
   background-color: var(--color-red);
 }
 
 /* Medium priority (B): default accent */
-:is(
-    .todoseq-panel,
-    .markdown-preview-view,
-    .markdown-rendered,
-    .todoseq-embedded-task-list-container
-  )
-  .todoseq-priority-badge.priority-med {
+.todoseq-priority-badge.priority-med {
   background-color: var(--interactive-accent);
 }
 
 /* Low priority (C): muted tone */
-:is(
-    .todoseq-panel,
-    .markdown-preview-view,
-    .markdown-rendered,
-    .todoseq-embedded-task-list-container
-  )
-  .todoseq-priority-badge.priority-low {
+.todoseq-priority-badge.priority-low {
   background-color: var(--background-modifier-border);
   color: var(--text-muted);
   box-shadow: inset 0 0 0 1px var(--background-modifier-border);
 }
 
-/* ============================================================================
-   Priority Pills - Live Preview Editor
-   ============================================================================ */
-
-/* Live Preview priority pill widget */
-.todoseq-cm-priority-pill {
-  display: inline-block;
-  padding: 0 var(--size-2-2);
-  border-radius: var(--radius-s);
-  font-weight: var(--font-medium);
-  font-size: 0.7rem;
-  line-height: 1.6;
-  vertical-align: baseline;
-  position: relative;
-  top: -1px;
-}
-
-/* High priority (A) in editor */
-.todoseq-cm-priority-pill.priority-high {
-  background-color: var(--color-red);
-  color: var(--text-on-accent);
-}
-
-/* Medium priority (B) in editor */
-.todoseq-cm-priority-pill.priority-med {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-/* Low priority (C) in editor */
-.todoseq-cm-priority-pill.priority-low {
-  background-color: var(--background-modifier-border);
-  color: var(--text-muted);
-}
-
 /* Raw text mode when cursor is near priority token */
-.todoseq-cm-priority-raw {
+.todoseq-edit-priority-raw {
   font-family: var(--font-monospace);
   opacity: 0.8;
 }
 
 /* Raw text mode colors by priority */
-.todoseq-cm-priority-raw.todoseq-cm-priority-a {
+.todoseq-edit-priority-raw.todoseq-edit-priority-a {
   color: var(--color-red);
 }
 
-.todoseq-cm-priority-raw.todoseq-cm-priority-b {
+.todoseq-edit-priority-raw.todoseq-edit-priority-b {
   color: var(--interactive-accent);
 }
 
-.todoseq-cm-priority-raw.todoseq-cm-priority-c {
+.todoseq-edit-priority-raw.todoseq-edit-priority-c {
   color: var(--text-muted);
 }
 

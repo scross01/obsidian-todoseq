@@ -54,7 +54,7 @@ class PriorityWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     const container = document.createElement('span');
-    container.className = `todoseq-cm-priority-pill todoseq-priority-badge priority-${this.priority}`;
+    container.className = `todoseq-edit-priority-pill todoseq-priority-badge priority-${this.priority}`;
     container.textContent = this.letter;
     container.setAttribute('data-priority', this.letter);
     container.setAttribute('aria-label', `Priority ${this.letter}`);
@@ -763,7 +763,7 @@ export class TaskKeywordDecorator {
           pillStart,
           pillEnd,
           Decoration.mark({
-            class: `todoseq-cm-priority-raw todoseq-cm-priority-${letter.toLowerCase()}`,
+            class: `todoseq-edit-priority-raw todoseq-edit-priority-${letter.toLowerCase()}`,
             attributes: {
               'data-priority': letter,
             },
