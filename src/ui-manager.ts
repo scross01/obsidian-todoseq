@@ -580,29 +580,18 @@ export class UIManager {
     // Get all task list leaves
     const leaves = workspace.getLeavesOfType(TaskListView.viewType);
 
-    console.debug('TODOseq: showTasks() - Found leaves:', leaves.length);
-
     if (leaves.length > 0) {
       // Find existing task list in priority order: right sidebar, left sidebar, tab
       const leaf = this.findTaskLeafInPriorityOrder(leaves);
 
       if (leaf) {
-        console.debug('TODOseq: showTasks() - Using existing leaf');
         // Only reveal if the leaf is not already active to avoid focus stealing
         const activeLeaf = workspace.activeLeaf;
         if (activeLeaf !== leaf && reveal) {
           await workspace.revealLeaf(leaf);
         }
         return;
-      } else {
-        console.debug(
-          'TODOseq: showTasks() - findTaskLeafInPriorityOrder returned null',
-        );
       }
-    } else {
-      console.debug(
-        'TODOseq: showTasks() - No existing leaves found, creating new one',
-      );
     }
 
     // No existing task list found, create a new one in the right sidebar
@@ -694,9 +683,6 @@ export class UIManager {
     // Fallback: Return the first leaf if priority search failed
     // This ensures we always use an existing leaf instead of creating a new one
     if (leaves.length > 0) {
-      console.debug(
-        'TODOseq: Could not determine leaf location, using first available leaf',
-      );
       return leaves[0];
     }
 

@@ -16,6 +16,7 @@ import { TAG_PATTERN } from '../../utils/patterns';
 import { DateUtils } from '../../utils/date-utils';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
+import { BaseDialog } from '../components/base-dialog';
 import {
   formatTaskForDailyNote,
   getTodayDailyNote,
@@ -1780,6 +1781,10 @@ export class EmbeddedTaskListRenderer {
   private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
     evt.preventDefault();
     evt.stopPropagation();
+
+    // Close any active dialog (task context menu, date picker, etc.)
+    BaseDialog.closeAnyActiveDialog();
+
     const menu = this.menuBuilder.buildStateMenu(task.state, async (state) => {
       await this.updateTaskState(task, state);
     });

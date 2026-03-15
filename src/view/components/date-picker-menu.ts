@@ -2,6 +2,7 @@ import { setIcon } from 'obsidian';
 import { DateUtils } from '../../utils/date-utils';
 import { DateRepeatInfo } from '../../types/task';
 import { isPhoneDevice } from '../../utils/mobile-utils';
+import { BaseDialog } from './base-dialog';
 
 /**
  * Callback types for date picker actions
@@ -39,13 +40,13 @@ export type DatePickerMode = 'scheduled' | 'deadline';
  * Single-instance pattern: only one picker can be open at a time.
  * Supports keyboard navigation and theme compatibility.
  */
-export class DatePicker {
-  private containerEl: HTMLElement | null = null;
+export class DatePicker extends BaseDialog {
+  // Override positionDialog to use date picker specific default dimensions
+  protected positionDialog(x: number, y: number): void {
+    super.positionDialog(x, y, 320, 400);
+  }
   private config: DatePickerConfig;
   private callbacks: DatePickerCallbacks;
-  private isShowing = false;
-  private focusedIndex = -1;
-  private focusableItems: HTMLElement[] = [];
 
   // State
   private selectedDate: Date | null = null;
@@ -61,15 +62,11 @@ export class DatePicker {
   private repeatSection: HTMLElement | null = null;
   private customRepeatDialog: HTMLElement | null = null;
 
-  // Bound handlers for cleanup
-  private documentClickHandler: ((e: MouseEvent) => void) | null = null;
-  private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
-  private scrollHandler: (() => void) | null = null;
-
   private timePickerSubmenu: HTMLElement | null = null;
   private repeatPickerSubmenu: HTMLElement | null = null;
 
   constructor(callbacks: DatePickerCallbacks, config: DatePickerConfig) {
+    super();
     this.callbacks = callbacks;
     this.config = config;
     this.currentMonth = new Date();
@@ -93,6 +90,9 @@ export class DatePicker {
     initialRepeat?: DateRepeatInfo | null,
   ): Promise<void> {
     this.mode = mode;
+
+    // Close any other active dialog before showing this one
+    this.closeActiveDialog();
 
     if (this.isShowing) {
       this.hide();
@@ -122,9 +122,16 @@ export class DatePicker {
     }
 
     await this.buildPicker();
-    this.positionPicker(position.x, position.y);
+    this.positionDialog(position.x, position.y);
     this.attachGlobalListeners();
+
+    // Add backdrop on phones for better UX
+    if (isPhoneDevice()) {
+      this.addBackdrop();
+    }
+
     this.isShowing = true;
+    this.registerAsActiveDialog();
   }
 
   /**
@@ -133,12 +140,18 @@ export class DatePicker {
   hide(): void {
     if (!this.isShowing) return;
 
+    // Unregister as active dialog
+    this.unregisterAsActiveDialog();
+
     // Close any open submenus
     this.closeTimePicker();
     this.closeRepeatPicker();
     this.closeCustomRepeatDialog();
 
     this.detachGlobalListeners();
+
+    // Remove backdrop
+    this.removeBackdrop();
 
     if (this.containerEl && this.containerEl.parentNode) {
       this.containerEl.remove();
@@ -1194,160 +1207,5 @@ export class DatePicker {
     const result = new Date(today);
     result.setDate(result.getDate() + daysUntilSaturday);
     return result;
-  }
-
-  // ─── Positioning ───────────────────────────────────────────────
-
-  private positionPicker(x: number, y: number): void {
-    if (!this.containerEl) return;
-
-    // Position initially off-screen to measure
-    this.containerEl.style.left = '-9999px';
-    this.containerEl.style.top = '-9999px';
-
-    // Force layout to get dimensions
-    const rect = this.containerEl.getBoundingClientRect();
-    const pickerWidth = rect.width || 320;
-    const pickerHeight = rect.height || 400;
-
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    let left: number;
-    let top: number;
-
-    // On phones, center the picker in viewport
-    if (isPhoneDevice()) {
-      left = (viewportWidth - pickerWidth) / 2;
-      top = (viewportHeight - pickerHeight) / 2;
-    } else {
-      // Desktop/tablet: position at cursor with viewport bounds checking
-      left = x;
-      top = y;
-
-      if (left + pickerWidth > viewportWidth) {
-        left = viewportWidth - pickerWidth - 8;
-      }
-      if (left < 8) {
-        left = 8;
-      }
-
-      if (top + pickerHeight > viewportHeight) {
-        top = viewportHeight - pickerHeight - 8;
-      }
-      if (top < 8) {
-        top = 8;
-      }
-    }
-
-    this.containerEl.style.left = `${left}px`;
-    this.containerEl.style.top = `${top}px`;
-  }
-
-  // ─── Global Event Listeners ────────────────────────────────────
-
-  private attachGlobalListeners(): void {
-    this.documentClickHandler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (this.containerEl && !this.containerEl.contains(target)) {
-        this.hide();
-      }
-    };
-
-    this.keydownHandler = (e: KeyboardEvent) => {
-      this.handleKeyDown(e);
-    };
-
-    this.scrollHandler = () => {
-      this.hide();
-    };
-
-    // Use setTimeout to avoid the same click that opened the menu from closing it
-    const clickHandler = this.documentClickHandler;
-    window.setTimeout(() => {
-      if (clickHandler) {
-        document.addEventListener('click', clickHandler);
-      }
-    }, 0);
-    document.addEventListener('keydown', this.keydownHandler);
-    window.addEventListener('scroll', this.scrollHandler, { passive: true });
-  }
-
-  private detachGlobalListeners(): void {
-    if (this.documentClickHandler) {
-      document.removeEventListener('click', this.documentClickHandler);
-      this.documentClickHandler = null;
-    }
-    if (this.keydownHandler) {
-      document.removeEventListener('keydown', this.keydownHandler);
-      this.keydownHandler = null;
-    }
-    if (this.scrollHandler) {
-      window.removeEventListener('scroll', this.scrollHandler);
-      this.scrollHandler = null;
-    }
-  }
-
-  // ─── Keyboard Navigation ──────────────────────────────────────
-
-  private handleKeyDown(e: KeyboardEvent): void {
-    if (!this.isShowing) return;
-
-    switch (e.key) {
-      case 'Escape':
-        e.preventDefault();
-        e.stopPropagation();
-        this.hide();
-        break;
-
-      case 'ArrowDown':
-        e.preventDefault();
-        e.stopPropagation();
-        this.moveFocus(1);
-        break;
-
-      case 'ArrowUp':
-        e.preventDefault();
-        e.stopPropagation();
-        this.moveFocus(-1);
-        break;
-
-      case 'Enter':
-      case ' ':
-        if (
-          this.focusedIndex >= 0 &&
-          this.focusedIndex < this.focusableItems.length
-        ) {
-          e.preventDefault();
-          e.stopPropagation();
-          this.focusableItems[this.focusedIndex].click();
-        }
-        break;
-    }
-  }
-
-  private moveFocus(direction: number): void {
-    if (this.focusableItems.length === 0) return;
-
-    // Remove current focus
-    if (
-      this.focusedIndex >= 0 &&
-      this.focusedIndex < this.focusableItems.length
-    ) {
-      this.focusableItems[this.focusedIndex].removeClass('is-focused');
-    }
-
-    // Calculate new index
-    this.focusedIndex += direction;
-    if (this.focusedIndex < 0) {
-      this.focusedIndex = this.focusableItems.length - 1;
-    } else if (this.focusedIndex >= this.focusableItems.length) {
-      this.focusedIndex = 0;
-    }
-
-    // Apply focus
-    const item = this.focusableItems[this.focusedIndex];
-    item.addClass('is-focused');
-    item.focus();
   }
 }

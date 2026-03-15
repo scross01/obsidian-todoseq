@@ -16,6 +16,7 @@ import {
 import { KeywordManager } from '../../utils/keyword-manager';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { StateMenuBuilder } from '../components/state-menu-builder';
+import { BaseDialog } from '../components/base-dialog';
 
 interface LinkPattern {
   type: 'wiki' | 'md' | 'url' | 'tag';
@@ -259,6 +260,9 @@ export class TaskItemRenderer {
   private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
     evt.preventDefault();
     evt.stopPropagation();
+
+    // Close any active dialog (task context menu, date picker, etc.)
+    BaseDialog.closeAnyActiveDialog();
 
     const menu = this.menuBuilder.buildStateMenu(
       task.state,

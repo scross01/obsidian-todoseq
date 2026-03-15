@@ -1,5 +1,6 @@
 import { MarkdownView } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
+import { BaseDialog } from '../components/base-dialog';
 import TodoTracker from '../../main';
 
 export class EditorKeywordMenu {
@@ -26,6 +27,9 @@ export class EditorKeywordMenu {
   ): void {
     evt.preventDefault();
     evt.stopPropagation();
+
+    // Close any active dialog (task context menu, date picker, etc.)
+    BaseDialog.closeAnyActiveDialog();
 
     // Use the shared menu builder
     const menu = this.menuBuilder.buildStateMenu(

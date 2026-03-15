@@ -6,6 +6,7 @@ import { isDailyNotesPluginEnabled } from '../../utils/daily-note-utils';
 import { isPhoneDevice } from '../../utils/mobile-utils';
 import { DatePicker, DatePickerMode } from './date-picker-menu';
 import { TaskStateManager } from '../../services/task-state-manager';
+import { BaseDialog } from './base-dialog';
 
 /**
  * Callback types for context menu actions
@@ -72,22 +73,17 @@ interface PriorityOption {
  * Supports keyboard navigation (Escape to close, arrow keys, Enter to select).
  * Supports mobile long-press.
  */
-export class TaskContextMenu {
-  private containerEl: HTMLElement | null = null;
+export class TaskContextMenu extends BaseDialog {
+  // Override positionDialog to use context menu specific default dimensions
+  protected positionDialog(x: number, y: number): void {
+    super.positionDialog(x, y, 220, 300);
+  }
   private task: Task | null = null;
   private callbacks: TaskContextMenuCallbacks;
   private config: TaskContextMenuConfig;
   private app: App;
-  private isShowing = false;
-  private focusedIndex = -1;
-  private focusableItems: HTMLElement[] = [];
-
-  // Bound handlers for cleanup
-  private documentClickHandler: ((e: MouseEvent) => void) | null = null;
-  private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
-  private scrollHandler: (() => void) | null = null;
-  private datePicker: DatePicker | null = null;
   private taskStateManager: TaskStateManager | null = null;
+  private datePicker: DatePicker | null = null;
 
   constructor(
     callbacks: TaskContextMenuCallbacks,
@@ -95,6 +91,7 @@ export class TaskContextMenu {
     app: App,
     taskStateManager: TaskStateManager | null = null,
   ) {
+    super();
     this.callbacks = callbacks;
     this.config = config;
     this.app = app;
@@ -114,6 +111,9 @@ export class TaskContextMenu {
    * Also closes any open date picker.
    */
   async show(task: Task, position: { x: number; y: number }): Promise<void> {
+    // Close any other active dialog before showing this one
+    this.closeActiveDialog();
+
     if (this.isShowing) {
       this.hide();
     }
@@ -125,9 +125,16 @@ export class TaskContextMenu {
 
     this.task = task;
     await this.buildMenu();
-    this.positionMenu(position.x, position.y);
+    this.positionDialog(position.x, position.y);
     this.attachGlobalListeners();
+
+    // Add backdrop on phones for better UX
+    if (isPhoneDevice()) {
+      this.addBackdrop();
+    }
+
     this.isShowing = true;
+    this.registerAsActiveDialog();
   }
 
   /**
@@ -145,7 +152,13 @@ export class TaskContextMenu {
   hide(): void {
     if (!this.isShowing) return;
 
+    // Unregister as active dialog
+    this.unregisterAsActiveDialog();
+
     this.detachGlobalListeners();
+
+    // Remove backdrop
+    this.removeBackdrop();
 
     if (this.containerEl && this.containerEl.parentNode) {
       this.containerEl.remove();
@@ -681,160 +694,5 @@ export class TaskContextMenu {
     const result = new Date(today);
     result.setDate(result.getDate() + daysUntilSaturday);
     return result;
-  }
-
-  // ─── Positioning ───────────────────────────────────────────────
-
-  private positionMenu(x: number, y: number): void {
-    if (!this.containerEl) return;
-
-    // Position initially off-screen to measure
-    this.containerEl.style.left = '-9999px';
-    this.containerEl.style.top = '-9999px';
-
-    // Force layout to get dimensions
-    const rect = this.containerEl.getBoundingClientRect();
-    const menuWidth = rect.width || 220;
-    const menuHeight = rect.height || 300;
-
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    let left: number;
-    let top: number;
-
-    // On phones, center the menu in viewport
-    if (isPhoneDevice()) {
-      left = (viewportWidth - menuWidth) / 2;
-      top = (viewportHeight - menuHeight) / 2;
-    } else {
-      // Desktop/tablet: position at cursor with viewport bounds checking
-      left = x;
-      top = y;
-
-      if (left + menuWidth > viewportWidth) {
-        left = viewportWidth - menuWidth - 8;
-      }
-      if (left < 8) {
-        left = 8;
-      }
-
-      if (top + menuHeight > viewportHeight) {
-        top = viewportHeight - menuHeight - 8;
-      }
-      if (top < 8) {
-        top = 8;
-      }
-    }
-
-    this.containerEl.style.left = `${left}px`;
-    this.containerEl.style.top = `${top}px`;
-  }
-
-  // ─── Global Event Listeners ────────────────────────────────────
-
-  private attachGlobalListeners(): void {
-    this.documentClickHandler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (this.containerEl && !this.containerEl.contains(target)) {
-        this.hide();
-      }
-    };
-
-    this.keydownHandler = (e: KeyboardEvent) => {
-      this.handleKeyDown(e);
-    };
-
-    this.scrollHandler = () => {
-      this.hide();
-    };
-
-    // Use setTimeout to avoid the same click that opened the menu from closing it
-    const clickHandler = this.documentClickHandler;
-    window.setTimeout(() => {
-      if (clickHandler) {
-        document.addEventListener('click', clickHandler);
-      }
-    }, 0);
-    document.addEventListener('keydown', this.keydownHandler);
-    window.addEventListener('scroll', this.scrollHandler, { passive: true });
-  }
-
-  private detachGlobalListeners(): void {
-    if (this.documentClickHandler) {
-      document.removeEventListener('click', this.documentClickHandler);
-      this.documentClickHandler = null;
-    }
-    if (this.keydownHandler) {
-      document.removeEventListener('keydown', this.keydownHandler);
-      this.keydownHandler = null;
-    }
-    if (this.scrollHandler) {
-      window.removeEventListener('scroll', this.scrollHandler);
-      this.scrollHandler = null;
-    }
-  }
-
-  // ─── Keyboard Navigation ──────────────────────────────────────
-
-  private handleKeyDown(e: KeyboardEvent): void {
-    if (!this.isShowing) return;
-
-    switch (e.key) {
-      case 'Escape':
-        e.preventDefault();
-        e.stopPropagation();
-        this.hide();
-        break;
-
-      case 'ArrowDown':
-        e.preventDefault();
-        e.stopPropagation();
-        this.moveFocus(1);
-        break;
-
-      case 'ArrowUp':
-        e.preventDefault();
-        e.stopPropagation();
-        this.moveFocus(-1);
-        break;
-
-      case 'Enter':
-      case ' ':
-        if (
-          this.focusedIndex >= 0 &&
-          this.focusedIndex < this.focusableItems.length
-        ) {
-          e.preventDefault();
-          e.stopPropagation();
-          this.focusableItems[this.focusedIndex].click();
-        }
-        break;
-    }
-  }
-
-  private moveFocus(direction: number): void {
-    if (this.focusableItems.length === 0) return;
-
-    // Remove current focus
-    if (
-      this.focusedIndex >= 0 &&
-      this.focusedIndex < this.focusableItems.length
-    ) {
-      this.focusableItems[this.focusedIndex].removeClass('is-focused');
-    }
-
-    // Calculate new index
-    this.focusedIndex += direction;
-    if (this.focusedIndex < 0) {
-      this.focusedIndex = this.focusableItems.length - 1;
-    } else if (this.focusedIndex >= this.focusableItems.length) {
-      this.focusedIndex = 0;
-    }
-
-    // Apply focus
-    const item = this.focusableItems[this.focusedIndex];
-    item.addClass('is-focused');
-    item.focus();
   }
 }
