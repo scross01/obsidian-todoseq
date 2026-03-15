@@ -169,6 +169,14 @@ export class PluginLifecycleManager {
       callback: () => this.plugin.uiManager.showTasks(),
     });
 
+    // Add command to show tasks in a new tab
+    this.plugin.addCommand({
+      id: 'show-task-list-in-new-tab',
+      name: 'Open task list in new tab',
+      icon: 'list-todo',
+      callback: () => this.plugin.uiManager.showTasksInNewTab(),
+    });
+
     // Add command to rescan vault
     this.plugin.addCommand({
       id: 'rescan-vault',
@@ -438,6 +446,14 @@ export class PluginLifecycleManager {
    * Obsidian lifecycle method called when the plugin is unloaded
    */
   async onunload() {
+    // Close all task list leaves to prevent orphaned views during hot reload
+    const leaves = this.plugin.app.workspace.getLeavesOfType(
+      TaskListView.viewType,
+    );
+    for (const leaf of leaves) {
+      leaf.detach();
+    }
+
     // Clean up EventCoordinator (removes all vault event listeners)
     await this.eventCoordinator?.destroy();
 

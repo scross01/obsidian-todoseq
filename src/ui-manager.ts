@@ -567,53 +567,152 @@ export class UIManager {
   /**
    * Show the tasks view
    * @param reveal - Whether to reveal/open the sidebar panel (default: true)
+   *
+   * Prioritizes showing existing task list in this order:
+   * 1. Right sidebar (default location)
+   * 2. Left sidebar (in case user moved it)
+   * 3. Page tab
+   * 4. If no existing task list found, creates a new one in the right sidebar
    */
   async showTasks(reveal = true): Promise<void> {
     const { workspace } = this.plugin.app;
 
-    // Create new leaf or use existing
-    let leaf: WorkspaceLeaf | null = null;
+    // Get all task list leaves
     const leaves = workspace.getLeavesOfType(TaskListView.viewType);
 
+    console.debug('TODOseq: showTasks() - Found leaves:', leaves.length);
+
     if (leaves.length > 0) {
-      leaf = leaves[0];
-      // Only reveal if the leaf is not already active to avoid focus stealing
-      const activeLeaf = workspace.activeLeaf;
-      if (activeLeaf !== leaf && reveal) {
-        await workspace.revealLeaf(leaf);
-      }
-    } else {
-      // Open in right sidebar instead of main area
-      // Use try-catch to handle workspace initialization issues
-      try {
-        leaf = workspace.getRightLeaf(false);
-        if (!leaf) {
-          // If no right leaf exists, create one by splitting the active leaf
-          const activeLeaf = workspace.getLeaf(false);
-          if (activeLeaf) {
-            leaf = workspace.createLeafBySplit(activeLeaf, 'vertical');
-          } else {
-            // Fallback to main area if no active leaf is available
-            leaf = workspace.getLeaf(true);
-          }
-        }
-        // Use active: false to prevent focus stealing on first install
-        leaf.setViewState({ type: TaskListView.viewType, active: false });
+      // Find existing task list in priority order: right sidebar, left sidebar, tab
+      const leaf = this.findTaskLeafInPriorityOrder(leaves);
+
+      if (leaf) {
+        console.debug('TODOseq: showTasks() - Using existing leaf');
         // Only reveal if the leaf is not already active to avoid focus stealing
         const activeLeaf = workspace.activeLeaf;
         if (activeLeaf !== leaf && reveal) {
           await workspace.revealLeaf(leaf);
         }
-      } catch (error) {
-        console.warn(
-          'Failed to open task view in right sidebar, falling back to main area:',
-          error,
+        return;
+      } else {
+        console.debug(
+          'TODOseq: showTasks() - findTaskLeafInPriorityOrder returned null',
         );
-        // Fallback to main area if right sidebar access fails
-        leaf = workspace.getLeaf(true);
-        leaf.setViewState({ type: TaskListView.viewType, active: false });
+      }
+    } else {
+      console.debug(
+        'TODOseq: showTasks() - No existing leaves found, creating new one',
+      );
+    }
+
+    // No existing task list found, create a new one in the right sidebar
+    // Use try-catch to handle workspace initialization issues
+    let leaf: WorkspaceLeaf | null = null;
+    try {
+      leaf = workspace.getRightLeaf(false);
+      if (!leaf) {
+        // If no right leaf exists, create one by splitting the active leaf
+        const activeLeaf = workspace.getLeaf(false);
+        if (activeLeaf) {
+          leaf = workspace.createLeafBySplit(activeLeaf, 'vertical');
+        } else {
+          // Fallback to main area if no active leaf is available
+          leaf = workspace.getLeaf(true);
+        }
+      }
+      // Use active: false to prevent focus stealing on first install
+      leaf.setViewState({ type: TaskListView.viewType, active: false });
+      // Only reveal if the leaf is not already active to avoid focus stealing
+      const activeLeaf = workspace.activeLeaf;
+      if (activeLeaf !== leaf && reveal) {
+        await workspace.revealLeaf(leaf);
+      }
+    } catch (error) {
+      console.warn(
+        'Failed to open task view in right sidebar, falling back to main area:',
+        error,
+      );
+      // Fallback to main area if right sidebar access fails
+      leaf = workspace.getLeaf(true);
+      leaf.setViewState({ type: TaskListView.viewType, active: false });
+    }
+  }
+
+  /**
+   * Find a task list leaf in priority order: right sidebar, left sidebar, tab
+   * @param leaves - Array of task list leaves to search through
+   * @returns The first leaf found in priority order, or null if none found
+   */
+  private findTaskLeafInPriorityOrder(
+    leaves: WorkspaceLeaf[],
+  ): WorkspaceLeaf | null {
+    // Helper function to check if a leaf is in the right sidebar
+    const isLeafInRightSidebar = (leaf: WorkspaceLeaf): boolean => {
+      try {
+        const root = leaf.getRoot();
+        const container = (root as unknown as { containerEl: HTMLElement })
+          .containerEl;
+        return container.classList.contains('mod-right-split');
+      } catch {
+        return false;
+      }
+    };
+
+    // Helper function to check if a leaf is in the left sidebar
+    const isLeafInLeftSidebar = (leaf: WorkspaceLeaf): boolean => {
+      try {
+        const root = leaf.getRoot();
+        const container = (root as unknown as { containerEl: HTMLElement })
+          .containerEl;
+        return container.classList.contains('mod-left-split');
+      } catch {
+        return false;
+      }
+    };
+
+    // Priority 1: Right sidebar
+    for (const leaf of leaves) {
+      if (isLeafInRightSidebar(leaf)) {
+        return leaf;
       }
     }
+
+    // Priority 2: Left sidebar
+    for (const leaf of leaves) {
+      if (isLeafInLeftSidebar(leaf)) {
+        return leaf;
+      }
+    }
+
+    // Priority 3: Tab (any leaf not in sidebars)
+    for (const leaf of leaves) {
+      if (!isLeafInRightSidebar(leaf) && !isLeafInLeftSidebar(leaf)) {
+        return leaf;
+      }
+    }
+
+    // Fallback: Return the first leaf if priority search failed
+    // This ensures we always use an existing leaf instead of creating a new one
+    if (leaves.length > 0) {
+      console.debug(
+        'TODOseq: Could not determine leaf location, using first available leaf',
+      );
+      return leaves[0];
+    }
+
+    return null;
+  }
+
+  /**
+   * Show the tasks view in a new tab
+   * Opens the task list in a regular page tab rather than the side panel
+   */
+  async showTasksInNewTab(): Promise<void> {
+    const { workspace } = this.plugin.app;
+
+    // Create a new leaf in the main area as a tab
+    const leaf = workspace.getLeaf('tab');
+    leaf.setViewState({ type: TaskListView.viewType, active: true });
   }
 
   /**

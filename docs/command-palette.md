@@ -5,6 +5,7 @@ TODOseq provides several commands that can be accessed through Obsidian's Comman
 ## Available Commands
 
 - TODOseq: Show task list
+- TODOseq: Open task list in new tab
 - TODOseq: Rescan vault
 - TODOseq: Toggle task state _(editor only)_
 - TODOseq: Cycle task state _(editor only)_
@@ -16,7 +17,11 @@ TODOseq provides several commands that can be accessed through Obsidian's Comman
 
 ### Show task list
 
-Opens the TODOseq Task List view. By default the Task List view is opened in the right sidebar.
+Opens the TODOseq Task List view. By default, Task List view is opened in the right sidebar.
+
+### Open task list in new tab
+
+Opens the TODOseq Task List view in a new tab in the main workspace area. This is useful when you want to view the task list alongside your notes, rather than in a side panel.
 
 ### Rescan vault
 
