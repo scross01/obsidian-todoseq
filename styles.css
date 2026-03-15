@@ -1261,18 +1261,9 @@
    ============================================================ */
 
 .todoseq-task-context-menu {
-  position: fixed;
-  z-index: var(--layer-menu);
   min-width: 200px;
   max-width: 280px;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  box-shadow: var(--shadow-s);
-  padding: var(--size-4-1) 0;
-  font-size: var(--font-ui-small);
-  color: var(--text-normal);
-  user-select: none;
+  padding: var(--menu-padding);
 }
 
 /* Backdrop for mobile dialogs */
@@ -1290,14 +1281,19 @@
    Shared Menu Row Patterns - Hover, Focus, Icons, Labels
    ============================================================================ */
 
-/* Hover/focus states for all menu rows (consolidated) */
-.todoseq-context-menu-row:hover,
-.todoseq-date-picker-quick-select-row:hover,
-.todoseq-date-picker-menu-row:hover,
-.todoseq-date-picker-submenu-row:hover {
-  background: var(--background-modifier-hover);
+/* Hover states for all menu items (mouse interaction) */
+.menu-item.todoseq-context-menu-row:not(.is-label):not(.is-disabled):hover,
+.menu-item.todoseq-date-picker-quick-select-row:not(.is-label):not(
+    .is-disabled
+  ):hover,
+.menu-item.todoseq-date-picker-menu-row:not(.is-label):not(.is-disabled):hover,
+.menu-item.todoseq-date-picker-submenu-row:not(.is-label):not(
+    .is-disabled
+  ):hover {
+  background-color: var(--background-modifier-hover);
 }
 
+/* Focus states for all menu rows (custom keyboard navigation) */
 .todoseq-context-menu-row:focus-visible,
 .todoseq-date-picker-quick-select-row:focus-visible,
 .todoseq-date-picker-menu-row:focus-visible,
@@ -1307,6 +1303,7 @@
   border-radius: var(--radius-s);
 }
 
+/* Keyboard navigation focus states */
 .todoseq-context-menu-row.is-focused,
 .todoseq-date-picker-quick-select-row.is-focused,
 .todoseq-date-picker-menu-row.is-focused,
@@ -1314,19 +1311,7 @@
   background: var(--background-modifier-hover);
 }
 
-/* Icon containers for all menu rows (consolidated) */
-.todoseq-context-menu-row-icon,
-.todoseq-date-picker-quick-select-icon,
-.todoseq-date-picker-menu-row-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(var(--icon-s + 2));
-  height: calc(var(--icon-s + 2));
-  color: var(--icon-color);
-  flex-shrink: 0;
-}
-
+/* Icon SVG sizing (custom) */
 .todoseq-context-menu-row-icon svg,
 .todoseq-date-picker-quick-select-icon svg,
 .todoseq-date-picker-menu-row-icon svg {
@@ -1334,35 +1319,13 @@
   height: var(--icon-s);
 }
 
-/* Labels for all menu rows (consolidated) */
-.todoseq-context-menu-row-label,
-.todoseq-date-picker-quick-select-label,
-.todoseq-date-picker-menu-row-label,
-.todoseq-date-picker-submenu-label {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Section headers (Scheduled, Priority) */
+/* Section headers (Scheduled, Priority) - custom enhancements */
 .todoseq-context-menu-header {
-  padding: var(--size-4-1) var(--size-4-3);
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
   font-weight: var(--font-semibold);
-  letter-spacing: 0.02em; /* em for reletive spacing */
 }
 
-/* Text rows (Go to task, Deadline) */
+/* Text rows (Go to task, Deadline) - custom min-height */
 .todoseq-context-menu-row {
-  display: flex;
-  align-items: center;
-  gap: var(--size-4-2);
-  padding: var(--size-4-1) var(--size-4-3);
-  cursor: pointer;
-  border-radius: 0;
-  min-height: 32px;
 }
 
 /* Icon rows (date shortcuts, priority flags) */
@@ -1387,12 +1350,23 @@
   color: var(--text-muted);
   padding: 0;
   transition: background-color 100ms ease;
-  background-color: var(--background-primary) !important;
+  background-color: var(--menu-background) !important;
   box-shadow: none !important;
 }
 
+/* force mobile to use default background colors */
+@media (max-width: 480px) {
+  .todoseq-context-menu-header,
+  .todoseq-context-menu-row,
+  .todoseq-context-menu-icon-row,
+  .todoseq-context-menu-icon-btn {
+    background-color: inherit !important;
+    background: inherit !important;
+  }
+}
+
 .todoseq-context-menu-icon-btn:hover {
-  background: var(--background-modifier-hover);
+  background: var(--background-modifier-hover) !important;
 }
 
 .todoseq-context-menu-icon-btn:focus-visible {
@@ -1440,55 +1414,23 @@
   color: var(--text-faint);
 }
 
-/* Separator */
-.todoseq-context-menu-separator {
-  height: 1px;
-  margin: var(--size-4-1) 0;
-  background: var(--background-modifier-border);
-}
-
 /* ============================================================================
    Date Picker
    ============================================================================ */
 
 .todoseq-date-picker {
-  position: fixed;
-  z-index: var(--layer-menu);
   min-width: 300px;
   max-width: 320px;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  box-shadow: var(--shadow-s);
-  padding: var(--size-4-1) 0;
-  font-size: var(--font-ui-small);
-  color: var(--text-normal);
-  user-select: none;
+  padding: var(--menu-padding);
 }
 
-/* Date Picker Header */
+/* Date Picker Header - custom enhancements */
 .todoseq-date-picker-header {
-  padding: var(--size-4-2) var(--size-4-3);
   font-weight: var(--font-semibold);
-  font-size: var(--font-ui-small);
-  color: var(--text-normal);
-  border-bottom: 1px solid var(--background-modifier-border);
-  margin-bottom: var(--size-4-1);
 }
 
 /* Quick Select Section */
 .todoseq-date-picker-quick-select {
-  padding: var(--size-4-1) var(--size-4-3);
-}
-
-.todoseq-date-picker-quick-select-row {
-  display: flex;
-  align-items: center;
-  gap: var(--size-4-2);
-  padding: var(--size-4-1) var(--size-4-2);
-  cursor: pointer;
-  border-radius: var(--radius-s);
-  min-height: 32px;
 }
 
 .todoseq-date-picker-quick-select-date {
@@ -1497,16 +1439,9 @@
   white-space: nowrap;
 }
 
-/* Separator */
-.todoseq-date-picker-separator {
-  height: 1px;
-  margin: var(--size-4-1) 0;
-  background: var(--background-modifier-border);
-}
-
 /* Calendar Section */
 .todoseq-date-picker-calendar {
-  padding: var(--size-4-1) var(--size-4-3);
+  padding: var(--size-4-1) var(--size-4-2);
 }
 
 .todoseq-date-picker-calendar-header {
@@ -1546,6 +1481,17 @@
 }
 
 .todoseq-date-picker-calendar-nav svg {
+  width: 16px;
+  height: 16px;
+}
+
+.todoseq-date-picker-calendar-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.todoseq-date-picker-calendar-nav-icon svg {
   width: 16px;
   height: 16px;
 }
@@ -1614,17 +1560,6 @@
 .todoseq-date-picker-time,
 .todoseq-date-picker-repeat,
 .todoseq-date-picker-no-date {
-  padding: var(--size-4-1) var(--size-4-3);
-}
-
-.todoseq-date-picker-menu-row {
-  display: flex;
-  align-items: center;
-  gap: var(--size-4-2);
-  padding: var(--size-4-1) var(--size-4-2);
-  cursor: pointer;
-  border-radius: var(--radius-s);
-  min-height: 32px;
 }
 
 .todoseq-date-picker-menu-row-label.is-selected {
@@ -1636,8 +1571,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 1.3em;
+  height: 1.3em;
   border: none;
   border-radius: var(--radius-s);
   background: transparent;
@@ -1662,30 +1597,29 @@
   height: 14px;
 }
 
-/* Submenu */
+.todoseq-date-picker-clear-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.todoseq-date-picker-clear-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Submenu - custom positioning and sizing */
 .todoseq-date-picker-submenu {
   position: absolute;
   min-width: 150px;
   max-height: 250px;
   overflow-y: auto;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  box-shadow: var(--shadow-s);
   z-index: calc(var(--layer-menu) + 1);
   padding: var(--size-4-1) 0;
 }
 
 .todoseq-date-picker-submenu-row {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: var(--size-4-2);
-  padding: var(--size-4-1) var(--size-4-3);
-  cursor: pointer;
-  border-radius: 0;
-  min-height: 32px;
-  font-size: var(--font-ui-small);
 }
 
 .todoseq-date-picker-submenu-value {
@@ -1818,4 +1752,14 @@
 
 .todoseq-date-picker-custom-repeat-save:hover {
   background: color-mix(in srgb, var(--interactive-accent) 85%, white);
+}
+
+/* force mobile to use default background colors */
+@media (max-width: 480px) {
+  .todoseq-date-picker-header,
+  .todoseq-date-picker-menu-row,
+  .todoseq-date-picker-quick-select-row {
+    background-color: inherit !important;
+    background: inherit !important;
+  }
 }

@@ -186,9 +186,8 @@ export class DatePicker extends BaseDialog {
 
   private async buildPicker(): Promise<void> {
     this.containerEl = document.createElement('div');
-    this.containerEl.className = 'todoseq-date-picker';
+    this.containerEl.className = 'menu todoseq-date-picker';
     this.containerEl.setAttribute('role', 'menu');
-    this.containerEl.setAttribute('aria-label', 'Date picker');
 
     this.focusableItems = [];
 
@@ -226,7 +225,7 @@ export class DatePicker extends BaseDialog {
     if (!this.containerEl) return;
 
     const header = this.containerEl.createEl('div', {
-      cls: 'todoseq-date-picker-header',
+      cls: 'menu-item menu-item-title todoseq-date-picker-header',
     });
 
     const headerText =
@@ -287,7 +286,10 @@ export class DatePicker extends BaseDialog {
         tabindex: '-1',
       },
     });
-    setIcon(prevBtn, 'lucide-chevron-left');
+    const prevIcon = prevBtn.createEl('span', {
+      cls: 'menu-item-icon todoseq-date-picker-calendar-nav-icon',
+    });
+    setIcon(prevIcon, 'lucide-chevron-left');
     prevBtn.addEventListener('click', (evt) => {
       evt.stopPropagation();
       this.previousMonth();
@@ -306,7 +308,10 @@ export class DatePicker extends BaseDialog {
         tabindex: '-1',
       },
     });
-    setIcon(nextBtn, 'lucide-chevron-right');
+    const nextIcon = nextBtn.createEl('span', {
+      cls: 'menu-item-icon todoseq-date-picker-calendar-nav-icon',
+    });
+    setIcon(nextIcon, 'lucide-chevron-right');
     nextBtn.addEventListener('click', (evt) => {
       evt.stopPropagation();
       this.nextMonth();
@@ -405,7 +410,10 @@ export class DatePicker extends BaseDialog {
           tabindex: '-1',
         },
       });
-      setIcon(clearBtn, 'lucide-x');
+      const clearIcon = clearBtn.createEl('span', {
+        cls: 'menu-item-icon todoseq-date-picker-clear-icon',
+      });
+      setIcon(clearIcon, 'lucide-x');
       clearBtn.addEventListener('click', (evt) => {
         evt.stopPropagation();
         this.clearTime();
@@ -449,7 +457,10 @@ export class DatePicker extends BaseDialog {
           tabindex: '-1',
         },
       });
-      setIcon(clearBtn, 'lucide-x');
+      const clearIcon = clearBtn.createEl('span', {
+        cls: 'menu-item-icon todoseq-date-picker-clear-icon',
+      });
+      setIcon(clearIcon, 'lucide-x');
       clearBtn.addEventListener('click', (evt) => {
         evt.stopPropagation();
         this.clearRepeat();
@@ -501,17 +512,17 @@ export class DatePicker extends BaseDialog {
     getDate: () => Date;
   }): HTMLElement {
     const row = document.createElement('div');
-    row.className = 'todoseq-date-picker-quick-select-row';
+    row.className = 'menu-item todoseq-date-picker-quick-select-row';
     row.setAttribute('role', 'menuitem');
     row.setAttribute('tabindex', '-1');
 
     const iconEl = row.createEl('span', {
-      cls: 'todoseq-date-picker-quick-select-icon',
+      cls: 'menu-item-icon todoseq-date-picker-quick-select-icon',
     });
     setIcon(iconEl, option.icon);
 
     const labelEl = row.createEl('span', {
-      cls: 'todoseq-date-picker-quick-select-label',
+      cls: 'menu-item-title todoseq-date-picker-quick-select-label',
     });
     labelEl.setText(option.label);
 
@@ -665,7 +676,7 @@ export class DatePicker extends BaseDialog {
 
     // Create submenu
     this.timePickerSubmenu = document.createElement('div');
-    this.timePickerSubmenu.className = 'todoseq-date-picker-submenu';
+    this.timePickerSubmenu.className = 'menu todoseq-date-picker-submenu';
 
     // Determine which time to focus: selected time or 12:00
     const targetHours = this.selectedTime ? this.selectedTime.hours : 12;
@@ -680,7 +691,7 @@ export class DatePicker extends BaseDialog {
         const timeStr = this.formatTime(time);
 
         const row = document.createElement('div');
-        row.className = 'todoseq-date-picker-submenu-row';
+        row.className = 'menu-item todoseq-date-picker-submenu-row';
         row.setAttribute('role', 'menuitem');
         row.setAttribute('tabindex', '-1');
         row.setText(timeStr);
@@ -795,7 +806,7 @@ export class DatePicker extends BaseDialog {
 
     // Create submenu
     this.repeatPickerSubmenu = document.createElement('div');
-    this.repeatPickerSubmenu.className = 'todoseq-date-picker-submenu';
+    this.repeatPickerSubmenu.className = 'menu todoseq-date-picker-submenu';
 
     // Preset repeat options
     const presetOptions: Array<{
@@ -822,12 +833,12 @@ export class DatePicker extends BaseDialog {
 
     for (const option of presetOptions) {
       const row = document.createElement('div');
-      row.className = 'todoseq-date-picker-submenu-row';
+      row.className = 'menu-item todoseq-date-picker-submenu-row';
       row.setAttribute('role', 'menuitem');
       row.setAttribute('tabindex', '-1');
 
       const labelSpan = document.createElement('span');
-      labelSpan.className = 'todoseq-date-picker-submenu-label';
+      labelSpan.className = 'menu-item-title todoseq-date-picker-submenu-label';
       labelSpan.setText(option.label);
       row.appendChild(labelSpan);
 
@@ -854,12 +865,12 @@ export class DatePicker extends BaseDialog {
 
     // Custom option
     const customRow = document.createElement('div');
-    customRow.className = 'todoseq-date-picker-submenu-row';
+    customRow.className = 'menu-item todoseq-date-picker-submenu-row';
     customRow.setAttribute('role', 'menuitem');
     customRow.setAttribute('tabindex', '-1');
 
     const customLabel = document.createElement('span');
-    customLabel.className = 'todoseq-date-picker-submenu-label';
+    customLabel.className = 'menu-item-title todoseq-date-picker-submenu-label';
     customLabel.setText('Custom...');
     customRow.appendChild(customLabel);
 
@@ -1118,16 +1129,16 @@ export class DatePicker extends BaseDialog {
     }
 
     const row = document.createElement('div');
-    row.className = 'todoseq-date-picker-menu-row';
+    row.className = 'menu-item todoseq-date-picker-menu-row';
     row.setAttribute('tabindex', '-1');
 
     const iconEl = row.createEl('span', {
-      cls: 'todoseq-date-picker-menu-row-icon',
+      cls: 'menu-item-icon todoseq-date-picker-menu-row-icon',
     });
     setIcon(iconEl, iconName);
 
     const labelEl = row.createEl('span', {
-      cls: 'todoseq-date-picker-menu-row-label',
+      cls: 'menu-item-title todoseq-date-picker-menu-row-label',
     });
     labelEl.setText(label);
 
@@ -1151,7 +1162,7 @@ export class DatePicker extends BaseDialog {
   private addSeparator(): void {
     if (!this.containerEl) return;
     this.containerEl.createEl('div', {
-      cls: 'todoseq-date-picker-separator',
+      cls: 'menu-separator todoseq-date-picker-separator',
     });
   }
 

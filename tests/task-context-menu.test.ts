@@ -273,9 +273,7 @@ describe('TaskContextMenu', () => {
     });
 
     it('should render separators between sections', () => {
-      const separators = document.querySelectorAll(
-        '.todoseq-context-menu-separator',
-      );
+      const separators = document.querySelectorAll('.menu-separator');
       expect(separators.length).toBe(4);
     });
   });

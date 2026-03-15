@@ -170,10 +170,6 @@ export class TaskListView extends ItemView {
           this.handleContextMenuScheduledDateChange(task, date, repeat ?? null),
         onDeadlineDateChange: (task, date, repeat) =>
           this.handleContextMenuDeadlineDateChange(task, date, repeat ?? null),
-        onDeadlineClick: (_task) => {
-          // Stub: date picker not yet implemented
-          new Notice('Date picker coming soon');
-        },
       },
       { weekStartsOn: plugin.settings.weekStartsOn },
       plugin.app,
@@ -2152,10 +2148,6 @@ export class TaskListView extends ItemView {
           this.handleContextMenuScheduledDateChange(task, date, repeat ?? null),
         onDeadlineDateChange: (task, date, repeat) =>
           this.handleContextMenuDeadlineDateChange(task, date, repeat ?? null),
-        onDeadlineClick: (_task) => {
-          // Stub: date picker not yet implemented
-          new Notice('Date picker coming soon');
-        },
       },
       { weekStartsOn: this.plugin.settings.weekStartsOn },
       this.plugin.app,

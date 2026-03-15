@@ -30,7 +30,6 @@ export type TaskContextMenuCallbacks = {
     date: Date | null,
     repeat?: DateRepeatInfo | null,
   ) => void;
-  onDeadlineClick: (task: Task) => void;
 };
 
 /**
@@ -193,9 +192,8 @@ export class TaskContextMenu extends BaseDialog {
 
   private async buildMenu(): Promise<void> {
     this.containerEl = document.createElement('div');
-    this.containerEl.className = 'todoseq-task-context-menu';
+    this.containerEl.className = 'menu todoseq-task-context-menu';
     this.containerEl.setAttribute('role', 'menu');
-    this.containerEl.setAttribute('aria-label', 'Task actions');
 
     this.focusableItems = [];
 
@@ -302,7 +300,7 @@ export class TaskContextMenu extends BaseDialog {
 
     // Section header
     const header = this.containerEl.createEl('div', {
-      cls: 'todoseq-context-menu-header',
+      cls: 'menu-item menu-item-title todoseq-context-menu-header',
     });
     header.setText('Scheduled');
 
@@ -395,7 +393,7 @@ export class TaskContextMenu extends BaseDialog {
 
     // Section header
     const header = this.containerEl.createEl('div', {
-      cls: 'todoseq-context-menu-header',
+      cls: 'menu-item menu-item-title todoseq-context-menu-header',
     });
     header.setText('Priority');
 
@@ -474,19 +472,19 @@ export class TaskContextMenu extends BaseDialog {
     }
 
     const row = this.containerEl.createEl('div', {
-      cls: 'todoseq-context-menu-row',
+      cls: 'menu-item todoseq-context-menu-row',
       attr: {
         tabindex: '-1',
       },
     });
 
     const iconEl = row.createEl('span', {
-      cls: 'todoseq-context-menu-row-icon',
+      cls: 'menu-item-icon todoseq-context-menu-row-icon',
     });
     setIcon(iconEl, iconName);
 
     const labelEl = row.createEl('span', {
-      cls: 'todoseq-context-menu-row-label',
+      cls: 'menu-item-title todoseq-context-menu-row-label',
     });
     labelEl.setText(label);
 
@@ -510,7 +508,7 @@ export class TaskContextMenu extends BaseDialog {
   private addSeparator(): void {
     if (!this.containerEl) return;
     this.containerEl.createEl('div', {
-      cls: 'todoseq-context-menu-separator',
+      cls: 'menu-separator',
     });
   }
 

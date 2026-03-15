@@ -49,9 +49,6 @@ export class EmbeddedTaskListRenderer {
           this.handleScheduledDateChange(task, date, repeat),
         onDeadlineDateChange: (task, date, repeat) =>
           this.handleDeadlineDateChange(task, date, repeat),
-        onDeadlineClick: (_task) => {
-          new Notice('Date picker coming soon');
-        },
       },
       { weekStartsOn: plugin.settings.weekStartsOn },
       plugin.app,
