@@ -940,4 +940,227 @@ describe('TaskWriter Instance Methods', () => {
       expect(resultContent).toBe('- TODO Task text');
     });
   });
+
+  describe('updateTaskClosedDate', () => {
+    const mockTFile = new MockTFile();
+
+    beforeEach(() => {
+      mockApp = {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(mockTFile),
+          process: jest.fn().mockResolvedValue(''),
+          read: jest.fn().mockResolvedValue(''),
+        },
+        workspace: {
+          getActiveViewOfType: jest.fn(),
+        },
+      };
+
+      // Update mockPlugin to use the new mockApp
+      mockPlugin = {
+        app: mockApp,
+        settings: {
+          additionalInactiveKeywords: ['CUSTOM'],
+          trackClosedDate: false,
+          stateTransitions: {
+            defaultInactive: 'TODO',
+            defaultActive: 'DOING',
+            defaultCompleted: 'DONE',
+            transitionStatements: [],
+          },
+        },
+      };
+
+      // Recreate TaskWriter with updated mock
+      const keywordManager = new KeywordManager({
+        additionalInactiveKeywords: ['CUSTOM'],
+      });
+      taskWriter = new TaskWriter(mockPlugin, keywordManager);
+    });
+
+    it('should add CLOSED line when task is completed and no CLOSED line exists', async () => {
+      const task: Task = createBaseTask({
+        rawText: '- [ ] TODO Task text',
+        path: 'test.md',
+        line: 0,
+        state: 'TODO',
+        completed: false,
+      });
+
+      mockApp.vault.read.mockResolvedValueOnce('- [ ] TODO Task text');
+
+      const result = await taskWriter.updateTaskClosedDate(
+        task,
+        new Date('2026-03-15'),
+      );
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      const processCall = mockApp.vault.process.mock.calls[0];
+      const updateFn = processCall[1];
+      const content = '- [ ] TODO Task text';
+      const resultContent = updateFn(content);
+      expect(resultContent).toContain('CLOSED:');
+      expect(result.task.closedDate).toBeInstanceOf(Date);
+      expect(result.lineDelta).toBe(1);
+    });
+
+    it('should update existing CLOSED line when task is re-completed', async () => {
+      const task: Task = createBaseTask({
+        rawText: '- [x] DONE Task text',
+        path: 'test.md',
+        line: 0,
+        state: 'DONE',
+        completed: true,
+      });
+
+      mockApp.vault.read.mockResolvedValueOnce(
+        '- [x] DONE Task text\n  CLOSED: [2026-03-14 Sat 10:00]',
+      );
+
+      const result = await taskWriter.updateTaskClosedDate(
+        task,
+        new Date('2026-03-15'),
+      );
+
+      const processCall = mockApp.vault.process.mock.calls[0];
+      const updateFn = processCall[1];
+      const content = '- [x] DONE Task text\n  CLOSED: [2026-03-14 Sat 10:00]';
+      const resultContent = updateFn(content);
+      const closedCount = (resultContent.match(/CLOSED:/g) || []).length;
+      expect(closedCount).toBe(1);
+      expect(result.task.closedDate).toBeInstanceOf(Date);
+      expect(result.lineDelta).toBe(0);
+    });
+
+    it('should use Vault API when forceVaultApi=true', async () => {
+      const task: Task = createBaseTask({
+        rawText: '- [ ] TODO Task text',
+        path: 'test.md',
+        line: 0,
+        state: 'TODO',
+        completed: false,
+      });
+
+      const mockEditor = { getLine: jest.fn() };
+      const mockMarkdownView = {
+        file: { path: 'test.md' },
+        editor: mockEditor,
+      };
+      mockApp.workspace.getActiveViewOfType.mockReturnValue(mockMarkdownView);
+      mockApp.vault.read.mockResolvedValueOnce('- [ ] TODO Task text');
+
+      await taskWriter.updateTaskClosedDate(task, new Date('2026-03-15'), true);
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+    });
+  });
+
+  describe('removeTaskClosedDate', () => {
+    const mockTFile = new MockTFile();
+
+    beforeEach(() => {
+      mockApp = {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(mockTFile),
+          process: jest.fn().mockImplementation((file, updateFn) => {
+            // Execute the update function synchronously to simulate vault.process behavior
+            const result = updateFn(
+              '- [ ] TODO Task text\n  CLOSED: [2026-03-15 Sat 10:00]',
+            );
+            return Promise.resolve(result);
+          }),
+          read: jest.fn().mockResolvedValue(''),
+        },
+        workspace: {
+          getActiveViewOfType: jest.fn(),
+        },
+      };
+
+      // Update mockPlugin to use the new mockApp
+      mockPlugin = {
+        app: mockApp,
+        settings: {
+          additionalInactiveKeywords: ['CUSTOM'],
+          trackClosedDate: false,
+          stateTransitions: {
+            defaultInactive: 'TODO',
+            defaultActive: 'DOING',
+            defaultCompleted: 'DONE',
+            transitionStatements: [],
+          },
+        },
+      };
+
+      // Recreate TaskWriter with updated mock
+      const keywordManager = new KeywordManager({
+        additionalInactiveKeywords: ['CUSTOM'],
+      });
+      taskWriter = new TaskWriter(mockPlugin, keywordManager);
+    });
+
+    it('should remove CLOSED line when task is uncompleted', async () => {
+      const task: Task = createBaseTask({
+        rawText: '- [ ] TODO Task text',
+        path: 'test.md',
+        line: 0,
+        state: 'TODO',
+        completed: false,
+        closedDate: new Date('2026-03-15'),
+      });
+
+      const result = await taskWriter.removeTaskClosedDate(task);
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      expect(result.task.closedDate).toBeNull();
+      expect(result.lineDelta).toBe(-1);
+    });
+
+    it('should handle case where no CLOSED line exists in file', async () => {
+      // Override the mock for this specific test
+      mockApp.vault.process = jest.fn().mockImplementation((file, updateFn) => {
+        const result = updateFn('- [ ] TODO Task text');
+        return Promise.resolve(result);
+      });
+
+      const task: Task = createBaseTask({
+        rawText: '- [ ] TODO Task text',
+        path: 'test.md',
+        line: 0,
+        state: 'TODO',
+        completed: false,
+        closedDate: new Date('2026-03-15'),
+      });
+
+      const result = await taskWriter.removeTaskClosedDate(task);
+
+      // Vault API is still called but won't find a line to remove
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      expect(result.lineDelta).toBe(0);
+    });
+
+    it('should use Vault API when forceVaultApi=true', async () => {
+      const task: Task = createBaseTask({
+        rawText: '- [ ] TODO Task text',
+        path: 'test.md',
+        line: 0,
+        state: 'TODO',
+        completed: false,
+        closedDate: new Date('2026-03-15'),
+      });
+
+      const mockEditor = { getLine: jest.fn() };
+      const mockMarkdownView = {
+        file: { path: 'test.md' },
+        editor: mockEditor,
+      };
+      mockApp.workspace.getActiveViewOfType.mockReturnValue(mockMarkdownView);
+      mockApp.vault.read.mockResolvedValueOnce(
+        '- [ ] TODO Task text\n  CLOSED: [2026-03-15 Sat 10:00]',
+      );
+
+      await taskWriter.removeTaskClosedDate(task, true);
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+    });
+  });
 });

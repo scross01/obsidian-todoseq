@@ -250,8 +250,14 @@ export class ReaderViewFormatter {
     }
 
     // Use TaskEditor directly (bypass coordinator's ChangeTracker)
+    // forceVaultApi=true because we're in reader/preview mode
     if (this.plugin.taskEditor) {
-      await this.plugin.taskEditor.updateTaskState(task, newState);
+      await this.plugin.taskEditor.updateTaskState(task, newState, true);
+
+      // Refresh the reader view to show changes (like CLOSED date line added/removed)
+      if (this.plugin.refreshReaderViewFormatter) {
+        this.plugin.refreshReaderViewFormatter();
+      }
     }
   }
 
@@ -281,9 +287,17 @@ export class ReaderViewFormatter {
 
     // The rendered text doesn't include the checkbox marker (- [ ] or - [x])
     // It also doesn't include block reference IDs (^reference)
-    // We need to find tasks that match the content after the checkbox
-    // Normalize the task text by removing leading/trailing whitespace
-    const normalizedTaskText = taskText.trim().replace(/\s+/g, ' ');
+    // But it DOES include date lines (CLOSED, SCHEDULED, DEADLINE) as part of the task text
+    // We need to remove these date lines when matching against file lines
+    let normalizedTaskText = taskText.trim().replace(/\s+/g, ' ');
+
+    // Remove date lines from taskText (CLOSED, SCHEDULED, DEADLINE lines)
+    // These are rendered on separate lines in the preview but are NOT part of the actual task line
+    normalizedTaskText = normalizedTaskText
+      .replace(/\s*CLOSED:.*$/im, '')
+      .replace(/\s*SCHEDULED:.*$/im, '')
+      .replace(/\s*DEADLINE:.*$/im, '')
+      .trim();
 
     // Find the line that matches this task
     for (let i = 0; i < lines.length; i++) {
@@ -2052,8 +2066,14 @@ export class ReaderViewFormatter {
     }
 
     // Use TaskEditor directly (bypass coordinator's ChangeTracker)
+    // forceVaultApi=true because we're in reader/preview mode
     if (this.plugin.taskEditor) {
-      await this.plugin.taskEditor.updateTaskState(task, newState);
+      await this.plugin.taskEditor.updateTaskState(task, newState, true);
+
+      // Refresh the reader view to show changes (like CLOSED date line added/removed)
+      if (this.plugin.refreshReaderViewFormatter) {
+        this.plugin.refreshReaderViewFormatter();
+      }
     }
   }
 

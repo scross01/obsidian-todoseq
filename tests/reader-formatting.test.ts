@@ -1073,7 +1073,11 @@ describe('ReaderViewFormatter', () => {
       checkbox.checked = true;
       await handleCheckboxClick.call(formatter, clickEvent, 'test.md');
 
-      expect(taskEditor.updateTaskState).toHaveBeenCalledWith(mockTask, 'DONE');
+      expect(taskEditor.updateTaskState).toHaveBeenCalledWith(
+        mockTask,
+        'DONE',
+        true,
+      );
 
       document.body.removeChild(container);
     });
@@ -1242,7 +1246,11 @@ describe('ReaderViewFormatter', () => {
       );
 
       expect(findTaskForKeyword).toHaveBeenCalledWith(keywordSpan, 'test.md');
-      expect(taskEditor.updateTaskState).toHaveBeenCalledWith(mockTask, 'DONE');
+      expect(taskEditor.updateTaskState).toHaveBeenCalledWith(
+        mockTask,
+        'DONE',
+        true,
+      );
 
       document.body.removeChild(container);
     });

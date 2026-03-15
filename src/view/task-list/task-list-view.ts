@@ -1093,9 +1093,18 @@ export class TaskListView extends ItemView {
         todoSeqPlugin?: {
           taskStateManager?: {
             optimisticUpdate: (task: Task, newState: string) => string;
+            adjustLineIndices: (
+              path: string,
+              fromLine: number,
+              delta: number,
+            ) => void;
           };
           taskEditor?: {
-            updateTaskState: (task: Task, newState: string) => Promise<Task>;
+            updateTaskState: (
+              task: Task,
+              newState: string,
+              forceVaultApi?: boolean,
+            ) => Promise<Task>;
           };
           taskUpdateCoordinator?: {
             updateTaskState: (
@@ -1119,12 +1128,28 @@ export class TaskListView extends ItemView {
       plugin.taskStateManager.optimisticUpdate(task, nextState);
 
       // Use TaskEditor directly (bypass coordinator's ChangeTracker)
-      const updated = await plugin.taskEditor.updateTaskState(task, nextState);
+      const updated = await plugin.taskEditor.updateTaskState(
+        task,
+        nextState,
+        true,
+      );
+
+      // Handle lineDelta for subsequent tasks - when date lines are added/removed,
+      // subsequent tasks need their line indices adjusted for rapid updates
+      const lineDelta = (updated as Task & { lineDelta?: number }).lineDelta;
+      if (lineDelta !== undefined && lineDelta !== 0) {
+        plugin.taskStateManager.adjustLineIndices(
+          updated.path,
+          updated.line + 1,
+          lineDelta,
+        );
+      }
 
       // Sync in-memory task from returned snapshot
       task.rawText = updated.rawText;
       task.state = updated.state;
       task.completed = updated.completed;
+      task.closedDate = updated.closedDate;
 
       // Announce state change to screen readers
       if (oldState !== task.state) {

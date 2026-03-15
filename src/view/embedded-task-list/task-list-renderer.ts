@@ -1811,8 +1811,47 @@ export class EmbeddedTaskListRenderer {
       }
 
       // Use TaskEditor directly (bypass coordinator's ChangeTracker)
+      // forceVaultApi=true because embedded task lists can appear in reader mode
+      // where Editor API changes don't persist
       if (this.plugin.taskEditor) {
-        await this.plugin.taskEditor.updateTaskState(task, newState);
+        const updated = await this.plugin.taskEditor.updateTaskState(
+          task,
+          newState,
+          true,
+        );
+
+        // Handle lineDelta for subsequent tasks - when date lines are added/removed,
+        // subsequent tasks need their line indices adjusted for rapid updates
+        const lineDelta = (updated as Task & { lineDelta?: number }).lineDelta;
+        if (
+          lineDelta !== undefined &&
+          lineDelta !== 0 &&
+          this.plugin.taskStateManager
+        ) {
+          this.plugin.taskStateManager.adjustLineIndices(
+            updated.path,
+            updated.line + 1,
+            lineDelta,
+          );
+        }
+
+        // Update taskStateManager with the result to sync closedDate and other fields
+        if (updated && this.plugin.taskStateManager) {
+          this.plugin.taskStateManager.updateTaskByPathAndLine(
+            updated.path,
+            updated.line,
+            {
+              rawText: updated.rawText,
+              state: updated.state,
+              completed: updated.completed,
+              scheduledDate: updated.scheduledDate,
+              deadlineDate: updated.deadlineDate,
+              scheduledDateRepeat: updated.scheduledDateRepeat,
+              deadlineDateRepeat: updated.deadlineDateRepeat,
+              closedDate: updated.closedDate,
+            },
+          );
+        }
       }
     } catch (error) {
       console.error('Error updating task state:', error);

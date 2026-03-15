@@ -239,11 +239,15 @@ export class TaskWriter {
     let lineDelta = 0;
     let updatedClosedDate = task.closedDate;
     if (completed && settings?.trackClosedDate) {
-      const closedResult = await this.updateTaskClosedDate(task, new Date());
+      const closedResult = await this.updateTaskClosedDate(
+        task,
+        new Date(),
+        forceVaultApi,
+      );
       lineDelta += closedResult.lineDelta;
       updatedClosedDate = closedResult.task.closedDate;
     } else if (!completed && task.closedDate) {
-      const closedResult = await this.removeTaskClosedDate(task);
+      const closedResult = await this.removeTaskClosedDate(task, forceVaultApi);
       lineDelta += closedResult.lineDelta;
       updatedClosedDate = closedResult.task.closedDate;
     }
@@ -755,6 +759,7 @@ export class TaskWriter {
   async updateTaskClosedDate(
     task: Task,
     closedDate: Date,
+    forceVaultApi = false,
   ): Promise<DateLineUpdateResult> {
     const dateStr = DateUtils.formatClosedDate(closedDate);
     let lineDelta = 0;
@@ -762,7 +767,8 @@ export class TaskWriter {
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
-      const isActive = md?.file?.path === task.path;
+      // Use Editor API only if NOT forcing Vault API AND file is active in editor (source mode)
+      const isActive = !forceVaultApi && md?.file?.path === task.path;
       const editor = md?.editor;
 
       if (isActive && editor) {
@@ -775,19 +781,16 @@ export class TaskWriter {
         // Get the proper indent including quote prefix, bullet, or checkbox marker
         const taskIndent = getTaskIndent(currentLine);
 
-        // If task doesn't have a closedDate, always insert new line
-        // Don't search for existing CLOSED line to avoid finding lines from other tasks
-        let closedLineIndex = -1;
-
-        if (task.closedDate) {
-          // Only search for existing CLOSED line if task had one before
-          closedLineIndex = findDateLine(
-            lines,
-            task.line + 1,
-            'CLOSED',
-            taskIndent,
-          );
-        }
+        // Search for existing CLOSED line
+        // Always search regardless of task.closedDate because:
+        // 1. On first completion: no CLOSED line exists, insert new
+        // 2. On re-completion: CLOSED line exists from previous close, update existing
+        const closedLineIndex = findDateLine(
+          lines,
+          task.line + 1,
+          'CLOSED',
+          taskIndent,
+        );
 
         // Find insert position (after DEADLINE/SCHEDULED if present, otherwise after task)
         // findDateLine now properly stops at task lines, so we can use the result directly
@@ -854,19 +857,16 @@ export class TaskWriter {
           // Get the proper indent including quote prefix, bullet, or checkbox marker
           const taskIndent = getTaskIndent(currentLine);
 
-          // If task doesn't have a closedDate, always insert new line
-          // Don't search for existing CLOSED line to avoid finding lines from other tasks
-          let closedLineIndex = -1;
-
-          if (task.closedDate) {
-            // Only search for existing CLOSED line if task had one before
-            closedLineIndex = findDateLine(
-              lines,
-              task.line + 1,
-              'CLOSED',
-              taskIndent,
-            );
-          }
+          // Search for existing CLOSED line
+          // Always search regardless of task.closedDate because:
+          // 1. On first completion: no CLOSED line exists, insert new
+          // 2. On re-completion: CLOSED line exists from previous close, update existing
+          const closedLineIndex = findDateLine(
+            lines,
+            task.line + 1,
+            'CLOSED',
+            taskIndent,
+          );
 
           // Find insert position (after DEADLINE/SCHEDULED if present, otherwise after task)
           // findDateLine now properly stops at task lines
@@ -918,9 +918,17 @@ export class TaskWriter {
 
           return lines.join('\n');
         });
-        // For Vault API, assume new line if task didn't have closedDate before
-        lineDelta = task.closedDate ? 0 : 1;
-        lineDelta = task.closedDate ? 0 : 1;
+        // Calculate lineDelta - search the file after the update to determine which happened
+        const fileContent = await this.app.vault.read(file);
+        const afterLines = fileContent.split('\n');
+        const afterTaskIndent = getTaskIndent(afterLines[task.line]);
+        const afterClosedLineIndex = findDateLine(
+          afterLines,
+          task.line + 1,
+          'CLOSED',
+          afterTaskIndent,
+        );
+        lineDelta = afterClosedLineIndex === -1 ? 1 : 0;
       }
     }
 
@@ -941,13 +949,17 @@ export class TaskWriter {
    * the parsed property and what exists in the file.
    * Returns both the updated task and the line delta (-1 if line removed, 0 if no line found).
    */
-  async removeTaskClosedDate(task: Task): Promise<DateLineUpdateResult> {
+  async removeTaskClosedDate(
+    task: Task,
+    forceVaultApi = false,
+  ): Promise<DateLineUpdateResult> {
     let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
       const md = this.app.workspace.getActiveViewOfType(MarkdownView);
-      const isActive = md?.file?.path === task.path;
+      // Use Editor API only if NOT forcing Vault API AND file is active in editor (source mode)
+      const isActive = !forceVaultApi && md?.file?.path === task.path;
       const editor = md?.editor;
 
       if (isActive && editor) {

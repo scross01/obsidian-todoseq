@@ -262,6 +262,14 @@ export class UIManager {
           this.plugin.taskStateManager.optimisticUpdate(task, newKeyword);
           // Refresh task list views
           this.plugin.refreshAllTaskListViews();
+
+          // Also call TaskEditor to handle CLOSED date
+          // Use setTimeout to allow Obsidian's checkbox handler to complete first
+          setTimeout(async () => {
+            if (this.plugin.taskEditor) {
+              await this.plugin.taskEditor.updateTaskState(task, newKeyword);
+            }
+          }, 0);
         }
       }
     }
