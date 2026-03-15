@@ -5,6 +5,26 @@
  */
 
 // ============================================================================
+// Viewport Breakpoints
+// ============================================================================
+
+/**
+ * Breakpoint for distinguishing phones from tablets.
+ * Viewport widths <= this value are considered phones.
+ * Matches the existing CSS media query breakpoint at 768px.
+ *
+ * Device reference (viewport width in portrait):
+ * - iPhone SE: 375px
+ * - iPhone 12/13/14: 390px
+ * - iPhone 12/13/14 Pro Max: 428px
+ * - iPhone 15 Pro Max: 430px
+ * - Android phones: 320-480px
+ * - iPad Mini: 768px (smallest tablet)
+ * - Android tablets: 600px+
+ */
+export const TABLET_BREAKPOINT = 768;
+
+// ============================================================================
 // Documentation URLs
 // ============================================================================
 

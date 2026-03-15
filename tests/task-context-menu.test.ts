@@ -100,6 +100,9 @@ beforeAll(() => {
 jest.mock('obsidian', () => ({
   setIcon: jest.fn(),
   Notice: jest.fn(),
+  Platform: {
+    isMobile: false,
+  },
   App: jest.fn().mockImplementation(() => ({
     vault: {
       adapter: {
@@ -107,6 +110,13 @@ jest.mock('obsidian', () => ({
       },
     },
   })),
+}));
+
+// Mock isPhoneDevice to control phone detection in tests
+let mockIsPhoneDevice = false;
+jest.mock('../src/utils/mobile-utils', () => ({
+  isPhoneDevice: () => mockIsPhoneDevice,
+  TABLET_BREAKPOINT: 768,
 }));
 
 describe('TaskContextMenu', () => {
@@ -743,6 +753,130 @@ describe('TaskContextMenu', () => {
 
       // Verify menu is shown
       expect(menu.isVisible()).toBe(true);
+    });
+  });
+
+  describe('phone-centered positioning', () => {
+    let originalInnerWidth: number;
+    let originalInnerHeight: number;
+
+    beforeEach(() => {
+      // Store original values
+      originalInnerWidth = window.innerWidth;
+      originalInnerHeight = window.innerHeight;
+    });
+
+    afterEach(() => {
+      // Restore original values
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: originalInnerWidth,
+      });
+      Object.defineProperty(window, 'innerHeight', {
+        writable: true,
+        configurable: true,
+        value: originalInnerHeight,
+      });
+      // Reset isPhoneDevice mock to default (desktop)
+      mockIsPhoneDevice = false;
+    });
+
+    it('should position at cursor on desktop (not mobile)', async () => {
+      // Simulate desktop environment
+      mockIsPhoneDevice = false;
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 1920,
+      });
+      Object.defineProperty(window, 'innerHeight', {
+        writable: true,
+        configurable: true,
+        value: 1080,
+      });
+
+      await menu.show(task, { x: 100, y: 100 });
+      const container = document.querySelector(
+        '.todoseq-task-context-menu',
+      ) as HTMLElement;
+
+      // Menu should be at cursor position
+      expect(parseFloat(container.style.left)).toBe(100);
+      expect(parseFloat(container.style.top)).toBe(100);
+    });
+
+    it('should position at cursor on tablet (mobile + large viewport)', async () => {
+      // Simulate tablet environment
+      mockIsPhoneDevice = false;
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 768, // iPad Mini width (at breakpoint)
+      });
+      Object.defineProperty(window, 'innerHeight', {
+        writable: true,
+        configurable: true,
+        value: 1024,
+      });
+
+      await menu.show(task, { x: 100, y: 100 });
+      const container = document.querySelector(
+        '.todoseq-task-context-menu',
+      ) as HTMLElement;
+
+      // Menu should be at cursor position (not centered, as viewport > 768px)
+      expect(parseFloat(container.style.left)).toBe(100);
+      expect(parseFloat(container.style.top)).toBe(100);
+    });
+
+    it('should handle viewport bounds on desktop when menu would overflow right', async () => {
+      mockIsPhoneDevice = false;
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 300,
+      });
+      Object.defineProperty(window, 'innerHeight', {
+        writable: true,
+        configurable: true,
+        value: 500,
+      });
+
+      // Position near right edge
+      await menu.show(task, { x: 250, y: 100 });
+      const container = document.querySelector(
+        '.todoseq-task-context-menu',
+      ) as HTMLElement;
+
+      // Menu should be adjusted to stay within viewport: 300 - 220 - 8 = 72
+      expect(parseFloat(container.style.left)).toBe(72);
+    });
+
+    it('should handle viewport bounds on desktop when menu would overflow bottom', async () => {
+      mockIsPhoneDevice = false;
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 500,
+      });
+      Object.defineProperty(window, 'innerHeight', {
+        writable: true,
+        configurable: true,
+        value: 300,
+      });
+
+      // Position near bottom edge
+      await menu.show(task, { x: 100, y: 250 });
+      const container = document.querySelector(
+        '.todoseq-task-context-menu',
+      ) as HTMLElement;
+
+      // Menu should be adjusted to stay within viewport with minimum 8px margin
+      const top = parseFloat(container.style.top);
+      expect(top).toBeGreaterThanOrEqual(8);
+      const rect = container.getBoundingClientRect();
+      expect(top + rect.height).toBeLessThanOrEqual(300 - 8);
     });
   });
 });

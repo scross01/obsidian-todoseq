@@ -3,6 +3,7 @@ import { Task } from '../../types/task';
 import { DateRepeatInfo } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
 import { isDailyNotesPluginEnabled } from '../../utils/daily-note-utils';
+import { isPhoneDevice } from '../../utils/mobile-utils';
 import { DatePicker, DatePickerMode } from './date-picker-menu';
 import { TaskStateManager } from '../../services/task-state-manager';
 
@@ -699,22 +700,31 @@ export class TaskContextMenu {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    // Adjust position to keep menu within viewport
-    let left = x;
-    let top = y;
+    let left: number;
+    let top: number;
 
-    if (left + menuWidth > viewportWidth) {
-      left = viewportWidth - menuWidth - 8;
-    }
-    if (left < 8) {
-      left = 8;
-    }
+    // On phones, center the menu in viewport
+    if (isPhoneDevice()) {
+      left = (viewportWidth - menuWidth) / 2;
+      top = (viewportHeight - menuHeight) / 2;
+    } else {
+      // Desktop/tablet: position at cursor with viewport bounds checking
+      left = x;
+      top = y;
 
-    if (top + menuHeight > viewportHeight) {
-      top = viewportHeight - menuHeight - 8;
-    }
-    if (top < 8) {
-      top = 8;
+      if (left + menuWidth > viewportWidth) {
+        left = viewportWidth - menuWidth - 8;
+      }
+      if (left < 8) {
+        left = 8;
+      }
+
+      if (top + menuHeight > viewportHeight) {
+        top = viewportHeight - menuHeight - 8;
+      }
+      if (top < 8) {
+        top = 8;
+      }
     }
 
     this.containerEl.style.left = `${left}px`;

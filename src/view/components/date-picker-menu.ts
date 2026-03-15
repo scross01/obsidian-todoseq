@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 import { DateUtils } from '../../utils/date-utils';
 import { DateRepeatInfo } from '../../types/task';
+import { isPhoneDevice } from '../../utils/mobile-utils';
 
 /**
  * Callback types for date picker actions
@@ -1212,22 +1213,31 @@ export class DatePicker {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    // Adjust position to keep picker within viewport
-    let left = x;
-    let top = y;
+    let left: number;
+    let top: number;
 
-    if (left + pickerWidth > viewportWidth) {
-      left = viewportWidth - pickerWidth - 8;
-    }
-    if (left < 8) {
-      left = 8;
-    }
+    // On phones, center the picker in viewport
+    if (isPhoneDevice()) {
+      left = (viewportWidth - pickerWidth) / 2;
+      top = (viewportHeight - pickerHeight) / 2;
+    } else {
+      // Desktop/tablet: position at cursor with viewport bounds checking
+      left = x;
+      top = y;
 
-    if (top + pickerHeight > viewportHeight) {
-      top = viewportHeight - pickerHeight - 8;
-    }
-    if (top < 8) {
-      top = 8;
+      if (left + pickerWidth > viewportWidth) {
+        left = viewportWidth - pickerWidth - 8;
+      }
+      if (left < 8) {
+        left = 8;
+      }
+
+      if (top + pickerHeight > viewportHeight) {
+        top = viewportHeight - pickerHeight - 8;
+      }
+      if (top < 8) {
+        top = 8;
+      }
     }
 
     this.containerEl.style.left = `${left}px`;
