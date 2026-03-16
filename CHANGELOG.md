@@ -2,6 +2,7 @@
 
 ## 0.12.0-dev
 
+- Added optional "Migrate to today" action to copy a task and daily note and update keyword on the source task. #43
 - Added "Open task list in new tab" command palette option to open task list view in a new tab in the main workspace area.
 - Added optional CLOSED: date on completed tasks, matching org mode syntax.
 - Added task context menu with quick actions for priority, scheduled date, and copy/move tasks. #34

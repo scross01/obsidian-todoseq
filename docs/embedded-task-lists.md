@@ -253,6 +253,10 @@ Click the checkbox next to a task to toggle its state between TODO and DONE. The
 
 Right-click on the task keyword to select the desired state. The task will be updated in the original file, and the embedded list will refresh automatically.
 
+### Task Context Menu
+
+Right-click anywhere on a task row to access additional actions through the context menu. The embedded task list supports the same [task context menu](task-list.md#task-context-menu) actions as the main Task List, including Copy to Today, Move to Today, and Migrate to Today. These options require the Daily Notes core plugin to be enabled, and Migrate to Today additionally requires a migrated state keyword to be configured in settings.
+
 ### Navigate to Task
 
 Click on the task text to navigate to the task's location in the original file.

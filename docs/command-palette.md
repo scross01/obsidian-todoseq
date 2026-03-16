@@ -9,6 +9,9 @@ TODOseq provides several commands that can be accessed through Obsidian's Comman
 - TODOseq: Rescan vault
 - TODOseq: Toggle task state _(editor only)_
 - TODOseq: Cycle task state _(editor only)_
+- TODOseq: Copy task to today _(editor only)_
+- TODOseq: Move task to today _(editor only)_
+- TODOseq: Migrate task to today _(editor only)_
 - TODOseq: Add scheduled date _(editor only)_
 - TODOseq: Add deadline date _(editor only)_
 - TODOseq: Set priority high _(editor only)_
@@ -60,6 +63,18 @@ After using the command:
 ```markdown
 - TODO test new cycle task state command
 ```
+
+### Copy task to today
+
+Copy the task at the current cursor position to today's daily note while keeping the original task in place. This command requires the Daily Notes core plugin to be enabled.
+
+### Move task to today
+
+Move the task at the current cursor position to today's daily note, removing it from its original location. This command requires the Daily Notes core plugin to be enabled.
+
+### Migrate task to today
+
+Copy the task at the current cursor position to today's daily note and update the original task with a custom state keyword. The keyword used is configured in settings (see [Migrated state keyword](settings.md#migrated-state-keyword)). This command requires both the Daily Notes core plugin to be enabled and a migrated state keyword to be configured.
 
 ### Add scheduled date
 

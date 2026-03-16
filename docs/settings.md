@@ -144,6 +144,23 @@ When a keyword changes groups, urgency is recalculated using the new group behav
 
 Validation rules for advanced syntax are strict. A keyword cannot be duplicated in one group, cannot appear across multiple groups, and a built-in cannot be both added and removed at the same time. Removal is only valid for built-ins that belong to that specific group. Invalid entries are ignored and shown as errors in settings; valid built-in overrides and removals are shown as warnings so the behavior is explicit.
 
+#### Migrated State Keyword
+
+**Setting**: "Migrated state keyword" text field in the Task Keywords section
+
+**Description**: Define the keyword used to mark tasks that have been migrated to today's daily note via the [Migrate to Today](moving-tasks.md) action. Leave empty to disable the migrate feature.
+
+**Default**: disabled
+
+**Examples**:
+
+- `ARCHIVED` - Marks tasks as archived after migrating
+- `MOVED` - Indicates the task was moved to another location
+- `(migrated)` - Non-keyword style marker
+- `ARCHIVED (migrated)` - Combines keyword with additional context
+
+When set, the Migrate to Today option appears in the [task context menu](task-list.md#task-context-menu) and [command palette](command-palette.md).
+
 #### Migration from Previous Versions
 
 If you had "Additional task keywords" configured in a previous version, they are automatically migrated to the **Inactive Keywords** group. You can move them to a different group if needed.

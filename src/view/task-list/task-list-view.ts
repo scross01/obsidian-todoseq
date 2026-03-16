@@ -160,6 +160,15 @@ export class TaskListView extends ItemView {
             await this.moveTaskToToday(freshTask);
           }
         },
+        onMigrateTaskToToday: async (task) => {
+          // Look up the fresh task from the current tasks array to get the latest state
+          const freshTask = this.tasks.find(
+            (t) => t.path === task.path && t.line === task.line,
+          );
+          if (freshTask) {
+            await this.migrateTaskToToday(freshTask);
+          }
+        },
         onPriorityChange: (task, priority) =>
           this.handleContextMenuPriorityChange(task, priority),
         onScheduledDateChange: (task, date, repeat) =>
@@ -167,7 +176,10 @@ export class TaskListView extends ItemView {
         onDeadlineDateChange: (task, date, repeat) =>
           this.handleContextMenuDeadlineDateChange(task, date, repeat ?? null),
       },
-      { weekStartsOn: plugin.settings.weekStartsOn },
+      {
+        weekStartsOn: plugin.settings.weekStartsOn,
+        migrateToTodayState: plugin.settings.migrateToTodayState,
+      },
       plugin.app,
       this.taskStateManager,
     );
@@ -1375,6 +1387,91 @@ export class TaskListView extends ItemView {
   }
 
   /**
+   * Migrate task to today's daily note
+   * Copies the task to today's daily note and updates the source task
+   * to the migrated state keyword.
+   * @param task The task to migrate
+   */
+  private async migrateTaskToToday(task: Task): Promise<void> {
+    // Get today's daily note
+    const todayNote = await getTodayDailyNote(this.plugin.app);
+    if (!todayNote) {
+      new Notice('Failed to get or create today daily note');
+      return;
+    }
+
+    // Check if task is already on today's daily note
+    if (isTaskOnTodayDailyNote(task, todayNote)) {
+      new Notice('Task is already on today daily note');
+      return;
+    }
+
+    // Format the task for daily note
+    const taskLines = formatTaskForDailyNote(task);
+
+    // Read the current content of today's daily note
+    const todayContent = await this.plugin.app.vault.read(todayNote);
+
+    // Append the task to the end of today's daily note
+    const newTodayContent =
+      todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+
+    // Write the updated content to today's daily note
+    await this.plugin.app.vault.modify(todayNote, newTodayContent);
+
+    // Update the source task to the migrated state
+    // Get the source file
+    const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
+    if (!(sourceFile instanceof TFile)) {
+      new Notice('Failed to find source file');
+      return;
+    }
+
+    // Read the source file content
+    const sourceContent = await this.plugin.app.vault.read(sourceFile);
+    const sourceLines = sourceContent.split('\n');
+
+    // Get the task line content
+    const taskLineContent = sourceLines[task.line];
+    if (!taskLineContent) {
+      new Notice('Failed to find task line');
+      return;
+    }
+
+    // Get the migrated state keyword from settings
+    const migrateState = this.plugin.settings.migrateToTodayState;
+    const taskKeyword = task.state || 'TODO';
+
+    // Escape special regex characters in the keyword
+    const escapeRegex = (str: string) =>
+      str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    let updatedLineContent: string;
+    if (migrateState === '') {
+      // If empty, remove the keyword entirely
+      updatedLineContent = taskLineContent.replace(
+        new RegExp(`^(\\s*)\\b${escapeRegex(taskKeyword)}\\b\\s*`, 'i'),
+        '$1',
+      );
+    } else {
+      // Replace the existing keyword with the migrated state
+      updatedLineContent = taskLineContent.replace(
+        new RegExp(`\\b${escapeRegex(taskKeyword)}\\b`, 'i'),
+        migrateState,
+      );
+    }
+
+    // Update the source line
+    sourceLines[task.line] = updatedLineContent;
+
+    // Write the updated content back to the source file
+    await this.plugin.app.vault.modify(sourceFile, sourceLines.join('\n'));
+
+    // Show notification
+    new Notice('Task migrated to today daily note');
+  }
+
+  /**
    * Announce task state change to screen readers
    * @param task Task that was updated
    * @param oldState Previous state of the task
@@ -2100,6 +2197,7 @@ export class TaskListView extends ItemView {
     if (this.taskContextMenu) {
       this.taskContextMenu.updateConfig({
         weekStartsOn: this.plugin.settings.weekStartsOn,
+        migrateToTodayState: this.plugin.settings.migrateToTodayState,
       });
     }
   }
@@ -2166,6 +2264,15 @@ export class TaskListView extends ItemView {
             await this.moveTaskToToday(freshTask);
           }
         },
+        onMigrateTaskToToday: async (task) => {
+          // Look up the fresh task from the current tasks array to get the latest state
+          const freshTask = this.tasks.find(
+            (t) => t.path === task.path && t.line === task.line,
+          );
+          if (freshTask) {
+            await this.migrateTaskToToday(freshTask);
+          }
+        },
         onPriorityChange: (task, priority) =>
           this.handleContextMenuPriorityChange(task, priority),
         onScheduledDateChange: (task, date, repeat) =>
@@ -2173,7 +2280,10 @@ export class TaskListView extends ItemView {
         onDeadlineDateChange: (task, date, repeat) =>
           this.handleContextMenuDeadlineDateChange(task, date, repeat ?? null),
       },
-      { weekStartsOn: this.plugin.settings.weekStartsOn },
+      {
+        weekStartsOn: this.plugin.settings.weekStartsOn,
+        migrateToTodayState: this.plugin.settings.migrateToTodayState,
+      },
       this.plugin.app,
       this.taskStateManager,
     );

@@ -44,6 +44,8 @@ export class EmbeddedTaskListRenderer {
         onCopyTask: (task) => this.copyTaskToClipboard(task),
         onCopyTaskToToday: async (task) => await this.copyTaskToToday(task),
         onMoveTaskToToday: async (task) => await this.moveTaskToToday(task),
+        onMigrateTaskToToday: async (task) =>
+          await this.migrateTaskToToday(task),
         onPriorityChange: (task, priority) =>
           this.handlePriorityChange(task, priority),
         onScheduledDateChange: (task, date, repeat) =>
@@ -51,7 +53,10 @@ export class EmbeddedTaskListRenderer {
         onDeadlineDateChange: (task, date, repeat) =>
           this.handleDeadlineDateChange(task, date, repeat),
       },
-      { weekStartsOn: plugin.settings.weekStartsOn },
+      {
+        weekStartsOn: plugin.settings.weekStartsOn,
+        migrateToTodayState: plugin.settings.migrateToTodayState,
+      },
       plugin.app,
       this.plugin.taskStateManager,
     );
@@ -185,6 +190,69 @@ export class EmbeddedTaskListRenderer {
     ];
     await this.plugin.app.vault.modify(sourceFile, newSourceLines.join('\n'));
     new Notice('Task moved to today daily note');
+  }
+
+  /**
+   * Migrate task to today's daily note
+   * Copies the task to today's daily note and updates the source task
+   * to the migrated state keyword.
+   */
+  private async migrateTaskToToday(task: Task): Promise<void> {
+    const todayNote = await getTodayDailyNote(this.plugin.app);
+    if (!todayNote) {
+      new Notice('Failed to get or create today daily note');
+      return;
+    }
+
+    if (isTaskOnTodayDailyNote(task, todayNote)) {
+      new Notice('Task is already on today daily note');
+      return;
+    }
+
+    const taskLines = formatTaskForDailyNote(task);
+    const todayContent = await this.plugin.app.vault.read(todayNote);
+    const newTodayContent =
+      todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+    await this.plugin.app.vault.modify(todayNote, newTodayContent);
+
+    // Update the source task to the migrated state
+    const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
+    if (!(sourceFile instanceof TFile)) {
+      new Notice('Failed to find source file');
+      return;
+    }
+
+    const sourceContent = await this.plugin.app.vault.read(sourceFile);
+    const sourceLines = sourceContent.split('\n');
+
+    const taskLineContent = sourceLines[task.line];
+    if (!taskLineContent) {
+      new Notice('Failed to find task line');
+      return;
+    }
+
+    const migrateState = this.plugin.settings.migrateToTodayState;
+    const taskKeyword = task.state || 'TODO';
+
+    const escapeRegex = (str: string) =>
+      str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    let updatedLineContent: string;
+    if (migrateState === '') {
+      updatedLineContent = taskLineContent.replace(
+        new RegExp(`^(\\s*)\\b${escapeRegex(taskKeyword)}\\b\\s*`, 'i'),
+        '$1',
+      );
+    } else {
+      updatedLineContent = taskLineContent.replace(
+        new RegExp(`\\b${escapeRegex(taskKeyword)}\\b`, 'i'),
+        migrateState,
+      );
+    }
+
+    sourceLines[task.line] = updatedLineContent;
+    await this.plugin.app.vault.modify(sourceFile, sourceLines.join('\n'));
+    new Notice('Task migrated to today daily note');
   }
 
   /**
@@ -2143,5 +2211,12 @@ export class EmbeddedTaskListRenderer {
    */
   public updateSettings(): void {
     // Menu builder now directly accesses the plugin's keyword manager, so no need to recreate it
+    // Update context menu configuration
+    if (this.taskContextMenu) {
+      this.taskContextMenu.updateConfig({
+        weekStartsOn: this.plugin.settings.weekStartsOn,
+        migrateToTodayState: this.plugin.settings.migrateToTodayState,
+      });
+    }
   }
 }

@@ -355,6 +355,24 @@ export class PluginLifecycleManager {
       },
     });
 
+    // Add editor command to migrate task to today's daily note
+    this.plugin.addCommand({
+      id: 'migrate-task-to-today',
+      name: 'Migrate task to today',
+      icon: 'arrow-up-right',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.editorController.handleMigrateTaskToTodayAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
     // Listen to VaultScanner events for task updates
     // Note: TaskListView now subscribes directly to TaskStateManager,
     // but we still refresh UI components that need updates

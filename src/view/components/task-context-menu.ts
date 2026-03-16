@@ -16,6 +16,7 @@ export type TaskContextMenuCallbacks = {
   onCopyTask: (task: Task) => void;
   onCopyTaskToToday: (task: Task) => void;
   onMoveTaskToToday: (task: Task) => void;
+  onMigrateTaskToToday: (task: Task) => void;
   onPriorityChange: (
     task: Task,
     priority: 'high' | 'med' | 'low' | null,
@@ -37,6 +38,7 @@ export type TaskContextMenuCallbacks = {
  */
 export interface TaskContextMenuConfig {
   weekStartsOn: 'Monday' | 'Sunday';
+  migrateToTodayState?: string;
 }
 
 /**
@@ -230,6 +232,9 @@ export class TaskContextMenu extends BaseDialog {
     // Move to today (only if daily notes plugin is enabled)
     await this.buildMoveToTodayRow();
 
+    // Migrate to today (only if daily notes plugin is enabled AND feature is enabled)
+    await this.buildMigrateToTodayRow();
+
     document.body.appendChild(this.containerEl);
   }
 
@@ -288,6 +293,29 @@ export class TaskContextMenu extends BaseDialog {
     const row = this.createMenuRow('Move to today', 'arrow-right', () => {
       if (this.task) {
         this.callbacks.onMoveTaskToToday(this.task);
+      }
+      this.hide();
+    });
+    row.setAttribute('role', 'menuitem');
+    this.focusableItems.push(row);
+  }
+
+  private async buildMigrateToTodayRow(): Promise<void> {
+    if (!this.containerEl || !this.task) return;
+
+    // Only show if daily notes plugin is enabled AND migrate state keyword is set
+    if (!(await isDailyNotesPluginEnabled(this.app))) {
+      return;
+    }
+
+    // Check if migrate state keyword is configured
+    if (!this.config.migrateToTodayState) {
+      return;
+    }
+
+    const row = this.createMenuRow('Migrate to today', 'arrow-up-right', () => {
+      if (this.task) {
+        this.callbacks.onMigrateTaskToToday(this.task);
       }
       this.hide();
     });

@@ -194,6 +194,28 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       this.plugin.settings.additionalArchivedKeywords,
     );
 
+    // Migrated state keyword setting
+    new Setting(containerEl)
+      .setName('Migrated state keyword')
+      .setDesc(
+        'Keyword or text to set on the source task after migrating to daily note. Leave empty to disable.',
+      )
+      .addText((text) => {
+        const currentValue = this.plugin.settings.migrateToTodayState;
+        text.setValue(currentValue);
+        text.setPlaceholder(currentValue || '(disabled)');
+        text.onChange(async (value) => {
+          this.plugin.settings.migrateToTodayState = value;
+          await this.plugin.saveSettings();
+          // Update embedded task list settings to refresh context menu
+          if (this.plugin.embeddedTaskListProcessor) {
+            this.plugin.embeddedTaskListProcessor.updateSettings();
+          }
+          // Refresh all task list views to update context menu
+          await this.refreshAllTaskListViews();
+        });
+      });
+
     // Run initial validation on open so existing warnings/errors are visible
     const parsedBySetting = this.parseKeywordInputsFromUI();
     const regexValidation =

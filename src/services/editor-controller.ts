@@ -1020,4 +1020,144 @@ export class EditorController {
 
     return true;
   }
+
+  /**
+   * Handle migrating a task to today's daily note.
+   * Copies the task to today's daily note and updates the source task
+   * to the migrated state keyword.
+   *
+   * @param checking - If true, only check if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  handleMigrateTaskToTodayAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    // Check if daily notes plugin is enabled
+    if (!isDailyNotesPluginEnabledSync(this.plugin.app)) {
+      return false;
+    }
+
+    // Check if migrate state keyword is configured
+    if (!this.plugin.settings.migrateToTodayState) {
+      return false;
+    }
+
+    const vaultScanner = this.plugin.getVaultScanner();
+    if (!vaultScanner) {
+      return false;
+    }
+
+    // Get the cursor position
+    const cursor = editor.getCursor();
+    const lineNumber = cursor.line;
+
+    // Get the line from the editor
+    const line = editor.getLine(lineNumber);
+
+    // Check if this line contains a valid task using VaultScanner's parser
+    const parser = vaultScanner.getParser();
+    if (!parser?.testRegex.test(line)) {
+      return false;
+    }
+
+    if (checking) {
+      return true;
+    }
+
+    // Parse the task from the line
+    const task = this.parseTaskFromLine(
+      line,
+      lineNumber,
+      view.file?.path || '',
+    );
+
+    if (!task) {
+      return false;
+    }
+
+    // Get the migrated state keyword from settings
+    const migrateState = this.plugin.settings.migrateToTodayState;
+
+    // Perform the async operation without waiting
+    void (async () => {
+      try {
+        // Get today's daily note
+        const todayNote = await getTodayDailyNote(this.plugin.app);
+        if (!todayNote) {
+          new Notice('Failed to get or create today daily note');
+          return;
+        }
+
+        // Check if task is already on today's daily note
+        if (isTaskOnTodayDailyNote(task, todayNote)) {
+          new Notice('Task is already on today daily note');
+          return;
+        }
+
+        // Clean the task text to remove any slash command
+        const cleanedTask = { ...task };
+        cleanedTask.text = this.cleanTaskTextFromSlashCommand(
+          task.text,
+          editor,
+          lineNumber,
+        );
+
+        // Format the task for daily note
+        const taskLines = formatTaskForDailyNote(cleanedTask);
+
+        // Read the current content of today's daily note
+        const todayContent = await this.plugin.app.vault.read(todayNote);
+
+        // Append the task to the end of today's daily note
+        const newTodayContent =
+          todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+
+        // Write the updated content to today's daily note
+        await this.plugin.app.vault.modify(todayNote, newTodayContent);
+
+        // Update the source task to the migrated state
+        // Replace the existing keyword with the migrated state
+        const taskKeyword = task.state || 'TODO';
+        const lineContent = editor.getLine(lineNumber);
+
+        // Escape special regex characters in the keyword
+        const escapeRegex = (str: string) =>
+          str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        let updatedLineContent: string;
+        if (migrateState === '') {
+          // If empty, remove the keyword entirely
+          updatedLineContent = lineContent.replace(
+            new RegExp(`^(\\s*)\\b${escapeRegex(taskKeyword)}\\b\\s*`, 'i'),
+            '$1',
+          );
+        } else {
+          // Replace the existing keyword with the migrated state
+          updatedLineContent = lineContent.replace(
+            new RegExp(`\\b${escapeRegex(taskKeyword)}\\b`, 'i'),
+            migrateState,
+          );
+        }
+
+        // Apply the change to the editor
+        editor.replaceRange(
+          updatedLineContent,
+          { line: lineNumber, ch: 0 },
+          { line: lineNumber, ch: lineContent.length },
+        );
+
+        // Show notification
+        new Notice('Task migrated to today daily note');
+      } catch (error) {
+        console.error('[TODOseq] Failed to migrate task to today:', error);
+        new Notice('Failed to migrate task to today');
+      }
+    })();
+
+    return true;
+  }
 }
