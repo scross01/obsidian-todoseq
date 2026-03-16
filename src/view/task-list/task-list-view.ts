@@ -968,9 +968,23 @@ export class TaskListView extends ItemView {
     }
 
     try {
+      // Get the current task from state manager to ensure we have the latest data
+      // The task parameter might be stale if the task was updated previously
+      const currentTask = this.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      if (!currentTask) {
+        console.error('TODOseq: Task not found in state manager');
+        return;
+      }
+
       // Use the centralized coordinator for the update
       // This handles optimistic updates, file writes, and embed refreshes
-      await plugin.taskUpdateCoordinator.updateTaskPriority(task, priority);
+      await plugin.taskUpdateCoordinator.updateTaskPriority(
+        currentTask,
+        priority,
+      );
     } catch (error) {
       console.error('TODOseq: Failed to update task priority:', error);
     }

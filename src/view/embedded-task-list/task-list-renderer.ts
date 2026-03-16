@@ -188,16 +188,46 @@ export class EmbeddedTaskListRenderer {
 
   /**
    * Handle priority change from context menu
-   * Uses optimistic UI updates via TaskUpdateCoordinator for immediate feedback
+   * Uses TaskUpdateCoordinator for optimistic UI updates
    */
   private async handlePriorityChange(
     task: Task,
     priority: 'high' | 'med' | 'low' | null,
   ): Promise<void> {
+    // Get the TaskUpdateCoordinator from the plugin (same pattern as main task list)
+    const plugin = (
+      window as unknown as {
+        todoSeqPlugin?: {
+          taskUpdateCoordinator?: {
+            updateTaskPriority: (
+              task: Task,
+              priority: 'high' | 'med' | 'low' | null,
+            ) => Promise<Task>;
+          };
+        };
+      }
+    ).todoSeqPlugin;
+
+    if (!plugin?.taskUpdateCoordinator) {
+      console.error('TODOseq: TaskUpdateCoordinator not available');
+      return;
+    }
+
     try {
+      // Get the current task from state manager to ensure we have the latest data
+      // The task parameter might be stale if the task was updated previously
+      const currentTask = this.plugin.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      if (!currentTask) {
+        console.error('TODOseq: Task not found in state manager');
+        return;
+      }
+
       // Use TaskUpdateCoordinator for optimistic UI updates
-      await this.plugin.taskUpdateCoordinator.updateTaskPriority(
-        task,
+      await plugin.taskUpdateCoordinator.updateTaskPriority(
+        currentTask,
         priority,
       );
     } catch (error) {
