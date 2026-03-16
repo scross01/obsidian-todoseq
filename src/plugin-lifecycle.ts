@@ -287,7 +287,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'set-priority-medium',
       name: 'Set priority medium',
-      icon: 'equal',
+      icon: 'chevron-up',
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
