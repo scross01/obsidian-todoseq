@@ -2,7 +2,11 @@ import TodoTracker from '../../main';
 import { Task } from '../../types/task';
 import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
-import { isCompletedKeyword, isArchivedKeyword } from '../../utils/task-utils';
+import {
+  isCompletedKeyword,
+  isArchivedKeyword,
+  stripMarkdownForDisplay,
+} from '../../utils/task-utils';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { TFile } from 'obsidian';
@@ -2109,91 +2113,110 @@ export class ReaderViewFormatter {
     // Parse all tasks in the file
     const allTasks = taskParser.parseFile(content, file.path, file);
 
-    // Get the raw text content from the task container (contains the full task)
+    // Get the task container
     const taskContainer = keywordElement.closest('.todoseq-task');
     if (!taskContainer) {
       return null;
     }
 
-    // Get the full task text from DOM and normalize it for comparison
-    // Strip markdown formatting that might have been rendered to HTML
-    const domTaskText = this.normalizeTaskText(taskContainer.textContent || '');
+    // Get the line number from the parent list item (data-line attribute)
+    const listItem = taskContainer.closest('li[data-line]');
+    const lineNumberAttr = listItem?.getAttribute('data-line');
+    const lineNumber = lineNumberAttr ? parseInt(lineNumberAttr, 10) : null;
 
-    // Also get just the text after the keyword for more precise matching
-    const keywordSpan = keywordElement;
-    const afterKeyword = keywordSpan.nextSibling?.textContent || '';
-    const domTaskTextAfterKeyword = this.normalizeTaskText(afterKeyword);
-
-    // Escape the keyword for regex
-    const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    // Create the regex once before the loop (optimization: avoid repeated compilation)
-    const keywordPrefixRegex = new RegExp(`^.*?${escapedKeyword}\\s*`);
-
-    // Find the line that contains this keyword and matches the task text
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
+    // If we have a line number, try to find the task at that exact line first
+    if (lineNumber !== null && lineNumber >= 0 && lineNumber < lines.length) {
+      const line = lines[lineNumber];
       // Check if this line contains the keyword
       if (line.includes(keyword)) {
-        // Get the task text from the source line (after the keyword)
-        const sourceTaskTextAfterKeyword = line
-          .replace(keywordPrefixRegex, '')
-          .trim();
+        // Find matching task from parsed tasks
+        const matchingTask = allTasks.find((t) => t.line === lineNumber);
+        if (matchingTask) {
+          return matchingTask;
+        }
+        // If no parsed task found, return a minimal task for this line
+        const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return {
+          path: file.path,
+          line: lineNumber,
+          rawText: line,
+          indent: '',
+          listMarker: '',
+          text: line
+            .replace(new RegExp(`^.*?${escapedKeyword}\\s*`), '')
+            .trim(),
+          state: keyword,
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          closedDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+          subtaskCount: 0,
+          subtaskCompletedCount: 0,
+        };
+      }
+    }
 
-        const normalizedSourceText = this.normalizeTaskText(
-          sourceTaskTextAfterKeyword,
-        );
+    // Fallback: use text-based matching if line number is not available
+    // Get the full task text from DOM using stripMarkdownForDisplay for consistent normalization
+    const domFullText = stripMarkdownForDisplay(
+      taskContainer.textContent || '',
+    );
 
-        // Check if the DOM text (after keyword) is contained in the source text
-        // This handles cases where DOM has rendered markdown but source has raw markdown
-        if (
-          normalizedSourceText.includes(domTaskTextAfterKeyword) ||
-          domTaskTextAfterKeyword.length === 0 ||
-          normalizedSourceText.length === 0
-        ) {
-          // Also verify the full task text matches
-          const fullNormalizedSource = this.normalizeTaskText(
-            line.replace(keywordPrefixRegex, ''),
-          );
+    // Use stripMarkdownForDisplay for consistent text normalization
+    // Compare full task text (including priority) to find the correct task line
 
-          // Find matching task from parsed tasks
-          const matchingTask = allTasks.find(
-            (t) =>
-              t.line === i ||
-              (t.state === keyword &&
-                (fullNormalizedSource.includes(domTaskText) ||
-                  domTaskText.length === 0)),
-          );
+    // First, try to find a task with matching line number and text
+    for (let i = 0; i < allTasks.length; i++) {
+      const task = allTasks[i];
+      if (task.state === keyword) {
+        // Get the normalized task text from source
+        const sourceText = stripMarkdownForDisplay(task.text);
+        const normalizedSource = sourceText.toLowerCase().trim();
+        const normalizedDom = domFullText.toLowerCase().trim();
 
-          if (matchingTask) {
-            return matchingTask;
-          }
-
-          // If no parsed task found, return a minimal task for this line
-          if (normalizedSourceText || domTaskTextAfterKeyword) {
-            return {
-              path: file.path,
-              line: i,
-              rawText: line,
-              indent: '',
-              listMarker: '',
-              text: sourceTaskTextAfterKeyword,
-              state: keyword,
-              completed: false,
-              priority: null,
-              scheduledDate: null,
-              deadlineDate: null,
-              closedDate: null,
-              urgency: null,
-              isDailyNote: false,
-              dailyNoteDate: null,
-              subtaskCount: 0,
-              subtaskCompletedCount: 0,
-            };
-          }
+        // Check if the full text matches (this handles priority too)
+        if (normalizedSource === normalizedDom) {
+          return task;
         }
       }
+    }
+
+    // Second, try matching with keyword + text content (allows for small differences)
+    for (let i = 0; i < allTasks.length; i++) {
+      const task = allTasks[i];
+      if (task.state === keyword) {
+        const sourceText = stripMarkdownForDisplay(task.text)
+          .toLowerCase()
+          .trim();
+        const domText = domFullText.toLowerCase().trim();
+
+        // Check if source text is contained in DOM text (or vice versa)
+        if (domText.includes(sourceText) || sourceText.includes(domText)) {
+          return task;
+        }
+      }
+    }
+
+    // Third, try matching by line index when we have multiple tasks with same keyword
+    // Use DOM order to find relative position
+    const tasksWithKeyword = allTasks.filter((t) => t.state === keyword);
+    if (tasksWithKeyword.length > 0) {
+      // Get the task container's position relative to other task containers
+      const allTaskContainers =
+        keywordElement.closest('div')?.querySelectorAll('.todoseq-task') || [];
+      const containerIndex =
+        Array.from(allTaskContainers).indexOf(taskContainer);
+
+      if (containerIndex >= 0 && containerIndex < tasksWithKeyword.length) {
+        return tasksWithKeyword[containerIndex];
+      }
+
+      // Fallback: return first task with matching keyword
+      return tasksWithKeyword[0];
     }
 
     return null;

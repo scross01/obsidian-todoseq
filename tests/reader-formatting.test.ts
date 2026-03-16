@@ -2210,6 +2210,251 @@ describe('ReaderViewFormatter', () => {
 
       document.body.removeChild(container);
     });
+
+    test('should match task by priority badge for paragraphs without data-line', async () => {
+      // This tests the bug fix: clicking keyword on TODO [#B] test 2 should NOT match TODO [#A] test 1
+      const container = document.createElement('div');
+
+      // First task: TODO [#A] test 1
+      const p1 = document.createElement('p');
+      const taskContainer1 = document.createElement('span');
+      taskContainer1.className = 'todoseq-task';
+      const keyword1 = document.createElement('span');
+      keyword1.className = 'todoseq-keyword-formatted';
+      keyword1.setAttribute('data-task-keyword', 'TODO');
+      keyword1.textContent = 'TODO';
+      const priorityBadge1 = document.createElement('span');
+      priorityBadge1.className = 'todoseq-priority-badge priority-high';
+      priorityBadge1.setAttribute('data-priority', 'A');
+      priorityBadge1.textContent = 'A';
+      const text1 = document.createTextNode(' test 1');
+
+      taskContainer1.appendChild(keyword1);
+      taskContainer1.appendChild(priorityBadge1);
+      taskContainer1.appendChild(text1);
+      p1.appendChild(taskContainer1);
+      container.appendChild(p1);
+
+      // Second task: TODO [#B] test 2
+      const p2 = document.createElement('p');
+      const taskContainer2 = document.createElement('span');
+      taskContainer2.className = 'todoseq-task';
+      const keyword2 = document.createElement('span');
+      keyword2.className = 'todoseq-keyword-formatted';
+      keyword2.setAttribute('data-task-keyword', 'TODO');
+      keyword2.textContent = 'TODO';
+      const priorityBadge2 = document.createElement('span');
+      priorityBadge2.className = 'todoseq-priority-badge priority-med';
+      priorityBadge2.setAttribute('data-priority', 'B');
+      priorityBadge2.textContent = 'B';
+      const text2 = document.createTextNode(' test 2');
+
+      taskContainer2.appendChild(keyword2);
+      taskContainer2.appendChild(priorityBadge2);
+      taskContainer2.appendChild(text2);
+      p2.appendChild(taskContainer2);
+      container.appendChild(p2);
+
+      document.body.appendChild(container);
+
+      const mockFile = new TFile('test.md');
+      const tasksFromParser = [
+        {
+          id: '1',
+          text: '[#A] test 1',
+          line: 0,
+          state: 'TODO',
+          priority: 'A',
+          rawText: 'TODO [#A] test 1',
+        },
+        {
+          id: '2',
+          text: '[#B] test 2',
+          line: 1,
+          state: 'TODO',
+          priority: 'B',
+          rawText: 'TODO [#B] test 2',
+        },
+      ];
+
+      jest
+        .spyOn(mockPlugin.app.vault, 'getAbstractFileByPath')
+        .mockReturnValue(mockFile);
+      jest
+        .spyOn(mockPlugin.app.vault, 'read')
+        .mockResolvedValue('TODO [#A] test 1\nTODO [#B] test 2');
+      jest.spyOn(formatter as any, 'getTaskParser').mockReturnValue({
+        testRegex: /^TODO (.*)$/,
+        parseFile: jest.fn().mockReturnValue(tasksFromParser),
+      });
+
+      const findTaskForKeyword = (
+        formatter as unknown as {
+          findTaskForKeyword: (
+            keywordElement: HTMLElement,
+            sourcePath: string,
+          ) => Promise<any>;
+        }
+      ).findTaskForKeyword;
+
+      // Clicking on the SECOND task (TODO [#B] test 2) should return the task with priority B
+      const task = await findTaskForKeyword.call(
+        formatter,
+        keyword2,
+        'test.md',
+      );
+
+      expect(task).not.toBeNull();
+      expect(task.line).toBe(1); // Should be line 1, not line 0
+      expect(task.priority).toBe('B');
+
+      document.body.removeChild(container);
+    });
+
+    test('should use data-line attribute for list items', async () => {
+      // Test that list items with data-line attribute work correctly
+      const container = document.createElement('div');
+
+      // Create list items with data-line attribute
+      const li1 = document.createElement('li');
+      li1.setAttribute('data-line', '0');
+      const taskContainer1 = document.createElement('span');
+      taskContainer1.className = 'todoseq-task';
+      const keyword1 = document.createElement('span');
+      keyword1.className = 'todoseq-keyword-formatted';
+      keyword1.setAttribute('data-task-keyword', 'TODO');
+      keyword1.textContent = 'TODO';
+      taskContainer1.appendChild(keyword1);
+      taskContainer1.appendChild(document.createTextNode(' task 1'));
+      li1.appendChild(taskContainer1);
+      container.appendChild(li1);
+
+      const li2 = document.createElement('li');
+      li2.setAttribute('data-line', '1');
+      const taskContainer2 = document.createElement('span');
+      taskContainer2.className = 'todoseq-task';
+      const keyword2 = document.createElement('span');
+      keyword2.className = 'todoseq-keyword-formatted';
+      keyword2.setAttribute('data-task-keyword', 'TODO');
+      keyword2.textContent = 'TODO';
+      taskContainer2.appendChild(keyword2);
+      taskContainer2.appendChild(document.createTextNode(' task 2'));
+      li2.appendChild(taskContainer2);
+      container.appendChild(li2);
+
+      document.body.appendChild(container);
+
+      const mockFile = new TFile('test.md');
+      const tasksFromParser = [
+        {
+          id: '1',
+          text: 'task 1',
+          line: 0,
+          state: 'TODO',
+          rawText: '- TODO task 1',
+        },
+        {
+          id: '2',
+          text: 'task 2',
+          line: 1,
+          state: 'TODO',
+          rawText: '- TODO task 2',
+        },
+      ];
+
+      jest
+        .spyOn(mockPlugin.app.vault, 'getAbstractFileByPath')
+        .mockReturnValue(mockFile);
+      jest
+        .spyOn(mockPlugin.app.vault, 'read')
+        .mockResolvedValue('- TODO task 1\n- TODO task 2');
+      jest.spyOn(formatter as any, 'getTaskParser').mockReturnValue({
+        testRegex: /^- TODO (.*)$/,
+        parseFile: jest.fn().mockReturnValue(tasksFromParser),
+      });
+
+      const findTaskForKeyword = (
+        formatter as unknown as {
+          findTaskForKeyword: (
+            keywordElement: HTMLElement,
+            sourcePath: string,
+          ) => Promise<any>;
+        }
+      ).findTaskForKeyword;
+
+      // Clicking on second task should return task at line 1
+      const task = await findTaskForKeyword.call(
+        formatter,
+        keyword2,
+        'test.md',
+      );
+
+      expect(task).not.toBeNull();
+      expect(task.line).toBe(1);
+      expect(task.text).toBe('task 2');
+
+      document.body.removeChild(container);
+    });
+
+    test('should use substring fallback when exact text does not match', async () => {
+      // Test the second-tier matching: substring match
+      const container = document.createElement('div');
+      const p = document.createElement('p');
+      const taskContainer = document.createElement('span');
+      taskContainer.className = 'todoseq-task';
+      const keyword = document.createElement('span');
+      keyword.className = 'todoseq-keyword-formatted';
+      keyword.setAttribute('data-task-keyword', 'TODO');
+      keyword.textContent = 'TODO';
+      // Note: no priority badge in this test
+      taskContainer.appendChild(keyword);
+      taskContainer.appendChild(
+        document.createTextNode(' some unique task text'),
+      );
+      p.appendChild(taskContainer);
+      container.appendChild(p);
+      document.body.appendChild(container);
+
+      const mockFile = new TFile('test.md');
+      // Parser returns slightly different text (e.g., with markdown)
+      const tasksFromParser = [
+        {
+          id: '1',
+          text: 'some **unique** task text',
+          line: 0,
+          state: 'TODO',
+          rawText: 'TODO some **unique** task text',
+        },
+      ];
+
+      jest
+        .spyOn(mockPlugin.app.vault, 'getAbstractFileByPath')
+        .mockReturnValue(mockFile);
+      jest
+        .spyOn(mockPlugin.app.vault, 'read')
+        .mockResolvedValue('TODO some **unique** task text');
+      jest.spyOn(formatter as any, 'getTaskParser').mockReturnValue({
+        testRegex: /^TODO (.*)$/,
+        parseFile: jest.fn().mockReturnValue(tasksFromParser),
+      });
+
+      const findTaskForKeyword = (
+        formatter as unknown as {
+          findTaskForKeyword: (
+            keywordElement: HTMLElement,
+            sourcePath: string,
+          ) => Promise<any>;
+        }
+      ).findTaskForKeyword;
+
+      const task = await findTaskForKeyword.call(formatter, keyword, 'test.md');
+
+      // Should still match via substring matching (stripMarkdownForDisplay normalizes both)
+      expect(task).not.toBeNull();
+      expect(task.line).toBe(0);
+
+      document.body.removeChild(container);
+    });
   });
 
   describe('findTaskForCheckbox', () => {
