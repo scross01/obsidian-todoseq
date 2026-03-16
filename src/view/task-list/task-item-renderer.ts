@@ -698,7 +698,7 @@ export class TaskItemRenderer {
       classes.push('todoseq-task-date-overdue');
     } else if (diffDays === 0) {
       classes.push('todoseq-task-date-today');
-    } else if (diffDays <= 3) {
+    } else if (diffDays <= 7) {
       classes.push('todoseq-task-date-soon');
     }
 

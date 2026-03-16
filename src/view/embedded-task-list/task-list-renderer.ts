@@ -1195,9 +1195,9 @@ export class EmbeddedTaskListRenderer {
     const li = document.createElement('li');
     li.className = 'todoseq-embedded-task-item';
 
-    // Apply date-based background styling if the task has scheduled or deadline dates
+    // Apply date-based background styling if the task has scheduled or deadline dates AND is not completed
     const dateCategory = this.getDateCategory(task);
-    if (dateCategory !== 'none') {
+    if (dateCategory !== 'none' && !task.completed) {
       li.classList.add(`todoseq-embedded-task-item-date-${dateCategory}`);
     }
 
