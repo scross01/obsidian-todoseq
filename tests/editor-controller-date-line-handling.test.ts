@@ -131,6 +131,50 @@ describe('Editor Controller - Date Line Handling', () => {
 
       expect(mockEditor.replaceRange).toHaveBeenCalled();
     });
+
+    it('should not add extra newline when empty line exists after task', () => {
+      const currentDate = new Date().toISOString().split('T')[0];
+      mockEditor = {
+        getLine: (lineNumber: number) => {
+          const lines = ['TODO Test task', '', 'TODO Next task'];
+          return lines[lineNumber] || '';
+        },
+        lineCount: () => 3,
+        setCursor: jest.fn(),
+        setSelection: jest.fn(),
+        replaceRange: jest.fn(),
+      };
+
+      editorController['insertDateLine'](mockEditor as any, 0, 'SCHEDULED');
+
+      expect(mockEditor.replaceRange).toHaveBeenCalledWith(
+        '\n' + 'SCHEDULED: <' + currentDate + '>',
+        { line: 0, ch: 14 },
+        { line: 0, ch: 14 },
+      );
+    });
+
+    it('should not add extra newline when non-empty line exists after task', () => {
+      const currentDate = new Date().toISOString().split('T')[0];
+      mockEditor = {
+        getLine: (lineNumber: number) => {
+          const lines = ['TODO Test task', '- [ ] subtask'];
+          return lines[lineNumber] || '';
+        },
+        lineCount: () => 2,
+        setCursor: jest.fn(),
+        setSelection: jest.fn(),
+        replaceRange: jest.fn(),
+      };
+
+      editorController['insertDateLine'](mockEditor as any, 0, 'SCHEDULED');
+
+      expect(mockEditor.replaceRange).toHaveBeenCalledWith(
+        '\n' + 'SCHEDULED: <' + currentDate + '>',
+        { line: 0, ch: 14 },
+        { line: 0, ch: 14 },
+      );
+    });
   });
 
   describe('handleAddDateAtLine', () => {

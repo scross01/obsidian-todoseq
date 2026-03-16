@@ -747,9 +747,9 @@ export class EditorController {
       );
       this.moveCursorToDateLine(editor, insertLine);
     } else {
-      // Insert with newline before and after (new date section)
+      // Insert with newline before (no newline after - existing content follows naturally)
       editor.replaceRange(
-        '\n' + dateLine + '\n',
+        '\n' + dateLine,
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
