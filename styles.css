@@ -650,6 +650,11 @@
   align-items: baseline;
 }
 
+/* Task text needs block-like behavior for ellipsis */
+.todoseq-embedded-task-text-container > .todoseq-embedded-task-text {
+  display: inline-block;
+}
+
 /* Task state */
 .todoseq-embedded-task-state {
   font-weight: var(--font-semibold);
@@ -665,6 +670,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
   font-size: 0.95rem;
 }
 
@@ -827,11 +833,12 @@
   min-width: 0;
   flex: 1;
   align-items: baseline;
+  overflow: hidden;
 }
 
 .todoseq-embedded-task-text-wrap-dynamic .todoseq-embedded-task-state,
 .todoseq-embedded-task-text-wrap-dynamic .todoseq-embedded-task-text {
-  display: inline;
+  display: inline-block;
 }
 
 /* Priority badge needs inline-block to maintain dimensions */
@@ -843,6 +850,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* File info inline on wide screens */
@@ -934,6 +942,11 @@
     overflow: visible;
     text-overflow: unset;
     white-space: normal;
+  }
+
+  /* Hide inline urgency on narrow screens (urgency already shown in file-info-row) */
+  .todoseq-embedded-task-item-wrap-dynamic .todoseq-embedded-task-urgency {
+    display: none;
   }
 }
 
@@ -1048,6 +1061,11 @@
   /* Dynamic mode - hide inline file info at <=768px (same as wrap-content:false) */
   .todoseq-embedded-task-item-wrap-dynamic .todoseq-embedded-task-file-info {
     display: none;
+  }
+
+  /* Right-align inline urgency in 480-768px range when file info is hidden */
+  .todoseq-embedded-task-item-wrap-dynamic .todoseq-embedded-task-urgency {
+    margin-left: auto;
   }
 }
 
