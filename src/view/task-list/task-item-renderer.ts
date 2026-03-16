@@ -55,8 +55,6 @@ export class TaskItemRenderer {
   private onStateChange: TaskStateChangeCallback;
   private onLocationOpen: TaskLocationOpenCallback;
   private onContextMenu: TaskContextMenuCallback | null;
-  private defaultCompleted: string;
-  private defaultInactive: string;
 
   constructor(
     getKeywordManager: () => KeywordManager,
@@ -64,8 +62,6 @@ export class TaskItemRenderer {
     getMenuBuilder: () => StateMenuBuilder,
     onStateChange: TaskStateChangeCallback,
     onLocationOpen: TaskLocationOpenCallback,
-    defaultCompleted: 'DONE',
-    defaultInactive: 'TODO',
     onContextMenu: TaskContextMenuCallback | null = null,
   ) {
     this.getKeywordManager = getKeywordManager;
@@ -74,8 +70,6 @@ export class TaskItemRenderer {
     this.onStateChange = onStateChange;
     this.onLocationOpen = onLocationOpen;
     this.onContextMenu = onContextMenu;
-    this.defaultCompleted = defaultCompleted;
-    this.defaultInactive = defaultInactive;
   }
 
   private get keywordManager(): KeywordManager {
@@ -114,9 +108,24 @@ export class TaskItemRenderer {
     checkbox.checked = task.completed;
 
     checkbox.addEventListener('change', async () => {
-      const targetState = checkbox.checked
-        ? this.defaultCompleted
-        : this.defaultInactive;
+      let targetState: string | null = null;
+
+      if (checkbox.checked) {
+        targetState = this.stateManager.getNextCompletedOrArchivedState(
+          task.state,
+        );
+        if (targetState === null) {
+          checkbox.checked = false;
+          return;
+        }
+      } else {
+        targetState = this.stateManager.getNextState(task.state);
+        if (targetState === task.state) {
+          checkbox.checked = true;
+          return;
+        }
+      }
+
       await this.onStateChange(task, targetState);
     });
 

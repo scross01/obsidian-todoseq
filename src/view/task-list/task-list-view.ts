@@ -129,10 +129,6 @@ export class TaskListView extends ItemView {
       plugin.settings?.stateTransitions,
     );
     this.menuBuilder = new StateMenuBuilder(plugin);
-    const defaultCompleted =
-      (plugin.settings?.stateTransitions?.defaultCompleted as 'DONE') || 'DONE';
-    const defaultInactive =
-      (plugin.settings?.stateTransitions?.defaultInactive as 'TODO') || 'TODO';
     // Create context menu for task items (right-click actions)
     this.taskContextMenu = new TaskContextMenu(
       {
@@ -182,8 +178,6 @@ export class TaskListView extends ItemView {
       () => this.menuBuilder,
       (task, newState) => this.updateTaskState(task, newState),
       (task) => this.openTaskLocationForRenderer(task),
-      defaultCompleted,
-      defaultInactive,
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
     );
     this.taskListFilter = new TaskListFilter(plugin, this.keywordManager);
@@ -2132,21 +2126,12 @@ export class TaskListView extends ItemView {
     this.taskListFilter = new TaskListFilter(this.plugin, this.keywordManager);
 
     // Update task item renderer with new keyword manager and state manager
-    const defaultCompleted =
-      (this.plugin.settings?.stateTransitions?.defaultCompleted as 'DONE') ||
-      'DONE';
-    const defaultInactive =
-      (this.plugin.settings?.stateTransitions?.defaultInactive as 'TODO') ||
-      'TODO';
-
     this.taskItemRenderer = new TaskItemRenderer(
       () => this.keywordManager,
       () => this.stateManager,
       () => this.menuBuilder,
       (task, newState) => this.updateTaskState(task, newState),
       (task) => this.openTaskLocationForRenderer(task),
-      defaultCompleted,
-      defaultInactive,
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
     );
 

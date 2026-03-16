@@ -17,9 +17,6 @@ describe('TaskItemRenderer', () => {
   let stateManager: TaskStateTransitionManager;
   let taskItemRenderer: TaskItemRenderer;
 
-  const defaultCompleted = 'DONE';
-  const defaultInactive = 'TODO';
-
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -32,8 +29,6 @@ describe('TaskItemRenderer', () => {
       () => mockMenuBuilder,
       mockOnStateChange,
       mockOnLocationOpen,
-      defaultCompleted,
-      defaultInactive,
     );
   });
 
@@ -125,16 +120,28 @@ describe('TaskItemRenderer', () => {
       expect(mockOnStateChange).toHaveBeenCalledWith(task, 'TODO');
     });
 
-    it('should use custom state values from constructor parameters', async () => {
-      // Create renderer with custom state values
+    it('should follow transition chain to completed state when checkbox is checked', async () => {
+      const customKeywordManager = new KeywordManager({
+        additionalInactiveKeywords: ['BACKLOG'],
+        additionalActiveKeywords: ['ACTIVE'],
+        additionalCompletedKeywords: ['COMPLETED'],
+      });
+      const customStateManager = new TaskStateTransitionManager(
+        customKeywordManager,
+        {
+          defaultInactive: 'BACKLOG',
+          defaultActive: 'ACTIVE',
+          defaultCompleted: 'COMPLETED',
+          transitionStatements: ['BACKLOG -> ACTIVE -> COMPLETED'],
+        },
+      );
+
       const customRenderer = new TaskItemRenderer(
-        () => keywordManager,
-        () => stateManager,
+        () => customKeywordManager,
+        () => customStateManager,
         () => mockMenuBuilder,
         mockOnStateChange,
         mockOnLocationOpen,
-        'COMPLETED',
-        'BACKLOG',
       );
 
       const task: Task = createBaseTask({
@@ -171,7 +178,7 @@ describe('TaskItemRenderer', () => {
       mockCheckbox.checked = true;
       await eventHandler();
 
-      // Should use 'COMPLETED' from custom settings (defaultCompleted)
+      // Should follow transition chain to COMPLETED (first completed/archived state)
       expect(mockOnStateChange).toHaveBeenCalledWith(task, 'COMPLETED');
     });
 

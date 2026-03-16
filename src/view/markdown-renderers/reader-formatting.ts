@@ -244,8 +244,26 @@ export class ReaderViewFormatter {
       return;
     }
 
-    // Determine the new state based on checkbox state
-    const newState = isChecked ? 'DONE' : 'TODO';
+    const keywordManager = this.vaultScanner.getKeywordManager();
+    const stateManager = new TaskStateTransitionManager(
+      keywordManager,
+      this.plugin.settings?.stateTransitions,
+    );
+
+    let newState: string | null = null;
+    if (isChecked) {
+      newState = stateManager.getNextCompletedOrArchivedState(task.state);
+      if (newState === null) {
+        checkbox.checked = false;
+        return;
+      }
+    } else {
+      newState = stateManager.getNextState(task.state);
+      if (newState === task.state) {
+        checkbox.checked = true;
+        return;
+      }
+    }
 
     // CRITICAL: Do optimistic update FIRST, synchronously
     // This ensures UI updates even if mobile context is destroyed

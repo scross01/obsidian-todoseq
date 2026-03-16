@@ -1,10 +1,10 @@
 import { MarkdownView, WorkspaceLeaf, TFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import TodoTracker from './main';
-import { isCompletedKeyword } from './utils/task-utils';
 import { taskKeywordPlugin } from './view/editor-extensions/task-formatting';
 import { dateAutocompleteExtension } from './view/editor-extensions/date-autocomplete';
 import { TaskListView } from './view/task-list/task-list-view';
+import { TaskStateTransitionManager } from './services/task-state-transition-manager';
 
 /**
  * Manages UI elements and interactions in the editor
@@ -216,23 +216,25 @@ export class UIManager {
       return;
     }
 
-    // Determine new state based on checkbox state
-    let newKeyword = currentKeyword;
-    // Only change state if there's a mismatch between current state and checkbox
-    if (
-      checkbox.checked &&
-      !isCompletedKeyword(currentKeyword, this.plugin.settings)
-    ) {
-      // Checkbox checked but current state is not completed -> change to DONE
-      newKeyword = 'DONE';
-    } else if (
-      !checkbox.checked &&
-      isCompletedKeyword(currentKeyword, this.plugin.settings)
-    ) {
-      // Checkbox unchecked but current state is completed -> change to TODO
-      newKeyword = 'TODO';
+    const stateManager = new TaskStateTransitionManager(
+      this.plugin.keywordManager,
+      this.plugin.settings?.stateTransitions,
+    );
+
+    let newKeyword: string | null = null;
+    if (checkbox.checked) {
+      newKeyword = stateManager.getNextCompletedOrArchivedState(currentKeyword);
+      if (newKeyword === null) {
+        checkbox.checked = false;
+        return;
+      }
+    } else {
+      newKeyword = stateManager.getNextState(currentKeyword);
+      if (newKeyword === currentKeyword) {
+        checkbox.checked = true;
+        return;
+      }
     }
-    // If checkbox state matches current state, keep current keyword
 
     // Update the keyword text and data attribute directly in the DOM
     keywordSpan.textContent = newKeyword;

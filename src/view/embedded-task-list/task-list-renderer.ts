@@ -22,6 +22,7 @@ import {
   getTodayDailyNote,
   isTaskOnTodayDailyNote,
 } from '../../utils/daily-note-utils';
+import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -1662,8 +1663,25 @@ export class EmbeddedTaskListRenderer {
       e.stopPropagation();
 
       try {
-        const newCompleted = checkbox.checked;
-        const newState = newCompleted ? 'DONE' : 'TODO';
+        const stateManager = new TaskStateTransitionManager(
+          this.plugin.keywordManager,
+          this.plugin.settings?.stateTransitions,
+        );
+
+        let newState: string | null = null;
+        if (checkbox.checked) {
+          newState = stateManager.getNextCompletedOrArchivedState(task.state);
+          if (newState === null) {
+            checkbox.checked = false;
+            return;
+          }
+        } else {
+          newState = stateManager.getNextState(task.state);
+          if (newState === task.state) {
+            checkbox.checked = true;
+            return;
+          }
+        }
 
         // Find the current task from TaskStateManager to get the latest line number
         // This ensures we use the correct task object after CLOSED date insertion

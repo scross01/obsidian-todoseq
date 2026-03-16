@@ -20,20 +20,29 @@ export class TaskStateTransitionManager {
     this.transitionSettings = transitionSettings;
     const parser = new TransitionParser(keywordManager);
 
-    // Check if we have valid transition statements
-    const hasValidStatements =
+    // Always start with default transition statements
+    const defaultResult = parser.parse(DEFAULT_TRANSITION_STATEMENTS);
+    this.parsedTransitions = defaultResult.transitions;
+    this.transitionErrors = defaultResult.errors;
+
+    // Check if we have custom transition statements to add/override
+    const hasCustomStatements =
       transitionSettings?.transitionStatements &&
       transitionSettings.transitionStatements.length > 0;
 
-    if (hasValidStatements) {
-      const result = parser.parse(transitionSettings.transitionStatements);
-      this.parsedTransitions = result.transitions;
-      this.transitionErrors = result.errors;
-    } else {
-      // Use default transition statements
-      const result = parser.parse(DEFAULT_TRANSITION_STATEMENTS);
-      this.parsedTransitions = result.transitions;
-      this.transitionErrors = result.errors;
+    if (hasCustomStatements) {
+      const customResult = parser.parse(
+        transitionSettings.transitionStatements,
+      );
+      // Add custom transitions (they override defaults if there's a conflict)
+      for (const [key, value] of customResult.transitions) {
+        this.parsedTransitions.set(key, value);
+      }
+      // Add any custom transition errors
+      this.transitionErrors = [
+        ...this.transitionErrors,
+        ...customResult.errors,
+      ];
     }
   }
 
@@ -172,5 +181,55 @@ export class TaskStateTransitionManager {
    */
   isTerminalState(state: string): boolean {
     return TransitionParser.isTerminalState(state, this.parsedTransitions);
+  }
+
+  /**
+   * Get the next completed or archived state from the current state by following
+   * the transition chain. Returns null if no completed or archived state exists
+   * in the chain (e.g., terminal states or chains without completion).
+   */
+  getNextCompletedOrArchivedState(current: string): string | null {
+    if (this.keywordManager.isArchived(current)) {
+      return current;
+    }
+
+    if (!this.isKnownKeyword(current)) {
+      return null;
+    }
+
+    const visited = new Set<string>();
+    let state = current;
+
+    while (state && !visited.has(state)) {
+      visited.add(state);
+
+      if (
+        this.keywordManager.isCompleted(state) ||
+        this.keywordManager.isArchived(state)
+      ) {
+        return state;
+      }
+
+      let nextState = this.parsedTransitions.get(state);
+
+      // If no explicit transition exists, fall back to default behavior
+      // For non-completed states, transition to DONE
+      if (nextState === undefined) {
+        const group = this.keywordManager.getGroup(state);
+        if (group === 'completedKeywords' || group === 'archivedKeywords') {
+          // Already handled above, but just in case
+          return state;
+        }
+        // For any other state (inactive, active, waiting), go to defaultCompleted
+        nextState = this.getRecoveredDefault('defaultCompleted');
+      }
+
+      if (nextState === state) {
+        break;
+      }
+      state = nextState;
+    }
+
+    return null;
   }
 }

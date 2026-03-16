@@ -53,8 +53,8 @@ describe('TaskStateTransitionManager', () => {
         transitionSettings,
       );
 
-      // LATER is inactive, should use default active (DOING)
-      expect(manager.getNextState('LATER')).toBe('DOING');
+      // LATER has explicit default transition (LATER -> NOW -> DONE), so uses that
+      expect(manager.getNextState('LATER')).toBe('NOW');
     });
 
     it('should not transition archived states', () => {
