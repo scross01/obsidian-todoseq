@@ -33,6 +33,10 @@ export default {
       { icon: 'github', link: 'https://github.com/scross01/obsidian-todoseq' },
     ],
 
+    search: {
+      provider: 'local',
+    },
+
     footer: {
       message: 'Released under the MIT License.',
       copyright: 'Copyright © 2026 Stephen Cross',
