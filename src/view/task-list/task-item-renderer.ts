@@ -114,10 +114,6 @@ export class TaskItemRenderer {
         targetState = this.stateManager.getNextCompletedOrArchivedState(
           task.state,
         );
-        if (targetState === null) {
-          checkbox.checked = false;
-          return;
-        }
       } else {
         targetState = this.stateManager.getNextState(task.state);
         if (targetState === task.state) {

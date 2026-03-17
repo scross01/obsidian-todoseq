@@ -253,10 +253,6 @@ export class ReaderViewFormatter {
     let newState: string | null = null;
     if (isChecked) {
       newState = stateManager.getNextCompletedOrArchivedState(task.state);
-      if (newState === null) {
-        checkbox.checked = false;
-        return;
-      }
     } else {
       newState = stateManager.getNextState(task.state);
       if (newState === task.state) {

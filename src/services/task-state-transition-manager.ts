@@ -185,16 +185,16 @@ export class TaskStateTransitionManager {
 
   /**
    * Get the next completed or archived state from the current state by following
-   * the transition chain. Returns null if no completed or archived state exists
-   * in the chain (e.g., terminal states or chains without completion).
+   * the transition chain. Returns defaultCompleted if no completed or archived state
+   * exists in the chain.
    */
-  getNextCompletedOrArchivedState(current: string): string | null {
+  getNextCompletedOrArchivedState(current: string): string {
     if (this.keywordManager.isArchived(current)) {
       return current;
     }
 
     if (!this.isKnownKeyword(current)) {
-      return null;
+      return this.getRecoveredDefault('defaultCompleted');
     }
 
     const visited = new Set<string>();
@@ -230,6 +230,6 @@ export class TaskStateTransitionManager {
       state = nextState;
     }
 
-    return null;
+    return this.getRecoveredDefault('defaultCompleted');
   }
 }

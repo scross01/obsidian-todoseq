@@ -224,10 +224,6 @@ export class UIManager {
     let newKeyword: string | null = null;
     if (checkbox.checked) {
       newKeyword = stateManager.getNextCompletedOrArchivedState(currentKeyword);
-      if (newKeyword === null) {
-        checkbox.checked = false;
-        return;
-      }
     } else {
       newKeyword = stateManager.getNextState(currentKeyword);
       if (newKeyword === currentKeyword) {

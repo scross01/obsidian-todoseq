@@ -1739,10 +1739,6 @@ export class EmbeddedTaskListRenderer {
         let newState: string | null = null;
         if (checkbox.checked) {
           newState = stateManager.getNextCompletedOrArchivedState(task.state);
-          if (newState === null) {
-            checkbox.checked = false;
-            return;
-          }
         } else {
           newState = stateManager.getNextState(task.state);
           if (newState === task.state) {

@@ -19,6 +19,7 @@ This file provides guidance to agents when working with code in this repository.
 - **Single test**: `npm test -- --testNamePattern="pattern"` (Jest with regex match)
 - **Coverage excludes**: `src/main.ts` excluded from coverage (line 9 in jest.config.json)
 - **Test console**: Tests mock console methods to reduce noise (lines 21-28 in tests/test-setup.ts)
+- **Timezone independence**: Always use local time methods (`getFullYear()`, `getMonth()`, `getDate()`) when working with dates in tests. Never use `toISOString()` which returns UTC and causes test failures in timezones ahead of UTC.
 
 ## Architecture
 
