@@ -1,4 +1,4 @@
-import { Plugin, MarkdownView } from 'obsidian';
+import { Plugin, MarkdownView, Platform } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from './types/task';
 import { TaskListView } from './view/task-list/task-list-view';
@@ -337,6 +337,8 @@ export default class TodoTracker extends Plugin {
   public refreshVisibleEditorDecorations(): void {
     // Get all visible markdown editors
     const leaves = this.app.workspace.getLeavesOfType('markdown');
+    let refreshed = false;
+
     for (const leaf of leaves) {
       const view = leaf.view;
       if (view instanceof MarkdownView && view.editor) {
@@ -345,6 +347,7 @@ export default class TodoTracker extends Plugin {
         if (editorView && typeof editorView.requestMeasure === 'function') {
           // Request a measurement update which will trigger decoration refresh
           editorView.requestMeasure();
+          refreshed = true;
         }
 
         // Additional force refresh: trigger a viewport change to ensure decorations are re-evaluated
@@ -360,8 +363,17 @@ export default class TodoTracker extends Plugin {
               editorView.requestMeasure();
             }
           }, 0);
+          refreshed = true;
         }
       }
+    }
+
+    // Mobile fallback: trigger layout change if no decorations were refreshed
+    // On mobile, CodeMirror APIs may not work reliably, so we trigger a full layout refresh
+    if (Platform.isMobile && !refreshed) {
+      setTimeout(() => {
+        this.app.workspace.trigger('layout-change');
+      }, 50);
     }
   }
 }

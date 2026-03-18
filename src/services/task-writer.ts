@@ -1030,4 +1030,40 @@ export class TaskWriter {
       lineDelta,
     };
   }
+
+  async writeLines(path: string, lines: string[]): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!file || !(file instanceof TFile)) {
+      throw new Error(`File not found: ${path}`);
+    }
+
+    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const isActive = md?.file?.path === path;
+    const editor = md?.editor;
+    const isSourceMode =
+      isActive &&
+      editor &&
+      md?.getViewType() === 'markdown' &&
+      md?.getMode?.() === 'source';
+
+    if (isSourceMode) {
+      // Get current content to determine line lengths
+      const currentContent = editor.getValue();
+      const currentLines = currentContent.split('\n');
+
+      // Apply changes to current content
+      const newContent = [...currentLines];
+      for (let i = 0; i < lines.length && i < newContent.length; i++) {
+        if (lines[i] !== newContent[i]) {
+          newContent[i] = lines[i];
+        }
+      }
+
+      // Replace entire editor content
+      editor.setValue(newContent.join('\n'));
+    } else {
+      // Not in source mode: use vault.modify
+      await this.app.vault.modify(file, lines.join('\n'));
+    }
+  }
 }

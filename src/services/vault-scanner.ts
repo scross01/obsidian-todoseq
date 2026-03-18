@@ -14,16 +14,7 @@ import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
 import { PropertySearchEngine } from './property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
-import {
-  calculateNextRepeatDate,
-  formatDateLine,
-} from '../utils/date-repeater';
-import {
-  findDateLineWithParser,
-  getTaskIndent,
-} from '../utils/task-line-utils';
 import { ChangeTracker } from './change-tracker';
-import { RecurrenceCoordinator } from './recurrence-coordinator';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -48,8 +39,7 @@ export class VaultScanner {
   private keywordManager: KeywordManager;
   private propertySearchEngine?: PropertySearchEngine;
   private changeTracker: ChangeTracker;
-  private recurrenceCoordinator: RecurrenceCoordinator;
-  private skipIncrementalChanges = new Set<string>();
+  private skipIncrementalChanges = new Map<string, number>();
 
   constructor(
     private plugin: TodoTracker,
@@ -90,12 +80,6 @@ export class VaultScanner {
     this.changeTracker = new ChangeTracker({
       defaultTimeoutMs: 5000,
     });
-
-    // Initialize RecurrenceCoordinator
-    this.recurrenceCoordinator = new RecurrenceCoordinator(
-      this.plugin,
-      this.taskStateManager,
-    );
   }
 
   /**
@@ -224,6 +208,22 @@ export class VaultScanner {
 
       // Default sort
       newTasks.sort(taskComparator);
+
+      // Check for completed recurring tasks and warn about them
+      // These tasks should be handled by completing them again to advance their dates
+      const completedRecurringTasks = newTasks.filter(
+        (task) =>
+          this.keywordManager.isCompleted(task.state) &&
+          ((task.scheduledDateRepeat != null && task.scheduledDate != null) ||
+            (task.deadlineDateRepeat != null && task.deadlineDate != null)),
+      );
+
+      if (completedRecurringTasks.length > 0) {
+        console.warn(
+          `[VaultScanner] Found ${completedRecurringTasks.length} completed recurring task(s) that should be updated. ` +
+            `Complete them again to advance their dates. Tasks: ${completedRecurringTasks.map((t) => `${t.path}:${t.line}`).join(', ')}`,
+        );
+      }
 
       // Update the centralized state manager
       this.taskStateManager.setTasks(newTasks);
@@ -476,12 +476,23 @@ export class VaultScanner {
     }
 
     // Skip processing if this file path is in the skip set (plugin-initiated file write)
+    // Use timestamp-based expiration to handle chained updates properly
     if (this.skipIncrementalChanges.has(file.path)) {
-      // Keep in skip set for 1 second to allow multiple checks for same file
-      setTimeout(() => {
+      const skipTime = this.skipIncrementalChanges.get(file.path);
+      if (skipTime !== undefined) {
+        const now = Date.now();
+        // Check if the skip has expired (5 seconds) - allows for chained rapid updates
+        if (now - skipTime > 5000) {
+          // Skip has expired, remove it and continue with processing
+          this.skipIncrementalChanges.delete(file.path);
+        } else {
+          // Skip is still valid - don't process this change
+          return;
+        }
+      } else {
+        // No timestamp found, remove and continue
         this.skipIncrementalChanges.delete(file.path);
-      }, 1000);
-      return;
+      }
     }
 
     try {
@@ -523,13 +534,9 @@ export class VaultScanner {
 
       updatedTasks.sort(taskComparator);
 
+      // Update and emit after all checks
       this.taskStateManager.setTasks(updatedTasks);
-
       this.emit('tasks-changed', updatedTasks);
-
-      // Process recovery using RecurrenceCoordinator
-      // Check if recovery should be skipped for each task
-      await this.processRecurringCompletedTasks(updatedTasks);
     } catch (err) {
       console.error('VaultScanner processIncrementalChange error', err);
       this.emit(
@@ -547,7 +554,7 @@ export class VaultScanner {
    * @param filePath - The file path to skip
    */
   addSkipIncrementalChange(filePath: string): void {
-    this.skipIncrementalChanges.add(filePath);
+    this.skipIncrementalChanges.set(filePath, Date.now());
   }
 
   // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate, subtask counts)
@@ -624,169 +631,6 @@ export class VaultScanner {
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => resolve()),
     );
-  }
-
-  /**
-   * Process completed recurring tasks - recovery on vault reload.
-   * Finds tasks in completed state with recurrence dates and updates them
-   * to inactive state with the next recurrence date.
-   */
-  private async processRecurringCompletedTasks(tasks: Task[]): Promise<void> {
-    const settings = this.settings;
-    const keywordManager = this.keywordManager;
-    const defaultInactive =
-      settings?.stateTransitions?.defaultInactive || 'TODO';
-
-    // Find completed tasks with recurrence dates
-    const completedRecurringTasks = tasks.filter(
-      (task) =>
-        keywordManager.isCompleted(task.state) &&
-        ((task.scheduledDateRepeat != null && task.scheduledDate != null) ||
-          (task.deadlineDateRepeat != null && task.deadlineDate != null)),
-    );
-
-    if (completedRecurringTasks.length === 0) {
-      return;
-    }
-
-    const parser = this.getParser();
-    if (!parser) {
-      return;
-    }
-
-    const filesToRescan: Set<string> = new Set();
-
-    // Process each completed recurring task
-    for (const task of completedRecurringTasks) {
-      // Check if recovery should be skipped for this task
-      // (RecurrenceCoordinator handles it if there's a pending recurrence update)
-      if (!this.recurrenceCoordinator.shouldProcessRecovery(task)) {
-        continue;
-      }
-      const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
-      if (!file || !(file instanceof TFile)) {
-        continue;
-      }
-
-      let content: string;
-      try {
-        content = await this.plugin.app.vault.read(file);
-      } catch {
-        continue;
-      }
-
-      const lines = content.split('\n');
-      if (task.line >= lines.length) {
-        continue;
-      }
-
-      // Get task indent level to properly identify date lines for this task
-      // This must include quote prefix, bullet marker, or checkbox marker for proper date line detection
-      const taskIndent = getTaskIndent(lines[task.line]);
-
-      const now = new Date();
-      let newScheduledDate: Date | null = null;
-      let newDeadlineDate: Date | null = null;
-
-      // Find the SCHEDULED and DEADLINE line indices using the shared utility
-      const scheduledLineIndex =
-        task.scheduledDateRepeat != null
-          ? findDateLineWithParser(
-              lines,
-              task.line + 1,
-              'SCHEDULED',
-              taskIndent,
-              parser,
-            )
-          : -1;
-      const deadlineLineIndex =
-        task.deadlineDateRepeat != null
-          ? findDateLineWithParser(
-              lines,
-              task.line + 1,
-              'DEADLINE',
-              taskIndent,
-              parser,
-            )
-          : -1;
-
-      // Parse and calculate next dates for SCHEDULED line
-      if (scheduledLineIndex >= 0 && task.scheduledDateRepeat != null) {
-        const line = lines[scheduledLineIndex];
-        const date = parser.parseDateFromLine(line);
-        if (date) {
-          newScheduledDate = calculateNextRepeatDate(
-            date,
-            task.scheduledDateRepeat,
-            now,
-          );
-        }
-      }
-
-      // Parse and calculate next dates for DEADLINE line
-      if (deadlineLineIndex >= 0 && task.deadlineDateRepeat != null) {
-        const line = lines[deadlineLineIndex];
-        const date = parser.parseDateFromLine(line);
-        if (date) {
-          newDeadlineDate = calculateNextRepeatDate(
-            date,
-            task.deadlineDateRepeat,
-            now,
-          );
-        }
-      }
-
-      // If no dates need updating, skip
-      if (!newScheduledDate && !newDeadlineDate) {
-        continue;
-      }
-
-      // Now update the date lines in the file
-      if (scheduledLineIndex >= 0 && newScheduledDate) {
-        lines[scheduledLineIndex] = formatDateLine(
-          lines[scheduledLineIndex],
-          newScheduledDate,
-          task.scheduledDateRepeat,
-        );
-      }
-
-      if (deadlineLineIndex >= 0 && newDeadlineDate) {
-        lines[deadlineLineIndex] = formatDateLine(
-          lines[deadlineLineIndex],
-          newDeadlineDate,
-          task.deadlineDateRepeat,
-        );
-      }
-
-      let lineUpdated = scheduledLineIndex >= 0 || deadlineLineIndex >= 0;
-
-      if (!lineUpdated) {
-        continue;
-      }
-
-      // Update the task keyword to inactive state
-      const taskLine = lines[task.line];
-      const allKeywords = keywordManager.getAllKeywords();
-
-      for (const keyword of allKeywords) {
-        if (taskLine.includes(keyword)) {
-          lines[task.line] = taskLine.replace(keyword, defaultInactive);
-          lineUpdated = true;
-          break;
-        }
-      }
-
-      await this.plugin.app.vault.modify(file, lines.join('\n'));
-      filesToRescan.add(file.path);
-    }
-
-    // Trigger rescan of modified files
-    for (const filePath of filesToRescan) {
-      const file = this.plugin.app.vault.getAbstractFileByPath(filePath);
-      if (file instanceof TFile) {
-        await this.processIncrementalChange(file);
-      }
-    }
   }
 
   // Clean up resources

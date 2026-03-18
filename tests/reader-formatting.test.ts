@@ -77,7 +77,10 @@ const createMockPlugin = (settings: TodoTrackerSettings) => ({
   registerMarkdownPostProcessor: jest.fn(),
   registerDomEvent: jest.fn(),
   taskEditor: { updateTaskState: jest.fn() },
-  taskStateManager: { optimisticUpdate: jest.fn() },
+  taskStateManager: {
+    optimisticUpdate: jest.fn(),
+    findTaskByPathAndLine: jest.fn().mockReturnValue(null),
+  },
   refreshVisibleEditorDecorations: jest.fn(),
   refreshReaderViewFormatter: jest.fn(),
   recreateParser: jest.fn(),

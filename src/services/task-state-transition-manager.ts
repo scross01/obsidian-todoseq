@@ -184,6 +184,15 @@ export class TaskStateTransitionManager {
   }
 
   /**
+   * Check if a state is a completed state (DONE, CANCELLED, ARCHIVED, REJECTED).
+   * @param state The state to check
+   * @returns true if the state is a completed state
+   */
+  isCompletedState(state: string): boolean {
+    return this.keywordManager.isCompleted(state);
+  }
+
+  /**
    * Get the next completed or archived state from the current state by following
    * the transition chain. Returns defaultCompleted if no completed or archived state
    * exists in the chain.

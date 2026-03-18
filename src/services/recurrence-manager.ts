@@ -43,7 +43,18 @@ export interface DateLineParser {
  * RecurrenceManager handles all recurrence-related logic for tasks.
  * Provides centralized calculation and update of recurring task dates.
  */
+import { KeywordManager } from '../utils/keyword-manager';
+
 export class RecurrenceManager {
+  private keywordManager?: KeywordManager;
+
+  constructor(keywordManager?: KeywordManager) {
+    this.keywordManager = keywordManager;
+  }
+
+  setKeywordManager(keywordManager: KeywordManager): void {
+    this.keywordManager = keywordManager;
+  }
   /**
    * Calculate the next recurrence dates for a task.
    *
@@ -161,17 +172,30 @@ export class RecurrenceManager {
     const updatedLines = [...lines];
     const taskLineContent = updatedLines[taskLine];
 
-    // Find the first keyword in the task line and replace it
-    // This handles all keyword formats (TODO, DONE, CANCELLED, etc.)
-    const keywordPattern =
-      /\b(TODO|DONE|CANCELLED|IN_PROGRESS|WAITING|BLOCKED|REJECTED|ARCHIVED|FIXME)\b/i;
-    const match = taskLineContent.match(keywordPattern);
+    // Use keywordManager if available, otherwise fall back to hardcoded pattern
+    if (this.keywordManager) {
+      const allKeywords = this.keywordManager.getAllKeywords();
+      for (const keyword of allKeywords) {
+        if (taskLineContent.includes(keyword)) {
+          updatedLines[taskLine] = taskLineContent.replace(
+            keyword,
+            defaultInactive,
+          );
+          break;
+        }
+      }
+    } else {
+      // Fallback to hardcoded pattern for backward compatibility
+      const keywordPattern =
+        /\b(TODO|DONE|CANCELLED|IN_PROGRESS|WAITING|BLOCKED|REJECTED|ARCHIVED|FIXME)\b/i;
+      const match = taskLineContent.match(keywordPattern);
 
-    if (match) {
-      updatedLines[taskLine] = taskLineContent.replace(
-        match[0],
-        defaultInactive,
-      );
+      if (match) {
+        updatedLines[taskLine] = taskLineContent.replace(
+          match[0],
+          defaultInactive,
+        );
+      }
     }
 
     return updatedLines;

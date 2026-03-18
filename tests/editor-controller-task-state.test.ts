@@ -38,6 +38,7 @@ describe('Editor Controller - Task State Methods', () => {
         },
       }),
       taskUpdateCoordinator: {
+        updateTask: jest.fn().mockResolvedValue({}),
         updateTaskState: jest.fn().mockResolvedValue({}),
       },
       taskEditor: {
@@ -145,7 +146,8 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+      // With unified architecture, all updates go through coordinator
+      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalled();
     });
 
     it('should set specific task state when newState is provided', () => {
@@ -157,9 +159,11 @@ describe('Editor Controller - Task State Methods', () => {
         'DOING',
       );
 
-      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalledWith(
-        expect.anything(),
+      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalledWith(
+        expect.any(String), // path
+        expect.any(Number), // line
         'DOING',
+        'editor',
       );
     });
 
@@ -173,10 +177,10 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalled();
     });
 
-    it('should call refresh decorations after updating task state', async () => {
+    it('should call taskUpdateCoordinator.updateTask to handle all updates', async () => {
       await editorController.handleUpdateTaskStateAtLine(
         false,
         0,
@@ -184,7 +188,8 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      expect(mockPlugin.refreshVisibleEditorDecorations).toHaveBeenCalled();
+      // With unified architecture, all updates go through coordinator
+      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalled();
     });
   });
 
@@ -221,7 +226,9 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskState,
+      ).toHaveBeenCalled();
     });
 
     it('should create new task with TODO state for non-task lines', async () => {
@@ -234,7 +241,9 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskState,
+      ).toHaveBeenCalled();
     });
 
     it('should set specific state when newState parameter is provided', async () => {
@@ -246,10 +255,9 @@ describe('Editor Controller - Task State Methods', () => {
         'WAIT',
       );
 
-      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalledWith(
-        expect.anything(),
-        'WAIT',
-      );
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskState,
+      ).toHaveBeenCalledWith(expect.anything(), 'WAIT', 'editor');
     });
 
     it('should handle WAIT keyword by cycling to IN-PROGRESS', async () => {
@@ -263,10 +271,9 @@ describe('Editor Controller - Task State Methods', () => {
       );
 
       // WAIT -> IN-PROGRESS according to CYCLE_TASK_STATE
-      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalledWith(
-        expect.anything(),
-        'IN-PROGRESS',
-      );
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskState,
+      ).toHaveBeenCalledWith(expect.anything(), 'IN-PROGRESS', 'editor');
     });
   });
 

@@ -244,6 +244,15 @@ export class ReaderViewFormatter {
       return;
     }
 
+    // CRITICAL: Get fresh task from state manager to ensure we have latest data
+    // The task object may be stale (e.g., old rawText)
+    const freshTask = this.plugin.taskStateManager.findTaskByPathAndLine(
+      task.path,
+      task.line,
+    );
+    // Use fresh task if found, otherwise fall back to captured task
+    const taskToUpdate = freshTask || task;
+
     const keywordManager = this.vaultScanner.getKeywordManager();
     const stateManager = new TaskStateTransitionManager(
       keywordManager,
@@ -252,30 +261,43 @@ export class ReaderViewFormatter {
 
     let newState: string | null = null;
     if (isChecked) {
-      newState = stateManager.getNextCompletedOrArchivedState(task.state);
+      newState = stateManager.getNextCompletedOrArchivedState(
+        taskToUpdate.state,
+      );
     } else {
-      newState = stateManager.getNextState(task.state);
-      if (newState === task.state) {
+      newState = stateManager.getNextState(taskToUpdate.state);
+      if (newState === taskToUpdate.state) {
         checkbox.checked = true;
         return;
       }
     }
 
-    // CRITICAL: Do optimistic update FIRST, synchronously
-    // This ensures UI updates even if mobile context is destroyed
-    if (this.plugin.taskStateManager) {
-      this.plugin.taskStateManager.optimisticUpdate(task, newState);
+    // If no state change, don't proceed
+    if (newState === taskToUpdate.state) {
+      return;
     }
 
-    // Use TaskEditor directly (bypass coordinator's ChangeTracker)
-    // forceVaultApi=true because we're in reader/preview mode
-    if (this.plugin.taskEditor) {
-      await this.plugin.taskEditor.updateTaskState(task, newState, true);
+    // Use unified updateTask method - handles fresh lookup, optimistic update,
+    // file write, recurrence, line adjustment, and UI refresh
+    if (this.plugin.taskUpdateCoordinator) {
+      await this.plugin.taskUpdateCoordinator.updateTask(
+        taskToUpdate.path,
+        taskToUpdate.line,
+        newState,
+        'reader',
+      );
+    } else if (this.plugin.taskEditor) {
+      // Fallback to TaskEditor if coordinator not available
+      await this.plugin.taskEditor.updateTaskState(
+        taskToUpdate,
+        newState,
+        true,
+      );
+    }
 
-      // Refresh the reader view to show changes (like CLOSED date line added/removed)
-      if (this.plugin.refreshReaderViewFormatter) {
-        this.plugin.refreshReaderViewFormatter();
-      }
+    // Refresh the reader view to show changes (like CLOSED date line added/removed)
+    if (this.plugin.refreshReaderViewFormatter) {
+      this.plugin.refreshReaderViewFormatter();
     }
   }
 
@@ -2077,21 +2099,36 @@ export class ReaderViewFormatter {
       return;
     }
 
-    // CRITICAL: Do optimistic update FIRST, synchronously
-    // This ensures UI updates even if mobile context is destroyed
-    if (this.plugin.taskStateManager) {
-      this.plugin.taskStateManager.optimisticUpdate(task, newState);
+    // CRITICAL: Get fresh task from state manager to ensure we have latest data
+    // The task object may be stale (e.g., old rawText)
+    const freshTask = this.plugin.taskStateManager.findTaskByPathAndLine(
+      task.path,
+      task.line,
+    );
+    // Use fresh task if found, otherwise fall back to captured task
+    const taskToUpdate = freshTask || task;
+
+    // Use unified updateTask method - handles fresh lookup, optimistic update,
+    // file write, recurrence, line adjustment, and UI refresh
+    if (this.plugin.taskUpdateCoordinator) {
+      await this.plugin.taskUpdateCoordinator.updateTask(
+        taskToUpdate.path,
+        taskToUpdate.line,
+        newState,
+        'reader',
+      );
+    } else if (this.plugin.taskEditor) {
+      // Fallback to TaskEditor if coordinator not available
+      await this.plugin.taskEditor.updateTaskState(
+        taskToUpdate,
+        newState,
+        true,
+      );
     }
 
-    // Use TaskEditor directly (bypass coordinator's ChangeTracker)
-    // forceVaultApi=true because we're in reader/preview mode
-    if (this.plugin.taskEditor) {
-      await this.plugin.taskEditor.updateTaskState(task, newState, true);
-
-      // Refresh the reader view to show changes (like CLOSED date line added/removed)
-      if (this.plugin.refreshReaderViewFormatter) {
-        this.plugin.refreshReaderViewFormatter();
-      }
+    // Refresh the reader view to show changes (like CLOSED date line added/removed)
+    if (this.plugin.refreshReaderViewFormatter) {
+      this.plugin.refreshReaderViewFormatter();
     }
   }
 

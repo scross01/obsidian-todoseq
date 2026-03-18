@@ -52,6 +52,9 @@ export class TaskItemRenderer {
   private getKeywordManager: () => KeywordManager;
   private getStateManager: () => TaskStateTransitionManager;
   private getMenuBuilder: () => StateMenuBuilder;
+  private getTaskStateManager: () => {
+    findTaskByPathAndLine: (path: string, line: number) => Task | null;
+  } | null;
   private onStateChange: TaskStateChangeCallback;
   private onLocationOpen: TaskLocationOpenCallback;
   private onContextMenu: TaskContextMenuCallback | null;
@@ -63,10 +66,14 @@ export class TaskItemRenderer {
     onStateChange: TaskStateChangeCallback,
     onLocationOpen: TaskLocationOpenCallback,
     onContextMenu: TaskContextMenuCallback | null = null,
+    getTaskStateManager: () => {
+      findTaskByPathAndLine: (path: string, line: number) => Task | null;
+    } | null = () => null,
   ) {
     this.getKeywordManager = getKeywordManager;
     this.getStateManager = getStateManager;
     this.getMenuBuilder = getMenuBuilder;
+    this.getTaskStateManager = getTaskStateManager;
     this.onStateChange = onStateChange;
     this.onLocationOpen = onLocationOpen;
     this.onContextMenu = onContextMenu;
@@ -108,21 +115,34 @@ export class TaskItemRenderer {
     checkbox.checked = task.completed;
 
     checkbox.addEventListener('change', async () => {
+      // CRITICAL: Look up fresh task state BEFORE computing transition
+      // The task object in closure may be stale after recurrence updates
+      const freshTask = this.getTaskStateManager()?.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      const currentTask = freshTask || task;
+      const currentState = currentTask.state;
+
       let targetState: string | null = null;
 
       if (checkbox.checked) {
-        targetState = this.stateManager.getNextCompletedOrArchivedState(
-          task.state,
-        );
+        targetState =
+          this.stateManager.getNextCompletedOrArchivedState(currentState);
       } else {
-        targetState = this.stateManager.getNextState(task.state);
-        if (targetState === task.state) {
+        targetState = this.stateManager.getNextState(currentState);
+        if (targetState === currentState) {
           checkbox.checked = true;
           return;
         }
       }
 
-      await this.onStateChange(task, targetState);
+      // If no state change, don't proceed
+      if (targetState === currentState) {
+        return;
+      }
+
+      await this.onStateChange(currentTask, targetState);
     });
 
     return checkbox;

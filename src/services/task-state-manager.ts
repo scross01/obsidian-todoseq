@@ -177,7 +177,11 @@ export class TaskStateManager {
     const isCompleted =
       updates.completed !== undefined ? updates.completed : wasCompleted;
 
-    this._tasks[index] = { ...existingTask, ...updates };
+    this._tasks[index] = {
+      ...existingTask,
+      ...updates,
+      _lastUpdateTime: Date.now(),
+    };
 
     // Update parent subtask counts if completion status changed
     if (wasCompleted !== isCompleted) {
@@ -399,7 +403,7 @@ export class TaskStateManager {
    * Notify all subscribers of task changes.
    * Guards against re-entrant notifications and queues pending notifications.
    */
-  private notifySubscribers(): void {
+  notifySubscribers(): void {
     if (this.isNotifying) {
       this.pendingNotification = true;
       return;

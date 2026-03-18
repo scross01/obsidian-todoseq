@@ -197,7 +197,9 @@ export class UIManager {
    * are triggered for dependent views. The file update is handled by Obsidian's
    * natural checkbox behavior.
    */
-  private handleCheckboxToggle(checkbox: HTMLInputElement): void {
+  private async handleCheckboxToggle(
+    checkbox: HTMLInputElement,
+  ): Promise<void> {
     // Find the task keyword span in the same line
     const lineElement = checkbox.closest('.cm-line, .HyperMD-task-line');
     if (!lineElement) {
@@ -221,15 +223,41 @@ export class UIManager {
       this.plugin.settings?.stateTransitions,
     );
 
+    // CRITICAL: Look up fresh task state from state manager BEFORE computing transition
+    // This ensures we use the actual current state, not stale DOM/state
+    const currentLine = this.getLineForElement(checkbox);
+    let freshState = currentKeyword;
+    if (currentLine !== null) {
+      const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+      if (view && view.file) {
+        const lineNumber = currentLine - 1;
+        const freshTask = this.plugin.taskStateManager.findTaskByPathAndLine(
+          view.file.path,
+          lineNumber,
+        );
+        if (freshTask) {
+          freshState = freshTask.state;
+        }
+      }
+    }
+
     let newKeyword: string | null = null;
     if (checkbox.checked) {
-      newKeyword = stateManager.getNextCompletedOrArchivedState(currentKeyword);
+      // Checkbox is checked - try to complete the task
+      // Only transition to completed if not already completed
+      // This prevents the bug where clicking a checked checkbox does nothing
+      newKeyword = stateManager.getNextCompletedOrArchivedState(freshState);
     } else {
-      newKeyword = stateManager.getNextState(currentKeyword);
-      if (newKeyword === currentKeyword) {
+      newKeyword = stateManager.getNextState(freshState);
+      if (newKeyword === freshState) {
         checkbox.checked = true;
         return;
       }
+    }
+
+    // If no state change, don't proceed
+    if (newKeyword === freshState) {
+      return;
     }
 
     // Update the keyword text and data attribute directly in the DOM
@@ -239,7 +267,7 @@ export class UIManager {
 
     // Trigger optimistic update for task list views
     // The file will be updated by Obsidian's natural checkbox behavior
-    const currentLine = this.getLineForElement(checkbox);
+    // Reuse currentLine from earlier lookup
     if (currentLine !== null) {
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
       if (view && view.file) {
@@ -254,20 +282,22 @@ export class UIManager {
           filePath,
         );
 
-        if (task && this.plugin.taskStateManager) {
-          // Perform optimistic update without file modification
-          // File will be updated by Obsidian's checkbox handling
-          this.plugin.taskStateManager.optimisticUpdate(task, newKeyword);
+        if (task) {
+          // Use unified updateTask method - handles fresh lookup, optimistic update,
+          // file write, recurrence, line adjustment, and UI refresh
+          if (this.plugin.taskUpdateCoordinator) {
+            this.plugin.taskUpdateCoordinator.updateTask(
+              filePath,
+              lineNumber,
+              newKeyword,
+              'editor',
+            );
+          } else if (this.plugin.taskEditor) {
+            // Fallback to TaskEditor if coordinator not available
+            await this.plugin.taskEditor.updateTaskState(task, newKeyword);
+          }
           // Refresh task list views
           this.plugin.refreshAllTaskListViews();
-
-          // Also call TaskEditor to handle CLOSED date
-          // Use setTimeout to allow Obsidian's checkbox handler to complete first
-          setTimeout(async () => {
-            if (this.plugin.taskEditor) {
-              await this.plugin.taskEditor.updateTaskState(task, newKeyword);
-            }
-          }, 0);
         }
       }
     }

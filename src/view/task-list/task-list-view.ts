@@ -191,6 +191,7 @@ export class TaskListView extends ItemView {
       (task, newState) => this.updateTaskState(task, newState),
       (task) => this.openTaskLocationForRenderer(task),
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
+      () => this.plugin?.taskStateManager ?? null,
     );
     this.taskListFilter = new TaskListFilter(plugin, this.keywordManager);
     this.renderQueue = new ChunkedRenderQueue();
@@ -1104,9 +1105,6 @@ export class TaskListView extends ItemView {
 
   // Cycle state via NEXT_STATE - use optimistic update + taskEditor directly
   private async updateTaskState(task: Task, nextState: string): Promise<void> {
-    // Store old state for announcement
-    const oldState = task.state;
-
     // Get the plugin instance
     const plugin = (
       window as unknown as {
@@ -1118,6 +1116,7 @@ export class TaskListView extends ItemView {
               fromLine: number,
               delta: number,
             ) => void;
+            findTaskByPathAndLine: (path: string, line: number) => Task | null;
           };
           taskEditor?: {
             updateTaskState: (
@@ -1127,6 +1126,12 @@ export class TaskListView extends ItemView {
             ) => Promise<Task>;
           };
           taskUpdateCoordinator?: {
+            updateTask: (
+              path: string,
+              line: number,
+              newState: string,
+              source: string,
+            ) => Promise<Task | null>;
             updateTaskState: (
               task: Task,
               newState: string,
@@ -1137,44 +1142,20 @@ export class TaskListView extends ItemView {
       }
     ).todoSeqPlugin;
 
-    if (!plugin?.taskStateManager || !plugin?.taskEditor) {
-      console.error('TODOseq: TaskStateManager or TaskEditor not available');
+    if (!plugin?.taskUpdateCoordinator) {
+      console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
     }
 
     try {
-      // CRITICAL: Do optimistic update FIRST, synchronously
-      // This ensures UI updates even if mobile context is destroyed
-      plugin.taskStateManager.optimisticUpdate(task, nextState);
-
-      // Use TaskEditor directly (bypass coordinator's ChangeTracker)
-      const updated = await plugin.taskEditor.updateTaskState(
-        task,
+      // Use unified updateTask method - handles fresh lookup, optimistic update,
+      // file write, recurrence, line adjustment, and UI refresh
+      await plugin.taskUpdateCoordinator.updateTask(
+        task.path,
+        task.line,
         nextState,
-        true,
+        'task-list',
       );
-
-      // Handle lineDelta for subsequent tasks - when date lines are added/removed,
-      // subsequent tasks need their line indices adjusted for rapid updates
-      const lineDelta = (updated as Task & { lineDelta?: number }).lineDelta;
-      if (lineDelta !== undefined && lineDelta !== 0) {
-        plugin.taskStateManager.adjustLineIndices(
-          updated.path,
-          updated.line + 1,
-          lineDelta,
-        );
-      }
-
-      // Sync in-memory task from returned snapshot
-      task.rawText = updated.rawText;
-      task.state = updated.state;
-      task.completed = updated.completed;
-      task.closedDate = updated.closedDate;
-
-      // Announce state change to screen readers
-      if (oldState !== task.state) {
-        this.announceTaskStateChange(task, oldState);
-      }
     } catch (error) {
       // Full refresh will be triggered by subscribe callback
       console.error('TODOseq: Failed to update task state:', error);
@@ -2231,6 +2212,7 @@ export class TaskListView extends ItemView {
       (task, newState) => this.updateTaskState(task, newState),
       (task) => this.openTaskLocationForRenderer(task),
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
+      () => this.plugin?.taskStateManager ?? null,
     );
 
     // Recreate context menu with updated task state manager reference

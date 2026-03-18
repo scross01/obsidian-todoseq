@@ -190,15 +190,18 @@ graph TB
 - **Key Patterns**: Event-driven architecture, performance optimization, yielding to event loop
 - **Interface**: `scanVault()`, `updateSettings()`, `getKeywordManager()`, `getParser()`, event emission
 - **Ownership**: Receives and uses KeywordManager instance; receives fully configured ParserRegistry via constructor
+- **Skip Set**: Uses timestamp-based expiration for `skipIncrementalChanges` set (5-second window) to handle chained rapid updates properly
 
 **TaskUpdateCoordinator** (`src/services/task-update-coordinator.ts`)
 
-- **Responsibility**: Centralized update pipeline with optimistic UI
-- **Key Patterns**: Command pattern, optimistic updates, race condition prevention
-- **Interface**: `updateTaskState()`, `updateTaskPriority()`, `updateTaskScheduledDate()`, `updateTaskDeadlineDate()`, coordinate updates
+- **Responsibility**: Centralized update pipeline with optimistic UI and race condition prevention
+- **Key Patterns**: Command pattern, optimistic updates, per-task locking, file queue management
+- **Interface**: `updateTask()`, `updateTaskState()`, `updateTaskPriority()`, `updateTaskScheduledDate()`, `updateTaskDeadline()`
 - **Change Tracking**: Uses `ChangeTracker` to register expected file changes with content hashing
-- **Recurrence Coordination**: Uses `RecurrenceCoordinator` for centralized recurrence management
+- **Recurrence Handling**: Calculates finalState (skipping DONE for recurring tasks), schedules `RecurrenceCoordinator` for date advancement
 - **Mobile Note**: The ChangeTracker requires reading file content before optimistic update, which is not compatible with mobile contexts. For mobile, call `taskEditor.updateTaskState()` directly instead.
+- **Per-Task Locking**: Uses `pendingTaskUpdates` Map to serialize rapid updates to the same task (path + line). Chained updates re-fetch fresh task state and recalculate transitions.
+- **File Queue**: Uses `fileUpdateQueues` Map to serialize updates per file, preventing race conditions when multiple tasks in the same file are updated rapidly.
 
 **EditorController** (`src/services/editor-controller.ts`)
 
@@ -208,9 +211,11 @@ graph TB
 
 **TaskWriter** (`src/services/task-writer.ts`)
 
-- **Responsibility**: Atomic file operations, state preservation, formatting
-- **Key Patterns**: Strategy pattern, atomic operations
-- **Interface**: `updateFile()`, `generateTaskLine()`, file persistence
+- **Responsibility**: Atomic file operations, state preservation, formatting, editor-aware writes
+- **Key Patterns**: Strategy pattern, atomic operations, editor/vault API handling
+- **Interface**: `updateTaskState()`, `applyLineUpdate()`, `writeLines()`, `generateTaskLine()`, file persistence
+- **Editor Awareness**: Uses Editor API (`editor.replaceRange()`) for active files in source mode to preserve cursor/selection/folds; falls back to Vault API for inactive files or preview mode
+- **Multiple Line Writes**: `writeLines()` method for writing multiple lines while maintaining editor awareness
 
 **EventCoordinator** (`src/services/event-coordinator.ts`)
 
@@ -264,9 +269,12 @@ graph TB
 
 **RecurrenceCoordinator** (`src/services/recurrence-coordinator.ts`)
 
-- **Responsibility**: Centralized coordination for recurrence updates
-- **Key Patterns**: Per-task tracking, recovery coordination, delayed updates
-- **Interface**: `scheduleRecurrence()`, `cancelRecurrence()`, `shouldProcessRecovery()`, `performRecurrenceUpdate()`, `destroy()`
+- **Responsibility**: Centralized coordination for recurrence updates (date advancement for recurring tasks)
+- **Key Patterns**: Per-task tracking, delayed updates, editor-aware file operations
+- **Interface**: `scheduleRecurrence()`, `cancelRecurrence()`, `performRecurrenceUpdate()`, `destroy()`
+- **Editor Awareness**: Uses `getFileContent()` helper to read from editor buffer when available (ensures latest content when editor hasn't synced to disk)
+- **File Writes**: Uses `TaskWriter.writeLines()` for proper editor-aware writes
+- **State Independence**: For recurring tasks (those with repeat dates), advances dates regardless of current task state (since DONE state is intentionally skipped during completion)
 - **Used by**: TaskUpdateCoordinator, VaultScanner
 
 ### 2. UI Layer (User Interaction)
@@ -587,8 +595,8 @@ sequenceDiagram
     participant ChangeTrack as ChangeTracker
     participant RecurCoord as RecurrenceCoordinator
     participant StateMgr as TaskStateManager
-    participant EditorCtrl as EditorController
     participant TaskWriter as TaskWriter
+    participant Editor as CodeMirror Editor
     participant FileSys as File System
     participant EventCoord as EventCoordinator
     participant VaultScan as VaultScanner
@@ -597,64 +605,73 @@ sequenceDiagram
 User->>UI: Click task keyword / edit task
 UI->>Coordinator: requestTaskUpdate()
 
-Note over Coordinator: Phase 1: Intent Detection
-Coordinator->>EditorCtrl: detectIntent()
-EditorCtrl->>StateMgr: findTaskByPathAndLine()
+Note over Coordinator: Phase 1: Per-Task Lock
+Coordinator->>Coordinator: Check pendingTaskUpdates
+alt Rapid Update (same task)
+    Coordinator->>Coordinator: Chain to existing update
+    Coordinator->>StateMgr: Re-fetch fresh task state
+    Coordinator->>Coordinator: Recalculate transition
+end
 
-Note over Coordinator: Phase 2: Register Expected Change
+Note over Coordinator: Phase 2: State Calculation
+Coordinator->>Coordinator: Calculate finalState
+Note over Coordinator: For recurring tasks: skip DONE<br/>e.g., DONE -> TODO (not DONE)
+
+Note over Coordinator: Phase 3: Register Expected Change
 Coordinator->>ChangeTrack: registerExpectedChange()
 ChangeTrack->>ChangeTrack: Store expected content hash
+Coordinator->>VaultScan: addSkipIncrementalChange()
 
-Note over Coordinator: Phase 3: Optimistic Update
+Note over Coordinator: Phase 4: Optimistic Update
 Coordinator->>StateMgr: optimisticUpdate()
 StateMgr->>StateMgr: Update internal state
 StateMgr->>Views: notifySubscribers()
 Views->>Views: Update UI immediately
+
+Note over Coordinator: Phase 5: File Persistence via TaskWriter
+Coordinator->>TaskWriter: updateTaskState(finalState)
+TaskWriter->>Editor: editor.replaceRange() (if source mode)
+Editor-->>TaskWriter: Success
+TaskWriter-->>Coordinator: Success
 Coordinator->>UI: Return success (optimistic)
 
-Note over Coordinator: Phase 4: File Persistence
-Coordinator->>TaskWriter: updateFile()
-TaskWriter->>FileSys: Write changes to disk
-FileSys-->>TaskWriter: Success/Failure
-TaskWriter-->>Coordinator: Success/Failure
+Note over Coordinator: Phase 6: Recurrence Scheduling
+alt Recurring task completed
+    Coordinator->>RecurCoord: scheduleRecurrence(50ms)
+    RecurCoord->>RecurCoord: Queue delayed update
+end
 
-alt File Update Success
-    Note over Coordinator: Phase 5: Event Coordination
-    FileSys-->>EventCoord: File change event
-    EventCoord->>EventCoord: Debounce and batch
-    EventCoord->>VaultScan: processFileChange()
+Note over Coordinator: Phase 7: Event Coordination
+FileSys-->>EventCoord: File change event
+EventCoord->>EventCoord: Debounce and batch
+EventCoord->>VaultScan: processFileChange()
+VaultScan->>VaultScan: Check skipIncrementalChanges
+alt In Skip Set (within 5s)
+    VaultScan->>VaultScan: Skip processing
+else Not in Skip Set
     VaultScan->>ChangeTrack: isExpectedChange()
     ChangeTrack->>VaultScan: Return expected status
     alt Expected Change
-        VaultScan->>VaultScan: Skip processing (already handled)
+        VaultScan->>VaultScan: Skip processing
     else Unexpected Change
         VaultScan->>VaultScan: Re-parse affected file
         VaultScan->>StateMgr: updateTasks()
         StateMgr->>Views: notifySubscribers()
         Views->>Views: Refresh with confirmed state
-        EventCoord->>PropertySearch: onFileChanged()
-        PropertySearch->>PropertySearch: Update property cache
     end
-else File Update Failure
-    Coordinator->>StateMgr: rollbackUpdate()
-    StateMgr->>Views: notifySubscribers()
-    Views->>Views: Revert to original state
-    Coordinator->>UI: Return error
 end
 
-Note over Coordinator: Recurrence Handling
-Coordinator->>RecurCoord: scheduleRecurrence()
-RecurCoord->>RecurCoord: Schedule delayed update
-Note over Recurrence: After delay, perform update
-RecurCoord->>TaskWriter: updateTaskState()
-TaskWriter->>FileSys: Write changes to disk
-FileSys-->>TaskWriter: Success/Failure
-TaskWriter-->>RecurCoord: Success/Failure
+Note over RecurCoord: Recurrence Update (after delay)
+RecurCoord->>RecurCoord: getFileContent() (from editor buffer)
+RecurCoord->>RecurCoord: calculateNextDates()
+RecurCoord->>TaskWriter: writeLines(updatedLines)
+TaskWriter->>Editor: setValue() / editor transaction
+Editor-->>TaskWriter: Success
+TaskWriter-->>RecurCoord: Success
+RecurCoord->>VaultScan: addSkipIncrementalChange()
 RecurCoord->>RecurCoord: Remove from pending set
-
-Note over Coordinator: Additional Updates
-Coordinator->>Views: refreshEmbeddedTaskLists()
-Coordinator->>UI: refreshEditorDecorations()
+RecurCoord->>StateMgr: updateTaskByPathAndLine()
+RecurCoord->>StateMgr: notifySubscribers()
 ```
 
 ## Search System Architecture
@@ -769,13 +786,16 @@ graph LR
 
 ### 3. Repeating Task System
 
-- **Delayed Updates**: Recurring tasks use 3-second delay via `RecurrenceCoordinator` before advancing dates
+- **Inline State Skipping**: When completing a recurring task, TODOseq writes the final inactive state (e.g., TODO) directly instead of DONE. The RecurrenceCoordinator then advances the dates.
+- **Delayed Updates**: Recurring tasks use 50ms delay via `RecurrenceCoordinator` before advancing dates
+- **Editor Awareness**: Both `TaskUpdateCoordinator` and `RecurrenceCoordinator` read from the editor buffer when available to ensure they have the latest content
+- **File Write Consistency**: `TaskWriter.writeLines()` ensures all file writes are editor-aware
 - **Recovery Processing**: `VaultScanner` identifies completed recurring tasks on vault reload and coordinates with `RecurrenceCoordinator` to prevent duplicate updates
 - **Date Repeater Logic**: Supports three types: `+` (plain), `.+` (delay from now), `++` (catch-up) with units h, d, w, m, y
 - **Time Preservation**: Always writes day of week before time; supports quoted, indented, checkbox, and callout blocks
 - **First-Only Updates**: Only first SCHEDULED and first DEADLINE lines are updated; subsequent occurrences are ignored
-- **Race Condition Prevention**: `RecurrenceCoordinator` tracks pending recurrence updates per task to prevent duplicate processing
-- **Change Tracking**: `ChangeTracker` uses SHA-256 content hashing to track expected file changes and prevent race conditions between plugin-initiated changes and file system watchers
+- **Race Condition Prevention**: Per-task locking in `TaskUpdateCoordinator` serializes rapid updates; timestamp-based skip set in `VaultScanner` handles chained updates
+- **Change Tracking**: `ChangeTracker` uses SHA-256 content hashing to track expected file changes
 
 ### 3. Plugin Architecture
 
@@ -1046,28 +1066,31 @@ The indicator uses monospace font and appears in both the main task list and emb
 2. **Parser Recreation**: When settings change, `VaultScanner.updateSettings()` updates all registered parsers via `parser.updateConfig()` without recreating them.
 3. **State Consistency**: Use `TaskUpdateCoordinator` for all state changes
 4. **Editor Operations**: Use `EditorController` for intent detection and `TaskWriter` for file operations
-5. **File Race Conditions**: Use `ChangeTracker` to track expected file changes with content hashing; use `RecurrenceCoordinator` for centralized recurrence management
-6. **Performance Testing**: Test with large vaults (1000+ files, 10000+ tasks)
-7. **Embedded Lists**: Use `TodoseqCodeBlockProcessor` with separate lifecycle from main plugin
-8. **Parser Registry**: All parsers are created and registered in `PluginLifecycleManager` before `VaultScanner` creation; `VaultScanner` receives fully configured `ParserRegistry` via constructor
-9. **Org-Mode Limitations**: Org-mode files support vault scanning only; editor styling is not supported
-10. **Property Search Initialization**: `PropertySearchEngine` initializes lazily - ensure to await `initialize()` before using
-11. **Event Debouncing**: `EventCoordinator` handles debouncing of file change events automatically
-12. **Property Cache Invalidation**: File changes automatically invalidate the property cache via EventCoordinator
-13. **Task List Performance**: TaskListView uses chunked rendering - avoid synchronous DOM updates for large task sets
-14. **Scroll Position Management**: TaskListView preserves scroll position - use anchor-based restoration for state changes
-15. **Search Debouncing**: SearchOptionsDropdown and SearchSuggestionDropdown use debounced updates - handle search history with care
-16. **Visibility Detection**: TaskListView detects panel visibility using ResizeObserver - refresh UI only when visible
-17. **Dropdown Coordination**: SearchOptionsDropdown and SearchSuggestionDropdown coordinate visibility - ensure proper cleanup
-18. **Keyword Sorting**: Keyword-based sorting requires configuration - use `buildKeywordSortConfig()` for setup
-19. **Keyword Classification**: Use `KeywordManager` for all keyword detection - do not check keywords directly in components
-20. **State Transitions**: Use `TaskStateTransitionManager` for state cycling - handles custom keywords and archived states correctly
-21. **KeywordManager Ownership**: Components should get KeywordManager from `vaultScanner.getKeywordManager()` rather than creating new instances
-22. **Parser Keyword Parameter**: TaskParser.create() and OrgModeTaskParser.create() require KeywordManager as first argument - never pass settings object
-23. **Keyword Group Access**: Use `getKeywordsForGroup('groupName', settings)` for all keyword groups - do not use separate getInactiveKeywords()
-24. **Urgency Calculation**: task-urgency functions require keyword sets to be passed via UrgencyContext - no fallback defaults
-25. **Subtask Detection**: Subtasks are only detected when indented one level deeper than the parent task; deeper nesting is not supported
-26. **Mobile Async Context**: On mobile (Android/iPad), async contexts may be destroyed after UI elements close (command palette, menus). Avoid awaits before critical operations like optimistic updates. Use `taskStateManager.optimisticUpdate()` synchronously first, then `taskEditor.updateTaskState()` for async file writes.
+5. **File Race Conditions**: Use `ChangeTracker` to track expected file changes with content hashing; use `RecurrenceCoordinator` for centralized recurrence management; use per-task locking in `TaskUpdateCoordinator` for rapid update handling
+6. **Rapid Update Handling**: `TaskUpdateCoordinator` uses per-task locking (`pendingTaskUpdates` Map) to serialize rapid updates to the same task. Chained updates re-fetch fresh task state before recalculating transitions.
+7. **Editor/File Sync**: When reading file content for recurrence updates, use `RecurrenceCoordinator.getFileContent()` which reads from editor buffer when available
+8. **Skip Set Expiration**: The vault scanner's `skipIncrementalChanges` uses timestamp-based expiration (5 seconds) instead of setTimeout to handle chained rapid updates
+9. **Performance Testing**: Test with large vaults (1000+ files, 10000+ tasks)
+10. **Embedded Lists**: Use `TodoseqCodeBlockProcessor` with separate lifecycle from main plugin
+11. **Parser Registry**: All parsers are created and registered in `PluginLifecycleManager` before `VaultScanner` creation; `VaultScanner` receives fully configured `ParserRegistry` via constructor
+12. **Org-Mode Limitations**: Org-mode files support vault scanning only; editor styling is not supported
+13. **Property Search Initialization**: `PropertySearchEngine` initializes lazily - ensure to await `initialize()` before using
+14. **Event Debouncing**: `EventCoordinator` handles debouncing of file change events automatically
+15. **Property Cache Invalidation**: File changes automatically invalidate the property cache via EventCoordinator
+16. **Task List Performance**: TaskListView uses chunked rendering - avoid synchronous DOM updates for large task sets
+17. **Scroll Position Management**: TaskListView preserves scroll position - use anchor-based restoration for state changes
+18. **Search Debouncing**: SearchOptionsDropdown and SearchSuggestionDropdown use debounced updates - handle search history with care
+19. **Visibility Detection**: TaskListView detects panel visibility using ResizeObserver - refresh UI only when visible
+20. **Dropdown Coordination**: SearchOptionsDropdown and SearchSuggestionDropdown coordinate visibility - ensure proper cleanup
+21. **Keyword Sorting**: Keyword-based sorting requires configuration - use `buildKeywordSortConfig()` for setup
+22. **Keyword Classification**: Use `KeywordManager` for all keyword detection - do not check keywords directly in components
+23. **State Transitions**: Use `TaskStateTransitionManager` for state cycling - handles custom keywords and archived states correctly
+24. **KeywordManager Ownership**: Components should get KeywordManager from `vaultScanner.getKeywordManager()` rather than creating new instances
+25. **Parser Keyword Parameter**: TaskParser.create() and OrgModeTaskParser.create() require KeywordManager as first argument - never pass settings object
+26. **Keyword Group Access**: Use `getKeywordsForGroup('groupName', settings)` for all keyword groups - do not use separate getInactiveKeywords()
+27. **Urgency Calculation**: task-urgency functions require keyword sets to be passed via UrgencyContext - no fallback defaults
+28. **Subtask Detection**: Subtasks are only detected when indented one level deeper than the parent task; deeper nesting is not supported
+29. **Mobile Async Context**: On mobile (Android/iPad), async contexts may be destroyed after UI elements close (command palette, menus). Avoid awaits before critical operations like optimistic updates. Use `taskStateManager.optimisticUpdate()` synchronously first, then `taskEditor.updateTaskState()` for async file writes.
 
 ### Testing Architecture
 

@@ -183,27 +183,30 @@ export class EditorController {
         targetState = stateManager.getNextState(task.state);
       }
 
-      // CRITICAL: Do optimistic update FIRST, synchronously
-      // This ensures UI updates even if mobile command palette closes before async completes
-      if (this.plugin.taskStateManager) {
-        this.plugin.taskStateManager.optimisticUpdate(task, targetState);
-      }
-
-      // Use TaskEditor directly for file write (bypass coordinator's ChangeTracker)
-      // This is the same pattern as priority which works on mobile
-      const taskEditor = this.plugin.taskEditor;
-      if (taskEditor) {
-        taskEditor.updateTaskState(task, targetState).catch((error) => {
-          console.error(
-            `[TODOseq] Failed to update task at line ${lineNumber}:`,
-            error,
-          );
-        });
-      }
-
-      // Refresh editor decorations to show the updated task state
-      if (this.plugin.refreshVisibleEditorDecorations) {
-        this.plugin.refreshVisibleEditorDecorations();
+      // Use unified updateTask method - handles fresh lookup, optimistic update,
+      // file write, recurrence, line adjustment, and UI refresh
+      const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
+      if (taskUpdateCoordinator) {
+        taskUpdateCoordinator.updateTask(
+          filePath,
+          lineNumber,
+          targetState,
+          'editor',
+        );
+      } else {
+        // Fallback: do optimistic update then use TaskEditor
+        if (this.plugin.taskStateManager) {
+          this.plugin.taskStateManager.optimisticUpdate(task, targetState);
+        }
+        const taskEditor = this.plugin.taskEditor;
+        if (taskEditor) {
+          taskEditor.updateTaskState(task, targetState).catch((error) => {
+            console.error(
+              `[TODOseq] Failed to update task at line ${lineNumber}:`,
+              error,
+            );
+          });
+        }
       }
     }
 
@@ -288,24 +291,20 @@ export class EditorController {
       }
     }
 
-    // CRITICAL: Do optimistic update FIRST, synchronously
-    // This ensures UI updates even if mobile command palette closes before async completes
-    if (task && this.plugin.taskStateManager) {
-      this.plugin.taskStateManager.optimisticUpdate(task, targetState);
-    }
-
-    // Use TaskEditor directly for file write (bypass coordinator's ChangeTracker)
-    // This is the same pattern as priority which works on mobile
-    const taskEditor = this.plugin.taskEditor;
-    if (taskEditor) {
+    // Use TaskUpdateCoordinator for unified update handling
+    // Optimistic update happens synchronously, async file write follows
+    // This works on both desktop and mobile
+    const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
+    if (taskUpdateCoordinator) {
       if (task) {
-        // Update existing task
-        taskEditor.updateTaskState(task, targetState).catch((error) => {
-          console.error(
-            `[TODOseq] Failed to update task cycle state at line ${lineNumber}:`,
-            error,
-          );
-        });
+        taskUpdateCoordinator
+          .updateTaskState(task, targetState, 'editor')
+          .catch((error) => {
+            console.error(
+              `[TODOseq] Failed to update task cycle state at line ${lineNumber}:`,
+              error,
+            );
+          });
       } else {
         // For lines without existing task keywords, create a basic task and update it
         const markerInfo = detectListMarker(line);
@@ -329,12 +328,14 @@ export class EditorController {
           subtaskCompletedCount: 0,
         };
 
-        taskEditor.updateTaskState(basicTask, targetState).catch((error) => {
-          console.error(
-            `[TODOseq] Failed to update task cycle state at line ${lineNumber}:`,
-            error,
-          );
-        });
+        taskUpdateCoordinator
+          .updateTaskState(basicTask, targetState, 'editor')
+          .catch((error) => {
+            console.error(
+              `[TODOseq] Failed to update task cycle state at line ${lineNumber}:`,
+              error,
+            );
+          });
       }
     }
 
