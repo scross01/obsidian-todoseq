@@ -1,27 +1,92 @@
 /**
- * TaskUpdateCoordinator provides a centralized way to handle all task state updates
+ * TaskUpdateCoordinator provides a centralized, unified way to handle all task updates
  * from any view (editor, reader, task list, embedded lists).
  *
- * It ensures consistent optimistic UI updates and embed reference refreshing
- * across all open views.
+ * ARCHITECTURE:
+ * - Single entry point: updateTask(context)
+ * - Sync phase (always completes): optimistic update, DOM manipulation, UI refresh
+ * - Async phase (background): file write, recurrence scheduling, state finalization
+ * - Per-task locking prevents race conditions from rapid updates
+ * - Per-file queueing ensures serialized writes to same file
+ *
+ * This design ensures consistent behavior on both desktop and mobile.
  */
 import { Task, DateRepeatInfo } from '../types/task';
 import { isCompletedKeyword } from '../utils/task-utils';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
-import { TFile, Platform } from 'obsidian';
+import { TaskWriter } from './task-writer';
+import { TFile } from 'obsidian';
 import { KeywordManager } from '../utils/keyword-manager';
 import { ChangeTracker } from './change-tracker';
 import { RecurrenceCoordinator } from './recurrence-coordinator';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
 import { RecurrenceManager } from './recurrence-manager';
 
+/**
+ * Types of task updates supported by the coordinator
+ */
+export type UpdateType =
+  | 'state'
+  | 'scheduled-date'
+  | 'deadline-date'
+  | 'priority'
+  | 'closed-date';
+
+/**
+ * Source of the update (for debugging/tracking)
+ */
+export type UpdateSource = 'editor' | 'reader' | 'task-list' | 'embedded';
+
+/**
+ * Context object for a task update operation.
+ * Contains all information needed to perform the update.
+ */
+export interface UpdateContext {
+  /** The task to update */
+  task: Task;
+  /** Type of update being performed */
+  type: UpdateType;
+  /** Source of the update */
+  source: UpdateSource;
+  /** New state (for 'state' type updates) */
+  newState?: string;
+  /** New date (for date type updates) */
+  newDate?: Date | null;
+  /** New repeat info (for date type updates) */
+  newRepeat?: DateRepeatInfo | null;
+  /** New priority (for 'priority' type updates) */
+  newPriority?: 'high' | 'med' | 'low' | null;
+}
+
+/**
+ * Internal context used during update processing
+ */
+interface ProcessingContext {
+  task: Task;
+  type: UpdateType;
+  source: UpdateSource;
+  /** The state to write to the file (may differ from requested for recurring tasks) */
+  newState: string;
+  /** The original requested state - used for recurrence checking */
+  originalNewState: string;
+  newDate?: Date | null;
+  newRepeat?: DateRepeatInfo | null;
+  newPriority?: 'high' | 'med' | 'low' | null;
+  filePath: string;
+  fileLine: number;
+}
+
 export class TaskUpdateCoordinator {
   private changeTracker: ChangeTracker;
   private recurrenceCoordinator: RecurrenceCoordinator;
   private recurrenceManager: RecurrenceManager;
+
+  /** Per-task locking: prevents race conditions from rapid updates to same task */
+  private pendingTaskUpdates = new Map<string, Promise<void>>();
+
+  /** Per-file queueing: ensures serialized writes to same file */
   private fileUpdateQueues = new Map<string, Promise<unknown>>();
-  private pendingTaskUpdates = new Map<string, Promise<Task>>();
 
   private getTaskKey(path: string, line: number): string {
     return `${path}:${line}`;
@@ -32,15 +97,12 @@ export class TaskUpdateCoordinator {
     private taskStateManager: TaskStateManager,
     private keywordManager: KeywordManager,
   ) {
-    // Initialize ChangeTracker with default options
     this.changeTracker = new ChangeTracker({
       defaultTimeoutMs: 5000,
     });
 
-    // Initialize RecurrenceManager with keywordManager for proper keyword handling
     this.recurrenceManager = new RecurrenceManager(this.keywordManager);
 
-    // Initialize RecurrenceCoordinator
     this.recurrenceCoordinator = new RecurrenceCoordinator(
       this.plugin,
       this.taskStateManager,
@@ -48,147 +110,251 @@ export class TaskUpdateCoordinator {
   }
 
   /**
-   * Unified method to update a task's state.
-   * This is the SINGLE entry point for all task state updates from any view.
+   * UNIFIED ENTRY POINT: Update a task with any combination of changes.
    *
-   * This method handles:
-   * - Fresh task lookup (by path+line)
-   * - Optimistic UI update
-   * - File write
-   * - Line index adjustment
-   * - Recurrence scheduling
-   * - UI refresh
+   * This is the SINGLE entry point for all task updates from any view.
    *
-   * @param taskPath - The file path of the task
-   * @param taskLine - The line number of the task
-   * @param newState - The new state to set
-   * @param source - The source of the update (for debugging/tracking)
-   * @returns Promise resolving to the updated task
+   * @param context - Update context containing task and change details
+   * @returns Promise resolving when async phase is complete (for testing)
    */
-  async updateTask(
-    taskPath: string,
-    taskLine: number,
-    newState: string,
-    source: string,
-  ): Promise<Task | null> {
-    // 1. Fresh task lookup by path+line
-    const task = this.taskStateManager.findTaskByPathAndLine(
-      taskPath,
-      taskLine,
-    );
-
-    if (!task) {
-      console.error(
-        `[TaskUpdateCoordinator] Task not found at path=${taskPath}, line=${taskLine}`,
-      );
-      return null;
-    }
-
-    // 2. Call the existing updateTaskState with the fresh task
-    // This handles optimistic update, file write, recurrence, etc.
-    type SourceType = 'editor' | 'reader' | 'task-list' | 'embedded';
-    return this.updateTaskState(task, newState, source as SourceType);
+  async updateTask(context: UpdateContext): Promise<void> {
+    const procContext = this.buildProcessingContext(context);
+    this.performSyncPhase(procContext);
+    return this.queueAsyncPhase(procContext);
   }
 
   /**
-   * Update a task's state from any view.
-   * This is the single entry point for all task state updates.
-   *
-   * @param task - The task to update
-   * @param newState - The new state to set
-   * @param source - The source of the update (for debugging/tracking)
-   * @returns Promise resolving to the updated task
+   * Convenience method for updating task state.
    */
   async updateTaskState(
     task: Task,
     newState: string,
-    source: 'editor' | 'reader' | 'task-list' | 'embedded' = 'editor',
-  ): Promise<Task> {
-    // CRITICAL: Do optimistic update FIRST, synchronously
-    // This ensures UI updates even if mobile command palette closes before async completes
-    // The async work (ChangeTracker, file write, recurrence) comes after
-    const isNewStateCompleted = this.keywordManager.isCompleted(newState);
-    const hasRepeatingDates =
-      (task.scheduledDateRepeat != null && task.scheduledDate != null) ||
-      (task.deadlineDateRepeat != null && task.deadlineDate != null);
-    const shouldDoInlineRecurrence = isNewStateCompleted && hasRepeatingDates;
+    source: UpdateSource = 'editor',
+  ): Promise<void> {
+    return this.updateTask({
+      task,
+      type: 'state',
+      source,
+      newState,
+    });
+  }
 
-    let finalState = newState;
-    if (shouldDoInlineRecurrence) {
-      const stateManager = new TaskStateTransitionManager(
-        this.keywordManager,
-        this.plugin.settings?.stateTransitions,
+  /**
+   * Convenience method for updating scheduled date.
+   */
+  async updateTaskScheduledDate(
+    task: Task,
+    date: Date | null,
+    repeat?: DateRepeatInfo | null,
+  ): Promise<void> {
+    return this.updateTask({
+      task,
+      type: 'scheduled-date',
+      source: 'task-list',
+      newDate: date,
+      newRepeat: repeat,
+    });
+  }
+
+  /**
+   * Convenience method for updating deadline date.
+   */
+  async updateTaskDeadlineDate(
+    task: Task,
+    date: Date | null,
+    repeat?: DateRepeatInfo | null,
+  ): Promise<void> {
+    return this.updateTask({
+      task,
+      type: 'deadline-date',
+      source: 'task-list',
+      newDate: date,
+      newRepeat: repeat,
+    });
+  }
+
+  /**
+   * Convenience method for updating task priority.
+   */
+  async updateTaskPriority(
+    task: Task,
+    newPriority: 'high' | 'med' | 'low' | null,
+  ): Promise<void> {
+    return this.updateTask({
+      task,
+      type: 'priority',
+      source: 'task-list',
+      newPriority,
+    });
+  }
+
+  /**
+   * Convenience method: Update task state by path and line.
+   */
+  async updateTaskByPath(
+    taskPath: string,
+    taskLine: number,
+    newState: string,
+    source: UpdateSource = 'editor',
+  ): Promise<void> {
+    const task = this.taskStateManager.findTaskByPathAndLine(
+      taskPath,
+      taskLine,
+    );
+    if (!task) {
+      console.error(
+        `[TaskUpdateCoordinator] Task not found at path=${taskPath}, line=${taskLine}`,
       );
-      finalState = stateManager.getNextState(newState);
+      return;
+    }
+    return this.updateTask({
+      task,
+      type: 'state',
+      source,
+      newState,
+    });
+  }
+
+  /**
+   * Build processing context with all required fields populated
+   */
+  private buildProcessingContext(context: UpdateContext): ProcessingContext {
+    let newState = context.newState ?? '';
+    // Preserve the original requested state for recurrence checking
+    const originalNewState = context.newState ?? '';
+
+    if (context.type === 'state' && context.newState) {
+      const isOriginalStateCompleted = this.keywordManager.isCompleted(
+        context.newState,
+      );
+      const hasRepeatingDates =
+        (context.task.scheduledDateRepeat != null &&
+          context.task.scheduledDate != null) ||
+        (context.task.deadlineDateRepeat != null &&
+          context.task.deadlineDate != null);
+
+      // For recurring tasks being marked complete, calculate the next inactive state
+      // but preserve originalNewState to track that user completed the task
+      if (isOriginalStateCompleted && hasRepeatingDates) {
+        const stateManager = new TaskStateTransitionManager(
+          this.keywordManager,
+          this.plugin.settings?.stateTransitions,
+        );
+        newState = stateManager.getNextState(context.newState);
+      }
     }
 
-    this.taskStateManager.optimisticUpdate(task, finalState);
+    return {
+      task: context.task,
+      type: context.type,
+      source: context.source,
+      newState,
+      originalNewState,
+      newDate: context.newDate,
+      newRepeat: context.newRepeat,
+      newPriority: context.newPriority,
+      filePath: context.task.path,
+      fileLine: context.task.line,
+    };
+  }
 
-    // Per-task lock to prevent race conditions when same task is updated rapidly
-    // (e.g., TODO->DOING->DONE clicks in quick succession)
-    const taskKey = this.getTaskKey(task.path, task.line);
-    const existingTaskUpdate = this.pendingTaskUpdates.get(taskKey);
+  /**
+   * SYNC PHASE: Execute immediately, always completes.
+   */
+  private performSyncPhase(context: ProcessingContext): void {
+    switch (context.type) {
+      case 'state':
+        this.taskStateManager.optimisticUpdate(context.task, context.newState);
+        break;
+      case 'scheduled-date':
+      case 'deadline-date':
+      case 'priority':
+      case 'closed-date':
+        break;
+    }
 
-    // The actual update logic - handles file write, ChangeTracker, recurrence, etc.
-    const doUpdateCoreCore = async (): Promise<Task> => {
-      // Register expected change with ChangeTracker
-      const expectedContent = await this.getExpectedFileContent(
-        task,
-        finalState,
-      );
-      this.changeTracker.registerExpectedChange(
-        task.path,
-        expectedContent,
-        5000,
-        { source },
-      );
+    if (context.type === 'state') {
+      this.performDirectEmbedDOMUpdate(context.task, context.newState);
+    }
 
-      // Fetch currentTask for file write
+    this.refreshVisibleEditorDecorations();
+  }
+
+  /**
+   * ASYNC PHASE: Queue for background execution.
+   */
+  private async queueAsyncPhase(context: ProcessingContext): Promise<void> {
+    const taskKey = this.getTaskKey(context.filePath, context.fileLine);
+    const existingUpdate = this.pendingTaskUpdates.get(taskKey);
+
+    const asyncWork = async (): Promise<void> => {
+      if (existingUpdate) {
+        await existingUpdate;
+      }
+      await this.performAsyncPhase(context);
+    };
+
+    const promise = asyncWork();
+    this.pendingTaskUpdates.set(taskKey, promise);
+
+    try {
+      await promise;
+    } finally {
+      this.pendingTaskUpdates.delete(taskKey);
+    }
+  }
+
+  /**
+   * ASYNC PHASE: Perform file write, recurrence, and state finalization.
+   */
+  private async performAsyncPhase(context: ProcessingContext): Promise<void> {
+    const existingQueue = this.fileUpdateQueues.get(context.filePath);
+
+    const doAsyncWork = async (): Promise<void> => {
+      const taskEditor = this.plugin.taskEditor;
+      if (!taskEditor) {
+        throw new Error('TaskEditor is not initialized');
+      }
+
       let currentTask = this.taskStateManager.findTaskByPathAndLine(
-        task.path,
-        task.line,
+        context.filePath,
+        context.fileLine,
       );
 
-      // If not found at expected line, search nearby lines for content match
-      if (!currentTask || currentTask.rawText !== task.rawText) {
+      if (!currentTask || currentTask.rawText !== context.task.rawText) {
         const validatedTask = this.taskStateManager.findTaskByContent(
-          task.path,
-          task,
+          context.filePath,
+          context.task,
         );
         if (validatedTask) {
           currentTask = validatedTask;
         }
       }
 
-      if (!currentTask) {
-        currentTask = task; // Fallback to original if not found
-      }
+      currentTask = currentTask || context.task;
 
-      // Update source file via TaskEditor
       let updatedTask: Task;
-      const taskEditor = this.plugin.taskEditor;
-      if (!taskEditor) {
-        throw new Error('TaskEditor is not initialized');
-      }
-
       try {
-        this.plugin.vaultScanner?.addSkipIncrementalChange(task.path);
-
-        updatedTask = await taskEditor.updateTaskState(currentTask, finalState);
+        this.plugin.vaultScanner?.addSkipIncrementalChange(context.filePath);
+        updatedTask = await this.performFileWrite(
+          taskEditor,
+          currentTask,
+          context,
+        );
       } catch (error) {
         console.error(
-          `[TODOseq] File write failed for task at line ${task.line}:`,
+          `[TODOseq] File write failed for ${context.type} at line ${context.fileLine}:`,
           error,
         );
-        // Re-process file to restore correct state
-        const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
+        const file = this.plugin.app.vault.getAbstractFileByPath(
+          context.filePath,
+        );
         if (file instanceof TFile) {
           await this.plugin.vaultScanner?.processIncrementalChange(file);
         }
-        throw error;
+        return;
       }
 
-      // Adjust line indices for subsequent tasks if date lines were added/removed
       const lineDelta = (updatedTask as Task & { lineDelta?: number })
         .lineDelta;
       if (lineDelta !== undefined && lineDelta !== 0) {
@@ -199,211 +365,204 @@ export class TaskUpdateCoordinator {
         );
       }
 
-      // Perform direct DOM manipulation for embeds
-      this.performDirectEmbedDOMUpdate(currentTask, updatedTask.state);
+      this.finalizeTaskState(updatedTask, context);
 
-      // Update the TaskStateManager with the final task state
-      this.taskStateManager.updateTaskByPathAndLine(
-        updatedTask.path,
-        updatedTask.line,
-        {
-          rawText: updatedTask.rawText,
-          state: updatedTask.state,
-          completed: updatedTask.completed,
-          scheduledDate: updatedTask.scheduledDate,
-          deadlineDate: updatedTask.deadlineDate,
-          scheduledDateRepeat: updatedTask.scheduledDateRepeat,
-          deadlineDateRepeat: updatedTask.deadlineDateRepeat,
-          closedDate: updatedTask.closedDate,
-        },
-      );
-
-      // Refresh editor decorations
-      if (this.plugin.refreshVisibleEditorDecorations) {
-        this.plugin.refreshVisibleEditorDecorations();
+      if (context.type === 'state') {
+        this.handleRecurrence(updatedTask, context);
       }
-
-      // Handle recurrence updates
-      const wasCompleted = this.keywordManager.isCompleted(currentTask.state);
-      const taskHasRepeatingDates =
-        (updatedTask.scheduledDateRepeat != null &&
-          updatedTask.scheduledDate != null) ||
-        (updatedTask.deadlineDateRepeat != null &&
-          updatedTask.deadlineDate != null);
-
-      if (wasCompleted && !isNewStateCompleted && taskHasRepeatingDates) {
-        this.recurrenceCoordinator.cancelRecurrence(updatedTask);
-      }
-
-      if (isNewStateCompleted && taskHasRepeatingDates) {
-        if (Platform.isMobile) {
-          this.recurrenceCoordinator.performRecurrenceUpdate(updatedTask);
-        } else {
-          this.recurrenceCoordinator.scheduleRecurrence(updatedTask, 50);
-        }
-      }
-
-      return updatedTask;
     };
 
-    // Wrapper that manages file queue
-    const runUpdate = (): Promise<Task> => {
-      const existingQueue = this.fileUpdateQueues.get(task.path);
-      const queuePromise = existingQueue
-        ? existingQueue.then(() => doUpdateCoreCore())
-        : doUpdateCoreCore();
+    const queuePromise = existingQueue
+      ? existingQueue.then(() => doAsyncWork())
+      : doAsyncWork();
 
-      this.fileUpdateQueues.set(task.path, queuePromise);
+    this.fileUpdateQueues.set(context.filePath, queuePromise);
 
-      return queuePromise.finally(() => {
-        // Clean up queue entry when this update completes
-        if (this.fileUpdateQueues.get(task.path) === queuePromise) {
-          this.fileUpdateQueues.delete(task.path);
-        }
-      });
-    };
-
-    // Chain this update after any existing update for the same task
-    if (existingTaskUpdate) {
-      // Re-fetch fresh task state after the previous update completes
-      // This ensures we calculate transitions from the correct current state
-      const chainedUpdate = existingTaskUpdate.then(async () => {
-        const freshTask = this.taskStateManager.findTaskByPathAndLine(
-          task.path,
-          task.line,
-        );
-        if (freshTask && freshTask.state !== task.state) {
-          // Calculate the next state from the fresh task's current state
-          const transitionManager = new TaskStateTransitionManager(
-            this.keywordManager,
-            this.plugin.settings?.stateTransitions,
-          );
-          newState = transitionManager.getNextState(freshTask.state);
-          task.state = freshTask.state;
-        }
-        return runUpdate();
-      });
-      this.pendingTaskUpdates.set(taskKey, chainedUpdate);
-      return chainedUpdate;
-    } else {
-      const updatePromise = runUpdate();
-      this.pendingTaskUpdates.set(taskKey, updatePromise);
-      try {
-        return await updatePromise;
-      } finally {
-        this.pendingTaskUpdates.delete(taskKey);
-      }
-    }
-  }
-
-  /**
-   * Get the expected file content after a task state update.
-   * This is used to register expected change with ChangeTracker.
-   *
-   * @param task - The task being updated
-   * @param newState - The new state
-   * @returns Promise resolving to the expected file content
-   */
-  private async getExpectedFileContent(
-    task: Task,
-    newState: string,
-  ): Promise<string> {
     try {
-      const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
-      if (!file || !(file instanceof TFile)) {
-        // If we can't read the file, return a simple hash
-        // This is a fallback case
-        return `task-state-update:${task.path}:${task.line}:${newState}`;
+      await queuePromise;
+    } finally {
+      if (this.fileUpdateQueues.get(context.filePath) === queuePromise) {
+        this.fileUpdateQueues.delete(context.filePath);
       }
-
-      const content = await this.plugin.app.vault.read(file);
-      const lines = content.split('\n');
-
-      if (task.line >= lines.length) {
-        return `task-state-update:${task.path}:${task.line}:${newState}`;
-      }
-
-      // Update the task line with the new state
-      const taskLine = lines[task.line];
-      const updatedLine = taskLine.replace(task.state, newState);
-      lines[task.line] = updatedLine;
-
-      return lines.join('\n');
-    } catch (error) {
-      console.error('[TODOseq] Failed to get expected file content:', error);
-      return `task-state-update:${task.path}:${task.line}:${newState}`;
     }
   }
 
   /**
-   * Perform optimistic UI updates immediately.
-   * This updates in-memory state and refreshes task list views.
-   *
-   * Note: Editor and reader views handle their own optimistic updates
-   * via CodeMirror decorations and DOM manipulation.
+   * Perform the appropriate file write based on update type
    */
-  private performOptimisticUpdate(task: Task, newState: string): void {
-    // Update in-memory state - subscriber callback will handle refresh
-    this.taskStateManager.optimisticUpdate(task, newState);
+  private async performFileWrite(
+    taskEditor: TaskWriter,
+    task: Task,
+    context: ProcessingContext,
+  ): Promise<Task> {
+    switch (context.type) {
+      case 'state':
+        return taskEditor.updateTaskState(task, context.newState);
+
+      case 'scheduled-date':
+        if (!context.newDate) {
+          return taskEditor.removeTaskScheduledDate(task);
+        }
+        return taskEditor.updateTaskScheduledDate(
+          task,
+          context.newDate,
+          context.newRepeat,
+        );
+
+      case 'deadline-date':
+        if (!context.newDate) {
+          return taskEditor.removeTaskDeadlineDate(task);
+        }
+        return taskEditor.updateTaskDeadlineDate(
+          task,
+          context.newDate,
+          context.newRepeat,
+        );
+
+      case 'priority':
+        if (context.newPriority === null || context.newPriority === undefined) {
+          return taskEditor.removeTaskPriority(task);
+        }
+        return taskEditor.updateTaskPriority(task, context.newPriority);
+
+      case 'closed-date':
+        return task;
+
+      default:
+        throw new Error(`Unknown update type: ${context.type}`);
+    }
   }
 
   /**
-   * Perform direct DOM manipulation on embeds to update the task state display.
-   * This updates the embed display without triggering a full re-render
-   * which would cause flicker. The DOM update is synchronous and only
-   * touches specific elements that need to change.
+   * Finalize task state in the state manager
+   */
+  private finalizeTaskState(
+    updatedTask: Task,
+    context: ProcessingContext,
+  ): void {
+    switch (context.type) {
+      case 'state':
+        this.taskStateManager.updateTaskByPathAndLine(
+          updatedTask.path,
+          updatedTask.line,
+          {
+            rawText: updatedTask.rawText,
+            state: updatedTask.state,
+            completed: updatedTask.completed,
+            scheduledDate: updatedTask.scheduledDate,
+            deadlineDate: updatedTask.deadlineDate,
+            scheduledDateRepeat: updatedTask.scheduledDateRepeat,
+            deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+            closedDate: updatedTask.closedDate,
+          },
+        );
+        break;
+
+      case 'scheduled-date':
+        this.taskStateManager.updateTaskByPathAndLine(
+          updatedTask.path,
+          updatedTask.line,
+          {
+            rawText: updatedTask.rawText,
+            scheduledDate: updatedTask.scheduledDate,
+            scheduledDateRepeat: updatedTask.scheduledDateRepeat,
+          },
+        );
+        break;
+
+      case 'deadline-date':
+        this.taskStateManager.updateTaskByPathAndLine(
+          updatedTask.path,
+          updatedTask.line,
+          {
+            rawText: updatedTask.rawText,
+            deadlineDate: updatedTask.deadlineDate,
+            deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+          },
+        );
+        break;
+
+      case 'priority':
+        this.taskStateManager.updateTaskByPathAndLine(
+          updatedTask.path,
+          updatedTask.line,
+          {
+            rawText: updatedTask.rawText,
+            priority: updatedTask.priority,
+          },
+        );
+        break;
+    }
+
+    this.taskStateManager.notifySubscribers();
+  }
+
+  /**
+   * Handle recurrence scheduling for completed recurring tasks.
+   * Uses originalNewState to determine if user completed the task (not the final written state).
+   */
+  private handleRecurrence(
+    originalTask: Task,
+    context: ProcessingContext,
+  ): void {
+    // Use originalNewState to check if user requested completion
+    // This is the state they clicked (e.g., DONE), not what was written (e.g., TODO)
+    const isOriginalCompleted = this.keywordManager.isCompleted(
+      context.originalNewState,
+    );
+
+    const taskHasRepeatingDates =
+      (originalTask.scheduledDateRepeat != null &&
+        originalTask.scheduledDate != null) ||
+      (originalTask.deadlineDateRepeat != null &&
+        originalTask.deadlineDate != null);
+
+    if (isOriginalCompleted && taskHasRepeatingDates) {
+      this.recurrenceCoordinator.scheduleRecurrence(originalTask, 50);
+    }
+  }
+
+  /**
+   * Perform direct DOM manipulation on embeds.
    */
   private performDirectEmbedDOMUpdate(task: Task, newState: string): void {
-    // Get filename from task path
     const fileName = task.path.split('/').pop()?.replace('.md', '');
     if (!fileName) return;
 
-    // Find all embeds that reference this file
     const embeds = document.querySelectorAll('.internal-embed');
 
     embeds.forEach((embed) => {
       const src = embed.getAttribute('src');
       if (!src || !src.includes(fileName)) return;
 
-      // If there's a specific embed reference, check if it matches
       if (task.embedReference) {
         const blockRef = task.embedReference.replace('^', '');
         if (!src.includes(blockRef)) return;
       }
 
-      // Find the keyword element within this embed
-      // It might have the old state (task.state) or be stale
       const keywordEl = embed.querySelector('[data-task-keyword]');
       if (!keywordEl) return;
 
-      // Get the old state from the element
       const oldState = keywordEl.getAttribute('data-task-keyword');
       if (!oldState || oldState === newState) return;
 
-      // Update the keyword element
       keywordEl.textContent = newState;
       keywordEl.setAttribute('data-task-keyword', newState);
       keywordEl.setAttribute('aria-label', `Task keyword: ${newState}`);
 
-      // Handle completed task styling
       const wasCompleted = isCompletedKeyword(oldState, this.plugin.settings);
       const isNowCompleted = isCompletedKeyword(newState, this.plugin.settings);
 
       if (wasCompleted && !isNowCompleted) {
-        // Transitioning from completed to non-completed: remove strikethrough
         const completedContainer = keywordEl.closest(
           '.todoseq-completed-task-text',
         );
         if (completedContainer && completedContainer.parentNode) {
-          // Unwrap content: move all children out of completed container
           const parent = completedContainer.parentNode;
-          // Move keyword element first
           parent.insertBefore(keywordEl, completedContainer.firstChild);
-          // Move remaining children after the keyword element
           while (completedContainer.firstChild) {
             parent.insertBefore(completedContainer.firstChild, keywordEl);
           }
-          // Remove the completed container
           completedContainer.remove();
         }
       }
@@ -411,239 +570,18 @@ export class TaskUpdateCoordinator {
   }
 
   /**
-   * Perform a date-related task update with coordinated state management.
-   * Handles task validation, file write, state manager update, and subscriber notification.
-   *
-   * @param task - The task to update
-   * @param performWrite - Async function that writes to file and returns updated task
-   * @param getUpdateProperties - Function to extract properties to update from the result
-   * @param errorContext - Context string for error messages
+   * Refresh visible editor decorations.
    */
-  private async performDateUpdate(
-    task: Task,
-    performWrite: () => Promise<Task>,
-    getUpdateProperties: (updatedTask: Task) => {
-      rawText: string;
-      scheduledDate?: Date | null;
-      scheduledDateRepeat?: DateRepeatInfo | null;
-      deadlineDate?: Date | null;
-      deadlineDateRepeat?: DateRepeatInfo | null;
-    },
-    errorContext: string,
-  ): Promise<void> {
-    // Queue this update for consistency with state updates
-    const existingQueue = this.fileUpdateQueues.get(task.path);
-
-    const doUpdateCore = async (): Promise<void> => {
-      const taskEditor = this.plugin.taskEditor;
-      if (!taskEditor) {
-        throw new Error('TaskEditor is not initialized');
-      }
-
-      // Validate task location before update
-      let currentTask = this.taskStateManager.findTaskByPathAndLine(
-        task.path,
-        task.line,
-      );
-
-      if (!currentTask || currentTask.rawText !== task.rawText) {
-        const validatedTask = this.taskStateManager.findTaskByContent(
-          task.path,
-          task,
-        );
-        if (validatedTask) {
-          currentTask = validatedTask;
-        }
-      }
-
-      currentTask = currentTask || task;
-
-      try {
-        const updatedTask = await performWrite();
-
-        // Update state manager with the new task data after successful file write
-        this.taskStateManager.updateTaskByPathAndLine(
-          updatedTask.path,
-          updatedTask.line,
-          getUpdateProperties(updatedTask),
-        );
-        // Notify subscribers so views (like TaskListView) refresh
-        this.taskStateManager.notifySubscribers();
-      } catch (error) {
-        console.error(`[TODOseq] ${errorContext} at line ${task.line}:`, error);
-        // Rollback: re-read file to restore state
-        const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
-        if (file instanceof TFile) {
-          await this.plugin.vaultScanner?.processIncrementalChange(file);
-        }
-        throw error;
-      }
-    };
-
-    const queuePromise = existingQueue
-      ? existingQueue.then(() => doUpdateCore())
-      : doUpdateCore();
-
-    this.fileUpdateQueues.set(task.path, queuePromise);
-
-    try {
-      await queuePromise;
-    } finally {
-      if (this.fileUpdateQueues.get(task.path) === queuePromise) {
-        this.fileUpdateQueues.delete(task.path);
-      }
-    }
-  }
-
-  /**
-   * Update a task's scheduled date from any view.
-   * This provides coordinated UI updates similar to updateTaskState.
-   *
-   * @param task - The task to update
-   * @param date - The new scheduled date
-   * @param repeat - The new repeat info
-   */
-  public async updateTaskScheduledDate(
-    task: Task,
-    date: Date | null,
-    repeat?: DateRepeatInfo | null,
-  ): Promise<void> {
-    const taskEditor = this.plugin.taskEditor;
-    if (!taskEditor) {
-      throw new Error('TaskEditor is not initialized');
-    }
-
-    await this.performDateUpdate(
-      task,
-      async () => {
-        if (date === null) {
-          return taskEditor.removeTaskScheduledDate(task);
-        } else {
-          return taskEditor.updateTaskScheduledDate(task, date, repeat);
-        }
-      },
-      (updatedTask) => ({
-        rawText: updatedTask.rawText,
-        scheduledDate: updatedTask.scheduledDate,
-        scheduledDateRepeat: updatedTask.scheduledDateRepeat,
-      }),
-      'Failed to update scheduled date',
-    );
-  }
-
-  /**
-   * Update a task's deadline date from any view.
-   * This provides coordinated UI updates similar to updateTaskState.
-   *
-   * @param task - The task to update
-   * @param date - The new deadline date
-   * @param repeat - The new repeat info
-   */
-  public async updateTaskDeadlineDate(
-    task: Task,
-    date: Date | null,
-    repeat?: DateRepeatInfo | null,
-  ): Promise<void> {
-    const taskEditor = this.plugin.taskEditor;
-    if (!taskEditor) {
-      throw new Error('TaskEditor is not initialized');
-    }
-
-    await this.performDateUpdate(
-      task,
-      async () => {
-        if (date === null) {
-          return taskEditor.removeTaskDeadlineDate(task);
-        } else {
-          return taskEditor.updateTaskDeadlineDate(task, date, repeat);
-        }
-      },
-      (updatedTask) => ({
-        rawText: updatedTask.rawText,
-        deadlineDate: updatedTask.deadlineDate,
-        deadlineDateRepeat: updatedTask.deadlineDateRepeat,
-      }),
-      'Failed to update deadline date',
-    );
-  }
-
-  /**
-
-   * Update a task's priority from any view.
-   * This provides optimistic UI updates similar to updateTaskState.
-   *
-   * @param task - The task to update
-   * @param newPriority - The new priority ('high', 'med', 'low', or null to remove)
-   */
-  public async updateTaskPriority(
-    task: Task,
-    newPriority: 'high' | 'med' | 'low' | null,
-  ): Promise<void> {
-    const taskEditor = this.plugin.taskEditor;
-    if (!taskEditor) {
-      throw new Error('TaskEditor is not initialized');
-    }
-
-    try {
-      if (newPriority === null) {
-        await taskEditor.removeTaskPriority(task);
-      } else {
-        await taskEditor.updateTaskPriority(task, newPriority);
-      }
-    } catch (error) {
-      console.error(
-        `[TODOseq] Failed to update priority for task at line ${task.line}:`,
-        error,
-      );
-      // Rollback: re-read file to restore state
-      const file = this.plugin.app.vault.getAbstractFileByPath(task.path);
-      if (file instanceof TFile) {
-        await this.plugin.vaultScanner?.processIncrementalChange(file);
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Schedule a delayed recurrence update for a completed recurring task.
-   * Cancels any existing pending update for this task.
-   */
-  private scheduleRecurrenceUpdate(task: Task): void {
-    // Delegate to RecurrenceCoordinator with small delay
-    this.recurrenceCoordinator.scheduleRecurrence(task, 50);
-  }
-
-  /**
-   * Cancel a pending recurrence update for a task.
-   */
-  private cancelRecurrenceUpdate(task: Task): void {
-    // Delegate to RecurrenceCoordinator
-    this.recurrenceCoordinator.cancelRecurrence(task);
-  }
-
-  /**
-   * Perform recurrence update: advance dates and reset to inactive state.
-   * This method is kept for backward compatibility but delegates to RecurrenceCoordinator.
-   */
-  private async performRecurrenceUpdate(task: Task): Promise<void> {
-    // Delegate to RecurrenceCoordinator
-    const result =
-      await this.recurrenceCoordinator.performRecurrenceUpdate(task);
-
-    if (!result.success) {
-      console.error(
-        '[TODOseq] Failed to perform recurrence update:',
-        result.error,
-      );
+  private refreshVisibleEditorDecorations(): void {
+    if (this.plugin.refreshVisibleEditorDecorations) {
+      this.plugin.refreshVisibleEditorDecorations();
     }
   }
 
   /**
    * Clean up resources.
-   * Call this when the coordinator is no longer needed to prevent open handles in tests.
    */
   destroy(): void {
-    // Clean up ChangeTracker to prevent open handles in tests
     this.changeTracker.destroy();
   }
 }

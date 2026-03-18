@@ -40,6 +40,7 @@ describe('Editor Controller - Task State Methods', () => {
       taskUpdateCoordinator: {
         updateTask: jest.fn().mockResolvedValue({}),
         updateTaskState: jest.fn().mockResolvedValue({}),
+        updateTaskByPath: jest.fn().mockResolvedValue({}),
       },
       taskEditor: {
         updateTaskState: jest.fn().mockResolvedValue({}),
@@ -147,7 +148,9 @@ describe('Editor Controller - Task State Methods', () => {
       );
 
       // With unified architecture, all updates go through coordinator
-      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskByPath,
+      ).toHaveBeenCalled();
     });
 
     it('should set specific task state when newState is provided', () => {
@@ -159,7 +162,9 @@ describe('Editor Controller - Task State Methods', () => {
         'DOING',
       );
 
-      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalledWith(
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskByPath,
+      ).toHaveBeenCalledWith(
         expect.any(String), // path
         expect.any(Number), // line
         'DOING',
@@ -177,10 +182,12 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskByPath,
+      ).toHaveBeenCalled();
     });
 
-    it('should call taskUpdateCoordinator.updateTask to handle all updates', async () => {
+    it('should call taskUpdateCoordinator.updateTaskByPath to handle all updates', async () => {
       await editorController.handleUpdateTaskStateAtLine(
         false,
         0,
@@ -188,8 +195,9 @@ describe('Editor Controller - Task State Methods', () => {
         mockView as any,
       );
 
-      // With unified architecture, all updates go through coordinator
-      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskByPath,
+      ).toHaveBeenCalled();
     });
   });
 
@@ -332,26 +340,26 @@ describe('Editor Controller - Task State Methods', () => {
       expect(mockHandleAddDateAtLine).toHaveBeenCalled();
     });
 
-    it('priority cursor handlers should delegate to handleSetPriorityAtCursor', () => {
+    it('priority cursor handlers should delegate to handleSetPriorityAtCursor', async () => {
       const mockHandleSetPriorityAtCursor = jest.spyOn(
         editorController as any,
         'handleSetPriorityAtCursor',
       );
-      mockHandleSetPriorityAtCursor.mockReturnValue(true);
+      mockHandleSetPriorityAtCursor.mockResolvedValue(true);
 
-      const resultHigh = editorController.handleSetPriorityHighAtCursor(
+      const resultHigh = await editorController.handleSetPriorityHighAtCursor(
         false,
         mockEditor as any,
         mockView as any,
       );
 
-      const resultMed = editorController.handleSetPriorityMediumAtCursor(
+      const resultMed = await editorController.handleSetPriorityMediumAtCursor(
         false,
         mockEditor as any,
         mockView as any,
       );
 
-      const resultLow = editorController.handleSetPriorityLowAtCursor(
+      const resultLow = await editorController.handleSetPriorityLowAtCursor(
         false,
         mockEditor as any,
         mockView as any,

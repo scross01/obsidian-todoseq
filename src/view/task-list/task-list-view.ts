@@ -1126,17 +1126,11 @@ export class TaskListView extends ItemView {
             ) => Promise<Task>;
           };
           taskUpdateCoordinator?: {
-            updateTask: (
-              path: string,
-              line: number,
-              newState: string,
-              source: string,
-            ) => Promise<Task | null>;
             updateTaskState: (
               task: Task,
               newState: string,
-              source: 'task-list',
-            ) => Promise<Task>;
+              source?: 'task-list',
+            ) => Promise<void>;
           };
         };
       }
@@ -1148,11 +1142,10 @@ export class TaskListView extends ItemView {
     }
 
     try {
-      // Use unified updateTask method - handles fresh lookup, optimistic update,
+      // Use unified updateTaskState method - handles fresh lookup, optimistic update,
       // file write, recurrence, line adjustment, and UI refresh
-      await plugin.taskUpdateCoordinator.updateTask(
-        task.path,
-        task.line,
+      await plugin.taskUpdateCoordinator.updateTaskState(
+        task,
         nextState,
         'task-list',
       );

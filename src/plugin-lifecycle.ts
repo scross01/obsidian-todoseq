@@ -270,7 +270,7 @@ export class PluginLifecycleManager {
       id: 'set-priority-high',
       name: 'Set priority high',
       icon: 'chevrons-up',
-      editorCheckCallback: (
+      editorCheckCallback: ((
         checking: boolean,
         editor: Editor,
         view: MarkdownView,
@@ -280,7 +280,11 @@ export class PluginLifecycleManager {
           editor,
           view,
         );
-      },
+      }) as unknown as (
+        checking: boolean,
+        editor: Editor,
+        ctx: MarkdownView | unknown,
+      ) => boolean | void,
     });
 
     // Add editor command to set medium priority
@@ -288,7 +292,7 @@ export class PluginLifecycleManager {
       id: 'set-priority-medium',
       name: 'Set priority medium',
       icon: 'chevron-up',
-      editorCheckCallback: (
+      editorCheckCallback: ((
         checking: boolean,
         editor: Editor,
         view: MarkdownView,
@@ -298,7 +302,11 @@ export class PluginLifecycleManager {
           editor,
           view,
         );
-      },
+      }) as unknown as (
+        checking: boolean,
+        editor: Editor,
+        ctx: MarkdownView | unknown,
+      ) => boolean | void,
     });
 
     // Add editor command to set low priority
@@ -306,7 +314,7 @@ export class PluginLifecycleManager {
       id: 'set-priority-low',
       name: 'Set priority low',
       icon: 'chevrons-down',
-      editorCheckCallback: (
+      editorCheckCallback: ((
         checking: boolean,
         editor: Editor,
         view: MarkdownView,
@@ -316,7 +324,11 @@ export class PluginLifecycleManager {
           editor,
           view,
         );
-      },
+      }) as unknown as (
+        checking: boolean,
+        editor: Editor,
+        ctx: MarkdownView | unknown,
+      ) => boolean | void,
     });
 
     // Add editor command to copy task to today's daily note

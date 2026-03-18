@@ -283,10 +283,10 @@ export class UIManager {
         );
 
         if (task) {
-          // Use unified updateTask method - handles fresh lookup, optimistic update,
+          // Use unified updateTaskByPath method - handles fresh lookup, optimistic update,
           // file write, recurrence, line adjustment, and UI refresh
           if (this.plugin.taskUpdateCoordinator) {
-            this.plugin.taskUpdateCoordinator.updateTask(
+            this.plugin.taskUpdateCoordinator.updateTaskByPath(
               filePath,
               lineNumber,
               newKeyword,

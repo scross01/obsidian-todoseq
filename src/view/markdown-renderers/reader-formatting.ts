@@ -277,10 +277,10 @@ export class ReaderViewFormatter {
       return;
     }
 
-    // Use unified updateTask method - handles fresh lookup, optimistic update,
+    // Use unified updateTaskByPath method - handles fresh lookup, optimistic update,
     // file write, recurrence, line adjustment, and UI refresh
     if (this.plugin.taskUpdateCoordinator) {
-      await this.plugin.taskUpdateCoordinator.updateTask(
+      await this.plugin.taskUpdateCoordinator.updateTaskByPath(
         taskToUpdate.path,
         taskToUpdate.line,
         newState,
@@ -2108,10 +2108,10 @@ export class ReaderViewFormatter {
     // Use fresh task if found, otherwise fall back to captured task
     const taskToUpdate = freshTask || task;
 
-    // Use unified updateTask method - handles fresh lookup, optimistic update,
+    // Use unified updateTaskByPath method - handles fresh lookup, optimistic update,
     // file write, recurrence, line adjustment, and UI refresh
     if (this.plugin.taskUpdateCoordinator) {
-      await this.plugin.taskUpdateCoordinator.updateTask(
+      await this.plugin.taskUpdateCoordinator.updateTaskByPath(
         taskToUpdate.path,
         taskToUpdate.line,
         newState,

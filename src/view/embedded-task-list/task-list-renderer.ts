@@ -1923,10 +1923,10 @@ export class EmbeddedTaskListRenderer {
    */
   private async updateTaskState(task: Task, newState: string): Promise<void> {
     try {
-      // Use unified updateTask method - handles fresh lookup, optimistic update,
+      // Use unified updateTaskByPath method - handles fresh lookup, optimistic update,
       // file write, recurrence, line adjustment, and UI refresh
       if (this.plugin.taskUpdateCoordinator) {
-        await this.plugin.taskUpdateCoordinator.updateTask(
+        await this.plugin.taskUpdateCoordinator.updateTaskByPath(
           task.path,
           task.line,
           newState,

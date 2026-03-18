@@ -32,7 +32,6 @@ describe('Priority Commands', () => {
       taskEditor: {
         updateTaskPriority: jest.fn(
           (task: Task, priority: 'high' | 'med' | 'low') => {
-            // Simple mock that returns a task with updated priority
             return Promise.resolve({
               ...task,
               priority,
@@ -43,13 +42,16 @@ describe('Priority Commands', () => {
           },
         ),
       },
+      taskUpdateCoordinator: {
+        updateTaskPriority: jest.fn().mockResolvedValue(undefined),
+      },
     };
 
     editorController = new EditorController(mockPlugin);
   });
 
   describe('handleSetPriorityAtCursor', () => {
-    it('should set high priority on task line via cursor handler', () => {
+    it('should set high priority on task line via cursor handler', async () => {
       const mockEditor = {
         getLine: (lineNumber: number) => 'TODO Test task without priority',
         getCursor: () => ({ line: 0 }),
@@ -59,7 +61,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = editorController.handleSetPriorityAtCursor(
+      const result = await editorController.handleSetPriorityAtCursor(
         false, // not checking
         mockEditor as any,
         mockView as any,
@@ -67,10 +69,12 @@ describe('Priority Commands', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskPriority,
+      ).toHaveBeenCalled();
     });
 
-    it('should set medium priority on task line via cursor handler', () => {
+    it('should set medium priority on task line via cursor handler', async () => {
       const mockEditor = {
         getLine: (lineNumber: number) => 'TODO Test task without priority',
         getCursor: () => ({ line: 0 }),
@@ -80,7 +84,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = editorController.handleSetPriorityAtCursor(
+      const result = await editorController.handleSetPriorityAtCursor(
         false, // not checking
         mockEditor as any,
         mockView as any,
@@ -88,10 +92,12 @@ describe('Priority Commands', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskPriority,
+      ).toHaveBeenCalled();
     });
 
-    it('should set low priority on task line via cursor handler', () => {
+    it('should set low priority on task line via cursor handler', async () => {
       const mockEditor = {
         getLine: (lineNumber: number) => 'TODO Test task without priority',
         getCursor: () => ({ line: 0 }),
@@ -101,7 +107,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = editorController.handleSetPriorityAtCursor(
+      const result = await editorController.handleSetPriorityAtCursor(
         false, // not checking
         mockEditor as any,
         mockView as any,
@@ -109,12 +115,14 @@ describe('Priority Commands', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskPriority,
+      ).toHaveBeenCalled();
     });
   });
 
   describe('handleSetPriorityAtLine', () => {
-    it('should set high priority on task line', () => {
+    it('should set high priority on task line', async () => {
       const mockEditor = {
         getLine: (lineNumber: number) => {
           return 'TODO Test task without priority';
@@ -126,7 +134,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = editorController.handleSetPriorityAtLine(
+      const result = await editorController.handleSetPriorityAtLine(
         false, // not checking
         0, // line number
         mockEditor as any,
@@ -135,10 +143,12 @@ describe('Priority Commands', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskPriority,
+      ).toHaveBeenCalled();
     });
 
-    it('should set medium priority on task line', () => {
+    it('should set medium priority on task line', async () => {
       const mockEditor = {
         getLine: (lineNumber: number) => {
           return 'TODO Test task without priority';
@@ -150,7 +160,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = editorController.handleSetPriorityAtLine(
+      const result = await editorController.handleSetPriorityAtLine(
         false, // not checking
         0, // line number
         mockEditor as any,
@@ -159,10 +169,12 @@ describe('Priority Commands', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskPriority,
+      ).toHaveBeenCalled();
     });
 
-    it('should set low priority on task line', () => {
+    it('should set low priority on task line', async () => {
       const mockEditor = {
         getLine: (lineNumber: number) => {
           return 'TODO Test task without priority';
@@ -174,7 +186,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = editorController.handleSetPriorityAtLine(
+      const result = await editorController.handleSetPriorityAtLine(
         false, // not checking
         0, // line number
         mockEditor as any,
@@ -183,10 +195,12 @@ describe('Priority Commands', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskPriority,
+      ).toHaveBeenCalled();
     });
 
-    it('should return false for non-task lines', () => {
+    it('should return false for non-task lines', async () => {
       const mockEditor = {
         getLine: (lineNumber: number) => {
           return 'This is not a task line';
@@ -198,7 +212,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = editorController.handleSetPriorityAtLine(
+      const result = await editorController.handleSetPriorityAtLine(
         false, // not checking
         0, // line number
         mockEditor as any,
@@ -207,10 +221,12 @@ describe('Priority Commands', () => {
       );
 
       expect(result).toBe(false);
-      expect(mockPlugin.taskEditor.updateTaskPriority).not.toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskPriority,
+      ).not.toHaveBeenCalled();
     });
 
-    it('should return true when checking on valid task line', () => {
+    it('should return true when checking on valid task line', async () => {
       const mockEditor = {
         getLine: (lineNumber: number) => {
           return 'TODO Test task without priority';
@@ -222,7 +238,7 @@ describe('Priority Commands', () => {
         file: { path: 'test.md' },
       };
 
-      const result = editorController.handleSetPriorityAtLine(
+      const result = await editorController.handleSetPriorityAtLine(
         true, // checking only
         0, // line number
         mockEditor as any,
@@ -231,7 +247,9 @@ describe('Priority Commands', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockPlugin.taskEditor.updateTaskPriority).not.toHaveBeenCalled();
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskPriority,
+      ).not.toHaveBeenCalled();
     });
   });
 });

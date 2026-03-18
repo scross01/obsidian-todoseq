@@ -6,8 +6,6 @@
  * per-update tracking mechanism using content hashing.
  */
 
-import { createHash } from 'crypto';
-
 /**
  * Information about a pending expected change.
  */
@@ -236,13 +234,19 @@ export class ChangeTracker {
   }
 
   /**
-   * Hash content using SHA-256.
+   * Hash content using consistent hash function for all platforms.
    *
    * @param content - Content to hash
    * @returns Hex string of the hash
    */
   private hashContent(content: string): string {
-    return createHash('sha256').update(content).digest('hex');
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16);
   }
 
   /**

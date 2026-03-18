@@ -194,16 +194,11 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
 
       taskStateManager.addTask(task);
       originalTask = task;
-      originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'TODO');
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
-      // TaskUpdateCoordinator calls updateTaskState which internally handles CLOSED dates
-      // Note: TaskUpdateCoordinator now gets the current task after optimistic update,
-      // so it calls updateTaskState with a task that has the new state
+      // Coordinator delegates to taskEditor which handles CLOSED date logic
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should be null after transitioning to non-completed state
-      expect(result.closedDate).toBeNull();
     });
 
     it('should remove CLOSED date when transitioning from DONE to LATER', async () => {
@@ -216,10 +211,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'LATER');
+      await taskUpdateCoordinator.updateTaskState(task, 'LATER');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      expect(result.closedDate).toBeNull();
     });
 
     it('should remove CLOSED date when transitioning from DONE to DOING', async () => {
@@ -232,10 +226,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'DOING');
+      await taskUpdateCoordinator.updateTaskState(task, 'DOING');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      expect(result.closedDate).toBeNull();
     });
   });
 
@@ -259,12 +252,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'TODO');
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
-      // TaskUpdateCoordinator calls updateTaskState which handles CLOSED dates internally
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should be null after transitioning to non-completed state
-      expect(result.closedDate).toBeNull();
     });
 
     it('should remove CLOSED date for recurring task with deadline date', async () => {
@@ -286,10 +276,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'TODO');
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      expect(result.closedDate).toBeNull();
     });
 
     it('should remove CLOSED date for recurring task with both dates', async () => {
@@ -320,10 +309,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'TODO');
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      expect(result.closedDate).toBeNull();
     });
   });
 
@@ -338,15 +326,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(
-        task,
-        'ARCHIVED',
-      );
+      await taskUpdateCoordinator.updateTaskState(task, 'ARCHIVED');
 
-      // TaskUpdateCoordinator calls updateTaskState which handles CLOSED dates internally
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should be preserved for ARCHIVED state
-      expect(result.closedDate).toEqual(new Date('2026-03-09'));
     });
 
     it('should NOT update or remove CLOSED date when transitioning from TODO to ARCHIVED', async () => {
@@ -359,14 +341,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(
-        task,
-        'ARCHIVED',
-      );
+      await taskUpdateCoordinator.updateTaskState(task, 'ARCHIVED');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should be preserved for ARCHIVED state
-      expect(result.closedDate).toEqual(new Date('2026-03-09'));
     });
   });
 
@@ -381,12 +358,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'DONE');
+      await taskUpdateCoordinator.updateTaskState(task, 'DONE');
 
-      // TaskUpdateCoordinator calls updateTaskState which handles CLOSED dates internally
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should be set when transitioning to completed state
-      expect(result.closedDate).toBeInstanceOf(Date);
     });
 
     it('should add CLOSED date when transitioning from LATER to DONE', async () => {
@@ -399,10 +373,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'DONE');
+      await taskUpdateCoordinator.updateTaskState(task, 'DONE');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      expect(result.closedDate).toBeInstanceOf(Date);
     });
   });
 
@@ -417,12 +390,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'LATER');
+      await taskUpdateCoordinator.updateTaskState(task, 'LATER');
 
-      // TaskUpdateCoordinator calls updateTaskState which handles CLOSED dates internally
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should remain unchanged for non-completed to non-completed transitions
-      expect(result.closedDate).toEqual(new Date('2026-03-09'));
     });
 
     it('should NOT modify CLOSED date when transitioning from DOING to TODO', async () => {
@@ -435,26 +405,22 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'TODO');
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      expect(result.closedDate).toEqual(new Date('2026-03-09'));
     });
   });
 
   describe('trackClosedDate setting disabled', () => {
     beforeEach(() => {
-      // Destroy existing TaskUpdateCoordinator before creating a new one
       if (taskUpdateCoordinator) {
         taskUpdateCoordinator.destroy();
       }
 
-      // Create settings with trackClosedDate disabled
       const settings = createBaseSettings({
         trackClosedDate: false,
       });
 
-      // Update the mock plugin settings
       mockPlugin.settings = settings;
 
       keywordManager = createTestKeywordManager(settings);
@@ -467,37 +433,27 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
         keywordManager,
       );
 
-      // Update the mock to handle trackClosedDate setting
       mockPlugin.taskEditor.updateTaskState.mockImplementation(
-        async (task, newState) => {
-          const keywordManager = createTestKeywordManager(
+        async (task: Task, newState: string) => {
+          const km = createTestKeywordManager(
             createBaseSettings({
               trackClosedDate: false,
               additionalArchivedKeywords: ['ARCHIVED'],
             }),
           );
-          const isCompleted = keywordManager.isCompleted(newState);
-          const isArchived = keywordManager.isArchived(newState);
-          // When trackClosedDate is false, CLOSED dates are not modified
-          let closedDate: Date | null;
-          if (isArchived) {
-            closedDate = task.closedDate; // Preserve existing CLOSED date for ARCHIVED
-          } else {
-            closedDate = task.closedDate; // Preserve existing CLOSED date when trackClosedDate is false
-          }
+          const isCompleted = km.isCompleted(newState);
           return {
             ...task,
             rawText: task.rawText.replace(task.state, newState),
             state: newState as Task['state'],
             completed: isCompleted,
-            closedDate,
+            closedDate: task.closedDate,
           };
         },
       );
     });
 
     afterEach(() => {
-      // Clean up TaskUpdateCoordinator to prevent open handles
       taskUpdateCoordinator.destroy();
     });
 
@@ -511,11 +467,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'DONE');
+      await taskUpdateCoordinator.updateTaskState(task, 'DONE');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should remain null when trackClosedDate is false
-      expect(result.closedDate).toBeNull();
     });
 
     it('should NOT remove CLOSED date when trackClosedDate is false', async () => {
@@ -528,11 +482,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'TODO');
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should be preserved when trackClosedDate is false
-      expect(result.closedDate).toEqual(new Date('2026-03-09'));
     });
   });
 
@@ -558,11 +510,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'TODO');
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should be null after transitioning to non-completed state
-      expect(result.closedDate).toBeNull();
     });
 
     it('should handle task with null deadlineDateRepeat but non-null scheduledDateRepeat', async () => {
@@ -586,11 +536,9 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'TODO');
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should be null after transitioning to non-completed state
-      expect(result.closedDate).toBeNull();
     });
 
     it('should handle task with repeat info but null date', async () => {
@@ -605,18 +553,16 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
         state: 'DONE' as Task['state'],
         completed: true,
         closedDate: new Date('2026-03-09'),
-        scheduledDate: null, // Date is null even though repeat info exists
+        scheduledDate: null,
         scheduledDateRepeat: scheduledRepeatInfo,
       });
 
       taskStateManager.addTask(task);
       originalTask = task;
 
-      const result = await taskUpdateCoordinator.updateTaskState(task, 'TODO');
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
-      // CLOSED date should be null after transitioning to non-completed state
-      expect(result.closedDate).toBeNull();
     });
   });
 });

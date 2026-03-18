@@ -28,13 +28,14 @@
   "formatTaskKeywords": true,
   "additionalFileExtensions": [],
   "detectOrgModeFiles": false,
+  "migrateToTodayState": "",
   "stateTransitions": {
     "defaultInactive": "",
     "defaultActive": "",
     "defaultCompleted": "",
     "transitionStatements": []
   },
-  "trackClosedDate": true,
+  "trackClosedDate": false,
   "_hasShownFirstInstallView": true,
   "settingsVersion": 2
 }

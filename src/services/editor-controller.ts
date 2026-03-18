@@ -183,11 +183,11 @@ export class EditorController {
         targetState = stateManager.getNextState(task.state);
       }
 
-      // Use unified updateTask method - handles fresh lookup, optimistic update,
+      // Use unified updateTaskByPath method - handles fresh lookup, optimistic update,
       // file write, recurrence, line adjustment, and UI refresh
       const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
       if (taskUpdateCoordinator) {
-        taskUpdateCoordinator.updateTask(
+        taskUpdateCoordinator.updateTaskByPath(
           filePath,
           lineNumber,
           targetState,
@@ -425,16 +425,14 @@ export class EditorController {
    * @param priority - The priority to set ('high', 'med', or 'low')
    * @returns boolean indicating if the command is available
    */
-  handleSetPriorityAtCursor(
+  async handleSetPriorityAtCursor(
     checking: boolean,
     editor: Editor,
     view: MarkdownView,
     priority: 'high' | 'med' | 'low',
-  ): boolean {
-    // Get the current line from the editor
+  ): Promise<boolean> {
     const cursor = editor.getCursor();
 
-    // Use the extracted method to handle the line-based logic
     return this.handleSetPriorityAtLine(
       checking,
       cursor.line,
@@ -451,11 +449,11 @@ export class EditorController {
    * @param view - The markdown view
    * @returns boolean indicating if the command is available
    */
-  handleSetPriorityHighAtCursor(
+  async handleSetPriorityHighAtCursor(
     checking: boolean,
     editor: Editor,
     view: MarkdownView,
-  ): boolean {
+  ): Promise<boolean> {
     return this.handleSetPriorityAtCursor(checking, editor, view, 'high');
   }
 
@@ -466,11 +464,11 @@ export class EditorController {
    * @param view - The markdown view
    * @returns boolean indicating if the command is available
    */
-  handleSetPriorityMediumAtCursor(
+  async handleSetPriorityMediumAtCursor(
     checking: boolean,
     editor: Editor,
     view: MarkdownView,
-  ): boolean {
+  ): Promise<boolean> {
     return this.handleSetPriorityAtCursor(checking, editor, view, 'med');
   }
 
@@ -481,11 +479,11 @@ export class EditorController {
    * @param view - The markdown view
    * @returns boolean indicating if the command is available
    */
-  handleSetPriorityLowAtCursor(
+  async handleSetPriorityLowAtCursor(
     checking: boolean,
     editor: Editor,
     view: MarkdownView,
-  ): boolean {
+  ): Promise<boolean> {
     return this.handleSetPriorityAtCursor(checking, editor, view, 'low');
   }
 
@@ -498,15 +496,16 @@ export class EditorController {
    * @param priority - The priority to set ('high', 'med', or 'low')
    * @returns boolean indicating if the operation was successful
    */
-  handleSetPriorityAtLine(
+  async handleSetPriorityAtLine(
     checking: boolean,
     lineNumber: number,
     editor: Editor,
     view: MarkdownView,
     priority: 'high' | 'med' | 'low',
-  ): boolean {
+  ): Promise<boolean> {
     const taskEditor = this.plugin.taskEditor;
     const vaultScanner = this.plugin.getVaultScanner();
+    const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
 
     if (!taskEditor || !vaultScanner) {
       return false;
@@ -548,7 +547,7 @@ export class EditorController {
 
       // Find the last slash command before the cursor position
       // This handles cases where user types /high, /med, /low, /pri, etc.
-      // The slash command can be at the end or anywhere in the text before the cursor
+      // The slash command can be at the end or anywhere in the text before cursor
       const slashCommandMatch = textBeforeCursor.match(/\s+\/([a-zA-Z]+)\s*$/);
 
       if (slashCommandMatch) {
@@ -568,8 +567,13 @@ export class EditorController {
         }
       }
 
-      // Update the task priority with cleaned text
-      taskEditor.updateTaskPriority(cleanedTask, priority);
+      // Use TaskUpdateCoordinator for consistent UI updates
+      if (taskUpdateCoordinator) {
+        await taskUpdateCoordinator.updateTaskPriority(cleanedTask, priority);
+      } else {
+        // Fallback to TaskEditor if coordinator not available
+        taskEditor.updateTaskPriority(cleanedTask, priority);
+      }
     }
 
     return true;

@@ -35,7 +35,7 @@ graph TB
              PropertySearchEngine["PropertySearchEngine<br/>Property Search"]
              StateTransitionManager["TaskStateTransitionManager<br/>State Transitions"]
              ChangeTracker["ChangeTracker<br/>Expected Change Tracking"]
-             RecurrenceCoordinator["RecurrenceCoordinator<br/>Recurrence Coordination"]
+             RecurrenceCoordinator["RecurrenceCoordinator<br/>Recurrence Coordination (50ms delay)"]
              RecurrenceManager["RecurrenceManager<br/>Recurrence Logic"]
              TransitionParser["TransitionParser<br/>State Transition Syntax"]
          end
@@ -188,7 +188,7 @@ graph TB
 
 - **Responsibility**: File system monitoring, incremental scanning, owns KeywordManager
 - **Key Patterns**: Event-driven architecture, performance optimization, yielding to event loop
-- **Interface**: `scanVault()`, `updateSettings()`, `getKeywordManager()`, `getParser()`, event emission
+- **Interface**: `scanVault()`, `updateSettings()`, `getKeywordManager()`, `getParserRegistry()`, `getParser()`, event emission
 - **Ownership**: Receives and uses KeywordManager instance; receives fully configured ParserRegistry via constructor
 - **Skip Set**: Uses timestamp-based expiration for `skipIncrementalChanges` set (5-second window) to handle chained rapid updates properly
 
@@ -196,7 +196,7 @@ graph TB
 
 - **Responsibility**: Centralized update pipeline with optimistic UI and race condition prevention
 - **Key Patterns**: Command pattern, optimistic updates, per-task locking, file queue management
-- **Interface**: `updateTask()`, `updateTaskState()`, `updateTaskPriority()`, `updateTaskScheduledDate()`, `updateTaskDeadline()`
+- **Interface**: `updateTask()`, `updateTaskState()`, `updateTaskPriority()`, `updateTaskScheduledDate()`, `updateTaskDeadlineDate()`
 - **Change Tracking**: Uses `ChangeTracker` to register expected file changes with content hashing
 - **Recurrence Handling**: Calculates finalState (skipping DONE for recurring tasks), schedules `RecurrenceCoordinator` for date advancement
 - **Mobile Note**: The ChangeTracker requires reading file content before optimistic update, which is not compatible with mobile contexts. For mobile, call `taskEditor.updateTaskState()` directly instead.
@@ -221,7 +221,7 @@ graph TB
 
 - **Responsibility**: Unified vault event handling with debouncing and batching
 - **Key Patterns**: Event aggregation, debouncing, batch processing
-- **Interface**: `onFileChange()`, `initialize()`, event coordination
+- **Interface**: `onFileChange()`, `initialize()`, `setVaultScanner()`, `setPropertySearchEngine()`, event coordination
 
 **PropertySearchEngine** (`src/services/property-search-engine.ts`)
 
@@ -233,7 +233,7 @@ graph TB
 
 - **Responsibility**: Handles all recurrence-related logic for tasks, providing centralized calculation and update of recurring task dates
 - **Key Patterns**: Date calculation, recurrence detection, date line formatting
-- **Interface**: `calculateNextDates()`, `updateTaskKeyword()`, `parseDateFromLine()`
+- **Interface**: `calculateNextDates()`, `updateTaskKeyword()`
 - **Used by**: RecurrenceCoordinator, VaultScanner
 - **Output**: Returns `RecurrenceUpdateResult` with updated lines and new dates
 
@@ -241,7 +241,7 @@ graph TB
 
 - **Responsibility**: Parser for declarative state transition syntax, supporting chain transitions, group alternatives, and terminal states
 - **Key Patterns**: Parser combinators, syntax tree construction, error handling
-- **Interface**: `parse()`, `parseStatement()`, `isTerminalState()`, supports syntax like `TODO -> DOING -> DONE` or `(WAIT | WAITING) -> IN-PROGRESS`
+- **Interface**: `parse()`, `isTerminalState()` (static), supports syntax like `TODO -> DOING -> DONE` or `(WAIT | WAITING) -> IN-PROGRESS`
 - **Used by**: TaskStateTransitionManager
 - **Output**: Returns `ParsedTransitionResult` with transitions map and errors
 
@@ -271,7 +271,7 @@ graph TB
 
 - **Responsibility**: Centralized coordination for recurrence updates (date advancement for recurring tasks)
 - **Key Patterns**: Per-task tracking, delayed updates, editor-aware file operations
-- **Interface**: `scheduleRecurrence()`, `cancelRecurrence()`, `performRecurrenceUpdate()`, `destroy()`
+- **Interface**: `scheduleRecurrence()`, `cancelRecurrence()`, `shouldProcessRecovery()`, `performRecurrenceUpdate()`, `destroy()`
 - **Editor Awareness**: Uses `getFileContent()` helper to read from editor buffer when available (ensures latest content when editor hasn't synced to disk)
 - **File Writes**: Uses `TaskWriter.writeLines()` for proper editor-aware writes
 - **State Independence**: For recurring tasks (those with repeat dates), advances dates regardless of current task state (since DONE state is intentionally skipped during completion)
@@ -295,7 +295,7 @@ graph TB
 
 - **Responsibility**: Task keyword formatting in reader/preview mode
 - **Key Patterns**: Double-click detection, settings change detection
-- **Interface**: `refreshReaderViewFormatter()`, keyword styling, state menus
+- **Interface**: `registerPostProcessor()`, `updateSettings()`, `cleanup()`, keyword styling, state menus
 
 **StatusBarManager** (`src/view/editor-extensions/status-bar.ts`)
 
@@ -337,7 +337,7 @@ graph TB
 
 - **Responsibility**: Right-click context menu for tasks in the main task list, providing quick access to common actions
 - **Key Patterns**: Single-instance pattern, keyboard navigation, mobile long-press support
-- **Interface**: `show()`, `showAtMouseEvent()`, `hide()`, `isVisible()`, `cleanup()`
+- **Interface**: `show(task, position)`, `showAtMouseEvent()`, `hide()`, `isVisible()`, `cleanup()`
 - **Features**: Go to task, priority selection, scheduled date shortcuts, deadline date picker, copy/move to today
 - **Used by**: TaskListView
 
@@ -353,7 +353,7 @@ graph TB
 
 - **Responsibility**: Manages multiple parsers and routes files to appropriate parser
 - **Key Patterns**: Registry pattern, factory pattern, file extension routing
-- **Interface**: `registerParser()`, `getParserForFile()`, `parseFile()`
+- **Interface**: `registerParser()`, `getParserForExtension()`, `getParser()`, `getAllParsers()`, `hasParserForExtension()`, `getSupportedExtensions()`, `unregister()`
 
 **TaskParser** (`src/parser/task-parser.ts`)
 
@@ -382,7 +382,7 @@ graph TB
 
 - **Responsibility**: Query parsing and evaluation
 - **Key Patterns**: Compiler pattern (parsing → AST → evaluation)
-- **Interface**: `search()`, query validation, error handling
+- **Interface**: `parse()`, `evaluate()`, `validate()`, `getError()`, `clearCache()`, query validation, error handling
 
 **SearchParser** (`src/search/search-parser.ts`)
 
@@ -787,7 +787,7 @@ graph LR
 ### 3. Repeating Task System
 
 - **Inline State Skipping**: When completing a recurring task, TODOseq writes the final inactive state (e.g., TODO) directly instead of DONE. The RecurrenceCoordinator then advances the dates.
-- **Delayed Updates**: Recurring tasks use 50ms delay via `RecurrenceCoordinator` before advancing dates
+- **Delayed Updates**: Recurring tasks use 50ms delay via `RecurrenceCoordinator` before advancing dates (scheduled by TaskUpdateCoordinator)
 - **Editor Awareness**: Both `TaskUpdateCoordinator` and `RecurrenceCoordinator` read from the editor buffer when available to ensure they have the latest content
 - **File Write Consistency**: `TaskWriter.writeLines()` ensures all file writes are editor-aware
 - **Recovery Processing**: `VaultScanner` identifies completed recurring tasks on vault reload and coordinates with `RecurrenceCoordinator` to prevent duplicate updates
