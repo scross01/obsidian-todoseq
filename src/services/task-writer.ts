@@ -1,6 +1,10 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
 import { Task, DateRepeatInfo } from '../types/task';
-import { PRIORITY_TOKEN_REGEX, CHECKBOX_REGEX } from '../utils/patterns';
+import {
+  PRIORITY_TOKEN_REGEX,
+  CHECKBOX_REGEX,
+  CHECKBOX_DETECTION_REGEX,
+} from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
 import { DateUtils } from '../utils/date-utils';
@@ -60,13 +64,12 @@ export class TaskWriter {
     const textWithoutQuote = quotePrefix
       ? rawText.substring(quotePrefix.length)
       : rawText;
-    const isCheckbox = textWithoutQuote.match(CHECKBOX_REGEX);
-    // Extract current checkbox state (x for checked, space for unchecked)
+    const checkboxMatch = textWithoutQuote.match(CHECKBOX_DETECTION_REGEX);
+    const isCheckbox = checkboxMatch !== null;
+    // Extract current list marker character (- or * or +) and checkbox state (x for checked, space for unchecked)
     // This preserves the checkbox state when changing to archived states
-    const currentCheckboxMatch = textWithoutQuote.match(/- \[([ x])\]/);
-    const currentCheckboxState = currentCheckboxMatch
-      ? currentCheckboxMatch[1]
-      : ' ';
+    const currentListMarkerChar = checkboxMatch ? checkboxMatch[1] : '-';
+    const currentCheckboxState = checkboxMatch ? checkboxMatch[2] : ' ';
     let newLine: string;
 
     // Get the indent without the quote prefix (task.indent already includes the quote prefix for quoted tasks)
@@ -80,7 +83,7 @@ export class TaskWriter {
         // For checkboxes, keep the checkbox format but remove the task keyword
         // Use single space between checkbox and text
         const textPart = task.text ? ` ${task.text}` : '';
-        newLine = `${indentWithoutQuote}${quotePrefix}- [ ]${textPart}`;
+        newLine = `${indentWithoutQuote}${quotePrefix}${currentListMarkerChar} [ ]${textPart}`;
       } else {
         // For regular tasks, remove the task keyword entirely
         // Handle spacing properly based on whether there's a list marker
@@ -105,7 +108,7 @@ export class TaskWriter {
           ? 'x'
           : ' ';
       const textPart = task.text ? ` ${task.text}` : '';
-      newLine = `${indentWithoutQuote}${quotePrefix}- [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
+      newLine = `${indentWithoutQuote}${quotePrefix}${currentListMarkerChar} [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
     } else {
       // Generate original format, preserving comment prefix if present
       const textPart = task.text ? ` ${task.text}` : '';
@@ -342,7 +345,8 @@ export class TaskWriter {
       const listMarker = match[2];
       const state = match[4];
       const text = match[5];
-      newTaskLine = `${indent}${listMarker} ${state} ${priorityToken} ${text}`;
+      const textPart = text ? ` ${text}` : '';
+      newTaskLine = `${indent}${listMarker} ${state} ${priorityToken}${textPart}`;
     } else {
       // Check for bulleted tasks without checkboxes: - TODO task text
       const bulletMatch = /^(\s*)([-*+])\s+(.+)$/.exec(cleanedLine);

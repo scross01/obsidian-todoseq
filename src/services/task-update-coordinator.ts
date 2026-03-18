@@ -16,7 +16,8 @@ import { isCompletedKeyword } from '../utils/task-utils';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 import { TaskWriter } from './task-writer';
-import { TFile } from 'obsidian';
+import { TFile, MarkdownView } from 'obsidian';
+import { EditorView } from '@codemirror/view';
 import { KeywordManager } from '../utils/keyword-manager';
 import { ChangeTracker } from './change-tracker';
 import { RecurrenceCoordinator } from './recurrence-coordinator';
@@ -369,6 +370,9 @@ export class TaskUpdateCoordinator {
 
       if (context.type === 'state') {
         this.handleRecurrence(updatedTask, context);
+
+        // Update editor checkbox visual state after markdown has been updated
+        this.performDirectEditorCheckboxUpdate(updatedTask, context.newState);
       }
     };
 
@@ -565,6 +569,66 @@ export class TaskUpdateCoordinator {
           }
           completedContainer.remove();
         }
+      }
+    });
+  }
+
+  /**
+   * Perform direct DOM manipulation on editor checkboxes.
+   * Updates the checkbox visual state after markdown has been updated.
+   */
+  private performDirectEditorCheckboxUpdate(
+    task: Task,
+    newState: string,
+  ): void {
+    const isCompleted = isCompletedKeyword(newState, this.plugin.settings);
+    const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+
+    if (!view || !view.file || view.file.path !== task.path) {
+      return;
+    }
+
+    const editorView = (view.editor as { cm?: EditorView })?.cm;
+    if (!editorView) {
+      return;
+    }
+
+    // Use requestAnimationFrame to ensure CodeMirror has finished re-rendering
+    requestAnimationFrame(() => {
+      try {
+        // Find the line element by line number
+        const linePos = editorView.state.doc.line(task.line + 1); // Convert to 1-indexed
+        const domAtPos = editorView.domAtPos(linePos.from);
+
+        if (!domAtPos) {
+          return;
+        }
+
+        // Find the closest line element
+        let lineElement: HTMLElement | null = domAtPos.node as HTMLElement;
+        while (lineElement && !lineElement.classList.contains('cm-line')) {
+          lineElement = lineElement.parentElement;
+        }
+
+        if (!lineElement) {
+          return;
+        }
+
+        // Find the checkbox in this line
+        const checkbox = lineElement.querySelector(
+          '.task-list-item-checkbox',
+        ) as HTMLInputElement;
+
+        if (checkbox) {
+          checkbox.checked = isCompleted;
+        }
+      } catch (error) {
+        // Silently fail if we can't find or update the checkbox
+        // This is a visual enhancement, not critical functionality
+        console.debug(
+          '[TaskUpdateCoordinator] Failed to update checkbox visual state:',
+          error,
+        );
       }
     });
   }

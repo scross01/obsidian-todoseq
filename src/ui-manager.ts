@@ -79,7 +79,7 @@ export class UIManager {
 
               // Handle checkbox clicks
               if (target.classList.contains('task-list-item-checkbox')) {
-                this.handleCheckboxToggle(target as HTMLInputElement);
+                this.handleCheckboxToggle(target as HTMLInputElement, event);
               }
               // Handle task keyword clicks (check target or any ancestor)
               else {
@@ -193,13 +193,20 @@ export class UIManager {
 
   /**
    * When the task checkbox is updated update the task keyword to match.
-   * The keyword state is updated in the DOM directly, and optimistic updates
-   * are triggered for dependent views. The file update is handled by Obsidian's
-   * natural checkbox behavior.
+   * The file update is handled by our task update system, preventing
+   * conflicts with Obsidian's natural behavior.
    */
   private async handleCheckboxToggle(
     checkbox: HTMLInputElement,
+    event?: MouseEvent,
   ): Promise<void> {
+    // Prevent default behavior and stop propagation to take full control of the update
+    // This prevents Obsidian's natural checkbox behavior from fighting with our update
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
     // Find the task keyword span in the same line
     const lineElement = checkbox.closest('.cm-line, .HyperMD-task-line');
     if (!lineElement) {
@@ -225,7 +232,7 @@ export class UIManager {
 
     // CRITICAL: Look up fresh task state from state manager BEFORE computing transition
     // This ensures we use the actual current state, not stale DOM/state
-    const currentLine = this.getLineForElement(checkbox);
+    const currentLine = this.getLineForElement(lineElement as HTMLElement);
     let freshState = currentKeyword;
     if (currentLine !== null) {
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
@@ -243,62 +250,51 @@ export class UIManager {
 
     let newKeyword: string | null = null;
     if (checkbox.checked) {
-      // Checkbox is checked - try to complete the task
-      // Only transition to completed if not already completed
-      // This prevents the bug where clicking a checked checkbox does nothing
+      // Checkbox is being checked - try to complete the task
       newKeyword = stateManager.getNextCompletedOrArchivedState(freshState);
     } else {
+      // Checkbox is being unchecked - move to next non-completed state (usually TODO)
       newKeyword = stateManager.getNextState(freshState);
-      if (newKeyword === freshState) {
-        checkbox.checked = true;
-        return;
-      }
     }
 
-    // If no state change, don't proceed
-    if (newKeyword === freshState) {
+    // If no state change AND the checkbox state already matches, don't proceed
+    if (
+      newKeyword === freshState &&
+      checkbox.checked === stateManager.isCompletedState(freshState)
+    ) {
       return;
     }
 
-    // Update the keyword text and data attribute directly in the DOM
-    keywordSpan.textContent = newKeyword;
-    keywordSpan.setAttribute('data-task-keyword', newKeyword);
-    keywordSpan.setAttribute('aria-label', `Task keyword: ${newKeyword}`);
-
-    // Trigger optimistic update for task list views
-    // The file will be updated by Obsidian's natural checkbox behavior
-    // Reuse currentLine from earlier lookup
+    // Trigger update for the task. We don't update the DOM directly here
+    // to avoid sync issues with CodeMirror. Instead, we let the document
+    // update trigger a clean re-render of the line.
     if (currentLine !== null) {
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
       if (view && view.file) {
         const lineNumber = currentLine - 1; // Convert to 0-indexed
         const filePath = view.file.path;
 
-        // Parse the task from the line for optimistic update
-        const line = view.editor.getLine(lineNumber);
-        const task = this.plugin.editorController.parseTaskFromLine(
-          line,
-          lineNumber,
-          filePath,
-        );
-
-        if (task) {
-          // Use unified updateTaskByPath method - handles fresh lookup, optimistic update,
-          // file write, recurrence, line adjustment, and UI refresh
-          if (this.plugin.taskUpdateCoordinator) {
-            this.plugin.taskUpdateCoordinator.updateTaskByPath(
-              filePath,
-              lineNumber,
-              newKeyword,
-              'editor',
-            );
-          } else if (this.plugin.taskEditor) {
-            // Fallback to TaskEditor if coordinator not available
+        if (this.plugin.taskUpdateCoordinator) {
+          void this.plugin.taskUpdateCoordinator.updateTaskByPath(
+            filePath,
+            lineNumber,
+            newKeyword,
+            'editor',
+          );
+        } else if (this.plugin.taskEditor) {
+          // Fallback to TaskEditor if coordinator not available
+          const line = view.editor.getLine(lineNumber);
+          const task = this.plugin.editorController.parseTaskFromLine(
+            line,
+            lineNumber,
+            filePath,
+          );
+          if (task) {
             await this.plugin.taskEditor.updateTaskState(task, newKeyword);
           }
-          // Refresh task list views
-          this.plugin.refreshAllTaskListViews();
         }
+        // Refresh task list views
+        this.plugin.refreshAllTaskListViews();
       }
     }
   }
@@ -454,15 +450,24 @@ export class UIManager {
    * Get the line number for a DOM element in the editor
    */
   public getLineForElement(element: HTMLElement): number | null {
+    // Find the closest line element if the element itself isn't one
+    const lineElement =
+      element.classList.contains('cm-line') ||
+      element.classList.contains('HyperMD-task-line')
+        ? element
+        : (element.closest('.cm-line, .HyperMD-task-line') as HTMLElement);
+
+    const targetElement = lineElement || element;
+
     // Get the EditorView for this element
-    const editorView = this.getEditorViewFromElement(element);
+    const editorView = this.getEditorViewFromElement(targetElement);
     if (!editorView) {
       return null;
     }
 
     try {
       // Use CodeMirror 6's posAtDOM to get the position of the element
-      const pos = editorView.posAtDOM(element);
+      const pos = editorView.posAtDOM(targetElement);
 
       // Get the line number from the position
       const lineNumber = editorView.state.doc.lineAt(pos).number;

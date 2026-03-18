@@ -50,22 +50,23 @@ export const CHECKBOX_PATTERN_SOURCE = CHECKBOX_PATTERN.source;
 /**
  * Checkbox regex for detecting markdown checkbox tasks with capture groups.
  * Matches: - [ ], - [x], * [ ], * [x], + [ ], + [x]
+ * Supports single word tasks (just keyword) and indented tasks.
  *
  * Capture groups:
  * 1: Leading whitespace
  * 2: Full checkbox marker (e.g., "- [x]")
  * 3: Checkbox status (" " or "x")
- * 4: First word after checkbox
- * 5: Rest of the text
+ * 4: First word after checkbox (the keyword)
+ * 5: Rest of the text (optional)
  */
 export const CHECKBOX_REGEX =
-  /^(\s*)([-*+]\s*\[(\s|[xX])\]\s*)\s+([^\s]+)\s+(.+)$/;
+  /^(\s*)([-*+]\s*\[(\s|x)\])\s+([^\s]+)(?:\s+(.+))?$/;
 
 /**
  * Simple checkbox detection regex (without capture groups for state)
- * Matches: - [ ], - [x], etc.
+ * Matches: - [ ], - [x], etc., including indented lines.
  */
-export const CHECKBOX_DETECTION_REGEX = /^(-|\*|\+)\s+\[[ xX]\]\s*/;
+export const CHECKBOX_DETECTION_REGEX = /^\s*([-*+])\s+\[([ xX\-/])\]\s*/;
 
 // ============================================================================
 // Prefix Patterns

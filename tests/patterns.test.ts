@@ -119,9 +119,9 @@ describe('patterns', () => {
       expect(CHECKBOX_REGEX.test('[] task')).toBe(false); // no list marker
     });
 
-    test('should not match single word after checkbox', () => {
-      expect(CHECKBOX_REGEX.test('- [ ] task')).toBe(false); // only one word
-      expect(CHECKBOX_REGEX.test('- [x] single')).toBe(false); // only one word
+    test('should match single word after checkbox', () => {
+      expect(CHECKBOX_REGEX.test('- [ ] task')).toBe(true); // single word (keyword)
+      expect(CHECKBOX_REGEX.test('- [x] single')).toBe(true); // single word (keyword)
     });
   });
 
