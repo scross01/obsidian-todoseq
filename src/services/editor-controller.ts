@@ -1,4 +1,5 @@
 import { Editor, MarkdownView, Notice } from 'obsidian';
+import { EditorView } from '@codemirror/view';
 import { Task } from '../types/task';
 import TodoTracker from '../main';
 import { detectListMarker } from '../utils/patterns';
@@ -11,6 +12,12 @@ import {
   isTaskOnTodayDailyNote,
 } from '../utils/daily-note-utils';
 import { findDateLine, getTaskIndent } from '../utils/task-line-utils';
+import { TaskContextMenu } from '../view/components/task-context-menu';
+import {
+  DatePicker,
+  DatePickerMode,
+} from '../view/components/date-picker-menu';
+import { DateRepeatInfo } from '../types/task';
 
 /**
  * EditorController handles operations related to modifying tasks in the editor
@@ -1162,6 +1169,292 @@ export class EditorController {
         new Notice('Failed to migrate task to today');
       }
     })();
+
+    return true;
+  }
+
+  /**
+   * Open the task context menu at the cursor position
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the operation was successful
+   */
+  handleOpenContextMenuAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    const vaultScanner = this.plugin.getVaultScanner();
+
+    if (!vaultScanner) {
+      return false;
+    }
+
+    const cursor = editor.getCursor();
+    const line = editor.getLine(cursor.line);
+
+    // Check if this line contains a valid task using VaultScanner's parser
+    const parser = vaultScanner.getParser();
+
+    if (!parser?.testRegex.test(line)) {
+      // Try footnote regex specifically
+      const footnoteRegex =
+        /\[\^\d+\]:\s+(TODO|DOING|LATER|DONE|CANCELED|CANCELLED|WAIT|WAITING|NOW|IN-PROGRESS)\s+/;
+      const footnoteResult = footnoteRegex.test(line);
+      if (!footnoteResult) {
+        return false;
+      }
+    }
+
+    if (checking) {
+      return true;
+    }
+
+    const filePath = view.file?.path || '';
+
+    // Parse the task from the line
+    const task = this.parseTaskFromLine(line, cursor.line, filePath);
+
+    if (!task) {
+      return false;
+    }
+
+    // Get cursor position in screen coordinates using CodeMirror editor
+    const cmEditor = (view.editor as { cm?: EditorView })?.cm;
+    if (!cmEditor) {
+      return false;
+    }
+
+    const pos = editor.posToOffset({ line: cursor.line, ch: 0 });
+    const coords = cmEditor.coordsAtPos(pos);
+
+    if (!coords) {
+      return false;
+    }
+
+    // Create context menu with callbacks
+    const contextMenu = new TaskContextMenu(
+      {
+        onGoToTask: (task: Task) => {
+          // Navigate to the task location (already there since we're in editor)
+          // This callback is mainly for task list view
+        },
+        onCopyTask: (task: Task) => {
+          this.handleCopyTaskToTodayAtCursor(false, editor, view);
+        },
+        onCopyTaskToToday: async (task: Task) => {
+          await this.handleCopyTaskToTodayAtCursor(false, editor, view);
+        },
+        onMoveTaskToToday: async (task: Task) => {
+          await this.handleMoveTaskToTodayAtCursor(false, editor, view);
+        },
+        onMigrateTaskToToday: async (task: Task) => {
+          await this.handleMigrateTaskToTodayAtCursor(false, editor, view);
+        },
+        onPriorityChange: (
+          task: Task,
+          priority: 'high' | 'med' | 'low' | null,
+        ) => {
+          const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
+          if (taskUpdateCoordinator) {
+            taskUpdateCoordinator.updateTask({
+              task,
+              type: 'priority',
+              source: 'editor',
+              newPriority: priority,
+            });
+          }
+        },
+        onScheduledDateChange: async (
+          task: Task,
+          date: Date | null,
+          repeat?: DateRepeatInfo | null,
+        ) => {
+          const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
+          if (taskUpdateCoordinator) {
+            taskUpdateCoordinator.updateTask({
+              task,
+              type: 'scheduled-date',
+              source: 'editor',
+              newDate: date,
+              newRepeat: repeat,
+            });
+          }
+        },
+        onDeadlineDateChange: async (
+          task: Task,
+          date: Date | null,
+          repeat?: DateRepeatInfo | null,
+        ) => {
+          const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
+          if (taskUpdateCoordinator) {
+            taskUpdateCoordinator.updateTask({
+              task,
+              type: 'deadline-date',
+              source: 'editor',
+              newDate: date,
+              newRepeat: repeat,
+            });
+          }
+        },
+      },
+      {
+        weekStartsOn: this.plugin.settings.weekStartsOn,
+        migrateToTodayState: this.plugin.settings.migrateToTodayState,
+      },
+      this.plugin.app,
+      this.plugin.taskStateManager,
+    );
+
+    // Show context menu at cursor position
+    contextMenu.show(task, { x: coords.left, y: coords.top + 20 });
+
+    return true;
+  }
+
+  /**
+   * Open the date picker for scheduled date at the cursor position
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the operation was successful
+   */
+  handleOpenScheduledDatePickerAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    return this.handleOpenDatePickerAtCursor(
+      checking,
+      editor,
+      view,
+      'scheduled',
+    );
+  }
+
+  /**
+   * Open the date picker for deadline date at the cursor position
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the operation was successful
+   */
+  handleOpenDeadlineDatePickerAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    return this.handleOpenDatePickerAtCursor(
+      checking,
+      editor,
+      view,
+      'deadline',
+    );
+  }
+
+  /**
+   * Open the date picker at the cursor position for the specified mode
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @param mode - The date picker mode ('scheduled' or 'deadline')
+   * @returns boolean indicating if the operation was successful
+   */
+  private handleOpenDatePickerAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+    mode: DatePickerMode,
+  ): boolean {
+    const vaultScanner = this.plugin.getVaultScanner();
+
+    if (!vaultScanner) {
+      return false;
+    }
+
+    const cursor = editor.getCursor();
+    const line = editor.getLine(cursor.line);
+
+    // Check if this line contains a valid task using VaultScanner's parser
+    const parser = vaultScanner.getParser();
+
+    if (!parser?.testRegex.test(line)) {
+      // Try footnote regex specifically
+      const footnoteRegex =
+        /\[\^\d+\]:\s+(TODO|DOING|LATER|DONE|CANCELED|CANCELLED|WAIT|WAITING|NOW|IN-PROGRESS)\s+/;
+      const footnoteResult = footnoteRegex.test(line);
+      if (!footnoteResult) {
+        return false;
+      }
+    }
+
+    if (checking) {
+      return true;
+    }
+
+    const filePath = view.file?.path || '';
+
+    // Parse the task from the line
+    const task = this.parseTaskFromLine(line, cursor.line, filePath);
+
+    if (!task) {
+      return false;
+    }
+
+    // Get cursor position in screen coordinates using CodeMirror editor
+    const cmEditor = (view.editor as { cm?: EditorView })?.cm;
+    if (!cmEditor) {
+      return false;
+    }
+
+    const pos = editor.posToOffset({ line: cursor.line, ch: 0 });
+    const coords = cmEditor.coordsAtPos(pos);
+
+    if (!coords) {
+      return false;
+    }
+
+    // Get initial date based on mode
+    const initialDate =
+      mode === 'scheduled' ? task.scheduledDate : task.deadlineDate;
+    const initialRepeat =
+      mode === 'scheduled' ? task.scheduledDateRepeat : task.deadlineDateRepeat;
+
+    // Create date picker with callbacks
+    const datePicker = new DatePicker(
+      {
+        onDateSelected: (
+          date: Date | null,
+          repeat: DateRepeatInfo | null,
+          selectedMode: DatePickerMode,
+        ) => {
+          const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
+          if (taskUpdateCoordinator) {
+            const updateType =
+              selectedMode === 'scheduled' ? 'scheduled-date' : 'deadline-date';
+            taskUpdateCoordinator.updateTask({
+              task,
+              type: updateType,
+              source: 'editor',
+              newDate: date,
+              newRepeat: repeat,
+            });
+          }
+        },
+      },
+      {
+        weekStartsOn: this.plugin.settings.weekStartsOn,
+      },
+    );
+
+    // Show date picker at cursor position
+    datePicker.show(
+      { x: coords.left, y: coords.top + 20 },
+      mode,
+      initialDate,
+      initialRepeat,
+    );
 
     return true;
   }

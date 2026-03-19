@@ -385,6 +385,60 @@ export class PluginLifecycleManager {
       },
     });
 
+    // Add editor command to open context menu
+    this.plugin.addCommand({
+      id: 'open-context-menu',
+      name: 'Open context menu',
+      icon: 'more-horizontal',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.editorController.handleOpenContextMenuAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
+    // Add editor command to open scheduled date picker
+    this.plugin.addCommand({
+      id: 'open-scheduled-date-picker',
+      name: 'Open scheduled date picker',
+      icon: 'calendar-clock',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.editorController.handleOpenScheduledDatePickerAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
+    // Add editor command to open deadline date picker
+    this.plugin.addCommand({
+      id: 'open-deadline-date-picker',
+      name: 'Open deadline date picker',
+      icon: 'calendar-range',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        return this.plugin.editorController.handleOpenDeadlineDatePickerAtCursor(
+          checking,
+          editor,
+          view,
+        );
+      },
+    });
+
     // Listen to VaultScanner events for task updates
     // Note: TaskListView now subscribes directly to TaskStateManager,
     // but we still refresh UI components that need updates

@@ -214,6 +214,11 @@ graph TB
 - **Responsibility**: Editor operations, task parsing under cursor, intent detection
 - **Key Patterns**: Bridge pattern, command delegation
 - **Interface**: Task cycling, priority changes, keyword toggling
+- **Command Palette Actions**: Provides three editor-specific commands that use `editorCheckCallback`:
+  - **Open context menu** (`open-context-menu`, icon: `more-horizontal`): Opens the task context menu at cursor position, providing access to priority, scheduled date, deadline date, and copy/move to today options. Uses CodeMirror editor API (`cmEditor.coordsAtPos()`) to get screen coordinates for positioning the menu. Only appears when cursor is on a valid task line.
+  - **Open scheduled date picker** (`open-scheduled-date-picker`, icon: `calendar-clock`): Opens the date picker dialog for setting the scheduled date at cursor position. Uses CodeMirror editor API for positioning. Only appears when cursor is on a valid task line.
+  - **Open deadline date picker** (`open-deadline-date-picker`, icon: `calendar-range`): Opens the date picker dialog for setting the deadline date at cursor position. Uses CodeMirror editor API for positioning. Only appears when cursor is on a valid task line.
+- **Implementation Details**: All three commands delegate to methods in EditorController: `handleOpenContextMenuAtCursor()`, `handleOpenScheduledDatePickerAtCursor()`, and `handleOpenDeadlineDatePickerAtCursor()`. These methods use the standard Obsidian `editorCheckCallback` signature `(checking: boolean, editor: Editor, view: MarkdownView)` and integrate with `TaskUpdateCoordinator` for task updates.
 
 **TaskWriter** (`src/services/task-writer.ts`)
 
