@@ -507,7 +507,19 @@ Obsidian does not notify plugins when the "Excluded files" setting has been modi
 
 The Toggle task state command palette action is bound to `Ctrl+Enter` by default.
 
-Use the Obsidian Hotkeys setting to add or remove hotkeys for command palette actions.
+Use the Obsidian Hotkeys setting to add or remove hotkeys for command palette actions. Available editor-specific commands include:
+
+- Toggle task state
+- Cycle task state
+- Open context menu
+- Open scheduled date picker
+- Open deadline date picker
+- Add scheduled date
+- Add deadline date
+- Set priority high/medium/low
+- Copy/move/migrate task to today
+
+All editor commands only appear in the command palette when your cursor is on a valid task line.
 
 ## Experimental Features
 

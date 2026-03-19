@@ -4,7 +4,7 @@ TODOseq seamlessly integrates with Obsidian's Markdown editor, providing visual 
 
 For information about task display and interaction in Reader view (Reading/Preview mode), see the [Reader View documentation](reader.md).
 
-![TODOseq task entry and update](./assets/todoseq-task-entry.gif)
+![TODOseq in editor view](./assets/todoseq-editor-view.png)
 
 ## Task Display in the Editor
 
@@ -112,3 +112,9 @@ When "Include tasks inside code blocks" is enabled, TODOseq can apply styling to
 ### Cursor Position Awareness
 
 Editor interactions respect your cursor position. The Ctrl+Enter keyboard shortcut works based on where your cursor is placed, allowing you to toggle task states without precisely clicking on keywords.
+
+### Command Palette Commands
+
+TODOseq provides several editor-specific commands to modify task that can be accessed through Obsidian's Command Palette (Ctrl/Cmd+P) and keyboard shortcuts. Task specific commands only appear when your cursor is on a valid task line
+
+See [Command Palette](command-palette.md) for more details.

@@ -17,6 +17,9 @@ TODOseq provides several commands that can be accessed through Obsidian's Comman
 - TODOseq: Set priority high _(editor only)_
 - TODOseq: Set priority medium _(editor only)_
 - TODOseq: Set priority low _(editor only)_
+- TODOseq: Open context menu _(editor only)_
+- TODOseq: Open scheduled date picker _(editor only)_
+- TODOseq: Open deadline date picker _(editor only)_
 
 ### Show task list
 
@@ -97,3 +100,61 @@ DEADLINE: <2026-01-16>
 ### Set priority high/medium/low
 
 Set the priority of the task at the current cursor position to high `[#A]`, medium `[#B]` or low `[#C]`.
+
+### Open context menu
+
+Opens the task context menu at the current cursor position in the Markdown editor. This command provides quick access to common task actions without using the mouse.
+
+**Availability**: Only appears when the cursor is on a valid task line.
+
+**Features**:
+
+- Go to task (navigation)
+- Priority selection (high, medium, low, or none)
+- Scheduled date shortcuts (today, tomorrow, next week, etc.)
+- Deadline date picker with calendar interface
+- Copy task to today's daily note
+- Move task to today's daily note
+- Migrate task to today's daily note
+
+**Implementation**: Uses CodeMirror editor API to get screen coordinates for positioning the menu at the cursor location.
+
+### Open scheduled date picker
+
+Opens a date picker dialog for setting the scheduled date of the task at the current cursor position. The date picker provides a calendar interface for selecting dates.
+
+**Availability**: Only appears when the cursor is on a valid task line.
+
+**Features**:
+
+- Calendar-based date selection
+- Quick date shortcuts (today, tomorrow, next week, etc.)
+- Support for recurring dates with repeat patterns
+- Integration with task update coordinator for immediate task updates
+
+**Example**:
+
+```txt
+TODO example task
+SCHEDULED: <2026-01-16>
+```
+
+### Open deadline date picker
+
+Opens a date picker dialog for setting the deadline date of the task at the current cursor position. The date picker provides a calendar interface for selecting dates.
+
+**Availability**: Only appears when the cursor is on a valid task line.
+
+**Features**:
+
+- Calendar-based date selection
+- Quick date shortcuts (today, tomorrow, next week, etc.)
+- Support for recurring dates with repeat patterns
+- Integration with task update coordinator for immediate task updates
+
+**Example**:
+
+```txt
+TODO example task
+DEADLINE: <2026-01-16>
+```

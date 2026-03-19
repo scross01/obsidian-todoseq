@@ -28,6 +28,8 @@ DONE Buy groceries
 DEADLINE: <2023-12-20>
 ```
 
+![Editor Task Styling Example](./assets/todoseq-example.png)
+
 ## Installation
 
 ### From Obsidian Community Plugins

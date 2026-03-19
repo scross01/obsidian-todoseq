@@ -2,6 +2,8 @@
 
 The Task List is the central interface for managing all your tasks across your Obsidian vault. It provides a comprehensive overview of your tasks and powerful tools for task management.
 
+![TODOseq with task list side panel](./assets/todoseq-editor-sidepanel-with-context-menu.png)
+
 ## Opening the Task List
 
 ### Automatic Opening
@@ -71,6 +73,8 @@ The checkbox provides a simple toggle between completed and incomplete states:
 
 Right-click any **task keyword** to see all available state options in a popup menu. This shows all possible states for the current task type, allows direct selection of any state, and provides quick access to less commonly used states.
 
+![TODOseq task content menu](./assets/todoseq-context-menu.png){width=50% height=50%}
+
 ### Task Context Menu
 
 Right-click anywhere on a task row in the Task List to open a comprehensive context menu with quick actions for task management. This menu provides fast access to common operations without needing to navigate to the source file.
@@ -87,25 +91,26 @@ The context menu includes several sections:
 - Tomorrow
 - This weekend
 - Next week
-- Next month
-- Pick date... - Opens the Date Picker for custom date, time, and repeat options
 - Clear scheduled date
+- Pick date...
 
 These shortcuts help you quickly reschedule tasks without manually editing dates. The new Date Picker provides a calendar view, time picker, and repeat options for more precise scheduling.
 
-**Deadline** - Access deadline options using the new Date Picker. The date picker provides quick date selections, calendar view, time picker, and repeat options.
+- **Deadline** - Access deadline options using the new Date Picker. The date picker provides quick date selections, calendar view, time picker, and repeat options.
 
-**Copy Task** - Copy the task text to your clipboard. This includes the task keyword, priority, and task text, making it easy to paste the task elsewhere.
+- **Copy** - Copy the task text to your clipboard. This includes the task keyword, priority, and task text, making it easy to paste the task elsewhere.
 
-**Copy to Today** - Copy the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is appended to the end of today's daily note while keeping the original task in place.
+- **Copy to today** - Copy the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is appended to the end of today's daily note while keeping the original task in place.
 
-**Move to Today** - Move the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is removed from its original location and appended to today's daily note. This is useful when you want to consolidate tasks for the current day.
+- **Move to today** - Move the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is removed from its original location and appended to today's daily note. This is useful when you want to consolidate tasks for the current day.
 
-**Migrate to Today** - Copy the task to today's daily note and update the original with a custom state keyword. This option appears only when both the Daily Notes plugin is enabled and a migrated state keyword is configured in settings. The original task's keyword is replaced with the configured state (see [Migrated state keyword](settings.md#migrated-state-keyword)). This is useful for marking tasks as moved or archived while preserving them in today's note.
+- **Migrate to today** - Copy the task to today's daily note and update the original with a custom state keyword. This option appears only when both the Daily Notes plugin is enabled and a migrated state keyword is configured in settings. The original task's keyword is replaced with the configured state (see [Migrated state keyword](settings.md#migrated-state-keyword)). This is useful for marking tasks as moved or archived while preserving them in today's note.
 
 The context menu supports keyboard navigation with arrow keys and Enter to select options, and can be dismissed with Escape. On mobile devices, long-press on a task row opens the context menu.
 
 ### Date Picker
+
+![TODOseq task content menu](./assets/todoseq-date-picker.png){width=50% height=50%}
 
 Use the Date Picker for selecting and managing task dates. The Date Picker provides:
 
@@ -130,50 +135,9 @@ In all cases, TODOseq navigates to the exact line containing the task and focuse
 
 ## Sort Methods
 
-Choose how tasks are ordered using the sort method dropdown:
+Sort the task list
 
-### 1. Default (File Path + Line Number)
-
-Tasks sorted alphabetically by vault file path and file name. Within each file, tasks are sorted by line number.
-
-### 2. Scheduled Date
-
-Tasks sorted by their SCHEDULED date. Tasks without scheduled dates appear at the end, with earlier dates appearing first. When two tasks have the same scheduled date, they are sorted by keyword group and position, then by file path and line number.
-
-### 3. Deadline Date
-
-Tasks sorted by their DEADLINE date. Tasks without deadline dates appear at the end, with earlier deadlines appearing first. When two tasks have the same deadline date, they are sorted by keyword group and position, then by file path and line number.
-
-### 4. Priority
-
-Tasks sorted by priority: High (`[#A]`) > Medium (`[#B]`) > Low (`[#C]`) > No priority. Within each priority level, tasks are sorted by keyword group and position, then by file path and line number.
-
-### 5. Urgency
-
-Tasks sorted by calculated urgency score (highest to lowest). Urgency is calculated based on multiple factors including due dates, priority, tags, and task state. Tasks with no urgency score appear at the end, and completed tasks are not included in urgency sorting. When two tasks have the same urgency score, they are sorted by keyword group and position, then by file path and line number.
-
-### 6. Keyword
-
-Tasks are sorted by effective keyword group and keyword order from your settings. That means custom keywords and advanced built-in overrides both affect this sort.
-
-Tasks are classified into 4 ordered groups:
-
-| Group         | Keywords                 |
-| ------------- | ------------------------ |
-| 1 - Active    | Active group keywords    |
-| 2 - Inactive  | Inactive group keywords  |
-| 3 - Waiting   | Waiting group keywords   |
-| 4 - Completed | Completed group keywords |
-
-**Example:**
-
-If you have current tasks with keywords DOING, TODO, and WAIT, they will be ordered as:
-
-1. DOING tasks (Group 1 - Active)
-2. TODO tasks (Group 2 - Inactive)
-3. WAIT tasks (Group 3 - Waiting)
-
-Within each group, tasks follow the keyword order currently defined in settings.
+See [Sort Methods](sort-methods.md) for detials.
 
 ## Search Functionality
 

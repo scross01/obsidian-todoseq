@@ -1,5 +1,7 @@
 # Introduction to TODOseq
 
+![TODOseq in action](./assets/todoseq-task-entry.gif)
+
 ## What is TODOseq?
 
 TODOseq ("to-do-seek") is a lightweight, keyword-based task management plugin for Obsidian that brings Org-mode and Logseq-style task tracking to your knowledge base. Unlike traditional checkbox-based task managers, TODOseq uses simple state keywords to define and manage tasks throughout your vault.

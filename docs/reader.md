@@ -2,6 +2,8 @@
 
 TODOseq brings the same interactive task experience from the editor into Obsidian's Reader view (also called Reading mode or Preview mode). When you're reading your notes rather than editing them, your tasks remain fully functional—you can click keywords to change states, use context menus, and see the same visual styling that helps you quickly identify task status.
 
+![TODOseq in reader View](./assets/todoseq-reader-view.png)
+
 ## What You Get in Reader View
 
 When the "Format task keywords" setting is enabled, TODOseq transforms how tasks appear in Reader view. Task keywords like `TODO`, `DOING`, and `DONE` receive distinctive styling with bold formatting and your theme's accent color. Completed tasks display with a line-through effect, making it immediately obvious which items are finished. SCHEDULED and DEADLINE lines also receive special formatting to stand out from regular text.
