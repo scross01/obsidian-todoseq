@@ -23,6 +23,12 @@ import { ChangeTracker } from './change-tracker';
 import { RecurrenceCoordinator } from './recurrence-coordinator';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
 import { RecurrenceManager } from './recurrence-manager';
+import {
+  calculateTaskUrgency,
+  getDefaultCoefficients,
+  UrgencyContext,
+  UrgencyCoefficients,
+} from '../utils/task-urgency';
 
 /**
  * Types of task updates supported by the coordinator
@@ -103,6 +109,7 @@ export class TaskUpdateCoordinator {
   private changeTracker: ChangeTracker;
   private recurrenceCoordinator: RecurrenceCoordinator;
   private recurrenceManager: RecurrenceManager;
+  private urgencyCoefficients: UrgencyCoefficients = getDefaultCoefficients();
 
   /** Per-task locking: prevents race conditions from rapid updates to same task */
   private pendingTaskUpdates = new Map<string, Promise<void>>();
@@ -132,6 +139,13 @@ export class TaskUpdateCoordinator {
 
     // Set the TaskUpdateCoordinator reference to avoid circular dependency
     this.recurrenceCoordinator.setTaskUpdateCoordinator(this);
+  }
+
+  /**
+   * Update the urgency coefficients (called when settings change).
+   */
+  setUrgencyCoefficients(coefficients: UrgencyCoefficients): void {
+    this.urgencyCoefficients = coefficients;
   }
 
   /**
@@ -612,6 +626,8 @@ export class TaskUpdateCoordinator {
       return;
     }
 
+    const urgency = this.calculateUrgencyForTask(updatedTask);
+
     switch (context.type) {
       case 'state':
         this.taskStateManager.updateTaskByPathAndLine(
@@ -626,6 +642,7 @@ export class TaskUpdateCoordinator {
             scheduledDateRepeat: updatedTask.scheduledDateRepeat,
             deadlineDateRepeat: updatedTask.deadlineDateRepeat,
             closedDate: updatedTask.closedDate,
+            urgency,
           },
         );
         break;
@@ -638,6 +655,7 @@ export class TaskUpdateCoordinator {
             rawText: updatedTask.rawText,
             scheduledDate: updatedTask.scheduledDate,
             scheduledDateRepeat: updatedTask.scheduledDateRepeat,
+            urgency,
           },
         );
         break;
@@ -650,6 +668,7 @@ export class TaskUpdateCoordinator {
             rawText: updatedTask.rawText,
             deadlineDate: updatedTask.deadlineDate,
             deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+            urgency,
           },
         );
         break;
@@ -661,6 +680,7 @@ export class TaskUpdateCoordinator {
           {
             rawText: updatedTask.rawText,
             priority: updatedTask.priority,
+            urgency,
           },
         );
         break;
@@ -677,12 +697,29 @@ export class TaskUpdateCoordinator {
             deadlineDate: updatedTask.deadlineDate,
             scheduledDateRepeat: updatedTask.scheduledDateRepeat,
             deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+            urgency,
           },
         );
         break;
     }
 
     this.taskStateManager.notifySubscribers();
+  }
+
+  /**
+   * Calculate urgency for a task using current urgency coefficients.
+   */
+  private calculateUrgencyForTask(task: Task): number | null {
+    if (task.completed) {
+      return null;
+    }
+
+    const urgencyContext: UrgencyContext = {
+      activeKeywordsSet: this.keywordManager.getActiveSet(),
+      waitingKeywordsSet: this.keywordManager.getWaitingSet(),
+    };
+
+    return calculateTaskUrgency(task, this.urgencyCoefficients, urgencyContext);
   }
 
   /**

@@ -185,6 +185,8 @@ export default class TodoTracker extends Plugin {
         this.settings,
         urgencyCoefficients,
       );
+      // Sync urgency coefficients to TaskUpdateCoordinator
+      this.taskUpdateCoordinator.setUrgencyCoefficients(urgencyCoefficients);
     }
   }
 
@@ -220,6 +222,9 @@ export default class TodoTracker extends Plugin {
         this.settings,
         urgencyCoefficients,
       );
+
+      // Sync urgency coefficients to TaskUpdateCoordinator
+      this.taskUpdateCoordinator.setUrgencyCoefficients(urgencyCoefficients);
 
       // Sync KeywordManager reference from VaultScanner to main.ts
       this.keywordManager = this.vaultScanner.getKeywordManager();
