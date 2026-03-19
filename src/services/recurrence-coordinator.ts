@@ -49,7 +49,7 @@ export interface RecurrenceCoordinatorOptions {
  * const coordinator = new RecurrenceCoordinator(app, taskStateManager);
  *
  * // Schedule a recurrence update for a completed task
- * coordinator.scheduleRecurrence(task, 3000);
+ * coordinator.scheduleRecurrence(task, 50);
  *
  * // Check if recovery should process a task
  * if (coordinator.shouldProcessRecovery(task)) {
@@ -123,7 +123,7 @@ export class RecurrenceCoordinator {
    * Schedule a recurrence update for a task.
    *
    * @param task - The task to schedule recurrence for
-   * @param delayMs - Delay in milliseconds (default: 3000)
+   * @param delayMs - Delay in milliseconds
    */
   scheduleRecurrence(task: Task, delayMs: number = this.defaultDelayMs): void {
     const key = this.getTaskKey(task);

@@ -90,7 +90,7 @@ export class StatusBarManager {
       hasParentDirectory && activeFile instanceof TFile
         ? `path:"${activeFile.parent?.path || ''}" `
         : '';
-    const fileFilter = `file:"${activeFile.basename}"`;
+    const fileFilter = `file:"${activeFile.basename}.${activeFile.extension}`;
     const searchQuery = pathFilter + fileFilter;
 
     const leaves = this.plugin.app.workspace.getLeavesOfType(

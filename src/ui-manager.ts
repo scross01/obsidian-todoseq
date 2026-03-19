@@ -200,23 +200,23 @@ export class UIManager {
     checkbox: HTMLInputElement,
     event?: MouseEvent,
   ): Promise<void> {
-    // Prevent default behavior and stop propagation to take full control of the update
-    // This prevents Obsidian's natural checkbox behavior from fighting with our update
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-
-    // Find the task keyword span in the same line
+    // Find the task keyword span in the same line first
     const lineElement = checkbox.closest('.cm-line, .HyperMD-task-line');
     if (!lineElement) {
       return;
     }
 
-    // Find the task keyword span
+    // Find the task keyword span - if not a TODOseq task, let Obsidian handle it normally
     const keywordSpan = lineElement.querySelector('.todoseq-keyword-formatted');
     if (!keywordSpan) {
-      return;
+      return; // Let Obsidian's natural checkbox behavior handle this
+    }
+
+    // Prevent default behavior and stop propagation to take full control of the update
+    // This prevents Obsidian's natural checkbox behavior from fighting with our update
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
     }
 
     // Get current keyword

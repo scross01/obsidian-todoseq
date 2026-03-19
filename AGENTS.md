@@ -7,7 +7,7 @@ This file provides guidance to agents when working with code in this repository.
 - **ALWAYS** consider the performance impact of any changes and prioritise performance without sacrificing functionality
 - **REMEMBER** this is an Obsidian plugin and should be treated as such, it is not a generic web app.
 - **DO NOT** use Unsafe assignment of an `any` value.
-- **TEST DRIVEN DEVELOPMENT** write or update unit tests before making changes to the codebase.
+- **TEST DRIVEN DEVELOPMENT** write or update unit tests before making changes to the codebase where unit test are appropriate (without significant mocking).
 - **DO NOT** use `console.log` for debugging, use `console.debug` instead.
 - **ALWAYS** use obsidian editor and vault APIs for file operations, do not use node.js file APIs for direct file manipulation.
 - **ALWAYS** use the `TaskWriter` to write tasks to files, do not use the editor or vault APIs directly.

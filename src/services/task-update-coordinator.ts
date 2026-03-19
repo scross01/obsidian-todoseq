@@ -237,6 +237,8 @@ export class TaskUpdateCoordinator {
 
   /**
    * Convenience method: Update task state by path and line.
+   * If the task is not found (e.g., was archived), re-parse it from the file
+   * if the new state is non-archived.
    */
   async updateTaskByPath(
     taskPath: string,
@@ -244,22 +246,71 @@ export class TaskUpdateCoordinator {
     newState: string,
     source: UpdateSource = 'editor',
   ): Promise<void> {
-    const task = this.taskStateManager.findTaskByPathAndLine(
-      taskPath,
-      taskLine,
-    );
+    let task = this.taskStateManager.findTaskByPathAndLine(taskPath, taskLine);
+
+    if (!task && !this.keywordManager.isArchived(newState)) {
+      task = await this.reAddTaskFromFile(taskPath, taskLine);
+    }
+
     if (!task) {
-      console.error(
+      console.debug(
         `[TaskUpdateCoordinator] Task not found at path=${taskPath}, line=${taskLine}`,
       );
       return;
     }
+
     return this.updateTask({
       task,
       type: 'state',
       source,
       newState,
     });
+  }
+
+  /**
+   * Re-parse a task from a file and add it to the state manager.
+   * Used when a task transitions from archived back to a non-archived state.
+   */
+  private async reAddTaskFromFile(
+    taskPath: string,
+    taskLine: number,
+  ): Promise<Task | null> {
+    const parser = this.plugin.vaultScanner?.getParser();
+    if (!parser) {
+      return null;
+    }
+
+    try {
+      const file = this.plugin.app.vault.getAbstractFileByPath(taskPath);
+      if (!(file instanceof TFile)) {
+        return null;
+      }
+
+      const content = await this.plugin.app.vault.read(file);
+      const lines = content.split('\n');
+
+      if (taskLine < 0 || taskLine >= lines.length) {
+        return null;
+      }
+
+      const line = lines[taskLine];
+      const parsedTask = parser.parseLine(line, taskLine, taskPath);
+
+      if (parsedTask) {
+        const existingTask = this.taskStateManager.findTaskByPathAndLine(
+          taskPath,
+          taskLine,
+        );
+        if (!existingTask) {
+          this.taskStateManager.addTask(parsedTask);
+        }
+        return parsedTask;
+      }
+    } catch (error) {
+      console.debug(`[TaskUpdateCoordinator] Failed to re-parse task:`, error);
+    }
+
+    return null;
   }
 
   /**
@@ -314,23 +365,20 @@ export class TaskUpdateCoordinator {
    * SYNC PHASE: Execute immediately, always completes.
    */
   private performSyncPhase(context: ProcessingContext): void {
-    switch (context.type) {
-      case 'state':
-        this.taskStateManager.optimisticUpdate(context.task, context.newState);
-        break;
-      case 'recurrence':
-        if (context.newStateForRecurrence) {
-          this.taskStateManager.optimisticUpdate(
-            context.task,
-            context.newStateForRecurrence,
-          );
-        }
-        break;
-      case 'scheduled-date':
-      case 'deadline-date':
-      case 'priority':
-      case 'closed-date':
-        break;
+    const newState =
+      context.type === 'state'
+        ? context.newState
+        : (context.newStateForRecurrence ?? '');
+
+    if (
+      context.type === 'state' ||
+      (context.type === 'recurrence' && context.newStateForRecurrence)
+    ) {
+      this.taskStateManager.optimisticUpdate(context.task, newState);
+
+      if (this.keywordManager.isArchived(newState)) {
+        this.removeTaskFromStateManager(context.task);
+      }
     }
 
     if (context.type === 'state') {
@@ -554,6 +602,16 @@ export class TaskUpdateCoordinator {
     updatedTask: Task,
     context: ProcessingContext,
   ): void {
+    const isStateUpdate =
+      context.type === 'state' || context.type === 'recurrence';
+    const newState =
+      context.type === 'state' ? context.newState : updatedTask.state;
+
+    if (isStateUpdate && this.keywordManager.isArchived(newState)) {
+      this.removeTaskFromStateManager(updatedTask);
+      return;
+    }
+
     switch (context.type) {
       case 'state':
         this.taskStateManager.updateTaskByPathAndLine(
@@ -762,6 +820,16 @@ export class TaskUpdateCoordinator {
     if (this.plugin.refreshVisibleEditorDecorations) {
       this.plugin.refreshVisibleEditorDecorations();
     }
+  }
+
+  /**
+   * Remove a task from the state manager and notify subscribers.
+   * Used when a task transitions to an archived state.
+   */
+  private removeTaskFromStateManager(task: Task): void {
+    this.taskStateManager.removeTasks(
+      (t) => t.path === task.path && t.line === task.line,
+    );
   }
 
   /**
