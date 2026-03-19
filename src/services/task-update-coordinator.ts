@@ -493,28 +493,38 @@ export class TaskUpdateCoordinator {
 
       case 'recurrence': {
         let updatedTask = task;
+        let totalLineDelta = 0;
         // Update scheduled date if needed
         if (context.newScheduledDate !== undefined) {
           if (context.newScheduledDate === null) {
-            updatedTask = await taskEditor.removeTaskScheduledDate(updatedTask);
+            const result =
+              await taskEditor.removeTaskScheduledDate(updatedTask);
+            updatedTask = result;
+            totalLineDelta += result.lineDelta ?? 0;
           } else {
-            updatedTask = await taskEditor.updateTaskScheduledDate(
+            const result = await taskEditor.updateTaskScheduledDate(
               updatedTask,
               context.newScheduledDate,
               context.newScheduledRepeat ?? updatedTask.scheduledDateRepeat,
             );
+            updatedTask = result;
+            totalLineDelta += result.lineDelta ?? 0;
           }
         }
         // Update deadline date if needed
         if (context.newDeadlineDate !== undefined) {
           if (context.newDeadlineDate === null) {
-            updatedTask = await taskEditor.removeTaskDeadlineDate(updatedTask);
+            const result = await taskEditor.removeTaskDeadlineDate(updatedTask);
+            updatedTask = result;
+            totalLineDelta += result.lineDelta ?? 0;
           } else {
-            updatedTask = await taskEditor.updateTaskDeadlineDate(
+            const result = await taskEditor.updateTaskDeadlineDate(
               updatedTask,
               context.newDeadlineDate,
               context.newDeadlineRepeat ?? updatedTask.deadlineDateRepeat,
             );
+            updatedTask = result;
+            totalLineDelta += result.lineDelta ?? 0;
           }
         }
         // Update state if needed
@@ -523,6 +533,11 @@ export class TaskUpdateCoordinator {
             updatedTask,
             context.newStateForRecurrence,
           );
+        }
+        // Store accumulated lineDelta for the async phase to handle
+        if (totalLineDelta !== 0) {
+          (updatedTask as Task & { lineDelta?: number }).lineDelta =
+            totalLineDelta;
         }
         return updatedTask;
       }

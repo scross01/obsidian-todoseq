@@ -175,23 +175,23 @@ export class TaskWriter {
       this.keywordManager,
     );
 
+    // Check if target is the active file in a MarkdownView
+    // Using getActiveViewOfType() is safer than accessing workspace.activeLeaf directly
+    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const isActive = md?.file?.path === task.path;
+    const editor = md?.editor;
+
+    // Check if we're in source/edit mode (has editor) vs preview/reader mode
+    // In preview mode, getViewType() returns 'markdown' but editor is undefined or null
+    const isSourceMode =
+      isActive &&
+      editor &&
+      md?.getViewType() === 'markdown' &&
+      md?.getMode &&
+      md.getMode() === 'source';
+
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
-      // Check if target is the active file in a MarkdownView
-      // Using getActiveViewOfType() is safer than accessing workspace.activeLeaf directly
-      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
-      const isActive = md?.file?.path === task.path;
-      const editor = md?.editor;
-
-      // Check if we're in source/edit mode (has editor) vs preview/reader mode
-      // In preview mode, getViewType() returns 'markdown' but editor is undefined or null
-      const isSourceMode =
-        isActive &&
-        editor &&
-        md?.getViewType() === 'markdown' &&
-        md?.getMode &&
-        md.getMode() === 'source';
-
       if (isSourceMode && !forceVaultApi) {
         // Replace only the specific line using Editor API to preserve editor state
         // This maintains cursor position, selection, and code folds for better UX
@@ -227,32 +227,117 @@ export class TaskWriter {
         }
       } else {
         // Not in source mode (preview/reader mode) or not active or forceVaultApi: use atomic background edit
+        // Include CLOSED date handling atomically in the same operation for consistency
+        const dateStr =
+          completed && settings?.trackClosedDate
+            ? DateUtils.formatClosedDate(new Date())
+            : null;
+        const shouldRemoveClosed = !completed && task.closedDate;
+
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
           if (task.line < lines.length) {
             lines[task.line] = newLine;
           }
+
+          // Handle CLOSED date atomically with task line update
+          if (dateStr !== null) {
+            // Adding CLOSED date
+            const currentLine = lines[task.line];
+            const taskIndent = getTaskIndent(currentLine);
+
+            // Search for existing CLOSED line
+            const closedLineIndex = findDateLine(
+              lines,
+              task.line + 1,
+              'CLOSED',
+              taskIndent,
+            );
+
+            // Find insert position (after DEADLINE/SCHEDULED if present, otherwise after task)
+            let insertIndex = task.line + 1;
+            const deadlineLineIndex = findDateLine(
+              lines,
+              task.line + 1,
+              'DEADLINE',
+              taskIndent,
+            );
+            if (deadlineLineIndex !== -1) {
+              insertIndex = deadlineLineIndex + 1;
+            } else {
+              const scheduledLineIndex = findDateLine(
+                lines,
+                task.line + 1,
+                'SCHEDULED',
+                taskIndent,
+              );
+              if (scheduledLineIndex !== -1) {
+                insertIndex = scheduledLineIndex + 1;
+              }
+            }
+
+            // Preserve existing indentation of CLOSED line if found
+            let closedIndent = taskIndent;
+            if (closedLineIndex >= 0) {
+              const line = lines[closedLineIndex];
+              const lineIndent = line.match(/^(\s*)/)?.[1] ?? '';
+              const lineQuotePrefix = line.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
+              closedIndent = lineQuotePrefix || lineIndent;
+            }
+
+            if (closedLineIndex >= 0) {
+              lines[closedLineIndex] = `${closedIndent}CLOSED: ${dateStr}`;
+            } else {
+              lines.splice(insertIndex, 0, `${closedIndent}CLOSED: ${dateStr}`);
+            }
+          } else if (shouldRemoveClosed) {
+            // Removing CLOSED date
+            const currentLine = lines[task.line];
+            const taskIndent = getTaskIndent(currentLine);
+
+            const closedLineIndex = findDateLine(
+              lines,
+              task.line + 1,
+              'CLOSED',
+              taskIndent,
+            );
+            if (closedLineIndex >= 0) {
+              lines.splice(closedLineIndex, 1);
+            }
+          }
+
           return lines.join('\n');
         });
       }
     }
 
-    // Handle CLOSED date for completed tasks
+    // For source mode, handle CLOSED date separately (Editor API doesn't support atomic multi-line operations)
     // Calculate line delta: +1 if new line inserted, -1 if removed, 0 if updated or no change
     let lineDelta = 0;
     let updatedClosedDate = task.closedDate;
-    if (completed && settings?.trackClosedDate) {
-      const closedResult = await this.updateTaskClosedDate(
-        task,
-        new Date(),
-        forceVaultApi,
-      );
-      lineDelta += closedResult.lineDelta;
-      updatedClosedDate = closedResult.task.closedDate;
-    } else if (!completed && task.closedDate) {
-      const closedResult = await this.removeTaskClosedDate(task, forceVaultApi);
-      lineDelta += closedResult.lineDelta;
-      updatedClosedDate = closedResult.task.closedDate;
+    if (isSourceMode && !forceVaultApi) {
+      if (completed && settings?.trackClosedDate) {
+        const closedResult = await this.updateTaskClosedDate(
+          task,
+          new Date(),
+          false,
+        );
+        lineDelta += closedResult.lineDelta;
+        updatedClosedDate = closedResult.task.closedDate;
+      } else if (!completed && task.closedDate) {
+        const closedResult = await this.removeTaskClosedDate(task, false);
+        lineDelta += closedResult.lineDelta;
+        updatedClosedDate = closedResult.task.closedDate;
+      }
+    } else if (!isSourceMode || forceVaultApi) {
+      // For non-source mode, CLOSED date was handled atomically above
+      if (completed && settings?.trackClosedDate) {
+        lineDelta = task.closedDate ? 0 : 1;
+        updatedClosedDate = new Date();
+      } else if (!completed && task.closedDate) {
+        lineDelta = -1;
+        updatedClosedDate = null;
+      }
     }
 
     // Return an updated Task snapshot (do not mutate original)
@@ -461,12 +546,13 @@ export class TaskWriter {
    * Updates or adds a SCHEDULED date line below the task.
    * If a SCHEDULED line already exists, it is updated in place.
    * If no SCHEDULED line exists, a new one is inserted after the task line.
+   * Returns the updated task with lineDelta for the coordinator to adjust subsequent task indices.
    */
   async updateTaskScheduledDate(
     task: Task,
     newDate: Date,
     repeat?: DateRepeatInfo | null,
-  ): Promise<Task> {
+  ): Promise<Task & { lineDelta?: number }> {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const year = newDate.getFullYear();
     const month = String(newDate.getMonth() + 1).padStart(2, '0');
@@ -480,6 +566,7 @@ export class TaskWriter {
         : ` ${hours}:${minutes}`;
     const repeatStr = repeat ? ` ${repeat.raw}` : '';
     const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}>`;
+    let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
@@ -513,6 +600,7 @@ export class TaskWriter {
         if (scheduledLineIndex >= 0) {
           // Update existing SCHEDULED line, preserving its indentation
           lines[scheduledLineIndex] = `${scheduledIndent}SCHEDULED: ${dateStr}`;
+          lineDelta = 0; // Updated in place, no line count change
         } else {
           // Insert new SCHEDULED line
           // If task has deadline date, insert before the deadline line
@@ -539,17 +627,22 @@ export class TaskWriter {
             0,
             `${scheduledIndent}SCHEDULED: ${dateStr}`,
           );
+          lineDelta = 1; // New line inserted
         }
 
         return lines.join('\n');
       });
     }
 
-    return {
+    const result: Task & { lineDelta?: number } = {
       ...task,
       scheduledDate: newDate,
       scheduledDateRepeat: repeat ?? null,
     };
+    if (lineDelta !== 0) {
+      result.lineDelta = lineDelta;
+    }
+    return result;
   }
 
   /**
@@ -558,8 +651,13 @@ export class TaskWriter {
    * Note: This method attempts to remove the SCHEDULED line regardless of whether
    * the task.scheduledDate property is set, as there may be a discrepancy between
    * the parsed property and what exists in the file.
+   * Returns the updated task with lineDelta for the coordinator to adjust subsequent task indices.
    */
-  async removeTaskScheduledDate(task: Task): Promise<Task> {
+  async removeTaskScheduledDate(
+    task: Task,
+  ): Promise<Task & { lineDelta?: number }> {
+    let lineDelta = 0;
+
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
@@ -579,28 +677,34 @@ export class TaskWriter {
 
         if (scheduledLineIndex >= 0) {
           lines.splice(scheduledLineIndex, 1); // Remove the SCHEDULED line
+          lineDelta = -1; // Line was removed
         }
 
         return lines.join('\n');
       });
     }
 
-    return {
+    const result: Task & { lineDelta?: number } = {
       ...task,
       scheduledDate: null,
     };
+    if (lineDelta !== 0) {
+      result.lineDelta = lineDelta;
+    }
+    return result;
   }
 
   /**
    * Updates or adds a DEADLINE date line below the task.
    * If a DEADLINE line already exists, it is updated in place.
    * If no DEADLINE line exists, a new one is inserted after the task line.
+   * Returns the updated task with lineDelta for the coordinator to adjust subsequent task indices.
    */
   async updateTaskDeadlineDate(
     task: Task,
     newDate: Date,
     repeat?: DateRepeatInfo | null,
-  ): Promise<Task> {
+  ): Promise<Task & { lineDelta?: number }> {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const year = newDate.getFullYear();
     const month = String(newDate.getMonth() + 1).padStart(2, '0');
@@ -614,6 +718,7 @@ export class TaskWriter {
         : ` ${hours}:${minutes}`;
     const repeatStr = repeat ? ` ${repeat.raw}` : '';
     const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}>`;
+    let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
@@ -647,6 +752,7 @@ export class TaskWriter {
         if (deadlineLineIndex >= 0) {
           // Update existing DEADLINE line, preserving its indentation
           lines[deadlineLineIndex] = `${deadlineIndent}DEADLINE: ${dateStr}`;
+          lineDelta = 0; // Updated in place, no line count change
         } else {
           // Insert new DEADLINE line
           // If task has scheduled date, insert after the scheduled line
@@ -669,17 +775,22 @@ export class TaskWriter {
           }
 
           lines.splice(insertIndex, 0, `${deadlineIndent}DEADLINE: ${dateStr}`);
+          lineDelta = 1; // New line inserted
         }
 
         return lines.join('\n');
       });
     }
 
-    return {
+    const result: Task & { lineDelta?: number } = {
       ...task,
       deadlineDate: newDate,
       deadlineDateRepeat: repeat ?? null,
     };
+    if (lineDelta !== 0) {
+      result.lineDelta = lineDelta;
+    }
+    return result;
   }
 
   /**
@@ -688,8 +799,13 @@ export class TaskWriter {
    * Note: This method attempts to remove the DEADLINE line regardless of whether
    * the task.deadlineDate property is set, as there may be a discrepancy between
    * the parsed property and what exists in the file.
+   * Returns the updated task with lineDelta for the coordinator to adjust subsequent task indices.
    */
-  async removeTaskDeadlineDate(task: Task): Promise<Task> {
+  async removeTaskDeadlineDate(
+    task: Task,
+  ): Promise<Task & { lineDelta?: number }> {
+    let lineDelta = 0;
+
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
@@ -709,16 +825,21 @@ export class TaskWriter {
 
         if (deadlineLineIndex >= 0) {
           lines.splice(deadlineLineIndex, 1); // Remove the DEADLINE line
+          lineDelta = -1; // Line was removed
         }
 
         return lines.join('\n');
       });
     }
 
-    return {
+    const result: Task & { lineDelta?: number } = {
       ...task,
       deadlineDate: null,
     };
+    if (lineDelta !== 0) {
+      result.lineDelta = lineDelta;
+    }
+    return result;
   }
 
   /**

@@ -112,6 +112,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
           ...task,
           scheduledDate: newDate,
           scheduledDateRepeat: repeat,
+          lineDelta: 1,
         };
       },
     );
@@ -122,6 +123,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
           ...task,
           scheduledDate: null,
           scheduledDateRepeat: null,
+          lineDelta: -1,
         };
       },
     );
@@ -132,6 +134,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
           ...task,
           deadlineDate: newDate,
           deadlineDateRepeat: repeat,
+          lineDelta: 1,
         };
       },
     );
@@ -142,6 +145,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
           ...task,
           deadlineDate: null,
           deadlineDateRepeat: null,
+          lineDelta: -1,
         };
       },
     );
