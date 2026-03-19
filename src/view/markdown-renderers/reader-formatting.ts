@@ -225,7 +225,6 @@ export class ReaderViewFormatter {
   ): Promise<void> {
     const checkbox = event.target as HTMLInputElement;
     const isChecked = checkbox.checked;
-
     // Find the task list item containing this checkbox
     const taskListItem = checkbox.closest('.task-list-item');
     if (!taskListItem) {

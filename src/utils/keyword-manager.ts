@@ -624,4 +624,47 @@ export class KeywordManager {
   getBuiltinKeywordsForGroup(group: KeywordGroup): readonly string[] {
     return BUILTIN_BY_GROUP[group];
   }
+
+  /**
+   * Get the default keyword for the inactive group.
+   * Uses 'TODO' if it exists in the keyword set, otherwise uses the first keyword.
+   */
+  getDefaultInactive(): string {
+    return this.getDefaultForGroup('inactiveKeywords', 'TODO');
+  }
+
+  /**
+   * Get the default keyword for the active group.
+   * Uses 'DOING' if it exists in the keyword set, otherwise uses the first keyword.
+   */
+  getDefaultActive(): string {
+    return this.getDefaultForGroup('activeKeywords', 'DOING');
+  }
+
+  /**
+   * Get the default keyword for the completed group.
+   * Uses 'DONE' if it exists in the keyword set, otherwise uses the first keyword.
+   */
+  getDefaultCompleted(): string {
+    return this.getDefaultForGroup('completedKeywords', 'DONE');
+  }
+
+  /**
+   * Get the default keyword for a specific group.
+   * Uses the preferred default if it exists in the keyword set,
+   * otherwise uses the first keyword from the ordered list for that group.
+   */
+  private getDefaultForGroup(
+    group: 'inactiveKeywords' | 'activeKeywords' | 'completedKeywords',
+    preferredDefault: string,
+  ): string {
+    const keywords = this.getKeywordsForGroup(group);
+    if (keywords.length === 0) {
+      return preferredDefault;
+    }
+    if (keywords.includes(preferredDefault)) {
+      return preferredDefault;
+    }
+    return keywords[0];
+  }
 }

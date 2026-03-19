@@ -2098,55 +2098,6 @@ export class EmbeddedTaskListRenderer {
   }
 
   /**
-   * Update a task in the plugin's task list
-   * @param task The task to update
-   * @param newState The new state for the task
-   */
-  private async updateTaskInPlugin(
-    // XXX unused
-    task: Task,
-    newState: string,
-  ): Promise<void> {
-    // Use TaskUpdateCoordinator to ensure proper queue coordination, index adjustments,
-    // and synchronization with all views (including embedded task lists)
-    const coordinator = this.plugin.taskUpdateCoordinator;
-
-    if (!coordinator) {
-      console.error('TODOseq: TaskUpdateCoordinator not available');
-      return;
-    }
-
-    try {
-      // Validate task location before update - find correct task by content
-      // This handles cases where line indices are stale
-      let taskToUpdate = this.plugin.taskStateManager.findTaskByPathAndLine(
-        task.path,
-        task.line,
-      );
-
-      // If not found at expected line or content doesn't match, search by content
-      if (!taskToUpdate || taskToUpdate.rawText !== task.rawText) {
-        taskToUpdate = this.plugin.taskStateManager.findTaskByContent(
-          task.path,
-          task,
-          2,
-        );
-      }
-
-      if (!taskToUpdate) {
-        console.error('TODOseq: Task not found for update');
-        return;
-      }
-
-      // Use the coordinator for proper update handling
-      // This ensures: queue coordination, index adjustments, and embed refresh
-      await coordinator.updateTaskState(taskToUpdate, newState, 'embedded');
-    } catch (error) {
-      console.error('TODOseq: Failed to update task state:', error);
-    }
-  }
-
-  /**
    * Render an error message in the container
    * @param container The container element
    * @param errorMessage The error message to display

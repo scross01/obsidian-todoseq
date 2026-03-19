@@ -32,7 +32,8 @@ export type UpdateType =
   | 'scheduled-date'
   | 'deadline-date'
   | 'priority'
-  | 'closed-date';
+  | 'closed-date'
+  | 'recurrence';
 
 /**
  * Source of the update (for debugging/tracking)
@@ -58,6 +59,16 @@ export interface UpdateContext {
   newRepeat?: DateRepeatInfo | null;
   /** New priority (for 'priority' type updates) */
   newPriority?: 'high' | 'med' | 'low' | null;
+  /** New scheduled date (for 'recurrence' type updates) */
+  newScheduledDate?: Date | null;
+  /** New deadline date (for 'recurrence' type updates) */
+  newDeadlineDate?: Date | null;
+  /** New scheduled repeat (for 'recurrence' type updates) */
+  newScheduledRepeat?: DateRepeatInfo | null;
+  /** New deadline repeat (for 'recurrence' type updates) */
+  newDeadlineRepeat?: DateRepeatInfo | null;
+  /** New state for recurrence (for 'recurrence' type updates) */
+  newStateForRecurrence?: string;
 }
 
 /**
@@ -74,6 +85,16 @@ interface ProcessingContext {
   newDate?: Date | null;
   newRepeat?: DateRepeatInfo | null;
   newPriority?: 'high' | 'med' | 'low' | null;
+  /** New scheduled date (for 'recurrence' type updates) */
+  newScheduledDate?: Date | null;
+  /** New deadline date (for 'recurrence' type updates) */
+  newDeadlineDate?: Date | null;
+  /** New scheduled repeat (for 'recurrence' type updates) */
+  newScheduledRepeat?: DateRepeatInfo | null;
+  /** New deadline repeat (for 'recurrence' type updates) */
+  newDeadlineRepeat?: DateRepeatInfo | null;
+  /** New state for recurrence (for 'recurrence' type updates) */
+  newStateForRecurrence?: string;
   filePath: string;
   fileLine: number;
 }
@@ -108,6 +129,9 @@ export class TaskUpdateCoordinator {
       this.plugin,
       this.taskStateManager,
     );
+
+    // Set the TaskUpdateCoordinator reference to avoid circular dependency
+    this.recurrenceCoordinator.setTaskUpdateCoordinator(this);
   }
 
   /**
@@ -190,6 +214,28 @@ export class TaskUpdateCoordinator {
   }
 
   /**
+   * Convenience method for updating task recurrence.
+   * Updates scheduled date, deadline date, and state for recurring tasks.
+   */
+  async updateTaskRecurrence(
+    task: Task,
+    options: {
+      newScheduledDate?: Date | null;
+      newDeadlineDate?: Date | null;
+      newScheduledRepeat?: DateRepeatInfo | null;
+      newDeadlineRepeat?: DateRepeatInfo | null;
+      newStateForRecurrence?: string;
+    },
+  ): Promise<void> {
+    return this.updateTask({
+      task,
+      type: 'recurrence',
+      source: 'task-list',
+      ...options,
+    });
+  }
+
+  /**
    * Convenience method: Update task state by path and line.
    */
   async updateTaskByPath(
@@ -254,6 +300,11 @@ export class TaskUpdateCoordinator {
       newDate: context.newDate,
       newRepeat: context.newRepeat,
       newPriority: context.newPriority,
+      newScheduledDate: context.newScheduledDate,
+      newDeadlineDate: context.newDeadlineDate,
+      newScheduledRepeat: context.newScheduledRepeat,
+      newDeadlineRepeat: context.newDeadlineRepeat,
+      newStateForRecurrence: context.newStateForRecurrence,
       filePath: context.task.path,
       fileLine: context.task.line,
     };
@@ -266,6 +317,14 @@ export class TaskUpdateCoordinator {
     switch (context.type) {
       case 'state':
         this.taskStateManager.optimisticUpdate(context.task, context.newState);
+        break;
+      case 'recurrence':
+        if (context.newStateForRecurrence) {
+          this.taskStateManager.optimisticUpdate(
+            context.task,
+            context.newStateForRecurrence,
+          );
+        }
         break;
       case 'scheduled-date':
       case 'deadline-date':
@@ -432,6 +491,42 @@ export class TaskUpdateCoordinator {
       case 'closed-date':
         return task;
 
+      case 'recurrence': {
+        let updatedTask = task;
+        // Update scheduled date if needed
+        if (context.newScheduledDate !== undefined) {
+          if (context.newScheduledDate === null) {
+            updatedTask = await taskEditor.removeTaskScheduledDate(updatedTask);
+          } else {
+            updatedTask = await taskEditor.updateTaskScheduledDate(
+              updatedTask,
+              context.newScheduledDate,
+              context.newScheduledRepeat ?? updatedTask.scheduledDateRepeat,
+            );
+          }
+        }
+        // Update deadline date if needed
+        if (context.newDeadlineDate !== undefined) {
+          if (context.newDeadlineDate === null) {
+            updatedTask = await taskEditor.removeTaskDeadlineDate(updatedTask);
+          } else {
+            updatedTask = await taskEditor.updateTaskDeadlineDate(
+              updatedTask,
+              context.newDeadlineDate,
+              context.newDeadlineRepeat ?? updatedTask.deadlineDateRepeat,
+            );
+          }
+        }
+        // Update state if needed
+        if (context.newStateForRecurrence) {
+          updatedTask = await taskEditor.updateTaskState(
+            updatedTask,
+            context.newStateForRecurrence,
+          );
+        }
+        return updatedTask;
+      }
+
       default:
         throw new Error(`Unknown update type: ${context.type}`);
     }
@@ -493,6 +588,22 @@ export class TaskUpdateCoordinator {
           {
             rawText: updatedTask.rawText,
             priority: updatedTask.priority,
+          },
+        );
+        break;
+
+      case 'recurrence':
+        this.taskStateManager.updateTaskByPathAndLine(
+          updatedTask.path,
+          updatedTask.line,
+          {
+            rawText: updatedTask.rawText,
+            state: updatedTask.state,
+            completed: updatedTask.completed,
+            scheduledDate: updatedTask.scheduledDate,
+            deadlineDate: updatedTask.deadlineDate,
+            scheduledDateRepeat: updatedTask.scheduledDateRepeat,
+            deadlineDateRepeat: updatedTask.deadlineDateRepeat,
           },
         );
         break;
@@ -625,10 +736,6 @@ export class TaskUpdateCoordinator {
       } catch (error) {
         // Silently fail if we can't find or update the checkbox
         // This is a visual enhancement, not critical functionality
-        console.debug(
-          '[TaskUpdateCoordinator] Failed to update checkbox visual state:',
-          error,
-        );
       }
     });
   }

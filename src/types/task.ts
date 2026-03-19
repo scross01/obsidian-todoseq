@@ -28,7 +28,7 @@ export interface Task {
   quoteNestingLevel?: number; // number of nested quote levels (e.g., 1 for "> ", 2 for "> > ")
   subtaskCount: number; // total number of subtasks (checkbox lines indented under this task)
   subtaskCompletedCount: number; // number of completed subtasks
-  _lastUpdateTime?: number; // timestamp of last update (used for race condition prevention)
+  _lastUpdateTime?: number; // timestamp of last task update by TODOseq (used for race condition prevention)
 }
 
 export type KeywordGroup =

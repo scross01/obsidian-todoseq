@@ -36,4 +36,100 @@ describe('KeywordManager update when settings change', () => {
       keywordManager2.getKeywordsForGroup('inactiveKeywords'),
     );
   });
+
+  describe('getDefaultInactive', () => {
+    it('should return TODO by default', () => {
+      const keywordManager = new KeywordManager(DefaultSettings);
+      expect(keywordManager.getDefaultInactive()).toBe('TODO');
+    });
+
+    it('should return TODO if it exists in the keyword set', () => {
+      const keywordManager = new KeywordManager({
+        additionalInactiveKeywords: ['CUSTOM'],
+      });
+      expect(keywordManager.getDefaultInactive()).toBe('TODO');
+    });
+
+    it('should return first keyword if TODO is removed', () => {
+      const keywordManager = new KeywordManager({
+        additionalInactiveKeywords: ['-TODO', 'CUSTOM'],
+      });
+      expect(keywordManager.getDefaultInactive()).toBe('LATER');
+    });
+
+    it('should return first keyword if all built-ins are removed', () => {
+      const keywordManager = new KeywordManager({
+        additionalInactiveKeywords: ['-TODO', '-LATER', 'CUSTOM'],
+      });
+      expect(keywordManager.getDefaultInactive()).toBe('CUSTOM');
+    });
+
+    it('should return TODO if it is moved but still in inactive group', () => {
+      const keywordManager = new KeywordManager({
+        additionalInactiveKeywords: ['TODO'],
+      });
+      expect(keywordManager.getDefaultInactive()).toBe('TODO');
+    });
+  });
+
+  describe('getDefaultActive', () => {
+    it('should return DOING by default', () => {
+      const keywordManager = new KeywordManager(DefaultSettings);
+      expect(keywordManager.getDefaultActive()).toBe('DOING');
+    });
+
+    it('should return DOING if it exists in the keyword set', () => {
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['CUSTOM'],
+      });
+      expect(keywordManager.getDefaultActive()).toBe('DOING');
+    });
+
+    it('should return first keyword if DOING is removed', () => {
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['-DOING', 'CUSTOM'],
+      });
+      expect(keywordManager.getDefaultActive()).toBe('NOW');
+    });
+
+    it('should return first keyword if all built-ins are removed', () => {
+      const keywordManager = new KeywordManager({
+        additionalActiveKeywords: ['-DOING', '-NOW', '-IN-PROGRESS', 'CUSTOM'],
+      });
+      expect(keywordManager.getDefaultActive()).toBe('CUSTOM');
+    });
+  });
+
+  describe('getDefaultCompleted', () => {
+    it('should return DONE by default', () => {
+      const keywordManager = new KeywordManager(DefaultSettings);
+      expect(keywordManager.getDefaultCompleted()).toBe('DONE');
+    });
+
+    it('should return DONE if it exists in the keyword set', () => {
+      const keywordManager = new KeywordManager({
+        additionalCompletedKeywords: ['CUSTOM'],
+      });
+      expect(keywordManager.getDefaultCompleted()).toBe('DONE');
+    });
+
+    it('should return first keyword if DONE is removed', () => {
+      const keywordManager = new KeywordManager({
+        additionalCompletedKeywords: ['-DONE', 'CUSTOM'],
+      });
+      expect(keywordManager.getDefaultCompleted()).toBe('CANCELED');
+    });
+
+    it('should return first keyword if all built-ins are removed', () => {
+      const keywordManager = new KeywordManager({
+        additionalCompletedKeywords: [
+          '-DONE',
+          '-CANCELED',
+          '-CANCELLED',
+          'CUSTOM',
+        ],
+      });
+      expect(keywordManager.getDefaultCompleted()).toBe('CUSTOM');
+    });
+  });
 });

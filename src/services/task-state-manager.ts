@@ -115,7 +115,6 @@ export class TaskStateManager {
   findTaskByPathAndLine(path: string, line: number): Task | null {
     const foundTask =
       this._tasks.find((t) => t.path === path && t.line === line) || null;
-
     return foundTask;
   }
 
@@ -147,7 +146,6 @@ export class TaskStateManager {
 
   /**
    * Update a task by file path and line number.
-   * This is safer than updateTask() which uses reference-based lookup.
    * @param path File path
    * @param line Line number (0-indexed)
    * @param updates Partial task properties to update

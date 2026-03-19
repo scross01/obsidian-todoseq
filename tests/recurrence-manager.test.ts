@@ -45,7 +45,8 @@ describe('RecurrenceManager', () => {
       );
 
       expect(result.updated).toBe(false);
-      expect(result.lines).toEqual(lines);
+      expect(result.newScheduledDate).toBeUndefined();
+      expect(result.newDeadlineDate).toBeUndefined();
     });
 
     it('should calculate next scheduled date', () => {
@@ -77,7 +78,6 @@ describe('RecurrenceManager', () => {
 
       expect(result.updated).toBe(true);
       expect(result.newScheduledDate?.getDate()).toBe(11); // Just check the day, ignore time zone
-      expect(result.lines[1]).toContain('2026-03-11');
     });
 
     it('should calculate next deadline date', () => {
@@ -109,7 +109,6 @@ describe('RecurrenceManager', () => {
 
       expect(result.updated).toBe(true);
       expect(result.newDeadlineDate?.getDate()).toBe(17); // Just check the day, ignore time zone
-      expect(result.lines[1]).toContain('2026-03-17');
     });
 
     it('should calculate both scheduled and deadline dates', () => {

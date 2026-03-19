@@ -6,6 +6,10 @@ import { RecurrenceCoordinator } from '../src/services/recurrence-coordinator';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { App, TFile } from 'obsidian';
 import { Task } from '../src/types/task';
+import {
+  createTestKeywordManager,
+  createBaseSettings,
+} from './helpers/test-helper';
 
 // Mock console methods to reduce noise
 const originalDebug = console.debug;
@@ -55,6 +59,13 @@ const mockApp = {
   },
 } as unknown as App;
 
+// Mock TodoTracker plugin
+const mockPlugin = {
+  app: mockApp,
+  settings: createBaseSettings(),
+  keywordManager: createTestKeywordManager(),
+} as any;
+
 // Mock TaskStateManager
 const mockTaskStateManager = {
   findTaskByPathAndLine: jest.fn(),
@@ -86,7 +97,11 @@ describe('RecurrenceCoordinator', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    coordinator = new RecurrenceCoordinator(mockApp, mockTaskStateManager, {});
+    coordinator = new RecurrenceCoordinator(
+      mockPlugin,
+      mockTaskStateManager,
+      {},
+    );
     mockTask = createMockTask();
   });
 

@@ -9,9 +9,8 @@
 import { Task } from '../types/task';
 import { TaskStateManager } from './task-state-manager';
 import { RecurrenceManager, DateLineParser } from './recurrence-manager';
-import { ChangeTracker } from './change-tracker';
-import { TFile, MarkdownView } from 'obsidian';
-import { App } from 'obsidian';
+import { TaskUpdateCoordinator } from './task-update-coordinator';
+import { App, TFile } from 'obsidian';
 import TodoTracker from '../main';
 
 /**
@@ -66,7 +65,7 @@ export class RecurrenceCoordinator {
   private recurrenceTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private readonly defaultDelayMs: number;
   private recurrenceManager: RecurrenceManager;
-  private changeTracker: ChangeTracker;
+  private taskUpdateCoordinator: TaskUpdateCoordinator;
 
   constructor(
     private plugin: TodoTracker,
@@ -74,11 +73,16 @@ export class RecurrenceCoordinator {
     options: RecurrenceCoordinatorOptions = {},
   ) {
     this.defaultDelayMs = options.defaultDelayMs ?? 0;
-    this.changeTracker = new ChangeTracker({
-      defaultTimeoutMs: 5000,
-    });
     // Initialize RecurrenceManager with keywordManager for proper keyword handling
     this.recurrenceManager = new RecurrenceManager(this.keywordManager);
+  }
+
+  /**
+   * Set the TaskUpdateCoordinator reference.
+   * This is called after construction to avoid circular dependency.
+   */
+  setTaskUpdateCoordinator(coordinator: TaskUpdateCoordinator): void {
+    this.taskUpdateCoordinator = coordinator;
   }
 
   private get app(): App {
@@ -94,10 +98,8 @@ export class RecurrenceCoordinator {
   }
 
   private async getFileContent(path: string): Promise<string> {
-    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (md?.file?.path === path && md.editor) {
-      return md.editor.getValue();
-    }
+    // Always read from vault for recurrence updates to get the latest content.
+    // The editor buffer may be stale in reader view after file updates.
     const file = this.app.vault.getAbstractFileByPath(path);
     if (file instanceof TFile) {
       return this.app.vault.read(file);
@@ -129,10 +131,6 @@ export class RecurrenceCoordinator {
     // Cancel any existing timeout for this task
     this.cancelRecurrence(task);
 
-    // Deep clone the task to prevent stale references when timeout fires
-    // This is critical because the task may be mutated or line indices may change
-    const clonedTask = this.cloneTask(task);
-
     // Add to pending set
     this.pendingRecurrenceTasks.add(key);
 
@@ -141,7 +139,7 @@ export class RecurrenceCoordinator {
       this.pendingRecurrenceTasks.delete(key);
       this.recurrenceTimeouts.delete(key);
 
-      await this.performRecurrenceUpdate(clonedTask);
+      await this.performRecurrenceUpdate(task);
     }, delayMs);
 
     this.recurrenceTimeouts.set(key, timeout);
@@ -186,9 +184,7 @@ export class RecurrenceCoordinator {
    * @returns Promise resolving to the update result
    */
   async performRecurrenceUpdate(task: Task): Promise<RecurrenceUpdateResult> {
-    const settings = this.settings;
-    const defaultInactive =
-      settings?.stateTransitions?.defaultInactive || 'TODO';
+    const defaultInactive = this.keywordManager.getDefaultInactive();
 
     // Check if task has repeating dates that need updating
     const hasScheduledRepeat = task.scheduledDateRepeat != null;
@@ -202,28 +198,6 @@ export class RecurrenceCoordinator {
     }
 
     try {
-      // Check if task has repeating dates that need updating
-      const hasScheduledRepeat = task.scheduledDateRepeat != null;
-      const hasDeadlineRepeat = task.deadlineDateRepeat != null;
-
-      if (!hasScheduledRepeat && !hasDeadlineRepeat) {
-        return {
-          success: false,
-          error: 'Task has no repeat dates',
-        };
-      }
-
-      // Validate task state from state manager
-      // For recurring tasks, we intentionally skip writing DONE state, so the task
-      // may not be in completed state. Check if task has repeating dates as a proxy
-      // for whether this is a recurring task that was completed.
-      // Note: We don't check the current state here because for recurring tasks,
-      // we intentionally skip writing DONE state, so the task may not be in completed state.
-
-      // For recurring tasks (those with repeat dates), we advance dates regardless of state
-      // because we intentionally skip writing DONE state
-      // For non-recurring tasks, only update if in completed state
-
       // Read the file for recurrence date calculation
       // Use getFileContent to read from editor buffer when available
       // This ensures we get the latest content even if editor hasn't synced to disk yet
@@ -271,90 +245,15 @@ export class RecurrenceCoordinator {
         };
       }
 
-      // Update the task keyword to inactive state
-      const updatedLines = this.recurrenceManager.updateTaskKeyword(
-        dateResult.lines,
-        task.line,
-        defaultInactive,
-      );
-
-      // Skip incremental change tracking for this file write to prevent vault scanner
-      // from re-processing this file as an external change
-      this.plugin.vaultScanner?.addSkipIncrementalChange(task.path);
-
-      // Register expected change with ChangeTracker to prevent vault scanner
-      // from treating this as an unexpected external change
-      this.changeTracker.registerExpectedChange(
-        task.path,
-        updatedLines.join('\n'),
-        5000,
-      );
-
-      // Write the updated file using TaskWriter for proper editor/vault handling
-      const taskWriter = this.plugin.taskEditor;
-      if (taskWriter) {
-        // Use TaskWriter's editor-aware approach
-        await taskWriter.writeLines(task.path, updatedLines);
-      } else {
-        // Fallback to vault.modify if TaskWriter is not available
-        const file = this.app.vault.getAbstractFileByPath(task.path);
-        if (file instanceof TFile) {
-          await this.app.vault.modify(file, updatedLines.join('\n'));
-        }
-      }
-
-      // After the file update, the task state may be stale in the state manager.
-      // Use content-based lookup to find the correct task (in case line indices shifted)
-      // This is critical because the stored task.line may not match the current file
-      const contentMatchTask = this.taskStateManager.findTaskByContent(
-        task.path,
-        task,
-      );
-
-      let taskToUpdate = contentMatchTask;
-
-      // If content match failed, try path+line as fallback
-      if (!taskToUpdate) {
-        taskToUpdate = this.taskStateManager.findTaskByPathAndLine(
-          task.path,
-          task.line,
-        );
-      }
-
-      if (taskToUpdate) {
-        // Use the found task's current line number to handle any line shifts
-        const updatePath = taskToUpdate.path;
-        const updateLine = taskToUpdate.line;
-
-        const updated = this.taskStateManager.updateTaskByPathAndLine(
-          updatePath,
-          updateLine,
-          {
-            rawText: updatedLines[updateLine] || updatedLines[task.line],
-            state: defaultInactive,
-            completed: false,
-            scheduledDate:
-              dateResult.newScheduledDate ?? taskToUpdate.scheduledDate,
-            deadlineDate:
-              dateResult.newDeadlineDate ?? taskToUpdate.deadlineDate,
-          },
-        );
-
-        if (updated) {
-          // Notify subscribers to refresh views with the updated task state
-          this.taskStateManager.notifySubscribers();
-
-          // Don't remove the skip set here - more file change events may come in
-          // The skip will be cleared by the next user-initiated change or timeout
-
-          return {
-            success: true,
-            task: taskToUpdate,
-          };
-        }
-      }
-
-      // Don't remove the skip set here either
+      // Use TaskUpdateCoordinator to update the task
+      // This ensures all updates go through the unified flow
+      await this.taskUpdateCoordinator.updateTaskRecurrence(task, {
+        newScheduledDate: dateResult.newScheduledDate ?? null,
+        newDeadlineDate: dateResult.newDeadlineDate ?? null,
+        newScheduledRepeat: task.scheduledDateRepeat,
+        newDeadlineRepeat: task.deadlineDateRepeat,
+        newStateForRecurrence: defaultInactive,
+      });
 
       return {
         success: true,

@@ -4,29 +4,22 @@
  */
 
 import { Task } from '../types/task';
-import {
-  calculateNextRepeatDate,
-  formatDateLine,
-} from '../utils/date-repeater';
+import { calculateNextRepeatDate } from '../utils/date-repeater';
 import {
   findDateLineWithParser,
   getTaskIndent,
 } from '../utils/task-line-utils';
 
 /**
- * Result of a recurrence update operation.
+ * Result of a recurrence date calculation operation.
  */
 export interface RecurrenceUpdateResult {
-  /** The modified lines array */
-  lines: string[];
   /** Whether any changes were made */
   updated: boolean;
   /** The new scheduled date (if updated) */
   newScheduledDate?: Date;
   /** The new deadline date (if updated) */
   newDeadlineDate?: Date;
-  /** The new task state keyword */
-  newState?: string;
 }
 
 /**
@@ -128,28 +121,10 @@ export class RecurrenceManager {
 
     // If no dates need updating, return early
     if (!newScheduledDate && !newDeadlineDate) {
-      return { lines, updated: false };
-    }
-
-    // Update the date lines in the file
-    if (scheduledLineIndex >= 0 && newScheduledDate) {
-      lines[scheduledLineIndex] = formatDateLine(
-        lines[scheduledLineIndex],
-        newScheduledDate,
-        task.scheduledDateRepeat,
-      );
-    }
-
-    if (deadlineLineIndex >= 0 && newDeadlineDate) {
-      lines[deadlineLineIndex] = formatDateLine(
-        lines[deadlineLineIndex],
-        newDeadlineDate,
-        task.deadlineDateRepeat,
-      );
+      return { updated: false };
     }
 
     return {
-      lines,
       updated: true,
       newScheduledDate: newScheduledDate ?? undefined,
       newDeadlineDate: newDeadlineDate ?? undefined,
