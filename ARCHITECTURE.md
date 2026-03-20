@@ -287,7 +287,7 @@ graph TB
 
 - **Responsibility**: Centralized coordination for recurrence updates (date advancement for recurring tasks)
 - **Key Patterns**: Per-task tracking, delayed updates, vault-based file operations
-- **Interface**: `scheduleRecurrence()`, `cancelRecurrence()`, `shouldProcessRecovery()`, `performRecurrenceUpdate()`, `destroy()`, `setTaskUpdateCoordinator()`
+- **Interface**: `scheduleRecurrence()`, `performRecurrenceUpdate()`, `destroy()`, `setTaskUpdateCoordinator()`
 - **Vault-Based Reads**: `getFileContent()` always reads from vault (not editor buffer) to ensure latest content
 - **TaskUpdateCoordinator Integration**: Uses `setTaskUpdateCoordinator()` to avoid circular dependency, delegates all updates to `TaskUpdateCoordinator`
 - **State Independence**: For recurring tasks (those with repeat dates), advances dates regardless of current task state (since DONE state is intentionally skipped during completion)

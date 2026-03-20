@@ -113,28 +113,20 @@ describe('RecurrenceCoordinator', () => {
     it('should schedule a recurrence update for a task', () => {
       const task = createMockTask();
 
-      coordinator.scheduleRecurrence(task, 3000);
-
-      expect(coordinator.getPendingCount()).toBe(1);
-      expect(coordinator.hasPendingRecurrence(task)).toBe(true);
+      expect(() => coordinator.scheduleRecurrence(task, 3000)).not.toThrow();
     });
 
     it('should cancel existing timeout for the same task', () => {
       const task = createMockTask();
 
       coordinator.scheduleRecurrence(task, 3000);
-      expect(coordinator.getPendingCount()).toBe(1);
-
       coordinator.scheduleRecurrence(task, 5000);
-      expect(coordinator.getPendingCount()).toBe(1);
     });
 
     it('should use default delay if not provided', () => {
       const task = createMockTask();
 
-      coordinator.scheduleRecurrence(task);
-
-      expect(coordinator.getPendingCount()).toBe(1);
+      expect(() => coordinator.scheduleRecurrence(task)).not.toThrow();
     });
 
     it('should handle multiple tasks', () => {
@@ -143,8 +135,6 @@ describe('RecurrenceCoordinator', () => {
 
       coordinator.scheduleRecurrence(task1);
       coordinator.scheduleRecurrence(task2);
-
-      expect(coordinator.getPendingCount()).toBe(2);
     });
   });
 
@@ -153,46 +143,13 @@ describe('RecurrenceCoordinator', () => {
       const task = createMockTask();
 
       coordinator.scheduleRecurrence(task);
-      expect(coordinator.hasPendingRecurrence(task)).toBe(true);
-
       coordinator.cancelRecurrence(task);
-      expect(coordinator.hasPendingRecurrence(task)).toBe(false);
     });
 
     it('should do nothing if no pending recurrence exists', () => {
       const task = createMockTask();
 
       expect(() => coordinator.cancelRecurrence(task)).not.toThrow();
-    });
-  });
-
-  describe('shouldProcessRecovery', () => {
-    it('should return true when no pending recurrence', () => {
-      const task = createMockTask();
-
-      const result = coordinator.shouldProcessRecovery(task);
-
-      expect(result).toBe(true);
-    });
-
-    it('should return false when pending recurrence exists', () => {
-      const task = createMockTask();
-
-      coordinator.scheduleRecurrence(task);
-      const result = coordinator.shouldProcessRecovery(task);
-
-      expect(result).toBe(false);
-    });
-
-    it('should return true after pending recurrence is cancelled', () => {
-      const task = createMockTask();
-
-      coordinator.scheduleRecurrence(task);
-      coordinator.cancelRecurrence(task);
-
-      const result = coordinator.shouldProcessRecovery(task);
-
-      expect(result).toBe(true);
     });
   });
 
@@ -221,68 +178,6 @@ describe('RecurrenceCoordinator', () => {
     });
   });
 
-  describe('getPendingCount', () => {
-    it('should return correct count of pending recurrences', () => {
-      expect(coordinator.getPendingCount()).toBe(0);
-
-      const task1 = createMockTask({ path: 'test1.md', line: 0 });
-      const task2 = createMockTask({ path: 'test2.md', line: 0 });
-
-      coordinator.scheduleRecurrence(task1);
-      expect(coordinator.getPendingCount()).toBe(1);
-
-      coordinator.scheduleRecurrence(task2);
-      expect(coordinator.getPendingCount()).toBe(2);
-    });
-  });
-
-  describe('hasPendingRecurrence', () => {
-    it('should return true for pending recurrence', () => {
-      const task = createMockTask();
-
-      coordinator.scheduleRecurrence(task);
-
-      expect(coordinator.hasPendingRecurrence(task)).toBe(true);
-    });
-
-    it('should return false for non-existent recurrence', () => {
-      const task = createMockTask();
-
-      expect(coordinator.hasPendingRecurrence(task)).toBe(false);
-    });
-
-    it('should return false after cancellation', () => {
-      const task = createMockTask();
-
-      coordinator.scheduleRecurrence(task);
-      coordinator.cancelRecurrence(task);
-
-      expect(coordinator.hasPendingRecurrence(task)).toBe(false);
-    });
-  });
-
-  describe('getPendingRecurrenceKeys', () => {
-    it('should return all pending recurrence keys', () => {
-      const task1 = createMockTask({ path: 'test1.md', line: 0 });
-      const task2 = createMockTask({ path: 'test2.md', line: 5 });
-
-      coordinator.scheduleRecurrence(task1);
-      coordinator.scheduleRecurrence(task2);
-
-      const keys = coordinator.getPendingRecurrenceKeys();
-
-      expect(keys).toHaveLength(2);
-      expect(keys).toContain('test1.md:0');
-      expect(keys).toContain('test2.md:5');
-    });
-
-    it('should return empty array when no pending recurrences', () => {
-      const keys = coordinator.getPendingRecurrenceKeys();
-
-      expect(keys).toHaveLength(0);
-    });
-  });
-
   describe('destroy', () => {
     it('should clean up all pending recurrences', () => {
       const task1 = createMockTask({ path: 'test1.md', line: 0 });
@@ -291,11 +186,7 @@ describe('RecurrenceCoordinator', () => {
       coordinator.scheduleRecurrence(task1);
       coordinator.scheduleRecurrence(task2);
 
-      expect(coordinator.getPendingCount()).toBe(2);
-
-      coordinator.destroy();
-
-      expect(coordinator.getPendingCount()).toBe(0);
+      expect(() => coordinator.destroy()).not.toThrow();
     });
 
     it('should clear all timeouts', () => {
@@ -336,42 +227,6 @@ describe('RecurrenceCoordinator', () => {
       const key2 = coordinator['getTaskKey'](task);
 
       expect(key1).toBe(key2);
-    });
-  });
-
-  describe('scheduled recurrence execution', () => {
-    it('should remove from pending set after execution', async () => {
-      const task = createMockTask();
-
-      coordinator.scheduleRecurrence(task, 100);
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      expect(coordinator.getPendingCount()).toBe(0);
-    });
-  });
-
-  describe('concurrent operations', () => {
-    it('should handle multiple concurrent schedules', () => {
-      const tasks = Array.from({ length: 5 }, (_, i) =>
-        createMockTask({ path: `test${i}.md`, line: 0 }),
-      );
-
-      tasks.forEach((task) => coordinator.scheduleRecurrence(task));
-
-      expect(coordinator.getPendingCount()).toBe(5);
-    });
-
-    it('should handle concurrent cancellations', () => {
-      const tasks = Array.from({ length: 5 }, (_, i) =>
-        createMockTask({ path: `test${i}.md`, line: 0 }),
-      );
-
-      tasks.forEach((task) => coordinator.scheduleRecurrence(task));
-      expect(coordinator.getPendingCount()).toBe(5);
-
-      tasks.forEach((task) => coordinator.cancelRecurrence(task));
-      expect(coordinator.getPendingCount()).toBe(0);
     });
   });
 });

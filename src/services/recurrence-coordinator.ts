@@ -1,9 +1,8 @@
 /**
  * RecurrenceCoordinator provides centralized coordination for recurrence updates.
  *
- * This class coordinates between scheduled recurrence updates and recovery
- * operations, preventing race conditions where both mechanisms might try to
- * update the same task.
+ * This class schedules delayed recurrence updates for completed recurring tasks,
+ * preventing duplicate updates via timeout cancellation.
  */
 
 import { Task } from '../types/task';
@@ -39,10 +38,9 @@ export interface RecurrenceCoordinatorOptions {
  * RecurrenceCoordinator manages all recurrence-related operations.
  *
  * This class:
- * - Tracks pending recurrence updates per task
- * - Coordinates between scheduled updates and recovery
+ * - Schedules delayed recurrence updates for completed recurring tasks
+ * - Prevents duplicate recurrence updates via timeout cancellation
  * - Provides a single entry point for recurrence operations
- * - Prevents duplicate recurrence updates
  *
  * Usage:
  * ```typescript
@@ -50,18 +48,9 @@ export interface RecurrenceCoordinatorOptions {
  *
  * // Schedule a recurrence update for a completed task
  * coordinator.scheduleRecurrence(task, 50);
- *
- * // Check if recovery should process a task
- * if (coordinator.shouldProcessRecovery(task)) {
- *   // Process recovery
- * }
- *
- * // Cancel a pending recurrence update
- * coordinator.cancelRecurrence(task);
  * ```
  */
 export class RecurrenceCoordinator {
-  private pendingRecurrenceTasks: Set<string> = new Set();
   private recurrenceTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private readonly defaultDelayMs: number;
   private recurrenceManager: RecurrenceManager;
@@ -108,18 +97,6 @@ export class RecurrenceCoordinator {
   }
 
   /**
-   * Deep clone a task to prevent stale references when stored for delayed execution.
-   * This ensures the task state captured at scheduling time is preserved.
-   */
-  private cloneTask(task: Task): Task {
-    return {
-      ...task,
-      // All primitive properties are copied by value
-      // Arrays and objects are reference types but Task properties are primitives
-    };
-  }
-
-  /**
    * Schedule a recurrence update for a task.
    *
    * @param task - The task to schedule recurrence for
@@ -131,12 +108,8 @@ export class RecurrenceCoordinator {
     // Cancel any existing timeout for this task
     this.cancelRecurrence(task);
 
-    // Add to pending set
-    this.pendingRecurrenceTasks.add(key);
-
-    // Schedule the update with cloned task
+    // Schedule the update
     const timeout = setTimeout(async () => {
-      this.pendingRecurrenceTasks.delete(key);
       this.recurrenceTimeouts.delete(key);
 
       await this.performRecurrenceUpdate(task);
@@ -157,24 +130,7 @@ export class RecurrenceCoordinator {
     if (timeout) {
       clearTimeout(timeout);
       this.recurrenceTimeouts.delete(key);
-      this.pendingRecurrenceTasks.delete(key);
     }
-  }
-
-  /**
-   * Check if recovery should process a task.
-   *
-   * Recovery should be skipped if there's a pending recurrence update
-   * for the task, as the scheduled update will handle it.
-   *
-   * @param task - The task to check
-   * @returns Whether recovery should process the task
-   */
-  shouldProcessRecovery(task: Task): boolean {
-    const key = this.getTaskKey(task);
-    const shouldProcess = !this.pendingRecurrenceTasks.has(key);
-
-    return shouldProcess;
   }
 
   /**
@@ -281,35 +237,6 @@ export class RecurrenceCoordinator {
   }
 
   /**
-   * Get the number of pending recurrence updates.
-   *
-   * @returns Number of pending updates
-   */
-  getPendingCount(): number {
-    return this.pendingRecurrenceTasks.size;
-  }
-
-  /**
-   * Check if there is a pending recurrence update for a task.
-   *
-   * @param task - The task to check
-   * @returns Whether there is a pending update
-   */
-  hasPendingRecurrence(task: Task): boolean {
-    const key = this.getTaskKey(task);
-    return this.pendingRecurrenceTasks.has(key);
-  }
-
-  /**
-   * Get all pending recurrence task keys (for debugging/testing).
-   *
-   * @returns Array of pending task keys
-   */
-  getPendingRecurrenceKeys(): string[] {
-    return Array.from(this.pendingRecurrenceTasks);
-  }
-
-  /**
    * Clean up all pending recurrence updates.
    */
   destroy(): void {
@@ -317,6 +244,5 @@ export class RecurrenceCoordinator {
       clearTimeout(timeout);
     }
     this.recurrenceTimeouts.clear();
-    this.pendingRecurrenceTasks.clear();
   }
 }
