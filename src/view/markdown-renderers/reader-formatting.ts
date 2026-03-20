@@ -2,11 +2,8 @@ import TodoTracker from '../../main';
 import { Task } from '../../types/task';
 import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
-import {
-  isCompletedKeyword,
-  isArchivedKeyword,
-  stripMarkdownForDisplay,
-} from '../../utils/task-utils';
+import { stripMarkdownForDisplay } from '../../utils/task-utils';
+import { KeywordManager } from '../../utils/keyword-manager';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { TFile } from 'obsidian';
@@ -879,10 +876,16 @@ export class ReaderViewFormatter {
         const keyword = match[4];
 
         // Check if this is a completed keyword for styling
-        const isCompleted = isCompletedKeyword(keyword, this.plugin.settings);
+        const isCompleted = KeywordManager.isCompletedKeyword(
+          keyword,
+          this.plugin.settings,
+        );
 
         // Check if this is an archived keyword for styling
-        const isArchived = isArchivedKeyword(keyword, this.plugin.settings);
+        const isArchived = KeywordManager.isArchivedKeyword(
+          keyword,
+          this.plugin.settings,
+        );
 
         // Create a span for the task keyword using helper method
         const keywordSpan = this.createKeywordSpan(
@@ -1144,10 +1147,16 @@ export class ReaderViewFormatter {
     const keyword = match[4];
 
     // Check if this is a completed keyword for styling
-    const isCompleted = isCompletedKeyword(keyword, this.plugin.settings);
+    const isCompleted = KeywordManager.isCompletedKeyword(
+      keyword,
+      this.plugin.settings,
+    );
 
     // Check if this is an archived keyword for styling
-    const isArchived = isArchivedKeyword(keyword, this.plugin.settings);
+    const isArchived = KeywordManager.isArchivedKeyword(
+      keyword,
+      this.plugin.settings,
+    );
 
     // Create a span for the task keyword
     const keywordSpan = this.createKeywordSpan(
@@ -1361,10 +1370,16 @@ export class ReaderViewFormatter {
         const keyword = match[4];
 
         // Check if this is a completed keyword for styling
-        const isCompleted = isCompletedKeyword(keyword, this.plugin.settings);
+        const isCompleted = KeywordManager.isCompletedKeyword(
+          keyword,
+          this.plugin.settings,
+        );
 
         // Check if this is an archived keyword for styling
-        const isArchived = isArchivedKeyword(keyword, this.plugin.settings);
+        const isArchived = KeywordManager.isArchivedKeyword(
+          keyword,
+          this.plugin.settings,
+        );
 
         // Create a span for the task keyword using helper method
         const keywordSpan = this.createKeywordSpan(
@@ -1551,7 +1566,8 @@ export class ReaderViewFormatter {
       const keyword = keywordSpan.getAttribute('data-task-keyword');
       if (!keyword) continue;
 
-      if (!isArchivedKeyword(keyword, this.plugin.settings)) continue;
+      if (!KeywordManager.isArchivedKeyword(keyword, this.plugin.settings))
+        continue;
 
       // Verify the keyword span is actually a child of the task container
       if (keywordSpan.parentNode !== taskContainer) {

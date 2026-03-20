@@ -149,6 +149,101 @@ export class KeywordManager {
     );
   }
 
+  /**
+   * Get all keywords for a specific group (built-in + custom)
+   * @param group The keyword group to get keywords for
+   * @param settings Settings object containing flat keyword properties
+   * @returns Array of all keywords for the group (built-in + custom)
+   */
+  static getKeywordsForGroup(
+    group: KeywordGroup,
+    settings: KeywordSettings,
+  ): string[] {
+    return new KeywordManager(settings).getKeywordsForGroup(group);
+  }
+
+  /**
+   * Get all keywords across all groups
+   * @param settings Settings object containing taskKeywordGroups
+   * @returns Array of all unique keywords across all groups
+   */
+  static getAllKeywords(settings: KeywordSettings): string[] {
+    return new KeywordManager(settings).getAllKeywords();
+  }
+
+  /**
+   * Determine which group a keyword belongs to
+   * @param keyword The keyword to look up
+   * @param settings Settings object containing taskKeywordGroups
+   * @returns The group name if found, null if keyword is not in any group
+   */
+  static getKeywordGroup(
+    keyword: string,
+    settings: KeywordSettings,
+  ): KeywordGroup | 'inactiveKeywords' | null {
+    return new KeywordManager(settings).getGroup(keyword);
+  }
+
+  /**
+   * Determine if a keyword indicates a completed task
+   * @param keyword The task state keyword
+   * @param settings Settings object containing taskKeywordGroups
+   * @returns True if the keyword is in the completed group
+   */
+  static isCompletedKeyword(
+    keyword: string,
+    settings: KeywordSettings,
+  ): boolean {
+    return new KeywordManager(settings).isCompleted(keyword);
+  }
+
+  /**
+   * Determine if a keyword indicates an archived task
+   * Archived tasks are styled but NOT collected during vault scans
+   * @param keyword The task state keyword
+   * @param settings Settings object containing taskKeywordGroups
+   * @returns True if the keyword is in the archived group
+   */
+  static isArchivedKeyword(
+    keyword: string,
+    settings: KeywordSettings,
+  ): boolean {
+    return new KeywordManager(settings).isArchived(keyword);
+  }
+
+  /**
+   * Determine if a keyword indicates an active task
+   * @param keyword The task state keyword
+   * @param settings Settings object containing taskKeywordGroups
+   * @returns True if the keyword is in the active group
+   */
+  static isActiveKeyword(keyword: string, settings: KeywordSettings): boolean {
+    return new KeywordManager(settings).isActive(keyword);
+  }
+
+  /**
+   * Determine if a keyword indicates a waiting task
+   * @param keyword The task state keyword
+   * @param settings Settings object containing taskKeywordGroups
+   * @returns True if the keyword is in the waiting group
+   */
+  static isWaitingKeyword(keyword: string, settings: KeywordSettings): boolean {
+    return new KeywordManager(settings).isWaiting(keyword);
+  }
+
+  /**
+   * Determine if a keyword indicates an inactive/pending task
+   * @param keyword The task state keyword
+   * @param settings Settings object containing taskKeywordGroups
+   * @returns True if the keyword is in the inactive group
+   */
+  static isInactiveKeyword(
+    keyword: string,
+    settings: KeywordSettings,
+  ): boolean {
+    return new KeywordManager(settings).isInactive(keyword);
+  }
+
   private static normalizeKeyword(value: string): string {
     return value.trim().toUpperCase();
   }

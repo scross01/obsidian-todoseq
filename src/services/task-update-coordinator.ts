@@ -14,13 +14,12 @@
  * This design ensures consistent behavior on both desktop and mobile.
  */
 import { Task, DateRepeatInfo } from '../types/task';
-import { isCompletedKeyword } from '../utils/task-utils';
+import { KeywordManager } from '../utils/keyword-manager';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 import { TaskWriter } from './task-writer';
 import { TFile, MarkdownView } from 'obsidian';
 import { EditorView } from '@codemirror/view';
-import { KeywordManager } from '../utils/keyword-manager';
 import { ChangeTracker } from './change-tracker';
 import { RecurrenceCoordinator } from './recurrence-coordinator';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
@@ -778,8 +777,14 @@ export class TaskUpdateCoordinator {
       keywordEl.setAttribute('data-task-keyword', newState);
       keywordEl.setAttribute('aria-label', `Task keyword: ${newState}`);
 
-      const wasCompleted = isCompletedKeyword(oldState, this.plugin.settings);
-      const isNowCompleted = isCompletedKeyword(newState, this.plugin.settings);
+      const wasCompleted = KeywordManager.isCompletedKeyword(
+        oldState,
+        this.plugin.settings,
+      );
+      const isNowCompleted = KeywordManager.isCompletedKeyword(
+        newState,
+        this.plugin.settings,
+      );
 
       if (wasCompleted && !isNowCompleted) {
         const completedContainer = keywordEl.closest(
@@ -805,7 +810,10 @@ export class TaskUpdateCoordinator {
     task: Task,
     newState: string,
   ): void {
-    const isCompleted = isCompletedKeyword(newState, this.plugin.settings);
+    const isCompleted = KeywordManager.isCompletedKeyword(
+      newState,
+      this.plugin.settings,
+    );
     const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
     if (!view || !view.file || view.file.path !== task.path) {

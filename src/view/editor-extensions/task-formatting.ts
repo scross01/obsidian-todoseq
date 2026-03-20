@@ -20,7 +20,7 @@ import {
   LanguageDefinition,
 } from '../../parser/language-registry';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
-import { isCompletedKeyword, isArchivedKeyword } from '../../utils/task-utils';
+import { KeywordManager } from '../../utils/keyword-manager';
 
 /**
  * Cached regex for priority tokens with global flag.
@@ -372,12 +372,12 @@ export class TaskKeywordDecorator {
           let cssClasses = 'todoseq-keyword-formatted';
 
           // Add completed keyword class for strikethrough styling on the keyword itself
-          if (isCompletedKeyword(keyword, this.settings)) {
+          if (KeywordManager.isCompletedKeyword(keyword, this.settings)) {
             cssClasses += ' todoseq-completed-keyword';
           }
 
           // Add archived keyword class for muted styling on the keyword itself
-          if (isArchivedKeyword(keyword, this.settings)) {
+          if (KeywordManager.isArchivedKeyword(keyword, this.settings)) {
             cssClasses += ' todoseq-archived-keyword';
           }
 
@@ -419,7 +419,7 @@ export class TaskKeywordDecorator {
           );
 
           // Add separate span for task text in completed tasks
-          if (isCompletedKeyword(keyword, this.settings)) {
+          if (KeywordManager.isCompletedKeyword(keyword, this.settings)) {
             // Calculate task text position (text after keyword)
             const taskTextStart = line.from + keywordEnd;
             const taskTextEnd = line.to; // End of line
@@ -440,7 +440,7 @@ export class TaskKeywordDecorator {
           }
 
           // Add separate span for task text in archived tasks
-          if (isArchivedKeyword(keyword, this.settings)) {
+          if (KeywordManager.isArchivedKeyword(keyword, this.settings)) {
             // Calculate task text position (text after keyword)
             const taskTextStart = line.from + keywordEnd;
             const taskTextEnd = line.to; // End of line

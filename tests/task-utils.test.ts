@@ -3,15 +3,8 @@ import {
   isCompletedState,
   getCheckboxStatus,
   truncateMiddle,
-  getKeywordsForGroup,
-  getAllKeywords,
-  getKeywordGroup,
-  isBuiltinKeyword,
-  isCompletedKeyword,
-  isActiveKeyword,
-  isWaitingKeyword,
-  isInactiveKeyword,
 } from '../src/utils/task-utils';
+import { KeywordManager } from '../src/utils/keyword-manager';
 import {
   BUILTIN_ACTIVE_KEYWORDS,
   BUILTIN_INACTIVE_KEYWORDS,
@@ -150,7 +143,10 @@ describe('task-utils', () => {
     describe('getKeywordsForGroup', () => {
       test('should return active keywords with custom additions', () => {
         const settings = { additionalActiveKeywords: ['WORKING'] };
-        const result = getKeywordsForGroup('activeKeywords', settings);
+        const result = KeywordManager.getKeywordsForGroup(
+          'activeKeywords',
+          settings,
+        );
         expect(result).toEqual(
           expect.arrayContaining([...BUILTIN_ACTIVE_KEYWORDS, 'WORKING']),
         );
@@ -158,7 +154,10 @@ describe('task-utils', () => {
 
       test('should return waiting keywords with custom additions', () => {
         const settings = { additionalWaitingKeywords: ['BLOCKED'] };
-        const result = getKeywordsForGroup('waitingKeywords', settings);
+        const result = KeywordManager.getKeywordsForGroup(
+          'waitingKeywords',
+          settings,
+        );
         expect(result).toEqual(
           expect.arrayContaining([...BUILTIN_WAITING_KEYWORDS, 'BLOCKED']),
         );
@@ -166,7 +165,10 @@ describe('task-utils', () => {
 
       test('should return completed keywords with custom additions', () => {
         const settings = { additionalCompletedKeywords: ['FINISHED'] };
-        const result = getKeywordsForGroup('completedKeywords', settings);
+        const result = KeywordManager.getKeywordsForGroup(
+          'completedKeywords',
+          settings,
+        );
         expect(result).toEqual(
           expect.arrayContaining([...BUILTIN_COMPLETED_KEYWORDS, 'FINISHED']),
         );
@@ -174,7 +176,10 @@ describe('task-utils', () => {
 
       test('should return empty array for invalid group', () => {
         const settings = {};
-        const result = getKeywordsForGroup('invalid' as any, settings);
+        const result = KeywordManager.getKeywordsForGroup(
+          'invalid' as any,
+          settings,
+        );
         expect(result).toEqual([]);
       });
     });
@@ -182,7 +187,10 @@ describe('task-utils', () => {
     describe('getKeywordsForGroup - inactiveKeywords', () => {
       test('should return inactive keywords with custom additions', () => {
         const settings = { additionalInactiveKeywords: ['PENDING'] };
-        const result = getKeywordsForGroup('inactiveKeywords', settings);
+        const result = KeywordManager.getKeywordsForGroup(
+          'inactiveKeywords',
+          settings,
+        );
         expect(result).toEqual(
           expect.arrayContaining([...BUILTIN_INACTIVE_KEYWORDS, 'PENDING']),
         );
@@ -190,7 +198,10 @@ describe('task-utils', () => {
 
       test('should return default inactive keywords when no custom', () => {
         const settings = {};
-        const result = getKeywordsForGroup('inactiveKeywords', settings);
+        const result = KeywordManager.getKeywordsForGroup(
+          'inactiveKeywords',
+          settings,
+        );
         expect(result).toEqual(
           expect.arrayContaining(BUILTIN_INACTIVE_KEYWORDS),
         );
@@ -205,7 +216,7 @@ describe('task-utils', () => {
           additionalWaitingKeywords: ['BLOCKED'],
           additionalCompletedKeywords: ['FINISHED'],
         };
-        const result = getAllKeywords(settings);
+        const result = KeywordManager.getAllKeywords(settings);
         expect(result).toEqual(
           expect.arrayContaining([
             ...BUILTIN_INACTIVE_KEYWORDS,
@@ -225,72 +236,82 @@ describe('task-utils', () => {
           additionalInactiveKeywords: ['TODO'], // Duplicate of built-in
           additionalActiveKeywords: ['DOING'], // Duplicate of built-in
         };
-        const result = getAllKeywords(settings);
-        expect(result.filter((k) => k === 'TODO').length).toBe(1);
-        expect(result.filter((k) => k === 'DOING').length).toBe(1);
+        const result = KeywordManager.getAllKeywords(settings);
+        expect(result.filter((k: string) => k === 'TODO').length).toBe(1);
+        expect(result.filter((k: string) => k === 'DOING').length).toBe(1);
       });
     });
 
     describe('getKeywordGroup', () => {
       test('should return active group for active keywords', () => {
         const settings = {};
-        expect(getKeywordGroup('DOING', settings)).toBe('activeKeywords');
+        expect(KeywordManager.getKeywordGroup('DOING', settings)).toBe(
+          'activeKeywords',
+        );
       });
 
       test('should return inactive group for inactive keywords', () => {
         const settings = {};
-        expect(getKeywordGroup('TODO', settings)).toBe('inactiveKeywords');
+        expect(KeywordManager.getKeywordGroup('TODO', settings)).toBe(
+          'inactiveKeywords',
+        );
       });
 
       test('should return waiting group for waiting keywords', () => {
         const settings = {};
-        expect(getKeywordGroup('WAIT', settings)).toBe('waitingKeywords');
+        expect(KeywordManager.getKeywordGroup('WAIT', settings)).toBe(
+          'waitingKeywords',
+        );
       });
 
       test('should return completed group for completed keywords', () => {
         const settings = {};
-        expect(getKeywordGroup('DONE', settings)).toBe('completedKeywords');
+        expect(KeywordManager.getKeywordGroup('DONE', settings)).toBe(
+          'completedKeywords',
+        );
       });
 
       test('should return inactive group for custom additional keywords', () => {
         const settings = { additionalInactiveKeywords: ['PENDING'] };
-        expect(getKeywordGroup('PENDING', settings)).toBe('inactiveKeywords');
+        expect(KeywordManager.getKeywordGroup('PENDING', settings)).toBe(
+          'inactiveKeywords',
+        );
       });
 
       test('should return null for unknown keyword', () => {
         const settings = {};
-        expect(getKeywordGroup('UNKNOWN', settings)).toBeNull();
+        expect(KeywordManager.getKeywordGroup('UNKNOWN', settings)).toBeNull();
       });
     });
 
     describe('isBuiltinKeyword', () => {
       test('should return true for built-in active keywords', () => {
         BUILTIN_ACTIVE_KEYWORDS.forEach((keyword) => {
-          expect(isBuiltinKeyword(keyword)).toBe(true);
+          expect(KeywordManager.isBuiltin(keyword)).toBe(true);
         });
       });
 
       test('should return true for built-in inactive keywords', () => {
         BUILTIN_INACTIVE_KEYWORDS.forEach((keyword) => {
-          expect(isBuiltinKeyword(keyword)).toBe(true);
+          expect(KeywordManager.isBuiltin(keyword)).toBe(true);
         });
       });
 
       test('should return true for built-in waiting keywords', () => {
         BUILTIN_WAITING_KEYWORDS.forEach((keyword) => {
-          expect(isBuiltinKeyword(keyword)).toBe(true);
+          expect(KeywordManager.isBuiltin(keyword)).toBe(true);
         });
       });
 
       test('should return true for built-in completed keywords', () => {
         BUILTIN_COMPLETED_KEYWORDS.forEach((keyword) => {
-          expect(isBuiltinKeyword(keyword)).toBe(true);
+          expect(KeywordManager.isBuiltin(keyword)).toBe(true);
         });
       });
 
       test('should return false for custom keywords', () => {
-        expect(isBuiltinKeyword('CUSTOM')).toBe(false);
-        expect(isBuiltinKeyword('PENDING')).toBe(false);
+        expect(KeywordManager.isBuiltin('CUSTOM')).toBe(false);
+        expect(KeywordManager.isBuiltin('PENDING')).toBe(false);
       });
     });
 
@@ -298,33 +319,39 @@ describe('task-utils', () => {
       test('isCompletedKeyword should detect completed keywords', () => {
         const settings = {};
         BUILTIN_COMPLETED_KEYWORDS.forEach((keyword) => {
-          expect(isCompletedKeyword(keyword, settings)).toBe(true);
+          expect(KeywordManager.isCompletedKeyword(keyword, settings)).toBe(
+            true,
+          );
         });
-        expect(isCompletedKeyword('DOING', settings)).toBe(false);
+        expect(KeywordManager.isCompletedKeyword('DOING', settings)).toBe(
+          false,
+        );
       });
 
       test('isActiveKeyword should detect active keywords', () => {
         const settings = {};
         BUILTIN_ACTIVE_KEYWORDS.forEach((keyword) => {
-          expect(isActiveKeyword(keyword, settings)).toBe(true);
+          expect(KeywordManager.isActiveKeyword(keyword, settings)).toBe(true);
         });
-        expect(isActiveKeyword('TODO', settings)).toBe(false);
+        expect(KeywordManager.isActiveKeyword('TODO', settings)).toBe(false);
       });
 
       test('isWaitingKeyword should detect waiting keywords', () => {
         const settings = {};
         BUILTIN_WAITING_KEYWORDS.forEach((keyword) => {
-          expect(isWaitingKeyword(keyword, settings)).toBe(true);
+          expect(KeywordManager.isWaitingKeyword(keyword, settings)).toBe(true);
         });
-        expect(isWaitingKeyword('DONE', settings)).toBe(false);
+        expect(KeywordManager.isWaitingKeyword('DONE', settings)).toBe(false);
       });
 
       test('isInactiveKeyword should detect inactive keywords', () => {
         const settings = {};
         BUILTIN_INACTIVE_KEYWORDS.forEach((keyword) => {
-          expect(isInactiveKeyword(keyword, settings)).toBe(true);
+          expect(KeywordManager.isInactiveKeyword(keyword, settings)).toBe(
+            true,
+          );
         });
-        expect(isInactiveKeyword('DOING', settings)).toBe(false);
+        expect(KeywordManager.isInactiveKeyword('DOING', settings)).toBe(false);
       });
 
       test('should detect custom additional keywords', () => {
@@ -335,10 +362,14 @@ describe('task-utils', () => {
           additionalCompletedKeywords: ['FINISHED'],
         };
 
-        expect(isInactiveKeyword('PENDING', settings)).toBe(true);
-        expect(isActiveKeyword('WORKING', settings)).toBe(true);
-        expect(isWaitingKeyword('BLOCKED', settings)).toBe(true);
-        expect(isCompletedKeyword('FINISHED', settings)).toBe(true);
+        expect(KeywordManager.isInactiveKeyword('PENDING', settings)).toBe(
+          true,
+        );
+        expect(KeywordManager.isActiveKeyword('WORKING', settings)).toBe(true);
+        expect(KeywordManager.isWaitingKeyword('BLOCKED', settings)).toBe(true);
+        expect(KeywordManager.isCompletedKeyword('FINISHED', settings)).toBe(
+          true,
+        );
       });
     });
   });
