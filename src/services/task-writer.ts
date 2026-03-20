@@ -315,7 +315,9 @@ export class TaskWriter {
       }
     }
 
-    // For source mode, handle CLOSED date separately (Editor API doesn't support atomic multi-line operations)
+    // For source mode, handle CLOSED date separately via individual Editor API calls
+    // The main editor.replaceRange above only replaces a single line, so CLOSED date
+    // insertion/removal requires its own editor operations
     // Calculate line delta: +1 if new line inserted, -1 if removed, 0 if updated or no change
     let lineDelta = 0;
     let updatedClosedDate = task.closedDate;

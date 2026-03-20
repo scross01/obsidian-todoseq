@@ -423,7 +423,7 @@ export class VaultScanner {
     return this.parserRegistry.getParser('markdown') as TaskParser | null;
   }
 
-  // Update settings and recreate parser if needed
+  // Update settings and update existing parsers with new configuration
   async updateSettings(
     newSettings: TodoTrackerSettings,
     urgencyCoefficients?: UrgencyCoefficients,

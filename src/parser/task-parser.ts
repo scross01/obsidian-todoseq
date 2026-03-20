@@ -224,9 +224,9 @@ export class TaskParser implements ITaskParser {
 
   /**
    * Extract quote nesting level from a line
-   * Counts the number of consecutive ">" characters at the start
+   * Counts the number of ">" characters in the leading quote prefix
    * @param line The line to analyze
-   * @returns The nesting level (number of consecutive ">" characters)
+   * @returns The nesting level (number of ">" characters in the quote prefix)
    */
   private static extractQuoteNestingLevel(line: string): number {
     const match = line.match(/^>\s*/);

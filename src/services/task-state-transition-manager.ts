@@ -184,7 +184,8 @@ export class TaskStateTransitionManager {
   }
 
   /**
-   * Check if a state is a completed state (DONE, CANCELLED, ARCHIVED, REJECTED).
+   * Check if a state is a completed state (DONE, CANCELED, CANCELLED).
+   * Note: ARCHIVED is tracked separately in archivedKeywords, not here.
    * @param state The state to check
    * @returns true if the state is a completed state
    */

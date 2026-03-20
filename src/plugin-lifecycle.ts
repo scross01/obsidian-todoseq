@@ -24,7 +24,8 @@ export class PluginLifecycleManager {
   constructor(private plugin: TodoTracker) {}
 
   /**
-   * Obsidian lifecycle method called when the plugin is loaded
+   * Obsidian lifecycle method called when the plugin is loaded.
+   * Delegates to this.plugin.loadSettings() for settings initialization.
    */
   async onload() {
     await this.loadSettings();

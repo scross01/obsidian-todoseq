@@ -7,7 +7,7 @@
  * - Convenience methods: updateTaskState, updateTaskScheduledDate, updateTaskDeadlineDate,
  *   updateTaskPriority, updateTaskRecurrence, updateTaskByPath (all delegate to updateTask)
  * - Sync phase (always completes): optimistic update, DOM manipulation, UI refresh
- * - Async phase (background): file write, recurrence scheduling, state finalization
+ * - Async phase (background): file write, conditional recurrence scheduling (for state updates with repeating dates), state finalization
  * - Per-task locking prevents race conditions from rapid updates
  * - Per-file queueing ensures serialized writes to same file
  *

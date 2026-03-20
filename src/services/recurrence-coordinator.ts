@@ -42,7 +42,7 @@ export interface RecurrenceCoordinatorOptions {
  *
  * Usage:
  * ```typescript
- * const coordinator = new RecurrenceCoordinator(app, taskStateManager);
+ * const coordinator = new RecurrenceCoordinator(plugin, taskStateManager);
  *
  * // Schedule a recurrence update for a completed task
  * coordinator.scheduleRecurrence(task, 50);

@@ -490,7 +490,7 @@ export class KeywordManager {
     return this.resolution.setByGroup.archivedKeywords.has(keyword);
   }
 
-  getGroup(keyword: string): KeywordGroup | 'inactiveKeywords' | null {
+  getGroup(keyword: string): KeywordGroup | null {
     if (this.resolution.setByGroup.inactiveKeywords.has(keyword)) {
       return 'inactiveKeywords';
     }
