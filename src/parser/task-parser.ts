@@ -124,7 +124,7 @@ export class TaskParser implements ITaskParser {
       regex,
       parserSettings?.includeCalloutBlocks ?? true,
       parserSettings?.includeCodeBlocks ?? true,
-      parserSettings?.includeCommentBlocks ?? true,
+      parserSettings?.includeCommentBlocks ?? false,
       parserSettings?.languageCommentSupport ?? false,
       keywordManager,
       app || null,
@@ -733,11 +733,10 @@ export class TaskParser implements ITaskParser {
   }
 
   /**
-   * Extract scheduled and deadline dates from lines following a task
+   * Extract scheduled, deadline, and closed dates from lines following a task
    * @param lines Array of lines in the file
    * @param startIndex Index to start searching from
    * @param indent Task indent level
-   * @param inCalloutBlock Whether we're in a callout block
    * @returns Date information including repeater info
    */
   private extractTaskDates(
@@ -828,6 +827,7 @@ export class TaskParser implements ITaskParser {
    * Check if a line is a subtask (checkbox line indented under a parent task)
    * @param line The line to check
    * @param parentIndent The indent level of the parent task
+   * @param parentHasCheckbox Whether the parent task has a checkbox
    * @returns Object with subtask info if line is a subtask
    */
   private isSubtaskLine(
@@ -907,6 +907,8 @@ export class TaskParser implements ITaskParser {
    * @param lines Array of lines in the file
    * @param startIndex Index to start searching from (after date lines)
    * @param indent Task indent level
+   * @param parentHasCheckbox Whether the parent task has a checkbox
+   * @param processedLines Set of line numbers that have been processed
    * @returns Subtask counts
    */
   private extractSubtasks(
@@ -1440,6 +1442,7 @@ export class TaskParser implements ITaskParser {
    * @param path File path
    * @param index Line index
    * @param lines All lines in file
+   * @param processedLines Set of line numbers that have been processed
    * @returns Parsed task or null
    */
   private tryParseCommentBlockTask(
@@ -1569,6 +1572,8 @@ export class TaskParser implements ITaskParser {
    * @param index Line index
    * @param taskDetails Extracted task details
    * @param lines All lines in file
+   * @param processedLines Set of line numbers that have been processed
+   * @param file Optional TFile object for daily note detection
    * @returns Parsed task
    */
   /**
@@ -1679,8 +1684,6 @@ export class TaskParser implements ITaskParser {
     task.closedDate = closedDate;
 
     // Extract subtasks from lines following date lines
-    // Footnote tasks don't have checkboxes
-    // Extract subtasks from lines following date lines
     // Check if parent task has a checkbox
     const parentHasCheckbox = CHECKBOX_REGEX.test(line);
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
@@ -1715,11 +1718,7 @@ export class TaskParser implements ITaskParser {
   }
 
   /**
-   * Lazy-load and return the LanguageRegistry instance
-   */
-  /**
-   * Parse a single line as a task. Returns a simplified structure that
-   * EditorController can consume for editor operations.
+   * Parse a single line as a task.
    *
    * @param line The line of text to parse
    * @param lineNumber The line number (for Task creation)
@@ -1836,6 +1835,10 @@ export class TaskParser implements ITaskParser {
     };
   }
 
+  /**
+   * Lazy-load and return the LanguageRegistry instance
+   * @returns The LanguageRegistry instance
+   */
   private getLanguageRegistry(): LanguageRegistry {
     if (!this.languageRegistry) {
       this.languageRegistry = new LanguageRegistry();

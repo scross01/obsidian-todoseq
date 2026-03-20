@@ -34,7 +34,7 @@ export type DatePickerMode = 'scheduled' | 'deadline';
  * - Quick date selections (Today, Tomorrow, Next weekend, Next week)
  * - Calendar grid view with month navigation
  * - Time picker with 30-minute increments
- * - Repeat options (Daily, Weekly, Monthly, Custom)
+ * - Repeat options (Daily, Weekly, Monthly, Yearly, Custom)
  * - Custom repeat dialog with advanced settings
  *
  * Single-instance pattern: only one picker can be open at a time.
@@ -590,7 +590,7 @@ export class DatePicker extends BaseDialog {
 
   private countCurrentCalendarItems(): number {
     // Count how many focusable items are in the current calendar section
-    // This includes: nav buttons (2), weekday labels (7), and day cells
+    // This includes: nav buttons (2), weekday labels (7), day cells, and empty cells
     if (!this.calendarSection) return 0;
 
     let count = 0;

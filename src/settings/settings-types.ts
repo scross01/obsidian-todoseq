@@ -16,7 +16,7 @@ export interface TodoTrackerSettings {
   additionalArchivedKeywords: string[]; // Custom archived keywords (ARCHIVED, etc.) - styled but not collected
   includeCodeBlocks: boolean; // when false, tasks inside fenced code blocks are ignored
   includeCalloutBlocks: boolean; // when true, tasks inside callout blocks are included
-  includeCommentBlocks: boolean; // when true, tasks inside multiline comment blocks ($$) are included
+  includeCommentBlocks: boolean; // when true, tasks inside multiline comment blocks (%%) are included
   taskListViewMode: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // controls view transformation in the task view
   futureTaskSorting: 'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture'; // controls how future tasks are handled
   defaultSortMethod:

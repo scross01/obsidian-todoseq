@@ -109,35 +109,6 @@ export class TransitionParser {
 
     const transitions: [string, string][] = [];
 
-    // Check for terminal state shorthand: STATE -> [FINAL]
-    if (
-      parts.length === 2 &&
-      parts[1].startsWith('[') &&
-      parts[1].endsWith(']')
-    ) {
-      const sourceKeywords = this.parseKeywords(parts[0]);
-      const targetKeyword = this.normalizeKeyword(parts[1].slice(1, -1).trim());
-
-      const sourceValidationError = this.validateKeywords(sourceKeywords);
-      if (sourceValidationError) {
-        return { transitions: [], error: sourceValidationError };
-      }
-
-      const targetValidationError = this.validateKeywords([targetKeyword]);
-      if (targetValidationError) {
-        return { transitions: [], error: targetValidationError };
-      }
-
-      // Create transitions from each source to target
-      for (const source of sourceKeywords) {
-        transitions.push([source, targetKeyword]);
-        // Terminal state: target transitions to itself
-        transitions.push([targetKeyword, targetKeyword]);
-      }
-
-      return { transitions };
-    }
-
     // Handle chain: A -> B -> C
     for (let i = 0; i < parts.length - 1; i++) {
       const sourceKeywords = this.parseKeywords(parts[i]);

@@ -117,11 +117,11 @@ export function calculateNextRepeatDate(
 /**
  * Calculate the next occurrence after a given date.
  * For .+ (delay):
- * - d: If base time > from time, use today at base time. Otherwise, add 1 day.
- * - h: Always add 1 hour to from time (not base time).
- * - w: Same as d (weeks).
- * - m: Add 1 month to from date, preserving the time from baseDate.
- * - y: Add 1 year to from date, preserving the time from baseDate.
+ * - d: If base time > from time, use today at base time. Otherwise, add x days.
+ * - h: Always add x hours to from time (not base time).
+ * - w: Like d (weeks), but with additional day-of-week correction to match base date's day.
+ * - m: Add x months to from date, preserving the time from baseDate.
+ * - y: Add x years to from date, preserving the time from baseDate.
  */
 function calculateNextOccurrenceAfter(
   baseDate: Date,
@@ -167,7 +167,7 @@ function calculateNextOccurrenceAfter(
       }
     }
   } else if (unit === 'h') {
-    // For hourly: add 1 hour to from time, preserving from minutes
+    // For hourly: add x hours to from time, preserving from minutes
     result.setHours(fromHours + value, fromMinutes, 0, 0);
   } else {
     // For m/y units: add to from date, preserving base time

@@ -14,9 +14,7 @@ describe('Editor Controller - Date Line Handling', () => {
 
   beforeEach(() => {
     settings = createBaseSettings({
-      languageCommentSupport: {
-        enabled: false,
-      },
+      languageCommentSupport: false,
     });
 
     mockPlugin = {

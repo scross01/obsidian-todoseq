@@ -379,7 +379,7 @@ export class TaskWriter {
     return await this.applyLineUpdate(task, state, true, forceVaultApi);
   }
 
-  // Cycles a task to its next state according to CYCLE_BULLET_STATE and persists change
+  // Cycles a task to its next state using TaskStateTransitionManager.getCycleState() and persists change
   async updateTaskCycleState(
     task: Task,
     nextState: string | null = null,
@@ -657,7 +657,8 @@ export class TaskWriter {
    * Note: This method attempts to remove the SCHEDULED line regardless of whether
    * the task.scheduledDate property is set, as there may be a discrepancy between
    * the parsed property and what exists in the file.
-   * Returns the updated task with lineDelta for the coordinator to adjust subsequent task indices.
+   * Returns the updated task with lineDelta (only included when non-zero) for the coordinator
+   * to adjust subsequent task indices.
    */
   async removeTaskScheduledDate(
     task: Task,
@@ -704,8 +705,10 @@ export class TaskWriter {
   /**
    * Updates or adds a DEADLINE date line below the task.
    * If a DEADLINE line already exists, it is updated in place.
-   * If no DEADLINE line exists, a new one is inserted after the task line.
-   * Returns the updated task with lineDelta for the coordinator to adjust subsequent task indices.
+   * If no DEADLINE line exists, a new one is inserted after the task line (or after the
+   * SCHEDULED line if one exists).
+   * Returns the updated task with lineDelta (only included when non-zero) for the coordinator
+   * to adjust subsequent task indices.
    */
   async updateTaskDeadlineDate(
     task: Task,
@@ -808,7 +811,8 @@ export class TaskWriter {
    * Note: This method attempts to remove the DEADLINE line regardless of whether
    * the task.deadlineDate property is set, as there may be a discrepancy between
    * the parsed property and what exists in the file.
-   * Returns the updated task with lineDelta for the coordinator to adjust subsequent task indices.
+   * Returns the updated task with lineDelta (only included when non-zero) for the coordinator
+   * to adjust subsequent task indices.
    */
   async removeTaskDeadlineDate(
     task: Task,
@@ -1090,6 +1094,8 @@ export class TaskWriter {
    * the task.closedDate property is set, as there may be a discrepancy between
    * the parsed property and what exists in the file.
    * Returns both the updated task and the line delta (-1 if line removed, 0 if no line found).
+   * Note: Unlike removeTaskScheduledDate and removeTaskDeadlineDate, this method always
+   * includes lineDelta in the return value (even when 0) due to its DateLineUpdateResult return type.
    */
   async removeTaskClosedDate(
     task: Task,

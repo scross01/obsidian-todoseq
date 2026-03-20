@@ -116,9 +116,7 @@ describe('Regular task parsing', () => {
   beforeEach(() => {
     settings = createBaseSettings({
       additionalInactiveKeywords: ['FIXME'],
-      languageCommentSupport: {
-        enabled: false,
-      },
+      languageCommentSupport: false,
     });
     parser = TaskParser.create(
       createTestKeywordManager(settings),
@@ -497,14 +495,14 @@ TODO task text
         {
           additionalInactiveKeywords: ['FIXME'],
           includeCommentBlocks: true,
-          languageCommentSupport: {
-            enabled: false,
-          },
+          languageCommentSupport: false,
         },
       );
       const parserWithCommentBlocks = TaskParser.create(
         createTestKeywordManager(settingsWithCommentBlocks),
         null,
+        undefined,
+        { includeCommentBlocks: true },
       );
 
       const lines = `
@@ -540,6 +538,8 @@ TODO task text
       const parserWithCommentBlocks = TaskParser.create(
         createTestKeywordManager(settingsWithCommentBlocks),
         null,
+        undefined,
+        { includeCommentBlocks: true },
       );
 
       const lines = `
@@ -578,6 +578,8 @@ TODO task text
       const parserWithCommentBlocks = TaskParser.create(
         createTestKeywordManager(settingsWithCommentBlocks),
         null,
+        undefined,
+        { includeCommentBlocks: true },
       );
 
       const lines = `
@@ -612,6 +614,8 @@ TODO task text
       const parserWithCommentBlocks = TaskParser.create(
         createTestKeywordManager(settingsWithCommentBlocks),
         null,
+        undefined,
+        { includeCommentBlocks: true },
       );
 
       const lines = `

@@ -22,18 +22,10 @@ export class PropertySearchEngine {
   private pendingUpdates = new Set<string>();
   private isUpdating = false;
   private initializationPromise: Promise<void> | null = null; // Track if initialization is already queued
-  private eventListenersRegistered = false; // Track if event listeners have been registered
 
   // Track pending update timeout for cleanup
   private pendingUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly PENDING_UPDATE_DEBOUNCE_MS = 100;
-
-  // Store event references for proper cleanup
-  private vaultRenameEventRef: ReturnType<App['vault']['on']> | null = null;
-  private vaultDeleteEventRef: ReturnType<App['vault']['on']> | null = null;
-  private metadataCacheChangedEventRef: ReturnType<
-    App['metadataCache']['on']
-  > | null = null;
 
   // Dependencies
   private taskStateManager: TaskStateManager;
@@ -614,63 +606,6 @@ export class PropertySearchEngine {
     }
   }
 
-  // Register event listeners for file changes
-  private registerEventListeners(): void {
-    if (this.eventListenersRegistered) {
-      return; // Already registered
-    }
-
-    // Register handlers for vault events and store references for cleanup
-    this.vaultRenameEventRef = this.app.vault.on('rename', (file, oldPath) => {
-      if (file instanceof TFile) {
-        this.onFileRenamed(file, oldPath);
-      }
-    });
-
-    this.vaultDeleteEventRef = this.app.vault.on('delete', (file) => {
-      if (file instanceof TFile) {
-        this.onFileDeleted(file);
-      }
-    });
-
-    // Only register metadata cache change handler - this is sufficient for all file content changes
-    this.metadataCacheChangedEventRef = this.app.metadataCache.on(
-      'changed',
-      (file) => {
-        if (file instanceof TFile) {
-          this.onFileChanged(file);
-        }
-      },
-    );
-
-    this.eventListenersRegistered = true;
-  }
-
-  // Unregister event listeners
-  private unregisterEventListeners(): void {
-    if (!this.eventListenersRegistered) {
-      return; // Not registered
-    }
-
-    // Remove each event listener using the stored references
-    if (this.vaultRenameEventRef) {
-      this.app.vault.offref(this.vaultRenameEventRef);
-      this.vaultRenameEventRef = null;
-    }
-
-    if (this.vaultDeleteEventRef) {
-      this.app.vault.offref(this.vaultDeleteEventRef);
-      this.vaultDeleteEventRef = null;
-    }
-
-    if (this.metadataCacheChangedEventRef) {
-      this.app.metadataCache.offref(this.metadataCacheChangedEventRef);
-      this.metadataCacheChangedEventRef = null;
-    }
-
-    this.eventListenersRegistered = false;
-  }
-
   // Check if a file path contains any tasks
   private filePathContainsTasks(filePath: string): boolean {
     try {
@@ -859,7 +794,6 @@ export class PropertySearchEngine {
    * Destroy the property search engine and clean up resources
    */
   destroy(): void {
-    this.unregisterEventListeners();
     this.reset();
     // Clear any pending update timeout
     if (this.pendingUpdateTimeout) {

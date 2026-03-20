@@ -111,6 +111,10 @@ export abstract class BaseDialog {
    * Position dialog at the given coordinates.
    * Subclasses can override this to provide custom positioning logic.
    * Default implementation centers the dialog on phones, follows cursor on desktop/tablet.
+   * @param x - The x coordinate for the dialog position.
+   * @param y - The y coordinate for the dialog position.
+   * @param defaultWidth - The default width of the dialog in pixels.
+   * @param defaultHeight - The default height of the dialog in pixels.
    */
   protected positionDialog(
     x: number,

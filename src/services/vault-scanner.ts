@@ -73,9 +73,6 @@ export class VaultScanner {
       this.loadUrgencyCoefficients();
     }
 
-    // NOTE: PropertySearchEngine now registers its own event listeners
-    // during initialization to support lazy initialization
-
     // Initialize ChangeTracker with default options
     this.changeTracker = new ChangeTracker({
       defaultTimeoutMs: 5000,

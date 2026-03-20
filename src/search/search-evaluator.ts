@@ -452,6 +452,7 @@ export class SearchEvaluator {
    * @param value Filter value
    * @param task Task to evaluate
    * @param caseSensitive Whether matching should be case sensitive
+   * @param settings Application settings
    * @returns True if task matches the scheduled filter
    */
   private static evaluateScheduledFilter(
@@ -468,6 +469,7 @@ export class SearchEvaluator {
    * @param value Filter value
    * @param task Task to evaluate
    * @param caseSensitive Whether matching should be case sensitive
+   * @param settings Application settings
    * @returns True if task matches the deadline filter
    */
   private static evaluateDeadlineFilter(
@@ -728,6 +730,7 @@ export class SearchEvaluator {
    * @param task Task to evaluate
    * @param caseSensitive Whether matching should be case sensitive
    * @param settings Application settings
+   * @param propertySearchEngine Property search engine instance
    * @returns True if task matches the property filter
    */
   private static async evaluatePropertyFilter(

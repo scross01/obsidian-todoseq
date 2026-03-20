@@ -28,7 +28,7 @@ export interface RecurrenceUpdateResult {
  * Configuration options for RecurrenceCoordinator.
  */
 export interface RecurrenceCoordinatorOptions {
-  /** Default delay for recurrence updates in milliseconds (default: 0) */
+  /** Default delay for recurrence updates in milliseconds (default: 50) */
   defaultDelayMs?: number;
   /** Whether to enable debug logging (default: false) */
   debug?: boolean;
@@ -61,7 +61,7 @@ export class RecurrenceCoordinator {
     private taskStateManager: TaskStateManager,
     options: RecurrenceCoordinatorOptions = {},
   ) {
-    this.defaultDelayMs = options.defaultDelayMs ?? 0;
+    this.defaultDelayMs = options.defaultDelayMs ?? 50;
     // Initialize RecurrenceManager with keywordManager for proper keyword handling
     this.recurrenceManager = new RecurrenceManager(this.keywordManager);
   }
@@ -155,8 +155,7 @@ export class RecurrenceCoordinator {
 
     try {
       // Read the file for recurrence date calculation
-      // Use getFileContent to read from editor buffer when available
-      // This ensures we get the latest content even if editor hasn't synced to disk yet
+      // Use getFileContent to read from vault for latest content
       const content = await this.getFileContent(task.path);
       const lines = content.split('\n');
 

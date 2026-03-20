@@ -32,6 +32,7 @@ export class StatusBarManager {
         clearTimeout(statusBarTimeout);
       }
       statusBarTimeout = setTimeout(() => {
+        // Clear timeout reference to indicate no pending debounced update
         statusBarTimeout = null;
         this.updateStatusBarItem(tasks);
       }, STATUS_BAR_DEBOUNCE_MS);

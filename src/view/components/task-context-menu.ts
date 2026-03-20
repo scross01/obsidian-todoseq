@@ -68,7 +68,7 @@ interface PriorityOption {
  * - Go to task (navigate to source)
  * - Scheduled date shortcuts (Today, Tomorrow, Next week, Next weekend, No date, ...)
  * - Priority selection (A/B/C/None via flag icons)
- * - Deadline (stub for date picker)
+ * - Deadline (date picker with calendar, time, and repeat support)
  *
  * Single-instance pattern: only one menu can be open at a time.
  * Supports keyboard navigation (Escape to close, arrow keys, Enter to select).

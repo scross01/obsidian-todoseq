@@ -261,11 +261,6 @@ export default class TodoTracker extends Plugin {
 
   // Public method to update reader view formatter with current settings
   public refreshReaderViewFormatter(): void {
-    // Update reader view formatter's menu builder with current keyword manager
-    if (this.readerViewFormatter) {
-      this.readerViewFormatter.updateSettings();
-    }
-
     // Force a refresh of all open markdown views to reprocess with new settings
     const leaves = this.app.workspace.getLeavesOfType('markdown');
     leaves.forEach((leaf) => {

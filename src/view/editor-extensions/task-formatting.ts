@@ -88,6 +88,7 @@ export class TaskKeywordDecorator {
   private previousTaskIndent = '';
 
   // Proximity buffer for cursor detection (in characters)
+  // Set to 0 for exact token overlap detection (no buffer)
   private readonly PROXIMITY_BUFFER = 0;
 
   constructor(
@@ -184,7 +185,7 @@ export class TaskKeywordDecorator {
           continue;
         }
 
-        // Skip highlighting if quote blocks are disabled and we're in a quote block
+        // Skip highlighting if quote/callout blocks are disabled and we're in a quote block
         if (this.inQuoteBlock && !this.settings.includeCalloutBlocks) {
           continue;
         }
@@ -538,9 +539,9 @@ export class TaskKeywordDecorator {
         // For multi-line comment blocks, toggle the block state
         this.inCommentBlock = !this.inCommentBlock;
       }
+      // Note: We don't reset inCommentBlock here because we want to maintain
+      // the state between opening and closing %% markers for multi-line blocks
     }
-    // Note: We don't reset inCommentBlock here because we want to maintain
-    // the state between opening and closing %% markers for multi-line blocks
   }
 
   /**
@@ -669,12 +670,6 @@ export class TaskKeywordDecorator {
       // Don't reset the task tracking
     } else if (linesSinceTask > 0 && trimmedLine) {
       // Non-empty line that's not a date line, reset tracking
-      this.previousTaskLine = null;
-      this.previousTaskIndent = '';
-    }
-
-    // Add limit to prevent infinite tracking - reset after 10 lines
-    if (linesSinceTask > 10) {
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
     }

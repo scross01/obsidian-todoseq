@@ -94,28 +94,6 @@ export class SearchSuggestions {
   }
 
   /**
-        const pathsSet = new Set<string>();
-         
-        tasks.forEach(task => {
-            const path = task.path;
-            // Extract parent directories
-            const parts = path.split('/');
-            if (parts.length > 1) {
-                // Add full path segments (without trailing slashes for display)
-                for (let i = 1; i < parts.length; i++) {
-                    const segment = parts.slice(0, i).join('/');
-                    pathsSet.add(segment);
-                }
-            }
-        });
-         
-        // Convert to array and sort alphabetically
-        const paths = Array.from(pathsSet);
-        paths.sort((a, b) => a.localeCompare(b));
-        return paths;
-    }
-     
-    /**
      * Get all unique paths in the vault (fallback method)
      * @param vault Obsidian vault instance
      * @returns Array of unique paths, sorted alphabetically

@@ -55,7 +55,7 @@ export class RecurrenceManager {
    * @param fileContent - The full file content as lines
    * @param parser - The task parser for date line detection
    * @param defaultInactive - The default inactive keyword (e.g., 'TODO')
-   * @returns RecurrenceUpdateResult with updated lines and new dates
+   * @returns RecurrenceUpdateResult with updated flag and new dates
    */
   calculateNextDates(
     task: Task,

@@ -52,7 +52,9 @@ export interface TodoseqParameters {
  * search: tag:project1 AND content:"example"
  * sort: priority
  * completed: hide
+ * show-completed: hide
  * future: show-all
+ * show-future: show-all
  * limit: 10
  * ```
  */

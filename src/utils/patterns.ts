@@ -42,7 +42,7 @@ export const CUSTOM_LIST_PATTERN_SOURCE = CUSTOM_LIST_PATTERN.source;
 
 /**
  * Checkbox pattern for task parsing (source version for composition)
- * Matches: [ ] (unchecked), [x] (checked) or [*] (other checkbox states)
+ * Matches: [ ] (unchecked), [x] (checked), or any non-whitespace character inside brackets
  */
 export const CHECKBOX_PATTERN = /\[[ x\S]\]\s+/;
 export const CHECKBOX_PATTERN_SOURCE = CHECKBOX_PATTERN.source;

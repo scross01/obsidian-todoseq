@@ -2273,33 +2273,6 @@ export class ReaderViewFormatter {
   }
 
   /**
-   * Normalize task text for comparison by stripping markdown formatting
-   */
-  private normalizeTaskText(text: string): string {
-    return text
-      .trim()
-      .replace(/\s+/g, ' ')
-      .replace(/\*\*([^*]+)\*\*/g, '$1') // **bold**
-      .replace(/\*([^*]+)\*/g, '$1') // *italic*
-      .replace(/__([^_]+)__/g, '$1') // __underline__
-      .replace(/_([^_]+)_/g, '$1') // _italic_
-      .replace(/~~([^~]+)~~/g, '$1') // ~~strikethrough~~
-      .replace(/`([^`]+)`/g, '$1') // `code`
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [text](url)
-      .replace(/^[-*+]\s+/gm, '') // List markers
-      .replace(/^\d+\.\s+/gm, '') // Numbered list markers
-      .replace(/^\[\s*[xX]\s*\]\s*/gm, ''); // Checkboxes
-  }
-
-  /**
-   * Update settings when plugin settings change
-   * This ensures reader view formatter uses the latest keyword manager
-   */
-  public updateSettings(): void {
-    // Menu builder now directly accesses the plugin's keyword manager, so no need to recreate it
-  }
-
-  /**
    * Clean up any resources
    */
   cleanup(): void {

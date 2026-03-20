@@ -151,12 +151,12 @@ function getTaskAge(task: Task): number {
 /**
  * Calculate due urgency based on deadline date using linear gradient formula
  * @param task The task to check
- * @returns Urgency value between 0.2 and 1.0 based on deadline proximity
+ * @returns Urgency value between 0 and 1.0 based on deadline proximity (0 if no deadline)
  *
  * Formula: ((days_overdue + 14.0) * 0.8 / 21.0) + 0.2
  * - 7 days overdue: 1.0
- * - Today (0 days): ~0.847
- * - 7 days future: ~0.6
+ * - Today (0 days): ~0.733
+ * - 7 days future: ~0.467
  * - 14 days future: 0.2
  */
 function getDeadlineUrgency(task: Task): number {

@@ -17,9 +17,7 @@ describe('Date Commands', () => {
   beforeEach(() => {
     // Create settings using the base settings helper with overrides
     settings = createBaseSettings({
-      languageCommentSupport: {
-        enabled: false,
-      },
+      languageCommentSupport: false,
     });
 
     // Mock plugin with necessary properties

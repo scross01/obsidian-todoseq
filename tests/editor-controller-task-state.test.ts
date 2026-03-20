@@ -15,9 +15,7 @@ describe('Editor Controller - Task State Methods', () => {
 
   beforeEach(() => {
     settings = createBaseSettings({
-      languageCommentSupport: {
-        enabled: false,
-      },
+      languageCommentSupport: false,
       additionalInactiveKeywords: [],
       // Add transition settings to ensure proper state transitions
       stateTransitions: {

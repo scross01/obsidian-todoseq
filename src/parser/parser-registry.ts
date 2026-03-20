@@ -12,8 +12,8 @@ import { ITaskParser } from './types';
  * @example
  * ```typescript
  * const registry = new ParserRegistry();
- * registry.register(new MarkdownTaskParser(config));
- * registry.register(new OrgModeTaskParser(config));
+ * registry.register(TaskParser.create(keywordManager, app));
+ * registry.register(OrgModeTaskParser.create(keywordManager, app));
  *
  * const parser = registry.getParserForExtension('.org');
  * const tasks = parser?.parseFile(content, path, file);

@@ -201,7 +201,12 @@ describe('TaskParser', () => {
     it('should retrieve daily note info when parsing comment block tasks', () => {
       // Enable comment blocks in settings
       settings.includeCommentBlocks = true;
-      parser = TaskParser.create(createTestKeywordManager(settings), mockApp);
+      parser = TaskParser.create(
+        createTestKeywordManager(settings),
+        mockApp,
+        undefined,
+        { includeCommentBlocks: true },
+      );
 
       const mockFile = {
         path: 'test.md',

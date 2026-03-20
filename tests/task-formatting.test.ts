@@ -9,9 +9,7 @@ describe('Task Formatting Settings Change Detection', () => {
     // Create mock settings
     mockSettings = createBaseSettings({
       refreshInterval: 60,
-      languageCommentSupport: {
-        enabled: false,
-      },
+      languageCommentSupport: false,
     });
 
     // Initialize previous state
@@ -45,7 +43,7 @@ describe('Task Formatting Settings Change Detection', () => {
 
     // Change settings
     mockSettings.includeCodeBlocks = true;
-    mockSettings.languageCommentSupport.enabled = true;
+    mockSettings.languageCommentSupport = true;
 
     // Should detect changes
     expect(hasSettingsChanged()).toBe(true);
@@ -69,11 +67,11 @@ describe('Task Formatting Settings Change Detection', () => {
 
   test('should handle languageCommentSupport setting change', () => {
     // Initial state
-    expect(mockSettings.languageCommentSupport.enabled).toBe(false);
+    expect(mockSettings.languageCommentSupport).toBe(false);
     expect(hasSettingsChanged()).toBe(false);
 
     // Change languageCommentSupport
-    mockSettings.languageCommentSupport.enabled = true;
+    mockSettings.languageCommentSupport = true;
     expect(hasSettingsChanged()).toBe(true);
   });
 
@@ -104,7 +102,7 @@ describe('Task Formatting Settings Change Detection', () => {
 
     // Change multiple settings
     mockSettings.includeCodeBlocks = true;
-    mockSettings.languageCommentSupport.enabled = true;
+    mockSettings.languageCommentSupport = true;
     mockSettings.formatTaskKeywords = false;
 
     // Should detect changes
@@ -118,7 +116,7 @@ describe('Task Formatting Settings Change Detection', () => {
 
     // Change back to original values
     mockSettings.includeCodeBlocks = false;
-    mockSettings.languageCommentSupport.enabled = false;
+    mockSettings.languageCommentSupport = false;
     mockSettings.formatTaskKeywords = true;
 
     // Should detect changes again

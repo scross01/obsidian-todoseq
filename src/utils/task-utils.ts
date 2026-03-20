@@ -28,9 +28,9 @@ type KeywordSettings = {
  * Result of building the task keyword list
  */
 export interface TaskKeywordResult {
-  /** All unique keywords (pending + active + completed + additional) */
+  /** All unique keywords (inactive + active + waiting + additional + completed) */
   allKeywords: string[];
-  /** Non-completed keywords (pending + active + additional) */
+  /** Non-completed keywords (inactive + active + waiting + additional) */
   nonCompletedKeywords: string[];
   /** Normalized additional keywords from settings */
   normalizedAdditional: string[];
@@ -363,7 +363,7 @@ export function getCheckboxStatus(completed: boolean): string {
  * Truncate a string in the middle with ellipsis
  * @param str The string to truncate
  * @param maxLength Maximum length of the result string
- * @returns Truncated string with '...' in middle if needed
+ * @returns Truncated string with '..' in middle if needed
  */
 export function truncateMiddle(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str;

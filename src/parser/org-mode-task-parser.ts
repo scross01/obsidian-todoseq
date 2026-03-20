@@ -39,7 +39,7 @@ import { TFile, App } from 'obsidian';
  *
  * @example
  * ```typescript
- * const parser = OrgModeTaskParser.create(settings, app);
+ * const parser = OrgModeTaskParser.create(keywordManager, app);
  * const tasks = parser.parseFile(content, path, file);
  * ```
  */
@@ -336,10 +336,9 @@ export class OrgModeTaskParser implements ITaskParser {
         continue;
       }
 
-      // If we hit a non-empty line that's not a date line, stop
+      // Break if we've found both scheduled and deadline dates
       // (org-mode dates are on separate lines immediately after the headline)
-      // But allow for body text - dates should be on the first few lines
-      // So we only break if we've already found dates or hit another headline
+      // Otherwise continue to allow finding body text or other date lines
       if (scheduledDate && deadlineDate) {
         break;
       }

@@ -152,9 +152,6 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
     test('should destroy engine properly', async () => {
       await propertySearchEngine.initialize();
 
-      // Register some event listeners to test unregistering
-      (propertySearchEngine as any).registerEventListeners();
-
       propertySearchEngine.destroy();
 
       expect(propertySearchEngine.isReady()).toBe(false);
@@ -225,20 +222,6 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
   });
 
   describe('Event Handling', () => {
-    test('should register and unregister event listeners', async () => {
-      const engine = PropertySearchEngine.getInstance(mockApp, {
-        taskStateManager: mockTaskStateManager,
-        refreshAllTaskListViews,
-        vaultScanner: mockVaultScanner,
-      });
-
-      (engine as any).registerEventListeners();
-      expect((engine as any).eventListenersRegistered).toBe(true);
-
-      (engine as any).unregisterEventListeners();
-      expect((engine as any).eventListenersRegistered).toBe(false);
-    });
-
     test('should handle file change events', async () => {
       const mockFile = createMockFile('changed-file.md');
       const invalidateFileSpy = jest.spyOn(

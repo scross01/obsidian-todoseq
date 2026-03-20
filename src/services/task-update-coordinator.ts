@@ -3,7 +3,9 @@
  * from any view (editor, reader, task list, embedded lists).
  *
  * ARCHITECTURE:
- * - Single entry point: updateTask(context)
+ * - Unified entry point: updateTask(context) handles all update types
+ * - Convenience methods: updateTaskState, updateTaskScheduledDate, updateTaskDeadlineDate,
+ *   updateTaskPriority, updateTaskRecurrence, updateTaskByPath (all delegate to updateTask)
  * - Sync phase (always completes): optimistic update, DOM manipulation, UI refresh
  * - Async phase (background): file write, recurrence scheduling, state finalization
  * - Per-task locking prevents race conditions from rapid updates

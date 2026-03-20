@@ -26,7 +26,7 @@ export function findDateLine(
   taskIndent: string,
   keywordManager: KeywordManager,
 ): number {
-  // Search limited to 8 lines after task (max nesting depth)
+  // Search limited to 9 lines after task (max nesting depth)
   const maxLines = Math.min(startIndex + 9, lines.length);
   const keyword = `${dateType}:`;
 

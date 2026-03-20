@@ -1517,7 +1517,6 @@ export class TaskListView extends ItemView {
         this.lazyLoadScrollHandler,
       );
     }
-    // Don't null out lazyLoadScrollHandler as it's used for scroll position tracking
 
     if (this.sentinelObserver) {
       this.sentinelObserver.disconnect();
