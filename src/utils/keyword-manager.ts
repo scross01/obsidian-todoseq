@@ -7,7 +7,7 @@ import {
 } from './constants';
 import { KeywordGroup } from '../types/task';
 
-type KeywordSettings = {
+export type KeywordSettings = {
   additionalInactiveKeywords?: string[];
   additionalActiveKeywords?: string[];
   additionalWaitingKeywords?: string[];

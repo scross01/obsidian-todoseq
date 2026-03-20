@@ -315,27 +315,3 @@ export function calculateTaskUrgency(
     return null;
   }
 }
-
-/**
- * Check if a task needs urgency recalculation based on changed properties
- * @param task The task to check
- * @param changedProps Array of property names that changed
- * @returns true if urgency needs recalculation
- */
-export function needsUrgencyRecalculation(
-  task: Task,
-  changedProps: string[],
-): boolean {
-  const urgencyAffectingProps = [
-    'priority',
-    'scheduledDate',
-    'deadlineDate',
-    'state',
-    'completed',
-    'tags', // tags array
-    'isDailyNote', // new field
-    'dailyNoteDate', // new field
-  ];
-
-  return changedProps.some((prop) => urgencyAffectingProps.includes(prop));
-}

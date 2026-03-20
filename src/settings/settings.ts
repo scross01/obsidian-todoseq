@@ -4,8 +4,8 @@ import { TaskParser } from '../parser/task-parser';
 import {
   parseKeywordInput,
   formatKeywordsForInput,
+  validateKeywordGroupsDetailed,
 } from '../utils/settings-utils';
-import { validateKeywordGroupsDetailed } from '../utils/task-utils';
 import { TodoTrackerSettings } from './settings-types';
 import { TaskListView } from '../view/task-list/task-list-view';
 import { KeywordGroup } from '../types/task';

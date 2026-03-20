@@ -1,20 +1,5 @@
 import { TodoTrackerSettings } from '../settings/settings-types';
-
-/**
- * Structural typing for accessing Obsidian plugin system
- */
-export type AppWithPlugins = {
-  plugins?: {
-    plugins?: Record<string, unknown>;
-  };
-};
-
-/**
- * Structural typing for accessing plugin settings (partial, only what we need)
- */
-export type HasPluginSettings = {
-  settings?: Partial<TodoTrackerSettings>;
-};
+import { KeywordManager } from './keyword-manager';
 
 /**
  * Utility class for managing settings change detection
@@ -106,24 +91,6 @@ export class SettingsChangeDetector {
 }
 
 /**
- * Create a new settings change detector instance
- * @returns New SettingsChangeDetector instance
- */
-export function createSettingsChangeDetector(): SettingsChangeDetector {
-  return new SettingsChangeDetector();
-}
-
-/**
- * Normalize a keyword string for storage
- * Trims whitespace and converts to uppercase
- * @param keyword The keyword to normalize
- * @returns Normalized keyword or empty string if invalid
- */
-export function normalizeKeyword(keyword: string): string {
-  return keyword.trim().toUpperCase();
-}
-
-/**
  * Parse a comma-separated string of keywords into an array
  * @param input The comma-separated string
  * @returns Array of normalized, non-empty keywords
@@ -131,7 +98,7 @@ export function normalizeKeyword(keyword: string): string {
 export function parseKeywordInput(input: string): string[] {
   return input
     .split(',')
-    .map(normalizeKeyword)
+    .map((k) => k.trim().toUpperCase())
     .filter((k) => k.length > 0);
 }
 
@@ -142,4 +109,34 @@ export function parseKeywordInput(input: string): string[] {
  */
 export function formatKeywordsForInput(keywords: string[]): string {
   return keywords.join(', ');
+}
+
+/**
+ * Input type for keyword group validation
+ */
+type KeywordGroupValidationInput = {
+  activeKeywords?: string[];
+  inactiveKeywords?: string[];
+  waitingKeywords?: string[];
+  completedKeywords?: string[];
+  archivedKeywords?: string[];
+};
+
+/**
+ * Detailed validation result for settings UI.
+ * @param groups The keyword groups to validate
+ * @returns Validation result with errors and warnings
+ */
+export function validateKeywordGroupsDetailed(
+  groups: KeywordGroupValidationInput,
+) {
+  const keywordManager = new KeywordManager({
+    additionalActiveKeywords: groups.activeKeywords ?? [],
+    additionalInactiveKeywords: groups.inactiveKeywords ?? [],
+    additionalWaitingKeywords: groups.waitingKeywords ?? [],
+    additionalCompletedKeywords: groups.completedKeywords ?? [],
+    additionalArchivedKeywords: groups.archivedKeywords ?? [],
+  });
+
+  return keywordManager.getValidationResult();
 }

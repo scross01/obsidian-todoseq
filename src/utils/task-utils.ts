@@ -1,5 +1,5 @@
 import { KeywordGroup, Task } from '../types/task';
-import { KeywordManager } from './keyword-manager';
+import { KeywordManager, KeywordSettings } from './keyword-manager';
 import {
   BUILTIN_ACTIVE_KEYWORDS,
   BUILTIN_INACTIVE_KEYWORDS,
@@ -7,74 +7,6 @@ import {
   BUILTIN_COMPLETED_KEYWORDS,
   BUILTIN_ARCHIVED_KEYWORDS,
 } from './constants';
-
-type KeywordGroupValidationInput = {
-  activeKeywords?: string[];
-  inactiveKeywords?: string[];
-  waitingKeywords?: string[];
-  completedKeywords?: string[];
-  archivedKeywords?: string[];
-};
-
-type KeywordSettings = {
-  additionalInactiveKeywords?: string[];
-  additionalActiveKeywords?: string[];
-  additionalWaitingKeywords?: string[];
-  additionalCompletedKeywords?: string[];
-  additionalArchivedKeywords?: string[];
-};
-
-/**
- * Result of building the task keyword list
- */
-export interface TaskKeywordResult {
-  /** All unique keywords (inactive + active + waiting + additional + completed) */
-  allKeywords: string[];
-  /** Non-completed keywords (inactive + active + waiting + additional) */
-  nonCompletedKeywords: string[];
-  /** Normalized additional keywords from settings */
-  normalizedAdditional: string[];
-}
-
-/**
- * Build the complete list of task keywords from settings
- * Combines default pending/active/completed states with user-defined additional keywords
- * @param additionalTaskKeywords Array of additional keywords from settings
- * @returns TaskKeywordResult containing all keyword arrays
- * @deprecated Use buildKeywordsFromGroups() instead, which supports all four keyword groups
- */
-export function buildTaskKeywords(
-  additionalTaskKeywords: unknown[],
-): TaskKeywordResult {
-  // Normalize additional keywords: ensure strings, trim, filter empties
-  const normalizedAdditional: string[] = Array.isArray(additionalTaskKeywords)
-    ? (additionalTaskKeywords as string[])
-        .filter((k): k is string => typeof k === 'string')
-        .map((k) => k.trim())
-        .filter((k) => k.length > 0)
-    : [];
-
-  // Build non-completed keywords using new constants
-  // Note: DEFAULT_PENDING_STATES includes both inactive and waiting keywords for backward compatibility
-  const nonCompletedKeywords: string[] = [
-    ...BUILTIN_INACTIVE_KEYWORDS,
-    ...BUILTIN_ACTIVE_KEYWORDS,
-    ...BUILTIN_WAITING_KEYWORDS,
-    ...normalizedAdditional,
-  ];
-
-  // Build all keywords (non-completed + completed)
-  const allKeywords: string[] = [
-    ...nonCompletedKeywords,
-    ...BUILTIN_COMPLETED_KEYWORDS,
-  ];
-
-  return {
-    allKeywords: Array.from(new Set(allKeywords)),
-    nonCompletedKeywords: Array.from(new Set(nonCompletedKeywords)),
-    normalizedAdditional,
-  };
-}
 
 /**
  * Get all keywords for a specific group (built-in + custom)
@@ -165,98 +97,6 @@ export function isBuiltinKeyword(keyword: string): boolean {
       keyword as (typeof BUILTIN_ARCHIVED_KEYWORDS)[number],
     )
   );
-}
-
-/**
- * Checks if any keyword appears in multiple groups
- * @param groups The keyword groups to validate (with flat properties)
- * @returns Array of duplicate keywords found (empty if no duplicates)
- */
-export function validateKeywordGroups(groups: {
-  activeKeywords?: string[];
-  inactiveKeywords?: string[];
-  waitingKeywords?: string[];
-  completedKeywords?: string[];
-  archivedKeywords?: string[];
-}): string[] {
-  return Array.from(
-    new Set(
-      validateKeywordGroupsDetailed(groups).errors.map(
-        (issue) => issue.keyword,
-      ),
-    ),
-  );
-}
-
-/**
- * Detailed validation result for settings UI.
- */
-export function validateKeywordGroupsDetailed(
-  groups: KeywordGroupValidationInput,
-) {
-  const keywordManager = new KeywordManager({
-    additionalActiveKeywords: groups.activeKeywords ?? [],
-    additionalInactiveKeywords: groups.inactiveKeywords ?? [],
-    additionalWaitingKeywords: groups.waitingKeywords ?? [],
-    additionalCompletedKeywords: groups.completedKeywords ?? [],
-    additionalArchivedKeywords: groups.archivedKeywords ?? [],
-  });
-
-  return keywordManager.getValidationResult();
-}
-
-/**
- * Result of building keywords from taskKeywordGroups setting
- */
-export interface TaskKeywordGroupsResult {
-  /** All unique keywords across all groups */
-  allKeywords: string[];
-  /** Keywords that indicate a task is completed */
-  completedKeywords: string[];
-  /** Keywords that indicate a task is active (being worked on) */
-  activeKeywords: string[];
-  /** Keywords that indicate a task is inactive/pending */
-  inactiveKeywords: string[];
-  /** Keywords that indicate a task is waiting/blocked */
-  waitingKeywords: string[];
-  /** Keywords that indicate a task is archived (styled but not collected) */
-  archivedKeywords: string[];
-}
-
-/**
- * Build keyword lists from taskKeywordGroups setting
- * Combines built-in keywords with custom keywords from settings
- * @param settings Settings object containing taskKeywordGroups
- * @returns TaskKeywordGroupsResult with all keyword arrays
- */
-export function buildKeywordsFromGroups(
-  settings: KeywordSettings,
-): TaskKeywordGroupsResult {
-  const activeKeywords = getKeywordsForGroup('activeKeywords', settings);
-  const inactiveKeywords = getKeywordsForGroup('inactiveKeywords', settings);
-  const waitingKeywords = getKeywordsForGroup('waitingKeywords', settings);
-  const completedKeywords = getKeywordsForGroup('completedKeywords', settings);
-  const archivedKeywords = getKeywordsForGroup('archivedKeywords', settings);
-
-  // Build all keywords, removing duplicates while preserving order
-  const allKeywords = Array.from(
-    new Set([
-      ...activeKeywords,
-      ...inactiveKeywords,
-      ...waitingKeywords,
-      ...completedKeywords,
-      ...archivedKeywords,
-    ]),
-  );
-
-  return {
-    allKeywords,
-    completedKeywords,
-    activeKeywords,
-    inactiveKeywords,
-    waitingKeywords,
-    archivedKeywords,
-  };
 }
 
 /**

@@ -7,8 +7,6 @@ import {
   getAllKeywords,
   getKeywordGroup,
   isBuiltinKeyword,
-  validateKeywordGroups,
-  buildKeywordsFromGroups,
   isCompletedKeyword,
   isActiveKeyword,
   isWaitingKeyword,
@@ -293,103 +291,6 @@ describe('task-utils', () => {
       test('should return false for custom keywords', () => {
         expect(isBuiltinKeyword('CUSTOM')).toBe(false);
         expect(isBuiltinKeyword('PENDING')).toBe(false);
-      });
-    });
-
-    describe('validateKeywordGroups', () => {
-      test('should return duplicates from multiple groups', () => {
-        const groups = {
-          activeKeywords: ['CUSTOM'],
-          waitingKeywords: ['CUSTOM'],
-          completedKeywords: ['ANOTHER'],
-        };
-        const result = validateKeywordGroups(groups);
-        expect(result).toEqual(['CUSTOM']);
-      });
-
-      test('should return empty array when no duplicates', () => {
-        const groups = {
-          activeKeywords: ['WORKING'],
-          waitingKeywords: ['BLOCKED'],
-          completedKeywords: ['FINISHED'],
-        };
-        const result = validateKeywordGroups(groups);
-        expect(result).toEqual([]);
-      });
-
-      test('should handle empty groups', () => {
-        const groups = {
-          activeKeywords: [],
-          waitingKeywords: [],
-          completedKeywords: [],
-        };
-        const result = validateKeywordGroups(groups);
-        expect(result).toEqual([]);
-      });
-
-      test('should allow built-in keywords to be redeclared across groups', () => {
-        const groups = {
-          activeKeywords: ['TODO'], // TODO is built-in inactive
-          waitingKeywords: ['DONE'], // DONE is built-in completed
-        };
-        const result = validateKeywordGroups(groups);
-        expect(result).toEqual([]);
-      });
-    });
-
-    describe('buildKeywordsFromGroups', () => {
-      test('should build all keyword groups correctly', () => {
-        const settings = {
-          additionalInactiveKeywords: ['PENDING'],
-          additionalActiveKeywords: ['WORKING'],
-          additionalWaitingKeywords: ['BLOCKED'],
-          additionalCompletedKeywords: ['FINISHED'],
-        };
-        const result = buildKeywordsFromGroups(settings);
-
-        expect(result.allKeywords).toEqual(
-          expect.arrayContaining([
-            ...BUILTIN_INACTIVE_KEYWORDS,
-            ...BUILTIN_ACTIVE_KEYWORDS,
-            ...BUILTIN_WAITING_KEYWORDS,
-            ...BUILTIN_COMPLETED_KEYWORDS,
-            'PENDING',
-            'WORKING',
-            'BLOCKED',
-            'FINISHED',
-          ]),
-        );
-
-        expect(result.activeKeywords).toEqual(
-          expect.arrayContaining([...BUILTIN_ACTIVE_KEYWORDS, 'WORKING']),
-        );
-        expect(result.inactiveKeywords).toEqual(
-          expect.arrayContaining([...BUILTIN_INACTIVE_KEYWORDS, 'PENDING']),
-        );
-        expect(result.waitingKeywords).toEqual(
-          expect.arrayContaining([...BUILTIN_WAITING_KEYWORDS, 'BLOCKED']),
-        );
-        expect(result.completedKeywords).toEqual(
-          expect.arrayContaining([...BUILTIN_COMPLETED_KEYWORDS, 'FINISHED']),
-        );
-      });
-
-      test('should handle empty settings', () => {
-        const settings = {};
-        const result = buildKeywordsFromGroups(settings);
-
-        expect(result.activeKeywords).toEqual(
-          expect.arrayContaining(BUILTIN_ACTIVE_KEYWORDS),
-        );
-        expect(result.inactiveKeywords).toEqual(
-          expect.arrayContaining(BUILTIN_INACTIVE_KEYWORDS),
-        );
-        expect(result.waitingKeywords).toEqual(
-          expect.arrayContaining(BUILTIN_WAITING_KEYWORDS),
-        );
-        expect(result.completedKeywords).toEqual(
-          expect.arrayContaining(BUILTIN_COMPLETED_KEYWORDS),
-        );
       });
     });
 

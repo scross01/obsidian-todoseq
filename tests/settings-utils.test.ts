@@ -1,7 +1,4 @@
-import {
-  SettingsChangeDetector,
-  createSettingsChangeDetector,
-} from '../src/utils/settings-utils';
+import { SettingsChangeDetector } from '../src/utils/settings-utils';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import {
   migrateSettings,
@@ -613,43 +610,6 @@ describe('settings-utils', () => {
           true,
         );
       });
-    });
-  });
-
-  describe('createSettingsChangeDetector', () => {
-    test('should create new detector instance', () => {
-      const detector = createSettingsChangeDetector();
-      expect(detector).toBeInstanceOf(SettingsChangeDetector);
-    });
-
-    test('should create independent detector instances', () => {
-      const detector1 = createSettingsChangeDetector();
-      const detector2 = createSettingsChangeDetector();
-
-      const settings: TodoTrackerSettings = createBaseSettings();
-
-      detector1.initialize(settings);
-      detector2.initialize(settings);
-
-      const changedSettings = { ...settings, formatTaskKeywords: false };
-
-      // Both should detect changes independently
-      expect(detector1.hasFormattingSettingsChanged(changedSettings)).toBe(
-        true,
-      );
-      expect(detector2.hasFormattingSettingsChanged(changedSettings)).toBe(
-        true,
-      );
-
-      // Update one detector
-      detector1.updatePreviousState(changedSettings);
-      expect(detector1.hasFormattingSettingsChanged(changedSettings)).toBe(
-        false,
-      );
-      // Other detector should still detect change
-      expect(detector2.hasFormattingSettingsChanged(changedSettings)).toBe(
-        true,
-      );
     });
   });
 });
