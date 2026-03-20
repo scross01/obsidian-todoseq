@@ -18,8 +18,6 @@ import TodoTracker from '../main';
 export interface RecurrenceUpdateResult {
   /** Whether the update was successful */
   success: boolean;
-  /** The updated task state */
-  task?: Task;
   /** Error message if the update failed */
   error?: string;
 }
@@ -62,7 +60,7 @@ export class RecurrenceCoordinator {
     options: RecurrenceCoordinatorOptions = {},
   ) {
     this.defaultDelayMs = options.defaultDelayMs ?? 50;
-    // Initialize RecurrenceManager with keywordManager for proper keyword handling
+    // Initialize RecurrenceManager with keywordManager (accessed via private getter)
     this.recurrenceManager = new RecurrenceManager(this.keywordManager);
   }
 
@@ -190,7 +188,6 @@ export class RecurrenceCoordinator {
         task,
         lines,
         parser,
-        defaultInactive,
       );
 
       if (!dateResult.updated) {

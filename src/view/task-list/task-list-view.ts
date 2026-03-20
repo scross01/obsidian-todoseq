@@ -355,6 +355,7 @@ export class TaskListView extends ItemView {
 
   /**
    * Filter tasks based on view mode
+   * Only filters when mode is 'hideCompleted'; returns a copy for all other modes
    * @param tasks Array of all tasks
    * @param mode Current view mode
    * @returns Filtered tasks array
@@ -1103,7 +1104,7 @@ export class TaskListView extends ItemView {
     }
   }
 
-  // Cycle state via NEXT_STATE - use optimistic update + taskEditor directly
+  // Cycle state via NEXT_STATE - delegates to taskUpdateCoordinator
   private async updateTaskState(task: Task, nextState: string): Promise<void> {
     // Get the plugin instance
     const plugin = (
@@ -1518,10 +1519,12 @@ export class TaskListView extends ItemView {
       );
     }
 
+    // Disconnect observer (property typed as IntersectionObserver but scroll handler is used instead)
     if (this.sentinelObserver) {
       this.sentinelObserver.disconnect();
       this.sentinelObserver = null;
     }
+    // Remove sentinel element
     if (this.sentinelElement) {
       this.sentinelElement.remove();
       this.sentinelElement = null;
@@ -2324,7 +2327,7 @@ export class TaskListView extends ItemView {
       this.resizeObserver = null;
     }
 
-    // Cleanup IntersectionObserver (sentinelObserver)
+    // Cleanup sentinelObserver (property typed as IntersectionObserver but scroll handler is used instead)
     if (this.sentinelObserver) {
       this.sentinelObserver.disconnect();
       this.sentinelObserver = null;

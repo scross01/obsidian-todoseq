@@ -475,9 +475,6 @@ export class PluginLifecycleManager {
     // Setup right-click event handlers for task keywords
     this.plugin.uiManager.setupTaskKeywordContextMenu();
 
-    // Vault events are now handled by EventCoordinator (single source of truth)
-    // File change events are debounced and batched by the coordinator
-
     // Conditional ribbon icon - only show on mobile devices
     if (Platform.isMobile) {
       this.plugin.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
@@ -580,13 +577,5 @@ export class PluginLifecycleManager {
    */
   private async saveSettings(): Promise<void> {
     await this.plugin.saveSettings();
-  }
-
-  /**
-   * Handle workspace layout changes
-   */
-  private handleLayoutChange(): void {
-    // Refresh task formatting when layout changes
-    this.plugin.uiManager.setupTaskFormatting();
   }
 }

@@ -80,7 +80,7 @@ export function extractRepeaterFromDate(dateContent: string): {
  * - '+': Add value * unit to base date (plain repeat)
  * - '.+': If baseDate < fromDate, find next occurrence after fromDate.
  *         If baseDate > fromDate, add to baseDate.
- * - '++': Add multiples of unit until date is in the future, preserving day-of-week for w/d
+ * - '++': Add multiples of unit until date is in the future, preserving day-of-week for w
  */
 export function calculateNextRepeatDate(
   baseDate: Date,
@@ -119,7 +119,7 @@ export function calculateNextRepeatDate(
  * For .+ (delay):
  * - d: If base time > from time, use today at base time. Otherwise, add x days.
  * - h: Always add x hours to from time (not base time).
- * - w: Like d (weeks), but with additional day-of-week correction to match base date's day.
+ * - w: Like d, but with day-of-week correction to match base date's day.
  * - m: Add x months to from date, preserving the time from baseDate.
  * - y: Add x years to from date, preserving the time from baseDate.
  */

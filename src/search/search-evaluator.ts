@@ -451,7 +451,6 @@ export class SearchEvaluator {
    * Evaluate scheduled date filter
    * @param value Filter value
    * @param task Task to evaluate
-   * @param caseSensitive Whether matching should be case sensitive
    * @param settings Application settings
    * @returns True if task matches the scheduled filter
    */
@@ -468,7 +467,6 @@ export class SearchEvaluator {
    * Evaluate deadline date filter
    * @param value Filter value
    * @param task Task to evaluate
-   * @param caseSensitive Whether matching should be case sensitive
    * @param settings Application settings
    * @returns True if task matches the deadline filter
    */
@@ -572,6 +570,7 @@ export class SearchEvaluator {
    * Evaluate date expressions like 'overdue', 'today', 'tomorrow', etc.
    * @param expression Date expression
    * @param date Date to evaluate
+   * @param settings Application settings
    * @returns True if date matches the expression
    */
   private static evaluateDateExpression(
@@ -619,7 +618,6 @@ export class SearchEvaluator {
    * Evaluate range filter (e.g., scheduled:2024-01-01..2024-01-31)
    * @param node Range filter node
    * @param task Task to evaluate
-   * @param caseSensitive Whether matching should be case sensitive
    * @returns True if task matches the range filter
    */
   private static evaluateRangeFilter(

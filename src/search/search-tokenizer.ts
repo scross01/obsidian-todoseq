@@ -44,7 +44,7 @@ export class SearchTokenizer {
 
       let matched = false;
 
-      // Try range pattern first after prefix_value
+      // Try range pattern first after prefix_value or prefix_value_quoted
       if (
         tokens.length > 0 &&
         (tokens[tokens.length - 1].type === 'prefix_value' ||
@@ -60,9 +60,10 @@ export class SearchTokenizer {
         pos += 2;
         matched = true;
       } else {
-        // Try each pattern in order, but skip word pattern if we might have a range
+        // Try each pattern in order. For word pattern after a prefix with a range,
+        // extract the prefix value before the range and create a prefix_value token
         for (const pattern of this.PATTERNS) {
-          // Skip word pattern if we're after a prefix and might have a range
+          // Extract prefix value before range if we're after a prefix and might have a range
           if (
             pattern.type === 'word' &&
             tokens.length > 0 &&

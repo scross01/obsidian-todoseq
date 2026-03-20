@@ -54,14 +54,12 @@ export class RecurrenceManager {
    * @param task - The task to calculate recurrence for
    * @param fileContent - The full file content as lines
    * @param parser - The task parser for date line detection
-   * @param defaultInactive - The default inactive keyword (e.g., 'TODO')
    * @returns RecurrenceUpdateResult with updated flag and new dates
    */
   calculateNextDates(
     task: Task,
     fileContent: string[],
     parser: DateLineParser,
-    defaultInactive: string,
   ): RecurrenceUpdateResult {
     const lines = [...fileContent]; // Create a copy to avoid mutating input
     const taskLine = lines[task.line];

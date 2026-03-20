@@ -43,7 +43,6 @@ describe('RecurrenceManager', () => {
         task,
         lines,
         mockParser,
-        'TODO',
       );
 
       expect(result.updated).toBe(false);
@@ -75,7 +74,6 @@ describe('RecurrenceManager', () => {
         task,
         lines,
         mockParser,
-        'TODO',
       );
 
       expect(result.updated).toBe(true);
@@ -106,7 +104,6 @@ describe('RecurrenceManager', () => {
         task,
         lines,
         mockParser,
-        'TODO',
       );
 
       expect(result.updated).toBe(true);
@@ -143,7 +140,6 @@ describe('RecurrenceManager', () => {
         task,
         lines,
         mockParser,
-        'TODO',
       );
 
       expect(result.updated).toBe(true);
@@ -175,7 +171,6 @@ describe('RecurrenceManager', () => {
         task,
         lines,
         mockParser,
-        'TODO',
       );
 
       expect(mockParser.getDateLineType).toHaveBeenCalled();

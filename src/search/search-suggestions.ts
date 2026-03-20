@@ -94,10 +94,10 @@ export class SearchSuggestions {
   }
 
   /**
-     * Get all unique paths in the vault (fallback method)
-     * @param vault Obsidian vault instance
-     * @returns Array of unique paths, sorted alphabetically
-     */
+   * Get all unique paths in the vault (fallback method)
+   * @param vault Obsidian vault instance
+   * @returns Array of unique paths, sorted alphabetically
+   */
   static async getAllPaths(vault: Vault): Promise<string[]> {
     const paths: string[] = [];
     const files = vault.getMarkdownFiles();

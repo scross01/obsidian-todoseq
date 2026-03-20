@@ -13,10 +13,11 @@ import { KeywordManager } from './keyword-manager';
  * @param startIndex - Starting line index (typically task.line + 1)
  * @param dateType - Type of date to find ('SCHEDULED', 'DEADLINE', or 'CLOSED')
  * @param taskIndent - The task's indent level (for proper nesting detection)
+ * @param keywordManager - KeywordManager for dynamic keyword detection
  * @returns Line index of found date line, or -1 if not found
  *
  * @example
- * findDateLine(lines, 5, 'SCHEDULED', '  ')
+ * findDateLine(lines, 5, 'SCHEDULED', '  ', keywordManager)
  * // Returns: 7 if SCHEDULED line found at index 7, -1 otherwise
  */
 export function findDateLine(
@@ -134,10 +135,11 @@ function isTaskLine(line: string, keywordManager: KeywordManager): boolean {
  * @param dateType - Type of date to find ('SCHEDULED', 'DEADLINE', or 'CLOSED')
  * @param taskIndent - The task's indent level (for proper nesting detection)
  * @param parser - Optional TaskParser for enhanced date line detection
+ * @param keywordManager - KeywordManager for dynamic keyword detection (used when parser is null)
  * @returns Line index of found date line, or -1 if not found
  *
  * @example
- * findDateLineWithParser(lines, 5, 'SCHEDULED', '  ', parser)
+ * findDateLineWithParser(lines, 5, 'SCHEDULED', '  ', parser, keywordManager)
  * // Returns: 7 if SCHEDULED line found at index 7, -1 otherwise
  */
 export function findDateLineWithParser(

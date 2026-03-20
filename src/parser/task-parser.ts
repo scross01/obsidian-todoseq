@@ -270,7 +270,7 @@ export class TaskParser implements ITaskParser {
   ): RegexPair {
     const escapedKeywords = TaskParser.escapeKeywords(keywords);
 
-    // starts with mutliline or singleline
+    // starts with multiline or singleline
     const startComment = [
       languageDefinition.patterns.singleLine?.source,
       languageDefinition.patterns.multiLineStart?.source,
@@ -279,8 +279,9 @@ export class TaskParser implements ITaskParser {
       .join('|');
     const midComment =
       languageDefinition.patterns.multilineMid?.source || '.*?';
-    const endComment =
-      `\\s+${languageDefinition.patterns.multiLineEnd?.source}\\s*` || '';
+    const endComment = languageDefinition.patterns.multiLineEnd?.source
+      ? `\\s+${languageDefinition.patterns.multiLineEnd.source}\\s*`
+      : '';
 
     const test = new RegExp(
       `^((?:(?:${CODE_PREFIX_SOURCE})?(?:(?:${startComment})\\s+))|(?:${midComment}\\s*))` +
@@ -288,7 +289,7 @@ export class TaskParser implements ITaskParser {
         `(${CHECKBOX_PATTERN_SOURCE})?` +
         `(${escapedKeywords})\\s+` +
         `(${TASK_TEXT_SOURCE})` +
-        `(?=${endComment}$|$)?(${endComment})?$`,
+        `(${endComment})?$`,
     );
     const capture = test;
     return { test, capture };
@@ -362,17 +363,17 @@ export class TaskParser implements ITaskParser {
 
     // For default regex, the task text is everything after the captured keyword
     // m[0] is the full match
-    // m[1] is the indent (spacing, prefix text, comment characters )
+    // m[1] is the indent (spacing, prefix text, comment characters)
     // m[2] is the list marker
     // m[3] is the checkbox
     // m[4] is the state keyword
     // m[5] is the task text
-    // m[6] is the closing comment characters
+    // m[6] is the closing comment characters (for code block regex only)
     const indent = m[1] || '';
     const listMarker = (m[2] || '') + (m[3] || '');
     const state = m[4];
     const taskText = m[5];
-    const tail = m[6];
+    const tail = m[6] || '';
 
     // Extract quote nesting level
     const quoteNestingLevel = TaskParser.extractQuoteNestingLevel(line);
@@ -1536,8 +1537,6 @@ export class TaskParser implements ITaskParser {
     task.closedDate = closedDate;
 
     // Extract subtasks from lines following date lines
-    // Footnote tasks don't have checkboxes
-    // Extract subtasks from lines following date lines
     // Check if parent task has a checkbox
     const parentHasCheckbox = CHECKBOX_REGEX.test(content);
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
@@ -1566,17 +1565,6 @@ export class TaskParser implements ITaskParser {
   }
 
   /**
-   * Create a Task from extracted task details
-   * @param line Original line
-   * @param path File path
-   * @param index Line index
-   * @param taskDetails Extracted task details
-   * @param lines All lines in file
-   * @param processedLines Set of line numbers that have been processed
-   * @param file Optional TFile object for daily note detection
-   * @returns Parsed task
-   */
-  /**
    * Extract tags from task text
    * @param taskText The task text to parse
    * @returns Array of tag strings (without #)
@@ -1591,6 +1579,17 @@ export class TaskParser implements ITaskParser {
     return matches.map((tag) => tag.substring(1));
   }
 
+  /**
+   * Create a Task from extracted task details
+   * @param line Original line
+   * @param path File path
+   * @param index Line index
+   * @param taskDetails Extracted task details
+   * @param lines All lines in file
+   * @param processedLines Set of line numbers that have been processed
+   * @param file Optional TFile object for daily note detection
+   * @returns Parsed task
+   */
   private createTaskFromDetails(
     line: string,
     path: string,
@@ -1785,11 +1784,18 @@ export class TaskParser implements ITaskParser {
     }
 
     // Extract task details
+    // m[0] is the full match
+    // m[1] is the indent (spacing, prefix text, comment characters)
+    // m[2] is the list marker
+    // m[3] is the checkbox
+    // m[4] is the state keyword
+    // m[5] is the task text
+    // m[6] is the closing comment characters (for code block regex only)
     const indent = match[1] || '';
     const listMarker = (match[2] || '') + (match[3] || '');
     const state = match[4];
     const taskText = match[5];
-    const tail = match[6];
+    const tail = match[6] || '';
 
     // Extract quote nesting level
     const quoteNestingLevel = TaskParser.extractQuoteNestingLevel(line);

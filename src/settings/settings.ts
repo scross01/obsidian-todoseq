@@ -922,7 +922,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Task detection')
       .setHeading()
-      .setDesc('Select where task are detected in the vault content.');
+      .setDesc('Select where tasks are detected in the vault content.');
 
     // Include tasks inside callout blocks
     new Setting(containerEl)
@@ -1096,7 +1096,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Future dated tasks')
       .setDesc(
-        'Chooose how tasks with future dates are displayed in the task list.',
+        'Choose how tasks with future dates are displayed in the task list.',
       )
       .addDropdown((drop) => {
         drop.addOption('showAll', 'Show all tasks');

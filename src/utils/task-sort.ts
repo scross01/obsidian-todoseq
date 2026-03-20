@@ -121,7 +121,7 @@ export function getKeywordGroup(
     return 2;
   }
 
-  // Group 4: Waiting keywords (check before completed to prioritize correctly)
+  // Group 4: Waiting keywords
   if (config.waitingKeywords.has(stateUpper)) {
     return 4;
   }
@@ -401,14 +401,6 @@ function getSortFunction(
       return taskComparator;
   }
 }
-
-/**
- * Sort tasks within a single category
- * @param tasks Tasks to sort
- * @param sortMethod Sort method to apply
- * @param keywordConfig Optional keyword sort configuration
- * @returns Sorted tasks
- */
 
 /**
  * Apply three-block task sorting according to PRD

@@ -554,7 +554,7 @@ export class VaultScanner {
     this.skipIncrementalChanges.set(filePath, Date.now());
   }
 
-  // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate, subtask counts)
+  // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate, subtaskCount, subtaskCompletedCount)
   private tasksIdentical(before: Task[], after: Task[]): boolean {
     if (before.length !== after.length) {
       return false;

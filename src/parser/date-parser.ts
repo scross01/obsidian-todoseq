@@ -90,8 +90,8 @@ export class DateParser {
 
   /**
    * Parse a date from a string using registered patterns
-   * @param content The string content to parse
-   * @returns Parsed Date object or null if parsing fails
+   * @param content The string content to parse in org-mode date format (e.g., "<2026-03-05>", "<2026-03-05 Wed>", "<2026-03-05 Wed 07:00>", "<2026-03-05 07:00>")
+   * @returns Parsed Date object or null if parsing fails. Plain YYYY-MM-DD input (without angle brackets) returns null.
    */
   static parseDate(content: string): Date | null {
     // First extract any repeater to get the base date string

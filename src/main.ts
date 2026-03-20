@@ -88,7 +88,7 @@ export default class TodoTracker extends Plugin {
       );
     };
 
-    // Load settings FIRST before initializing any components that need them
+    // Load settings before initializing any components that need them
     await this.loadSettings();
 
     // Initialize centralized state manager first
@@ -145,7 +145,7 @@ export default class TodoTracker extends Plugin {
     await this.lifecycleManager?.onunload();
   }
 
-  // Obsidian lifecycle method called to settings are loaded
+  // Obsidian lifecycle method called when settings are loaded
   async loadSettings() {
     const loaded = await this.loadData(); // eslint-disable-line @typescript-eslint/no-unsafe-assignment
 

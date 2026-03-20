@@ -11,9 +11,8 @@ import { RegexCache } from './regex-cache';
 
 /**
  * Build org-mode headline regex with dynamic keywords.
- * Uses buildTaskKeywords() to include custom keywords from settings.
  *
- * @param keywords Array of all task keywords from buildTaskKeywords()
+ * @param keywords Array of all task keywords
  * @param regexCache Optional RegexCache instance for caching
  * @returns RegExp for matching org-mode headlines
  *

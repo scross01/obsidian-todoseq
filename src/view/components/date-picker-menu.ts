@@ -209,7 +209,7 @@ export class DatePicker extends BaseDialog {
     // Time section
     this.buildTimeSection();
 
-    // Repeat section (no separator before this)
+    // Repeat section
     this.buildRepeatSection();
 
     // Separator

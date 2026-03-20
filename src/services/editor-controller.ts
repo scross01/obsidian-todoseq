@@ -225,7 +225,7 @@ export class EditorController {
    * @param checking - Whether this is just a check to see if the command is available
    * @param editor - The editor instance
    * @param view - The markdown view
-   * @returns boolean indicating if the command is available
+   * @returns boolean indicating if the command is available (always returns true)
    */
   handleCycleTaskStateAtCursor(
     checking: boolean,
@@ -247,7 +247,7 @@ export class EditorController {
    * @param editor - The editor instance
    * @param view - The markdown view
    * @param newState - Optional specific state to set
-   * @returns boolean indicating if the command is available
+   * @returns boolean indicating if the command is available (checking returns true without verifying vault scanner)
    */
   handleUpdateTaskCycleStateAtLine(
     checking: boolean,
@@ -359,7 +359,7 @@ export class EditorController {
    * @param checking - Whether this is just a check to see if the command is available
    * @param editor - The editor instance
    * @param view - The markdown view
-   * @returns boolean indicating if the command is available
+   * @returns boolean indicating if the command is available (always returns true)
    */
   handleToggleTaskStateAtCursor(
     checking: boolean,
