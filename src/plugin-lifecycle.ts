@@ -390,7 +390,7 @@ export class PluginLifecycleManager {
     this.plugin.addCommand({
       id: 'open-context-menu',
       name: 'Open context menu',
-      icon: 'more-horizontal',
+      icon: 'square-menu',
       editorCheckCallback: (
         checking: boolean,
         editor: Editor,
