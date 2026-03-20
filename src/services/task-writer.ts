@@ -252,6 +252,7 @@ export class TaskWriter {
               task.line + 1,
               'CLOSED',
               taskIndent,
+              this.keywordManager,
             );
 
             // Find insert position (after DEADLINE/SCHEDULED if present, otherwise after task)
@@ -261,6 +262,7 @@ export class TaskWriter {
               task.line + 1,
               'DEADLINE',
               taskIndent,
+              this.keywordManager,
             );
             if (deadlineLineIndex !== -1) {
               insertIndex = deadlineLineIndex + 1;
@@ -270,6 +272,7 @@ export class TaskWriter {
                 task.line + 1,
                 'SCHEDULED',
                 taskIndent,
+                this.keywordManager,
               );
               if (scheduledLineIndex !== -1) {
                 insertIndex = scheduledLineIndex + 1;
@@ -300,6 +303,7 @@ export class TaskWriter {
               task.line + 1,
               'CLOSED',
               taskIndent,
+              this.keywordManager,
             );
             if (closedLineIndex >= 0) {
               lines.splice(closedLineIndex, 1);
@@ -583,6 +587,7 @@ export class TaskWriter {
           task.line + 1,
           'SCHEDULED',
           taskIndent,
+          this.keywordManager,
         );
 
         // Preserve the existing indentation of the SCHEDULED line if found
@@ -614,6 +619,7 @@ export class TaskWriter {
               task.line + 1,
               'DEADLINE',
               taskIndent,
+              this.keywordManager,
             );
             // Insert before deadline line if found, otherwise after task line
             insertIndex =
@@ -673,6 +679,7 @@ export class TaskWriter {
           task.line + 1,
           'SCHEDULED',
           taskIndent,
+          this.keywordManager,
         );
 
         if (scheduledLineIndex >= 0) {
@@ -735,6 +742,7 @@ export class TaskWriter {
           task.line + 1,
           'DEADLINE',
           taskIndent,
+          this.keywordManager,
         );
 
         // Preserve the existing indentation of the DEADLINE line if found
@@ -766,6 +774,7 @@ export class TaskWriter {
               task.line + 1,
               'SCHEDULED',
               taskIndent,
+              this.keywordManager,
             );
             // Insert after scheduled line if found, otherwise after task line
             insertIndex =
@@ -821,6 +830,7 @@ export class TaskWriter {
           task.line + 1,
           'DEADLINE',
           taskIndent,
+          this.keywordManager,
         );
 
         if (deadlineLineIndex >= 0) {
@@ -915,6 +925,7 @@ export class TaskWriter {
           task.line + 1,
           'CLOSED',
           taskIndent,
+          this.keywordManager,
         );
 
         // Find insert position (after DEADLINE/SCHEDULED if present, otherwise after task)
@@ -924,6 +935,7 @@ export class TaskWriter {
           task.line + 1,
           'DEADLINE',
           taskIndent,
+          this.keywordManager,
         );
 
         // Calculate insert index - default to right after task
@@ -939,6 +951,7 @@ export class TaskWriter {
             task.line + 1,
             'SCHEDULED',
             taskIndent,
+            this.keywordManager,
           );
           if (scheduledLineIndex !== -1) {
             insertIndex = scheduledLineIndex + 1;
@@ -991,6 +1004,7 @@ export class TaskWriter {
             task.line + 1,
             'CLOSED',
             taskIndent,
+            this.keywordManager,
           );
 
           // Find insert position (after DEADLINE/SCHEDULED if present, otherwise after task)
@@ -1000,6 +1014,7 @@ export class TaskWriter {
             task.line + 1,
             'DEADLINE',
             taskIndent,
+            this.keywordManager,
           );
 
           // Calculate insert index - default to right after task
@@ -1015,6 +1030,7 @@ export class TaskWriter {
               task.line + 1,
               'SCHEDULED',
               taskIndent,
+              this.keywordManager,
             );
             if (scheduledLineIndex !== -1) {
               insertIndex = scheduledLineIndex + 1;
@@ -1052,6 +1068,7 @@ export class TaskWriter {
           task.line + 1,
           'CLOSED',
           afterTaskIndent,
+          this.keywordManager,
         );
         lineDelta = afterClosedLineIndex === -1 ? 1 : 0;
       }
@@ -1100,6 +1117,7 @@ export class TaskWriter {
           task.line + 1,
           'CLOSED',
           taskIndent,
+          this.keywordManager,
         );
 
         if (closedLineIndex >= 0) {
@@ -1135,6 +1153,7 @@ export class TaskWriter {
             task.line + 1,
             'CLOSED',
             taskIndent,
+            this.keywordManager,
           );
 
           if (closedLineIndex >= 0) {

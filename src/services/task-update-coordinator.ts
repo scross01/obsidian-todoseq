@@ -724,10 +724,11 @@ export class TaskUpdateCoordinator {
 
   /**
    * Handle recurrence scheduling for completed recurring tasks.
-   * Uses originalNewState to determine if user completed the task (not the final written state).
+   * Receives the post-file-write task (inactive state written, not completed state).
+   * Uses originalNewState to detect user's completion intent.
    */
   private handleRecurrence(
-    originalTask: Task,
+    updatedTask: Task,
     context: ProcessingContext,
   ): void {
     // Use originalNewState to check if user requested completion
@@ -737,13 +738,13 @@ export class TaskUpdateCoordinator {
     );
 
     const taskHasRepeatingDates =
-      (originalTask.scheduledDateRepeat != null &&
-        originalTask.scheduledDate != null) ||
-      (originalTask.deadlineDateRepeat != null &&
-        originalTask.deadlineDate != null);
+      (updatedTask.scheduledDateRepeat != null &&
+        updatedTask.scheduledDate != null) ||
+      (updatedTask.deadlineDateRepeat != null &&
+        updatedTask.deadlineDate != null);
 
     if (isOriginalCompleted && taskHasRepeatingDates) {
-      this.recurrenceCoordinator.scheduleRecurrence(originalTask, 50);
+      this.recurrenceCoordinator.scheduleRecurrence(updatedTask, 50);
     }
   }
 

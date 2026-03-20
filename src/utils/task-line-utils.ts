@@ -3,6 +3,8 @@
  * Provides shared logic used across multiple services to avoid code duplication.
  */
 
+import { KeywordManager } from './keyword-manager';
+
 /**
  * Find a date line of specified type after a task line.
  * Uses regex-based detection consistent with parser's getDateLineType logic.
@@ -22,6 +24,7 @@ export function findDateLine(
   startIndex: number,
   dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED',
   taskIndent: string,
+  keywordManager: KeywordManager,
 ): number {
   // Search limited to 8 lines after task (max nesting depth)
   const maxLines = Math.min(startIndex + 9, lines.length);
@@ -63,7 +66,7 @@ export function findDateLine(
     }
 
     // Check if this is a task line (we should stop searching if we find one)
-    if (isTaskLine(trimmedLine)) {
+    if (isTaskLine(trimmedLine, keywordManager)) {
       // Found another task - stop searching
       break;
     }
@@ -94,33 +97,28 @@ export function findDateLine(
 
 /**
  * Check if a line is a task line.
- * Looks for common task patterns like TODO, DONE, LATER, IN_PROGRESS, or checkboxes.
+ * Uses KeywordManager to check for task keywords and checkbox patterns.
  * @param line - The line to check
+ * @param keywordManager - KeywordManager for dynamic keyword detection
  * @returns true if the line appears to be a task
  */
-function isTaskLine(line: string): boolean {
+function isTaskLine(line: string, keywordManager: KeywordManager): boolean {
   // Check for checkbox pattern: - [ ] or - [x]
   if (/^[\s]*- \[[ x]\]/i.test(line)) {
     return true;
   }
 
-  // Check for task keywords at the start
-  // Common keywords: TODO, DONE, LATER, IN_PROGRESS, WAITING, CANCELLED, etc.
-  if (
-    /^[\s]*(TODO|DONE|LATER|IN_PROGRESS|WAITING|CANCELLED|ARCHIVED|NEXT)\b/i.test(
-      line,
-    )
-  ) {
-    return true;
-  }
-
-  // Check for quoted task lines: > TODO, > DONE, etc.
-  if (
-    /^>+\s+(TODO|DONE|LATER|IN_PROGRESS|WAITING|CANCELLED|ARCHIVED|NEXT)\b/i.test(
-      line,
-    )
-  ) {
-    return true;
+  const allKeywords = keywordManager.getAllKeywords();
+  for (let i = 0; i < allKeywords.length; i++) {
+    const keyword = allKeywords[i];
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const taskPattern = new RegExp(
+      `^[\\s]*${escaped}\\b|^>+\\s+${escaped}\\b`,
+      'i',
+    );
+    if (taskPattern.test(line)) {
+      return true;
+    }
   }
 
   return false;
@@ -147,12 +145,16 @@ export function findDateLineWithParser(
   startIndex: number,
   dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED',
   taskIndent: string,
-  parser?: {
-    getDateLineType: (
-      line: string,
-      indent: string,
-    ) => 'scheduled' | 'deadline' | 'closed' | null;
-  } | null,
+  parser:
+    | {
+        getDateLineType: (
+          line: string,
+          indent: string,
+        ) => 'scheduled' | 'deadline' | 'closed' | null;
+      }
+    | null
+    | undefined,
+  keywordManager: KeywordManager,
 ): number {
   // If parser is provided, use it for detection
   if (parser) {
@@ -180,7 +182,7 @@ export function findDateLineWithParser(
   }
 
   // Fall back to regex-based detection
-  return findDateLine(lines, startIndex, dateType, taskIndent);
+  return findDateLine(lines, startIndex, dateType, taskIndent, keywordManager);
 }
 
 /**

@@ -31,7 +31,10 @@ describe('Editor Controller - Date Line Handling', () => {
       }),
     };
 
-    editorController = new EditorController(mockPlugin);
+    editorController = new EditorController(
+      mockPlugin,
+      createTestKeywordManager(settings),
+    );
 
     mockEditor = {
       getLine: (lineNumber: number) => '',

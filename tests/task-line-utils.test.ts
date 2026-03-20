@@ -7,6 +7,9 @@ import {
   findDateLine,
   findDateLineWithParser,
 } from '../src/utils/task-line-utils';
+import { KeywordManager } from '../src/utils/keyword-manager';
+
+const keywordManager = new KeywordManager({});
 
 describe('task-line-utils', () => {
   describe('getTaskIndent', () => {
@@ -72,56 +75,62 @@ describe('task-line-utils', () => {
     ];
 
     it('should find SCHEDULED line at correct index', () => {
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(1);
     });
 
     it('should find DEADLINE line at correct index', () => {
-      const result = findDateLine(lines, 1, 'DEADLINE', '  ');
+      const result = findDateLine(lines, 1, 'DEADLINE', '  ', keywordManager);
       expect(result).toBe(4);
     });
 
     it('should find SCHEDULED line with time at correct index', () => {
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(1);
     });
 
     it('should find DEADLINE line with time at correct index', () => {
-      const result = findDateLine(lines, 1, 'DEADLINE', '  ');
+      const result = findDateLine(lines, 1, 'DEADLINE', '  ', keywordManager);
       expect(result).toBe(4);
     });
 
     it('should find SCHEDULED line with repeater at correct index', () => {
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(1);
     });
 
     it('should find DEADLINE line with repeater at correct index', () => {
-      const result = findDateLine(lines, 1, 'DEADLINE', '  ');
+      const result = findDateLine(lines, 1, 'DEADLINE', '  ', keywordManager);
       expect(result).toBe(4);
     });
 
     it('should return -1 when date line not found', () => {
       // CLOSED line is at index 10, but search only goes up to index 9 (8 lines after start)
-      const result = findDateLine(lines, 1, 'CLOSED', '  ');
+      const result = findDateLine(lines, 1, 'CLOSED', '  ', keywordManager);
       expect(result).toBe(-1);
     });
 
     it('should handle quoted SCHEDULED line', () => {
       // Line 8 has indent '  ', not '  >', so this should return -1
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  >');
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  >', keywordManager);
       expect(result).toBe(-1);
     });
 
     it('should handle quoted DEADLINE line', () => {
       // There is no quoted DEADLINE line in test data, so this should return -1
-      const result = findDateLine(lines, 1, 'DEADLINE', '  >');
+      const result = findDateLine(lines, 1, 'DEADLINE', '  >', keywordManager);
       expect(result).toBe(-1);
     });
 
     it('should handle nested quote SCHEDULED line', () => {
       // Line 9 has indent '  ', not '  > >', so this should return -1
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  > >');
+      const result = findDateLine(
+        lines,
+        1,
+        'SCHEDULED',
+        '  > >',
+        keywordManager,
+      );
       expect(result).toBe(-1);
     });
 
@@ -133,7 +142,13 @@ describe('task-line-utils', () => {
         ...Array(10).fill('  some other content'),
         'SCHEDULED: <2026-03-06 Thu>',
       ];
-      const result = findDateLine(longLines, 1, 'SCHEDULED', '');
+      const result = findDateLine(
+        longLines,
+        1,
+        'SCHEDULED',
+        '',
+        keywordManager,
+      );
       expect(result).toBe(1); // Should find the first one, not the one beyond 8 lines
     });
 
@@ -145,7 +160,13 @@ describe('task-line-utils', () => {
         '  Some other task',
         '  SCHEDULED: <2026-03-06 Thu>',
       ];
-      const result = findDateLine(linesWithStop, 1, 'SCHEDULED', '');
+      const result = findDateLine(
+        linesWithStop,
+        1,
+        'SCHEDULED',
+        '',
+        keywordManager,
+      );
       expect(result).toBe(1);
     });
 
@@ -156,61 +177,67 @@ describe('task-line-utils', () => {
         '    DEADLINE: <2026-03-05 Fri>',
         '  SCHEDULED: <2026-03-06 Thu>',
       ];
-      const result = findDateLine(nestedLines, 1, 'SCHEDULED', '');
+      const result = findDateLine(
+        nestedLines,
+        1,
+        'SCHEDULED',
+        '',
+        keywordManager,
+      );
       expect(result).toBe(1);
     });
 
     it('should not find date line that is a separate bullet', () => {
       const lines = ['- TODO task a', '- SCHEDULED: <2026-03-10>'];
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(-1);
     });
 
     it('should not find date line with nested bullet marker', () => {
       const lines = ['+ TODO task b', '  + SCHEDULED: <2026-03-10>'];
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(-1);
     });
 
     it('should not find date line at wrong quote level', () => {
       const lines = ['> TODO task c', '  SCHEDULED: <2026-03-10>'];
-      const result = findDateLine(lines, 1, 'SCHEDULED', '> ');
+      const result = findDateLine(lines, 1, 'SCHEDULED', '> ', keywordManager);
       expect(result).toBe(-1);
     });
 
     it('should not find date line at lower indent than task', () => {
       const lines = ['  TODO task d', 'SCHEDULED: <2026-03-10>'];
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(-1);
     });
 
     it('should not find date line without indent for bullet task', () => {
       const lines = ['- TODO task e', 'SCHEDULED: <2026-03-10>'];
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ');
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(-1);
     });
 
     it('should find CLOSED date line', () => {
       const lines = ['TODO task', 'CLOSED: [2026-03-05 Thu 10:00]'];
-      const result = findDateLine(lines, 1, 'CLOSED', '');
+      const result = findDateLine(lines, 1, 'CLOSED', '', keywordManager);
       expect(result).toBe(1);
     });
 
     it('should find CLOSED date line with proper indent', () => {
       const lines = ['  TODO task', '  CLOSED: [2026-03-05 Thu 10:00]'];
-      const result = findDateLine(lines, 1, 'CLOSED', '  ');
+      const result = findDateLine(lines, 1, 'CLOSED', '  ', keywordManager);
       expect(result).toBe(1);
     });
 
     it('should find CLOSED in quoted task', () => {
       const lines = ['> TODO task', '> CLOSED: [2026-03-05 Thu 10:00]'];
-      const result = findDateLine(lines, 1, 'CLOSED', '> ');
+      const result = findDateLine(lines, 1, 'CLOSED', '> ', keywordManager);
       expect(result).toBe(1);
     });
 
     it('should find CLOSED at nested indent', () => {
       const lines = ['TODO task', '  CLOSED: [2026-03-05 Thu 10:00]'];
-      const result = findDateLine(lines, 1, 'CLOSED', '');
+      const result = findDateLine(lines, 1, 'CLOSED', '', keywordManager);
       expect(result).toBe(1);
     });
   });
@@ -227,6 +254,7 @@ describe('task-line-utils', () => {
         'SCHEDULED',
         '  ',
         mockParser,
+        keywordManager,
       );
       expect(result).toBe(1);
       expect(mockParser.getDateLineType).toHaveBeenCalledWith(
@@ -237,7 +265,14 @@ describe('task-line-utils', () => {
 
     it('should fall back to regex when parser is null', () => {
       const lines = ['TODO task', '  SCHEDULED: <2026-03-10>'];
-      const result = findDateLineWithParser(lines, 1, 'SCHEDULED', '  ', null);
+      const result = findDateLineWithParser(
+        lines,
+        1,
+        'SCHEDULED',
+        '  ',
+        null,
+        keywordManager,
+      );
       expect(result).toBe(1);
     });
 
@@ -249,6 +284,7 @@ describe('task-line-utils', () => {
         'SCHEDULED',
         '  ',
         undefined,
+        keywordManager,
       );
       expect(result).toBe(1);
     });
@@ -267,6 +303,7 @@ describe('task-line-utils', () => {
         'SCHEDULED',
         '  ',
         mockParser,
+        keywordManager,
       );
       expect(result).toBe(1);
     });

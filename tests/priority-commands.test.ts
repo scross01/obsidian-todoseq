@@ -47,7 +47,10 @@ describe('Priority Commands', () => {
       },
     };
 
-    editorController = new EditorController(mockPlugin);
+    editorController = new EditorController(
+      mockPlugin,
+      createTestKeywordManager(settings),
+    );
   });
 
   describe('handleSetPriorityAtCursor', () => {

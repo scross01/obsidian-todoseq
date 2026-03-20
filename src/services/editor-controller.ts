@@ -666,6 +666,7 @@ export class EditorController {
       taskLineNumber + 1,
       dateType,
       taskIndent,
+      this.keywordManager,
     );
 
     return dateLineIndex >= 0 ? dateLineIndex : null;
@@ -704,6 +705,7 @@ export class EditorController {
       taskLineNumber + 1,
       'SCHEDULED',
       taskIndent,
+      this.keywordManager,
     );
 
     // Determine the correct insertion position

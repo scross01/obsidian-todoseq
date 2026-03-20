@@ -39,9 +39,9 @@ export interface DateLineParser {
 import { KeywordManager } from '../utils/keyword-manager';
 
 export class RecurrenceManager {
-  private keywordManager?: KeywordManager;
+  private keywordManager: KeywordManager;
 
-  constructor(keywordManager?: KeywordManager) {
+  constructor(keywordManager: KeywordManager) {
     this.keywordManager = keywordManager;
   }
 
@@ -80,6 +80,7 @@ export class RecurrenceManager {
             'SCHEDULED',
             taskIndent,
             parser,
+            this.keywordManager,
           )
         : -1;
     const deadlineLineIndex =
@@ -90,6 +91,7 @@ export class RecurrenceManager {
             'DEADLINE',
             taskIndent,
             parser,
+            this.keywordManager,
           )
         : -1;
 
@@ -147,29 +149,14 @@ export class RecurrenceManager {
     const updatedLines = [...lines];
     const taskLineContent = updatedLines[taskLine];
 
-    // Use keywordManager if available, otherwise fall back to hardcoded pattern
-    if (this.keywordManager) {
-      const allKeywords = this.keywordManager.getAllKeywords();
-      for (const keyword of allKeywords) {
-        if (taskLineContent.includes(keyword)) {
-          updatedLines[taskLine] = taskLineContent.replace(
-            keyword,
-            defaultInactive,
-          );
-          break;
-        }
-      }
-    } else {
-      // Fallback to hardcoded pattern for backward compatibility
-      const keywordPattern =
-        /\b(TODO|DONE|CANCELLED|IN_PROGRESS|WAITING|BLOCKED|REJECTED|ARCHIVED|FIXME)\b/i;
-      const match = taskLineContent.match(keywordPattern);
-
-      if (match) {
+    const allKeywords = this.keywordManager.getAllKeywords();
+    for (const keyword of allKeywords) {
+      if (taskLineContent.includes(keyword)) {
         updatedLines[taskLine] = taskLineContent.replace(
-          match[0],
+          keyword,
           defaultInactive,
         );
+        break;
       }
     }
 

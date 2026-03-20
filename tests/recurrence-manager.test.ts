@@ -3,13 +3,15 @@
  */
 
 import { RecurrenceManager } from '../src/services/recurrence-manager';
+import { KeywordManager } from '../src/utils/keyword-manager';
 import { Task } from '../src/types/task';
 
 describe('RecurrenceManager', () => {
   let recurrenceManager: RecurrenceManager;
+  const keywordManager = new KeywordManager({});
 
   beforeEach(() => {
-    recurrenceManager = new RecurrenceManager();
+    recurrenceManager = new RecurrenceManager(keywordManager);
     jest.clearAllMocks();
   });
 
@@ -198,8 +200,12 @@ describe('RecurrenceManager', () => {
     });
 
     it('should replace IN_PROGRESS with TODO', () => {
+      const kmWithInProgress = new KeywordManager({
+        additionalActiveKeywords: ['IN_PROGRESS'],
+      });
+      const rmWithInProgress = new RecurrenceManager(kmWithInProgress);
       const lines = ['IN_PROGRESS task', '  SCHEDULED: <2026-03-10>'];
-      const result = recurrenceManager.updateTaskKeyword(lines, 0, 'TODO');
+      const result = rmWithInProgress.updateTaskKeyword(lines, 0, 'TODO');
 
       expect(result[0]).toBe('TODO task');
     });
