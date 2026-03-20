@@ -2056,42 +2056,69 @@ export class EmbeddedTaskListRenderer {
       targetLeaf.openFile(file).then(() => {
         // Focus the editor and move cursor to the task line with highlighting
         setTimeout(() => {
-          const activeView = workspace.getActiveViewOfType(MarkdownView);
-          if (activeView && activeView.editor) {
-            const lineContent = activeView.editor.getLine(task.line);
-            const pos = { line: task.line, ch: lineContent.length };
+          // Check the view in the target leaf, not the active view
+          // This prevents highlighting the wrong file when Obsidian doesn't support
+          // certain file types (e.g., .org files)
+          const leafView = targetLeaf?.view;
+          if (
+            !leafView ||
+            !(leafView instanceof MarkdownView) ||
+            !leafView.editor
+          ) {
+            console.debug(
+              `TaskListRenderer: No valid MarkdownView in leaf - leafView: ${leafView}, is MarkdownView: ${leafView instanceof MarkdownView}, has editor: ${(leafView as MarkdownView).editor ? 'yes' : 'no'}`,
+            );
+            return;
+          }
 
-            // Set cursor position
-            activeView.editor.setCursor(pos);
+          // Check if the correct file was successfully opened before navigation
+          // This prevents navigation to invalid pages when Obsidian doesn't support
+          // certain file types (e.g., .org files)
+          const isFileOpenSuccessfully =
+            leafView.file && leafView.file.path === task.path;
 
-            // Try to set ephemeral state for better navigation
-            try {
-              (
-                activeView as MarkdownView & {
-                  setEphemeralState?: (state: {
-                    line: number;
-                    col: number;
-                  }) => void;
-                }
-              ).setEphemeralState?.({
-                line: task.line,
-                col: lineContent.length,
-              });
-            } catch (_) {
-              // Ignore if ephemeral state is not available
-            }
+          if (!isFileOpenSuccessfully) {
+            console.debug(
+              `TODOseq: File '${task.path}' was not successfully opened. The file type may not be supported by Obsidian.`,
+            );
+            return;
+          }
 
-            // Scroll into view with highlighting
-            activeView.editor.scrollIntoView({ from: pos, to: pos }, true);
+          const lineContent = leafView.editor.getLine(task.line);
+          const pos = { line: task.line, ch: lineContent.length };
 
-            // Focus the editor
-            activeView.editor.focus();
+          // Set cursor position
+          leafView.editor.setCursor(pos);
+
+          // Try to set ephemeral state for better navigation
+          try {
+            (
+              leafView as MarkdownView & {
+                setEphemeralState?: (state: {
+                  line: number;
+                  col: number;
+                }) => void;
+              }
+            ).setEphemeralState?.({
+              line: task.line,
+              col: lineContent.length,
+            });
+          } catch (_) {
+            // Ignore if ephemeral state is not available
+          }
+
+          // Scroll into view with highlighting
+          leafView.editor.scrollIntoView({ from: pos, to: pos }, true);
+
+          // Focus the editor
+          leafView.editor.focus();
+
+          // Reveal the leaf to ensure proper focus
+          if (targetLeaf) {
+            workspace.revealLeaf(targetLeaf);
           }
         }, 100);
       });
-
-      // Reveal the leaf to ensure proper focus
-      workspace.revealLeaf(targetLeaf);
     } catch (error) {
       console.error('Error navigating to task:', error);
     }

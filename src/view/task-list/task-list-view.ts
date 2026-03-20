@@ -2140,21 +2140,34 @@ export class TaskListView extends ItemView {
       }
     }
 
-    if (targetLeaf.view instanceof MarkdownView) {
-      const markdownView = targetLeaf.view;
-      const editor = markdownView.editor;
-      const lineContent = editor.getLine(task.line);
-      const pos = { line: task.line, ch: lineContent.length };
-      editor.setCursor(pos);
-      try {
-        (
-          markdownView as unknown as {
-            setEphemeralState?: (state: { line: number; col: number }) => void;
-          }
-        ).setEphemeralState?.({ line: task.line, col: lineContent.length });
-      } catch (_) {}
-      editor.scrollIntoView({ from: pos, to: pos }, true);
+    // Check if the correct file was successfully opened before navigation
+    // This prevents navigation to invalid pages when Obsidian doesn't support
+    // certain file types (e.g., .org files)
+    const isFileOpenSuccessfully =
+      targetLeaf.view instanceof MarkdownView &&
+      targetLeaf.view.file &&
+      targetLeaf.view.file.path === task.path;
+
+    if (!isFileOpenSuccessfully) {
+      console.debug(
+        `TODOseq: File '${task.path}' was not successfully opened. The file type may not be supported by Obsidian.`,
+      );
+      return;
     }
+
+    const markdownView = targetLeaf.view as MarkdownView;
+    const editor = markdownView.editor;
+    const lineContent = editor.getLine(task.line);
+    const pos = { line: task.line, ch: lineContent.length };
+    editor.setCursor(pos);
+    try {
+      (
+        markdownView as unknown as {
+          setEphemeralState?: (state: { line: number; col: number }) => void;
+        }
+      ).setEphemeralState?.({ line: task.line, col: lineContent.length });
+    } catch (_) {}
+    editor.scrollIntoView({ from: pos, to: pos }, true);
 
     if (targetLeaf) {
       await workspace.revealLeaf(targetLeaf);
