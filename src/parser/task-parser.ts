@@ -216,7 +216,7 @@ export class TaskParser implements ITaskParser {
         `(${BULLET_LIST_PATTERN_SOURCE}|${NUMBERED_LIST_PATTERN_SOURCE}|${LETTER_LIST_PATTERN_SOURCE}|${CUSTOM_LIST_PATTERN_SOURCE})??` +
         `(${CHECKBOX_PATTERN_SOURCE})?` +
         `(${escaped_keywords})\\s+` +
-        `(${TASK_TEXT_SOURCE})$`,
+        `(${TASK_TEXT_SOURCE})?$`,
     );
     const capture = test;
     return { test, capture };
@@ -1794,7 +1794,7 @@ export class TaskParser implements ITaskParser {
     const indent = match[1] || '';
     const listMarker = (match[2] || '') + (match[3] || '');
     const state = match[4];
-    const taskText = match[5];
+    const taskText = match[5] || '';
     const tail = match[6] || '';
 
     // Extract quote nesting level

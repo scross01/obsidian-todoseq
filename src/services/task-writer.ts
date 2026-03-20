@@ -111,7 +111,7 @@ export class TaskWriter {
       newLine = `${indentWithoutQuote}${quotePrefix}${currentListMarkerChar} [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
     } else {
       // Generate original format, preserving comment prefix if present
-      const textPart = task.text ? ` ${task.text}` : '';
+      const textPart = task.text ? ` ${task.text}` : ' ';
       // Check if this is a footnote task and include the footnote marker
       const footnoteMarker = task.footnoteMarker || '';
       newLine = `${task.indent}${footnoteMarker}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
@@ -207,12 +207,12 @@ export class TaskWriter {
           };
           editor.replaceRange(newLine, from, to);
 
-          // Special cursor positioning for blank lines when adding task keywords
-          if (currentLine.trim() === '' && newState === 'TODO') {
-            // Position cursor after the TODO keyword on blank lines
-            const keywordPosition = newLine.indexOf('TODO');
+          // Special cursor positioning for tasks with empty text
+          if (task.text === '') {
+            // Position cursor after the space that follows the keyword
+            const keywordPosition = newLine.indexOf(newState);
             if (keywordPosition !== -1) {
-              const newCursorPosition = keywordPosition + 'TODO'.length;
+              const newCursorPosition = keywordPosition + newState.length + 1;
               editor.setCursor({ line: task.line, ch: newCursorPosition });
             }
           } else if (cursorPosition.line === task.line) {

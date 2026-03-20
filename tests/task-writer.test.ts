@@ -493,7 +493,7 @@ describe('TaskWriter.generateTaskLine', () => {
         true,
         createTestKeywordManager(),
       );
-      expect(result.newLine).toBe('TODO');
+      expect(result.newLine).toBe('TODO ');
       expect(result.completed).toBe(false);
     });
   });

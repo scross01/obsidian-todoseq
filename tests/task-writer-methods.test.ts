@@ -160,7 +160,7 @@ describe('TaskWriter Instance Methods', () => {
 
       await taskWriter.applyLineUpdate(task, 'TODO');
 
-      expect(mockEditor.setCursor).toHaveBeenCalledWith({ line: 0, ch: 4 });
+      expect(mockEditor.setCursor).toHaveBeenCalledWith({ line: 0, ch: 5 });
     });
   });
 
