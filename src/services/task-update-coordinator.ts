@@ -1000,6 +1000,9 @@ export class TaskUpdateCoordinator {
     this.pendingTaskUpdates.clear();
     this.fileUpdateQueues.clear();
 
+    // Clean up recurrence coordinator to clear pending timeouts
+    this.recurrenceCoordinator.destroy();
+
     // ChangeTracker is now owned by main.ts and destroyed there
   }
 }
