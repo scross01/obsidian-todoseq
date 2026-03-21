@@ -183,8 +183,19 @@ export default class TodoTracker extends Plugin {
         this.settings,
         urgencyCoefficients,
       );
+
+      // Sync KeywordManager reference from VaultScanner to main.ts
+      // This fixes the bug where loadSettings() didn't sync the KeywordManager
+      this.keywordManager = this.vaultScanner.getKeywordManager();
+
+      // Sync to TaskStateManager
+      this.taskStateManager.setKeywordManager(this.keywordManager);
+
       // Sync urgency coefficients to TaskUpdateCoordinator
       this.taskUpdateCoordinator?.setUrgencyCoefficients(urgencyCoefficients);
+
+      // Sync keyword manager to TaskUpdateCoordinator (which forwards to RecurrenceCoordinator)
+      this.taskUpdateCoordinator?.setKeywordManager(this.keywordManager);
     }
   }
 

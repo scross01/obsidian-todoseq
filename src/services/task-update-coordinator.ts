@@ -132,6 +132,7 @@ export class TaskUpdateCoordinator {
     this.recurrenceCoordinator = new RecurrenceCoordinator(
       this.plugin,
       this.taskStateManager,
+      this.keywordManager,
     );
 
     // Set the TaskUpdateCoordinator reference to avoid circular dependency
@@ -143,6 +144,15 @@ export class TaskUpdateCoordinator {
    */
   setUrgencyCoefficients(coefficients: UrgencyCoefficients): void {
     this.urgencyCoefficients = coefficients;
+  }
+
+  /**
+   * Update the keyword manager (called when settings change).
+   */
+  setKeywordManager(keywordManager: KeywordManager): void {
+    this.keywordManager = keywordManager;
+    this.recurrenceManager = new RecurrenceManager(keywordManager);
+    this.recurrenceCoordinator.setKeywordManager(keywordManager);
   }
 
   /**

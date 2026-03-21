@@ -174,6 +174,32 @@ graph TB
     class ObsidianAPI,Workspace,FileSystem,Editor,DailyNotes external
 ```
 
+### Component initialization
+
+**Core Services (created in main.ts):**
+
+- These are fundamental services that must be created early and are used by multiple components
+- `TaskStateManager` - Central state management
+- `KeywordManager` - Keyword classification
+- `ChangeTracker` - Expected change tracking (shared across components)
+
+**Dependent Services (created in PluginLifecycleManager):**
+
+- These are services that depend on core services and are managed together as a lifecycle group
+- `VaultScanner` - File monitoring (receives `TaskStateManager`, `KeywordManager`, `ChangeTracker`)
+- `TaskUpdateCoordinator` - Update pipeline (receives `TaskStateManager`, `KeywordManager`, `ChangeTracker`)
+- `EmbeddedTaskListProcessor` - Embedded lists (receives `TaskUpdateCoordinator`)
+- `EventCoordinator` - Event handling (receives `VaultScanner`, `PropertySearchEngine`)
+- Other UI and lifecycle components
+
+**Benefits of this pattern:**
+
+1. **Clear separation**: Core services vs dependent services
+2. **Avoids circular dependencies**: Core services created first, dependent services can safely reference them
+3. **Centralized lifecycle**: `PluginLifecycleManager` handles all dependent service initialization and cleanup
+4. **Shared state**: `ChangeTracker` is a single shared instance, not duplicated across components
+5. **Consistent ownership**: Each component has a clear owner responsible for its lifecycle
+
 ## Component Layering and Separation of Concerns
 
 ### 1. Service Layer (Business Logic)

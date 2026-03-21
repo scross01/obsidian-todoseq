@@ -11,6 +11,7 @@ import { RecurrenceManager, DateLineParser } from './recurrence-manager';
 import { TaskUpdateCoordinator } from './task-update-coordinator';
 import { App, TFile } from 'obsidian';
 import TodoTracker from '../main';
+import { KeywordManager } from '../utils/keyword-manager';
 
 /**
  * Result of a recurrence update operation.
@@ -57,10 +58,11 @@ export class RecurrenceCoordinator {
   constructor(
     private plugin: TodoTracker,
     private taskStateManager: TaskStateManager,
+    private keywordManager: KeywordManager,
     options: RecurrenceCoordinatorOptions = {},
   ) {
     this.defaultDelayMs = options.defaultDelayMs ?? 50;
-    // Initialize RecurrenceManager with keywordManager (accessed via private getter)
+    // Initialize RecurrenceManager with injected keywordManager
     this.recurrenceManager = new RecurrenceManager(this.keywordManager);
   }
 
@@ -72,16 +74,20 @@ export class RecurrenceCoordinator {
     this.taskUpdateCoordinator = coordinator;
   }
 
+  /**
+   * Update the keyword manager (called when settings change).
+   */
+  setKeywordManager(keywordManager: KeywordManager): void {
+    this.keywordManager = keywordManager;
+    this.recurrenceManager.setKeywordManager(keywordManager);
+  }
+
   private get app(): App {
     return this.plugin.app;
   }
 
   private get settings() {
     return this.plugin.settings;
-  }
-
-  private get keywordManager() {
-    return this.plugin.keywordManager;
   }
 
   private async getFileContent(path: string): Promise<string> {

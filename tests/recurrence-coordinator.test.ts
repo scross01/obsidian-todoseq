@@ -63,8 +63,10 @@ const mockApp = {
 const mockPlugin = {
   app: mockApp,
   settings: createBaseSettings(),
-  keywordManager: createTestKeywordManager(),
 } as any;
+
+// Create keyword manager for tests
+const keywordManager = createTestKeywordManager();
 
 // Mock TaskStateManager
 const mockTaskStateManager = {
@@ -100,6 +102,7 @@ describe('RecurrenceCoordinator', () => {
     coordinator = new RecurrenceCoordinator(
       mockPlugin,
       mockTaskStateManager,
+      keywordManager,
       {},
     );
     mockTask = createMockTask();
