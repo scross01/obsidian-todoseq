@@ -13,9 +13,9 @@ export interface Task {
   completed: boolean; // is the task considered complete
   priority: 'high' | 'med' | 'low' | null;
   scheduledDate: Date | null; // scheduled date from SCHEDULED: line
-  scheduledDateRepeat?: DateRepeatInfo | null; // repeater info for scheduled date (optional for backward compat)
+  scheduledDateRepeat: DateRepeatInfo | null; // repeater info for scheduled date
   deadlineDate: Date | null; // deadline date from DEADLINE: line
-  deadlineDateRepeat?: DateRepeatInfo | null; // repeater info for deadline date (optional for backward compat)
+  deadlineDateRepeat: DateRepeatInfo | null; // repeater info for deadline date
   closedDate: Date | null; // closed date from CLOSED: line (when task was marked as completed)
   tail?: string; // trailing end characters after the task text (e.g., " */")
   urgency: number | null; // calculated urgency score
