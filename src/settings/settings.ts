@@ -552,6 +552,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               this.validateTransitionSettings();
               // Update task list views with new state transition settings
               this.plugin.updateTaskListViewSettings();
+              // Update task update coordinator with new settings
+              this.plugin.updateTaskUpdateCoordinatorSettings();
             }, this.TRANSITION_VALIDATION_DEBOUNCE_MS);
           });
       });
@@ -586,6 +588,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.validateTransitionSettings();
           // Update task list views with new state transition settings
           this.plugin.updateTaskListViewSettings();
+          // Update task update coordinator with new settings
+          this.plugin.updateTaskUpdateCoordinatorSettings();
         });
       });
 
@@ -618,6 +622,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.validateTransitionSettings();
           // Update task list views with new state transition settings
           this.plugin.updateTaskListViewSettings();
+          // Update task update coordinator with new settings
+          this.plugin.updateTaskUpdateCoordinatorSettings();
         });
       });
 
@@ -651,6 +657,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           this.validateTransitionSettings();
           // Update task list views with new state transition settings
           this.plugin.updateTaskListViewSettings();
+          // Update task update coordinator with new settings
+          this.plugin.updateTaskUpdateCoordinatorSettings();
         });
       });
 

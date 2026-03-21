@@ -342,6 +342,18 @@ export default class TodoTracker extends Plugin {
     }
   }
 
+  /**
+   * Update task update coordinator with new settings.
+   * Called when state transition settings change.
+   */
+  public updateTaskUpdateCoordinatorSettings(): void {
+    if (this.taskUpdateCoordinator) {
+      this.taskUpdateCoordinator.setStateTransitionSettings(
+        this.settings.stateTransitions,
+      );
+    }
+  }
+
   // Force refresh of editor decorations in all visible markdown editors
   public refreshVisibleEditorDecorations(): void {
     // Get all visible markdown editors

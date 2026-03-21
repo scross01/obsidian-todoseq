@@ -30,6 +30,7 @@ import {
   UrgencyContext,
   UrgencyCoefficients,
 } from '../utils/task-urgency';
+import type { StateTransitionSettings } from '../settings/settings-types';
 
 /**
  * Types of task updates supported by the coordinator
@@ -130,6 +131,7 @@ export class TaskUpdateCoordinator {
   private recurrenceCoordinator: RecurrenceCoordinator;
   private recurrenceManager: RecurrenceManager;
   private urgencyCoefficients: UrgencyCoefficients = getDefaultCoefficients();
+  private stateTransitionManager: TaskStateTransitionManager;
 
   /** Per-task locking: prevents race conditions from rapid updates to same task */
   private pendingTaskUpdates = new Map<string, PendingUpdate>();
@@ -164,6 +166,12 @@ export class TaskUpdateCoordinator {
       this.keywordManager,
     );
 
+    // Initialize cached state transition manager
+    this.stateTransitionManager = new TaskStateTransitionManager(
+      this.keywordManager,
+      this.plugin.settings?.stateTransitions,
+    );
+
     // Set the TaskUpdateCoordinator reference to avoid circular dependency
     this.recurrenceCoordinator.setTaskUpdateCoordinator(this);
 
@@ -185,6 +193,18 @@ export class TaskUpdateCoordinator {
     this.keywordManager = keywordManager;
     this.recurrenceManager = new RecurrenceManager(keywordManager);
     this.recurrenceCoordinator.setKeywordManager(keywordManager);
+  }
+
+  /**
+   * Update the state transition manager (called when settings change).
+   */
+  setStateTransitionSettings(
+    transitionSettings?: StateTransitionSettings,
+  ): void {
+    this.stateTransitionManager = new TaskStateTransitionManager(
+      this.keywordManager,
+      transitionSettings,
+    );
   }
 
   /**
@@ -387,11 +407,8 @@ export class TaskUpdateCoordinator {
       // For recurring tasks being marked complete, calculate the next inactive state
       // but preserve originalNewState to track that user completed the task
       if (isOriginalStateCompleted && hasRepeatingDates) {
-        const stateManager = new TaskStateTransitionManager(
-          this.keywordManager,
-          this.plugin.settings?.stateTransitions,
-        );
-        newState = stateManager.getNextState(context.newState);
+        // Use cached state transition manager instead of creating new instance
+        newState = this.stateTransitionManager.getNextState(context.newState);
       }
     }
 

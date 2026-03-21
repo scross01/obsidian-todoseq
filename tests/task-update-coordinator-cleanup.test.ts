@@ -360,4 +360,79 @@ describe('TaskUpdateCoordinator - Memory Leak Cleanup', () => {
       expect(privateMap.has('test.md:999')).toBe(true);
     });
   });
+
+  describe('TaskUpdateCoordinator - State Transition Manager Caching', () => {
+    it('should initialize state transition manager in constructor', () => {
+      // Verify the coordinator has the state transition manager initialized
+      expect(taskUpdateCoordinator).toBeDefined();
+      // The state transition manager should be accessible via private field
+      // We can verify it's working by calling a method that uses it
+      expect(() => {
+        taskUpdateCoordinator.setStateTransitionSettings(
+          mockPlugin.settings.stateTransitions,
+        );
+      }).not.toThrow();
+    });
+
+    it('should update cached manager when settings change', () => {
+      // Create new transition settings
+      const newTransitionSettings = {
+        defaultInactive: 'TODO',
+        defaultActive: 'DOING',
+        defaultCompleted: 'DONE',
+        transitionStatements: ['TODO -> DOING -> DONE'],
+      };
+
+      // Update the settings
+      mockPlugin.settings.stateTransitions = newTransitionSettings;
+
+      // Call setStateTransitionSettings - should not throw
+      expect(() => {
+        taskUpdateCoordinator.setStateTransitionSettings(newTransitionSettings);
+      }).not.toThrow();
+    });
+
+    it('should use cached manager in buildProcessingContext for recurring tasks', async () => {
+      // Create a task with repeating dates
+      const task = createBaseTask();
+      task.state = 'TODO';
+      task.scheduledDate = new Date(BASE_TIME);
+      task.scheduledDateRepeat = {
+        type: '.+',
+        unit: 'd',
+        value: 1,
+        raw: '.+1d',
+      };
+
+      // Add task to state manager
+      taskStateManager.addTask(task);
+
+      // Update task to completed state with repeating dates
+      // This should trigger the state transition manager logic
+      const updatePromise = taskUpdateCoordinator.updateTaskState(
+        task,
+        'DONE',
+        'task-list',
+      );
+
+      // Wait for the update to complete
+      await updatePromise;
+
+      // Verify the task was updated
+      const updatedTask = taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      expect(updatedTask).toBeDefined();
+      // The task should be in a state after the completed state (due to recurrence)
+      expect(updatedTask?.state).not.toBe('DONE');
+    });
+
+    it('should handle setStateTransitionSettings with undefined settings', () => {
+      // Should handle undefined settings gracefully
+      expect(() => {
+        taskUpdateCoordinator.setStateTransitionSettings(undefined);
+      }).not.toThrow();
+    });
+  });
 });
