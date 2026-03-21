@@ -106,16 +106,45 @@ interface ProcessingContext {
   fileLine: number;
 }
 
+/**
+ * Internal wrapper for tracking pending task updates with timestamps.
+ */
+interface PendingUpdate {
+  /** The promise for the update operation */
+  promise: Promise<void>;
+  /** Timestamp when the update was queued */
+  timestamp: number;
+}
+
+/**
+ * Internal wrapper for tracking pending file update queues with timestamps.
+ */
+interface PendingFileQueue {
+  /** The promise for the file update queue */
+  promise: Promise<unknown>;
+  /** Timestamp when the queue was created */
+  timestamp: number;
+}
+
 export class TaskUpdateCoordinator {
   private recurrenceCoordinator: RecurrenceCoordinator;
   private recurrenceManager: RecurrenceManager;
   private urgencyCoefficients: UrgencyCoefficients = getDefaultCoefficients();
 
   /** Per-task locking: prevents race conditions from rapid updates to same task */
-  private pendingTaskUpdates = new Map<string, Promise<void>>();
+  private pendingTaskUpdates = new Map<string, PendingUpdate>();
 
   /** Per-file queueing: ensures serialized writes to same file */
-  private fileUpdateQueues = new Map<string, Promise<unknown>>();
+  private fileUpdateQueues = new Map<string, PendingFileQueue>();
+
+  /** Cleanup interval for removing stale map entries */
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
+  /** Interval between cleanup runs (5 seconds) */
+  private readonly CLEANUP_INTERVAL_MS = 5000;
+
+  /** Timeout after which an entry is considered stale (30 seconds) */
+  private readonly STALE_ENTRY_TIMEOUT_MS = 30000;
 
   private getTaskKey(path: string, line: number): string {
     return `${path}:${line}`;
@@ -137,6 +166,9 @@ export class TaskUpdateCoordinator {
 
     // Set the TaskUpdateCoordinator reference to avoid circular dependency
     this.recurrenceCoordinator.setTaskUpdateCoordinator(this);
+
+    // Start periodic cleanup of stale map entries
+    this.startCleanup();
   }
 
   /**
@@ -418,13 +450,16 @@ export class TaskUpdateCoordinator {
 
     const asyncWork = async (): Promise<void> => {
       if (existingUpdate) {
-        await existingUpdate;
+        await existingUpdate.promise;
       }
       await this.performAsyncPhase(context);
     };
 
     const promise = asyncWork();
-    this.pendingTaskUpdates.set(taskKey, promise);
+    this.pendingTaskUpdates.set(taskKey, {
+      promise,
+      timestamp: Date.now(),
+    });
 
     try {
       await promise;
@@ -505,15 +540,20 @@ export class TaskUpdateCoordinator {
     };
 
     const queuePromise = existingQueue
-      ? existingQueue.then(() => doAsyncWork())
+      ? existingQueue.promise.then(() => doAsyncWork())
       : doAsyncWork();
 
-    this.fileUpdateQueues.set(context.filePath, queuePromise);
+    this.fileUpdateQueues.set(context.filePath, {
+      promise: queuePromise,
+      timestamp: Date.now(),
+    });
 
     try {
       await queuePromise;
     } finally {
-      if (this.fileUpdateQueues.get(context.filePath) === queuePromise) {
+      if (
+        this.fileUpdateQueues.get(context.filePath)?.promise === queuePromise
+      ) {
         this.fileUpdateQueues.delete(context.filePath);
       }
     }
@@ -887,9 +927,62 @@ export class TaskUpdateCoordinator {
   }
 
   /**
+   * Start the periodic cleanup interval.
+   * Removes stale entries from pendingTaskUpdates and fileUpdateQueues maps.
+   */
+  private startCleanup(): void {
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupStaleEntries();
+    }, this.CLEANUP_INTERVAL_MS);
+  }
+
+  /**
+   * Clean up stale entries from the pending maps.
+   * Removes entries that have been pending longer than STALE_ENTRY_TIMEOUT_MS.
+   */
+  private cleanupStaleEntries(): void {
+    const now = Date.now();
+    const staleTaskKeys: string[] = [];
+    const staleFilePaths: string[] = [];
+
+    // Check pendingTaskUpdates for stale entries
+    for (const [key, update] of this.pendingTaskUpdates.entries()) {
+      if (now - update.timestamp > this.STALE_ENTRY_TIMEOUT_MS) {
+        staleTaskKeys.push(key);
+      }
+    }
+
+    // Check fileUpdateQueues for stale entries
+    for (const [path, queue] of this.fileUpdateQueues.entries()) {
+      if (now - queue.timestamp > this.STALE_ENTRY_TIMEOUT_MS) {
+        staleFilePaths.push(path);
+      }
+    }
+
+    // Remove stale entries
+    for (const key of staleTaskKeys) {
+      this.pendingTaskUpdates.delete(key);
+    }
+
+    for (const path of staleFilePaths) {
+      this.fileUpdateQueues.delete(path);
+    }
+  }
+
+  /**
    * Clean up resources.
    */
   destroy(): void {
+    // Stop cleanup interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+
+    // Clear maps to prevent memory leaks
+    this.pendingTaskUpdates.clear();
+    this.fileUpdateQueues.clear();
+
     // ChangeTracker is now owned by main.ts and destroyed there
   }
 }
