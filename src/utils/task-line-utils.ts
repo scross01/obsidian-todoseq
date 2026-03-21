@@ -7,6 +7,24 @@ import { Task } from '../types/task';
 import { KeywordManager } from './keyword-manager';
 
 /**
+ * Calculate the total indentation length (treating tabs as 2 spaces).
+ * Matches the logic in TaskParser.getIndentLength().
+ * @param indent The indent string (may contain tabs and spaces)
+ * @returns The visual indentation length
+ */
+export function getIndentLength(indent: string): number {
+  let length = 0;
+  for (const char of indent) {
+    if (char === '\t') {
+      length += 2; // Count tabs as 2 spaces (existing convention)
+    } else {
+      length += 1;
+    }
+  }
+  return length;
+}
+
+/**
  * Find a date line of specified type after a task line.
  * Uses regex-based detection consistent with parser's getDateLineType logic.
  *
@@ -89,7 +107,10 @@ export function findDateLine(
       const effectiveTaskIndent =
         taskIndent.match(/^(\s*(>\s*)+)/)?.[1] ?? taskIndent;
 
-      if (effectiveLineIndent.length <= effectiveTaskIndent.length) {
+      if (
+        getIndentLength(effectiveLineIndent) <=
+        getIndentLength(effectiveTaskIndent)
+      ) {
         break;
       }
     }

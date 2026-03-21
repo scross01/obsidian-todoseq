@@ -1135,5 +1135,51 @@ TODO 🇨🇦 Canadian flag
       ).toBeNull();
       expect(parser.getDateLineType('* CLOSED: [2026-03-10]', '  ')).toBeNull();
     });
+
+    test('should accept tab-indented date line when task has space indent', () => {
+      // Task has 1 space, date line has 1 tab (both = 2 visual columns)
+      expect(parser.getDateLineType('\tSCHEDULED: <2026-03-10>', ' ')).toBe(
+        'scheduled',
+      );
+      // Task has 2 spaces, date line has 1 tab (both = 2 visual columns)
+      expect(parser.getDateLineType('\tDEADLINE: <2026-03-10>', '  ')).toBe(
+        'deadline',
+      );
+    });
+
+    test('should accept space-indented date line when task has tab indent', () => {
+      // Task has 1 tab, date line has 2 spaces (both = 2 visual columns)
+      expect(parser.getDateLineType('  SCHEDULED: <2026-03-10>', '\t')).toBe(
+        'scheduled',
+      );
+      // Task has 1 tab, date line has 1 space (task is deeper)
+      expect(
+        parser.getDateLineType(' DEADLINE: <2026-03-10>', '\t'),
+      ).toBeNull();
+    });
+
+    test('should handle mixed tab and space indentation', () => {
+      // Task has 1 tab + 1 space (3 visual columns)
+      // Date line has 2 tabs (4 visual columns) - deeper, should be accepted
+      expect(parser.getDateLineType('\t\tSCHEDULED: <2026-03-10>', '\t ')).toBe(
+        'scheduled',
+      );
+      // Task has 1 tab + 1 space (3 visual columns)
+      // Date line has 1 space (1 visual column) - shallower, should be rejected
+      expect(
+        parser.getDateLineType(' SCHEDULED: <2026-03-10>', '\t '),
+      ).toBeNull();
+    });
+
+    test('should accept date line with same visual indent (tabs vs spaces)', () => {
+      // Task has 4 spaces, date line has 2 tabs (both = 4 visual columns)
+      expect(
+        parser.getDateLineType('\t\tSCHEDULED: <2026-03-10>', '    '),
+      ).toBe('scheduled');
+      // Task has 2 tabs, date line has 4 spaces (both = 4 visual columns)
+      expect(parser.getDateLineType('    DEADLINE: <2026-03-10>', '\t\t')).toBe(
+        'deadline',
+      );
+    });
   });
 });

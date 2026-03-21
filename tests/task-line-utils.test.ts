@@ -6,6 +6,7 @@ import {
   getTaskIndent,
   findDateLine,
   findDateLineWithParser,
+  getIndentLength,
 } from '../src/utils/task-line-utils';
 import { Task } from '../src/types/task';
 import { KeywordManager } from '../src/utils/keyword-manager';
@@ -409,6 +410,71 @@ describe('task-line-utils', () => {
         mockParser,
         keywordManager,
       );
+      expect(result).toBe(1);
+    });
+  });
+
+  describe('getIndentLength', () => {
+    it('should return 0 for empty string', () => {
+      expect(getIndentLength('')).toBe(0);
+    });
+
+    it('should count spaces as 1', () => {
+      expect(getIndentLength(' ')).toBe(1);
+      expect(getIndentLength('  ')).toBe(2);
+      expect(getIndentLength('    ')).toBe(4);
+    });
+
+    it('should count tabs as 2 spaces', () => {
+      expect(getIndentLength('\t')).toBe(2);
+      expect(getIndentLength('\t\t')).toBe(4);
+      expect(getIndentLength('\t\t\t')).toBe(6);
+    });
+
+    it('should handle mixed tabs and spaces', () => {
+      expect(getIndentLength(' \t ')).toBe(4);
+      expect(getIndentLength('\t  ')).toBe(4);
+      expect(getIndentLength('  \t')).toBe(4);
+      expect(getIndentLength('\t \t')).toBe(5); // 2 + 1 + 2 = 5
+    });
+  });
+
+  describe('findDateLine with tab/space indentation', () => {
+    it('should find date line with tab indent when task has space indent', () => {
+      // Task has 1 space, date line has 1 tab (both = 2 visual columns)
+      const lines = [' TODO task', '\tSCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', ' ', keywordManager);
+      expect(result).toBe(1);
+    });
+
+    it('should find date line with space indent when task has tab indent', () => {
+      // Task has 1 tab, date line has 2 spaces (both = 2 visual columns)
+      const lines = ['\tTODO task', '  SCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '\t', keywordManager);
+      expect(result).toBe(1);
+    });
+
+    it('should stop at non-date line with shallower visual indent', () => {
+      // Task has 1 tab (2 visual columns)
+      // Date line has 1 space (1 visual column) - shallower, should stop
+      const lines = ['\tTODO task', ' Other line'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '\t', keywordManager);
+      expect(result).toBe(-1);
+    });
+
+    it('should handle mixed tab/space indents correctly', () => {
+      // Task has 2 spaces (2 visual columns)
+      // Date line has 1 tab (2 visual columns) - same level, should find
+      const lines = ['  TODO task', '\tSCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
+      expect(result).toBe(1);
+    });
+
+    it('should accept date line at deeper visual indent (tabs vs spaces)', () => {
+      // Task has 2 spaces (2 visual columns)
+      // Date line has 1 tab + 1 space (3 visual columns) - deeper, should find
+      const lines = ['  TODO task', '\t SCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(1);
     });
   });

@@ -11,6 +11,7 @@ import {
   UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
+import { getIndentLength } from '../utils/task-line-utils';
 import {
   BULLET_LIST_PATTERN_SOURCE,
   NUMBERED_LIST_PATTERN_SOURCE,
@@ -673,7 +674,11 @@ export class TaskParser implements ITaskParser {
 
     // For regular tasks, check indent matching
     const lineIndent = line.substring(0, line.length - trimmedLine.length);
-    if (lineIndent !== taskIndent && !lineIndent.startsWith(taskIndent)) {
+    const lineIndentLength = getIndentLength(lineIndent);
+    const taskIndentLength = getIndentLength(taskIndent);
+
+    // Date line must be at same or deeper indent level
+    if (lineIndentLength < taskIndentLength) {
       return null;
     }
 
