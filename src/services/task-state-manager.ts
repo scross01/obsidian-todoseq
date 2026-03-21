@@ -48,11 +48,15 @@ export class TaskStateManager {
   }
 
   /**
-   * Get the current tasks array (reference, not copy).
-   * @returns Current tasks array
+   * Get the current tasks array (shallow copy).
+   * The returned array is a copy to prevent external mutations.
+   * Task objects within the array are still mutable by design for performance.
+   * Use setTasks(), updateTasks(), or other methods to modify state.
+   *
+   * @returns Shallow copy of current tasks array
    */
   getTasks(): Task[] {
-    return this._tasks;
+    return [...this._tasks];
   }
 
   /**

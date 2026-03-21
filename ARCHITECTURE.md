@@ -207,8 +207,9 @@ graph TB
 **TaskStateManager** (`src/services/task-state-manager.ts`)
 
 - **Responsibility**: Single source of truth for all task data
-- **Key Patterns**: Observer pattern for reactive updates
-- **Interface**: `getTasks()`, `setTasks()`, `subscribe(callback)`, `findTaskByPathAndLine()`
+- **Key Patterns**: Observer pattern for reactive updates, defensive copying
+- **Interface**: `getTasks()` (returns shallow copy), `setTasks()`, `subscribe(callback)`, `findTaskByPathAndLine()`
+- **Mutation Policy**: External consumers receive shallow copies; internal methods may mutate task objects for performance
 
 **VaultScanner** (`src/services/vault-scanner.ts`)
 
