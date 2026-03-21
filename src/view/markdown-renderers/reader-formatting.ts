@@ -234,7 +234,51 @@ export class ReaderViewFormatter {
       return;
     }
 
-    // Find the task associated with this checkbox
+    // Check if this is a checkbox-only subtask (no keyword)
+    // These have no .todoseq-keyword-formatted child element
+    const keywordSpan = taskListItem.querySelector(
+      '.todoseq-keyword-formatted',
+    );
+    if (!keywordSpan) {
+      // This is a checkbox-only subtask - handle with optimistic update
+      const lineAttr = taskListItem.getAttribute('data-line');
+      if (lineAttr !== null) {
+        const lineNumber = parseInt(lineAttr, 10);
+
+        // Read file to get line content and extract indent
+        try {
+          const content = await this.plugin.app.vault.read(file);
+          const lines = content.split('\n');
+          if (lineNumber >= 0 && lineNumber < lines.length) {
+            const lineContent = lines[lineNumber];
+            const indentMatch = lineContent.match(/^(\s*)/);
+            const indent = indentMatch ? indentMatch[1] : '';
+
+            // wasCompleted is opposite of the new checkbox state
+            // (if checkbox is now checked, task was NOT completed before)
+            const wasCompleted = !isChecked;
+
+            // Update parent subtask counts optimistically for immediate UI
+            this.plugin.taskStateManager.updateParentSubtaskCountsForCheckbox(
+              sourcePath,
+              lineNumber,
+              indent,
+              wasCompleted,
+              isChecked,
+              true,
+            );
+          }
+        } catch (error) {
+          console.debug(
+            '[TODOseq] Failed to read file for checkbox-only subtask update:',
+            error,
+          );
+        }
+      }
+      return; // Let Obsidian handle the file update
+    }
+
+    // Find the task associated with this checkbox (for tasks with keywords)
     const task = await this.findTaskForCheckbox(taskListItem, file);
     if (!task) {
       return;

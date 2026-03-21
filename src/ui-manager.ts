@@ -206,10 +206,43 @@ export class UIManager {
       return;
     }
 
-    // Find the task keyword span - if not a TODOseq task, let Obsidian handle it normally
+    // Find the task keyword span - if not a TODOseq task, handle checkbox-only subtasks
     const keywordSpan = lineElement.querySelector('.todoseq-keyword-formatted');
+
+    // Handle checkbox-only subtasks (no keyword)
     if (!keywordSpan) {
-      return; // Let Obsidian's natural checkbox behavior handle this
+      const currentLine = this.getLineForElement(lineElement as HTMLElement);
+      if (currentLine !== null) {
+        const view =
+          this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view && view.file) {
+          const lineNumber = currentLine - 1; // Convert to 0-indexed
+          const filePath = view.file.path;
+
+          // Get the original line content from editor to extract indent
+          const lineContent = view.editor.getLine(lineNumber);
+
+          // Extract indent from the line (leading whitespace)
+          const indentMatch = lineContent.match(/^(\s*)/);
+          const indent = indentMatch ? indentMatch[1] : '';
+
+          // wasCompleted is opposite of the new checkbox state
+          // (if checkbox is now checked, task was NOT completed before)
+          const wasCompleted = !checkbox.checked;
+          const isCompleted = checkbox.checked;
+
+          // Update parent subtask counts immediately for optimistic UI
+          this.plugin.taskStateManager.updateParentSubtaskCountsForCheckbox(
+            filePath,
+            lineNumber,
+            indent,
+            wasCompleted,
+            isCompleted,
+            true, // notify subscribers immediately
+          );
+        }
+      }
+      return; // Let Obsidian's natural checkbox behavior handle the file update
     }
 
     // Prevent default behavior and stop propagation to take full control of the update

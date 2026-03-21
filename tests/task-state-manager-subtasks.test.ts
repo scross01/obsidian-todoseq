@@ -1,4 +1,5 @@
 import { TaskStateManager } from '../src/services/task-state-manager';
+import { Task } from '../src/types/task';
 import {
   createBaseTask,
   createCheckboxTask,
@@ -574,6 +575,220 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
 
       const isSubtaskOf = (stateManager as any).isSubtaskOf.bind(stateManager);
       expect(isSubtaskOf(sameLevelTask, parentTask)).toBe(true);
+    });
+  });
+
+  describe('findParentTasksForCheckbox', () => {
+    test('should find parent task for checkbox-only subtask', () => {
+      const parentTask = createCheckboxTask({
+        line: 0,
+        rawText: '- [ ] TODO Parent task',
+        text: 'Parent task',
+        indent: '',
+        subtaskCount: 1,
+        subtaskCompletedCount: 0,
+      });
+
+      stateManager.addTask(parentTask);
+
+      const parents = stateManager.findParentTasksForCheckbox(
+        'test.md',
+        1,
+        '  ',
+      );
+
+      expect(parents).toHaveLength(1);
+      expect(parents[0].line).toBe(0);
+    });
+
+    test('should find multiple parent tasks for nested checkbox-only subtask', () => {
+      const rootTask = createCheckboxTask({
+        line: 0,
+        rawText: '- [ ] TODO Root task',
+        text: 'Root task',
+        indent: '',
+        subtaskCount: 1,
+        subtaskCompletedCount: 0,
+      });
+
+      const middleTask = createCheckboxTask({
+        line: 1,
+        rawText: '  - [ ] TODO Middle task',
+        text: 'Middle task',
+        indent: '  ',
+        subtaskCount: 1,
+        subtaskCompletedCount: 0,
+      });
+
+      stateManager.addTask(rootTask);
+      stateManager.addTask(middleTask);
+
+      const parents = stateManager.findParentTasksForCheckbox(
+        'test.md',
+        2,
+        '    ',
+      );
+
+      expect(parents).toHaveLength(2);
+      expect(parents[0].line).toBe(1); // Immediate parent first
+      expect(parents[1].line).toBe(0); // Root parent second
+    });
+
+    test('should return empty array when no parent task exists', () => {
+      const parents = stateManager.findParentTasksForCheckbox('test.md', 0, '');
+      expect(parents).toHaveLength(0);
+    });
+
+    test('should return empty array for task in different file', () => {
+      const parentTask = createCheckboxTask({
+        line: 0,
+        rawText: '- [ ] TODO Parent task',
+        text: 'Parent task',
+        indent: '',
+        path: 'other.md',
+      });
+
+      stateManager.addTask(parentTask);
+
+      const parents = stateManager.findParentTasksForCheckbox(
+        'test.md',
+        1,
+        '  ',
+      );
+      expect(parents).toHaveLength(0);
+    });
+  });
+
+  describe('updateParentSubtaskCountsForCheckbox', () => {
+    let parentTask: Task;
+    let notifySubscriber: jest.Mock;
+
+    beforeEach(() => {
+      notifySubscriber = jest.fn();
+      stateManager.subscribe(notifySubscriber);
+
+      parentTask = createCheckboxTask({
+        line: 0,
+        rawText: '- [ ] TODO Parent task',
+        text: 'Parent task',
+        indent: '',
+        subtaskCount: 2,
+        subtaskCompletedCount: 0,
+      });
+
+      stateManager.addTask(parentTask);
+    });
+
+    test('should increment completed count when checkbox-only subtask is checked', () => {
+      stateManager.updateParentSubtaskCountsForCheckbox(
+        'test.md',
+        1,
+        '  ',
+        false, // was not completed
+        true, // now completed
+        true,
+      );
+
+      const updatedParent = stateManager.findTaskByPathAndLine('test.md', 0);
+      expect(updatedParent?.subtaskCompletedCount).toBe(1);
+      expect(notifySubscriber).toHaveBeenCalled();
+    });
+
+    test('should decrement completed count when checkbox-only subtask is unchecked', () => {
+      // Set up with one completed subtask
+      stateManager.updateParentSubtaskCountsForCheckbox(
+        'test.md',
+        1,
+        '  ',
+        false,
+        true,
+        false,
+      );
+
+      notifySubscriber.mockClear();
+
+      stateManager.updateParentSubtaskCountsForCheckbox(
+        'test.md',
+        1,
+        '  ',
+        true, // was completed
+        false, // now not completed
+        true,
+      );
+
+      const updatedParent = stateManager.findTaskByPathAndLine('test.md', 0);
+      expect(updatedParent?.subtaskCompletedCount).toBe(0);
+      expect(notifySubscriber).toHaveBeenCalled();
+    });
+
+    test('should not change count when completion status does not change', () => {
+      notifySubscriber.mockClear();
+
+      stateManager.updateParentSubtaskCountsForCheckbox(
+        'test.md',
+        1,
+        '  ',
+        false,
+        false,
+        true,
+      );
+
+      const updatedParent = stateManager.findTaskByPathAndLine('test.md', 0);
+      expect(updatedParent?.subtaskCompletedCount).toBe(0);
+      expect(notifySubscriber).not.toHaveBeenCalled();
+    });
+
+    test('should not decrement below zero', () => {
+      stateManager.updateParentSubtaskCountsForCheckbox(
+        'test.md',
+        1,
+        '  ',
+        true, // was completed
+        false, // now not completed
+        true,
+      );
+
+      const updatedParent = stateManager.findTaskByPathAndLine('test.md', 0);
+      expect(updatedParent?.subtaskCompletedCount).toBe(0);
+    });
+
+    test('should update all parent counts for nested checkbox-only subtask', () => {
+      const rootTask = createCheckboxTask({
+        line: 0,
+        rawText: '- [ ] TODO Root task',
+        text: 'Root task',
+        indent: '',
+        subtaskCount: 1,
+        subtaskCompletedCount: 0,
+      });
+
+      const middleTask = createCheckboxTask({
+        line: 1,
+        rawText: '  - [ ] TODO Middle task',
+        text: 'Middle task',
+        indent: '  ',
+        subtaskCount: 1,
+        subtaskCompletedCount: 0,
+      });
+
+      stateManager.clearTasks();
+      stateManager.addTask(rootTask);
+      stateManager.addTask(middleTask);
+
+      stateManager.updateParentSubtaskCountsForCheckbox(
+        'test.md',
+        2,
+        '    ',
+        false,
+        true,
+        true,
+      );
+
+      const updatedRoot = stateManager.findTaskByPathAndLine('test.md', 0);
+      const updatedMiddle = stateManager.findTaskByPathAndLine('test.md', 1);
+
+      expect(updatedRoot?.subtaskCompletedCount).toBe(1);
+      expect(updatedMiddle?.subtaskCompletedCount).toBe(1);
     });
   });
 });

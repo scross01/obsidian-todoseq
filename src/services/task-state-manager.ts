@@ -402,6 +402,117 @@ export class TaskStateManager {
   }
 
   /**
+   * Find parent tasks for a checkbox-only subtask (no keyword).
+   * Used for optimistic updates when checkbox-only subtasks are toggled.
+   *
+   * @param filePath - File path of the subtask
+   * @param line - Line number of the subtask (0-indexed)
+   * @param indent - Indent of the subtask line
+   * @returns Array of parent tasks (ordered from immediate to root)
+   */
+  findParentTasksForCheckbox(
+    filePath: string,
+    line: number,
+    indent: string,
+  ): Task[] {
+    const tasksInFile = this._tasks
+      .filter((t) => t.path === filePath && t.line < line)
+      .sort((a, b) => a.line - b.line);
+
+    const parents: Task[] = [];
+    let currentIndent = indent;
+    let currentIndentLength = this.getIndentLength(indent);
+
+    for (let i = tasksInFile.length - 1; i >= 0; i--) {
+      const potentialParent = tasksInFile[i];
+
+      const parentIndent = potentialParent.indent;
+      const parentQuotePrefix = parentIndent.match(/^(>\s*)+/)?.[0] ?? '';
+      const taskQuotePrefix = currentIndent.match(/^(>\s*)+/)?.[0] ?? '';
+
+      if (parentQuotePrefix !== taskQuotePrefix) {
+        continue;
+      }
+
+      const parentWhitespaceIndent = parentIndent.substring(
+        parentQuotePrefix.length,
+      );
+      const parentIndentLength = this.getIndentLength(parentWhitespaceIndent);
+
+      const parentHasCheckbox = CHECKBOX_DETECTION_REGEX.test(
+        potentialParent.rawText,
+      );
+
+      let isParent = false;
+      if (parentHasCheckbox) {
+        isParent = currentIndentLength > parentIndentLength;
+      } else {
+        isParent = currentIndentLength >= parentIndentLength;
+      }
+
+      if (isParent) {
+        parents.push(potentialParent);
+
+        if (this.getIndentLength(parentWhitespaceIndent) === 0) {
+          break;
+        }
+
+        currentIndent = parentIndent;
+        currentIndentLength = parentIndentLength;
+      }
+    }
+
+    return parents;
+  }
+
+  /**
+   * Optimistically update parent subtask counts for a checkbox-only subtask (no keyword).
+   * This enables immediate UI updates when checkbox-only subtasks are toggled.
+   *
+   * @param filePath - File path of the subtask
+   * @param line - Line number of the subtask (0-indexed)
+   * @param indent - Indent of the subtask line
+   * @param wasCompleted - Whether the subtask was completed before
+   * @param isCompleted - Whether the subtask is completed now
+   * @param shouldNotify - Whether to notify subscribers (default: true)
+   */
+  updateParentSubtaskCountsForCheckbox(
+    filePath: string,
+    line: number,
+    indent: string,
+    wasCompleted: boolean,
+    isCompleted: boolean,
+    shouldNotify = true,
+  ): void {
+    if (wasCompleted === isCompleted) {
+      return;
+    }
+
+    const parentTasks = this.findParentTasksForCheckbox(filePath, line, indent);
+    for (const parent of parentTasks) {
+      const index = this._tasks.indexOf(parent);
+      if (index === -1) continue;
+
+      const updatedTask = { ...parent };
+
+      if (wasCompleted && !isCompleted) {
+        updatedTask.subtaskCompletedCount = Math.max(
+          0,
+          updatedTask.subtaskCompletedCount - 1,
+        );
+      } else if (!wasCompleted && isCompleted) {
+        updatedTask.subtaskCompletedCount += 1;
+      }
+
+      this._tasks[index] = updatedTask;
+    }
+
+    if (shouldNotify && parentTasks.length > 0) {
+      this.notifySubscribers();
+    }
+  }
+
+  /**
    * Notify all subscribers of task changes.
    * Guards against re-entrant notifications and queues pending notifications.
    */
