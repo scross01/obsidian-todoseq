@@ -923,6 +923,104 @@ export class EditorController {
   }
 
   /**
+   * Handle copying task at cursor to clipboard
+   * @param checking - Whether this is just a check to see if the command is available
+   * @param editor - The editor instance
+   * @param view - The markdown view
+   * @returns boolean indicating if the command is available
+   */
+  handleCopyTaskAtCursor(
+    checking: boolean,
+    editor: Editor,
+    view: MarkdownView,
+  ): boolean {
+    const vaultScanner = this.plugin.getVaultScanner();
+    if (!vaultScanner) {
+      return false;
+    }
+
+    // Get the cursor position
+    const cursor = editor.getCursor();
+    const lineNumber = cursor.line;
+
+    // Get the line from the editor
+    const line = editor.getLine(lineNumber);
+
+    // Check if this line contains a valid task using VaultScanner's parser
+    const parser = vaultScanner.getParser();
+    if (!parser?.testRegex.test(line)) {
+      return false;
+    }
+
+    if (checking) {
+      return true;
+    }
+
+    // Parse the task from the line
+    const task = this.parseTaskFromLine(
+      line,
+      lineNumber,
+      view.file?.path || '',
+    );
+
+    if (!task) {
+      return false;
+    }
+
+    // Format the task for clipboard in Org mode format
+    const lines: string[] = [];
+
+    // Build the main task line: KEYWORD [#priority] text
+    let taskLine = task.state;
+    if (task.priority) {
+      const priorityMap: Record<string, string> = {
+        high: 'A',
+        med: 'B',
+        low: 'C',
+      };
+      taskLine += ` [#${priorityMap[task.priority]}]`;
+    }
+    taskLine += ` ${task.text}`;
+    lines.push(taskLine);
+
+    // Add scheduled date if present
+    if (task.scheduledDate) {
+      const scheduledStr = this.formatDateForClipboard(task.scheduledDate);
+      lines.push(`SCHEDULED: ${scheduledStr}`);
+    }
+
+    // Add deadline date if present
+    if (task.deadlineDate) {
+      const deadlineStr = this.formatDateForClipboard(task.deadlineDate);
+      lines.push(`DEADLINE: ${deadlineStr}`);
+    }
+
+    // Copy to clipboard
+    const textToCopy = lines.join('\n');
+    navigator.clipboard.writeText(textToCopy).then(
+      () => {
+        new Notice('Task copied to clipboard');
+      },
+      () => {
+        new Notice('Failed to copy task');
+      },
+    );
+
+    return true;
+  }
+
+  /**
+   * Format date for clipboard in Org mode format: <2026-03-07 Sat>
+   */
+  private formatDateForClipboard(date: Date): string {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const dayOfWeek = date.toLocaleDateString(undefined, { weekday: 'short' });
+    return `<${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${dayOfWeek}>`;
+  }
+
+  /**
    * Handle moving task at cursor to today's daily note
    * @param checking - Whether this is just a check to see if the command is available
    * @param editor - The editor instance
@@ -1259,7 +1357,7 @@ export class EditorController {
           // This callback is mainly for task list view
         },
         onCopyTask: (task: Task) => {
-          this.handleCopyTaskToTodayAtCursor(false, editor, view);
+          this.handleCopyTaskAtCursor(false, editor, view);
         },
         onCopyTaskToToday: async (task: Task) => {
           await this.handleCopyTaskToTodayAtCursor(false, editor, view);
