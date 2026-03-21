@@ -1,10 +1,6 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
 import { Task, DateRepeatInfo } from '../types/task';
-import {
-  PRIORITY_TOKEN_REGEX,
-  CHECKBOX_REGEX,
-  CHECKBOX_DETECTION_REGEX,
-} from '../utils/patterns';
+import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
 import { DateUtils } from '../utils/date-utils';
@@ -404,100 +400,29 @@ export class TaskWriter {
     task: Task,
     newPriority: 'high' | 'med' | 'low',
   ): Promise<Task> {
-    const { newLine } = TaskWriter.generateTaskLine(
-      task,
-      task.state,
-      true, // Keep existing priority
-      this.keywordManager,
-    );
-
-    // Add the new priority to the task line
+    // Generate priority token
     const priorityToken =
       newPriority === 'high' ? '[#A]' : newPriority === 'med' ? '[#B]' : '[#C]';
 
-    // First, remove any existing priority tokens from the task description
-    // to handle the case where priority exists but not at the beginning
-    // Preserve trailing spaces by using trimStart() instead of trim()
-    const cleanedLine = newLine
-      .replace(PRIORITY_TOKEN_REGEX, ' ')
-      .replace(/\s+/g, ' ')
-      .trimStart();
+    // Reconstruct task line from task attributes
+    // This preserves indent by using task.indent directly
+    const indent = task.indent;
+    const listMarker = task.listMarker || '';
+    const state = task.state;
+    const text = task.text ? ` ${task.text}` : '';
 
-    // Parse the cleaned line to find where to insert the priority
-    const match = CHECKBOX_REGEX.exec(cleanedLine);
-    let newTaskLine: string;
+    // For checkbox tasks, add a space after the list marker
+    // The listMarker for checkboxes is "- [ ]" but format requires "- [ ] "
+    // Check for '[' instead of '-[' to avoid footnote issues
+    const isCheckboxTask = listMarker.includes('[');
+    const listMarkerWithSpace = isCheckboxTask ? `${listMarker} ` : listMarker;
 
-    if (match) {
-      // For checkbox tasks: - [ ] TODO task text
-      // Insert priority after the state with proper spacing
-      const indent = match[1];
-      const listMarker = match[2];
-      const state = match[4];
-      const text = match[5];
-      const textPart = text ? ` ${text}` : '';
-      newTaskLine = `${indent}${listMarker} ${state} ${priorityToken}${textPart}`;
-    } else {
-      // Check for bulleted tasks without checkboxes: - TODO task text
-      const bulletMatch = /^(\s*)([-*+])\s+(.+)$/.exec(cleanedLine);
-      if (bulletMatch) {
-        // For bulleted tasks: - TODO task text
-        // Insert priority after the state with proper spacing
-        const indent = bulletMatch[1];
-        const bullet = bulletMatch[2];
-        const rest = bulletMatch[3];
-
-        // Split the rest into state and description
-        const restParts = rest.split(' ');
-        if (restParts.length >= 2) {
-          const state = restParts[0];
-          const description = restParts.slice(1).join(' ');
-          newTaskLine = `${indent}${bullet} ${state} ${priorityToken} ${description}`;
-        } else {
-          // Fallback for malformed bulleted tasks
-          newTaskLine = `${indent}${bullet} ${rest} ${priorityToken}`;
-        }
-      } else {
-        // Check for quote block tasks: > TODO task text or > > TODO task text
-        // For nested quotes like "> >", we need to handle spaces between > characters
-        const quoteMatch = /^(\s*)(>\s*)+(.+)$/.exec(cleanedLine);
-        if (quoteMatch) {
-          // For quote block tasks: > TODO task text or > > TODO task text
-          // Insert priority after the state with proper spacing
-          const indent = quoteMatch[1];
-          // quoteMatch[2] will be the last > in the chain (e.g., ">" or "> ")
-          // We need to reconstruct the full quote prefix
-          const fullMatch = quoteMatch[0].substring(indent.length);
-          const quotePrefixMatch = /^(\s*)(>\s*)+/.exec(fullMatch);
-          const quotePrefix = quotePrefixMatch
-            ? quotePrefixMatch[0].trimEnd()
-            : '>';
-          const rest = quoteMatch[3]; // Already starts after the quote prefix
-
-          // Split the rest (after quote prefix) into state and description
-          const restParts = rest.trim().split(' ');
-          if (restParts.length >= 2) {
-            const state = restParts[0];
-            const description = restParts.slice(1).join(' ');
-            newTaskLine = `${indent}${quotePrefix} ${state} ${priorityToken} ${description}`;
-          } else {
-            // Fallback for malformed quote tasks
-            newTaskLine = `${indent}${quotePrefix} ${rest} ${priorityToken}`;
-          }
-        } else {
-          // For non-checkbox, non-bulleted, non-quote tasks: TODO task text
-          // Insert priority after the state with proper spacing
-          const taskParts = cleanedLine.split(' ');
-          if (taskParts.length >= 2) {
-            const state = taskParts[0];
-            const rest = taskParts.slice(1).join(' ');
-            newTaskLine = `${state} ${priorityToken} ${rest}`;
-          } else {
-            // Fallback for malformed tasks
-            newTaskLine = `${cleanedLine} ${priorityToken}`;
-          }
-        }
-      }
-    }
+    // Preserve embed and footnote references if they exist
+    // Embed reference comes before the text, footnote reference comes after the text
+    const footnoteMarker = task.footnoteMarker || '';
+    const embedReference = task.embedReference || '';
+    const footnoteReference = task.footnoteReference || '';
+    const newTaskLine = `${indent}${footnoteMarker}${listMarkerWithSpace}${state} ${priorityToken}${embedReference}${text}${footnoteReference}`;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
@@ -530,12 +455,25 @@ export class TaskWriter {
       return { ...task };
     }
 
-    // Strip the priority token from the raw text
-    // Replace with a single space to preserve spacing between task keyword and text
-    const newTaskLine = task.rawText
-      .replace(PRIORITY_TOKEN_REGEX, ' ')
-      .replace(/  +/g, ' ') // collapse double spaces left by removal
-      .trim(); // trim any leading/trailing whitespace
+    // Reconstruct task line from task attributes (without priority)
+    // This preserves indent by using task.indent directly
+    const indent = task.indent;
+    const listMarker = task.listMarker || '';
+    const state = task.state;
+    const text = task.text ? ` ${task.text}` : '';
+
+    // For checkbox tasks, add a space after the list marker
+    // The listMarker for checkboxes is "- [ ]" but format requires "- [ ] "
+    // Check for '[' instead of '-[' to avoid footnote issues
+    const isCheckboxTask = listMarker.includes('[');
+    const listMarkerWithSpace = isCheckboxTask ? `${listMarker} ` : listMarker;
+
+    // Preserve embed and footnote references if they exist
+    // Embed reference comes before the text, footnote reference comes after the text
+    const footnoteMarker = task.footnoteMarker || '';
+    const embedReference = task.embedReference || '';
+    const footnoteReference = task.footnoteReference || '';
+    const newTaskLine = `${indent}${footnoteMarker}${listMarkerWithSpace}${state}${embedReference}${text}${footnoteReference}`;
 
     await this.writeLineToFile(task, newTaskLine);
 

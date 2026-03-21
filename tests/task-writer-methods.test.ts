@@ -394,6 +394,50 @@ describe('TaskWriter Instance Methods', () => {
       expect(result.priority).toBe('high');
       expect(result.rawText).toBe('> > TODO [#A] nested test');
     });
+
+    it('should preserve indent when adding priority to indented task', async () => {
+      // Before: "    - TODO test 1" (4 spaces indent)
+      // After:  "    - TODO [#A] test 1" (4 spaces indent preserved)
+      const task: Task = createBaseTask({
+        rawText: '    - TODO test 1',
+        indent: '    ',
+        listMarker: '- ',
+        priority: null,
+        text: 'test 1',
+      });
+      mockApp.workspace.getActiveViewOfType = jest.fn().mockReturnValue(null);
+      const mockTFile = new MockTFile();
+      mockApp.vault.getAbstractFileByPath = jest
+        .fn()
+        .mockReturnValue(mockTFile);
+
+      const result = await taskWriter.updateTaskPriority(task, 'high');
+
+      expect(result.priority).toBe('high');
+      expect(result.rawText).toBe('    - TODO [#A] test 1');
+    });
+
+    it('should preserve indent when adding priority to indented checkbox task', async () => {
+      // Before: "  - [ ] TODO test 2" (2 spaces indent)
+      // After:  "  - [ ] TODO [#B] test 2" (2 spaces indent preserved)
+      const task: Task = createBaseTask({
+        rawText: '  - [ ] TODO test 2',
+        indent: '  ',
+        listMarker: '- [ ]',
+        priority: null,
+        text: 'test 2',
+      });
+      mockApp.workspace.getActiveViewOfType = jest.fn().mockReturnValue(null);
+      const mockTFile = new MockTFile();
+      mockApp.vault.getAbstractFileByPath = jest
+        .fn()
+        .mockReturnValue(mockTFile);
+
+      const result = await taskWriter.updateTaskPriority(task, 'med');
+
+      expect(result.priority).toBe('med');
+      expect(result.rawText).toBe('  - [ ] TODO [#B] test 2');
+    });
   });
 
   describe('removeTaskPriority', () => {
@@ -512,6 +556,29 @@ describe('TaskWriter Instance Methods', () => {
       expect(result.rawText).not.toContain('[#A]');
       // The key assertion: should preserve single space between TODO and task text
       expect(result.rawText).toBe('- TODO this is another task');
+      expect(mockApp.vault.process).toHaveBeenCalled();
+    });
+
+    it('should preserve indent when removing priority from indented task', async () => {
+      // Before: "    - TODO [#A] test 1" (4 spaces indent)
+      // After:  "    - TODO test 1" (4 spaces indent preserved)
+      const task: Task = createBaseTask({
+        rawText: '    - TODO [#A] test 1',
+        indent: '    ',
+        listMarker: '- ',
+        priority: 'high',
+        text: 'test 1',
+      });
+      mockApp.workspace.getActiveViewOfType = jest.fn().mockReturnValue(null);
+      const mockTFile = new MockTFile();
+      mockApp.vault.getAbstractFileByPath = jest
+        .fn()
+        .mockReturnValue(mockTFile);
+
+      const result = await taskWriter.removeTaskPriority(task);
+
+      expect(result.priority).toBeNull();
+      expect(result.rawText).toBe('    - TODO test 1');
       expect(mockApp.vault.process).toHaveBeenCalled();
     });
 

@@ -691,7 +691,6 @@ export class EditorController {
     dateType: 'SCHEDULED' | 'DEADLINE',
   ): void {
     const currentDate = this.getCurrentDateString();
-    const dateLine = `${dateType}: <${currentDate}>`;
 
     // Start by inserting immediately after the task line
     let insertLine = taskLineNumber + 1;
@@ -706,6 +705,9 @@ export class EditorController {
     const taskIndent = task
       ? getTaskIndent(task)
       : (taskLine.match(/^(\s*)/)?.[1] ?? '');
+
+    // Create the date line with the correct indent
+    const dateLine = `${taskIndent}${dateType}: <${currentDate}>`;
 
     // Build lines array from editor.getLine()
     const lines: string[] = [];
