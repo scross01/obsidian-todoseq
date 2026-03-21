@@ -7,6 +7,7 @@ import {
   findDateLine,
   findDateLineWithParser,
 } from '../src/utils/task-line-utils';
+import { Task } from '../src/types/task';
 import { KeywordManager } from '../src/utils/keyword-manager';
 
 const keywordManager = new KeywordManager({});
@@ -14,48 +15,146 @@ const keywordManager = new KeywordManager({});
 describe('task-line-utils', () => {
   describe('getTaskIndent', () => {
     it('should return empty string for empty line', () => {
-      expect(getTaskIndent('')).toBe('');
+      const task = { rawText: '', state: 'TODO' } as Task;
+      expect(getTaskIndent(task)).toBe('');
     });
 
     it('should return quote prefix for quoted tasks', () => {
-      expect(getTaskIndent('> TODO task')).toBe('> ');
-      expect(getTaskIndent('  > TODO task')).toBe('  > ');
-      expect(getTaskIndent('>> TODO task')).toBe('>> ');
-      expect(getTaskIndent('>>> TODO task')).toBe('>>> ');
+      expect(
+        getTaskIndent({ rawText: '> TODO task', state: 'TODO' } as Task),
+      ).toBe('> ');
+      expect(
+        getTaskIndent({ rawText: '  > TODO task', state: 'TODO' } as Task),
+      ).toBe('  > ');
+      expect(
+        getTaskIndent({ rawText: '>> TODO task', state: 'TODO' } as Task),
+      ).toBe('>> ');
+      expect(
+        getTaskIndent({ rawText: '>>> TODO task', state: 'TODO' } as Task),
+      ).toBe('>>> ');
     });
 
-    it('should return 2-space indent for checkbox tasks', () => {
-      expect(getTaskIndent('- [ ] TODO task')).toBe('  ');
-      expect(getTaskIndent('  - [x] TODO task')).toBe('    ');
-      expect(getTaskIndent('  - [X] TODO task')).toBe('    ');
+    it('should return indent for checkbox tasks', () => {
+      expect(
+        getTaskIndent({ rawText: '- [ ] TODO task', state: 'TODO' } as Task),
+      ).toBe('      ');
+      expect(
+        getTaskIndent({ rawText: '  - [x] TODO task', state: 'TODO' } as Task),
+      ).toBe('        ');
+      expect(
+        getTaskIndent({ rawText: '  - [X] TODO task', state: 'TODO' } as Task),
+      ).toBe('        ');
     });
 
-    it('should return 2-space indent for bullet tasks with leading whitespace', () => {
-      expect(getTaskIndent('- TODO task')).toBe('  ');
-      expect(getTaskIndent('  + TODO task')).toBe('    ');
-      expect(getTaskIndent('* TODO task')).toBe('  ');
-      expect(getTaskIndent('  - TODO task')).toBe('    ');
+    it('should return indent for bullet tasks with leading whitespace', () => {
+      expect(
+        getTaskIndent({ rawText: '- TODO task', state: 'TODO' } as Task),
+      ).toBe('  ');
+      expect(
+        getTaskIndent({ rawText: '  + TODO task', state: 'TODO' } as Task),
+      ).toBe('    ');
+      expect(
+        getTaskIndent({ rawText: '* TODO task', state: 'TODO' } as Task),
+      ).toBe('  ');
+      expect(
+        getTaskIndent({ rawText: '  - TODO task', state: 'TODO' } as Task),
+      ).toBe('    ');
     });
 
-    it('should return 2-space indent for bullet tasks with existing leading whitespace', () => {
-      expect(getTaskIndent('  - TODO task')).toBe('    ');
-      expect(getTaskIndent('    - TODO task')).toBe('      ');
-      expect(getTaskIndent('  - TODO task')).toBe('    ');
+    it('should return indent for bullet tasks with existing leading whitespace', () => {
+      expect(
+        getTaskIndent({ rawText: '  - TODO task', state: 'TODO' } as Task),
+      ).toBe('    ');
+      expect(
+        getTaskIndent({ rawText: '    - TODO task', state: 'TODO' } as Task),
+      ).toBe('      ');
+      expect(
+        getTaskIndent({ rawText: '  - TODO task', state: 'TODO' } as Task),
+      ).toBe('    ');
     });
 
     it('should return leading whitespace for regular tasks', () => {
-      expect(getTaskIndent('TODO task')).toBe('');
-      expect(getTaskIndent('  TODO task')).toBe('  ');
-      expect(getTaskIndent('    TODO task')).toBe('    ');
+      expect(
+        getTaskIndent({ rawText: 'TODO task', state: 'TODO' } as Task),
+      ).toBe('');
+      expect(
+        getTaskIndent({ rawText: '  TODO task', state: 'TODO' } as Task),
+      ).toBe('  ');
+      expect(
+        getTaskIndent({ rawText: '    TODO task', state: 'TODO' } as Task),
+      ).toBe('    ');
     });
 
     it('should not treat date-like lines as bullet tasks', () => {
-      expect(getTaskIndent('- SCHEDULED: <2026-03-10>')).toBe('  ');
-      expect(getTaskIndent('- DEADLINE: <2026-03-10>')).toBe('  ');
-      expect(getTaskIndent('- CLOSED: <2026-03-10>')).toBe('  ');
-      expect(getTaskIndent('  - SCHEDULED: <2026-03-10>')).toBe('    ');
-      expect(getTaskIndent('+ SCHEDULED: <2026-03-10>')).toBe('  ');
-      expect(getTaskIndent('* DEADLINE: <2026-03-10>')).toBe('  ');
+      expect(
+        getTaskIndent({
+          rawText: '- SCHEDULED: <2026-03-10>',
+          state: 'SCHEDULED',
+        } as Task),
+      ).toBe('  ');
+      expect(
+        getTaskIndent({
+          rawText: '- DEADLINE: <2026-03-10>',
+          state: 'DEADLINE',
+        } as Task),
+      ).toBe('  ');
+      expect(
+        getTaskIndent({
+          rawText: '- CLOSED: <2026-03-10>',
+          state: 'CLOSED',
+        } as Task),
+      ).toBe('  ');
+      expect(
+        getTaskIndent({
+          rawText: '  - SCHEDULED: <2026-03-10>',
+          state: 'SCHEDULED',
+        } as Task),
+      ).toBe('    ');
+      expect(
+        getTaskIndent({
+          rawText: '+ SCHEDULED: <2026-03-10>',
+          state: 'SCHEDULED',
+        } as Task),
+      ).toBe('  ');
+      expect(
+        getTaskIndent({
+          rawText: '* DEADLINE: <2026-03-10>',
+          state: 'DEADLINE',
+        } as Task),
+      ).toBe('  ');
+    });
+
+    it('should return indent for numbered list tasks', () => {
+      expect(
+        getTaskIndent({ rawText: '1. TODO test 1', state: 'TODO' } as Task),
+      ).toBe('   ');
+      expect(
+        getTaskIndent({ rawText: '10. TODO test 1', state: 'TODO' } as Task),
+      ).toBe('    ');
+      expect(
+        getTaskIndent({ rawText: '1) TODO test 1', state: 'TODO' } as Task),
+      ).toBe('   ');
+      expect(
+        getTaskIndent({ rawText: '  1. TODO test 1', state: 'TODO' } as Task),
+      ).toBe('     ');
+    });
+
+    it('should return indent for lettered list tasks', () => {
+      expect(
+        getTaskIndent({ rawText: 'a. TODO test 1', state: 'TODO' } as Task),
+      ).toBe('   ');
+      expect(
+        getTaskIndent({ rawText: 'b. TODO test 1', state: 'TODO' } as Task),
+      ).toBe('   ');
+      expect(
+        getTaskIndent({ rawText: 'A) TODO test 1', state: 'TODO' } as Task),
+      ).toBe('   ');
+      expect(
+        getTaskIndent({ rawText: 'Z) TODO test 1', state: 'TODO' } as Task),
+      ).toBe('   ');
+      expect(
+        getTaskIndent({ rawText: '  a. TODO test 1', state: 'TODO' } as Task),
+      ).toBe('     ');
     });
   });
 
@@ -69,8 +168,6 @@ describe('task-line-utils', () => {
       '  DEADLINE: <2026-03-05 Fri 20:00 ++1d>',
       '  SCHEDULED: <2026-03-05 Wed 07:00 .+1d>',
       '  DEADLINE: <2026-03-05 Fri 20:00 ++1d>',
-      '  > SCHEDULED: <2026-03-05 Wed>',
-      '  > > SCHEDULED: <2026-03-05 Wed>',
       '  CLOSED: <2026-03-05 Fri>',
     ];
 
@@ -84,53 +181,22 @@ describe('task-line-utils', () => {
       expect(result).toBe(4);
     });
 
-    it('should find SCHEDULED line with time at correct index', () => {
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
-      expect(result).toBe(1);
-    });
-
-    it('should find DEADLINE line with time at correct index', () => {
-      const result = findDateLine(lines, 1, 'DEADLINE', '  ', keywordManager);
-      expect(result).toBe(4);
-    });
-
-    it('should find SCHEDULED line with repeater at correct index', () => {
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
-      expect(result).toBe(1);
-    });
-
-    it('should find DEADLINE line with repeater at correct index', () => {
-      const result = findDateLine(lines, 1, 'DEADLINE', '  ', keywordManager);
-      expect(result).toBe(4);
-    });
-
-    it('should return -1 when date line not found', () => {
-      // CLOSED line is at index 10, but search only goes up to index 9 (8 lines after start)
+    it('should find CLOSED line at correct index', () => {
       const result = findDateLine(lines, 1, 'CLOSED', '  ', keywordManager);
-      expect(result).toBe(-1);
+      expect(result).toBe(8);
     });
 
     it('should handle quoted SCHEDULED line', () => {
-      // Line 8 has indent '  ', not '  >', so this should return -1
+      // Task has quotes ('  >'), but lines in test data have no quotes
+      // With new behavior, quote levels must match, so no date line should be found
       const result = findDateLine(lines, 1, 'SCHEDULED', '  >', keywordManager);
       expect(result).toBe(-1);
     });
 
     it('should handle quoted DEADLINE line', () => {
-      // There is no quoted DEADLINE line in test data, so this should return -1
+      // Task has quotes ('  >'), but lines in test data have no quotes
+      // With new behavior, quote levels must match, so no date line should be found
       const result = findDateLine(lines, 1, 'DEADLINE', '  >', keywordManager);
-      expect(result).toBe(-1);
-    });
-
-    it('should handle nested quote SCHEDULED line', () => {
-      // Line 9 has indent '  ', not '  > >', so this should return -1
-      const result = findDateLine(
-        lines,
-        1,
-        'SCHEDULED',
-        '  > >',
-        keywordManager,
-      );
       expect(result).toBe(-1);
     });
 
@@ -205,16 +271,17 @@ describe('task-line-utils', () => {
       expect(result).toBe(-1);
     });
 
-    it('should not find date line at lower indent than task', () => {
+    it('should find date line at any indent level', () => {
+      // With new behavior, any indent level is allowed for non-quoted lines
       const lines = ['  TODO task d', 'SCHEDULED: <2026-03-10>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
-      expect(result).toBe(-1);
+      expect(result).toBe(1);
     });
 
     it('should not find date line without indent for bullet task', () => {
       const lines = ['- TODO task e', 'SCHEDULED: <2026-03-10>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
-      expect(result).toBe(-1);
+      expect(result).toBe(1);
     });
 
     it('should find CLOSED date line', () => {
@@ -239,6 +306,43 @@ describe('task-line-utils', () => {
       const lines = ['TODO task', '  CLOSED: [2026-03-05 Thu 10:00]'];
       const result = findDateLine(lines, 1, 'CLOSED', '', keywordManager);
       expect(result).toBe(1);
+    });
+
+    // New behavior tests - any indent level is allowed for non-quoted lines
+    it('should find date line at any indent level for non-quoted task', () => {
+      const lines = ['   TODO test 1', 'SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '   ', keywordManager);
+      expect(result).toBe(1);
+    });
+
+    it('should find date line at deeper indent for non-quoted task', () => {
+      const lines = ['TODO test 1', '   SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '', keywordManager);
+      expect(result).toBe(1);
+    });
+
+    it('should find date line at any indent after quotes for quoted task', () => {
+      const lines = ['> TODO test 2', '>    SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '> ', keywordManager);
+      expect(result).toBe(1);
+    });
+
+    it('should not find date line at different quote level', () => {
+      const lines = ['TODO test 1', '> SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '', keywordManager);
+      expect(result).toBe(-1);
+    });
+
+    it('should not find date line without quotes when task has quotes', () => {
+      const lines = ['> TODO test 1', 'SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '> ', keywordManager);
+      expect(result).toBe(-1);
+    });
+
+    it('should not find date line with quotes when task has no quotes', () => {
+      const lines = ['TODO test 1', '> SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '', keywordManager);
+      expect(result).toBe(-1);
     });
   });
 

@@ -243,8 +243,7 @@ export class TaskWriter {
           // Handle CLOSED date atomically with task line update
           if (dateStr !== null) {
             // Adding CLOSED date
-            const currentLine = lines[task.line];
-            const taskIndent = getTaskIndent(currentLine);
+            const taskIndent = getTaskIndent(task);
 
             // Search for existing CLOSED line
             const closedLineIndex = findDateLine(
@@ -295,8 +294,7 @@ export class TaskWriter {
             }
           } else if (shouldRemoveClosed) {
             // Removing CLOSED date
-            const currentLine = lines[task.line];
-            const taskIndent = getTaskIndent(currentLine);
+            const taskIndent = getTaskIndent(task);
 
             const closedLineIndex = findDateLine(
               lines,
@@ -578,10 +576,9 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const currentLine = lines[task.line];
 
         // Get the proper indent including quote prefix, bullet, or checkbox marker
-        const taskIndent = getTaskIndent(currentLine);
+        const taskIndent = getTaskIndent(task);
 
         // Look for existing SCHEDULED line after the task
         const scheduledLineIndex = findDateLine(
@@ -671,10 +668,9 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const currentLine = lines[task.line];
 
         // Get the proper indent including quote prefix, bullet, or checkbox marker
-        const taskIndent = getTaskIndent(currentLine);
+        const taskIndent = getTaskIndent(task);
 
         // Look for existing SCHEDULED line after the task
         const scheduledLineIndex = findDateLine(
@@ -736,10 +732,9 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const currentLine = lines[task.line];
 
         // Get the proper indent including quote prefix, bullet, or checkbox marker
-        const taskIndent = getTaskIndent(currentLine);
+        const taskIndent = getTaskIndent(task);
 
         // Look for existing DEADLINE line after the task
         const deadlineLineIndex = findDateLine(
@@ -825,10 +820,9 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const currentLine = lines[task.line];
 
         // Get the proper indent including quote prefix, bullet, or checkbox marker
-        const taskIndent = getTaskIndent(currentLine);
+        const taskIndent = getTaskIndent(task);
 
         // Look for existing DEADLINE line after the task
         const deadlineLineIndex = findDateLine(
@@ -917,10 +911,9 @@ export class TaskWriter {
         const lines = Array.from({ length: editor.lineCount() }, (_, i) =>
           editor.getLine(i),
         );
-        const currentLine = lines[task.line];
 
         // Get the proper indent including quote prefix, bullet, or checkbox marker
-        const taskIndent = getTaskIndent(currentLine);
+        const taskIndent = getTaskIndent(task);
 
         // Search for existing CLOSED line
         // Always search regardless of task.closedDate because:
@@ -996,10 +989,9 @@ export class TaskWriter {
         // Use Vault API for background edits
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
-          const currentLine = lines[task.line];
 
           // Get the proper indent including quote prefix, bullet, or checkbox marker
-          const taskIndent = getTaskIndent(currentLine);
+          const taskIndent = getTaskIndent(task);
 
           // Search for existing CLOSED line
           // Always search regardless of task.closedDate because:
@@ -1068,7 +1060,7 @@ export class TaskWriter {
         // Calculate lineDelta - search the file after the update to determine which happened
         const fileContent = await this.app.vault.read(file);
         const afterLines = fileContent.split('\n');
-        const afterTaskIndent = getTaskIndent(afterLines[task.line]);
+        const afterTaskIndent = getTaskIndent(task);
         const afterClosedLineIndex = findDateLine(
           afterLines,
           task.line + 1,
@@ -1114,8 +1106,7 @@ export class TaskWriter {
 
       if (isActive && editor) {
         // Use Editor API when file is open in editor to avoid triggering file watcher
-        const currentLine = editor.getLine(task.line);
-        const taskIndent = getTaskIndent(currentLine);
+        const taskIndent = getTaskIndent(task);
 
         // Look for existing CLOSED line after the task
         const closedLineIndex = findDateLine(
@@ -1150,10 +1141,9 @@ export class TaskWriter {
         // Use Vault API for background edits
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
-          const currentLine = lines[task.line];
 
           // Get the proper indent including quote prefix, bullet, or checkbox marker
-          const taskIndent = getTaskIndent(currentLine);
+          const taskIndent = getTaskIndent(task);
 
           // Look for existing CLOSED line after the task
           const closedLineIndex = findDateLine(

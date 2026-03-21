@@ -3,6 +3,7 @@
  * Provides shared logic used across multiple services to avoid code duplication.
  */
 
+import { Task } from '../types/task';
 import { KeywordManager } from './keyword-manager';
 
 /**
@@ -44,13 +45,15 @@ export function findDateLine(
         .substring(quotePrefix.length)
         .trim();
       if (contentAfterQuotes.startsWith(keyword)) {
-        // For quoted lines, compare the quote prefix (not the whitespace indent)
-        const effectiveLineIndent = quotePrefix;
-        const effectiveTaskIndent =
-          taskIndent.match(/^(>\s*)+/)?.[1] ?? taskIndent;
+        // For quoted lines, ensure the quote level matches
+        // Any indent after the quote prefix is allowed
+        const lineQuotePrefix = quotePrefix;
+        // Extract quote prefix from task indent (including any leading whitespace before quotes)
+        const taskQuotePrefix = taskIndent.match(/(\s*(>\s*)+)/)?.[1] ?? '';
+        // Quote levels must match (or date line can be at deeper quote level)
         if (
-          effectiveLineIndent === effectiveTaskIndent ||
-          effectiveLineIndent.startsWith(effectiveTaskIndent)
+          taskQuotePrefix !== '' &&
+          lineQuotePrefix.startsWith(taskQuotePrefix)
         ) {
           return i;
         }
@@ -58,12 +61,11 @@ export function findDateLine(
     }
 
     // For regular lines, check if trimmed line starts with keyword
-    if (trimmedLine.startsWith(keyword)) {
-      // Verify indent matches (or is nested under task indent)
-      const lineIndent = line.substring(0, line.length - trimmedLine.length);
-      if (lineIndent === taskIndent || lineIndent.startsWith(taskIndent)) {
-        return i;
-      }
+    // Any indent level is allowed - no indent check needed
+    // But only if the task is NOT quoted (quote levels must match)
+    const taskHasQuotes = taskIndent.match(/(>\s*)+/)?.[0] ?? '';
+    if (taskHasQuotes === '' && trimmedLine.startsWith(keyword)) {
+      return i;
     }
 
     // Check if this is a task line (we should stop searching if we find one)
@@ -189,42 +191,18 @@ export function findDateLineWithParser(
 
 /**
  * Get the proper indent for date lines under a task.
- * Handles quote prefix, checkbox, bullet, and plain tasks.
+ * Uses the position of the task state keyword in the raw text to determine indent.
  *
- * @param line - The task line
+ * @param task - The task object
  * @returns The proper indent string for date lines
- *
- * @example
- * getTaskIndent('  - [ ] TODO task')
- * // Returns: '    ' (leading whitespace + 2 spaces)
- *
- * @example
- * getTaskIndent('> TODO task')
- * // Returns: '> '
- *
- * @example
- * getTaskIndent('  TODO task')
- * // Returns: '  '
  */
-export function getTaskIndent(line: string): string {
-  // Check for quote block tasks: > TODO task or > > TODO task
-  const quotePrefixMatch = line.match(/^(\s*)(>\s*)+/);
-  if (quotePrefixMatch) {
-    return quotePrefixMatch[0];
+export function getTaskIndent(task: Task): string {
+  const stateIndex = task.rawText.indexOf(task.state);
+  if (stateIndex === -1) {
+    // Fallback to leading whitespace if state not found
+    return task.rawText.match(/^(\s*)/)?.[1] ?? '';
   }
-
-  // Check for checkbox tasks: - [ ] TODO task
-  const checkboxMatch = line.match(/^(\s*)- \[([ xX])\] /);
-  if (checkboxMatch) {
-    return checkboxMatch[1] + '  ';
-  }
-
-  // Check for bulleted tasks: - TODO task or + TODO task or * TODO task
-  const bulletMatch = line.match(/^(\s*)([-*+])\s+(.*)/);
-  if (bulletMatch) {
-    return bulletMatch[1] + '  ';
-  }
-
-  // Regular task: just use whitespace indent
-  return line.match(/^(\s*)/)?.[1] ?? '';
+  const indent = task.rawText.substring(0, stateIndex);
+  // Replace any characters that are not '>' or whitespace with spaces
+  return indent.replace(/[^>\s]/g, ' ');
 }

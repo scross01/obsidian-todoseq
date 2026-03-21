@@ -653,7 +653,14 @@ export class EditorController {
   ): number | null {
     const totalLines = editor.lineCount();
     const taskLine = editor.getLine(taskLineNumber);
-    const taskIndent = getTaskIndent(taskLine);
+
+    // Parse the task to get its state and raw text for indent calculation
+    const vaultScanner = this.plugin.getVaultScanner();
+    const parser = vaultScanner?.getParser();
+    const task = parser?.parseLine(taskLine, taskLineNumber, '') ?? null;
+    const taskIndent = task
+      ? getTaskIndent(task)
+      : (taskLine.match(/^(\s*)/)?.[1] ?? '');
 
     // Build lines array from editor.getLine()
     const lines: string[] = [];
@@ -691,7 +698,14 @@ export class EditorController {
 
     const totalLines = editor.lineCount();
     const taskLine = editor.getLine(taskLineNumber);
-    const taskIndent = getTaskIndent(taskLine);
+
+    // Parse the task to get its state and raw text for indent calculation
+    const vaultScanner = this.plugin.getVaultScanner();
+    const parser = vaultScanner?.getParser();
+    const task = parser?.parseLine(taskLine, taskLineNumber, '') ?? null;
+    const taskIndent = task
+      ? getTaskIndent(task)
+      : (taskLine.match(/^(\s*)/)?.[1] ?? '');
 
     // Build lines array from editor.getLine()
     const lines: string[] = [];

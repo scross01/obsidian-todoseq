@@ -62,8 +62,7 @@ export class RecurrenceManager {
     parser: DateLineParser,
   ): RecurrenceUpdateResult {
     const lines = [...fileContent]; // Create a copy to avoid mutating input
-    const taskLine = lines[task.line];
-    const taskIndent = getTaskIndent(taskLine);
+    const taskIndent = getTaskIndent(task);
 
     const now = new Date();
     let newScheduledDate: Date | null = null;

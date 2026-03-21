@@ -689,7 +689,7 @@ describe('TaskWriter Instance Methods', () => {
       const updateFn = processCall[1];
       const result = updateFn('- [ ] TODO Task text');
       expect(result).toBe(
-        '- [ ] TODO Task text\n  SCHEDULED: <2026-03-10 Tue>',
+        '- [ ] TODO Task text\n      SCHEDULED: <2026-03-10 Tue>',
       );
     });
 
@@ -809,10 +809,10 @@ describe('TaskWriter Instance Methods', () => {
       const processCall = mockApp.vault.process.mock.calls[0];
       const updateFn = processCall[1];
       const result = updateFn(
-        '- [ ] TODO Task text\n  SCHEDULED: <2026-03-05 Thu>',
+        '- [ ] TODO Task text\n      SCHEDULED: <2026-03-05 Thu>',
       );
       expect(result).toBe(
-        '- [ ] TODO Task text\n  SCHEDULED: <2026-03-15 Sun>',
+        '- [ ] TODO Task text\n      SCHEDULED: <2026-03-15 Sun>',
       );
     });
   });
@@ -1024,7 +1024,8 @@ describe('TaskWriter Instance Methods', () => {
 
       const processCall = mockApp.vault.process.mock.calls[0];
       const updateFn = processCall[1];
-      const content = '- [x] DONE Task text\n  CLOSED: [2026-03-14 Sat 10:00]';
+      const content =
+        '- [x] DONE Task text\n      CLOSED: [2026-03-14 Sat 10:00]';
       const resultContent = updateFn(content);
       const closedCount = (resultContent.match(/CLOSED:/g) || []).length;
       expect(closedCount).toBe(1);
