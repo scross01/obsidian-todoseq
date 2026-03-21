@@ -1648,6 +1648,34 @@ export class ReaderViewFormatter {
       // Process date keywords in this paragraph
       this.processDateKeywordsInParagraph(paragraph);
     });
+
+    // Also process date lines inside task containers (e.g., when sub-bullets follow immediately)
+    // This handles cases like:
+    // - TODO task
+    //   SCHEDULED: <2026-03-20 Fri>
+    //   - TODO subtask
+    // where the SCHEDULED line is inside the todoseq-task span instead of a separate paragraph
+    const taskContainers = element.querySelectorAll('.todoseq-task');
+
+    taskContainers.forEach((taskContainer) => {
+      if (!(taskContainer instanceof HTMLElement)) {
+        return;
+      }
+
+      const text = taskContainer.textContent || '';
+
+      // Quick check: skip task containers without date keywords
+      if (
+        !text.includes('SCHEDULED:') &&
+        !text.includes('DEADLINE:') &&
+        !text.includes('CLOSED:')
+      ) {
+        return;
+      }
+
+      // Process date keywords in this task container
+      this.processDateKeywordsInElement(taskContainer);
+    });
   }
 
   /**
@@ -1823,6 +1851,54 @@ export class ReaderViewFormatter {
   ): { node: Text; index: number } | null {
     // Use a TreeWalker to find all text nodes, including nested ones
     const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+
+    let node;
+    while ((node = walker.nextNode())) {
+      const textContent = node.textContent || '';
+      if (textContent.includes(keyword)) {
+        return {
+          node: node as Text,
+          index: textContent.indexOf(keyword),
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Process SCHEDULED:, DEADLINE:, and CLOSED: keywords in any element
+   * Similar to processDateKeywordsInParagraph but works with any element type
+   */
+  private processDateKeywordsInElement(element: HTMLElement): void {
+    const dateKeywords = [
+      { keyword: 'SCHEDULED:', type: 'scheduled' as const },
+      { keyword: 'DEADLINE:', type: 'deadline' as const },
+      { keyword: 'CLOSED:', type: 'closed' as const },
+    ];
+
+    const text = element.textContent || '';
+
+    for (const { keyword, type } of dateKeywords) {
+      if (!text.includes(keyword)) continue;
+
+      // Find the text node containing this keyword
+      const result = this.findDateKeywordNodeInElement(element, keyword);
+      if (!result) continue;
+
+      const { node, index } = result;
+      this.wrapDateKeyword(node, index, keyword, type);
+    }
+  }
+
+  /**
+   * Find the text node containing a date keyword in any element
+   */
+  private findDateKeywordNodeInElement(
+    element: HTMLElement,
+    keyword: string,
+  ): { node: Text; index: number } | null {
+    // Use a TreeWalker to find all text nodes, including nested ones
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
 
     let node;
     while ((node = walker.nextNode())) {
