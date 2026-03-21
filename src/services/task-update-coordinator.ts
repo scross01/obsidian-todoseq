@@ -107,7 +107,6 @@ interface ProcessingContext {
 }
 
 export class TaskUpdateCoordinator {
-  private changeTracker: ChangeTracker;
   private recurrenceCoordinator: RecurrenceCoordinator;
   private recurrenceManager: RecurrenceManager;
   private urgencyCoefficients: UrgencyCoefficients = getDefaultCoefficients();
@@ -126,11 +125,8 @@ export class TaskUpdateCoordinator {
     private plugin: TodoTracker,
     private taskStateManager: TaskStateManager,
     private keywordManager: KeywordManager,
+    private changeTracker: ChangeTracker,
   ) {
-    this.changeTracker = new ChangeTracker({
-      defaultTimeoutMs: 5000,
-    });
-
     this.recurrenceManager = new RecurrenceManager(this.keywordManager);
 
     this.recurrenceCoordinator = new RecurrenceCoordinator(
@@ -884,6 +880,6 @@ export class TaskUpdateCoordinator {
    * Clean up resources.
    */
   destroy(): void {
-    this.changeTracker.destroy();
+    // ChangeTracker is now owned by main.ts and destroyed there
   }
 }

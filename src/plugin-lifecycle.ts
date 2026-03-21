@@ -17,6 +17,8 @@ import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
+import { TaskUpdateCoordinator } from './services/task-update-coordinator';
+import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 
 export class PluginLifecycleManager {
   private eventCoordinator: EventCoordinator | null = null;
@@ -60,7 +62,7 @@ export class PluginLifecycleManager {
       parserRegistry.register(orgModeParser);
     }
 
-    // VaultScanner - use shared KeywordManager from main.ts
+    // VaultScanner - use shared KeywordManager and ChangeTracker from main.ts
     this.plugin.vaultScanner = new VaultScanner(
       this.plugin,
       this.plugin.settings,
@@ -68,6 +70,7 @@ export class PluginLifecycleManager {
       urgencyCoefficients,
       this.plugin.keywordManager,
       parserRegistry,
+      this.plugin.changeTracker,
     );
 
     // Initialize property search engine after vault scanner
@@ -93,6 +96,20 @@ export class PluginLifecycleManager {
 
     // Expose EventCoordinator on plugin for other components
     this.plugin.eventCoordinator = this.eventCoordinator;
+
+    // Initialize task update coordinator with shared ChangeTracker
+    this.plugin.taskUpdateCoordinator = new TaskUpdateCoordinator(
+      this.plugin,
+      this.plugin.taskStateManager,
+      this.plugin.keywordManager,
+      this.plugin.changeTracker,
+    );
+
+    // Initialize embedded task list processor
+    this.plugin.embeddedTaskListProcessor = new TodoseqCodeBlockProcessor(
+      this.plugin,
+    );
+    this.plugin.embeddedTaskListProcessor.registerProcessor();
 
     this.plugin.taskEditor = new TaskWriter(
       this.plugin,
@@ -534,6 +551,11 @@ export class PluginLifecycleManager {
     );
     for (const leaf of leaves) {
       leaf.detach();
+    }
+
+    // Clean up embedded task list processor
+    if (this.plugin.embeddedTaskListProcessor) {
+      this.plugin.embeddedTaskListProcessor.cleanup();
     }
 
     // Clean up EventCoordinator (removes all vault event listeners)

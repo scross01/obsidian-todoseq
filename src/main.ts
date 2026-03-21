@@ -21,6 +21,7 @@ import { KeywordManager } from './utils/keyword-manager';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
+import { ChangeTracker } from './services/change-tracker';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -33,8 +34,11 @@ export default class TodoTracker extends Plugin {
   // Centralized keyword manager - single source of truth for keywords
   public keywordManager: KeywordManager;
 
-  // Centralized task update coordinator
-  public taskUpdateCoordinator: TaskUpdateCoordinator;
+  // Centralized change tracker - single source of truth for expected changes
+  public changeTracker: ChangeTracker;
+
+  // Centralized task update coordinator (created by PluginLifecycleManager)
+  public taskUpdateCoordinator: TaskUpdateCoordinator | null = null;
 
   // Managers for different functional areas
   public editorController: EditorController;
@@ -49,7 +53,7 @@ export default class TodoTracker extends Plugin {
   public statusBarManager: StatusBarManager | null = null;
   public readerViewFormatter: ReaderViewFormatter | null = null;
 
-  // Embedded task list processor
+  // Embedded task list processor (created by PluginLifecycleManager)
   public embeddedTaskListProcessor: TodoseqCodeBlockProcessor | null = null;
 
   // Property search engine
@@ -95,23 +99,17 @@ export default class TodoTracker extends Plugin {
     this.keywordManager = new KeywordManager(this.settings);
     this.taskStateManager = new TaskStateManager(this.keywordManager);
 
-    // Initialize task update coordinator
-    this.taskUpdateCoordinator = new TaskUpdateCoordinator(
-      this,
-      this.taskStateManager,
-      this.keywordManager,
-    );
+    // Initialize centralized change tracker
+    this.changeTracker = new ChangeTracker({
+      defaultTimeoutMs: 5000,
+    });
 
     // Initialize managers
     this.editorController = new EditorController(this, this.keywordManager);
     this.uiManager = new UIManager(this);
     this.lifecycleManager = new PluginLifecycleManager(this);
 
-    // Initialize embedded task list processor (now with settings loaded)
-    this.embeddedTaskListProcessor = new TodoseqCodeBlockProcessor(this);
-    this.embeddedTaskListProcessor.registerProcessor();
-
-    // Delegate to lifecycle manager (which initializes vaultScanner and readerViewFormatter)
+    // Delegate to lifecycle manager (which initializes taskUpdateCoordinator, vaultScanner, embeddedTaskListProcessor, and readerViewFormatter)
     await this.lifecycleManager.onload();
   }
 
@@ -131,17 +129,17 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called when the plugin is unloaded
   async onunload() {
-    // Clean up embedded task list processor
-    if (this.embeddedTaskListProcessor) {
-      this.embeddedTaskListProcessor.cleanup();
-    }
-
     // Clean up property search engine
     if (this.propertySearchEngine) {
       this.propertySearchEngine.destroy();
     }
 
-    // Delegate cleanup to lifecycle manager to centralize cleanup logic
+    // Clean up change tracker
+    if (this.changeTracker) {
+      this.changeTracker.destroy();
+    }
+
+    // Delegate cleanup to lifecycle manager (which now handles embedded task list processor)
     await this.lifecycleManager?.onunload();
   }
 
@@ -186,7 +184,7 @@ export default class TodoTracker extends Plugin {
         urgencyCoefficients,
       );
       // Sync urgency coefficients to TaskUpdateCoordinator
-      this.taskUpdateCoordinator.setUrgencyCoefficients(urgencyCoefficients);
+      this.taskUpdateCoordinator?.setUrgencyCoefficients(urgencyCoefficients);
     }
   }
 
@@ -224,7 +222,7 @@ export default class TodoTracker extends Plugin {
       );
 
       // Sync urgency coefficients to TaskUpdateCoordinator
-      this.taskUpdateCoordinator.setUrgencyCoefficients(urgencyCoefficients);
+      this.taskUpdateCoordinator?.setUrgencyCoefficients(urgencyCoefficients);
 
       // Sync KeywordManager reference from VaultScanner to main.ts
       this.keywordManager = this.vaultScanner.getKeywordManager();

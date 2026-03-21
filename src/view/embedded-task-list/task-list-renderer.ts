@@ -315,7 +315,7 @@ export class EmbeddedTaskListRenderer {
   ): Promise<void> {
     try {
       // Use TaskUpdateCoordinator for optimistic UI updates
-      await this.plugin.taskUpdateCoordinator.updateTaskScheduledDate(
+      await this.plugin.taskUpdateCoordinator?.updateTaskScheduledDate(
         task,
         date,
         repeat,
@@ -336,7 +336,7 @@ export class EmbeddedTaskListRenderer {
   ): Promise<void> {
     try {
       // Use TaskUpdateCoordinator for optimistic UI updates
-      await this.plugin.taskUpdateCoordinator.updateTaskDeadlineDate(
+      await this.plugin.taskUpdateCoordinator?.updateTaskDeadlineDate(
         task,
         date,
         repeat,

@@ -38,7 +38,6 @@ export class VaultScanner {
   private parserRegistry: ParserRegistry;
   private keywordManager: KeywordManager;
   private propertySearchEngine?: PropertySearchEngine;
-  private changeTracker: ChangeTracker;
   private skipIncrementalChanges = new Map<string, number>();
 
   constructor(
@@ -48,6 +47,7 @@ export class VaultScanner {
     urgencyCoefficients: UrgencyCoefficients,
     keywordManager: KeywordManager,
     parserRegistry: ParserRegistry,
+    private changeTracker: ChangeTracker,
   ) {
     this.keywordManager = keywordManager;
     this.parserRegistry = parserRegistry;
@@ -72,11 +72,6 @@ export class VaultScanner {
       // Fallback: load urgency coefficients on startup if not provided
       this.loadUrgencyCoefficients();
     }
-
-    // Initialize ChangeTracker with default options
-    this.changeTracker = new ChangeTracker({
-      defaultTimeoutMs: 5000,
-    });
   }
 
   /**
@@ -634,8 +629,5 @@ export class VaultScanner {
   destroy(): void {
     // Clear all event listeners
     this.eventListeners.clear();
-
-    // Clean up ChangeTracker to prevent open handles in tests
-    this.changeTracker.destroy();
   }
 }
