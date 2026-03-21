@@ -917,7 +917,7 @@ export class TaskUpdateCoordinator {
         if (checkbox) {
           checkbox.checked = isCompleted;
         }
-      } catch (error) {
+      } catch {
         // Silently fail if we can't find or update the checkbox
         // This is a visual enhancement, not critical functionality
       }

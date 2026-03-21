@@ -786,7 +786,7 @@ export class SearchEvaluator {
 
         // Check if the task's file is in the matching files
         return matchingFiles.has(task.path);
-      } catch (error) {
+      } catch {
         // Fall back to direct metadata access if PropertySearchEngine fails
       }
     }

@@ -1662,7 +1662,7 @@ export class TaskListView extends ItemView {
           .filter((result) => result.matches)
           .map((result) => result.task);
         this.searchError = null;
-      } catch (error) {
+      } catch {
         // If there's an error in parsing, fall back to simple search
         const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
         const searchText = this.isCaseSensitive
@@ -2130,12 +2130,12 @@ export class TaskListView extends ItemView {
             setPinned?: (pinned: boolean) => void;
           }
         ).setPinned?.(true);
-      } catch (_) {
+      } catch {
         /* ignore */
       }
       try {
         (targetLeaf as WorkspaceLeaf as { pinned?: boolean }).pinned = true;
-      } catch (_) {
+      } catch {
         /* ignore */
       }
     }
@@ -2166,7 +2166,7 @@ export class TaskListView extends ItemView {
           setEphemeralState?: (state: { line: number; col: number }) => void;
         }
       ).setEphemeralState?.({ line: task.line, col: lineContent.length });
-    } catch (_) {}
+    } catch {}
     editor.scrollIntoView({ from: pos, to: pos }, true);
 
     if (targetLeaf) {

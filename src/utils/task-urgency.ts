@@ -109,7 +109,7 @@ export async function parseUrgencyCoefficients(
 
     // If no custom file found, use default coefficients
     return { ...DEFAULT_URGENCY_COEFFICIENTS };
-  } catch (error) {
+  } catch {
     // Fallback to defaults on any error
     return { ...DEFAULT_URGENCY_COEFFICIENTS };
   }

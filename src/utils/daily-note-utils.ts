@@ -72,7 +72,7 @@ export function isDailyNotesPluginEnabledSync(app: App): boolean {
     const isEnabled = settings !== undefined;
     dailyNotesPluginEnabledCache = isEnabled;
     return isEnabled;
-  } catch (error) {
+  } catch {
     // Fallback: if there's any error, assume plugin is not available
     return false;
   }
@@ -131,7 +131,7 @@ export function isDailyNotesPluginEnabled(
       const isEnabled = settings !== undefined;
       dailyNotesPluginEnabledCache = isEnabled;
       return Promise.resolve(isEnabled);
-    } catch (fallbackError) {
+    } catch {
       dailyNotesPluginEnabledCache = false;
       return Promise.resolve(false);
     }

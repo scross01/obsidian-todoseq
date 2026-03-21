@@ -204,7 +204,7 @@ export class OrgModeTaskParser implements ITaskParser {
         const dailyNoteInfo = getDailyNoteInfo(this.app, file);
         isDailyNote = dailyNoteInfo.isDailyNote;
         dailyNoteDate = dailyNoteInfo.dailyNoteDate;
-      } catch (error) {
+      } catch {
         // If daily note detection fails, continue without it
       }
     }

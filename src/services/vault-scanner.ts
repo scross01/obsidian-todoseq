@@ -98,7 +98,7 @@ export class VaultScanner {
       this.urgencyCoefficients = await parseUrgencyCoefficients(
         this.plugin.app,
       );
-    } catch (error) {
+    } catch {
       // Failed to load urgency coefficients
       // Fallback to defaults handled in parseUrgencyCoefficients
     }
@@ -326,7 +326,7 @@ export class VaultScanner {
           return false;
         }
       });
-    } catch (error) {
+    } catch {
       // If we can't get the config, don't exclude anything
       return false;
     }

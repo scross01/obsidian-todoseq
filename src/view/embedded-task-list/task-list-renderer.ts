@@ -2103,7 +2103,7 @@ export class EmbeddedTaskListRenderer {
               line: task.line,
               col: lineContent.length,
             });
-          } catch (_) {
+          } catch {
             // Ignore if ephemeral state is not available
           }
 

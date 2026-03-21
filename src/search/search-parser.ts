@@ -21,7 +21,7 @@ export class SearchParser {
     try {
       this.parse(query);
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
