@@ -137,6 +137,16 @@ describe('Regular task parsing', () => {
       expect(task.text).toBe('task');
     });
 
+    test(`should handle task with only keyword and trailing spaces`, () => {
+      const line = `TODO `;
+      const tasks = parser.parseFile(line, 'test.md');
+
+      expect(tasks).toHaveLength(1);
+      const task = tasks[0];
+      expect(task.state).toBe('TODO');
+      expect(task.text).toBe('');
+    });
+
     test(`should match valid bullets`, () => {
       const lines = `
 - TODO task

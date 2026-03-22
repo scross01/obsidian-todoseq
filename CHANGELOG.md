@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.12.1
+
+- Fixed error when task line has no content causing task list to show no results for the affected page.
+- Fixed search filter from clicking task count in status bar not performing an exact file match.
+
 ## 0.12.0
 
 - Added task context menu with quick actions for priority, scheduled date, and copy/move tasks. #34

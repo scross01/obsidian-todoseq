@@ -327,7 +327,7 @@ export class TaskParser implements ITaskParser {
     const listMarker = ''; // Footnotes don't have list markers
     const footnoteMarker = m[1]; // Capture the footnote marker [^1]:
     const state = m[2];
-    const taskText = m[3];
+    const taskText = m[3] || '';
     const tail = '';
 
     return {
@@ -373,7 +373,7 @@ export class TaskParser implements ITaskParser {
     const indent = m[1] || '';
     const listMarker = (m[2] || '') + (m[3] || '');
     const state = m[4];
-    const taskText = m[5];
+    const taskText = m[5] || '';
     const tail = m[6] || '';
 
     // Extract quote nesting level

@@ -33,6 +33,16 @@ TODO task with %% embedded comment %% in the text
 
 ---
 
+**Ensure HTML formatting is stripped in task list**
+
+TODO task with embedded html <b>bold</b> <i>italic</i> <br/> <pre>code</pre> 
+**Ensure script tags are stripped in task list to prevent DOM injection**
+
+TODO task with attempted XSS script injection <script>alert(1)</script>
+TODO task with attempted XSS script injection <<script>alert(1)</script>
+
+---
+
 ```todoseq
 search: file:"Test Formatting"
 ```
