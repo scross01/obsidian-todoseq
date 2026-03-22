@@ -1,5 +1,7 @@
 # Change Log
 
+## 0.13.0-dev
+
 ## 0.12.1
 
 - Fixed error when task line has no content causing task list to show no results for the affected page.
