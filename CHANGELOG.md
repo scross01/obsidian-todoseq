@@ -1,8 +1,11 @@
 # Change Log
 
+## 0.13.0-dev
+
+
 ## 0.12.2
 
-- Added optional `show-scheduled-date:` and `show-deadline-date:` parameters to embedded task lists to control whether to show inline scheduled and deadline date badges on incomplete tasks. Defaults to `hide`.
+- Added optional `show-scheduled-date:` and `show-deadline-date:` parameters to embedded task lists to control whether to show inline scheduled and deadline date badges on incomplete tasks. Defaults to `hide`. #65
 
 ## 0.12.1
 
