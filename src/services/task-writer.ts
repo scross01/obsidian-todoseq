@@ -95,14 +95,17 @@ export class TaskWriter {
     } else if (isCheckbox) {
       // Generate markdown checkbox format with proper spacing
       // For archived states, preserve the existing checkbox state
-      // For other states, use the default logic (check if it's a completed state)
       const isArchived = keywordManagerInstance.isArchived(newState);
-      const isCompleted = keywordManagerInstance.isCompleted(newState);
-      const checkboxStatus = isArchived
-        ? currentCheckboxState
-        : isCompleted
-          ? 'x'
-          : ' ';
+
+      let checkboxStatus: string;
+      if (isArchived) {
+        // Preserve existing checkbox state for archived tasks
+        checkboxStatus = currentCheckboxState;
+      } else {
+        // Get the checkbox state character for the new state
+        checkboxStatus = keywordManagerInstance.getCheckboxState(newState);
+      }
+
       const textPart = task.text ? ` ${task.text}` : '';
       newLine = `${indentWithoutQuote}${quotePrefix}${currentListMarkerChar} [${checkboxStatus}] ${newState}${priorityPart}${textPart}`;
     } else {

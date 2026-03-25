@@ -116,7 +116,7 @@ describe('TaskWriter.generateTaskLine', () => {
         true,
         createTestKeywordManager(),
       );
-      expect(result.newLine).toBe('- [ ] DOING Task text');
+      expect(result.newLine).toBe('- [/] DOING Task text');
       expect(result.completed).toBe(false);
     });
 

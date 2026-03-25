@@ -244,6 +244,19 @@ export class KeywordManager {
     return new KeywordManager(settings).isInactive(keyword);
   }
 
+  /**
+   * Determine if a keyword indicates a canceled task
+   * @param keyword The task state keyword
+   * @param settings Settings object containing taskKeywordGroups
+   * @returns True if the keyword is CANCELED or CANCELLED
+   */
+  static isCanceledKeyword(
+    keyword: string,
+    settings: KeywordSettings,
+  ): boolean {
+    return new KeywordManager(settings).isCanceled(keyword);
+  }
+
   private static normalizeKeyword(value: string): string {
     return value.trim().toUpperCase();
   }
@@ -585,6 +598,10 @@ export class KeywordManager {
     return this.resolution.setByGroup.archivedKeywords.has(keyword);
   }
 
+  isCanceled(keyword: string): boolean {
+    return keyword === 'CANCELED' || keyword === 'CANCELLED';
+  }
+
   getGroup(keyword: string): KeywordGroup | null {
     if (this.resolution.setByGroup.inactiveKeywords.has(keyword)) {
       return 'inactiveKeywords';
@@ -627,6 +644,10 @@ export class KeywordManager {
 
   getArchivedSet(): Set<string> {
     return new Set(this.resolution.orderedByGroup.archivedKeywords);
+  }
+
+  getCanceledSet(): Set<string> {
+    return new Set(['CANCELED', 'CANCELLED']);
   }
 
   getCustomCompletedSet(): Set<string> {
@@ -761,5 +782,37 @@ export class KeywordManager {
       return preferredDefault;
     }
     return keywords[0];
+  }
+
+  /**
+   * Get the checkbox state character for a task keyword.
+   * Returns the markdown checkbox state character (' ', 'x', '/', or '-') for the given keyword.
+   * Uses the instance's resolution (built with settings) to determine the state.
+   *
+   * @param keyword - The task keyword to get the checkbox state for
+   * @returns The checkbox state character: ' ' for inactive/waiting, 'x' for completed, '/' for active, '-' for canceled
+   */
+  getCheckboxState(keyword: string): string {
+    if (this.isCanceled(keyword)) {
+      return '-';
+    } else if (this.isCompleted(keyword)) {
+      return 'x';
+    } else if (this.isActive(keyword)) {
+      return '/';
+    } else {
+      return ' ';
+    }
+  }
+
+  /**
+   * Get the checkbox state character for a task keyword (static wrapper).
+   * Returns the markdown checkbox state character (' ', 'x', '/', or '-') for the given keyword.
+   *
+   * @param keyword - The task keyword to get the checkbox state for
+   * @param settings - Plugin settings (for building KeywordManager instance)
+   * @returns The checkbox state character: ' ' for inactive/waiting, 'x' for completed, '/' for active, '-' for canceled
+   */
+  static getCheckboxState(keyword: string, settings: KeywordSettings): string {
+    return new KeywordManager(settings).getCheckboxState(keyword);
   }
 }

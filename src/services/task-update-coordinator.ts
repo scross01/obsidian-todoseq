@@ -552,7 +552,10 @@ export class TaskUpdateCoordinator {
         this.handleRecurrence(updatedTask, context);
 
         // Update editor checkbox visual state after markdown has been updated
-        this.performDirectEditorCheckboxUpdate(updatedTask, context.newState);
+        // Only for editor updates to prevent Obsidian's re-render from overriding checkbox state
+        if (context.source === 'editor') {
+          this.performDirectEditorCheckboxUpdate(updatedTask, context.newState);
+        }
       }
     };
 
@@ -877,6 +880,13 @@ export class TaskUpdateCoordinator {
       newState,
       this.plugin.settings,
     );
+
+    // Get the checkbox state character for the new state
+    const newCheckboxState = KeywordManager.getCheckboxState(
+      newState,
+      this.plugin.settings,
+    );
+
     const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
 
     if (!view || !view.file || view.file.path !== task.path) {
@@ -888,7 +898,7 @@ export class TaskUpdateCoordinator {
       return;
     }
 
-    // Use requestAnimationFrame to ensure CodeMirror has finished re-rendering
+    // Use requestAnimationFrame to wait for Obsidian's re-render to complete
     requestAnimationFrame(() => {
       try {
         // Find the line element by line number
@@ -915,7 +925,19 @@ export class TaskUpdateCoordinator {
         ) as HTMLInputElement;
 
         if (checkbox) {
-          checkbox.checked = isCompleted;
+          // Only update if the checkbox doesn't already match the expected state
+          // This prevents double refresh when Obsidian has already set the correct state
+          const currentCheckboxState = checkbox.getAttribute('data-task');
+          const currentStateMatches =
+            currentCheckboxState === newCheckboxState &&
+            checkbox.checked === isCompleted;
+
+          if (!currentStateMatches) {
+            // Update checkbox to match the new state
+            checkbox.checked = isCompleted;
+            // Update data-task attribute to match the new checkbox state (Obsidian's checkbox metadata)
+            checkbox.setAttribute('data-task', newCheckboxState);
+          }
         }
       } catch {
         // Silently fail if we can't find or update the checkbox
