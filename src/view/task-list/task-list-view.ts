@@ -22,6 +22,7 @@ import { TaskStateManager } from '../../services/task-state-manager';
 import { TaskElementCache } from './task-element-cache';
 import { ChunkedRenderQueue } from './chunked-render-queue';
 import { TaskItemRenderer } from './task-item-renderer';
+import { TaskDragDropHandler } from './task-drag-drop';
 import {
   TaskListFilter,
   TaskListViewMode,
@@ -76,6 +77,9 @@ export class TaskListView extends ItemView {
 
   // Task item renderer for single task DOM elements
   private taskItemRenderer: TaskItemRenderer;
+
+  // Drag-and-drop handler for task items
+  private taskDragDropHandler: TaskDragDropHandler | null = null;
 
   // Search history debounce mechanism
   private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
@@ -1967,6 +1971,17 @@ export class TaskListView extends ItemView {
     // Set up ResizeObserver to detect when panel becomes visible from collapsed
     this.setupVisibilityObserver();
 
+    // Initialize drag-and-drop handler for task items
+    this.taskDragDropHandler = new TaskDragDropHandler(
+      this.app,
+      this.plugin,
+      container,
+    );
+    this.taskDragDropHandler.initialize({
+      onGetTask: (path: string, line: number) =>
+        this.tasks.find((t) => t.path === path && t.line === line),
+    });
+
     // Keyboard shortcuts: Slash to focus search, Esc to clear
     const input: HTMLInputElement | null = this.searchInputEl ?? null;
     const keyHandler = async (evt: KeyboardEvent) => {
@@ -2326,6 +2341,12 @@ export class TaskListView extends ItemView {
     // Cleanup task context menu
     if (this.taskContextMenu) {
       this.taskContextMenu.cleanup();
+    }
+
+    // Cleanup drag-and-drop handler
+    if (this.taskDragDropHandler) {
+      this.taskDragDropHandler.destroy();
+      this.taskDragDropHandler = null;
     }
 
     // Unsubscribe from state manager

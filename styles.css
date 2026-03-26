@@ -50,6 +50,17 @@
   contain-intrinsic-size: 0 100px;
 }
 
+/* Drag-and-drop */
+.todoseq-panel .todoseq-task-item[draggable='true'] {
+  cursor: grab;
+}
+.todoseq-panel .todoseq-task-item[draggable='true']:active {
+  cursor: grabbing;
+}
+.todoseq-panel .todoseq-task-dragging {
+  opacity: 0.4;
+}
+
 /* Task text and completion state */
 .todoseq-panel .todoseq-task-text {
   line-height: var(--line-height-tight, 1.4);

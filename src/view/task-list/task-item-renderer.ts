@@ -466,6 +466,7 @@ export class TaskItemRenderer {
     li.setAttribute('data-path', task.path);
     li.setAttribute('data-line', String(task.line));
     li.setAttribute('data-raw-text', task.rawText);
+    li.draggable = true;
 
     // Create a flex container for checkbox + text + indicator (all on same row)
     const mainContent = li.createEl('div', { cls: 'todo-main-content' });
@@ -520,6 +521,9 @@ export class TaskItemRenderer {
    * Update an existing DOM element with new task data (for smart diff)
    */
   updateTaskElementContent(task: Task, element: HTMLLIElement): void {
+    // Ensure draggable is set for reused elements
+    element.draggable = true;
+
     // 1. Update checkbox
     const checkbox = element.querySelector(
       'input.todoseq-task-checkbox',
