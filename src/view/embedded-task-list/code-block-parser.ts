@@ -40,6 +40,8 @@ export interface TodoseqParameters {
   showQuery?: boolean;
   wrapContent?: boolean | 'dynamic';
   collapse?: boolean;
+  showScheduledDate?: boolean;
+  showDeadlineDate?: boolean;
   error?: string;
 }
 
@@ -78,6 +80,8 @@ export class TodoseqCodeBlockParser {
       let showQuery: boolean | undefined;
       let wrapContent: boolean | 'dynamic' | undefined;
       let collapse: boolean | undefined;
+      let showScheduledDate: boolean | undefined;
+      let showDeadlineDate: boolean | undefined;
 
       // Parse each line for parameters
       for (const line of lines) {
@@ -269,6 +273,34 @@ export class TodoseqCodeBlockParser {
               `Invalid collapse option: ${collapseValue}. Valid options: true, false`,
             );
           }
+        } else if (trimmed.startsWith('show-scheduled-date:')) {
+          const value = trimmed
+            .substring('show-scheduled-date:'.length)
+            .trim()
+            .toLowerCase();
+          if (value === 'false' || value === 'hide') {
+            showScheduledDate = false;
+          } else if (value === 'true' || value === 'show') {
+            showScheduledDate = true;
+          } else {
+            throw new Error(
+              `Invalid show-scheduled-date option: ${value}. Valid options: true, false, show, hide`,
+            );
+          }
+        } else if (trimmed.startsWith('show-deadline-date:')) {
+          const value = trimmed
+            .substring('show-deadline-date:'.length)
+            .trim()
+            .toLowerCase();
+          if (value === 'false' || value === 'hide') {
+            showDeadlineDate = false;
+          } else if (value === 'true' || value === 'show') {
+            showDeadlineDate = true;
+          } else {
+            throw new Error(
+              `Invalid show-deadline-date option: ${value}. Valid options: true, false, show, hide`,
+            );
+          }
         }
       }
 
@@ -302,6 +334,8 @@ export class TodoseqCodeBlockParser {
         showQuery,
         wrapContent,
         collapse,
+        showScheduledDate,
+        showDeadlineDate,
       };
     } catch (error) {
       const errorMessage =
@@ -316,6 +350,8 @@ export class TodoseqCodeBlockParser {
         showQuery: undefined,
         wrapContent: undefined,
         collapse: undefined,
+        showScheduledDate: undefined,
+        showDeadlineDate: undefined,
       };
     }
   }

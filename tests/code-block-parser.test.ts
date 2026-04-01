@@ -61,6 +61,81 @@ collapse: true`;
       expect(params.future).toBe('hide');
     });
 
+    it('should parse show-scheduled-date option', () => {
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-scheduled-date: true',
+        ).showScheduledDate,
+      ).toBe(true);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-scheduled-date: show',
+        ).showScheduledDate,
+      ).toBe(true);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-scheduled-date: false',
+        ).showScheduledDate,
+      ).toBe(false);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-scheduled-date: hide',
+        ).showScheduledDate,
+      ).toBe(false);
+      expect(
+        TodoseqCodeBlockParser.parse('search: tag:test').showScheduledDate,
+      ).toBeUndefined();
+    });
+
+    it('should parse show-deadline-date option', () => {
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-deadline-date: true',
+        ).showDeadlineDate,
+      ).toBe(true);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-deadline-date: show',
+        ).showDeadlineDate,
+      ).toBe(true);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-deadline-date: false',
+        ).showDeadlineDate,
+      ).toBe(false);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-deadline-date: hide',
+        ).showDeadlineDate,
+      ).toBe(false);
+      expect(
+        TodoseqCodeBlockParser.parse('search: tag:test').showDeadlineDate,
+      ).toBeUndefined();
+    });
+
+    it('should reject invalid show-scheduled-date values', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n show-scheduled-date: yes',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('should reject invalid show-deadline-date values', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n show-deadline-date: yes',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('should parse both date display options together', () => {
+      const source =
+        'search: tag:test\n show-scheduled-date: true\n show-deadline-date: show';
+      const params = TodoseqCodeBlockParser.parse(source);
+      expect(params.showScheduledDate).toBe(true);
+      expect(params.showDeadlineDate).toBe(true);
+      expect(params.error).toBeUndefined();
+    });
+
     it('should validate collapse option requirements', () => {
       // Should NOT throw error when collapse=true without title or showQuery (showQuery is undefined)
       const source = 'search: tag:test\n collapse: true';

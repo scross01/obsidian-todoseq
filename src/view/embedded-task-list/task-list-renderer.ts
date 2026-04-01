@@ -1244,6 +1244,81 @@ export class EmbeddedTaskListRenderer {
     return DateUtils.getDateOnly(date);
   }
 
+  private buildDateBadge(
+    date: Date,
+    iconName: 'calendar' | 'calendar-clock' | 'calendar-range' | 'target',
+    parent: HTMLElement,
+  ): void {
+    const badge = parent.createEl('span', {
+      cls: 'todoseq-embedded-task-date-badge',
+    });
+    setIcon(badge, iconName);
+    const svg = badge.querySelector('svg');
+    if (svg) {
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+    }
+    badge.createSpan({
+      text: DateUtils.formatDateForDisplay(date),
+    });
+  }
+
+  private buildDateInfoRow(
+    label: string,
+    date: Date,
+    parent: HTMLElement,
+    extraCls?: string,
+  ): void {
+    const row = parent.createEl('div', {
+      cls: 'todoseq-embedded-task-date-info' + (extraCls ? ` ${extraCls}` : ''),
+    });
+    row.createSpan({
+      cls: 'todoseq-embedded-task-date-info-label',
+      text: `${label}: `,
+    });
+    row.createSpan({
+      cls: 'todoseq-embedded-task-date-info-value',
+      text: DateUtils.formatDateForDisplay(date),
+    });
+  }
+
+  private buildInlineDateBadge(
+    task: Task,
+    params: TodoseqParameters,
+    parent: HTMLElement,
+  ): void {
+    if (task.completed) return;
+    const showScheduled = params.showScheduledDate === true;
+    const showDeadline = params.showDeadlineDate === true;
+    if (!showScheduled && !showDeadline) return;
+
+    if (showScheduled && task.scheduledDate) {
+      this.buildDateBadge(task.scheduledDate, 'calendar', parent);
+    }
+    if (showDeadline && task.deadlineDate) {
+      this.buildDateBadge(task.deadlineDate, 'target', parent);
+    }
+  }
+
+  private buildWrapDateInfoRows(
+    task: Task,
+    params: TodoseqParameters,
+    parent: HTMLElement,
+    extraCls?: string,
+  ): void {
+    if (task.completed) return;
+    const showScheduled = params.showScheduledDate === true;
+    const showDeadline = params.showDeadlineDate === true;
+    if (!showScheduled && !showDeadline) return;
+
+    if (showScheduled && task.scheduledDate) {
+      this.buildDateInfoRow('Scheduled', task.scheduledDate, parent, extraCls);
+    }
+    if (showDeadline && task.deadlineDate) {
+      this.buildDateInfoRow('Deadline', task.deadlineDate, parent, extraCls);
+    }
+  }
+
   /**
    * Build repeat icon element for a task (only the icon, no date labels/values)
    * Shows the repeat icon at the end of the task details line
@@ -1468,6 +1543,9 @@ export class EmbeddedTaskListRenderer {
       // Append text row to content wrapper
       contentWrapper.appendChild(textRow);
 
+      // Add date info rows for wrap mode (both dates on separate lines)
+      this.buildWrapDateInfoRows(task, params, contentWrapper);
+
       // Handle file info and urgency display
       const urgencyValue = task.urgency;
       const showUrgency =
@@ -1554,8 +1632,19 @@ export class EmbeddedTaskListRenderer {
         textRow.appendChild(floatingIndicators);
       }
 
+      // Add inline date badge for dynamic mode (visible on wide screens)
+      this.buildInlineDateBadge(task, params, textContainer);
+
       // Append text row to content wrapper
       contentWrapper.appendChild(textRow);
+
+      // Add date info rows for dynamic mode wrap layout (visible on narrow screens)
+      this.buildWrapDateInfoRows(
+        task,
+        params,
+        contentWrapper,
+        'todoseq-embedded-task-date-info-dynamic-wrap',
+      );
 
       // Handle file info and urgency display
       const urgencyValue = task.urgency;
@@ -1701,6 +1790,9 @@ export class EmbeddedTaskListRenderer {
         );
         textContainer.appendChild(subtaskSpan);
       }
+
+      // Add inline date badge before repeat icon
+      this.buildInlineDateBadge(task, params, textContainer);
 
       // Add repeat icon only (no date labels/values) at the end of task details
       // Shows after subtask count if present

@@ -137,8 +137,8 @@
   color: var(--text-on-accent);
   font-weight: var(--font-medium);
   font-size: 0.7rem;
-  line-height: 1.6;
-  vertical-align: baseline;
+  line-height: 1.3;
+  vertical-align: middle;
 }
 
 .todoseq-panel .todoseq-priority-badge {
@@ -334,7 +334,7 @@
   color: var(--text-muted);
   font-size: 0.75rem;
   flex-shrink: 0;
-  align-self: baseline;
+  align-self: center;
 }
 
 .todoseq-panel .todoseq-subtask-indicator {
@@ -639,15 +639,14 @@
 .todoseq-embedded-task-text-container {
   flex: 1;
   display: flex;
-  align-items: baseline;
-  min-width: 0; /* Allow text to truncate */
-  font-size: 0; /* prevent ghost gap */
+  align-items: center;
+  min-width: 0;
 }
 
 /* Ensure all direct children are baseline aligned */
 .todoseq-embedded-task-text-container > * {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
 }
 
 /* Task text needs block-like behavior for ellipsis */
@@ -698,6 +697,49 @@
   display: inline;
 }
 
+/* Inline date badge (truncated mode and dynamic wide screens) */
+.todoseq-embedded-task-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.todoseq-embedded-task-date-badge svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+/* Wrap mode date info rows */
+.todoseq-embedded-task-date-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.todoseq-embedded-task-date-info-label {
+  font-weight: var(--font-medium);
+}
+
+.todoseq-embedded-task-date-info-value {
+  font-weight: var(--font-normal);
+}
+
+/* Dynamic mode: date info rows hidden on wide screens, shown on narrow */
+.todoseq-embedded-task-item-wrap-dynamic
+  .todoseq-embedded-task-date-info-dynamic-wrap {
+  display: none;
+}
+
+/* Dynamic mode: inline date badge shown on wide screens */
+.todoseq-embedded-task-text-wrap-dynamic .todoseq-embedded-task-date-badge {
+  display: inline-flex;
+}
+
 /* ============================================================================
    Wrap Content Mode - Task text wrapping and file info on new row
    ============================================================================ */
@@ -724,7 +766,7 @@
 /* Text row - holds text and floating indicators side by side */
 .todoseq-embedded-task-text-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: flex-start;
   gap: var(--size-4-2);
   min-width: 0;
@@ -832,7 +874,7 @@
   display: flex;
   min-width: 0;
   flex: 1;
-  align-items: baseline;
+  align-items: center;
   overflow: hidden;
 }
 
@@ -948,6 +990,17 @@
   .todoseq-embedded-task-item-wrap-dynamic .todoseq-embedded-task-urgency {
     display: none;
   }
+
+  /* Dynamic mode - show date info rows on narrow screens */
+  .todoseq-embedded-task-item-wrap-dynamic
+    .todoseq-embedded-task-date-info-dynamic-wrap {
+    display: block;
+  }
+
+  /* Dynamic mode - hide inline date badge on narrow screens */
+  .todoseq-embedded-task-text-wrap-dynamic .todoseq-embedded-task-date-badge {
+    display: none;
+  }
 }
 
 /* ============================================================================
@@ -973,7 +1026,7 @@
 /* Dynamic mode - floating indicators position depends on viewport */
 .todoseq-embedded-task-item-wrap-dynamic
   .todoseq-embedded-task-floating-indicators {
-  align-self: baseline;
+  align-self: center;
 }
 
 /* Ensure subtask indicator in floating div has correct styling */

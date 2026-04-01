@@ -30,6 +30,8 @@ Using the following parameters within the `todoseq` code block you define which 
 - `show-future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Controls how future-dated tasks are displayed. Defaults to `show-all`. (`future:` is an alternative alias)
 - `show-query:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `show`
 - `wrap-content:` (optional) `true`, `false`, `wrap`, `truncate`, or `dynamic`. Controls whether task text wraps to multiple lines or truncates with ellipsis. Defaults to `dynamic` (responsive - truncates on wide screens, wraps on mobile). When wrap is enabled, file info moves to a new row with full filename
+- `show-scheduled-date:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show inline scheduled date badges on incomplete tasks. Defaults to `hide`
+- `show-deadline-date:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show inline deadline date badges on incomplete tasks. Defaults to `hide`
 - `collapse:` (optional) `true` or `false`. When enabled, the task list is collapsible with a chevron toggle. Defaults to `false`. Requires either `title:` to be set OR `show-query: true`
 
 Example:
@@ -204,6 +206,38 @@ wrap-content: false
 ```
 ````
 
+### Show Scheduled Date
+
+The `show-scheduled-date:` parameter controls whether an inline scheduled date badge is displayed on incomplete tasks:
+
+- `true` or `show` - Show scheduled date badges
+- `false` or `hide` - Hide scheduled date badges (default)
+
+````txt
+```todoseq
+search: tag:project1
+show-scheduled-date: true
+```
+````
+
+When enabled, a calendar icon with the scheduled date appears inline after the task text. In truncated mode, the badge is shown inline; in wrap mode, a "Scheduled: date" row appears below the task text. Both scheduled and deadline can be shown simultaneously — when a task has both dates, only the earliest date badge is shown inline.
+
+### Show Deadline Date
+
+The `show-deadline-date:` parameter controls whether an inline deadline date badge is displayed on incomplete tasks:
+
+- `true` or `show` - Show deadline date badges
+- `false` or `hide` - Hide deadline date badges (default)
+
+````txt
+```todoseq
+search: priority:high
+show-deadline-date: true
+```
+````
+
+When enabled, a calendar icon with the deadline date appears inline after the task text. In truncated mode, the badge is shown inline; in wrap mode, a "Deadline: date" row appears below the task text. Both scheduled and deadline can be shown simultaneously — when a task has both dates, only the earliest date badge is shown inline.
+
 ### Collapsible Task Lists
 
 The `collapse:` parameter makes the task list collapsible, allowing you to save space in your notes:
@@ -235,6 +269,8 @@ sort: priority
 show-completed: hide
 show-future: show-all
 show-file: false
+show-scheduled-date: true
+show-deadline-date: true
 limit: 10
 ```
 ````

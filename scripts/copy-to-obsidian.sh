@@ -4,7 +4,7 @@
 
 # Get the absolute path of the workspace
 WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PLUGIN_DIR="$HOME/Development/todoseq/.obsidian/plugins/todoseq"
+PLUGIN_DIR="$WORKSPACE_DIR/.obsidian/plugins/todoseq"
 
 # Create plugin directory if it doesn't exist
 mkdir -p "$PLUGIN_DIR"

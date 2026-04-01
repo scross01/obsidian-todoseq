@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.12.2
+
+- Added optional `show-scheduled-date:` and `show-deadline-date:` parameters to embedded task lists to control whether to show inline scheduled and deadline date badges on incomplete tasks. Defaults to `hide`.
+
 ## 0.12.1
 
 - Fixed error when task line has no content causing task list to show no results for the affected page.
