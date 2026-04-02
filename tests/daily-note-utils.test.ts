@@ -1,6 +1,8 @@
 import { App, TFile } from 'obsidian';
 import { getDailyNoteInfo } from '../src/utils/daily-note-utils';
+import { formatTaskLines } from '../src/utils/task-format';
 import { getDateFromFile } from 'obsidian-daily-notes-interface';
+import { Task, DateRepeatInfo } from '../src/types/task';
 
 // Mock the external module
 jest.mock('obsidian-daily-notes-interface', () => ({
@@ -156,6 +158,144 @@ describe('daily-note-utils', () => {
       expect(getDateFromFile).toHaveBeenCalledWith(mockFile, 'day');
       expect(result.isDailyNote).toBe(true);
       expect(result.dailyNoteDate).toEqual(mockDate);
+    });
+  });
+
+  describe('formatTaskLines', () => {
+    function makeTask(overrides: Partial<Task> = {}): Task {
+      return {
+        path: 'test.md',
+        line: 0,
+        rawText: 'TODO test task',
+        indent: '',
+        listMarker: '',
+        text: 'test task',
+        state: 'TODO',
+        completed: false,
+        priority: null,
+        scheduledDate: null,
+        scheduledDateRepeat: null,
+        deadlineDate: null,
+        deadlineDateRepeat: null,
+        closedDate: null,
+        urgency: null,
+        isDailyNote: false,
+        dailyNoteDate: null,
+        subtaskCount: 0,
+        subtaskCompletedCount: 0,
+        ...overrides,
+      };
+    }
+
+    it('formats a simple task with no dates', () => {
+      const task = makeTask();
+      expect(formatTaskLines(task)).toEqual(['TODO test task']);
+    });
+
+    it('formats a task with priority', () => {
+      const task = makeTask({ priority: 'high' });
+      expect(formatTaskLines(task)).toEqual(['TODO [#A] test task']);
+    });
+
+    it('formats a task with scheduled date', () => {
+      const task = makeTask({
+        scheduledDate: new Date(2026, 3, 2),
+      });
+      const result = formatTaskLines(task);
+      expect(result).toEqual(['TODO test task', 'SCHEDULED: <2026-04-02 Thu>']);
+    });
+
+    it('formats a task with deadline date', () => {
+      const task = makeTask({
+        deadlineDate: new Date(2026, 3, 3),
+      });
+      const result = formatTaskLines(task);
+      expect(result).toEqual(['TODO test task', 'DEADLINE: <2026-04-03 Fri>']);
+    });
+
+    it('formats a task with both scheduled and deadline dates', () => {
+      const task = makeTask({
+        scheduledDate: new Date(2026, 3, 2),
+        deadlineDate: new Date(2026, 3, 3),
+      });
+      const result = formatTaskLines(task);
+      expect(result).toEqual([
+        'TODO test task',
+        'SCHEDULED: <2026-04-02 Thu>',
+        'DEADLINE: <2026-04-03 Fri>',
+      ]);
+    });
+
+    it('includes scheduled date repeat modifier', () => {
+      const repeat: DateRepeatInfo = {
+        type: '.+',
+        unit: 'd',
+        value: 1,
+        raw: '.+1d',
+      };
+      const task = makeTask({
+        scheduledDate: new Date(2026, 3, 2),
+        scheduledDateRepeat: repeat,
+      });
+      const result = formatTaskLines(task);
+      expect(result).toEqual([
+        'TODO test task',
+        'SCHEDULED: <2026-04-02 Thu .+1d>',
+      ]);
+    });
+
+    it('includes deadline date repeat modifier', () => {
+      const repeat: DateRepeatInfo = {
+        type: '++',
+        unit: 'w',
+        value: 2,
+        raw: '++2w',
+      };
+      const task = makeTask({
+        deadlineDate: new Date(2026, 3, 3),
+        deadlineDateRepeat: repeat,
+      });
+      const result = formatTaskLines(task);
+      expect(result).toEqual([
+        'TODO test task',
+        'DEADLINE: <2026-04-03 Fri ++2w>',
+      ]);
+    });
+
+    it('includes both scheduled and deadline repeat modifiers', () => {
+      const schedRepeat: DateRepeatInfo = {
+        type: '+',
+        unit: 'm',
+        value: 1,
+        raw: '+1m',
+      };
+      const dlRepeat: DateRepeatInfo = {
+        type: '.+',
+        unit: 'd',
+        value: 3,
+        raw: '.+3d',
+      };
+      const task = makeTask({
+        scheduledDate: new Date(2026, 3, 2),
+        scheduledDateRepeat: schedRepeat,
+        deadlineDate: new Date(2026, 3, 3),
+        deadlineDateRepeat: dlRepeat,
+      });
+      const result = formatTaskLines(task);
+      expect(result).toEqual([
+        'TODO test task',
+        'SCHEDULED: <2026-04-02 Thu +1m>',
+        'DEADLINE: <2026-04-03 Fri .+3d>',
+      ]);
+    });
+
+    it('formats date without repeat when repeat is null', () => {
+      const task = makeTask({
+        scheduledDate: new Date(2026, 3, 2),
+        scheduledDateRepeat: null,
+      });
+      const result = formatTaskLines(task);
+      expect(result).toEqual(['TODO test task', 'SCHEDULED: <2026-04-02 Thu>']);
     });
   });
 });

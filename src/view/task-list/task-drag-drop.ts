@@ -1,7 +1,8 @@
 import { App, Notice, TFile, MarkdownView, Editor } from 'obsidian';
+import { EditorView } from '@codemirror/view';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
-import { formatTaskForDailyNote } from '../../utils/daily-note-utils';
+import { formatTaskLines } from '../../utils/task-format';
 import { CHECKBOX_DETECTION_REGEX } from '../../utils/patterns';
 
 export interface TaskDragDropCallbacks {
@@ -15,6 +16,14 @@ export function getDropAction(
 ): 'copy' | 'move' | 'migrate' {
   if (ctrlKey || metaKey) return 'move';
   if (shiftKey) return 'migrate';
+  return 'copy';
+}
+
+export function getDropEffect(
+  action: 'copy' | 'move' | 'migrate',
+): 'copy' | 'move' | 'link' {
+  if (action === 'migrate') return 'link';
+  if (action === 'move') return 'move';
   return 'copy';
 }
 
@@ -124,6 +133,7 @@ export class TaskDragDropHandler {
   private containerEl: HTMLElement;
   private callbacks: TaskDragDropCallbacks | null = null;
   private editorDropRef: ReturnType<App['workspace']['on']> | null = null;
+  private dragoverHandler: ((evt: DragEvent) => void) | null = null;
   private draggedTask: Task | null = null;
 
   constructor(app: App, plugin: TodoTracker, containerEl: HTMLElement) {
@@ -150,10 +160,13 @@ export class TaskDragDropHandler {
 
     if (evt.dataTransfer) {
       evt.dataTransfer.setData('text/plain', task.state + ' ' + task.text);
-      evt.dataTransfer.effectAllowed = 'copyMove';
+      evt.dataTransfer.effectAllowed = 'all';
     }
 
     target.addClass('todoseq-task-dragging');
+
+    this.dragoverHandler = this.onDragOver;
+    document.addEventListener('dragover', this.dragoverHandler, true);
   };
 
   private onDragEnd = (evt: DragEvent): void => {
@@ -161,8 +174,24 @@ export class TaskDragDropHandler {
     if (target instanceof HTMLElement) {
       target.removeClass('todoseq-task-dragging');
     }
+    this.removeDragoverListener();
     this.draggedTask = null;
   };
+
+  private onDragOver = (evt: DragEvent): void => {
+    if (!this.draggedTask) return;
+    if (!evt.dataTransfer) return;
+    const action = getDropAction(evt.ctrlKey, evt.metaKey, evt.shiftKey);
+    evt.dataTransfer.dropEffect = getDropEffect(action);
+    evt.preventDefault();
+  };
+
+  private removeDragoverListener(): void {
+    if (this.dragoverHandler) {
+      document.removeEventListener('dragover', this.dragoverHandler, true);
+      this.dragoverHandler = null;
+    }
+  }
 
   private onEditorDrop = (
     evt: DragEvent,
@@ -198,7 +227,17 @@ export class TaskDragDropHandler {
 
     const isSourceMode = mdView?.getMode() === 'source';
 
-    void this.executeDrop(task, editor, targetFile, isSourceMode, action);
+    const dropPos =
+      mdView && isSourceMode ? this.getDropPosition(mdView, evt) : undefined;
+
+    void this.executeDrop(
+      task,
+      editor,
+      targetFile,
+      isSourceMode,
+      action,
+      dropPos,
+    );
     this.showActionNotice(action);
   };
 
@@ -208,13 +247,14 @@ export class TaskDragDropHandler {
     targetFile: TFile,
     isSourceMode: boolean | undefined,
     action: 'copy' | 'move' | 'migrate',
+    dropPos?: { line: number; ch: number } | null,
   ): Promise<void> {
-    const taskLines = formatTaskForDailyNote(task);
+    const taskLines = formatTaskLines(task);
     const subtaskLines = await this.readSubtaskLines(task);
     const allLines = [...taskLines, ...subtaskLines];
 
     if (isSourceMode) {
-      this.insertAtCursor(editor, allLines);
+      this.insertAtPosition(editor, allLines, dropPos);
     } else {
       await this.insertAtEnd(targetFile, allLines);
     }
@@ -246,6 +286,7 @@ export class TaskDragDropHandler {
   destroy(): void {
     this.containerEl.removeEventListener('dragstart', this.onDragStart);
     this.containerEl.removeEventListener('dragend', this.onDragEnd);
+    this.removeDragoverListener();
 
     if (this.editorDropRef) {
       this.app.workspace.offref(this.editorDropRef);
@@ -256,12 +297,31 @@ export class TaskDragDropHandler {
     this.callbacks = null;
   }
 
-  private insertAtCursor(editor: Editor, lines: string[]): void {
-    const cursor = editor.getCursor();
+  private getDropPosition(
+    view: MarkdownView,
+    evt: DragEvent,
+  ): { line: number; ch: number } | null {
+    const editorView = (view.editor as { cm?: EditorView })?.cm;
+    if (!editorView) return null;
+    const pos = editorView.posAtCoords(
+      { x: evt.clientX, y: evt.clientY },
+      false,
+    );
+    if (pos == null) return null;
+    const line = editorView.state.doc.lineAt(pos);
+    return { line: line.number - 1, ch: line.length };
+  }
+
+  private insertAtPosition(
+    editor: Editor,
+    lines: string[],
+    pos?: { line: number; ch: number } | null,
+  ): void {
+    const cursor = pos ?? editor.getCursor();
     const currentLine = editor.getLine(cursor.line);
-    const pos = { line: cursor.line, ch: currentLine.length };
+    const insertPos = { line: cursor.line, ch: currentLine.length };
     const prefix = currentLine === '' ? '' : '\n';
-    editor.replaceRange(prefix + lines.join('\n'), pos);
+    editor.replaceRange(prefix + lines.join('\n'), insertPos);
   }
 
   private async insertAtEnd(file: TFile, lines: string[]): Promise<void> {

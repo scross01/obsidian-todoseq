@@ -5,8 +5,8 @@ import TodoTracker from '../main';
 import { detectListMarker } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
+import { formatTaskLines } from '../utils/task-format';
 import {
-  formatTaskForDailyNote,
   getTodayDailyNote,
   isDailyNotesPluginEnabledSync,
   isTaskOnTodayDailyNote,
@@ -900,7 +900,7 @@ export class EditorController {
         );
 
         // Format the task for daily note
-        const taskLines = formatTaskForDailyNote(cleanedTask);
+        const taskLines = formatTaskLines(cleanedTask);
 
         // Read the current content of today's daily note
         const currentContent = await this.plugin.app.vault.read(todayNote);
@@ -1098,7 +1098,7 @@ export class EditorController {
         );
 
         // Format the task for daily note
-        const taskLines = formatTaskForDailyNote(cleanedTask);
+        const taskLines = formatTaskLines(cleanedTask);
 
         // Read the current content of today's daily note
         const todayContent = await this.plugin.app.vault.read(todayNote);
@@ -1237,7 +1237,7 @@ export class EditorController {
         );
 
         // Format the task for daily note
-        const taskLines = formatTaskForDailyNote(cleanedTask);
+        const taskLines = formatTaskLines(cleanedTask);
 
         // Read the current content of today's daily note
         const todayContent = await this.plugin.app.vault.read(todayNote);

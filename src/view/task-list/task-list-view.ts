@@ -29,10 +29,10 @@ import {
   SortMethod,
 } from './task-list-filter';
 import {
-  formatTaskForDailyNote,
   getTodayDailyNote,
   isTaskOnTodayDailyNote,
 } from '../../utils/daily-note-utils';
+import { formatTaskLines } from '../../utils/task-format';
 
 const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
@@ -1273,7 +1273,7 @@ export class TaskListView extends ItemView {
     }
 
     // Format the task for daily note
-    const taskLines = formatTaskForDailyNote(task);
+    const taskLines = formatTaskLines(task);
 
     // Read the current content of today's daily note
     const currentContent = await this.plugin.app.vault.read(todayNote);
@@ -1309,7 +1309,7 @@ export class TaskListView extends ItemView {
     }
 
     // Format the task for daily note
-    const taskLines = formatTaskForDailyNote(task);
+    const taskLines = formatTaskLines(task);
 
     // Read the current content of today's daily note
     const todayContent = await this.plugin.app.vault.read(todayNote);
@@ -1386,7 +1386,7 @@ export class TaskListView extends ItemView {
     }
 
     // Format the task for daily note
-    const taskLines = formatTaskForDailyNote(task);
+    const taskLines = formatTaskLines(task);
 
     // Read the current content of today's daily note
     const todayContent = await this.plugin.app.vault.read(todayNote);

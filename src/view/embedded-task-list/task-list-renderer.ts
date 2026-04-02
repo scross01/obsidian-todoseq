@@ -18,10 +18,10 @@ import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
 import { BaseDialog } from '../components/base-dialog';
 import {
-  formatTaskForDailyNote,
   getTodayDailyNote,
   isTaskOnTodayDailyNote,
 } from '../../utils/daily-note-utils';
+import { formatTaskLines } from '../../utils/task-format';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 
 /**
@@ -131,7 +131,7 @@ export class EmbeddedTaskListRenderer {
       return;
     }
 
-    const taskLines = formatTaskForDailyNote(task);
+    const taskLines = formatTaskLines(task);
     const currentContent = await this.plugin.app.vault.read(todayNote);
     const newContent =
       currentContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
@@ -154,7 +154,7 @@ export class EmbeddedTaskListRenderer {
       return;
     }
 
-    const taskLines = formatTaskForDailyNote(task);
+    const taskLines = formatTaskLines(task);
     const todayContent = await this.plugin.app.vault.read(todayNote);
     const newTodayContent =
       todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
@@ -209,7 +209,7 @@ export class EmbeddedTaskListRenderer {
       return;
     }
 
-    const taskLines = formatTaskForDailyNote(task);
+    const taskLines = formatTaskLines(task);
     const todayContent = await this.plugin.app.vault.read(todayNote);
     const newTodayContent =
       todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
