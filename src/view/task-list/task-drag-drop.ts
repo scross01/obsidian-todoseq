@@ -1,9 +1,121 @@
 import { App, Notice, TFile, MarkdownView, Editor } from 'obsidian';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
+import { formatTaskForDailyNote } from '../../utils/daily-note-utils';
+import { CHECKBOX_DETECTION_REGEX } from '../../utils/patterns';
 
 export interface TaskDragDropCallbacks {
   onGetTask: (path: string, line: number) => Task | undefined;
+}
+
+export function getDropAction(
+  ctrlKey: boolean,
+  metaKey: boolean,
+  shiftKey: boolean,
+): 'copy' | 'move' | 'migrate' {
+  if (ctrlKey || metaKey) return 'move';
+  if (shiftKey) return 'migrate';
+  return 'copy';
+}
+
+export function buildRemovalRange(
+  lines: string[],
+  taskLine: number,
+): { start: number; end: number } {
+  let end = taskLine;
+  for (let i = taskLine + 1; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('SCHEDULED:') || trimmed.startsWith('DEADLINE:')) {
+      end = i;
+    } else {
+      break;
+    }
+  }
+  return { start: taskLine, end };
+}
+
+export function findSubtaskEnd(
+  lines: string[],
+  afterLine: number,
+  taskIndent: string,
+  parentHasCheckbox: boolean,
+): number {
+  const parentIndentLen = taskIndent.length;
+  let end = afterLine;
+  for (let i = afterLine + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === '') break;
+    const lineIndentLen = line.length - line.trimStart().length;
+    if (lineIndentLen > parentIndentLen) {
+      end = i;
+    } else if (
+      lineIndentLen === parentIndentLen &&
+      !parentHasCheckbox &&
+      CHECKBOX_DETECTION_REGEX.test(line)
+    ) {
+      end = i;
+    } else {
+      break;
+    }
+  }
+  return end;
+}
+
+export function extractSubtaskLines(
+  lines: string[],
+  dateEnd: number,
+  taskIndent: string,
+  parentHasCheckbox: boolean,
+): string[] {
+  const subtaskEnd = findSubtaskEnd(
+    lines,
+    dateEnd,
+    taskIndent,
+    parentHasCheckbox,
+  );
+  if (subtaskEnd <= dateEnd) return [];
+
+  const parentIndentLen = taskIndent.length;
+  const result: string[] = [];
+  for (let i = dateEnd + 1; i <= subtaskEnd; i++) {
+    result.push(lines[i].substring(parentIndentLen));
+  }
+  return result;
+}
+
+export function modifyLinesForMigration(
+  lines: string[],
+  taskLine: number,
+  oldKeyword: string,
+  migrateState: string,
+): string[] {
+  const result = [...lines];
+  const taskLineContent = result[taskLine];
+  if (!taskLineContent) return result;
+
+  const escaped = oldKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (migrateState === '') {
+    result[taskLine] = taskLineContent.replace(
+      new RegExp(`^(.*?)\\b${escaped}\\b\\s*`, 'i'),
+      '$1',
+    );
+  } else {
+    result[taskLine] = taskLineContent.replace(
+      new RegExp(`\\b${escaped}\\b`, 'i'),
+      migrateState,
+    );
+  }
+
+  const { end } = buildRemovalRange(result, taskLine);
+  if (end > taskLine) {
+    result.splice(taskLine + 1, end - taskLine);
+  }
+
+  return result;
+}
+
+function taskHasCheckbox(task: Task): boolean {
+  return CHECKBOX_DETECTION_REGEX.test(task.rawText);
 }
 
 export class TaskDragDropHandler {
@@ -68,10 +180,16 @@ export class TaskDragDropHandler {
       return;
     }
 
-    evt.preventDefault();
+    const action = getDropAction(evt.ctrlKey, evt.metaKey, evt.shiftKey);
 
-    const isMove = evt.ctrlKey || evt.metaKey;
-    const isMigrate = evt.shiftKey;
+    if (action === 'migrate' && !this.plugin.settings.migrateToTodayState) {
+      new Notice(
+        'Migration is disabled. Configure the migrated state keyword in TODOseq settings.',
+      );
+      return;
+    }
+
+    evt.preventDefault();
 
     const mdView =
       view instanceof MarkdownView
@@ -80,30 +198,37 @@ export class TaskDragDropHandler {
 
     const isSourceMode = mdView?.getMode() === 'source';
 
-    if (isSourceMode) {
-      const lines = this.formatTaskForInsertion(task);
-      this.insertAtCursor(editor, lines);
-    } else {
-      const lines = this.formatTaskForInsertion(task);
-      void this.insertAtEnd(targetFile, lines).then(() => {
-        this.handleSourceModification(task, isMove, isMigrate);
-        this.showActionNotice(isMove, isMigrate);
-      });
-      return;
-    }
-
-    void this.handleSourceModification(task, isMove, isMigrate);
-    this.showActionNotice(isMove, isMigrate);
+    void this.executeDrop(task, editor, targetFile, isSourceMode, action);
+    this.showActionNotice(action);
   };
 
-  private showActionNotice(isMove: boolean, isMigrate: boolean): void {
-    if (isMove) {
-      new Notice('Task moved');
-    } else if (isMigrate) {
-      new Notice('Task migrated');
+  private async executeDrop(
+    task: Task,
+    editor: Editor,
+    targetFile: TFile,
+    isSourceMode: boolean | undefined,
+    action: 'copy' | 'move' | 'migrate',
+  ): Promise<void> {
+    const taskLines = formatTaskForDailyNote(task);
+    const subtaskLines = await this.readSubtaskLines(task);
+    const allLines = [...taskLines, ...subtaskLines];
+
+    if (isSourceMode) {
+      this.insertAtCursor(editor, allLines);
     } else {
-      new Notice('Task copied');
+      await this.insertAtEnd(targetFile, allLines);
     }
+
+    await this.handleSourceModification(task, action);
+  }
+
+  private showActionNotice(action: 'copy' | 'move' | 'migrate'): void {
+    const messages: Record<string, string> = {
+      copy: 'Task copied',
+      move: 'Task moved',
+      migrate: 'Task migrated',
+    };
+    new Notice(messages[action]);
   }
 
   initialize(callbacks: TaskDragDropCallbacks): void {
@@ -131,37 +256,12 @@ export class TaskDragDropHandler {
     this.callbacks = null;
   }
 
-  private formatTaskForInsertion(task: Task): string[] {
-    const lines: string[] = [];
-
-    let taskLine = task.listMarker + task.state;
-    if (task.priority) {
-      const priorityMap: Record<string, string> = {
-        high: 'A',
-        med: 'B',
-        low: 'C',
-      };
-      taskLine += ` [#${priorityMap[task.priority]}]`;
-    }
-    taskLine += ` ${task.text}`;
-    lines.push(taskLine);
-
-    if (task.scheduledDate) {
-      lines.push(`SCHEDULED: ${this.formatDate(task.scheduledDate)}`);
-    }
-
-    if (task.deadlineDate) {
-      lines.push(`DEADLINE: ${this.formatDate(task.deadlineDate)}`);
-    }
-
-    return lines;
-  }
-
   private insertAtCursor(editor: Editor, lines: string[]): void {
     const cursor = editor.getCursor();
     const currentLine = editor.getLine(cursor.line);
     const pos = { line: cursor.line, ch: currentLine.length };
-    editor.replaceRange('\n' + lines.join('\n'), pos);
+    const prefix = currentLine === '' ? '' : '\n';
+    editor.replaceRange(prefix + lines.join('\n'), pos);
   }
 
   private async insertAtEnd(file: TFile, lines: string[]): Promise<void> {
@@ -170,87 +270,69 @@ export class TaskDragDropHandler {
     await this.app.vault.modify(file, newContent);
   }
 
-  private handleSourceModification(
+  private async readSubtaskLines(task: Task): Promise<string[]> {
+    try {
+      const sourceFile = this.app.vault.getAbstractFileByPath(task.path);
+      if (!(sourceFile instanceof TFile)) return [];
+
+      const sourceContent = await this.app.vault.read(sourceFile);
+      const sourceLines = sourceContent.split('\n');
+
+      const { end: dateEnd } = buildRemovalRange(sourceLines, task.line);
+      return extractSubtaskLines(
+        sourceLines,
+        dateEnd,
+        task.indent,
+        taskHasCheckbox(task),
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  private async handleSourceModification(
     task: Task,
-    isMove: boolean,
-    isMigrate: boolean,
-  ): void {
-    if (isMove) {
-      void this.removeSourceTask(task);
-    } else if (isMigrate) {
-      void this.migrateSourceTask(task);
-    }
-  }
+    action: 'copy' | 'move' | 'migrate',
+  ): Promise<void> {
+    if (action === 'copy') return;
 
-  private async removeSourceTask(task: Task): Promise<void> {
-    const sourceFile = this.app.vault.getAbstractFileByPath(task.path);
-    if (!(sourceFile instanceof TFile)) return;
+    try {
+      const sourceFile = this.app.vault.getAbstractFileByPath(task.path);
+      if (!(sourceFile instanceof TFile)) return;
 
-    const sourceContent = await this.app.vault.read(sourceFile);
-    const sourceLines = sourceContent.split('\n');
+      const sourceContent = await this.app.vault.read(sourceFile);
+      const sourceLines = sourceContent.split('\n');
 
-    const startLine = task.line;
-    let endLine = startLine;
-
-    for (let i = startLine + 1; i < sourceLines.length; i++) {
-      const nextLine = sourceLines[i].trim();
-      if (
-        nextLine.startsWith('SCHEDULED:') ||
-        nextLine.startsWith('DEADLINE:')
-      ) {
-        endLine = i;
-      } else {
-        break;
+      if (action === 'move') {
+        const { start, end: dateEnd } = buildRemovalRange(
+          sourceLines,
+          task.line,
+        );
+        const subtaskEnd = findSubtaskEnd(
+          sourceLines,
+          dateEnd,
+          task.indent,
+          taskHasCheckbox(task),
+        );
+        const newLines = [
+          ...sourceLines.slice(0, start),
+          ...sourceLines.slice(subtaskEnd + 1),
+        ];
+        await this.app.vault.modify(sourceFile, newLines.join('\n'));
+      } else if (action === 'migrate') {
+        const migrateState = this.plugin.settings.migrateToTodayState;
+        const taskKeyword = task.state || 'TODO';
+        const modified = modifyLinesForMigration(
+          sourceLines,
+          task.line,
+          taskKeyword,
+          migrateState,
+        );
+        await this.app.vault.modify(sourceFile, modified.join('\n'));
       }
+    } catch (error) {
+      console.error('[TODOseq] Failed to modify source task:', error);
+      new Notice('Failed to update source task');
     }
-
-    const newLines = [
-      ...sourceLines.slice(0, startLine),
-      ...sourceLines.slice(endLine + 1),
-    ];
-
-    await this.app.vault.modify(sourceFile, newLines.join('\n'));
-  }
-
-  private async migrateSourceTask(task: Task): Promise<void> {
-    const migrateState = this.plugin.settings.migrateToTodayState;
-    if (!migrateState) return;
-
-    const sourceFile = this.app.vault.getAbstractFileByPath(task.path);
-    if (!(sourceFile instanceof TFile)) return;
-
-    const sourceContent = await this.app.vault.read(sourceFile);
-    const sourceLines = sourceContent.split('\n');
-
-    const taskLineContent = sourceLines[task.line];
-    if (!taskLineContent) return;
-
-    const taskKeyword = task.state || 'TODO';
-    const escapedKeyword = taskKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    let updatedLine: string;
-    if (migrateState === '') {
-      updatedLine = taskLineContent.replace(
-        new RegExp(`^(\\s*)\\b${escapedKeyword}\\b\\s*`, 'i'),
-        '$1',
-      );
-    } else {
-      updatedLine = taskLineContent.replace(
-        new RegExp(`\\b${escapedKeyword}\\b`, 'i'),
-        migrateState,
-      );
-    }
-
-    sourceLines[task.line] = updatedLine;
-    await this.app.vault.modify(sourceFile, sourceLines.join('\n'));
-  }
-
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const weekday = weekdays[date.getDay()];
-    return `<${year}-${month}-${day} ${weekday}>`;
   }
 }

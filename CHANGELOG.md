@@ -2,6 +2,7 @@
 
 ## 0.13.0-dev
 
+- Added support for drag and drop tasks from task list to active page. #61
 
 ## 0.12.2
 
