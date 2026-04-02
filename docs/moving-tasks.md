@@ -2,7 +2,9 @@
 
 TODOseq provides several ways to move tasks between locations in your vault. Whether you want to copy a task to today's note, move it entirely, or migrate it with a custom state marker, these actions help you manage task flow without losing context.
 
-All copy adn move actions, except copy to clipboard, require the Daily Notes core plugin to be enabled in Obsidian.
+You can perform these actions through the [task context menu](task-list.md#task-context-menu) or by [drag and drop](task-list.md#drag-and-drop) directly from the Task List into an open file in your vault.
+
+Some copy/move actions require the Daily Notes core plugin to be enabled in Obsidian.
 
 ## Copy
 
@@ -22,7 +24,7 @@ Migrate to Today combines copying with state transformation. It copies the task 
 
 The replacement keyword is configurable in settings under [Migrated state keyword](settings.md#migrated-state-keyword). Here are several approaches to using this feature:
 
-Using a standard keyword like `ARCHIVED` or a custom keyword liek `MOVED` to clearly indicates the task's new status while maintaining compatibility with TODOseq's state system:
+Using a standard keyword like `ARCHIVED` or a custom keyword like `MOVED` to clearly indicates the task's new status while maintaining compatibility with TODOseq's state system:
 
 ```markdown
 # source page
