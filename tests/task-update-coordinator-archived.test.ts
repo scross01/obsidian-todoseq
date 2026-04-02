@@ -55,6 +55,7 @@ describe('TaskUpdateCoordinator - Archived State Removal', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
 
     const mockTFile = new TFile();
     mockTFile.path = 'test.md';
@@ -256,6 +257,11 @@ describe('TaskUpdateCoordinator - Archived State Removal', () => {
     expect(taskStateManager.findTaskByPathAndLine('test.md', 1)).toBeNull();
     expect(taskStateManager.findTaskByPathAndLine('test.md', 2)).not.toBeNull();
   });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    taskUpdateCoordinator.destroy();
+  });
 });
 
 describe('TaskUpdateCoordinator - Re-adding Tasks from Archived', () => {
@@ -265,6 +271,7 @@ describe('TaskUpdateCoordinator - Re-adding Tasks from Archived', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
 
     const mockTFile = new TFile();
     mockTFile.path = 'test.md';
@@ -438,5 +445,10 @@ describe('TaskUpdateCoordinator - Re-adding Tasks from Archived', () => {
     );
 
     expect(taskStateManager.getTaskCount()).toBe(0);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    taskUpdateCoordinator.destroy();
   });
 });

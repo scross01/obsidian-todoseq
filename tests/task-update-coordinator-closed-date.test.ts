@@ -57,6 +57,7 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
+    jest.useFakeTimers();
     originalTask = null;
 
     // Create a mock file

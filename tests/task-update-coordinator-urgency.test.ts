@@ -62,6 +62,7 @@ describe('TaskUpdateCoordinator - Urgency Recalculation', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
 
     const mockTFile = new TFile();
     mockTFile.path = 'test.md';
@@ -432,5 +433,10 @@ describe('TaskUpdateCoordinator - Urgency Recalculation', () => {
       const urgency = expectNotNull(notNullTask.urgency);
       expect(urgency).toBeGreaterThan(0);
     });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    taskUpdateCoordinator.destroy();
   });
 });

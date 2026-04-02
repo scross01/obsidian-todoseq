@@ -8,11 +8,14 @@ const registry = new LanguageRegistry();
 export { registry };
 
 // Mock console methods to reduce noise during tests
+// Use jest.Mock to allow tests to spy on console calls when needed
+const createSilentMock = () => jest.fn();
+
 global.console = {
   ...console,
-  log: jest.fn(),
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
+  log: createSilentMock(),
+  debug: createSilentMock(),
+  info: createSilentMock(),
+  warn: createSilentMock(),
+  error: console.error, // Keep error to surface real issues
 };

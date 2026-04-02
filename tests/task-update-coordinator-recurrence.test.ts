@@ -59,6 +59,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
 
     // Create a mock file
     const mockTFile = new TFile();
@@ -271,5 +272,10 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
       );
       expect(updatedTask?.state).toBe(newStateForRecurrence);
     });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    taskUpdateCoordinator.destroy();
   });
 });
