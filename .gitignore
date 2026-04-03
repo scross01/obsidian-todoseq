@@ -54,3 +54,6 @@ CLAUDE.md
 .claude/
 .obsidian/themes/
 examples/Test Performance/*
+
+# TypeScript build info
+tsconfig.tsbuildinfo

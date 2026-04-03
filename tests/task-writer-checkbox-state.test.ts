@@ -42,10 +42,13 @@ describe('TaskWriter checkbox state generation', () => {
           defaultCompleted: 'DONE',
           transitionStatements: [],
         },
+        useExtendedCheckboxStyles: true,
       },
     };
 
-    const keywordManager = createTestKeywordManager();
+    const keywordManager = createTestKeywordManager({
+      useExtendedCheckboxStyles: true,
+    });
     taskWriter = new TaskWriter(mockPlugin, keywordManager);
   });
 

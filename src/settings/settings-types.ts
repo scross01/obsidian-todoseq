@@ -40,6 +40,8 @@ export interface TodoTrackerSettings {
   stateTransitions: StateTransitionSettings;
   // Task completion settings
   trackClosedDate: boolean; // when true, adds CLOSED: timestamp when tasks are marked as completed
+  // Experimental features
+  useExtendedCheckboxStyles: boolean; // when true, uses themed markdown checkbox styles ([/], [-]) for active and cancelled tasks
 }
 
 export const DefaultStateTransitionSettings: StateTransitionSettings = {
@@ -69,4 +71,5 @@ export const DefaultSettings: TodoTrackerSettings = {
   migrateToTodayState: '', // Default state to set on source task after migrating (empty = disabled)
   stateTransitions: DefaultStateTransitionSettings,
   trackClosedDate: false, // Disabled by default
+  useExtendedCheckboxStyles: false, // Experimental feature - disabled by default
 };

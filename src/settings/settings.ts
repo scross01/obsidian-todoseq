@@ -1258,5 +1258,24 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             }
           }),
       );
+
+    // Use extended checkbox styles toggle
+    new Setting(containerEl)
+      .setName('Use extended markdown checkbox styles')
+      .setDesc(
+        'When enabled, uses themed checkbox styles ([/], [-]) for active and cancelled tasks.',
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.useExtendedCheckboxStyles)
+          .onChange(async (value) => {
+            this.plugin.settings.useExtendedCheckboxStyles = value;
+            await this.plugin.saveSettings();
+            // Re-create parser to update KeywordManager with new settings
+            await this.plugin.recreateParser();
+            // Update KeywordManager in TaskWriter with new settings
+            this.plugin.updateTaskWriterKeywordManager();
+          }),
+      );
   }
 }

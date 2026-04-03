@@ -13,6 +13,7 @@ export type KeywordSettings = {
   additionalWaitingKeywords?: string[];
   additionalCompletedKeywords?: string[];
   additionalArchivedKeywords?: string[];
+  useExtendedCheckboxStyles?: boolean;
 };
 
 const BUILTIN_COMPLETED_SET = new Set<string>(BUILTIN_COMPLETED_KEYWORDS);
@@ -106,6 +107,10 @@ export class KeywordManager {
 
   constructor(private settings: KeywordSettings) {
     this.resolution = this.buildResolution();
+  }
+
+  getSettings(): KeywordSettings {
+    return this.settings;
   }
 
   static getBuiltinCompletedSet(): Set<string> {
@@ -790,18 +795,26 @@ export class KeywordManager {
    * Uses the instance's resolution (built with settings) to determine the state.
    *
    * @param keyword - The task keyword to get the checkbox state for
-   * @returns The checkbox state character: ' ' for inactive/waiting, 'x' for completed, '/' for active, '-' for canceled
+   * @param settings - Plugin settings (optional, for checking useExtendedCheckboxStyles)
+   * @returns The checkbox state character: ' ' for inactive/waiting, 'x' for completed, '/' for active (if extended styles enabled), '-' for canceled (if extended styles enabled)
    */
-  getCheckboxState(keyword: string): string {
-    if (this.isCanceled(keyword)) {
-      return '-';
-    } else if (this.isCompleted(keyword)) {
-      return 'x';
-    } else if (this.isActive(keyword)) {
-      return '/';
-    } else {
-      return ' ';
+  getCheckboxState(keyword: string, settings?: KeywordSettings): string {
+    const useExtended = settings?.useExtendedCheckboxStyles ?? false;
+
+    if (useExtended) {
+      if (this.isCanceled(keyword)) {
+        return '-';
+      } else if (this.isCompleted(keyword)) {
+        return 'x';
+      } else if (this.isActive(keyword)) {
+        return '/';
+      }
     }
+    // Default: use standard checkbox states
+    if (this.isCompleted(keyword)) {
+      return 'x';
+    }
+    return ' ';
   }
 
   /**
@@ -809,10 +822,10 @@ export class KeywordManager {
    * Returns the markdown checkbox state character (' ', 'x', '/', or '-') for the given keyword.
    *
    * @param keyword - The task keyword to get the checkbox state for
-   * @param settings - Plugin settings (for building KeywordManager instance)
-   * @returns The checkbox state character: ' ' for inactive/waiting, 'x' for completed, '/' for active, '-' for canceled
+   * @param settings - Plugin settings (for building KeywordManager instance and checking useExtendedCheckboxStyles)
+   * @returns The checkbox state character: ' ' for inactive/waiting, 'x' for completed, '/' for active (if extended styles enabled), '-' for canceled (if extended styles enabled)
    */
   static getCheckboxState(keyword: string, settings: KeywordSettings): string {
-    return new KeywordManager(settings).getCheckboxState(keyword);
+    return new KeywordManager(settings).getCheckboxState(keyword, settings);
   }
 }

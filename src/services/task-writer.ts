@@ -22,8 +22,15 @@ export class TaskWriter {
    */
   constructor(
     private readonly plugin: TodoTracker,
-    private readonly keywordManager: KeywordManager,
+    private keywordManager: KeywordManager,
   ) {}
+
+  /**
+   * Update the KeywordManager instance when settings change.
+   */
+  public updateKeywordManager(keywordManager: KeywordManager): void {
+    this.keywordManager = keywordManager;
+  }
 
   private get app(): App {
     return this.plugin.app;
@@ -103,7 +110,10 @@ export class TaskWriter {
         checkboxStatus = currentCheckboxState;
       } else {
         // Get the checkbox state character for the new state
-        checkboxStatus = keywordManagerInstance.getCheckboxState(newState);
+        checkboxStatus = keywordManagerInstance.getCheckboxState(
+          newState,
+          keywordManagerInstance.getSettings(),
+        );
       }
 
       const textPart = task.text ? ` ${task.text}` : '';

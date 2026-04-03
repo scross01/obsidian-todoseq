@@ -354,6 +354,18 @@ export default class TodoTracker extends Plugin {
     }
   }
 
+  /**
+   * Update the KeywordManager in TaskWriter with new settings.
+   * Called when settings that affect KeywordManager change.
+   */
+  public updateTaskWriterKeywordManager(): void {
+    if (this.taskEditor && this.vaultScanner) {
+      this.taskEditor.updateKeywordManager(
+        this.vaultScanner.getKeywordManager(),
+      );
+    }
+  }
+
   // Force refresh of editor decorations in all visible markdown editors
   public refreshVisibleEditorDecorations(): void {
     // Get all visible markdown editors
