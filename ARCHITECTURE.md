@@ -909,7 +909,7 @@ The [`ParserRegistry`](src/parser/parser-registry.ts) manages multiple parsers a
 | `TaskParser`        | `.md`, `.markdown` | Markdown tasks, checkboxes, code blocks, comments        |
 | `OrgModeTaskParser` | `.org`             | Org-mode headlines, priorities, scheduled/deadline dates |
 
-> **Note**: The `OrgModeTaskParser` is registered conditionally based on the `detectOrgModeFiles` experimental feature setting. When disabled (default), `.org` files are not parsed. Enable it in Settings → TODOseq → Experimental Features.
+> **Note**: The `OrgModeTaskParser` is registered conditionally based on the `detectOrgModeFiles` experimental feature setting. When disabled (default), `.org` files are not parsed. Enable it in Settings → TODOseq → Experimental features.
 
 ### Extending with New Parsers
 

@@ -1204,10 +1204,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     // Experimental Features Group
     new Setting(containerEl)
-      .setName('Experimental Features')
+      .setName('⚠︎ Experimental features')
       .setHeading()
       .setDesc(
-        '⚠︎ Experimental features may be changed significantly or removed entirely in future versions.',
+        'Experimental features may be changed significantly or removed entirely in future versions.',
       );
 
     // Org-mode file detection toggle

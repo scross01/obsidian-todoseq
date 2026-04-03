@@ -523,7 +523,7 @@ All editor commands only appear in the command palette when your cursor is on a 
 
 ## Experimental Features
 
-The Experimental Features section contains settings for features that are still in development or testing. These features may not be fully functional and could change or be removed in future versions.
+The experimental features section contains settings for features that are still in development or testing. These features may not be fully functional and could change or be removed in future versions.
 
 ### Detect Tasks in Org Mode Files
 

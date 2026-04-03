@@ -30,7 +30,7 @@ When enabled, TODOseq will:
 
 1. Open Obsidian Settings
 2. Navigate to "Community plugins" → "TODOseq"
-3. Scroll to the "Experimental Features" section
+3. Scroll to the "Experimental features" section
 4. Enable "Detect tasks in org mode files"
 
 Once enabled, `.org` files will be automatically included in vault scans.
@@ -123,4 +123,69 @@ If you encounter issues with Org-mode support, please report them on the [GitHub
 - The Org-mode file content (or a sample that reproduces the issue)
 - Expected behavior
 - Actual behavior
+- Whether the issue persists after disabling and re-enabling the feature
+
+## Checkbox Theming
+
+Checkbox theming allows TODOseq to display special checkbox markers in the markdown editor and task lists based on the active Obsidian theme styling to indicate task state visually.
+
+### What It Does
+
+When enabled, TODOseq will:
+
+- Use the `- [/]` markdown checkbox format for active tasks in the markdown editor
+- Use the `- [-]` markdown checkbox for cancelled tasks in the markdown editor
+- Style the checkbox marker based on the task's state
+- Apply this formatting to markdown task lines in both editor and preview views
+
+### How to Enable
+
+1. Open Obsidian Settings
+2. Navigate to "Community plugins" → "TODOseq"
+3. Scroll to the "Experimental features" section
+4. Enable "Use extended markdown checkbox styles"
+
+### Requirements
+
+**This feature requires a theme with styled checkboxes.** Most themes will display the checkbox marker with appropriate colors or styles based on task state:
+
+- Incomplete tasks: Typically shown with a standard checkbox icon
+- Cancelled tasks: Often shown with a dimmed or cross-marked checkbox
+
+Without a theme that supports checkbox styling, the checkbox markers may appear unstyled or plain text.
+
+### Marker Behavior
+
+The `-` and `/` markers are **only added to updated tasks**. Existing checkbox states in your markdown files remain unchanged until the task's state changes:
+
+- If you have an existing task line: `* [ ] My task`, it will appear as-is until you toggle its state
+- When you toggle a task to complete or cancel, the marker updates: `* [-] My task` or `* [/] My task`
+- The markers are synchronized with the task's current state in the Task List
+
+### Limitations
+
+The following limitations apply to checkbox theming:
+
+- **Theme dependency**: Checkbox styling relies on your active theme's checkbox CSS
+- **Default theme**: Only standard markdown checkbox syntax (`[ ]`, `[x]`) is supported
+- **Synced markers**: Markers only appear in the editor when task state changes; existing checkboxes remain unmodified
+- **Limited format**: Only `-` (cancelled) and `/` (in-progress) markers are supported; completed tasks use standard `[x]` format
+
+### Example
+
+```markdown
+- [/] Review pull requests (in progress)
+- [ ] Update documentation (not started)
+- [-] Fix bugs (cancelled)
+- [x] Deploy to production (completed)
+```
+
+### Reporting Issues
+
+If you encounter issues with checkbox theming, please report them on the [GitHub issue tracker](https://github.com/scross01/obsidian-todoseq/issues) with:
+
+- The theme you're using (or screenshots if applicable)
+- The markdown task content
+- Expected checkbox marker appearance
+- Actual checkbox marker appearance
 - Whether the issue persists after disabling and re-enabling the feature

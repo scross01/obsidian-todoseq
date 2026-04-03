@@ -116,7 +116,7 @@ def process_user(user):
 
 ### In Org-Mode Files _(Experimental)_
 
-> **Note**: Org-mode support is an experimental feature. Enable it in Settings → TODOseq → Experimental Features.
+> **Note**: Org-mode support is an experimental feature. Enable it in Settings → TODOseq → Experimental features.
 
 ```org
 * TODO [#A] Critical security patch
