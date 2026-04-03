@@ -107,12 +107,30 @@ export class TaskItemRenderer {
       cls: 'todoseq-task-checkbox',
     });
 
-    // Add state-specific class for styling (includes custom active keywords)
-    if (this.keywordManager.isActive(task.state)) {
-      checkbox.addClass('todoseq-task-checkbox-active');
+    checkbox.addClass('task-list-item-checkbox');
+
+    const settings = this.keywordManager.getSettings();
+
+    // Determine data-task character and checked state based on settings
+    let dataTaskChar: string;
+    if (settings.useExtendedCheckboxStyles) {
+      // Theme handles styling via :checked + data-task selectors
+      dataTaskChar = this.keywordManager.getCheckboxState(task.state, settings);
+      checkbox.checked = dataTaskChar !== ' ';
+    } else {
+      // Default behavior: use standard checkbox states
+      // For active keywords, use '/' so CSS can apply active styling
+      if (this.keywordManager.isActive(task.state)) {
+        dataTaskChar = '/';
+      } else if (this.keywordManager.isCompleted(task.state)) {
+        dataTaskChar = 'x';
+      } else {
+        dataTaskChar = ' ';
+      }
+      checkbox.checked = task.completed;
     }
 
-    checkbox.checked = task.completed;
+    checkbox.setAttribute('data-task', dataTaskChar);
 
     checkbox.addEventListener('change', async () => {
       // CRITICAL: Look up fresh task state BEFORE computing transition
@@ -473,6 +491,12 @@ export class TaskItemRenderer {
 
     const checkbox = this.buildCheckbox(task, mainContent);
 
+    // Set data-task on the <li> for theme compatibility.
+    // Obsidian natively sets data-task on both <li> and <input>. Some themes
+    // (Iridium, Velocity) target li[data-task] or [data-task] ancestor selectors
+    // rather than input[data-task] directly (like Border does).
+    li.setAttribute('data-task', checkbox.getAttribute('data-task') || ' ');
+
     // Create wrapper div for checkbox + text (they stay together)
     const textWrapper = mainContent.createEl('div', {
       cls: 'todoseq-task-text-wrapper',
@@ -529,11 +553,34 @@ export class TaskItemRenderer {
       'input.todoseq-task-checkbox',
     ) as HTMLInputElement;
     if (checkbox) {
-      checkbox.checked = task.completed;
-      checkbox.classList.toggle(
-        'todoseq-task-checkbox-active',
-        this.keywordManager.isActive(task.state),
-      );
+      const settings = this.keywordManager.getSettings();
+
+      // Determine data-task character and checked state based on settings
+      let dataTaskChar: string;
+      if (settings.useExtendedCheckboxStyles) {
+        dataTaskChar = this.keywordManager.getCheckboxState(
+          task.state,
+          settings,
+        );
+        checkbox.checked = dataTaskChar !== ' ';
+      } else {
+        // Default behavior: use standard checkbox states
+        // For active keywords, use '/' so CSS can apply active styling
+        if (this.keywordManager.isActive(task.state)) {
+          dataTaskChar = '/';
+        } else if (this.keywordManager.isCompleted(task.state)) {
+          dataTaskChar = 'x';
+        } else {
+          dataTaskChar = ' ';
+        }
+        checkbox.checked = task.completed;
+      }
+
+      checkbox.setAttribute('data-task', dataTaskChar);
+      // Also set data-task on the <li> for theme compatibility.
+      // Obsidian natively sets data-task on both <li> and <input>. Some themes
+      // (Iridium, Velocity) target li[data-task] or [data-task] ancestor selectors.
+      element.setAttribute('data-task', dataTaskChar);
     }
 
     // 2. Update keyword button

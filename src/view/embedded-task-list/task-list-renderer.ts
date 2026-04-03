@@ -1383,7 +1383,33 @@ export class EmbeddedTaskListRenderer {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'todoseq-embedded-task-checkbox';
-    checkbox.checked = task.completed;
+    checkbox.classList.add('task-list-item-checkbox');
+
+    const settings = this.plugin.keywordManager.getSettings();
+
+    let dataTaskChar: string;
+    if (settings.useExtendedCheckboxStyles) {
+      dataTaskChar = this.plugin.keywordManager.getCheckboxState(
+        task.state,
+        settings,
+      );
+      checkbox.checked = dataTaskChar !== ' ';
+    } else {
+      if (this.plugin.keywordManager.isActive(task.state)) {
+        dataTaskChar = '/';
+      } else if (this.plugin.keywordManager.isCompleted(task.state)) {
+        dataTaskChar = 'x';
+      } else {
+        dataTaskChar = ' ';
+      }
+      checkbox.checked = task.completed;
+    }
+
+    checkbox.setAttribute('data-task', dataTaskChar);
+    // Also set data-task on the <li> for theme compatibility.
+    // Obsidian natively sets data-task on both <li> and <input>. Some themes
+    // (Iridium, Velocity) target li[data-task] or [data-task] ancestor selectors.
+    li.setAttribute('data-task', dataTaskChar);
     checkbox.setAttribute(
       'aria-label',
       `Toggle task: ${task.text || task.state}`,
@@ -1855,10 +1881,27 @@ export class EmbeddedTaskListRenderer {
 
         // Update task state using existing TaskEditor
         await this.updateTaskState(currentTask, newState);
+
+        // Update data-task attribute to reflect new state
+        const newCheckboxChar = this.plugin.keywordManager.getCheckboxState(
+          newState,
+          this.plugin.keywordManager.getSettings(),
+        );
+        checkbox.setAttribute('data-task', newCheckboxChar);
+        // Also update data-task on the parent <li> for theme compatibility
+        li.setAttribute('data-task', newCheckboxChar);
       } catch (error) {
         console.error('Error updating task state:', error);
         // Revert checkbox on error
         checkbox.checked = !checkbox.checked;
+        // Revert data-task attribute
+        const revertedChar = this.plugin.keywordManager.getCheckboxState(
+          task.state,
+          this.plugin.keywordManager.getSettings(),
+        );
+        checkbox.setAttribute('data-task', revertedChar);
+        // Also revert data-task on the parent <li>
+        li.setAttribute('data-task', revertedChar);
       }
     });
 

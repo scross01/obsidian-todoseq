@@ -45,7 +45,7 @@ describe('TaskItemRenderer', () => {
 
       // Create a mock container
       const mockCheckbox = {
-        checked: false,
+        checked: true,
         classList: {
           add: jest.fn(),
           remove: jest.fn(),
@@ -53,6 +53,7 @@ describe('TaskItemRenderer', () => {
         },
         addEventListener: jest.fn(),
         addClass: jest.fn(),
+        setAttribute: jest.fn(),
       };
 
       const container = {
@@ -91,7 +92,7 @@ describe('TaskItemRenderer', () => {
       });
 
       const mockCheckbox = {
-        checked: true,
+        checked: false,
         classList: {
           add: jest.fn(),
           remove: jest.fn(),
@@ -99,6 +100,7 @@ describe('TaskItemRenderer', () => {
         },
         addEventListener: jest.fn(),
         addClass: jest.fn(),
+        setAttribute: jest.fn(),
       };
 
       const container = {
@@ -162,6 +164,7 @@ describe('TaskItemRenderer', () => {
         },
         addEventListener: jest.fn(),
         addClass: jest.fn(),
+        setAttribute: jest.fn(),
       };
 
       const container = {
@@ -203,6 +206,7 @@ describe('TaskItemRenderer', () => {
         },
         addEventListener: jest.fn(),
         addClass: jest.fn(),
+        setAttribute: jest.fn(),
       };
 
       const container = {

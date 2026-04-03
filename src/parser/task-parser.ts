@@ -1546,8 +1546,9 @@ export class TaskParser implements ITaskParser {
     task.closedDate = closedDate;
 
     // Extract subtasks from lines following date lines
-    // Check if parent task has a checkbox
-    const parentHasCheckbox = CHECKBOX_REGEX.test(content);
+    // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
+    // all checkbox states including [/], [-], etc., not just [ ] and [x])
+    const parentHasCheckbox = CHECKBOX_DETECTION_REGEX.test(content);
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
       lines,
       index + 1,
@@ -1694,8 +1695,9 @@ export class TaskParser implements ITaskParser {
     task.closedDate = closedDate;
 
     // Extract subtasks from lines following date lines
-    // Check if parent task has a checkbox
-    const parentHasCheckbox = CHECKBOX_REGEX.test(line);
+    // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
+    // all checkbox states including [/], [-], etc., not just [ ] and [x])
+    const parentHasCheckbox = CHECKBOX_DETECTION_REGEX.test(line);
     const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
       lines,
       index + 1,

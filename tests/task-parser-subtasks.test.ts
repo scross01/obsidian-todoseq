@@ -302,3 +302,115 @@ describe('Task Parser - Quoted Task Indentation', () => {
     expect(task.line).toBe(0);
   });
 });
+
+describe('Task Parser - Checkbox Task Subtask Detection', () => {
+  let parser: TaskParser;
+
+  beforeEach(() => {
+    const keywordManager = createTestKeywordManager({
+      additionalActiveKeywords: ['TODO', 'DOING'],
+    });
+    parser = TaskParser.create(keywordManager, null);
+  });
+
+  test('should NOT treat same-indent checkbox lines as subtasks when parent has [-] checkbox', () => {
+    const content = `- [-] DOING active task with checkbox
+- [ ] next line at same indent
+- [ ] another line at same indent`;
+
+    const tasks = parser.parseFile(content, 'test.md');
+
+    const activeTask = tasks.find((t) =>
+      t.text.includes('active task with checkbox'),
+    );
+    expect(activeTask).not.toBeUndefined();
+    // Parent has a checkbox, so same-indent checkbox lines are NOT subtasks
+    expect(activeTask?.subtaskCount).toBe(0);
+  });
+
+  test('should NOT treat same-indent checkbox lines as subtasks when parent has [/] checkbox', () => {
+    const content = `- [/] DOING active task with checkbox
+- [ ] next line at same indent
+- [ ] another line at same indent`;
+
+    const tasks = parser.parseFile(content, 'test.md');
+
+    const activeTask = tasks.find((t) =>
+      t.text.includes('active task with checkbox'),
+    );
+    expect(activeTask).not.toBeUndefined();
+    // Parent has a checkbox, so same-indent checkbox lines are NOT subtasks
+    expect(activeTask?.subtaskCount).toBe(0);
+  });
+
+  test('should count indented checkbox lines as subtasks when parent has [/] checkbox', () => {
+    const content = `- [/] DOING active task with checkbox
+  - [ ] indented subtask 1
+  - [ ] indented subtask 2`;
+
+    const tasks = parser.parseFile(content, 'test.md');
+
+    const activeTask = tasks.find((t) =>
+      t.text.includes('active task with checkbox'),
+    );
+    expect(activeTask).not.toBeUndefined();
+    // Parent has a checkbox, indented lines ARE subtasks
+    expect(activeTask?.subtaskCount).toBe(2);
+  });
+
+  test('should NOT treat same-indent checkbox lines as subtasks when parent has [x] checkbox', () => {
+    const content = `- [x] DONE completed task with checkbox
+- [ ] next line at same indent
+- [ ] another line at same indent`;
+
+    const keywordManager = createTestKeywordManager({
+      additionalActiveKeywords: ['TODO'],
+      additionalCompletedKeywords: ['DONE'],
+    });
+    const completedParser = TaskParser.create(keywordManager, null);
+
+    const tasks = completedParser.parseFile(content, 'test.md');
+
+    const completedTask = tasks.find((t) =>
+      t.text.includes('completed task with checkbox'),
+    );
+    expect(completedTask).not.toBeUndefined();
+    // Parent has a checkbox, so same-indent checkbox lines are NOT subtasks
+    expect(completedTask?.subtaskCount).toBe(0);
+  });
+
+  test('SHOULD treat same-indent checkbox lines as subtasks when parent has NO checkbox', () => {
+    const content = `TODO task without checkbox
+- [ ] subtask at same indent
+- [ ] another subtask at same indent`;
+
+    const tasks = parser.parseFile(content, 'test.md');
+
+    const parentTask = tasks.find((t) =>
+      t.text.includes('task without checkbox'),
+    );
+    expect(parentTask).not.toBeUndefined();
+    // Parent has NO checkbox, so same-indent checkbox lines ARE subtasks
+    expect(parentTask?.subtaskCount).toBe(2);
+  });
+
+  test('should separate checkbox tasks with [/] at same indent level', () => {
+    const content = `- [/] DOING first task
+- [ ] TODO second task
+  - [ ] subtask of second task`;
+
+    const tasks = parser.parseFile(content, 'test.md');
+
+    const firstTask = tasks.find((t) => t.text.includes('first task'));
+    const secondTask = tasks.find((t) => t.text.includes('second task'));
+
+    expect(firstTask).not.toBeUndefined();
+    expect(secondTask).not.toBeUndefined();
+
+    // First task should have NO subtasks (checkbox parent, same indent lines are not subtasks)
+    expect(firstTask?.subtaskCount).toBe(0);
+
+    // Second task should have 1 subtask (indented)
+    expect(secondTask?.subtaskCount).toBe(1);
+  });
+});

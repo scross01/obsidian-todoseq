@@ -486,12 +486,59 @@ export class ReaderViewFormatter {
 
       const taskParagraph = taskElement.querySelector('p');
 
+      // Get keyword from the formatted keyword element (needed for checkbox styling)
+      let keyword: string | null = null;
+      if (taskElement instanceof HTMLElement) {
+        const keywordSpan = taskElement.querySelector(
+          '.todoseq-keyword-formatted',
+        );
+        keyword = keywordSpan?.getAttribute('data-task-keyword') || null;
+      }
+
       if (taskParagraph) {
         // Process tasks with paragraph elements (standard case)
         this.processParagraphForTasks(taskParagraph);
       } else if (taskElement instanceof HTMLElement) {
         // Process tasks without paragraph elements (direct text in li)
         this.processTaskListItemDirectly(taskElement);
+      }
+
+      // Add data-task attribute and checked state for checkbox styling
+      // This allows CSS to apply the TODOseq active task style or theme styles
+      if (taskElement instanceof HTMLElement) {
+        const checkbox = taskElement.querySelector(
+          '.task-list-item-checkbox',
+        ) as HTMLInputElement | null;
+        if (checkbox && keyword) {
+          const keywordManager = this.vaultScanner.getKeywordManager();
+          if (keywordManager) {
+            const settings = keywordManager.getSettings();
+            let dataTaskChar: string;
+            if (settings.useExtendedCheckboxStyles) {
+              // Theme handles styling via :checked + data-task selectors
+              dataTaskChar = keywordManager.getCheckboxState(keyword, settings);
+              checkbox.checked = dataTaskChar !== ' ';
+            } else {
+              // Default behavior: use standard checkbox states
+              // For active keywords, use '/' so CSS can apply active styling
+              if (keywordManager.isActive(keyword)) {
+                dataTaskChar = '/';
+              } else if (keywordManager.isCompleted(keyword)) {
+                dataTaskChar = 'x';
+              } else {
+                dataTaskChar = ' ';
+              }
+              // Keep checked state based on the task's completed status
+              checkbox.checked = checkbox.defaultChecked;
+            }
+            checkbox.setAttribute('data-task', dataTaskChar);
+            // Also set data-task on the parent <li> element for theme compatibility.
+            // Obsidian natively sets data-task on both <li> and <input>. Some themes
+            // (Iridium, Velocity) target li[data-task] or [data-task] ancestor selectors
+            // rather than input[data-task] directly (like Border does).
+            taskElement.setAttribute('data-task', dataTaskChar);
+          }
+        }
       }
     });
   }

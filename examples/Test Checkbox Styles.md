@@ -1,15 +1,19 @@
 Requires theme support.
 
-- [ ] TODO this is todo.
+- [ ] TODO this is todo
 - [/] DOING this is doing
 - [x] DONE this is done
+- [-] CANCELED this is canceled
+
 - [ ] LATER this is later
 - [/] NOW this is now
 - [/] IN-PROGRESS this is in progress
 - [ ] WAIT this is wait
 - [ ] WAITING this is waiting
-- [-] CANCELED this is canceled
+
 - [-] CANCELLED this is cancelled
+
+- [ ] DOING this is doing without the active check mark
 
 ---
 
