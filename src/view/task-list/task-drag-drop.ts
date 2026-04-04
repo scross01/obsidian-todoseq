@@ -4,6 +4,7 @@ import { Task } from '../../types/task';
 import TodoTracker from '../../main';
 import { formatTaskLines } from '../../utils/task-format';
 import { CHECKBOX_DETECTION_REGEX } from '../../utils/patterns';
+import { isPhoneDevice } from '../../utils/mobile-utils';
 
 export interface TaskDragDropCallbacks {
   onGetTask: (path: string, line: number) => Task | undefined;
@@ -273,6 +274,10 @@ export class TaskDragDropHandler {
 
   initialize(callbacks: TaskDragDropCallbacks): void {
     this.callbacks = callbacks;
+
+    if (isPhoneDevice()) {
+      return;
+    }
 
     this.containerEl.addEventListener('dragstart', this.onDragStart);
     this.containerEl.addEventListener('dragend', this.onDragEnd);

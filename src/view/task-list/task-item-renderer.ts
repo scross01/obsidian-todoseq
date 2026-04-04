@@ -13,6 +13,7 @@ import {
   hasSubtasks,
   getTaskTextDisplay,
 } from '../../utils/task-utils';
+import { isPhoneDevice } from '../../utils/mobile-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { StateMenuBuilder } from '../components/state-menu-builder';
@@ -484,7 +485,7 @@ export class TaskItemRenderer {
     li.setAttribute('data-path', task.path);
     li.setAttribute('data-line', String(task.line));
     li.setAttribute('data-raw-text', task.rawText);
-    li.draggable = true;
+    li.draggable = !isPhoneDevice();
 
     // Create a flex container for checkbox + text + indicator (all on same row)
     const mainContent = li.createEl('div', { cls: 'todo-main-content' });
@@ -546,7 +547,7 @@ export class TaskItemRenderer {
    */
   updateTaskElementContent(task: Task, element: HTMLLIElement): void {
     // Ensure draggable is set for reused elements
-    element.draggable = true;
+    element.draggable = !isPhoneDevice();
 
     // 1. Update checkbox
     const checkbox = element.querySelector(
