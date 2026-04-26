@@ -23,16 +23,16 @@ describe('getDropAction', () => {
     expect(getDropAction(false, true, false)).toBe('move');
   });
 
-  it('returns migrate with Shift key', () => {
-    expect(getDropAction(false, false, true)).toBe('migrate');
+  it('returns copy with only Alt key', () => {
+    expect(getDropAction(false, false, true)).toBe('copy');
   });
 
-  it('prioritizes move over migrate when both Ctrl and Shift held', () => {
-    expect(getDropAction(true, false, true)).toBe('move');
+  it('returns migrate with Ctrl+Alt', () => {
+    expect(getDropAction(true, false, true)).toBe('migrate');
   });
 
-  it('prioritizes move over migrate when both Meta and Shift held', () => {
-    expect(getDropAction(false, true, true)).toBe('move');
+  it('returns migrate with Meta+Alt', () => {
+    expect(getDropAction(false, true, true)).toBe('migrate');
   });
 });
 

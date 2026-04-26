@@ -13,10 +13,10 @@ export interface TaskDragDropCallbacks {
 export function getDropAction(
   ctrlKey: boolean,
   metaKey: boolean,
-  shiftKey: boolean,
+  altKey: boolean,
 ): 'copy' | 'move' | 'migrate' {
+  if ((ctrlKey || metaKey) && altKey) return 'migrate';
   if (ctrlKey || metaKey) return 'move';
-  if (shiftKey) return 'migrate';
   return 'copy';
 }
 
@@ -136,6 +136,13 @@ export class TaskDragDropHandler {
   private editorDropRef: ReturnType<App['workspace']['on']> | null = null;
   private dragoverHandler: ((evt: DragEvent) => void) | null = null;
   private draggedTask: Task | null = null;
+  private modifierKeys: { ctrl: boolean; meta: boolean; alt: boolean } = {
+    ctrl: false,
+    meta: false,
+    alt: false,
+  };
+  private keydownHandler: ((evt: KeyboardEvent) => void) | null = null;
+  private keyupHandler: ((evt: KeyboardEvent) => void) | null = null;
 
   constructor(app: App, plugin: TodoTracker, containerEl: HTMLElement) {
     this.app = app;
@@ -182,7 +189,7 @@ export class TaskDragDropHandler {
   private onDragOver = (evt: DragEvent): void => {
     if (!this.draggedTask) return;
     if (!evt.dataTransfer) return;
-    const action = getDropAction(evt.ctrlKey, evt.metaKey, evt.shiftKey);
+    const action = getDropAction(evt.ctrlKey, evt.metaKey, evt.altKey);
     evt.dataTransfer.dropEffect = getDropEffect(action);
     evt.preventDefault();
   };
@@ -191,6 +198,36 @@ export class TaskDragDropHandler {
     if (this.dragoverHandler) {
       document.removeEventListener('dragover', this.dragoverHandler, true);
       this.dragoverHandler = null;
+    }
+  }
+
+  private updateModifierClass(): void {
+    const active = this.modifierKeys.ctrl || this.modifierKeys.meta;
+    this.containerEl.toggleClass('drag-modifier-active', active);
+  }
+
+  private onKeyDown = (evt: KeyboardEvent): void => {
+    this.modifierKeys.ctrl = evt.ctrlKey;
+    this.modifierKeys.meta = evt.metaKey;
+    this.modifierKeys.alt = evt.altKey;
+    this.updateModifierClass();
+  };
+
+  private onKeyUp = (evt: KeyboardEvent): void => {
+    this.modifierKeys.ctrl = evt.ctrlKey;
+    this.modifierKeys.meta = evt.metaKey;
+    this.modifierKeys.alt = evt.altKey;
+    this.updateModifierClass();
+  };
+
+  private removeKeyListeners(): void {
+    if (this.keydownHandler) {
+      document.removeEventListener('keydown', this.keydownHandler, true);
+      this.keydownHandler = null;
+    }
+    if (this.keyupHandler) {
+      document.removeEventListener('keyup', this.keyupHandler, true);
+      this.keyupHandler = null;
     }
   }
 
@@ -210,7 +247,7 @@ export class TaskDragDropHandler {
       return;
     }
 
-    const action = getDropAction(evt.ctrlKey, evt.metaKey, evt.shiftKey);
+    const action = getDropAction(evt.ctrlKey, evt.metaKey, evt.altKey);
 
     if (action === 'migrate' && !this.plugin.settings.migrateToTodayState) {
       new Notice(
@@ -282,6 +319,11 @@ export class TaskDragDropHandler {
     this.containerEl.addEventListener('dragstart', this.onDragStart);
     this.containerEl.addEventListener('dragend', this.onDragEnd);
 
+    this.keydownHandler = this.onKeyDown;
+    this.keyupHandler = this.onKeyUp;
+    document.addEventListener('keydown', this.keydownHandler, true);
+    document.addEventListener('keyup', this.keyupHandler, true);
+
     this.editorDropRef = this.app.workspace.on(
       'editor-drop',
       this.onEditorDrop,
@@ -292,12 +334,15 @@ export class TaskDragDropHandler {
     this.containerEl.removeEventListener('dragstart', this.onDragStart);
     this.containerEl.removeEventListener('dragend', this.onDragEnd);
     this.removeDragoverListener();
+    this.removeKeyListeners();
 
     if (this.editorDropRef) {
       this.app.workspace.offref(this.editorDropRef);
       this.editorDropRef = null;
     }
 
+    this.modifierKeys = { ctrl: false, meta: false, alt: false };
+    this.containerEl.removeClass('drag-modifier-active');
     this.draggedTask = null;
     this.callbacks = null;
   }

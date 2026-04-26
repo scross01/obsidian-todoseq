@@ -142,8 +142,8 @@ You can drag tasks from the Task List directly into an open file in your vault. 
 **Action selection**: Use keyboard modifiers during the drag to choose the action:
 
 - **No modifier**: Copy - the task is duplicated in the target location while keeping the original
-- **Ctrl/Cmd**: Move - the task is moved to the target location and removed from the original
-- **Shift**: Migrate - the task is copied to the target and the original is updated with a custom state (requires [Migrated state keyword](settings.md#migrated-state-keyword) to be configured)
+- **Ctrl/Cmd** (Ctrl on Windows/Linux, ⌘ on macOS): Move - the task is moved to the target location and removed from the original
+- **Ctrl/Cmd+Alt** (Ctrl+Alt on Windows/Linux, ⌘+Option on macOS): Migrate - the task is copied to the target and the original is updated with a custom state (requires [Migrated state keyword](settings.md#migrated-state-keyword) to be configured)
 
 **Drop behavior**: When dropping into a file in the editor view, the task is inserted at the cursor position.
 A notice appears confirming the action: "Task copied", "Task moved", or "Task migrated".
