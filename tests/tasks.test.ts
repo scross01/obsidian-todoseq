@@ -1026,5 +1026,76 @@ y = 2
         expect(tasks[6].text).toBe('task in quote');
       });
     });
+
+    describe('Code block delimiter matching', () => {
+      beforeEach(() => {
+        settings.includeCodeBlocks = true;
+        settings.languageCommentSupport = false;
+        parser = TaskParser.create(
+          createTestKeywordManager(settings),
+          null,
+          undefined,
+          settings,
+        );
+      });
+
+      test('should not incorrectly close code block when inner content contains alternative fence', () => {
+        const content = `TODO test 1
+
+\`\`\`
+Testing 124
+~~~
+\`\`\`
+
+TODO test 2
+`;
+        const tasks = parser.parseFile(content, 'test.md');
+
+        expect(tasks).toHaveLength(2);
+        expect(tasks[0].state).toBe('TODO');
+        expect(tasks[0].text).toBe('test 1');
+        expect(tasks[1].state).toBe('TODO');
+        expect(tasks[1].text).toBe('test 2');
+      });
+
+      test('should match closing fence with same delimiter type and length', () => {
+        const content = `TODO before
+
+\`\`\`
+code block
+\`\`\`
+
+TODO between
+
+~~~
+tilde block
+~~~
+
+TODO after
+`;
+        const tasks = parser.parseFile(content, 'test.md');
+
+        expect(tasks).toHaveLength(3);
+        expect(tasks[0].text).toBe('before');
+        expect(tasks[1].text).toBe('between');
+        expect(tasks[2].text).toBe('after');
+      });
+
+      test('should handle longer fence delimiters (4+ characters)', () => {
+        const content = `TODO before
+
+\`\`\`\`
+code with 4 backticks
+\`\`\`\`
+
+TODO after
+`;
+        const tasks = parser.parseFile(content, 'test.md');
+
+        expect(tasks).toHaveLength(2);
+        expect(tasks[0].text).toBe('before');
+        expect(tasks[1].text).toBe('after');
+      });
+    });
   });
 });

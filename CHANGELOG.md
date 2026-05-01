@@ -3,6 +3,7 @@
 ## 0.13.0-dev
 
 - Added support for drag and drop tasks from task list to active page. #61
+- Fixed task line not styled after code block with alternate delimiters in content.
 
 ## 0.12.2
 

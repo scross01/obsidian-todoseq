@@ -1039,6 +1039,7 @@ export class TaskParser implements ITaskParser {
     // Initialize state machine
     let inBlock = false;
     let blockMarker: 'code' | 'math' | 'comment' | null = null;
+    let codeDelimiter: string | null = null;
     let codeRegex: RegExp | null = null;
 
     const tasks: Task[] = [];
@@ -1072,6 +1073,7 @@ export class TaskParser implements ITaskParser {
         line,
         inBlock,
         blockMarker,
+        codeDelimiter,
       );
       if (blockTransition) {
         const result = this.handleBlockTransition(
@@ -1085,6 +1087,7 @@ export class TaskParser implements ITaskParser {
         if (result) {
           inBlock = result.inBlock;
           blockMarker = result.blockMarker;
+          codeDelimiter = result.blockDelimiter ?? null;
           codeRegex = result.codeRegex;
         }
         continue;
@@ -1156,26 +1159,40 @@ export class TaskParser implements ITaskParser {
    * @param line The line to check
    * @param currentInBlock Whether currently inside a block
    * @param currentBlockMarker Current block type
+   * @param currentCodeDelimiter The delimiter used to open the current code block (null if no code block)
    * @returns Block transition info or null
    */
   private detectBlockTransition(
     line: string,
     currentInBlock: boolean,
     currentBlockMarker: 'code' | 'math' | 'comment' | null,
+    currentCodeDelimiter: string | null,
   ): {
     type: 'code' | 'math' | 'comment';
     entering: boolean;
     language?: string;
+    delimiter?: string;
   } | null {
     const codeMatch = CODE_BLOCK_REGEX.exec(line);
     if (codeMatch) {
-      // If we're already in a code block, this is an exit
+      const delimiter = codeMatch[1];
+      // If we're already in a code block, check if this line closes it
       if (currentInBlock && currentBlockMarker === 'code') {
-        return { type: 'code', entering: false };
+        // Only exit if delimiter matches opening character and has sufficient length
+        const openingChar = currentCodeDelimiter ? currentCodeDelimiter[0] : '';
+        const closingChar = delimiter[0];
+        const openingLength = currentCodeDelimiter ? currentCodeDelimiter.length : 0;
+        const closingLength = delimiter.length;
+        if (closingChar === openingChar && closingLength >= openingLength) {
+          return { type: 'code', entering: false, delimiter };
+        }
+        // Different delimiter or too short → ignore (stay in block)
+        return null;
       }
-      return { type: 'code', entering: true };
+      // Starting a new code block
+      return { type: 'code', entering: true, delimiter };
     }
-
+    
     const mathMatch = MATH_BLOCK_REGEX.exec(line);
     if (mathMatch) {
       if (currentInBlock && currentBlockMarker === 'math') {
@@ -1217,6 +1234,7 @@ export class TaskParser implements ITaskParser {
       type: 'code' | 'math' | 'comment';
       entering: boolean;
       language?: string;
+      delimiter?: string;
     },
     index: number,
     lines: string[],
@@ -1226,16 +1244,19 @@ export class TaskParser implements ITaskParser {
   ): {
     inBlock: boolean;
     blockMarker: 'code' | 'math' | 'comment' | null;
+    blockDelimiter?: string | null;
     codeRegex: RegExp | null;
   } {
     let inBlock = currentInBlock;
     let blockMarker: 'code' | 'math' | 'comment' | null = null;
+    let codeDelimiter: string | null = null;
     let codeRegex: RegExp | null = currentCodeRegex;
 
     if (transition.type === 'code') {
       if (transition.entering) {
         inBlock = true;
         blockMarker = 'code';
+        codeDelimiter = transition.delimiter || null;
         if (this.includeCodeBlocks && this.languageCommentSupport) {
           const line = lines[index];
           const m = CODE_BLOCK_REGEX.exec(line);
@@ -1252,6 +1273,7 @@ export class TaskParser implements ITaskParser {
       } else {
         inBlock = false;
         blockMarker = null;
+        codeDelimiter = null;
         codeRegex = null;
         this.currentLanguage = null;
       }
@@ -1273,7 +1295,7 @@ export class TaskParser implements ITaskParser {
       }
     }
 
-    return { inBlock, blockMarker, codeRegex };
+    return { inBlock, blockMarker, blockDelimiter: codeDelimiter, codeRegex };
   }
 
   /**

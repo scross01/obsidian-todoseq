@@ -76,6 +76,7 @@ export class TaskKeywordDecorator {
   private currentLanguage: LanguageDefinition | null = null;
   private inCodeBlock = false;
   private codeBlockLanguage = '';
+  private codeBlockDelimiter: string = ''; // Track opening delimiter
   private inQuoteBlock = false;
   private quoteNestingLevel = 0;
   private inCalloutBlock = false;
@@ -164,6 +165,7 @@ export class TaskKeywordDecorator {
       // Reset state tracking
       this.inCodeBlock = false;
       this.codeBlockLanguage = '';
+      this.codeBlockDelimiter = '';
       this.currentLanguage = null;
       this.inQuoteBlock = false;
       this.inCalloutBlock = false;
@@ -477,18 +479,28 @@ export class TaskKeywordDecorator {
   }
 
   private updateCodeBlockState(lineText: string): void {
-    const codeBlockMatch = /^\s*(```|~~~)\s*(\S+)?$/.exec(lineText);
+    const codeBlockMatch = /^\s*(`{3,}|~{3,})\s*(\S+)?$/.exec(lineText);
     if (codeBlockMatch) {
+      const delimiter = codeBlockMatch[1];
       if (!this.inCodeBlock) {
         // Starting a new code block
         this.inCodeBlock = true;
+        this.codeBlockDelimiter = delimiter; // Store opening delimiter
         this.codeBlockLanguage = codeBlockMatch[2] || '';
         this.detectLanguage(this.codeBlockLanguage);
       } else {
-        // Ending code block
-        this.inCodeBlock = false;
-        this.codeBlockLanguage = '';
-        this.currentLanguage = null;
+        // Ending code block only if delimiter matches the opening character and length >= opening delimiter
+        const openingChar = this.codeBlockDelimiter[0];
+        const closingChar = delimiter[0];
+        const openingLength = this.codeBlockDelimiter.length;
+        const closingLength = delimiter.length;
+        if (closingChar === openingChar && closingLength >= openingLength) {
+          this.inCodeBlock = false;
+          this.codeBlockDelimiter = '';
+          this.codeBlockLanguage = '';
+          this.currentLanguage = null;
+        }
+        // else: different delimiter inside code block (e.g., ~~~ inside ```) → ignore, stay in code block
       }
     }
   }

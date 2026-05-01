@@ -97,10 +97,10 @@ export const CALLOUT_PREFIX_SOURCE = CALLOUT_PREFIX_PATTERN.source;
 // ============================================================================
 
 /**
- * Code block marker ``` or ~~~ with optional language
- * Example: "```", "```javascript", "~~~python"
+ * Code block marker ``` or ~~~ with optional language (three or more backticks or tildes)
+ * Example: "```", "````", "~~~~", "```javascript", "~~~python"
  */
-export const CODE_BLOCK_REGEX = /^\s*(```|~~~)\s*(\S+)?$/;
+export const CODE_BLOCK_REGEX = /^\s*(`{3,}|~{3,})\s*(\S+)?$/;
 
 /**
  * Math block marker $$
