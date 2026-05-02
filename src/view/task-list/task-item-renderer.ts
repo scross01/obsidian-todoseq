@@ -709,7 +709,9 @@ export class TaskItemRenderer {
     }
 
     // 5. Update date display
-    const hasDates = task.scheduledDate || task.deadlineDate || task.closedDate;
+    const hasDates =
+      (!task.completed && (task.scheduledDate || task.deadlineDate)) ||
+      (task.completed && task.closedDate);
     const existingDateDisplay = element.querySelector(
       '.todoseq-task-date-container',
     );
