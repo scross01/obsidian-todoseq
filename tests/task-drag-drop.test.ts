@@ -4,11 +4,13 @@
 
 import {
   getDropAction,
+} from '../src/view/task-list/task-drag-drop';
+import {
   buildRemovalRange,
   modifyLinesForMigration,
   findSubtaskEnd,
   extractSubtaskLines,
-} from '../src/view/task-list/task-drag-drop';
+} from '../src/utils/task-sub-bullets';
 
 describe('getDropAction', () => {
   it('returns copy with no modifiers', () => {

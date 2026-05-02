@@ -4,6 +4,8 @@
 
 - Added support for drag and drop tasks from task list to active page. #61
 - Fixed task line not styled after code block with alternate delimiters in content.
+- Fixed preserve task line list markers when copying/moving tasks.
+- Fixed preserve task sub bullet content when copying/moving tasks.
 
 ## 0.12.2
 

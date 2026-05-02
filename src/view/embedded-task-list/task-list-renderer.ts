@@ -21,7 +21,11 @@ import {
   getTodayDailyNote,
   isTaskOnTodayDailyNote,
 } from '../../utils/daily-note-utils';
-import { formatTaskLines } from '../../utils/task-format';
+import {
+  getTaskRemovalRange,
+  modifyLinesForMigration,
+  readTaskBlockFromVault,
+} from '../../utils/task-sub-bullets';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 
 /**
@@ -65,36 +69,9 @@ export class EmbeddedTaskListRenderer {
   /**
    * Copy task to clipboard in Org mode format
    */
-  private copyTaskToClipboard(task: Task): void {
-    const lines: string[] = [];
-
-    // Build the main task line: KEYWORD [#priority] text
-    let taskLine = task.state;
-    if (task.priority) {
-      const priorityMap: Record<string, string> = {
-        high: 'A',
-        med: 'B',
-        low: 'C',
-      };
-      taskLine += ` [#${priorityMap[task.priority]}]`;
-    }
-    taskLine += ` ${task.text}`;
-    lines.push(taskLine);
-
-    // Add scheduled date if present
-    if (task.scheduledDate) {
-      const scheduledStr = this.formatDateForClipboard(task.scheduledDate);
-      lines.push(`SCHEDULED: ${scheduledStr}`);
-    }
-
-    // Add deadline date if present
-    if (task.deadlineDate) {
-      const deadlineStr = this.formatDateForClipboard(task.deadlineDate);
-      lines.push(`DEADLINE: ${deadlineStr}`);
-    }
-
-    // Copy to clipboard
-    const textToCopy = lines.join('\n');
+  private async copyTaskToClipboard(task: Task): Promise<void> {
+    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
+    const textToCopy = allLines.join('\n');
     navigator.clipboard.writeText(textToCopy).then(
       () => {
         new Notice('Task copied to clipboard');
@@ -103,17 +80,6 @@ export class EmbeddedTaskListRenderer {
         new Notice('Failed to copy task');
       },
     );
-  }
-
-  /**
-   * Format date for clipboard in Org mode format: <2026-03-07 Sat>
-   */
-  private formatDateForClipboard(date: Date): string {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const dayOfWeek = date.toLocaleDateString(undefined, { weekday: 'short' });
-    return `<${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${dayOfWeek}>`;
   }
 
   /**
@@ -131,10 +97,10 @@ export class EmbeddedTaskListRenderer {
       return;
     }
 
-    const taskLines = formatTaskLines(task);
+    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
     const currentContent = await this.plugin.app.vault.read(todayNote);
     const newContent =
-      currentContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+      currentContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
     await this.plugin.app.vault.modify(todayNote, newContent);
     new Notice('Task copied to today daily note');
   }
@@ -154,13 +120,13 @@ export class EmbeddedTaskListRenderer {
       return;
     }
 
-    const taskLines = formatTaskLines(task);
+    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
+
     const todayContent = await this.plugin.app.vault.read(todayNote);
     const newTodayContent =
-      todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+      todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
     await this.plugin.app.vault.modify(todayNote, newTodayContent);
 
-    // Remove task from source file
     const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
     if (!(sourceFile instanceof TFile)) {
       new Notice('Failed to find source file');
@@ -169,24 +135,10 @@ export class EmbeddedTaskListRenderer {
 
     const sourceContent = await this.plugin.app.vault.read(sourceFile);
     const sourceLines = sourceContent.split('\n');
-    const startLine = task.line;
-    let endLine = startLine;
-
-    for (let i = startLine + 1; i < sourceLines.length; i++) {
-      const nextLine = sourceLines[i].trim();
-      if (
-        nextLine.startsWith('SCHEDULED:') ||
-        nextLine.startsWith('DEADLINE:')
-      ) {
-        endLine = i;
-      } else {
-        break;
-      }
-    }
-
+    const { start, end } = getTaskRemovalRange(sourceLines, task);
     const newSourceLines = [
-      ...sourceLines.slice(0, startLine),
-      ...sourceLines.slice(endLine + 1),
+      ...sourceLines.slice(0, start),
+      ...sourceLines.slice(end + 1),
     ];
     await this.plugin.app.vault.modify(sourceFile, newSourceLines.join('\n'));
     new Notice('Task moved to today daily note');
@@ -209,13 +161,13 @@ export class EmbeddedTaskListRenderer {
       return;
     }
 
-    const taskLines = formatTaskLines(task);
+    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
+
     const todayContent = await this.plugin.app.vault.read(todayNote);
     const newTodayContent =
-      todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+      todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
     await this.plugin.app.vault.modify(todayNote, newTodayContent);
 
-    // Update the source task to the migrated state
     const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
     if (!(sourceFile instanceof TFile)) {
       new Notice('Failed to find source file');
@@ -224,34 +176,15 @@ export class EmbeddedTaskListRenderer {
 
     const sourceContent = await this.plugin.app.vault.read(sourceFile);
     const sourceLines = sourceContent.split('\n');
-
-    const taskLineContent = sourceLines[task.line];
-    if (!taskLineContent) {
-      new Notice('Failed to find task line');
-      return;
-    }
-
     const migrateState = this.plugin.settings.migrateToTodayState;
     const taskKeyword = task.state || 'TODO';
-
-    const escapeRegex = (str: string) =>
-      str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    let updatedLineContent: string;
-    if (migrateState === '') {
-      updatedLineContent = taskLineContent.replace(
-        new RegExp(`^(\\s*)\\b${escapeRegex(taskKeyword)}\\b\\s*`, 'i'),
-        '$1',
-      );
-    } else {
-      updatedLineContent = taskLineContent.replace(
-        new RegExp(`\\b${escapeRegex(taskKeyword)}\\b`, 'i'),
-        migrateState,
-      );
-    }
-
-    sourceLines[task.line] = updatedLineContent;
-    await this.plugin.app.vault.modify(sourceFile, sourceLines.join('\n'));
+    const modified = modifyLinesForMigration(
+      sourceLines,
+      task.line,
+      taskKeyword,
+      migrateState,
+    );
+    await this.plugin.app.vault.modify(sourceFile, modified.join('\n'));
     new Notice('Task migrated to today daily note');
   }
 

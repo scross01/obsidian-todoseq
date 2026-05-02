@@ -32,7 +32,11 @@ import {
   getTodayDailyNote,
   isTaskOnTodayDailyNote,
 } from '../../utils/daily-note-utils';
-import { formatTaskLines } from '../../utils/task-format';
+import {
+  getTaskRemovalRange,
+  modifyLinesForMigration,
+  readTaskBlockFromVault,
+} from '../../utils/task-sub-bullets';
 
 const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
@@ -1203,36 +1207,9 @@ export class TaskListView extends ItemView {
    * Copy task to clipboard in Org mode format (no indentation, bullets, or checkbox)
    * Format: TODO [#B] task text\nSCHEDULED <2026-03-07 Sat>\nDEADLINE <2026-03-07 Sat>
    */
-  private copyTaskToClipboard(task: Task): void {
-    const lines: string[] = [];
-
-    // Build the main task line: KEYWORD [#priority] text
-    let taskLine = task.state;
-    if (task.priority) {
-      const priorityMap: Record<string, string> = {
-        high: 'A',
-        med: 'B',
-        low: 'C',
-      };
-      taskLine += ` [#${priorityMap[task.priority]}]`;
-    }
-    taskLine += ` ${task.text}`;
-    lines.push(taskLine);
-
-    // Add scheduled date if present
-    if (task.scheduledDate) {
-      const scheduledStr = this.formatDateForClipboard(task.scheduledDate);
-      lines.push(`SCHEDULED: ${scheduledStr}`);
-    }
-
-    // Add deadline date if present
-    if (task.deadlineDate) {
-      const deadlineStr = this.formatDateForClipboard(task.deadlineDate);
-      lines.push(`DEADLINE: ${deadlineStr}`);
-    }
-
-    // Copy to clipboard
-    const textToCopy = lines.join('\n');
+  private async copyTaskToClipboard(task: Task): Promise<void> {
+    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
+    const textToCopy = allLines.join('\n');
     navigator.clipboard.writeText(textToCopy).then(
       () => {
         new Notice('Task copied to clipboard');
@@ -1244,49 +1221,27 @@ export class TaskListView extends ItemView {
   }
 
   /**
-   * Format date for clipboard in Org mode format: <2026-03-07 Sat>
-   */
-  private formatDateForClipboard(date: Date): string {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const dayOfWeek = date.toLocaleDateString(undefined, { weekday: 'short' });
-    return `<${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${dayOfWeek}>`;
-  }
-
-  /**
    * Copy task to today's daily note
    * @param task The task to copy
    */
   private async copyTaskToToday(task: Task): Promise<void> {
-    // Get today's daily note
     const todayNote = await getTodayDailyNote(this.plugin.app);
     if (!todayNote) {
       new Notice('Failed to get or create today daily note');
       return;
     }
 
-    // Check if task is already on today's daily note
     if (isTaskOnTodayDailyNote(task, todayNote)) {
       new Notice('Task is already on today daily note');
       return;
     }
 
-    // Format the task for daily note
-    const taskLines = formatTaskLines(task);
-
-    // Read the current content of today's daily note
+    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
     const currentContent = await this.plugin.app.vault.read(todayNote);
-
-    // Append the task to the end of the file
-    // Add two newlines before the task to separate from existing content
     const newContent =
-      currentContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
-
-    // Write the updated content back to the file
+      currentContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
     await this.plugin.app.vault.modify(todayNote, newContent);
 
-    // Show notification
     new Notice('Task copied to today daily note');
   }
 
@@ -1295,73 +1250,40 @@ export class TaskListView extends ItemView {
    * @param task The task to move
    */
   private async moveTaskToToday(task: Task): Promise<void> {
-    // Get today's daily note
     const todayNote = await getTodayDailyNote(this.plugin.app);
     if (!todayNote) {
       new Notice('Failed to get or create today daily note');
       return;
     }
 
-    // Check if task is already on today's daily note
     if (isTaskOnTodayDailyNote(task, todayNote)) {
       new Notice('Task is already on today daily note');
       return;
     }
 
-    // Format the task for daily note
-    const taskLines = formatTaskLines(task);
+    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
 
-    // Read the current content of today's daily note
     const todayContent = await this.plugin.app.vault.read(todayNote);
-
-    // Append the task to the end of today's daily note
-    // Add two newlines before the task to separate from existing content
     const newTodayContent =
-      todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
-
-    // Write the updated content to today's daily note
+      todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
     await this.plugin.app.vault.modify(todayNote, newTodayContent);
 
-    // Remove the task from the source file
-    // Get the source file
     const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
     if (!(sourceFile instanceof TFile)) {
       new Notice('Failed to find source file');
       return;
     }
 
-    // Read the source file content
     const sourceContent = await this.plugin.app.vault.read(sourceFile);
     const sourceLines = sourceContent.split('\n');
+    const { start, end } = getTaskRemovalRange(sourceLines, task);
 
-    // Find the task line and any subsequent date lines
-    const startLine = task.line;
-    let endLine = startLine;
-
-    // Look for SCHEDULED and DEADLINE lines immediately after the task
-    for (let i = startLine + 1; i < sourceLines.length; i++) {
-      const nextLine = sourceLines[i].trim();
-      if (
-        nextLine.startsWith('SCHEDULED:') ||
-        nextLine.startsWith('DEADLINE:')
-      ) {
-        endLine = i;
-      } else {
-        // Stop at the first non-date line
-        break;
-      }
-    }
-
-    // Remove the task and its date lines from the source file
     const newSourceLines = [
-      ...sourceLines.slice(0, startLine),
-      ...sourceLines.slice(endLine + 1),
+      ...sourceLines.slice(0, start),
+      ...sourceLines.slice(end + 1),
     ];
-
-    // Write the updated content back to the source file
     await this.plugin.app.vault.modify(sourceFile, newSourceLines.join('\n'));
 
-    // Show notification
     new Notice('Task moved to today daily note');
   }
 
@@ -1372,81 +1294,42 @@ export class TaskListView extends ItemView {
    * @param task The task to migrate
    */
   private async migrateTaskToToday(task: Task): Promise<void> {
-    // Get today's daily note
     const todayNote = await getTodayDailyNote(this.plugin.app);
     if (!todayNote) {
       new Notice('Failed to get or create today daily note');
       return;
     }
 
-    // Check if task is already on today's daily note
     if (isTaskOnTodayDailyNote(task, todayNote)) {
       new Notice('Task is already on today daily note');
       return;
     }
 
-    // Format the task for daily note
-    const taskLines = formatTaskLines(task);
+    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
 
-    // Read the current content of today's daily note
     const todayContent = await this.plugin.app.vault.read(todayNote);
-
-    // Append the task to the end of today's daily note
     const newTodayContent =
-      todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
-
-    // Write the updated content to today's daily note
+      todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
     await this.plugin.app.vault.modify(todayNote, newTodayContent);
 
-    // Update the source task to the migrated state
-    // Get the source file
     const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
     if (!(sourceFile instanceof TFile)) {
       new Notice('Failed to find source file');
       return;
     }
 
-    // Read the source file content
     const sourceContent = await this.plugin.app.vault.read(sourceFile);
     const sourceLines = sourceContent.split('\n');
-
-    // Get the task line content
-    const taskLineContent = sourceLines[task.line];
-    if (!taskLineContent) {
-      new Notice('Failed to find task line');
-      return;
-    }
-
-    // Get the migrated state keyword from settings
     const migrateState = this.plugin.settings.migrateToTodayState;
     const taskKeyword = task.state || 'TODO';
+    const modified = modifyLinesForMigration(
+      sourceLines,
+      task.line,
+      taskKeyword,
+      migrateState,
+    );
+    await this.plugin.app.vault.modify(sourceFile, modified.join('\n'));
 
-    // Escape special regex characters in the keyword
-    const escapeRegex = (str: string) =>
-      str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    let updatedLineContent: string;
-    if (migrateState === '') {
-      // If empty, remove the keyword entirely
-      updatedLineContent = taskLineContent.replace(
-        new RegExp(`^(\\s*)\\b${escapeRegex(taskKeyword)}\\b\\s*`, 'i'),
-        '$1',
-      );
-    } else {
-      // Replace the existing keyword with the migrated state
-      updatedLineContent = taskLineContent.replace(
-        new RegExp(`\\b${escapeRegex(taskKeyword)}\\b`, 'i'),
-        migrateState,
-      );
-    }
-
-    // Update the source line
-    sourceLines[task.line] = updatedLineContent;
-
-    // Write the updated content back to the source file
-    await this.plugin.app.vault.modify(sourceFile, sourceLines.join('\n'));
-
-    // Show notification
     new Notice('Task migrated to today daily note');
   }
 

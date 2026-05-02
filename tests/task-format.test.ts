@@ -7,7 +7,7 @@ function createTask(overrides: Partial<Task> = {}): Task {
     line: 1,
     rawText: 'TODO test task',
     indent: '',
-    listMarker: '- ',
+    listMarker: '',
     text: 'test task',
     state: 'TODO',
     completed: false,
@@ -27,20 +27,68 @@ function createTask(overrides: Partial<Task> = {}): Task {
 }
 
 describe('formatTaskLines', () => {
-  test('should format task with only state', () => {
+  test('should format task with only state (no list marker)', () => {
     const task = createTask({ state: 'TODO', text: 'test task' });
     const lines = formatTaskLines(task);
     expect(lines).toEqual(['TODO test task']);
   });
 
-  test('should format task with high priority', () => {
+  test('should format task with list marker', () => {
     const task = createTask({
+      rawText: '- TODO test task',
+      listMarker: '- ',
+      state: 'TODO',
+      text: 'test task',
+    });
+    const lines = formatTaskLines(task);
+    expect(lines).toEqual(['- TODO test task']);
+  });
+
+  test('should format task with checkbox', () => {
+    const task = createTask({
+      rawText: '- [ ] TODO test task',
+      listMarker: '- ',
+      state: 'TODO',
+      text: 'test task',
+    });
+    const lines = formatTaskLines(task);
+    expect(lines).toEqual(['- [ ] TODO test task']);
+  });
+
+  test('should format task with checked checkbox', () => {
+    const task = createTask({
+      rawText: '- [x] DONE test task',
+      listMarker: '- ',
+      state: 'DONE',
+      text: 'test task',
+      completed: true,
+    });
+    const lines = formatTaskLines(task);
+    expect(lines).toEqual(['- [x] DONE test task']);
+  });
+
+  test('should format task with high priority and list marker', () => {
+    const task = createTask({
+      rawText: '- TODO [#A] test task',
+      listMarker: '- ',
       state: 'TODO',
       text: 'test task',
       priority: 'high',
     });
     const lines = formatTaskLines(task);
-    expect(lines).toEqual(['TODO [#A] test task']);
+    expect(lines).toEqual(['- TODO [#A] test task']);
+  });
+
+  test('should format task with priority and checkbox', () => {
+    const task = createTask({
+      rawText: '- [ ] TODO [#A] test task',
+      listMarker: '- ',
+      state: 'TODO',
+      text: 'test task',
+      priority: 'high',
+    });
+    const lines = formatTaskLines(task);
+    expect(lines).toEqual(['- [ ] TODO [#A] test task']);
   });
 
   test('should format task with med priority', () => {
@@ -152,5 +200,70 @@ describe('formatTaskLines', () => {
     });
     const lines = formatTaskLines(task);
     expect(lines).toEqual(['DONE completed task']);
+  });
+
+  test('should preserve asterisk list marker', () => {
+    const task = createTask({
+      rawText: '* TODO test task',
+      listMarker: '* ',
+      state: 'TODO',
+      text: 'test task',
+    });
+    const lines = formatTaskLines(task);
+    expect(lines).toEqual(['* TODO test task']);
+  });
+
+  test('should preserve plus list marker', () => {
+    const task = createTask({
+      rawText: '+ TODO test task',
+      listMarker: '+ ',
+      state: 'TODO',
+      text: 'test task',
+    });
+    const lines = formatTaskLines(task);
+    expect(lines).toEqual(['+ TODO test task']);
+  });
+
+  test('should preserve checkbox with asterisk marker', () => {
+    const task = createTask({
+      rawText: '* [ ] TODO test task',
+      listMarker: '* ',
+      state: 'TODO',
+      text: 'test task',
+    });
+    const lines = formatTaskLines(task);
+    expect(lines).toEqual(['* [ ] TODO test task']);
+  });
+
+  test('should format bullet task with scheduled date', () => {
+    const scheduledDate = new Date(2026, 4, 9, 0, 0, 0);
+    const task = createTask({
+      rawText: '- TODO task 1',
+      listMarker: '- ',
+      state: 'TODO',
+      text: 'task 1',
+      scheduledDate,
+    });
+    const lines = formatTaskLines(task);
+    expect(lines).toEqual([
+      '- TODO task 1',
+      'SCHEDULED: <2026-05-09 Sat>',
+    ]);
+  });
+
+  test('should format checkbox task with scheduled date', () => {
+    const scheduledDate = new Date(2026, 4, 2, 0, 0, 0);
+    const task = createTask({
+      rawText: '- [ ] TODO task 3',
+      listMarker: '- ',
+      state: 'TODO',
+      text: 'task 3',
+      scheduledDate,
+    });
+    const lines = formatTaskLines(task);
+    expect(lines).toEqual([
+      '- [ ] TODO task 3',
+      'SCHEDULED: <2026-05-02 Sat>',
+    ]);
   });
 });

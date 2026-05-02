@@ -1,18 +1,25 @@
 import { DateRepeatInfo, Task } from '../types/task';
+import { CHECKBOX_DETECTION_REGEX } from './patterns';
 
 export function formatTaskLines(task: Task): string[] {
   const lines: string[] = [];
 
-  let taskLine = task.state;
-  if (task.priority) {
-    const priorityMap: Record<string, string> = {
-      high: 'A',
-      med: 'B',
-      low: 'C',
-    };
-    taskLine += ` [#${priorityMap[task.priority]}]`;
+  const checkboxMatch = task.rawText.match(CHECKBOX_DETECTION_REGEX);
+  const isCheckbox = checkboxMatch !== null;
+
+  const priorityPart = task.priority
+    ? ` [#${task.priority === 'high' ? 'A' : task.priority === 'med' ? 'B' : 'C'}]`
+    : '';
+  const textPart = task.text ? ` ${task.text}` : '';
+
+  let taskLine: string;
+  if (isCheckbox) {
+    const listMarkerChar = checkboxMatch[1];
+    const checkboxState = checkboxMatch[2];
+    taskLine = `${listMarkerChar} [${checkboxState}] ${task.state}${priorityPart}${textPart}`;
+  } else {
+    taskLine = `${task.listMarker || ''}${task.state}${priorityPart}${textPart}`;
   }
-  taskLine += ` ${task.text}`;
   lines.push(taskLine);
 
   if (task.scheduledDate) {

@@ -2,8 +2,13 @@ import { App, Notice, TFile, MarkdownView, Editor } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
-import { formatTaskLines } from '../../utils/task-format';
-import { CHECKBOX_DETECTION_REGEX } from '../../utils/patterns';
+import {
+  buildRemovalRange,
+  findSubtaskEnd,
+  modifyLinesForMigration,
+  readTaskBlockFromVault,
+  taskHasCheckbox,
+} from '../../utils/task-sub-bullets';
 import { isPhoneDevice } from '../../utils/mobile-utils';
 
 export interface TaskDragDropCallbacks {
@@ -28,105 +33,7 @@ export function getDropEffect(
   return 'copy';
 }
 
-export function buildRemovalRange(
-  lines: string[],
-  taskLine: number,
-): { start: number; end: number } {
-  let end = taskLine;
-  for (let i = taskLine + 1; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (trimmed.startsWith('SCHEDULED:') || trimmed.startsWith('DEADLINE:')) {
-      end = i;
-    } else {
-      break;
-    }
-  }
-  return { start: taskLine, end };
-}
 
-export function findSubtaskEnd(
-  lines: string[],
-  afterLine: number,
-  taskIndent: string,
-  parentHasCheckbox: boolean,
-): number {
-  const parentIndentLen = taskIndent.length;
-  let end = afterLine;
-  for (let i = afterLine + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === '') break;
-    const lineIndentLen = line.length - line.trimStart().length;
-    if (lineIndentLen > parentIndentLen) {
-      end = i;
-    } else if (
-      lineIndentLen === parentIndentLen &&
-      !parentHasCheckbox &&
-      CHECKBOX_DETECTION_REGEX.test(line)
-    ) {
-      end = i;
-    } else {
-      break;
-    }
-  }
-  return end;
-}
-
-export function extractSubtaskLines(
-  lines: string[],
-  dateEnd: number,
-  taskIndent: string,
-  parentHasCheckbox: boolean,
-): string[] {
-  const subtaskEnd = findSubtaskEnd(
-    lines,
-    dateEnd,
-    taskIndent,
-    parentHasCheckbox,
-  );
-  if (subtaskEnd <= dateEnd) return [];
-
-  const parentIndentLen = taskIndent.length;
-  const result: string[] = [];
-  for (let i = dateEnd + 1; i <= subtaskEnd; i++) {
-    result.push(lines[i].substring(parentIndentLen));
-  }
-  return result;
-}
-
-export function modifyLinesForMigration(
-  lines: string[],
-  taskLine: number,
-  oldKeyword: string,
-  migrateState: string,
-): string[] {
-  const result = [...lines];
-  const taskLineContent = result[taskLine];
-  if (!taskLineContent) return result;
-
-  const escaped = oldKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  if (migrateState === '') {
-    result[taskLine] = taskLineContent.replace(
-      new RegExp(`^(.*?)\\b${escaped}\\b\\s*`, 'i'),
-      '$1',
-    );
-  } else {
-    result[taskLine] = taskLineContent.replace(
-      new RegExp(`\\b${escaped}\\b`, 'i'),
-      migrateState,
-    );
-  }
-
-  const { end } = buildRemovalRange(result, taskLine);
-  if (end > taskLine) {
-    result.splice(taskLine + 1, end - taskLine);
-  }
-
-  return result;
-}
-
-function taskHasCheckbox(task: Task): boolean {
-  return CHECKBOX_DETECTION_REGEX.test(task.rawText);
-}
 
 export class TaskDragDropHandler {
   private app: App;
@@ -384,9 +291,7 @@ export class TaskDragDropHandler {
     action: 'copy' | 'move' | 'migrate',
     dropPos?: { line: number; ch: number } | null,
   ): Promise<void> {
-    const taskLines = formatTaskLines(task);
-    const subtaskLines = await this.readSubtaskLines(task);
-    const allLines = [...taskLines, ...subtaskLines];
+    const allLines = await readTaskBlockFromVault(this.app, task);
 
     if (isSourceMode) {
       this.insertAtPosition(editor, allLines, dropPos);
@@ -476,26 +381,6 @@ export class TaskDragDropHandler {
     const content = await this.app.vault.read(file);
     const newContent = content.trimEnd() + '\n\n' + lines.join('\n') + '\n';
     await this.app.vault.modify(file, newContent);
-  }
-
-  private async readSubtaskLines(task: Task): Promise<string[]> {
-    try {
-      const sourceFile = this.app.vault.getAbstractFileByPath(task.path);
-      if (!(sourceFile instanceof TFile)) return [];
-
-      const sourceContent = await this.app.vault.read(sourceFile);
-      const sourceLines = sourceContent.split('\n');
-
-      const { end: dateEnd } = buildRemovalRange(sourceLines, task.line);
-      return extractSubtaskLines(
-        sourceLines,
-        dateEnd,
-        task.indent,
-        taskHasCheckbox(task),
-      );
-    } catch {
-      return [];
-    }
   }
 
   private async handleSourceModification(

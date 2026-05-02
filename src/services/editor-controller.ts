@@ -5,7 +5,11 @@ import TodoTracker from '../main';
 import { detectListMarker } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
-import { formatTaskLines } from '../utils/task-format';
+import {
+  getTaskRemovalRange,
+  modifyLinesForMigration,
+  readTaskBlockFromLines,
+} from '../utils/task-sub-bullets';
 import {
   getTodayDailyNote,
   isDailyNotesPluginEnabledSync,
@@ -890,25 +894,22 @@ export class EditorController {
           return;
         }
 
-        // Clean the task text to remove any slash command
-        // This handles the case where user types a slash command like /copy, /move, /high, /med, /low
-        const cleanedTask = { ...task };
-        cleanedTask.text = this.cleanTaskTextFromSlashCommand(
+        const editorContent = editor.getValue();
+        const editorLines = editorContent.split('\n');
+        let allLines = readTaskBlockFromLines(editorLines, task);
+
+        const cleanedText = this.cleanTaskTextFromSlashCommand(
           task.text,
           editor,
           lineNumber,
         );
+        if (cleanedText !== task.text && allLines.length > 0) {
+          allLines[0] = allLines[0].replace(task.text, cleanedText);
+        }
 
-        // Format the task for daily note
-        const taskLines = formatTaskLines(cleanedTask);
-
-        // Read the current content of today's daily note
         const currentContent = await this.plugin.app.vault.read(todayNote);
-
-        // Append the task to the end of the file
-        // Add two newlines before the task to separate from existing content
         const newContent =
-          currentContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
+          currentContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
 
         // Write the updated content back to the file
         await this.plugin.app.vault.modify(todayNote, newContent);
@@ -969,36 +970,11 @@ export class EditorController {
       return false;
     }
 
-    // Format the task for clipboard in Org mode format
-    const lines: string[] = [];
+    const editorContent = editor.getValue();
+    const editorLines = editorContent.split('\n');
+    const allLines = readTaskBlockFromLines(editorLines, task);
 
-    // Build the main task line: KEYWORD [#priority] text
-    let taskLine = task.state;
-    if (task.priority) {
-      const priorityMap: Record<string, string> = {
-        high: 'A',
-        med: 'B',
-        low: 'C',
-      };
-      taskLine += ` [#${priorityMap[task.priority]}]`;
-    }
-    taskLine += ` ${task.text}`;
-    lines.push(taskLine);
-
-    // Add scheduled date if present
-    if (task.scheduledDate) {
-      const scheduledStr = this.formatDateForClipboard(task.scheduledDate);
-      lines.push(`SCHEDULED: ${scheduledStr}`);
-    }
-
-    // Add deadline date if present
-    if (task.deadlineDate) {
-      const deadlineStr = this.formatDateForClipboard(task.deadlineDate);
-      lines.push(`DEADLINE: ${deadlineStr}`);
-    }
-
-    // Copy to clipboard
-    const textToCopy = lines.join('\n');
+    const textToCopy = allLines.join('\n');
     navigator.clipboard.writeText(textToCopy).then(
       () => {
         new Notice('Task copied to clipboard');
@@ -1009,17 +985,6 @@ export class EditorController {
     );
 
     return true;
-  }
-
-  /**
-   * Format date for clipboard in Org mode format: <2026-03-07 Sat>
-   */
-  private formatDateForClipboard(date: Date): string {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const dayOfWeek = date.toLocaleDateString(undefined, { weekday: 'short' });
-    return `<${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${dayOfWeek}>`;
   }
 
   /**
@@ -1088,55 +1053,26 @@ export class EditorController {
           return;
         }
 
-        // Clean the task text to remove any slash command
-        // This handles the case where user types a slash command like /copy, /move, /high, /med, /low
-        const cleanedTask = { ...task };
-        cleanedTask.text = this.cleanTaskTextFromSlashCommand(
+        const fileContent = editor.getValue();
+        const fileLines = fileContent.split('\n');
+        let allLines = readTaskBlockFromLines(fileLines, task);
+
+        const cleanedText = this.cleanTaskTextFromSlashCommand(
           task.text,
           editor,
           lineNumber,
         );
-
-        // Format the task for daily note
-        const taskLines = formatTaskLines(cleanedTask);
-
-        // Read the current content of today's daily note
-        const todayContent = await this.plugin.app.vault.read(todayNote);
-
-        // Append the task to the end of today's daily note
-        // Add two newlines before the task to separate from existing content
-        const newTodayContent =
-          todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
-
-        // Write the updated content to today's daily note
-        await this.plugin.app.vault.modify(todayNote, newTodayContent);
-
-        // Remove the task from the source file using the editor API
-        // Get the full line range of the task (including any date lines)
-        const startLine = lineNumber;
-        let endLine = lineNumber;
-
-        // Check if there are scheduled/deadline dates on the following lines
-        const fileContent = editor.getValue();
-        const lines = fileContent.split('\n');
-
-        // Look for SCHEDULED and DEADLINE lines immediately after the task
-        for (let i = lineNumber + 1; i < lines.length; i++) {
-          const nextLine = lines[i].trim();
-          if (
-            nextLine.startsWith('SCHEDULED:') ||
-            nextLine.startsWith('DEADLINE:')
-          ) {
-            endLine = i;
-          } else {
-            // Stop at the first non-date line
-            break;
-          }
+        if (cleanedText !== task.text && allLines.length > 0) {
+          allLines[0] = allLines[0].replace(task.text, cleanedText);
         }
 
-        // Remove the task and its date lines
-        // We need to delete from endLine to startLine (reverse order to maintain line numbers)
-        for (let i = endLine; i >= startLine; i--) {
+        const todayContent = await this.plugin.app.vault.read(todayNote);
+        const newTodayContent =
+          todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
+        await this.plugin.app.vault.modify(todayNote, newTodayContent);
+
+        const { start, end } = getTaskRemovalRange(fileLines, task);
+        for (let i = end; i >= start; i--) {
           editor.replaceRange('', { line: i, ch: 0 }, { line: i + 1, ch: 0 });
         }
 
@@ -1228,57 +1164,41 @@ export class EditorController {
           return;
         }
 
-        // Clean the task text to remove any slash command
-        const cleanedTask = { ...task };
-        cleanedTask.text = this.cleanTaskTextFromSlashCommand(
+        const fileContent = editor.getValue();
+        const fileLines = fileContent.split('\n');
+        let allLines = readTaskBlockFromLines(fileLines, task);
+
+        const cleanedText = this.cleanTaskTextFromSlashCommand(
           task.text,
           editor,
           lineNumber,
         );
-
-        // Format the task for daily note
-        const taskLines = formatTaskLines(cleanedTask);
-
-        // Read the current content of today's daily note
-        const todayContent = await this.plugin.app.vault.read(todayNote);
-
-        // Append the task to the end of today's daily note
-        const newTodayContent =
-          todayContent.trimEnd() + '\n\n' + taskLines.join('\n') + '\n';
-
-        // Write the updated content to today's daily note
-        await this.plugin.app.vault.modify(todayNote, newTodayContent);
-
-        // Update the source task to the migrated state
-        // Replace the existing keyword with the migrated state
-        const taskKeyword = task.state || 'TODO';
-        const lineContent = editor.getLine(lineNumber);
-
-        // Escape special regex characters in the keyword
-        const escapeRegex = (str: string) =>
-          str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-        let updatedLineContent: string;
-        if (migrateState === '') {
-          // If empty, remove the keyword entirely
-          updatedLineContent = lineContent.replace(
-            new RegExp(`^(\\s*)\\b${escapeRegex(taskKeyword)}\\b\\s*`, 'i'),
-            '$1',
-          );
-        } else {
-          // Replace the existing keyword with the migrated state
-          updatedLineContent = lineContent.replace(
-            new RegExp(`\\b${escapeRegex(taskKeyword)}\\b`, 'i'),
-            migrateState,
-          );
+        if (cleanedText !== task.text && allLines.length > 0) {
+          allLines[0] = allLines[0].replace(task.text, cleanedText);
         }
 
-        // Apply the change to the editor
-        editor.replaceRange(
-          updatedLineContent,
-          { line: lineNumber, ch: 0 },
-          { line: lineNumber, ch: lineContent.length },
+        const todayContent = await this.plugin.app.vault.read(todayNote);
+        const newTodayContent =
+          todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
+        await this.plugin.app.vault.modify(todayNote, newTodayContent);
+
+        const taskKeyword = task.state || 'TODO';
+        const modified = modifyLinesForMigration(
+          fileLines,
+          lineNumber,
+          taskKeyword,
+          migrateState,
         );
+
+        const updatedSource = modified.join('\n');
+        const currentSource = fileContent;
+        if (updatedSource !== currentSource) {
+          const cursor = editor.getCursor();
+          editor.setValue(updatedSource);
+          if (cursor.line < editor.lineCount()) {
+            editor.setCursor(cursor);
+          }
+        }
 
         // Show notification
         new Notice('Task migrated to today daily note');
