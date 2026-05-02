@@ -33,8 +33,6 @@ export function getDropEffect(
   return 'copy';
 }
 
-
-
 export class TaskDragDropHandler {
   private app: App;
   private plugin: TodoTracker;

@@ -41,10 +41,7 @@ export function findSubtaskEnd(
       const isCheckbox = CHECKBOX_DETECTION_REGEX.test(line);
       const isPlainBullet =
         !isCheckbox && BULLET_LIST_PATTERN.test(trimmedContent);
-      if (
-        (!parentHasCheckbox && isCheckbox) ||
-        isPlainBullet
-      ) {
+      if ((!parentHasCheckbox && isCheckbox) || isPlainBullet) {
         end = i;
       } else {
         break;
@@ -83,7 +80,12 @@ export function getSubtaskLinesFromLines(
   task: Task,
 ): string[] {
   const { end: dateEnd } = buildRemovalRange(lines, task.line);
-  return extractSubtaskLines(lines, dateEnd, task.indent, taskHasCheckbox(task));
+  return extractSubtaskLines(
+    lines,
+    dateEnd,
+    task.indent,
+    taskHasCheckbox(task),
+  );
 }
 
 export function getTaskRemovalRange(
@@ -131,10 +133,7 @@ export function modifyLinesForMigration(
   return result;
 }
 
-export function readTaskBlockFromLines(
-  lines: string[],
-  task: Task,
-): string[] {
+export function readTaskBlockFromLines(lines: string[], task: Task): string[] {
   const { start } = buildRemovalRange(lines, task.line);
   const { end } = getTaskRemovalRange(lines, task);
 

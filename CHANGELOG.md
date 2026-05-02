@@ -6,6 +6,7 @@
 - Fixed task line not styled after code block with alternate delimiters in content.
 - Fixed preserve task line list markers when copying/moving tasks.
 - Fixed preserve task sub bullet content when copying/moving tasks.
+- Fixed date indent spacing for bulleted tasks.
 
 ## 0.12.2
 

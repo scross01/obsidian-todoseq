@@ -15,7 +15,11 @@ import {
   isDailyNotesPluginEnabledSync,
   isTaskOnTodayDailyNote,
 } from '../utils/daily-note-utils';
-import { findDateLine, getTaskIndent } from '../utils/task-line-utils';
+import {
+  findDateLine,
+  getTaskIndent,
+  getDateLineIndent,
+} from '../utils/task-line-utils';
 import { TaskContextMenu } from '../view/components/task-context-menu';
 import {
   DatePicker,
@@ -711,9 +715,10 @@ export class EditorController {
     const taskIndent = task
       ? getTaskIndent(task)
       : (taskLine.match(/^(\s*)/)?.[1] ?? '');
+    const dateLineIndent = task ? getDateLineIndent(task) : taskIndent;
 
-    // Create the date line with the correct indent
-    const dateLine = `${taskIndent}${dateType}: <${currentDate}>`;
+    // Create the date line with the correct indent (2 spaces more than task indent)
+    const dateLine = `${dateLineIndent}${dateType}: <${currentDate}>`;
 
     // Build lines array from editor.getLine()
     const lines: string[] = [];

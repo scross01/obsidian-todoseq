@@ -245,10 +245,7 @@ describe('formatTaskLines', () => {
       scheduledDate,
     });
     const lines = formatTaskLines(task);
-    expect(lines).toEqual([
-      '- TODO task 1',
-      'SCHEDULED: <2026-05-09 Sat>',
-    ]);
+    expect(lines).toEqual(['- TODO task 1', '  SCHEDULED: <2026-05-09 Sat>']);
   });
 
   test('should format checkbox task with scheduled date', () => {
@@ -263,7 +260,7 @@ describe('formatTaskLines', () => {
     const lines = formatTaskLines(task);
     expect(lines).toEqual([
       '- [ ] TODO task 3',
-      'SCHEDULED: <2026-05-02 Sat>',
+      '  SCHEDULED: <2026-05-02 Sat>',
     ]);
   });
 });

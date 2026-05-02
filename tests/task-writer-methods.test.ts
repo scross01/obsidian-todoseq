@@ -756,7 +756,7 @@ describe('TaskWriter Instance Methods', () => {
       const updateFn = processCall[1];
       const result = updateFn('- [ ] TODO Task text');
       expect(result).toBe(
-        '- [ ] TODO Task text\n      SCHEDULED: <2026-03-10 Tue>',
+        '- [ ] TODO Task text\n  SCHEDULED: <2026-03-10 Tue>',
       );
     });
 

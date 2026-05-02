@@ -8,24 +8,6 @@
       "key": "Enter"
     }
   ],
-  "todoseq:add-deadline-date": [
-    {
-      "modifiers": [
-        "Ctrl",
-        "Shift"
-      ],
-      "key": "S"
-    }
-  ],
-  "todoseq:add-scheduled-date": [
-    {
-      "modifiers": [
-        "Ctrl",
-        "Shift"
-      ],
-      "key": "D"
-    }
-  ],
   "todoseq:set-priority-high": [
     {
       "modifiers": [
@@ -51,6 +33,24 @@
         "Shift"
       ],
       "key": "M"
+    }
+  ],
+  "todoseq:add-scheduled-date": [
+    {
+      "modifiers": [
+        "Ctrl",
+        "Shift"
+      ],
+      "key": "S"
+    }
+  ],
+  "todoseq:add-deadline-date": [
+    {
+      "modifiers": [
+        "Ctrl",
+        "Shift"
+      ],
+      "key": "D"
     }
   ]
 }

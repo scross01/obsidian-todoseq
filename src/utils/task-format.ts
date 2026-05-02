@@ -1,5 +1,6 @@
 import { DateRepeatInfo, Task } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX } from './patterns';
+import { getDateLineIndent } from './task-line-utils';
 
 export function formatTaskLines(task: Task): string[] {
   const lines: string[] = [];
@@ -27,7 +28,7 @@ export function formatTaskLines(task: Task): string[] {
       task.scheduledDate,
       task.scheduledDateRepeat,
     );
-    lines.push(`SCHEDULED: ${scheduledStr}`);
+    lines.push(`${getDateLineIndent(task)}SCHEDULED: ${scheduledStr}`);
   }
 
   if (task.deadlineDate) {
@@ -35,7 +36,7 @@ export function formatTaskLines(task: Task): string[] {
       task.deadlineDate,
       task.deadlineDateRepeat,
     );
-    lines.push(`DEADLINE: ${deadlineStr}`);
+    lines.push(`${getDateLineIndent(task)}DEADLINE: ${deadlineStr}`);
   }
 
   return lines;

@@ -227,3 +227,31 @@ export function getTaskIndent(task: Task): string {
   // Replace any characters that are not '>' or whitespace with spaces
   return indent.replace(/[^>\s]/g, ' ');
 }
+
+/**
+ * Get the proper indent for date lines (SCHEDULED, DEADLINE, CLOSED) under a task.
+ * For tasks with list markers (bullets, checkboxes), date lines should be indented 2 spaces more than the task's leading whitespace.
+ * For keyword-only tasks (no list marker), date lines should be at the same indent level as the task.
+ * For quoted tasks, the date line should be at the same quote level as the task.
+ *
+ * @param task - The task object
+ * @returns The proper indent string for date lines
+ */
+export function getDateLineIndent(task: Task): string {
+  // Extract quote prefix (e.g., "> ", "> > ") if present
+  const quotePrefix = task.rawText.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
+
+  // For quoted tasks, preserve the quote prefix without adding extra spaces
+  if (quotePrefix && quotePrefix.trim().length > 0) {
+    return quotePrefix;
+  }
+
+  // Check if task has a list marker (bullet, checkbox, numbered, etc.)
+  const hasListMarker = /^\s*[-*]\s|^\s*\d+[.)]\s|^\s*[a-zA-Z][.)]\s/i.test(
+    task.rawText,
+  );
+
+  // For tasks with list markers, add 2 spaces to the leading whitespace
+  // For keyword-only tasks, use the same indent as the task
+  return hasListMarker ? task.indent + '  ' : task.indent;
+}

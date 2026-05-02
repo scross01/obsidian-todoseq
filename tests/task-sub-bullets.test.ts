@@ -119,9 +119,7 @@ describe('getSubtaskLinesFromLines', () => {
       '- sub bullet',
     ];
     const task = createTask({ line: 0 });
-    expect(getSubtaskLinesFromLines(lines, task)).toEqual([
-      '- [ ] sub task',
-    ]);
+    expect(getSubtaskLinesFromLines(lines, task)).toEqual(['- [ ] sub task']);
   });
 
   it('stops at non-indented line for bullet task', () => {
@@ -136,9 +134,7 @@ describe('getSubtaskLinesFromLines', () => {
       listMarker: '- ',
       line: 0,
     });
-    expect(getSubtaskLinesFromLines(lines, task)).toEqual([
-      '  - [ ] sub task',
-    ]);
+    expect(getSubtaskLinesFromLines(lines, task)).toEqual(['  - [ ] sub task']);
   });
 
   it('handles deeply indented parent task', () => {
@@ -169,11 +165,7 @@ describe('getTaskRemovalRange', () => {
   });
 
   it('includes date lines but no subtasks when no subtasks present', () => {
-    const lines = [
-      'TODO task',
-      'SCHEDULED: <2026-05-09 Sat>',
-      'NEXT_LINE',
-    ];
+    const lines = ['TODO task', 'SCHEDULED: <2026-05-09 Sat>', 'NEXT_LINE'];
     const task = createTask({ line: 0 });
     expect(getTaskRemovalRange(lines, task)).toEqual({ start: 0, end: 1 });
   });

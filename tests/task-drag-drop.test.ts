@@ -2,9 +2,7 @@
  * @jest-environment jsdom
  */
 
-import {
-  getDropAction,
-} from '../src/view/task-list/task-drag-drop';
+import { getDropAction } from '../src/view/task-list/task-drag-drop';
 import {
   buildRemovalRange,
   modifyLinesForMigration,

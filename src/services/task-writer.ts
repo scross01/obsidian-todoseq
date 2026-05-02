@@ -4,7 +4,11 @@ import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
 import { DateUtils } from '../utils/date-utils';
-import { findDateLine, getTaskIndent } from '../utils/task-line-utils';
+import {
+  findDateLine,
+  getTaskIndent,
+  getDateLineIndent,
+} from '../utils/task-line-utils';
 import TodoTracker from '../main';
 
 export interface DateLineUpdateResult {
@@ -288,7 +292,7 @@ export class TaskWriter {
             }
 
             // Preserve existing indentation of CLOSED line if found
-            let closedIndent = taskIndent;
+            let closedIndent = getDateLineIndent(task);
             if (closedLineIndex >= 0) {
               const line = lines[closedLineIndex];
               const lineIndent = line.match(/^(\s*)/)?.[1] ?? '';
@@ -549,8 +553,9 @@ export class TaskWriter {
           existingScheduledIndent = lineQuotePrefix || lineIndent;
         }
 
-        // Use existing indent if updating, otherwise use task indent (aligned to keyword start)
-        const scheduledIndent = existingScheduledIndent || taskIndent;
+        // Use existing indent if updating, otherwise use date line indent (2 spaces more than task indent)
+        const scheduledIndent =
+          existingScheduledIndent || getDateLineIndent(task);
 
         if (scheduledLineIndex >= 0) {
           // Update existing SCHEDULED line, preserving its indentation
@@ -705,8 +710,9 @@ export class TaskWriter {
           existingDeadlineIndent = lineQuotePrefix || lineIndent;
         }
 
-        // Use existing indent if updating, otherwise use task indent (aligned to keyword start)
-        const deadlineIndent = existingDeadlineIndent || taskIndent;
+        // Use existing indent if updating, otherwise use date line indent (2 spaces more than task indent)
+        const deadlineIndent =
+          existingDeadlineIndent || getDateLineIndent(task);
 
         if (deadlineLineIndex >= 0) {
           // Update existing DEADLINE line, preserving its indentation
