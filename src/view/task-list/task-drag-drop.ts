@@ -136,6 +136,8 @@ export class TaskDragDropHandler {
   private editorDropRef: ReturnType<App['workspace']['on']> | null = null;
   private dragoverHandler: ((evt: DragEvent) => void) | null = null;
   private draggedTask: Task | null = null;
+  private currentAction: 'copy' | 'move' | 'migrate' = 'copy';
+  private dragImageEl: HTMLElement | null = null;
   private modifierKeys: { ctrl: boolean; meta: boolean; alt: boolean } = {
     ctrl: false,
     meta: false,
@@ -165,17 +167,30 @@ export class TaskDragDropHandler {
     if (!task) return;
 
     this.draggedTask = task;
-
-    if (evt.dataTransfer) {
-      evt.dataTransfer.setData('text/plain', task.state + ' ' + task.text);
-      evt.dataTransfer.effectAllowed = 'all';
-    }
-
-    target.addClass('todoseq-task-dragging');
+    this.currentAction = 'copy';
 
     this.modifierKeys.ctrl = evt.ctrlKey;
     this.modifierKeys.meta = evt.metaKey;
     this.modifierKeys.alt = evt.altKey;
+
+    if (evt.dataTransfer) {
+      evt.dataTransfer.setData('text/plain', task.state + ' ' + task.text);
+      evt.dataTransfer.effectAllowed = 'all';
+      // eslint-disable-next-line no-undef
+      const img = new Image();
+      img.src =
+        'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=';
+      evt.dataTransfer.setDragImage(img, 0, 0);
+    }
+
+    this.dragImageEl = this.createDragOverlay(
+      task,
+      'copy',
+      evt.clientX,
+      evt.clientY,
+    );
+
+    target.addClass('todoseq-task-dragging');
 
     this.dragoverHandler = this.onDragOver;
     window.addEventListener('dragover', this.dragoverHandler, true);
@@ -187,7 +202,9 @@ export class TaskDragDropHandler {
       target.removeClass('todoseq-task-dragging');
     }
     this.removeDragoverListener();
+    this.removeDragOverlay();
     this.draggedTask = null;
+    this.currentAction = 'copy';
   };
 
   private onDragOver = (evt: DragEvent): void => {
@@ -195,7 +212,26 @@ export class TaskDragDropHandler {
     this.modifierKeys.ctrl = evt.ctrlKey;
     this.modifierKeys.meta = evt.metaKey;
     this.modifierKeys.alt = evt.altKey;
-    this.updateModifierClass();
+    const action = getDropAction(
+      this.modifierKeys.ctrl || evt.ctrlKey,
+      this.modifierKeys.meta || evt.metaKey,
+      this.modifierKeys.alt || evt.altKey,
+    );
+    const overTarget = this.isOverValidDropTarget(evt);
+    if (this.dragImageEl) {
+      this.dragImageEl.style.left = evt.clientX + 12 + 'px';
+      this.dragImageEl.style.top = evt.clientY + 12 + 'px';
+      this.dragImageEl.toggleClass(
+        'todoseq-drag-overlay-over-target',
+        overTarget,
+      );
+    }
+    if (action !== this.currentAction) {
+      this.currentAction = action;
+      if (this.dragImageEl) {
+        this.updateOverlayAction(this.dragImageEl, action);
+      }
+    }
   };
 
   private removeDragoverListener(): void {
@@ -205,23 +241,76 @@ export class TaskDragDropHandler {
     }
   }
 
-  private updateModifierClass(): void {
-    const active = this.modifierKeys.alt;
-    this.containerEl.toggleClass('drag-modifier-active', active);
+  private isOverValidDropTarget(evt: DragEvent): boolean {
+    const target = evt.target;
+    if (!(target instanceof HTMLElement)) return false;
+    return !!target.closest('.markdown-source-view');
+  }
+
+  private createDragOverlay(
+    task: Task,
+    action: 'copy' | 'move' | 'migrate',
+    x: number,
+    y: number,
+  ): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'todoseq-drag-overlay';
+    el.style.left = x + 12 + 'px';
+    el.style.top = y + 12 + 'px';
+
+    const taskLine = document.createElement('div');
+    taskLine.className = 'todoseq-drag-overlay-task';
+    taskLine.textContent = task.state + ' ' + task.text;
+    el.appendChild(taskLine);
+
+    const actionLine = document.createElement('div');
+    actionLine.className = 'todoseq-drag-overlay-action';
+    this.setActionText(actionLine, action);
+    el.appendChild(actionLine);
+
+    document.body.appendChild(el);
+    return el;
+  }
+
+  private setActionText(
+    el: HTMLElement,
+    action: 'copy' | 'move' | 'migrate',
+  ): void {
+    const labels: Record<string, string> = {
+      copy: 'Copy task here',
+      move: 'Move task here',
+      migrate: 'Migrate task here',
+    };
+    el.textContent = labels[action];
+  }
+
+  private updateOverlayAction(
+    el: HTMLElement,
+    action: 'copy' | 'move' | 'migrate',
+  ): void {
+    const actionLine = el.querySelector('.todoseq-drag-overlay-action');
+    if (actionLine) {
+      this.setActionText(actionLine as HTMLElement, action);
+    }
+  }
+
+  private removeDragOverlay(): void {
+    if (this.dragImageEl) {
+      this.dragImageEl.remove();
+      this.dragImageEl = null;
+    }
   }
 
   private onKeyDown = (evt: KeyboardEvent): void => {
     this.modifierKeys.ctrl = evt.ctrlKey;
     this.modifierKeys.meta = evt.metaKey;
     this.modifierKeys.alt = evt.altKey;
-    this.updateModifierClass();
   };
 
   private onKeyUp = (evt: KeyboardEvent): void => {
     this.modifierKeys.ctrl = evt.ctrlKey;
     this.modifierKeys.meta = evt.metaKey;
     this.modifierKeys.alt = evt.altKey;
-    this.updateModifierClass();
   };
 
   private removeKeyListeners(): void {
@@ -350,8 +439,9 @@ export class TaskDragDropHandler {
     }
 
     this.modifierKeys = { ctrl: false, meta: false, alt: false };
-    this.containerEl.removeClass('drag-modifier-active');
+    this.removeDragOverlay();
     this.draggedTask = null;
+    this.currentAction = 'copy';
     this.callbacks = null;
   }
 

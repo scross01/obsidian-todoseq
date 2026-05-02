@@ -51,14 +51,39 @@
 }
 
 /* Drag-and-drop */
-.todoseq-panel .todoseq-task-item[draggable='true']:active {
-  cursor: grabbing;
-}
-.todoseq-panel.drag-modifier-active .todoseq-task-item[draggable='true'] {
-  cursor: grab;
-}
 .todoseq-panel .todoseq-task-dragging {
   opacity: 0.4;
+}
+
+.todoseq-drag-overlay {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: 300px;
+  font-size: var(--font-ui-small);
+}
+
+.todoseq-drag-overlay-task {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-normal);
+}
+
+.todoseq-drag-overlay-action {
+  display: none;
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  margin-top: 2px;
+}
+
+.todoseq-drag-overlay-over-target .todoseq-drag-overlay-action {
+  display: block;
 }
 
 /* Task text and completion state */
