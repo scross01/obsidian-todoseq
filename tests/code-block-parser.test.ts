@@ -127,12 +127,55 @@ collapse: true`;
       expect(params.error).toBeDefined();
     });
 
+    it('should parse show-closed-date option', () => {
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-closed-date: true',
+        ).showClosedDate,
+      ).toBe(true);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-closed-date: show',
+        ).showClosedDate,
+      ).toBe(true);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-closed-date: false',
+        ).showClosedDate,
+      ).toBe(false);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n show-closed-date: hide',
+        ).showClosedDate,
+      ).toBe(false);
+      expect(
+        TodoseqCodeBlockParser.parse('search: tag:test').showClosedDate,
+      ).toBeUndefined();
+    });
+
+    it('should reject invalid show-closed-date values', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n show-closed-date: yes',
+      );
+      expect(params.error).toBeDefined();
+    });
+
     it('should parse both date display options together', () => {
       const source =
         'search: tag:test\n show-scheduled-date: true\n show-deadline-date: show';
       const params = TodoseqCodeBlockParser.parse(source);
       expect(params.showScheduledDate).toBe(true);
       expect(params.showDeadlineDate).toBe(true);
+      expect(params.error).toBeUndefined();
+    });
+
+    it('should parse all three date display options together', () => {
+      const source =
+        'search: tag:test\n show-scheduled-date: true\n show-deadline-date: show\n show-closed-date: true';
+      const params = TodoseqCodeBlockParser.parse(source);
+      expect(params.showScheduledDate).toBe(true);
+      expect(params.showDeadlineDate).toBe(true);
+      expect(params.showClosedDate).toBe(true);
       expect(params.error).toBeUndefined();
     });
 

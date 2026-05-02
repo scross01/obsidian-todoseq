@@ -42,6 +42,7 @@ export interface TodoseqParameters {
   collapse?: boolean;
   showScheduledDate?: boolean;
   showDeadlineDate?: boolean;
+  showClosedDate?: boolean;
   error?: string;
 }
 
@@ -82,6 +83,7 @@ export class TodoseqCodeBlockParser {
       let collapse: boolean | undefined;
       let showScheduledDate: boolean | undefined;
       let showDeadlineDate: boolean | undefined;
+      let showClosedDate: boolean | undefined;
 
       // Parse each line for parameters
       for (const line of lines) {
@@ -301,6 +303,20 @@ export class TodoseqCodeBlockParser {
               `Invalid show-deadline-date option: ${value}. Valid options: true, false, show, hide`,
             );
           }
+        } else if (trimmed.startsWith('show-closed-date:')) {
+          const value = trimmed
+            .substring('show-closed-date:'.length)
+            .trim()
+            .toLowerCase();
+          if (value === 'false' || value === 'hide') {
+            showClosedDate = false;
+          } else if (value === 'true' || value === 'show') {
+            showClosedDate = true;
+          } else {
+            throw new Error(
+              `Invalid show-closed-date option: ${value}. Valid options: true, false, show, hide`,
+            );
+          }
         }
       }
 
@@ -336,6 +352,7 @@ export class TodoseqCodeBlockParser {
         collapse,
         showScheduledDate,
         showDeadlineDate,
+        showClosedDate,
       };
     } catch (error) {
       const errorMessage =
@@ -352,6 +369,7 @@ export class TodoseqCodeBlockParser {
         collapse: undefined,
         showScheduledDate: undefined,
         showDeadlineDate: undefined,
+        showClosedDate: undefined,
       };
     }
   }

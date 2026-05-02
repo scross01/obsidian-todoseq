@@ -48,6 +48,7 @@ The main area displays all detected tasks with the following information:
 - **State keyword**: Colored badge showing task state (TODO, DOING, DONE, etc.). Right-click the badge to see all next state options
 - **Priority badge**: Shows `[#A]`, `[#B]`, or `[#C]` if present
 - **Task text**: The full text of the task
+- **Date displays**: Shows scheduled dates, deadline dates (for incomplete tasks), or closed dates (for completed tasks) below the task text
 - **File path**: Shows the file name and line number location of the task in your vault. Hover the mouse over it to see the full path
 
 ## Task Interactions
@@ -180,3 +181,19 @@ Task priority indicators use colors picked from the current active theme:
 Tasks can contain subtasks represented by indented checkbox items. TODOseq detects these subtasks and displays a progress indicator in the task list showing how many have been completed.
 
 The subtask indicator appears as `[x/y]` where `x` is the number of completed subtasks and `y` is the total number of subtasks. For example, `[1/3]` means one of three subtasks is complete.
+
+### Date Displays
+
+Tasks can display date information below the task text in the Task List:
+
+**Scheduled Dates** - Shown for incomplete tasks with a scheduled date. Displays "Scheduled: [date]" with color coding based on urgency:
+
+- Red: Overdue tasks
+- Orange: Due today
+- Green: Due within 7 days
+
+**Deadline Dates** - Shown for incomplete tasks with a deadline date. Displays "Deadline: [date]" with the same color coding as scheduled dates.
+
+**Closed Dates** - Shown for completed tasks with a closed date. Displays "Closed: [date]" in a grey theme, indicating when the task was marked as complete.
+
+Date displays include repeat icons (⟳) when the date has a repeat pattern configured. The time is shown when available (e.g., "Today 10:00 am").

@@ -1179,7 +1179,12 @@ export class EmbeddedTaskListRenderer {
 
   private buildDateBadge(
     date: Date,
-    iconName: 'calendar' | 'calendar-clock' | 'calendar-range' | 'target',
+    iconName:
+      | 'calendar'
+      | 'calendar-clock'
+      | 'calendar-range'
+      | 'target'
+      | 'check-circle',
     parent: HTMLElement,
   ): void {
     const badge = parent.createEl('span', {
@@ -1220,16 +1225,19 @@ export class EmbeddedTaskListRenderer {
     params: TodoseqParameters,
     parent: HTMLElement,
   ): void {
-    if (task.completed) return;
     const showScheduled = params.showScheduledDate === true;
     const showDeadline = params.showDeadlineDate === true;
-    if (!showScheduled && !showDeadline) return;
+    const showClosed = params.showClosedDate === true;
+    if (!showScheduled && !showDeadline && !showClosed) return;
 
-    if (showScheduled && task.scheduledDate) {
+    if (showScheduled && task.scheduledDate && !task.completed) {
       this.buildDateBadge(task.scheduledDate, 'calendar', parent);
     }
-    if (showDeadline && task.deadlineDate) {
+    if (showDeadline && task.deadlineDate && !task.completed) {
       this.buildDateBadge(task.deadlineDate, 'target', parent);
+    }
+    if (showClosed && task.closedDate && task.completed) {
+      this.buildDateBadge(task.closedDate, 'check-circle', parent);
     }
   }
 
@@ -1239,16 +1247,19 @@ export class EmbeddedTaskListRenderer {
     parent: HTMLElement,
     extraCls?: string,
   ): void {
-    if (task.completed) return;
     const showScheduled = params.showScheduledDate === true;
     const showDeadline = params.showDeadlineDate === true;
-    if (!showScheduled && !showDeadline) return;
+    const showClosed = params.showClosedDate === true;
+    if (!showScheduled && !showDeadline && !showClosed) return;
 
-    if (showScheduled && task.scheduledDate) {
+    if (showScheduled && task.scheduledDate && !task.completed) {
       this.buildDateInfoRow('Scheduled', task.scheduledDate, parent, extraCls);
     }
-    if (showDeadline && task.deadlineDate) {
+    if (showDeadline && task.deadlineDate && !task.completed) {
       this.buildDateInfoRow('Deadline', task.deadlineDate, parent, extraCls);
+    }
+    if (showClosed && task.closedDate && task.completed) {
+      this.buildDateInfoRow('Closed', task.closedDate, parent, extraCls);
     }
   }
 

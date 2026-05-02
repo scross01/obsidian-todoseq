@@ -238,6 +238,22 @@ show-deadline-date: true
 
 When enabled, a calendar icon with the deadline date appears inline after the task text. In truncated mode, the badge is shown inline; in wrap mode, a "Deadline: date" row appears below the task text. Both scheduled and deadline can be shown simultaneously — when a task has both dates, only the earliest date badge is shown inline.
 
+### Show Closed Date
+
+The `show-closed-date:` parameter controls whether a closed date badge is displayed on completed tasks:
+
+- `true` or `show` - Show closed date badges on completed tasks
+- `false` or `hide` - Hide closed date badges (default)
+
+````txt
+```todoseq
+search: closed:"last 7 days"
+show-closed-date: true
+```
+````
+
+When enabled, a check-circle icon with the closed date appears inline after the task text for completed tasks. In truncated mode, the badge is shown inline; in wrap mode, a "Closed: date" row appears below the task text. This option only affects completed tasks — incomplete tasks will not display a closed date badge.
+
 ### Collapsible Task Lists
 
 The `collapse:` parameter makes the task list collapsible, allowing you to save space in your notes:

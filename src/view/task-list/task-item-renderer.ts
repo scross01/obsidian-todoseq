@@ -510,8 +510,11 @@ export class TaskItemRenderer {
       this.buildSubtaskIndicator(task, mainContent);
     }
 
-    // Add date display if scheduled or deadline dates exist and task is not completed
-    if ((task.scheduledDate || task.deadlineDate) && !task.completed) {
+    // Add date display if scheduled, deadline, or closed dates exist
+    const hasDatesToShow =
+      (!task.completed && (task.scheduledDate || task.deadlineDate)) ||
+      (task.completed && task.closedDate);
+    if (hasDatesToShow) {
       this.buildDateDisplay(task, li);
     }
 
@@ -706,8 +709,7 @@ export class TaskItemRenderer {
     }
 
     // 5. Update date display
-    const hasDates =
-      (task.scheduledDate || task.deadlineDate) && !task.completed;
+    const hasDates = task.scheduledDate || task.deadlineDate || task.closedDate;
     const existingDateDisplay = element.querySelector(
       '.todoseq-task-date-container',
     );
@@ -790,8 +792,8 @@ export class TaskItemRenderer {
       cls: 'todoseq-task-date-container',
     });
 
-    // Display scheduled date
-    if (task.scheduledDate) {
+    // Display scheduled date (only for non-completed tasks)
+    if (task.scheduledDate && !task.completed) {
       const scheduledDiv = dateContainer.createEl('div', {
         cls: this.getDateStatusClasses(task.scheduledDate, false),
       });
@@ -831,8 +833,8 @@ export class TaskItemRenderer {
       }
     }
 
-    // Display deadline date
-    if (task.deadlineDate) {
+    // Display deadline date (only for non-completed tasks)
+    if (task.deadlineDate && !task.completed) {
       const deadlineDiv = dateContainer.createEl('div', {
         cls: this.getDateStatusClasses(task.deadlineDate, true),
       });
@@ -870,6 +872,32 @@ export class TaskItemRenderer {
           `Repeats ${task.deadlineDateRepeat.raw}`,
         );
       }
+    }
+
+    // Display closed date (only for completed tasks with closed date)
+    if (task.closedDate && task.completed) {
+      const closedDiv = dateContainer.createEl('div', {
+        cls: ['todoseq-task-date', 'todoseq-task-date-closed'],
+      });
+
+      const dateRow = closedDiv.createEl('div', {
+        cls: 'todoseq-task-date-row',
+      });
+
+      const dateLabel = dateRow.createEl('span', {
+        cls: 'todoseq-task-date-label',
+      });
+      dateLabel.setText('Closed: ');
+
+      const dateValue = dateRow.createEl('span', {
+        cls: 'todoseq-task-date-value',
+      });
+      dateValue.setText(this.formatDateForDisplay(task.closedDate, true));
+
+      // Add empty repeat cell to match scheduled/deadline layout
+      dateRow.createEl('span', {
+        cls: 'todoseq-task-date-repeat-cell',
+      });
     }
 
     return dateContainer;

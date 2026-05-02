@@ -335,9 +335,7 @@
 /* Date row with right-aligned repeat icon */
 .todoseq-panel .todoseq-task-date-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: var(--size-4-2);
 }
 
 .todoseq-panel .todoseq-task-date-repeat-cell {
@@ -372,9 +370,12 @@
   opacity: 0.8;
 }
 
+.todoseq-panel .todoseq-task-date .todoseq-task-date-label {
+  margin-right: var(--size-2-2);
+}
+
 .todoseq-panel .todoseq-task-date .todoseq-task-date-value {
   font-weight: var(--font-normal);
-  margin-left: var(--size-2-2);
 }
 
 /* Main content container - holds checkbox+text and indicator on same row */
@@ -433,6 +434,16 @@
 
 .todoseq-panel .todoseq-task-date-soon .todoseq-task-date-value {
   color: var(--text-accent);
+}
+
+/* Closed date styling - grey theme for completed tasks */
+.todoseq-panel .todoseq-task-date-closed {
+  background-color: color-mix(in srgb, var(--text-muted) 5%, transparent);
+  border-left-color: color-mix(in srgb, var(--text-muted) 50%, transparent);
+}
+
+.todoseq-panel .todoseq-task-date-closed .todoseq-task-date-value {
+  color: var(--text-muted);
 }
 
 /* Settings UI - Shared font size for messages */
