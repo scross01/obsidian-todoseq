@@ -19,7 +19,8 @@ export class SearchTokenizer {
     { type: 'rparen' as const, regex: /\)/y },
     {
       type: 'prefix' as const,
-      regex: /\b(path|file|tag|state|priority|content|scheduled|deadline):/y,
+      regex:
+        /\b(path|file|tag|state|priority|content|scheduled|deadline|closed):/y,
     },
     // Property bracket syntax: [key:value], ["key":"value"], [type], [type:Draft OR Published]
     {

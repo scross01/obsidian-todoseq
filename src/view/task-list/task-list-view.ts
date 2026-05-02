@@ -845,6 +845,7 @@ export class TaskListView extends ItemView {
         'content',
         'scheduled',
         'deadline',
+        'closed',
       ];
       if (
         validPrefixes.includes(prefixBase) ||

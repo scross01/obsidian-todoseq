@@ -3,6 +3,7 @@
 ## 0.13.0-dev
 
 - Added support for drag and drop tasks from task list to active page. #61
+- Added support to search/filter for tasks by closed date. #66
 - Fixed task line not styled after code block with alternate delimiters in content.
 - Fixed preserve task line list markers when copying/moving tasks.
 - Fixed preserve task sub bullet content when copying/moving tasks.

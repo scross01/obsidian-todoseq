@@ -270,6 +270,8 @@ export class SearchEvaluator {
           caseSensitive,
           settings,
         );
+      case 'closed':
+        return this.evaluateClosedFilter(value, task, caseSensitive, settings);
       default:
         return false;
     }
@@ -480,6 +482,22 @@ export class SearchEvaluator {
   }
 
   /**
+   * Evaluate closed date filter
+   * @param value Filter value
+   * @param task Task to evaluate
+   * @param settings Application settings
+   * @returns True if task matches the closed filter
+   */
+  private static evaluateClosedFilter(
+    value: string,
+    task: Task,
+    caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
+  ): boolean {
+    return this.evaluateDateFilter(value, task.closedDate, settings);
+  }
+
+  /**
    * Common date filter evaluation logic
    * @param value Filter value
    * @param taskDate Task date to evaluate against
@@ -601,6 +619,14 @@ export class SearchEvaluator {
         return DateUtils.isDateInCurrentMonth(date, now);
       case 'next month':
         return DateUtils.isDateInNextMonth(date, now);
+      case 'yesterday':
+        return DateUtils.isDateYesterday(date, now);
+      case 'last 7 days':
+        return DateUtils.isDateInLast7Days(date, now);
+      case 'last week':
+        return DateUtils.isDateInLastWeek(date, now, weekStartsOn);
+      case 'last month':
+        return DateUtils.isDateInLastMonth(date, now);
       default:
         // Handle "next N days" pattern
         {
@@ -645,7 +671,13 @@ export class SearchEvaluator {
 
     // Get the task date based on the field
     const taskDate =
-      field === 'scheduled' ? task.scheduledDate : task.deadlineDate;
+      field === 'scheduled'
+        ? task.scheduledDate
+        : field === 'deadline'
+          ? task.deadlineDate
+          : field === 'closed'
+            ? task.closedDate
+            : null;
 
     // Handle tasks without the specified date
     if (!taskDate) {

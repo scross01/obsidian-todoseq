@@ -267,6 +267,21 @@ export class SearchSuggestions {
   }
 
   /**
+   * Get date suggestion options for closed date filter
+   * @returns Array of date suggestion options
+   */
+  static getClosedDateSuggestions(): string[] {
+    return [
+      'today',
+      'yesterday',
+      'last 7 days',
+      'last week',
+      'last month',
+      'none',
+    ];
+  }
+
+  /**
    * Extract all unique scheduled dates from tasks
    * @param tasks Array of tasks to analyze
    * @param mode Current view mode (optional)
@@ -316,6 +331,36 @@ export class SearchSuggestions {
     filteredTasks.forEach((task) => {
       if (task.deadlineDate) {
         const dateStr = task.deadlineDate.toISOString().split('T')[0];
+        datesSet.add(dateStr);
+      }
+    });
+
+    // Convert to array and sort chronologically
+    const dates = Array.from(datesSet);
+    dates.sort((a, b) => a.localeCompare(b));
+    return dates;
+  }
+
+  /**
+   * Extract all unique closed dates from tasks
+   * @param tasks Array of tasks to analyze
+   * @param mode Current view mode (optional)
+   * @returns Array of unique closed dates in YYYY-MM-DD format, sorted chronologically
+   */
+  static getClosedDateSuggestionsFromTasks(
+    tasks: Task[],
+    mode?: TaskListViewMode,
+  ): string[] {
+    const datesSet = new Set<string>();
+
+    // Filter tasks based on view mode
+    const filteredTasks = mode
+      ? this.filterTasksByViewMode(tasks, mode)
+      : tasks;
+
+    filteredTasks.forEach((task) => {
+      if (task.closedDate) {
+        const dateStr = task.closedDate.toISOString().split('T')[0];
         datesSet.add(dateStr);
       }
     });

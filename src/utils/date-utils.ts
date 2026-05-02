@@ -93,10 +93,14 @@ export class DateUtils {
       case 'due':
       case 'today':
       case 'tomorrow':
+      case 'yesterday':
       case 'this week':
       case 'next week':
+      case 'last week':
       case 'this month':
       case 'next month':
+      case 'last month':
+      case 'last 7 days':
         return trimmedValue;
     }
 
@@ -395,6 +399,81 @@ export class DateUtils {
     nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
 
     return this.isSameMonth(date, nextMonthDate);
+  }
+
+  /**
+   * Check if a date is yesterday
+   * @param date Date to check
+   * @param referenceDate Reference date (default: now)
+   * @returns True if date is yesterday
+   */
+  static isDateYesterday(
+    date: Date | null,
+    referenceDate: Date = new Date(),
+  ): boolean {
+    if (!date) return false;
+
+    const yesterday = this.addDays(referenceDate, -1);
+    return this.isSameDay(date, yesterday);
+  }
+
+  /**
+   * Check if a date is within the last 7 days (including today)
+   * @param date Date to check
+   * @param referenceDate Reference date (default: now)
+   * @returns True if date is within the last 7 days
+   */
+  static isDateInLast7Days(
+    date: Date | null,
+    referenceDate: Date = new Date(),
+  ): boolean {
+    if (!date) return false;
+
+    const target = this.getStartOfDay(date);
+    const ref = this.getStartOfDay(referenceDate);
+    const startDate = this.getStartOfDay(this.addDays(referenceDate, -6));
+
+    return target >= startDate && target <= ref;
+  }
+
+  /**
+   * Check if a date is in the last (previous) calendar week
+   * @param date Date to check
+   * @param referenceDate Reference date (default: now)
+   * @param weekStartsOn Day the week starts ('Monday' or 'Sunday')
+   * @returns True if date is in last week
+   */
+  static isDateInLastWeek(
+    date: Date | null,
+    referenceDate: Date = new Date(),
+    weekStartsOn: 'Monday' | 'Sunday' = 'Monday',
+  ): boolean {
+    if (!date) return false;
+
+    const target = this.getStartOfDay(date);
+    const currentWeekRange = this.getWeekRange(referenceDate, weekStartsOn);
+    const lastWeekStart = this.addDays(currentWeekRange.start, -7);
+    const lastWeekEnd = this.addDays(currentWeekRange.start, -1);
+
+    return target >= lastWeekStart && target <= lastWeekEnd;
+  }
+
+  /**
+   * Check if a date is in the last (previous) calendar month
+   * @param date Date to check
+   * @param referenceDate Reference date (default: now)
+   * @returns True if date is in last month
+   */
+  static isDateInLastMonth(
+    date: Date | null,
+    referenceDate: Date = new Date(),
+  ): boolean {
+    if (!date) return false;
+
+    const lastMonthDate = new Date(referenceDate);
+    lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+
+    return this.isSameMonth(date, lastMonthDate);
   }
 
   /**

@@ -73,6 +73,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
       'content:',
       'scheduled:',
       'deadline:',
+      'closed:',
       '[]',
     ];
 
@@ -300,6 +301,8 @@ export class SearchOptionsDropdown extends BaseDropdown {
         return 'filter by scheduled date';
       case 'deadline:':
         return 'filter by deadline date';
+      case 'closed:':
+        return 'filter by closed date';
       case '[]':
         return 'match page property';
       default:

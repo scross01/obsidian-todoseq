@@ -124,6 +124,7 @@ TODOseq supports filter keywords similar to Obsidian's general vault search for 
 | `content:`   | Find tasks with specific content        | `content:project`         |
 | `scheduled:` | Find tasks with scheduled dates         | `scheduled:due`           |
 | `deadline:`  | Find tasks with deadline dates          | `deadline:"this week"`    |
+| `closed:`    | Find tasks by closed date               | `closed:yesterday`        |
 | `property:`  | Find tasks based on page properties     | `property:[type:Project]` |
 
 ### Using Search Filters
@@ -252,6 +253,87 @@ deadline:2026-06-01..2026-06-30 state:TODO
 ```
 
 Find TODO tasks with deadlines in June 2026.
+
+## Closed Date Filter Expressions
+
+The `closed:` prefix filters tasks by when they were marked as complete. It supports unique expressions tailored for completed tasks.
+
+### Closed Date Expressions
+
+| Expression    | Description                                 |
+| ------------- | ------------------------------------------- |
+| `today`       | Tasks closed today                          |
+| `yesterday`   | Tasks closed yesterday                      |
+| `last 7 days` | Tasks closed in the last 7 days (inclusive) |
+| `last week`   | Tasks closed last calendar week\*           |
+| `last month`  | Tasks closed last calendar month            |
+| `this week`   | Tasks closed this week\*                    |
+| `this month`  | Tasks closed this month                     |
+| `none`        | Tasks that are not closed                   |
+
+\*Weeks start on Monday by default; this can be changed in the settings.
+
+### Closed Date Expression Examples
+
+```txt
+closed:today
+```
+
+Find tasks closed today.
+
+```txt
+closed:yesterday
+```
+
+Find tasks closed yesterday.
+
+```txt
+closed:"last 7 days"
+```
+
+Find tasks closed in the last 7 days.
+
+```txt
+closed:"last week"
+```
+
+Find tasks closed last calendar week.
+
+```txt
+closed:"this month"
+```
+
+Find tasks closed this month.
+
+```txt
+closed:none
+```
+
+Find tasks that are not yet closed.
+
+### Closed Date Range Syntax
+
+Use `..` to specify date ranges in `YYYY-MM-DD` format for closed dates.
+
+```txt
+closed:2026-01-01..2026-01-31
+```
+
+Find tasks closed in January 2026.
+
+### Combining Closed Date with Other Filters
+
+```txt
+closed:"last 7 days" priority:high
+```
+
+Find high priority tasks closed in the last 7 days.
+
+```txt
+closed:2026-01-01..2026-01-31 state:DONE
+```
+
+Find tasks marked as DONE in January 2026.
 
 ## Priority Filter Values
 

@@ -578,4 +578,241 @@ describe('Date Search Filters', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('Closed date filtering', () => {
+    // Tasks with closed dates for testing
+    const taskClosedToday = createCheckboxTask({
+      path: 'closed1.md',
+      line: 1,
+      rawText: '- [x] DONE Task closed today',
+      text: 'Task closed today',
+      completed: true,
+      closedDate: todayMidnight,
+    });
+
+    const taskClosedYesterday = createCheckboxTask({
+      path: 'closed2.md',
+      line: 2,
+      rawText: '- [x] DONE Task closed yesterday',
+      text: 'Task closed yesterday',
+      completed: true,
+      closedDate: yesterday,
+    });
+
+    const taskClosedLastWeek = createCheckboxTask({
+      path: 'closed3.md',
+      line: 3,
+      rawText: '- [x] DONE Task closed last week',
+      text: 'Task closed last week',
+      completed: true,
+      // 10 days ago (last week relative to Jan 14)
+      closedDate: new Date(2026, 0, 4),
+    });
+
+    const taskClosedLastMonth = createCheckboxTask({
+      path: 'closed4.md',
+      line: 4,
+      rawText: '- [x] DONE Task closed last month',
+      text: 'Task closed last month',
+      completed: true,
+      // December 2025 (last month relative to January 2026)
+      closedDate: new Date(2025, 11, 15),
+    });
+
+    const taskNotClosed = createCheckboxTask({
+      path: 'closed5.md',
+      line: 5,
+      rawText: '- [ ] TODO Task not closed',
+      text: 'Task not closed',
+      completed: false,
+      closedDate: null,
+    });
+
+    const taskClosedThisWeek = createCheckboxTask({
+      path: 'closed6.md',
+      line: 6,
+      rawText: '- [x] DONE Task closed this week',
+      text: 'Task closed this week',
+      completed: true,
+      // Monday Jan 12, 2026 (same week as Jan 14 with weekStartsOn='Monday')
+      closedDate: new Date(2026, 0, 12),
+    });
+
+    const taskClosedThisMonth = createCheckboxTask({
+      path: 'closed7.md',
+      line: 7,
+      rawText: '- [x] DONE Task closed this month',
+      text: 'Task closed this month',
+      completed: true,
+      // January 5, 2026 (same month as Jan 14)
+      closedDate: new Date(2026, 0, 5),
+    });
+
+    const closedTestTasks = [
+      taskClosedToday,
+      taskClosedYesterday,
+      taskClosedLastWeek,
+      taskClosedLastMonth,
+      taskNotClosed,
+      taskClosedThisWeek,
+      taskClosedThisMonth,
+    ];
+
+    describe('DateUtils methods for closed dates', () => {
+      it('should identify yesterday correctly', () => {
+        expect(DateUtils.isDateYesterday(yesterday, fixedNow)).toBe(true);
+        expect(DateUtils.isDateYesterday(todayMidnight, fixedNow)).toBe(false);
+      });
+
+      it('should identify last 7 days correctly', () => {
+        // Yesterday should be in last 7 days
+        expect(DateUtils.isDateInLast7Days(yesterday, fixedNow)).toBe(true);
+        // 6 days ago should be in last 7 days
+        const sixDaysAgo = new Date(2026, 0, 8);
+        expect(DateUtils.isDateInLast7Days(sixDaysAgo, fixedNow)).toBe(true);
+        // 8 days ago should NOT be in last 7 days
+        const eightDaysAgo = new Date(2026, 0, 6);
+        expect(DateUtils.isDateInLast7Days(eightDaysAgo, fixedNow)).toBe(false);
+      });
+
+      it('should identify last week correctly', () => {
+        // Task closed 10 days ago (Jan 4) is in last week
+        expect(
+          DateUtils.isDateInLastWeek(
+            new Date(2025, 11, 15),
+            fixedNow,
+            'Monday',
+          ),
+        ).toBe(false);
+        // Date in previous calendar week
+        const lastWeekDate = new Date(2026, 0, 7); // Thursday Jan 7 (previous week)
+        expect(
+          DateUtils.isDateInLastWeek(lastWeekDate, fixedNow, 'Monday'),
+        ).toBe(true);
+      });
+
+      it('should identify last month correctly', () => {
+        // December 2025 is last month relative to January 2026
+        expect(
+          DateUtils.isDateInLastMonth(new Date(2025, 11, 15), fixedNow),
+        ).toBe(true);
+        // January 2026 is NOT last month
+        expect(DateUtils.isDateInLastMonth(todayMidnight, fixedNow)).toBe(
+          false,
+        );
+      });
+    });
+
+    it('should filter tasks with closed:today', async () => {
+      const query = 'closed:today';
+      const node = SearchParser.parse(query);
+
+      const results = await Promise.all(
+        closedTestTasks.map(async (task) => {
+          return await SearchEvaluator.evaluate(node, task, false);
+        }),
+      );
+      const filteredTasks = closedTestTasks.filter(
+        (_, index) => results[index],
+      );
+      expect(filteredTasks.length).toBe(1);
+      expect(filteredTasks[0].text).toBe('Task closed today');
+    });
+
+    it('should filter tasks with closed:yesterday', async () => {
+      const query = 'closed:yesterday';
+      const node = SearchParser.parse(query);
+
+      const results = await Promise.all(
+        closedTestTasks.map(async (task) => {
+          return await SearchEvaluator.evaluate(node, task, false);
+        }),
+      );
+      const filteredTasks = closedTestTasks.filter(
+        (_, index) => results[index],
+      );
+      expect(filteredTasks.length).toBe(1);
+      expect(filteredTasks[0].text).toBe('Task closed yesterday');
+    });
+
+    it('should filter tasks with closed:last 7 days', async () => {
+      const query = 'closed:"last 7 days"';
+      const node = SearchParser.parse(query);
+
+      const results = await Promise.all(
+        closedTestTasks.map(async (task) => {
+          return await SearchEvaluator.evaluate(node, task, false);
+        }),
+      );
+      const filteredTasks = closedTestTasks.filter(
+        (_, index) => results[index],
+      );
+      // Jan 8-14: today (14), yesterday (13), this week (12) match
+      expect(filteredTasks.length).toBe(3);
+    });
+
+    it('should filter tasks with closed:none', async () => {
+      const query = 'closed:none';
+      const node = SearchParser.parse(query);
+
+      const results = await Promise.all(
+        closedTestTasks.map(async (task) => {
+          return await SearchEvaluator.evaluate(node, task, false);
+        }),
+      );
+      const filteredTasks = closedTestTasks.filter(
+        (_, index) => results[index],
+      );
+      // Task not closed should match
+      expect(filteredTasks.length).toBe(1);
+      expect(filteredTasks[0].text).toBe('Task not closed');
+    });
+
+    it('should filter tasks with closed date range', async () => {
+      const query = 'closed:2026-01-13..2026-01-14';
+      const node = SearchParser.parse(query);
+
+      const results = await Promise.all(
+        closedTestTasks.map(async (task) => {
+          return await SearchEvaluator.evaluate(node, task, false);
+        }),
+      );
+      const filteredTasks = closedTestTasks.filter(
+        (_, index) => results[index],
+      );
+      expect(filteredTasks.length).toBe(2); // yesterday and today
+    });
+
+    it('should filter tasks with closed:"this week"', async () => {
+      const query = 'closed:"this week"';
+      const node = SearchParser.parse(query);
+
+      const results = await Promise.all(
+        closedTestTasks.map(async (task) => {
+          return await SearchEvaluator.evaluate(node, task, false);
+        }),
+      );
+      const filteredTasks = closedTestTasks.filter(
+        (_, index) => results[index],
+      );
+      // Week of Jan 12-18 (Monday-Sunday): Jan 12, 13, 14 match
+      expect(filteredTasks.length).toBe(3);
+    });
+
+    it('should filter tasks with closed:"this month"', async () => {
+      const query = 'closed:"this month"';
+      const node = SearchParser.parse(query);
+
+      const results = await Promise.all(
+        closedTestTasks.map(async (task) => {
+          return await SearchEvaluator.evaluate(node, task, false);
+        }),
+      );
+      const filteredTasks = closedTestTasks.filter(
+        (_, index) => results[index],
+      );
+      // 5 tasks in January 2026: Jan 14, 13, 12, 5, and 4
+      expect(filteredTasks.length).toBe(5);
+    });
+  });
 });
