@@ -15,24 +15,28 @@ describe('getDropAction', () => {
     expect(getDropAction(false, false, false)).toBe('copy');
   });
 
-  it('returns move with Ctrl key', () => {
-    expect(getDropAction(true, false, false)).toBe('move');
+  it('returns copy with only Ctrl key', () => {
+    expect(getDropAction(true, false, false)).toBe('copy');
   });
 
-  it('returns move with Meta key', () => {
-    expect(getDropAction(false, true, false)).toBe('move');
+  it('returns copy with only Meta key', () => {
+    expect(getDropAction(false, true, false)).toBe('copy');
   });
 
-  it('returns copy with only Alt key', () => {
-    expect(getDropAction(false, false, true)).toBe('copy');
+  it('returns move with Alt key', () => {
+    expect(getDropAction(false, false, true)).toBe('move');
+  });
+
+  it('returns move with Alt+Meta', () => {
+    expect(getDropAction(false, true, true)).toBe('move');
   });
 
   it('returns migrate with Ctrl+Alt', () => {
     expect(getDropAction(true, false, true)).toBe('migrate');
   });
 
-  it('returns migrate with Meta+Alt', () => {
-    expect(getDropAction(false, true, true)).toBe('migrate');
+  it('returns migrate with all modifiers', () => {
+    expect(getDropAction(true, true, true)).toBe('migrate');
   });
 });
 

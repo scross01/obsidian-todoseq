@@ -15,8 +15,8 @@ export function getDropAction(
   metaKey: boolean,
   altKey: boolean,
 ): 'copy' | 'move' | 'migrate' {
-  if ((ctrlKey || metaKey) && altKey) return 'migrate';
-  if (ctrlKey || metaKey) return 'move';
+  if (altKey && ctrlKey) return 'migrate';
+  if (altKey) return 'move';
   return 'copy';
 }
 
@@ -173,8 +173,12 @@ export class TaskDragDropHandler {
 
     target.addClass('todoseq-task-dragging');
 
+    this.modifierKeys.ctrl = evt.ctrlKey;
+    this.modifierKeys.meta = evt.metaKey;
+    this.modifierKeys.alt = evt.altKey;
+
     this.dragoverHandler = this.onDragOver;
-    document.addEventListener('dragover', this.dragoverHandler, true);
+    window.addEventListener('dragover', this.dragoverHandler, true);
   };
 
   private onDragEnd = (evt: DragEvent): void => {
@@ -188,21 +192,21 @@ export class TaskDragDropHandler {
 
   private onDragOver = (evt: DragEvent): void => {
     if (!this.draggedTask) return;
-    if (!evt.dataTransfer) return;
-    const action = getDropAction(evt.ctrlKey, evt.metaKey, evt.altKey);
-    evt.dataTransfer.dropEffect = getDropEffect(action);
-    evt.preventDefault();
+    this.modifierKeys.ctrl = evt.ctrlKey;
+    this.modifierKeys.meta = evt.metaKey;
+    this.modifierKeys.alt = evt.altKey;
+    this.updateModifierClass();
   };
 
   private removeDragoverListener(): void {
     if (this.dragoverHandler) {
-      document.removeEventListener('dragover', this.dragoverHandler, true);
+      window.removeEventListener('dragover', this.dragoverHandler, true);
       this.dragoverHandler = null;
     }
   }
 
   private updateModifierClass(): void {
-    const active = this.modifierKeys.ctrl || this.modifierKeys.meta;
+    const active = this.modifierKeys.alt;
     this.containerEl.toggleClass('drag-modifier-active', active);
   }
 
@@ -247,7 +251,13 @@ export class TaskDragDropHandler {
       return;
     }
 
-    const action = getDropAction(evt.ctrlKey, evt.metaKey, evt.altKey);
+    evt.preventDefault();
+
+    const action = getDropAction(
+      this.modifierKeys.ctrl || evt.ctrlKey,
+      this.modifierKeys.meta || evt.metaKey,
+      this.modifierKeys.alt || evt.altKey,
+    );
 
     if (action === 'migrate' && !this.plugin.settings.migrateToTodayState) {
       new Notice(
@@ -255,8 +265,6 @@ export class TaskDragDropHandler {
       );
       return;
     }
-
-    evt.preventDefault();
 
     const mdView =
       view instanceof MarkdownView

@@ -1181,7 +1181,9 @@ export class TaskParser implements ITaskParser {
         // Only exit if delimiter matches opening character and has sufficient length
         const openingChar = currentCodeDelimiter ? currentCodeDelimiter[0] : '';
         const closingChar = delimiter[0];
-        const openingLength = currentCodeDelimiter ? currentCodeDelimiter.length : 0;
+        const openingLength = currentCodeDelimiter
+          ? currentCodeDelimiter.length
+          : 0;
         const closingLength = delimiter.length;
         if (closingChar === openingChar && closingLength >= openingLength) {
           return { type: 'code', entering: false, delimiter };
@@ -1192,7 +1194,7 @@ export class TaskParser implements ITaskParser {
       // Starting a new code block
       return { type: 'code', entering: true, delimiter };
     }
-    
+
     const mathMatch = MATH_BLOCK_REGEX.exec(line);
     if (mathMatch) {
       if (currentInBlock && currentBlockMarker === 'math') {
