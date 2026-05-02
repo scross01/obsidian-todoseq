@@ -1,6 +1,6 @@
 # Change Log
 
-## 0.13.0-dev
+## 0.13.0
 
 - Added support for drag and drop tasks from task list to active page. #61
 - Added support to search/filter for tasks by closed date. #66
