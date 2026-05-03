@@ -115,9 +115,8 @@ export class TaskItemRenderer {
     // Determine data-task character and checked state based on settings
     let dataTaskChar: string;
     if (settings.useExtendedCheckboxStyles) {
-      // Theme handles styling via :checked + data-task selectors
       dataTaskChar = this.keywordManager.getCheckboxState(task.state, settings);
-      checkbox.checked = dataTaskChar !== ' ';
+      checkbox.checked = task.completed;
     } else {
       // Default behavior: use standard checkbox states
       // For active keywords, use '/' so CSS can apply active styling
