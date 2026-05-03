@@ -16,6 +16,7 @@ export type SortMethod =
   | 'default'
   | 'sortByScheduled'
   | 'sortByDeadline'
+  | 'sortByClosedDate'
   | 'sortByPriority'
   | 'sortByUrgency'
   | 'sortByKeyword';
@@ -63,7 +64,8 @@ export class TaskListFilter {
         attr === 'sortByDeadline' ||
         attr === 'sortByPriority' ||
         attr === 'sortByUrgency' ||
-        attr === 'sortByKeyword'
+        attr === 'sortByKeyword' ||
+        attr === 'sortByClosedDate'
       )
         return attr;
     }
@@ -73,7 +75,8 @@ export class TaskListFilter {
       defaultSortMethod === 'sortByDeadline' ||
       defaultSortMethod === 'sortByPriority' ||
       defaultSortMethod === 'sortByUrgency' ||
-      defaultSortMethod === 'sortByKeyword'
+      defaultSortMethod === 'sortByKeyword' ||
+      defaultSortMethod === 'sortByClosedDate'
     ) {
       return defaultSortMethod;
     }
@@ -120,7 +123,8 @@ export class TaskListFilter {
       sortMethod === 'sortByUrgency' ||
       sortMethod === 'sortByPriority' ||
       sortMethod === 'sortByScheduled' ||
-      sortMethod === 'sortByDeadline'
+      sortMethod === 'sortByDeadline' ||
+      sortMethod === 'sortByClosedDate'
     ) {
       keywordConfig = this.getKeywordSortConfig();
     }

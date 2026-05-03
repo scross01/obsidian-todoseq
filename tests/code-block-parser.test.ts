@@ -45,6 +45,13 @@ collapse: true`;
       expect(params.error).toBeUndefined();
     });
 
+    it('should parse closed sort method', () => {
+      const source = 'sort: closed';
+      const params = TodoseqCodeBlockParser.parse(source);
+      expect(params.sortMethod).toBe('closed');
+      expect(params.error).toBeUndefined();
+    });
+
     it('should handle invalid parameters gracefully', () => {
       const source =
         'search: invalid query syntax\n sort: invalid\n completed: invalid\n future: invalid\n limit: -1';
@@ -277,6 +284,9 @@ collapse: true`;
       expect(
         TodoseqCodeBlockParser.getSortMethod({ sortMethod: 'keyword' }),
       ).toBe('sortByKeyword');
+      expect(
+        TodoseqCodeBlockParser.getSortMethod({ sortMethod: 'closed' }),
+      ).toBe('sortByClosedDate');
     });
 
     it('should return default for unknown sort method', () => {

@@ -43,6 +43,7 @@ export type SortMethod =
   | 'default'
   | 'sortByScheduled'
   | 'sortByDeadline'
+  | 'sortByClosedDate'
   | 'sortByPriority'
   | 'sortByUrgency'
   | 'sortByKeyword';
@@ -345,6 +346,31 @@ function getSortFunction(
         }
 
         // If deadline dates are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
+        return taskComparator(a, b);
+      };
+
+    case 'sortByClosedDate':
+      return (a, b) => {
+        // Tasks without closed dates go to the end
+        if (!a.closedDate && !b.closedDate) {
+          if (keywordConfig) {
+            return keywordSortComparator(a, b, keywordConfig);
+          }
+          return taskComparator(a, b);
+        }
+        if (!a.closedDate) return 1;
+        if (!b.closedDate) return -1;
+
+        // Compare closed dates (earlier first)
+        const dateDiff = a.closedDate.getTime() - b.closedDate.getTime();
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
+
+        // If closed dates are equal, use keyword sort as secondary
         if (keywordConfig) {
           return keywordSortComparator(a, b, keywordConfig);
         }

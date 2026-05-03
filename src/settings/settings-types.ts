@@ -23,6 +23,7 @@ export interface TodoTrackerSettings {
     | 'default'
     | 'sortByScheduled'
     | 'sortByDeadline'
+    | 'sortByClosedDate'
     | 'sortByPriority'
     | 'sortByUrgency'; // default sort method for task list view
   languageCommentSupport: boolean; // language-specific comment support settings

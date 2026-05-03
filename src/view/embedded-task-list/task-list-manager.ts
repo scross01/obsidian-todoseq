@@ -202,14 +202,15 @@ export class EmbeddedTaskListManager {
           ? TodoseqCodeBlockParser.getCompletedSetting(params.completed)
           : 'showAll'; // Default embedded lists to show all unless overridden
 
-      // Build keyword config if sorting by keyword, priority, urgency, scheduled, or deadline
+      // Build keyword config if sorting by keyword, priority, urgency, scheduled, deadline, or closed date
       let keywordConfig: KeywordSortConfig | undefined;
       if (
         sortMethod === 'sortByKeyword' ||
         sortMethod === 'sortByUrgency' ||
         sortMethod === 'sortByPriority' ||
         sortMethod === 'sortByScheduled' ||
-        sortMethod === 'sortByDeadline'
+        sortMethod === 'sortByDeadline' ||
+        sortMethod === 'sortByClosedDate'
       ) {
         keywordConfig = this.getKeywordSortConfig();
       }
@@ -256,6 +257,7 @@ export class EmbeddedTaskListManager {
       filepath: 'default',
       scheduled: 'sortByScheduled',
       deadline: 'sortByDeadline',
+      closed: 'sortByClosedDate',
       priority: 'sortByPriority',
       urgency: 'sortByUrgency',
       keyword: 'sortByKeyword',

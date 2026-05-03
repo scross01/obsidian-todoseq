@@ -912,6 +912,168 @@ describe('Task Sorting System', () => {
     });
   });
 
+  describe('Sort by Closed Date', () => {
+    const closedDate1 = new Date('2024-01-10T12:00:00Z'); // earlier
+    const closedDate2 = new Date('2024-01-15T12:00:00Z'); // middle
+    const closedDate3 = new Date('2024-01-20T12:00:00Z'); // later
+
+    it('sorts by closed date (earlier dates first)', () => {
+      const task1 = createTask({ closedDate: closedDate3, text: 'Later' });
+      const task2 = createTask({ closedDate: closedDate1, text: 'Earlier' });
+      const task3 = createTask({ closedDate: closedDate2, text: 'Middle' });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2, task3],
+        now,
+        'showAll',
+        'showAll',
+        'sortByClosedDate',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      const texts = mainBlock.tasks.map((t) => t.text);
+      expect(texts).toEqual(['Earlier', 'Middle', 'Later']);
+    });
+
+    it('tasks without closed dates appear at the end', () => {
+      const taskWithDate = createTask({
+        closedDate: closedDate1,
+        text: 'Has Date',
+      });
+      const taskWithoutDate = createTask({ closedDate: null, text: 'No Date' });
+
+      const blocks = sortTasksInBlocks(
+        [taskWithoutDate, taskWithDate],
+        now,
+        'showAll',
+        'showAll',
+        'sortByClosedDate',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].text).toBe('Has Date');
+      expect(mainBlock.tasks[1].text).toBe('No Date');
+    });
+
+    it('uses keyword sort as secondary when closed dates are equal', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        closedDate: closedDate1,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        closedDate: closedDate1,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByClosedDate',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('uses keyword sort as secondary when both tasks have no closed date', () => {
+      const config = createMockKeywordConfig();
+      const nowTask = createMockTaskWithKeyword('NOW', false, {
+        closedDate: null,
+        path: 'z.md',
+        line: 1,
+      });
+      const todoTask = createMockTaskWithKeyword('TODO', false, {
+        closedDate: null,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [todoTask, nowTask],
+        now,
+        'showAll',
+        'showAll',
+        'sortByClosedDate',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].state).toBe('NOW');
+      expect(mainBlock.tasks[1].state).toBe('TODO');
+    });
+
+    it('falls back to path/line when closed dates equal and same keyword', () => {
+      const config = createMockKeywordConfig();
+      const task1 = createMockTaskWithKeyword('NOW', false, {
+        closedDate: closedDate1,
+        path: 'b.md',
+        line: 1,
+      });
+      const task2 = createMockTaskWithKeyword('NOW', false, {
+        closedDate: closedDate1,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByClosedDate',
+        config,
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+
+    it('falls back to taskComparator when no keywordConfig provided', () => {
+      const task1 = createTask({
+        closedDate: closedDate1,
+        path: 'b.md',
+        line: 1,
+      });
+      const task2 = createTask({
+        closedDate: closedDate1,
+        path: 'a.md',
+        line: 1,
+      });
+
+      const blocks = sortTasksInBlocks(
+        [task1, task2],
+        now,
+        'showAll',
+        'showAll',
+        'sortByClosedDate',
+      );
+
+      const mainBlock = blocks.find((b) => b.type === 'main');
+      expect(mainBlock).toBeDefined();
+      if (!mainBlock) throw new Error('Main block should be defined');
+      expect(mainBlock.tasks[0].path).toBe('a.md');
+      expect(mainBlock.tasks[1].path).toBe('b.md');
+    });
+  });
+
   describe('Flatten Blocks Function', () => {
     it('combines all blocks into a single array in order', () => {
       const currentTask = createTask({

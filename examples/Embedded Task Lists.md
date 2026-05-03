@@ -13,7 +13,7 @@ sort: priority
 
 - `search:` any valid search string.
 - `title:` (optional) adds a custom title displayed above the task list.
-- `sort:` one of `filepath`, `scheduled`, `deadline`, `priority` or `urgency`.
+- `sort:` one of `filepath`, `scheduled`, `deadline`, `closed`, `priority`, `urgency`, or `keyword`.
 - `limit:` (optional) set the display limit to result the number of results shown.
 - `show-completed:` (optional) overrides "Completed tasks" setting. `show`, `hide`, `sort-to-end`.
 - `show-future:` (optional) overrides "Future dated tasks" setting. `show-all`, `show-upcoming`, `hide`, `sort-to-end`.
@@ -48,6 +48,8 @@ The `sort:` parameter accepts any valid TODOseq sort method:
 - `deadline` - sort by deadline date
 - `priority` - sort by priority
 - `urgency` - sort by urgency (see [urgency](urgency.md))
+- `keyword` - sort by keyword group and order
+- `closed` - sort by closed date (see [sort methods](sort-methods.md))
 
 ```todoseq
 sort: Priority
@@ -69,6 +71,11 @@ sort: filepath
 limit: 5
 ```
 
+```todoseq
+sort: closed
+limit: 10
+```
+
 ### Combined Parameters
 
 You can combine multiple parameters:
@@ -83,7 +90,6 @@ search: state:TODO
 sort: scheduled
 limit: 5
 ```
-
 
 ## Interactive Features
 
@@ -129,6 +135,7 @@ Click on the task text (excluding the checkbox) to navigate to the task's locati
 ### Refresh List
 
 The list automatically refreshes when:
+
 - Tasks are modified in the vault
 - Files are created, deleted, or renamed
 - Settings are changed
@@ -138,6 +145,7 @@ The list automatically refreshes when:
 ```todoseq
 search: bogus
 ```
+
 ## Error Handling
 
 If there's an error parsing the search query or sort method, an error message will be displayed:

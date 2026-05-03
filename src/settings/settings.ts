@@ -1131,6 +1131,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         drop.addOption('default', 'Default (file path)');
         drop.addOption('sortByScheduled', 'Scheduled date');
         drop.addOption('sortByDeadline', 'Deadline date');
+        drop.addOption('sortByClosedDate', 'Closed date');
         drop.addOption('sortByPriority', 'Priority');
         drop.addOption('sortByUrgency', 'Urgency');
         drop.setValue(this.plugin.settings.defaultSortMethod);
@@ -1139,6 +1140,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             | 'default'
             | 'sortByScheduled'
             | 'sortByDeadline'
+            | 'sortByClosedDate'
             | 'sortByPriority'
             | 'sortByUrgency';
           this.plugin.settings.defaultSortMethod = sortMethod;
