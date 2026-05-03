@@ -1337,7 +1337,7 @@ export class EmbeddedTaskListRenderer {
         task.state,
         settings,
       );
-      checkbox.checked = task.completed;
+      checkbox.checked = dataTaskChar !== ' ';
     } else {
       if (this.plugin.keywordManager.isActive(task.state)) {
         dataTaskChar = '/';

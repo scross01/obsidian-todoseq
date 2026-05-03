@@ -1123,12 +1123,17 @@
   height: 0.9rem;
 }
 
-/* Completed task styling */
-.todoseq-embedded-task-item:has(.todoseq-embedded-task-checkbox:checked) {
+/* Completed task styling - target data-task values for done (x) and canceled (-) only */
+.todoseq-embedded-task-item:has(.todoseq-embedded-task-checkbox[data-task='x']),
+.todoseq-embedded-task-item:has(
+  .todoseq-embedded-task-checkbox[data-task='-']
+) {
   opacity: 0.6;
 }
 
-.todoseq-embedded-task-item:has(.todoseq-embedded-task-checkbox:checked)
+.todoseq-embedded-task-item:has(.todoseq-embedded-task-checkbox[data-task='x'])
+  .todoseq-embedded-task-text,
+.todoseq-embedded-task-item:has(.todoseq-embedded-task-checkbox[data-task='-'])
   .todoseq-embedded-task-text {
   text-decoration: line-through;
 }
