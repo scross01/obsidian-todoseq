@@ -1,6 +1,6 @@
 import { Search } from '../src/search/search';
 import { Task } from '../src/types/task';
-import { createBaseTask } from './helpers/test-helper';
+import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 
 describe('Search Prefix Filters', () => {
   const testTasks: Task[] = [
@@ -481,6 +481,402 @@ describe('Search Prefix Filters', () => {
       );
       const result = testTasks.filter((_, index) => results[index]);
       expect(result.length).toBe(2);
+    });
+  });
+
+  describe('State Group Keywords', () => {
+    const groupTestTasks: Task[] = [
+      createBaseTask({
+        path: 'notes/todo.md',
+        line: 1,
+        rawText: 'TODO task',
+        listMarker: '-',
+        text: 'task',
+        state: 'TODO',
+      }),
+      createBaseTask({
+        path: 'notes/later.md',
+        line: 2,
+        rawText: 'LATER task',
+        listMarker: '-',
+        text: 'task',
+        state: 'LATER',
+      }),
+      createBaseTask({
+        path: 'notes/doing.md',
+        line: 3,
+        rawText: 'DOING task',
+        listMarker: '-',
+        text: 'task',
+        state: 'DOING',
+      }),
+      createBaseTask({
+        path: 'notes/now.md',
+        line: 4,
+        rawText: 'NOW task',
+        listMarker: '-',
+        text: 'task',
+        state: 'NOW',
+      }),
+      createBaseTask({
+        path: 'notes/inprogress.md',
+        line: 5,
+        rawText: 'IN-PROGRESS task',
+        listMarker: '-',
+        text: 'task',
+        state: 'IN-PROGRESS',
+      }),
+      createBaseTask({
+        path: 'notes/wait.md',
+        line: 6,
+        rawText: 'WAIT task',
+        listMarker: '-',
+        text: 'task',
+        state: 'WAIT',
+      }),
+      createBaseTask({
+        path: 'notes/waiting.md',
+        line: 7,
+        rawText: 'WAITING task',
+        listMarker: '-',
+        text: 'task',
+        state: 'WAITING',
+      }),
+      createBaseTask({
+        path: 'notes/done.md',
+        line: 8,
+        rawText: 'DONE task',
+        listMarker: '-',
+        text: 'task',
+        state: 'DONE',
+      }),
+      createBaseTask({
+        path: 'notes/canceled.md',
+        line: 9,
+        rawText: 'CANCELED task',
+        listMarker: '-',
+        text: 'task',
+        state: 'CANCELED',
+      }),
+    ];
+
+    it('should match all active states with state:active', async () => {
+      const settings = createBaseSettings();
+      const results = await Promise.all(
+        groupTestTasks.map(async (task) => {
+          return await Search.evaluate('state:active', task, false, settings);
+        }),
+      );
+      const matched = groupTestTasks.filter((_, i) => results[i]);
+      expect(matched.map((t) => t.state).sort()).toEqual([
+        'DOING',
+        'IN-PROGRESS',
+        'NOW',
+      ]);
+    });
+
+    it('should match all inactive states with state:inactive', async () => {
+      const settings = createBaseSettings();
+      const results = await Promise.all(
+        groupTestTasks.map(async (task) => {
+          return await Search.evaluate(
+            'state:inactive',
+            task,
+            false,
+            settings,
+          );
+        }),
+      );
+      const matched = groupTestTasks.filter((_, i) => results[i]);
+      expect(matched.map((t) => t.state).sort()).toEqual(['LATER', 'TODO']);
+    });
+
+    it('should match all waiting states with state:waiting', async () => {
+      const settings = createBaseSettings();
+      const results = await Promise.all(
+        groupTestTasks.map(async (task) => {
+          return await Search.evaluate(
+            'state:waiting',
+            task,
+            false,
+            settings,
+          );
+        }),
+      );
+      const matched = groupTestTasks.filter((_, i) => results[i]);
+      expect(matched.map((t) => t.state).sort()).toEqual(['WAIT', 'WAITING']);
+    });
+
+    it('should match all completed states with state:completed', async () => {
+      const settings = createBaseSettings();
+      const results = await Promise.all(
+        groupTestTasks.map(async (task) => {
+          return await Search.evaluate(
+            'state:completed',
+            task,
+            false,
+            settings,
+          );
+        }),
+      );
+      const matched = groupTestTasks.filter((_, i) => results[i]);
+      expect(matched.map((t) => t.state).sort()).toEqual([
+        'CANCELED',
+        'DONE',
+      ]);
+    });
+
+    it('should not match group when uppercase ACTIVE (falls through to exact match)', async () => {
+      const settings = createBaseSettings();
+      const task = createBaseTask({
+        path: 'notes/test.md',
+        line: 10,
+        rawText: 'DOING task',
+        listMarker: '-',
+        text: 'task',
+        state: 'DOING',
+      });
+      const result = await Search.evaluate(
+        'state:ACTIVE',
+        task,
+        false,
+        settings,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should not match group when uppercase INACTIVE', async () => {
+      const settings = createBaseSettings();
+      const task = createBaseTask({
+        path: 'notes/test.md',
+        line: 10,
+        rawText: 'TODO task',
+        listMarker: '-',
+        text: 'task',
+        state: 'TODO',
+      });
+      const result = await Search.evaluate(
+        'state:INACTIVE',
+        task,
+        false,
+        settings,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should match exact keyword WAITING via uppercase even though waiting is a group', async () => {
+      const settings = createBaseSettings();
+      const waitingTask = createBaseTask({
+        path: 'notes/test.md',
+        line: 10,
+        rawText: 'WAITING task',
+        listMarker: '-',
+        text: 'task',
+        state: 'WAITING',
+      });
+      const waitTask = createBaseTask({
+        path: 'notes/test2.md',
+        line: 11,
+        rawText: 'WAIT task',
+        listMarker: '-',
+        text: 'task',
+        state: 'WAIT',
+      });
+      const waitingResult = await Search.evaluate(
+        'state:WAITING',
+        waitingTask,
+        false,
+        settings,
+      );
+      expect(waitingResult).toBe(true);
+
+      const waitResult = await Search.evaluate(
+        'state:WAITING',
+        waitTask,
+        false,
+        settings,
+      );
+      expect(waitResult).toBe(false);
+    });
+
+    it('should match exact keyword COMPLETED when configured, not the group', async () => {
+      const settings = createBaseSettings({
+        additionalCompletedKeywords: ['COMPLETED'],
+      });
+      const completedTask = createBaseTask({
+        path: 'notes/test.md',
+        line: 10,
+        rawText: 'COMPLETED task',
+        listMarker: '-',
+        text: 'task',
+        state: 'COMPLETED',
+      });
+      const doneTask = createBaseTask({
+        path: 'notes/test2.md',
+        line: 11,
+        rawText: 'DONE task',
+        listMarker: '-',
+        text: 'task',
+        state: 'DONE',
+      });
+
+      const completedResult = await Search.evaluate(
+        'state:COMPLETED',
+        completedTask,
+        false,
+        settings,
+      );
+      expect(completedResult).toBe(true);
+
+      const doneResult = await Search.evaluate(
+        'state:COMPLETED',
+        doneTask,
+        false,
+        settings,
+      );
+      expect(doneResult).toBe(false);
+    });
+
+    it('should still match exact state when not a group keyword', async () => {
+      const settings = createBaseSettings();
+      const results = await Promise.all(
+        groupTestTasks.map(async (task) => {
+          return await Search.evaluate('state:TODO', task, false, settings);
+        }),
+      );
+      const matched = groupTestTasks.filter((_, i) => results[i]);
+      expect(matched.length).toBe(1);
+      expect(matched[0].state).toBe('TODO');
+    });
+
+    it('should include custom keywords in group matches', async () => {
+      const settings = createBaseSettings({
+        additionalActiveKeywords: ['REVIEWING'],
+      });
+      const customTask = createBaseTask({
+        path: 'notes/review.md',
+        line: 10,
+        rawText: 'REVIEWING task',
+        listMarker: '-',
+        text: 'task',
+        state: 'REVIEWING',
+      });
+      const result = await Search.evaluate(
+        'state:active',
+        customTask,
+        false,
+        settings,
+      );
+      expect(result).toBe(true);
+    });
+
+    it('should not match custom active keyword with state:inactive', async () => {
+      const settings = createBaseSettings({
+        additionalActiveKeywords: ['REVIEWING'],
+      });
+      const customTask = createBaseTask({
+        path: 'notes/review.md',
+        line: 10,
+        rawText: 'REVIEWING task',
+        listMarker: '-',
+        text: 'task',
+        state: 'REVIEWING',
+      });
+      const result = await Search.evaluate(
+        'state:inactive',
+        customTask,
+        false,
+        settings,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should still match group with lowercase active even when ACTIVE is a custom keyword', async () => {
+      const settings = createBaseSettings({
+        additionalActiveKeywords: ['ACTIVE'],
+      });
+      const activeKeywordTask = createBaseTask({
+        path: 'notes/active.md',
+        line: 10,
+        rawText: 'ACTIVE task',
+        listMarker: '-',
+        text: 'task',
+        state: 'ACTIVE',
+      });
+      const doingTask = createBaseTask({
+        path: 'notes/doing.md',
+        line: 11,
+        rawText: 'DOING task',
+        listMarker: '-',
+        text: 'task',
+        state: 'DOING',
+      });
+
+      const activeResult = await Search.evaluate(
+        'state:active',
+        activeKeywordTask,
+        false,
+        settings,
+      );
+      expect(activeResult).toBe(true);
+
+      const doingResult = await Search.evaluate(
+        'state:active',
+        doingTask,
+        false,
+        settings,
+      );
+      expect(doingResult).toBe(true);
+    });
+
+    it('should fall back to exact match without settings', async () => {
+      const results = await Promise.all(
+        groupTestTasks.map(async (task) => {
+          return await Search.evaluate('state:active', task, false);
+        }),
+      );
+      const matched = groupTestTasks.filter((_, i) => results[i]);
+      expect(matched.length).toBe(0);
+    });
+
+    it('should work with NOT operator for group keywords', async () => {
+      const settings = createBaseSettings();
+      const results = await Promise.all(
+        groupTestTasks.map(async (task) => {
+          return await Search.evaluate(
+            '-state:completed',
+            task,
+            false,
+            settings,
+          );
+        }),
+      );
+      const matched = groupTestTasks.filter((_, i) => results[i]);
+      expect(matched.map((t) => t.state)).not.toContain('DONE');
+      expect(matched.map((t) => t.state)).not.toContain('CANCELED');
+      expect(matched.length).toBe(7);
+    });
+
+    it('should work with OR operator for group keywords', async () => {
+      const settings = createBaseSettings();
+      const results = await Promise.all(
+        groupTestTasks.map(async (task) => {
+          return await Search.evaluate(
+            'state:active OR state:waiting',
+            task,
+            false,
+            settings,
+          );
+        }),
+      );
+      const matched = groupTestTasks.filter((_, i) => results[i]);
+      expect(matched.map((t) => t.state).sort()).toEqual([
+        'DOING',
+        'IN-PROGRESS',
+        'NOW',
+        'WAIT',
+        'WAITING',
+      ]);
     });
   });
 });

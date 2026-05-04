@@ -7,7 +7,16 @@ import { getFilename } from '../utils/task-utils';
 import { RegexCache } from '../utils/regex-cache';
 import { TAG_PATTERN } from '../utils/patterns';
 import { PropertySearchEngine } from '../services/property-search-engine';
+import { KeywordManager } from '../utils/keyword-manager';
+import { KeywordGroup } from '../types/task';
 import { App, TFile } from 'obsidian';
+
+const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
+  active: 'activeKeywords',
+  inactive: 'inactiveKeywords',
+  waiting: 'waitingKeywords',
+  completed: 'completedKeywords',
+};
 
 export class SearchEvaluator {
   private static regexCache = new RegexCache();
@@ -251,7 +260,7 @@ export class SearchEvaluator {
       case 'tag':
         return this.evaluateTagFilter(value, task, caseSensitive, node.exact);
       case 'state':
-        return this.evaluateStateFilter(value, task, caseSensitive);
+        return this.evaluateStateFilter(value, task, caseSensitive, settings);
       case 'priority':
         return this.evaluatePriorityFilter(value, task, caseSensitive);
       case 'content':
@@ -387,7 +396,20 @@ export class SearchEvaluator {
     value: string,
     task: Task,
     caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
   ): boolean {
+    const group = STATE_GROUP_MAP[value];
+    if (group && settings) {
+      const groupKeywords = KeywordManager.getKeywordsForGroup(
+        group,
+        settings,
+      );
+      const taskState = caseSensitive ? task.state : task.state.toLowerCase();
+      return groupKeywords.some((k) =>
+        caseSensitive ? k === task.state : k.toLowerCase() === taskState,
+      );
+    }
+
     const searchText = caseSensitive ? value : value.toLowerCase();
     const taskState = caseSensitive ? task.state : task.state.toLowerCase();
 

@@ -484,8 +484,12 @@ describe('Search Suggestions', () => {
       // and cannot be searched for
       expect(states).not.toContain('ARCHIVED');
 
-      // Should be sorted alphabetically
+      // Should be sorted alphabetically with group keywords first
       expect(states).toEqual([
+        'active',
+        'completed',
+        'inactive',
+        'waiting',
         'CANCELED',
         'CANCELLED',
         'DOING',

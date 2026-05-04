@@ -119,7 +119,7 @@ TODOseq supports filter keywords similar to Obsidian's general vault search for 
 | `path:`      | Find tasks in specific file paths       | `path:Journal`            |
 | `file:`      | Find tasks in files with matching names | `file:meeting.md`         |
 | `tag:`       | Find tasks containing specific tags     | `tag:urgent`              |
-| `state:`     | Find tasks with specific states         | `state:DOING`             |
+| `state:`     | Find tasks with specific states or groups | `state:active`          |
 | `priority:`  | Find tasks with specific priorities     | `priority:high`           |
 | `content:`   | Find tasks with specific content        | `content:project`         |
 | `scheduled:` | Find tasks with scheduled dates         | `scheduled:due`           |
@@ -156,6 +156,51 @@ The `state:` filter and state autocomplete suggestions follow the effective keyw
 ```
 
 Find tasks on pages marked as projects.
+
+### State Group Keywords
+
+In addition to matching individual state keywords (e.g., `state:TODO`, `state:DOING`), the `state:` filter supports group keywords that match all tasks belonging to a keyword group. These group keywords are resolved dynamically based on your settings, so any custom keywords you have configured are included automatically.
+
+| Group Keyword  | Description                                                  |
+| -------------- | ------------------------------------------------------------ |
+| `active`       | Matches all active state keywords (default: NOW, DOING, IN-PROGRESS, plus any custom active keywords) |
+| `inactive`     | Matches all inactive state keywords (default: TODO, LATER, plus any custom inactive keywords) |
+| `waiting`      | Matches all waiting state keywords (default: WAIT, WAITING, plus any custom waiting keywords) |
+| `completed`    | Matches all completed state keywords (default: DONE, CANCELED, CANCELLED, plus any custom completed keywords) |
+
+#### State Group Examples
+
+```txt
+state:active
+```
+
+Find all tasks in any active state (NOW, DOING, IN-PROGRESS, and any custom active keywords).
+
+```txt
+state:inactive priority:high
+```
+
+Find high priority tasks in any inactive state (TODO, LATER, and any custom inactive keywords).
+
+```txt
+-state:completed
+```
+
+Find all tasks that are not in a completed state. This is a convenient alternative to excluding each completed keyword individually.
+
+```txt
+state:active OR state:waiting
+```
+
+Find all tasks that are either active or waiting.
+
+```txt
+[type:Project] state:active deadline:"this week"
+```
+
+Find active tasks on project pages with deadlines this week.
+
+Group keywords must be lowercase (`state:active`, `state:inactive`, `state:waiting`, `state:completed`). Using uppercase (e.g., `state:ACTIVE`) will perform a regular exact match against a task keyword named "ACTIVE" rather than matching the group. This ensures group keywords and individual task keywords never conflict.
 
 ## Date Filter Expressions
 
@@ -520,6 +565,18 @@ Find high or medium priority tasks scheduled in January 2026 in the work folder.
 ```
 
 Find TODO or DOING tasks on project pages, excluding those with blocked status.
+
+```txt
+[type:Project] state:active deadline:"this week"
+```
+
+Find all active tasks on project pages with deadlines this week.
+
+```txt
+-state:completed priority:high scheduled:"this week"
+```
+
+Find high priority tasks scheduled this week that are not yet completed.
 
 ## Search Logic and Behavior
 

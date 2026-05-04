@@ -222,21 +222,24 @@ export class SearchSuggestions {
    * @returns Array of task states, sorted alphabetically
    */
   static getAllStates(settings?: TodoTrackerSettings): string[] {
-    // Get all keywords but exclude archived - archived tasks are never collected
-    // during vault scans and cannot be searched for
     const allKeywords = KeywordManager.getAllKeywords(settings ?? {});
     const archivedKeywords = KeywordManager.getKeywordsForGroup(
       'archivedKeywords',
       settings ?? {},
     );
 
-    // Filter out archived keywords
     const searchableKeywords = allKeywords.filter(
       (k) => !archivedKeywords.includes(k),
     );
 
-    // Sort alphabetically (case-insensitive)
-    return searchableKeywords.sort((a, b) => a.localeCompare(b));
+    const groupKeywords = ['active', 'completed', 'inactive', 'waiting'];
+
+    const allStates = [
+      ...groupKeywords,
+      ...searchableKeywords.sort((a, b) => a.localeCompare(b)),
+    ];
+
+    return allStates;
   }
 
   /**

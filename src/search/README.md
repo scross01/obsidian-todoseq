@@ -206,7 +206,7 @@ TODOseq now supports Obsidian-style prefix filters for targeted field-specific s
 - **Path filter**: `path:Journal` - Filter tasks by file path
 - **File filter**: `file:meeting` - Filter tasks by filename
 - **Tag filter**: `tag:#urgent` - Filter tasks by tags
-- **State filter**: `state:DOING` - Filter tasks by state
+- **State filter**: `state:DOING` - Filter tasks by state (individual keyword or group)
 - **Priority filter**: `priority:high` or `priority:A` - Filter tasks by priority
 - **Content filter**: `content:"project action"` - Filter tasks by content
 
@@ -231,6 +231,26 @@ priority:A                       // Same as priority:high
 content:"project action"         // Tasks containing exact phrase
 ```
 
+### State Group Keywords
+
+The `state:` filter supports group keywords that match all tasks belonging to a keyword group. These are resolved dynamically based on the configured keyword settings.
+
+| Group Keyword | Matches                                               |
+| ------------- | ----------------------------------------------------- |
+| `active`      | All active keywords (NOW, DOING, IN-PROGRESS, + custom) |
+| `inactive`    | All inactive keywords (TODO, LATER, + custom)           |
+| `waiting`     | All waiting keywords (WAIT, WAITING, + custom)          |
+| `completed`   | All completed keywords (DONE, CANCELED, CANCELLED, + custom) |
+
+```txt
+state:active                     // All tasks in any active state
+state:inactive priority:high     // High priority inactive tasks
+-state:completed                 // All non-completed tasks
+state:active OR state:waiting    // Active or waiting tasks
+```
+
+Group keywords must be lowercase. Using uppercase (e.g., `state:ACTIVE`) performs a regular exact match against a task keyword rather than matching the group.
+
 ### Combined Prefix Filters
 
 ```txt
@@ -238,6 +258,7 @@ path:Journal/ tag:#urgent        // Implicit AND: urgent tasks in Journal
 state:TODO OR state:DOING       // OR logic with prefix filters
 priority:high -state:DOING      // High priority excluding DOING state
 file:meeting content:project    // Project tasks in meeting files
+state:active deadline:"this week" // Active tasks due this week
 ```
 
 ### Implementation Details
@@ -247,6 +268,7 @@ file:meeting content:project    // Project tasks in meeting files
 - **Full boolean support**: Prefix filters work with OR, AND, NOT operators
 - **Case sensitivity**: Respects global case sensitivity setting
 - **Quoted values**: Supports multi-word values with quotes (e.g., `path:"Folder Name"`)
+- **Group keyword resolution**: State filter resolves group keywords (active, inactive, waiting, completed) via `KeywordManager` using current settings
 
 ## Future Enhancements
 
