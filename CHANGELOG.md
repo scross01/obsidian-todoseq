@@ -2,11 +2,11 @@
 
 ## 0.13.1
 
-- Added sort by closed date option in task list view and emedded task lists.
-- Added search filters but state groups `state:active`, `state:completed`, `state:inactive`, and `state:waiting`.
+- Added sort by closed date option in task list view and embedded task lists.
+- Added search filters for state groups `state:active`, `state:completed`, `state:inactive`, and `state:waiting`.
 - Added urgency `time.coefficient` to increase urgency for tasks with a specific deadline or scheduled time.
 - Fixed urgency calculation and sort for tasks with a scheduled time or deadline time.
-- Fixed issue with active tasks being struckthrough in embedded task list when extended markdown checkbox option enabled.
+- Fixed issue with active tasks being struck-through in embedded task list when extended markdown checkbox option enabled.
 
 ## 0.13.0
 
