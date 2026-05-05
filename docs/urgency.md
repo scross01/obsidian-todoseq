@@ -10,8 +10,8 @@ The urgency score considers various aspects of your tasks:
 
 - **Due dates**: Tasks that are due today or overdue receive the highest urgency boost
 - **Priority**: High priority tasks (`[#A]`) are more urgent than medium (`[#B]`) or low (`[#C]`) priority tasks
-- **Scheduled dates**: Tasks with scheduled dates are more urgent than those without
-- **Deadlines**: Tasks with deadline dates are more urgent than those without
+- **Scheduled dates**: Tasks with scheduled dates are more urgent than those without; tasks with a specific time get an additional contribution weighted by time-of-day (earlier = more urgent)
+- **Deadlines**: Tasks with deadline dates are more urgent than those without; tasks with a specific time get an additional contribution weighted by time-of-day (earlier = more urgent)
 - **Active state**: Tasks that are currently being worked on (DOING, NOW, IN-PROGRESS, or custom active keywords) are more urgent
 - **Task age**: Older tasks in daily note pages gain urgency over time using a linear scale (0.0 to 1.0) based on days since creation, with a maximum of 365 days
 - **Tags**: Tasks with tags receive a small urgency boost based on the number of tags (0.8 for 1 tag, 0.9 for 2 tags, 1.0 for 3+ tags)
@@ -38,7 +38,9 @@ urgency.priority.high.coefficient = 6.0    # priority is high [#A]
 urgency.priority.medium.coefficient = 3.9  # priority is medium [#B]
 urgency.priority.low.coefficient = 1.8     # priority is low [#C]
 urgency.scheduled.coefficient = 5.0        # task has a scheduled date that is today or in the past
+urgency.scheduled.time.coefficient = 1.0   # task has a scheduled time, weighted by time-of-day (00:00=1.0, 23:59=0)
 urgency.deadline.coefficient = 12.0        # deadline date is upcoming (+14 days) due (today) or overdue (-7 days)
+urgency.deadline.time.coefficient = 1.0    # task has a deadline time, weighted by time-of-day (00:00=1.0, 23:59=0)
 urgency.active.coefficient = 4.0           # state is an active keyword (DOING, NOW, IN-PROGRESS, or custom active keywords)
 urgency.age.coefficient = 2.0              # if the page is a daily notes page, weight tasks on older pages higher
 urgency.tags.coefficient = 1.0             # the task has one or more tags (multiplied by tag factor)
@@ -70,16 +72,36 @@ This approach provides diminishing returns for additional tags, encouraging focu
 
 ### Scheduled Date Calculation
 
-The scheduled date uses a simple binary approach:
+The scheduled date uses a simple binary approach with day-level comparison:
 
 - **If scheduled date is today or in the past**: Contributes the full `urgency.scheduled.coefficient` (5.0) to the urgency score
 - **If scheduled date is in the future**: Contributes 0 to the urgency score
 
-This means a task scheduled for tomorrow won't receive any scheduled urgency boost until that day arrives.
+The comparison normalizes both dates to the start of the day, so tasks scheduled with a specific time (e.g., `<2026-05-04 Mon 10:00>`) are correctly compared at the day level.
+
+### Scheduled Time Calculation
+
+For tasks with a specific scheduled time (e.g., `SCHEDULED: <2026-05-04 Mon 10:00>`), an additional time-based contribution is applied. The time contribution is weighted by the time of day — tasks scheduled earlier in the day are considered more urgent:
+
+**Formula**: `urgency.scheduled.time.coefficient × (1.0 - minutes_from_midnight / 1440)`
+
+- **00:00 (start of day)**: Full weight (1.0 × coefficient)
+- **06:00**: 0.75 × coefficient
+- **12:00 (midday)**: 0.5 × coefficient
+- **18:00**: 0.25 × coefficient
+- **23:59 (end of day)**: Near-zero weight (~0.0 × coefficient)
+- **No time component**: Contributes 0
+
+**Examples**:
+
+- Task scheduled at 00:01: `1.0 × (1.0 - 1/1440) ≈ 1.0` time contribution
+- Task scheduled at 12:00: `1.0 × (1.0 - 720/1440) = 0.5` time contribution
+- Task scheduled at 23:59: `1.0 × (1.0 - 1439/1440) ≈ 0.0` time contribution
+- Task scheduled with no time: `0` time contribution
 
 ### Deadline Date Calculation
 
-The deadline date uses a more sophisticated gradient formula that considers how close the deadline is:
+The deadline date uses a more sophisticated gradient formula that considers how close the deadline is. The comparison normalizes both dates to the start of the day so that deadlines with a specific time are correctly handled at the day level.
 
 **Formula**: `((days_overdue + 14.0) * 0.8 / 21.0) + 0.2`
 
@@ -97,6 +119,26 @@ The formula clamps the range to -14 days (14 days in the future) to +7 days (7 d
 - Task due today: `((0 + 14.0) * 0.8 / 21.0) + 0.2 = 0.733 × 12.0 ≈ 8.8`
 - Task due tomorrow: `((-1 + 14.0) * 0.8 / 21.0) + 0.2 = 0.695 × 12.0 ≈ 8.3`
 - Task 7 days overdue: `((7 + 14.0) * 0.8 / 21.0) + 0.2 = 1.0 × 12.0 = 12.0`
+
+### Deadline Time Calculation
+
+For tasks with a specific deadline time (e.g., `DEADLINE: <2026-05-04 Mon 10:00>`), an additional time-based contribution is applied. The time contribution is weighted by the time of day — tasks due earlier in the day are considered more urgent:
+
+**Formula**: `urgency.deadline.time.coefficient × (1.0 - minutes_from_midnight / 1440)`
+
+- **00:00 (start of day)**: Full weight (1.0 × coefficient)
+- **06:00**: 0.75 × coefficient
+- **12:00 (midday)**: 0.5 × coefficient
+- **18:00**: 0.25 × coefficient
+- **23:59 (end of day)**: Near-zero weight (~0.0 × coefficient)
+- **No time component**: Contributes 0
+
+**Examples**:
+
+- Task due at 00:01: `1.0 × (1.0 - 1/1440) ≈ 1.0` time contribution
+- Task due at 12:00: `1.0 × (1.0 - 720/1440) = 0.5` time contribution
+- Task due at 23:59: `1.0 × (1.0 - 1439/1440) ≈ 0.0` time contribution
+- Task due with no time: `0` time contribution
 
 ## Priority Calculation
 

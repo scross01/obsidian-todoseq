@@ -10,7 +10,9 @@ export interface UrgencyCoefficients {
   priorityMedium: number;
   priorityLow: number;
   scheduled: number;
+  scheduledTime: number;
   deadline: number;
+  deadlineTime: number;
   active: number;
   age: number;
   tags: number;
@@ -25,7 +27,9 @@ const DEFAULT_URGENCY_COEFFICIENTS: UrgencyCoefficients = {
   priorityMedium: 3.9,
   priorityLow: 1.8,
   scheduled: 5.0,
+  scheduledTime: 1.0,
   deadline: 12.0,
+  deadlineTime: 1.0,
   active: 4.0,
   age: 2.0,
   tags: 1.0,
@@ -69,9 +73,11 @@ export function parseUrgencyCoefficientsFromContent(
           coefficients.priorityMedium = numValue;
         else if (subcategory === 'low') coefficients.priorityLow = numValue;
       } else if (category === 'scheduled') {
-        coefficients.scheduled = numValue;
+        if (subcategory === 'time') coefficients.scheduledTime = numValue;
+        else coefficients.scheduled = numValue;
       } else if (category === 'deadline' || category === 'due') {
-        coefficients.deadline = numValue;
+        if (subcategory === 'time') coefficients.deadlineTime = numValue;
+        else coefficients.deadline = numValue;
       } else if (category === 'active') {
         coefficients.active = numValue;
       } else if (category === 'age') {
@@ -160,24 +166,40 @@ function getTaskAge(task: Task): number {
  * - 14 days future: 0.2
  */
 function getDeadlineUrgency(task: Task): number {
-  // Only use deadline date (not scheduled date)
   if (!task.deadlineDate) return 0;
 
   const deadline = task.deadlineDate;
+  const deadlineDay = DateUtils.getStartOfDay(deadline);
   const today = DateUtils.getStartOfDay(new Date());
 
-  // Calculate days overdue (positive for overdue, negative for future)
-  // daysOverdue = today - deadline (so overdue tasks have positive values)
-  const diffTime = today.getTime() - deadline.getTime();
+  const diffTime = today.getTime() - deadlineDay.getTime();
   const daysOverdue = Math.floor(diffTime / DateUtils.MILLISECONDS_PER_DAY);
 
-  // Clamp to the 21-day range: -14 (14 days future) to +7 (7 days overdue)
   const clampedDays = Math.max(-14, Math.min(7, daysOverdue));
 
-  // Apply the formula: ((days_overdue + 14.0) * 0.8 / 21.0) + 0.2
   const urgency = ((clampedDays + 14.0) * 0.8) / 21.0 + 0.2;
 
   return urgency;
+}
+
+/**
+ * Calculate a time-of-day weight for a date.
+ * Returns a value between 0 and 1.0 where earlier times are more urgent:
+ * 00:00 gets full weight (1.0), 23:59 gets near-zero weight.
+ * Returns 0 if the date has no time component (midnight with no explicit time).
+ */
+function getTimeOfDayWeight(date: Date | null): number {
+  if (!date) return 0;
+
+  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0;
+  if (!hasTime) return 0;
+
+  const minutesFromMidnight = date.getHours() * 60 + date.getMinutes();
+  return 1.0 - minutesFromMidnight / 1440;
+}
+
+function getDeadlineTimeUrgency(task: Task): number {
+  return getTimeOfDayWeight(task.deadlineDate);
 }
 
 /**
@@ -188,12 +210,14 @@ function getDeadlineUrgency(task: Task): number {
 function getScheduledUrgency(task: Task): number {
   if (!task.scheduledDate) return 0;
 
-  const scheduled = task.scheduledDate;
+  const scheduledDay = DateUtils.getStartOfDay(task.scheduledDate);
   const today = DateUtils.getStartOfDay(new Date());
 
-  // Check if scheduled date is today or in the past
-  // scheduled <= today means today or overdue
-  return scheduled <= today ? 1.0 : 0;
+  return scheduledDay.getTime() <= today.getTime() ? 1.0 : 0;
+}
+
+function getScheduledTimeUrgency(task: Task): number {
+  return getTimeOfDayWeight(task.scheduledDate);
 }
 
 /**
@@ -268,6 +292,9 @@ export function calculateTaskUrgency(
     const deadlineUrgency = getDeadlineUrgency(task);
     urgency += coefficients.deadline * deadlineUrgency;
 
+    const deadlineTimeUrgency = getDeadlineTimeUrgency(task);
+    urgency += coefficients.deadlineTime * deadlineTimeUrgency;
+
     // Priority urgency
     if (task.priority === 'high') {
       urgency += coefficients.priorityHigh;
@@ -277,9 +304,11 @@ export function calculateTaskUrgency(
       urgency += coefficients.priorityLow;
     }
 
-    // Scheduled date urgency - use getScheduledUrgency() function
     const scheduledUrgency = getScheduledUrgency(task);
     urgency += coefficients.scheduled * scheduledUrgency;
+
+    const scheduledTimeUrgency = getScheduledTimeUrgency(task);
+    urgency += coefficients.scheduledTime * scheduledTimeUrgency;
 
     // Active state urgency - pass keyword set
     const active = isActive(task, context?.activeKeywordsSet ?? new Set());

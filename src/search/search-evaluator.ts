@@ -400,10 +400,7 @@ export class SearchEvaluator {
   ): boolean {
     const group = STATE_GROUP_MAP[value];
     if (group && settings) {
-      const groupKeywords = KeywordManager.getKeywordsForGroup(
-        group,
-        settings,
-      );
+      const groupKeywords = KeywordManager.getKeywordsForGroup(group, settings);
       const taskState = caseSensitive ? task.state : task.state.toLowerCase();
       return groupKeywords.some((k) =>
         caseSensitive ? k === task.state : k.toLowerCase() === taskState,

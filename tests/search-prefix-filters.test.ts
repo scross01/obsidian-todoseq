@@ -579,12 +579,7 @@ describe('Search Prefix Filters', () => {
       const settings = createBaseSettings();
       const results = await Promise.all(
         groupTestTasks.map(async (task) => {
-          return await Search.evaluate(
-            'state:inactive',
-            task,
-            false,
-            settings,
-          );
+          return await Search.evaluate('state:inactive', task, false, settings);
         }),
       );
       const matched = groupTestTasks.filter((_, i) => results[i]);
@@ -595,12 +590,7 @@ describe('Search Prefix Filters', () => {
       const settings = createBaseSettings();
       const results = await Promise.all(
         groupTestTasks.map(async (task) => {
-          return await Search.evaluate(
-            'state:waiting',
-            task,
-            false,
-            settings,
-          );
+          return await Search.evaluate('state:waiting', task, false, settings);
         }),
       );
       const matched = groupTestTasks.filter((_, i) => results[i]);
@@ -620,10 +610,7 @@ describe('Search Prefix Filters', () => {
         }),
       );
       const matched = groupTestTasks.filter((_, i) => results[i]);
-      expect(matched.map((t) => t.state).sort()).toEqual([
-        'CANCELED',
-        'DONE',
-      ]);
+      expect(matched.map((t) => t.state).sort()).toEqual(['CANCELED', 'DONE']);
     });
 
     it('should not match group when uppercase ACTIVE (falls through to exact match)', async () => {

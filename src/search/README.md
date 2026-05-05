@@ -235,11 +235,11 @@ content:"project action"         // Tasks containing exact phrase
 
 The `state:` filter supports group keywords that match all tasks belonging to a keyword group. These are resolved dynamically based on the configured keyword settings.
 
-| Group Keyword | Matches                                               |
-| ------------- | ----------------------------------------------------- |
-| `active`      | All active keywords (NOW, DOING, IN-PROGRESS, + custom) |
-| `inactive`    | All inactive keywords (TODO, LATER, + custom)           |
-| `waiting`     | All waiting keywords (WAIT, WAITING, + custom)          |
+| Group Keyword | Matches                                                      |
+| ------------- | ------------------------------------------------------------ |
+| `active`      | All active keywords (NOW, DOING, IN-PROGRESS, + custom)      |
+| `inactive`    | All inactive keywords (TODO, LATER, + custom)                |
+| `waiting`     | All waiting keywords (WAIT, WAITING, + custom)               |
 | `completed`   | All completed keywords (DONE, CANCELED, CANCELLED, + custom) |
 
 ```txt

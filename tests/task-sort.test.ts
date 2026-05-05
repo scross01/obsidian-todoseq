@@ -143,6 +143,40 @@ describe('Task Sorting System', () => {
       expect(blocks).toHaveLength(1);
       expect(blocks[0].type).toBe('main');
     });
+
+    it('should classify tasks with today date and later time as current (day-level comparison)', () => {
+      const localNow = new Date(2024, 0, 15, 8, 0);
+      const todayLaterTime = new Date(2024, 0, 15, 14, 0);
+
+      const todayLaterTask = createTask({ scheduledDate: todayLaterTime });
+
+      const blocks = sortTasksInBlocks(
+        [todayLaterTask],
+        localNow,
+        'sortToEnd',
+        'showAll',
+      );
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].type).toBe('main');
+      expect(blocks[0].tasks).toHaveLength(1);
+    });
+
+    it('should classify tasks with today deadline and later time as current (day-level comparison)', () => {
+      const localNow = new Date(2024, 0, 15, 8, 0);
+      const todayLaterTime = new Date(2024, 0, 15, 23, 0);
+
+      const todayLaterTask = createTask({ deadlineDate: todayLaterTime });
+
+      const blocks = sortTasksInBlocks(
+        [todayLaterTask],
+        localNow,
+        'sortToEnd',
+        'showAll',
+      );
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].type).toBe('main');
+      expect(blocks[0].tasks).toHaveLength(1);
+    });
   });
 
   describe('Three-Block System', () => {

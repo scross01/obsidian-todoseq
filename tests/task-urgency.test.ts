@@ -10,7 +10,7 @@ import {
 } from '../src/utils/task-urgency';
 import { Task } from '../src/types/task';
 import { App, Vault, DataAdapter } from 'obsidian';
-import { createBaseTask, createUTCDate } from './helpers/test-helper';
+import { createBaseTask, createDate } from './helpers/test-helper';
 import { KeywordManager } from '../src/utils/keyword-manager';
 import { DateUtils } from '../src/utils/date-utils';
 
@@ -47,6 +47,8 @@ urgency.priority.high.coefficient = 6.0
 urgency.priority.medium.coefficient = 3.9
 urgency.priority.low.coefficient = 1.8
 urgency.scheduled.coefficient = 5.0
+urgency.scheduled.time.coefficient = 1.0
+urgency.deadline.time.coefficient = 1.0
 urgency.active.coefficient = 4.0
 urgency.age.coefficient = 2.0
 urgency.tags.coefficient = 1.0
@@ -61,13 +63,14 @@ urgency.waiting.coefficient = -3.0
     expect(coefficients.priorityMedium).toBe(3.9);
     expect(coefficients.priorityLow).toBe(1.8);
     expect(coefficients.scheduled).toBe(5.0);
-    expect(coefficients.deadline).toBe(12.0); // urgency.due.coefficient should map to deadline
+    expect(coefficients.scheduledTime).toBe(1.0);
+    expect(coefficients.deadline).toBe(12.0);
+    expect(coefficients.deadlineTime).toBe(1.0);
     expect(coefficients.active).toBe(4.0);
     expect(coefficients.age).toBe(2.0);
     expect(coefficients.tags).toBe(1.0);
     expect(coefficients.waiting).toBe(-3.0);
 
-    // Verify the correct path was used
     expect(mockApp.vault.adapter.read).toHaveBeenCalledWith(
       '.obsidian/plugins/todoseq/urgency.ini',
     );
@@ -149,17 +152,14 @@ urgency.waiting.coefficient = -3.0
 describe('Urgency Calculation', () => {
   const defaultCoefficients = getDefaultCoefficients();
 
-  // Use a fixed reference date for all date-dependent tests (timezone-independent)
-  // Using April 15, 2026 to avoid DST boundaries
-  const referenceDate = createUTCDate(2026, 4, 15); // April 15, 2026 UTC
+  const referenceDate = createDate(2026, 4, 15);
 
   beforeEach(() => {
-    // Mock DateUtils.getStartOfDay to return a fixed date
-    jest.spyOn(DateUtils, 'getStartOfDay').mockReturnValue(referenceDate);
+    jest.useFakeTimers().setSystemTime(referenceDate);
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it('should return null for completed tasks', () => {
@@ -169,7 +169,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate urgency with deadline date (7 days overdue)', () => {
-    const sevenDaysAgo = createUTCDate(2026, 4, 8); // April 8, 2026 UTC (7 days before reference)
+    const sevenDaysAgo = createDate(2026, 4, 8);
 
     const task = createTestTask({
       deadlineDate: sevenDaysAgo,
@@ -186,7 +186,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate urgency with deadline date (today)', () => {
-    const today = createUTCDate(2026, 4, 15); // April 15, 2026 UTC (same as reference)
+    const today = createDate(2026, 4, 15);
 
     const task = createTestTask({
       deadlineDate: today,
@@ -203,7 +203,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should add urgency for future deadline dates', () => {
-    const tomorrow = createUTCDate(2026, 4, 16); // April 16, 2026 UTC (1 day after reference)
+    const tomorrow = createDate(2026, 4, 16);
 
     const task = createTestTask({
       deadlineDate: tomorrow,
@@ -272,7 +272,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should add urgency for scheduled date (today)', () => {
-    const today = createUTCDate(2026, 4, 15); // April 15, 2026 UTC (same as reference)
+    const today = createDate(2026, 4, 15);
 
     const task = createTestTask({
       scheduledDate: today,
@@ -282,14 +282,28 @@ describe('Urgency Calculation', () => {
     });
 
     const urgency = calculateTaskUrgency(task, defaultCoefficients);
-    // getScheduledUrgency returns 1.0, multiplied by 5.0 = 5.0
-    // + age factor (1.0) * age coefficient (2.0) = 2.0
-    // Total = 7.0
     expect(urgency).toBe(7.0);
   });
 
+  it('should add urgency for scheduled date with time (today, same day)', () => {
+    const todayWithTime = createDate(2026, 4, 15, 10, 0);
+
+    const task = createTestTask({
+      scheduledDate: todayWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // getScheduledUrgency normalizes to start-of-day, so 10:00 → midnight ≤ midnight → 1.0
+    // getScheduledTimeUrgency: 1.0 - 600/1440 ≈ 0.5833
+    // Total = 5.0 + 0.5833 + 2.0 ≈ 7.5833
+    expect(urgency).toBeCloseTo(7.5833, 3);
+  });
+
   it('should add urgency for scheduled date (past)', () => {
-    const yesterday = createUTCDate(2026, 4, 14); // April 14, 2026 UTC (1 day before reference)
+    const yesterday = createDate(2026, 4, 14);
 
     const task = createTestTask({
       scheduledDate: yesterday,
@@ -306,7 +320,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should NOT add urgency for future scheduled dates', () => {
-    const tomorrow = createUTCDate(2026, 4, 16); // April 16, 2026 UTC (1 day after reference)
+    const tomorrow = createDate(2026, 4, 16);
 
     const task = createTestTask({
       scheduledDate: tomorrow,
@@ -322,7 +336,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should add urgency for deadline date', () => {
-    const future = createUTCDate(2026, 4, 20); // April 20, 2026 UTC (5 days after reference)
+    const future = createDate(2026, 4, 20);
 
     const task = createTestTask({
       deadlineDate: future,
@@ -339,8 +353,8 @@ describe('Urgency Calculation', () => {
   });
 
   it('should use both scheduled and deadline when both exist', () => {
-    const soon = createUTCDate(2026, 4, 17); // April 17, 2026 UTC (2 days after reference)
-    const later = createUTCDate(2026, 4, 20); // April 20, 2026 UTC (5 days after reference)
+    const soon = createDate(2026, 4, 17);
+    const later = createDate(2026, 4, 20);
 
     const task = createTestTask({
       scheduledDate: soon,
@@ -359,8 +373,8 @@ describe('Urgency Calculation', () => {
   });
 
   it('should use both scheduled and deadline when both exist (scheduled is past)', () => {
-    const yesterday = createUTCDate(2026, 4, 14); // April 14, 2026 UTC (1 day before reference)
-    const later = createUTCDate(2026, 4, 20); // April 20, 2026 UTC (5 days after reference)
+    const yesterday = createDate(2026, 4, 14);
+    const later = createDate(2026, 4, 20);
 
     const task = createTestTask({
       scheduledDate: yesterday,
@@ -483,7 +497,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate combined urgency correctly', () => {
-    const today = createUTCDate(2026, 4, 15); // April 15, 2026 UTC (same as reference)
+    const today = createDate(2026, 4, 15);
 
     const task = createTestTask({
       priority: 'high',
@@ -514,7 +528,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should calculate age factor for daily note tasks', () => {
-    const tenDaysAgo = createUTCDate(2026, 4, 5); // April 5, 2026 UTC (10 days before reference)
+    const tenDaysAgo = createDate(2026, 4, 5);
 
     const task = createTestTask({
       isDailyNote: true,
@@ -528,7 +542,7 @@ describe('Urgency Calculation', () => {
   });
 
   it('should return maximum age factor for very old daily note tasks', () => {
-    const twoYearsAgo = createUTCDate(2024, 3, 10); // March 10, 2024 UTC (2 years before reference)
+    const twoYearsAgo = createDate(2024, 3, 10);
 
     const task = createTestTask({
       isDailyNote: true,
@@ -561,7 +575,9 @@ describe('Default Coefficients', () => {
     expect(defaults.priorityMedium).toBe(3.9);
     expect(defaults.priorityLow).toBe(1.8);
     expect(defaults.scheduled).toBe(5.0);
+    expect(defaults.scheduledTime).toBe(1.0);
     expect(defaults.deadline).toBe(12.0);
+    expect(defaults.deadlineTime).toBe(1.0);
     expect(defaults.active).toBe(4.0);
     expect(defaults.age).toBe(2.0);
     expect(defaults.tags).toBe(1.0);
@@ -573,5 +589,218 @@ describe('Default Coefficients', () => {
     const second = getDefaultCoefficients();
     expect(first).not.toBe(second);
     expect(first).toEqual(second);
+  });
+});
+
+describe('Scheduled Time Urgency', () => {
+  const defaultCoefficients = getDefaultCoefficients();
+  const referenceDate = createDate(2026, 4, 15);
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(referenceDate);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('should apply full time weight for 00:00 (start of day)', () => {
+    const scheduledWithTime = createDate(2026, 4, 15, 0, 1);
+
+    const task = createTestTask({
+      scheduledDate: scheduledWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // base scheduled: 5.0 (today)
+    // time weight: 1.0 - 1/1440 ≈ 0.9993 * 1.0 ≈ 0.9993
+    // age: 2.0
+    expect(urgency).toBeCloseTo(7.999, 2);
+  });
+
+  it('should apply half time weight for 12:00 (midday)', () => {
+    const scheduledWithTime = createDate(2026, 4, 15, 12, 0);
+
+    const task = createTestTask({
+      scheduledDate: scheduledWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // base scheduled: 5.0 (today)
+    // time weight: 1.0 - 720/1440 = 0.5 * 1.0 = 0.5
+    // age: 2.0
+    expect(urgency).toBeCloseTo(7.5, 2);
+  });
+
+  it('should apply near-zero time weight for 23:59 (end of day)', () => {
+    const scheduledWithTime = createDate(2026, 4, 15, 23, 59);
+
+    const task = createTestTask({
+      scheduledDate: scheduledWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // base scheduled: 5.0 (today)
+    // time weight: 1.0 - 1439/1440 ≈ 0.0007 * 1.0 ≈ 0.0007
+    // age: 2.0
+    expect(urgency).toBeCloseTo(7.0007, 3);
+  });
+
+  it('should NOT apply time weight for date-only tasks (no time component)', () => {
+    const scheduledDateOnly = createDate(2026, 4, 15);
+
+    const task = createTestTask({
+      scheduledDate: scheduledDateOnly,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // base scheduled: 5.0 (today)
+    // time weight: 0 (no time component)
+    // age: 2.0
+    expect(urgency).toBe(7.0);
+  });
+
+  it('should apply time weight for past day tasks with time', () => {
+    const yesterdayWithTime = createDate(2026, 4, 14, 6, 0);
+
+    const task = createTestTask({
+      scheduledDate: yesterdayWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // base scheduled: 5.0 (past day)
+    // time weight: 1.0 - 360/1440 = 0.75 * 1.0 = 0.75
+    // age: 2.0
+    expect(urgency).toBeCloseTo(7.75, 2);
+  });
+
+  it('should apply time weight for future day tasks with time', () => {
+    const tomorrowWithTime = createDate(2026, 4, 16, 10, 0);
+
+    const task = createTestTask({
+      scheduledDate: tomorrowWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // base scheduled: 0 (future day)
+    // time weight: 1.0 - 600/1440 ≈ 0.5833 * 1.0 ≈ 0.5833
+    // age: 2.0
+    expect(urgency).toBeCloseTo(2.5833, 3);
+  });
+});
+
+describe('Deadline Time Urgency', () => {
+  const defaultCoefficients = getDefaultCoefficients();
+  const referenceDate = createDate(2026, 4, 15);
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(referenceDate);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('should apply full time weight for 00:01 (start of day)', () => {
+    const deadlineWithTime = createDate(2026, 4, 15, 0, 1);
+
+    const task = createTestTask({
+      deadlineDate: deadlineWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // deadline gradient: ~0.733 * 12.0 ≈ 8.8
+    // deadline time weight: 1.0 - 1/1440 ≈ 0.9993 * 1.0 ≈ 0.9993
+    // age: 2.0
+    expect(urgency).toBeCloseTo(11.799, 2);
+  });
+
+  it('should apply half time weight for 12:00 (midday)', () => {
+    const deadlineWithTime = createDate(2026, 4, 15, 12, 0);
+
+    const task = createTestTask({
+      deadlineDate: deadlineWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // deadline gradient: ~0.733 * 12.0 ≈ 8.8
+    // deadline time weight: 0.5 * 1.0 = 0.5
+    // age: 2.0
+    expect(urgency).toBeCloseTo(11.3, 1);
+  });
+
+  it('should apply near-zero time weight for 23:59 (end of day)', () => {
+    const deadlineWithTime = createDate(2026, 4, 15, 23, 59);
+
+    const task = createTestTask({
+      deadlineDate: deadlineWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // deadline gradient: ~0.733 * 12.0 ≈ 8.8
+    // deadline time weight: ≈0.0007 * 1.0 ≈ 0.0007
+    // age: 2.0
+    expect(urgency).toBeCloseTo(10.801, 2);
+  });
+
+  it('should NOT apply time weight for date-only deadlines', () => {
+    const deadlineDateOnly = createDate(2026, 4, 15);
+
+    const task = createTestTask({
+      deadlineDate: deadlineDateOnly,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // deadline gradient: ~0.733 * 12.0 ≈ 8.8
+    // deadline time weight: 0 (no time component)
+    // age: 2.0
+    expect(urgency).toBeCloseTo(10.8, 1);
+  });
+
+  it('should apply time weight for past day deadlines with time', () => {
+    const yesterdayWithTime = createDate(2026, 4, 14, 6, 0);
+
+    const task = createTestTask({
+      deadlineDate: yesterdayWithTime,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+    });
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients);
+    // deadline gradient: 1 day overdue → ((1+14)*0.8/21)+0.2 ≈ 0.771 * 12.0 ≈ 9.257
+    // deadline time weight: 1.0 - 360/1440 = 0.75 * 1.0 = 0.75
+    // age: 2.0
+    expect(urgency).toBeCloseTo(12.007, 2);
   });
 });

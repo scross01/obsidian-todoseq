@@ -279,15 +279,19 @@ function classifyTask(task: Task, now: Date): TaskClassification {
     return { category: 'current', earliestDate: null };
   }
 
+  // Normalize to day-level comparison to avoid time-of-day misclassification
+  const today = DateUtils.getStartOfDay(now);
+  const earliestDay = DateUtils.getStartOfDay(earliestDate);
+
   // Tasks with dates on or before today are current
-  if (earliestDate <= now) {
+  if (earliestDay <= today) {
     return { category: 'current', earliestDate };
   }
 
   // Tasks with dates within 7 days (excluding today) are upcoming
-  const sevenDaysFromNow = DateUtils.addDays(now, 7);
+  const sevenDaysFromToday = DateUtils.addDays(today, 7);
 
-  if (earliestDate <= sevenDaysFromNow) {
+  if (earliestDay <= sevenDaysFromToday) {
     return { category: 'upcoming', earliestDate };
   }
 

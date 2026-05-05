@@ -114,18 +114,18 @@ TODOseq supports filter keywords similar to Obsidian's general vault search for 
 
 ### Available Prefix Filters
 
-| Prefix       | Description                             | Example                   |
-| ------------ | --------------------------------------- | ------------------------- |
-| `path:`      | Find tasks in specific file paths       | `path:Journal`            |
-| `file:`      | Find tasks in files with matching names | `file:meeting.md`         |
-| `tag:`       | Find tasks containing specific tags     | `tag:urgent`              |
-| `state:`     | Find tasks with specific states or groups | `state:active`          |
-| `priority:`  | Find tasks with specific priorities     | `priority:high`           |
-| `content:`   | Find tasks with specific content        | `content:project`         |
-| `scheduled:` | Find tasks with scheduled dates         | `scheduled:due`           |
-| `deadline:`  | Find tasks with deadline dates          | `deadline:"this week"`    |
-| `closed:`    | Find tasks by closed date               | `closed:yesterday`        |
-| `property:`  | Find tasks based on page properties     | `property:[type:Project]` |
+| Prefix       | Description                               | Example                   |
+| ------------ | ----------------------------------------- | ------------------------- |
+| `path:`      | Find tasks in specific file paths         | `path:Journal`            |
+| `file:`      | Find tasks in files with matching names   | `file:meeting.md`         |
+| `tag:`       | Find tasks containing specific tags       | `tag:urgent`              |
+| `state:`     | Find tasks with specific states or groups | `state:active`            |
+| `priority:`  | Find tasks with specific priorities       | `priority:high`           |
+| `content:`   | Find tasks with specific content          | `content:project`         |
+| `scheduled:` | Find tasks with scheduled dates           | `scheduled:due`           |
+| `deadline:`  | Find tasks with deadline dates            | `deadline:"this week"`    |
+| `closed:`    | Find tasks by closed date                 | `closed:yesterday`        |
+| `property:`  | Find tasks based on page properties       | `property:[type:Project]` |
 
 ### Using Search Filters
 
@@ -161,12 +161,12 @@ Find tasks on pages marked as projects.
 
 In addition to matching individual state keywords (e.g., `state:TODO`, `state:DOING`), the `state:` filter supports group keywords that match all tasks belonging to a keyword group. These group keywords are resolved dynamically based on your settings, so any custom keywords you have configured are included automatically.
 
-| Group Keyword  | Description                                                  |
-| -------------- | ------------------------------------------------------------ |
-| `active`       | Matches all active state keywords (default: NOW, DOING, IN-PROGRESS, plus any custom active keywords) |
-| `inactive`     | Matches all inactive state keywords (default: TODO, LATER, plus any custom inactive keywords) |
-| `waiting`      | Matches all waiting state keywords (default: WAIT, WAITING, plus any custom waiting keywords) |
-| `completed`    | Matches all completed state keywords (default: DONE, CANCELED, CANCELLED, plus any custom completed keywords) |
+| Group Keyword | Description                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `active`      | Matches all active state keywords (default: NOW, DOING, IN-PROGRESS, plus any custom active keywords)         |
+| `inactive`    | Matches all inactive state keywords (default: TODO, LATER, plus any custom inactive keywords)                 |
+| `waiting`     | Matches all waiting state keywords (default: WAIT, WAITING, plus any custom waiting keywords)                 |
+| `completed`   | Matches all completed state keywords (default: DONE, CANCELED, CANCELLED, plus any custom completed keywords) |
 
 #### State Group Examples
 
