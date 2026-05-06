@@ -26,7 +26,7 @@ import {
   modifyLinesForMigration,
   readTaskBlockFromVault,
 } from '../../utils/task-sub-bullets';
-import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
+import { getStateTransitionManager } from '../../services/task-update-coordinator';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -1859,7 +1859,8 @@ export class EmbeddedTaskListRenderer {
         const currentTask = freshTask || task;
         const currentState = currentTask.state;
 
-        const stateManager = new TaskStateTransitionManager(
+        const stateManager = getStateTransitionManager(
+          this.plugin.taskUpdateCoordinator,
           this.plugin.keywordManager,
           this.plugin.settings?.stateTransitions,
         );

@@ -2,7 +2,6 @@ import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
 import { Task, DateRepeatInfo } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
-import { TaskStateTransitionManager } from './task-state-transition-manager';
 import { DateUtils } from '../utils/date-utils';
 import {
   findDateLine,
@@ -10,6 +9,7 @@ import {
   getDateLineIndent,
 } from '../utils/task-line-utils';
 import TodoTracker from '../main';
+import { getStateTransitionManager } from './task-update-coordinator';
 
 export interface DateLineUpdateResult {
   task: Task;
@@ -380,10 +380,10 @@ export class TaskWriter {
   ): Promise<Task> {
     let state: string;
     if (nextState == null) {
-      const settings = this.settings;
-      const stateManager = new TaskStateTransitionManager(
+      const stateManager = getStateTransitionManager(
+        this.plugin.taskUpdateCoordinator,
         this.keywordManager,
-        settings?.stateTransitions,
+        this.settings?.stateTransitions,
       );
       state = stateManager.getNextState(task.state);
     } else {
@@ -400,10 +400,10 @@ export class TaskWriter {
   ): Promise<Task> {
     let state: string;
     if (nextState == null) {
-      const settings = this.settings;
-      const stateManager = new TaskStateTransitionManager(
+      const stateManager = getStateTransitionManager(
+        this.plugin.taskUpdateCoordinator,
         this.keywordManager,
-        settings?.stateTransitions,
+        this.settings?.stateTransitions,
       );
       state = stateManager.getCycleState(task.state);
     } else {

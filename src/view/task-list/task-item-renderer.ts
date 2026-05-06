@@ -14,7 +14,7 @@ import {
   getTaskTextDisplay,
 } from '../../utils/task-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
-import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
+import type { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { BaseDialog } from '../components/base-dialog';
 

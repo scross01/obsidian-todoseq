@@ -17,7 +17,8 @@ import { TaskContextMenu } from '../components/task-context-menu';
 import TodoTracker from '../../main';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { VaultScanner } from '../../services/vault-scanner';
-import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
+import type { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
+import { getStateTransitionManager } from '../../services/task-update-coordinator';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TaskElementCache } from './task-element-cache';
 import { ChunkedRenderQueue } from './chunked-render-queue';
@@ -132,8 +133,9 @@ export class TaskListView extends ItemView {
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = plugin.settings.defaultSortMethod;
     this.keywordManager = keywordManager;
-    this.stateManager = new TaskStateTransitionManager(
-      this.keywordManager,
+    this.stateManager = getStateTransitionManager(
+      plugin.taskUpdateCoordinator,
+      keywordManager,
       plugin.settings?.stateTransitions,
     );
     this.menuBuilder = new StateMenuBuilder(plugin);
@@ -2105,8 +2107,9 @@ export class TaskListView extends ItemView {
       this.plugin as TodoTracker & { vaultScanner: VaultScanner }
     ).vaultScanner.getKeywordManager();
 
-    // Update state manager with new state transition settings
-    this.stateManager = new TaskStateTransitionManager(
+    // Use the shared state transition manager from the coordinator
+    this.stateManager = getStateTransitionManager(
+      this.plugin.taskUpdateCoordinator,
       this.keywordManager,
       this.plugin.settings?.stateTransitions,
     );

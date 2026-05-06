@@ -4,7 +4,7 @@ import TodoTracker from './main';
 import { taskKeywordPlugin } from './view/editor-extensions/task-formatting';
 import { dateAutocompleteExtension } from './view/editor-extensions/date-autocomplete';
 import { TaskListView } from './view/task-list/task-list-view';
-import { TaskStateTransitionManager } from './services/task-state-transition-manager';
+import { getStateTransitionManager } from './services/task-update-coordinator';
 
 /**
  * Manages UI elements and interactions in the editor
@@ -258,7 +258,8 @@ export class UIManager {
       return;
     }
 
-    const stateManager = new TaskStateTransitionManager(
+    const stateManager = getStateTransitionManager(
+      this.plugin.taskUpdateCoordinator,
       this.plugin.keywordManager,
       this.plugin.settings?.stateTransitions,
     );

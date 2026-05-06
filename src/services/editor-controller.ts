@@ -4,12 +4,12 @@ import { Task } from '../types/task';
 import TodoTracker from '../main';
 import { detectListMarker } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
-import { TaskStateTransitionManager } from './task-state-transition-manager';
 import {
   getTaskRemovalRange,
   modifyLinesForMigration,
   readTaskBlockFromLines,
 } from '../utils/task-sub-bullets';
+import { getStateTransitionManager } from './task-update-coordinator';
 import {
   getTodayDailyNote,
   isDailyNotesPluginEnabledSync,
@@ -190,10 +190,10 @@ export class EditorController {
       let targetState: string = newState ?? '';
       if (!newState) {
         // Cycle to next state
-        const settings = this.plugin.settings;
-        const stateManager = new TaskStateTransitionManager(
+        const stateManager = getStateTransitionManager(
+          this.plugin.taskUpdateCoordinator,
           this.keywordManager,
-          settings?.stateTransitions,
+          this.plugin.settings?.stateTransitions,
         );
         targetState = stateManager.getNextState(task.state);
       }
@@ -288,22 +288,14 @@ export class EditorController {
     // Determine the target state using cycle task state logic
     let targetState: string = newState ?? '';
     if (!newState) {
-      if (task) {
-        const settings = this.plugin.settings;
-        const stateManager = new TaskStateTransitionManager(
-          this.keywordManager,
-          settings?.stateTransitions,
-        );
-        targetState = stateManager.getCycleState(task.state);
-      } else {
-        // For lines without existing task keywords, use the default inactive from settings
-        const settings = this.plugin.settings;
-        const stateManager = new TaskStateTransitionManager(
-          this.keywordManager,
-          settings?.stateTransitions,
-        );
-        targetState = stateManager.getCycleState('');
-      }
+      const stateManager = getStateTransitionManager(
+        this.plugin.taskUpdateCoordinator,
+        this.keywordManager,
+        this.plugin.settings?.stateTransitions,
+      );
+      targetState = task
+        ? stateManager.getCycleState(task.state)
+        : stateManager.getCycleState('');
     }
 
     // Use TaskUpdateCoordinator for unified update handling

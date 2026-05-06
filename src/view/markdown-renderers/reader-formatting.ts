@@ -8,7 +8,7 @@ import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { TFile } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
-import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
+import { getStateTransitionManager } from '../../services/task-update-coordinator';
 
 /**
  * Cached regex for priority tokens with global flag.
@@ -293,9 +293,9 @@ export class ReaderViewFormatter {
     // Use fresh task if found, otherwise fall back to captured task
     const taskToUpdate = freshTask || task;
 
-    const keywordManager = this.vaultScanner.getKeywordManager();
-    const stateManager = new TaskStateTransitionManager(
-      keywordManager,
+    const stateManager = getStateTransitionManager(
+      this.plugin.taskUpdateCoordinator,
+      this.plugin.keywordManager,
       this.plugin.settings?.stateTransitions,
     );
 
@@ -2257,9 +2257,9 @@ export class ReaderViewFormatter {
       return;
     }
 
-    const keywordManager = this.vaultScanner.getKeywordManager();
-    const transitionManager = new TaskStateTransitionManager(
-      keywordManager,
+    const transitionManager = getStateTransitionManager(
+      this.plugin.taskUpdateCoordinator,
+      this.plugin.keywordManager,
       this.plugin.settings?.stateTransitions,
     );
     const nextState = transitionManager.getNextState(currentState);

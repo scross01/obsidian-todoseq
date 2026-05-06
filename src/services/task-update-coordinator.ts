@@ -131,7 +131,8 @@ export class TaskUpdateCoordinator {
   private recurrenceCoordinator: RecurrenceCoordinator;
   private recurrenceManager: RecurrenceManager;
   private urgencyCoefficients: UrgencyCoefficients = getDefaultCoefficients();
-  private stateTransitionManager: TaskStateTransitionManager;
+  private transitionSettings?: StateTransitionSettings;
+  public stateTransitionManager: TaskStateTransitionManager;
 
   /** Per-task locking: prevents race conditions from rapid updates to same task */
   private pendingTaskUpdates = new Map<string, PendingUpdate>();
@@ -167,9 +168,10 @@ export class TaskUpdateCoordinator {
     );
 
     // Initialize cached state transition manager
+    this.transitionSettings = this.plugin.settings?.stateTransitions;
     this.stateTransitionManager = new TaskStateTransitionManager(
       this.keywordManager,
-      this.plugin.settings?.stateTransitions,
+      this.transitionSettings,
     );
 
     // Set the TaskUpdateCoordinator reference to avoid circular dependency
@@ -193,6 +195,11 @@ export class TaskUpdateCoordinator {
     this.keywordManager = keywordManager;
     this.recurrenceManager = new RecurrenceManager(keywordManager);
     this.recurrenceCoordinator.setKeywordManager(keywordManager);
+    // Recreate state transition manager with new keyword manager but same transition settings
+    this.stateTransitionManager = new TaskStateTransitionManager(
+      keywordManager,
+      this.transitionSettings,
+    );
   }
 
   /**
@@ -201,10 +208,27 @@ export class TaskUpdateCoordinator {
   setStateTransitionSettings(
     transitionSettings?: StateTransitionSettings,
   ): void {
+    this.transitionSettings = transitionSettings;
     this.stateTransitionManager = new TaskStateTransitionManager(
       this.keywordManager,
       transitionSettings,
     );
+  }
+
+  /**
+   * Get the state transition manager.
+   * Returns the shared instance if available, otherwise creates a fallback.
+   * This supports test environments where the coordinator may be partially initialized.
+   */
+  getStateTransitionManager(
+    keywordManager: KeywordManager,
+    transitionSettings?: StateTransitionSettings,
+  ): TaskStateTransitionManager {
+    if (this.stateTransitionManager) {
+      return this.stateTransitionManager;
+    }
+    // Fallback for environments where the coordinator hasn't initialized the manager
+    return new TaskStateTransitionManager(keywordManager, transitionSettings);
   }
 
   /**
@@ -1027,4 +1051,32 @@ export class TaskUpdateCoordinator {
 
     // ChangeTracker is now owned by main.ts and destroyed there
   }
+}
+
+/**
+ * Get the TaskStateTransitionManager from a coordinator, or create a fallback instance.
+ * This centralizes the logic for accessing the manager in environments where the
+ * coordinator may not be fully initialized (e.g., unit tests or minimal mocks).
+ *
+ * @param coordinator - The TaskUpdateCoordinator instance (may be undefined or mock)
+ * @param keywordManager - The KeywordManager to use for fallback creation
+ * @param transitionSettings - Optional transition settings for fallback creation
+ * @returns The shared state transition manager or a new fallback instance
+ */
+type CoordinatorRef =
+  | {
+      stateTransitionManager?: TaskStateTransitionManager;
+    }
+  | null
+  | undefined;
+export function getStateTransitionManager(
+  coordinator: CoordinatorRef,
+  keywordManager: KeywordManager,
+  transitionSettings?: StateTransitionSettings,
+): TaskStateTransitionManager {
+  if (coordinator?.stateTransitionManager) {
+    return coordinator.stateTransitionManager;
+  }
+  // Fallback for test environments or incomplete initialization
+  return new TaskStateTransitionManager(keywordManager, transitionSettings);
 }
