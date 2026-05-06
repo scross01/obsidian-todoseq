@@ -1121,6 +1121,57 @@ describe('TaskWriter Instance Methods', () => {
 
       expect(mockApp.vault.process).toHaveBeenCalled();
     });
+
+    it('should use correct indent for indented checkbox task CLOSED date', async () => {
+      const task: Task = createBaseTask({
+        rawText: '\t- [ ] TODO [#A] #diy #household design the basement closet door',
+        indent: '\t',
+        listMarker: '- ',
+        path: 'test.md',
+        line: 1,
+        state: 'TODO',
+        completed: false,
+      });
+
+      mockApp.vault.read.mockResolvedValueOnce(
+        '- [ ] Framing wood\n\t- [ ] TODO [#A] #diy #household design the basement closet door\n\t  SCHEDULED: <2026-05-04>\n- [ ] Exterior paint',
+      );
+
+      await taskWriter.updateTaskClosedDate(task, new Date(2026, 2, 15));
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      const processCall = mockApp.vault.process.mock.calls[0];
+      const updateFn = processCall[1];
+      const content =
+        '- [ ] Framing wood\n\t- [ ] TODO [#A] #diy #household design the basement closet door\n\t  SCHEDULED: <2026-05-04>\n- [ ] Exterior paint';
+      const resultContent = updateFn(content);
+      const lines = resultContent.split('\n');
+      expect(lines[3]).toBe('\t  CLOSED: [2026-03-15 Sun 00:00]');
+    });
+
+    it('should use correct indent for top-level checkbox task CLOSED date', async () => {
+      const task: Task = createBaseTask({
+        rawText: '- [ ] TODO Task text',
+        indent: '',
+        listMarker: '- ',
+        path: 'test.md',
+        line: 0,
+        state: 'TODO',
+        completed: false,
+      });
+
+      mockApp.vault.read.mockResolvedValueOnce('- [ ] TODO Task text');
+
+      await taskWriter.updateTaskClosedDate(task, new Date(2026, 2, 15));
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      const processCall = mockApp.vault.process.mock.calls[0];
+      const updateFn = processCall[1];
+      const content = '- [ ] TODO Task text';
+      const resultContent = updateFn(content);
+      const lines = resultContent.split('\n');
+      expect(lines[1]).toBe('  CLOSED: [2026-03-15 Sun 00:00]');
+    });
   });
 
   describe('removeTaskClosedDate', () => {

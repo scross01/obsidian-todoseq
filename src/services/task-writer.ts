@@ -923,8 +923,7 @@ export class TaskWriter {
           existingClosedIndent = lineQuotePrefix || lineIndent;
         }
 
-        // Use existing indent if updating, otherwise use task indent (aligned to keyword start)
-        const closedIndent = existingClosedIndent || taskIndent;
+        const closedIndent = existingClosedIndent || getDateLineIndent(task);
 
         if (closedLineIndex >= 0) {
           // Update existing CLOSED line, preserving its indentation
@@ -1001,8 +1000,7 @@ export class TaskWriter {
             existingClosedIndent = lineQuotePrefix || lineIndent;
           }
 
-          // Use existing indent if updating, otherwise use task indent (aligned to keyword start)
-          const closedIndent = existingClosedIndent || taskIndent;
+          const closedIndent = existingClosedIndent || getDateLineIndent(task);
 
           if (closedLineIndex >= 0) {
             // Update existing CLOSED line, preserving its indentation

@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.13.3
+
+- Fixed issue with placement of closed date on indented tasks.
+
+## 0.13.2
+
+- (no changes)
+
 ## 0.13.1
 
 - Added sort by closed date option in task list view and embedded task lists.
