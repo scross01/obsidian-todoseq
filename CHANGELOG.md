@@ -4,6 +4,7 @@
 
 - Fixed issue with inconsistent behavior opening the task context menu from the tas list on mobile. #67
 - Fixed consistency of embedded task list selected task highlight styling across platforms.
+- Fixed styling of embedded task list content wrap in dynamic mode.
 
 ## 0.13.3
 

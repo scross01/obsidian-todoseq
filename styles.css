@@ -955,6 +955,12 @@
   margin-left: auto;
 }
 
+/* Dynamic mode - floating indicators position depends on viewport */
+.todoseq-embedded-task-item-wrap-dynamic
+  .todoseq-embedded-task-floating-indicators {
+  align-self: center;
+}
+
 /* Dynamic wrap mode - default to truncated on wide screens, wrap on narrow */
 /* Override base wrap styles for dynamic mode on wide screens */
 .todoseq-embedded-task-item-wrap-dynamic {
@@ -1025,6 +1031,7 @@
   /* Floating indicators align to right on narrow screens */
   .todoseq-embedded-task-item-wrap-dynamic
     .todoseq-embedded-task-floating-indicators {
+    align-self: flex-start;
     margin-left: auto;
   }
 
@@ -1037,6 +1044,11 @@
   }
 
   .todoseq-embedded-task-text-wrap-dynamic {
+    display: inline;
+  }
+
+  .todoseq-embedded-task-text-wrap-dynamic .todoseq-embedded-task-state,
+  .todoseq-embedded-task-text-wrap-dynamic .todoseq-embedded-task-text {
     display: inline;
   }
 
@@ -1075,7 +1087,7 @@
   .todoseq-embedded-task-item-wrap-dynamic
     .todoseq-embedded-task-floating-indicators {
     display: flex;
-    align-self: anchor-center;
+    align-self: flex-start;
     margin-top: var(--size-2-1);
     margin-left: auto;
   }
@@ -1124,12 +1136,6 @@
 .todoseq-embedded-task-item-wrap .todoseq-embedded-task-floating-indicators {
   align-self: flex-start;
   margin-top: var(--size-2-1);
-}
-
-/* Dynamic mode - floating indicators position depends on viewport */
-.todoseq-embedded-task-item-wrap-dynamic
-  .todoseq-embedded-task-floating-indicators {
-  align-self: center;
 }
 
 /* Ensure subtask indicator in floating div has correct styling */
