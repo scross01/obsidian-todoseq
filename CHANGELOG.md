@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.13.4
+
+- Fixed issue with inconsistent behavior opening the task context menu from the tas list on mobile. #67
+
 ## 0.13.3
 
 - Fixed issue with placement of closed date on indented tasks.

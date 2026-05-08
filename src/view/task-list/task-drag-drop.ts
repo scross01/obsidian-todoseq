@@ -1,4 +1,4 @@
-import { App, Notice, TFile, MarkdownView, Editor } from 'obsidian';
+import { App, Notice, TFile, MarkdownView, Editor, Platform } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
@@ -9,7 +9,6 @@ import {
   readTaskBlockFromVault,
   taskHasCheckbox,
 } from '../../utils/task-sub-bullets';
-import { isPhoneDevice } from '../../utils/mobile-utils';
 
 export interface TaskDragDropCallbacks {
   onGetTask: (path: string, line: number) => Task | undefined;
@@ -312,7 +311,7 @@ export class TaskDragDropHandler {
   initialize(callbacks: TaskDragDropCallbacks): void {
     this.callbacks = callbacks;
 
-    if (isPhoneDevice()) {
+    if (Platform.isMobile) {
       return;
     }
 

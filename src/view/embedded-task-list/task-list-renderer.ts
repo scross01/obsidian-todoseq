@@ -1371,51 +1371,96 @@ export class EmbeddedTaskListRenderer {
     stateSpan.setAttribute('tabindex', '0');
     stateSpan.setAttribute('aria-checked', String(task.completed));
 
-    // Right-click to open state selection menu
-    stateSpan.addEventListener('contextmenu', (evt: MouseEvent) => {
-      this.openStateMenuAtMouseEvent(task, evt);
-    });
+    // Shared suppress flag — set by state span long-press to prevent <li>
+    // contextmenu from also opening the task context menu
+    const liWithFlag = li as HTMLLIElement & { _stateSpanTouchActive?: boolean };
 
-    // Long-press for mobile
-    let touchTimer: number | null = null;
-    let suppressNextContextMenu = false;
+    // Long-press for mobile (state span)
+    let stateTouchTimer: number | null = null;
+    let stateInitialTouchX = 0;
+    let stateInitialTouchY = 0;
+    let lastStateMenuOpenTs = 0;
+    const STATE_MENU_DEBOUNCE_MS = 350;
+
+    const openStateMenuOnceAtPosition = (x: number, y: number) => {
+      const now = Date.now();
+      if (now - lastStateMenuOpenTs < STATE_MENU_DEBOUNCE_MS) return;
+      lastStateMenuOpenTs = now;
+      this.openStateMenuAtPosition(task, { x, y });
+    };
+
+    const openStateMenuOnceAtMouseEvent = (evt: MouseEvent) => {
+      const now = Date.now();
+      if (now - lastStateMenuOpenTs < STATE_MENU_DEBOUNCE_MS) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        return;
+      }
+      lastStateMenuOpenTs = now;
+      this.openStateMenuAtMouseEvent(task, evt);
+    };
+
+    let highlightTimer: number | null = null;
 
     stateSpan.addEventListener(
       'touchstart',
       (evt: TouchEvent) => {
         if (evt.touches.length !== 1) return;
+        evt.stopPropagation();
+        liWithFlag._stateSpanTouchActive = true;
         const touch = evt.touches[0];
-        suppressNextContextMenu = true;
-        touchTimer = window.setTimeout(() => {
+        stateInitialTouchX = touch.clientX;
+        stateInitialTouchY = touch.clientY;
+        highlightTimer = window.setTimeout(() => {
+          li.classList.add('todoseq-pressed');
+          highlightTimer = null;
+        }, 150);
+        stateTouchTimer = window.setTimeout(() => {
           const x = touch.clientX;
           const y = touch.clientY;
-          this.openStateMenuAtPosition(task, { x, y });
-        }, 450);
+          openStateMenuOnceAtPosition(x, y);
+        }, 350);
       },
       { passive: true },
     );
 
-    const clearTouch = () => {
-      if (touchTimer) {
-        window.clearTimeout(touchTimer);
-        touchTimer = null;
+    const clearStateTouch = () => {
+      if (stateTouchTimer) {
+        window.clearTimeout(stateTouchTimer);
+        stateTouchTimer = null;
       }
+      if (highlightTimer) {
+        window.clearTimeout(highlightTimer);
+        highlightTimer = null;
+      }
+      li.classList.remove('todoseq-pressed');
       window.setTimeout(() => {
-        suppressNextContextMenu = false;
-      }, 250);
+        liWithFlag._stateSpanTouchActive = false;
+      }, 500);
     };
 
-    stateSpan.addEventListener('touchend', clearTouch, { passive: true });
-    stateSpan.addEventListener('touchcancel', clearTouch, { passive: true });
+    stateSpan.addEventListener('touchend', clearStateTouch, { passive: true });
+    stateSpan.addEventListener('touchcancel', clearStateTouch, { passive: true });
 
-    // Prevent duplicate context menu on Android
+    stateSpan.addEventListener(
+      'touchmove',
+      (evt: TouchEvent) => {
+        if (!stateTouchTimer) return;
+        const touch = evt.touches[0];
+        const deltaX = Math.abs(touch.clientX - stateInitialTouchX);
+        const deltaY = Math.abs(touch.clientY - stateInitialTouchY);
+        if (deltaX > 10 || deltaY > 10) {
+          clearStateTouch();
+        }
+      },
+      { passive: true },
+    );
+
     stateSpan.addEventListener('contextmenu', (evt: MouseEvent) => {
-      if (suppressNextContextMenu) {
-        evt.preventDefault();
-        evt.stopPropagation();
-        return;
-      }
-      this.openStateMenuAtMouseEvent(task, evt);
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (liWithFlag._stateSpanTouchActive) return;
+      openStateMenuOnceAtMouseEvent(evt);
     });
 
     textContainer.appendChild(stateSpan);
@@ -1856,8 +1901,21 @@ export class EmbeddedTaskListRenderer {
       }
     });
 
-    // Right-click context menu handler
+    let touchTimer: number | null = null;
+    let suppressNextContextMenu = false;
+    let initialTouchX = 0;
+    let initialTouchY = 0;
+    let liHighlightTimer: number | null = null;
+    const LONG_PRESS_MS = 350;
+    const TOUCH_MOVE_THRESHOLD = 10;
+
     li.addEventListener('contextmenu', (evt: MouseEvent) => {
+      if ((li as any)._stateSpanTouchActive) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        return;
+      }
+
       // Don't intercept right-clicks on the checkbox or state span (they have their own menus)
       const target = evt.target;
       if (
@@ -1869,18 +1927,16 @@ export class EmbeddedTaskListRenderer {
         return;
       }
 
+      if (suppressNextContextMenu) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        return;
+      }
+
       evt.preventDefault();
       evt.stopPropagation();
       this.taskContextMenu.showAtMouseEvent(task, evt);
     });
-
-    // Long-press for mobile (matching main task list pattern)
-    let touchTimer: number | null = null;
-    let suppressNextContextMenu = false;
-    let initialTouchX = 0;
-    let initialTouchY = 0;
-    const LONG_PRESS_MS = 450;
-    const TOUCH_MOVE_THRESHOLD = 10;
 
     li.addEventListener(
       'touchstart',
@@ -1898,6 +1954,10 @@ export class EmbeddedTaskListRenderer {
           return;
         }
 
+        liHighlightTimer = window.setTimeout(() => {
+          li.classList.add('todoseq-pressed');
+          liHighlightTimer = null;
+        }, 150);
         const touch = evt.touches[0];
         initialTouchX = touch.clientX;
         initialTouchY = touch.clientY;
@@ -1920,6 +1980,11 @@ export class EmbeddedTaskListRenderer {
         window.clearTimeout(touchTimer);
         touchTimer = null;
       }
+      if (liHighlightTimer) {
+        window.clearTimeout(liHighlightTimer);
+        liHighlightTimer = null;
+      }
+      li.classList.remove('todoseq-pressed');
       window.setTimeout(() => {
         suppressNextContextMenu = false;
       }, 250);
@@ -1927,7 +1992,6 @@ export class EmbeddedTaskListRenderer {
     li.addEventListener('touchend', clearTouch, { passive: true });
     li.addEventListener('touchcancel', clearTouch, { passive: true });
 
-    // Only clear the long-press timer if touch moves beyond threshold
     li.addEventListener(
       'touchmove',
       (evt: TouchEvent) => {
@@ -1943,14 +2007,6 @@ export class EmbeddedTaskListRenderer {
       },
       { passive: true },
     );
-
-    // Suppress contextmenu event after long-press on mobile
-    li.addEventListener('contextmenu', (evt: MouseEvent) => {
-      if (suppressNextContextMenu) {
-        evt.preventDefault();
-        evt.stopPropagation();
-      }
-    });
   }
 
   /**

@@ -1,6 +1,6 @@
 import { Task } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
-import { setIcon } from 'obsidian';
+import { setIcon, Platform } from 'obsidian';
 import {
   TAG_PATTERN,
   WIKI_LINK_REGEX,
@@ -13,7 +13,6 @@ import {
   hasSubtasks,
   getTaskTextDisplay,
 } from '../../utils/task-utils';
-import { isPhoneDevice } from '../../utils/mobile-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { StateMenuBuilder } from '../components/state-menu-builder';
@@ -266,7 +265,7 @@ export class TaskItemRenderer {
           const x = touch.clientX;
           const y = touch.clientY;
           openMenuAtPositionOnce(x, y);
-        }, 450);
+        }, 350);
       },
       { passive: true },
     );
@@ -347,7 +346,13 @@ export class TaskItemRenderer {
    * Excludes clicks on the keyword span (which has its own state menu).
    */
   private attachTaskContextMenuHandlers(li: HTMLLIElement, task: Task): void {
-    // Right-click context menu
+    let touchTimer: number | null = null;
+    let suppressNextContextMenu = false;
+    let initialTouchX = 0;
+    let initialTouchY = 0;
+    const LONG_PRESS_MS = 350;
+    const TOUCH_MOVE_THRESHOLD = 10;
+
     li.addEventListener('contextmenu', (evt: MouseEvent) => {
       // Don't intercept right-clicks on the keyword (it has its own state menu)
       const target = evt.target;
@@ -359,21 +364,18 @@ export class TaskItemRenderer {
         return;
       }
 
+      if (suppressNextContextMenu) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        return;
+      }
+
       evt.preventDefault();
       evt.stopPropagation();
       if (this.onContextMenu) {
         this.onContextMenu(task, evt);
       }
     });
-
-    // Long-press for mobile (matching keyword long-press pattern)
-    let touchTimer: number | null = null;
-    let suppressNextContextMenu = false;
-    let initialTouchX = 0;
-    let initialTouchY = 0;
-    const LONG_PRESS_MS = 450;
-    // Touch movement threshold (in pixels) - only cancel long-press if moved beyond this
-    const TOUCH_MOVE_THRESHOLD = 10;
 
     li.addEventListener(
       'touchstart',
@@ -437,14 +439,6 @@ export class TaskItemRenderer {
       },
       { passive: true },
     );
-
-    // Suppress contextmenu event after long-press on mobile
-    li.addEventListener('contextmenu', (evt: MouseEvent) => {
-      if (suppressNextContextMenu) {
-        evt.preventDefault();
-        evt.stopPropagation();
-      }
-    });
   }
 
   /**
@@ -485,7 +479,7 @@ export class TaskItemRenderer {
     li.setAttribute('data-path', task.path);
     li.setAttribute('data-line', String(task.line));
     li.setAttribute('data-raw-text', task.rawText);
-    li.draggable = !isPhoneDevice();
+    li.draggable = !Platform.isMobile;
 
     // Create a flex container for checkbox + text + indicator (all on same row)
     const mainContent = li.createEl('div', { cls: 'todo-main-content' });
@@ -550,7 +544,7 @@ export class TaskItemRenderer {
    */
   updateTaskElementContent(task: Task, element: HTMLLIElement): void {
     // Ensure draggable is set for reused elements
-    element.draggable = !isPhoneDevice();
+    element.draggable = !Platform.isMobile;
 
     // 1. Update checkbox
     const checkbox = element.querySelector(

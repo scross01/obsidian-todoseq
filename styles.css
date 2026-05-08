@@ -701,6 +701,26 @@
   background-color: var(--background-modifier-active);
 }
 
+.is-mobile .todoseq-embedded-task-item {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.is-mobile .todoseq-embedded-task-item.todoseq-pressed {
+  background-color: var(--background-modifier-active);
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.is-mobile .todoseq-embedded-task-item:focus-within {
+  outline: none;
+}
+
+.is-mobile .todoseq-embedded-task-state {
+  -webkit-touch-callout: none;
+}
+
 /* Checkbox */
 .todoseq-embedded-task-checkbox {
   margin-right: var(--size-4-2);

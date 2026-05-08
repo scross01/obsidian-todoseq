@@ -8,6 +8,7 @@
  * - Keyboard navigation
  * - Global menu management (only one menu open at a time)
  */
+import { Platform } from 'obsidian';
 import { isPhoneDevice } from '../../utils/mobile-utils';
 
 export abstract class BaseDialog {
@@ -72,6 +73,9 @@ export abstract class BaseDialog {
 
     this.backdropEl = document.createElement('div');
     this.backdropEl.className = 'todoseq-backdrop';
+    this.backdropEl.addEventListener('click', () => {
+      this.hide();
+    });
 
     // Insert backdrop before the dialog
     if (this.containerEl.parentNode) {
@@ -171,7 +175,10 @@ export abstract class BaseDialog {
    * Attach global event listeners.
    */
   protected attachGlobalListeners(): void {
+    const suppressUntil = Platform.isMobile ? Date.now() + 500 : 0;
+
     this.documentClickHandler = (e: MouseEvent) => {
+      if (Date.now() < suppressUntil) return;
       const target = e.target as Node;
       if (this.containerEl && !this.containerEl.contains(target)) {
         this.hide();
@@ -179,6 +186,7 @@ export abstract class BaseDialog {
     };
 
     this.contextmenuHandler = (e: MouseEvent) => {
+      if (Date.now() < suppressUntil) return;
       const target = e.target as Node;
       if (this.containerEl && !this.containerEl.contains(target)) {
         this.hide();
@@ -190,6 +198,7 @@ export abstract class BaseDialog {
     };
 
     this.scrollHandler = () => {
+      if (Date.now() < suppressUntil) return;
       this.hide();
     };
 
