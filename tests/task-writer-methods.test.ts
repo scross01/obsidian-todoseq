@@ -1124,7 +1124,8 @@ describe('TaskWriter Instance Methods', () => {
 
     it('should use correct indent for indented checkbox task CLOSED date', async () => {
       const task: Task = createBaseTask({
-        rawText: '\t- [ ] TODO [#A] #diy #household design the basement closet door',
+        rawText:
+          '\t- [ ] TODO [#A] #diy #household design the basement closet door',
         indent: '\t',
         listMarker: '- ',
         path: 'test.md',

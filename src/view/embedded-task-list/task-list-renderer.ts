@@ -1373,7 +1373,9 @@ export class EmbeddedTaskListRenderer {
 
     // Shared suppress flag — set by state span long-press to prevent <li>
     // contextmenu from also opening the task context menu
-    const liWithFlag = li as HTMLLIElement & { _stateSpanTouchActive?: boolean };
+    const liWithFlag = li as HTMLLIElement & {
+      _stateSpanTouchActive?: boolean;
+    };
 
     // Long-press for mobile (state span)
     let stateTouchTimer: number | null = null;
@@ -1386,7 +1388,11 @@ export class EmbeddedTaskListRenderer {
       const now = Date.now();
       if (now - lastStateMenuOpenTs < STATE_MENU_DEBOUNCE_MS) return;
       lastStateMenuOpenTs = now;
-      this.openStateMenuAtPosition(task, { x, y });
+      this.clearAllPressed();
+      li.classList.add('todoseq-pressed');
+      this.openStateMenuAtPosition(task, { x, y }, () =>
+        li.classList.remove('todoseq-pressed'),
+      );
     };
 
     const openStateMenuOnceAtMouseEvent = (evt: MouseEvent) => {
@@ -1397,7 +1403,11 @@ export class EmbeddedTaskListRenderer {
         return;
       }
       lastStateMenuOpenTs = now;
-      this.openStateMenuAtMouseEvent(task, evt);
+      this.clearAllPressed();
+      li.classList.add('todoseq-pressed');
+      this.openStateMenuAtMouseEvent(task, evt, () =>
+        li.classList.remove('todoseq-pressed'),
+      );
     };
 
     let highlightTimer: number | null = null;
@@ -1440,7 +1450,9 @@ export class EmbeddedTaskListRenderer {
     };
 
     stateSpan.addEventListener('touchend', clearStateTouch, { passive: true });
-    stateSpan.addEventListener('touchcancel', clearStateTouch, { passive: true });
+    stateSpan.addEventListener('touchcancel', clearStateTouch, {
+      passive: true,
+    });
 
     stateSpan.addEventListener(
       'touchmove',
@@ -1935,7 +1947,15 @@ export class EmbeddedTaskListRenderer {
 
       evt.preventDefault();
       evt.stopPropagation();
-      this.taskContextMenu.showAtMouseEvent(task, evt);
+      const prev = this.taskContextMenu.onHide;
+      this.taskContextMenu.onHide = () => {
+        prev?.();
+        li.classList.remove('todoseq-pressed');
+      };
+      this.taskContextMenu.showAtMouseEvent(task, evt).then(() => {
+        this.clearAllPressed();
+        li.classList.add('todoseq-pressed');
+      });
     });
 
     li.addEventListener(
@@ -2009,6 +2029,12 @@ export class EmbeddedTaskListRenderer {
     );
   }
 
+  private clearAllPressed(): void {
+    document
+      .querySelectorAll('.todoseq-embedded-task-item.todoseq-pressed')
+      .forEach((el) => el.classList.remove('todoseq-pressed'));
+  }
+
   /**
    * Open Obsidian Menu at a specific screen position
    * @param task The task to update
@@ -2017,10 +2043,14 @@ export class EmbeddedTaskListRenderer {
   private openStateMenuAtPosition(
     task: Task,
     pos: { x: number; y: number },
+    onHide?: () => void,
   ): void {
+    BaseDialog.closeAnyActiveDialog();
+    this.clearAllPressed();
     const menu = this.menuBuilder.buildStateMenu(task.state, async (state) => {
       await this.updateTaskState(task, state);
     });
+    if (onHide) menu.onHide(onHide);
     menu.showAtPosition({ x: pos.x, y: pos.y });
   }
 
@@ -2029,16 +2059,22 @@ export class EmbeddedTaskListRenderer {
    * @param task The task to update
    * @param evt The mouse event
    */
-  private openStateMenuAtMouseEvent(task: Task, evt: MouseEvent): void {
+  private openStateMenuAtMouseEvent(
+    task: Task,
+    evt: MouseEvent,
+    onHide?: () => void,
+  ): void {
     evt.preventDefault();
     evt.stopPropagation();
 
     // Close any active dialog (task context menu, date picker, etc.)
     BaseDialog.closeAnyActiveDialog();
+    this.clearAllPressed();
 
     const menu = this.menuBuilder.buildStateMenu(task.state, async (state) => {
       await this.updateTaskState(task, state);
     });
+    if (onHide) menu.onHide(onHide);
 
     // Prefer API helper when available; fallback to explicit coordinates
     const maybeShowAtMouseEvent = (

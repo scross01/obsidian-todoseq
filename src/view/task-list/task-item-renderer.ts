@@ -331,6 +331,7 @@ export class TaskItemRenderer {
     task: Task,
     pos: { x: number; y: number },
   ): void {
+    BaseDialog.closeAnyActiveDialog();
     const menu = this.menuBuilder.buildStateMenu(
       task.state,
       async (newState: string) => {

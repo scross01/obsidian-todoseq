@@ -85,6 +85,7 @@ export class TaskContextMenu extends BaseDialog {
   private app: App;
   private taskStateManager: TaskStateManager | null = null;
   private datePicker: DatePicker | null = null;
+  onHide: (() => void) | null = null;
 
   constructor(
     callbacks: TaskContextMenuCallbacks,
@@ -170,6 +171,8 @@ export class TaskContextMenu extends BaseDialog {
     this.isShowing = false;
     this.focusedIndex = -1;
     this.focusableItems = [];
+    this.onHide?.();
+    this.onHide = null;
   }
 
   /**
