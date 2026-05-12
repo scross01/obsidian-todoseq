@@ -1923,7 +1923,10 @@ export class EmbeddedTaskListRenderer {
     const TOUCH_MOVE_THRESHOLD = 10;
 
     li.addEventListener('contextmenu', (evt: MouseEvent) => {
-      if ((li as HTMLLIElement & { _stateSpanTouchActive?: boolean })._stateSpanTouchActive) {
+      if (
+        (li as HTMLLIElement & { _stateSpanTouchActive?: boolean })
+          ._stateSpanTouchActive
+      ) {
         evt.preventDefault();
         evt.stopPropagation();
         return;

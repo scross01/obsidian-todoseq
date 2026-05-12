@@ -173,6 +173,8 @@ Some other text
 });
 
 describe('Task Parser - Edge Cases', () => {
+  let parser: TaskParser;
+
   beforeEach(() => {
     const keywordManager = createTestKeywordManager({
       additionalActiveKeywords: ['TODO'],
