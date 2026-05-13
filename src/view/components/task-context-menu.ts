@@ -12,25 +12,25 @@ import { BaseDialog } from './base-dialog';
  * Callback types for context menu actions
  */
 export type TaskContextMenuCallbacks = {
-  onGoToTask: (task: Task) => void;
-  onCopyTask: (task: Task) => void;
-  onCopyTaskToToday: (task: Task) => void;
-  onMoveTaskToToday: (task: Task) => void;
-  onMigrateTaskToToday: (task: Task) => void;
+  onGoToTask: (task: Task) => void | Promise<void>;
+  onCopyTask: (task: Task) => void | Promise<void>;
+  onCopyTaskToToday: (task: Task) => void | Promise<void>;
+  onMoveTaskToToday: (task: Task) => void | Promise<void>;
+  onMigrateTaskToToday: (task: Task) => void | Promise<void>;
   onPriorityChange: (
     task: Task,
     priority: 'high' | 'med' | 'low' | null,
-  ) => void;
+  ) => void | Promise<void>;
   onScheduledDateChange: (
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
-  ) => void;
+  ) => void | Promise<void>;
   onDeadlineDateChange: (
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
-  ) => void;
+  ) => void | Promise<void>;
 };
 
 /**

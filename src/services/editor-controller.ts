@@ -1309,7 +1309,7 @@ export class EditorController {
               });
           }
         },
-        onScheduledDateChange: async (
+        onScheduledDateChange: (
           task: Task,
           date: Date | null,
           repeat?: DateRepeatInfo | null,
@@ -1330,7 +1330,7 @@ export class EditorController {
               });
           }
         },
-        onDeadlineDateChange: async (
+        onDeadlineDateChange: (
           task: Task,
           date: Date | null,
           repeat?: DateRepeatInfo | null,
