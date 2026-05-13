@@ -185,7 +185,7 @@ export class DatePicker extends BaseDialog {
   // ─── DOM Building ──────────────────────────────────────────────
 
   private async buildPicker(): Promise<void> {
-    this.containerEl = document.createElement('div');
+    this.containerEl = window.activeDocument.createElement('div');
     this.containerEl.className = 'menu todoseq-date-picker';
     this.containerEl.setAttribute('role', 'menu');
 
@@ -218,7 +218,7 @@ export class DatePicker extends BaseDialog {
     // No date option
     this.buildNoDateOption();
 
-    document.body.appendChild(this.containerEl);
+    window.activeDocument.body.appendChild(this.containerEl);
   }
 
   private buildHeaderSection(): void {
@@ -511,7 +511,7 @@ export class DatePicker extends BaseDialog {
     label: string;
     getDate: () => Date;
   }): HTMLElement {
-    const row = document.createElement('div');
+    const row = window.activeDocument.createElement('div');
     row.className = 'menu-item todoseq-date-picker-quick-select-row';
     row.setAttribute('role', 'menuitem');
     row.setAttribute('tabindex', '-1');
@@ -675,7 +675,7 @@ export class DatePicker extends BaseDialog {
     if (!this.timeSection || !this.containerEl) return;
 
     // Create submenu
-    this.timePickerSubmenu = document.createElement('div');
+    this.timePickerSubmenu = window.activeDocument.createElement('div');
     this.timePickerSubmenu.className = 'menu todoseq-date-picker-submenu';
 
     // Determine which time to focus: selected time or 12:00
@@ -690,7 +690,7 @@ export class DatePicker extends BaseDialog {
         const time: { hours: number; minutes: number } = { hours, minutes };
         const timeStr = this.formatTime(time);
 
-        const row = document.createElement('div');
+        const row = window.activeDocument.createElement('div');
         row.className = 'menu-item todoseq-date-picker-submenu-row';
         row.setAttribute('role', 'menuitem');
         row.setAttribute('tabindex', '-1');
@@ -805,7 +805,7 @@ export class DatePicker extends BaseDialog {
     if (!this.repeatSection || !this.containerEl) return;
 
     // Create submenu
-    this.repeatPickerSubmenu = document.createElement('div');
+    this.repeatPickerSubmenu = window.activeDocument.createElement('div');
     this.repeatPickerSubmenu.className = 'menu todoseq-date-picker-submenu';
 
     // Preset repeat options
@@ -832,17 +832,17 @@ export class DatePicker extends BaseDialog {
     ];
 
     for (const option of presetOptions) {
-      const row = document.createElement('div');
+      const row = window.activeDocument.createElement('div');
       row.className = 'menu-item todoseq-date-picker-submenu-row';
       row.setAttribute('role', 'menuitem');
       row.setAttribute('tabindex', '-1');
 
-      const labelSpan = document.createElement('span');
+      const labelSpan = window.activeDocument.createElement('span');
       labelSpan.className = 'menu-item-title todoseq-date-picker-submenu-label';
       labelSpan.setText(option.label);
       row.appendChild(labelSpan);
 
-      const valueSpan = document.createElement('span');
+      const valueSpan = window.activeDocument.createElement('span');
       valueSpan.className = 'todoseq-date-picker-submenu-value';
       valueSpan.setText(option.repeat.raw);
       row.appendChild(valueSpan);
@@ -864,12 +864,12 @@ export class DatePicker extends BaseDialog {
     }
 
     // Custom option
-    const customRow = document.createElement('div');
+    const customRow = window.activeDocument.createElement('div');
     customRow.className = 'menu-item todoseq-date-picker-submenu-row';
     customRow.setAttribute('role', 'menuitem');
     customRow.setAttribute('tabindex', '-1');
 
-    const customLabel = document.createElement('span');
+    const customLabel = window.activeDocument.createElement('span');
     customLabel.className = 'menu-item-title todoseq-date-picker-submenu-label';
     customLabel.setText('Custom...');
     customRow.appendChild(customLabel);
@@ -916,7 +916,7 @@ export class DatePicker extends BaseDialog {
     if (!this.containerEl) return;
 
     // Create custom repeat dialog
-    this.customRepeatDialog = document.createElement('div');
+    this.customRepeatDialog = window.activeDocument.createElement('div');
     this.customRepeatDialog.className = 'todoseq-date-picker-custom-repeat';
 
     // Header
@@ -1128,7 +1128,7 @@ export class DatePicker extends BaseDialog {
       throw new Error('Container element not initialized');
     }
 
-    const row = document.createElement('div');
+    const row = window.activeDocument.createElement('div');
     row.className = 'menu-item todoseq-date-picker-menu-row';
     row.setAttribute('tabindex', '-1');
 

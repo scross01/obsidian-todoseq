@@ -477,10 +477,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       }
 
       if (groupErrors.length > 0) {
-        const errorDiv = document.createElement('div');
+        const errorDiv = window.activeDocument.createElement('div');
         errorDiv.className = 'todoseq-setting-item-error';
         for (const message of groupErrors) {
-          const row = document.createElement('div');
+          const row = window.activeDocument.createElement('div');
           row.textContent = message;
           errorDiv.appendChild(row);
         }
@@ -489,10 +489,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       }
 
       if (groupWarnings.length > 0) {
-        const warningDiv = document.createElement('div');
+        const warningDiv = window.activeDocument.createElement('div');
         warningDiv.className = 'todoseq-setting-item-warning';
         for (const message of groupWarnings) {
-          const row = document.createElement('div');
+          const row = window.activeDocument.createElement('div');
           row.textContent = message;
           warningDiv.appendChild(row);
         }
@@ -679,7 +679,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     // Add keywords in sorted order
     const sortedKeywords = Array.from(keywords).sort();
     for (const keyword of sortedKeywords) {
-      const option = document.createElement('option');
+      const option = window.activeDocument.createElement('option');
       option.value = keyword;
       option.textContent = keyword;
       dropdown.selectEl.appendChild(option);
@@ -885,12 +885,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     let infoDiv = settingInfo.querySelector('.todoseq-info-message');
     if (!infoDiv) {
-      infoDiv = document.createElement('div');
+      infoDiv = window.activeDocument.createElement('div');
       infoDiv.className = 'todoseq-setting-item-warning';
       settingInfo.appendChild(infoDiv);
     }
 
-    const row = document.createElement('div');
+    const row = window.activeDocument.createElement('div');
     row.textContent = `${message}`;
     infoDiv.appendChild(row);
   }
@@ -907,10 +907,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     const settingInfo = setting.settingEl.querySelector('.setting-item-info');
     if (!settingInfo) return;
 
-    const errorDiv = document.createElement('div');
+    const errorDiv = window.activeDocument.createElement('div');
     errorDiv.className = 'todoseq-setting-item-error';
     for (const message of messages) {
-      const row = document.createElement('div');
+      const row = window.activeDocument.createElement('div');
       row.textContent = message;
       errorDiv.appendChild(row);
     }

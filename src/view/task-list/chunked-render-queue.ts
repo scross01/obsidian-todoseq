@@ -87,7 +87,7 @@ export class ChunkedRenderQueue {
     renderFn: (task: Task) => HTMLLIElement,
     yieldDuringRender = true,
   ): Promise<DocumentFragment> {
-    const fragment = document.createDocumentFragment();
+    const fragment = window.activeDocument.createDocumentFragment();
 
     for (let i = 0; i < tasks.length; i++) {
       const element = renderFn(tasks[i]);

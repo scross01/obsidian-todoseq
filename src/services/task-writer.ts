@@ -762,18 +762,18 @@ export class TaskWriter {
             this.keywordManager,
           ) >= 0;
 
-          await this.app.vault.process(file, (data) => {
-            const lines = data.split('\n');
-            updateOrInsertDateLine(
-              lines,
-              task.line,
-              'CLOSED',
-              dateStr,
-              task,
-              this.keywordManager,
-            );
-            return lines.join('\n');
-          });
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          updateOrInsertDateLine(
+            lines,
+            task.line,
+            'CLOSED',
+            dateStr,
+            task,
+            this.keywordManager,
+          );
+          return lines.join('\n');
+        });
 
         lineDelta = closedExists ? 0 : 1;
       }

@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import { TaskUpdateCoordinator } from '../src/services/task-update-coordinator';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { Task, DateRepeatInfo } from '../src/types/task';
@@ -8,10 +12,8 @@ import {
 } from './helpers/test-helper';
 import { TFile } from 'obsidian';
 
-// Mock document for DOM operations
-global.document = {
-  querySelectorAll: jest.fn(() => []),
-} as any;
+// Mock window.activeDocument for Obsidian API compatibility
+(window as any).activeDocument = document;
 
 // Mock the Obsidian App
 const mockApp = {

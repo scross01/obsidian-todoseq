@@ -846,7 +846,7 @@ export class TaskUpdateCoordinator {
     const fileName = task.path.split('/').pop()?.replace('.md', '');
     if (!fileName) return;
 
-    const embeds = document.querySelectorAll('.internal-embed');
+    const embeds = window.activeDocument.querySelectorAll('.internal-embed');
 
     embeds.forEach((embed) => {
       const src = embed.getAttribute('src');

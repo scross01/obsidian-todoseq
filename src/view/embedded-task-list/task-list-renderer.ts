@@ -1310,7 +1310,7 @@ export class EmbeddedTaskListRenderer {
     index: number,
     params: TodoseqParameters,
   ): HTMLLIElement {
-    const li = document.createElement('li');
+    const li = window.activeDocument.createElement('li');
     li.className = 'todoseq-embedded-task-item';
 
     // Apply date-based background styling if the task has scheduled or deadline dates AND is not completed
@@ -1324,7 +1324,7 @@ export class EmbeddedTaskListRenderer {
     li.setAttribute('data-index', String(index));
 
     // Create checkbox
-    const checkbox = document.createElement('input');
+    const checkbox = window.activeDocument.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'todoseq-embedded-task-checkbox';
     checkbox.classList.add('task-list-item-checkbox');
@@ -1360,11 +1360,11 @@ export class EmbeddedTaskListRenderer {
     );
 
     // Create task text container
-    const textContainer = document.createElement('div');
+    const textContainer = window.activeDocument.createElement('div');
     textContainer.className = 'todoseq-embedded-task-text-container';
 
     // Create task state
-    const stateSpan = document.createElement('span');
+    const stateSpan = window.activeDocument.createElement('span');
     stateSpan.className = 'todoseq-embedded-task-state';
     stateSpan.textContent = task.state;
     stateSpan.setAttribute('role', 'button');
@@ -1480,7 +1480,7 @@ export class EmbeddedTaskListRenderer {
     // Create priority indicator if present
     if (task.priority) {
       const pri = task.priority; // 'high' | 'med' | 'low'
-      const prioritySpan = document.createElement('span');
+      const prioritySpan = window.activeDocument.createElement('span');
       prioritySpan.className = [
         'todoseq-priority-badge',
         `priority-${pri}`,
@@ -1494,7 +1494,7 @@ export class EmbeddedTaskListRenderer {
 
     // Create task text if present
     if (task.text) {
-      const textSpan = document.createElement('span');
+      const textSpan = window.activeDocument.createElement('span');
       textSpan.className = 'todoseq-embedded-task-text';
       if (textContainer.children.length > 0) {
         textSpan.appendText(' ');
@@ -1531,11 +1531,11 @@ export class EmbeddedTaskListRenderer {
       textContainer.classList.add('todoseq-embedded-task-text-wrap');
 
       // Create content wrapper for wrapped layout
-      contentWrapper = document.createElement('div');
+      contentWrapper = window.activeDocument.createElement('div');
       contentWrapper.className = 'todoseq-embedded-task-content-wrapper';
 
       // Create a text row that holds text + floating indicators side by side
-      const textRow = document.createElement('div');
+      const textRow = window.activeDocument.createElement('div');
       textRow.className = 'todoseq-embedded-task-text-row';
 
       // Append text container to text row
@@ -1543,13 +1543,13 @@ export class EmbeddedTaskListRenderer {
 
       // Add floating indicators to text row (before file info)
       if (needsFloatingIndicators) {
-        const floatingIndicators = document.createElement('div');
+        const floatingIndicators = window.activeDocument.createElement('div');
         floatingIndicators.className =
           'todoseq-embedded-task-floating-indicators';
 
         // Add subtask indicator to floating div
         if (hasSubtask) {
-          const subtaskSpan = document.createElement('span');
+          const subtaskSpan = window.activeDocument.createElement('span');
           subtaskSpan.className = 'todoseq-subtask-indicator';
           subtaskSpan.textContent = getSubtaskDisplayText(task);
           subtaskSpan.setAttribute(
@@ -1582,11 +1582,11 @@ export class EmbeddedTaskListRenderer {
       const showFile = params.showFile !== false;
 
       if (showFile || showUrgency) {
-        fileInfoRow = document.createElement('div');
+        fileInfoRow = window.activeDocument.createElement('div');
         fileInfoRow.className = 'todoseq-embedded-task-file-info-row';
 
         if (showFile) {
-          const fileInfo = document.createElement('span');
+          const fileInfo = window.activeDocument.createElement('span');
           fileInfo.className = 'todoseq-embedded-task-file-info-wrap';
           const fileName = task.path.split('/').pop() || task.path;
           const displayName = fileName.replace(/\.md$/, '');
@@ -1600,7 +1600,7 @@ export class EmbeddedTaskListRenderer {
           urgencyValue !== null &&
           urgencyValue !== undefined
         ) {
-          const urgencyInfo = document.createElement('span');
+          const urgencyInfo = window.activeDocument.createElement('span');
           urgencyInfo.className = 'todoseq-embedded-task-urgency-wrap';
           urgencyInfo.textContent = `${urgencyValue.toFixed(2)}`;
           urgencyInfo.setAttribute(
@@ -1623,11 +1623,11 @@ export class EmbeddedTaskListRenderer {
       textContainer.classList.add('todoseq-embedded-task-text-wrap-dynamic');
 
       // Create content wrapper (will be styled by CSS based on viewport width)
-      contentWrapper = document.createElement('div');
+      contentWrapper = window.activeDocument.createElement('div');
       contentWrapper.className = 'todoseq-embedded-task-content-wrapper';
 
       // Create a text row that holds text + floating indicators side by side
-      const textRow = document.createElement('div');
+      const textRow = window.activeDocument.createElement('div');
       textRow.className = 'todoseq-embedded-task-text-row';
 
       // Append text container to text row
@@ -1635,13 +1635,13 @@ export class EmbeddedTaskListRenderer {
 
       // Add floating indicators to text row (before file info)
       if (needsFloatingIndicators) {
-        const floatingIndicators = document.createElement('div');
+        const floatingIndicators = window.activeDocument.createElement('div');
         floatingIndicators.className =
           'todoseq-embedded-task-floating-indicators';
 
         // Add subtask indicator to floating div
         if (hasSubtask) {
-          const subtaskSpan = document.createElement('span');
+          const subtaskSpan = window.activeDocument.createElement('span');
           subtaskSpan.className = 'todoseq-subtask-indicator';
           subtaskSpan.textContent = getSubtaskDisplayText(task);
           subtaskSpan.setAttribute(
@@ -1685,11 +1685,11 @@ export class EmbeddedTaskListRenderer {
       // CSS will toggle visibility based on viewport width
       if (showFile || showUrgency) {
         // Create file info row for narrow screens (wrapped)
-        fileInfoRow = document.createElement('div');
+        fileInfoRow = window.activeDocument.createElement('div');
         fileInfoRow.className = 'todoseq-embedded-task-file-info-row';
 
         if (showFile) {
-          const fileInfo = document.createElement('span');
+          const fileInfo = window.activeDocument.createElement('span');
           fileInfo.className = 'todoseq-embedded-task-file-info-wrap';
           const fileName = task.path.split('/').pop() || task.path;
           const displayName = fileName.replace(/\.md$/, '');
@@ -1703,7 +1703,7 @@ export class EmbeddedTaskListRenderer {
           urgencyValue !== null &&
           urgencyValue !== undefined
         ) {
-          const urgencyInfo = document.createElement('span');
+          const urgencyInfo = window.activeDocument.createElement('span');
           urgencyInfo.className = 'todoseq-embedded-task-urgency-dynamic';
           urgencyInfo.textContent = `${urgencyValue.toFixed(2)}`;
           urgencyInfo.setAttribute(
@@ -1719,7 +1719,7 @@ export class EmbeddedTaskListRenderer {
         // This is shown via CSS at >768px and hidden at <=768px
         // Add it as a sibling of textRow in contentWrapper (like wrap-content:false mode)
         if (showFile) {
-          const inlineFileInfo = document.createElement('div');
+          const inlineFileInfo = window.activeDocument.createElement('div');
           inlineFileInfo.className = 'todoseq-embedded-task-file-info';
           const fileName = task.path.split('/').pop() || task.path;
           const displayName = fileName.replace(/\.md$/, '');
@@ -1736,7 +1736,7 @@ export class EmbeddedTaskListRenderer {
           urgencyValue !== null &&
           urgencyValue !== undefined
         ) {
-          const urgencyInline = document.createElement('span');
+          const urgencyInline = window.activeDocument.createElement('span');
           urgencyInline.className = 'todoseq-embedded-task-urgency';
           urgencyInline.textContent = `${urgencyValue.toFixed(2)}`;
           urgencyInline.setAttribute(
@@ -1754,7 +1754,7 @@ export class EmbeddedTaskListRenderer {
       // Default (truncated) mode
       // Create file info if show-file is not explicitly false
       if (params.showFile !== false) {
-        const fileInfo = document.createElement('div');
+        const fileInfo = window.activeDocument.createElement('div');
         fileInfo.className = 'todoseq-embedded-task-file-info';
         const fileName = task.path.split('/').pop() || task.path;
         // Strip .md extension from display name
@@ -1775,7 +1775,7 @@ export class EmbeddedTaskListRenderer {
           task.urgency !== null &&
           task.urgency !== undefined
         ) {
-          const urgencyInfo = document.createElement('span');
+          const urgencyInfo = window.activeDocument.createElement('span');
           urgencyInfo.className = 'todoseq-embedded-task-urgency';
           urgencyInfo.textContent = `${task.urgency.toFixed(2)}`;
           urgencyInfo.setAttribute(
@@ -1795,7 +1795,7 @@ export class EmbeddedTaskListRenderer {
           task.urgency !== null &&
           task.urgency !== undefined
         ) {
-          const urgencyInfo = document.createElement('span');
+          const urgencyInfo = window.activeDocument.createElement('span');
           urgencyInfo.className = 'todoseq-embedded-task-urgency';
           urgencyInfo.textContent = `${task.urgency.toFixed(2)}`;
           urgencyInfo.setAttribute(
@@ -1808,7 +1808,7 @@ export class EmbeddedTaskListRenderer {
 
       // Add inline subtask indicator and repeat icon for non-wrap mode
       if (hasSubtask) {
-        const subtaskSpan = document.createElement('span');
+        const subtaskSpan = window.activeDocument.createElement('span');
         subtaskSpan.className = 'todoseq-subtask-indicator';
         subtaskSpan.textContent = getSubtaskDisplayText(task);
         subtaskSpan.setAttribute(

@@ -53,7 +53,7 @@ class PriorityWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const container = document.createElement('span');
+    const container = window.activeDocument.createElement('span');
     container.className = `todoseq-edit-priority-pill todoseq-priority-badge priority-${this.priority}`;
     container.textContent = this.letter;
     container.setAttribute('data-priority', this.letter);

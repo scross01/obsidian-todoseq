@@ -1876,7 +1876,7 @@ export class TaskListView extends ItemView {
     // Keyboard shortcuts: Slash to focus search, Esc to clear
     const input: HTMLInputElement | null = this.searchInputEl ?? null;
     const keyHandler = async (evt: KeyboardEvent) => {
-      const active = document.activeElement as HTMLElement | null;
+      const active = window.activeDocument.activeElement as HTMLElement | null;
       const isTyping =
         !!active &&
         (active.tagName === 'INPUT' ||

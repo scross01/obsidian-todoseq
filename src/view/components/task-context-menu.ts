@@ -196,7 +196,7 @@ export class TaskContextMenu extends BaseDialog {
   // ─── DOM Building ──────────────────────────────────────────────
 
   private async buildMenu(): Promise<void> {
-    this.containerEl = document.createElement('div');
+    this.containerEl = window.activeDocument.createElement('div');
     this.containerEl.className = 'menu todoseq-task-context-menu';
     this.containerEl.setAttribute('role', 'menu');
 
@@ -238,7 +238,7 @@ export class TaskContextMenu extends BaseDialog {
     // Migrate to today (only if daily notes plugin is enabled AND feature is enabled)
     await this.buildMigrateToTodayRow();
 
-    document.body.appendChild(this.containerEl);
+    window.activeDocument.body.appendChild(this.containerEl);
   }
 
   private buildGoToTaskRow(): void {

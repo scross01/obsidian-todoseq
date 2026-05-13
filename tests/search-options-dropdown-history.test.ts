@@ -67,6 +67,8 @@ beforeAll(() => {
   }): HTMLSpanElement {
     return this.createEl('span', options);
   };
+  // Mock window.activeDocument for Obsidian API compatibility
+  (window as any).activeDocument = document;
 });
 
 // Mock setIcon since it's called in the constructor

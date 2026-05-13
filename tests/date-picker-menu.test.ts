@@ -90,6 +90,8 @@ beforeAll(() => {
   }): HTMLSpanElement {
     return this.createEl('span', options);
   };
+  // Mock window.activeDocument for Obsidian API compatibility
+  (window as any).activeDocument = document;
 });
 
 // Mock obsidian module

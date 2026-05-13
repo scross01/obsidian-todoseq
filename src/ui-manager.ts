@@ -430,18 +430,24 @@ export class UIManager {
     };
 
     // Add temporary event listeners for mouse tracking
-    document.addEventListener('mousemove', this.mouseMoveHandler);
-    document.addEventListener('mouseup', this.mouseUpHandler);
+    window.activeDocument.addEventListener('mousemove', this.mouseMoveHandler);
+    window.activeDocument.addEventListener('mouseup', this.mouseUpHandler);
 
     // Set a timeout to process as single click if no second click occurs
     this.pendingClickTimeout = window.setTimeout(() => {
       // Clean up mouse event listeners
       if (this.mouseMoveHandler) {
-        document.removeEventListener('mousemove', this.mouseMoveHandler);
+        window.activeDocument.removeEventListener(
+          'mousemove',
+          this.mouseMoveHandler,
+        );
         this.mouseMoveHandler = null;
       }
       if (this.mouseUpHandler) {
-        document.removeEventListener('mouseup', this.mouseUpHandler);
+        window.activeDocument.removeEventListener(
+          'mouseup',
+          this.mouseUpHandler,
+        );
         this.mouseUpHandler = null;
       }
 
@@ -467,11 +473,14 @@ export class UIManager {
 
     // Remove mouse event listeners
     if (this.mouseMoveHandler) {
-      document.removeEventListener('mousemove', this.mouseMoveHandler);
+      window.activeDocument.removeEventListener(
+        'mousemove',
+        this.mouseMoveHandler,
+      );
       this.mouseMoveHandler = null;
     }
     if (this.mouseUpHandler) {
-      document.removeEventListener('mouseup', this.mouseUpHandler);
+      window.activeDocument.removeEventListener('mouseup', this.mouseUpHandler);
       this.mouseUpHandler = null;
     }
 

@@ -157,22 +157,22 @@ export class TaskDragDropHandler {
     x: number,
     y: number,
   ): HTMLElement {
-    const el = document.createElement('div');
+    const el = window.activeDocument.createElement('div');
     el.className = 'todoseq-drag-overlay';
     el.style.left = x + 12 + 'px';
     el.style.top = y + 12 + 'px';
 
-    const taskLine = document.createElement('div');
+    const taskLine = window.activeDocument.createElement('div');
     taskLine.className = 'todoseq-drag-overlay-task';
     taskLine.textContent = task.state + ' ' + task.text;
     el.appendChild(taskLine);
 
-    const actionLine = document.createElement('div');
+    const actionLine = window.activeDocument.createElement('div');
     actionLine.className = 'todoseq-drag-overlay-action';
     this.setActionText(actionLine, action);
     el.appendChild(actionLine);
 
-    document.body.appendChild(el);
+    window.activeDocument.body.appendChild(el);
     return el;
   }
 
@@ -219,11 +219,19 @@ export class TaskDragDropHandler {
 
   private removeKeyListeners(): void {
     if (this.keydownHandler) {
-      document.removeEventListener('keydown', this.keydownHandler, true);
+      window.activeDocument.removeEventListener(
+        'keydown',
+        this.keydownHandler,
+        true,
+      );
       this.keydownHandler = null;
     }
     if (this.keyupHandler) {
-      document.removeEventListener('keyup', this.keyupHandler, true);
+      window.activeDocument.removeEventListener(
+        'keyup',
+        this.keyupHandler,
+        true,
+      );
       this.keyupHandler = null;
     }
   }
@@ -320,8 +328,12 @@ export class TaskDragDropHandler {
 
     this.keydownHandler = this.onKeyDown;
     this.keyupHandler = this.onKeyUp;
-    document.addEventListener('keydown', this.keydownHandler, true);
-    document.addEventListener('keyup', this.keyupHandler, true);
+    window.activeDocument.addEventListener(
+      'keydown',
+      this.keydownHandler,
+      true,
+    );
+    window.activeDocument.addEventListener('keyup', this.keyupHandler, true);
 
     this.editorDropRef = this.app.workspace.on(
       'editor-drop',

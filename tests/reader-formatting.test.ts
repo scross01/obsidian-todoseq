@@ -49,6 +49,11 @@ if (!HTMLElement.prototype.createSpan) {
   };
 }
 
+// Mock window.activeDocument for Obsidian API compatibility
+if (typeof window !== 'undefined') {
+  (window as any).activeDocument = document;
+}
+
 // Mock Obsidian's TFile
 jest.mock('obsidian', () => ({
   TFile: class TFile {

@@ -71,7 +71,7 @@ export abstract class BaseDialog {
   protected addBackdrop(): void {
     if (!this.containerEl) return;
 
-    this.backdropEl = document.createElement('div');
+    this.backdropEl = window.activeDocument.createElement('div');
     this.backdropEl.className = 'todoseq-backdrop';
     this.backdropEl.addEventListener('click', () => {
       this.hide();
@@ -207,13 +207,16 @@ export abstract class BaseDialog {
     const contextmenuHandler = this.contextmenuHandler;
     window.setTimeout(() => {
       if (clickHandler) {
-        document.addEventListener('click', clickHandler);
+        window.activeDocument.addEventListener('click', clickHandler);
       }
       if (contextmenuHandler) {
-        document.addEventListener('contextmenu', contextmenuHandler);
+        window.activeDocument.addEventListener(
+          'contextmenu',
+          contextmenuHandler,
+        );
       }
     }, 0);
-    document.addEventListener('keydown', this.keydownHandler);
+    window.activeDocument.addEventListener('keydown', this.keydownHandler);
     window.addEventListener('scroll', this.scrollHandler, { passive: true });
   }
 
@@ -222,15 +225,21 @@ export abstract class BaseDialog {
    */
   protected detachGlobalListeners(): void {
     if (this.documentClickHandler) {
-      document.removeEventListener('click', this.documentClickHandler);
+      window.activeDocument.removeEventListener(
+        'click',
+        this.documentClickHandler,
+      );
       this.documentClickHandler = null;
     }
     if (this.contextmenuHandler) {
-      document.removeEventListener('contextmenu', this.contextmenuHandler);
+      window.activeDocument.removeEventListener(
+        'contextmenu',
+        this.contextmenuHandler,
+      );
       this.contextmenuHandler = null;
     }
     if (this.keydownHandler) {
-      document.removeEventListener('keydown', this.keydownHandler);
+      window.activeDocument.removeEventListener('keydown', this.keydownHandler);
       this.keydownHandler = null;
     }
     if (this.scrollHandler) {

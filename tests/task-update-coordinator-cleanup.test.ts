@@ -1,5 +1,6 @@
 /**
  * Tests for TaskUpdateCoordinator - Memory Leak Cleanup
+ * @jest-environment jsdom
  */
 
 import { TaskUpdateCoordinator } from '../src/services/task-update-coordinator';
@@ -12,9 +13,8 @@ import {
 } from './helpers/test-helper';
 import { TFile } from 'obsidian';
 
-global.document = {
-  querySelectorAll: jest.fn(() => []),
-} as any;
+// Mock window.activeDocument for Obsidian API compatibility
+(window as any).activeDocument = document;
 
 const mockApp = {
   vault: {

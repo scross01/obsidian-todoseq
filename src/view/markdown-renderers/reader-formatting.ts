@@ -64,7 +64,7 @@ export class ReaderViewFormatter {
     isCompleted = false,
     isArchived = false,
   ): HTMLSpanElement {
-    const tempContainer = document.createElement('div');
+    const tempContainer = window.activeDocument.createElement('div');
     let cssClasses = 'todoseq-keyword-formatted';
     if (isArchived) {
       cssClasses += ' todoseq-archived-keyword';
@@ -88,7 +88,7 @@ export class ReaderViewFormatter {
    * Create a task container span element using Obsidian DOM helpers
    */
   private createTaskContainer(): HTMLSpanElement {
-    const tempContainer = document.createElement('div');
+    const tempContainer = window.activeDocument.createElement('div');
     const container = tempContainer.createSpan({ cls: 'todoseq-task' });
     return container;
   }
@@ -97,7 +97,7 @@ export class ReaderViewFormatter {
    * Create a completed task container span element using Obsidian DOM helpers
    */
   private createCompletedTaskContainer(): HTMLSpanElement {
-    const tempContainer = document.createElement('div');
+    const tempContainer = window.activeDocument.createElement('div');
     const container = tempContainer.createSpan({
       cls: 'todoseq-completed-task-text',
       attr: {
@@ -111,7 +111,7 @@ export class ReaderViewFormatter {
    * Create an archived task container span element using Obsidian DOM helpers
    */
   private createArchivedTaskContainer(): HTMLSpanElement {
-    const tempContainer = document.createElement('div');
+    const tempContainer = window.activeDocument.createElement('div');
     const container = tempContainer.createSpan({
       cls: 'todoseq-archived-task-text',
       attr: {
@@ -898,8 +898,8 @@ export class ReaderViewFormatter {
       const afterText = currentText.substring(pillEnd);
 
       // Create new text nodes
-      const beforeNode = document.createTextNode(beforeText);
-      const afterNode = document.createTextNode(afterText);
+      const beforeNode = window.activeDocument.createTextNode(beforeText);
+      const afterNode = window.activeDocument.createTextNode(afterText);
 
       // Replace the current node with before + pill + after
       const parentNode = currentNode.parentNode;
@@ -929,7 +929,7 @@ export class ReaderViewFormatter {
           ? 'priority-med'
           : 'priority-low';
 
-    const container = document.createElement('div');
+    const container = window.activeDocument.createElement('div');
     const span = container.createSpan({
       cls: `todoseq-priority-badge ${priorityClass}`,
       attr: {
@@ -1086,8 +1086,8 @@ export class ReaderViewFormatter {
           const afterText = nodeText.substring(keywordEndInNode);
 
           // Create new nodes
-          const beforeSpan = document.createTextNode(beforeText);
-          const afterSpan = document.createTextNode(afterText);
+          const beforeSpan = window.activeDocument.createTextNode(beforeText);
+          const afterSpan = window.activeDocument.createTextNode(afterText);
 
           // Replace the text node with our structured content
           textNode.parentNode?.insertBefore(afterSpan, textNode);
@@ -1168,7 +1168,7 @@ export class ReaderViewFormatter {
           keywordStartInNode + keyword.length,
         );
         if (afterText) {
-          const afterSpan = document.createTextNode(afterText);
+          const afterSpan = window.activeDocument.createTextNode(afterText);
           nodesAfterKeyword.push(afterSpan);
         }
       } else if (keywordFound) {
@@ -1352,8 +1352,8 @@ export class ReaderViewFormatter {
           const afterText = nodeText.substring(keywordEndInNode);
 
           // Create new nodes
-          const beforeNode = document.createTextNode(beforeText);
-          const afterNode = document.createTextNode(afterText);
+          const beforeNode = window.activeDocument.createTextNode(beforeText);
+          const afterNode = window.activeDocument.createTextNode(afterText);
 
           // Replace the text node with our structured content
           const parent = textNode.parentNode;
@@ -1571,7 +1571,9 @@ export class ReaderViewFormatter {
         // Add text before keyword
         const beforeText = nodeText.substring(0, keywordStartInNode);
         if (beforeText) {
-          taskContainer.appendChild(document.createTextNode(beforeText));
+          taskContainer.appendChild(
+            window.activeDocument.createTextNode(beforeText),
+          );
         }
 
         // Add the keyword span
@@ -1580,7 +1582,9 @@ export class ReaderViewFormatter {
         // Add text after keyword
         const afterText = nodeText.substring(keywordEndInNode);
         if (afterText) {
-          taskContainer.appendChild(document.createTextNode(afterText));
+          taskContainer.appendChild(
+            window.activeDocument.createTextNode(afterText),
+          );
         }
 
         keywordInserted = true;
@@ -1701,7 +1705,10 @@ export class ReaderViewFormatter {
    */
   private getTextNodes(element: HTMLElement): Node[] {
     const textNodes: Node[] = [];
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const walker = window.activeDocument.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+    );
 
     let node;
     while ((node = walker.nextNode())) {
@@ -1941,7 +1948,10 @@ export class ReaderViewFormatter {
     keyword: string,
   ): { node: Text; index: number } | null {
     // Use a TreeWalker to find all text nodes, including nested ones
-    const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+    const walker = window.activeDocument.createTreeWalker(
+      paragraph,
+      NodeFilter.SHOW_TEXT,
+    );
 
     let node;
     while ((node = walker.nextNode())) {
@@ -1989,7 +1999,10 @@ export class ReaderViewFormatter {
     keyword: string,
   ): { node: Text; index: number } | null {
     // Use a TreeWalker to find all text nodes, including nested ones
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const walker = window.activeDocument.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+    );
 
     let node;
     while ((node = walker.nextNode())) {
@@ -2014,14 +2027,14 @@ export class ReaderViewFormatter {
     type: 'scheduled' | 'deadline' | 'closed',
   ): void {
     // Create a date container
-    const dateContainer = document.createElement('span');
+    const dateContainer = window.activeDocument.createElement('span');
     dateContainer.className = `todoseq-${type}-line`;
     dateContainer.setAttribute('data-date-line-type', type);
     dateContainer.setAttribute('aria-label', `${type} date line`);
     dateContainer.setAttribute('role', 'note');
 
     // Create a styled keyword span
-    const keywordSpan = document.createElement('span');
+    const keywordSpan = window.activeDocument.createElement('span');
     keywordSpan.className = `todoseq-${type}-keyword`;
     keywordSpan.textContent = keyword;
     keywordSpan.setAttribute('data-date-keyword', keyword);
@@ -2034,8 +2047,8 @@ export class ReaderViewFormatter {
     const afterText = nodeText.substring(keywordIndex + keyword.length);
 
     // Create new text nodes
-    const beforeNode = document.createTextNode(beforeText);
-    const afterNode = document.createTextNode(afterText);
+    const beforeNode = window.activeDocument.createTextNode(beforeText);
+    const afterNode = window.activeDocument.createTextNode(afterText);
 
     // Replace the original text node with the new structure
     keywordNode.parentNode?.replaceChild(dateContainer, keywordNode);

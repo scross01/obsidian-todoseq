@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import { TaskUpdateCoordinator } from '../src/services/task-update-coordinator';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import {
@@ -8,9 +12,8 @@ import {
 import { TFile } from 'obsidian';
 import { getDefaultCoefficients } from '../src/utils/task-urgency';
 
-global.document = {
-  querySelectorAll: jest.fn(() => []),
-} as any;
+// Mock window.activeDocument for Obsidian API compatibility
+(window as any).activeDocument = document;
 
 const mockApp = {
   vault: {

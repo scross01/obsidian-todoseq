@@ -2,7 +2,7 @@
 
 ## 0.14.0-dev
 
--
+- Address Obsidian community scorecard review feedback items.
 
 ## 0.13.4
 

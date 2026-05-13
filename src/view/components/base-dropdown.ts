@@ -19,10 +19,10 @@ export abstract class BaseDropdown {
     this.inputEl = inputEl;
     this.vault = vault;
 
-    this.containerEl = document.createElement('div');
+    this.containerEl = window.activeDocument.createElement('div');
     this.containerEl.addClass('todoseq-dropdown');
 
-    document.body.appendChild(this.containerEl);
+    window.activeDocument.body.appendChild(this.containerEl);
 
     this.updateWidth();
     this.setupBaseEventListeners();
@@ -63,7 +63,7 @@ export abstract class BaseDropdown {
       this.updatePosition();
     };
 
-    document.addEventListener('click', this.documentClickHandler);
+    window.activeDocument.addEventListener('click', this.documentClickHandler);
     this.inputEl.addEventListener('blur', this.blurHandler);
     window.addEventListener('resize', this.resizeHandler);
     window.addEventListener('scroll', this.scrollHandler, { passive: true });
@@ -126,7 +126,10 @@ export abstract class BaseDropdown {
   }
 
   public cleanup(): void {
-    document.removeEventListener('click', this.documentClickHandler);
+    window.activeDocument.removeEventListener(
+      'click',
+      this.documentClickHandler,
+    );
     this.inputEl.removeEventListener('blur', this.blurHandler);
     window.removeEventListener('resize', this.resizeHandler);
     window.removeEventListener('scroll', this.scrollHandler);
