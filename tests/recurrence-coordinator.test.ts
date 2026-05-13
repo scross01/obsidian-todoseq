@@ -26,16 +26,10 @@ afterAll(() => {
 });
 
 // Mock App and TFile
-const mockFile = {
-  path: 'test.md',
-  extension: 'md',
-  name: 'test.md',
-  stat: {
-    mtime: Date.now(),
-    ctime: Date.now(),
-    size: 100,
-  },
-} as unknown as TFile;
+const mockFile = new TFile('test.md', 'test.md', 'md');
+Object.assign(mockFile, {
+  stat: { mtime: Date.now(), ctime: Date.now(), size: 100 },
+});
 
 const mockParser = {
   getDateLineType: jest.fn(),
@@ -193,12 +187,7 @@ describe('RecurrenceCoordinator', () => {
     });
 
     it('should clear all timeouts', () => {
-      const clearTimeoutSpy = jest.spyOn(
-        (globalThis as Record<string, unknown>).activeWindow as {
-          clearTimeout: typeof global.clearTimeout;
-        },
-        'clearTimeout',
-      );
+      const clearTimeoutSpy = jest.spyOn(window, 'clearTimeout');
 
       const task1 = createMockTask({ path: 'test1.md', line: 0 });
       const task2 = createMockTask({ path: 'test2.md', line: 0 });

@@ -34,7 +34,7 @@ const MIGRATIONS: SettingsMigrations[] = [
           typeof oldValue === 'object' &&
           oldValue !== null &&
           'enabled' in oldValue &&
-          typeof (oldValue as { enabled: unknown }).enabled === 'boolean'
+          typeof oldValue.enabled === 'boolean'
         ) {
           migrated['languageCommentSupport'] = (
             oldValue as { enabled: boolean }

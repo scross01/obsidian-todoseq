@@ -190,7 +190,7 @@ export class ReaderViewFormatter {
     const checkboxes = element.querySelectorAll('.task-list-item-checkbox');
 
     checkboxes.forEach((checkbox) => {
-      if (!(checkbox instanceof HTMLElement)) {
+      if (!checkbox.instanceOf(HTMLElement)) {
         return;
       }
       // Check if this checkbox is inside an embedded transclusion
@@ -482,7 +482,7 @@ export class ReaderViewFormatter {
       // Skip if quote/callout blocks are disabled and this element is inside one
       if (
         !includeCalloutBlocks &&
-        taskElement instanceof HTMLElement &&
+        taskElement.instanceOf(HTMLElement) &&
         this.isInQuoteOrCalloutBlock(taskElement)
       ) {
         return;
@@ -492,7 +492,7 @@ export class ReaderViewFormatter {
 
       // Get keyword from the formatted keyword element (needed for checkbox styling)
       let keyword: string | null = null;
-      if (taskElement instanceof HTMLElement) {
+      if (taskElement.instanceOf(HTMLElement)) {
         const keywordSpan = taskElement.querySelector(
           '.todoseq-keyword-formatted',
         );
@@ -502,17 +502,17 @@ export class ReaderViewFormatter {
       if (taskParagraph) {
         // Process tasks with paragraph elements (standard case)
         this.processParagraphForTasks(taskParagraph);
-      } else if (taskElement instanceof HTMLElement) {
+      } else if (taskElement.instanceOf(HTMLElement)) {
         // Process tasks without paragraph elements (direct text in li)
         this.processTaskListItemDirectly(taskElement);
       }
 
       // Add data-task attribute and checked state for checkbox styling
       // This allows CSS to apply the TODOseq active task style or theme styles
-      if (taskElement instanceof HTMLElement) {
-        const checkbox = taskElement.querySelector(
+      if (taskElement.instanceOf(HTMLElement)) {
+        const checkbox: HTMLInputElement | null = taskElement.querySelector(
           '.task-list-item-checkbox',
-        ) as HTMLInputElement | null;
+        );
         if (checkbox && keyword) {
           const keywordManager = this.vaultScanner.getKeywordManager();
           if (keywordManager) {
@@ -562,7 +562,7 @@ export class ReaderViewFormatter {
         return;
       }
 
-      if (paragraph instanceof HTMLElement) {
+      if (paragraph.instanceOf(HTMLElement)) {
         // Skip if quote/callout blocks are disabled and this paragraph is inside one
         if (!includeCalloutBlocks && this.isInQuoteOrCalloutBlock(paragraph)) {
           return;
@@ -595,13 +595,13 @@ export class ReaderViewFormatter {
       // Skip if quote/callout blocks are disabled and this list item is inside one
       if (
         !includeCalloutBlocks &&
-        listItem instanceof HTMLElement &&
+        listItem.instanceOf(HTMLElement) &&
         this.isInQuoteOrCalloutBlock(listItem)
       ) {
         return;
       }
 
-      if (!(listItem instanceof HTMLElement)) {
+      if (!listItem.instanceOf(HTMLElement)) {
         return;
       }
 
@@ -645,13 +645,13 @@ export class ReaderViewFormatter {
       // Skip if quote/callout blocks are disabled and this element is inside one
       if (
         !includeCalloutBlocks &&
-        taskItem instanceof HTMLElement &&
+        taskItem.instanceOf(HTMLElement) &&
         this.isInQuoteOrCalloutBlock(taskItem)
       ) {
         return;
       }
 
-      if (!(taskItem instanceof HTMLElement)) {
+      if (!taskItem.instanceOf(HTMLElement)) {
         return;
       }
 
@@ -671,13 +671,13 @@ export class ReaderViewFormatter {
       // Skip if quote/callout blocks are disabled and this element is inside one
       if (
         !includeCalloutBlocks &&
-        listItem instanceof HTMLElement &&
+        listItem.instanceOf(HTMLElement) &&
         this.isInQuoteOrCalloutBlock(listItem)
       ) {
         return;
       }
 
-      if (!(listItem instanceof HTMLElement)) {
+      if (!listItem.instanceOf(HTMLElement)) {
         return;
       }
 
@@ -697,13 +697,13 @@ export class ReaderViewFormatter {
       // Skip if quote/callout blocks are disabled and this paragraph is inside one
       if (
         !includeCalloutBlocks &&
-        paragraph instanceof HTMLElement &&
+        paragraph.instanceOf(HTMLElement) &&
         this.isInQuoteOrCalloutBlock(paragraph)
       ) {
         return;
       }
 
-      if (!(paragraph instanceof HTMLElement)) {
+      if (!paragraph.instanceOf(HTMLElement)) {
         return;
       }
 
@@ -753,7 +753,7 @@ export class ReaderViewFormatter {
     const tagLinks = element.querySelectorAll('a.tag');
 
     tagLinks.forEach((tagLink) => {
-      if (!(tagLink instanceof HTMLElement)) {
+      if (!tagLink.instanceOf(HTMLElement)) {
         return;
       }
 
@@ -1761,7 +1761,7 @@ export class ReaderViewFormatter {
     const taskContainers = element.querySelectorAll('.todoseq-task');
 
     taskContainers.forEach((taskContainer) => {
-      if (!(taskContainer instanceof HTMLElement)) {
+      if (!taskContainer.instanceOf(HTMLElement)) {
         return;
       }
 
@@ -2096,7 +2096,7 @@ export class ReaderViewFormatter {
     const keywords = element.querySelectorAll('.todoseq-keyword-formatted');
 
     keywords.forEach((keyword: Element) => {
-      if (!(keyword instanceof HTMLElement)) {
+      if (!keyword.instanceOf(HTMLElement)) {
         return;
       }
 
@@ -2151,7 +2151,7 @@ export class ReaderViewFormatter {
 
     // Clear any pending single click timeout
     if (this.pendingClickTimeout) {
-      activeWindow.clearTimeout(this.pendingClickTimeout);
+      window.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
     }
 
@@ -2194,7 +2194,7 @@ export class ReaderViewFormatter {
 
     // Clear any pending single click timeout
     if (this.pendingClickTimeout) {
-      activeWindow.clearTimeout(this.pendingClickTimeout);
+      window.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
       this.lastClickedElement = null;
       this.lastClickTime = 0;
@@ -2481,7 +2481,7 @@ export class ReaderViewFormatter {
   cleanup(): void {
     // Clear any pending timeouts
     if (this.pendingClickTimeout) {
-      activeWindow.clearTimeout(this.pendingClickTimeout);
+      window.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
     }
   }

@@ -6,7 +6,7 @@ import {
   getDailyNote,
   getDateFromFile,
 } from 'obsidian-daily-notes-interface';
-import moment from 'moment';
+import { moment } from 'obsidian';
 import { Task } from '../types/task';
 
 // Cache for daily notes plugin status to avoid repeated file reads
@@ -96,7 +96,7 @@ export function isDailyNotesPluginEnabled(
   try {
     // Check .obsidian/core-plugins.json file to determine plugin status
     const adapter = app.vault.adapter;
-    const corePluginsPath = '.obsidian/core-plugins.json';
+    const corePluginsPath = `${app.vault.configDir}/core-plugins.json`;
 
     // Read core plugins file
     return adapter
@@ -153,11 +153,11 @@ export function refreshDailyNotesPluginStatus(): void {
  */
 export async function getTodayDailyNote(app: App): Promise<TFile | null> {
   try {
-    if (!isDailyNotesPluginEnabled(app)) {
+    if (!(await isDailyNotesPluginEnabled(app))) {
       return null;
     }
 
-    const today = moment();
+    const today: moment.Moment = window.moment();
     const allDailyNotes = getAllDailyNotes();
 
     // Try to get existing daily note

@@ -1,6 +1,5 @@
 import {
   sortTasksWithThreeBlockSystem,
-  SortMethod as TaskSortMethod,
   buildKeywordSortConfig,
   KeywordSortConfig,
 } from '../../utils/task-sort';
@@ -134,7 +133,7 @@ export class TaskListFilter {
       now,
       futureSetting,
       completedSetting,
-      sortMethod as TaskSortMethod,
+      sortMethod,
       keywordConfig,
     );
 

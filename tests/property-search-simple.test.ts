@@ -6,23 +6,13 @@ import { App, TFile } from 'obsidian';
 
 // Create simple mock files with known properties
 const createMockFile = (index: number, hasProperties = true): TFile => {
-  const mockFile = {
-    path: `file-${index}.md`,
-    name: `file-${index}.md`,
+  const file = new TFile(`file-${index}.md`, `file-${index}.md`, 'md');
+  Object.assign(file, {
     basename: `file-${index}`,
-    extension: 'md',
     stat: { size: 1024, mtime: Date.now() },
-    // Add isTFile property to help with type check
     isTFile: true,
-  };
-
-  // Make it recognize as TFile instance
-  Object.setPrototypeOf(mockFile, {
-    constructor: { name: 'TFile' },
-    __proto__: { __proto__: Object.prototype },
   });
-
-  return mockFile as unknown as TFile;
+  return file;
 };
 
 import { TaskStateManager } from '../src/services/task-state-manager';

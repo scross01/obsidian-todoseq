@@ -161,10 +161,10 @@ export class TaskParser implements ITaskParser {
       /\([^)]*\)[^)]*\\\d+/,
 
       // Lookaheads/lookbehinds (complex and potentially dangerous)
-      /\(?=/, // (?= positive lookahead
-      /\(?!/, // (?! negative lookahead
-      /\(?<=/, // (?<= positive lookbehind
-      /\(?<!/, // (?<! negative lookbehind
+      /\(\?=/, // (?= positive lookahead
+      /\(\?!/, // (?! negative lookahead
+      /\(\?<=/, // (?<= positive lookbehind
+      /\(\?<!/, // (?<! negative lookbehind
 
       // Very long keywords (performance concern)
       /^.{50,}$/, // keywords longer than 50 characters
@@ -1385,13 +1385,14 @@ export class TaskParser implements ITaskParser {
 
     if (this.app) {
       try {
-        const dailyNoteInfo = getDailyNoteInfo(
-          this.app,
-          this.app.vault.getAbstractFileByPath(path) as TFile,
-        );
-        isDailyNote = dailyNoteInfo.isDailyNote;
-        dailyNoteDate = dailyNoteInfo.dailyNoteDate;
-        taskFile = this.app.vault.getAbstractFileByPath(path) as TFile;
+        const abstractFile = this.app.vault.getAbstractFileByPath(path);
+        const tFile = abstractFile instanceof TFile ? abstractFile : undefined;
+        if (tFile) {
+          const dailyNoteInfo = getDailyNoteInfo(this.app, tFile);
+          isDailyNote = dailyNoteInfo.isDailyNote;
+          dailyNoteDate = dailyNoteInfo.dailyNoteDate;
+          taskFile = tFile;
+        }
       } catch (error) {
         // If daily note detection fails, continue without it
         console.warn('Daily note detection failed:', error);
@@ -1515,13 +1516,14 @@ export class TaskParser implements ITaskParser {
 
     if (this.app) {
       try {
-        const dailyNoteInfo = getDailyNoteInfo(
-          this.app,
-          this.app.vault.getAbstractFileByPath(path) as TFile,
-        );
-        isDailyNote = dailyNoteInfo.isDailyNote;
-        dailyNoteDate = dailyNoteInfo.dailyNoteDate;
-        taskFile = this.app.vault.getAbstractFileByPath(path) as TFile;
+        const abstractFile = this.app.vault.getAbstractFileByPath(path);
+        const tFile = abstractFile instanceof TFile ? abstractFile : undefined;
+        if (tFile) {
+          const dailyNoteInfo = getDailyNoteInfo(this.app, tFile);
+          isDailyNote = dailyNoteInfo.isDailyNote;
+          dailyNoteDate = dailyNoteInfo.dailyNoteDate;
+          taskFile = tFile;
+        }
       } catch (error) {
         // If daily note detection fails, continue without it
         console.warn('Daily note detection failed:', error);
@@ -1861,7 +1863,7 @@ export class TaskParser implements ITaskParser {
       indent,
       listMarker,
       text: cleanedText,
-      state: state as Task['state'],
+      state: state,
       completed,
       priority,
       scheduledDate: null,

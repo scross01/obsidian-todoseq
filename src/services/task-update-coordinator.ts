@@ -141,7 +141,7 @@ export class TaskUpdateCoordinator {
   private fileUpdateQueues = new Map<string, PendingFileQueue>();
 
   /** Cleanup interval for removing stale map entries */
-  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private cleanupInterval: number | null = null;
 
   /** Interval between cleanup runs (5 seconds) */
   private readonly CLEANUP_INTERVAL_MS = 5000;
@@ -695,8 +695,10 @@ export class TaskUpdateCoordinator {
         return updatedTask;
       }
 
-      default:
-        throw new Error(`Unknown update type: ${context.type}`);
+      default: {
+        const _exhaustiveCheck: never = context.type;
+        throw new Error(`Unknown update type: ${String(_exhaustiveCheck)}`);
+      }
     }
   }
 
@@ -923,7 +925,7 @@ export class TaskUpdateCoordinator {
     }
 
     // Use requestAnimationFrame to wait for Obsidian's re-render to complete
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       try {
         // Find the line element by line number
         const linePos = editorView.state.doc.line(task.line + 1); // Convert to 1-indexed
@@ -994,7 +996,7 @@ export class TaskUpdateCoordinator {
    * Removes stale entries from pendingTaskUpdates and fileUpdateQueues maps.
    */
   private startCleanup(): void {
-    this.cleanupInterval = setInterval(() => {
+    this.cleanupInterval = window.setInterval(() => {
       this.cleanupStaleEntries();
     }, this.CLEANUP_INTERVAL_MS);
   }
@@ -1038,7 +1040,7 @@ export class TaskUpdateCoordinator {
   destroy(): void {
     // Stop cleanup interval
     if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
+      window.clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
     }
 

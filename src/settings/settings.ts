@@ -274,58 +274,60 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           // Clear any pending debounce timer for this specific group
           const existingTimer = this.keywordGroupDebounceTimers.get(settingKey);
           if (existingTimer) {
-            activeWindow.clearTimeout(existingTimer);
+            window.clearTimeout(existingTimer);
           }
 
           // Debounce the expensive operations
-          const newTimer = activeWindow.setTimeout(async () => {
-            // Clear the timer from the map when it executes
-            this.keywordGroupDebounceTimers.delete(settingKey);
+          const newTimer = window.setTimeout(() => {
+            void (async () => {
+              // Clear the timer from the map when it executes
+              this.keywordGroupDebounceTimers.delete(settingKey);
 
-            // Parse and validate all keyword fields so all groups get updated warnings/errors
-            const parsedBySetting = this.parseKeywordInputsFromUI();
-            const regexValidation =
-              this.validateKeywordRegexForAllGroups(parsedBySetting);
-            const groupsForValidation = this.toGroupKeywordInput(
-              regexValidation.validBySetting,
-            );
-            const keywordValidation =
-              validateKeywordGroupsDetailed(groupsForValidation);
-
-            this.renderKeywordValidationState(
-              regexValidation.errorsByGroup,
-              keywordValidation.errors,
-              keywordValidation.warnings,
-            );
-
-            // Persist parsed values that pass regex safety. KeywordManager handles
-            // semantic validation for duplicates/group placement conflicts.
-            for (const [key, values] of Object.entries(
-              regexValidation.validBySetting,
-            )) {
-              this.plugin.settings[key as KeywordSettingKey] = values;
-            }
-            await this.plugin.saveSettings();
-
-            // Update default state dropdowns when keywords change
-            await this.updateDefaultStateDropdowns();
-
-            // Re-validate transition settings when keywords change
-            this.validateTransitionSettings();
-
-            // Recreate parser and rescan
-            try {
-              await this.plugin.recreateParser();
-              await this.plugin.scanVault();
-              await this.refreshAllTaskListViews();
-              this.plugin.refreshVisibleEditorDecorations();
-              this.plugin.refreshReaderViewFormatter();
-            } catch (parseError) {
-              console.error(
-                'Failed to recreate parser with keywords:',
-                parseError,
+              // Parse and validate all keyword fields so all groups get updated warnings/errors
+              const parsedBySetting = this.parseKeywordInputsFromUI();
+              const regexValidation =
+                this.validateKeywordRegexForAllGroups(parsedBySetting);
+              const groupsForValidation = this.toGroupKeywordInput(
+                regexValidation.validBySetting,
               );
-            }
+              const keywordValidation =
+                validateKeywordGroupsDetailed(groupsForValidation);
+
+              this.renderKeywordValidationState(
+                regexValidation.errorsByGroup,
+                keywordValidation.errors,
+                keywordValidation.warnings,
+              );
+
+              // Persist parsed values that pass regex safety. KeywordManager handles
+              // semantic validation for duplicates/group placement conflicts.
+              for (const [key, values] of Object.entries(
+                regexValidation.validBySetting,
+              )) {
+                this.plugin.settings[key as KeywordSettingKey] = values;
+              }
+              await this.plugin.saveSettings();
+
+              // Update default state dropdowns when keywords change
+              await this.updateDefaultStateDropdowns();
+
+              // Re-validate transition settings when keywords change
+              this.validateTransitionSettings();
+
+              // Recreate parser and rescan
+              try {
+                await this.plugin.recreateParser();
+                await this.plugin.scanVault();
+                await this.refreshAllTaskListViews();
+                this.plugin.refreshVisibleEditorDecorations();
+                this.plugin.refreshReaderViewFormatter();
+              } catch (parseError) {
+                console.error(
+                  'Failed to recreate parser with keywords:',
+                  parseError,
+                );
+              }
+            })();
           }, this.KEYWORD_DEBOUNCE_MS);
 
           // Store the timer in the map
@@ -522,7 +524,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     transitionsSetting
       .setName('State transitions')
       .setDesc(
-        'Define how states transition. Each line: STATE -> NEXT_STATE. Use (A | B) to define multiple initial states.',
+        'Define how states transition. Each line: STATE -> next_state. Use (a | b) to define multiple initial states.',
       )
       .addTextArea((textArea) => {
         // Set the size of the textarea directly on the underlying element
@@ -535,7 +537,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             ),
           )
           .setPlaceholder(
-            'TODO -> DOING -> DONE\n(WAIT | WAITING) -> IN-PROGRESS\nLATER -> NOW -> DONE',
+            'Todo -> doing -> done\n(wait | waiting) -> in-progress\nlater -> now -> done',
           )
           .onChange(async (value: string) => {
             const statements = value
@@ -548,19 +550,16 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
             // Debounce validation to allow user to finish typing
             if (this.transitionValidationDebounceTimer) {
-              activeWindow.clearTimeout(this.transitionValidationDebounceTimer);
+              window.clearTimeout(this.transitionValidationDebounceTimer);
             }
-            this.transitionValidationDebounceTimer = activeWindow.setTimeout(
-              () => {
-                this.transitionValidationDebounceTimer = null;
-                this.validateTransitionSettings();
-                // Update task list views with new state transition settings
-                this.plugin.updateTaskListViewSettings();
-                // Update task update coordinator with new settings
-                this.plugin.updateTaskUpdateCoordinatorSettings();
-              },
-              this.TRANSITION_VALIDATION_DEBOUNCE_MS,
-            );
+            this.transitionValidationDebounceTimer = window.setTimeout(() => {
+              this.transitionValidationDebounceTimer = null;
+              this.validateTransitionSettings();
+              // Update task list views with new state transition settings
+              this.plugin.updateTaskListViewSettings();
+              // Update task update coordinator with new settings
+              this.plugin.updateTaskUpdateCoordinatorSettings();
+            }, this.TRANSITION_VALIDATION_DEBOUNCE_MS);
           });
       });
 
@@ -1166,7 +1165,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Format task keywords')
       .setDesc(
-        'Highlight task keywords (TODO, DOING, etc.) in bold with accent color in the editor.',
+        'Highlight task keywords (todo, doing, etc.) in bold with accent color in the editor.',
       )
       .addToggle((toggle) =>
         toggle
@@ -1188,7 +1187,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     // Track closed date toggle
     new Setting(containerEl)
       .setName('Track closed date')
-      .setDesc('Add CLOSED: timestamp when tasks are marked as completed.')
+      .setDesc('Add closed: timestamp when tasks are marked as completed.')
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.trackClosedDate)
@@ -1212,6 +1211,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     // Experimental Features Group
     new Setting(containerEl)
+      // eslint-disable-next-line obsidianmd/ui/sentence-case
       .setName('⚠︎ Experimental features')
       .setHeading()
       .setDesc(
@@ -1269,7 +1269,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     // Use extended checkbox styles toggle
     new Setting(containerEl)
-      .setName('Use extended markdown checkbox styles')
+      .setName('Use extended Markdown checkbox styles')
       .setDesc(
         'When enabled, uses themed checkbox styles ([/], [-]) for active and cancelled tasks.',
       )

@@ -135,35 +135,37 @@ export class TaskItemRenderer {
 
     checkbox.setAttribute('data-task', dataTaskChar);
 
-    checkbox.addEventListener('change', async () => {
-      // CRITICAL: Look up fresh task state BEFORE computing transition
-      // The task object in closure may be stale after recurrence updates
-      const freshTask = this.getTaskStateManager()?.findTaskByPathAndLine(
-        task.path,
-        task.line,
-      );
-      const currentTask = freshTask || task;
-      const currentState = currentTask.state;
+    checkbox.addEventListener('change', () => {
+      void (async () => {
+        // CRITICAL: Look up fresh task state BEFORE computing transition
+        // The task object in closure may be stale after recurrence updates
+        const freshTask = this.getTaskStateManager()?.findTaskByPathAndLine(
+          task.path,
+          task.line,
+        );
+        const currentTask = freshTask || task;
+        const currentState = currentTask.state;
 
-      let targetState: string | null = null;
+        let targetState: string | null = null;
 
-      if (checkbox.checked) {
-        targetState =
-          this.stateManager.getNextCompletedOrArchivedState(currentState);
-      } else {
-        targetState = this.stateManager.getNextState(currentState);
+        if (checkbox.checked) {
+          targetState =
+            this.stateManager.getNextCompletedOrArchivedState(currentState);
+        } else {
+          targetState = this.stateManager.getNextState(currentState);
+          if (targetState === currentState) {
+            checkbox.checked = true;
+            return;
+          }
+        }
+
+        // If no state change, don't proceed
         if (targetState === currentState) {
-          checkbox.checked = true;
           return;
         }
-      }
 
-      // If no state change, don't proceed
-      if (targetState === currentState) {
-        return;
-      }
-
-      await this.onStateChange(currentTask, targetState);
+        await this.onStateChange(currentTask, targetState);
+      })();
     });
 
     return checkbox;
@@ -382,7 +384,7 @@ export class TaskItemRenderer {
       evt.preventDefault();
       evt.stopPropagation();
       if (this.onContextMenu) {
-        this.onContextMenu(task, evt);
+        void this.onContextMenu(task, evt);
       }
     });
 
@@ -413,7 +415,7 @@ export class TaskItemRenderer {
               clientY: touch.clientY,
               bubbles: true,
             });
-            this.onContextMenu(task, syntheticEvt);
+            void this.onContextMenu(task, syntheticEvt);
           }
         }, LONG_PRESS_MS);
       },
@@ -536,7 +538,7 @@ export class TaskItemRenderer {
         target instanceof HTMLElement &&
         !target.hasClass('todo-task-keyword')
       ) {
-        this.onLocationOpen(task);
+        void this.onLocationOpen(task);
       }
     });
 
@@ -671,9 +673,7 @@ export class TaskItemRenderer {
 
     // 4. Handle subtask indicator updates
     // Find the content wrapper (now uses todo-main-content)
-    const contentWrapper = element.querySelector(
-      '.todo-main-content',
-    ) as HTMLElement | null;
+    const contentWrapper = element.querySelector('.todo-main-content');
     const existingIndicator = element.querySelector(
       '.todoseq-subtask-indicator',
     );
@@ -681,14 +681,14 @@ export class TaskItemRenderer {
       if (existingIndicator) {
         existingIndicator.textContent = getSubtaskDisplayText(task);
       } else if (contentWrapper) {
-        this.buildSubtaskIndicator(task, contentWrapper);
+        this.buildSubtaskIndicator(task, contentWrapper as HTMLElement);
       } else {
         // Fallback: create main content wrapper and add indicator
         const newWrapper = element.createEl('div', {
           cls: 'todo-main-content',
         });
         const todoText = element.querySelector('.todoseq-task-text');
-        if (todoText && todoText instanceof HTMLElement) {
+        if (todoText && todoText.instanceOf(HTMLElement)) {
           // Insert newWrapper before the text wrapper
           const textWrapper = element.querySelector(
             '.todoseq-task-text-wrapper',

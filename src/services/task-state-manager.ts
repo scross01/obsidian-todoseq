@@ -10,7 +10,7 @@ import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
  */
 export class TaskStateManager {
   private _tasks: Task[] = [];
-  private subscribers = new Set<(tasks: Task[]) => void>();
+  private subscribers = new Set<(tasks: Task[]) => void | Promise<void>>();
   private isNotifying = false;
   private pendingNotification = false;
   private keywordManager: KeywordManager;
@@ -34,8 +34,10 @@ export class TaskStateManager {
    */
   subscribe(callback: (tasks: Task[]) => void | Promise<void>): () => void {
     this.subscribers.add(callback);
-    callback(this._tasks);
-    return () => this.subscribers.delete(callback);
+    void callback(this._tasks);
+    return () => {
+      this.subscribers.delete(callback);
+    };
   }
 
   /**
@@ -217,7 +219,7 @@ export class TaskStateManager {
     // Update using path+line lookup for safety
     // Note: updateTaskByPathAndLine already handles parent subtask count updates
     this.updateTaskByPathAndLine(task.path, task.line, {
-      state: newState as Task['state'],
+      state: newState,
       completed: isCompleted,
       rawText: newLine,
     });
@@ -527,7 +529,7 @@ export class TaskStateManager {
         this.pendingNotification = false;
         this.subscribers.forEach((callback) => {
           try {
-            callback(this._tasks);
+            void callback(this._tasks);
           } catch (error) {
             console.error('Error in TaskStateManager subscriber:', error);
           }

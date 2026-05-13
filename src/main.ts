@@ -84,9 +84,10 @@ export default class TodoTracker extends Plugin {
     // Usage: todoSeqResetFirstInstall()
     (
       window as unknown as { todoSeqResetFirstInstall?: () => void }
-    ).todoSeqResetFirstInstall = async () => {
+    ).todoSeqResetFirstInstall = () => {
       this.settings._hasShownFirstInstallView = false;
-      await this.saveSettings();
+      void this.saveSettings();
+      // eslint-disable-next-line obsidianmd/rule-custom-message
       console.log(
         'TODOseq: First install flag reset. Reload plugin to test first-install behavior.',
       );
@@ -131,7 +132,7 @@ export default class TodoTracker extends Plugin {
   }
 
   // Obsidian lifecycle method called when the plugin is unloaded
-  async onunload() {
+  onunload(): void {
     // Clean up property search engine
     if (this.propertySearchEngine) {
       this.propertySearchEngine.destroy();
@@ -143,7 +144,7 @@ export default class TodoTracker extends Plugin {
     }
 
     // Delegate cleanup to lifecycle manager (which now handles embedded task list processor)
-    await this.lifecycleManager?.onunload();
+    void this.lifecycleManager?.onunload();
   }
 
   // Obsidian lifecycle method called when settings are loaded
@@ -244,7 +245,7 @@ export default class TodoTracker extends Plugin {
       this.taskStateManager.setKeywordManager(this.keywordManager);
 
       // Wait for the parser to be fully created
-      await this.vaultScanner.getParser();
+      this.vaultScanner.getParser();
     }
 
     // Update embedded task list processor with new settings
@@ -394,7 +395,7 @@ export default class TodoTracker extends Plugin {
           });
 
           // Force a second update to ensure decorations are properly applied/removed
-          activeWindow.setTimeout(() => {
+          window.setTimeout(() => {
             if (editorView && typeof editorView.requestMeasure === 'function') {
               editorView.requestMeasure();
             }
@@ -407,7 +408,7 @@ export default class TodoTracker extends Plugin {
     // Mobile fallback: trigger layout change if no decorations were refreshed
     // On mobile, CodeMirror APIs may not work reliably, so we trigger a full layout refresh
     if (Platform.isMobile && !refreshed) {
-      activeWindow.setTimeout(() => {
+      window.setTimeout(() => {
         this.app.workspace.trigger('layout-change');
       }, 50);
     }

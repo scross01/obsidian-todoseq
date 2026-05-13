@@ -11,91 +11,11 @@ import { createBaseTask } from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { App } from 'obsidian';
 import { DateUtils } from '../src/utils/date-utils';
-
-// Extend HTMLElement with Obsidian's DOM extensions for jsdom
-declare global {
-  interface HTMLElement {
-    addClass: (cls: string) => void;
-    removeClass: (cls: string) => void;
-    hasClass: (cls: string) => boolean;
-    setText: (text: string) => void;
-    setAttr: (key: string, value: string) => void;
-    createEl: <K extends keyof HTMLElementTagNameMap>(
-      tag: K,
-      options?: {
-        cls?: string | string[];
-        attr?: Record<string, string>;
-        text?: string;
-      },
-    ) => HTMLElementTagNameMap[K];
-    createDiv: (options?: {
-      cls?: string;
-      attr?: Record<string, string>;
-    }) => HTMLDivElement;
-    createSpan: (options?: { cls?: string; text?: string }) => HTMLSpanElement;
-  }
-}
+import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
 // Install Obsidian-style DOM extensions on HTMLElement prototype
 beforeAll(() => {
-  HTMLElement.prototype.addClass = function (cls: string): void {
-    this.classList.add(cls);
-  };
-  HTMLElement.prototype.removeClass = function (cls: string): void {
-    this.classList.remove(cls);
-  };
-  HTMLElement.prototype.hasClass = function (cls: string): boolean {
-    return this.classList.contains(cls);
-  };
-  HTMLElement.prototype.setText = function (text: string): void {
-    this.textContent = text;
-  };
-  HTMLElement.prototype.setAttr = function (key: string, value: string): void {
-    this.setAttribute(key, value);
-  };
-  HTMLElement.prototype.createEl = function <
-    K extends keyof HTMLElementTagNameMap,
-  >(
-    tag: K,
-    options?: {
-      cls?: string | string[];
-      attr?: Record<string, string>;
-      text?: string;
-    },
-  ): HTMLElementTagNameMap[K] {
-    const el = document.createElement(tag);
-    if (options?.cls) {
-      if (Array.isArray(options.cls)) {
-        for (const c of options.cls) {
-          if (c) el.classList.add(c);
-        }
-      } else {
-        el.className = options.cls;
-      }
-    }
-    if (options?.attr) {
-      for (const [key, value] of Object.entries(options.attr)) {
-        el.setAttribute(key, value);
-      }
-    }
-    if (options?.text) el.textContent = options.text;
-    this.appendChild(el);
-    return el;
-  };
-  HTMLElement.prototype.createDiv = function (options?: {
-    cls?: string;
-    attr?: Record<string, string>;
-  }): HTMLDivElement {
-    return this.createEl('div', options);
-  };
-  HTMLElement.prototype.createSpan = function (options?: {
-    cls?: string;
-    text?: string;
-  }): HTMLSpanElement {
-    return this.createEl('span', options);
-  };
-  // Mock window.activeDocument for Obsidian API compatibility
-  (window as any).activeDocument = document;
+  installObsidianDomMocks();
 });
 
 // Mock obsidian module
@@ -130,7 +50,7 @@ describe('TaskContextMenu', () => {
 
   beforeEach(() => {
     // Clean up DOM
-    document.body.innerHTML = '';
+    activeDocument.body.innerHTML = '';
 
     // Create mock app
     app = new App();
@@ -182,14 +102,18 @@ describe('TaskContextMenu', () => {
 
     it('should create a container element in the DOM', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const container = document.querySelector('.todoseq-task-context-menu');
+      const container = activeDocument.querySelector(
+        '.todoseq-task-context-menu',
+      );
       expect(container).not.toBeNull();
     });
 
     it('should remove container element from DOM on hide', async () => {
       await menu.show(task, { x: 100, y: 100 });
       menu.hide();
-      const container = document.querySelector('.todoseq-task-context-menu');
+      const container = activeDocument.querySelector(
+        '.todoseq-task-context-menu',
+      );
       expect(container).toBeNull();
     });
 
@@ -199,7 +123,7 @@ describe('TaskContextMenu', () => {
       await menu.show(task2, { x: 200, y: 200 });
 
       // Should only have one menu in the DOM
-      const containers = document.querySelectorAll(
+      const containers = activeDocument.querySelectorAll(
         '.todoseq-task-context-menu',
       );
       expect(containers.length).toBe(1);
@@ -207,7 +131,9 @@ describe('TaskContextMenu', () => {
 
     it('should set role=menu on container', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const container = document.querySelector('.todoseq-task-context-menu');
+      const container = activeDocument.querySelector(
+        '.todoseq-task-context-menu',
+      );
       expect(container?.getAttribute('role')).toBe('menu');
     });
   });
@@ -218,7 +144,7 @@ describe('TaskContextMenu', () => {
     });
 
     it('should render Go to task row', () => {
-      const rows = document.querySelectorAll('.todoseq-context-menu-row');
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
       expect(rows.length).toBeGreaterThanOrEqual(1);
       const goToRow = rows[0];
       const label = goToRow.querySelector('.todoseq-context-menu-row-label');
@@ -226,7 +152,9 @@ describe('TaskContextMenu', () => {
     });
 
     it('should render Scheduled section header', () => {
-      const headers = document.querySelectorAll('.todoseq-context-menu-header');
+      const headers = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-header',
+      );
       const scheduledHeader = Array.from(headers).find(
         (h) => h.textContent === 'Scheduled',
       );
@@ -234,7 +162,7 @@ describe('TaskContextMenu', () => {
     });
 
     it('should render 6 scheduled date icons', () => {
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       expect(iconRows.length).toBeGreaterThanOrEqual(2);
@@ -246,7 +174,9 @@ describe('TaskContextMenu', () => {
     });
 
     it('should render Priority section header', () => {
-      const headers = document.querySelectorAll('.todoseq-context-menu-header');
+      const headers = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-header',
+      );
       const priorityHeader = Array.from(headers).find(
         (h) => h.textContent === 'Priority',
       );
@@ -254,7 +184,7 @@ describe('TaskContextMenu', () => {
     });
 
     it('should render 4 priority icons', () => {
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       expect(iconRows.length).toBeGreaterThanOrEqual(2);
@@ -266,7 +196,7 @@ describe('TaskContextMenu', () => {
     });
 
     it('should render Deadline row', () => {
-      const rows = document.querySelectorAll('.todoseq-context-menu-row');
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
       const deadlineRow = Array.from(rows).find((r) => {
         const label = r.querySelector('.todoseq-context-menu-row-label');
         return label?.textContent === 'Deadline';
@@ -275,7 +205,7 @@ describe('TaskContextMenu', () => {
     });
 
     it('should render separators between sections', () => {
-      const separators = document.querySelectorAll('.menu-separator');
+      const separators = activeDocument.querySelectorAll('.menu-separator');
       expect(separators.length).toBe(4);
     });
   });
@@ -283,7 +213,7 @@ describe('TaskContextMenu', () => {
   describe('Go to task action', () => {
     it('should call onGoToTask callback when clicked', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const rows = document.querySelectorAll('.todoseq-context-menu-row');
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
       const goToRow = rows[0] as HTMLElement;
       goToRow.click();
 
@@ -292,7 +222,7 @@ describe('TaskContextMenu', () => {
 
     it('should hide menu after Go to task click', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const rows = document.querySelectorAll('.todoseq-context-menu-row');
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
       const goToRow = rows[0] as HTMLElement;
       goToRow.click();
 
@@ -303,7 +233,7 @@ describe('TaskContextMenu', () => {
   describe('Priority actions', () => {
     it('should call onPriorityChange with high when first flag clicked', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const priorityRow = iconRows[0];
@@ -317,7 +247,7 @@ describe('TaskContextMenu', () => {
 
     it('should call onPriorityChange with med when second flag clicked', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const priorityRow = iconRows[0];
@@ -331,7 +261,7 @@ describe('TaskContextMenu', () => {
 
     it('should call onPriorityChange with low when third flag clicked', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const priorityRow = iconRows[0];
@@ -345,7 +275,7 @@ describe('TaskContextMenu', () => {
 
     it('should call onPriorityChange with null when flag-off clicked', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const priorityRow = iconRows[0];
@@ -361,7 +291,7 @@ describe('TaskContextMenu', () => {
       const highPriorityTask = createBaseTask({ priority: 'high' });
       await menu.show(highPriorityTask, { x: 100, y: 100 });
 
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const priorityRow = iconRows[0];
@@ -380,7 +310,7 @@ describe('TaskContextMenu', () => {
       const noPriorityTask = createBaseTask({ priority: null });
       await menu.show(noPriorityTask, { x: 100, y: 100 });
 
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const priorityRow = iconRows[0];
@@ -399,7 +329,7 @@ describe('TaskContextMenu', () => {
   describe('Scheduled date actions', () => {
     it('should call onScheduledDateChange with today date', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const scheduledRow = iconRows[1];
@@ -417,7 +347,7 @@ describe('TaskContextMenu', () => {
 
     it('should call onScheduledDateChange with null for No date', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const scheduledRow = iconRows[1];
@@ -441,7 +371,7 @@ describe('TaskContextMenu', () => {
       });
 
       await menu.show(taskWithTime, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const scheduledRow = iconRows[1];
@@ -470,7 +400,7 @@ describe('TaskContextMenu', () => {
       });
 
       await menu.show(taskWithTime, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const scheduledRow = iconRows[1];
@@ -499,7 +429,7 @@ describe('TaskContextMenu', () => {
       });
 
       await menu.show(taskNoDate, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const scheduledRow = iconRows[1];
@@ -532,7 +462,7 @@ describe('TaskContextMenu', () => {
       });
 
       await menu.show(taskMidnight, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const scheduledRow = iconRows[1];
@@ -565,7 +495,7 @@ describe('TaskContextMenu', () => {
       });
 
       await menu.show(taskWithRepeat, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const scheduledRow = iconRows[1];
@@ -609,7 +539,7 @@ describe('TaskContextMenu', () => {
       });
 
       await menu.show(taskWithRepeat, { x: 100, y: 100 });
-      const iconRows = document.querySelectorAll(
+      const iconRows = activeDocument.querySelectorAll(
         '.todoseq-context-menu-icon-row',
       );
       const scheduledRow = iconRows[1];
@@ -640,7 +570,7 @@ describe('TaskContextMenu', () => {
   describe('Deadline action', () => {
     it('should hide menu when Deadline row clicked (date picker will be shown)', async () => {
       await menu.show(task, { x: 100, y: 100 });
-      const rows = document.querySelectorAll('.todoseq-context-menu-row');
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
       const deadlineRow = Array.from(rows).find((r) => {
         const label = r.querySelector('.todoseq-context-menu-row-label');
         return label?.textContent === 'Deadline';
@@ -661,7 +591,7 @@ describe('TaskContextMenu', () => {
         key: 'Escape',
         bubbles: true,
       });
-      document.dispatchEvent(event);
+      activeDocument.dispatchEvent(event);
 
       expect(menu.isVisible()).toBe(false);
     });
@@ -685,7 +615,9 @@ describe('TaskContextMenu', () => {
       await menu.show(task, { x: 100, y: 100 });
       menu.cleanup();
 
-      const container = document.querySelector('.todoseq-task-context-menu');
+      const container = activeDocument.querySelector(
+        '.todoseq-task-context-menu',
+      );
       expect(container).toBeNull();
       expect(menu.isVisible()).toBe(false);
     });
@@ -781,7 +713,7 @@ describe('TaskContextMenu', () => {
       });
 
       await menu.show(task, { x: 100, y: 100 });
-      const container = document.querySelector(
+      const container = activeDocument.querySelector(
         '.todoseq-task-context-menu',
       ) as HTMLElement;
 
@@ -805,7 +737,7 @@ describe('TaskContextMenu', () => {
       });
 
       await menu.show(task, { x: 100, y: 100 });
-      const container = document.querySelector(
+      const container = activeDocument.querySelector(
         '.todoseq-task-context-menu',
       ) as HTMLElement;
 
@@ -829,7 +761,7 @@ describe('TaskContextMenu', () => {
 
       // Position near right edge
       await menu.show(task, { x: 250, y: 100 });
-      const container = document.querySelector(
+      const container = activeDocument.querySelector(
         '.todoseq-task-context-menu',
       ) as HTMLElement;
 
@@ -852,7 +784,7 @@ describe('TaskContextMenu', () => {
 
       // Position near bottom edge
       await menu.show(task, { x: 100, y: 250 });
-      const container = document.querySelector(
+      const container = activeDocument.querySelector(
         '.todoseq-task-context-menu',
       ) as HTMLElement;
 

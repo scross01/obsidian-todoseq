@@ -7,21 +7,13 @@ import { TFile } from 'obsidian';
 
 // Create mock files
 const createMockFile = (path: string): TFile => {
-  const mockFile = {
-    path,
-    name: path.split('/').pop() || path,
+  const file = new TFile(path, path.split('/').pop() || path, 'md');
+  Object.assign(file, {
     basename: path.replace('.md', ''),
-    extension: 'md',
     stat: { size: 1024, mtime: Date.now() },
     isTFile: true,
-  };
-
-  Object.setPrototypeOf(mockFile, {
-    constructor: { name: 'TFile' },
-    __proto__: { __proto__: Object.prototype },
   });
-
-  return mockFile as unknown as TFile;
+  return file;
 };
 
 // Mock TaskStateManager

@@ -147,7 +147,7 @@ export class TaskListView extends ItemView {
             (t) => t.path === task.path && t.line === task.line,
           );
           if (freshTask) {
-            this.copyTaskToClipboard(freshTask);
+            void this.copyTaskToClipboard(freshTask);
           }
         },
         onCopyTaskToToday: async (task) => {
@@ -211,7 +211,7 @@ export class TaskListView extends ItemView {
       async (tasks) => {
         // Cancel any pending debounced refresh - process immediately (interrupt pattern)
         if (this.taskRefreshTimeout) {
-          activeWindow.clearTimeout(this.taskRefreshTimeout);
+          window.clearTimeout(this.taskRefreshTimeout);
           this.taskRefreshTimeout = null;
         }
 
@@ -321,7 +321,7 @@ export class TaskListView extends ItemView {
       defaultMode === 'sortCompletedLast' ||
       defaultMode === 'hideCompleted'
     ) {
-      return defaultMode as TaskListViewMode;
+      return defaultMode;
     }
     // Final safety fallback
     return 'showAll';
@@ -419,10 +419,12 @@ export class TaskListView extends ItemView {
       cls: 'search-input-clear-button',
       attr: { 'aria-label': 'Clear search' },
     });
-    clearSearch.addEventListener('click', async () => {
-      inputEl.value = '';
-      this.setSearchQuery('');
-      await this.refreshVisibleList();
+    clearSearch.addEventListener('click', () => {
+      void (async () => {
+        inputEl.value = '';
+        this.setSearchQuery('');
+        await this.refreshVisibleList();
+      })();
     });
     const matchCase = searchInputWrap.createEl('div', {
       cls: 'input-right-decorator clickable-icon',
@@ -431,22 +433,24 @@ export class TaskListView extends ItemView {
     setIcon(matchCase, 'uppercase-lowercase-a');
 
     // Toggle case sensitivity
-    matchCase.addEventListener('click', async () => {
-      this.isCaseSensitive = !this.isCaseSensitive;
-      matchCase.toggleClass('is-active', this.isCaseSensitive);
-      await this.refreshVisibleList();
+    matchCase.addEventListener('click', () => {
+      void (async () => {
+        this.isCaseSensitive = !this.isCaseSensitive;
+        matchCase.toggleClass('is-active', this.isCaseSensitive);
+        await this.refreshVisibleList();
+      })();
     });
     // Narrow to HTMLInputElement via runtime guard
-    if (!(inputEl instanceof HTMLInputElement)) {
+    if (!inputEl.instanceOf(HTMLInputElement)) {
       throw new Error('Failed to create search input element');
     }
     inputEl.value = this.getSearchQuery();
     inputEl.addEventListener('input', () => {
       // Debounce search refresh to avoid excessive re-renders
       if (this.searchRefreshDebounceTimer) {
-        activeWindow.clearTimeout(this.searchRefreshDebounceTimer);
+        window.clearTimeout(this.searchRefreshDebounceTimer);
       }
-      this.searchRefreshDebounceTimer = activeWindow.setTimeout(() => {
+      this.searchRefreshDebounceTimer = window.setTimeout(() => {
         this.searchRefreshDebounceTimer = null;
         // Update attribute and re-render list only, preserving focus
         this.setSearchQuery(inputEl.value);
@@ -493,7 +497,7 @@ export class TaskListView extends ItemView {
 
     // Create expandable settings section below the first row
     const settingsSection = toolbar.createEl('div', { cls: 'search-params' });
-    settingsSection.style.display = 'none'; // Start hidden
+    settingsSection.addClass('todoseq-settings-section-hidden'); // Start hidden
 
     // Add "Show completed tasks" dropdown
     const completedTasksSetting = settingsSection.createEl('div', {
@@ -539,15 +543,18 @@ export class TaskListView extends ItemView {
 
     // Toggle settings section visibility
     const toggleSettings = () => {
-      const isExpanded = settingsSection.style.display !== 'none';
-      settingsSection.style.display = isExpanded ? 'none' : 'block';
-      settingsBtn.setAttr('aria-expanded', String(!isExpanded));
-      // Add/remove is-active class for visual feedback
-      if (isExpanded) {
-        settingsBtn.removeClass('is-active');
+      const isNowVisible = settingsSection.hasClass(
+        'todoseq-settings-section-visible',
+      );
+      if (isNowVisible) {
+        settingsSection.removeClass('todoseq-settings-section-visible');
+        settingsSection.addClass('todoseq-settings-section-hidden');
       } else {
-        settingsBtn.addClass('is-active');
+        settingsSection.removeClass('todoseq-settings-section-hidden');
+        settingsSection.addClass('todoseq-settings-section-visible');
       }
+      settingsBtn.setAttr('aria-expanded', String(!isNowVisible));
+      settingsBtn.toggleClass('is-active', !isNowVisible);
     };
 
     settingsBtn.addEventListener('click', toggleSettings);
@@ -625,24 +632,26 @@ export class TaskListView extends ItemView {
     futureDropdown.value = this.plugin.settings.futureTaskSorting;
 
     // Handle future task sorting changes
-    futureDropdown.addEventListener('change', async () => {
-      const selectedValue = futureDropdown.value as
-        | 'showAll'
-        | 'showUpcoming'
-        | 'sortToEnd'
-        | 'hideFuture';
+    futureDropdown.addEventListener('change', () => {
+      void (async () => {
+        const selectedValue = futureDropdown.value as
+          | 'showAll'
+          | 'showUpcoming'
+          | 'sortToEnd'
+          | 'hideFuture';
 
-      // Update settings and re-render
-      this.plugin.settings.futureTaskSorting = selectedValue;
+        // Update settings and re-render
+        this.plugin.settings.futureTaskSorting = selectedValue;
 
-      // Dispatch event for persistence
-      const evt = new CustomEvent('todoseq:future-task-sorting-change', {
-        detail: { mode: selectedValue },
-      });
-      window.dispatchEvent(evt);
+        // Dispatch event for persistence
+        const evt = new CustomEvent('todoseq:future-task-sorting-change', {
+          detail: { mode: selectedValue },
+        });
+        window.dispatchEvent(evt);
 
-      // Re-render with new future task sorting - preserve scroll position
-      await this.refreshVisibleList(false);
+        // Re-render with new future task sorting - preserve scroll position
+        await this.refreshVisibleList(false);
+      })();
     });
 
     // Add search results info bar (second row)
@@ -655,7 +664,7 @@ export class TaskListView extends ItemView {
       cls: 'search-results-result-count',
     });
     const searchResultsCount = searchResultsWarp.createEl('span');
-    searchResultsCount.setText('0 of 0 tasks');
+    searchResultsCount.setText('0 Of 0 tasks');
 
     // Right side: sort dropdown
     // const sortDropdown = searchResultsInfo.createEl('div');
@@ -749,24 +758,17 @@ export class TaskListView extends ItemView {
       import('../components/search-suggestion-dropdown'),
     ])
       .then(([optionsModule, suggestionsModule]) => {
-        this.suggestionDropdown = new (
-          suggestionsModule as {
-            SearchSuggestionDropdown: typeof SearchSuggestionDropdown;
-          }
-        ).SearchSuggestionDropdown(
-          inputEl,
-          this.app.vault,
-          this.app,
-          this.tasks,
-          this.plugin.settings,
-          this.getViewMode(),
-        );
+        this.suggestionDropdown =
+          new suggestionsModule.SearchSuggestionDropdown(
+            inputEl,
+            this.app.vault,
+            this.app,
+            this.tasks,
+            this.plugin.settings,
+            this.getViewMode(),
+          );
 
-        this.optionsDropdown = new (
-          optionsModule as {
-            SearchOptionsDropdown: typeof SearchOptionsDropdown;
-          }
-        ).SearchOptionsDropdown(
+        this.optionsDropdown = new optionsModule.SearchOptionsDropdown(
           inputEl,
           this.app.vault,
           this.tasks,
@@ -933,7 +935,7 @@ export class TaskListView extends ItemView {
     if (suggestionVisible || optionsVisible) {
       // A dropdown is visible - clear the debounce timer
       if (this.searchHistoryDebounceTimer) {
-        activeWindow.clearTimeout(this.searchHistoryDebounceTimer);
+        window.clearTimeout(this.searchHistoryDebounceTimer);
         this.searchHistoryDebounceTimer = null;
       }
     } else {
@@ -959,12 +961,12 @@ export class TaskListView extends ItemView {
 
     // Clear any existing timer
     if (this.searchHistoryDebounceTimer) {
-      activeWindow.clearTimeout(this.searchHistoryDebounceTimer);
+      window.clearTimeout(this.searchHistoryDebounceTimer);
       this.searchHistoryDebounceTimer = null;
     }
 
     // Start new timer
-    this.searchHistoryDebounceTimer = activeWindow.setTimeout(() => {
+    this.searchHistoryDebounceTimer = window.setTimeout(() => {
       this.captureSearchToHistory(query);
       this.searchHistoryDebounceTimer = null;
     }, this.SEARCH_HISTORY_DEBOUNCE_MS);
@@ -1207,7 +1209,7 @@ export class TaskListView extends ItemView {
   }
 
   getDisplayText() {
-    return 'TODOseq';
+    return 'Todoseq';
   }
 
   getIcon(): string {
@@ -1413,7 +1415,7 @@ export class TaskListView extends ItemView {
       const isNearBottom = sentinelTop <= scrollBottom + threshold;
 
       if (isNearBottom && !this.isLoadingMore && !this.isAllTasksLoaded) {
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
           void this.loadMoreTasks().catch((error) => {
             new Notice('Failed to load more tasks');
             console.error('Error loading more tasks:', error);
@@ -1523,7 +1525,7 @@ export class TaskListView extends ItemView {
 
     // Cancel any pending debounced refresh - this call takes precedence
     if (this.taskRefreshTimeout) {
-      activeWindow.clearTimeout(this.taskRefreshTimeout);
+      window.clearTimeout(this.taskRefreshTimeout);
       this.taskRefreshTimeout = null;
     }
 
@@ -1535,7 +1537,7 @@ export class TaskListView extends ItemView {
     const container = this.contentEl;
 
     // Yield to main thread to prevent blocking user typing
-    await new Promise((resolve) => activeWindow.setTimeout(resolve, 0));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
 
     // Abort if another refresh was triggered while we yielded
     if (this.refreshGeneration !== currentGeneration) {
@@ -1714,7 +1716,7 @@ export class TaskListView extends ItemView {
         // No tasks in vault at all
         title.setText('No tasks found');
         subtitle.setText(
-          'Create tasks in your notes using "TODO Your task". They will appear here automatically.',
+          'Create tasks in your notes using "todo your task". They will appear here automatically.',
         );
       } else if (isHideCompleted && !hasAnyIncomplete) {
         // b) Hide-completed enabled, but only completed tasks exist
@@ -1980,7 +1982,7 @@ export class TaskListView extends ItemView {
     let targetLeaf: WorkspaceLeaf | null = null;
 
     // Get current active leaf and check if it's a markdown view
-    const currentActiveLeaf = workspace.activeLeaf;
+    const currentActiveLeaf = workspace.getLeaf(false);
     const isCurrentActiveMarkdown =
       currentActiveLeaf && isMarkdownLeaf(currentActiveLeaf);
 
@@ -2061,7 +2063,7 @@ export class TaskListView extends ItemView {
         /* ignore */
       }
       try {
-        (targetLeaf as WorkspaceLeaf as { pinned?: boolean }).pinned = true;
+        (targetLeaf as { pinned?: boolean }).pinned = true;
       } catch {
         /* ignore */
       }
@@ -2161,7 +2163,7 @@ export class TaskListView extends ItemView {
             (t) => t.path === task.path && t.line === task.line,
           );
           if (freshTask) {
-            this.copyTaskToClipboard(freshTask);
+            void this.copyTaskToClipboard(freshTask);
           }
         },
         onCopyTaskToToday: async (task) => {
@@ -2218,9 +2220,7 @@ export class TaskListView extends ItemView {
 
   // Cleanup listeners
   async onClose() {
-    const handler = this._searchKeyHandler as
-      | ((e: KeyboardEvent) => void)
-      | undefined;
+    const handler = this._searchKeyHandler;
     if (handler) {
       window.removeEventListener('keydown', handler);
       this._searchKeyHandler = undefined;
@@ -2228,19 +2228,19 @@ export class TaskListView extends ItemView {
 
     // Cleanup search history debounce timer
     if (this.searchHistoryDebounceTimer) {
-      activeWindow.clearTimeout(this.searchHistoryDebounceTimer);
+      window.clearTimeout(this.searchHistoryDebounceTimer);
       this.searchHistoryDebounceTimer = null;
     }
 
     // Cleanup search refresh debounce timer
     if (this.searchRefreshDebounceTimer) {
-      activeWindow.clearTimeout(this.searchRefreshDebounceTimer);
+      window.clearTimeout(this.searchRefreshDebounceTimer);
       this.searchRefreshDebounceTimer = null;
     }
 
     // Cleanup task refresh debounce timer
     if (this.taskRefreshTimeout) {
-      activeWindow.clearTimeout(this.taskRefreshTimeout);
+      window.clearTimeout(this.taskRefreshTimeout);
       this.taskRefreshTimeout = null;
     }
 

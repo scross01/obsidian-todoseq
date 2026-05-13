@@ -2,6 +2,7 @@ import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { ParserConfig } from '../src/parser/types';
 import { getDailyNoteInfo } from '../src/utils/daily-note-utils';
+import { TFile } from 'obsidian';
 import { getDefaultCoefficients } from '../src/utils/task-urgency';
 import {
   createBaseSettings,
@@ -169,6 +170,7 @@ describe('TaskParser', () => {
         languageCommentSupport: false,
       });
 
+      (getDailyNoteInfo as jest.Mock).mockReset();
       (getDailyNoteInfo as jest.Mock).mockReturnValue({
         isDailyNote: false,
         dailyNoteDate: null,
@@ -178,10 +180,7 @@ describe('TaskParser', () => {
     });
 
     it('should retrieve daily note info when parsing footnote tasks', () => {
-      const mockFile = {
-        path: 'test.md',
-        name: 'test.md',
-      };
+      const mockFile = new TFile('test.md', 'test.md');
       mockApp.vault.getAbstractFileByPath.mockReturnValue(mockFile);
 
       const mockDailyNoteInfo = {
@@ -208,10 +207,7 @@ describe('TaskParser', () => {
         { includeCommentBlocks: true },
       );
 
-      const mockFile = {
-        path: 'test.md',
-        name: 'test.md',
-      };
+      const mockFile = new TFile('test.md', 'test.md');
       mockApp.vault.getAbstractFileByPath.mockReturnValue(mockFile);
 
       const mockDailyNoteInfo = {
@@ -229,7 +225,12 @@ describe('TaskParser', () => {
     });
 
     it('should handle daily note info retrieval errors', () => {
-      const mockError = new Error('Failed to get daily note info');
+      mockApp.vault.getAbstractFileByPath.mockReturnValue(
+        new TFile('test.md', 'test.md'),
+      );
+
+      // Make getDailyNoteInfo throw an error
+      const mockError = new Error('Test error');
       (getDailyNoteInfo as jest.Mock).mockImplementation(() => {
         throw mockError;
       });

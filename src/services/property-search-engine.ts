@@ -113,7 +113,7 @@ export class PropertySearchEngine {
 
       // Refresh all visible task list views after initialization completes
       // Delay to prevent recursion
-      activeWindow.setTimeout(() => {
+      window.setTimeout(() => {
         this.refreshVisibleTaskListViews();
       }, 0);
     } catch (error) {
@@ -137,7 +137,7 @@ export class PropertySearchEngine {
           this.vaultScanner.isScanning() ||
           this.vaultScanner.isObsidianInitializing()
         ) {
-          await new Promise((resolve) => activeWindow.setTimeout(resolve, 50));
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
         }
       }
     } catch (error) {
@@ -223,7 +223,7 @@ export class PropertySearchEngine {
           }
 
           // Yield to event loop to keep UI responsive
-          await new Promise((resolve) => activeWindow.setTimeout(resolve, 0));
+          await new Promise((resolve) => window.setTimeout(resolve, 0));
         }
 
         return;
@@ -540,7 +540,7 @@ export class PropertySearchEngine {
     // Debounce updates
     if (!this.isUpdating) {
       this.isUpdating = true;
-      this.pendingUpdateTimeout = activeWindow.setTimeout(
+      this.pendingUpdateTimeout = window.setTimeout(
         () => this.processPendingUpdates(),
         this.PENDING_UPDATE_DEBOUNCE_MS,
       );
@@ -599,7 +599,7 @@ export class PropertySearchEngine {
     // Debounce updates only if we actually added a new pending update
     if (added && !this.isUpdating) {
       this.isUpdating = true;
-      this.pendingUpdateTimeout = activeWindow.setTimeout(
+      this.pendingUpdateTimeout = window.setTimeout(
         () => this.processPendingUpdates(),
         1000,
       );
@@ -797,7 +797,7 @@ export class PropertySearchEngine {
     this.reset();
     // Clear any pending update timeout
     if (this.pendingUpdateTimeout) {
-      activeWindow.clearTimeout(this.pendingUpdateTimeout);
+      window.clearTimeout(this.pendingUpdateTimeout);
       this.pendingUpdateTimeout = null;
     }
   }

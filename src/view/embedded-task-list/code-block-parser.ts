@@ -326,8 +326,10 @@ export class TodoseqCodeBlockParser {
       if (searchQuery) {
         try {
           Search.validate(searchQuery);
-        } catch (error) {
-          throw new Error(`Invalid search query: ${error.message}`);
+        } catch (error: unknown) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          throw new Error(`Invalid search query: ${message}`);
         }
       }
 

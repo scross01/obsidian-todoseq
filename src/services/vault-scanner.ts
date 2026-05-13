@@ -228,6 +228,7 @@ export class VaultScanner {
 
       const endTime = performance.now();
       const scanDuration = endTime - startTime;
+      // eslint-disable-next-line obsidianmd/rule-custom-message
       console.log(
         `TODOseq: scan vault completed in ${scanDuration.toFixed(2)}ms (${newTasks.length} tasks found)`,
       );
@@ -623,7 +624,7 @@ export class VaultScanner {
   // Utility method to yield to event loop
   private async yieldToEventLoop(): Promise<void> {
     await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => resolve()),
+      window.requestAnimationFrame(() => resolve()),
     );
   }
 

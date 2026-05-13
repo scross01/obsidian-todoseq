@@ -115,7 +115,7 @@ export class EventCoordinator {
       return;
     }
 
-    const tFile = file as TFile;
+    const tFile = file;
 
     // Don't debounce delete events - file won't receive further changes
     if (type === 'delete') {
@@ -129,10 +129,10 @@ export class EventCoordinator {
 
     const existingTimeout = this.fileChangeTimeouts.get(tFile.path);
     if (existingTimeout) {
-      activeWindow.clearTimeout(existingTimeout);
+      window.clearTimeout(existingTimeout);
     }
 
-    const timeout = activeWindow.setTimeout(() => {
+    const timeout = window.setTimeout(() => {
       this.fileChangeTimeouts.delete(tFile.path);
       this.queueFileEvent({
         type,
@@ -151,7 +151,7 @@ export class EventCoordinator {
 
     this.queueFileEvent({
       type: 'rename',
-      file: file as TFile,
+      file: file,
       oldPath,
       timestamp: Date.now(),
     });
@@ -175,10 +175,10 @@ export class EventCoordinator {
     }
 
     if (this.batchTimeout) {
-      activeWindow.clearTimeout(this.batchTimeout);
+      window.clearTimeout(this.batchTimeout);
     }
 
-    this.batchTimeout = activeWindow.setTimeout(() => {
+    this.batchTimeout = window.setTimeout(() => {
       this.processBatch().catch((error) => {
         console.error('Error processing file event batch:', error);
       });
@@ -266,7 +266,7 @@ export class EventCoordinator {
 
   async flush(): Promise<void> {
     if (this.batchTimeout) {
-      activeWindow.clearTimeout(this.batchTimeout);
+      window.clearTimeout(this.batchTimeout);
       this.batchTimeout = null;
     }
     await this.processBatch();
@@ -311,9 +311,7 @@ export class EventCoordinator {
     // Flush any pending events before clearing timeouts
     await this.flush();
 
-    this.fileChangeTimeouts.forEach((timeout) =>
-      activeWindow.clearTimeout(timeout),
-    );
+    this.fileChangeTimeouts.forEach((timeout) => window.clearTimeout(timeout));
     this.fileChangeTimeouts.clear();
 
     if (this.vaultModifyRef) {

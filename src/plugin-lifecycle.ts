@@ -227,12 +227,6 @@ export class PluginLifecycleManager {
           view,
         );
       },
-      hotkeys: [
-        {
-          modifiers: ['Ctrl'],
-          key: 'Enter',
-        },
-      ],
     });
 
     // Add editor command to cycle task state
@@ -307,7 +301,7 @@ export class PluginLifecycleManager {
       }) as unknown as (
         checking: boolean,
         editor: Editor,
-        ctx: MarkdownView | unknown,
+        ctx: unknown,
       ) => boolean | void,
     });
 
@@ -329,7 +323,7 @@ export class PluginLifecycleManager {
       }) as unknown as (
         checking: boolean,
         editor: Editor,
-        ctx: MarkdownView | unknown,
+        ctx: unknown,
       ) => boolean | void,
     });
 
@@ -351,7 +345,7 @@ export class PluginLifecycleManager {
       }) as unknown as (
         checking: boolean,
         editor: Editor,
-        ctx: MarkdownView | unknown,
+        ctx: unknown,
       ) => boolean | void,
     });
 
@@ -478,7 +472,7 @@ export class PluginLifecycleManager {
 
     this.plugin.vaultScanner.on('scan-completed', () => {
       // Use setTimeout to ensure tasks are fully set in TaskStateManager before refreshing
-      activeWindow.setTimeout(() => {
+      window.setTimeout(() => {
         // Explicitly refresh the TaskListView to ensure it updates
         this.plugin.uiManager.refreshOpenTaskListViews().catch((error) => {
           new Notice('Failed to refresh task list');
@@ -507,6 +501,7 @@ export class PluginLifecycleManager {
 
     // Conditional ribbon icon - only show on mobile devices
     if (Platform.isMobile) {
+      // eslint-disable-next-line obsidianmd/ui/sentence-case
       this.plugin.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
         this.plugin.uiManager.showTasks().catch((error) => {
           new Notice('Failed to open task list');

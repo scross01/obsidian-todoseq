@@ -244,7 +244,7 @@ describe('ChangeTracker', () => {
     });
 
     it('should stop cleanup interval', () => {
-      const spy = jest.spyOn(global, 'clearInterval');
+      const spy = jest.spyOn(window, 'clearInterval');
 
       tracker.destroy();
 

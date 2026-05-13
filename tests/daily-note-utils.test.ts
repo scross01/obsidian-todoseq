@@ -26,10 +26,7 @@ describe('daily-note-utils', () => {
       };
       (getDateFromFile as jest.Mock).mockReturnValue(mockMomentDate);
 
-      const mockFile = {
-        path: '2023-01-01.md',
-        name: '2023-01-01.md',
-      } as unknown as TFile;
+      const mockFile = new TFile('2023-01-01.md', '2023-01-01.md');
 
       // Act
       const result = getDailyNoteInfo(mockApp as App, mockFile);
@@ -45,10 +42,7 @@ describe('daily-note-utils', () => {
       // Arrange
       (getDateFromFile as jest.Mock).mockReturnValue(null);
 
-      const mockFile = {
-        path: 'non-daily-note.md',
-        name: 'non-daily-note.md',
-      } as unknown as TFile;
+      const mockFile = new TFile('non-daily-note.md', 'non-daily-note.md');
 
       // Act
       const result = getDailyNoteInfo(mockApp as App, mockFile);
@@ -66,10 +60,7 @@ describe('daily-note-utils', () => {
         throw mockError;
       });
 
-      const mockFile = {
-        path: 'some-file.md',
-        name: 'some-file.md',
-      } as unknown as TFile;
+      const mockFile = new TFile('some-file.md', 'some-file.md');
 
       // Create a specific spy for console.warn for this test
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
@@ -107,10 +98,7 @@ describe('daily-note-utils', () => {
 
       testCases.forEach((filename) => {
         // Act
-        const mockFile = {
-          path: filename,
-          name: filename,
-        } as unknown as TFile;
+        const mockFile = new TFile(filename, filename);
         const result = getDailyNoteInfo(mockApp as App, mockFile);
 
         // Assert
@@ -124,10 +112,7 @@ describe('daily-note-utils', () => {
       // Arrange
       (getDateFromFile as jest.Mock).mockReturnValue(null);
 
-      const mockFile = {
-        path: '2023-01-01.txt',
-        name: '2023-01-01.txt',
-      } as unknown as TFile;
+      const mockFile = new TFile('2023-01-01.txt', '2023-01-01.txt');
 
       // Act
       const result = getDailyNoteInfo(mockApp as App, mockFile);
@@ -146,10 +131,10 @@ describe('daily-note-utils', () => {
       };
       (getDateFromFile as jest.Mock).mockReturnValue(mockMomentDate);
 
-      const mockFile = {
-        path: 'notes/2023/01/2023-01-01.md',
-        name: '2023-01-01.md',
-      } as unknown as TFile;
+      const mockFile = new TFile(
+        'notes/2023/01/2023-01-01.md',
+        '2023-01-01.md',
+      );
 
       // Act
       const result = getDailyNoteInfo(mockApp as App, mockFile);

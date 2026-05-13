@@ -137,15 +137,32 @@ export class SearchOptionsDropdown extends BaseDropdown {
       attr: { 'aria-label': 'Read more' },
     });
 
-    iconContainer.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round" class="svg-icon lucide-info">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 16v-4"></path>
-                <path d="M12 8h.01"></path>
-            </svg>
-        `;
+    const svgEl = iconContainer.createEl(
+      'svg' as unknown as keyof HTMLElementTagNameMap,
+      {
+        attr: {
+          xmlns: 'http://www.w3.org/2000/svg',
+          width: '24',
+          height: '24',
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          'stroke-width': '2',
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          class: 'svg-icon lucide-info',
+        },
+      },
+    );
+    svgEl.createEl('circle' as unknown as keyof HTMLElementTagNameMap, {
+      attr: { cx: '12', cy: '12', r: '10' },
+    });
+    svgEl.createEl('path' as unknown as keyof HTMLElementTagNameMap, {
+      attr: { d: 'M12 16v-4' },
+    });
+    svgEl.createEl('path' as unknown as keyof HTMLElementTagNameMap, {
+      attr: { d: 'M12 8h.01' },
+    });
 
     iconContainer.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -277,7 +294,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
 
     this.hide();
 
-    activeWindow.setTimeout(() => {
+    window.setTimeout(() => {
       const event = new Event('input', { bubbles: true });
       this.inputEl.dispatchEvent(event);
     }, 0);
@@ -428,7 +445,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
       }
     }
 
-    activeWindow.setTimeout(() => {
+    window.setTimeout(() => {
       const event = new Event('input', { bubbles: true });
       input.dispatchEvent(event);
     }, 150);
@@ -451,9 +468,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
   private getFocusableElements(): HTMLElement[] {
     const focusableSelector =
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-    return Array.from(
-      this.containerEl.querySelectorAll(focusableSelector),
-    ) as HTMLElement[];
+    return Array.from(this.containerEl.querySelectorAll(focusableSelector));
   }
 
   private setupKeyboardNavigation(): void {

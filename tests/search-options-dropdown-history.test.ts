@@ -8,67 +8,11 @@
  */
 import { SearchOptionsDropdown } from '../src/view/components/search-options-dropdown';
 import { Task } from '../src/types/task';
-
-// Extend HTMLElement with Obsidian's DOM extensions for jsdom
-declare global {
-  interface HTMLElement {
-    addClass: (cls: string) => void;
-    removeClass: (cls: string) => void;
-    hasClass: (cls: string) => boolean;
-    createEl: <K extends keyof HTMLElementTagNameMap>(
-      tag: K,
-      options?: { cls?: string; attr?: Record<string, string>; text?: string },
-    ) => HTMLElementTagNameMap[K];
-    createDiv: (options?: {
-      cls?: string;
-      attr?: Record<string, string>;
-    }) => HTMLDivElement;
-    createSpan: (options?: { cls?: string; text?: string }) => HTMLSpanElement;
-  }
-}
+import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
 // Install Obsidian-style DOM extensions on HTMLElement prototype
 beforeAll(() => {
-  HTMLElement.prototype.addClass = function (cls: string): void {
-    this.classList.add(cls);
-  };
-  HTMLElement.prototype.removeClass = function (cls: string): void {
-    this.classList.remove(cls);
-  };
-  HTMLElement.prototype.hasClass = function (cls: string): boolean {
-    return this.classList.contains(cls);
-  };
-  HTMLElement.prototype.createEl = function <
-    K extends keyof HTMLElementTagNameMap,
-  >(
-    tag: K,
-    options?: { cls?: string; attr?: Record<string, string>; text?: string },
-  ): HTMLElementTagNameMap[K] {
-    const el = document.createElement(tag);
-    if (options?.cls) el.className = options.cls;
-    if (options?.attr) {
-      for (const [key, value] of Object.entries(options.attr)) {
-        el.setAttribute(key, value);
-      }
-    }
-    if (options?.text) el.textContent = options.text;
-    this.appendChild(el);
-    return el;
-  };
-  HTMLElement.prototype.createDiv = function (options?: {
-    cls?: string;
-    attr?: Record<string, string>;
-  }): HTMLDivElement {
-    return this.createEl('div', options);
-  };
-  HTMLElement.prototype.createSpan = function (options?: {
-    cls?: string;
-    text?: string;
-  }): HTMLSpanElement {
-    return this.createEl('span', options);
-  };
-  // Mock window.activeDocument for Obsidian API compatibility
-  (window as any).activeDocument = document;
+  installObsidianDomMocks();
 });
 
 // Mock setIcon since it's called in the constructor
@@ -80,9 +24,9 @@ jest.mock('obsidian', () => ({
 
 // Helper to create a mock input element with proper bounding rect
 function createMockInput(): HTMLInputElement {
-  const input = document.createElement('input');
+  const input = activeDocument.createElement('input');
   input.type = 'text';
-  document.body.appendChild(input);
+  activeDocument.body.appendChild(input);
   // Mock getBoundingClientRect since jsdom doesn't implement layout
   input.getBoundingClientRect = () => ({
     width: 300,
@@ -152,7 +96,7 @@ describe('SearchOptionsDropdown - History Functionality', () => {
 
   beforeEach(() => {
     // Clean up any existing dropdown containers from previous tests
-    document.body.innerHTML = '';
+    activeDocument.body.innerHTML = '';
 
     mockInput = createMockInput();
     mockVault = createMockVault();
@@ -169,7 +113,7 @@ describe('SearchOptionsDropdown - History Functionality', () => {
 
   afterEach(() => {
     // Clean up the dropdown container from the DOM
-    const containers = document.querySelectorAll('.todoseq-dropdown');
+    const containers = activeDocument.querySelectorAll('.todoseq-dropdown');
     containers.forEach((container) => container.remove());
   });
 

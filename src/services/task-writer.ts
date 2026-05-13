@@ -316,7 +316,7 @@ export class TaskWriter {
     const result: Task & { lineDelta?: number } = {
       ...task,
       rawText: newLine,
-      state: newState as Task['state'],
+      state: newState,
       completed,
       closedDate: updatedClosedDate,
     };

@@ -246,7 +246,7 @@ export class TaskContextMenu extends BaseDialog {
 
     const row = this.createMenuRow('Go to task', 'locate', () => {
       if (this.task) {
-        this.callbacks.onGoToTask(this.task);
+        void this.callbacks.onGoToTask(this.task);
       }
       this.hide();
     });
@@ -259,7 +259,7 @@ export class TaskContextMenu extends BaseDialog {
 
     const row = this.createMenuRow('Copy', 'copy', () => {
       if (this.task) {
-        this.callbacks.onCopyTask(this.task);
+        void this.callbacks.onCopyTask(this.task);
       }
       this.hide();
     });
@@ -277,7 +277,7 @@ export class TaskContextMenu extends BaseDialog {
 
     const row = this.createMenuRow('Copy to today', 'clipboard-paste', () => {
       if (this.task) {
-        this.callbacks.onCopyTaskToToday(this.task);
+        void this.callbacks.onCopyTaskToToday(this.task);
       }
       this.hide();
     });
@@ -295,7 +295,7 @@ export class TaskContextMenu extends BaseDialog {
 
     const row = this.createMenuRow('Move to today', 'arrow-right', () => {
       if (this.task) {
-        this.callbacks.onMoveTaskToToday(this.task);
+        void this.callbacks.onMoveTaskToToday(this.task);
       }
       this.hide();
     });
@@ -318,7 +318,7 @@ export class TaskContextMenu extends BaseDialog {
 
     const row = this.createMenuRow('Migrate to today', 'arrow-up-right', () => {
       if (this.task) {
-        this.callbacks.onMigrateTaskToToday(this.task);
+        void this.callbacks.onMigrateTaskToToday(this.task);
       }
       this.hide();
     });
@@ -406,9 +406,13 @@ export class TaskContextMenu extends BaseDialog {
 
             // Only pass repeat argument if it exists
             if (repeat) {
-              this.callbacks.onScheduledDateChange(currentTask, date, repeat);
+              void this.callbacks.onScheduledDateChange(
+                currentTask,
+                date,
+                repeat,
+              );
             } else {
-              this.callbacks.onScheduledDateChange(currentTask, date);
+              void this.callbacks.onScheduledDateChange(currentTask, date);
             }
             this.hide();
           }
@@ -467,7 +471,7 @@ export class TaskContextMenu extends BaseDialog {
               currentTask = freshTask;
             }
           }
-          this.callbacks.onPriorityChange(currentTask, option.priority);
+          void this.callbacks.onPriorityChange(currentTask, option.priority);
         }
         this.hide();
       });
@@ -630,13 +634,13 @@ export class TaskContextMenu extends BaseDialog {
         onDateSelected: (date, repeat, mode) => {
           if (currentTask) {
             if (mode === 'deadline') {
-              this.callbacks.onDeadlineDateChange(
+              void this.callbacks.onDeadlineDateChange(
                 currentTask,
                 date,
                 repeat ?? null,
               );
             } else {
-              this.callbacks.onScheduledDateChange(
+              void this.callbacks.onScheduledDateChange(
                 currentTask,
                 date,
                 repeat ?? null,

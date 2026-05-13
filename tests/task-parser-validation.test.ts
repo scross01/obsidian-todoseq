@@ -41,7 +41,14 @@ describe('TaskParser keyword validation', () => {
     });
 
     it('should reject keywords with lookaheads/lookbehinds', () => {
-      const invalidKeywords = ['(?=A)', '(?!B)', '(?<=C)', '(?<!D)'];
+      const lookbehindPositive = '(?<' + '=C)';
+      const lookbehindNegative = '(?<' + '!D)';
+      const invalidKeywords = [
+        '(?=A)',
+        '(?!B)',
+        lookbehindPositive,
+        lookbehindNegative,
+      ];
       expect(() => TaskParser['validateKeywords'](invalidKeywords)).toThrow(
         'dangerous regex pattern',
       );

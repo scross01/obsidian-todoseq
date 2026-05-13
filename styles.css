@@ -1948,3 +1948,41 @@
     background: inherit !important;
   }
 }
+
+/* Off-screen positioning for measurement */
+.todoseq-dialog-offscreen {
+  left: -9999px !important;
+  top: -9999px !important;
+  position: absolute !important;
+}
+
+/* Submenu measurement state - hidden off-screen */
+.todoseq-date-picker-submenu-measuring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+}
+
+/* Submenu visible state */
+.todoseq-date-picker-submenu-visible {
+  position: absolute;
+  visibility: visible;
+  z-index: 1000;
+}
+
+/* Centered dialog positioning */
+.todoseq-date-picker-custom-repeat-centered {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Settings section toggle visibility */
+.todoseq-settings-section-hidden {
+  display: none;
+}
+
+.todoseq-settings-section-visible {
+  display: block;
+}

@@ -45,9 +45,9 @@ export class TodoseqCodeBlockProcessor {
           return;
         }
         if (embedRefreshTimeout) {
-          activeWindow.clearTimeout(embedRefreshTimeout);
+          window.clearTimeout(embedRefreshTimeout);
         }
-        embedRefreshTimeout = activeWindow.setTimeout(() => {
+        embedRefreshTimeout = window.setTimeout(() => {
           embedRefreshTimeout = null;
           this.onTasksChanged();
         }, EMBED_REFRESH_DEBOUNCE_MS);
@@ -139,9 +139,10 @@ export class TodoseqCodeBlockProcessor {
         (id: string) => this.eventHandler.toggleCollapse(id),
         containerId,
       );
-    } catch (error) {
-      console.error('Error processing todoseq code block:', error);
-      this.renderer.renderError(el, `Processing error: ${error.message}`);
+    } catch (error: unknown) {
+      console.error('Error processing TODOseq code block:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      this.renderer.renderError(el, `Processing error: ${message}`);
     }
   }
 

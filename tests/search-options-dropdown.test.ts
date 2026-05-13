@@ -8,67 +8,11 @@
  */
 import { SearchOptionsDropdown } from '../src/view/components/search-options-dropdown';
 import { Task } from '../src/types/task';
-
-// Extend HTMLElement with Obsidian's DOM extensions for jsdom
-declare global {
-  interface HTMLElement {
-    addClass: (cls: string) => void;
-    removeClass: (cls: string) => void;
-    hasClass: (cls: string) => boolean;
-    createEl: <K extends keyof HTMLElementTagNameMap>(
-      tag: K,
-      options?: { cls?: string; attr?: Record<string, string>; text?: string },
-    ) => HTMLElementTagNameMap[K];
-    createDiv: (options?: {
-      cls?: string;
-      attr?: Record<string, string>;
-    }) => HTMLDivElement;
-    createSpan: (options?: { cls?: string; text?: string }) => HTMLSpanElement;
-  }
-}
+import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
 // Install Obsidian-style DOM extensions on HTMLElement prototype
 beforeAll(() => {
-  HTMLElement.prototype.addClass = function (cls: string): void {
-    this.classList.add(cls);
-  };
-  HTMLElement.prototype.removeClass = function (cls: string): void {
-    this.classList.remove(cls);
-  };
-  HTMLElement.prototype.hasClass = function (cls: string): boolean {
-    return this.classList.contains(cls);
-  };
-  HTMLElement.prototype.createEl = function <
-    K extends keyof HTMLElementTagNameMap,
-  >(
-    tag: K,
-    options?: { cls?: string; attr?: Record<string, string>; text?: string },
-  ): HTMLElementTagNameMap[K] {
-    const el = document.createElement(tag);
-    if (options?.cls) el.className = options.cls;
-    if (options?.attr) {
-      for (const [key, value] of Object.entries(options.attr)) {
-        el.setAttribute(key, value);
-      }
-    }
-    if (options?.text) el.textContent = options.text;
-    this.appendChild(el);
-    return el;
-  };
-  HTMLElement.prototype.createDiv = function (options?: {
-    cls?: string;
-    attr?: Record<string, string>;
-  }): HTMLDivElement {
-    return this.createEl('div', options);
-  };
-  HTMLElement.prototype.createSpan = function (options?: {
-    cls?: string;
-    text?: string;
-  }): HTMLSpanElement {
-    return this.createEl('span', options);
-  };
-  // Mock window.activeDocument for Obsidian API compatibility
-  (window as any).activeDocument = document;
+  installObsidianDomMocks();
 });
 
 // Mock setIcon since it's called in the constructor
@@ -80,9 +24,9 @@ jest.mock('obsidian', () => ({
 
 // Helper to create a mock input element with proper bounding rect
 function createMockInput(): HTMLInputElement {
-  const input = document.createElement('input');
+  const input = activeDocument.createElement('input');
   input.type = 'text';
-  document.body.appendChild(input);
+  activeDocument.body.appendChild(input);
   // Mock getBoundingClientRect since jsdom doesn't implement layout
   input.getBoundingClientRect = () => ({
     width: 300,
@@ -129,7 +73,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
 
   beforeEach(() => {
     // Clean up any existing dropdown containers from previous tests
-    document.body.innerHTML = '';
+    activeDocument.body.innerHTML = '';
 
     mockInput = createMockInput();
     mockVault = createMockVault();
@@ -146,7 +90,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
 
   afterEach(() => {
     // Clean up the dropdown container from the DOM
-    const containers = document.querySelectorAll('.todoseq-dropdown');
+    const containers = activeDocument.querySelectorAll('.todoseq-dropdown');
     containers.forEach((container) => container.remove());
   });
 
@@ -157,7 +101,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
     });
 
     it('should create container element in DOM', () => {
-      const container = document.querySelector('.todoseq-dropdown');
+      const container = activeDocument.querySelector('.todoseq-dropdown');
       expect(container).not.toBeNull();
     });
   });
@@ -186,7 +130,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
 
   describe('Positioning Methods', () => {
     it('should update width to match input', () => {
-      const container = document.querySelector('.todoseq-dropdown');
+      const container = activeDocument.querySelector('.todoseq-dropdown');
       expect(container).not.toBeNull();
       if (container) {
         // Mock getBoundingClientRect to return known width
@@ -212,7 +156,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
     });
 
     it('should update position below input', () => {
-      const container = document.querySelector('.todoseq-dropdown');
+      const container = activeDocument.querySelector('.todoseq-dropdown');
       expect(container).not.toBeNull();
       if (container) {
         // Mock scroll positions
@@ -250,7 +194,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
     it('should render options dropdown with suggestions', async () => {
       await dropdown.showOptionsDropdown();
 
-      const container = document.querySelector('.todoseq-dropdown');
+      const container = activeDocument.querySelector('.todoseq-dropdown');
       expect(container).not.toBeNull();
 
       const suggestionItems = container?.querySelectorAll(
@@ -262,7 +206,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
     it('should render search options with descriptions', async () => {
       await dropdown.showOptionsDropdown();
 
-      const container = document.querySelector('.todoseq-dropdown');
+      const container = activeDocument.querySelector('.todoseq-dropdown');
       const infoTexts = container?.querySelectorAll(
         '.search-suggest-info-text',
       );
@@ -273,7 +217,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
       dropdown.addToHistory('test query');
       await dropdown.showOptionsDropdown();
 
-      const container = document.querySelector('.todoseq-dropdown');
+      const container = activeDocument.querySelector('.todoseq-dropdown');
       const historyItems = container?.querySelectorAll(
         '.search-suggest-history-item',
       );
@@ -286,7 +230,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
       dropdown.addToHistory('test query');
       await dropdown.showOptionsDropdown();
 
-      const container = document.querySelector('.todoseq-dropdown');
+      const container = activeDocument.querySelector('.todoseq-dropdown');
       const historyItem = container?.querySelector(
         '.search-suggest-history-item',
       );
@@ -335,12 +279,13 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
   describe('Event Listeners', () => {
     it('should setup and cleanup event listeners', () => {
       // Test that cleanup removes container from DOM
-      const container = document.querySelector('.todoseq-dropdown');
+      const container = activeDocument.querySelector('.todoseq-dropdown');
       expect(container).not.toBeNull();
 
       dropdown.cleanup();
 
-      const removedContainer = document.querySelector('.todoseq-dropdown');
+      const removedContainer =
+        activeDocument.querySelector('.todoseq-dropdown');
       expect(removedContainer).toBeNull();
     });
   });

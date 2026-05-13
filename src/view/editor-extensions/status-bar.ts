@@ -29,9 +29,9 @@ export class StatusBarManager {
 
     this.plugin.taskStateManager.subscribe((tasks: Task[]) => {
       if (statusBarTimeout) {
-        activeWindow.clearTimeout(statusBarTimeout);
+        window.clearTimeout(statusBarTimeout);
       }
-      statusBarTimeout = activeWindow.setTimeout(() => {
+      statusBarTimeout = window.setTimeout(() => {
         // Clear timeout reference to indicate no pending debounced update
         statusBarTimeout = null;
         this.updateStatusBarItem(tasks);
@@ -137,10 +137,10 @@ export class StatusBarManager {
 
   // Helper methods to access plugin internals
   private getVaultScanner() {
-    return (this.plugin as TodoTracker).getVaultScanner();
+    return this.plugin.getVaultScanner();
   }
 
   private getTasks(): Task[] {
-    return (this.plugin as TodoTracker).getTasks();
+    return this.plugin.getTasks();
   }
 }

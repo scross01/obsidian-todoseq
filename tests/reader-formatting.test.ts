@@ -25,6 +25,9 @@ import {
 import { TaskParser } from '../src/parser/task-parser';
 import { VaultScanner } from '../src/services/vault-scanner';
 import { App, TFile } from 'obsidian';
+import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
+
+installObsidianDomMocks();
 
 // Mock Obsidian's createSpan helper on HTMLElement prototype
 if (!HTMLElement.prototype.createSpan) {
@@ -33,7 +36,7 @@ if (!HTMLElement.prototype.createSpan) {
     text?: string;
     attr?: Record<string, string>;
   }): HTMLSpanElement {
-    const span = document.createElement('span');
+    const span = activeDocument.createElement('span');
     if (config?.cls) {
       span.className = config.cls;
     }
@@ -52,11 +55,12 @@ if (!HTMLElement.prototype.createSpan) {
 // Mock window.activeDocument for Obsidian API compatibility
 // Polyfill Obsidian's createDiv on DocumentFragment for jsdom
 if (typeof window !== 'undefined') {
+  // eslint-disable-next-line obsidianmd/prefer-active-doc
   (window as any).activeDocument = document;
   (window as any).DocumentFragment.prototype.createDiv = function (
     cls?: string | { cls?: string },
   ): HTMLDivElement {
-    const el = document.createElement('div');
+    const el = activeDocument.createElement('div');
     if (typeof cls === 'string') {
       el.className = cls;
     } else if (cls?.cls) {
@@ -162,7 +166,7 @@ describe('ReaderViewFormatter', () => {
     );
 
     // Setup DOM environment for tests that need it
-    document.body.innerHTML = '';
+    activeDocument.body.textContent = '';
   });
 
   afterEach(() => {
@@ -370,8 +374,8 @@ describe('ReaderViewFormatter', () => {
 
   describe('isInQuoteOrCalloutBlock', () => {
     test('should return false for element not in blockquote', () => {
-      const div = document.createElement('div');
-      document.body.appendChild(div);
+      const div = activeDocument.createElement('div');
+      activeDocument.body.appendChild(div);
 
       const isInQuoteOrCalloutBlock = (
         formatter as unknown as {
@@ -381,14 +385,14 @@ describe('ReaderViewFormatter', () => {
       const result = isInQuoteOrCalloutBlock.call(formatter, div);
 
       expect(result).toBe(false);
-      document.body.removeChild(div);
+      activeDocument.body.removeChild(div);
     });
 
     test('should return true for element inside blockquote', () => {
-      const blockquote = document.createElement('blockquote');
-      const div = document.createElement('div');
+      const blockquote = activeDocument.createElement('blockquote');
+      const div = activeDocument.createElement('div');
       blockquote.appendChild(div);
-      document.body.appendChild(blockquote);
+      activeDocument.body.appendChild(blockquote);
 
       const isInQuoteOrCalloutBlock = (
         formatter as unknown as {
@@ -398,15 +402,15 @@ describe('ReaderViewFormatter', () => {
       const result = isInQuoteOrCalloutBlock.call(formatter, div);
 
       expect(result).toBe(true);
-      document.body.removeChild(blockquote);
+      activeDocument.body.removeChild(blockquote);
     });
 
     test('should return true for element inside callout', () => {
-      const callout = document.createElement('div');
+      const callout = activeDocument.createElement('div');
       callout.classList.add('callout');
-      const div = document.createElement('div');
+      const div = activeDocument.createElement('div');
       callout.appendChild(div);
-      document.body.appendChild(callout);
+      activeDocument.body.appendChild(callout);
 
       const isInQuoteOrCalloutBlock = (
         formatter as unknown as {
@@ -416,15 +420,15 @@ describe('ReaderViewFormatter', () => {
       const result = isInQuoteOrCalloutBlock.call(formatter, div);
 
       expect(result).toBe(true);
-      document.body.removeChild(callout);
+      activeDocument.body.removeChild(callout);
     });
 
     test('should return true for element inside admonition', () => {
-      const admonition = document.createElement('div');
+      const admonition = activeDocument.createElement('div');
       admonition.classList.add('admonition');
-      const div = document.createElement('div');
+      const div = activeDocument.createElement('div');
       admonition.appendChild(div);
-      document.body.appendChild(admonition);
+      activeDocument.body.appendChild(admonition);
 
       const isInQuoteOrCalloutBlock = (
         formatter as unknown as {
@@ -434,12 +438,12 @@ describe('ReaderViewFormatter', () => {
       const result = isInQuoteOrCalloutBlock.call(formatter, div);
 
       expect(result).toBe(true);
-      document.body.removeChild(admonition);
+      activeDocument.body.removeChild(admonition);
     });
 
     test('should return false for element at document root', () => {
-      const div = document.createElement('div');
-      document.body.appendChild(div);
+      const div = activeDocument.createElement('div');
+      activeDocument.body.appendChild(div);
 
       const isInQuoteOrCalloutBlock = (
         formatter as unknown as {
@@ -449,7 +453,7 @@ describe('ReaderViewFormatter', () => {
       const result = isInQuoteOrCalloutBlock.call(formatter, div);
 
       expect(result).toBe(false);
-      document.body.removeChild(div);
+      activeDocument.body.removeChild(div);
     });
   });
 
@@ -515,7 +519,7 @@ describe('ReaderViewFormatter', () => {
 
   describe('getTextNodes', () => {
     test('should return empty array for empty element', () => {
-      const div = document.createElement('div');
+      const div = activeDocument.createElement('div');
 
       const getTextNodes = (
         formatter as unknown as { getTextNodes: (el: HTMLElement) => Node[] }
@@ -526,7 +530,7 @@ describe('ReaderViewFormatter', () => {
     });
 
     test('should return text nodes from element', () => {
-      const div = document.createElement('div');
+      const div = activeDocument.createElement('div');
       div.textContent = 'Hello world';
 
       const getTextNodes = (
@@ -539,8 +543,12 @@ describe('ReaderViewFormatter', () => {
     });
 
     test('should return multiple text nodes from nested elements', () => {
-      const div = document.createElement('div');
-      div.innerHTML = '<span>Hello</span> <span>world</span>';
+      const div = activeDocument.createElement('div');
+      div.appendChild(activeDocument.createElement('span')).textContent =
+        'Hello';
+      div.appendChild(activeDocument.createTextNode(' '));
+      div.appendChild(activeDocument.createElement('span')).textContent =
+        'World';
 
       const getTextNodes = (
         formatter as unknown as { getTextNodes: (el: HTMLElement) => Node[] }
@@ -551,8 +559,9 @@ describe('ReaderViewFormatter', () => {
     });
 
     test('should return text nodes in document order', () => {
-      const div = document.createElement('div');
-      div.innerHTML = '<p>First</p><p>Second</p>';
+      const div = activeDocument.createElement('div');
+      div.appendChild(activeDocument.createElement('p')).textContent = 'First';
+      div.appendChild(activeDocument.createElement('p')).textContent = 'Second';
 
       const getTextNodes = (
         formatter as unknown as { getTextNodes: (el: HTMLElement) => Node[] }
@@ -566,15 +575,15 @@ describe('ReaderViewFormatter', () => {
 
   describe('hasPrecedingTask', () => {
     test('should check for task in previous siblings', () => {
-      const container = document.createElement('div');
-      const taskParagraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const taskParagraph = activeDocument.createElement('p');
       taskParagraph.textContent = 'TODO something';
-      const dateParagraph = document.createElement('p');
+      const dateParagraph = activeDocument.createElement('p');
       dateParagraph.textContent = 'SCHEDULED: today';
 
       container.appendChild(taskParagraph);
       container.appendChild(dateParagraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const hasPrecedingTask = (
         formatter as unknown as {
@@ -584,16 +593,16 @@ describe('ReaderViewFormatter', () => {
       const result = hasPrecedingTask.call(formatter, dateParagraph);
 
       expect(result).toBe(true);
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should return false when no preceding task', () => {
-      const container = document.createElement('div');
-      const dateParagraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const dateParagraph = activeDocument.createElement('p');
       dateParagraph.textContent = 'SCHEDULED: today';
 
       container.appendChild(dateParagraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const hasPrecedingTask = (
         formatter as unknown as {
@@ -603,21 +612,21 @@ describe('ReaderViewFormatter', () => {
       const result = hasPrecedingTask.call(formatter, dateParagraph);
 
       expect(result).toBe(false);
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('hasTaskInPreviousSiblings', () => {
     test('should find task in previous sibling', () => {
-      const container = document.createElement('div');
-      const taskParagraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const taskParagraph = activeDocument.createElement('p');
       taskParagraph.textContent = 'TODO something';
-      const otherParagraph = document.createElement('p');
+      const otherParagraph = activeDocument.createElement('p');
       otherParagraph.textContent = 'SCHEDULED: today';
 
       container.appendChild(taskParagraph);
       container.appendChild(otherParagraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const hasTaskInPreviousSiblings = (
         formatter as unknown as {
@@ -627,13 +636,13 @@ describe('ReaderViewFormatter', () => {
       const result = hasTaskInPreviousSiblings.call(formatter, otherParagraph);
 
       expect(result).toBe(true);
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should return false when no previous siblings', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'SCHEDULED: today';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const hasTaskInPreviousSiblings = (
         formatter as unknown as {
@@ -643,19 +652,19 @@ describe('ReaderViewFormatter', () => {
       const result = hasTaskInPreviousSiblings.call(formatter, paragraph);
 
       expect(result).toBe(false);
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should detect task-list-item class', () => {
-      const container = document.createElement('div');
-      const taskItem = document.createElement('div');
+      const container = activeDocument.createElement('div');
+      const taskItem = activeDocument.createElement('div');
       taskItem.classList.add('task-list-item');
-      const otherParagraph = document.createElement('p');
+      const otherParagraph = activeDocument.createElement('p');
       otherParagraph.textContent = 'SCHEDULED: today';
 
       container.appendChild(taskItem);
       container.appendChild(otherParagraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const hasTaskInPreviousSiblings = (
         formatter as unknown as {
@@ -665,15 +674,15 @@ describe('ReaderViewFormatter', () => {
       const result = hasTaskInPreviousSiblings.call(formatter, otherParagraph);
 
       expect(result).toBe(true);
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('hasTaskBeforeDateInParagraph', () => {
     test('should find task before date in same paragraph', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'TODO something SCHEDULED: today';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const hasTaskBeforeDateInParagraph = (
         formatter as unknown as {
@@ -683,13 +692,15 @@ describe('ReaderViewFormatter', () => {
       const result = hasTaskBeforeDateInParagraph.call(formatter, paragraph);
 
       expect(result).toBe(true);
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should handle br elements as separators', () => {
-      const paragraph = document.createElement('p');
-      paragraph.innerHTML = 'TODO something<br>SCHEDULED: today';
-      document.body.appendChild(paragraph);
+      const paragraph = activeDocument.createElement('p');
+      paragraph.appendChild(activeDocument.createTextNode('TODO something'));
+      paragraph.appendChild(activeDocument.createElement('br'));
+      paragraph.appendChild(activeDocument.createTextNode('SCHEDULED: today'));
+      activeDocument.body.appendChild(paragraph);
 
       const hasTaskBeforeDateInParagraph = (
         formatter as unknown as {
@@ -699,13 +710,13 @@ describe('ReaderViewFormatter', () => {
       const result = hasTaskBeforeDateInParagraph.call(formatter, paragraph);
 
       expect(result).toBe(true);
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should return false when only date line exists', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'SCHEDULED: today';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const hasTaskBeforeDateInParagraph = (
         formatter as unknown as {
@@ -715,7 +726,7 @@ describe('ReaderViewFormatter', () => {
       const result = hasTaskBeforeDateInParagraph.call(formatter, paragraph);
 
       expect(result).toBe(false);
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
   });
 
@@ -732,7 +743,7 @@ describe('ReaderViewFormatter', () => {
 
       const registeredCallback =
         mockPlugin.registerMarkdownPostProcessor.mock.calls[0][0];
-      const mockElement = document.createElement('div');
+      const mockElement = activeDocument.createElement('div');
       const mockContext = { sourcePath: 'test.md' };
 
       // Should return early without processing
@@ -758,9 +769,9 @@ describe('ReaderViewFormatter', () => {
 
   describe('findDateKeywordNode', () => {
     test('should find SCHEDULED: in text node', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'SCHEDULED: 2024-01-01';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const findDateKeywordNode = (
         formatter as unknown as {
@@ -778,13 +789,13 @@ describe('ReaderViewFormatter', () => {
 
       expect(result).not.toBeNull();
       expect(result?.index).toBe(0);
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should find DEADLINE: in text node', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'DEADLINE: 2024-01-01';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const findDateKeywordNode = (
         formatter as unknown as {
@@ -802,13 +813,13 @@ describe('ReaderViewFormatter', () => {
 
       expect(result).not.toBeNull();
       expect(result?.index).toBe(0);
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should return null when keyword not found', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'Some other text';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const findDateKeywordNode = (
         formatter as unknown as {
@@ -825,15 +836,15 @@ describe('ReaderViewFormatter', () => {
       );
 
       expect(result).toBeNull();
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
   });
 
   describe('processPriorityPillsInTextNode', () => {
     test('should replace priority token in text node with pill', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'Task with priority [#A]';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const textNode = paragraph.firstChild as Text;
 
@@ -850,13 +861,13 @@ describe('ReaderViewFormatter', () => {
       expect(pill?.textContent).toBe('A');
       expect(pill?.classList.contains('priority-high')).toBe(true);
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should handle multiple priority tokens in single text node', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'Task with priorities [#A], [#B], and [#C]';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const textNode = paragraph.firstChild as Text;
 
@@ -877,13 +888,13 @@ describe('ReaderViewFormatter', () => {
       expect(pills[2].textContent).toBe('A');
       expect(pills[2].classList.contains('priority-high')).toBe(true);
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should not modify text node without priority tokens', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'Task without priority';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const textNode = paragraph.firstChild as Text;
 
@@ -898,18 +909,18 @@ describe('ReaderViewFormatter', () => {
 
       expect(paragraph.innerHTML).toEqual(originalContent);
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
   });
 
   describe('attachKeywordClickHandlers', () => {
     test('should attach click, contextmenu, and keydown handlers to keywords', () => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const attachKeywordClickHandlers = (
         formatter as unknown as {
@@ -930,15 +941,15 @@ describe('ReaderViewFormatter', () => {
       expect(keywordSpan.getAttribute('tabindex')).toBe('0');
       expect(keywordSpan.getAttribute('role')).toBe('button');
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should skip elements without todoseq-keyword-formatted class', () => {
-      const container = document.createElement('div');
-      const span = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const span = activeDocument.createElement('span');
       span.textContent = 'NOT A KEYWORD';
       container.appendChild(span);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const attachKeywordClickHandlers = (
         formatter as unknown as {
@@ -957,19 +968,19 @@ describe('ReaderViewFormatter', () => {
       expect(span.getAttribute('tabindex')).toBe(null);
       expect(span.getAttribute('role')).toBe(null);
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('handleKeywordKeydown', () => {
     test('should handle Enter key to toggle state', async () => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const toggleTaskState = jest.spyOn(formatter as any, 'toggleTaskState');
 
@@ -988,17 +999,17 @@ describe('ReaderViewFormatter', () => {
 
       expect(toggleTaskState).toHaveBeenCalledWith(keywordSpan, 'test.md');
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should handle Space key to toggle state', async () => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const toggleTaskState = jest.spyOn(formatter as any, 'toggleTaskState');
 
@@ -1017,18 +1028,18 @@ describe('ReaderViewFormatter', () => {
 
       expect(toggleTaskState).toHaveBeenCalledWith(keywordSpan, 'test.md');
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('attachCheckboxClickHandlers', () => {
     test('should attach click handlers to checkboxes', () => {
-      const container = document.createElement('div');
-      const checkbox = document.createElement('input');
+      const container = activeDocument.createElement('div');
+      const checkbox = activeDocument.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'task-list-item-checkbox';
       container.appendChild(checkbox);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const attachCheckboxClickHandlers = (
         formatter as unknown as {
@@ -1048,7 +1059,7 @@ describe('ReaderViewFormatter', () => {
       expect(registerDomEvent.mock.calls[0][0]).toEqual(checkbox);
       expect(registerDomEvent.mock.calls[0][1]).toEqual('click');
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
@@ -1057,16 +1068,16 @@ describe('ReaderViewFormatter', () => {
       // Skipped: This test requires more complex mock setup for the new transition logic
       // The core transition logic is properly tested in task-item-renderer.test.ts
       // and the implementation is working correctly in practice
-      const container = document.createElement('div');
-      const checkbox = document.createElement('input');
+      const container = activeDocument.createElement('div');
+      const checkbox = activeDocument.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'task-list-item-checkbox';
-      const taskListItem = document.createElement('div');
+      const taskListItem = activeDocument.createElement('div');
       taskListItem.className = 'task-list-item';
       taskListItem.textContent = 'Test task';
       taskListItem.appendChild(checkbox);
       container.appendChild(taskListItem);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const mockFile = new TFile('test.md');
       const mockTask = { id: '1', text: 'Test task', state: 'TODO' };
@@ -1103,16 +1114,16 @@ describe('ReaderViewFormatter', () => {
         true,
       );
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should return early if no task list item found', async () => {
-      const container = document.createElement('div');
-      const checkbox = document.createElement('input');
+      const container = activeDocument.createElement('div');
+      const checkbox = activeDocument.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'task-list-item-checkbox';
       container.appendChild(checkbox);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const handleCheckboxClick = (
         formatter as unknown as {
@@ -1129,19 +1140,19 @@ describe('ReaderViewFormatter', () => {
       // Should return early without error
       expect(true).toBe(true);
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('handleKeywordContextMenu', () => {
     test('should show context menu on right-click', async () => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const mockMenu = { showAtPosition: jest.fn() };
       const buildStateMenu = jest
@@ -1172,19 +1183,19 @@ describe('ReaderViewFormatter', () => {
       expect(buildStateMenu).toHaveBeenCalledWith('TODO', expect.any(Function));
       expect(mockMenu.showAtPosition).toHaveBeenCalledWith({ x: 100, y: 200 });
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('toggleTaskState', () => {
     test('should toggle task state using NEXT_STATE map', async () => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const updateTaskState = jest.spyOn(formatter as any, 'updateTaskState');
 
@@ -1205,16 +1216,16 @@ describe('ReaderViewFormatter', () => {
         'DOING',
       );
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should return early if no data-task-keyword attribute', async () => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const updateTaskState = jest.spyOn(formatter as any, 'updateTaskState');
 
@@ -1231,19 +1242,19 @@ describe('ReaderViewFormatter', () => {
 
       expect(updateTaskState).not.toHaveBeenCalled();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('updateTaskState', () => {
     test('should call taskEditor.updateTaskState', async () => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const mockTask = { id: '1', text: 'Test task' };
       const findTaskForKeyword = jest
@@ -1276,17 +1287,17 @@ describe('ReaderViewFormatter', () => {
         true,
       );
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should return early if task not found', async () => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const findTaskForKeyword = jest
         .spyOn(formatter as any, 'findTaskForKeyword')
@@ -1314,19 +1325,19 @@ describe('ReaderViewFormatter', () => {
       expect(findTaskForKeyword).toHaveBeenCalledWith(keywordSpan, 'test.md');
       expect(updateTaskState).not.toHaveBeenCalled();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('handleKeywordClick', () => {
     test('should handle single click and toggle state', (done) => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const toggleTaskState = jest.spyOn(formatter as any, 'toggleTaskState');
 
@@ -1345,19 +1356,19 @@ describe('ReaderViewFormatter', () => {
 
       setTimeout(() => {
         expect(toggleTaskState).toHaveBeenCalledWith(keywordSpan, 'test.md');
-        document.body.removeChild(container);
+        activeDocument.body.removeChild(container);
         done();
       }, 350); // Wait a little longer than DOUBLE_CLICK_THRESHOLD (300ms)
     });
 
     test('should handle double click and not toggle state', (done) => {
-      const container = document.createElement('div');
-      const keywordSpan = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
       container.appendChild(keywordSpan);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const toggleTaskState = jest.spyOn(formatter as any, 'toggleTaskState');
 
@@ -1381,7 +1392,7 @@ describe('ReaderViewFormatter', () => {
 
       setTimeout(() => {
         expect(toggleTaskState).not.toHaveBeenCalled();
-        document.body.removeChild(container);
+        activeDocument.body.removeChild(container);
         done();
       }, 350);
     });
@@ -1389,16 +1400,16 @@ describe('ReaderViewFormatter', () => {
 
   describe('replaceKeywordInTextNodesAndBuildTask', () => {
     test('should replace keyword in single text node', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'TODO task text';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
-      const keywordSpan = document.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
 
-      const taskContainer = document.createElement('span');
+      const taskContainer = activeDocument.createElement('span');
       taskContainer.className = 'todoseq-task';
 
       const replaceKeywordInTextNodesAndBuildTask = (
@@ -1425,20 +1436,23 @@ describe('ReaderViewFormatter', () => {
       ).not.toBeNull();
       expect(taskContainer.textContent).toContain('task text');
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should clone non-text nodes', () => {
-      const paragraph = document.createElement('p');
-      paragraph.innerHTML = 'TODO <b>important</b> task';
-      document.body.appendChild(paragraph);
+      const paragraph = activeDocument.createElement('p');
+      paragraph.appendChild(activeDocument.createTextNode('TODO '));
+      paragraph.appendChild(activeDocument.createElement('b')).textContent =
+        'important';
+      paragraph.appendChild(activeDocument.createTextNode(' task'));
+      activeDocument.body.appendChild(paragraph);
 
-      const keywordSpan = document.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
 
-      const taskContainer = document.createElement('span');
+      const taskContainer = activeDocument.createElement('span');
       taskContainer.className = 'todoseq-task';
 
       const replaceKeywordInTextNodesAndBuildTask = (
@@ -1466,20 +1480,20 @@ describe('ReaderViewFormatter', () => {
       expect(taskContainer.querySelector('b')).not.toBeNull();
       expect(taskContainer.textContent).toContain('important');
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should clone all nodes if keyword not found', () => {
-      const paragraph = document.createElement('p');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'Regular text without keyword';
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
-      const keywordSpan = document.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
 
-      const taskContainer = document.createElement('span');
+      const taskContainer = activeDocument.createElement('span');
       taskContainer.className = 'todoseq-task';
 
       const replaceKeywordInTextNodesAndBuildTask = (
@@ -1508,25 +1522,25 @@ describe('ReaderViewFormatter', () => {
         'Regular text without keyword',
       );
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
   });
 
   describe('applyCompletedTaskStylingToTaskContainer', () => {
     test('should wrap completed task content in container', () => {
-      const taskContainer = document.createElement('span');
+      const taskContainer = activeDocument.createElement('span');
       taskContainer.className = 'todoseq-task';
 
-      const keywordSpan = document.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'DONE');
       keywordSpan.textContent = 'DONE';
 
-      const taskText = document.createTextNode(' task text');
+      const taskText = activeDocument.createTextNode(' task text');
 
       taskContainer.appendChild(keywordSpan);
       taskContainer.appendChild(taskText);
-      document.body.appendChild(taskContainer);
+      activeDocument.body.appendChild(taskContainer);
 
       const applyCompletedTaskStylingToTaskContainer = (
         formatter as unknown as {
@@ -1557,16 +1571,18 @@ describe('ReaderViewFormatter', () => {
       expect(wrappedKeyword).not.toBeNull();
       expect(wrappedKeyword?.textContent).toBe('DONE');
 
-      document.body.removeChild(taskContainer);
+      activeDocument.body.removeChild(taskContainer);
     });
 
     test('should not modify container without keyword span', () => {
-      const taskContainer = document.createElement('span');
+      const taskContainer = activeDocument.createElement('span');
       taskContainer.className = 'todoseq-task';
 
-      const taskText = document.createTextNode('Task without keyword span');
+      const taskText = activeDocument.createTextNode(
+        'Task without keyword span',
+      );
       taskContainer.appendChild(taskText);
-      document.body.appendChild(taskContainer);
+      activeDocument.body.appendChild(taskContainer);
 
       const applyCompletedTaskStylingToTaskContainer = (
         formatter as unknown as {
@@ -1586,23 +1602,23 @@ describe('ReaderViewFormatter', () => {
 
       expect(taskContainer.innerHTML).toEqual(originalContent);
 
-      document.body.removeChild(taskContainer);
+      activeDocument.body.removeChild(taskContainer);
     });
 
     test('should wrap any task container with keyword span', () => {
-      const taskContainer = document.createElement('span');
+      const taskContainer = activeDocument.createElement('span');
       taskContainer.className = 'todoseq-task';
 
-      const keywordSpan = document.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
 
-      const taskText = document.createTextNode(' task text');
+      const taskText = activeDocument.createTextNode(' task text');
 
       taskContainer.appendChild(keywordSpan);
       taskContainer.appendChild(taskText);
-      document.body.appendChild(taskContainer);
+      activeDocument.body.appendChild(taskContainer);
 
       const applyCompletedTaskStylingToTaskContainer = (
         formatter as unknown as {
@@ -1633,16 +1649,23 @@ describe('ReaderViewFormatter', () => {
       expect(wrappedKeyword).not.toBeNull();
       expect(wrappedKeyword?.textContent).toBe('TODO');
 
-      document.body.removeChild(taskContainer);
+      activeDocument.body.removeChild(taskContainer);
     });
   });
 
   describe('processPriorityTagLinks', () => {
     test('should replace priority tag links with pills', () => {
-      const paragraph = document.createElement('p');
-      paragraph.innerHTML =
-        'Task with priority [<a href="#A" class="tag">#A</a>]';
-      document.body.appendChild(paragraph);
+      const paragraph = activeDocument.createElement('p');
+      paragraph.appendChild(
+        activeDocument.createTextNode('Task with priority ['),
+      );
+      const tagLinkA = activeDocument.createElement('a');
+      tagLinkA.href = '#A';
+      tagLinkA.className = 'tag';
+      tagLinkA.textContent = '#A';
+      paragraph.appendChild(tagLinkA);
+      paragraph.appendChild(activeDocument.createTextNode(']'));
+      activeDocument.body.appendChild(paragraph);
 
       const processPriorityTagLinks = (
         formatter as unknown as {
@@ -1660,14 +1683,19 @@ describe('ReaderViewFormatter', () => {
       const tagLink = paragraph.querySelector('a.tag');
       expect(tagLink).toBeNull();
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should skip non-priority tag links', () => {
-      const paragraph = document.createElement('p');
-      paragraph.innerHTML =
-        'Task with tag [<a href="#important" class="tag">#important</a>]';
-      document.body.appendChild(paragraph);
+      const paragraph = activeDocument.createElement('p');
+      paragraph.appendChild(activeDocument.createTextNode('Task with tag ['));
+      const tagLinkImportant = activeDocument.createElement('a');
+      tagLinkImportant.href = '#important';
+      tagLinkImportant.className = 'tag';
+      tagLinkImportant.textContent = '#important';
+      paragraph.appendChild(tagLinkImportant);
+      paragraph.appendChild(activeDocument.createTextNode(']'));
+      activeDocument.body.appendChild(paragraph);
 
       const processPriorityTagLinks = (
         formatter as unknown as {
@@ -1680,14 +1708,14 @@ describe('ReaderViewFormatter', () => {
 
       expect(paragraph.innerHTML).toEqual(originalContent);
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
   });
 
   describe('processTaskKeywords', () => {
     test('should call processTaskListItems, processRegularParagraphs, and processBulletListItems', () => {
-      const container = document.createElement('div');
-      document.body.appendChild(container);
+      const container = activeDocument.createElement('div');
+      activeDocument.body.appendChild(container);
 
       const processTaskListItems = jest.spyOn(
         formatter as any,
@@ -1714,12 +1742,12 @@ describe('ReaderViewFormatter', () => {
       expect(processRegularParagraphs).toHaveBeenCalled();
       expect(processBulletListItems).toHaveBeenCalled();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should warn and return early if task parser is not initialized', () => {
-      const container = document.createElement('div');
-      document.body.appendChild(container);
+      const container = activeDocument.createElement('div');
+      activeDocument.body.appendChild(container);
 
       const getTaskParser = jest
         .spyOn(formatter as any, 'getTaskParser')
@@ -1740,18 +1768,18 @@ describe('ReaderViewFormatter', () => {
 
       getTaskParser.mockRestore();
       consoleWarn.mockRestore();
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('processPriorityPills', () => {
     test('should process priority pills in task list items', () => {
-      const container = document.createElement('div');
-      const taskItem = document.createElement('div');
+      const container = activeDocument.createElement('div');
+      const taskItem = activeDocument.createElement('div');
       taskItem.className = 'task-list-item';
       taskItem.textContent = 'TODO task with priority [#A]';
       container.appendChild(taskItem);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const processPriorityPills = (
         formatter as unknown as {
@@ -1766,15 +1794,15 @@ describe('ReaderViewFormatter', () => {
       expect(pill?.textContent).toBe('A');
       expect(pill?.classList.contains('priority-high')).toBe(true);
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should process priority pills in regular list items', () => {
-      const container = document.createElement('div');
-      const listItem = document.createElement('li');
+      const container = activeDocument.createElement('div');
+      const listItem = activeDocument.createElement('li');
       listItem.textContent = 'TODO task with priority [#B]';
       container.appendChild(listItem);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const processPriorityPills = (
         formatter as unknown as {
@@ -1789,18 +1817,18 @@ describe('ReaderViewFormatter', () => {
       expect(pill?.textContent).toBe('B');
       expect(pill?.classList.contains('priority-med')).toBe(true);
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should skip processing when formatTaskKeywords is false', () => {
       mockPlugin.settings.formatTaskKeywords = false;
 
-      const container = document.createElement('div');
-      const taskItem = document.createElement('div');
+      const container = activeDocument.createElement('div');
+      const taskItem = activeDocument.createElement('div');
       taskItem.className = 'task-list-item';
       taskItem.textContent = 'TODO task with priority [#A]';
       container.appendChild(taskItem);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const processPriorityPills = (
         formatter as unknown as {
@@ -1813,7 +1841,7 @@ describe('ReaderViewFormatter', () => {
       const pill = taskItem.querySelector('.todoseq-priority-badge');
       expect(pill).toBeNull();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
       mockPlugin.settings.formatTaskKeywords = true; // Reset to default
     });
   });
@@ -1870,10 +1898,10 @@ describe('ReaderViewFormatter', () => {
 
   describe('wrapDateKeyword', () => {
     test('should wrap SCHEDULED: keyword in styled spans', () => {
-      const paragraph = document.createElement('p');
-      const textNode = document.createTextNode('SCHEDULED: 2024-01-01');
+      const paragraph = activeDocument.createElement('p');
+      const textNode = activeDocument.createTextNode('SCHEDULED: 2024-01-01');
       paragraph.appendChild(textNode);
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const wrapDateKeyword = (
         formatter as unknown as {
@@ -1894,14 +1922,14 @@ describe('ReaderViewFormatter', () => {
       expect(keywordSpan).not.toBeNull();
       expect(keywordSpan?.textContent).toBe('SCHEDULED:');
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should wrap DEADLINE: keyword in styled spans', () => {
-      const paragraph = document.createElement('p');
-      const textNode = document.createTextNode('DEADLINE: 2024-01-01');
+      const paragraph = activeDocument.createElement('p');
+      const textNode = activeDocument.createTextNode('DEADLINE: 2024-01-01');
       paragraph.appendChild(textNode);
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const wrapDateKeyword = (
         formatter as unknown as {
@@ -1922,14 +1950,14 @@ describe('ReaderViewFormatter', () => {
       expect(keywordSpan).not.toBeNull();
       expect(keywordSpan?.textContent).toBe('DEADLINE:');
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should set correct aria-label on date container', () => {
-      const paragraph = document.createElement('p');
-      const textNode = document.createTextNode('SCHEDULED: 2024-01-01');
+      const paragraph = activeDocument.createElement('p');
+      const textNode = activeDocument.createTextNode('SCHEDULED: 2024-01-01');
       paragraph.appendChild(textNode);
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const wrapDateKeyword = (
         formatter as unknown as {
@@ -1948,14 +1976,14 @@ describe('ReaderViewFormatter', () => {
         'scheduled date line',
       );
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
 
     test('should set correct role attributes', () => {
-      const paragraph = document.createElement('p');
-      const textNode = document.createTextNode('SCHEDULED: 2024-01-01');
+      const paragraph = activeDocument.createElement('p');
+      const textNode = activeDocument.createTextNode('SCHEDULED: 2024-01-01');
       paragraph.appendChild(textNode);
-      document.body.appendChild(paragraph);
+      activeDocument.body.appendChild(paragraph);
 
       const wrapDateKeyword = (
         formatter as unknown as {
@@ -1975,21 +2003,21 @@ describe('ReaderViewFormatter', () => {
       const keywordSpan = paragraph.querySelector('.todoseq-scheduled-keyword');
       expect(keywordSpan?.getAttribute('role')).toBe('mark');
 
-      document.body.removeChild(paragraph);
+      activeDocument.body.removeChild(paragraph);
     });
   });
 
   describe('processDateLines', () => {
     test('should process paragraphs with SCHEDULED:', () => {
-      const container = document.createElement('div');
-      const taskParagraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const taskParagraph = activeDocument.createElement('p');
       taskParagraph.textContent = 'TODO something';
-      const dateParagraph = document.createElement('p');
+      const dateParagraph = activeDocument.createElement('p');
       dateParagraph.textContent = 'SCHEDULED: today';
 
       container.appendChild(taskParagraph);
       container.appendChild(dateParagraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const processDateLines = (
         formatter as unknown as { processDateLines: (el: HTMLElement) => void }
@@ -2001,19 +2029,19 @@ describe('ReaderViewFormatter', () => {
       );
       expect(dateContainer).not.toBeNull();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should process paragraphs with DEADLINE:', () => {
-      const container = document.createElement('div');
-      const taskParagraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const taskParagraph = activeDocument.createElement('p');
       taskParagraph.textContent = 'TODO something';
-      const dateParagraph = document.createElement('p');
+      const dateParagraph = activeDocument.createElement('p');
       dateParagraph.textContent = 'DEADLINE: today';
 
       container.appendChild(taskParagraph);
       container.appendChild(dateParagraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const processDateLines = (
         formatter as unknown as { processDateLines: (el: HTMLElement) => void }
@@ -2025,15 +2053,15 @@ describe('ReaderViewFormatter', () => {
       );
       expect(dateContainer).not.toBeNull();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should skip paragraphs without date keywords', () => {
-      const container = document.createElement('div');
-      const paragraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'Just regular text';
       container.appendChild(paragraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const processDateLines = (
         formatter as unknown as { processDateLines: (el: HTMLElement) => void }
@@ -2043,15 +2071,15 @@ describe('ReaderViewFormatter', () => {
       // Paragraph should remain unchanged
       expect(paragraph.textContent).toBe('Just regular text');
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should skip date lines without preceding task', () => {
-      const container = document.createElement('div');
-      const dateParagraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const dateParagraph = activeDocument.createElement('p');
       dateParagraph.textContent = 'SCHEDULED: today';
       container.appendChild(dateParagraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const processDateLines = (
         formatter as unknown as { processDateLines: (el: HTMLElement) => void }
@@ -2061,19 +2089,19 @@ describe('ReaderViewFormatter', () => {
       // Paragraph should remain unchanged (no preceding task)
       expect(dateParagraph.querySelector('.todoseq-scheduled-line')).toBeNull();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('findTaskForKeyword', () => {
     test('should return null if file not found', async () => {
-      const container = document.createElement('div');
-      const paragraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'TODO Test task';
       container.appendChild(paragraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
-      const keywordSpan = document.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
@@ -2100,17 +2128,17 @@ describe('ReaderViewFormatter', () => {
 
       expect(task).toBeNull();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should return null if task parser not available', async () => {
-      const container = document.createElement('div');
-      const paragraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'TODO Test task';
       container.appendChild(paragraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
-      const keywordSpan = document.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
@@ -2143,16 +2171,16 @@ describe('ReaderViewFormatter', () => {
 
       expect(task).toBeNull();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should return null if task container not found', async () => {
       // Create a keyword span not contained in any valid task container
-      const keywordSpan = document.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
-      document.body.appendChild(keywordSpan);
+      activeDocument.body.appendChild(keywordSpan);
 
       const mockFile = new TFile('test.md');
 
@@ -2186,17 +2214,17 @@ describe('ReaderViewFormatter', () => {
 
       expect(task).toBeNull();
 
-      document.body.removeChild(keywordSpan);
+      activeDocument.body.removeChild(keywordSpan);
     });
 
     test('should return null if no task found', async () => {
-      const container = document.createElement('div');
-      const paragraph = document.createElement('p');
+      const container = activeDocument.createElement('div');
+      const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'NOT A TASK';
       container.appendChild(paragraph);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
-      const keywordSpan = document.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
       keywordSpan.className = 'todoseq-keyword-formatted';
       keywordSpan.setAttribute('data-task-keyword', 'TODO');
       keywordSpan.textContent = 'TODO';
@@ -2232,26 +2260,26 @@ describe('ReaderViewFormatter', () => {
 
       expect(task).toBeNull();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should match task by priority badge for paragraphs without data-line', async () => {
       // This tests the bug fix: clicking keyword on TODO [#B] test 2 should NOT match TODO [#A] test 1
-      const container = document.createElement('div');
+      const container = activeDocument.createElement('div');
 
       // First task: TODO [#A] test 1
-      const p1 = document.createElement('p');
-      const taskContainer1 = document.createElement('span');
+      const p1 = activeDocument.createElement('p');
+      const taskContainer1 = activeDocument.createElement('span');
       taskContainer1.className = 'todoseq-task';
-      const keyword1 = document.createElement('span');
+      const keyword1 = activeDocument.createElement('span');
       keyword1.className = 'todoseq-keyword-formatted';
       keyword1.setAttribute('data-task-keyword', 'TODO');
       keyword1.textContent = 'TODO';
-      const priorityBadge1 = document.createElement('span');
+      const priorityBadge1 = activeDocument.createElement('span');
       priorityBadge1.className = 'todoseq-priority-badge priority-high';
       priorityBadge1.setAttribute('data-priority', 'A');
       priorityBadge1.textContent = 'A';
-      const text1 = document.createTextNode(' test 1');
+      const text1 = activeDocument.createTextNode(' test 1');
 
       taskContainer1.appendChild(keyword1);
       taskContainer1.appendChild(priorityBadge1);
@@ -2260,18 +2288,18 @@ describe('ReaderViewFormatter', () => {
       container.appendChild(p1);
 
       // Second task: TODO [#B] test 2
-      const p2 = document.createElement('p');
-      const taskContainer2 = document.createElement('span');
+      const p2 = activeDocument.createElement('p');
+      const taskContainer2 = activeDocument.createElement('span');
       taskContainer2.className = 'todoseq-task';
-      const keyword2 = document.createElement('span');
+      const keyword2 = activeDocument.createElement('span');
       keyword2.className = 'todoseq-keyword-formatted';
       keyword2.setAttribute('data-task-keyword', 'TODO');
       keyword2.textContent = 'TODO';
-      const priorityBadge2 = document.createElement('span');
+      const priorityBadge2 = activeDocument.createElement('span');
       priorityBadge2.className = 'todoseq-priority-badge priority-med';
       priorityBadge2.setAttribute('data-priority', 'B');
       priorityBadge2.textContent = 'B';
-      const text2 = document.createTextNode(' test 2');
+      const text2 = activeDocument.createTextNode(' test 2');
 
       taskContainer2.appendChild(keyword2);
       taskContainer2.appendChild(priorityBadge2);
@@ -2279,7 +2307,7 @@ describe('ReaderViewFormatter', () => {
       p2.appendChild(taskContainer2);
       container.appendChild(p2);
 
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const mockFile = new TFile('test.md');
       const tasksFromParser = [
@@ -2332,41 +2360,41 @@ describe('ReaderViewFormatter', () => {
       expect(task.line).toBe(1); // Should be line 1, not line 0
       expect(task.priority).toBe('B');
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should use data-line attribute for list items', async () => {
       // Test that list items with data-line attribute work correctly
-      const container = document.createElement('div');
+      const container = activeDocument.createElement('div');
 
       // Create list items with data-line attribute
-      const li1 = document.createElement('li');
+      const li1 = activeDocument.createElement('li');
       li1.setAttribute('data-line', '0');
-      const taskContainer1 = document.createElement('span');
+      const taskContainer1 = activeDocument.createElement('span');
       taskContainer1.className = 'todoseq-task';
-      const keyword1 = document.createElement('span');
+      const keyword1 = activeDocument.createElement('span');
       keyword1.className = 'todoseq-keyword-formatted';
       keyword1.setAttribute('data-task-keyword', 'TODO');
       keyword1.textContent = 'TODO';
       taskContainer1.appendChild(keyword1);
-      taskContainer1.appendChild(document.createTextNode(' task 1'));
+      taskContainer1.appendChild(activeDocument.createTextNode(' task 1'));
       li1.appendChild(taskContainer1);
       container.appendChild(li1);
 
-      const li2 = document.createElement('li');
+      const li2 = activeDocument.createElement('li');
       li2.setAttribute('data-line', '1');
-      const taskContainer2 = document.createElement('span');
+      const taskContainer2 = activeDocument.createElement('span');
       taskContainer2.className = 'todoseq-task';
-      const keyword2 = document.createElement('span');
+      const keyword2 = activeDocument.createElement('span');
       keyword2.className = 'todoseq-keyword-formatted';
       keyword2.setAttribute('data-task-keyword', 'TODO');
       keyword2.textContent = 'TODO';
       taskContainer2.appendChild(keyword2);
-      taskContainer2.appendChild(document.createTextNode(' task 2'));
+      taskContainer2.appendChild(activeDocument.createTextNode(' task 2'));
       li2.appendChild(taskContainer2);
       container.appendChild(li2);
 
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const mockFile = new TFile('test.md');
       const tasksFromParser = [
@@ -2417,27 +2445,27 @@ describe('ReaderViewFormatter', () => {
       expect(task.line).toBe(1);
       expect(task.text).toBe('task 2');
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should use substring fallback when exact text does not match', async () => {
       // Test the second-tier matching: substring match
-      const container = document.createElement('div');
-      const p = document.createElement('p');
-      const taskContainer = document.createElement('span');
+      const container = activeDocument.createElement('div');
+      const p = activeDocument.createElement('p');
+      const taskContainer = activeDocument.createElement('span');
       taskContainer.className = 'todoseq-task';
-      const keyword = document.createElement('span');
+      const keyword = activeDocument.createElement('span');
       keyword.className = 'todoseq-keyword-formatted';
       keyword.setAttribute('data-task-keyword', 'TODO');
       keyword.textContent = 'TODO';
       // Note: no priority badge in this test
       taskContainer.appendChild(keyword);
       taskContainer.appendChild(
-        document.createTextNode(' some unique task text'),
+        activeDocument.createTextNode(' some unique task text'),
       );
       p.appendChild(taskContainer);
       container.appendChild(p);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const mockFile = new TFile('test.md');
       // Parser returns slightly different text (e.g., with markdown)
@@ -2477,23 +2505,23 @@ describe('ReaderViewFormatter', () => {
       expect(task).not.toBeNull();
       expect(task.line).toBe(0);
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 
   describe('findTaskForCheckbox', () => {
     test('should find a task for a checkbox in task list item', async () => {
-      const container = document.createElement('div');
-      const taskListItem = document.createElement('div');
+      const container = activeDocument.createElement('div');
+      const taskListItem = activeDocument.createElement('div');
       taskListItem.className = 'task-list-item';
-      const checkbox = document.createElement('input');
+      const checkbox = activeDocument.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'task-list-item-checkbox';
-      const taskText = document.createTextNode('Test task');
+      const taskText = activeDocument.createTextNode('Test task');
       taskListItem.appendChild(checkbox);
       taskListItem.appendChild(taskText);
       container.appendChild(taskListItem);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const mockFile = new TFile('test.md');
       const mockTask = { id: '1', text: 'Test task', line: 0 };
@@ -2526,16 +2554,16 @@ describe('ReaderViewFormatter', () => {
 
       expect(task).toEqual(mockTask);
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
 
     test('should return null if no task list item found', async () => {
-      const container = document.createElement('div');
-      const checkbox = document.createElement('input');
+      const container = activeDocument.createElement('div');
+      const checkbox = activeDocument.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'task-list-item-checkbox';
       container.appendChild(checkbox);
-      document.body.appendChild(container);
+      activeDocument.body.appendChild(container);
 
       const mockFile = new TFile('test.md');
 
@@ -2556,13 +2584,13 @@ describe('ReaderViewFormatter', () => {
 
       const task = await findTaskForCheckbox.call(
         formatter,
-        document.createElement('div'),
+        activeDocument.createElement('div'),
         mockFile,
       );
 
       expect(task).toBeNull();
 
-      document.body.removeChild(container);
+      activeDocument.body.removeChild(container);
     });
   });
 });

@@ -7,91 +7,11 @@ import {
   DatePickerCallbacks,
   DatePickerConfig,
 } from '../src/view/components/date-picker-menu';
-
-// Extend HTMLElement with Obsidian's DOM extensions for jsdom
-declare global {
-  interface HTMLElement {
-    addClass: (cls: string) => void;
-    removeClass: (cls: string) => void;
-    hasClass: (cls: string) => boolean;
-    setText: (text: string) => void;
-    setAttr: (key: string, value: string) => void;
-    createEl: <K extends keyof HTMLElementTagNameMap>(
-      tag: K,
-      options?: {
-        cls?: string | string[];
-        attr?: Record<string, string>;
-        text?: string;
-      },
-    ) => HTMLElementTagNameMap[K];
-    createDiv: (options?: {
-      cls?: string;
-      attr?: Record<string, string>;
-    }) => HTMLDivElement;
-    createSpan: (options?: { cls?: string; text?: string }) => HTMLSpanElement;
-  }
-}
+import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
 // Install Obsidian-style DOM extensions on HTMLElement prototype
 beforeAll(() => {
-  HTMLElement.prototype.addClass = function (cls: string): void {
-    this.classList.add(cls);
-  };
-  HTMLElement.prototype.removeClass = function (cls: string): void {
-    this.classList.remove(cls);
-  };
-  HTMLElement.prototype.hasClass = function (cls: string): boolean {
-    return this.classList.contains(cls);
-  };
-  HTMLElement.prototype.setText = function (text: string): void {
-    this.textContent = text;
-  };
-  HTMLElement.prototype.setAttr = function (key: string, value: string): void {
-    this.setAttribute(key, value);
-  };
-  HTMLElement.prototype.createEl = function <
-    K extends keyof HTMLElementTagNameMap,
-  >(
-    tag: K,
-    options?: {
-      cls?: string | string[];
-      attr?: Record<string, string>;
-      text?: string;
-    },
-  ): HTMLElementTagNameMap[K] {
-    const el = document.createElement(tag);
-    if (options?.cls) {
-      if (Array.isArray(options.cls)) {
-        for (const c of options.cls) {
-          if (c) el.classList.add(c);
-        }
-      } else {
-        el.className = options.cls;
-      }
-    }
-    if (options?.attr) {
-      for (const [key, value] of Object.entries(options.attr)) {
-        el.setAttribute(key, value);
-      }
-    }
-    if (options?.text) el.textContent = options.text;
-    this.appendChild(el);
-    return el;
-  };
-  HTMLElement.prototype.createDiv = function (options?: {
-    cls?: string;
-    attr?: Record<string, string>;
-  }): HTMLDivElement {
-    return this.createEl('div', options);
-  };
-  HTMLElement.prototype.createSpan = function (options?: {
-    cls?: string;
-    text?: string;
-  }): HTMLSpanElement {
-    return this.createEl('span', options);
-  };
-  // Mock window.activeDocument for Obsidian API compatibility
-  (window as any).activeDocument = document;
+  installObsidianDomMocks();
 });
 
 // Mock obsidian module
@@ -117,7 +37,7 @@ describe('DatePicker', () => {
 
   beforeEach(() => {
     // Clean up DOM
-    document.body.innerHTML = '';
+    activeDocument.body.innerHTML = '';
 
     callbacks = {
       onDateSelected: jest.fn(),
@@ -153,20 +73,20 @@ describe('DatePicker', () => {
 
     it('should create a container element in DOM', async () => {
       await picker.show({ x: 100, y: 100 });
-      const container = document.querySelector('.todoseq-date-picker');
+      const container = activeDocument.querySelector('.todoseq-date-picker');
       expect(container).not.toBeNull();
     });
 
     it('should remove container element from DOM on hide', async () => {
       await picker.show({ x: 100, y: 100 });
       picker.hide();
-      const container = document.querySelector('.todoseq-date-picker');
+      const container = activeDocument.querySelector('.todoseq-date-picker');
       expect(container).toBeNull();
     });
 
     it('should set role=menu on container', async () => {
       await picker.show({ x: 100, y: 100 });
-      const container = document.querySelector('.todoseq-date-picker');
+      const container = activeDocument.querySelector('.todoseq-date-picker');
       expect(container?.getAttribute('role')).toBe('menu');
     });
   });
@@ -212,7 +132,7 @@ describe('DatePicker', () => {
       });
 
       await picker.show({ x: 100, y: 100 });
-      const container = document.querySelector(
+      const container = activeDocument.querySelector(
         '.todoseq-date-picker',
       ) as HTMLElement;
 
@@ -236,7 +156,7 @@ describe('DatePicker', () => {
       });
 
       await picker.show({ x: 100, y: 100 });
-      const container = document.querySelector(
+      const container = activeDocument.querySelector(
         '.todoseq-date-picker',
       ) as HTMLElement;
 
@@ -260,7 +180,7 @@ describe('DatePicker', () => {
 
       // Position near right edge
       await picker.show({ x: 350, y: 100 });
-      const container = document.querySelector(
+      const container = activeDocument.querySelector(
         '.todoseq-date-picker',
       ) as HTMLElement;
 
@@ -283,7 +203,7 @@ describe('DatePicker', () => {
 
       // Position near bottom edge
       await picker.show({ x: 100, y: 350 });
-      const container = document.querySelector(
+      const container = activeDocument.querySelector(
         '.todoseq-date-picker',
       ) as HTMLElement;
 

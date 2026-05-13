@@ -866,7 +866,9 @@ export class SearchEvaluator {
     if (propertyValue === null || (propertyValue === '' && !node.exact)) {
       // Check if property exists (regardless of value)
       if (effectiveCaseSensitive) {
-        return Object.prototype.hasOwnProperty.call(frontmatter, propertyKey);
+        return Boolean(
+          Object.prototype.hasOwnProperty.call(frontmatter, propertyKey),
+        );
       } else {
         // Case insensitive key search
         const lowerField = propertyKey.toLowerCase();
@@ -879,10 +881,10 @@ export class SearchEvaluator {
     // Handle null value search (e.g., [type:null])
     if (propertyValue === 'null') {
       if (effectiveCaseSensitive) {
-        return (
-          Object.prototype.hasOwnProperty.call(frontmatter, propertyKey) &&
-          frontmatter[propertyKey] === null
+        const hasKey = Boolean(
+          Object.prototype.hasOwnProperty.call(frontmatter, propertyKey),
         );
+        return hasKey && frontmatter[propertyKey] === null;
       } else {
         // Case insensitive key search for null value
         const lowerField = propertyKey.toLowerCase();

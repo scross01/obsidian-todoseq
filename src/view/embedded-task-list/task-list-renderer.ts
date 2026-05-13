@@ -303,13 +303,13 @@ export class EmbeddedTaskListRenderer {
       const hasTitle = !!params.title;
       const taskListContainer = container.querySelector(
         '.todoseq-embedded-task-list-container',
-      ) as HTMLElement | null;
+      );
 
       // Check if we can do an incremental update (container exists with correct structure)
       if (taskListContainer) {
         // Incremental update - keep header, just update state and content
         this.updateCollapsibleList(
-          taskListContainer,
+          taskListContainer as HTMLElement,
           tasks,
           params,
           isCollapsed ?? true,
@@ -2047,7 +2047,7 @@ export class EmbeddedTaskListRenderer {
   }
 
   private clearAllPressed(): void {
-    document
+    activeDocument
       .querySelectorAll('.todoseq-embedded-task-item.todoseq-pressed')
       .forEach((el) => el.classList.remove('todoseq-pressed'));
   }
@@ -2197,7 +2197,9 @@ export class EmbeddedTaskListRenderer {
       // 3. Open in current active tab if it's markdown
       // 4. Open new tab if no pages already open
       else {
-        const currentActiveLeaf = workspace.activeLeaf;
+        const currentActiveLeaf =
+          workspace.getActiveViewOfType(MarkdownView)?.leaf ??
+          workspace.getLeaf();
         const isCurrentActiveMarkdown =
           currentActiveLeaf && isMarkdownLeaf(currentActiveLeaf);
 
@@ -2245,7 +2247,7 @@ export class EmbeddedTaskListRenderer {
         .openFile(file)
         .then(() => {
           // Focus the editor and move cursor to the task line with highlighting
-          activeWindow.setTimeout(() => {
+          window.setTimeout(() => {
             // Check the view in the target leaf, not the active view
             // This prevents highlighting the wrong file when Obsidian doesn't support
             // certain file types (e.g., .org files)
@@ -2256,7 +2258,7 @@ export class EmbeddedTaskListRenderer {
               !leafView.editor
             ) {
               console.debug(
-                `TaskListRenderer: No valid MarkdownView in leaf - leafView: ${leafView}, is MarkdownView: ${leafView instanceof MarkdownView}, has editor: ${(leafView as MarkdownView).editor ? 'yes' : 'no'}`,
+                `TaskListRenderer: No valid MarkdownView in leaf - leafView: ${leafView?.getViewType?.() || 'unknown'}, is MarkdownView: ${leafView instanceof MarkdownView}, has editor: ${(leafView as MarkdownView).editor ? 'yes' : 'no'}`,
               );
               return;
             }
@@ -2305,7 +2307,7 @@ export class EmbeddedTaskListRenderer {
 
             // Reveal the leaf to ensure proper focus
             if (targetLeaf) {
-              workspace.revealLeaf(targetLeaf);
+              void workspace.revealLeaf(targetLeaf);
             }
           }, 100);
         })

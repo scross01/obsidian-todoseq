@@ -190,7 +190,7 @@ export class UIManager {
     this.plugin.registerEvent(
       this.plugin.app.workspace.on('file-open', () => {
         // Small delay to allow the editor to fully initialize
-        activeWindow.setTimeout(() => {
+        window.setTimeout(() => {
           setupEditorListeners();
         }, 100);
       }),
@@ -345,9 +345,8 @@ export class UIManager {
   private async handleTaskKeywordClick(
     keywordElement: HTMLElement,
     view: MarkdownView,
+    event?: MouseEvent,
   ): Promise<void> {
-    // Prevent default behavior and stop propagation
-    const event = window.event as MouseEvent;
     if (event) {
       event.preventDefault();
       event.stopPropagation();
@@ -396,7 +395,7 @@ export class UIManager {
 
     // Clear any pending single click timeout
     if (this.pendingClickTimeout) {
-      activeWindow.clearTimeout(this.pendingClickTimeout);
+      window.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
     }
 
@@ -463,10 +462,12 @@ export class UIManager {
 
       // Process as single click only if click wasn't cancelled
       if (!clickCancelled) {
-        this.handleTaskKeywordClick(keywordElement, view).catch((error) => {
-          new Notice('Failed to update task');
-          console.error('Error updating task:', error);
-        });
+        this.handleTaskKeywordClick(keywordElement, view, event).catch(
+          (error) => {
+            new Notice('Failed to update task');
+            console.error('Error updating task:', error);
+          },
+        );
       }
     }, 300); // Standard double-click detection window
   }
@@ -476,7 +477,7 @@ export class UIManager {
    */
   private cancelPendingClick(): void {
     if (this.pendingClickTimeout) {
-      activeWindow.clearTimeout(this.pendingClickTimeout);
+      window.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
     }
 
@@ -536,7 +537,7 @@ export class UIManager {
    */
   public getEditorViewFromElement(element: HTMLElement): EditorView | null {
     // Find the closest CodeMirror editor container
-    const editorContainer = element.closest('.cm-editor') as HTMLElement | null;
+    const editorContainer = element.closest('.cm-editor');
     if (!editorContainer) {
       return null;
     }
@@ -597,7 +598,7 @@ export class UIManager {
       this.plugin.app.workspace.on('file-open', (file) => {
         if (file instanceof TFile && file.extension === 'md') {
           // Small delay to allow editor to fully load
-          activeWindow.setTimeout(() => {
+          window.setTimeout(() => {
             this.addContextMenuToEditor();
           }, 100);
         }
@@ -624,9 +625,7 @@ export class UIManager {
 
           // Use .closest() to reliably find the keyword element regardless of nesting
           // This handles cases where the click target is a child element of the keyword span
-          const keywordElement = target.closest(
-            '.todoseq-keyword-formatted',
-          ) as HTMLElement | null;
+          const keywordElement = target.closest('.todoseq-keyword-formatted');
 
           if (keywordElement) {
             const keyword = keywordElement.getAttribute('data-task-keyword');
@@ -638,7 +637,7 @@ export class UIManager {
               // Open the context menu
               this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
                 keyword,
-                keywordElement,
+                keywordElement as HTMLElement,
                 evt,
               );
             }
@@ -679,7 +678,7 @@ export class UIManager {
 
       if (leaf) {
         // Only reveal if the leaf is not already active to avoid focus stealing
-        const activeLeaf = workspace.activeLeaf;
+        const activeLeaf = workspace.getLeaf(false);
         if (activeLeaf !== leaf && reveal) {
           await workspace.revealLeaf(leaf);
         }
@@ -710,7 +709,7 @@ export class UIManager {
           console.error('Error setting view state:', error);
         });
       // Only reveal if the leaf is not already active to avoid focus stealing
-      const activeLeaf = workspace.activeLeaf;
+      const activeLeaf = workspace.getLeaf(false);
       if (activeLeaf !== leaf && reveal) {
         await workspace.revealLeaf(leaf);
       }

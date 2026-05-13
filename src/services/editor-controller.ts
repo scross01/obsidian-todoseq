@@ -1281,14 +1281,14 @@ export class EditorController {
         onCopyTask: (task: Task) => {
           this.handleCopyTaskAtCursor(false, editor, view);
         },
-        onCopyTaskToToday: async (task: Task) => {
-          await this.handleCopyTaskToTodayAtCursor(false, editor, view);
+        onCopyTaskToToday: (task: Task) => {
+          this.handleCopyTaskToTodayAtCursor(false, editor, view);
         },
-        onMoveTaskToToday: async (task: Task) => {
-          await this.handleMoveTaskToTodayAtCursor(false, editor, view);
+        onMoveTaskToToday: (task: Task) => {
+          this.handleMoveTaskToTodayAtCursor(false, editor, view);
         },
-        onMigrateTaskToToday: async (task: Task) => {
-          await this.handleMigrateTaskToTodayAtCursor(false, editor, view);
+        onMigrateTaskToToday: (task: Task) => {
+          this.handleMigrateTaskToTodayAtCursor(false, editor, view);
         },
         onPriorityChange: (
           task: Task,

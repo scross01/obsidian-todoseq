@@ -720,10 +720,7 @@ export class DatePicker extends BaseDialog {
     }
 
     // Append submenu temporarily to measure its height
-    this.timePickerSubmenu.style.position = 'absolute';
-    this.timePickerSubmenu.style.left = '0';
-    this.timePickerSubmenu.style.top = '0';
-    this.timePickerSubmenu.style.visibility = 'hidden';
+    this.timePickerSubmenu.addClass('todoseq-date-picker-submenu-measuring');
     this.containerEl.appendChild(this.timePickerSubmenu);
 
     // Measure submenu height
@@ -731,9 +728,9 @@ export class DatePicker extends BaseDialog {
 
     // Position the submenu to overlay (above the time section)
     const timeSectionOffsetTop = this.timeSection.offsetTop;
+    this.timePickerSubmenu.removeClass('todoseq-date-picker-submenu-measuring');
     this.timePickerSubmenu.style.top = `${timeSectionOffsetTop - submenuHeight}px`;
-    this.timePickerSubmenu.style.visibility = 'visible';
-    this.timePickerSubmenu.style.zIndex = '1000';
+    this.timePickerSubmenu.addClass('todoseq-date-picker-submenu-visible');
 
     // Scroll the target row into view
     if (targetRow) {
@@ -883,10 +880,7 @@ export class DatePicker extends BaseDialog {
     this.repeatPickerSubmenu.appendChild(customRow);
 
     // Append submenu temporarily to measure its height
-    this.repeatPickerSubmenu.style.position = 'absolute';
-    this.repeatPickerSubmenu.style.left = '0';
-    this.repeatPickerSubmenu.style.top = '0';
-    this.repeatPickerSubmenu.style.visibility = 'hidden';
+    this.repeatPickerSubmenu.addClass('todoseq-date-picker-submenu-measuring');
     this.containerEl.appendChild(this.repeatPickerSubmenu);
 
     // Measure submenu height
@@ -894,9 +888,11 @@ export class DatePicker extends BaseDialog {
 
     // Position the submenu to overlay (above the repeat section)
     const repeatSectionOffsetTop = this.repeatSection.offsetTop;
+    this.repeatPickerSubmenu.removeClass(
+      'todoseq-date-picker-submenu-measuring',
+    );
     this.repeatPickerSubmenu.style.top = `${repeatSectionOffsetTop - submenuHeight}px`;
-    this.repeatPickerSubmenu.style.visibility = 'visible';
-    this.repeatPickerSubmenu.style.zIndex = '1000';
+    this.repeatPickerSubmenu.addClass('todoseq-date-picker-submenu-visible');
   }
 
   private closeRepeatPicker(): void {
@@ -923,7 +919,7 @@ export class DatePicker extends BaseDialog {
     const header = this.customRepeatDialog.createEl('div', {
       cls: 'todoseq-date-picker-custom-repeat-header',
     });
-    header.setText('Custom Repeat');
+    header.setText('Custom repeat');
 
     // Repeat type section
     const typeLabel = this.customRepeatDialog.createEl('div', {
@@ -1034,13 +1030,8 @@ export class DatePicker extends BaseDialog {
     saveBtn.addEventListener('click', (evt) => {
       evt.preventDefault();
       evt.stopPropagation();
-      const value = parseInt((valueInput as HTMLInputElement).value, 10) || 1;
-      const unit = (unitSelect as HTMLSelectElement).value as
-        | 'y'
-        | 'm'
-        | 'w'
-        | 'd'
-        | 'h';
+      const value = parseInt(valueInput.value, 10) || 1;
+      const unit = unitSelect.value as 'y' | 'm' | 'w' | 'd' | 'h';
       const repeat: DateRepeatInfo = {
         type: selectedType,
         unit,
@@ -1053,9 +1044,9 @@ export class DatePicker extends BaseDialog {
     });
 
     // Position the dialog
-    this.customRepeatDialog.style.left = '50%';
-    this.customRepeatDialog.style.top = '50%';
-    this.customRepeatDialog.style.transform = 'translate(-50%, -50%)';
+    this.customRepeatDialog.addClass(
+      'todoseq-date-picker-custom-repeat-centered',
+    );
 
     this.containerEl.appendChild(this.customRepeatDialog);
   }

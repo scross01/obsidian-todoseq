@@ -113,10 +113,9 @@ export class RecurrenceCoordinator {
     this.cancelRecurrence(task);
 
     // Schedule the update
-    const timeout = activeWindow.setTimeout(async () => {
+    const timeout = window.setTimeout(() => {
       this.recurrenceTimeouts.delete(key);
-
-      await this.performRecurrenceUpdate(task);
+      void this.performRecurrenceUpdate(task);
     }, delayMs);
 
     this.recurrenceTimeouts.set(key, timeout);
@@ -132,7 +131,7 @@ export class RecurrenceCoordinator {
     const timeout = this.recurrenceTimeouts.get(key);
 
     if (timeout) {
-      activeWindow.clearTimeout(timeout);
+      window.clearTimeout(timeout);
       this.recurrenceTimeouts.delete(key);
     }
   }
@@ -243,7 +242,7 @@ export class RecurrenceCoordinator {
    */
   destroy(): void {
     for (const timeout of this.recurrenceTimeouts.values()) {
-      activeWindow.clearTimeout(timeout);
+      window.clearTimeout(timeout);
     }
     this.recurrenceTimeouts.clear();
   }

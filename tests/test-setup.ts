@@ -20,16 +20,25 @@ global.console = {
   error: console.error, // Keep error to surface real issues
 };
 
-// Mock activeWindow for popout window compatibility
-(globalThis as Record<string, unknown>).activeWindow = {
-  setTimeout: global.setTimeout.bind(global),
-  clearTimeout: global.clearTimeout.bind(global),
-  setInterval: global.setInterval.bind(global),
-  clearInterval: global.clearInterval.bind(global),
-  requestAnimationFrame:
-    global.requestAnimationFrame?.bind(global) ??
-    ((cb: () => void) => setTimeout(cb)),
-  cancelAnimationFrame:
-    global.cancelAnimationFrame?.bind(global) ??
-    ((id: number) => clearTimeout(id)),
-};
+// Mock window and activeWindow for popout window compatibility (timers)
+// Only set up if window is not already defined (i.e. not in jsdom environment)
+if (typeof globalThis.window === 'undefined') {
+  const mockWindow = {
+    setTimeout: global.setTimeout.bind(global),
+    clearTimeout: global.clearTimeout.bind(global),
+    setInterval: global.setInterval.bind(global),
+    clearInterval: global.clearInterval.bind(global),
+    requestAnimationFrame:
+      global.requestAnimationFrame?.bind(global) ??
+      ((cb: () => void) => setTimeout(cb)),
+    cancelAnimationFrame:
+      global.cancelAnimationFrame?.bind(global) ??
+      ((id: number) => clearTimeout(id)),
+  };
+
+  (globalThis as Record<string, unknown>).window = mockWindow;
+  (globalThis as Record<string, unknown>).activeWindow = mockWindow;
+} else {
+  // In jsdom, set activeWindow to the existing window
+  (globalThis as Record<string, unknown>).activeWindow = globalThis.window;
+}

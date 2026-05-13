@@ -111,7 +111,7 @@ export class StateMenuBuilder {
         menu.addItem((item) => {
           item.setTitle(state);
           item.onClick(() => {
-            onStateSelected(state);
+            void onStateSelected(state);
           });
         });
       }

@@ -15,10 +15,11 @@ import { KeywordManager } from '../src/utils/keyword-manager';
 import { DateUtils } from '../src/utils/date-utils';
 
 // Mock Obsidian app for testing
-const createMockApp = (): App => {
+const MOCK_CONFIG_DIR = 'config-dir';
+const createMockApp = (configDir: string = MOCK_CONFIG_DIR): App => {
   return {
     vault: {
-      configDir: '.obsidian',
+      configDir,
       adapter: {
         read: jest.fn(),
       } as unknown as DataAdapter,
@@ -72,7 +73,7 @@ urgency.waiting.coefficient = -3.0
     expect(coefficients.waiting).toBe(-3.0);
 
     expect(mockApp.vault.adapter.read).toHaveBeenCalledWith(
-      '.obsidian/plugins/todoseq/urgency.ini',
+      `${mockApp.vault.configDir}/plugins/todoseq/urgency.ini`,
     );
   });
 

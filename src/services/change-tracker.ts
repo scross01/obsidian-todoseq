@@ -44,7 +44,7 @@ export function createPendingChange(
     timestamp,
     timeout,
     metadata,
-    isExpired() {
+    isExpired(this: PendingChange) {
       return Date.now() - this.timestamp > this.timeout;
     },
   };
@@ -102,7 +102,7 @@ export interface ChangeTrackerOptions {
 export class ChangeTracker {
   private pendingChanges: Map<string, PendingChange> = new Map();
   private readonly defaultTimeoutMs: number;
-  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private cleanupInterval: number | null = null;
 
   constructor(options: ChangeTrackerOptions = {}) {
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 5000;
@@ -217,7 +217,7 @@ export class ChangeTracker {
    */
   private startCleanup(): void {
     // Clean up every second
-    this.cleanupInterval = setInterval(() => {
+    this.cleanupInterval = window.setInterval(() => {
       this.cleanupExpired();
     }, 1000);
   }
@@ -227,7 +227,7 @@ export class ChangeTracker {
    */
   destroy(): void {
     if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
+      window.clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
     }
     this.pendingChanges.clear();

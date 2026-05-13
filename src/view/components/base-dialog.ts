@@ -129,8 +129,7 @@ export abstract class BaseDialog {
     if (!this.containerEl) return;
 
     // Position initially off-screen to measure
-    this.containerEl.style.left = '-9999px';
-    this.containerEl.style.top = '-9999px';
+    this.containerEl.addClass('todoseq-dialog-offscreen');
 
     // Force layout to get dimensions
     const rect = this.containerEl.getBoundingClientRect();
@@ -167,6 +166,7 @@ export abstract class BaseDialog {
       }
     }
 
+    this.containerEl.removeClass('todoseq-dialog-offscreen');
     this.containerEl.style.left = `${left}px`;
     this.containerEl.style.top = `${top}px`;
   }

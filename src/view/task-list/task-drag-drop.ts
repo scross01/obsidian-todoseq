@@ -58,7 +58,7 @@ export class TaskDragDropHandler {
 
   private onDragStart = (evt: DragEvent): void => {
     const target = (evt.target as HTMLElement)?.closest?.('.todoseq-task-item');
-    if (!target || !(target instanceof HTMLElement)) return;
+    if (!target || !target.instanceOf(HTMLElement)) return;
 
     const path = target.getAttribute('data-path');
     const lineStr = target.getAttribute('data-line');
@@ -80,7 +80,7 @@ export class TaskDragDropHandler {
     if (evt.dataTransfer) {
       evt.dataTransfer.setData('text/plain', task.state + ' ' + task.text);
       evt.dataTransfer.effectAllowed = 'all';
-      // eslint-disable-next-line no-undef
+
       const img = new Image();
       img.src =
         'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=';
@@ -262,6 +262,7 @@ export class TaskDragDropHandler {
 
     if (action === 'migrate' && !this.plugin.settings.migrateToTodayState) {
       new Notice(
+        // eslint-disable-next-line obsidianmd/ui/sentence-case
         'Migration is disabled. Configure the migrated state keyword in TODOseq settings.',
       );
       return;

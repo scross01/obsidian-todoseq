@@ -32,12 +32,9 @@ export class EditorKeywordMenu {
     BaseDialog.closeAnyActiveDialog();
 
     // Use the shared menu builder
-    const menu = this.menuBuilder.buildStateMenu(
-      state,
-      async (newState: string) => {
-        await this.updateTaskKeywordState(state, keywordElement, newState);
-      },
-    );
+    const menu = this.menuBuilder.buildStateMenu(state, (newState: string) => {
+      this.updateTaskKeywordState(state, keywordElement, newState);
+    });
 
     // Show menu at mouse position
     menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
@@ -46,19 +43,17 @@ export class EditorKeywordMenu {
   /**
    * Update the task keyword state using UIManager and EditorController
    */
-  private async updateTaskKeywordState(
+  private updateTaskKeywordState(
     state: string,
     keywordElement: HTMLElement,
     newState: string,
-  ): Promise<void> {
-    // Use UIManager's methods to get line number and update through EditorController
+  ): void {
     const currentLine = this.plugin.uiManager.getLineForElement(keywordElement);
 
     if (currentLine !== null) {
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
       if (view && view.editor) {
-        // handleUpdateTaskStateAtLine is now async, so we need to await it
-        await this.plugin.editorController.handleUpdateTaskStateAtLine(
+        this.plugin.editorController.handleUpdateTaskStateAtLine(
           false,
           currentLine - 1,
           view.editor,

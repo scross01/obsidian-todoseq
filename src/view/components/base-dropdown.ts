@@ -48,7 +48,7 @@ export abstract class BaseDropdown {
     };
 
     this.blurHandler = () => {
-      requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
         if (!this.shouldPreventHide()) {
           this.hide();
         }

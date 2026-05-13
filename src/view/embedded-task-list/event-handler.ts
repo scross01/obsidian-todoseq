@@ -211,12 +211,10 @@ export class EmbeddedTaskListEventHandler {
         (id: string) => this.toggleCollapse(id),
         containerId,
       );
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error refreshing code block:', error);
-      this.renderer.renderError(
-        codeBlock.element,
-        `Refresh error: ${error.message}`,
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      this.renderer.renderError(codeBlock.element, `Refresh error: ${message}`);
     }
   }
 
