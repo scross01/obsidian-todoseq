@@ -26,6 +26,10 @@ global.console = {
   clearTimeout: global.clearTimeout.bind(global),
   setInterval: global.setInterval.bind(global),
   clearInterval: global.clearInterval.bind(global),
-  requestAnimationFrame: global.requestAnimationFrame?.bind(global) ?? ((cb: () => void) => setTimeout(cb)),
-  cancelAnimationFrame: global.cancelAnimationFrame?.bind(global) ?? ((id: number) => clearTimeout(id)),
+  requestAnimationFrame:
+    global.requestAnimationFrame?.bind(global) ??
+    ((cb: () => void) => setTimeout(cb)),
+  cancelAnimationFrame:
+    global.cancelAnimationFrame?.bind(global) ??
+    ((id: number) => clearTimeout(id)),
 };

@@ -2151,7 +2151,7 @@ export class ReaderViewFormatter {
 
     // Clear any pending single click timeout
     if (this.pendingClickTimeout) {
-      clearTimeout(this.pendingClickTimeout);
+      activeWindow.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
     }
 
@@ -2194,7 +2194,7 @@ export class ReaderViewFormatter {
 
     // Clear any pending single click timeout
     if (this.pendingClickTimeout) {
-      clearTimeout(this.pendingClickTimeout);
+      activeWindow.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
       this.lastClickedElement = null;
       this.lastClickTime = 0;
@@ -2481,7 +2481,7 @@ export class ReaderViewFormatter {
   cleanup(): void {
     // Clear any pending timeouts
     if (this.pendingClickTimeout) {
-      clearTimeout(this.pendingClickTimeout);
+      activeWindow.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
     }
   }

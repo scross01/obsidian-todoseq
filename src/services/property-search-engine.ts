@@ -797,7 +797,7 @@ export class PropertySearchEngine {
     this.reset();
     // Clear any pending update timeout
     if (this.pendingUpdateTimeout) {
-      clearTimeout(this.pendingUpdateTimeout);
+      activeWindow.clearTimeout(this.pendingUpdateTimeout);
       this.pendingUpdateTimeout = null;
     }
   }

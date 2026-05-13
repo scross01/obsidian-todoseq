@@ -193,7 +193,12 @@ describe('RecurrenceCoordinator', () => {
     });
 
     it('should clear all timeouts', () => {
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+      const clearTimeoutSpy = jest.spyOn(
+        (globalThis as Record<string, unknown>).activeWindow as {
+          clearTimeout: typeof global.clearTimeout;
+        },
+        'clearTimeout',
+      );
 
       const task1 = createMockTask({ path: 'test1.md', line: 0 });
       const task2 = createMockTask({ path: 'test2.md', line: 0 });

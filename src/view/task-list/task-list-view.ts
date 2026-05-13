@@ -211,7 +211,7 @@ export class TaskListView extends ItemView {
       async (tasks) => {
         // Cancel any pending debounced refresh - process immediately (interrupt pattern)
         if (this.taskRefreshTimeout) {
-          clearTimeout(this.taskRefreshTimeout);
+          activeWindow.clearTimeout(this.taskRefreshTimeout);
           this.taskRefreshTimeout = null;
         }
 
@@ -444,7 +444,7 @@ export class TaskListView extends ItemView {
     inputEl.addEventListener('input', async () => {
       // Debounce search refresh to avoid excessive re-renders
       if (this.searchRefreshDebounceTimer) {
-        clearTimeout(this.searchRefreshDebounceTimer);
+        activeWindow.clearTimeout(this.searchRefreshDebounceTimer);
       }
       this.searchRefreshDebounceTimer = activeWindow.setTimeout(async () => {
         this.searchRefreshDebounceTimer = null;
@@ -933,7 +933,7 @@ export class TaskListView extends ItemView {
     if (suggestionVisible || optionsVisible) {
       // A dropdown is visible - clear the debounce timer
       if (this.searchHistoryDebounceTimer) {
-        clearTimeout(this.searchHistoryDebounceTimer);
+        activeWindow.clearTimeout(this.searchHistoryDebounceTimer);
         this.searchHistoryDebounceTimer = null;
       }
     } else {
@@ -959,7 +959,7 @@ export class TaskListView extends ItemView {
 
     // Clear any existing timer
     if (this.searchHistoryDebounceTimer) {
-      clearTimeout(this.searchHistoryDebounceTimer);
+      activeWindow.clearTimeout(this.searchHistoryDebounceTimer);
       this.searchHistoryDebounceTimer = null;
     }
 
@@ -1523,7 +1523,7 @@ export class TaskListView extends ItemView {
 
     // Cancel any pending debounced refresh - this call takes precedence
     if (this.taskRefreshTimeout) {
-      clearTimeout(this.taskRefreshTimeout);
+      activeWindow.clearTimeout(this.taskRefreshTimeout);
       this.taskRefreshTimeout = null;
     }
 
@@ -2228,19 +2228,19 @@ export class TaskListView extends ItemView {
 
     // Cleanup search history debounce timer
     if (this.searchHistoryDebounceTimer) {
-      clearTimeout(this.searchHistoryDebounceTimer);
+      activeWindow.clearTimeout(this.searchHistoryDebounceTimer);
       this.searchHistoryDebounceTimer = null;
     }
 
     // Cleanup search refresh debounce timer
     if (this.searchRefreshDebounceTimer) {
-      clearTimeout(this.searchRefreshDebounceTimer);
+      activeWindow.clearTimeout(this.searchRefreshDebounceTimer);
       this.searchRefreshDebounceTimer = null;
     }
 
     // Cleanup task refresh debounce timer
     if (this.taskRefreshTimeout) {
-      clearTimeout(this.taskRefreshTimeout);
+      activeWindow.clearTimeout(this.taskRefreshTimeout);
       this.taskRefreshTimeout = null;
     }
 

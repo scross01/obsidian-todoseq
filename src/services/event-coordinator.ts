@@ -129,7 +129,7 @@ export class EventCoordinator {
 
     const existingTimeout = this.fileChangeTimeouts.get(tFile.path);
     if (existingTimeout) {
-      clearTimeout(existingTimeout);
+      activeWindow.clearTimeout(existingTimeout);
     }
 
     const timeout = activeWindow.setTimeout(() => {
@@ -175,7 +175,7 @@ export class EventCoordinator {
     }
 
     if (this.batchTimeout) {
-      clearTimeout(this.batchTimeout);
+      activeWindow.clearTimeout(this.batchTimeout);
     }
 
     this.batchTimeout = activeWindow.setTimeout(() => {
@@ -266,7 +266,7 @@ export class EventCoordinator {
 
   async flush(): Promise<void> {
     if (this.batchTimeout) {
-      clearTimeout(this.batchTimeout);
+      activeWindow.clearTimeout(this.batchTimeout);
       this.batchTimeout = null;
     }
     await this.processBatch();
@@ -311,7 +311,9 @@ export class EventCoordinator {
     // Flush any pending events before clearing timeouts
     await this.flush();
 
-    this.fileChangeTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.fileChangeTimeouts.forEach((timeout) =>
+      activeWindow.clearTimeout(timeout),
+    );
     this.fileChangeTimeouts.clear();
 
     if (this.vaultModifyRef) {

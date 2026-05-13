@@ -29,7 +29,7 @@ export class StatusBarManager {
 
     this.plugin.taskStateManager.subscribe((tasks: Task[]) => {
       if (statusBarTimeout) {
-        clearTimeout(statusBarTimeout);
+        activeWindow.clearTimeout(statusBarTimeout);
       }
       statusBarTimeout = activeWindow.setTimeout(() => {
         // Clear timeout reference to indicate no pending debounced update

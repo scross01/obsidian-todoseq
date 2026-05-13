@@ -45,7 +45,7 @@ export class TodoseqCodeBlockProcessor {
           return;
         }
         if (embedRefreshTimeout) {
-          clearTimeout(embedRefreshTimeout);
+          activeWindow.clearTimeout(embedRefreshTimeout);
         }
         embedRefreshTimeout = activeWindow.setTimeout(() => {
           embedRefreshTimeout = null;

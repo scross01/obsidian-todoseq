@@ -396,7 +396,7 @@ export class UIManager {
 
     // Clear any pending single click timeout
     if (this.pendingClickTimeout) {
-      clearTimeout(this.pendingClickTimeout);
+      activeWindow.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
     }
 
@@ -476,7 +476,7 @@ export class UIManager {
    */
   private cancelPendingClick(): void {
     if (this.pendingClickTimeout) {
-      clearTimeout(this.pendingClickTimeout);
+      activeWindow.clearTimeout(this.pendingClickTimeout);
       this.pendingClickTimeout = null;
     }
 

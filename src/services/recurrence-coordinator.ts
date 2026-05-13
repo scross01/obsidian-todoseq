@@ -132,7 +132,7 @@ export class RecurrenceCoordinator {
     const timeout = this.recurrenceTimeouts.get(key);
 
     if (timeout) {
-      clearTimeout(timeout);
+      activeWindow.clearTimeout(timeout);
       this.recurrenceTimeouts.delete(key);
     }
   }
@@ -243,7 +243,7 @@ export class RecurrenceCoordinator {
    */
   destroy(): void {
     for (const timeout of this.recurrenceTimeouts.values()) {
-      clearTimeout(timeout);
+      activeWindow.clearTimeout(timeout);
     }
     this.recurrenceTimeouts.clear();
   }

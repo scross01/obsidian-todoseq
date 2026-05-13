@@ -274,7 +274,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           // Clear any pending debounce timer for this specific group
           const existingTimer = this.keywordGroupDebounceTimers.get(settingKey);
           if (existingTimer) {
-            clearTimeout(existingTimer);
+            activeWindow.clearTimeout(existingTimer);
           }
 
           // Debounce the expensive operations
@@ -548,7 +548,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
             // Debounce validation to allow user to finish typing
             if (this.transitionValidationDebounceTimer) {
-              clearTimeout(this.transitionValidationDebounceTimer);
+              activeWindow.clearTimeout(this.transitionValidationDebounceTimer);
             }
             this.transitionValidationDebounceTimer = activeWindow.setTimeout(
               () => {
