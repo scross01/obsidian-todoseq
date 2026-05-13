@@ -829,22 +829,21 @@ export class DatePicker extends BaseDialog {
     ];
 
     for (const option of presetOptions) {
-      const row = window.activeDocument.createElement('div');
-      row.className = 'menu-item todoseq-date-picker-submenu-row';
-      row.setAttribute('role', 'menuitem');
-      row.setAttribute('tabindex', '-1');
+      const row = this.repeatPickerSubmenu.createDiv({
+        cls: 'menu-item todoseq-date-picker-submenu-row',
+        attr: { role: 'menuitem', tabindex: '-1' },
+      });
 
-      const labelSpan = window.activeDocument.createElement('span');
-      labelSpan.className = 'menu-item-title todoseq-date-picker-submenu-label';
-      labelSpan.setText(option.label);
-      row.appendChild(labelSpan);
+      row.createSpan({
+        cls: 'menu-item-title todoseq-date-picker-submenu-label',
+        text: option.label,
+      });
 
-      const valueSpan = window.activeDocument.createElement('span');
-      valueSpan.className = 'todoseq-date-picker-submenu-value';
-      valueSpan.setText(option.repeat.raw);
-      row.appendChild(valueSpan);
+      row.createSpan({
+        cls: 'todoseq-date-picker-submenu-value',
+        text: option.repeat.raw,
+      });
 
-      // Highlight if selected
       if (
         this.selectedRepeat &&
         this.selectedRepeat.raw === option.repeat.raw
@@ -856,28 +855,23 @@ export class DatePicker extends BaseDialog {
         evt.stopPropagation();
         this.selectRepeat(option.repeat);
       });
-
-      this.repeatPickerSubmenu.appendChild(row);
     }
 
-    // Custom option
-    const customRow = window.activeDocument.createElement('div');
-    customRow.className = 'menu-item todoseq-date-picker-submenu-row';
-    customRow.setAttribute('role', 'menuitem');
-    customRow.setAttribute('tabindex', '-1');
+    const customRow = this.repeatPickerSubmenu.createDiv({
+      cls: 'menu-item todoseq-date-picker-submenu-row',
+      attr: { role: 'menuitem', tabindex: '-1' },
+    });
 
-    const customLabel = window.activeDocument.createElement('span');
-    customLabel.className = 'menu-item-title todoseq-date-picker-submenu-label';
-    customLabel.setText('Custom...');
-    customRow.appendChild(customLabel);
+    customRow.createSpan({
+      cls: 'menu-item-title todoseq-date-picker-submenu-label',
+      text: 'Custom...',
+    });
 
     customRow.addEventListener('click', (evt) => {
       evt.stopPropagation();
       this.closeRepeatPicker();
       this.openCustomRepeatDialog();
     });
-
-    this.repeatPickerSubmenu.appendChild(customRow);
 
     // Append submenu temporarily to measure its height
     this.repeatPickerSubmenu.addClass('todoseq-date-picker-submenu-measuring');

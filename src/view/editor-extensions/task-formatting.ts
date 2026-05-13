@@ -53,13 +53,16 @@ class PriorityWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const container = window.activeDocument.createElement('span');
-    container.className = `todoseq-edit-priority-pill todoseq-priority-badge priority-${this.priority}`;
-    container.textContent = this.letter;
-    container.setAttribute('data-priority', this.letter);
-    container.setAttribute('aria-label', `Priority ${this.letter}`);
-    container.setAttribute('role', 'badge');
-    return container;
+    const tempContainer = window.activeDocument.createElement('div');
+    return tempContainer.createSpan({
+      cls: `todoseq-edit-priority-pill todoseq-priority-badge priority-${this.priority}`,
+      text: this.letter,
+      attr: {
+        'data-priority': this.letter,
+        'aria-label': `Priority ${this.letter}`,
+        role: 'badge',
+      },
+    });
   }
 
   ignoreEvent(): boolean {

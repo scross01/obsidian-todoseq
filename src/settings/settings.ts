@@ -679,7 +679,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     keywords: Set<string>,
   ): void {
     // Clear existing options
-    dropdown.selectEl.innerHTML = '';
+    dropdown.selectEl.empty();
 
     // Add keywords in sorted order
     const sortedKeywords = Array.from(keywords).sort();

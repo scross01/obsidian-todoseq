@@ -100,7 +100,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
   }
 
   protected async renderDropdown(): Promise<void> {
-    this.containerEl.innerHTML = '';
+    this.containerEl.empty();
 
     const suggestionContainerEl = this.containerEl.createEl('div', {
       cls: 'suggestion-container mod-search-suggestion',

@@ -64,8 +64,7 @@ export class ReaderViewFormatter {
     isCompleted = false,
     isArchived = false,
   ): HTMLSpanElement {
-    const tempFrag = window.activeDocument.createDocumentFragment();
-    const tempContainer = tempFrag.createDiv();
+    const tempContainer = window.activeDocument.createElement('div');
     let cssClasses = 'todoseq-keyword-formatted';
     if (isArchived) {
       cssClasses += ' todoseq-archived-keyword';
@@ -89,8 +88,7 @@ export class ReaderViewFormatter {
    * Create a task container span element using Obsidian DOM helpers
    */
   private createTaskContainer(): HTMLSpanElement {
-    const tempFrag = window.activeDocument.createDocumentFragment();
-    const tempContainer = tempFrag.createDiv();
+    const tempContainer = window.activeDocument.createElement('div');
     const container = tempContainer.createSpan({ cls: 'todoseq-task' });
     return container;
   }
@@ -99,8 +97,7 @@ export class ReaderViewFormatter {
    * Create a completed task container span element using Obsidian DOM helpers
    */
   private createCompletedTaskContainer(): HTMLSpanElement {
-    const tempFrag = window.activeDocument.createDocumentFragment();
-    const tempContainer = tempFrag.createDiv();
+    const tempContainer = window.activeDocument.createElement('div');
     const container = tempContainer.createSpan({
       cls: 'todoseq-completed-task-text',
       attr: {
@@ -114,8 +111,7 @@ export class ReaderViewFormatter {
    * Create an archived task container span element using Obsidian DOM helpers
    */
   private createArchivedTaskContainer(): HTMLSpanElement {
-    const tempFrag = window.activeDocument.createDocumentFragment();
-    const tempContainer = tempFrag.createDiv();
+    const tempContainer = window.activeDocument.createElement('div');
     const container = tempContainer.createSpan({
       cls: 'todoseq-archived-task-text',
       attr: {
@@ -933,8 +929,7 @@ export class ReaderViewFormatter {
           ? 'priority-med'
           : 'priority-low';
 
-    const tempFrag = window.activeDocument.createDocumentFragment();
-    const container = tempFrag.createDiv();
+    const container = window.activeDocument.createElement('div');
     const span = container.createSpan({
       cls: `todoseq-priority-badge ${priorityClass}`,
       attr: {
@@ -2031,34 +2026,42 @@ export class ReaderViewFormatter {
     keyword: string,
     type: 'scheduled' | 'deadline' | 'closed',
   ): void {
-    // Create a date container
-    const dateContainer = window.activeDocument.createElement('span');
-    dateContainer.className = `todoseq-${type}-line`;
-    dateContainer.setAttribute('data-date-line-type', type);
-    dateContainer.setAttribute('aria-label', `${type} date line`);
-    dateContainer.setAttribute('role', 'note');
-
-    // Create a styled keyword span
-    const keywordSpan = window.activeDocument.createElement('span');
-    keywordSpan.className = `todoseq-${type}-keyword`;
-    keywordSpan.textContent = keyword;
-    keywordSpan.setAttribute('data-date-keyword', keyword);
-    keywordSpan.setAttribute('aria-label', `${type} keyword`);
-    keywordSpan.setAttribute('role', 'mark');
-
     // Split the text node into before, keyword, and after parts
     const nodeText = keywordNode.textContent || '';
     const beforeText = nodeText.substring(0, keywordIndex);
     const afterText = nodeText.substring(keywordIndex + keyword.length);
 
-    // Create new text nodes
-    const beforeNode = window.activeDocument.createTextNode(beforeText);
-    const afterNode = window.activeDocument.createTextNode(afterText);
+    // Create a date container
+    const tempContainer = window.activeDocument.createElement('div');
+    const dateContainer = tempContainer.createSpan({
+      cls: `todoseq-${type}-line`,
+      attr: {
+        'data-date-line-type': type,
+        'aria-label': `${type} date line`,
+        role: 'note',
+      },
+    });
 
     // Replace the original text node with the new structure
     keywordNode.parentNode?.replaceChild(dateContainer, keywordNode);
+
+    // Create before text node
+    const beforeNode = window.activeDocument.createTextNode(beforeText);
     dateContainer.appendChild(beforeNode);
-    dateContainer.appendChild(keywordSpan);
+
+    // Create a styled keyword span
+    dateContainer.createSpan({
+      cls: `todoseq-${type}-keyword`,
+      text: keyword,
+      attr: {
+        'data-date-keyword': keyword,
+        'aria-label': `${type} keyword`,
+        role: 'mark',
+      },
+    });
+
+    // Create after text node
+    const afterNode = window.activeDocument.createTextNode(afterText);
     dateContainer.appendChild(afterNode);
   }
 

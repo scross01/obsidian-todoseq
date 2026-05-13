@@ -28,6 +28,7 @@ declare global {
       attr?: Record<string, string>;
     }) => HTMLDivElement;
     createSpan: (options?: { cls?: string; text?: string }) => HTMLSpanElement;
+    empty: () => void;
   }
 }
 
@@ -98,6 +99,12 @@ export function installObsidianDomMocks(): void {
     text?: string;
   }): HTMLSpanElement {
     return this.createEl('span', options);
+  };
+
+  HTMLElement.prototype.empty = function (): void {
+    while (this.firstChild) {
+      this.removeChild(this.firstChild);
+    }
   };
 
   // Obsidian adds instanceOf to Element prototype for type checking

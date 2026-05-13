@@ -619,7 +619,7 @@ export class TaskItemRenderer {
           keywordSpan?.getAttribute('aria-checked') || 'false';
 
         // Clear existing text content
-        todoText.innerHTML = '';
+        todoText.empty();
 
         // Re-add keyword span
         const newKeywordSpan = todoText.createEl('span', {
