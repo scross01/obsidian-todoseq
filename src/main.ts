@@ -394,7 +394,7 @@ export default class TodoTracker extends Plugin {
           });
 
           // Force a second update to ensure decorations are properly applied/removed
-          setTimeout(() => {
+          activeWindow.setTimeout(() => {
             if (editorView && typeof editorView.requestMeasure === 'function') {
               editorView.requestMeasure();
             }
@@ -407,7 +407,7 @@ export default class TodoTracker extends Plugin {
     // Mobile fallback: trigger layout change if no decorations were refreshed
     // On mobile, CodeMirror APIs may not work reliably, so we trigger a full layout refresh
     if (Platform.isMobile && !refreshed) {
-      setTimeout(() => {
+      activeWindow.setTimeout(() => {
         this.app.workspace.trigger('layout-change');
       }, 50);
     }

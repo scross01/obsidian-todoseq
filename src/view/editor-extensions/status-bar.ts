@@ -24,14 +24,14 @@ export class StatusBarManager {
 
     // Subscribe to TaskStateManager for task changes
     // Use debouncing to prevent excessive updates during rapid changes
-    let statusBarTimeout: ReturnType<typeof setTimeout> | null = null;
+    let statusBarTimeout: number | null = null;
     const STATUS_BAR_DEBOUNCE_MS = 150;
 
     this.plugin.taskStateManager.subscribe((tasks: Task[]) => {
       if (statusBarTimeout) {
         clearTimeout(statusBarTimeout);
       }
-      statusBarTimeout = setTimeout(() => {
+      statusBarTimeout = activeWindow.setTimeout(() => {
         // Clear timeout reference to indicate no pending debounced update
         statusBarTimeout = null;
         this.updateStatusBarItem(tasks);

@@ -277,7 +277,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
 
     this.hide();
 
-    setTimeout(() => {
+    activeWindow.setTimeout(() => {
       const event = new Event('input', { bubbles: true });
       this.inputEl.dispatchEvent(event);
     }, 0);
@@ -428,7 +428,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
       }
     }
 
-    setTimeout(() => {
+    activeWindow.setTimeout(() => {
       const event = new Event('input', { bubbles: true });
       input.dispatchEvent(event);
     }, 150);

@@ -24,7 +24,7 @@ export class PropertySearchEngine {
   private initializationPromise: Promise<void> | null = null; // Track if initialization is already queued
 
   // Track pending update timeout for cleanup
-  private pendingUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pendingUpdateTimeout: number | null = null;
   private readonly PENDING_UPDATE_DEBOUNCE_MS = 100;
 
   // Dependencies
@@ -113,7 +113,7 @@ export class PropertySearchEngine {
 
       // Refresh all visible task list views after initialization completes
       // Delay to prevent recursion
-      setTimeout(() => {
+      activeWindow.setTimeout(() => {
         this.refreshVisibleTaskListViews();
       }, 0);
     } catch (error) {
@@ -137,7 +137,7 @@ export class PropertySearchEngine {
           this.vaultScanner.isScanning() ||
           this.vaultScanner.isObsidianInitializing()
         ) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
+          await new Promise((resolve) => activeWindow.setTimeout(resolve, 50));
         }
       }
     } catch (error) {
@@ -223,7 +223,7 @@ export class PropertySearchEngine {
           }
 
           // Yield to event loop to keep UI responsive
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          await new Promise((resolve) => activeWindow.setTimeout(resolve, 0));
         }
 
         return;
@@ -540,7 +540,7 @@ export class PropertySearchEngine {
     // Debounce updates
     if (!this.isUpdating) {
       this.isUpdating = true;
-      this.pendingUpdateTimeout = setTimeout(
+      this.pendingUpdateTimeout = activeWindow.setTimeout(
         () => this.processPendingUpdates(),
         this.PENDING_UPDATE_DEBOUNCE_MS,
       );
@@ -599,7 +599,7 @@ export class PropertySearchEngine {
     // Debounce updates only if we actually added a new pending update
     if (added && !this.isUpdating) {
       this.isUpdating = true;
-      this.pendingUpdateTimeout = setTimeout(
+      this.pendingUpdateTimeout = activeWindow.setTimeout(
         () => this.processPendingUpdates(),
         1000,
       );

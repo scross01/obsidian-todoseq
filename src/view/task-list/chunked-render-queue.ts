@@ -64,7 +64,7 @@ export class ChunkedRenderQueue {
 
         if (renderedInBatch >= YIELD_EVERY_N_TASKS) {
           renderedInBatch = 0;
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          await new Promise((resolve) => activeWindow.setTimeout(resolve, 0));
         }
       }
     }
@@ -94,7 +94,7 @@ export class ChunkedRenderQueue {
       fragment.appendChild(element);
 
       if (yieldDuringRender && i > 0 && i % YIELD_EVERY_N_TASKS === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise((resolve) => activeWindow.setTimeout(resolve, 0));
       }
     }
 

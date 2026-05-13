@@ -36,15 +36,9 @@ interface KeywordFieldBinding {
 export class TodoTrackerSettingTab extends PluginSettingTab {
   plugin: TodoTracker;
   // Separate debounce timers for each keyword group input
-  private keywordGroupDebounceTimers: Map<
-    string,
-    ReturnType<typeof setTimeout>
-  > = new Map();
-  private fileExtensionsDebounceTimer: ReturnType<typeof setTimeout> | null =
-    null;
-  private transitionValidationDebounceTimer: ReturnType<
-    typeof setTimeout
-  > | null = null;
+  private keywordGroupDebounceTimers: Map<string, number> = new Map();
+  private fileExtensionsDebounceTimer: number | null = null;
+  private transitionValidationDebounceTimer: number | null = null;
   private readonly KEYWORD_DEBOUNCE_MS = 500;
   private readonly FILE_EXTENSIONS_DEBOUNCE_MS = 500;
   private readonly TRANSITION_VALIDATION_DEBOUNCE_MS = 500;
@@ -284,7 +278,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }
 
           // Debounce the expensive operations
-          const newTimer = setTimeout(async () => {
+          const newTimer = activeWindow.setTimeout(async () => {
             // Clear the timer from the map when it executes
             this.keywordGroupDebounceTimers.delete(settingKey);
 
@@ -556,14 +550,17 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             if (this.transitionValidationDebounceTimer) {
               clearTimeout(this.transitionValidationDebounceTimer);
             }
-            this.transitionValidationDebounceTimer = setTimeout(() => {
-              this.transitionValidationDebounceTimer = null;
-              this.validateTransitionSettings();
-              // Update task list views with new state transition settings
-              this.plugin.updateTaskListViewSettings();
-              // Update task update coordinator with new settings
-              this.plugin.updateTaskUpdateCoordinatorSettings();
-            }, this.TRANSITION_VALIDATION_DEBOUNCE_MS);
+            this.transitionValidationDebounceTimer = activeWindow.setTimeout(
+              () => {
+                this.transitionValidationDebounceTimer = null;
+                this.validateTransitionSettings();
+                // Update task list views with new state transition settings
+                this.plugin.updateTaskListViewSettings();
+                // Update task update coordinator with new settings
+                this.plugin.updateTaskUpdateCoordinatorSettings();
+              },
+              this.TRANSITION_VALIDATION_DEBOUNCE_MS,
+            );
           });
       });
 

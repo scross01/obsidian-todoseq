@@ -63,6 +63,7 @@ export default [
         NodeJS: 'readonly',
         queueMicrotask: 'readonly',
         createEl: 'readonly',
+        activeWindow: 'readonly',
         Node: 'readonly',
         Text: 'readonly',
         Element: 'readonly',

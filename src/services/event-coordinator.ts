@@ -31,8 +31,8 @@ export class EventCoordinator {
   private fileChangeCallbacks: ((event: FileChangeEvent) => void)[] = [];
 
   private pendingEvents = new Map<string, FileChangeEvent>();
-  private batchTimeout: ReturnType<typeof setTimeout> | null = null;
-  private fileChangeTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  private batchTimeout: number | null = null;
+  private fileChangeTimeouts = new Map<string, number>();
 
   private vaultModifyRef: EventRef | null = null;
   private vaultCreateRef: EventRef | null = null;
@@ -132,7 +132,7 @@ export class EventCoordinator {
       clearTimeout(existingTimeout);
     }
 
-    const timeout = setTimeout(() => {
+    const timeout = activeWindow.setTimeout(() => {
       this.fileChangeTimeouts.delete(tFile.path);
       this.queueFileEvent({
         type,
@@ -178,7 +178,7 @@ export class EventCoordinator {
       clearTimeout(this.batchTimeout);
     }
 
-    this.batchTimeout = setTimeout(() => {
+    this.batchTimeout = activeWindow.setTimeout(() => {
       this.processBatch().catch((error) => {
         console.error('Error processing file event batch:', error);
       });

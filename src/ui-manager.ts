@@ -190,7 +190,7 @@ export class UIManager {
     this.plugin.registerEvent(
       this.plugin.app.workspace.on('file-open', () => {
         // Small delay to allow the editor to fully initialize
-        setTimeout(() => {
+        activeWindow.setTimeout(() => {
           setupEditorListeners();
         }, 100);
       }),
@@ -597,7 +597,7 @@ export class UIManager {
       this.plugin.app.workspace.on('file-open', (file) => {
         if (file instanceof TFile && file.extension === 'md') {
           // Small delay to allow editor to fully load
-          setTimeout(() => {
+          activeWindow.setTimeout(() => {
             this.addContextMenuToEditor();
           }, 100);
         }

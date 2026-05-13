@@ -472,7 +472,7 @@ export class PluginLifecycleManager {
 
     this.plugin.vaultScanner.on('scan-completed', () => {
       // Use setTimeout to ensure tasks are fully set in TaskStateManager before refreshing
-      setTimeout(() => {
+      activeWindow.setTimeout(() => {
         // Explicitly refresh the TaskListView to ensure it updates
         this.plugin.uiManager.refreshOpenTaskListViews().catch((error) => {
           new Notice('Failed to refresh task list');

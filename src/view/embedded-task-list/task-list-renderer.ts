@@ -2242,7 +2242,7 @@ export class EmbeddedTaskListRenderer {
         .openFile(file)
         .then(() => {
           // Focus the editor and move cursor to the task line with highlighting
-          setTimeout(() => {
+          activeWindow.setTimeout(() => {
             // Check the view in the target leaf, not the active view
             // This prevents highlighting the wrong file when Obsidian doesn't support
             // certain file types (e.g., .org files)

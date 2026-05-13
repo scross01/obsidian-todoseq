@@ -291,7 +291,7 @@ export class SearchSuggestionDropdown extends BaseDropdown {
 
     input.focus();
 
-    setTimeout(() => {
+    activeWindow.setTimeout(() => {
       this.justSelected = false;
     }, 100);
   }

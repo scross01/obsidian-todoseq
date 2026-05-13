@@ -87,15 +87,13 @@ export class TaskListView extends ItemView {
   private taskDragDropHandler: TaskDragDropHandler | null = null;
 
   // Search history debounce mechanism
-  private searchHistoryDebounceTimer: ReturnType<typeof setTimeout> | null =
-    null;
+  private searchHistoryDebounceTimer: number | null = null;
   private readonly SEARCH_HISTORY_DEBOUNCE_MS = 3000; // 3 seconds idle timeout
-  private searchRefreshDebounceTimer: ReturnType<typeof setTimeout> | null =
-    null;
+  private searchRefreshDebounceTimer: number | null = null;
   private readonly SEARCH_REFRESH_DEBOUNCE_MS = 250; // 250ms debounce for search refresh
 
   // Task state refresh debounce timer (class property for cleanup)
-  private taskRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
+  private taskRefreshTimeout: number | null = null;
   private readonly TASK_REFRESH_DEBOUNCE_MS = 150;
 
   // Task list filter for filtering and sorting
@@ -448,7 +446,7 @@ export class TaskListView extends ItemView {
       if (this.searchRefreshDebounceTimer) {
         clearTimeout(this.searchRefreshDebounceTimer);
       }
-      this.searchRefreshDebounceTimer = setTimeout(async () => {
+      this.searchRefreshDebounceTimer = activeWindow.setTimeout(async () => {
         this.searchRefreshDebounceTimer = null;
         // Update attribute and re-render list only, preserving focus
         this.setSearchQuery(inputEl.value);
@@ -966,7 +964,7 @@ export class TaskListView extends ItemView {
     }
 
     // Start new timer
-    this.searchHistoryDebounceTimer = setTimeout(() => {
+    this.searchHistoryDebounceTimer = activeWindow.setTimeout(() => {
       this.captureSearchToHistory(query);
       this.searchHistoryDebounceTimer = null;
     }, this.SEARCH_HISTORY_DEBOUNCE_MS);
@@ -1537,7 +1535,7 @@ export class TaskListView extends ItemView {
     const container = this.contentEl;
 
     // Yield to main thread to prevent blocking user typing
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => activeWindow.setTimeout(resolve, 0));
 
     // Abort if another refresh was triggered while we yielded
     if (this.refreshGeneration !== currentGeneration) {

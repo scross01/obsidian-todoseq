@@ -19,3 +19,13 @@ global.console = {
   warn: createSilentMock(),
   error: console.error, // Keep error to surface real issues
 };
+
+// Mock activeWindow for popout window compatibility
+(globalThis as Record<string, unknown>).activeWindow = {
+  setTimeout: global.setTimeout.bind(global),
+  clearTimeout: global.clearTimeout.bind(global),
+  setInterval: global.setInterval.bind(global),
+  clearInterval: global.clearInterval.bind(global),
+  requestAnimationFrame: global.requestAnimationFrame?.bind(global) ?? ((cb: () => void) => setTimeout(cb)),
+  cancelAnimationFrame: global.cancelAnimationFrame?.bind(global) ?? ((id: number) => clearTimeout(id)),
+};

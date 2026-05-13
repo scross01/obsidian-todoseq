@@ -50,7 +50,7 @@ export interface RecurrenceCoordinatorOptions {
  * ```
  */
 export class RecurrenceCoordinator {
-  private recurrenceTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private recurrenceTimeouts: Map<string, number> = new Map();
   private readonly defaultDelayMs: number;
   private recurrenceManager: RecurrenceManager;
   private taskUpdateCoordinator: TaskUpdateCoordinator;
@@ -113,7 +113,7 @@ export class RecurrenceCoordinator {
     this.cancelRecurrence(task);
 
     // Schedule the update
-    const timeout = setTimeout(async () => {
+    const timeout = activeWindow.setTimeout(async () => {
       this.recurrenceTimeouts.delete(key);
 
       await this.performRecurrenceUpdate(task);
