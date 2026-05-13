@@ -50,8 +50,20 @@ if (!HTMLElement.prototype.createSpan) {
 }
 
 // Mock window.activeDocument for Obsidian API compatibility
+// Polyfill Obsidian's createDiv on DocumentFragment for jsdom
 if (typeof window !== 'undefined') {
   (window as any).activeDocument = document;
+  (window as any).DocumentFragment.prototype.createDiv = function (
+    cls?: string | { cls?: string },
+  ): HTMLDivElement {
+    const el = document.createElement('div');
+    if (typeof cls === 'string') {
+      el.className = cls;
+    } else if (cls?.cls) {
+      el.className = cls.cls;
+    }
+    return el;
+  };
 }
 
 // Mock Obsidian's TFile

@@ -64,7 +64,8 @@ export class ReaderViewFormatter {
     isCompleted = false,
     isArchived = false,
   ): HTMLSpanElement {
-    const tempContainer = window.activeDocument.createElement('div');
+    const tempFrag = window.activeDocument.createDocumentFragment();
+    const tempContainer = tempFrag.createDiv();
     let cssClasses = 'todoseq-keyword-formatted';
     if (isArchived) {
       cssClasses += ' todoseq-archived-keyword';
@@ -88,7 +89,8 @@ export class ReaderViewFormatter {
    * Create a task container span element using Obsidian DOM helpers
    */
   private createTaskContainer(): HTMLSpanElement {
-    const tempContainer = window.activeDocument.createElement('div');
+    const tempFrag = window.activeDocument.createDocumentFragment();
+    const tempContainer = tempFrag.createDiv();
     const container = tempContainer.createSpan({ cls: 'todoseq-task' });
     return container;
   }
@@ -97,7 +99,8 @@ export class ReaderViewFormatter {
    * Create a completed task container span element using Obsidian DOM helpers
    */
   private createCompletedTaskContainer(): HTMLSpanElement {
-    const tempContainer = window.activeDocument.createElement('div');
+    const tempFrag = window.activeDocument.createDocumentFragment();
+    const tempContainer = tempFrag.createDiv();
     const container = tempContainer.createSpan({
       cls: 'todoseq-completed-task-text',
       attr: {
@@ -111,7 +114,8 @@ export class ReaderViewFormatter {
    * Create an archived task container span element using Obsidian DOM helpers
    */
   private createArchivedTaskContainer(): HTMLSpanElement {
-    const tempContainer = window.activeDocument.createElement('div');
+    const tempFrag = window.activeDocument.createDocumentFragment();
+    const tempContainer = tempFrag.createDiv();
     const container = tempContainer.createSpan({
       cls: 'todoseq-archived-task-text',
       attr: {
@@ -929,7 +933,8 @@ export class ReaderViewFormatter {
           ? 'priority-med'
           : 'priority-low';
 
-    const container = window.activeDocument.createElement('div');
+    const tempFrag = window.activeDocument.createDocumentFragment();
+    const container = tempFrag.createDiv();
     const span = container.createSpan({
       cls: `todoseq-priority-badge ${priorityClass}`,
       attr: {
