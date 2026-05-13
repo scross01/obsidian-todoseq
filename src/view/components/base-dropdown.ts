@@ -82,7 +82,7 @@ export abstract class BaseDropdown {
     const inputRect = this.inputEl.getBoundingClientRect();
 
     const leftPos = window.scrollX + inputRect.left;
-    const topPos = window.scrollY + inputRect.bottom + 2;
+    const topPos = window.scrollY + inputRect.bottom;
 
     this.containerEl.style.left = `${leftPos}px`;
     this.containerEl.style.top = `${topPos}px`;

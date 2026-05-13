@@ -59,6 +59,8 @@
   position: fixed;
   pointer-events: none;
   z-index: 9999;
+  --todoseq-drag-offset: 12px;
+  transform: translate(var(--todoseq-drag-offset), var(--todoseq-drag-offset));
   padding: 6px 10px;
   border-radius: 6px;
   background-color: var(--background-secondary);
@@ -578,6 +580,8 @@
   position: absolute;
   z-index: var(--layer-menu);
   display: none;
+  --todoseq-dropdown-gap: 2px;
+  transform: translateY(var(--todoseq-dropdown-gap));
 }
 
 .todoseq-dropdown.show {
@@ -1967,6 +1971,7 @@
 /* Submenu visible state */
 .todoseq-date-picker-submenu-visible {
   position: absolute;
+  top: var(--todoseq-submenu-top);
   visibility: visible;
   z-index: 1000;
 }

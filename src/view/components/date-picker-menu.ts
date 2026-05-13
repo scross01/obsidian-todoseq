@@ -729,7 +729,10 @@ export class DatePicker extends BaseDialog {
     // Position the submenu to overlay (above the time section)
     const timeSectionOffsetTop = this.timeSection.offsetTop;
     this.timePickerSubmenu.removeClass('todoseq-date-picker-submenu-measuring');
-    this.timePickerSubmenu.style.top = `${timeSectionOffsetTop - submenuHeight}px`;
+    this.timePickerSubmenu.style.setProperty(
+      '--todoseq-submenu-top',
+      `${timeSectionOffsetTop - submenuHeight}px`,
+    );
     this.timePickerSubmenu.addClass('todoseq-date-picker-submenu-visible');
 
     // Scroll the target row into view
@@ -885,7 +888,10 @@ export class DatePicker extends BaseDialog {
     this.repeatPickerSubmenu.removeClass(
       'todoseq-date-picker-submenu-measuring',
     );
-    this.repeatPickerSubmenu.style.top = `${repeatSectionOffsetTop - submenuHeight}px`;
+    this.repeatPickerSubmenu.style.setProperty(
+      '--todoseq-submenu-top',
+      `${repeatSectionOffsetTop - submenuHeight}px`,
+    );
     this.repeatPickerSubmenu.addClass('todoseq-date-picker-submenu-visible');
   }
 

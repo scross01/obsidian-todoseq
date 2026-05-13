@@ -175,7 +175,7 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
         dropdown.updatePosition();
 
         expect((container as HTMLElement).style.left).toBe('150px'); // 100 (scrollX) + 50 (input left)
-        expect((container as HTMLElement).style.top).toBe('332px'); // 200 (scrollY) + 130 (input bottom) + 2
+        expect((container as HTMLElement).style.top).toBe('330px'); // 200 (scrollY) + 130 (input bottom)
 
         // Restore original values
         Object.defineProperty(window, 'scrollX', {

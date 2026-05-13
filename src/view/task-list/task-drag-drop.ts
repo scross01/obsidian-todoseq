@@ -123,8 +123,8 @@ export class TaskDragDropHandler {
     );
     const overTarget = this.isOverValidDropTarget(evt);
     if (this.dragImageEl) {
-      this.dragImageEl.style.left = evt.clientX + 12 + 'px';
-      this.dragImageEl.style.top = evt.clientY + 12 + 'px';
+      this.dragImageEl.style.left = evt.clientX + 'px';
+      this.dragImageEl.style.top = evt.clientY + 'px';
       this.dragImageEl.toggleClass(
         'todoseq-drag-overlay-over-target',
         overTarget,
@@ -159,8 +159,8 @@ export class TaskDragDropHandler {
   ): HTMLElement {
     const el = window.activeDocument.createElement('div');
     el.className = 'todoseq-drag-overlay';
-    el.style.left = x + 12 + 'px';
-    el.style.top = y + 12 + 'px';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
 
     const taskLine = window.activeDocument.createElement('div');
     taskLine.className = 'todoseq-drag-overlay-task';
