@@ -141,12 +141,15 @@ export class PluginLifecycleManager {
     );
 
     // Persist view-mode changes coming from TodoView toolbars
-    const handler = async (e: Event) => {
+    const saveViewMode = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { mode: TaskListViewMode };
       if (!detail?.mode) return;
       this.plugin.settings.taskListViewMode = detail.mode;
       await this.saveSettings();
       await this.plugin.uiManager.refreshOpenTaskListViews();
+    };
+    const handler = (e: Event) => {
+      void saveViewMode(e);
     };
     window.addEventListener('todoseq:view-mode-change', handler);
     this.plugin.register(() =>
@@ -154,7 +157,7 @@ export class PluginLifecycleManager {
     );
 
     // Persist future task sorting changes coming from TodoView toolbars
-    const futureTaskHandler = async (e: Event) => {
+    const saveFutureTaskSorting = async (e: Event) => {
       const detail = (e as CustomEvent).detail as {
         mode: 'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture';
       };
@@ -162,6 +165,9 @@ export class PluginLifecycleManager {
       this.plugin.settings.futureTaskSorting = detail.mode;
       await this.saveSettings();
       await this.plugin.uiManager.refreshOpenTaskListViews();
+    };
+    const futureTaskHandler = (e: Event) => {
+      void saveFutureTaskSorting(e);
     };
     window.addEventListener(
       'todoseq:future-task-sorting-change',

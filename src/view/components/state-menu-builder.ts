@@ -95,7 +95,7 @@ export class StateMenuBuilder {
    */
   public buildStateMenu(
     currentState: string,
-    onStateSelected: (state: string) => void,
+    onStateSelected: (state: string) => void | Promise<void>,
   ): Menu {
     const menu = new Menu();
     const groups = this.getSelectableStatesForMenu(currentState);

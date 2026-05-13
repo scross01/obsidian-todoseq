@@ -441,16 +441,16 @@ export class TaskListView extends ItemView {
       throw new Error('Failed to create search input element');
     }
     inputEl.value = this.getSearchQuery();
-    inputEl.addEventListener('input', async () => {
+    inputEl.addEventListener('input', () => {
       // Debounce search refresh to avoid excessive re-renders
       if (this.searchRefreshDebounceTimer) {
         activeWindow.clearTimeout(this.searchRefreshDebounceTimer);
       }
-      this.searchRefreshDebounceTimer = activeWindow.setTimeout(async () => {
+      this.searchRefreshDebounceTimer = activeWindow.setTimeout(() => {
         this.searchRefreshDebounceTimer = null;
         // Update attribute and re-render list only, preserving focus
         this.setSearchQuery(inputEl.value);
-        await this.refreshVisibleList();
+        void this.refreshVisibleList();
         // Start debounce timer for history capture
         this.handleSearchHistoryDebounce(inputEl.value);
       }, this.SEARCH_REFRESH_DEBOUNCE_MS);
@@ -1896,7 +1896,7 @@ export class TaskListView extends ItemView {
 
     // Keyboard shortcuts: Slash to focus search, Esc to clear
     const input: HTMLInputElement | null = this.searchInputEl ?? null;
-    const keyHandler = async (evt: KeyboardEvent) => {
+    const keyHandler = (evt: KeyboardEvent) => {
       const active = window.activeDocument.activeElement as HTMLElement | null;
       const isTyping =
         !!active &&
@@ -1918,7 +1918,7 @@ export class TaskListView extends ItemView {
           evt.preventDefault();
           input.value = '';
           this.setSearchQuery('');
-          await this.refreshVisibleList(); // re-render cleared without losing focus context
+          void this.refreshVisibleList(); // re-render cleared without losing focus context
           queueMicrotask(() => input.blur());
         }
       }

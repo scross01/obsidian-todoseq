@@ -35,9 +35,12 @@ export type TaskStateChangeCallback = (
   newState: string,
 ) => Promise<void>;
 
-export type TaskLocationOpenCallback = (task: Task) => void;
+export type TaskLocationOpenCallback = (task: Task) => void | Promise<void>;
 
-export type TaskContextMenuCallback = (task: Task, evt: MouseEvent) => void;
+export type TaskContextMenuCallback = (
+  task: Task,
+  evt: MouseEvent,
+) => void | Promise<void>;
 
 /**
  * TaskItemRenderer - Handles rendering individual task items for the Task List View.
@@ -194,7 +197,9 @@ export class TaskItemRenderer {
     };
 
     // Click advances to next state (quick action)
-    todoSpan.addEventListener('click', (evt) => activate(evt));
+    todoSpan.addEventListener('click', (evt) => {
+      void activate(evt);
+    });
 
     // Keyboard support: Enter/Space and menu keys
     todoSpan.addEventListener('keydown', (evt: KeyboardEvent) => {

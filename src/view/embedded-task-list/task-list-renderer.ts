@@ -1846,65 +1846,68 @@ export class EmbeddedTaskListRenderer {
     task: Task,
   ): void {
     // Checkbox change handler
-    checkbox.addEventListener('change', async (e) => {
-      e.stopPropagation();
+    checkbox.addEventListener('change', (e) => {
+      void (async () => {
+        e.stopPropagation();
 
-      try {
-        // CRITICAL: Look up fresh task state BEFORE computing transition
-        // The task object in closure may be stale after recurrence updates
-        const freshTask = this.plugin.taskStateManager.findTaskByPathAndLine(
-          task.path,
-          task.line,
-        );
-        const currentTask = freshTask || task;
-        const currentState = currentTask.state;
+        try {
+          // CRITICAL: Look up fresh task state BEFORE computing transition
+          // The task object in closure may be stale after recurrence updates
+          const freshTask = this.plugin.taskStateManager.findTaskByPathAndLine(
+            task.path,
+            task.line,
+          );
+          const currentTask = freshTask || task;
+          const currentState = currentTask.state;
 
-        const stateManager = getStateTransitionManager(
-          this.plugin.taskUpdateCoordinator,
-          this.plugin.keywordManager,
-          this.plugin.settings?.stateTransitions,
-        );
+          const stateManager = getStateTransitionManager(
+            this.plugin.taskUpdateCoordinator,
+            this.plugin.keywordManager,
+            this.plugin.settings?.stateTransitions,
+          );
 
-        let newState: string | null = null;
-        if (checkbox.checked) {
-          newState = stateManager.getNextCompletedOrArchivedState(currentState);
-        } else {
-          newState = stateManager.getNextState(currentState);
+          let newState: string | null = null;
+          if (checkbox.checked) {
+            newState =
+              stateManager.getNextCompletedOrArchivedState(currentState);
+          } else {
+            newState = stateManager.getNextState(currentState);
+            if (newState === currentState) {
+              checkbox.checked = true;
+              return;
+            }
+          }
+
+          // If no state change, don't proceed
           if (newState === currentState) {
-            checkbox.checked = true;
             return;
           }
+
+          // Update task state using existing TaskEditor
+          await this.updateTaskState(currentTask, newState);
+
+          // Update data-task attribute to reflect new state
+          const newCheckboxChar = this.plugin.keywordManager.getCheckboxState(
+            newState,
+            this.plugin.keywordManager.getSettings(),
+          );
+          checkbox.setAttribute('data-task', newCheckboxChar);
+          // Also update data-task on the parent <li> for theme compatibility
+          li.setAttribute('data-task', newCheckboxChar);
+        } catch (error) {
+          console.error('Error updating task state:', error);
+          // Revert checkbox on error
+          checkbox.checked = !checkbox.checked;
+          // Revert data-task attribute
+          const revertedChar = this.plugin.keywordManager.getCheckboxState(
+            task.state,
+            this.plugin.keywordManager.getSettings(),
+          );
+          checkbox.setAttribute('data-task', revertedChar);
+          // Also revert data-task on the parent <li>
+          li.setAttribute('data-task', revertedChar);
         }
-
-        // If no state change, don't proceed
-        if (newState === currentState) {
-          return;
-        }
-
-        // Update task state using existing TaskEditor
-        await this.updateTaskState(currentTask, newState);
-
-        // Update data-task attribute to reflect new state
-        const newCheckboxChar = this.plugin.keywordManager.getCheckboxState(
-          newState,
-          this.plugin.keywordManager.getSettings(),
-        );
-        checkbox.setAttribute('data-task', newCheckboxChar);
-        // Also update data-task on the parent <li> for theme compatibility
-        li.setAttribute('data-task', newCheckboxChar);
-      } catch (error) {
-        console.error('Error updating task state:', error);
-        // Revert checkbox on error
-        checkbox.checked = !checkbox.checked;
-        // Revert data-task attribute
-        const revertedChar = this.plugin.keywordManager.getCheckboxState(
-          task.state,
-          this.plugin.keywordManager.getSettings(),
-        );
-        checkbox.setAttribute('data-task', revertedChar);
-        // Also revert data-task on the parent <li>
-        li.setAttribute('data-task', revertedChar);
-      }
+      })();
     });
 
     // Click handler for navigation (excluding checkbox)

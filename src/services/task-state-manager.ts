@@ -32,7 +32,7 @@ export class TaskStateManager {
    * @param callback Function to call when tasks change
    * @returns Unsubscribe function
    */
-  subscribe(callback: (tasks: Task[]) => void): () => void {
+  subscribe(callback: (tasks: Task[]) => void | Promise<void>): () => void {
     this.subscribers.add(callback);
     callback(this._tasks);
     return () => this.subscribers.delete(callback);
