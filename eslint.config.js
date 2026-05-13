@@ -1,13 +1,8 @@
-import js from '@eslint/js';
-import tseslint from '@typescript-eslint/eslint-plugin';
+import obsidianmd from 'eslint-plugin-obsidianmd';
 import tsparser from '@typescript-eslint/parser';
+import tseslint from 'typescript-eslint';
 import prettier from 'eslint-plugin-prettier';
 import eslintConfigPrettier from 'eslint-config-prettier';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 export default [
   {
@@ -26,7 +21,16 @@ export default [
       '**/*.cjs',
     ],
   },
-  js.configs.recommended,
+  ...obsidianmd.configs.recommended,
+  {
+    rules: {
+      'obsidianmd/no-plugin-as-component': 'off',
+      'obsidianmd/no-view-references-in-plugin': 'off',
+      'obsidianmd/no-unsupported-api': 'off',
+      'obsidianmd/prefer-file-manager-trash-file': 'off',
+      'obsidianmd/prefer-instanceof': 'off',
+    },
+  },
   {
     files: ['src/**/*.ts'],
     languageOptions: {
@@ -34,48 +38,12 @@ export default [
       parserOptions: {
         sourceType: 'module',
         project: ['./tsconfig.json'],
-        tsconfigRootDir: __dirname,
-      },
-      globals: {
-        console: 'readonly',
-        window: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-        navigator: 'readonly',
-        localStorage: 'readonly',
-        document: 'readonly',
-        HTMLElement: 'readonly',
-        HTMLLIElement: 'readonly',
-        HTMLDivElement: 'readonly',
-        HTMLSpanElement: 'readonly',
-        HTMLParagraphElement: 'readonly',
-        HTMLInputElement: 'readonly',
-        HTMLElementTagNameMap: 'readonly',
-        KeyboardEvent: 'readonly',
-        MouseEvent: 'readonly',
-        requestAnimationFrame: 'readonly',
-        cancelAnimationFrame: 'readonly',
-        requestIdleCallback: 'readonly',
-        cancelIdleCallback: 'readonly',
-        performance: 'readonly',
-        NodeJS: 'readonly',
-        queueMicrotask: 'readonly',
-        createEl: 'readonly',
-        activeWindow: 'readonly',
-        Node: 'readonly',
-        Text: 'readonly',
-        Element: 'readonly',
-        Event: 'readonly',
       },
     },
     plugins: {
-      '@typescript-eslint': tseslint,
       prettier: prettier,
     },
     rules: {
-      ...tseslint.configs.recommended.rules,
       'no-unused-vars': 'off',
       'no-empty': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { args: 'none' }],
@@ -86,17 +54,20 @@ export default [
       '@typescript-eslint/no-unsafe-assignment': 'warn',
       'no-useless-assignment': 'off',
       'preserve-caught-error': 'off',
+      'obsidianmd/no-plugin-as-component': 'error',
+      'obsidianmd/no-view-references-in-plugin': 'error',
+      'obsidianmd/no-unsupported-api': 'error',
+      'obsidianmd/prefer-file-manager-trash-file': 'warn',
+      'obsidianmd/prefer-instanceof': 'error',
     },
   },
   {
     files: ['tests/**/*.ts', '__mocks__/**/*.ts'],
+    ...tseslint.configs.disableTypeChecked,
     languageOptions: {
+      ...tseslint.configs.disableTypeChecked.languageOptions,
       parser: tsparser,
-      parserOptions: {
-        project: null,
-      },
       globals: {
-        console: 'readonly',
         describe: 'readonly',
         it: 'readonly',
         test: 'readonly',
@@ -108,33 +79,17 @@ export default [
         afterAll: 'readonly',
         global: 'writable',
         parser: 'writable',
-        HTMLElement: 'readonly',
-        HTMLLIElement: 'readonly',
-        HTMLDivElement: 'readonly',
-        HTMLSpanElement: 'readonly',
-        HTMLParagraphElement: 'readonly',
-        HTMLInputElement: 'readonly',
-        HTMLElementTagNameMap: 'readonly',
-        window: 'readonly',
-        document: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-        KeyboardEvent: 'readonly',
-        MouseEvent: 'readonly',
-        Node: 'readonly',
-        Text: 'readonly',
-        Element: 'readonly',
-        Event: 'readonly',
       },
     },
     rules: {
+      ...tseslint.configs.disableTypeChecked.rules,
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       'no-empty': 'off',
+      'obsidianmd/no-global-this': 'off',
+      'obsidianmd/prefer-window-timers': 'off',
     },
   },
   eslintConfigPrettier,
