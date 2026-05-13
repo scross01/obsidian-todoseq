@@ -1,4 +1,4 @@
-import { Plugin, MarkdownView, Platform } from 'obsidian';
+import { Plugin, MarkdownView, Platform, Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from './types/task';
 import { TaskListView } from './view/task-list/task-list-view';
@@ -122,7 +122,10 @@ export default class TodoTracker extends Plugin {
         // Update the dropdown's task reference so it uses the latest tasks
         leaf.view.updateTasks(tasks);
         // Lighter refresh: only update the visible list rather than full onOpen re-init
-        leaf.view.refreshVisibleList();
+        leaf.view.refreshVisibleList().catch((error) => {
+          new Notice('Failed to refresh task list');
+          console.error('Error refreshing task list:', error);
+        });
       }
     }
   }
@@ -321,7 +324,7 @@ export default class TodoTracker extends Plugin {
    */
   public refreshAllTaskListViews(): void {
     // Refresh main task list views
-    this.uiManager.refreshOpenTaskListViews();
+    void this.uiManager.refreshOpenTaskListViews();
 
     // Refresh embedded task lists
     if (this.embeddedTaskListProcessor) {

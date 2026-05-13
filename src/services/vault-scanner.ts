@@ -70,7 +70,9 @@ export class VaultScanner {
       this.urgencyCoefficients = urgencyCoefficients;
     } else {
       // Fallback: load urgency coefficients on startup if not provided
-      this.loadUrgencyCoefficients();
+      this.loadUrgencyCoefficients().catch((error) => {
+        console.error('Error loading urgency coefficients:', error);
+      });
     }
   }
 

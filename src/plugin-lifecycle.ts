@@ -12,7 +12,7 @@ import { TaskParser } from './parser/task-parser';
 import { OrgModeTaskParser } from './parser/org-mode-task-parser';
 import { ParserRegistry } from './parser/parser-registry';
 import { TASK_VIEW_ICON } from './main';
-import { Editor, MarkdownView, Platform } from 'obsidian';
+import { Editor, MarkdownView, Platform, Notice } from 'obsidian';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
 import { PropertySearchEngine } from './services/property-search-engine';
@@ -463,7 +463,10 @@ export class PluginLifecycleManager {
     this.plugin.vaultScanner.on('scan-started', () => {
       // Refresh all task list views to show "Scanning vault..." message
       // This updates views that have no tasks yet to indicate scan is in progress
-      this.plugin.uiManager.refreshOpenTaskListViews();
+      this.plugin.uiManager.refreshOpenTaskListViews().catch((error) => {
+        new Notice('Failed to refresh task list');
+        console.error('Error refreshing task list:', error);
+      });
       this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists();
     });
 
@@ -471,7 +474,10 @@ export class PluginLifecycleManager {
       // Use setTimeout to ensure tasks are fully set in TaskStateManager before refreshing
       setTimeout(() => {
         // Explicitly refresh the TaskListView to ensure it updates
-        this.plugin.uiManager.refreshOpenTaskListViews();
+        this.plugin.uiManager.refreshOpenTaskListViews().catch((error) => {
+          new Notice('Failed to refresh task list');
+          console.error('Error refreshing task list:', error);
+        });
         // Also refresh embedded lists
         this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists();
       }, 0);
@@ -496,7 +502,10 @@ export class PluginLifecycleManager {
     // Conditional ribbon icon - only show on mobile devices
     if (Platform.isMobile) {
       this.plugin.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
-        this.plugin.uiManager.showTasks();
+        this.plugin.uiManager.showTasks().catch((error) => {
+          new Notice('Failed to open task list');
+          console.error('Error opening task list:', error);
+        });
       });
     }
 
@@ -527,10 +536,16 @@ export class PluginLifecycleManager {
         this.plugin.settings._hasShownFirstInstallView = true;
         await this.plugin.saveSettings();
         // First install: reveal=true to show the sidebar and bring view into focus
-        this.plugin.uiManager.showTasks(true);
+        this.plugin.uiManager.showTasks(true).catch((error) => {
+          new Notice('Failed to open task list');
+          console.error('Error opening task list:', error);
+        });
       } else {
         // On subsequent reloads, ensure the panel is available but don't steal focus
-        this.plugin.uiManager.showTasks(false);
+        this.plugin.uiManager.showTasks(false).catch((error) => {
+          new Notice('Failed to open task list');
+          console.error('Error opening task list:', error);
+        });
       }
 
       // Allow any fatal exceptions inside the unawaited scan sequence to securely log

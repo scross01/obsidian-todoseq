@@ -1,4 +1,4 @@
-import { setIcon, App } from 'obsidian';
+import { setIcon, App, Notice } from 'obsidian';
 import { Task } from '../../types/task';
 import { DateRepeatInfo } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
@@ -650,7 +650,12 @@ export class TaskContextMenu extends BaseDialog {
       },
     );
 
-    this.datePicker.show(position, mode, initialDate, initialRepeat);
+    this.datePicker
+      .show(position, mode, initialDate, initialRepeat)
+      .catch((error) => {
+        new Notice('Failed to show date picker');
+        console.error('Error showing date picker:', error);
+      });
   }
 
   private getPriorityOptions(): PriorityOption[] {

@@ -1,7 +1,7 @@
 import TodoTracker from '../../main';
 import { Task } from '../../types/task';
 import { TaskListView } from '../task-list/task-list-view';
-import { TFile } from 'obsidian';
+import { TFile, Notice } from 'obsidian';
 
 export class StatusBarManager {
   private statusBarItem: HTMLElement | null = null;
@@ -81,8 +81,11 @@ export class StatusBarManager {
     const activeFile = this.plugin.app.workspace.getActiveFile();
     if (!activeFile) return;
 
-    // Open/focus the TODOseq Task List
-    this.plugin.uiManager.showTasks();
+    // Open/focus TODOseq Task List
+    this.plugin.uiManager.showTasks().catch((error) => {
+      new Notice('Failed to open task list');
+      console.error('Error opening task list:', error);
+    });
 
     // Populate the search filter with file name only
     // Omit path filter for files without parent directory
@@ -118,7 +121,10 @@ export class StatusBarManager {
       searchInput.value = query;
     }
     // Trigger a refresh to apply the new search query
-    view.refreshVisibleList();
+    view.refreshVisibleList().catch((error) => {
+      new Notice('Failed to refresh task list');
+      console.error('Error refreshing task list:', error);
+    });
   }
 
   // Clean up status bar item

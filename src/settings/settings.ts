@@ -1,4 +1,10 @@
-import { PluginSettingTab, App, Setting, ToggleComponent } from 'obsidian';
+import {
+  PluginSettingTab,
+  App,
+  Setting,
+  ToggleComponent,
+  Notice,
+} from 'obsidian';
 import TodoTracker from '../main';
 import { TaskParser } from '../parser/task-parser';
 import {
@@ -90,7 +96,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         // Update context menu config for settings changes
         taskListView.updateContextMenuConfig();
         // Use lighter refresh instead of full onOpen rebuild
-        taskListView.refreshVisibleList();
+        taskListView.refreshVisibleList().catch((error) => {
+          new Notice('Failed to refresh task list');
+          console.error('Error refreshing task list:', error);
+        });
       }
     }
   };

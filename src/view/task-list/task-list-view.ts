@@ -574,7 +574,10 @@ export class TaskListView extends ItemView {
       window.dispatchEvent(evt);
 
       // Refresh the visible list - preserve scroll position
-      this.refreshVisibleList(false);
+      this.refreshVisibleList(false).catch((error) => {
+        new Notice('Failed to refresh task list');
+        console.error('Error refreshing task list:', error);
+      });
     });
 
     // Add Future Task Sorting dropdown
@@ -720,7 +723,7 @@ export class TaskListView extends ItemView {
 
       // Refresh the visible list (transformForView will handle the sorting)
       // Reset to top since sort order changed fundamentally
-      this.refreshVisibleList(true);
+      void this.refreshVisibleList(true);
     });
 
     // Keep a reference for keyboard handlers to focus later
@@ -824,7 +827,9 @@ export class TaskListView extends ItemView {
     // Check if we should show suggestions
     if (value.length === 0) {
       // Empty input - show options dropdown
-      this.optionsDropdown.showOptionsDropdown(value);
+      this.optionsDropdown.showOptionsDropdown(value).catch((error) => {
+        console.error('Error showing options dropdown:', error);
+      });
       this.suggestionDropdown.hide();
       return;
     }
@@ -861,11 +866,19 @@ export class TaskListView extends ItemView {
         if (hasColon) {
           // Complete prefix with colon - show filtered suggestions
           const prefix = prefixBase + ':';
-          this.suggestionDropdown.showPrefixDropdown(prefix, searchTerm);
+          void this.suggestionDropdown
+            .showPrefixDropdown(prefix, searchTerm)
+            .catch((error) => {
+              console.error('Error showing suggestion dropdown:', error);
+            });
           this.optionsDropdown.hide();
         } else {
           // Incomplete prefix being typed - show options dropdown if it matches the start of any prefix
-          this.optionsDropdown.showOptionsDropdown(prefixBase);
+          void this.optionsDropdown
+            .showOptionsDropdown(prefixBase)
+            .catch((error) => {
+              console.error('Error showing options dropdown:', error);
+            });
           this.suggestionDropdown.hide();
         }
         return;
@@ -875,7 +888,9 @@ export class TaskListView extends ItemView {
     // Check if cursor is at end of text that ends with space
     if (cursorPos === value.length && value.endsWith(' ')) {
       // Show options dropdown
-      this.optionsDropdown.showOptionsDropdown();
+      void this.optionsDropdown.showOptionsDropdown().catch((error) => {
+        console.error('Error showing options dropdown:', error);
+      });
       this.suggestionDropdown.hide();
       return;
     }
@@ -902,7 +917,9 @@ export class TaskListView extends ItemView {
 
     if (value.length === 0) {
       // Show options dropdown when focusing empty input
-      this.optionsDropdown.showOptionsDropdown();
+      void this.optionsDropdown.showOptionsDropdown().catch((error) => {
+        console.error('Error showing options dropdown:', error);
+      });
       this.suggestionDropdown.hide();
     }
   }
@@ -1208,7 +1225,10 @@ export class TaskListView extends ItemView {
       cancelable: true,
       view: window,
     });
-    this.openTaskLocation(syntheticEvent, task);
+    this.openTaskLocation(syntheticEvent, task).catch((error) => {
+      new Notice('Failed to open task location');
+      console.error('Error opening task location:', error);
+    });
   }
 
   /**
@@ -1396,7 +1416,10 @@ export class TaskListView extends ItemView {
 
       if (isNearBottom && !this.isLoadingMore && !this.isAllTasksLoaded) {
         requestAnimationFrame(() => {
-          this.loadMoreTasks();
+          void this.loadMoreTasks().catch((error) => {
+            new Notice('Failed to load more tasks');
+            console.error('Error loading more tasks:', error);
+          });
         });
       }
     };
@@ -2186,7 +2209,10 @@ export class TaskListView extends ItemView {
     );
 
     // Refresh visible list to ensure all elements are using the updated settings
-    this.refreshVisibleList();
+    void this.refreshVisibleList().catch((error) => {
+      new Notice('Failed to refresh task list');
+      console.error('Error refreshing task list:', error);
+    });
 
     // Update context menu configuration
     this.updateContextMenuConfig();
@@ -2298,7 +2324,10 @@ export class TaskListView extends ItemView {
 
         // Panel went from hidden to visible - refresh the list
         if (isNowVisible && !this.wasPanelVisible) {
-          this.refreshVisibleList();
+          void this.refreshVisibleList().catch((error) => {
+            new Notice('Failed to refresh task list');
+            console.error('Error refreshing task list:', error);
+          });
         }
 
         this.wasPanelVisible = isNowVisible;

@@ -168,7 +168,9 @@ export class EventCoordinator {
 
     if (this.BATCH_DELAY_MS === 0) {
       // Process immediately without debounce
-      this.processBatch();
+      this.processBatch().catch((error) => {
+        console.error('Error processing file event batch:', error);
+      });
       return;
     }
 
@@ -177,7 +179,9 @@ export class EventCoordinator {
     }
 
     this.batchTimeout = setTimeout(() => {
-      this.processBatch();
+      this.processBatch().catch((error) => {
+        console.error('Error processing file event batch:', error);
+      });
     }, this.BATCH_DELAY_MS);
   }
 

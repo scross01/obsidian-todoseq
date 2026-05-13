@@ -202,12 +202,12 @@ export class EditorController {
       // file write, recurrence, line adjustment, and UI refresh
       const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
       if (taskUpdateCoordinator) {
-        taskUpdateCoordinator.updateTaskByPath(
-          filePath,
-          lineNumber,
-          targetState,
-          'editor',
-        );
+        taskUpdateCoordinator
+          .updateTaskByPath(filePath, lineNumber, targetState, 'editor')
+          .catch((error) => {
+            new Notice('Failed to update task');
+            console.error('Error updating task:', error);
+          });
       } else {
         // Fallback: do optimistic update then use TaskEditor
         if (this.plugin.taskStateManager) {
@@ -581,7 +581,10 @@ export class EditorController {
         await taskUpdateCoordinator.updateTaskPriority(cleanedTask, priority);
       } else {
         // Fallback to TaskEditor if coordinator not available
-        taskEditor.updateTaskPriority(cleanedTask, priority);
+        taskEditor.updateTaskPriority(cleanedTask, priority).catch((error) => {
+          new Notice('Failed to update task priority');
+          console.error('Error updating task priority:', error);
+        });
       }
     }
 
@@ -1293,12 +1296,17 @@ export class EditorController {
         ) => {
           const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
           if (taskUpdateCoordinator) {
-            taskUpdateCoordinator.updateTask({
-              task,
-              type: 'priority',
-              source: 'editor',
-              newPriority: priority,
-            });
+            taskUpdateCoordinator
+              .updateTask({
+                task,
+                type: 'priority',
+                source: 'editor',
+                newPriority: priority,
+              })
+              .catch((error) => {
+                new Notice('Failed to update task priority');
+                console.error('Error updating task priority:', error);
+              });
           }
         },
         onScheduledDateChange: async (
@@ -1308,13 +1316,18 @@ export class EditorController {
         ) => {
           const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
           if (taskUpdateCoordinator) {
-            taskUpdateCoordinator.updateTask({
-              task,
-              type: 'scheduled-date',
-              source: 'editor',
-              newDate: date,
-              newRepeat: repeat,
-            });
+            taskUpdateCoordinator
+              .updateTask({
+                task,
+                type: 'scheduled-date',
+                source: 'editor',
+                newDate: date,
+                newRepeat: repeat,
+              })
+              .catch((error) => {
+                new Notice('Failed to update task date');
+                console.error('Error updating task date:', error);
+              });
           }
         },
         onDeadlineDateChange: async (
@@ -1324,13 +1337,18 @@ export class EditorController {
         ) => {
           const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
           if (taskUpdateCoordinator) {
-            taskUpdateCoordinator.updateTask({
-              task,
-              type: 'deadline-date',
-              source: 'editor',
-              newDate: date,
-              newRepeat: repeat,
-            });
+            taskUpdateCoordinator
+              .updateTask({
+                task,
+                type: 'deadline-date',
+                source: 'editor',
+                newDate: date,
+                newRepeat: repeat,
+              })
+              .catch((error) => {
+                new Notice('Failed to update task deadline');
+                console.error('Error updating task deadline:', error);
+              });
           }
         },
       },
@@ -1343,7 +1361,12 @@ export class EditorController {
     );
 
     // Show context menu at cursor position
-    contextMenu.show(task, { x: coords.left, y: coords.top + 20 });
+    contextMenu
+      .show(task, { x: coords.left, y: coords.top + 20 })
+      .catch((error) => {
+        new Notice('Failed to show context menu');
+        console.error('Error showing context menu:', error);
+      });
 
     return true;
   }
@@ -1468,13 +1491,18 @@ export class EditorController {
           if (taskUpdateCoordinator) {
             const updateType =
               selectedMode === 'scheduled' ? 'scheduled-date' : 'deadline-date';
-            taskUpdateCoordinator.updateTask({
-              task,
-              type: updateType,
-              source: 'editor',
-              newDate: date,
-              newRepeat: repeat,
-            });
+            taskUpdateCoordinator
+              .updateTask({
+                task,
+                type: updateType,
+                source: 'editor',
+                newDate: date,
+                newRepeat: repeat,
+              })
+              .catch((error) => {
+                new Notice('Failed to update task date');
+                console.error('Error updating task date:', error);
+              });
           }
         },
       },
@@ -1484,12 +1512,17 @@ export class EditorController {
     );
 
     // Show date picker at cursor position
-    datePicker.show(
-      { x: coords.left, y: coords.top + 20 },
-      mode,
-      initialDate,
-      initialRepeat,
-    );
+    datePicker
+      .show(
+        { x: coords.left, y: coords.top + 20 },
+        mode,
+        initialDate,
+        initialRepeat,
+      )
+      .catch((error) => {
+        new Notice('Failed to show date picker');
+        console.error('Error showing date picker:', error);
+      });
 
     return true;
   }

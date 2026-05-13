@@ -86,8 +86,10 @@ export class EmbeddedTaskListEventHandler {
     // Toggle the collapse state
     codeBlock.isCollapsed = !codeBlock.isCollapsed;
 
-    // Refresh the code block to re-render with new state
-    this.refreshCodeBlock(containerId);
+    // Refresh code block to re-render with new state
+    this.refreshCodeBlock(containerId).catch((error) => {
+      console.error('Error refreshing code block:', error);
+    });
   }
 
   /**
@@ -155,7 +157,9 @@ export class EmbeddedTaskListEventHandler {
    */
   public refreshAllCodeBlocks(): void {
     this.activeCodeBlocks.forEach((_, containerId) => {
-      this.refreshCodeBlock(containerId);
+      this.refreshCodeBlock(containerId).catch((error) => {
+        console.error('Error refreshing code block:', error);
+      });
     });
   }
 
@@ -166,7 +170,9 @@ export class EmbeddedTaskListEventHandler {
   private refreshCodeBlocksInFile(filePath: string): void {
     this.activeCodeBlocks.forEach((codeBlock, containerId) => {
       if (codeBlock.filePath === filePath) {
-        this.refreshCodeBlock(containerId);
+        this.refreshCodeBlock(containerId).catch((error) => {
+          console.error('Error refreshing code block:', error);
+        });
       }
     });
   }

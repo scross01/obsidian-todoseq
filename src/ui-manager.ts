@@ -1,4 +1,4 @@
-import { MarkdownView, WorkspaceLeaf, TFile } from 'obsidian';
+import { MarkdownView, WorkspaceLeaf, TFile, Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import TodoTracker from './main';
 import { taskKeywordPlugin } from './view/editor-extensions/task-formatting';
@@ -79,7 +79,13 @@ export class UIManager {
 
               // Handle checkbox clicks
               if (target.classList.contains('task-list-item-checkbox')) {
-                this.handleCheckboxToggle(target as HTMLInputElement, event);
+                this.handleCheckboxToggle(
+                  target as HTMLInputElement,
+                  event,
+                ).catch((error) => {
+                  new Notice('Failed to update task');
+                  console.error('Error updating task:', error);
+                });
               }
               // Handle task keyword clicks (check target or any ancestor)
               else {
@@ -309,12 +315,12 @@ export class UIManager {
         const filePath = view.file.path;
 
         if (this.plugin.taskUpdateCoordinator) {
-          void this.plugin.taskUpdateCoordinator.updateTaskByPath(
-            filePath,
-            lineNumber,
-            newKeyword,
-            'editor',
-          );
+          this.plugin.taskUpdateCoordinator
+            .updateTaskByPath(filePath, lineNumber, newKeyword, 'editor')
+            .catch((error) => {
+              new Notice('Failed to update task');
+              console.error('Error updating task:', error);
+            });
         } else if (this.plugin.taskEditor) {
           // Fallback to TaskEditor if coordinator not available
           const line = view.editor.getLine(lineNumber);
@@ -457,7 +463,10 @@ export class UIManager {
 
       // Process as single click only if click wasn't cancelled
       if (!clickCancelled) {
-        this.handleTaskKeywordClick(keywordElement, view);
+        this.handleTaskKeywordClick(keywordElement, view).catch((error) => {
+          new Notice('Failed to update task');
+          console.error('Error updating task:', error);
+        });
       }
     }, 300); // Standard double-click detection window
   }
@@ -694,7 +703,12 @@ export class UIManager {
         }
       }
       // Use active: false to prevent focus stealing on first install
-      leaf.setViewState({ type: TaskListView.viewType, active: false });
+      leaf
+        .setViewState({ type: TaskListView.viewType, active: false })
+        .catch((error) => {
+          new Notice('Failed to set view state');
+          console.error('Error setting view state:', error);
+        });
       // Only reveal if the leaf is not already active to avoid focus stealing
       const activeLeaf = workspace.activeLeaf;
       if (activeLeaf !== leaf && reveal) {
@@ -707,7 +721,12 @@ export class UIManager {
       );
       // Fallback to main area if right sidebar access fails
       leaf = workspace.getLeaf(true);
-      leaf.setViewState({ type: TaskListView.viewType, active: false });
+      leaf
+        .setViewState({ type: TaskListView.viewType, active: false })
+        .catch((error) => {
+          new Notice('Failed to set view state');
+          console.error('Error setting view state:', error);
+        });
     }
   }
 
@@ -782,7 +801,12 @@ export class UIManager {
 
     // Create a new leaf in the main area as a tab
     const leaf = workspace.getLeaf('tab');
-    leaf.setViewState({ type: TaskListView.viewType, active: true });
+    leaf
+      .setViewState({ type: TaskListView.viewType, active: true })
+      .catch((error) => {
+        new Notice('Failed to set view state');
+        console.error('Error setting view state:', error);
+      });
   }
 
   /**
@@ -823,8 +847,11 @@ export class UIManager {
       if (leaf.view instanceof TaskListView) {
         // Update the dropdown's task reference so it uses the latest tasks
         leaf.view.updateTasks(tasks);
-        // Full refresh of the visible list
-        leaf.view.refreshVisibleList();
+        // Full refresh of visible list
+        leaf.view.refreshVisibleList().catch((error) => {
+          new Notice('Failed to refresh task list');
+          console.error('Error refreshing task list:', error);
+        });
       }
     }
   }

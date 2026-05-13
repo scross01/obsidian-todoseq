@@ -55,7 +55,9 @@ export class SearchOptionsDropdown extends BaseDropdown {
   public clearHistory(): void {
     this.searchHistory = [];
     if (this.isShowing) {
-      this.renderDropdown();
+      this.renderDropdown().catch((error) => {
+        console.error('Error rendering dropdown:', error);
+      });
     }
   }
 
@@ -418,7 +420,11 @@ export class SearchOptionsDropdown extends BaseDropdown {
         this.suggestionDropdown.isHandlingPrefixSelection = true;
         const prefixForDropdown =
           suggestion === '[]' ? 'property:' : suggestion;
-        this.suggestionDropdown.showPrefixDropdown(prefixForDropdown, '');
+        this.suggestionDropdown
+          .showPrefixDropdown(prefixForDropdown, '')
+          .catch((error) => {
+            console.error('Error showing prefix dropdown:', error);
+          });
       }
     }
 

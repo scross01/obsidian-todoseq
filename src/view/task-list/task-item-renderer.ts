@@ -1,6 +1,6 @@
 import { Task } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
-import { setIcon, Platform } from 'obsidian';
+import { setIcon, Platform, Notice } from 'obsidian';
 import {
   TAG_PATTERN,
   WIKI_LINK_REGEX,
@@ -202,7 +202,10 @@ export class TaskItemRenderer {
       if (key === 'Enter' || key === ' ') {
         evt.preventDefault();
         evt.stopPropagation();
-        activate(evt);
+        activate(evt).catch((error) => {
+          new Notice('Failed to activate task');
+          console.error('Error activating task:', error);
+        });
       }
       if (key === 'F10' && evt.shiftKey) {
         evt.preventDefault();
