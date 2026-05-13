@@ -749,22 +749,9 @@ export class TaskWriter {
         }
       } else {
         // Vault API path
-        // Determine if CLOSED line already exists before mutation
-        const existingContent = await this.app.vault.read(file);
-        const existingLines = existingContent.split('\n');
-        const taskIndent = getTaskIndent(task);
-        const closedExists =
-          findDateLine(
-            existingLines,
-            task.line + 1,
-            'CLOSED',
-            taskIndent,
-            this.keywordManager,
-          ) >= 0;
-
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
-          updateOrInsertDateLine(
+          const result = updateOrInsertDateLine(
             lines,
             task.line,
             'CLOSED',
@@ -772,10 +759,9 @@ export class TaskWriter {
             task,
             this.keywordManager,
           );
+          lineDelta = result.lineDelta;
           return lines.join('\n');
         });
-
-        lineDelta = closedExists ? 0 : 1;
       }
     }
 

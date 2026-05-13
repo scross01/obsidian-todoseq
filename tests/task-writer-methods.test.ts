@@ -1015,7 +1015,10 @@ describe('TaskWriter Instance Methods', () => {
       mockApp = {
         vault: {
           getAbstractFileByPath: jest.fn().mockReturnValue(mockTFile),
-          process: jest.fn().mockResolvedValue(''),
+          process: jest.fn().mockImplementation((_file, updateFn) => {
+            const result = updateFn('- [ ] TODO Task text');
+            return Promise.resolve(result);
+          }),
           read: jest.fn().mockResolvedValue(''),
         },
         workspace: {
@@ -1080,9 +1083,14 @@ describe('TaskWriter Instance Methods', () => {
         completed: true,
       });
 
-      mockApp.vault.read.mockResolvedValueOnce(
-        '- [x] DONE Task text\n  CLOSED: [2026-03-14 Sat 10:00]',
-      );
+      mockApp.vault.process = jest
+        .fn()
+        .mockImplementation((_file, updateFn) => {
+          const result = updateFn(
+            '- [x] DONE Task text\n  CLOSED: [2026-03-14 Sat 10:00]',
+          );
+          return Promise.resolve(result);
+        });
 
       const result = await taskWriter.updateTaskClosedDate(
         task,
