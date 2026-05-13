@@ -13,7 +13,6 @@ import {
 import { TFile } from 'obsidian';
 
 // Mock window.activeDocument for Obsidian API compatibility
-// eslint-disable-next-line obsidianmd/prefer-active-doc
 (window as any).activeDocument = document;
 
 // Mock the Obsidian App

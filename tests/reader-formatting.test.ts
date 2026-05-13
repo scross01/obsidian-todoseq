@@ -52,11 +52,8 @@ if (!HTMLElement.prototype.createSpan) {
   };
 }
 
-// Mock window.activeDocument for Obsidian API compatibility
 // Polyfill Obsidian's createDiv on DocumentFragment for jsdom
 if (typeof window !== 'undefined') {
-  // eslint-disable-next-line obsidianmd/prefer-active-doc
-  (window as any).activeDocument = document;
   (window as any).DocumentFragment.prototype.createDiv = function (
     cls?: string | { cls?: string },
   ): HTMLDivElement {

@@ -25,7 +25,11 @@ This file provides guidance to agents when working with code in this repository.
 - **Lint**: `npm run lint` - run format first to reduce lint errors.
 - **Single test**: `npm test -- --testNamePattern="pattern"` (Jest with regex match)
 - **Coverage excludes**: `src/main.ts` excluded from coverage (line 9 in jest.config.json)
-- **Test console**: Tests mock console methods to reduce noise (lines 21-28 in tests/test-setup.ts)
+- **Test console**: Tests mock console methods to reduce noise (lines 10-21 in tests/test-setup.ts)
+- **Test window mock**: `tests/test-setup.ts` provides a mock `window` global (with timers) for tests running in Node.js environment; does not override jsdom's window
+- **Test DOM mocks**: Use `installObsidianDomMocks()` from `tests/helpers/obsidian-dom-mock.ts` in jsdom tests — adds `createEl`, `createDiv`, `createSpan`, `instanceOf()`, and `activeDocument` to DOM prototypes
+- **Test environments**: Jest config defaults to `node`; jsdom tests use `@jest-environment jsdom` pragma
+- **Eslint for tests**: Some Obsidian-specific rules are disabled for tests — see `tests/**/*.ts` block in `eslint.config.js`
 - **Timezone independence**: Always use local time methods (`getFullYear()`, `getMonth()`, `getDate()`) when working with dates in tests. Never use `Date.now()` or UTC dates in tests to avoid test failures in timezones ahead of UTC.
 
 ## Architecture
@@ -54,5 +58,5 @@ This file provides guidance to agents when working with code in this repository.
 
 ## Code Style
 
-- **ESLint exceptions**: `@typescript-eslint/no-explicit-any` is "warn" (not error) for all files (line 48 in .eslintrc)
+- **ESLint exceptions**: `@typescript-eslint/no-explicit-any` is "warn" (not error) for all files (line 53 in eslint.config.js)
 - **Import order**: Circular dependency handled between main plugin and parsers

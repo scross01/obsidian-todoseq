@@ -90,6 +90,7 @@ export default [
       '@typescript-eslint/no-unused-vars': 'off',
       'no-empty': 'off',
       'obsidianmd/no-global-this': 'off',
+      'obsidianmd/prefer-active-doc': 'off',
       'obsidianmd/prefer-window-timers': 'off',
       'obsidianmd/ui/sentence-case': 'off',
     },

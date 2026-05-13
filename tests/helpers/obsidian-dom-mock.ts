@@ -32,9 +32,9 @@ declare global {
 }
 
 export function installObsidianDomMocks(): void {
-  // Set up activeDocument before using it in createEl
-  // eslint-disable-next-line obsidianmd/prefer-active-doc
+  // Set up activeDocument on both window and globalThis
   (window as any).activeDocument = document;
+  (globalThis as any).activeDocument = document;
 
   HTMLElement.prototype.addClass = function (cls: string): void {
     this.classList.add(cls);

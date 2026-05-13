@@ -2,6 +2,8 @@
 
 ## 0.14.0-dev
 
+- Breaking change: Removed default hot-key for cycling task states, as per Obsidian plugin developer guidelines. Hotkeys can be configured in Obsidian settings.
+
 - Address Obsidian community scorecard review feedback items.
 
 ## 0.13.4

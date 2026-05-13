@@ -13,7 +13,6 @@ import { TFile } from 'obsidian';
 import { getDefaultCoefficients } from '../src/utils/task-urgency';
 
 // Mock window.activeDocument for Obsidian API compatibility
-// eslint-disable-next-line obsidianmd/prefer-active-doc
 (window as any).activeDocument = document;
 
 const mockApp = {
