@@ -1,22 +1,39 @@
 import { App, TFile } from 'obsidian';
-import { getDailyNoteInfo } from '../src/utils/daily-note-utils';
+import {
+  getDailyNoteInfo,
+  isDailyNotesPluginEnabledSync,
+  isDailyNotesPluginEnabled,
+  refreshDailyNotesPluginStatus,
+  getTodayDailyNote,
+  isTaskOnTodayDailyNote,
+} from '../src/utils/daily-note-utils';
 import { formatTaskLines } from '../src/utils/task-format';
-import { getDateFromFile } from 'obsidian-daily-notes-interface';
+import {
+  getDateFromFile,
+  appHasDailyNotesPluginLoaded,
+  createDailyNote,
+  getAllDailyNotes,
+  getDailyNote,
+} from 'obsidian-daily-notes-interface';
 import { Task, DateRepeatInfo } from '../src/types/task';
+import { createBaseTask } from './helpers/test-helper';
 
-// Mock the external module
 jest.mock('obsidian-daily-notes-interface', () => ({
   getDateFromFile: jest.fn(),
+  appHasDailyNotesPluginLoaded: jest.fn(),
+  createDailyNote: jest.fn(),
+  getAllDailyNotes: jest.fn(),
+  getDailyNote: jest.fn(),
 }));
 
 describe('daily-note-utils', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    refreshDailyNotesPluginStatus();
+  });
+
   describe('getDailyNoteInfo', () => {
     const mockApp: Partial<App> = {};
-
-    beforeEach(() => {
-      // Reset all mocks before each test
-      jest.clearAllMocks();
-    });
 
     test('should return isDailyNote: true with valid date when file is a daily note', () => {
       // Arrange
@@ -281,6 +298,267 @@ describe('daily-note-utils', () => {
       });
       const result = formatTaskLines(task);
       expect(result).toEqual(['TODO test task', 'SCHEDULED: <2026-04-02 Thu>']);
+    });
+  });
+
+  describe('isTaskOnTodayDailyNote', () => {
+    test('returns true when task path matches today note path', () => {
+      const task = createBaseTask({ path: '2023-01-01.md' });
+      const todayNote = new TFile('2023-01-01.md', '2023-01-01.md');
+      expect(isTaskOnTodayDailyNote(task, todayNote)).toBe(true);
+    });
+
+    test('returns false when task path differs from today note path', () => {
+      const task = createBaseTask({ path: 'other.md' });
+      const todayNote = new TFile('2023-01-01.md', '2023-01-01.md');
+      expect(isTaskOnTodayDailyNote(task, todayNote)).toBe(false);
+    });
+
+    test('returns false when task is in a subfolder', () => {
+      const task = createBaseTask({ path: 'notes/2023-01-01.md' });
+      const todayNote = new TFile('2023-01-01.md', '2023-01-01.md');
+      expect(isTaskOnTodayDailyNote(task, todayNote)).toBe(false);
+    });
+  });
+
+  describe('isDailyNotesPluginEnabledSync', () => {
+    test('returns true when appHasDailyNotesPluginLoaded returns a value', () => {
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue({});
+      const app = new App();
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(true);
+    });
+
+    test('returns false when appHasDailyNotesPluginLoaded returns undefined', () => {
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(undefined);
+      const app = new App();
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(false);
+    });
+
+    test('returns false when appHasDailyNotesPluginLoaded throws', () => {
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockImplementation(() => {
+        throw new Error('plugin unavailable');
+      });
+      const app = new App();
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(false);
+    });
+
+    test('caches result and does not recheck on subsequent calls', () => {
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue({});
+      const app = new App();
+
+      isDailyNotesPluginEnabledSync(app);
+      isDailyNotesPluginEnabledSync(app);
+
+      expect(appHasDailyNotesPluginLoaded).toHaveBeenCalledTimes(1);
+    });
+
+    test('rechecks after refreshDailyNotesPluginStatus resets cache', () => {
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue({});
+      const app = new App();
+
+      isDailyNotesPluginEnabledSync(app);
+      expect(appHasDailyNotesPluginLoaded).toHaveBeenCalledTimes(1);
+
+      refreshDailyNotesPluginStatus();
+
+      isDailyNotesPluginEnabledSync(app);
+      expect(appHasDailyNotesPluginLoaded).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('isDailyNotesPluginEnabled', () => {
+    function createAppWithAdapter(readResult?: string | Error): App {
+      const adapter = { read: jest.fn() };
+      if (readResult instanceof Error) {
+        adapter.read.mockRejectedValue(readResult);
+      } else if (readResult !== undefined) {
+        adapter.read.mockResolvedValue(readResult);
+      }
+      return {
+        // eslint-disable-next-line obsidianmd/hardcoded-config-path
+        vault: { adapter, configDir: '.obsidian' },
+      } as unknown as App;
+    }
+
+    test('returns true when daily-notes is enabled in core-plugins.json', async () => {
+      const app = createAppWithAdapter(JSON.stringify({ 'daily-notes': true }));
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(true);
+    });
+
+    test('returns false when daily-notes is disabled in core-plugins.json', async () => {
+      const app = createAppWithAdapter(
+        JSON.stringify({ 'daily-notes': false }),
+      );
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
+    });
+
+    test('returns false when daily-notes key is absent from core-plugins.json', async () => {
+      const app = createAppWithAdapter(
+        JSON.stringify({ 'other-plugin': true }),
+      );
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
+    });
+
+    test('returns false when adapter.read rejects', async () => {
+      const app = createAppWithAdapter(new Error('file not found'));
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
+    });
+
+    test('returns false when core-plugins.json contains invalid JSON', async () => {
+      const app = createAppWithAdapter('not valid json');
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
+    });
+
+    test('caches result across calls without re-reading file', async () => {
+      const app = createAppWithAdapter(JSON.stringify({ 'daily-notes': true }));
+      await isDailyNotesPluginEnabled(app);
+      await isDailyNotesPluginEnabled(app);
+      const adapter = (
+        app as unknown as { vault: { adapter: { read: jest.Mock } } }
+      ).vault.adapter;
+      expect(adapter.read).toHaveBeenCalledTimes(1);
+    });
+
+    test('forceRefresh re-reads the file', async () => {
+      const app = createAppWithAdapter(JSON.stringify({ 'daily-notes': true }));
+      await isDailyNotesPluginEnabled(app);
+      await isDailyNotesPluginEnabled(app, true);
+      const adapter = (
+        app as unknown as { vault: { adapter: { read: jest.Mock } } }
+      ).vault.adapter;
+      expect(adapter.read).toHaveBeenCalledTimes(2);
+    });
+
+    test('falls back to appHasDailyNotesPluginLoaded when vault is unavailable', async () => {
+      const app = {} as App;
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue({});
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(true);
+      expect(appHasDailyNotesPluginLoaded).toHaveBeenCalled();
+    });
+
+    test('returns false when vault unavailable and fallback also fails', async () => {
+      const app = {} as App;
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockImplementation(() => {
+        throw new Error('fallback fail');
+      });
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
+    });
+  });
+
+  describe('getTodayDailyNote', () => {
+    let originalMoment: unknown;
+
+    function createAppWithPluginEnabled(): App {
+      return {
+        vault: {
+          adapter: {
+            read: jest
+              .fn()
+              .mockResolvedValue(JSON.stringify({ 'daily-notes': true })),
+          },
+          // eslint-disable-next-line obsidianmd/hardcoded-config-path
+          configDir: '.obsidian',
+        },
+      } as unknown as App;
+    }
+
+    beforeEach(() => {
+      const win = (globalThis as Record<string, unknown>).window as Record<
+        string,
+        unknown
+      >;
+      originalMoment = win.moment;
+      win.moment = jest.fn().mockReturnValue('mock-today');
+    });
+
+    afterEach(() => {
+      const win = (globalThis as Record<string, unknown>).window as Record<
+        string,
+        unknown
+      >;
+      win.moment = originalMoment;
+    });
+
+    test('returns null when daily notes plugin is not enabled', async () => {
+      const app = {
+        vault: {
+          adapter: {
+            read: jest
+              .fn()
+              .mockResolvedValue(JSON.stringify({ 'daily-notes': false })),
+          },
+          // eslint-disable-next-line obsidianmd/hardcoded-config-path
+          configDir: '.obsidian',
+        },
+      } as unknown as App;
+
+      await expect(getTodayDailyNote(app)).resolves.toBeNull();
+    });
+
+    test('returns existing daily note without creating a new one', async () => {
+      const app = createAppWithPluginEnabled();
+      const existingNote = new TFile('2023-01-01.md', '2023-01-01.md');
+
+      (getAllDailyNotes as jest.Mock).mockReturnValue({
+        '2023-01-01': existingNote,
+      });
+      (getDailyNote as jest.Mock).mockReturnValue(existingNote);
+
+      const result = await getTodayDailyNote(app);
+      expect(result).toBe(existingNote);
+      expect(createDailyNote).not.toHaveBeenCalled();
+    });
+
+    test('creates new daily note when none exists', async () => {
+      const app = createAppWithPluginEnabled();
+      const newNote = new TFile('2023-01-01.md', '2023-01-01.md');
+
+      (getAllDailyNotes as jest.Mock).mockReturnValue({});
+      (getDailyNote as jest.Mock).mockReturnValue(null);
+      (createDailyNote as jest.Mock).mockResolvedValue(newNote);
+
+      const result = await getTodayDailyNote(app);
+      expect(result).toBe(newNote);
+      expect(createDailyNote).toHaveBeenCalledWith('mock-today');
+    });
+
+    test('returns null when createDailyNote fails', async () => {
+      const app = createAppWithPluginEnabled();
+
+      (getAllDailyNotes as jest.Mock).mockReturnValue({});
+      (getDailyNote as jest.Mock).mockReturnValue(null);
+      (createDailyNote as jest.Mock).mockRejectedValue(
+        new Error('create failed'),
+      );
+
+      await expect(getTodayDailyNote(app)).resolves.toBeNull();
+    });
+
+    test('returns null when an unexpected error occurs', async () => {
+      const app = createAppWithPluginEnabled();
+      (getAllDailyNotes as jest.Mock).mockImplementation(() => {
+        throw new Error('unexpected');
+      });
+
+      await expect(getTodayDailyNote(app)).resolves.toBeNull();
+    });
+
+    test('uses window.moment to get today date', async () => {
+      const app = createAppWithPluginEnabled();
+
+      (getAllDailyNotes as jest.Mock).mockReturnValue({});
+      (getDailyNote as jest.Mock).mockReturnValue(null);
+      (createDailyNote as jest.Mock).mockResolvedValue(
+        new TFile('2023-01-01.md', '2023-01-01.md'),
+      );
+
+      await getTodayDailyNote(app);
+
+      const win = (globalThis as Record<string, unknown>).window as Record<
+        string,
+        unknown
+      >;
+      expect(win.moment).toHaveBeenCalled();
     });
   });
 });

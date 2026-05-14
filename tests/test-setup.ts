@@ -20,6 +20,18 @@ global.console = {
   error: console.error, // Keep error to surface real issues
 };
 
+// Polyfill DragEvent for jsdom environments
+if (typeof globalThis.window !== 'undefined' && typeof (globalThis.window as any).DragEvent === 'undefined') {
+  class DragEventPolyfill extends MouseEvent {
+    dataTransfer: DataTransfer | null = null;
+    constructor(type: string, init: any = {}) {
+      super(type, init);
+      this.dataTransfer = init.dataTransfer ?? null;
+    }
+  }
+  (globalThis as any).DragEvent = DragEventPolyfill;
+}
+
 // Mock window and activeWindow for popout window compatibility (timers)
 // Only set up if window is not already defined (i.e. not in jsdom environment)
 if (typeof globalThis.window === 'undefined') {

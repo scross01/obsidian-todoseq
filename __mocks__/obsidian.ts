@@ -28,6 +28,10 @@ export class Vault {
     return '';
   }
 
+  async modify(_file: TFile, _data: string): Promise<void> {
+    // no-op in tests
+  }
+
   getMarkdownFiles(): TFile[] {
     return [];
   }
@@ -57,10 +61,43 @@ export class Plugin {
   onunload(): void {}
 }
 
-export class MarkdownView {}
+export class MarkdownView {
+  file: TFile | null = null;
+  getMode(): string {
+    return 'source';
+  }
+  editor: { cm?: unknown } = {};
+}
+
+export class Editor {
+  getCursor(): { line: number; ch: number } {
+    return { line: 0, ch: 0 };
+  }
+  getLine(_line: number): string {
+    return '';
+  }
+  replaceRange(_text: string, _from: unknown, _to?: unknown): void {}
+}
+
+export class Workspace {
+  on(_name: string, _callback: (...args: unknown[]) => unknown): string {
+    return 'mock-ref';
+  }
+  offref(_ref: string): void {}
+  getActiveViewOfType<T>(_type: new (...args: unknown[]) => T): T | null {
+    return null;
+  }
+}
+
+export const Platform = { isMobile: false };
 
 export class Notice {
-  constructor(_message: string, _timeout?: number) {}
+  constructor(message: string, timeout?: number) {
+    const instances = (Notice as any).instances as Array<{ message: string; timeout?: number }> | undefined;
+    if (instances) {
+      instances.push({ message, timeout });
+    }
+  }
 }
 
 export function setIcon(_el: HTMLElement, _iconId: string): void {

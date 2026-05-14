@@ -1,9 +1,17 @@
+/**
+ * @jest-environment jsdom
+ */
 import {
   getFilename,
   isCompletedState,
   getCheckboxStatus,
   truncateMiddle,
+  getTaskTextDisplay,
+  stripMarkdownForDisplay,
+  hasSubtasks,
+  getSubtaskDisplayText,
 } from '../src/utils/task-utils';
+import { Task } from '../src/types/task';
 import { KeywordManager } from '../src/utils/keyword-manager';
 import {
   BUILTIN_ACTIVE_KEYWORDS,
@@ -371,6 +379,202 @@ describe('task-utils', () => {
           true,
         );
       });
+    });
+  });
+
+  function createTask(overrides: Partial<Task> = {}): Task {
+    return {
+      path: '',
+      line: 0,
+      rawText: '',
+      indent: '',
+      listMarker: '- ',
+      text: '',
+      state: 'TODO',
+      completed: false,
+      priority: null,
+      scheduledDate: null,
+      scheduledDateRepeat: null,
+      deadlineDate: null,
+      deadlineDateRepeat: null,
+      closedDate: null,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+      subtaskCount: 0,
+      subtaskCompletedCount: 0,
+      ...overrides,
+    };
+  }
+
+  describe('getTaskTextDisplay', () => {
+    test('returns cached textDisplay if already set', () => {
+      const task = createTask({ text: 'hello', textDisplay: 'cached' });
+      expect(getTaskTextDisplay(task)).toBe('cached');
+    });
+
+    test('computes and caches textDisplay from text', () => {
+      const task = createTask({ text: '**bold** task' });
+      expect(task.textDisplay).toBeUndefined();
+      const result = getTaskTextDisplay(task);
+      expect(result).toBe('bold task');
+      expect(task.textDisplay).toBe('bold task');
+    });
+
+    test('returns same cached value on second call', () => {
+      const task = createTask({ text: '**bold**' });
+      const first = getTaskTextDisplay(task);
+      task.text = 'changed';
+      const second = getTaskTextDisplay(task);
+      expect(first).toBe(second);
+    });
+  });
+
+  describe('stripMarkdownForDisplay', () => {
+    test('returns empty string for empty input', () => {
+      expect(stripMarkdownForDisplay('')).toBe('');
+    });
+
+    test('strips HTML tags', () => {
+      expect(stripMarkdownForDisplay('<b>bold</b> and <i>italic</i>')).toBe(
+        'bold and italic',
+      );
+    });
+
+    test('strips image syntax preserving alt text', () => {
+      expect(stripMarkdownForDisplay('see ![photo](img.png) here')).toBe(
+        'see photo here',
+      );
+    });
+
+    test('strips image with empty alt', () => {
+      expect(stripMarkdownForDisplay('![](img.png)')).toBe('');
+    });
+
+    test('strips inline code backticks', () => {
+      expect(stripMarkdownForDisplay('use `console.debug` please')).toBe(
+        'use console.debug please',
+      );
+    });
+
+    test('strips headings', () => {
+      expect(stripMarkdownForDisplay('## Heading text')).toBe('Heading text');
+    });
+
+    test('strips heading with leading spaces', () => {
+      expect(stripMarkdownForDisplay('   ### Deep heading')).toBe(
+        'Deep heading',
+      );
+    });
+
+    test('strips bold with asterisks', () => {
+      expect(stripMarkdownForDisplay('this is **bold** text')).toBe(
+        'this is bold text',
+      );
+    });
+
+    test('strips bold with underscores', () => {
+      expect(stripMarkdownForDisplay('this is __bold__ text')).toBe(
+        'this is bold text',
+      );
+    });
+
+    test('strips italic with asterisks', () => {
+      expect(stripMarkdownForDisplay('this is *italic* text')).toBe(
+        'this is italic text',
+      );
+    });
+
+    test('strips italic with underscores', () => {
+      expect(stripMarkdownForDisplay('this is _italic_ text')).toBe(
+        'this is italic text',
+      );
+    });
+
+    test('strips strikethrough', () => {
+      expect(stripMarkdownForDisplay('this is ~~removed~~ text')).toBe(
+        'this is removed text',
+      );
+    });
+
+    test('strips highlight', () => {
+      expect(stripMarkdownForDisplay('this is ==highlighted== text')).toBe(
+        'this is highlighted text',
+      );
+    });
+
+    test('strips math blocks', () => {
+      expect(stripMarkdownForDisplay('formula $$E=mc^2$$ here')).toBe(
+        'formula E=mc^2 here',
+      );
+    });
+
+    test('normalizes carriage returns', () => {
+      expect(stripMarkdownForDisplay('line1\r\nline2')).toBe('line1\nline2');
+    });
+
+    test('normalizes trailing spaces on lines', () => {
+      expect(stripMarkdownForDisplay('line1   \nline2')).toBe('line1\nline2');
+    });
+
+    test('collapses multiple blank lines', () => {
+      expect(stripMarkdownForDisplay('line1\n\n\n\nline2')).toBe(
+        'line1\n\nline2',
+      );
+    });
+
+    test('trims leading and trailing whitespace', () => {
+      expect(stripMarkdownForDisplay('  hello world  ')).toBe('hello world');
+    });
+
+    test('handles plain text without markdown unchanged', () => {
+      expect(stripMarkdownForDisplay('just plain text')).toBe(
+        'just plain text',
+      );
+    });
+
+    test('handles combination of multiple markdown features', () => {
+      const input = '## **Bold** and *italic* with `code`';
+      expect(stripMarkdownForDisplay(input)).toBe('Bold and italic with code');
+    });
+  });
+
+  describe('hasSubtasks', () => {
+    test('returns false when subtaskCount is 0', () => {
+      const task = createTask({ subtaskCount: 0 });
+      expect(hasSubtasks(task)).toBe(false);
+    });
+
+    test('returns true when subtaskCount is positive', () => {
+      const task = createTask({ subtaskCount: 3 });
+      expect(hasSubtasks(task)).toBe(true);
+    });
+
+    test('returns true when subtaskCount is 1', () => {
+      const task = createTask({ subtaskCount: 1 });
+      expect(hasSubtasks(task)).toBe(true);
+    });
+  });
+
+  describe('getSubtaskDisplayText', () => {
+    test('returns empty string when no subtasks', () => {
+      const task = createTask({ subtaskCount: 0, subtaskCompletedCount: 0 });
+      expect(getSubtaskDisplayText(task)).toBe('');
+    });
+
+    test('returns completed/total format', () => {
+      const task = createTask({ subtaskCount: 3, subtaskCompletedCount: 1 });
+      expect(getSubtaskDisplayText(task)).toBe('1/3');
+    });
+
+    test('returns all completed format', () => {
+      const task = createTask({ subtaskCount: 5, subtaskCompletedCount: 5 });
+      expect(getSubtaskDisplayText(task)).toBe('5/5');
+    });
+
+    test('returns zero completed format', () => {
+      const task = createTask({ subtaskCount: 4, subtaskCompletedCount: 0 });
+      expect(getSubtaskDisplayText(task)).toBe('0/4');
     });
   });
 });

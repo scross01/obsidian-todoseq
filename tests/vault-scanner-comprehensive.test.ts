@@ -11,6 +11,7 @@ import {
 import { Task } from '../src/types/task';
 import { App, TFile } from 'obsidian';
 import TodoTracker from '../src/main';
+import { ChangeTracker } from '../src/services/change-tracker';
 
 /**
  * Helper function to create a TFile instance for testing
@@ -24,6 +25,7 @@ describe('VaultScanner', () => {
   let taskStateManager: TaskStateManager;
   let mockApp: jest.Mocked<App>;
   let settings: ReturnType<typeof createBaseSettings>;
+  let changeTracker: ChangeTracker;
 
   beforeEach(() => {
     settings = createBaseSettings();
@@ -52,6 +54,8 @@ describe('VaultScanner', () => {
       taskStateManager,
       keywordManager,
     } as unknown as TodoTracker;
+
+    changeTracker = new ChangeTracker();
 
     const urgencyCoefficients = {
       priorityHigh: 6,
@@ -89,11 +93,13 @@ describe('VaultScanner', () => {
       urgencyCoefficients,
       keywordManager,
       parserRegistry,
+      changeTracker,
     );
   });
 
   afterEach(() => {
     vaultScanner.destroy();
+    changeTracker.destroy();
   });
 
   describe('Event Management', () => {
@@ -338,6 +344,28 @@ describe('VaultScanner', () => {
       await vaultScanner.updateSettings(newSettings);
 
       expect(updateConfigSpy).toHaveBeenCalled();
+    });
+
+    it('should accept urgency coefficients parameter', async () => {
+      const newSettings = createBaseSettings();
+      const customCoefficients = {
+        priorityHigh: 10,
+        priorityMedium: 8,
+        priorityLow: 4,
+        scheduled: 16,
+        scheduledTime: 2,
+        deadline: 24,
+        deadlineTime: 2,
+        active: 8,
+        age: 4,
+        tags: 2,
+        waiting: -6,
+      };
+
+      await vaultScanner.updateSettings(newSettings, customCoefficients);
+
+      // @ts-ignore - accessing private field
+      expect(vaultScanner['urgencyCoefficients']).toEqual(customCoefficients);
     });
 
     it('should respect default settings for includeCodeBlocks and includeCommentBlocks during initialization', async () => {
@@ -616,6 +644,34 @@ TODO task outside blocks
       expect(tasks).toHaveLength(2);
       expect(tasks.some((t) => t.path === 'new-name.md')).toBe(true);
     });
+
+    it('should handle errors during file deletion', async () => {
+      jest.spyOn(taskStateManager, 'getTasks').mockImplementationOnce(() => {
+        throw new Error('State error');
+      });
+
+      const scanError = jest.fn();
+      vaultScanner.on('scan-error', scanError);
+
+      const file = createMockFile('file1.md', 'file1.md');
+      await vaultScanner.processFileDelete(file);
+
+      expect(scanError).toHaveBeenCalled();
+    });
+
+    it('should handle errors during file rename', async () => {
+      jest.spyOn(taskStateManager, 'getTasks').mockImplementationOnce(() => {
+        throw new Error('State error');
+      });
+
+      const scanError = jest.fn();
+      vaultScanner.on('scan-error', scanError);
+
+      const file = createMockFile('new-name.md', 'new-name.md');
+      await vaultScanner.processFileRename(file, 'old-name.md');
+
+      expect(scanError).toHaveBeenCalled();
+    });
   });
 
   describe('Cleanup', () => {
@@ -638,271 +694,399 @@ TODO task outside blocks
     });
   });
 
-  describe('tasksIdentical method', () => {
-    it('should return true for identical tasks', () => {
-      const date = new Date(2024, 0, 15);
+  describe('scanVault', () => {
+    it('should scan files and collect tasks', async () => {
+      const file1 = new TFile('file1.md', 'file1.md', 'md');
+      const file2 = new TFile('file2.md', 'file2.md', 'md');
 
-      const tasks1: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: date,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 0,
-          subtaskCompletedCount: 0,
-        },
-      ];
+      mockApp.vault.getFiles.mockReturnValue([file1, file2]);
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO test task');
 
-      const tasks2: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: date,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 0,
-          subtaskCompletedCount: 0,
-        },
-      ];
+      const tasksChanged = jest.fn();
+      const scanStarted = jest.fn();
+      const scanCompleted = jest.fn();
+      vaultScanner.on('tasks-changed', tasksChanged);
+      vaultScanner.on('scan-started', scanStarted);
+      vaultScanner.on('scan-completed', scanCompleted);
+
+      await vaultScanner.scanVault();
+
+      expect(vaultScanner.isScanning()).toBe(false);
+      expect(vaultScanner.getTasks()).toHaveLength(2);
+      expect(scanStarted).toHaveBeenCalledTimes(1);
+      expect(tasksChanged).toHaveBeenCalled();
+      expect(scanCompleted).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return early if already scanning', async () => {
+      // @ts-ignore - setting private property
+      vaultScanner['_isScanning'] = true;
+      mockApp.vault.getFiles.mockReturnValue([]);
+
+      await vaultScanner.scanVault();
+
+      expect(mockApp.vault.getFiles).not.toHaveBeenCalled();
+      expect(vaultScanner.isScanning()).toBe(true);
+    });
+
+    it('should filter archived tasks', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+
+      mockApp.vault.getFiles.mockReturnValue([file]);
+      mockApp.vault.cachedRead.mockResolvedValue(
+        '- TODO active task\n- ARCHIVED old task',
+      );
+
+      await vaultScanner.scanVault();
+
+      const tasks = vaultScanner.getTasks();
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].text).toBe('active task');
+    });
+
+    it('should handle read errors gracefully', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+      mockApp.vault.getFiles.mockReturnValue([file]);
+      mockApp.vault.cachedRead = jest
+        .fn()
+        .mockRejectedValue(new Error('Read error'));
+
+      await vaultScanner.scanVault();
+
+      expect(vaultScanner.isScanning()).toBe(false);
+      expect(vaultScanner.getTasks()).toHaveLength(0);
+    });
+
+    it('should handle errors during vault scan', async () => {
+      mockApp.vault.getFiles.mockImplementation(() => {
+        throw new Error('Vault error');
+      });
+
+      const scanError = jest.fn();
+      vaultScanner.on('scan-error', scanError);
+
+      await vaultScanner.scanVault();
+
+      expect(scanError).toHaveBeenCalled();
+      expect(vaultScanner.isScanning()).toBe(false);
+    });
+  });
+
+  describe('shouldScanFile', () => {
+    it('should scan markdown files', () => {
+      const file = new TFile('test.md', 'test.md', 'md');
 
       // @ts-ignore - Accessing private method for testing
-      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      const result = vaultScanner.shouldScanFile(file);
+
       expect(result).toBe(true);
     });
 
-    it('should return false when scheduled date changes', () => {
-      const tasks1: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: new Date(2024, 0, 15),
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 0,
-          subtaskCompletedCount: 0,
-        },
-      ];
-
-      const tasks2: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: new Date(2024, 0, 16),
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 0,
-          subtaskCompletedCount: 0,
-        },
-      ];
+    it('should not scan non-markdown files without additional extensions', () => {
+      const file = new TFile('test.txt', 'test.txt', 'txt');
 
       // @ts-ignore - Accessing private method for testing
-      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      const result = vaultScanner.shouldScanFile(file);
+
       expect(result).toBe(false);
     });
 
-    it('should return false when arrays have different lengths', () => {
-      const date = new Date(2024, 0, 15);
+    it('should scan non-markdown files with matching additional extensions', async () => {
+      const newSettings = createBaseSettings({
+        additionalFileExtensions: ['.txt'],
+      });
+      await vaultScanner.updateSettings(newSettings);
 
-      const tasks1: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: date,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 0,
-          subtaskCompletedCount: 0,
-        },
-      ];
-
-      const tasks2: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: date,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 0,
-          subtaskCompletedCount: 0,
-        },
-        {
-          path: 'test.md',
-          line: 1,
-          rawText: '- DOING another task',
-          indent: '',
-          listMarker: '- ',
-          text: 'another task',
-          state: 'DOING',
-          completed: false,
-          priority: null,
-          scheduledDate: null,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 0,
-          subtaskCompletedCount: 0,
-        },
-      ];
+      const file = new TFile('test.txt', 'test.txt', 'txt');
 
       // @ts-ignore - Accessing private method for testing
-      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      const result = vaultScanner.shouldScanFile(file);
+
+      expect(result).toBe(true);
+    });
+
+    it('should not scan excluded files', () => {
+      mockApp.vault.getConfig.mockReturnValue(['secret']);
+
+      const file = new TFile('secret/notes.md', 'notes.md', 'md');
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.shouldScanFile(file);
+
       expect(result).toBe(false);
     });
 
-    it('should return false when subtask counts differ', () => {
-      const date = new Date(2024, 0, 15);
+    it('should match multi-level extensions', async () => {
+      const newSettings = createBaseSettings({
+        additionalFileExtensions: ['.txt.bak'],
+      });
+      await vaultScanner.updateSettings(newSettings);
 
-      const tasks1: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: date,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 2,
-          subtaskCompletedCount: 1,
-        },
-      ];
-
-      const tasks2: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: date,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 3,
-          subtaskCompletedCount: 1,
-        },
-      ];
+      const file = new TFile('backup/test.txt.bak', 'test.txt.bak', 'bak');
 
       // @ts-ignore - Accessing private method for testing
-      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      const result = vaultScanner.shouldScanFile(file);
+
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('isExcluded', () => {
+    it('should return false when no ignore filters are configured', () => {
+      mockApp.vault.getConfig.mockReturnValue(null);
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.isExcluded('test.md');
+
       expect(result).toBe(false);
     });
 
-    it('should return false when subtask completed counts differ', () => {
-      const date = new Date(2024, 0, 15);
+    it('should exclude by regex pattern', () => {
+      mockApp.vault.getConfig.mockReturnValue(['/^secret/']);
 
-      const tasks1: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: date,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 2,
-          subtaskCompletedCount: 1,
-        },
-      ];
+      // @ts-ignore
+      expect(vaultScanner.isExcluded('secret/file.md')).toBe(true);
+      // @ts-ignore
+      expect(vaultScanner.isExcluded('public/file.md')).toBe(false);
+    });
 
-      const tasks2: Task[] = [
-        {
-          path: 'test.md',
-          line: 0,
-          rawText: '- TODO test task',
-          indent: '',
-          listMarker: '- ',
-          text: 'test task',
-          state: 'TODO',
-          completed: false,
-          priority: null,
-          scheduledDate: date,
-          deadlineDate: null,
-          urgency: null,
-          isDailyNote: false,
-          dailyNoteDate: null,
-          subtaskCount: 2,
-          subtaskCompletedCount: 2,
-        },
-      ];
+    it('should exclude by directory path pattern', () => {
+      mockApp.vault.getConfig.mockReturnValue(['archive/']);
 
-      // @ts-ignore - Accessing private method for testing
-      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      // @ts-ignore
+      expect(vaultScanner.isExcluded('archive/file.md')).toBe(true);
+      // @ts-ignore
+      expect(vaultScanner.isExcluded('notes/file.md')).toBe(false);
+    });
+
+    it('should exclude by simple string match', () => {
+      mockApp.vault.getConfig.mockReturnValue(['draft']);
+
+      // @ts-ignore
+      expect(vaultScanner.isExcluded('draft/notes.md')).toBe(true);
+      // @ts-ignore
+      expect(vaultScanner.isExcluded('notes/draft.md')).toBe(true);
+      // @ts-ignore
+      expect(vaultScanner.isExcluded('final/notes.md')).toBe(false);
+    });
+
+    it('should handle invalid patterns gracefully', () => {
+      mockApp.vault.getConfig.mockReturnValue(['/[invalid/']);
+
+      // @ts-ignore
+      const result = vaultScanner.isExcluded('test.md');
+
       expect(result).toBe(false);
+    });
+
+    it('should return false when getConfig is unavailable', () => {
+      const vaultWithoutConfig = {
+        getFiles: jest.fn(),
+        cachedRead: jest.fn(),
+        read: jest.fn(),
+        getConfig: jest.fn().mockImplementation(() => {
+          throw new Error('Config not available');
+        }),
+      };
+      const originalVault = mockApp.vault;
+      mockApp.vault = vaultWithoutConfig as typeof mockApp.vault;
+
+      // @ts-ignore
+      const result = vaultScanner.isExcluded('test.md');
+
+      expect(result).toBe(false);
+
+      mockApp.vault = originalVault;
+    });
+  });
+
+  describe('scanFile', () => {
+    it('should return tasks from a markdown file', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO test task');
+
+      const tasks = await vaultScanner.scanFile(file);
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].text).toBe('test task');
+      expect(tasks[0].state).toBe('TODO');
+    });
+
+    it('should return empty array when no keywords match', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+      mockApp.vault.cachedRead.mockResolvedValue('Just some regular text');
+
+      const tasks = await vaultScanner.scanFile(file);
+
+      expect(tasks).toHaveLength(0);
+    });
+
+    it('should return empty array when no parser for extension', async () => {
+      const file = new TFile('test.xyz', 'test.xyz', 'xyz');
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO test task');
+
+      const tasks = await vaultScanner.scanFile(file);
+
+      expect(tasks).toHaveLength(0);
+    });
+
+    it('should handle cachedRead errors', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+      mockApp.vault.cachedRead = jest
+        .fn()
+        .mockRejectedValue(new Error('Read error'));
+
+      const scanError = jest.fn();
+      vaultScanner.on('scan-error', scanError);
+
+      const tasks = await vaultScanner.scanFile(file);
+
+      expect(tasks).toHaveLength(0);
+      expect(scanError).toHaveBeenCalled();
+    });
+  });
+
+  describe('processIncrementalChange', () => {
+    it('should update tasks when file changes', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+      const existingTask = createBaseTask({ path: 'other.md', text: 'other' });
+      taskStateManager.setTasks([existingTask]);
+
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO new task');
+      mockApp.vault.read.mockResolvedValue('- TODO new task');
+
+      const tasksChanged = jest.fn();
+      vaultScanner.on('tasks-changed', tasksChanged);
+
+      await vaultScanner.processIncrementalChange(file);
+
+      expect(tasksChanged).toHaveBeenCalled();
+      const tasks = vaultScanner.getTasks();
+      expect(tasks).toHaveLength(2);
+      expect(tasks.some((t) => t.text === 'new task')).toBe(true);
+    });
+
+    it('should skip excluded files', async () => {
+      mockApp.vault.getConfig.mockReturnValue(['secret/']);
+
+      const file = new TFile('secret/test.md', 'test.md', 'md');
+
+      await vaultScanner.processIncrementalChange(file);
+
+      expect(mockApp.vault.cachedRead).not.toHaveBeenCalled();
+    });
+
+    it('should skip when tasks are unchanged', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+      const existingTask = createBaseTask({
+        path: 'test.md',
+        line: 0,
+        rawText: '- TODO test task',
+        text: 'test task',
+        state: 'TODO',
+      });
+      taskStateManager.setTasks([existingTask]);
+
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO test task');
+      mockApp.vault.read.mockResolvedValue('- TODO test task');
+
+      const tasksChanged = jest.fn();
+      vaultScanner.on('tasks-changed', tasksChanged);
+
+      await vaultScanner.processIncrementalChange(file);
+
+      expect(tasksChanged).not.toHaveBeenCalled();
+      expect(vaultScanner.getTasks()).toHaveLength(1);
+    });
+
+    it('should skip when change is tracked as expected', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+      const existingTask = createBaseTask({
+        path: 'test.md',
+        text: 'old text',
+      });
+      taskStateManager.setTasks([existingTask]);
+
+      changeTracker.registerExpectedChange('test.md', '- TODO new text');
+
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO new text');
+      mockApp.vault.read.mockResolvedValue('- TODO new text');
+
+      const tasksChanged = jest.fn();
+      vaultScanner.on('tasks-changed', tasksChanged);
+
+      await vaultScanner.processIncrementalChange(file);
+
+      expect(tasksChanged).not.toHaveBeenCalled();
+      expect(vaultScanner.getTasks()[0].text).toBe('old text');
+    });
+
+    it('should skip during addSkipIncrementalChange window', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+
+      vaultScanner.addSkipIncrementalChange('test.md');
+
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO new task');
+
+      await vaultScanner.processIncrementalChange(file);
+
+      expect(mockApp.vault.cachedRead).not.toHaveBeenCalled();
+    });
+
+    it('should handle errors during read', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO new task');
+      mockApp.vault.read = jest.fn().mockRejectedValue(new Error('Read error'));
+
+      const scanError = jest.fn();
+      vaultScanner.on('scan-error', scanError);
+
+      await vaultScanner.processIncrementalChange(file);
+
+      expect(scanError).toHaveBeenCalled();
+    });
+
+    it('should process change when skip entry has expired', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+
+      // Set an expired timestamp (6 seconds in the past)
+      vaultScanner['skipIncrementalChanges'].set('test.md', Date.now() - 6000);
+
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO new task');
+      mockApp.vault.read.mockResolvedValue('- TODO new task');
+
+      await vaultScanner.processIncrementalChange(file);
+
+      const tasks = vaultScanner.getTasks();
+      expect(tasks).toHaveLength(1);
+    });
+
+    it('should handle missing timestamp in skip entry', async () => {
+      const file = new TFile('test.md', 'test.md', 'md');
+
+      // Set entry with undefined timestamp (edge case)
+      // @ts-ignore - accessing private property
+      vaultScanner['skipIncrementalChanges'].set('test.md', undefined as any);
+
+      mockApp.vault.cachedRead.mockResolvedValue('- TODO new task');
+      mockApp.vault.read.mockResolvedValue('- TODO new task');
+
+      await vaultScanner.processIncrementalChange(file);
+
+      const tasks = vaultScanner.getTasks();
+      expect(tasks).toHaveLength(1);
+    });
+  });
+
+  describe('addSkipIncrementalChange', () => {
+    it('should record a skip entry for the file path', () => {
+      vaultScanner.addSkipIncrementalChange('test.md');
+
+      // @ts-ignore - accessing private property
+      expect(vaultScanner['skipIncrementalChanges'].has('test.md')).toBe(true);
+      // @ts-ignore
+      const timestamp = vaultScanner['skipIncrementalChanges'].get('test.md');
+      expect(typeof timestamp).toBe('number');
     });
   });
 });

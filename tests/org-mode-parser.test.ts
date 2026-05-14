@@ -9,6 +9,10 @@ import {
   createBaseSettings,
   createTestKeywordManager,
 } from './helpers/test-helper';
+import { getDailyNoteInfo } from '../src/utils/daily-note-utils';
+jest.mock('../src/utils/daily-note-utils', () => ({
+  getDailyNoteInfo: jest.fn(),
+}));
 
 // Default settings for testing
 const defaultSettings = createBaseSettings();
@@ -299,6 +303,161 @@ More text`;
       // New keywords should now be recognized as tasks
       expect(customParser.isTaskLine('* TEMP Custom task')).toBe(true);
       expect(customParser.isTaskLine('* MAYBE Custom task')).toBe(true);
+    });
+  });
+
+  describe('hasAnyKeyword', () => {
+    it('should return true when content contains a known keyword', () => {
+      expect(parser.hasAnyKeyword('This is a TODO task')).toBe(true);
+    });
+    it('should return false when no keywords present', () => {
+      expect(parser.hasAnyKeyword('Just some random text')).toBe(false);
+    });
+  });
+
+  describe('updateConfig with keywordManager', () => {
+    it('should replace internal keywordManager and rebuild regex', () => {
+      const newSettings = createBaseSettings({
+        additionalInactiveKeywords: ['CUSTOM'],
+      });
+      const newKM = createTestKeywordManager(newSettings);
+      expect(parser.isTaskLine('* CUSTOM task')).toBe(false);
+      parser.updateConfig({ keywordManager: newKM });
+      expect(parser.isTaskLine('* CUSTOM task')).toBe(true);
+    });
+  });
+
+  describe('daily note detection', () => {
+    let parserWithApp: OrgModeTaskParser;
+    const mockApp = {} as any;
+    const mockFile = { path: 'test.org' } as any;
+
+    beforeEach(() => {
+      parserWithApp = OrgModeTaskParser.create(
+        defaultKeywordManager,
+        mockApp,
+        getDefaultCoefficients(),
+      );
+      jest.clearAllMocks();
+    });
+
+    it('should set isDailyNote and dailyNoteDate when getDailyNoteInfo returns true', () => {
+      (getDailyNoteInfo as jest.Mock).mockReturnValue({
+        isDailyNote: true,
+        dailyNoteDate: new Date(2026, 2, 5),
+      });
+      const tasks = parserWithApp.parseFile(
+        '* TODO task',
+        'test.org',
+        mockFile,
+      );
+      expect(tasks[0].isDailyNote).toBe(true);
+      expect(tasks[0].dailyNoteDate).toEqual(new Date(2026, 2, 5));
+      expect(getDailyNoteInfo).toHaveBeenCalledWith(mockApp, mockFile);
+    });
+
+    it('should handle errors from getDailyNoteInfo gracefully', () => {
+      (getDailyNoteInfo as jest.Mock).mockImplementation(() => {
+        throw new Error('plugin missing');
+      });
+      const tasks = parserWithApp.parseFile(
+        '* TODO task',
+        'test.org',
+        mockFile,
+      );
+      expect(tasks[0].isDailyNote).toBe(false);
+      expect(tasks[0].dailyNoteDate).toBeNull();
+    });
+  });
+
+  describe('inactive date brackets', () => {
+    it('should parse inactive scheduled date [YYYY-MM-DD]', () => {
+      const content = `* TODO Task
+  SCHEDULED: [2026-03-05]`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].scheduledDate).not.toBeNull();
+      expect(tasks[0].scheduledDate!.getFullYear()).toBe(2026);
+    });
+
+    it('should parse inactive deadline date with day-of-week and time', () => {
+      const content = `* TODO Task
+  DEADLINE: [2026-03-05 Wed 14:30]`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].deadlineDate).not.toBeNull();
+      expect(tasks[0].deadlineDate!.getHours()).toBe(14);
+    });
+
+    it('should handle inactive date with repeater', () => {
+      const content = `* TODO Task
+  SCHEDULED: [2026-03-05 .+1d]`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].scheduledDate).not.toBeNull();
+      expect(tasks[0].scheduledDateRepeat).not.toBeNull();
+      expect(tasks[0].scheduledDateRepeat!.type).toBe('.+');
+    });
+  });
+
+  describe('properties drawer handling', () => {
+    it('should ignore dates inside properties drawer', () => {
+      const content = `* TODO Task
+:PROPERTIES:
+  SCHEDULED: <2026-03-05>
+:END:
+  DEADLINE: <2026-03-10>`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].scheduledDate).toBeNull();
+      expect(tasks[0].deadlineDate).not.toBeNull();
+    });
+
+    it('should resume parsing after :END:', () => {
+      const content = `* TODO Task
+:PROPERTIES:
+SOMETHING: value
+:END:
+  SCHEDULED: <2026-03-05>`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].scheduledDate).not.toBeNull();
+    });
+  });
+
+  describe('early termination when both dates found', () => {
+    it('should stop scanning after both scheduled and deadline are found', () => {
+      const content = `* TODO Task
+  SCHEDULED: <2026-03-05>
+  DEADLINE: <2026-03-10>
+  SCHEDULED: <2026-03-15>
+* TODO Next task`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].scheduledDate!.getDate()).toBe(5);
+      expect(tasks[0].deadlineDate!.getDate()).toBe(10);
+    });
+  });
+
+  describe('branch coverage for edge cases', () => {
+    it('should handle invalid scheduled date (null date)', () => {
+      const content = `* TODO Task
+  SCHEDULED: <invalid>
+  DEADLINE: <2026-03-10>`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].scheduledDate).toBeNull();
+      expect(tasks[0].deadlineDate).not.toBeNull();
+    });
+
+    it('should handle invalid deadline date (null date)', () => {
+      const content = `* TODO Task
+  SCHEDULED: <2026-03-05>
+  DEADLINE: <invalid>`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].scheduledDate).not.toBeNull();
+      expect(tasks[0].deadlineDate).toBeNull();
+    });
+
+    it('should create parser with default urgencyCoefficients when omitted', () => {
+      const newParser = OrgModeTaskParser.create(defaultKeywordManager, null);
+      expect(newParser).toBeInstanceOf(OrgModeTaskParser);
+      const tasks = newParser.parseFile('* TODO test', 'test.org');
+      expect(tasks).toHaveLength(1);
     });
   });
 });

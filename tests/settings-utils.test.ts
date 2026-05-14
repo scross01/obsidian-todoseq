@@ -1,4 +1,9 @@
-import { SettingsChangeDetector } from '../src/utils/settings-utils';
+import {
+  SettingsChangeDetector,
+  parseKeywordInput,
+  formatKeywordsForInput,
+  validateKeywordGroupsDetailed,
+} from '../src/utils/settings-utils';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import {
   migrateSettings,
@@ -569,6 +574,70 @@ describe('settings-utils', () => {
       });
     });
 
+    describe('initialization errors', () => {
+      test('should throw when hasFormattingSettingsChanged called before initialize', () => {
+        expect(() =>
+          detector.hasFormattingSettingsChanged(baseSettings),
+        ).toThrow(
+          'SettingsChangeDetector must be initialized before use. Call initialize() first.',
+        );
+      });
+
+      test('should throw when updatePreviousState called before initialize', () => {
+        expect(() => detector.updatePreviousState(baseSettings)).toThrow(
+          'SettingsChangeDetector must be initialized before use. Call initialize() first.',
+        );
+      });
+
+      test('should throw when initialize called twice', () => {
+        detector.initialize(baseSettings);
+        expect(() => detector.initialize(baseSettings)).toThrow(
+          'SettingsChangeDetector is already initialized. Create a new instance instead.',
+        );
+      });
+    });
+
+    describe('reset', () => {
+      test('should allow re-initialization after reset', () => {
+        detector.initialize(baseSettings);
+        detector.reset();
+        expect(() => detector.initialize(baseSettings)).not.toThrow();
+      });
+
+      test('should throw on hasFormattingSettingsChanged after reset', () => {
+        detector.initialize(baseSettings);
+        detector.reset();
+        expect(() =>
+          detector.hasFormattingSettingsChanged(baseSettings),
+        ).toThrow(
+          'SettingsChangeDetector must be initialized before use. Call initialize() first.',
+        );
+      });
+
+      test('should throw on updatePreviousState after reset', () => {
+        detector.initialize(baseSettings);
+        detector.reset();
+        expect(() => detector.updatePreviousState(baseSettings)).toThrow(
+          'SettingsChangeDetector must be initialized before use. Call initialize() first.',
+        );
+      });
+
+      test('should detect changes correctly after reset and re-initialization with different settings', () => {
+        detector.initialize(baseSettings);
+        detector.reset();
+
+        const differentSettings = {
+          ...baseSettings,
+          formatTaskKeywords: false,
+        };
+        detector.initialize(differentSettings);
+        expect(detector.hasFormattingSettingsChanged(differentSettings)).toBe(
+          false,
+        );
+        expect(detector.hasFormattingSettingsChanged(baseSettings)).toBe(true);
+      });
+    });
+
     describe('edge cases', () => {
       test('should handle settings with circular references gracefully', () => {
         detector.initialize(baseSettings);
@@ -580,6 +649,21 @@ describe('settings-utils', () => {
         // Should not throw, but return false (no change detected due to error)
         expect(() => {
           detector.hasFormattingSettingsChanged(problematicSettings);
+        }).not.toThrow();
+      });
+
+      test('should return empty fingerprint when JSON.stringify throws on circular fingerprinted property', () => {
+        detector.initialize(baseSettings);
+
+        const circularArr: any[] = [];
+        circularArr.push(circularArr);
+        const settingsWithCircularKeyword = {
+          ...baseSettings,
+          additionalInactiveKeywords: circularArr as any,
+        };
+
+        expect(() => {
+          detector.hasFormattingSettingsChanged(settingsWithCircularKeyword);
         }).not.toThrow();
       });
 
@@ -610,6 +694,125 @@ describe('settings-utils', () => {
           true,
         );
       });
+    });
+  });
+
+  describe('parseKeywordInput', () => {
+    test('should parse comma-separated keywords into array', () => {
+      expect(parseKeywordInput('TODO, DOING, DONE')).toEqual([
+        'TODO',
+        'DOING',
+        'DONE',
+      ]);
+    });
+
+    test('should trim whitespace from keywords', () => {
+      expect(parseKeywordInput('  TODO  ,  DOING  ')).toEqual([
+        'TODO',
+        'DOING',
+      ]);
+    });
+
+    test('should convert keywords to uppercase', () => {
+      expect(parseKeywordInput('todo, doing, done')).toEqual([
+        'TODO',
+        'DOING',
+        'DONE',
+      ]);
+    });
+
+    test('should filter out empty strings', () => {
+      expect(parseKeywordInput('TODO,,DOING,')).toEqual(['TODO', 'DOING']);
+    });
+
+    test('should handle leading and trailing commas', () => {
+      expect(parseKeywordInput(',TODO,DOING,')).toEqual(['TODO', 'DOING']);
+    });
+
+    test('should return empty array for empty string', () => {
+      expect(parseKeywordInput('')).toEqual([]);
+    });
+
+    test('should return empty array for whitespace-only string', () => {
+      expect(parseKeywordInput('   ')).toEqual([]);
+    });
+
+    test('should return empty array for commas only', () => {
+      expect(parseKeywordInput(',,,')).toEqual([]);
+    });
+
+    test('should handle single keyword', () => {
+      expect(parseKeywordInput('TODO')).toEqual(['TODO']);
+    });
+
+    test('should handle single keyword with whitespace', () => {
+      expect(parseKeywordInput('  TODO  ')).toEqual(['TODO']);
+    });
+  });
+
+  describe('formatKeywordsForInput', () => {
+    test('should join keywords with comma and space', () => {
+      expect(formatKeywordsForInput(['TODO', 'DOING', 'DONE'])).toBe(
+        'TODO, DOING, DONE',
+      );
+    });
+
+    test('should return empty string for empty array', () => {
+      expect(formatKeywordsForInput([])).toBe('');
+    });
+
+    test('should handle single keyword', () => {
+      expect(formatKeywordsForInput(['TODO'])).toBe('TODO');
+    });
+
+    test('should preserve keyword casing', () => {
+      expect(formatKeywordsForInput(['todo', 'Doing'])).toBe('todo, Doing');
+    });
+  });
+
+  describe('validateKeywordGroupsDetailed', () => {
+    test('should return valid result with empty groups', () => {
+      const result = validateKeywordGroupsDetailed({});
+      expect(result.errors).toEqual([]);
+      expect(result.warnings).toEqual([]);
+      expect(result.invalidKeywords).toEqual([]);
+    });
+
+    test('should return valid result with valid custom keywords', () => {
+      const result = validateKeywordGroupsDetailed({
+        activeKeywords: ['NOW'],
+        inactiveKeywords: ['LATER'],
+      });
+      expect(result.errors).toEqual([]);
+      expect(result.invalidKeywords).toEqual([]);
+    });
+
+    test('should detect duplicate keywords across groups', () => {
+      const result = validateKeywordGroupsDetailed({
+        activeKeywords: ['CUSTOM'],
+        inactiveKeywords: ['CUSTOM'],
+      });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.errors[0].message).toContain('CUSTOM');
+    });
+
+    test('should detect built-in keywords in custom groups', () => {
+      const result = validateKeywordGroupsDetailed({
+        activeKeywords: ['TODO'],
+      });
+      expect(result.warnings.length).toBeGreaterThan(0);
+    });
+
+    test('should pass through all keyword groups to KeywordManager', () => {
+      const result = validateKeywordGroupsDetailed({
+        activeKeywords: ['NOW'],
+        inactiveKeywords: ['LATER'],
+        waitingKeywords: ['HOLD'],
+        completedKeywords: ['FINISHED'],
+        archivedKeywords: ['ARCHIVED'],
+      });
+      expect(result.errors).toEqual([]);
+      expect(result.invalidKeywords).toEqual([]);
     });
   });
 });

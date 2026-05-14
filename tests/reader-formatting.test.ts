@@ -98,6 +98,10 @@ const createMockPlugin = (settings: TodoTrackerSettings) => ({
   taskStateManager: {
     optimisticUpdate: jest.fn(),
     findTaskByPathAndLine: jest.fn().mockReturnValue(null),
+    updateParentSubtaskCountsForCheckbox: jest.fn(),
+  },
+  taskUpdateCoordinator: {
+    updateTaskByPath: jest.fn(),
   },
   refreshVisibleEditorDecorations: jest.fn(),
   refreshReaderViewFormatter: jest.fn(),
@@ -1259,6 +1263,8 @@ describe('ReaderViewFormatter', () => {
         .mockResolvedValue(mockTask);
       const taskEditor = { updateTaskState: jest.fn() };
       (formatter as any).plugin.taskEditor = taskEditor;
+      const savedCoordinator = (formatter as any).plugin.taskUpdateCoordinator;
+      (formatter as any).plugin.taskUpdateCoordinator = undefined;
 
       const updateTaskStateMethod = (
         formatter as unknown as {
@@ -1284,6 +1290,7 @@ describe('ReaderViewFormatter', () => {
         true,
       );
 
+      (formatter as any).plugin.taskUpdateCoordinator = savedCoordinator;
       activeDocument.body.removeChild(container);
     });
 
@@ -2506,6 +2513,1513 @@ describe('ReaderViewFormatter', () => {
     });
   });
 
+  describe('createKeywordSpan - archived class', () => {
+    test('should add archived class when isArchived is true', () => {
+      const createKeywordSpan = (
+        formatter as unknown as {
+          createKeywordSpan: (
+            keyword: string,
+            isCompleted?: boolean,
+            isArchived?: boolean,
+          ) => HTMLSpanElement;
+        }
+      ).createKeywordSpan;
+      const span = createKeywordSpan.call(formatter, 'CANCELED', false, true);
+
+      expect(span.classList.contains('todoseq-keyword-formatted')).toBe(true);
+      expect(span.classList.contains('todoseq-archived-keyword')).toBe(true);
+      expect(span.classList.contains('todoseq-completed-keyword')).toBe(false);
+    });
+  });
+
+  describe('createKeywordSpan - completed class', () => {
+    test('should add completed class when isCompleted is true', () => {
+      const createKeywordSpan = (
+        formatter as unknown as {
+          createKeywordSpan: (
+            keyword: string,
+            isCompleted?: boolean,
+            isArchived?: boolean,
+          ) => HTMLSpanElement;
+        }
+      ).createKeywordSpan;
+      const span = createKeywordSpan.call(formatter, 'DONE', true, false);
+
+      expect(span.classList.contains('todoseq-keyword-formatted')).toBe(true);
+      expect(span.classList.contains('todoseq-completed-keyword')).toBe(true);
+      expect(span.classList.contains('todoseq-archived-keyword')).toBe(false);
+    });
+  });
+
+  describe('createArchivedTaskContainer', () => {
+    test('should create span with archived class', () => {
+      const createArchivedTaskContainer = (
+        formatter as unknown as {
+          createArchivedTaskContainer: () => HTMLSpanElement;
+        }
+      ).createArchivedTaskContainer;
+      const container = createArchivedTaskContainer.call(formatter);
+
+      expect(container.classList.contains('todoseq-archived-task-text')).toBe(
+        true,
+      );
+      expect(container.getAttribute('data-archived-task')).toBe('true');
+      expect(container.tagName).toBe('SPAN');
+    });
+  });
+
+  describe('processTaskListItems', () => {
+    test('should format task keyword in task list item with paragraph', () => {
+      const container = activeDocument.createElement('div');
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      li.setAttribute('data-line', '0');
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      li.appendChild(checkbox);
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO task text';
+      li.appendChild(p);
+      container.appendChild(li);
+      activeDocument.body.appendChild(container);
+
+      const processTaskListItems = (
+        formatter as unknown as {
+          processTaskListItems: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processTaskListItems;
+
+      processTaskListItems.call(formatter, container, true);
+
+      const keywordSpan = li.querySelector('.todoseq-keyword-formatted');
+      expect(keywordSpan).not.toBeNull();
+      expect(keywordSpan?.getAttribute('data-task-keyword')).toBe('TODO');
+
+      const taskContainer = li.querySelector('.todoseq-task');
+      expect(taskContainer).not.toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should skip elements inside embedded task list container', () => {
+      const container = activeDocument.createElement('div');
+      const embedded = activeDocument.createElement('div');
+      embedded.className = 'todoseq-embedded-task-list-container';
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      li.setAttribute('data-line', '0');
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO embedded task';
+      li.appendChild(p);
+      embedded.appendChild(li);
+      container.appendChild(embedded);
+      activeDocument.body.appendChild(container);
+
+      const processTaskListItems = (
+        formatter as unknown as {
+          processTaskListItems: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processTaskListItems;
+
+      processTaskListItems.call(formatter, container, true);
+
+      expect(li.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should skip elements inside callout when includeCalloutBlocks is false', () => {
+      const container = activeDocument.createElement('div');
+      const callout = activeDocument.createElement('div');
+      callout.className = 'callout';
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      li.setAttribute('data-line', '0');
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO callout task';
+      li.appendChild(p);
+      callout.appendChild(li);
+      container.appendChild(callout);
+      activeDocument.body.appendChild(container);
+
+      const processTaskListItems = (
+        formatter as unknown as {
+          processTaskListItems: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processTaskListItems;
+
+      processTaskListItems.call(formatter, container, false);
+
+      expect(li.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should apply checkbox styling when keyword span already exists', () => {
+      const container = activeDocument.createElement('div');
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      li.setAttribute('data-line', '0');
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      li.appendChild(checkbox);
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+      keywordSpan.textContent = 'TODO';
+      const p = activeDocument.createElement('p');
+      p.appendChild(keywordSpan);
+      p.appendChild(activeDocument.createTextNode(' task text'));
+      li.appendChild(p);
+      container.appendChild(li);
+      activeDocument.body.appendChild(container);
+
+      const processTaskListItems = (
+        formatter as unknown as {
+          processTaskListItems: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processTaskListItems;
+
+      processTaskListItems.call(formatter, container, true);
+
+      expect(checkbox.getAttribute('data-task')).toBeTruthy();
+      expect(li.getAttribute('data-task')).toBeTruthy();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should process task list item without paragraph via processTaskListItemDirectly', () => {
+      const container = activeDocument.createElement('div');
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      li.setAttribute('data-line', '0');
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      li.appendChild(checkbox);
+      li.appendChild(activeDocument.createTextNode('TODO direct task text'));
+      container.appendChild(li);
+      activeDocument.body.appendChild(container);
+
+      const processTaskListItems = (
+        formatter as unknown as {
+          processTaskListItems: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processTaskListItems;
+
+      processTaskListItems.call(formatter, container, true);
+
+      const keywordSpan = li.querySelector('.todoseq-keyword-formatted');
+      expect(keywordSpan).not.toBeNull();
+      expect(keywordSpan?.getAttribute('data-task-keyword')).toBe('TODO');
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('processRegularParagraphs', () => {
+    test('should format task keyword in standalone paragraph', () => {
+      const container = activeDocument.createElement('div');
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO standalone task';
+      container.appendChild(p);
+      activeDocument.body.appendChild(container);
+
+      const processRegularParagraphs = (
+        formatter as unknown as {
+          processRegularParagraphs: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processRegularParagraphs;
+
+      processRegularParagraphs.call(formatter, container, true);
+
+      const keywordSpan = p.querySelector('.todoseq-keyword-formatted');
+      expect(keywordSpan).not.toBeNull();
+      expect(keywordSpan?.getAttribute('data-task-keyword')).toBe('TODO');
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should skip paragraphs inside embedded task list container', () => {
+      const container = activeDocument.createElement('div');
+      const embedded = activeDocument.createElement('div');
+      embedded.className = 'todoseq-embedded-task-list-container';
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO embedded task';
+      embedded.appendChild(p);
+      container.appendChild(embedded);
+      activeDocument.body.appendChild(container);
+
+      const processRegularParagraphs = (
+        formatter as unknown as {
+          processRegularParagraphs: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processRegularParagraphs;
+
+      processRegularParagraphs.call(formatter, container, true);
+
+      expect(p.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should skip paragraphs inside callout when disabled', () => {
+      const container = activeDocument.createElement('div');
+      const callout = activeDocument.createElement('div');
+      callout.className = 'callout';
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO callout task';
+      callout.appendChild(p);
+      container.appendChild(callout);
+      activeDocument.body.appendChild(container);
+
+      const processRegularParagraphs = (
+        formatter as unknown as {
+          processRegularParagraphs: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processRegularParagraphs;
+
+      processRegularParagraphs.call(formatter, container, false);
+
+      expect(p.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('processBulletListItems', () => {
+    test('should format task keyword in bullet list item', () => {
+      const container = activeDocument.createElement('div');
+      const li = activeDocument.createElement('li');
+      li.appendChild(activeDocument.createTextNode('TODO bullet task text'));
+      container.appendChild(li);
+      activeDocument.body.appendChild(container);
+
+      const processBulletListItems = (
+        formatter as unknown as {
+          processBulletListItems: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processBulletListItems;
+
+      processBulletListItems.call(formatter, container, true);
+
+      const keywordSpan = li.querySelector('.todoseq-keyword-formatted');
+      expect(keywordSpan).not.toBeNull();
+      expect(keywordSpan?.getAttribute('data-task-keyword')).toBe('TODO');
+
+      const taskContainer = li.querySelector('.todoseq-task');
+      expect(taskContainer).not.toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should process bullet list item with paragraph child', () => {
+      const container = activeDocument.createElement('div');
+      const li = activeDocument.createElement('li');
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO task in paragraph';
+      li.appendChild(p);
+      container.appendChild(li);
+      activeDocument.body.appendChild(container);
+
+      const processBulletListItems = (
+        formatter as unknown as {
+          processBulletListItems: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processBulletListItems;
+
+      processBulletListItems.call(formatter, container, true);
+
+      const keywordSpan = li.querySelector('.todoseq-keyword-formatted');
+      expect(keywordSpan).not.toBeNull();
+      expect(keywordSpan?.getAttribute('data-task-keyword')).toBe('TODO');
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should skip bullet items inside embedded task list container', () => {
+      const container = activeDocument.createElement('div');
+      const embedded = activeDocument.createElement('div');
+      embedded.className = 'todoseq-embedded-task-list-container';
+      const li = activeDocument.createElement('li');
+      li.appendChild(activeDocument.createTextNode('TODO embedded'));
+      embedded.appendChild(li);
+      container.appendChild(embedded);
+      activeDocument.body.appendChild(container);
+
+      const processBulletListItems = (
+        formatter as unknown as {
+          processBulletListItems: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processBulletListItems;
+
+      processBulletListItems.call(formatter, container, true);
+
+      expect(li.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should skip bullet items inside callout when disabled', () => {
+      const container = activeDocument.createElement('div');
+      const callout = activeDocument.createElement('div');
+      callout.className = 'callout';
+      const li = activeDocument.createElement('li');
+      li.appendChild(activeDocument.createTextNode('TODO callout task'));
+      callout.appendChild(li);
+      container.appendChild(callout);
+      activeDocument.body.appendChild(container);
+
+      const processBulletListItems = (
+        formatter as unknown as {
+          processBulletListItems: (
+            el: HTMLElement,
+            includeCalloutBlocks: boolean,
+          ) => void;
+        }
+      ).processBulletListItems;
+
+      processBulletListItems.call(formatter, container, false);
+
+      expect(li.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('processTaskListItemDirectly', () => {
+    test('should format task keyword and wrap in task container', () => {
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      li.appendChild(checkbox);
+      li.appendChild(activeDocument.createTextNode('TODO direct task'));
+      activeDocument.body.appendChild(li);
+
+      const processTaskListItemDirectly = (
+        formatter as unknown as {
+          processTaskListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processTaskListItemDirectly;
+
+      processTaskListItemDirectly.call(formatter, li);
+
+      const keywordSpan = li.querySelector('.todoseq-keyword-formatted');
+      expect(keywordSpan).not.toBeNull();
+      expect(keywordSpan?.getAttribute('data-task-keyword')).toBe('TODO');
+
+      const taskContainer = li.querySelector('.todoseq-task');
+      expect(taskContainer).not.toBeNull();
+
+      expect(checkbox.parentNode).toBe(li);
+
+      activeDocument.body.removeChild(li);
+    });
+
+    test('should apply completed styling for completed keyword', () => {
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      li.appendChild(checkbox);
+      li.appendChild(activeDocument.createTextNode('DONE completed task'));
+      activeDocument.body.appendChild(li);
+
+      const processTaskListItemDirectly = (
+        formatter as unknown as {
+          processTaskListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processTaskListItemDirectly;
+
+      processTaskListItemDirectly.call(formatter, li);
+
+      const completedContainer = li.querySelector(
+        '.todoseq-completed-task-text',
+      );
+      expect(completedContainer).not.toBeNull();
+
+      activeDocument.body.removeChild(li);
+    });
+  });
+
+  describe('processListItemDirectly', () => {
+    test('should format task keyword and wrap in task container', () => {
+      const li = activeDocument.createElement('li');
+      const bullet = activeDocument.createElement('span');
+      bullet.className = 'list-bullet';
+      li.appendChild(bullet);
+      li.appendChild(activeDocument.createTextNode('TODO list task'));
+      activeDocument.body.appendChild(li);
+
+      const processListItemDirectly = (
+        formatter as unknown as {
+          processListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processListItemDirectly;
+
+      processListItemDirectly.call(formatter, li);
+
+      const keywordSpan = li.querySelector('.todoseq-keyword-formatted');
+      expect(keywordSpan).not.toBeNull();
+      expect(keywordSpan?.getAttribute('data-task-keyword')).toBe('TODO');
+
+      const taskContainer = li.querySelector('.todoseq-task');
+      expect(taskContainer).not.toBeNull();
+
+      expect(bullet.parentNode).toBe(li);
+
+      activeDocument.body.removeChild(li);
+    });
+
+    test('should apply completed styling for completed keyword', () => {
+      const li = activeDocument.createElement('li');
+      li.appendChild(activeDocument.createTextNode('DONE completed task'));
+      activeDocument.body.appendChild(li);
+
+      const processListItemDirectly = (
+        formatter as unknown as {
+          processListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processListItemDirectly;
+
+      processListItemDirectly.call(formatter, li);
+
+      const completedContainer = li.querySelector(
+        '.todoseq-completed-task-text',
+      );
+      expect(completedContainer).not.toBeNull();
+
+      activeDocument.body.removeChild(li);
+    });
+
+    test('should preserve collapse indicator elements', () => {
+      const li = activeDocument.createElement('li');
+      const collapse = activeDocument.createElement('span');
+      collapse.className = 'collapse-indicator';
+      li.appendChild(collapse);
+      li.appendChild(activeDocument.createTextNode('TODO task'));
+      activeDocument.body.appendChild(li);
+
+      const processListItemDirectly = (
+        formatter as unknown as {
+          processListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processListItemDirectly;
+
+      processListItemDirectly.call(formatter, li);
+
+      expect(collapse.parentNode).toBe(li);
+
+      activeDocument.body.removeChild(li);
+    });
+
+    test('should skip items without task keywords', () => {
+      const li = activeDocument.createElement('li');
+      li.appendChild(activeDocument.createTextNode('Just regular text'));
+      activeDocument.body.appendChild(li);
+
+      const processListItemDirectly = (
+        formatter as unknown as {
+          processListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processListItemDirectly;
+
+      processListItemDirectly.call(formatter, li);
+
+      expect(li.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      activeDocument.body.removeChild(li);
+    });
+  });
+
+  describe('processParagraphByChildNodes', () => {
+    test('should process multi-line paragraph with BR elements', () => {
+      const p = activeDocument.createElement('p');
+      p.appendChild(activeDocument.createTextNode('TODO first task'));
+      p.appendChild(activeDocument.createElement('br'));
+      p.appendChild(activeDocument.createTextNode('TODO second task'));
+      activeDocument.body.appendChild(p);
+
+      const processParagraphByChildNodes = (
+        formatter as unknown as {
+          processParagraphByChildNodes: (el: HTMLElement) => void;
+        }
+      ).processParagraphByChildNodes;
+
+      processParagraphByChildNodes.call(formatter, p);
+
+      const keywordSpans = p.querySelectorAll('.todoseq-keyword-formatted');
+      expect(keywordSpans.length).toBe(2);
+      expect(keywordSpans[0]?.getAttribute('data-task-keyword')).toBe('TODO');
+      expect(keywordSpans[1]?.getAttribute('data-task-keyword')).toBe('TODO');
+
+      activeDocument.body.removeChild(p);
+    });
+
+    test('should skip already-processed keyword spans', () => {
+      const p = activeDocument.createElement('p');
+      const existingSpan = activeDocument.createElement('span');
+      existingSpan.className = 'todoseq-keyword-formatted';
+      existingSpan.setAttribute('data-task-keyword', 'TODO');
+      existingSpan.textContent = 'TODO';
+      p.appendChild(existingSpan);
+      p.appendChild(activeDocument.createTextNode(' task text'));
+      activeDocument.body.appendChild(p);
+
+      const processParagraphByChildNodes = (
+        formatter as unknown as {
+          processParagraphByChildNodes: (el: HTMLElement) => void;
+        }
+      ).processParagraphByChildNodes;
+
+      processParagraphByChildNodes.call(formatter, p);
+
+      const keywordSpans = p.querySelectorAll('.todoseq-keyword-formatted');
+      expect(keywordSpans.length).toBe(1);
+
+      activeDocument.body.removeChild(p);
+    });
+  });
+
+  describe('applyArchivedTaskStylingToTaskContainer', () => {
+    test('should wrap archived keyword and following text in archived container', () => {
+      const taskContainer = activeDocument.createElement('span');
+      taskContainer.className = 'todoseq-task';
+
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'CANCELED');
+      keywordSpan.textContent = 'CANCELED';
+
+      const taskText = activeDocument.createTextNode(' task text');
+
+      taskContainer.appendChild(keywordSpan);
+      taskContainer.appendChild(taskText);
+      activeDocument.body.appendChild(taskContainer);
+
+      mockSettings.additionalArchivedKeywords = ['CANCELED'];
+      const km = createTestKeywordManager(mockSettings);
+      (mockPlugin as any).keywordManager = km;
+
+      const applyArchivedTaskStylingToTaskContainer = (
+        formatter as unknown as {
+          applyArchivedTaskStylingToTaskContainer: (el: HTMLElement) => void;
+        }
+      ).applyArchivedTaskStylingToTaskContainer;
+
+      applyArchivedTaskStylingToTaskContainer.call(formatter, taskContainer);
+
+      const archivedContainer = taskContainer.querySelector(
+        '.todoseq-archived-task-text',
+      );
+      expect(archivedContainer).not.toBeNull();
+      expect(archivedContainer?.getAttribute('data-archived-task')).toBe(
+        'true',
+      );
+
+      const wrappedKeyword = archivedContainer?.querySelector(
+        '.todoseq-keyword-formatted',
+      );
+      expect(wrappedKeyword).not.toBeNull();
+      expect(wrappedKeyword?.textContent).toBe('CANCELED');
+
+      mockSettings.additionalArchivedKeywords = [];
+      activeDocument.body.removeChild(taskContainer);
+    });
+
+    test('should not modify container without archived keyword span', () => {
+      const taskContainer = activeDocument.createElement('span');
+      taskContainer.className = 'todoseq-task';
+
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+      keywordSpan.textContent = 'TODO';
+
+      const taskText = activeDocument.createTextNode(' task text');
+
+      taskContainer.appendChild(keywordSpan);
+      taskContainer.appendChild(taskText);
+      activeDocument.body.appendChild(taskContainer);
+
+      const applyArchivedTaskStylingToTaskContainer = (
+        formatter as unknown as {
+          applyArchivedTaskStylingToTaskContainer: (el: HTMLElement) => void;
+        }
+      ).applyArchivedTaskStylingToTaskContainer;
+
+      const originalHTML = taskContainer.innerHTML;
+      applyArchivedTaskStylingToTaskContainer.call(formatter, taskContainer);
+
+      expect(taskContainer.innerHTML).toEqual(originalHTML);
+
+      activeDocument.body.removeChild(taskContainer);
+    });
+  });
+
+  describe('processDateLines with task containers', () => {
+    test('should process SCHEDULED date inside task container', () => {
+      const container = activeDocument.createElement('div');
+      const taskContainer = activeDocument.createElement('span');
+      taskContainer.className = 'todoseq-task';
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+      keywordSpan.textContent = 'TODO';
+      taskContainer.appendChild(keywordSpan);
+      taskContainer.appendChild(
+        activeDocument.createTextNode(' task SCHEDULED: 2024-01-01'),
+      );
+      container.appendChild(taskContainer);
+      activeDocument.body.appendChild(container);
+
+      const processDateLines = (
+        formatter as unknown as { processDateLines: (el: HTMLElement) => void }
+      ).processDateLines;
+
+      processDateLines.call(formatter, container);
+
+      const scheduledLine = taskContainer.querySelector(
+        '.todoseq-scheduled-line',
+      );
+      expect(scheduledLine).not.toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('processDateKeywordsInElement', () => {
+    test('should process SCHEDULED keyword in generic element', () => {
+      const element = activeDocument.createElement('div');
+      element.appendChild(
+        activeDocument.createTextNode('SCHEDULED: 2024-01-01'),
+      );
+      activeDocument.body.appendChild(element);
+
+      const processDateKeywordsInElement = (
+        formatter as unknown as {
+          processDateKeywordsInElement: (el: HTMLElement) => void;
+        }
+      ).processDateKeywordsInElement;
+
+      processDateKeywordsInElement.call(formatter, element);
+
+      const scheduledLine = element.querySelector('.todoseq-scheduled-line');
+      expect(scheduledLine).not.toBeNull();
+      expect(
+        element.querySelector('.todoseq-scheduled-keyword')?.textContent,
+      ).toBe('SCHEDULED:');
+
+      activeDocument.body.removeChild(element);
+    });
+
+    test('should process DEADLINE keyword in generic element', () => {
+      const element = activeDocument.createElement('div');
+      element.appendChild(
+        activeDocument.createTextNode('DEADLINE: 2024-01-01'),
+      );
+      activeDocument.body.appendChild(element);
+
+      const processDateKeywordsInElement = (
+        formatter as unknown as {
+          processDateKeywordsInElement: (el: HTMLElement) => void;
+        }
+      ).processDateKeywordsInElement;
+
+      processDateKeywordsInElement.call(formatter, element);
+
+      const deadlineLine = element.querySelector('.todoseq-deadline-line');
+      expect(deadlineLine).not.toBeNull();
+
+      activeDocument.body.removeChild(element);
+    });
+
+    test('should process CLOSED keyword in generic element', () => {
+      const element = activeDocument.createElement('div');
+      element.appendChild(activeDocument.createTextNode('CLOSED: 2024-01-01'));
+      activeDocument.body.appendChild(element);
+
+      const processDateKeywordsInElement = (
+        formatter as unknown as {
+          processDateKeywordsInElement: (el: HTMLElement) => void;
+        }
+      ).processDateKeywordsInElement;
+
+      processDateKeywordsInElement.call(formatter, element);
+
+      const closedLine = element.querySelector('.todoseq-closed-line');
+      expect(closedLine).not.toBeNull();
+
+      activeDocument.body.removeChild(element);
+    });
+  });
+
+  describe('findDateKeywordNodeInElement', () => {
+    test('should find SCHEDULED keyword node', () => {
+      const element = activeDocument.createElement('div');
+      const textNode = activeDocument.createTextNode(
+        'prefix SCHEDULED: 2024-01-01',
+      );
+      element.appendChild(textNode);
+      activeDocument.body.appendChild(element);
+
+      const findDateKeywordNodeInElement = (
+        formatter as unknown as {
+          findDateKeywordNodeInElement: (
+            el: HTMLElement,
+            keyword: string,
+          ) => { node: Text; index: number } | null;
+        }
+      ).findDateKeywordNodeInElement;
+
+      const result = findDateKeywordNodeInElement.call(
+        formatter,
+        element,
+        'SCHEDULED:',
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.index).toBe(7);
+
+      activeDocument.body.removeChild(element);
+    });
+
+    test('should return null when keyword not found', () => {
+      const element = activeDocument.createElement('div');
+      element.appendChild(activeDocument.createTextNode('no date keywords'));
+      activeDocument.body.appendChild(element);
+
+      const findDateKeywordNodeInElement = (
+        formatter as unknown as {
+          findDateKeywordNodeInElement: (
+            el: HTMLElement,
+            keyword: string,
+          ) => { node: Text; index: number } | null;
+        }
+      ).findDateKeywordNodeInElement;
+
+      const result = findDateKeywordNodeInElement.call(
+        formatter,
+        element,
+        'SCHEDULED:',
+      );
+
+      expect(result).toBeNull();
+
+      activeDocument.body.removeChild(element);
+    });
+  });
+
+  describe('containsTaskKeyword - null parser', () => {
+    test('should return false when parser is null', () => {
+      const getTaskParserSpy = jest
+        .spyOn(formatter as any, 'getTaskParser')
+        .mockReturnValue(null);
+
+      const containsTaskKeyword = (
+        formatter as unknown as {
+          containsTaskKeyword: (text: string) => boolean;
+        }
+      ).containsTaskKeyword;
+
+      const result = containsTaskKeyword.call(formatter, 'TODO task');
+      expect(result).toBe(false);
+
+      getTaskParserSpy.mockRestore();
+    });
+  });
+
+  describe('attachKeywordClickHandlers - already attached', () => {
+    test('should skip elements that already have handlers attached', () => {
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-todoseq-handlers-attached', 'true');
+      keywordSpan.textContent = 'TODO';
+      container.appendChild(keywordSpan);
+      activeDocument.body.appendChild(container);
+
+      const attachKeywordClickHandlers = (
+        formatter as unknown as {
+          attachKeywordClickHandlers: (
+            element: HTMLElement,
+            context: { sourcePath: string },
+          ) => void;
+        }
+      ).attachKeywordClickHandlers;
+
+      attachKeywordClickHandlers.call(formatter, container, {
+        sourcePath: 'test.md',
+      });
+
+      expect(mockPlugin.registerDomEvent).not.toHaveBeenCalled();
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('handleKeywordKeydown - additional keys', () => {
+    test('should open context menu with Shift+F10', () => {
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+      keywordSpan.textContent = 'TODO';
+      container.appendChild(keywordSpan);
+      activeDocument.body.appendChild(container);
+
+      const buildStateMenu = jest.fn().mockReturnValue({
+        showAtPosition: jest.fn(),
+      });
+      const menuBuilder = (formatter as any).menuBuilder;
+      jest
+        .spyOn(menuBuilder, 'buildStateMenu')
+        .mockImplementation(buildStateMenu as any);
+
+      const handleKeywordKeydown = (
+        formatter as unknown as {
+          handleKeywordKeydown: (
+            event: KeyboardEvent,
+            el: HTMLElement,
+            path: string,
+          ) => void;
+        }
+      ).handleKeywordKeydown;
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'F10',
+        shiftKey: true,
+      });
+      Object.defineProperty(event, 'preventDefault', { value: jest.fn() });
+      Object.defineProperty(event, 'stopPropagation', { value: jest.fn() });
+
+      handleKeywordKeydown.call(formatter, event, keywordSpan, 'test.md');
+
+      expect(buildStateMenu).toHaveBeenCalledWith('TODO', expect.any(Function));
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should open context menu with ContextMenu key', () => {
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+      keywordSpan.textContent = 'TODO';
+      container.appendChild(keywordSpan);
+      activeDocument.body.appendChild(container);
+
+      const buildStateMenu = jest.fn().mockReturnValue({
+        showAtPosition: jest.fn(),
+      });
+      const menuBuilder = (formatter as any).menuBuilder;
+      jest
+        .spyOn(menuBuilder, 'buildStateMenu')
+        .mockImplementation(buildStateMenu as any);
+
+      const handleKeywordKeydown = (
+        formatter as unknown as {
+          handleKeywordKeydown: (
+            event: KeyboardEvent,
+            el: HTMLElement,
+            path: string,
+          ) => void;
+        }
+      ).handleKeywordKeydown;
+
+      const event = new KeyboardEvent('keydown', { key: 'ContextMenu' });
+      Object.defineProperty(event, 'preventDefault', { value: jest.fn() });
+      Object.defineProperty(event, 'stopPropagation', { value: jest.fn() });
+
+      handleKeywordKeydown.call(formatter, event, keywordSpan, 'test.md');
+
+      expect(buildStateMenu).toHaveBeenCalledWith('TODO', expect.any(Function));
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('handleKeywordContextMenu', () => {
+    test('should clear pending click timeout', () => {
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+      keywordSpan.textContent = 'TODO';
+      container.appendChild(keywordSpan);
+      activeDocument.body.appendChild(container);
+
+      (formatter as any).pendingClickTimeout = 12345;
+      const clearTimeoutSpy = jest.spyOn(window, 'clearTimeout');
+
+      const mockMenu = { showAtPosition: jest.fn() };
+      jest
+        .spyOn((formatter as any).menuBuilder, 'buildStateMenu')
+        .mockReturnValue(mockMenu);
+
+      const handleKeywordContextMenu = (
+        formatter as unknown as {
+          handleKeywordContextMenu: (
+            event: MouseEvent,
+            el: HTMLElement,
+            path: string,
+          ) => void;
+        }
+      ).handleKeywordContextMenu;
+
+      const event = new MouseEvent('contextmenu', {
+        clientX: 100,
+        clientY: 200,
+      });
+      Object.defineProperty(event, 'preventDefault', { value: jest.fn() });
+      Object.defineProperty(event, 'stopPropagation', { value: jest.fn() });
+
+      handleKeywordContextMenu.call(formatter, event, keywordSpan, 'test.md');
+
+      expect(clearTimeoutSpy).toHaveBeenCalledWith(12345);
+      expect((formatter as any).pendingClickTimeout).toBeNull();
+
+      clearTimeoutSpy.mockRestore();
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should return early when no state attribute', () => {
+      const container = activeDocument.createElement('div');
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.textContent = 'TODO';
+      container.appendChild(keywordSpan);
+      activeDocument.body.appendChild(container);
+
+      const buildStateMenu = jest.fn().mockReturnValue({
+        showAtPosition: jest.fn(),
+      });
+      const menuBuilder = (formatter as any).menuBuilder;
+      jest
+        .spyOn(menuBuilder, 'buildStateMenu')
+        .mockImplementation(buildStateMenu as any);
+
+      const handleKeywordContextMenu = (
+        formatter as unknown as {
+          handleKeywordContextMenu: (
+            event: MouseEvent,
+            el: HTMLElement,
+            path: string,
+          ) => void;
+        }
+      ).handleKeywordContextMenu;
+
+      const event = new MouseEvent('contextmenu', {
+        clientX: 100,
+        clientY: 200,
+      });
+      Object.defineProperty(event, 'preventDefault', { value: jest.fn() });
+      Object.defineProperty(event, 'stopPropagation', { value: jest.fn() });
+
+      handleKeywordContextMenu.call(formatter, event, keywordSpan, 'test.md');
+
+      expect(buildStateMenu).not.toHaveBeenCalled();
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('updateTaskState - with coordinator', () => {
+    test('should use taskUpdateCoordinator when available', async () => {
+      const container = activeDocument.createElement('div');
+      const p = activeDocument.createElement('p');
+      const taskContainer = activeDocument.createElement('span');
+      taskContainer.className = 'todoseq-task';
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+      keywordSpan.textContent = 'TODO';
+      taskContainer.appendChild(keywordSpan);
+      taskContainer.appendChild(activeDocument.createTextNode(' task text'));
+      p.appendChild(taskContainer);
+      container.appendChild(p);
+      activeDocument.body.appendChild(container);
+
+      const mockTask = {
+        path: 'test.md',
+        line: 0,
+        state: 'TODO',
+        text: 'task text',
+        rawText: 'TODO task text',
+        indent: '',
+        listMarker: '',
+        completed: false,
+        priority: null,
+        scheduledDate: null,
+        scheduledDateRepeat: null,
+        deadlineDate: null,
+        deadlineDateRepeat: null,
+        closedDate: null,
+        urgency: null,
+        isDailyNote: false,
+        dailyNoteDate: null,
+        subtaskCount: 0,
+        subtaskCompletedCount: 0,
+      };
+
+      const mockFile = new TFile('test.md');
+      jest
+        .spyOn(mockPlugin.app.vault, 'getAbstractFileByPath')
+        .mockReturnValue(mockFile);
+      jest
+        .spyOn(mockPlugin.app.vault, 'read')
+        .mockResolvedValue('TODO task text');
+      jest.spyOn(formatter as any, 'getTaskParser').mockReturnValue({
+        testRegex: /^TODO\s+(.*)$/,
+        parseFile: jest.fn().mockReturnValue([mockTask]),
+      });
+
+      const updateTaskState = (
+        formatter as unknown as {
+          updateTaskState: (
+            el: HTMLElement,
+            path: string,
+            state: string,
+          ) => Promise<void>;
+        }
+      ).updateTaskState;
+
+      await updateTaskState.call(formatter, keywordSpan, 'test.md', 'DOING');
+
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskByPath,
+      ).toHaveBeenCalledWith('test.md', 0, 'DOING', 'reader');
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('handleCheckboxClick', () => {
+    test('should handle checkbox-only subtask update', async () => {
+      const container = activeDocument.createElement('div');
+      const li = activeDocument.createElement('div');
+      li.className = 'task-list-item';
+      li.setAttribute('data-line', '0');
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      checkbox.checked = true;
+      li.appendChild(checkbox);
+      li.appendChild(activeDocument.createTextNode('subtask text'));
+      container.appendChild(li);
+      activeDocument.body.appendChild(container);
+
+      const mockFile = new TFile('test.md');
+      jest
+        .spyOn(mockPlugin.app.vault, 'getAbstractFileByPath')
+        .mockReturnValue(mockFile);
+      jest
+        .spyOn(mockPlugin.app.vault, 'read')
+        .mockResolvedValue('- [ ] subtask text');
+
+      const handleCheckboxClick = (
+        formatter as unknown as {
+          handleCheckboxClick: (event: Event, path: string) => Promise<void>;
+        }
+      ).handleCheckboxClick;
+
+      const event = new Event('click');
+      Object.defineProperty(event, 'target', { value: checkbox });
+
+      await handleCheckboxClick.call(formatter, event, 'test.md');
+
+      expect(
+        mockPlugin.taskStateManager.updateParentSubtaskCountsForCheckbox,
+      ).toHaveBeenCalled();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should handle task with keyword and state transition', async () => {
+      const container = activeDocument.createElement('div');
+      const li = activeDocument.createElement('div');
+      li.className = 'task-list-item';
+      li.setAttribute('data-line', '0');
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      checkbox.checked = true;
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+      li.appendChild(checkbox);
+      li.appendChild(keywordSpan);
+      li.appendChild(activeDocument.createTextNode(' task text'));
+      container.appendChild(li);
+      activeDocument.body.appendChild(container);
+
+      const mockTask = {
+        path: 'test.md',
+        line: 0,
+        state: 'TODO',
+        text: 'task text',
+        rawText: '- [ ] TODO task text',
+        indent: '',
+        listMarker: '- ',
+        completed: false,
+        priority: null,
+        scheduledDate: null,
+        scheduledDateRepeat: null,
+        deadlineDate: null,
+        deadlineDateRepeat: null,
+        closedDate: null,
+        urgency: null,
+        isDailyNote: false,
+        dailyNoteDate: null,
+        subtaskCount: 0,
+        subtaskCompletedCount: 0,
+      };
+
+      const mockFile = new TFile('test.md');
+      jest
+        .spyOn(mockPlugin.app.vault, 'getAbstractFileByPath')
+        .mockReturnValue(mockFile);
+
+      jest
+        .spyOn(formatter as any, 'findTaskForCheckbox')
+        .mockResolvedValue(mockTask);
+
+      const handleCheckboxClick = (
+        formatter as unknown as {
+          handleCheckboxClick: (event: Event, path: string) => Promise<void>;
+        }
+      ).handleCheckboxClick;
+
+      const event = new Event('click');
+      Object.defineProperty(event, 'target', { value: checkbox });
+
+      await handleCheckboxClick.call(formatter, event, 'test.md');
+
+      expect(
+        mockPlugin.taskUpdateCoordinator.updateTaskByPath,
+      ).toHaveBeenCalled();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should return early when no task list item', async () => {
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      activeDocument.body.appendChild(checkbox);
+
+      const handleCheckboxClick = (
+        formatter as unknown as {
+          handleCheckboxClick: (event: Event, path: string) => Promise<void>;
+        }
+      ).handleCheckboxClick;
+
+      const event = new Event('click');
+      Object.defineProperty(event, 'target', { value: checkbox });
+
+      await handleCheckboxClick.call(formatter, event, 'test.md');
+
+      expect(
+        mockPlugin.taskStateManager.updateParentSubtaskCountsForCheckbox,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('attachCheckboxClickHandlers - embedded transclusion', () => {
+    test('should handle embedded transclusion checkbox', () => {
+      const container = activeDocument.createElement('div');
+      const embed = activeDocument.createElement('div');
+      embed.className = 'internal-embed';
+      embed.setAttribute('src', 'other-file.md#^block1');
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      embed.appendChild(checkbox);
+      container.appendChild(embed);
+      activeDocument.body.appendChild(container);
+
+      const attachCheckboxClickHandlers = (
+        formatter as unknown as {
+          attachCheckboxClickHandlers: (
+            element: HTMLElement,
+            context: { sourcePath: string },
+          ) => void;
+        }
+      ).attachCheckboxClickHandlers;
+
+      attachCheckboxClickHandlers.call(formatter, container, {
+        sourcePath: 'test.md',
+      });
+
+      expect(mockPlugin.registerDomEvent).toHaveBeenCalledWith(
+        checkbox,
+        'click',
+        expect.any(Function),
+      );
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('findTaskForKeyword - additional paths', () => {
+    test('should create minimal task when no parsed task found at line', async () => {
+      const container = activeDocument.createElement('div');
+      const p = activeDocument.createElement('p');
+      const taskContainer = activeDocument.createElement('span');
+      taskContainer.className = 'todoseq-task';
+      const keyword = activeDocument.createElement('span');
+      keyword.className = 'todoseq-keyword-formatted';
+      keyword.setAttribute('data-task-keyword', 'TODO');
+      keyword.textContent = 'TODO';
+      taskContainer.appendChild(keyword);
+      taskContainer.appendChild(
+        activeDocument.createTextNode(' unique task text'),
+      );
+      const li = activeDocument.createElement('li');
+      li.setAttribute('data-line', '0');
+      li.appendChild(taskContainer);
+      p.appendChild(li);
+      container.appendChild(p);
+      activeDocument.body.appendChild(container);
+
+      const mockFile = new TFile('test.md');
+      jest
+        .spyOn(mockPlugin.app.vault, 'getAbstractFileByPath')
+        .mockReturnValue(mockFile);
+      jest
+        .spyOn(mockPlugin.app.vault, 'read')
+        .mockResolvedValue('TODO unique task text');
+      jest.spyOn(formatter as any, 'getTaskParser').mockReturnValue({
+        testRegex: /^TODO\s+(.*)$/,
+        parseFile: jest.fn().mockReturnValue([]),
+      });
+
+      const findTaskForKeyword = (
+        formatter as unknown as {
+          findTaskForKeyword: (el: HTMLElement, path: string) => Promise<any>;
+        }
+      ).findTaskForKeyword;
+
+      const task = await findTaskForKeyword.call(formatter, keyword, 'test.md');
+
+      expect(task).not.toBeNull();
+      expect(task.path).toBe('test.md');
+      expect(task.line).toBe(0);
+      expect(task.state).toBe('TODO');
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should return null when keyword element has no data-task-keyword', async () => {
+      const keyword = activeDocument.createElement('span');
+      keyword.className = 'todoseq-keyword-formatted';
+
+      const findTaskForKeyword = (
+        formatter as unknown as {
+          findTaskForKeyword: (el: HTMLElement, path: string) => Promise<any>;
+        }
+      ).findTaskForKeyword;
+
+      const task = await findTaskForKeyword.call(formatter, keyword, 'test.md');
+
+      expect(task).toBeNull();
+    });
+  });
+
+  describe('cleanup - with pending timeout', () => {
+    test('should clear pending click timeout', () => {
+      (formatter as any).pendingClickTimeout = 99999;
+      const clearTimeoutSpy = jest.spyOn(window, 'clearTimeout');
+
+      formatter.cleanup();
+
+      expect(clearTimeoutSpy).toHaveBeenCalledWith(99999);
+      expect((formatter as any).pendingClickTimeout).toBeNull();
+
+      clearTimeoutSpy.mockRestore();
+    });
+  });
+
+  describe('processPriorityPills - embedded and callout skips', () => {
+    test('should skip priority pills in embedded task list containers', () => {
+      const container = activeDocument.createElement('div');
+      const embedded = activeDocument.createElement('div');
+      embedded.className = 'todoseq-embedded-task-list-container';
+      const taskItem = activeDocument.createElement('div');
+      taskItem.className = 'task-list-item';
+      taskItem.textContent = 'TODO task [#A]';
+      embedded.appendChild(taskItem);
+      container.appendChild(embedded);
+      activeDocument.body.appendChild(container);
+
+      const processPriorityPills = (
+        formatter as unknown as {
+          processPriorityPills: (el: HTMLElement) => void;
+        }
+      ).processPriorityPills;
+
+      processPriorityPills.call(formatter, container);
+
+      expect(taskItem.querySelector('.todoseq-priority-badge')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should skip priority pills in callout when disabled', () => {
+      mockPlugin.settings.includeCalloutBlocks = false;
+      const container = activeDocument.createElement('div');
+      const callout = activeDocument.createElement('div');
+      callout.className = 'callout';
+      const taskItem = activeDocument.createElement('div');
+      taskItem.className = 'task-list-item';
+      taskItem.textContent = 'TODO task [#A]';
+      callout.appendChild(taskItem);
+      container.appendChild(callout);
+      activeDocument.body.appendChild(container);
+
+      const processPriorityPills = (
+        formatter as unknown as {
+          processPriorityPills: (el: HTMLElement) => void;
+        }
+      ).processPriorityPills;
+
+      processPriorityPills.call(formatter, container);
+
+      expect(taskItem.querySelector('.todoseq-priority-badge')).toBeNull();
+
+      mockPlugin.settings.includeCalloutBlocks = true;
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should process priority pills in paragraphs with task keywords', () => {
+      const container = activeDocument.createElement('div');
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO task with priority [#A]';
+      container.appendChild(p);
+      activeDocument.body.appendChild(container);
+
+      const processPriorityPills = (
+        formatter as unknown as {
+          processPriorityPills: (el: HTMLElement) => void;
+        }
+      ).processPriorityPills;
+
+      processPriorityPills.call(formatter, container);
+
+      const pill = p.querySelector('.todoseq-priority-badge');
+      expect(pill).not.toBeNull();
+      expect(pill?.textContent).toBe('A');
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('should skip priority pills in paragraphs without task keywords', () => {
+      const container = activeDocument.createElement('div');
+      const p = activeDocument.createElement('p');
+      p.textContent = 'Regular text with priority [#A]';
+      container.appendChild(p);
+      activeDocument.body.appendChild(container);
+
+      const processPriorityPills = (
+        formatter as unknown as {
+          processPriorityPills: (el: HTMLElement) => void;
+        }
+      ).processPriorityPills;
+
+      processPriorityPills.call(formatter, container);
+
+      expect(p.querySelector('.todoseq-priority-badge')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('registerPostProcessor - end-to-end', () => {
+    test('should register callback and format tasks through full pipeline', () => {
+      formatter.registerPostProcessor();
+
+      expect(mockPlugin.registerMarkdownPostProcessor).toHaveBeenCalledTimes(1);
+
+      const callback =
+        mockPlugin.registerMarkdownPostProcessor.mock.calls[0][0];
+
+      const element = activeDocument.createElement('div');
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO full pipeline task';
+      element.appendChild(p);
+      activeDocument.body.appendChild(element);
+
+      callback(element, { sourcePath: 'test.md' });
+
+      const keywordSpan = element.querySelector('.todoseq-keyword-formatted');
+      expect(keywordSpan).not.toBeNull();
+      expect(keywordSpan?.getAttribute('data-task-keyword')).toBe('TODO');
+
+      activeDocument.body.removeChild(element);
+    });
+
+    test('should skip processing when formatTaskKeywords is disabled', () => {
+      mockPlugin.settings.formatTaskKeywords = false;
+      formatter.registerPostProcessor();
+
+      const callback =
+        mockPlugin.registerMarkdownPostProcessor.mock.calls[
+          mockPlugin.registerMarkdownPostProcessor.mock.calls.length - 1
+        ][0];
+
+      const element = activeDocument.createElement('div');
+      const p = activeDocument.createElement('p');
+      p.textContent = 'TODO disabled task';
+      element.appendChild(p);
+      activeDocument.body.appendChild(element);
+
+      callback(element, { sourcePath: 'test.md' });
+
+      expect(element.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      mockPlugin.settings.formatTaskKeywords = true;
+      activeDocument.body.removeChild(element);
+    });
+  });
+
   describe('findTaskForCheckbox', () => {
     test('should find a task for a checkbox in task list item', async () => {
       const container = activeDocument.createElement('div');
@@ -2588,6 +4102,391 @@ describe('ReaderViewFormatter', () => {
       expect(task).toBeNull();
 
       activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('processLineText - styling branches', () => {
+    test('should apply completed styling for completed keyword in line', () => {
+      const paragraph = activeDocument.createElement('p');
+      paragraph.appendChild(
+        activeDocument.createTextNode('DONE completed task'),
+      );
+
+      const processLineText = (
+        formatter as unknown as {
+          processLineText: (
+            paragraph: HTMLElement,
+            lineText: string,
+            lineNodes: Node[],
+          ) => void;
+        }
+      ).processLineText;
+
+      processLineText.call(formatter, paragraph, 'DONE completed task', [
+        ...Array.from(paragraph.childNodes),
+      ]);
+
+      const taskContainer = paragraph.querySelector('.todoseq-task');
+      expect(taskContainer).not.toBeNull();
+
+      const completedContainer = paragraph.querySelector(
+        '.todoseq-completed-task-text',
+      );
+      expect(completedContainer).not.toBeNull();
+    });
+
+    test('should apply archived styling for archived keyword in line', () => {
+      mockSettings.additionalArchivedKeywords = ['CANCELED'];
+      const km = createTestKeywordManager(mockSettings);
+      (mockPlugin as any).keywordManager = km;
+
+      const wrapper = activeDocument.createElement('div');
+      const paragraph = activeDocument.createElement('p');
+      paragraph.appendChild(
+        activeDocument.createTextNode('CANCELED archived task'),
+      );
+      wrapper.appendChild(paragraph);
+      activeDocument.body.appendChild(wrapper);
+
+      const processLineText = (
+        formatter as unknown as {
+          processLineText: (
+            paragraph: HTMLElement,
+            lineText: string,
+            lineNodes: Node[],
+          ) => void;
+        }
+      ).processLineText;
+
+      processLineText.call(formatter, paragraph, 'CANCELED archived task', [
+        ...Array.from(paragraph.childNodes),
+      ]);
+
+      const archivedContainer = paragraph.querySelector(
+        '.todoseq-archived-task-text',
+      );
+      expect(archivedContainer).not.toBeNull();
+
+      mockSettings.additionalArchivedKeywords = [];
+      activeDocument.body.removeChild(wrapper);
+    });
+  });
+
+  describe('replaceKeywordInTextNodesAndBuildTask - edge cases', () => {
+    test('should handle keyword at start of text', () => {
+      const nodes: Node[] = [activeDocument.createTextNode('TODO task text')];
+      const taskContainer = activeDocument.createElement('span');
+      taskContainer.className = 'todoseq-task';
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+
+      const replaceKeywordInTextNodesAndBuildTask = (
+        formatter as unknown as {
+          replaceKeywordInTextNodesAndBuildTask: (
+            lineNodes: Node[],
+            keyword: string,
+            keywordSpan: HTMLElement,
+            taskContainer: HTMLElement,
+          ) => void;
+        }
+      ).replaceKeywordInTextNodesAndBuildTask;
+
+      replaceKeywordInTextNodesAndBuildTask.call(
+        formatter,
+        nodes,
+        'TODO',
+        keywordSpan,
+        taskContainer,
+      );
+
+      expect(
+        taskContainer.querySelector('.todoseq-keyword-formatted'),
+      ).not.toBeNull();
+      expect(taskContainer.textContent).toContain('task text');
+      expect(taskContainer.childNodes[0]?.nodeType).toBe(Node.ELEMENT_NODE);
+    });
+
+    test('should handle keyword at end of text', () => {
+      const nodes: Node[] = [activeDocument.createTextNode('task text TODO')];
+      const taskContainer = activeDocument.createElement('span');
+      taskContainer.className = 'todoseq-task';
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+
+      const replaceKeywordInTextNodesAndBuildTask = (
+        formatter as unknown as {
+          replaceKeywordInTextNodesAndBuildTask: (
+            lineNodes: Node[],
+            keyword: string,
+            keywordSpan: HTMLElement,
+            taskContainer: HTMLElement,
+          ) => void;
+        }
+      ).replaceKeywordInTextNodesAndBuildTask;
+
+      replaceKeywordInTextNodesAndBuildTask.call(
+        formatter,
+        nodes,
+        'TODO',
+        keywordSpan,
+        taskContainer,
+      );
+
+      expect(
+        taskContainer.querySelector('.todoseq-keyword-formatted'),
+      ).not.toBeNull();
+      expect(taskContainer.textContent).toContain('task text');
+    });
+  });
+
+  describe('processTaskListItemDirectly - null parser', () => {
+    test('should return early when parser is null', () => {
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      li.appendChild(activeDocument.createTextNode('TODO task'));
+      activeDocument.body.appendChild(li);
+
+      const getTaskParserSpy = jest
+        .spyOn(formatter as any, 'getTaskParser')
+        .mockReturnValue(null);
+
+      const processTaskListItemDirectly = (
+        formatter as unknown as {
+          processTaskListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processTaskListItemDirectly;
+
+      processTaskListItemDirectly.call(formatter, li);
+
+      expect(li.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      getTaskParserSpy.mockRestore();
+      activeDocument.body.removeChild(li);
+    });
+  });
+
+  describe('processListItemDirectly - null parser', () => {
+    test('should return early when parser is null', () => {
+      const li = activeDocument.createElement('li');
+      li.appendChild(activeDocument.createTextNode('TODO task'));
+      activeDocument.body.appendChild(li);
+
+      const getTaskParserSpy = jest
+        .spyOn(formatter as any, 'getTaskParser')
+        .mockReturnValue(null);
+
+      const processListItemDirectly = (
+        formatter as unknown as {
+          processListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processListItemDirectly;
+
+      processListItemDirectly.call(formatter, li);
+
+      expect(li.querySelector('.todoseq-keyword-formatted')).toBeNull();
+
+      getTaskParserSpy.mockRestore();
+      activeDocument.body.removeChild(li);
+    });
+  });
+
+  describe('processParagraphByChildNodes - element nodes', () => {
+    test('should process paragraph containing element nodes with task text', () => {
+      const paragraph = activeDocument.createElement('p');
+      const bold = activeDocument.createElement('strong');
+      bold.textContent = 'TODO';
+      paragraph.appendChild(bold);
+      paragraph.appendChild(activeDocument.createTextNode(' task text'));
+      activeDocument.body.appendChild(paragraph);
+
+      const processParagraphByChildNodes = (
+        formatter as unknown as {
+          processParagraphByChildNodes: (el: HTMLElement) => void;
+        }
+      ).processParagraphByChildNodes;
+
+      processParagraphByChildNodes.call(formatter, paragraph);
+
+      const taskContainer = paragraph.querySelector('.todoseq-task');
+      expect(taskContainer).not.toBeNull();
+
+      activeDocument.body.removeChild(paragraph);
+    });
+  });
+
+  describe('applyCompletedTaskStylingToTaskContainer - keyword not direct child', () => {
+    test('should not wrap when keyword span parent is not the task container', () => {
+      const taskContainer = activeDocument.createElement('span');
+      taskContainer.className = 'todoseq-task';
+
+      const innerSpan = activeDocument.createElement('span');
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+      keywordSpan.setAttribute('data-task-keyword', 'DONE');
+      keywordSpan.textContent = 'DONE';
+      innerSpan.appendChild(keywordSpan);
+
+      taskContainer.appendChild(innerSpan);
+      taskContainer.appendChild(activeDocument.createTextNode(' task text'));
+      activeDocument.body.appendChild(taskContainer);
+
+      const applyCompletedTaskStylingToTaskContainer = (
+        formatter as unknown as {
+          applyCompletedTaskStylingToTaskContainer: (
+            container: HTMLElement,
+            keyword: string,
+          ) => void;
+        }
+      ).applyCompletedTaskStylingToTaskContainer;
+
+      const originalHTML = taskContainer.innerHTML;
+      applyCompletedTaskStylingToTaskContainer.call(
+        formatter,
+        taskContainer,
+        'DONE',
+      );
+
+      expect(taskContainer.innerHTML).toEqual(originalHTML);
+
+      activeDocument.body.removeChild(taskContainer);
+    });
+  });
+
+  describe('hasTaskBeforeDateInParagraph - element node with date', () => {
+    test('should detect task before date keyword in element node', () => {
+      const paragraph = activeDocument.createElement('p');
+      const span = activeDocument.createElement('span');
+      span.textContent = 'TODO task SCHEDULED: 2024-01-01';
+      paragraph.appendChild(span);
+      activeDocument.body.appendChild(paragraph);
+
+      const hasTaskBeforeDateInParagraph = (
+        formatter as unknown as {
+          hasTaskBeforeDateInParagraph: (p: HTMLParagraphElement) => boolean;
+        }
+      ).hasTaskBeforeDateInParagraph;
+
+      const result = hasTaskBeforeDateInParagraph.call(formatter, paragraph);
+      expect(result).toBe(true);
+
+      activeDocument.body.removeChild(paragraph);
+    });
+
+    test('should check previous sibling when paragraph only has date text', () => {
+      const container = activeDocument.createElement('div');
+      const prevP = activeDocument.createElement('p');
+      prevP.textContent = 'TODO something';
+      const dateP = activeDocument.createElement('p');
+      dateP.textContent = 'SCHEDULED: 2024-01-01';
+      container.appendChild(prevP);
+      container.appendChild(dateP);
+      activeDocument.body.appendChild(container);
+
+      const hasTaskBeforeDateInParagraph = (
+        formatter as unknown as {
+          hasTaskBeforeDateInParagraph: (p: HTMLParagraphElement) => boolean;
+        }
+      ).hasTaskBeforeDateInParagraph;
+
+      const result = hasTaskBeforeDateInParagraph.call(formatter, dateP);
+      expect(result).toBe(true);
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
+  describe('handleKeywordKeydown - no state attribute', () => {
+    test('should return early for Shift+F10 without state attribute', () => {
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+
+      const buildStateMenu = jest.fn().mockReturnValue({
+        showAtPosition: jest.fn(),
+      });
+      jest
+        .spyOn((formatter as any).menuBuilder, 'buildStateMenu')
+        .mockImplementation(buildStateMenu as any);
+
+      const handleKeywordKeydown = (
+        formatter as unknown as {
+          handleKeywordKeydown: (
+            event: KeyboardEvent,
+            el: HTMLElement,
+            path: string,
+          ) => void;
+        }
+      ).handleKeywordKeydown;
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'F10',
+        shiftKey: true,
+      });
+      Object.defineProperty(event, 'preventDefault', { value: jest.fn() });
+      Object.defineProperty(event, 'stopPropagation', { value: jest.fn() });
+
+      handleKeywordKeydown.call(formatter, event, keywordSpan, 'test.md');
+
+      expect(buildStateMenu).not.toHaveBeenCalled();
+    });
+
+    test('should return early for ContextMenu key without state attribute', () => {
+      const keywordSpan = activeDocument.createElement('span');
+      keywordSpan.className = 'todoseq-keyword-formatted';
+
+      const buildStateMenu = jest.fn().mockReturnValue({
+        showAtPosition: jest.fn(),
+      });
+      jest
+        .spyOn((formatter as any).menuBuilder, 'buildStateMenu')
+        .mockImplementation(buildStateMenu as any);
+
+      const handleKeywordKeydown = (
+        formatter as unknown as {
+          handleKeywordKeydown: (
+            event: KeyboardEvent,
+            el: HTMLElement,
+            path: string,
+          ) => void;
+        }
+      ).handleKeywordKeydown;
+
+      const event = new KeyboardEvent('keydown', { key: 'ContextMenu' });
+      Object.defineProperty(event, 'preventDefault', { value: jest.fn() });
+      Object.defineProperty(event, 'stopPropagation', { value: jest.fn() });
+
+      handleKeywordKeydown.call(formatter, event, keywordSpan, 'test.md');
+
+      expect(buildStateMenu).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findTaskForCheckbox - null parser', () => {
+    test('should return null when parser is null', async () => {
+      const mockFile = new TFile('test.md');
+      jest.spyOn(mockPlugin.app.vault, 'read').mockResolvedValue('- [ ] test');
+      jest.spyOn(formatter as any, 'getTaskParser').mockReturnValue(null);
+
+      const findTaskForCheckbox = (
+        formatter as unknown as {
+          findTaskForCheckbox: (
+            taskListItem: Element,
+            file: any,
+          ) => Promise<any>;
+        }
+      ).findTaskForCheckbox;
+
+      const taskListItem = activeDocument.createElement('div');
+      taskListItem.textContent = 'test';
+
+      const result = await findTaskForCheckbox.call(
+        formatter,
+        taskListItem,
+        mockFile,
+      );
+
+      expect(result).toBeNull();
     });
   });
 });

@@ -41,6 +41,24 @@ jest.mock('../src/utils/mobile-utils', () => ({
   TABLET_BREAKPOINT: 768,
 }));
 
+let mockDailyNotesEnabled = false;
+jest.mock('../src/utils/daily-note-utils', () => ({
+  isDailyNotesPluginEnabled: () => Promise.resolve(mockDailyNotesEnabled),
+}));
+
+let capturedDatePickerCallbacks: any = null;
+jest.mock('../src/view/components/date-picker-menu', () => ({
+  DatePicker: jest.fn().mockImplementation((cb: any) => {
+    capturedDatePickerCallbacks = cb;
+    return {
+      show: jest.fn().mockResolvedValue(undefined),
+      hide: jest.fn(),
+      isVisible: jest.fn().mockReturnValue(false),
+      cleanup: jest.fn(),
+    };
+  }),
+}));
+
 describe('TaskContextMenu', () => {
   let menu: TaskContextMenu;
   let callbacks: TaskContextMenuCallbacks;
@@ -60,10 +78,10 @@ describe('TaskContextMenu', () => {
       onCopyTask: jest.fn(),
       onCopyTaskToToday: jest.fn(),
       onMoveTaskToToday: jest.fn(),
+      onMigrateTaskToToday: jest.fn(),
       onPriorityChange: jest.fn(),
       onScheduledDateChange: jest.fn(),
       onDeadlineDateChange: jest.fn(),
-      onDeadlineClick: jest.fn(),
     };
 
     config = {
@@ -77,6 +95,8 @@ describe('TaskContextMenu', () => {
       priority: null,
       scheduledDate: null,
     });
+
+    mockDailyNotesEnabled = false;
   });
 
   afterEach(() => {
@@ -568,7 +588,7 @@ describe('TaskContextMenu', () => {
   });
 
   describe('Deadline action', () => {
-    it('should hide menu when Deadline row clicked (date picker will be shown)', async () => {
+    it('should hide menu and show date picker when Deadline row clicked', async () => {
       await menu.show(task, { x: 100, y: 100 });
       const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
       const deadlineRow = Array.from(rows).find((r) => {
@@ -577,10 +597,18 @@ describe('TaskContextMenu', () => {
       }) as HTMLElement;
       deadlineRow.click();
 
-      // The menu should be hidden after clicking Deadline
       expect(menu.isVisible()).toBe(false);
-      // onDeadlineClick is no longer called - the date picker is shown instead
-      expect(callbacks.onDeadlineClick).not.toHaveBeenCalled();
+      const datePicker = (menu as any).datePicker;
+      expect(datePicker).not.toBeNull();
+      expect(datePicker.show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          x: expect.any(Number),
+          y: expect.any(Number),
+        }),
+        'deadline',
+        null,
+        null,
+      );
     });
   });
 
@@ -793,6 +821,605 @@ describe('TaskContextMenu', () => {
       expect(top).toBeGreaterThanOrEqual(8);
       const rect = container.getBoundingClientRect();
       expect(top + rect.height).toBeLessThanOrEqual(300 - 8);
+    });
+  });
+
+  describe('updateConfig', () => {
+    it('should apply updated config on next menu build', async () => {
+      menu.updateConfig({
+        weekStartsOn: 'Sunday',
+        migrateToTodayState: 'DONE',
+      });
+      mockDailyNotesEnabled = true;
+      await menu.show(task, { x: 100, y: 100 });
+
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const migrateRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Migrate to today';
+      });
+      expect(migrateRow).not.toBeUndefined();
+    });
+  });
+
+  describe('Copy task action', () => {
+    it('should call onCopyTask callback and hide menu', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const copyRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Copy';
+      }) as HTMLElement;
+      copyRow.click();
+
+      expect(callbacks.onCopyTask).toHaveBeenCalledWith(task);
+      expect(menu.isVisible()).toBe(false);
+    });
+  });
+
+  describe('daily notes rows', () => {
+    it('should not show Copy to today when daily notes disabled', async () => {
+      mockDailyNotesEnabled = false;
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const copyRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Copy to today';
+      });
+      expect(copyRow).toBeUndefined();
+    });
+
+    it('should show Copy to today and invoke callback when daily notes enabled', async () => {
+      mockDailyNotesEnabled = true;
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const copyRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Copy to today';
+      }) as HTMLElement;
+      expect(copyRow).not.toBeUndefined();
+
+      copyRow.click();
+      expect(callbacks.onCopyTaskToToday).toHaveBeenCalledWith(task);
+      expect(menu.isVisible()).toBe(false);
+    });
+
+    it('should not show Move to today when daily notes disabled', async () => {
+      mockDailyNotesEnabled = false;
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const moveRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Move to today';
+      });
+      expect(moveRow).toBeUndefined();
+    });
+
+    it('should show Move to today and invoke callback when daily notes enabled', async () => {
+      mockDailyNotesEnabled = true;
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const moveRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Move to today';
+      }) as HTMLElement;
+      expect(moveRow).not.toBeUndefined();
+
+      moveRow.click();
+      expect(callbacks.onMoveTaskToToday).toHaveBeenCalledWith(task);
+      expect(menu.isVisible()).toBe(false);
+    });
+
+    it('should not show Migrate to today when daily notes disabled', async () => {
+      menu.updateConfig({
+        weekStartsOn: 'Monday',
+        migrateToTodayState: 'DONE',
+      });
+      mockDailyNotesEnabled = false;
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const migrateRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Migrate to today';
+      });
+      expect(migrateRow).toBeUndefined();
+    });
+
+    it('should not show Migrate to today when config migrateToTodayState not set', async () => {
+      mockDailyNotesEnabled = true;
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const migrateRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Migrate to today';
+      });
+      expect(migrateRow).toBeUndefined();
+    });
+
+    it('should show Migrate to today and invoke callback when both conditions met', async () => {
+      menu.updateConfig({
+        weekStartsOn: 'Monday',
+        migrateToTodayState: 'DONE',
+      });
+      mockDailyNotesEnabled = true;
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const migrateRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Migrate to today';
+      }) as HTMLElement;
+      expect(migrateRow).not.toBeUndefined();
+
+      migrateRow.click();
+      expect(callbacks.onMigrateTaskToToday).toHaveBeenCalledWith(task);
+      expect(menu.isVisible()).toBe(false);
+    });
+  });
+
+  describe('Next week scheduled action', () => {
+    it('should produce next Monday when weekStartsOn is Monday', async () => {
+      jest
+        .spyOn(DateUtils, 'getDateOnly')
+        .mockImplementation(() => new Date(2026, 2, 8));
+
+      await menu.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[2] as HTMLElement).click();
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const date = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0][1] as Date;
+      expect(date.getDate()).toBe(9);
+      expect(date.getMonth()).toBe(2);
+    });
+
+    it('should produce next Sunday when weekStartsOn is Sunday', async () => {
+      const sundayMenu = new TaskContextMenu(
+        callbacks,
+        { weekStartsOn: 'Sunday' },
+        app,
+      );
+      jest
+        .spyOn(DateUtils, 'getDateOnly')
+        .mockImplementation(() => new Date(2026, 2, 9));
+
+      await sundayMenu.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[2] as HTMLElement).click();
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const date = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0][1] as Date;
+      expect(date.getDate()).toBe(15);
+      expect(date.getMonth()).toBe(2);
+      sundayMenu.cleanup();
+    });
+  });
+
+  describe('Next weekend scheduled action', () => {
+    it('should produce next Saturday', async () => {
+      jest
+        .spyOn(DateUtils, 'getDateOnly')
+        .mockImplementation(() => new Date(2026, 2, 8));
+
+      await menu.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[3] as HTMLElement).click();
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const date = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0][1] as Date;
+      expect(date.getDate()).toBe(14);
+      expect(date.getMonth()).toBe(2);
+    });
+
+    it('should produce next Saturday when today is Saturday', async () => {
+      jest
+        .spyOn(DateUtils, 'getDateOnly')
+        .mockImplementation(() => new Date(2026, 2, 14));
+
+      await menu.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[3] as HTMLElement).click();
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalled();
+      const date = (callbacks.onScheduledDateChange as jest.Mock).mock
+        .calls[0][1] as Date;
+      expect(date.getDate()).toBe(21);
+      expect(date.getMonth()).toBe(2);
+    });
+  });
+
+  describe('Pick date action', () => {
+    it('should show date picker and hide menu', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[5] as HTMLElement).click();
+
+      expect(menu.isVisible()).toBe(false);
+      const datePicker = (menu as any).datePicker;
+      expect(datePicker).not.toBeNull();
+      expect(datePicker.show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          x: expect.any(Number),
+          y: expect.any(Number),
+        }),
+        'scheduled',
+        null,
+        null,
+      );
+    });
+  });
+
+  describe('onHide callback', () => {
+    it('should invoke onHide when menu hides', async () => {
+      const onHide = jest.fn();
+      await menu.show(task, { x: 100, y: 100 });
+      menu.onHide = onHide;
+      menu.hide();
+
+      expect(onHide).toHaveBeenCalled();
+    });
+
+    it('should clear onHide reference after invocation', async () => {
+      const onHide = jest.fn();
+      await menu.show(task, { x: 100, y: 100 });
+      menu.onHide = onHide;
+      menu.hide();
+
+      expect(menu.onHide).toBeNull();
+    });
+  });
+
+  describe('keyboard arrow and enter navigation', () => {
+    it('should move focus forward with ArrowDown', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      activeDocument.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+      );
+
+      expect((menu as any).focusedIndex).toBe(0);
+      const item = (menu as any).focusableItems[0];
+      expect(item.classList.contains('is-focused')).toBe(true);
+    });
+
+    it('should cycle from last to first with ArrowDown', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      (menu as any).focusedIndex = (menu as any).focusableItems.length - 1;
+      activeDocument.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+      );
+
+      expect((menu as any).focusedIndex).toBe(0);
+    });
+
+    it('should cycle from first to last with ArrowUp', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      (menu as any).focusedIndex = 0;
+      activeDocument.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }),
+      );
+
+      expect((menu as any).focusedIndex).toBe(
+        (menu as any).focusableItems.length - 1,
+      );
+    });
+
+    it('should trigger click on focused item with Enter', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      (menu as any).focusedIndex = 0;
+      activeDocument.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
+
+      expect(callbacks.onGoToTask).toHaveBeenCalled();
+    });
+  });
+
+  describe('createMenuRow keydown handler', () => {
+    it('should trigger click on Enter key', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      (rows[0] as HTMLElement).dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
+
+      expect(callbacks.onGoToTask).toHaveBeenCalledWith(task);
+    });
+
+    it('should trigger click on Space key', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      (rows[0] as HTMLElement).dispatchEvent(
+        new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
+      );
+
+      expect(callbacks.onGoToTask).toHaveBeenCalledWith(task);
+    });
+  });
+
+  describe('TaskStateManager integration', () => {
+    it('should use fresh task for priority change when available', async () => {
+      const freshTask = createBaseTask({ priority: 'med' });
+      const tsm = {
+        findTaskByPathAndLine: jest.fn().mockReturnValue(freshTask),
+      };
+      const menuWithState = new TaskContextMenu(
+        callbacks,
+        config,
+        app,
+        tsm as any,
+      );
+
+      await menuWithState.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[0].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[0] as HTMLElement).click();
+
+      expect(tsm.findTaskByPathAndLine).toHaveBeenCalledWith(
+        task.path,
+        task.line,
+      );
+      expect(callbacks.onPriorityChange).toHaveBeenCalledWith(
+        freshTask,
+        'high',
+      );
+      menuWithState.cleanup();
+    });
+
+    it('should use fresh task for scheduled date change when available', async () => {
+      const freshTask = createBaseTask({
+        scheduledDate: new Date(2026, 2, 8, 10, 0),
+      });
+      const tsm = {
+        findTaskByPathAndLine: jest.fn().mockReturnValue(freshTask),
+      };
+      const menuWithState = new TaskContextMenu(
+        callbacks,
+        config,
+        app,
+        tsm as any,
+      );
+
+      await menuWithState.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[0] as HTMLElement).click();
+
+      expect(tsm.findTaskByPathAndLine).toHaveBeenCalledWith(
+        task.path,
+        task.line,
+      );
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalledWith(
+        freshTask,
+        expect.any(Date),
+      );
+      menuWithState.cleanup();
+    });
+
+    it('should fall back to stored task when TaskStateManager returns null', async () => {
+      const tsm = {
+        findTaskByPathAndLine: jest.fn().mockReturnValue(null),
+      };
+      const menuWithState = new TaskContextMenu(
+        callbacks,
+        config,
+        app,
+        tsm as any,
+      );
+
+      await menuWithState.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[0].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[0] as HTMLElement).click();
+
+      expect(callbacks.onPriorityChange).toHaveBeenCalledWith(task, 'high');
+      menuWithState.cleanup();
+    });
+  });
+
+  describe('phone backdrop', () => {
+    afterEach(() => {
+      mockIsPhoneDevice = false;
+    });
+
+    it('should add backdrop when showing on phone device', async () => {
+      mockIsPhoneDevice = true;
+      await menu.show(task, { x: 100, y: 100 });
+
+      expect(activeDocument.querySelector('.todoseq-backdrop')).not.toBeNull();
+    });
+
+    it('should remove backdrop on hide', async () => {
+      mockIsPhoneDevice = true;
+      await menu.show(task, { x: 100, y: 100 });
+      menu.hide();
+
+      expect(activeDocument.querySelector('.todoseq-backdrop')).toBeNull();
+    });
+  });
+
+  describe('cleanup with date picker', () => {
+    it('should cleanup date picker when it exists', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const deadlineRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Deadline';
+      }) as HTMLElement;
+      deadlineRow.click();
+
+      const datePicker = (menu as any).datePicker;
+      expect(datePicker).not.toBeNull();
+
+      menu.cleanup();
+      expect(datePicker.cleanup).toHaveBeenCalled();
+      expect((menu as any).datePicker).toBeNull();
+    });
+  });
+
+  describe('showDatePicker with TaskStateManager', () => {
+    it('should look up fresh task when showing date picker', async () => {
+      const freshTask = createBaseTask({
+        scheduledDate: new Date(2026, 2, 10),
+        deadlineDate: new Date(2026, 2, 15),
+      });
+      const tsm = {
+        findTaskByPathAndLine: jest.fn().mockReturnValue(freshTask),
+      };
+      const menuWithState = new TaskContextMenu(
+        callbacks,
+        config,
+        app,
+        tsm as any,
+      );
+
+      await menuWithState.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const deadlineRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Deadline';
+      }) as HTMLElement;
+      deadlineRow.click();
+
+      expect(tsm.findTaskByPathAndLine).toHaveBeenCalledWith(
+        task.path,
+        task.line,
+      );
+      menuWithState.cleanup();
+    });
+  });
+
+  describe('DatePicker callback integration', () => {
+    it('should invoke onDeadlineDateChange when date picker selects deadline date', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const rows = activeDocument.querySelectorAll('.todoseq-context-menu-row');
+      const deadlineRow = Array.from(rows).find((r) => {
+        const label = r.querySelector('.todoseq-context-menu-row-label');
+        return label?.textContent === 'Deadline';
+      }) as HTMLElement;
+      deadlineRow.click();
+
+      const selectedDate = new Date(2026, 3, 1);
+      capturedDatePickerCallbacks.onDateSelected(
+        selectedDate,
+        null,
+        'deadline',
+      );
+
+      expect(callbacks.onDeadlineDateChange).toHaveBeenCalledWith(
+        task,
+        selectedDate,
+        null,
+      );
+    });
+
+    it('should invoke onScheduledDateChange when date picker selects scheduled date', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+      (buttons[5] as HTMLElement).click();
+
+      const selectedDate = new Date(2026, 3, 5);
+      capturedDatePickerCallbacks.onDateSelected(
+        selectedDate,
+        null,
+        'scheduled',
+      );
+
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalledWith(
+        task,
+        selectedDate,
+        null,
+      );
+    });
+  });
+
+  describe('scheduled option tooltips', () => {
+    it('should set aria-labels on all scheduled buttons', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+
+      expect(buttons[0].getAttribute('aria-label')).toBe('Today');
+      expect(buttons[1].getAttribute('aria-label')).toBe('Tomorrow');
+      expect(buttons[2].getAttribute('aria-label')).toBe('Next week');
+      expect(buttons[3].getAttribute('aria-label')).toBe('Next weekend');
+      expect(buttons[4].getAttribute('aria-label')).toBe('No date');
+      expect(buttons[5].getAttribute('aria-label')).toBe('Pick date...');
+    });
+
+    it('should use plain label as title for No date and Pick date', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+
+      expect(buttons[4].getAttribute('title')).toBe('No date');
+      expect(buttons[5].getAttribute('title')).toBe('Pick date...');
+    });
+
+    it('should include formatted date in title for date options', async () => {
+      await menu.show(task, { x: 100, y: 100 });
+      const iconRows = activeDocument.querySelectorAll(
+        '.todoseq-context-menu-icon-row',
+      );
+      const buttons = iconRows[1].querySelectorAll(
+        '.todoseq-context-menu-icon-btn',
+      );
+
+      expect(buttons[0].getAttribute('title')).toContain('Today');
+      expect(buttons[0].getAttribute('title')).toContain('—');
+      expect(buttons[1].getAttribute('title')).toContain('Tomorrow');
+      expect(buttons[1].getAttribute('title')).toContain('—');
     });
   });
 });

@@ -465,6 +465,20 @@ describe('Search Suggestions', () => {
     });
   });
 
+  describe('Closed date suggestion methods', () => {
+    it('should return closed date suggestions', () => {
+      const dateSuggestions = SearchSuggestions.getClosedDateSuggestions();
+      expect(dateSuggestions).toEqual([
+        'today',
+        'yesterday',
+        'last 7 days',
+        'last week',
+        'last month',
+        'none',
+      ]);
+    });
+  });
+
   describe('State and priority methods', () => {
     it('should return default task states', () => {
       const states = SearchSuggestions.getAllStates();
@@ -532,6 +546,86 @@ describe('Search Suggestions', () => {
         'next 7 days',
         'none',
       ]);
+    });
+  });
+
+  describe('Closed date extraction from tasks', () => {
+    it('should extract closed dates from tasks', () => {
+      const tasks = [
+        createBaseTask({
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO task with closed date',
+          listMarker: '-',
+          text: 'task with closed date',
+          closedDate: new Date('2023-05-15T00:00:00Z'),
+        }),
+        createBaseTask({
+          path: 'notes/tasks.md',
+          line: 2,
+          rawText: 'TODO task with different closed date',
+          listMarker: '-',
+          text: 'task with different closed date',
+          closedDate: new Date('2023-06-20T00:00:00Z'),
+        }),
+        createBaseTask({
+          path: 'notes/tasks.md',
+          line: 3,
+          rawText: 'TODO task without closed date',
+          listMarker: '-',
+          text: 'task without closed date',
+          closedDate: null,
+        }),
+      ];
+
+      const dates = SearchSuggestions.getClosedDateSuggestionsFromTasks(tasks);
+      expect(dates).toContain('2023-05-15');
+      expect(dates).toContain('2023-06-20');
+      expect(dates).toEqual(['2023-05-15', '2023-06-20']);
+    });
+
+    it('should handle empty task array for closed dates', () => {
+      const dates = SearchSuggestions.getClosedDateSuggestionsFromTasks([]);
+      expect(dates).toEqual([]);
+    });
+
+    it('should handle tasks with no closed dates', () => {
+      const tasks = [
+        createBaseTask({
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO task without closed date',
+          listMarker: '-',
+          text: 'task without closed date',
+          closedDate: null,
+        }),
+      ];
+      const dates = SearchSuggestions.getClosedDateSuggestionsFromTasks(tasks);
+      expect(dates).toEqual([]);
+    });
+
+    it('should deduplicate same closed dates', () => {
+      const date = new Date('2023-05-15T00:00:00Z');
+      const tasks = [
+        createBaseTask({
+          path: 'notes/tasks.md',
+          line: 1,
+          rawText: 'TODO task 1',
+          listMarker: '-',
+          text: 'task 1',
+          closedDate: date,
+        }),
+        createBaseTask({
+          path: 'notes/tasks.md',
+          line: 2,
+          rawText: 'TODO task 2',
+          listMarker: '-',
+          text: 'task 2',
+          closedDate: date,
+        }),
+      ];
+      const dates = SearchSuggestions.getClosedDateSuggestionsFromTasks(tasks);
+      expect(dates).toEqual(['2023-05-15']);
     });
   });
 
@@ -655,6 +749,252 @@ describe('Search Suggestions', () => {
 
       const dates = SearchSuggestions.getDeadlineDateSuggestions(tasks);
       expect(dates).toEqual([]);
+    });
+  });
+
+  describe('Property key extraction', () => {
+    it('should extract property keys from vault frontmatter', () => {
+      const mockCache = {
+        getFileCache: () => ({
+          frontmatter: {
+            tags: 'test',
+            aliases: 'foo',
+            created: '2023-01-01',
+          },
+        }),
+      };
+      const mockVault = {
+        getMarkdownFiles: () => [
+          { path: 'notes/test.md', name: 'test.md' },
+          { path: 'notes/other.md', name: 'other.md' },
+        ],
+      };
+      const mockApp = {
+        vault: mockVault,
+        metadataCache: mockCache,
+      };
+
+      const keys = SearchSuggestions.getAllPropertyKeys(mockApp as any);
+      expect(keys).toEqual(['aliases', 'created', 'tags']);
+    });
+
+    it('should handle files without frontmatter', () => {
+      const mockCache = {
+        getFileCache: () => null,
+      };
+      const mockVault = {
+        getMarkdownFiles: () => [{ path: 'notes/test.md', name: 'test.md' }],
+      };
+      const mockApp = {
+        vault: mockVault,
+        metadataCache: mockCache,
+      };
+
+      const keys = SearchSuggestions.getAllPropertyKeys(mockApp as any);
+      expect(keys).toEqual([]);
+    });
+
+    it('should handle empty vault', () => {
+      const mockCache = {
+        getFileCache: () => null,
+      };
+      const mockVault = {
+        getMarkdownFiles: () => [],
+      };
+      const mockApp = {
+        vault: mockVault,
+        metadataCache: mockCache,
+      };
+
+      const keys = SearchSuggestions.getAllPropertyKeys(mockApp as any);
+      expect(keys).toEqual([]);
+    });
+
+    it('should handle files with empty frontmatter', () => {
+      const mockCache = {
+        getFileCache: () => ({
+          frontmatter: {},
+        }),
+      };
+      const mockVault = {
+        getMarkdownFiles: () => [{ path: 'notes/test.md', name: 'test.md' }],
+      };
+      const mockApp = {
+        vault: mockVault,
+        metadataCache: mockCache,
+      };
+
+      const keys = SearchSuggestions.getAllPropertyKeys(mockApp as any);
+      expect(keys).toEqual([]);
+    });
+
+    it('should deduplicate property keys across files', () => {
+      const callCount = { count: 0 };
+      const mockCache = {
+        getFileCache: () => {
+          callCount.count++;
+          return {
+            frontmatter: {
+              tags: 'shared',
+            },
+          };
+        },
+      };
+      const mockVault = {
+        getMarkdownFiles: () => [
+          { path: 'a.md', name: 'a.md' },
+          { path: 'b.md', name: 'b.md' },
+        ],
+      };
+      const mockApp = {
+        vault: mockVault,
+        metadataCache: mockCache,
+      };
+
+      const keys = SearchSuggestions.getAllPropertyKeys(mockApp as any);
+      expect(keys).toEqual(['tags']);
+      expect(callCount.count).toBe(2);
+    });
+  });
+
+  describe('View mode filtering', () => {
+    const completedTask = createBaseTask({
+      path: 'notes/completed.md',
+      line: 1,
+      rawText: 'DONE completed task',
+      listMarker: '-',
+      text: 'completed task',
+      completed: true,
+      scheduledDate: new Date('2023-01-15T00:00:00Z'),
+      deadlineDate: new Date('2023-03-10T00:00:00Z'),
+      closedDate: new Date('2023-02-01T00:00:00Z'),
+    });
+
+    const activeTask = createBaseTask({
+      path: 'notes/active.md',
+      line: 2,
+      rawText: 'TODO active task #urgent',
+      listMarker: '-',
+      text: 'active task',
+      completed: false,
+      scheduledDate: new Date('2023-02-20T00:00:00Z'),
+      deadlineDate: new Date('2023-04-05T00:00:00Z'),
+      closedDate: null,
+    });
+
+    const tasks = [completedTask, activeTask];
+
+    it('should filter paths by hideCompleted mode', () => {
+      const paths = SearchSuggestions.getAllPathsFromTasks(
+        tasks,
+        'hideCompleted',
+      );
+
+      expect(paths).toContain('notes');
+      expect(paths).not.toContain('notes/completed.md');
+      expect(paths).toEqual(['notes']);
+    });
+
+    it('should return all paths when mode is showAll', () => {
+      const paths = SearchSuggestions.getAllPathsFromTasks(tasks, 'showAll');
+
+      expect(paths).toContain('notes');
+      expect(paths).toEqual(['notes']);
+    });
+
+    it('should filter files by hideCompleted mode', () => {
+      const files = SearchSuggestions.getAllFilesFromTasks(
+        tasks,
+        'hideCompleted',
+      );
+
+      expect(files).toContain('active.md');
+      expect(files).not.toContain('completed.md');
+    });
+
+    it('should return all files when mode is sortCompletedLast', () => {
+      const files = SearchSuggestions.getAllFilesFromTasks(
+        tasks,
+        'sortCompletedLast',
+      );
+
+      expect(files).toContain('active.md');
+      expect(files).toContain('completed.md');
+    });
+
+    it('should filter tags by hideCompleted mode', () => {
+      const tags = SearchSuggestions.getAllTags(tasks, 'hideCompleted');
+
+      expect(tags).toContain('urgent');
+      expect(tags).not.toContain('completed');
+      expect(tags).toEqual(['urgent']);
+    });
+
+    it('should return all tags when mode is showAll', () => {
+      const tags = SearchSuggestions.getAllTags(tasks, 'showAll');
+
+      expect(tags).toContain('urgent');
+      expect(tags).toEqual(['urgent']);
+    });
+
+    it('should filter scheduled dates by hideCompleted mode', () => {
+      const dates = SearchSuggestions.getScheduledDateSuggestions(
+        tasks,
+        'hideCompleted',
+      );
+
+      expect(dates).toContain('2023-02-20');
+      expect(dates).not.toContain('2023-01-15');
+      expect(dates).toEqual(['2023-02-20']);
+    });
+
+    it('should return all scheduled dates when mode is sortCompletedLast', () => {
+      const dates = SearchSuggestions.getScheduledDateSuggestions(
+        tasks,
+        'sortCompletedLast',
+      );
+
+      expect(dates).toContain('2023-01-15');
+      expect(dates).toContain('2023-02-20');
+    });
+
+    it('should filter deadline dates by hideCompleted mode', () => {
+      const dates = SearchSuggestions.getDeadlineDateSuggestions(
+        tasks,
+        'hideCompleted',
+      );
+
+      expect(dates).toContain('2023-04-05');
+      expect(dates).not.toContain('2023-03-10');
+      expect(dates).toEqual(['2023-04-05']);
+    });
+
+    it('should return all deadline dates when mode is sortCompletedLast', () => {
+      const dates = SearchSuggestions.getDeadlineDateSuggestions(
+        tasks,
+        'sortCompletedLast',
+      );
+
+      expect(dates).toContain('2023-03-10');
+      expect(dates).toContain('2023-04-05');
+    });
+
+    it('should filter closed dates by hideCompleted mode', () => {
+      const dates = SearchSuggestions.getClosedDateSuggestionsFromTasks(
+        tasks,
+        'hideCompleted',
+      );
+
+      expect(dates).toEqual([]);
+    });
+
+    it('should return all closed dates when mode is sortCompletedLast', () => {
+      const dates = SearchSuggestions.getClosedDateSuggestionsFromTasks(
+        tasks,
+        'sortCompletedLast',
+      );
+
+      expect(dates).toContain('2023-02-01');
     });
   });
 

@@ -1,6 +1,7 @@
 import { Search } from '../src/search/search';
 import { Task } from '../src/types/task';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
+import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 
 describe('Search functionality', () => {
@@ -296,6 +297,172 @@ describe('Search functionality', () => {
         mockSettings,
       );
       expect(result).toBe(false); // Case sensitive should not match
+    });
+  });
+
+  describe('Cache management', () => {
+    const task = createBaseTask({
+      path: 'notes/meeting.md',
+      line: 1,
+      rawText: 'TODO meeting about project planning',
+      listMarker: '-',
+      text: 'meeting about project planning',
+    });
+
+    beforeEach(() => {
+      Search.clearCache();
+    });
+
+    it('should clear the AST cache', () => {
+      Search.parse('meeting OR personal');
+      Search.clearCache();
+      // Verify search still works after cache clear
+      const result = Search.parse('meeting OR personal');
+      expect(result).toBeDefined();
+    });
+
+    it('should use cached AST for repeated evaluate calls', async () => {
+      const result1 = await Search.evaluate('meeting', task, false);
+      expect(result1).toBe(true);
+
+      const result2 = await Search.evaluate('meeting', task, false);
+      expect(result2).toBe(true);
+    });
+
+    it('should evict oldest entries when cache exceeds max size', async () => {
+      // Fill cache beyond the 50-entry limit
+      const dummyTask = createBaseTask({
+        path: 'notes/test.md',
+        line: 1,
+        rawText: 'TODO generic task',
+        listMarker: '-',
+        text: 'generic task',
+      });
+
+      for (let i = 0; i < 55; i++) {
+        await Search.evaluate(`query${i}`, dummyTask, false);
+      }
+
+      // Evaluate a new unique query to trigger eviction
+      const result = await Search.evaluate('fresh', dummyTask, false);
+      expect(result).toBe(false);
+
+      // Existing queries not yet evicted should still work
+      const lastResult = await Search.evaluate('query54', dummyTask, false);
+      expect(lastResult).toBe(false);
+    });
+  });
+
+  describe('evaluate with PropertySearchEngine', () => {
+    it('should evaluate property filter query with PropertySearchEngine', async () => {
+      const mockEngine = {
+        searchProperties: jest.fn(
+          async (_query: string, _caseSensitive?: boolean) => {
+            return new Set(['notes/meeting.md']);
+          },
+        ),
+      } as unknown as PropertySearchEngine;
+
+      const task = createBaseTask({
+        path: 'notes/meeting.md',
+        line: 1,
+        rawText: 'TODO meeting about project planning',
+        listMarker: '-',
+        text: 'meeting about project planning',
+      });
+
+      const result = await Search.evaluate(
+        '[type:Project]',
+        task,
+        false,
+        undefined,
+        mockEngine,
+      );
+      expect(result).toBe(true);
+      expect(mockEngine.searchProperties).toHaveBeenCalledWith(
+        '[type:Project]',
+        false,
+      );
+    });
+
+    it('should return false when PropertySearchEngine does not match file', async () => {
+      const mockEngine = {
+        searchProperties: jest.fn(async () => new Set<string>()),
+      } as unknown as PropertySearchEngine;
+
+      const task = createBaseTask({
+        path: 'notes/meeting.md',
+        line: 1,
+        rawText: 'TODO meeting about project planning',
+        listMarker: '-',
+        text: 'meeting about project planning',
+      });
+
+      const result = await Search.evaluate(
+        '[type:Project]',
+        task,
+        false,
+        undefined,
+        mockEngine,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should handle case sensitivity with PropertySearchEngine', async () => {
+      const mockEngine = {
+        searchProperties: jest.fn(
+          async (_query: string, caseSensitive?: boolean) => {
+            if (!caseSensitive) {
+              return new Set(['notes/meeting.md']);
+            }
+            return new Set();
+          },
+        ),
+      } as unknown as PropertySearchEngine;
+
+      const task = createBaseTask({
+        path: 'notes/meeting.md',
+        line: 1,
+        rawText: 'TODO meeting about project planning',
+        listMarker: '-',
+        text: 'meeting about project planning',
+      });
+
+      const result = await Search.evaluate(
+        '[type:Project]',
+        task,
+        false,
+        undefined,
+        mockEngine,
+      );
+      expect(result).toBe(true);
+      expect(mockEngine.searchProperties).toHaveBeenCalledWith(
+        '[type:Project]',
+        false,
+      );
+    });
+  });
+
+  describe('evaluate error handling', () => {
+    it('should re-throw unexpected errors (non-SearchError)', async () => {
+      const originalParse = Search.parse;
+      Search.parse = jest.fn(() => {
+        throw new Error('Unexpected internal error');
+      });
+
+      const task = createBaseTask({
+        path: 'test.md',
+        line: 1,
+        rawText: 'TODO test',
+        listMarker: '-',
+        text: 'test',
+      });
+
+      await expect(Search.evaluate('test', task, false)).rejects.toThrow(
+        'Unexpected internal error',
+      );
+
+      Search.parse = originalParse;
     });
   });
 });
