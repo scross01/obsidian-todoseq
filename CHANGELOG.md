@@ -1,6 +1,10 @@
 # Change Log
 
-## 0.14.0-dev
+## 0.14.1
+
+- Address more Obsidian community scorecard review feedback items.
+
+## 0.14.0
 
 This release addresses the majority of the new Obsidian plugin code review feedback items.
 
