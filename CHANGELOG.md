@@ -2,9 +2,14 @@
 
 ## 0.14.0-dev
 
+This release addresses the majority of the new Obsidian plugin code review feedback items.
+
 - Breaking change: Removed default hot-key for cycling task states, as per Obsidian plugin developer guidelines. Hotkeys can be configured in Obsidian settings.
 
-- Address Obsidian community scorecard review feedback items.
+- Added github artifact attestations for `main.js` and `styles.css`.
+- Addressed 615 Obsidian community scorecard review feedback items.
+- Added `eslint-plugin-obsidianmd` lint checks.
+- Expanded unit test coverage.
 
 ## 0.13.4
 
