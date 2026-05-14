@@ -52,14 +52,14 @@ export class OrgModeTaskParser implements ITaskParser {
   private urgencyCoefficients: UrgencyCoefficients;
   private regexCache: RegexCache;
   private headlineRegex: RegExp;
-  private readonly app: App | null;
+  private readonly app: App;
 
   private constructor(
     keywords: string[],
     keywordManager: KeywordManager,
     urgencyCoefficients: UrgencyCoefficients,
     regexCache: RegexCache,
-    app: App | null,
+    app: App,
   ) {
     this.keywords = keywords;
     this.keywordManager = keywordManager;
@@ -79,7 +79,7 @@ export class OrgModeTaskParser implements ITaskParser {
    */
   static create(
     keywordManager: KeywordManager,
-    app: App | null,
+    app: App,
     urgencyCoefficients?: UrgencyCoefficients,
   ): OrgModeTaskParser {
     const keywords = keywordManager.getAllKeywords();
@@ -197,7 +197,6 @@ export class OrgModeTaskParser implements ITaskParser {
     // Detect daily note information
     let isDailyNote = false;
     let dailyNoteDate: Date | null = null;
-    const taskFile: TFile | undefined = file;
 
     if (this.app && file) {
       try {
@@ -227,7 +226,7 @@ export class OrgModeTaskParser implements ITaskParser {
       closedDate: null,
       tail: '',
       urgency: null,
-      file: taskFile,
+      file,
       isDailyNote,
       dailyNoteDate,
       quoteNestingLevel: nestingLevel, // Store nesting level here

@@ -479,7 +479,7 @@ describe('daily-note-utils', () => {
       win.moment = originalMoment;
     });
 
-    test('returns null when daily notes plugin is not enabled', async () => {
+    test('throws when daily notes plugin is not enabled', async () => {
       const app = {
         vault: {
           adapter: {
@@ -492,7 +492,9 @@ describe('daily-note-utils', () => {
         },
       } as unknown as App;
 
-      await expect(getTodayDailyNote(app)).resolves.toBeNull();
+      await expect(getTodayDailyNote(app)).rejects.toThrow(
+        'Daily notes plugin is not enabled',
+      );
     });
 
     test('returns existing daily note without creating a new one', async () => {
@@ -522,7 +524,7 @@ describe('daily-note-utils', () => {
       expect(createDailyNote).toHaveBeenCalledWith('mock-today');
     });
 
-    test('returns null when createDailyNote fails', async () => {
+    test('throws when createDailyNote fails', async () => {
       const app = createAppWithPluginEnabled();
 
       (getAllDailyNotes as jest.Mock).mockReturnValue({});
@@ -531,16 +533,16 @@ describe('daily-note-utils', () => {
         new Error('create failed'),
       );
 
-      await expect(getTodayDailyNote(app)).resolves.toBeNull();
+      await expect(getTodayDailyNote(app)).rejects.toThrow('create failed');
     });
 
-    test('returns null when an unexpected error occurs', async () => {
+    test('throws when an unexpected error occurs', async () => {
       const app = createAppWithPluginEnabled();
       (getAllDailyNotes as jest.Mock).mockImplementation(() => {
         throw new Error('unexpected');
       });
 
-      await expect(getTodayDailyNote(app)).resolves.toBeNull();
+      await expect(getTodayDailyNote(app)).rejects.toThrow('unexpected');
     });
 
     test('uses window.moment to get today date', async () => {

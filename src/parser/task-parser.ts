@@ -72,7 +72,7 @@ export class TaskParser implements ITaskParser {
   private urgencyCoefficients: UrgencyCoefficients;
 
   // App instance for daily note detection (optional for decoration-only use)
-  private readonly app: App | null;
+  private readonly app: App;
 
   private constructor(
     regex: RegexPair,
@@ -81,7 +81,7 @@ export class TaskParser implements ITaskParser {
     includeCommentBlocks: boolean,
     languageCommentSupport: boolean,
     keywordManager: KeywordManager,
-    app: App | null,
+    app: App,
     urgencyCoefficients?: UrgencyCoefficients,
   ) {
     this.keywordManager = keywordManager;
@@ -109,7 +109,7 @@ export class TaskParser implements ITaskParser {
    */
   static create(
     keywordManager: KeywordManager,
-    app: App | null,
+    app: App,
     urgencyCoefficients?: UrgencyCoefficients,
     parserSettings?: {
       includeCalloutBlocks?: boolean;
@@ -128,7 +128,7 @@ export class TaskParser implements ITaskParser {
       parserSettings?.includeCommentBlocks ?? false,
       parserSettings?.languageCommentSupport ?? false,
       keywordManager,
-      app || null,
+      app,
       urgencyCoefficients,
     );
   }
@@ -1378,25 +1378,20 @@ export class TaskParser implements ITaskParser {
     const { priority, cleanedText, embedReference, footnoteReference } =
       this.extractPriority(taskDetails.taskText);
 
-    // Detect daily note information if file is provided
+    // Detect daily note information
     let isDailyNote = false;
     let dailyNoteDate: Date | null = null;
-    let taskFile: TFile | undefined = undefined;
 
-    if (this.app) {
-      try {
-        const abstractFile = this.app.vault.getAbstractFileByPath(path);
-        const tFile = abstractFile instanceof TFile ? abstractFile : undefined;
-        if (tFile) {
-          const dailyNoteInfo = getDailyNoteInfo(this.app, tFile);
-          isDailyNote = dailyNoteInfo.isDailyNote;
-          dailyNoteDate = dailyNoteInfo.dailyNoteDate;
-          taskFile = tFile;
-        }
-      } catch (error) {
-        // If daily note detection fails, continue without it
-        console.warn('Daily note detection failed:', error);
+    try {
+      const abstractFile = this.app.vault.getAbstractFileByPath(path);
+      if (abstractFile instanceof TFile) {
+        const dailyNoteInfo = getDailyNoteInfo(this.app, abstractFile);
+        isDailyNote = dailyNoteInfo.isDailyNote;
+        dailyNoteDate = dailyNoteInfo.dailyNoteDate;
       }
+    } catch (error) {
+      // If daily note detection fails, continue without it
+      console.warn('Daily note detection failed:', error);
     }
 
     const task: Task = {
@@ -1417,7 +1412,6 @@ export class TaskParser implements ITaskParser {
       closedDate: null,
       tail: taskDetails.tail,
       urgency: null,
-      file: taskFile,
       isDailyNote,
       dailyNoteDate,
       embedReference,
@@ -1509,25 +1503,20 @@ export class TaskParser implements ITaskParser {
       taskDetails.listMarker,
     );
 
-    // Detect daily note information if file is provided
+    // Detect daily note information
     let isDailyNote = false;
     let dailyNoteDate: Date | null = null;
-    let taskFile: TFile | undefined = undefined;
 
-    if (this.app) {
-      try {
-        const abstractFile = this.app.vault.getAbstractFileByPath(path);
-        const tFile = abstractFile instanceof TFile ? abstractFile : undefined;
-        if (tFile) {
-          const dailyNoteInfo = getDailyNoteInfo(this.app, tFile);
-          isDailyNote = dailyNoteInfo.isDailyNote;
-          dailyNoteDate = dailyNoteInfo.dailyNoteDate;
-          taskFile = tFile;
-        }
-      } catch (error) {
-        // If daily note detection fails, continue without it
-        console.warn('Daily note detection failed:', error);
+    try {
+      const abstractFile = this.app.vault.getAbstractFileByPath(path);
+      if (abstractFile instanceof TFile) {
+        const dailyNoteInfo = getDailyNoteInfo(this.app, abstractFile);
+        isDailyNote = dailyNoteInfo.isDailyNote;
+        dailyNoteDate = dailyNoteInfo.dailyNoteDate;
       }
+    } catch (error) {
+      // If daily note detection fails, continue without it
+      console.warn('Daily note detection failed:', error);
     }
 
     const task: Task = {
@@ -1547,7 +1536,6 @@ export class TaskParser implements ITaskParser {
       closedDate: null,
       tail: taskDetails.tail,
       urgency: null,
-      file: taskFile,
       isDailyNote,
       dailyNoteDate,
       embedReference,
@@ -1663,7 +1651,6 @@ export class TaskParser implements ITaskParser {
     // Detect daily note information if file is provided
     let isDailyNote = false;
     let dailyNoteDate: Date | null = null;
-    const taskFile: TFile | undefined = file;
 
     if (file && this.app) {
       try {
@@ -1694,7 +1681,7 @@ export class TaskParser implements ITaskParser {
       closedDate: null,
       tail: taskDetails.tail,
       urgency: null,
-      file: taskFile,
+      file,
       tags,
       isDailyNote,
       dailyNoteDate,

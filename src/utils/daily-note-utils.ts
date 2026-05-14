@@ -149,12 +149,13 @@ export function refreshDailyNotesPluginStatus(): void {
 /**
  * Get today's daily note, creating it if it doesn't exist
  * @param app The Obsidian app instance
- * @returns The today daily note file, or null if daily notes plugin is not enabled
+ * @returns The today daily note file
+ * @throws Error if daily notes plugin is not enabled or note creation fails
  */
-export async function getTodayDailyNote(app: App): Promise<TFile | null> {
+export async function getTodayDailyNote(app: App): Promise<TFile> {
   try {
     if (!(await isDailyNotesPluginEnabled(app))) {
-      return null;
+      throw new Error('Daily notes plugin is not enabled');
     }
 
     const today: moment.Moment = window.moment();
@@ -167,10 +168,14 @@ export async function getTodayDailyNote(app: App): Promise<TFile | null> {
     }
 
     // Create new daily note if it doesn't exist
-    return (await createDailyNote(today)) ?? null;
+    const note = await createDailyNote(today);
+    if (!note) {
+      throw new Error('Failed to create daily note');
+    }
+    return note;
   } catch (error) {
     console.warn('Failed to get or create today daily note:', error);
-    return null;
+    throw error;
   }
 }
 

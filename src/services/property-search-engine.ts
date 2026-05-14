@@ -180,8 +180,7 @@ export class PropertySearchEngine {
           for (const filePath of batch) {
             const file = this.app.vault.getAbstractFileByPath(filePath);
             // Check if it's a markdown file - type narrow from TAbstractFile to TFile
-            // TFile has extension, TFolder has children
-            const tfile = file as TFile | undefined;
+            const tfile = file instanceof TFile ? file : undefined;
             const isMarkdownFile = tfile && tfile.extension === 'md';
 
             if (isMarkdownFile && tfile) {
@@ -636,7 +635,7 @@ export class PropertySearchEngine {
       this.removeFileFromCache(filePath);
 
       // If file still exists, update with new properties
-      let file: TFile | null = null;
+      let file;
       if (
         this.app.vault &&
         typeof this.app.vault.getAbstractFileByPath === 'function'

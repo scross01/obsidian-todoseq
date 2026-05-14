@@ -57,10 +57,10 @@ export class SearchEvaluator {
   private static getFileForTask(
     task: Task,
     settings?: TodoTrackerSettings,
-  ): TFile | null {
+  ): TFile {
     const app = this.getApp(settings);
     if (!app) {
-      return null;
+      throw new Error('Cannot get file: App not available');
     }
 
     const abstractFile = app.vault.getAbstractFileByPath(task.path);
@@ -72,7 +72,7 @@ export class SearchEvaluator {
       return abstractFile;
     }
 
-    return null;
+    throw new Error('Cannot get file: File not found or not a markdown file');
   }
 
   static async evaluate(
@@ -844,8 +844,10 @@ export class SearchEvaluator {
 
     // Fall back to direct metadata access (simplified, no global state access)
     // Get file cache and frontmatter
-    const file = this.getFileForTask(task, settings);
-    if (!file) {
+    let file;
+    try {
+      file = this.getFileForTask(task, settings);
+    } catch {
       return false;
     }
 
