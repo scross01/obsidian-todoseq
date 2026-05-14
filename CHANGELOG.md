@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.14.2
+
+- Address more Obsidian community scorecard review feedback items.
+
 ## 0.14.1
 
 - Address more Obsidian community scorecard review feedback items.
