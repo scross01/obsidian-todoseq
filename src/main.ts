@@ -87,7 +87,7 @@ export default class TodoTracker extends Plugin {
     ).todoSeqResetFirstInstall = () => {
       this.settings._hasShownFirstInstallView = false;
       void this.saveSettings();
-      // eslint-disable-next-line obsidianmd/rule-custom-message
+      // eslint-disable-next-line obsidianmd/rule-custom-message -- developer utility log, not a UI message
       console.log(
         'TODOseq: First install flag reset. Reload plugin to test first-install behavior.',
       );
@@ -149,7 +149,8 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called when settings are loaded
   async loadSettings() {
-    const loaded = await this.loadData(); // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- loadData() returns unknown; migration layer validates shape below
+    const loaded = await this.loadData();
 
     // Apply migrations to handle settings from older versions
     const { migrateSettings } = await import('./utils/settings-migration');

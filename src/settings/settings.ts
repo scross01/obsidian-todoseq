@@ -4,6 +4,7 @@ import {
   Setting,
   ToggleComponent,
   Notice,
+  DropdownComponent,
 } from 'obsidian';
 import TodoTracker from '../main';
 import { TaskParser } from '../parser/task-parser';
@@ -48,17 +49,17 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
   >();
   // Store dropdown components for default state settings to update when keywords change
   private defaultStateDropdowns: {
-    inactive?: import('obsidian').DropdownComponent;
-    active?: import('obsidian').DropdownComponent;
-    completed?: import('obsidian').DropdownComponent;
+    inactive?: DropdownComponent;
+    active?: DropdownComponent;
+    completed?: DropdownComponent;
   } = {};
 
   // Store Setting instances for transition settings to attach validation errors
   private transitionSettings: {
-    inactive?: import('obsidian').Setting;
-    active?: import('obsidian').Setting;
-    completed?: import('obsidian').Setting;
-    transitions?: import('obsidian').Setting;
+    inactive?: Setting;
+    active?: Setting;
+    completed?: Setting;
+    transitions?: Setting;
   } = {};
 
   private readonly keywordSettingToGroup: Record<
@@ -675,7 +676,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
    * Populate a default state dropdown with keywords from the specified group.
    */
   private populateDefaultStateDropdown(
-    dropdown: import('obsidian').DropdownComponent,
+    dropdown: DropdownComponent,
     keywords: Set<string>,
   ): void {
     // Clear existing options
@@ -880,7 +881,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
    * Attach info messages to a setting's info area.
    */
   private attachInfoToSetting(
-    setting: import('obsidian').Setting | undefined,
+    setting: Setting | undefined,
     message: string,
   ): void {
     if (!setting) return;
@@ -904,7 +905,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
    * Attach error messages to a setting, similar to keyword errors.
    */
   private attachErrorsToSetting(
-    setting: import('obsidian').Setting | undefined,
+    setting: Setting | undefined,
     messages: string[],
   ): void {
     if (!setting || messages.length === 0) return;
@@ -1211,7 +1212,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     // Experimental Features Group
     new Setting(containerEl)
-      // eslint-disable-next-line obsidianmd/ui/sentence-case
+      // eslint-disable-next-line obsidianmd/ui/sentence-case -- section header uses emoji prefix
       .setName('⚠︎ Experimental features')
       .setHeading()
       .setDesc(

@@ -2055,7 +2055,7 @@ export class TaskListView extends ItemView {
     if (evt.altKey) {
       try {
         (
-          targetLeaf as WorkspaceLeaf & {
+          targetLeaf as {
             setPinned?: (pinned: boolean) => void;
           }
         ).setPinned?.(true);
@@ -2095,7 +2095,9 @@ export class TaskListView extends ItemView {
           setEphemeralState?: (state: { line: number; col: number }) => void;
         }
       ).setEphemeralState?.({ line: task.line, col: lineContent.length });
-    } catch {}
+    } catch {
+      // Ignore if ephemeral state is not available
+    }
     editor.scrollIntoView({ from: pos, to: pos }, true);
 
     if (targetLeaf) {

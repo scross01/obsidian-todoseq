@@ -73,6 +73,9 @@ export class EmbeddedTaskItemRenderer {
 
     checkbox.setAttribute('data-task', dataTaskChar);
     li.setAttribute('data-task', dataTaskChar);
+    if (dataTaskChar === 'x' || dataTaskChar === '-') {
+      li.classList.add('todoseq-embedded-task-completed');
+    }
     checkbox.setAttribute(
       'aria-label',
       `Toggle task: ${task.text || task.state}`,
@@ -499,6 +502,10 @@ export class EmbeddedTaskItemRenderer {
           );
           checkbox.setAttribute('data-task', newCheckboxChar);
           li.setAttribute('data-task', newCheckboxChar);
+          li.classList.toggle(
+            'todoseq-embedded-task-completed',
+            newCheckboxChar === 'x' || newCheckboxChar === '-',
+          );
         } catch (error) {
           console.error('Error updating task state:', error);
           checkbox.checked = !checkbox.checked;
@@ -508,6 +515,10 @@ export class EmbeddedTaskItemRenderer {
           );
           checkbox.setAttribute('data-task', revertedChar);
           li.setAttribute('data-task', revertedChar);
+          li.classList.toggle(
+            'todoseq-embedded-task-completed',
+            revertedChar === 'x' || revertedChar === '-',
+          );
         }
       })();
     });
@@ -1053,7 +1064,7 @@ export class EmbeddedTaskItemRenderer {
 
             try {
               (
-                leafView as MarkdownView & {
+                leafView as {
                   setEphemeralState?: (state: {
                     line: number;
                     col: number;

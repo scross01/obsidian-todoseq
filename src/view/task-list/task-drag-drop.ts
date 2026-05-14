@@ -1,4 +1,12 @@
-import { App, Notice, TFile, MarkdownView, Editor, Platform } from 'obsidian';
+import {
+  App,
+  Notice,
+  TFile,
+  MarkdownView,
+  Editor,
+  Platform,
+  EventRef,
+} from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
@@ -37,7 +45,7 @@ export class TaskDragDropHandler {
   private plugin: TodoTracker;
   private containerEl: HTMLElement;
   private callbacks: TaskDragDropCallbacks | null = null;
-  private editorDropRef: ReturnType<App['workspace']['on']> | null = null;
+  private editorDropRef: EventRef | null = null;
   private dragoverHandler: ((evt: DragEvent) => void) | null = null;
   private draggedTask: Task | null = null;
   private currentAction: 'copy' | 'move' | 'migrate' = 'copy';
@@ -262,7 +270,7 @@ export class TaskDragDropHandler {
 
     if (action === 'migrate' && !this.plugin.settings.migrateToTodayState) {
       new Notice(
-        // eslint-disable-next-line obsidianmd/ui/sentence-case
+        // eslint-disable-next-line obsidianmd/ui/sentence-case -- "TODOseq" is a proper name in scentence.
         'Migration is disabled. Configure the migrated state keyword in TODOseq settings.',
       );
       return;

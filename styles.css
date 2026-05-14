@@ -14,15 +14,15 @@
 
 /* Visually-hidden label for accessibility */
 .todoseq-panel .sr-only {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0 0 0 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Task list container - scrollable area */
@@ -181,8 +181,8 @@
 /* Non-clickable link-like styling for in-text links */
 .todoseq-panel .todoseq-task-link {
   color: var(--link-color);
-  text-decoration: underline dotted;
-  cursor: pointer; /* visually like a link, does not intercept clicks */
+  border-bottom: 1px dotted;
+  cursor: pointer;
 }
 
 /* ============================================================================
@@ -370,9 +370,6 @@
 .todoseq-panel .todoseq-task-date .todoseq-task-date-label {
   font-weight: var(--font-medium);
   opacity: 0.8;
-}
-
-.todoseq-panel .todoseq-task-date .todoseq-task-date-label {
   margin-right: var(--size-2-2);
 }
 
@@ -396,7 +393,7 @@
 
 /* Subtask indicator styling - positioned as right-aligned cell */
 .todoseq-subtask-indicator {
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--font-mono, monospace);
   color: var(--text-muted);
   font-size: 0.75rem;
   flex-shrink: 0;
@@ -469,14 +466,14 @@
 /* Settings UI - Info message */
 .todoseq-setting-item-info,
 .setting-item-info .todoseq-info-message {
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #999999);
 }
 
 /* Settings UI - Invalid input highlighting (consolidated) */
 .setting-item :is(input, textarea).todoseq-invalid-input {
-  border-color: var(--error-color, #ff0000) !important;
-  border-width: 2px !important;
-  border-style: solid !important;
+  border-color: var(--error-color, #ff0000);
+  border-width: 2px;
+  border-style: solid;
 }
 
 /* Task keyword formatting in editor and reading view */
@@ -550,14 +547,14 @@
 /* Completed task text styling */
 :is(.markdown-preview-view, .cm-editor) .todoseq-completed-task-text {
   text-decoration: line-through;
-  text-decoration-color: var(--text-muted);
+  opacity: 0.8;
 }
 
 /* Completed task keyword styling - applies strikethrough to the keyword itself */
 /* Works for both built-in (DONE, CANCELLED, CANCELED) and custom completed keywords */
 :is(.markdown-preview-view, .cm-editor) .todoseq-completed-keyword {
   text-decoration: line-through;
-  text-decoration-color: var(--text-muted);
+  opacity: 0.8;
 }
 
 /* Archived task styling - muted/dimmed appearance without strikethrough */
@@ -718,10 +715,6 @@
 }
 
 .is-mobile .todoseq-embedded-task-item:focus-within {
-  outline: none;
-}
-
-.todoseq-embedded-task-item:focus-within {
   outline: none;
 }
 
@@ -1035,7 +1028,9 @@
   /* Floating indicators align to right on narrow screens */
   .todoseq-embedded-task-item-wrap-dynamic
     .todoseq-embedded-task-floating-indicators {
+    display: flex;
     align-self: flex-start;
+    margin-top: var(--size-2-1);
     margin-left: auto;
   }
 
@@ -1087,15 +1082,6 @@
     display: none;
   }
 
-  /* Ensure floating indicators are visible at top-right on narrow screens */
-  .todoseq-embedded-task-item-wrap-dynamic
-    .todoseq-embedded-task-floating-indicators {
-    display: flex;
-    align-self: flex-start;
-    margin-top: var(--size-2-1);
-    margin-left: auto;
-  }
-
   /* File info on new row on narrow screens */
   .todoseq-embedded-task-item-wrap-dynamic
     .todoseq-embedded-task-file-info-wrap {
@@ -1144,7 +1130,7 @@
 
 /* Ensure subtask indicator in floating div has correct styling */
 .todoseq-embedded-task-floating-indicators .todoseq-subtask-indicator {
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--font-mono, monospace);
   color: var(--text-muted);
   font-size: 0.75rem;
   white-space: nowrap;
@@ -1162,18 +1148,12 @@
   height: 0.9rem;
 }
 
-/* Completed task styling - target data-task values for done (x) and canceled (-) only */
-.todoseq-embedded-task-item:has(.todoseq-embedded-task-checkbox[data-task='x']),
-.todoseq-embedded-task-item:has(
-  .todoseq-embedded-task-checkbox[data-task='-']
-) {
+/* Completed task styling - target completed (x) and canceled (-) states */
+.todoseq-embedded-task-item.todoseq-embedded-task-completed {
   opacity: 0.6;
 }
 
-.todoseq-embedded-task-item:has(.todoseq-embedded-task-checkbox[data-task='x'])
-  .todoseq-embedded-task-text,
-.todoseq-embedded-task-item:has(.todoseq-embedded-task-checkbox[data-task='-'])
-  .todoseq-embedded-task-text {
+.todoseq-embedded-task-completed .todoseq-embedded-task-text {
   text-decoration: line-through;
 }
 
@@ -1525,7 +1505,7 @@
   padding: var(--size-4-1) var(--size-4-3);
 }
 
-.todoseq-context-menu-icon-btn {
+.menu .todoseq-context-menu-icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1539,23 +1519,23 @@
   color: var(--text-muted);
   padding: 0;
   transition: background-color 100ms ease;
-  background-color: var(--menu-background) !important;
-  box-shadow: none !important;
+  background-color: var(--menu-background);
+  box-shadow: none;
 }
 
 /* force mobile to use default background colors */
 @media (max-width: 480px) {
-  .todoseq-context-menu-header,
-  .todoseq-context-menu-row,
-  .todoseq-context-menu-icon-row,
-  .todoseq-context-menu-icon-btn {
-    background-color: inherit !important;
-    background: inherit !important;
+  .menu .todoseq-context-menu-header,
+  .menu .todoseq-context-menu-row,
+  .menu .todoseq-context-menu-icon-row,
+  .menu .todoseq-context-menu-icon-btn {
+    background-color: inherit;
+    background: inherit;
   }
 }
 
-.todoseq-context-menu-icon-btn:hover {
-  background: var(--background-modifier-hover) !important;
+.menu .todoseq-context-menu-icon-btn:hover {
+  background: var(--background-modifier-hover);
 }
 
 .todoseq-context-menu-icon-btn:focus-visible {
@@ -1945,19 +1925,19 @@
 
 /* force mobile to use default background colors */
 @media (max-width: 480px) {
-  .todoseq-date-picker-header,
-  .todoseq-date-picker-menu-row,
-  .todoseq-date-picker-quick-select-row {
-    background-color: inherit !important;
-    background: inherit !important;
+  .menu .todoseq-date-picker-header,
+  .menu .todoseq-date-picker-menu-row,
+  .menu .todoseq-date-picker-quick-select-row {
+    background-color: inherit;
+    background: inherit;
   }
 }
 
 /* Off-screen positioning for measurement */
-.todoseq-dialog-offscreen {
-  left: -9999px !important;
-  top: -9999px !important;
-  position: absolute !important;
+.menu.todoseq-dialog-offscreen {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
 }
 
 /* Submenu measurement state - hidden off-screen */

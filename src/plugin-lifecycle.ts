@@ -501,7 +501,7 @@ export class PluginLifecycleManager {
 
     // Conditional ribbon icon - only show on mobile devices
     if (Platform.isMobile) {
-      // eslint-disable-next-line obsidianmd/ui/sentence-case
+      // eslint-disable-next-line obsidianmd/ui/sentence-case -- "Open TODOseq" is a proper name, not a sentence
       this.plugin.addRibbonIcon(TASK_VIEW_ICON, 'Open TODOseq', () => {
         this.plugin.uiManager.showTasks().catch((error) => {
           new Notice('Failed to open task list');
