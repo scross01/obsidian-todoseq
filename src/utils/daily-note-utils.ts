@@ -167,7 +167,7 @@ export async function getTodayDailyNote(app: App): Promise<TFile | null> {
     }
 
     // Create new daily note if it doesn't exist
-    return await createDailyNote(today);
+    return (await createDailyNote(today)) ?? null;
   } catch (error) {
     console.warn('Failed to get or create today daily note:', error);
     return null;
