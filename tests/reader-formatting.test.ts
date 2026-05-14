@@ -1065,59 +1065,6 @@ describe('ReaderViewFormatter', () => {
   });
 
   describe('handleCheckboxClick', () => {
-    test.skip('should follow transition chain to completed state when checkbox is checked', async () => {
-      // Skipped: This test requires more complex mock setup for the new transition logic
-      // The core transition logic is properly tested in task-item-renderer.test.ts
-      // and the implementation is working correctly in practice
-      const container = activeDocument.createElement('div');
-      const checkbox = activeDocument.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'task-list-item-checkbox';
-      const taskListItem = activeDocument.createElement('div');
-      taskListItem.className = 'task-list-item';
-      taskListItem.textContent = 'Test task';
-      taskListItem.appendChild(checkbox);
-      container.appendChild(taskListItem);
-      activeDocument.body.appendChild(container);
-
-      const mockFile = new TFile('test.md');
-      const mockTask = { id: '1', text: 'Test task', state: 'TODO' };
-
-      jest
-        .spyOn(mockPlugin.app.vault, 'getAbstractFileByPath')
-        .mockReturnValue(mockFile);
-      jest
-        .spyOn(mockPlugin.app.vault, 'read')
-        .mockResolvedValue('- [ ] Test task');
-      jest
-        .spyOn(formatter as any, 'findTaskForCheckbox')
-        .mockResolvedValue(mockTask);
-
-      const taskEditor = { updateTaskState: jest.fn() };
-      (formatter as any).plugin.taskEditor = taskEditor;
-
-      const handleCheckboxClick = (
-        formatter as unknown as {
-          handleCheckboxClick: (
-            event: Event,
-            sourcePath: string,
-          ) => Promise<void>;
-        }
-      ).handleCheckboxClick;
-
-      const clickEvent = { target: checkbox } as unknown as Event;
-      checkbox.checked = true;
-      await handleCheckboxClick.call(formatter, clickEvent, 'test.md');
-
-      expect(taskEditor.updateTaskState).toHaveBeenCalledWith(
-        mockTask,
-        'DONE',
-        true,
-      );
-
-      activeDocument.body.removeChild(container);
-    });
-
     test('should return early if no task list item found', async () => {
       const container = activeDocument.createElement('div');
       const checkbox = activeDocument.createElement('input');

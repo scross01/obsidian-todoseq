@@ -359,9 +359,7 @@ describe('UIManager', () => {
       expect(pluginMock.registerEditorExtension).toHaveBeenCalledWith(
         expect.arrayContaining([expect.any(Array), expect.any(Array)]),
       );
-      expect(
-        pluginMock.taskFormatters.has('editor-extension'),
-      ).toBe(true);
+      expect(pluginMock.taskFormatters.has('editor-extension')).toBe(true);
     });
   });
 
@@ -419,9 +417,7 @@ describe('UIManager', () => {
       (uiManager as any).mouseMoveHandler = null;
       (uiManager as any).mouseUpHandler = null;
 
-      expect(
-        () => (uiManager as any).cancelPendingClick(),
-      ).not.toThrow();
+      expect(() => (uiManager as any).cancelPendingClick()).not.toThrow();
     });
   });
 
@@ -435,15 +431,11 @@ describe('UIManager', () => {
         .spyOn(uiManager as any, 'getLineForElement')
         .mockReturnValue(5);
 
-      await (uiManager as any).handleTaskKeywordClick(
-        keywordElement,
-        view,
-      );
+      await (uiManager as any).handleTaskKeywordClick(keywordElement, view);
 
       expect(getLineSpy).toHaveBeenCalledWith(keywordElement);
       expect(
-        (pluginMock.editorController as any)
-          .handleUpdateTaskStateAtLine,
+        (pluginMock.editorController as any).handleUpdateTaskStateAtLine,
       ).toHaveBeenCalledWith(false, 4, view.editor, view);
     });
 
@@ -451,14 +443,10 @@ describe('UIManager', () => {
       const keywordElement = activeDocument.createElement('span');
       const view = { editor: {} };
 
-      await (uiManager as any).handleTaskKeywordClick(
-        keywordElement,
-        view,
-      );
+      await (uiManager as any).handleTaskKeywordClick(keywordElement, view);
 
       expect(
-        (pluginMock.editorController as any)
-          .handleUpdateTaskStateAtLine,
+        (pluginMock.editorController as any).handleUpdateTaskStateAtLine,
       ).not.toHaveBeenCalled();
     });
 
@@ -467,18 +455,12 @@ describe('UIManager', () => {
       keywordElement.setAttribute('data-task-keyword', 'TODO');
       const view = { editor: {} };
 
-      jest
-        .spyOn(uiManager as any, 'getLineForElement')
-        .mockReturnValue(null);
+      jest.spyOn(uiManager as any, 'getLineForElement').mockReturnValue(null);
 
-      await (uiManager as any).handleTaskKeywordClick(
-        keywordElement,
-        view,
-      );
+      await (uiManager as any).handleTaskKeywordClick(keywordElement, view);
 
       expect(
-        (pluginMock.editorController as any)
-          .handleUpdateTaskStateAtLine,
+        (pluginMock.editorController as any).handleUpdateTaskStateAtLine,
       ).not.toHaveBeenCalled();
     });
 
@@ -491,9 +473,7 @@ describe('UIManager', () => {
       const preventDefaultSpy = jest.spyOn(event, 'preventDefault');
       const stopPropagationSpy = jest.spyOn(event, 'stopPropagation');
 
-      jest
-        .spyOn(uiManager as any, 'getLineForElement')
-        .mockReturnValue(3);
+      jest.spyOn(uiManager as any, 'getLineForElement').mockReturnValue(3);
 
       await (uiManager as any).handleTaskKeywordClick(
         keywordElement,
@@ -518,9 +498,7 @@ describe('UIManager', () => {
 
     it('should process single click after 300ms timeout', () => {
       let fakeTime = 1000;
-      jest
-        .spyOn(Date, 'now')
-        .mockImplementation(() => fakeTime);
+      jest.spyOn(Date, 'now').mockImplementation(() => fakeTime);
 
       const keywordElement = activeDocument.createElement('span');
       keywordElement.setAttribute('data-task-keyword', 'TODO');
@@ -552,9 +530,7 @@ describe('UIManager', () => {
 
     it('should suppress double-click within 300ms', () => {
       let fakeTime = 1000;
-      jest
-        .spyOn(Date, 'now')
-        .mockImplementation(() => fakeTime);
+      jest.spyOn(Date, 'now').mockImplementation(() => fakeTime);
 
       const keywordElement = activeDocument.createElement('span');
       keywordElement.setAttribute('data-task-keyword', 'TODO');
@@ -588,9 +564,7 @@ describe('UIManager', () => {
 
     it('should cancel click when mouse leaves element during click', () => {
       let fakeTime = 1000;
-      jest
-        .spyOn(Date, 'now')
-        .mockImplementation(() => fakeTime);
+      jest.spyOn(Date, 'now').mockImplementation(() => fakeTime);
 
       const keywordElement = activeDocument.createElement('span');
       keywordElement.setAttribute('data-task-keyword', 'TODO');
@@ -692,9 +666,7 @@ describe('UIManager', () => {
       const { TFile } = jest.requireMock('obsidian');
       const fileOpenCallback = (
         pluginMock.app.workspace.on as jest.Mock
-      ).mock.calls.find(
-        (call: [string]) => call[0] === 'file-open',
-      )?.[1];
+      ).mock.calls.find((call: [string]) => call[0] === 'file-open')?.[1];
 
       expect(fileOpenCallback).toBeDefined();
 
@@ -738,10 +710,7 @@ describe('UIManager', () => {
           return [];
         });
 
-      const addEventListenerSpy = jest.spyOn(
-        editorDom,
-        'addEventListener',
-      );
+      const addEventListenerSpy = jest.spyOn(editorDom, 'addEventListener');
 
       uiManager.setupCheckboxEventListeners();
 
@@ -770,9 +739,7 @@ describe('UIManager', () => {
       );
 
       // Should have tracked listeners in registeredEventListeners
-      const registeredListeners = (
-        uiManager as any
-      ).registeredEventListeners;
+      const registeredListeners = (uiManager as any).registeredEventListeners;
       const editorListeners = registeredListeners.filter(
         (l: { target: HTMLElement }) => l.target === editorDom,
       );

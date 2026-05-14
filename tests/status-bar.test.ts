@@ -282,9 +282,7 @@ describe('StatusBarManager', () => {
         parent: null,
       };
       mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
-      mockPlugin.uiManager.showTasks.mockRejectedValueOnce(
-        new Error('Fail'),
-      );
+      mockPlugin.uiManager.showTasks.mockRejectedValueOnce(new Error('Fail'));
 
       manager.handleStatusBarClick();
 

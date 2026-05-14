@@ -346,10 +346,7 @@ describe('TodoTrackerSettingTab', () => {
       const selectEl = activeDocument.createElement('select');
       const dropdown = { selectEl };
 
-      (settingTab as any).populateDefaultStateDropdown(
-        dropdown,
-        new Set(),
-      );
+      (settingTab as any).populateDefaultStateDropdown(dropdown, new Set());
 
       expect(selectEl.children.length).toBe(0);
     });
@@ -396,9 +393,7 @@ describe('TodoTrackerSettingTab', () => {
         transitionsEl.querySelector('.todoseq-setting-item-info'),
       ).toBeFalsy();
       // Textarea highlighting should be cleared
-      expect(
-        textarea.classList.contains('todoseq-invalid-input'),
-      ).toBe(false);
+      expect(textarea.classList.contains('todoseq-invalid-input')).toBe(false);
     });
 
     it('should handle null/undefined settings gracefully', () => {
@@ -454,15 +449,11 @@ describe('TodoTrackerSettingTab', () => {
         'Error two',
       ]);
 
-      const errorDiv = settingEl.querySelector(
-        '.todoseq-setting-item-error',
-      );
+      const errorDiv = settingEl.querySelector('.todoseq-setting-item-error');
       expect(errorDiv).toBeTruthy();
       expect(errorDiv?.textContent).toContain('Error one');
       expect(errorDiv?.textContent).toContain('Error two');
-      expect(
-        textarea.classList.contains('todoseq-invalid-input'),
-      ).toBe(true);
+      expect(textarea.classList.contains('todoseq-invalid-input')).toBe(true);
     });
 
     it('should do nothing with empty messages array', () => {
@@ -482,9 +473,7 @@ describe('TodoTrackerSettingTab', () => {
 
   describe('validateKeywordRegexForAllGroups', () => {
     afterEach(() => {
-      const { TaskParser } = jest.requireMock(
-        '../src/parser/task-parser',
-      );
+      const { TaskParser } = jest.requireMock('../src/parser/task-parser');
       (TaskParser.validateKeywords as jest.Mock).mockReset();
     });
 
@@ -497,9 +486,9 @@ describe('TodoTrackerSettingTab', () => {
         additionalArchivedKeywords: ['OLD'],
       };
 
-      const result = (
-        settingTab as any
-      ).validateKeywordRegexForAllGroups(parsedBySetting);
+      const result = (settingTab as any).validateKeywordRegexForAllGroups(
+        parsedBySetting,
+      );
 
       expect(result.validBySetting.additionalActiveKeywords).toEqual([
         'STARTED',
@@ -507,24 +496,15 @@ describe('TodoTrackerSettingTab', () => {
       expect(result.validBySetting.additionalInactiveKeywords).toEqual([
         'FIXME',
       ]);
-      expect(
-        result.errorsByGroup.activeKeywords,
-      ).toEqual([]);
-      expect(
-        result.errorsByGroup.inactiveKeywords,
-      ).toEqual([]);
+      expect(result.errorsByGroup.activeKeywords).toEqual([]);
+      expect(result.errorsByGroup.inactiveKeywords).toEqual([]);
     });
 
     it('should separate invalid keywords into errors', () => {
-      const { TaskParser } = jest.requireMock(
-        '../src/parser/task-parser',
-      );
+      const { TaskParser } = jest.requireMock('../src/parser/task-parser');
       (TaskParser.validateKeywords as jest.Mock).mockImplementation(
         (keywords: string[]) => {
-          if (
-            keywords[0] === 'INVALID!' ||
-            keywords[0] === 'BAD@KEY'
-          ) {
+          if (keywords[0] === 'INVALID!' || keywords[0] === 'BAD@KEY') {
             throw new Error('Invalid keyword syntax');
           }
         },
@@ -538,9 +518,9 @@ describe('TodoTrackerSettingTab', () => {
         additionalArchivedKeywords: [],
       };
 
-      const result = (
-        settingTab as any
-      ).validateKeywordRegexForAllGroups(parsedBySetting);
+      const result = (settingTab as any).validateKeywordRegexForAllGroups(
+        parsedBySetting,
+      );
 
       // Valid keywords should pass through
       expect(result.validBySetting.additionalActiveKeywords).toEqual([
@@ -549,23 +529,19 @@ describe('TodoTrackerSettingTab', () => {
       expect(result.validBySetting.additionalInactiveKeywords).toEqual([
         'FIXME',
       ]);
-      expect(
-        result.validBySetting.additionalCompletedKeywords,
-      ).toEqual([]);
+      expect(result.validBySetting.additionalCompletedKeywords).toEqual([]);
 
       // Invalid keywords should appear in errors
-      expect(
-        result.errorsByGroup.inactiveKeywords,
-      ).toContain('Invalid keyword syntax: INVALID!');
-      expect(
-        result.errorsByGroup.completedKeywords,
-      ).toContain('Invalid keyword syntax: BAD@KEY');
+      expect(result.errorsByGroup.inactiveKeywords).toContain(
+        'Invalid keyword syntax: INVALID!',
+      );
+      expect(result.errorsByGroup.completedKeywords).toContain(
+        'Invalid keyword syntax: BAD@KEY',
+      );
     });
 
     it('should handle negative prefix tokens', () => {
-      const { TaskParser } = jest.requireMock(
-        '../src/parser/task-parser',
-      );
+      const { TaskParser } = jest.requireMock('../src/parser/task-parser');
       (TaskParser.validateKeywords as jest.Mock).mockImplementation(
         (keywords: string[]) => {
           if (keywords[0] === 'INVALID') {
@@ -582,17 +558,17 @@ describe('TodoTrackerSettingTab', () => {
         additionalArchivedKeywords: [],
       };
 
-      const result = (
-        settingTab as any
-      ).validateKeywordRegexForAllGroups(parsedBySetting);
+      const result = (settingTab as any).validateKeywordRegexForAllGroups(
+        parsedBySetting,
+      );
 
       // Negative prefix tokens should have the '-' stripped before validation
-      expect(
-        result.validBySetting.additionalActiveKeywords,
-      ).toEqual(['-EXCLUDE']);
-      expect(
-        result.errorsByGroup.inactiveKeywords,
-      ).toContain('Invalid keyword syntax: INVALID');
+      expect(result.validBySetting.additionalActiveKeywords).toEqual([
+        '-EXCLUDE',
+      ]);
+      expect(result.errorsByGroup.inactiveKeywords).toContain(
+        'Invalid keyword syntax: INVALID',
+      );
     });
   });
 
@@ -605,14 +581,11 @@ describe('TodoTrackerSettingTab', () => {
       info.className = 'setting-item-info';
       settingEl.appendChild(info);
 
-      (settingTab as any).keywordFieldBindings.set(
-        'additionalActiveKeywords',
-        {
-          settingKey: 'additionalActiveKeywords',
-          inputEl,
-          settingEl,
-        },
-      );
+      (settingTab as any).keywordFieldBindings.set('additionalActiveKeywords', {
+        settingKey: 'additionalActiveKeywords',
+        inputEl,
+        settingEl,
+      });
 
       (settingTab as any).renderKeywordValidationState(
         {
@@ -636,26 +609,18 @@ describe('TodoTrackerSettingTab', () => {
         ],
       );
 
-      const errorDiv = settingEl.querySelector(
-        '.todoseq-setting-item-error',
-      );
+      const errorDiv = settingEl.querySelector('.todoseq-setting-item-error');
       expect(errorDiv).toBeTruthy();
-      expect(errorDiv?.textContent).toContain(
-        'Duplicate keyword: STARTED',
-      );
+      expect(errorDiv?.textContent).toContain('Duplicate keyword: STARTED');
 
       const warningDiv = settingEl.querySelector(
         '.todoseq-setting-item-warning',
       );
       expect(warningDiv).toBeTruthy();
-      expect(warningDiv?.textContent).toContain(
-        'Keyword similar to built-in',
-      );
+      expect(warningDiv?.textContent).toContain('Keyword similar to built-in');
 
       // Input should be marked invalid due to errors
-      expect(
-        inputEl.classList.contains('todoseq-invalid-input'),
-      ).toBe(true);
+      expect(inputEl.classList.contains('todoseq-invalid-input')).toBe(true);
     });
 
     it('should clear previous errors before re-rendering', () => {
@@ -672,14 +637,11 @@ describe('TodoTrackerSettingTab', () => {
       settingEl.appendChild(oldError);
       inputEl.classList.add('todoseq-invalid-input');
 
-      (settingTab as any).keywordFieldBindings.set(
-        'additionalActiveKeywords',
-        {
-          settingKey: 'additionalActiveKeywords',
-          inputEl,
-          settingEl,
-        },
-      );
+      (settingTab as any).keywordFieldBindings.set('additionalActiveKeywords', {
+        settingKey: 'additionalActiveKeywords',
+        inputEl,
+        settingEl,
+      });
 
       // Render with no errors this time
       (settingTab as any).renderKeywordValidationState(
@@ -699,9 +661,7 @@ describe('TodoTrackerSettingTab', () => {
         settingEl.querySelector('.todoseq-setting-item-error'),
       ).toBeFalsy();
       // Invalid class should be removed
-      expect(
-        inputEl.classList.contains('todoseq-invalid-input'),
-      ).toBe(false);
+      expect(inputEl.classList.contains('todoseq-invalid-input')).toBe(false);
     });
   });
 
@@ -712,14 +672,11 @@ describe('TodoTrackerSettingTab', () => {
       const inactiveInput = activeDocument.createElement('input');
       inactiveInput.value = 'FIXME, HACK';
 
-      (settingTab as any).keywordFieldBindings.set(
-        'additionalActiveKeywords',
-        {
-          settingKey: 'additionalActiveKeywords',
-          inputEl: activeInput,
-          settingEl: activeDocument.createElement('div'),
-        },
-      );
+      (settingTab as any).keywordFieldBindings.set('additionalActiveKeywords', {
+        settingKey: 'additionalActiveKeywords',
+        inputEl: activeInput,
+        settingEl: activeDocument.createElement('div'),
+      });
       (settingTab as any).keywordFieldBindings.set(
         'additionalInactiveKeywords',
         {
@@ -736,9 +693,7 @@ describe('TodoTrackerSettingTab', () => {
       expect(result.additionalActiveKeywords).toContain('IN-PROGRESS');
       expect(result.additionalInactiveKeywords).toContain('FIXME');
       // Groups without bindings should use fallback settings
-      expect(Array.isArray(result.additionalWaitingKeywords)).toBe(
-        true,
-      );
+      expect(Array.isArray(result.additionalWaitingKeywords)).toBe(true);
     });
   });
 });
