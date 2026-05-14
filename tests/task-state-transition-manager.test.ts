@@ -138,6 +138,177 @@ describe('TaskStateTransitionManager', () => {
     });
   });
 
+  describe('getNextState edge cases', () => {
+    it('should handle waiting keywords by transitioning to defaultActive', () => {
+      // Add a custom keyword to the waiting group
+      const customSettings = {
+        ...DefaultSettings,
+        additionalWaitingKeywords: ['AWAITING'],
+      };
+      const customKm = new KeywordManager(customSettings);
+      const manager = new TaskStateTransitionManager(customKm, {
+        ...DefaultStateTransitionSettings,
+        transitionStatements: [],
+      });
+
+      // AWAITING is a waiting keyword without an explicit transition
+      // Default behavior: waiting -> defaultActive
+      expect(manager.getNextState('AWAITING')).toBe('DOING');
+    });
+
+    it('should handle terminal state in explicit transitions', () => {
+      const manager = new TaskStateTransitionManager(
+        keywordManager,
+        DefaultStateTransitionSettings,
+      );
+
+      // Set up transition where DONE is not terminal (it's not in the default transitions)
+      // In legacy mode without custom transitions, DONE goes to TODO via default
+      expect(manager.getNextState('DONE')).toBe('TODO');
+    });
+
+    it('should handle unknown keywords by returning the same state', () => {
+      const manager = new TaskStateTransitionManager(keywordManager);
+      expect(manager.getNextState('UNKNOWN_KEYWORD')).toBe('UNKNOWN_KEYWORD');
+    });
+  });
+
+  describe('getNextCompletedOrArchivedState', () => {
+    it('should return the state itself if already archived', () => {
+      const manager = new TaskStateTransitionManager(keywordManager);
+      expect(manager.getNextCompletedOrArchivedState('ARCHIVED')).toBe(
+        'ARCHIVED',
+      );
+    });
+
+    it('should return the state itself if already completed', () => {
+      const manager = new TaskStateTransitionManager(keywordManager);
+      expect(manager.getNextCompletedOrArchivedState('DONE')).toBe('DONE');
+    });
+
+    it('should follow transition chain from inactive to completed', () => {
+      const transitionSettings = {
+        ...DefaultStateTransitionSettings,
+        transitionStatements: ['TODO -> DOING -> DONE'],
+      };
+      const manager = new TaskStateTransitionManager(
+        keywordManager,
+        transitionSettings,
+      );
+
+      expect(manager.getNextCompletedOrArchivedState('TODO')).toBe('DONE');
+    });
+
+    it('should return defaultCompleted when keyword is unknown', () => {
+      const manager = new TaskStateTransitionManager(keywordManager);
+      expect(manager.getNextCompletedOrArchivedState('UNKNOWN')).toBe('DONE');
+    });
+
+    it('should not loop infinitely on cycles', () => {
+      const transitionSettings = {
+        ...DefaultStateTransitionSettings,
+        transitionStatements: ['A -> B -> A'],
+      };
+      const customKm = new KeywordManager({
+        ...DefaultSettings,
+        additionalActiveKeywords: ['A', 'B'],
+        additionalInactiveKeywords: [],
+      });
+      const manager = new TaskStateTransitionManager(
+        customKm,
+        transitionSettings,
+      );
+
+      // A -> B -> A would loop, so it returns defaultCompleted
+      expect(manager.getNextCompletedOrArchivedState('A')).toBe('DONE');
+    });
+  });
+
+  describe('getRecoveredDefault', () => {
+    it('should use configured defaults when provided', () => {
+      const transitionSettings = {
+        ...DefaultStateTransitionSettings,
+        defaultInactive: 'BACKLOG',
+        defaultActive: 'IN-PROGRESS',
+        defaultCompleted: 'COMPLETED',
+      };
+      const customKm = new KeywordManager({
+        ...DefaultSettings,
+        additionalInactiveKeywords: ['BACKLOG'],
+        additionalActiveKeywords: ['IN-PROGRESS'],
+        additionalCompletedKeywords: ['COMPLETED'],
+      });
+      const manager = new TaskStateTransitionManager(
+        customKm,
+        transitionSettings,
+      );
+
+      // getCycleState('') should return defaultInactive (BACKLOG)
+      expect(manager.getCycleState('')).toBe('BACKLOG');
+
+      // BACKLOG is a custom keyword NOT in the default transition statements.
+      // So getNextState falls through to getDefaultForState, which uses
+      // getRecoveredDefault. Since BACKLOG is inactive, it returns defaultActive = 'IN-PROGRESS'.
+      expect(manager.getNextState('BACKLOG')).toBe('IN-PROGRESS');
+    });
+
+    it('should fall back to built-in defaults when configured value is empty', () => {
+      const transitionSettings = {
+        ...DefaultStateTransitionSettings,
+        defaultInactive: '',
+      };
+      const manager = new TaskStateTransitionManager(
+        keywordManager,
+        transitionSettings,
+      );
+
+      expect(manager.getCycleState('')).toBe('TODO');
+    });
+  });
+
+  describe('isCustomKeyword', () => {
+    it('should detect custom keywords', () => {
+      const customSettings = {
+        ...DefaultSettings,
+        additionalActiveKeywords: ['CUSTOM_ACTIVE'],
+      };
+      const customKm = new KeywordManager(customSettings);
+      const manager = new TaskStateTransitionManager(customKm);
+
+      expect((manager as any).isCustomKeyword('CUSTOM_ACTIVE')).toBe(true);
+      expect((manager as any).isCustomKeyword('TODO')).toBe(false);
+    });
+  });
+
+  describe('isCompletedState', () => {
+    it('should identify completed states via keyword manager', () => {
+      const manager = new TaskStateTransitionManager(keywordManager);
+
+      expect(manager.isCompletedState('DONE')).toBe(true);
+      expect(manager.isCompletedState('CANCELED')).toBe(true);
+      expect(manager.isCompletedState('CANCELLED')).toBe(true);
+      expect(manager.isCompletedState('TODO')).toBe(false);
+    });
+  });
+
+  describe('empty transition statements', () => {
+    it('should handle empty transitionStatements array gracefully', () => {
+      const transitionSettings = {
+        ...DefaultStateTransitionSettings,
+        transitionStatements: [],
+      };
+      const manager = new TaskStateTransitionManager(
+        keywordManager,
+        transitionSettings,
+      );
+
+      // Should fall back to defaults
+      expect(manager.getNextState('TODO')).toBe('DOING');
+      expect(manager.getNextState('DOING')).toBe('DONE');
+      expect(manager.hasValidationErrors()).toBe(false);
+    });
+  });
+
   describe('validation errors', () => {
     it('should report validation errors', () => {
       const transitionSettings = {

@@ -481,11 +481,7 @@ describe('TaskDragDropHandler', () => {
       onGetTask: jest.fn(),
     };
 
-    handler = new TaskDragDropHandler(
-      mockApp,
-      mockPlugin as any,
-      containerEl,
-    );
+    handler = new TaskDragDropHandler(mockApp, mockPlugin as any, containerEl);
   });
 
   afterEach(() => {
@@ -1018,7 +1014,11 @@ describe('TaskDragDropHandler', () => {
       dropCallback(mockEvt, mockEditor, view);
 
       expect(noticeInstances.length).toBeGreaterThanOrEqual(1);
-      expect(noticeInstances.some((n) => n.message === 'Task is already in this file')).toBe(true);
+      expect(
+        noticeInstances.some(
+          (n) => n.message === 'Task is already in this file',
+        ),
+      ).toBe(true);
     });
 
     it('should show notice when migrate is disabled', () => {
@@ -1035,9 +1035,11 @@ describe('TaskDragDropHandler', () => {
       const view = { file: new TFile('target.md', 'target.md') };
       dropCallback(mockEvt, mockEditor, view);
 
-      expect(noticeInstances.some((n) =>
-        n.message.includes('Migration is disabled'),
-      )).toBe(true);
+      expect(
+        noticeInstances.some((n) =>
+          n.message.includes('Migration is disabled'),
+        ),
+      ).toBe(true);
     });
 
     it('should call executeDrop and show notice for copy action', async () => {
@@ -1068,9 +1070,9 @@ describe('TaskDragDropHandler', () => {
       expect(readSpy).toHaveBeenCalled();
       expect(modifySpy).toHaveBeenCalled();
 
-      expect(noticeInstances.some((n) =>
-        n.message.includes('copied'),
-      )).toBe(true);
+      expect(noticeInstances.some((n) => n.message.includes('copied'))).toBe(
+        true,
+      );
 
       readSpy.mockRestore();
       modifySpy.mockRestore();
@@ -1140,16 +1142,15 @@ describe('TaskDragDropHandler', () => {
       const editor = createMockEditor();
       editor.getLine.mockReturnValue('');
 
-      (handler as any).insertAtPosition(
-        editor as any,
-        ['TODO New task'],
-        { line: 0, ch: 0 },
-      );
+      (handler as any).insertAtPosition(editor as any, ['TODO New task'], {
+        line: 0,
+        ch: 0,
+      });
 
-      expect(editor.replaceRange).toHaveBeenCalledWith(
-        'TODO New task',
-        { line: 0, ch: 0 },
-      );
+      expect(editor.replaceRange).toHaveBeenCalledWith('TODO New task', {
+        line: 0,
+        ch: 0,
+      });
     });
 
     it('should use editor cursor when pos is null', () => {
@@ -1158,10 +1159,10 @@ describe('TaskDragDropHandler', () => {
 
       (handler as any).insertAtPosition(editor as any, ['TODO Task'], null);
 
-      expect(editor.replaceRange).toHaveBeenCalledWith(
-        '\nTODO Task',
-        { line: 0, ch: 8 },
-      );
+      expect(editor.replaceRange).toHaveBeenCalledWith('\nTODO Task', {
+        line: 0,
+        ch: 8,
+      });
     });
   });
 
@@ -1281,9 +1282,11 @@ describe('TaskDragDropHandler', () => {
       await (handler as any).handleSourceModification(task, 'move');
 
       expect(consoleSpy).toHaveBeenCalled();
-      expect(noticeInstances.some((n) =>
-        n.message.includes('Failed to update source task'),
-      )).toBe(true);
+      expect(
+        noticeInstances.some((n) =>
+          n.message.includes('Failed to update source task'),
+        ),
+      ).toBe(true);
 
       consoleSpy.mockRestore();
     });
@@ -1360,9 +1363,7 @@ describe('TaskDragDropHandler', () => {
         .spyOn(handler as any, 'handleSourceModification')
         .mockResolvedValue(undefined);
 
-      jest
-        .spyOn(mockApp.vault, 'read')
-        .mockResolvedValue('TODO Task');
+      jest.spyOn(mockApp.vault, 'read').mockResolvedValue('TODO Task');
 
       await (handler as any).executeDrop(
         task,
@@ -1389,9 +1390,7 @@ describe('TaskDragDropHandler', () => {
         .spyOn(handler as any, 'handleSourceModification')
         .mockResolvedValue(undefined);
 
-      jest
-        .spyOn(mockApp.vault, 'read')
-        .mockResolvedValue('TODO Task');
+      jest.spyOn(mockApp.vault, 'read').mockResolvedValue('TODO Task');
 
       await (handler as any).executeDrop(
         task,

@@ -40,7 +40,7 @@ type PriorityLevel = 'high' | 'med' | 'low';
  * Custom widget for rendering priority pills in the editor
  * Implements eq() for efficient updates and toDOM() for rendering
  */
-class PriorityWidget extends WidgetType {
+export class PriorityWidget extends WidgetType {
   constructor(
     readonly letter: string,
     readonly priority: PriorityLevel,

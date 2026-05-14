@@ -21,7 +21,10 @@ global.console = {
 };
 
 // Polyfill DragEvent for jsdom environments
-if (typeof globalThis.window !== 'undefined' && typeof (globalThis.window as any).DragEvent === 'undefined') {
+if (
+  typeof globalThis.window !== 'undefined' &&
+  typeof (globalThis.window as any).DragEvent === 'undefined'
+) {
   class DragEventPolyfill extends MouseEvent {
     dataTransfer: DataTransfer | null = null;
     constructor(type: string, init: any = {}) {

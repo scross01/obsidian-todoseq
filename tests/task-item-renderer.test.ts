@@ -899,6 +899,75 @@ describe('TaskItemRenderer', () => {
       expect(li.classList.contains('active')).toBe(false);
     });
 
+    it('should update checkbox with extended styles in updateTaskElementContent', () => {
+      const km = createTestKeywordManager({ useExtendedCheckboxStyles: true });
+      const customRenderer = new TaskItemRenderer(
+        () => km,
+        () => stateManager,
+        () => mockMenuBuilder,
+        mockOnStateChange,
+        mockOnLocationOpen,
+      );
+
+      const task = createBaseTask({ state: 'TODO', completed: false });
+      const li = customRenderer.buildTaskListItem(task);
+
+      const updatedTask = createBaseTask({ state: 'DOING', completed: false });
+      customRenderer.updateTaskElementContent(updatedTask, li);
+
+      const checkbox = li.querySelector(
+        'input.todoseq-task-checkbox',
+      ) as HTMLInputElement;
+      const expectedChar = km.getCheckboxState('DOING', km.getSettings());
+      expect(checkbox.getAttribute('data-task')).toBe(expectedChar);
+      expect(li.getAttribute('data-task')).toBe(expectedChar);
+    });
+
+    it('should rebuild date display when task gains a new date (replace existing)', () => {
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 3, 1),
+        completed: false,
+      });
+      const li = renderer.buildTaskListItem(task);
+
+      // Replace with deadline date, remove scheduled
+      const updatedTask = createBaseTask({
+        deadlineDate: new Date(2026, 5, 15),
+        completed: false,
+      });
+      renderer.updateTaskElementContent(updatedTask, li);
+
+      // Should contain deadline but not scheduled
+      const dateContainer = li.querySelector('.todoseq-task-date-container');
+      expect(dateContainer).not.toBeNull();
+      expect(dateContainer?.textContent).toContain('Deadline:');
+      expect(dateContainer?.textContent).not.toContain('Scheduled:');
+    });
+
+    it('should toggle keyword aria-checked when text is unchanged but completed status changes', () => {
+      const task = createBaseTask({
+        state: 'TODO',
+        text: 'Same text',
+        rawText: 'TODO Same text',
+        completed: false,
+      });
+      const li = renderer.buildTaskListItem(task);
+
+      const updatedTask = createBaseTask({
+        state: 'DONE',
+        text: 'Same text',
+        rawText: 'TODO Same text',
+        completed: true,
+      });
+      renderer.updateTaskElementContent(updatedTask, li);
+
+      const keyword = li.querySelector('.todo-task-keyword') as HTMLSpanElement;
+      expect(keyword.getAttribute('aria-checked')).toBe('true');
+      expect(
+        li.querySelector('.todoseq-task-text')?.classList.contains('completed'),
+      ).toBe(true);
+    });
+
     it('should set draggable on reused elements', () => {
       const task = createBaseTask();
       const li = renderer.buildTaskListItem(task);
@@ -1058,6 +1127,22 @@ describe('TaskItemRenderer', () => {
       expect(container.textContent).not.toContain('Closed:');
     });
 
+    it('should create date container with no dates when task has none', () => {
+      const task = createBaseTask({
+        scheduledDate: null,
+        deadlineDate: null,
+        closedDate: null,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      // Container is created but empty — no date labels
+      expect(container.classList.contains('todoseq-task-date-container')).toBe(
+        true,
+      );
+      expect(container.children.length).toBe(0);
+    });
+
     it('should include empty repeat cell for closed date layout consistency', () => {
       const task = createBaseTask({
         closedDate: new Date(2026, 3, 10),
@@ -1105,6 +1190,14 @@ describe('TaskItemRenderer', () => {
       expect(parent.textContent).toBe('Just plain text');
       expect(parent.querySelector('.todoseq-task-link')).toBeNull();
       expect(parent.querySelector('.todoseq-task-tag')).toBeNull();
+    });
+
+    it('should handle empty task text gracefully', () => {
+      const task = createBaseTask({ text: '' });
+      const parent = activeDocument.createElement('span');
+      renderer.renderTaskTextWithLinks(task, parent);
+
+      expect(parent.textContent).toBe('');
     });
 
     it('should render wiki links with alias', () => {

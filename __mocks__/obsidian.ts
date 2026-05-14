@@ -61,7 +61,34 @@ export class Plugin {
   onunload(): void {}
 }
 
-export class MarkdownView {
+export class PluginSettingTab {
+  app: App;
+  containerEl: HTMLElement;
+  plugin: Plugin;
+
+  constructor(app: App, plugin: Plugin) {
+    this.app = app;
+    this.plugin = plugin;
+    this.containerEl = activeDocument.createElement('div');
+  }
+
+  display(): void {}
+}
+
+export class ItemView {
+  getViewType(): string {
+    return 'item-view';
+  }
+}
+
+export class WorkspaceLeaf {
+  view: ItemView;
+  constructor() {
+    this.view = new ItemView();
+  }
+}
+
+export class MarkdownView extends ItemView {
   file: TFile | null = null;
   getMode(): string {
     return 'source';
@@ -93,7 +120,9 @@ export const Platform = { isMobile: false };
 
 export class Notice {
   constructor(message: string, timeout?: number) {
-    const instances = (Notice as any).instances as Array<{ message: string; timeout?: number }> | undefined;
+    const instances = (Notice as any).instances as
+      | Array<{ message: string; timeout?: number }>
+      | undefined;
     if (instances) {
       instances.push({ message, timeout });
     }
