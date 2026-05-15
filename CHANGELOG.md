@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.14.3
+
+- Fix style regression with mobile context menu.
+
 ## 0.14.2
 
 - Address more Obsidian community scorecard review feedback items.
