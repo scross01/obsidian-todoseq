@@ -15,7 +15,12 @@ import {
   setIcon,
   Notice,
 } from 'obsidian';
-import { TAG_PATTERN } from '../../utils/patterns';
+import {
+  TAG_PATTERN,
+  WIKI_LINK_REGEX,
+  MD_LINK_REGEX,
+  URL_REGEX,
+} from '../../utils/patterns';
 import { DateUtils } from '../../utils/date-utils';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
@@ -721,9 +726,9 @@ export class EmbeddedTaskItemRenderer {
   private renderTaskTextWithLinks(task: Task, parent: HTMLElement) {
     const textToProcess = getTaskTextDisplay(task);
     const patterns: { type: 'wiki' | 'md' | 'url' | 'tag'; regex: RegExp }[] = [
-      { type: 'wiki', regex: /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g },
-      { type: 'md', regex: /\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]\(([^)]+)\)/g },
-      { type: 'url', regex: /\bhttps?:\/\/[^\s)]+/g },
+      { type: 'wiki', regex: new RegExp(WIKI_LINK_REGEX) },
+      { type: 'md', regex: new RegExp(MD_LINK_REGEX) },
+      { type: 'url', regex: new RegExp(URL_REGEX) },
       { type: 'tag', regex: TAG_PATTERN },
     ];
 
