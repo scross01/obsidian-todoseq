@@ -1525,10 +1525,10 @@
 
 /* force mobile to use default background colors */
 @media (max-width: 480px) {
-  .menu .todoseq-context-menu-header,
-  .menu .todoseq-context-menu-row,
-  .menu .todoseq-context-menu-icon-row,
-  .menu .todoseq-context-menu-icon-btn {
+  .is-mobile .menu .todoseq-context-menu-header,
+  .is-mobile .menu .todoseq-context-menu-row,
+  .is-mobile .menu .todoseq-context-menu-icon-row,
+  .is-mobile .menu .todoseq-context-menu-icon-btn {
     background-color: inherit;
     background: inherit;
   }
@@ -1925,9 +1925,9 @@
 
 /* force mobile to use default background colors */
 @media (max-width: 480px) {
-  .menu .todoseq-date-picker-header,
-  .menu .todoseq-date-picker-menu-row,
-  .menu .todoseq-date-picker-quick-select-row {
+  .is-mobile .menu .todoseq-date-picker-header,
+  .is-mobile .menu .todoseq-date-picker-menu-row,
+  .is-mobile .menu .todoseq-date-picker-quick-select-row {
     background-color: inherit;
     background: inherit;
   }
