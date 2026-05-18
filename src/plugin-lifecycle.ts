@@ -20,6 +20,9 @@ import { EventCoordinator } from './services/event-coordinator';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 
+/** Window flag key to detect hot reload vs fresh Obsidian startup */
+const TODOSEQ_HOT_RELOAD_FLAG = '__todoseq_wasUnloaded';
+
 export class PluginLifecycleManager {
   private eventCoordinator: EventCoordinator | null = null;
 
@@ -532,7 +535,18 @@ export class PluginLifecycleManager {
         );
       }
 
-      // Only show the task view on first install (not on subsequent reloads)
+      // Auto-open behavior:
+      // - First install: always show the task list (with reveal/focus)
+      // - Plugin reload (hot reload/update): recreate the task list (without focus)
+      // - Fresh Obsidian startup: do NOT auto-open (user opens manually via command/ribbon)
+      //
+      // The window flag distinguishes hot reload from fresh startup:
+      // onunload() sets it, and since hot reload reuses the same JS context,
+      // the flag survives. A fresh Obsidian startup has no flag.
+      const isReload = (window as unknown as Record<string, unknown>)[
+        TODOSEQ_HOT_RELOAD_FLAG
+      ] === true;
+
       if (!this.plugin.settings._hasShownFirstInstallView) {
         this.plugin.settings._hasShownFirstInstallView = true;
         await this.plugin.saveSettings();
@@ -541,13 +555,16 @@ export class PluginLifecycleManager {
           new Notice('Failed to open task list');
           console.error('Error opening task list:', error);
         });
-      } else {
-        // On subsequent reloads, ensure the panel is available but don't steal focus
+      } else if (isReload) {
+        // Plugin was just reloaded (hot reload or update) — leaves were detached
+        // in onunload, so recreate the panel without stealing focus
+        (window as unknown as Record<string, unknown>)[TODOSEQ_HOT_RELOAD_FLAG] = false;
         this.plugin.uiManager.showTasks(false).catch((error) => {
           new Notice('Failed to open task list');
           console.error('Error opening task list:', error);
         });
       }
+      // else: fresh Obsidian startup — do not auto-open
 
       // Allow any fatal exceptions inside the unawaited scan sequence to securely log
       // without failing the Obsidian Workspace startup initialization.
@@ -561,6 +578,11 @@ export class PluginLifecycleManager {
    * Obsidian lifecycle method called when the plugin is unloaded
    */
   async onunload() {
+    // Set window flag to indicate this was a hot reload (not a fresh startup)
+    // This survives the reload because hot reload reuses the same JS context.
+    // Checked in onLayoutReady to recreate the task list on reload.
+    (window as unknown as Record<string, unknown>)[TODOSEQ_HOT_RELOAD_FLAG] = true;
+
     // Close all task list leaves to prevent orphaned views during hot reload
     const leaves = this.plugin.app.workspace.getLeavesOfType(
       TaskListView.viewType,
