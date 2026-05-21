@@ -1,5 +1,6 @@
 import TodoTracker from './main';
 import { VaultScanner } from './services/vault-scanner';
+import { SmartDateProcessor } from './services/smart-date-processor';
 import { TaskWriter } from './services/task-writer';
 import { EditorKeywordMenu } from './view/editor-extensions/editor-keyword-menu';
 import { StatusBarManager } from './view/editor-extensions/status-bar';
@@ -19,6 +20,7 @@ import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
+import { smartDatePlugin } from './view/editor-extensions/smart-date-extension';
 
 /** Window flag key to detect hot reload vs fresh Obsidian startup */
 const TODOSEQ_HOT_RELOAD_FLAG = '__todoseq_wasUnloaded';
@@ -128,6 +130,18 @@ export class PluginLifecycleManager {
       this.plugin.vaultScanner,
     );
     this.plugin.readerViewFormatter.registerPostProcessor();
+
+    // Initialize smart date processor and register its editor extension
+    this.plugin.smartDateProcessor = new SmartDateProcessor(this.plugin);
+    this.plugin.smartDateProcessor.setEnabled(
+      this.plugin.settings.enableSmartDateRecognition,
+    );
+    this.plugin.smartDateProcessor.setParseDelay(
+      this.plugin.settings.smartDateParseDelay,
+    );
+    this.plugin.registerEditorExtension([
+      smartDatePlugin(this.plugin.smartDateProcessor, this.plugin.settings),
+    ]);
 
     // Register the custom view type
     // TaskListView now subscribes to TaskStateManager for task updates
@@ -543,9 +557,10 @@ export class PluginLifecycleManager {
       // The window flag distinguishes hot reload from fresh startup:
       // onunload() sets it, and since hot reload reuses the same JS context,
       // the flag survives. A fresh Obsidian startup has no flag.
-      const isReload = (window as unknown as Record<string, unknown>)[
-        TODOSEQ_HOT_RELOAD_FLAG
-      ] === true;
+      const isReload =
+        (window as unknown as Record<string, unknown>)[
+          TODOSEQ_HOT_RELOAD_FLAG
+        ] === true;
 
       if (!this.plugin.settings._hasShownFirstInstallView) {
         this.plugin.settings._hasShownFirstInstallView = true;
@@ -558,7 +573,9 @@ export class PluginLifecycleManager {
       } else if (isReload) {
         // Plugin was just reloaded (hot reload or update) — leaves were detached
         // in onunload, so recreate the panel without stealing focus
-        (window as unknown as Record<string, unknown>)[TODOSEQ_HOT_RELOAD_FLAG] = false;
+        (window as unknown as Record<string, unknown>)[
+          TODOSEQ_HOT_RELOAD_FLAG
+        ] = false;
         this.plugin.uiManager.showTasks(false).catch((error) => {
           new Notice('Failed to open task list');
           console.error('Error opening task list:', error);
@@ -581,7 +598,8 @@ export class PluginLifecycleManager {
     // Set window flag to indicate this was a hot reload (not a fresh startup)
     // This survives the reload because hot reload reuses the same JS context.
     // Checked in onLayoutReady to recreate the task list on reload.
-    (window as unknown as Record<string, unknown>)[TODOSEQ_HOT_RELOAD_FLAG] = true;
+    (window as unknown as Record<string, unknown>)[TODOSEQ_HOT_RELOAD_FLAG] =
+      true;
 
     // Close all task list leaves to prevent orphaned views during hot reload
     const leaves = this.plugin.app.workspace.getLeavesOfType(
@@ -618,6 +636,12 @@ export class PluginLifecycleManager {
     if (this.plugin.readerViewFormatter) {
       this.plugin.readerViewFormatter.cleanup();
       this.plugin.readerViewFormatter = null;
+    }
+
+    // Clean up smart date processor
+    if (this.plugin.smartDateProcessor) {
+      this.plugin.smartDateProcessor.destroy();
+      this.plugin.smartDateProcessor = null;
     }
 
     // Clear any remaining references

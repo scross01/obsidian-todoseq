@@ -74,6 +74,7 @@ jest.mock('../src/main', () => ({
     updateTaskUpdateCoordinatorSettings = jest.fn();
     updateTaskWriterKeywordManager = jest.fn();
     register = jest.fn();
+    registerEditorExtension = jest.fn();
     registerView = jest.fn();
     registerEvent = jest.fn().mockReturnValue({ unload: jest.fn() });
     addCommand = jest.fn();
@@ -261,6 +262,7 @@ describe('PluginLifecycleManager', () => {
       updateTaskUpdateCoordinatorSettings: jest.fn(),
       updateTaskWriterKeywordManager: jest.fn(),
       register: jest.fn(),
+      registerEditorExtension: jest.fn(),
       registerView: jest.fn(),
       registerEvent: jest.fn().mockReturnValue({ unload: jest.fn() }),
       addCommand: jest.fn(),

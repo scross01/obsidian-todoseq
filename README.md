@@ -16,7 +16,9 @@ Most task managers force you into a separate system. TODOseq meets you where you
 
 ## Core Features
 
-**Natural Task Capture** — Write tasks as plain text using keywords: `TODO`, `DOING`, `DONE`, `LATER`, `NOW`, `WAIT`, and more. Add priorities `[#A]`, `[#B]`, `[#C]` and dates `SCHEDULED: <2025-03-15>` using familiar Logseq-style syntax.
+**Natural Task Capture** — Write tasks as plain text using keywords: `TODO`, `DOING`, `DONE`, `LATER`, `NOW`, `WAIT`, and more. Add priorities `[#A]`, `[#B]`, `[#C]` and dates using natural language or structured Org-mode syntax.
+
+**Smart Date Recognition** — Type dates using everyday language like "today", "tomorrow", "every Friday", or "daily 20:00". TODOSeq automatically converts them to structured format when you finish typing.
 
 **Unified Task List** — See all tasks from across your vault in one searchable, sortable panel. Filter by state, priority, date, tags, or use advanced boolean queries. Sort by urgency to surface what matters most right now.
 
@@ -28,7 +30,7 @@ Most task managers force you into a separate system. TODOseq meets you where you
 
 **Subtasks** — Break down complex tasks with indented checkbox items. The Task List shows subtask progress as `[1/3]` indicating completed and total subtasks.
 
-**Repeating Tasks** — Automatically advance scheduled and deadline dates when completed. Use `.+1d`, `++1w`, or `+1m` syntax to create recurring tasks.
+**Repeating Tasks** — Automatically advance scheduled and deadline dates when completed. Use natural language like "every day" or Org-mode repeaters like `.+1d`, `++1w`, or `+1m` to create recurring tasks.
 
 **Closed Date Tracking** — Optional CLOSED date on completed tasks, following Org-mode syntax. Records when tasks were marked as done and automatically manages the date when tasks are reactivated.
 
@@ -37,6 +39,16 @@ Most task managers force you into a separate system. TODOseq meets you where you
 **Experimental Features** — Additional capabilities including Org-mode file support are available as experimental features. See [documentation](docs/experimental-features.md) for details.
 
 ## Quick Start
+
+### Basic Tasks with Natural Language Dates
+
+```markdown
+TODO [#A] Finish quarterly report #work tomorrow
+DOING [#B] Review pull requests #coding
+DONE Submit expense report
+```
+
+Or use structured Org-mode dates:
 
 ```markdown
 TODO [#A] Finish quarterly report #work
@@ -50,9 +62,10 @@ DEADLINE: <2025-03-10>
 
 1. **Install** from Obsidian Community Plugins (search "TODOseq")
 2. **Create tasks** by typing `TODO`, `DOING`, `DONE`, etc. in any note
-3. **Open Task List** — it appears automatically in the right sidebar (or use Command Palette → "TODOseq: Show task list")
-4. **Click keywords** to cycle states, or click task text to jump to source
-5. **Search** using natural language or advanced filters like `priority:high deadline:this week`
+3. **Add dates** using natural language ("today", "tomorrow", "every Friday") or structured format
+4. **Open Task List** — it appears automatically in the right sidebar (or use Command Palette → "TODOseq: Show task list")
+5. **Click keywords** to cycle states, or click task text to jump to source
+6. **Search** using natural language or advanced filters like `priority:high deadline:this week`
 
 ## Installation
 
@@ -97,12 +110,30 @@ DONE Submit final version
 
 ### With Priorities and Dates
 
+**Natural Language Dates:**
+
+```markdown
+TODO [#A] Critical security patch tomorrow
+DOING [#B] Update documentation next Friday
+DONE [#C] Quarterly review monthly
+```
+
+**Structured Org-mode Dates:**
+
 ```markdown
 TODO [#A] Critical security patch
 DEADLINE: <2025-03-12>
 
 DOING [#B] Update documentation
 SCHEDULED: <2025-03-15>
+```
+
+**Recurring Tasks:**
+
+```markdown
+TODO Daily standup every day 9am
+DOING Weekly team meeting every Friday 14:00
+DONE Monthly review every month
 ```
 
 ### In Code Blocks

@@ -233,6 +233,61 @@ SCHEDULED: <2025-01-15 Wed 14:30>
 DEADLINE: <2025-01-20 Mon 17:00>
 ```
 
+### Smart Date Entry
+
+When Smart Date Recognition is enabled, you can type dates in plain language at the end of a task line. When you finish typing the cursor moves away, TODOseq automatically converts the phrase to a structured `SCHEDULED:` or `DEADLINE:` date line.
+
+The underlying natural language engine is based on [sherlockjs](https://github.com/neilgupta/Sherlock/) with a TODOseq-specific recurrence overlay on top. The table below lists every pattern that will be recognised on a task line.
+
+#### One-shot dates (sherlockjs)
+
+| Expression | Result |
+|------------|--------|
+| `today` | today |
+| `tomorrow` | tomorrow |
+| `yesterday` | yesterday |
+| `day before yesterday` | two days ago |
+| `in 5 days` / `in 2 weeks` / `in 3 months` / `in 2 years` | relative |
+| `in 2 hours` / `in 30 minutes` | today at time |
+| `next week` / `last week` / `next month` / `last month` / `next year` / `last year` | relative week/month/year |
+| `Monday` / `Friday` / … | next named weekday |
+| `next Monday` / `last Wednesday` | explicit next/last weekday |
+| `on Monday` / `on Friday` | same as bare weekday name |
+| `January 27` / `27 January` / `2026-08-11` | specific date |
+| `at 9am` / `at 5:30pm` / `at 16:00` | today at time |
+| `20:00` / `9pm` | today at time |
+| `tomorrow at 16:00` / `on Friday at 2:00pm` | date + time combined |
+
+#### Recurrence overlay (TODOseq-specific)
+
+| Expression | Repeat type |
+|------------|-------------|
+| `daily` | every day (`+1d`) |
+| `every day` | every day (`+1d`) |
+| `weekly` | every week (`+1w`) |
+| `every week` | every week (`+1w`) |
+| `monthly` | every month (`+1m`) |
+| `every month` | every month (`+1m`) |
+| `yearly` | every year (`+1y`) |
+| `every year` | every year (`+1y`) |
+| `every Friday` / `every Monday` … | weekly, anchored to that weekday |
+| `every morning` / `every afternoon` / `every evening` / `every night` | every day (`+1d`) |
+| `every weekend` | every week (`+1w`) |
+| `daily 20:00` | every day at 20:00 (`+1d`) |
+
+#### Date type (SCHEDULED vs DEADLINE)
+
+`TODOseq` infers the date type from the task text:
+
+- Phrases containing `due` or `deadline` → **DEADLINE**
+- Everything else → **SCHEDULED**
+
+```markdown
+TODO Project due tomorrow     → DEADLINE: <…>
+TODO Call John tomorrow       → SCHEDULED: <…>
+TODO Review PR on deadline Friday → DEADLINE: <…>
+```
+
 ### CLOSED Date
 
 TODOseq supports a CLOSED date that records when a task was marked as completed, following Org-mode syntax.

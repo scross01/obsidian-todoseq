@@ -82,6 +82,8 @@ export class SettingsChangeDetector {
         additionalActiveKeywords: settings.additionalActiveKeywords,
         additionalWaitingKeywords: settings.additionalWaitingKeywords,
         additionalCompletedKeywords: settings.additionalCompletedKeywords,
+        enableSmartDateRecognition: settings.enableSmartDateRecognition,
+        smartDateRemoveKeywords: settings.smartDateRemoveKeywords,
       });
     } catch (error) {
       console.warn('Failed to create settings fingerprint:', error);

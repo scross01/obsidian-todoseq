@@ -43,6 +43,10 @@ export interface TodoTrackerSettings {
   trackClosedDate: boolean; // when true, adds CLOSED: timestamp when tasks are marked as completed
   // Experimental features
   useExtendedCheckboxStyles: boolean; // when true, uses themed markdown checkbox styles ([/], [-]) for active and cancelled tasks
+  // Smart date recognition settings
+  enableSmartDateRecognition: boolean; // when true, enables natural language date parsing
+  smartDateParseDelay: number; // delay in milliseconds before parsing (debounce)
+  smartDateRemoveKeywords: boolean; // when true, removes natural language text after conversion
 }
 
 export const DefaultStateTransitionSettings: StateTransitionSettings = {
@@ -73,4 +77,8 @@ export const DefaultSettings: TodoTrackerSettings = {
   stateTransitions: DefaultStateTransitionSettings,
   trackClosedDate: false, // Disabled by default
   useExtendedCheckboxStyles: false, // Experimental feature - disabled by default
+  // Smart date recognition settings
+  enableSmartDateRecognition: false, // Disabled by default
+  smartDateParseDelay: 1500, // 1.5 second delay before parsing
+  smartDateRemoveKeywords: true, // Remove natural language text after conversion
 };

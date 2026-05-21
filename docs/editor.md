@@ -83,9 +83,92 @@ Clicking the checkbox toggles between empty `[ ]` and checked `[x]` states. The 
 
 ### Entering Scheduled and Deadline Dates
 
+TODOseq provides multiple ways to add scheduled and deadline dates to your tasks:
+
+#### Manual Date Entry
+
 When adding a `SCHEDULED:` or `DEADLINE:` date after a task, the editor will autocomplete after the keyword with the required date format, e.g. `<2026-01-01>`, with the date auto-filled to the current date and selected for easy replacement or editing.
 
 ![Date Autocomplete Example](./assets/todoseq-editor-date-autocomplete.png)
+
+#### Smart Date Recognition
+
+When smart date recognition is enabled in settings, you can type natural language dates directly on your task lines. TODOseq automatically converts them to structured Org-mode dates when you finish typing. The supported date patterns are listed below.
+
+**One-time Dates:**
+
+```markdown
+TODO Call John today
+DOING Review PR tomorrow
+LATER Submit report on Friday
+LATER Meeting next week
+```
+
+**Recurring Dates:**
+
+```markdown
+TODO Daily standup daily
+TODO Team meeting every Friday
+TODO Monthly review monthly
+```
+
+**With Time:**
+
+```markdown
+TODO Conference call tomorrow at 16:00
+TODO Evening review 9pm
+TODO Daily meeting daily 20:00
+TODO Standup at 8:00am
+TODO Call on Friday at 15:30
+```
+
+**DEADLINE Detection:**
+
+The system automatically detects whether dates should be SCHEDULED or DEADLINE based on context:
+
+```markdown
+TODO Project due tomorrow → DEADLINE
+TODO Submit by deadline Friday → DEADLINE
+TODO Call John tomorrow → SCHEDULED
+TODO Meeting on Monday → SCHEDULED
+```
+
+**Supported Date Expressions:**
+
+- **Simple**: today, tomorrow, yesterday
+- **Relative**: in 5 days, in 2 weeks, in 3 months, in 2 hours, day before yesterday
+- **Next / last / this**: next week, last week, next month, last month, next year, last year
+- **Weekdays**: Monday, Tuesday, Friday, next Friday, last Monday, this Friday
+- **With time**: 6pm, 9am, at 8:00am, at 16:00, at 5:30pm, tomorrow at 14:00
+- **With day and time**: on Friday at 2pm, on Thursday at 8:30am
+- **Time-of-day**: morning (→ 08:00), afternoon (→ 14:00), evening (→ 19:00), noon (→ 12:00), midnight (→ 00:00)
+- **Recurring**: daily, every day, weekly, every week, monthly, every month, every Friday
+- **Specific dates**: January 27, 27 January, 2026-08-11, 8/11/2026, 27th
+
+**Re-typing a date or moving the cursor away** triggers the conversion.
+
+**Input:**
+
+```markdown
+TODO Call John tomorrow
+```
+
+**Output:**
+
+```markdown
+TODO Call John
+SCHEDULED: <2026-05-19 Mon>
+```
+
+**Configuration:**
+
+See [Settings → Smart Date Recognition](settings.md#smart-date-recognition) for:
+
+- Enable/disable the feature
+- Adjust parse delay to prevent false positives
+- Choose whether to remove the natural language text after conversion
+
+This feature helps you capture tasks quickly without breaking your writing flow, while ensuring dates are stored in a consistent, structured format that works across all TODOseq features.
 
 ## Task State Synchronization
 

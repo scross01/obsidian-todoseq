@@ -409,6 +409,59 @@ FIXME Handle edge cases
 - No CLOSED date is added or removed automatically
 - Manual CLOSED dates in notes are still recognized and parsed
 
+### Smart Date Recognition
+
+**Setting**: "Smart date recognition" section
+
+**Description**: Automatically convert natural language date expressions to structured Org-mode dates.
+
+#### Enable Smart Date Recognition
+
+**Setting**: "Enable smart date recognition" toggle
+
+**Description**: Enable or disable automatic conversion of natural language dates.
+
+**Default**: Disabled
+
+**When Enabled:**
+
+- Type dates using natural language at the end of task lines
+- Automatically converts to structured format when you finish typing
+- Supports both one-time and recurring dates
+
+#### Parse Delay
+
+**Setting**: "Parse delay (seconds)" slider (0.5-5.0)
+
+**Description**: Wait time after typing before converting dates to prevent false positives.
+
+**Default**: 1.5 seconds
+
+**How It Works:**
+
+- Conversion happens after you stop typing for the specified delay
+- Prevents false positives while you're still composing the task line
+- Shorter delay = faster conversion, but more risk of unwanted conversions
+- Longer delay = slower conversion, but more accurate detection
+
+#### Remove Date Keywords
+
+**Setting**: "Remove date keywords" toggle
+
+**Description**: Remove natural language text after conversion to structured dates.
+
+**Default**: Enabled
+
+**When Enabled:**
+
+- Input: `TODO Call John tomorrow`
+- Output: `TODO Call John` + `SCHEDULED: <date>`
+
+**When Disabled:**
+
+- Input: `TODO Call John tomorrow`
+- Output: `TODO Call John tomorrow` + `SCHEDULED: <date>`
+
 ### Include Tasks Inside Comment Blocks
 
 **Setting**: "Include tasks inside comments" (toggle)

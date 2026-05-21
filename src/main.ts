@@ -22,6 +22,7 @@ import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { ChangeTracker } from './services/change-tracker';
+import { SmartDateProcessor } from './services/smart-date-processor';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -61,6 +62,9 @@ export default class TodoTracker extends Plugin {
 
   // Event coordinator for unified vault event handling
   public eventCoordinator: EventCoordinator | null = null;
+
+  // Smart date processor for automatic natural language date conversion
+  public smartDateProcessor: SmartDateProcessor | null = null;
 
   // Public getter methods for internal services
   public getVaultScanner(): VaultScanner | null {
@@ -110,7 +114,7 @@ export default class TodoTracker extends Plugin {
     this.uiManager = new UIManager(this);
     this.lifecycleManager = new PluginLifecycleManager(this);
 
-    // Delegate to lifecycle manager (which initializes taskUpdateCoordinator, vaultScanner, embeddedTaskListProcessor, and readerViewFormatter)
+    // Delegate to lifecycle manager (which initializes taskUpdateCoordinator, vaultScanner, embeddedTaskListProcessor, readerViewFormatter, and smart date processor)
     await this.lifecycleManager.onload();
   }
 
@@ -143,7 +147,7 @@ export default class TodoTracker extends Plugin {
       this.changeTracker.destroy();
     }
 
-    // Delegate cleanup to lifecycle manager (which now handles embedded task list processor)
+    // Delegate cleanup to lifecycle manager (which handles embedded task list processor, smart date processor, etc.)
     void this.lifecycleManager?.onunload();
   }
 

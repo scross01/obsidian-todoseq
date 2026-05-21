@@ -1,4 +1,4 @@
-import { formatTaskLines } from '../src/utils/task-format';
+import { formatTaskLines, formatOrgDate } from '../src/utils/task-format';
 import { Task, DateRepeatInfo } from '../src/types/task';
 
 function createTask(overrides: Partial<Task> = {}): Task {
@@ -262,5 +262,41 @@ describe('formatTaskLines', () => {
       '- [ ] TODO task 3',
       '  SCHEDULED: <2026-05-02 Sat>',
     ]);
+  });
+});
+
+describe('formatOrgDate', () => {
+  test('should format date without time', () => {
+    const date = new Date(2026, 4, 18, 0, 0, 0);
+    expect(formatOrgDate(date)).toBe('<2026-05-18 Mon>');
+  });
+
+  test('should format date with repeat', () => {
+    const date = new Date(2026, 4, 18, 0, 0, 0);
+    const repeat: DateRepeatInfo = {
+      type: '.+',
+      unit: 'd',
+      value: 1,
+      raw: '.+1d',
+    };
+    expect(formatOrgDate(date, repeat)).toBe('<2026-05-18 Mon .+1d>');
+  });
+
+  test('should format date with time', () => {
+    const date = new Date(2026, 4, 18, 14, 30, 0);
+    expect(formatOrgDate(date, null, '14:30')).toBe('<2026-05-18 Mon 14:30>');
+  });
+
+  test('should format date with time and repeat', () => {
+    const date = new Date(2026, 4, 18, 14, 30, 0);
+    const repeat: DateRepeatInfo = {
+      type: '++',
+      unit: 'w',
+      value: 1,
+      raw: '++1w',
+    };
+    expect(formatOrgDate(date, repeat, '14:30')).toBe(
+      '<2026-05-18 Mon 14:30 ++1w>',
+    );
   });
 });

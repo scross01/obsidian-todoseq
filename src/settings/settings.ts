@@ -1156,6 +1156,73 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
   }
 
   /**
+   * Creates smart date recognition settings
+   */
+  private createSmartDateRecognitionSettings(containerEl: HTMLElement) {
+    new Setting(containerEl)
+      .setName('Smart date recognition')
+      .setHeading()
+      .setDesc(
+        'Automatically convert natural language dates to structured org-mode dates.',
+      );
+
+    // Enable smart date recognition
+    new Setting(containerEl)
+      .setName('Enable smart date recognition')
+      .setDesc(
+        'Automatically convert natural language dates like "today", "tomorrow", "next week" to org-mode dates.',
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableSmartDateRecognition)
+          .onChange(async (value) => {
+            this.plugin.settings.enableSmartDateRecognition = value;
+            await this.plugin.saveSettings();
+            // Update smart date processor if it exists
+            if (this.plugin.smartDateProcessor) {
+              this.plugin.smartDateProcessor.setEnabled(value);
+            }
+          }),
+      );
+
+    // Smart date parse delay
+    new Setting(containerEl)
+      .setName('Parse delay (seconds)')
+      .setDesc(
+        'Wait time after typing before converting dates (prevents false positives).',
+      )
+      .addSlider((slider) =>
+        slider
+          .setLimits(0.5, 5.0, 0.5)
+          .setValue(this.plugin.settings.smartDateParseDelay / 1000)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            const delayMs = Math.round(value * 1000);
+            this.plugin.settings.smartDateParseDelay = delayMs;
+            await this.plugin.saveSettings();
+            if (this.plugin.smartDateProcessor) {
+              this.plugin.smartDateProcessor.setParseDelay(delayMs);
+            }
+          }),
+      );
+
+    // Remove keywords after conversion
+    new Setting(containerEl)
+      .setName('Remove date keywords')
+      .setDesc(
+        'Remove natural language text (e.g., "today", "tomorrow") after conversion to structured dates.',
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.smartDateRemoveKeywords)
+          .onChange(async (value) => {
+            this.plugin.settings.smartDateRemoveKeywords = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+  }
+
+  /**
    * Creates main settings
    */
   display(): void {
@@ -1197,6 +1264,9 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           }),
       );
+
+    // Smart date recognition Group
+    this.createSmartDateRecognitionSettings(containerEl);
 
     // Task detection Group
     this.createTaskDetectionSettings(containerEl);

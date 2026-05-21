@@ -45,6 +45,17 @@ const MIGRATIONS: SettingsMigrations[] = [
       return migrated;
     },
   },
+  {
+    version: 3,
+    migrate: (settings: Record<string, unknown>) => {
+      // v3: added smart date recognition settings
+      // (enableSmartDateRecognition,
+      //  smartDateParseDelay,
+      //  smartDateRemoveKeywords)
+      // No structural migration needed — defaults supplied by DefaultSettings.
+      return { ...settings };
+    },
+  },
 ];
 
 export function migrateSettings(

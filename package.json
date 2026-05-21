@@ -7,13 +7,13 @@
   "main": "main.js",
   "type": "module",
   "devDependencies": {
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6",
     "@eslint/js": "^10.0.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.19.37",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
     "@typescript-eslint/parser": "^8.57.1",
-    "@codemirror/state": "6.5.0",
-    "@codemirror/view": "6.38.6",
     "esbuild": "^0.25.8",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
@@ -46,7 +46,8 @@
     "generate-content": "ts-node scripts/content-generator.ts"
   },
   "dependencies": {
-    "obsidian-daily-notes-interface": "^0.9.4"
+    "obsidian-daily-notes-interface": "^0.9.4",
+    "sherlockjs": "^1.4.2"
   },
   "overrides": {
     "esbuild": "^0.25.8"
