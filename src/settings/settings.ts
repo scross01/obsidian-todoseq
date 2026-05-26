@@ -1166,6 +1166,9 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         'Automatically convert natural language dates to structured org-mode dates.',
       );
 
+    // Remove date keywords toggle component reference (for enabling/disabling)
+    let removeKeywordsToggleComponent: ToggleComponent | null = null;
+
     // Enable smart date recognition
     new Setting(containerEl)
       .setName('Enable smart date recognition')
@@ -1177,7 +1180,18 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.enableSmartDateRecognition)
           .onChange(async (value) => {
             this.plugin.settings.enableSmartDateRecognition = value;
+            // If disabling smart date recognition, also disable remove date keywords
+            if (!value) {
+              this.plugin.settings.smartDateRemoveKeywords = false;
+            }
             await this.plugin.saveSettings();
+            // Update remove keywords toggle visual state
+            if (removeKeywordsToggleComponent) {
+              removeKeywordsToggleComponent.setValue(
+                this.plugin.settings.smartDateRemoveKeywords,
+              );
+            }
+            removeKeywordsSetting.setDisabled(!value);
             // Update smart date processor if it exists
             if (this.plugin.smartDateProcessor) {
               this.plugin.smartDateProcessor.setEnabled(value);
@@ -1185,20 +1199,42 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
-    // Remove keywords after conversion
-    new Setting(containerEl)
+    // Remove keywords after conversion (dependent on Enable smart date recognition)
+    const removeKeywordsSettingContainer = containerEl.createDiv();
+    const removeKeywordsSetting = new Setting(removeKeywordsSettingContainer)
       .setName('Remove date keywords')
       .setDesc(
         'Remove natural language text (e.g., "today", "tomorrow") after conversion to structured dates.',
       )
-      .addToggle((toggle) =>
-        toggle
+      .addToggle((toggle) => {
+        removeKeywordsToggleComponent = toggle;
+        return toggle
           .setValue(this.plugin.settings.smartDateRemoveKeywords)
           .onChange(async (value) => {
             this.plugin.settings.smartDateRemoveKeywords = value;
             await this.plugin.saveSettings();
-          }),
-      );
+          });
+      });
+
+    // Set initial disabled state based on enableSmartDateRecognition setting
+    removeKeywordsSetting.setDisabled(
+      !this.plugin.settings.enableSmartDateRecognition,
+    );
+
+    // Sync remove keywords toggle when enableSmartDateRecognition changes externally
+    const updateRemoveKeywordsToggle = (enabled: boolean) => {
+      const removeKeywordsToggle =
+        removeKeywordsSetting.settingEl.querySelector(
+          'input[type="checkbox"]',
+        ) as HTMLInputElement;
+      if (removeKeywordsToggle) {
+        removeKeywordsToggle.checked = enabled;
+      }
+      removeKeywordsSetting.setDisabled(!enabled);
+    };
+
+    // Initialize toggle state based on current settings
+    updateRemoveKeywordsToggle(this.plugin.settings.enableSmartDateRecognition);
   }
 
   /**

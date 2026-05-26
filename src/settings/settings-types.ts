@@ -77,6 +77,6 @@ export const DefaultSettings: TodoTrackerSettings = {
   trackClosedDate: false, // Disabled by default
   useExtendedCheckboxStyles: false, // Experimental feature - disabled by default
   // Smart date recognition settings
-  enableSmartDateRecognition: false, // Disabled by default
+  enableSmartDateRecognition: true, // Enabled by default
   smartDateRemoveKeywords: true, // Remove natural language text after conversion
 };
