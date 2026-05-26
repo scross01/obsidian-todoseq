@@ -138,14 +138,16 @@ TODO Meeting on Monday → SCHEDULED
 - **Simple**: today, tomorrow, yesterday
 - **Relative**: in 5 days, in 2 weeks, in 3 months, in 2 hours, day before yesterday
 - **Next / last / this**: next week, last week, next month, last month, next year, last year
-- **Weekdays**: Monday, Tuesday, Friday, next Friday, last Monday, this Friday
+- **Weekdays**: Monday, Tuesday, Friday, next Friday, last Monday, this Friday, on Monday, on Friday
 - **With time**: 6pm, 9am, at 8:00am, at 16:00, at 5:30pm, tomorrow at 14:00
 - **With day and time**: on Friday at 2pm, on Thursday at 8:30am
 - **Time-of-day**: morning (→ 08:00), afternoon (→ 14:00), evening (→ 19:00), noon (→ 12:00), midnight (→ 00:00)
 - **Recurring**: daily, every day, weekly, every week, monthly, every month, every Friday
 - **Specific dates**: January 27, 27 January, 2026-08-11, 8/11/2026, 27th
 
-**Re-typing a date or moving the cursor away** triggers the conversion.
+**Visual highlight**: When the cursor is on a task line, TODOseq highlights the detected date expression with a subtle outline so you can see exactly what will be converted.
+
+Re-typing a date or moving the cursor away triggers the conversion.
 
 **Input:**
 

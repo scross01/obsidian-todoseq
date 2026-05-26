@@ -235,11 +235,9 @@ DEADLINE: <2025-01-20 Mon 17:00>
 
 ### Smart Date Entry
 
-When Smart Date Recognition is enabled, you can type dates in plain language at the end of a task line. When you finish typing the cursor moves away, TODOseq automatically converts the phrase to a structured `SCHEDULED:` or `DEADLINE:` date line.
+When Smart Date Recognition is enabled, you can type dates in plain language at the end of a task line. When you finish typing or move the cursor away, TODOseq automatically converts the phrase to a structured `SCHEDULED:` or `DEADLINE:` date line. The table below lists every pattern that is recognised on a task line.
 
-The underlying natural language engine is based on [sherlockjs](https://github.com/neilgupta/Sherlock/) with a TODOseq-specific recurrence overlay on top. The table below lists every pattern that will be recognised on a task line.
-
-#### One-shot dates (sherlockjs)
+#### One-shot dates
 
 | Expression | Result |
 |------------|--------|
@@ -258,7 +256,7 @@ The underlying natural language engine is based on [sherlockjs](https://github.c
 | `20:00` / `9pm` | today at time |
 | `tomorrow at 16:00` / `on Friday at 2:00pm` | date + time combined |
 
-#### Recurrence overlay (TODOseq-specific)
+#### Recurring dates
 
 | Expression | Repeat type |
 |------------|-------------|
