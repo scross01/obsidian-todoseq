@@ -287,4 +287,64 @@ describe('buildSmartDateDecorations', () => {
       'Natural date: today',
     );
   });
+
+  it('highlights "scheduled Friday" including the connector word', () => {
+    // "scheduled Friday" should be highlighted as a unit — the NLP parser
+    // detects "Friday" as the date, but the connector "scheduled" immediately
+    // precedes it in the original line, so rawExpression includes it.
+    const view = buildMockView({
+      lines: ['TODO test scheduled Friday'],
+      cursorLine: 1,
+    });
+    const settings = createBaseSettings({ enableSmartDateRecognition: true });
+    const decorations = buildSmartDateDecorations(
+      view,
+      settings,
+      () => ({ isTaskLine: () => true }) as any,
+    );
+    const ranges = collectDecorations(decorations);
+    expect(ranges).toHaveLength(1);
+    // "scheduled Friday" starts at index 10, length 16 (ends at index 25)
+    expect(ranges[0].from).toBe(10);
+    expect(ranges[0].to).toBe(26);
+    expect(ranges[0].class).toContain('todoseq-smart-date-highlight');
+  });
+
+  it('highlights "due tomorrow" including the connector word', () => {
+    const view = buildMockView({
+      lines: ['TODO project due tomorrow'],
+      cursorLine: 1,
+    });
+    const settings = createBaseSettings({ enableSmartDateRecognition: true });
+    const decorations = buildSmartDateDecorations(
+      view,
+      settings,
+      () => ({ isTaskLine: () => true }) as any,
+    );
+    const ranges = collectDecorations(decorations);
+    expect(ranges).toHaveLength(1);
+    // "due tomorrow" starts at index 13 ("TODO project " = 13 chars), length 12
+    expect(ranges[0].from).toBe(13);
+    expect(ranges[0].to).toBe(25);
+    expect(ranges[0].class).toContain('todoseq-smart-date-highlight');
+  });
+
+  it('highlights "deadline Friday" including the connector word', () => {
+    const view = buildMockView({
+      lines: ['TODO project deadline Friday'],
+      cursorLine: 1,
+    });
+    const settings = createBaseSettings({ enableSmartDateRecognition: true });
+    const decorations = buildSmartDateDecorations(
+      view,
+      settings,
+      () => ({ isTaskLine: () => true }) as any,
+    );
+    const ranges = collectDecorations(decorations);
+    expect(ranges).toHaveLength(1);
+    // "deadline Friday" starts at index 13, length 15
+    expect(ranges[0].from).toBe(13);
+    expect(ranges[0].to).toBe(28);
+    expect(ranges[0].class).toContain('todoseq-smart-date-highlight');
+  });
 });

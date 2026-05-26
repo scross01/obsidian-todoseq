@@ -255,6 +255,72 @@ function eventTitleIsRecurrence(eventTitle: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Shared validation constants (defined at module scope so both the
+// validation block and the rawExpression-building blocks can reference them)
+// ---------------------------------------------------------------------------
+
+const CONNECTOR_WORDS = [
+  'due',
+  'scheduled',
+  'deadline',
+  'on',
+  'at',
+  'this',
+  'next',
+  'in',
+] as const;
+
+/**
+ * Readonly array of known date-related words (used for both Array.includes
+ * and CONNECTOR_WORDS reference).  Kept as an array so that
+ * Array.prototype.includes() can be used, which accepts `unknown` as the
+ * search element — avoiding the TS2537 "no matching index signature for
+ * type number" error that Set.has() produces with a literal-union cast.
+ */
+const DATE_RELATED_WORDS_LIST = [
+  'today',
+  'tomorrow',
+  'yesterday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+  'week',
+  'day',
+  'month',
+  'year',
+  'hour',
+  'minute',
+  'morning',
+  'afternoon',
+  'evening',
+  'night',
+  'weekend',
+  'daily',
+  'weekly',
+  'monthly',
+  'yearly',
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+  'every',
+] as const;
+
+type DateRelatedWord = (typeof DATE_RELATED_WORDS_LIST)[number];
+
+// ---------------------------------------------------------------------------
 // Public parse()
 // ---------------------------------------------------------------------------
 
@@ -379,65 +445,18 @@ export class NaturalDateParser {
     const validation = Sherlock.parse(finalText);
     const validationTitle = (validation.eventTitle ?? '').trim();
     if (validationTitle.length > 0) {
-      const connectorWords = [
-        'due',
-        'scheduled',
-        'deadline',
-        'on',
-        'at',
-        'this',
-        'next',
-        'in',
-      ];
-      const dateRelatedWords = new Set([
-        'today',
-        'tomorrow',
-        'yesterday',
-        'monday',
-        'tuesday',
-        'wednesday',
-        'thursday',
-        'friday',
-        'saturday',
-        'sunday',
-        'week',
-        'day',
-        'month',
-        'year',
-        'hour',
-        'minute',
-        'morning',
-        'afternoon',
-        'evening',
-        'night',
-        'weekend',
-        'daily',
-        'weekly',
-        'monthly',
-        'yearly',
-        'january',
-        'february',
-        'march',
-        'april',
-        'may',
-        'june',
-        'july',
-        'august',
-        'september',
-        'october',
-        'november',
-        'december',
-        'every',
-      ]);
       const validationTitleWords = validationTitle
         .toLowerCase()
         .split(/\s+/)
         .filter((w) => w.length > 0);
       const nonConnectorWords = validationTitleWords.filter(
-        (w) => !connectorWords.includes(w),
+        (w): boolean => !CONNECTOR_WORDS.includes(w as (typeof CONNECTOR_WORDS)[number]),
       );
-      const invalidWords = nonConnectorWords.filter(
-        (w) => !dateRelatedWords.has(w),
+      const invalidWords: string[] = nonConnectorWords.filter(
+        (w) =>
+          !DATE_RELATED_WORDS_LIST.includes(
+            w as DateRelatedWord,
+          ),
       );
       if (invalidWords.length > 0) {
         return null;
@@ -472,20 +491,67 @@ export class NaturalDateParser {
 
     // When there's no " at " separator, strip leading connector words from matchedText.
     // These connectors precede the date expression (e.g., "due tomorrow" → "tomorrow").
+    let rawExpression = finalText;
     if (atIdx < 0) {
       const leadingConnectors = [
-        /^\bdue\b\s*/,
-        /^\bscheduled\b\s*/,
-        /^\bdeadline\b\s*/,
-        /^\bon\b\s*/,
-        /^\bat\b\s*/,
-        /^\bthis\b\s*/,
-        /^\bnext\b\s*/,
+        /^\bdue\b\s*/i,
+        /^\bscheduled\b\s*/i,
+        /^\bdeadline\b\s*/i,
+        /^\bon\b\s*/i,
+        /^\bat\b\s*/i,
+        /^\bthis\b\s*/i,
+        /^\bnext\b\s*/i,
       ];
+      const strippedMatchedText = matchedText;
       for (const rx of leadingConnectors) {
         matchedText = matchedText.replace(rx, '');
       }
       matchedText = matchedText.trim();
+
+      // If a leading connector was stripped from matchedText (e.g. "on Friday"
+      // → matchedText="Friday"), include that connector in rawExpression so the
+      // highlight plugin highlights the full user-typed expression.
+      const strippedLen = strippedMatchedText.length - matchedText.length;
+      if (strippedLen > 0) {
+        const matchedLower = matchedText.toLowerCase();
+        const trimmedLower = trimmed.toLowerCase();
+        const matchedIdx = matchedLower
+          ? trimmedLower.lastIndexOf(matchedLower)
+          : -1;
+        if (matchedIdx > 0) {
+          const connectorCandidate = trimmed.substring(0, matchedIdx).trim();
+          const connectorWord = connectorCandidate.split(/\s+/).pop() ?? '';
+          if (
+            connectorWord.length > 0 &&
+            strippedMatchedText.toLowerCase().startsWith(
+              connectorWord.toLowerCase(),
+            )
+          ) {
+            rawExpression = connectorWord + ' ' + matchedText;
+          }
+        }
+      }
+
+      // If no connector was stripped (e.g. "scheduled Friday" → matchedText still
+      // "Friday"), the connector word lives in the EVENT TITLE ("TODO test
+      // scheduled") and never appears in finalText.  Check whether the title's
+      // last word is a known connector and, if so, prepend it to rawExpression
+      // so the full "scheduled Friday" is highlighted.
+      if (
+        strippedLen === 0 &&
+        title.length > 0 &&
+        rawExpression === finalText
+      ) {
+        const titleWords = title.trim().split(/\s+/);
+        const lastTitleWord = titleWords[titleWords.length - 1].toLowerCase();
+        if (
+          CONNECTOR_WORDS.includes(
+            lastTitleWord as typeof CONNECTOR_WORDS[number],
+          )
+        ) {
+          rawExpression = lastTitleWord + ' ' + matchedText;
+        }
+      }
     }
 
     return {
@@ -494,7 +560,7 @@ export class NaturalDateParser {
         ? { type: '+', unit: 'd', value: 1, raw: '+1d' }
         : null,
       isRecurring: isRecurringFromTitle,
-      rawExpression: finalText,
+      rawExpression,
       matchedText,
       hasTime: !raw.isAllDay,
     };

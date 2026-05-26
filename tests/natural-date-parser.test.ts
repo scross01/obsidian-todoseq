@@ -737,6 +737,44 @@ describe('NaturalDateParser', () => {
       );
       expect(result).not.toBeNull();
       expect(result?.matchedText).toBe('tomorrow');
+      // rawExpression should include "due" since it immediately precedes the date
+      expect(result?.rawExpression).toBe('due tomorrow');
+    });
+
+    it('should include "scheduled" connector in rawExpression for "scheduled Friday"', () => {
+      const result = NaturalDateParser.parse(
+        'TODO test scheduled Friday',
+        referenceDate,
+      );
+      expect(result).not.toBeNull();
+      expect(result?.matchedText).toBe('Friday');
+      // rawExpression includes the "scheduled" connector so the highlight
+      // plugin finds "scheduled Friday" rather than just "Friday"
+      expect(result?.rawExpression).toBe('scheduled Friday');
+    });
+
+    it('should include "deadline" connector in rawExpression for "deadline Friday"', () => {
+      const result = NaturalDateParser.parse(
+        'TODO project deadline Friday',
+        referenceDate,
+      );
+      expect(result).not.toBeNull();
+      expect(result?.matchedText).toBe('Friday');
+      expect(result?.rawExpression).toBe('deadline Friday');
+    });
+
+    it('should not double-include connector when rawExpression already has it', () => {
+      // For "on Friday", Block 1 handles the connector "on" by prepending it to
+      // rawExpression (not matchedText — matchedText stays as "Friday" so that
+      // removeDateFromText strips only the date word, leaving the connector in
+      // the event title for the trailing-connector strip to handle).
+      const result = NaturalDateParser.parse(
+        'TODO Call John on Friday',
+        referenceDate,
+      );
+      expect(result).not.toBeNull();
+      expect(result?.rawExpression).toBe('on Friday');
+      expect(result?.matchedText).toBe('Friday');
     });
 
     it('should not detect "this weekend" as a date (not in sherlockjs supported patterns)', () => {
