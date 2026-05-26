@@ -458,6 +458,7 @@ describe('SmartDateProcessor', () => {
 
       // dispatch must be called with a single editor change replacing
       // the original line with "TODO test\nSCHEDULED: <YYYY-MM-DD Mon>"
+      // Two dispatches: first for content change, second for cursor position
       expect(dispatchFn).toHaveBeenCalledTimes(1);
 
       const arg = dispatchFn.mock.calls[0][0];
@@ -652,6 +653,7 @@ describe('SmartDateProcessor', () => {
       // RAF mock fires synchronously — no extra await needed.
       await processor.processLine(filePath, 1, taskLineText, mockView, true);
 
+      // Two dispatches: first for content change, second for cursor position
       expect(dispatchFn).toHaveBeenCalledTimes(1);
 
       const arg = dispatchFn.mock.calls[0][0];
@@ -729,6 +731,7 @@ describe('SmartDateProcessor', () => {
 
       await processor.processLine(filePath, 1, taskLineText, mockView, true);
 
+      // Two dispatches: first for content change, second for cursor position
       expect(dispatchFn).toHaveBeenCalledTimes(1);
 
       const arg = dispatchFn.mock.calls[0][0];

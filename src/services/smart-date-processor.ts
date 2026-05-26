@@ -21,6 +21,15 @@ import { getDateLineIndent } from '../utils/task-line-utils';
 export type InlineDateType = 'SCHEDULED' | 'DEADLINE';
 
 /**
+ * What triggered the conversion — determines whether we override the cursor.
+ * - 'debounce': user pressed Enter/Down/Right (cursor left via keystroke, not yet
+ *   moved to a new line when our RAF fires). We should move cursor to end of date line.
+ * - 'cursorLeave': user pressed Up/Left/clicked away. The cursor has already moved
+ *   naturally to the previous line. We should NOT override it — just insert the date line.
+ */
+export type ConversionTrigger = 'debounce' | 'cursorLeave';
+
+/**
  * Check if a task line already contains inline structured dates
  * (SCHEDULED: or DEADLINE: with angle-bracket syntax).
  * Exported so the highlight plugin can stay consistent with SmartDateProcessor.
@@ -95,6 +104,17 @@ export class SmartDateProcessor {
       return;
     }
 
+    // Cancel any pending debounce timer for this line — we want to process
+    // it NOW via handleCursorLeave's forceReprocess path, not wait for the
+    // debounce delay.  This prevents double-dispatch (debounce RAF + cursor-
+    // leave RAF both firing for the same line).
+    const debounceKey = `${file.path}:${previousLineNumber}`;
+    const existingTimer = this.debounceTimers.get(debounceKey);
+    if (existingTimer !== undefined) {
+      window.clearTimeout(existingTimer);
+      this.debounceTimers.delete(debounceKey);
+    }
+
     const line = view.state.doc.line(previousLineNumber);
 
     // Detect if this line has a natural language date. If so, force reprocess
@@ -108,6 +128,7 @@ export class SmartDateProcessor {
       view,
       true,
       hasNaturalDate, // forceReprocess when line has natural date
+      'cursorLeave',
     );
   }
 
@@ -146,7 +167,15 @@ export class SmartDateProcessor {
         return;
       }
       const taskLineText = view.state.doc.line(lineNumber).text;
-      void this.processLine(filePath, lineNumber, taskLineText, view);
+      void this.processLine(
+        filePath,
+        lineNumber,
+        taskLineText,
+        view,
+        false,
+        false,
+        'debounce',
+      );
       this.debounceTimers.delete(key);
     }, this.DEBOUNCE_DELAY_MS);
 
@@ -160,6 +189,7 @@ export class SmartDateProcessor {
     view: EditorView,
     skipCursorCheck: boolean = false,
     forceReprocess: boolean = false,
+    triggerSource: ConversionTrigger = 'debounce',
   ): Promise<void> {
     if (this.isProcessing.get(`${filePath}:${lineNumber}`)) {
       return;
@@ -268,6 +298,7 @@ export class SmartDateProcessor {
               task,
               view,
               existingDateLines,
+              triggerSource,
             );
           }
         } catch {
@@ -370,6 +401,7 @@ export class SmartDateProcessor {
     task: Task,
     view: EditorView,
     existingDateLines: { lineNumber: number; type: InlineDateType }[] = [],
+    triggerSource: ConversionTrigger = 'debounce',
   ): boolean {
     try {
       if (!parsedDate.date) return false;
@@ -397,6 +429,7 @@ export class SmartDateProcessor {
         task,
         view,
         replaceLineNumber,
+        triggerSource,
       );
     } catch {
       return false;
@@ -462,6 +495,9 @@ export class SmartDateProcessor {
 
   /**
    * Synchronous version of applyConversion for use in requestAnimationFrame.
+   * Dispatches a single CM6 transaction that replaces the task line (+ optional
+   * existing date line) with the task + date line, and positions the cursor at
+   * the start of the new date line.
    */
   private applyConversionSync(
     lineNumber: number,
@@ -471,6 +507,7 @@ export class SmartDateProcessor {
     task: Task,
     editorView: EditorView,
     replaceLineNumber: number | null = null,
+    triggerSource: ConversionTrigger = 'debounce',
   ): boolean {
     const { state: docState } = editorView;
 
@@ -482,7 +519,6 @@ export class SmartDateProcessor {
       (mdView?.editor as { cm?: EditorView })?.cm === editorView
         ? getDateLineIndent(task)
         : '';
-
     const dateLine = `${effectiveIndent}${dateType}: ${dateStr}`;
     const newContent = [updatedTaskLine, dateLine].join('\n');
 
@@ -490,21 +526,42 @@ export class SmartDateProcessor {
       if (replaceLineNumber < 1 || replaceLineNumber > docState.doc.lines)
         return false;
       const existingDateLine = docState.doc.line(replaceLineNumber);
-      editorView.dispatch({
-        changes: {
-          from: taskLine.from,
-          to: existingDateLine.to,
-          insert: newContent,
-        },
-      });
+      if (triggerSource === 'cursorLeave') {
+        // Cursor has already moved naturally (Up/Left/click). Just insert
+        // the date line and leave the cursor where the user moved it.
+        editorView.dispatch({
+          changes: {
+            from: taskLine.from,
+            to: existingDateLine.to,
+            insert: newContent,
+          },
+        });
+      } else {
+        // Debounce trigger (Enter/Down/Right): move cursor to end of date line.
+        const cursorInNewDoc =
+          taskLine.from + updatedTaskLine.length + 1 + dateLine.length;
+        editorView.dispatch({
+          changes: {
+            from: taskLine.from,
+            to: existingDateLine.to,
+            insert: newContent,
+          },
+          selection: { anchor: cursorInNewDoc, head: cursorInNewDoc },
+        });
+      }
     } else {
-      editorView.dispatch({
-        changes: {
-          from: taskLine.from,
-          to: taskLine.to,
-          insert: newContent,
-        },
-      });
+      if (triggerSource === 'cursorLeave') {
+        editorView.dispatch({
+          changes: { from: taskLine.from, to: taskLine.to, insert: newContent },
+        });
+      } else {
+        const cursorInNewDoc =
+          taskLine.from + updatedTaskLine.length + 1 + dateLine.length;
+        editorView.dispatch({
+          changes: { from: taskLine.from, to: taskLine.to, insert: newContent },
+          selection: { anchor: cursorInNewDoc, head: cursorInNewDoc },
+        });
+      }
     }
 
     return true;
