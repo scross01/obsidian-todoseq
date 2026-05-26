@@ -450,13 +450,11 @@ export class NaturalDateParser {
         .split(/\s+/)
         .filter((w) => w.length > 0);
       const nonConnectorWords = validationTitleWords.filter(
-        (w): boolean => !CONNECTOR_WORDS.includes(w as (typeof CONNECTOR_WORDS)[number]),
+        (w): boolean =>
+          !CONNECTOR_WORDS.includes(w as (typeof CONNECTOR_WORDS)[number]),
       );
       const invalidWords: string[] = nonConnectorWords.filter(
-        (w) =>
-          !DATE_RELATED_WORDS_LIST.includes(
-            w as DateRelatedWord,
-          ),
+        (w) => !DATE_RELATED_WORDS_LIST.includes(w as DateRelatedWord),
       );
       if (invalidWords.length > 0) {
         return null;
@@ -523,9 +521,9 @@ export class NaturalDateParser {
           const connectorWord = connectorCandidate.split(/\s+/).pop() ?? '';
           if (
             connectorWord.length > 0 &&
-            strippedMatchedText.toLowerCase().startsWith(
-              connectorWord.toLowerCase(),
-            )
+            strippedMatchedText
+              .toLowerCase()
+              .startsWith(connectorWord.toLowerCase())
           ) {
             rawExpression = connectorWord + ' ' + matchedText;
           }
@@ -546,7 +544,7 @@ export class NaturalDateParser {
         const lastTitleWord = titleWords[titleWords.length - 1].toLowerCase();
         if (
           CONNECTOR_WORDS.includes(
-            lastTitleWord as typeof CONNECTOR_WORDS[number],
+            lastTitleWord as (typeof CONNECTOR_WORDS)[number],
           )
         ) {
           rawExpression = lastTitleWord + ' ' + matchedText;
