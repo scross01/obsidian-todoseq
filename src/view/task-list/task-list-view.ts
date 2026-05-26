@@ -1209,7 +1209,7 @@ export class TaskListView extends ItemView {
   }
 
   getDisplayText() {
-    return 'Todoseq';
+    return 'TODOseq'; // eslint-disable-line obsidianmd/ui/sentence-case 
   }
 
   getIcon(): string {

@@ -206,7 +206,7 @@ describe('TaskListView', () => {
 
   describe('getDisplayText', () => {
     it('should return Todoseq as display text', () => {
-      expect(view.getDisplayText()).toBe('Todoseq');
+      expect(view.getDisplayText()).toBe('TODOseq');
     });
   });
 
