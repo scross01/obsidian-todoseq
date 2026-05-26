@@ -20,6 +20,15 @@ import { getDateLineIndent } from '../utils/task-line-utils';
 
 export type InlineDateType = 'SCHEDULED' | 'DEADLINE';
 
+/**
+ * Check if a task line already contains inline structured dates
+ * (SCHEDULED: or DEADLINE: with angle-bracket syntax).
+ * Exported so the highlight plugin can stay consistent with SmartDateProcessor.
+ */
+export function hasInlineStructuredDates(lineText: string): boolean {
+  return /\S.*(SCHEDULED|DEADLINE):\s*</.test(lineText);
+}
+
 export interface InlineDateInfo {
   type: InlineDateType;
   dateStr: string;
@@ -27,7 +36,7 @@ export interface InlineDateInfo {
 
 export class SmartDateProcessor {
   private enabled: boolean = false;
-  private parseDelay: number = 1500;
+  private readonly DEBOUNCE_DELAY_MS = 1500;
   private debounceTimers: Map<string, number> = new Map();
   private lastProcessedLines: Map<
     string,
@@ -44,10 +53,6 @@ export class SmartDateProcessor {
       this.lastProcessedLines.clear();
       this.isProcessing.clear();
     }
-  }
-
-  setParseDelay(delay: number): void {
-    this.parseDelay = delay;
   }
 
   handleEditorUpdate(view: EditorView, update: ViewUpdate): void {
@@ -70,6 +75,10 @@ export class SmartDateProcessor {
   /**
    * Handle cursor leaving a line (user finished typing).
    * Processes the line the cursor LEFT, not the current line.
+   * When the line contains a natural language date (detected via NaturalDateParser),
+   * forces reprocessing regardless of prior vault-scan processing to ensure the
+   * date is always extracted when the user explicitly leaves the line (via Enter,
+   * arrow keys, mouse click, etc.).
    */
   handleCursorLeave(view: EditorView, previousLineNumber: number): void {
     if (!this.enabled) return;
@@ -78,14 +87,39 @@ export class SmartDateProcessor {
     if (!mdView) return;
 
     const file = mdView.file;
-    if (!file) return;
-
-    if (previousLineNumber < 1 || previousLineNumber > view.state.doc.lines)
+    if (!file) {
       return;
+    }
+
+    if (previousLineNumber < 1 || previousLineNumber > view.state.doc.lines) {
+      return;
+    }
 
     const line = view.state.doc.line(previousLineNumber);
 
-    void this.processLine(file.path, previousLineNumber, line.text, view, true);
+    // Detect if this line has a natural language date. If so, force reprocess
+    // to ensure the date is extracted even if vault scan already processed it.
+    const hasNaturalDate = this.hasNaturalLanguageDate(line.text);
+
+    void this.processLine(
+      file.path,
+      previousLineNumber,
+      line.text,
+      view,
+      true,
+      hasNaturalDate, // forceReprocess when line has natural date
+    );
+  }
+
+  /**
+   * Check if a line contains a natural language date that should be extracted.
+   * Used to detect when cursor leaves a line with styling (highlight) on the date.
+   */
+  private hasNaturalLanguageDate(lineText: string): boolean {
+    if (this.hasInlineStructuredDates(lineText)) return false;
+    if (this.isDateLine(lineText)) return false;
+    const parsed = NaturalDateParser.parse(lineText);
+    return parsed !== null && parsed.matchedText !== null;
   }
 
   private processLineWithDebounce(
@@ -114,7 +148,7 @@ export class SmartDateProcessor {
       const taskLineText = view.state.doc.line(lineNumber).text;
       void this.processLine(filePath, lineNumber, taskLineText, view);
       this.debounceTimers.delete(key);
-    }, this.parseDelay);
+    }, this.DEBOUNCE_DELAY_MS);
 
     this.debounceTimers.set(key, timer);
   }
@@ -125,33 +159,42 @@ export class SmartDateProcessor {
     lineText: string,
     view: EditorView,
     skipCursorCheck: boolean = false,
+    forceReprocess: boolean = false,
   ): Promise<void> {
     if (this.isProcessing.get(`${filePath}:${lineNumber}`)) {
       return;
     }
 
-    try {
-      this.isProcessing.set(`${filePath}:${lineNumber}`, true);
+    const parser = this.plugin.getVaultScanner()?.getParser();
+    if (!parser) {
+      return;
+    }
 
-      const parser = this.plugin.getVaultScanner()?.getParser();
-      if (!parser) return;
+    if (!parser.isTaskLine(lineText)) {
+      return;
+    }
 
-      if (!parser.isTaskLine(lineText)) return;
+    if (this.isDateLine(lineText)) {
+      return;
+    }
 
-      if (this.isDateLine(lineText)) return;
-
-      if (!skipCursorCheck) {
-        const cursorPos = view.state.selection.main.head;
-        const currentLine = view.state.doc.lineAt(cursorPos);
-        if (currentLine.number === lineNumber) {
-          return;
-        }
+    if (!skipCursorCheck) {
+      const cursorPos = view.state.selection.main.head;
+      const currentLine = view.state.doc.lineAt(cursorPos);
+      if (currentLine.number === lineNumber) {
+        return;
       }
+    }
 
+    const now = Date.now();
+
+    // Bypass the 1-second guard when forceReprocess is true, since
+    // handleCursorLeave / Enter key means the user explicitly left the line
+    // and wants the date extracted regardless of prior vault-scan processing.
+    if (!forceReprocess) {
       const lastProcessed = this.lastProcessedLines.get(
         `${filePath}:${lineNumber}`,
       );
-      const now = Date.now();
       if (
         lastProcessed &&
         lastProcessed.text === lineText &&
@@ -159,58 +202,91 @@ export class SmartDateProcessor {
       ) {
         return;
       }
+    }
 
-      // If the task already has date lines below (SCHEDULED/DEADLINE), note their
-      // positions so convertNaturalLanguageDate can REPLACE them instead of
-      // appending duplicate date lines.  Removing this early-return is what fixes
-      // the "edit a dated task and add a new date expression – nothing happens"
-      // regression: the task text is re-parsed and the existing date is updated.
-      const existingDateLines: { lineNumber: number; type: InlineDateType }[] =
-        this.findExistingDateLines(filePath, lineNumber, view);
+    // If the task already has date lines below (SCHEDULED/DEADLINE), note their
+    // positions so convertNaturalLanguageDate can REPLACE them instead of
+    // appending duplicate date lines.  Removing this early-return is what fixes
+    // the "edit a dated task and add a new date expression – nothing happens"
+    // regression: the task text is re-parsed and the existing date is updated.
+    const existingDateLines: { lineNumber: number; type: InlineDateType }[] =
+      this.findExistingDateLines(filePath, lineNumber, view);
 
-      const hasInlineDates = this.hasInlineStructuredDates(lineText);
-      const parsedDate = hasInlineDates
-        ? null
-        : NaturalDateParser.parse(lineText);
+    const hasInlineDates = this.hasInlineStructuredDates(lineText);
+    const parsedDate = hasInlineDates
+      ? null
+      : NaturalDateParser.parse(lineText);
 
-      if (!parsedDate && !hasInlineDates) return;
+    if (!parsedDate && !hasInlineDates) {
+      return;
+    }
 
-      const task = parser.parseLineAsTask(lineText, lineNumber - 1, filePath);
-      if (!task) return;
+    const task = parser.parseLineAsTask(lineText, lineNumber - 1, filePath);
+    if (!task) {
+      return;
+    }
 
-      if (hasInlineDates) {
-        const converted = await this.convertInlineStructuredDates(
-          filePath,
-          lineNumber,
-          lineText,
-          task,
-          view,
-        );
+    // Defer ALL dispatch operations until after the current update cycle
+    // completes. EditorView.dispatch() is not allowed during an active update
+    // (e.g., while smartDatePlugin.update() is on the call stack). Using
+    // requestAnimationFrame ensures we dispatch after the current transaction
+    // chain completes — both inline structured dates and natural language dates.
+    //
+    // isProcessing is set RIGHT BEFORE scheduling the RAF, not earlier in a
+    // finally block, so that early-return paths above don't need to manage it.
+    // The RAF callback always clears it at the end (or on early exit).
+    this.isProcessing.set(`${filePath}:${lineNumber}`, true);
+    try {
+      window.requestAnimationFrame(() => {
+        // Re-check that the line still exists and hasn't been modified since
+        // processLine was called (view state may have changed)
+        if (lineNumber < 1 || lineNumber > view.state.doc.lines) {
+          this.isProcessing.set(`${filePath}:${lineNumber}`, false);
+          return;
+        }
+        const currentLine = view.state.doc.line(lineNumber);
+        if (currentLine.text !== lineText) {
+          // Line text changed - don't dispatch stale conversion
+          this.isProcessing.set(`${filePath}:${lineNumber}`, false);
+          return;
+        }
+
+        let converted = false;
+        try {
+          if (hasInlineDates) {
+            converted = this.applyInlineConversionSync(
+              lineNumber,
+              lineText,
+              task,
+              view,
+            );
+          } else if (parsedDate !== null) {
+            converted = this.convertNaturalLanguageDateSync(
+              lineNumber,
+              lineText,
+              parsedDate,
+              task,
+              view,
+              existingDateLines,
+            );
+          }
+        } catch {
+          // Conversion failed - treat as not converted
+          converted = false;
+        }
+
         if (converted) {
           this.lastProcessedLines.set(`${filePath}:${lineNumber}`, {
             line: lineNumber,
-            timestamp: now,
+            timestamp: Date.now(),
             text: lineText,
           });
         }
-      } else if (parsedDate !== null) {
-        const converted = await this.convertNaturalLanguageDate(
-          lineNumber,
-          lineText,
-          parsedDate,
-          task,
-          view,
-          existingDateLines,
-        );
-        if (converted) {
-          this.lastProcessedLines.set(`${filePath}:${lineNumber}`, {
-            line: lineNumber,
-            timestamp: now,
-            text: lineText,
-          });
-        }
-      }
-    } finally {
+        this.isProcessing.set(`${filePath}:${lineNumber}`, false);
+      });
+    } catch {
+      // Unexpected exception before RAF registered — clear the guard so the
+      // line can be processed on the next trigger.
       this.isProcessing.set(`${filePath}:${lineNumber}`, false);
     }
   }
@@ -235,7 +311,7 @@ export class SmartDateProcessor {
    * Check if a line has inline structured dates (SCHEDULED: or DEADLINE: on the task line)
    */
   private hasInlineStructuredDates(lineText: string): boolean {
-    return /\S.*(SCHEDULED|DEADLINE):\s*</.test(lineText);
+    return hasInlineStructuredDates(lineText);
   }
 
   /**
@@ -281,51 +357,20 @@ export class SmartDateProcessor {
   }
 
   /**
-   * Convert inline structured dates (e.g., "TODO test SCHEDULED: <2026-08-11>")
-   * to separate lines below the task.
+   * Synchronous version of convertNaturalLanguageDate for use inside
+   * requestAnimationFrame callbacks where we cannot await.
+   * Note: This method is NOT async since applyConversionSync is synchronous.
+   * It returns boolean directly to avoid Promise unhandled-rejection issues
+   * when called without await inside RAF callbacks.
    */
-  private async convertInlineStructuredDates(
-    filePath: string,
-    lineNumber: number,
-    lineText: string,
-    task: Task,
-    view: EditorView,
-  ): Promise<boolean> {
-    try {
-      const dates = this.extractInlineDates(lineText);
-      if (dates.length === 0) return false;
-
-      const updatedTaskLine = this.removeInlineDatesFromText(lineText, dates);
-
-      return this.applyInlineConversion(
-        lineNumber,
-        updatedTaskLine,
-        dates,
-        task,
-        view,
-      );
-    } catch (error) {
-      console.debug(
-        '[TODOseq] Error converting inline structured dates:',
-        error,
-      );
-      return false;
-    }
-  }
-
-  /**
-   * Convert natural language date to structured org-mode date.
-   * When existingDateLines are supplied, the matching date line below the task
-   * is REPLACED in-place rather than a new date line being appended.
-   */
-  private async convertNaturalLanguageDate(
+  private convertNaturalLanguageDateSync(
     lineNumber: number,
     lineText: string,
     parsedDate: ParsedDateInfo,
     task: Task,
     view: EditorView,
     existingDateLines: { lineNumber: number; type: InlineDateType }[] = [],
-  ): Promise<boolean> {
+  ): boolean {
     try {
       if (!parsedDate.date) return false;
 
@@ -344,7 +389,7 @@ export class SmartDateProcessor {
         (sameTypeDate != null ? sameTypeDate.lineNumber : null) ??
         existingDateLines[0]?.lineNumber;
 
-      return await this.applyConversion(
+      return this.applyConversionSync(
         lineNumber,
         updatedTaskLine,
         dateType,
@@ -353,8 +398,7 @@ export class SmartDateProcessor {
         view,
         replaceLineNumber,
       );
-    } catch (error) {
-      console.debug('[TODOseq] Error converting to structured date:', error);
+    } catch {
       return false;
     }
   }
@@ -417,15 +461,9 @@ export class SmartDateProcessor {
   }
 
   /**
-   * Apply the date conversion for natural language dates.
-   * Dispatches a single CM6 editor change to replace the task line and
-   * insert (or replace) the date line below it — no file background write.
-   *
-   * @param replaceLineNumber - When non-null, replaces this date line instead
-   *   of inserting a new one. Used when the editor content is updated from a
-   *   dated task where a SCHEDULED/DEADLINE line already exists below the task.
+   * Synchronous version of applyConversion for use in requestAnimationFrame.
    */
-  private async applyConversion(
+  private applyConversionSync(
     lineNumber: number,
     updatedTaskLine: string,
     dateType: InlineDateType,
@@ -433,7 +471,7 @@ export class SmartDateProcessor {
     task: Task,
     editorView: EditorView,
     replaceLineNumber: number | null = null,
-  ): Promise<boolean> {
+  ): boolean {
     const { state: docState } = editorView;
 
     if (lineNumber < 1 || lineNumber > docState.doc.lines) return false;
@@ -449,9 +487,6 @@ export class SmartDateProcessor {
     const newContent = [updatedTaskLine, dateLine].join('\n');
 
     if (replaceLineNumber !== null) {
-      // Replace the task line and the existing date line in one CM6 change.
-      // re-read lines to tolerate any intermediate edits between the check
-      // in processLine and this dispatch
       if (replaceLineNumber < 1 || replaceLineNumber > docState.doc.lines)
         return false;
       const existingDateLine = docState.doc.line(replaceLineNumber);
@@ -476,14 +511,12 @@ export class SmartDateProcessor {
   }
 
   /**
-   * Apply the inline date conversion.
-   * Dispatches a single CM6 editor change to replace the task line and
-   * insert the new date line(s) below it — no file background write.
+   * Synchronous version of applyInlineConversion for use in requestAnimationFrame.
+   * Extracts dates from lineText and dispatches inline structured dates conversion.
    */
-  private applyInlineConversion(
+  private applyInlineConversionSync(
     lineNumber: number,
-    updatedTaskLine: string,
-    dates: InlineDateInfo[],
+    lineText: string,
     task: Task,
     view: EditorView,
   ): boolean {
@@ -494,6 +527,11 @@ export class SmartDateProcessor {
     const { state } = editorView;
     if (lineNumber < 1 || lineNumber > state.doc.lines) return false;
     const line = state.doc.line(lineNumber);
+
+    const dates = this.extractInlineDates(lineText);
+    if (dates.length === 0) return false;
+
+    const updatedTaskLine = this.removeInlineDatesFromText(lineText, dates);
 
     const insertLines = [updatedTaskLine];
     for (const dateInfo of dates) {

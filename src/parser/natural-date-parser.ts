@@ -306,17 +306,143 @@ export class NaturalDateParser {
     const raw = Sherlock.parse(trimmed);
     if (!raw.startDate) return null;
 
-    const title = (raw.eventTitle ?? '').trim();
-    const titleIdx = title ? trimmed.indexOf(title) : -1;
-    const finalText =
-      titleIdx >= 0
-        ? trimmed.substring(titleIdx + title.length).trim()
-        : trimmed;
+    let title = (raw.eventTitle ?? '').trim();
+    // Use case-insensitive search so Sherlock's lowercased eventTitle still
+    // matches the original text (e.g. "TODO" vs "todo").
+    const titleLower = title.toLowerCase();
+    const trimmedLower = trimmed.toLowerCase();
+    let titleIdx = title ? trimmedLower.indexOf(titleLower) : -1;
+
+    // When the eventTitle doesn't appear as a contiguous substring in the
+    // original text, Sherlock has split words around the date. Re-parse the
+    // full text to see if we can recover a cleaner title that appears
+    // contiguously (e.g. "Friday next week" sometimes yields a cleaner title
+    // on re-parse). If the re-parse gives an empty title, the whole line is a
+    // date expression.
+    if (titleIdx < 0 && title.length > 0) {
+      Sherlock._setNow(referenceDate);
+      const fullValidation = Sherlock.parse(trimmed);
+      if (!fullValidation.startDate) return null;
+      const validationTitle = (fullValidation.eventTitle ?? '').trim();
+      if (validationTitle.length > 0) {
+        const validationTitleIdx = trimmedLower.indexOf(
+          validationTitle.toLowerCase(),
+        );
+        if (validationTitleIdx >= 0) {
+          title = validationTitle;
+          titleIdx = validationTitleIdx;
+        }
+      }
+    }
+
+    let finalText: string;
+    if (titleIdx >= 0) {
+      finalText = trimmed.substring(titleIdx + title.length).trim();
+    } else {
+      // Compute finalText from the first word not present in the title.
+      // This handles compound dates like "Friday next week" where the title
+      // doesn't appear contiguously in the original text.
+      const titleWordSet = new Set(
+        titleLower.split(/\s+/).filter((w) => w.length > 0),
+      );
+      const trimmedWords = trimmedLower
+        .split(/\s+/)
+        .filter((w) => w.length > 0);
+      const firstNonTitleIdx = trimmedWords.findIndex(
+        (w) => !titleWordSet.has(w),
+      );
+      if (firstNonTitleIdx < 0) return null;
+      let charPos = 0;
+      for (let i = 0; i < firstNonTitleIdx; i++) {
+        charPos = trimmedLower.indexOf(trimmedWords[i], charPos);
+        if (charPos < 0) return null;
+        charPos += trimmedWords[i].length;
+        while (charPos < trimmed.length && /\s/.test(trimmed[charPos])) {
+          charPos++;
+        }
+      }
+      finalText = trimmed.substring(charPos).trim();
+    }
 
     // Detect recurrence by checking whether the EVENT TITLE (not the suffix)
     // is a pure recurrence keyword.  This handles cases like "daily 20:00"
     // where eventTitle="daily" and suffix="20:00".
     const isRecurringFromTitle = title ? eventTitleIsRecurrence(title) : false;
+
+    // Validate that finalText is a pure date expression with no trailing
+    // non-date content.  Re-parse finalText standalone; if the standalone
+    // parse produces a non-empty eventTitle containing words that are NOT
+    // recognised date connectors and are NOT known date-related words,
+    // those words are trailing content after the date and the match must
+    // be rejected.
+    Sherlock._setNow(referenceDate);
+    const validation = Sherlock.parse(finalText);
+    const validationTitle = (validation.eventTitle ?? '').trim();
+    if (validationTitle.length > 0) {
+      const connectorWords = [
+        'due',
+        'scheduled',
+        'deadline',
+        'on',
+        'at',
+        'this',
+        'next',
+        'in',
+      ];
+      const dateRelatedWords = new Set([
+        'today',
+        'tomorrow',
+        'yesterday',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+        'week',
+        'day',
+        'month',
+        'year',
+        'hour',
+        'minute',
+        'morning',
+        'afternoon',
+        'evening',
+        'night',
+        'weekend',
+        'daily',
+        'weekly',
+        'monthly',
+        'yearly',
+        'january',
+        'february',
+        'march',
+        'april',
+        'may',
+        'june',
+        'july',
+        'august',
+        'september',
+        'october',
+        'november',
+        'december',
+        'every',
+      ]);
+      const validationTitleWords = validationTitle
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 0);
+      const nonConnectorWords = validationTitleWords.filter(
+        (w) => !connectorWords.includes(w),
+      );
+      const invalidWords = nonConnectorWords.filter(
+        (w) => !dateRelatedWords.has(w),
+      );
+      if (invalidWords.length > 0) {
+        return null;
+      }
+    }
 
     // Extract `matchedText` to be a precise anchor for
     // `removeDateFromText()`.  Three shapes are possible:

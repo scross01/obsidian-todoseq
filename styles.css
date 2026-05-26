@@ -476,6 +476,20 @@
   border-style: solid;
 }
 
+/* Smart date highlight — subtle outline and background on the active task line */
+.todoseq-smart-date-highlight {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 20%,
+    transparent
+  );
+  color: color-mix(in srgb, var(--interactive-accent) 20%, currentColor);
+  outline: 1.5px solid
+    color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+
 /* Task keyword formatting in editor and reading view */
 .todoseq-keyword-formatted {
   font-weight: var(--font-bold);

@@ -20,7 +20,10 @@ import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
-import { smartDatePlugin } from './view/editor-extensions/smart-date-extension';
+import {
+  smartDatePlugin,
+  smartDateHighlightPlugin,
+} from './view/editor-extensions/smart-date-extension';
 
 /** Window flag key to detect hot reload vs fresh Obsidian startup */
 const TODOSEQ_HOT_RELOAD_FLAG = '__todoseq_wasUnloaded';
@@ -136,11 +139,12 @@ export class PluginLifecycleManager {
     this.plugin.smartDateProcessor.setEnabled(
       this.plugin.settings.enableSmartDateRecognition,
     );
-    this.plugin.smartDateProcessor.setParseDelay(
-      this.plugin.settings.smartDateParseDelay,
-    );
     this.plugin.registerEditorExtension([
       smartDatePlugin(this.plugin.smartDateProcessor, this.plugin.settings),
+      smartDateHighlightPlugin(
+        this.plugin.settings,
+        () => this.plugin.vaultScanner?.getParser() ?? null,
+      ),
     ]);
 
     // Register the custom view type

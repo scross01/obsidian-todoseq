@@ -1185,27 +1185,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
-    // Smart date parse delay
-    new Setting(containerEl)
-      .setName('Parse delay (seconds)')
-      .setDesc(
-        'Wait time after typing before converting dates (prevents false positives).',
-      )
-      .addSlider((slider) =>
-        slider
-          .setLimits(0.5, 5.0, 0.5)
-          .setValue(this.plugin.settings.smartDateParseDelay / 1000)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            const delayMs = Math.round(value * 1000);
-            this.plugin.settings.smartDateParseDelay = delayMs;
-            await this.plugin.saveSettings();
-            if (this.plugin.smartDateProcessor) {
-              this.plugin.smartDateProcessor.setParseDelay(delayMs);
-            }
-          }),
-      );
-
     // Remove keywords after conversion
     new Setting(containerEl)
       .setName('Remove date keywords')

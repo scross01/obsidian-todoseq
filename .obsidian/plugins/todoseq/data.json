@@ -38,7 +38,6 @@
   "trackClosedDate": false,
   "useExtendedCheckboxStyles": false,
   "enableSmartDateRecognition": true,
-  "smartDateParseDelay": 1000,
   "smartDateRemoveKeywords": true,
   "_hasShownFirstInstallView": true,
   "settingsVersion": 3

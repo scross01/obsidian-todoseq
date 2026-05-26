@@ -21,7 +21,6 @@ type MockApp = {
 function createMockPlugin(): jest.Mocked<TodoTracker> {
   const settings = createBaseSettings({
     enableSmartDateRecognition: true,
-    smartDateParseDelay: 1500,
     smartDateRemoveKeywords: true,
   });
 
@@ -98,6 +97,25 @@ describe('SmartDateProcessor', () => {
   beforeEach(() => {
     mockPlugin = createMockPlugin();
     processor = new SmartDateProcessor(mockPlugin);
+    // Mock requestAnimationFrame to execute synchronously so the RAF callback
+    // runs before assertions are checked. The source uses window.requestAnimationFrame
+    // (Obsidian popout compatibility), so we mock it directly on both globals.
+    const mockRaf = jest.fn((cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
+    // @ts-ignore - globalThis may not have requestAnimationFrame in type definitions
+    globalThis.requestAnimationFrame = mockRaf;
+    window.requestAnimationFrame = mockRaf;
+  });
+
+  afterEach(() => {
+    // Restore both globals using a plain delete + reassignment pattern.
+    // jest.spyOn().mockRestore() only works on spied references; since we
+    // assigned directly, we delete and let the original restore naturally
+    // (or leave undefined — subsequent beforeEach reassigns anyway).
+    delete (globalThis as any).requestAnimationFrame;
+    delete (window as any).requestAnimationFrame;
   });
 
   describe('Configuration', () => {
@@ -113,11 +131,6 @@ describe('SmartDateProcessor', () => {
       processor.setEnabled(true);
       processor.setEnabled(false);
       expect(processor['debounceTimers'].size).toBe(0);
-    });
-
-    it('should set parse delay', () => {
-      processor.setParseDelay(2000);
-      expect(processor['parseDelay']).toBe(2000);
     });
   });
 
@@ -553,23 +566,193 @@ describe('SmartDateProcessor', () => {
   });
 
   describe('SmartDateProcessor – Bug 2: replace existing date lines below task', () => {
-    let mockPlugin: jest.Mocked<TodoTracker>;
-    let processor: SmartDateProcessor;
-    let dispatchChanges: Array<Record<string, unknown>> = [];
+    it('replaces an existing SCHEDULED line instead of appending a duplicate', async () => {
+      // Bug 2: editing a task that already has a SCHEDULED date line causes
+      // the date parser to re-extract the date and replace the existing line
+      // in-place, rather than appending a duplicate date line below.
 
-    beforeEach(() => {
-      mockPlugin = createMockPlugin();
-      processor = new SmartDateProcessor(mockPlugin);
-      dispatchChanges = [];
+      const filePath = 'test.md';
+      // Use "at 4:00pm" as the date expression — NLP parses it, and
+      // removeDateFromText strips the "at 4:00pm" suffix leaving the clean
+      // task text for the assertion.
+      const taskLineText = 'TODO test 2 at 4:00pm';
+      const taskLineLen = taskLineText.length; // 20
+      // The doc has task line + existing SCHEDULED line below it.
+      // task line: "TODO test 2 at 4:00pm"  (20 chars, from=0, to=20)
+      // newline between lines: position 20
+      // date line: "  SCHEDULED: <2026-05-19 Tue>" (28 chars)
+      const dateLineText = '  SCHEDULED: <2026-05-19 Tue>';
+      const dateLineFrom = taskLineLen + 1; // 21 (after "\n")
+      const dateLineTo = dateLineFrom + dateLineText.length; // 49
+
+      mockPlugin.getVaultScanner.mockReturnValue({
+        getParser: jest.fn().mockReturnValue({
+          isTaskLine: jest.fn().mockReturnValue(true),
+          getDateLineType: jest.fn().mockReturnValue(null),
+          parseLineAsTask: jest.fn().mockReturnValue(
+            createBaseTask({
+              path: filePath,
+              line: 0,
+              rawText: taskLineText,
+              text: 'test 2 at 4:00pm',
+              state: 'TODO',
+            }),
+          ),
+        }),
+      });
+
+      const dispatchFn = jest.fn();
+      const mockView = {
+        state: {
+          selection: { main: { head: 13 } },
+          doc: {
+            lines: 2,
+            // lineAt must correctly map positions to lines so the boundary
+            // check (nextLineNum > doc.lines) works AND findExistingDateLines
+            // can scan line 2. Positions 0-20 → line 1; positions 21-49 → line 2.
+            lineAt: jest.fn((pos: number) => {
+              if (pos <= taskLineLen) {
+                return {
+                  number: 1,
+                  text: taskLineText,
+                  from: 0,
+                  to: taskLineLen,
+                };
+              }
+              return {
+                number: 2,
+                text: dateLineText,
+                from: dateLineFrom,
+                to: dateLineTo,
+              };
+            }),
+            line: jest.fn((n: number) => {
+              if (n === 1) {
+                return { from: 0, to: taskLineLen, text: taskLineText };
+              }
+              if (n === 2) {
+                return {
+                  from: dateLineFrom,
+                  to: dateLineTo,
+                  text: dateLineText,
+                };
+              }
+              return { from: 0, to: taskLineLen, text: taskLineText };
+            }),
+          },
+        },
+        dispatch: dispatchFn,
+      } as any;
+
+      mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
+        file: { path: filePath },
+        editor: { cm: mockView },
+      } as any);
+
+      // RAF mock fires synchronously — no extra await needed.
+      await processor.processLine(filePath, 1, taskLineText, mockView, true);
+
+      expect(dispatchFn).toHaveBeenCalledTimes(1);
+
+      const arg = dispatchFn.mock.calls[0][0];
+      // The replace path: changes.to reaches the END of the existing SCHEDULED
+      // line (dateLineTo=49), not just the task line boundary.
+      expect(arg.changes.from).toBe(0);
+      expect(arg.changes.to).toBe(dateLineTo);
+
+      const insertLines = arg.changes.insert.split('\n');
+      expect(insertLines).toHaveLength(2);
+      // removeDateFromText strips "at 4:00pm" since it's a time expression,
+      // so the task line in the insert is "TODO test 2".
+      expect(insertLines[0]).toBe('TODO test 2');
+      expect(insertLines[1]).toMatch(
+        /^SCHEDULED: <\d{4}-\d{2}-\d{2} \w{3}(?: \d{2}:\d{2})?>$/,
+      );
     });
 
+    it('appends a new date line when no existing date line is present', async () => {
+      // Without an existing date line below, dispatch replaces only the task
+      // line (from=0, to=taskLineLen) — no replace target.
+      // Use "tomorrow" so NLP recognizes it as a valid date expression, and
+      // use doc.lines=1 so findExistingDateLines' boundary check
+      // (nextLineNum > doc.lines) fires immediately after line 1.
+      const filePath = 'test.md';
+      const taskLineText = 'TODO test new date tomorrow';
+      const taskLineLen = taskLineText.length;
+
+      mockPlugin.getVaultScanner.mockReturnValue({
+        getParser: jest.fn().mockReturnValue({
+          isTaskLine: jest.fn().mockReturnValue(true),
+          getDateLineType: jest.fn().mockReturnValue(null),
+          parseLineAsTask: jest.fn().mockReturnValue(
+            createBaseTask({
+              path: filePath,
+              line: 0,
+              rawText: taskLineText,
+              text: 'test new date tomorrow',
+              state: 'TODO',
+            }),
+          ),
+        }),
+      });
+
+      const dispatchFn = jest.fn();
+      const mockView = {
+        state: {
+          selection: { main: { head: 13 } },
+          doc: {
+            // lines=1 means findExistingDateLines' boundary check
+            // (nextLineNum=2 > doc.lines=1) breaks immediately — no scanning.
+            lines: 1,
+            lineAt: jest.fn().mockReturnValue({
+              number: 1,
+              text: taskLineText,
+              from: 0,
+            }),
+            line: jest.fn((n: number) => {
+              if (n === 1) {
+                return { from: 0, to: taskLineLen, text: taskLineText };
+              }
+              // Out-of-range line access — shouldn't be reached since boundary
+              // check fires first, but provide a safe fallback.
+              return { from: 0, to: taskLineLen, text: taskLineText };
+            }),
+          },
+        },
+        dispatch: dispatchFn,
+      } as any;
+
+      mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
+        file: { path: filePath },
+        editor: { cm: mockView },
+      } as any);
+
+      await processor.processLine(filePath, 1, taskLineText, mockView, true);
+
+      expect(dispatchFn).toHaveBeenCalledTimes(1);
+
+      const arg = dispatchFn.mock.calls[0][0];
+      // No existing date line to replace — range ends at task line boundary
+      expect(arg.changes.from).toBe(0);
+      expect(arg.changes.to).toBe(taskLineLen);
+
+      const insertLines = arg.changes.insert.split('\n');
+      expect(insertLines).toHaveLength(2);
+      // removeDateFromText strips "tomorrow" since it's a date expression,
+      // so the task line in the insert is "TODO test new date".
+      expect(insertLines[0]).toBe('TODO test new date');
+      expect(insertLines[1]).toMatch(
+        /^SCHEDULED: <\d{4}-\d{2}-\d{2} \w{3}(?: \d{2}:\d{2})?>$/,
+      );
+    });
+  });
+
+  describe('findExistingDateLines helper', () => {
     /** Build a document whose lines are driven by a plain string array. */
     function buildView(
       lines: string[],
       cursorLine: number = 3,
-      dispatchFn: jest.Mock = jest.fn((...args: unknown[]) => {
-        dispatchChanges.push(...(args as Array<Record<string, unknown>>));
-      }),
+      dispatchFn: jest.Mock = jest.fn(),
     ): Record<string, unknown> {
       const fns = lines.map((t) =>
         jest.fn(() => ({ text: t, number: 0, from: 0, to: t.length })),
@@ -599,83 +782,15 @@ describe('SmartDateProcessor', () => {
       } as Record<string, unknown>;
     }
 
-    it('replaces an existing SCHEDULED line instead of appending a duplicate', async () => {
-      // Bug 2: editing a task that already has a SCHEDULED date line now causes
-      // the date parser to re-extract the date and replace the existing line
-      // in-place.
-
-      const filePath = 'test.md';
-      const taskLineText = 'TODO test 2';
-      const existingScheduled = '  SCHEDULED: <2026-05-19 Tue>';
-      const updatedTaskText = 'TODO test 2 Saturday';
-
-      mockPlugin.getVaultScanner.mockReturnValue({
-        getParser: jest.fn().mockReturnValue({
-          isTaskLine: jest.fn().mockReturnValue(true),
-          getDateLineType: jest.fn().mockReturnValue(null),
-          parseLineAsTask: jest.fn().mockReturnValue(
-            createBaseTask({
-              path: filePath,
-              line: 0,
-              rawText: updatedTaskText,
-              text: 'test 2 Saturday',
-              state: 'TODO',
-            }),
-          ),
-        }),
-      });
-
-      const mockView = buildView([
-        taskLineText,
-        existingScheduled,
-        '',
-        '',
-        '',
-        '',
-      ]);
-      mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
-        file: { path: filePath },
-        editor: { cm: mockView as any },
-      } as any);
-
-      // processLine called with skipCursorCheck=true (cursor-leave path)
-      await processor.processLine(
-        filePath,
-        1,
-        updatedTaskText,
-        mockView as any,
-        true,
-      );
-      await Promise.resolve();
-
-      // CM6 dispatch was called exactly once
-      expect(dispatchChanges).toHaveLength(1);
-
-      // The dispatched change replaces the task+existing-scheduled span with new content
-      const changeChanges = dispatchChanges[0].changes as {
-        from: number;
-        to: number;
-        insert: string;
-      };
-      const lines = changeChanges.insert.split('\n');
-      expect(lines).toHaveLength(2);
-      // getDateLineIndent returns '' for keyword-only tasks (no list marker),
-      // so the SCHEDULED/DEADLINE line has no leading indent.
-      expect(lines[0]).toContain('TODO test 2');
-      expect(lines[1]).toMatch(/^SCHEDULED: <\d{4}-\d{2}-\d{2} \w{3}>$/);
-      expect(changeChanges.insert).not.toContain('Saturday'); // natural language removed
-    });
-
     it('findExistingDateLines correctly skips empty lines and stops at non-date lines', () => {
       const filePath = 'test.md';
-      const lines = [
+      const mockView = buildView([
         'TODO task',
         '  SCHEDULED: <2026-05-19 Tue>',
         '  DEADLINE: <2026-05-20 Wed>',
         '  CLOSED: [2026-05-18 Mon]',
         'regular text that is not a date line',
-      ];
-      const mockView = buildView(lines);
+      ]);
 
       mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
         file: { path: filePath },
@@ -694,10 +809,27 @@ describe('SmartDateProcessor', () => {
     });
 
     it('findExistingDateLines returns empty when view file does not match', () => {
+      const filePath = 'test.md';
+      const mockView = buildView(['TODO task', '  SCHEDULED: <...>']);
+
+      mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
+        file: { path: filePath },
+        editor: { cm: mockView as any },
+      } as any);
+
+      const result = (processor as any).findExistingDateLines(
+        'other.md',
+        1,
+        mockView as any,
+      );
+      expect(result).toHaveLength(0);
+    });
+
+    it('findExistingDateLines returns empty when view is null', () => {
       mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue(null);
       const mockView = buildView(['TODO task', '  SCHEDULED: <...>']);
       const result = (processor as any).findExistingDateLines(
-        'other.md',
+        'test.md',
         1,
         mockView as any,
       );

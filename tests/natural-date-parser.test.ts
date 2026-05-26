@@ -679,6 +679,57 @@ describe('NaturalDateParser', () => {
       expect(result).toBeNull();
     });
 
+    it('should reject a date followed by trailing non-date content', () => {
+      const result = NaturalDateParser.parse(
+        'TODO test 1 on Wednesday invalid',
+        referenceDate,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should reject "tomorrow" followed by trailing content', () => {
+      const result = NaturalDateParser.parse(
+        'TODO Call John tomorrow invalid',
+        referenceDate,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should reject "today" followed by trailing content', () => {
+      const result = NaturalDateParser.parse(
+        'TODO task today invalid',
+        referenceDate,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should parse "due tomorrow" with connector prefix', () => {
+      const result = NaturalDateParser.parse(
+        'TODO test 8 due tomorrow',
+        referenceDate,
+      );
+      expect(result).not.toBeNull();
+      expect(result?.date?.getDate()).toBe(19);
+      expect(result?.matchedText).toBe('tomorrow');
+    });
+
+    it('should reject weekday+time followed by trailing content', () => {
+      const result = NaturalDateParser.parse(
+        'TODO test 1 on Wednesday at 4:00pm invalid',
+        referenceDate,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should still parse a date at the very end of the line', () => {
+      const result = NaturalDateParser.parse(
+        'TODO test 1 on Wednesday',
+        referenceDate,
+      );
+      expect(result).not.toBeNull();
+      expect(result?.date?.getDay()).toBe(3);
+    });
+
     it('should parse "due tomorrow" as one-time (connector stripped by caller)', () => {
       const result = NaturalDateParser.parse(
         'TODO project due tomorrow',
