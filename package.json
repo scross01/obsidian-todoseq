@@ -46,8 +46,8 @@
     "generate-content": "ts-node scripts/content-generator.ts"
   },
   "dependencies": {
-    "obsidian-daily-notes-interface": "^0.9.4",
-    "sherlockjs": "^1.4.2"
+    "chrono-node": "^2.9.1",
+    "obsidian-daily-notes-interface": "^0.9.4"
   },
   "overrides": {
     "esbuild": "^0.25.8"

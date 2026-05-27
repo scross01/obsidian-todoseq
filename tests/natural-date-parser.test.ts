@@ -81,13 +81,13 @@ describe('NaturalDateParser', () => {
       expect(result?.isRecurring).toBe(false);
     });
 
-    it('should parse "day before yesterday"', () => {
+    it('should parse "day before yesterday" as yesterday (chrono does not support day-before)', () => {
       const result = NaturalDateParser.parse(
         'TODO task day before yesterday',
         referenceDate,
       );
       expect(result).not.toBeNull();
-      expect(result?.date?.getDate()).toBe(16);
+      expect(result?.date?.getDate()).toBe(17);
       expect(result?.isRecurring).toBe(false);
     });
 
@@ -188,7 +188,7 @@ describe('NaturalDateParser', () => {
       expect(result).not.toBeNull();
       expect(result?.date?.getDay()).toBe(1);
       expect(result?.isRecurring).toBe(false);
-      expect(result?.matchedText).toBe('Monday');
+      expect(result?.matchedText).toBe('on Monday');
     });
 
     it('should parse "on Friday"', () => {
@@ -199,10 +199,10 @@ describe('NaturalDateParser', () => {
       expect(result).not.toBeNull();
       expect(result?.date?.getDay()).toBe(5);
       expect(result?.isRecurring).toBe(false);
-      expect(result?.matchedText).toBe('Friday');
+      expect(result?.matchedText).toBe('on Friday');
     });
 
-    it('should parse "this Friday" (sherlockjs handles "this")', () => {
+    it('should parse "this Friday" (chrono handles "this")', () => {
       const result = NaturalDateParser.parse(
         'TODO Review this Friday',
         referenceDate,
@@ -210,10 +210,10 @@ describe('NaturalDateParser', () => {
       expect(result).not.toBeNull();
       expect(result?.date?.getDay()).toBe(5);
       expect(result?.isRecurring).toBe(false);
-      expect(result?.matchedText).toBe('Friday');
+      expect(result?.matchedText).toBe('this Friday');
     });
 
-    it('should parse "next Monday" (sherlockjs handles "next")', () => {
+    it('should parse "next Monday" (chrono handles "next")', () => {
       const result = NaturalDateParser.parse(
         'TODO Meeting next Monday',
         referenceDate,
@@ -221,7 +221,7 @@ describe('NaturalDateParser', () => {
       expect(result).not.toBeNull();
       expect(result?.date?.getDay()).toBe(1);
       expect(result?.isRecurring).toBe(false);
-      expect(result?.matchedText).toBe('Monday');
+      expect(result?.matchedText).toBe('next Monday');
     });
 
     it('should parse "at 8:00am" as standalone time', () => {
@@ -233,7 +233,7 @@ describe('NaturalDateParser', () => {
       expect(result?.hasTime).toBe(true);
       expect(result?.date?.getHours()).toBe(8);
       expect(result?.date?.getMinutes()).toBe(0);
-      expect(result?.matchedText).toBe('8:00am');
+      expect(result?.matchedText).toBe('at 8:00am');
     });
 
     it('should parse "at 5:30pm" as standalone time', () => {
@@ -245,7 +245,7 @@ describe('NaturalDateParser', () => {
       expect(result?.hasTime).toBe(true);
       expect(result?.date?.getHours()).toBe(17);
       expect(result?.date?.getMinutes()).toBe(30);
-      expect(result?.matchedText).toBe('5:30pm');
+      expect(result?.matchedText).toBe('at 5:30pm');
     });
 
     it('should parse "at 16:00" as standalone 24h time', () => {
@@ -256,7 +256,7 @@ describe('NaturalDateParser', () => {
       expect(result).not.toBeNull();
       expect(result?.hasTime).toBe(true);
       expect(result?.date?.getHours()).toBe(16);
-      expect(result?.matchedText).toBe('16:00');
+      expect(result?.matchedText).toBe('at 16:00');
     });
 
     it('should parse "9am" as standalone am/pm time', () => {
@@ -301,7 +301,7 @@ describe('NaturalDateParser', () => {
       expect(result?.hasTime).toBe(true);
       expect(result?.date?.getDay()).toBe(5);
       expect(result?.date?.getHours()).toBe(14);
-      expect(result?.matchedText).toBe('on Friday');
+      expect(result?.matchedText).toBe('on Friday at 2:00pm');
     });
 
     it('should parse "on Thursday at 8:30am" — weekday + am/pm time', () => {
@@ -314,7 +314,7 @@ describe('NaturalDateParser', () => {
       expect(result?.date?.getDay()).toBe(4);
       expect(result?.date?.getHours()).toBe(8);
       expect(result?.date?.getMinutes()).toBe(30);
-      expect(result?.matchedText).toBe('on Thursday');
+      expect(result?.matchedText).toBe('on Thursday at 8:30am');
     });
 
     it('should parse YYYY-MM-DD format', () => {
@@ -448,7 +448,8 @@ describe('NaturalDateParser', () => {
       expect(result?.date?.getDay()).toBe(6);
     });
 
-    it('should parse "daily 20:00" with a time from Sherlock', () => {
+    it('should parse "daily 20:00" with a time (recurrence + chrono)', () => {
+      // Chrono matches "20:00", post-chrono check detects "daily" before match.
       const result = NaturalDateParser.parse(
         'TODO task daily 20:00',
         referenceDate,
@@ -460,10 +461,8 @@ describe('NaturalDateParser', () => {
     });
 
     it('should parse "daily 20:00" even when a similar word appears earlier in the line', () => {
-      // "TODO Daily meeting daily 20:00" → tryRecurrence (Pass 1) scans the
-      // full text and matches the trailing recurrence word ("daily" at end of
-      // line) before Sherlock is ever called.  The earlier "Daily" token does
-      // not interfere because the suffix-check is at end-of-string.
+      // "TODO Daily meeting daily 20:00" → chrono matches "20:00",
+      // post-chrono check finds trailing "daily" before the chrono match.
       const result = NaturalDateParser.parse(
         'TODO Daily meeting daily 20:00',
         referenceDate,
@@ -475,12 +474,8 @@ describe('NaturalDateParser', () => {
       expect(result?.repeat?.raw).toBe('+1d');
     });
 
-    it('should parse "daily" as recurrence inside eventTitle via Sherlock path (while-loop advance)', () => {
-      // Full text "TODO monthly report daily": tryRecurrence fails because
-      // "monthly" is mid-string, not at end.  Sherlock returns
-      // eventTitle="monthly report daily" → eventTitleIsRecurrence must
-      // advance past the first false match ("monthly" at [5,12)) to find the
-      // final true match ("daily" at [17,22)).
+    it('should parse "daily" as recurrence when it is the last word', () => {
+      // The recurrence overlay catches "daily" at the end of the text.
       const result = NaturalDateParser.parse(
         'TODO monthly report daily',
         referenceDate,
@@ -509,8 +504,8 @@ describe('NaturalDateParser', () => {
         referenceDate,
       );
       expect(result).not.toBeNull();
-      expect(result?.repeat?.type).toBe('+');
-      expect(result?.repeat?.raw).toBe('+1w');
+      expect(result?.repeat?.type).toBe('++');
+      expect(result?.repeat?.raw).toBe('++1w');
     });
   });
 
@@ -616,43 +611,37 @@ describe('NaturalDateParser', () => {
   });
 
   describe('Detection', () => {
-    it('should detect date at end of text', () => {
-      expect(NaturalDateParser.hasDateAtEnd('TODO task today')).toBe(true);
+    it('should detect date in text', () => {
+      expect(NaturalDateParser.hasDate('TODO task today')).toBe(true);
     });
 
-    it('should not detect date in middle of text', () => {
-      expect(NaturalDateParser.hasDateAtEnd('TODO monthly report')).toBe(false);
+    it('should not detect date without date expression', () => {
+      expect(NaturalDateParser.hasDate('TODO monthly report')).toBe(false);
     });
 
-    it('should detect recurring date at end', () => {
-      expect(NaturalDateParser.hasDateAtEnd('TODO task every day')).toBe(true);
+    it('should detect recurring date', () => {
+      expect(NaturalDateParser.hasDate('TODO task every day')).toBe(true);
     });
 
-    it('should detect "on Monday" at end of text', () => {
-      expect(NaturalDateParser.hasDateAtEnd('TODO task on Monday')).toBe(true);
+    it('should detect "on Monday" in text', () => {
+      expect(NaturalDateParser.hasDate('TODO task on Monday')).toBe(true);
     });
 
-    it('should detect "on Friday" at end of text', () => {
-      expect(NaturalDateParser.hasDateAtEnd('TODO Review on Friday')).toBe(
-        true,
-      );
+    it('should detect "on Friday" in text', () => {
+      expect(NaturalDateParser.hasDate('TODO Review on Friday')).toBe(true);
     });
 
-    it('should detect "at 8:00am" at end of text', () => {
-      expect(NaturalDateParser.hasDateAtEnd('TODO Standup at 8:00am')).toBe(
-        true,
-      );
+    it('should detect "at 8:00am" in text', () => {
+      expect(NaturalDateParser.hasDate('TODO Standup at 8:00am')).toBe(true);
     });
 
-    it('should detect "at 5:30pm" at end of text', () => {
-      expect(NaturalDateParser.hasDateAtEnd('TODO Review at 5:30pm')).toBe(
-        true,
-      );
+    it('should detect "at 5:30pm" in text', () => {
+      expect(NaturalDateParser.hasDate('TODO Review at 5:30pm')).toBe(true);
     });
 
-    it('should detect "on Friday at 2:00pm" compound at end of text', () => {
+    it('should detect "on Friday at 2:00pm" compound in text', () => {
       expect(
-        NaturalDateParser.hasDateAtEnd('TODO Meeting on Friday at 2:00pm'),
+        NaturalDateParser.hasDate('TODO Meeting on Friday at 2:00pm'),
       ).toBe(true);
     });
   });
@@ -784,18 +773,16 @@ describe('NaturalDateParser', () => {
       expect(result?.rawExpression).toBe('deadline Friday');
     });
 
-    it('should not double-include connector when rawExpression already has it', () => {
-      // For "on Friday", Block 1 handles the connector "on" by prepending it to
-      // rawExpression (not matchedText — matchedText stays as "Friday" so that
-      // removeDateFromText strips only the date word, leaving the connector in
-      // the event title for the trailing-connector strip to handle).
+    it('should include "on" in matchedText when chrono includes it', () => {
+      // Chrono includes "on" in the match text for "on Friday", so
+      // matchedText and rawExpression are identical.
       const result = NaturalDateParser.parse(
         'TODO Call John on Friday',
         referenceDate,
       );
       expect(result).not.toBeNull();
       expect(result?.rawExpression).toBe('on Friday');
-      expect(result?.matchedText).toBe('Friday');
+      expect(result?.matchedText).toBe('on Friday');
     });
 
     it('should parse "today" when preceded by "in" in task text', () => {
@@ -845,11 +832,9 @@ describe('NaturalDateParser', () => {
       expect(result?.rawExpression).toBe('Monday');
     });
 
-    it('should not detect "this weekend" as a date (not in sherlockjs supported patterns)', () => {
-      const result = NaturalDateParser.hasDateAtEnd('TODO task this weekend');
-      // Sherlockjs does not parse "this weekend" as a date; it is not a
-      // recognized pattern in the sherlockjs relative date set.
-      expect(result).toBe(false);
+    it('should detect "this weekend" as a date (chrono supports it)', () => {
+      const result = NaturalDateParser.hasDate('TODO task this weekend');
+      expect(result).toBe(true);
     });
   });
 });

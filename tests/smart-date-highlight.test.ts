@@ -250,10 +250,9 @@ describe('buildSmartDateDecorations', () => {
     expect(ranges[0].to).toBe(42 + 5); // 47
   });
 
-  it('skips highlighting when the parser cannot isolate the date expression', () => {
-    // When the NLP parser returns matchedText that covers most of the line,
-    // it failed to separate eventTitle from the date — highlighting the
-    // entire line is useless noise, so we skip.
+  it('highlights the last date when multiple date-like words exist in the line', () => {
+    // Chrono correctly isolates "today" (the last date word) as the
+    // matchedText, so highlighting is produced.
     const view = buildMockView({
       lines: ['TODO today task about today'],
       cursorLine: 1,
@@ -265,7 +264,8 @@ describe('buildSmartDateDecorations', () => {
       () => ({ isTaskLine: () => true }) as any,
     );
     const ranges = collectDecorations(decorations);
-    expect(ranges).toHaveLength(0);
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0].from).toBe(22); // last "today" on the line
   });
 
   it('includes correct aria-label and data attribute', () => {
