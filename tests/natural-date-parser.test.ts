@@ -592,6 +592,27 @@ describe('NaturalDateParser', () => {
       );
       expect(result).toBe('TODO project');
     });
+
+    it('should retain non-date words before the date when preceded by "in"', () => {
+      const result = NaturalDateParser.removeDateFromText(
+        'TODO put stuff in the basement tomorrow',
+      );
+      expect(result).toBe('TODO put stuff in the basement');
+    });
+
+    it('should retain non-date words before the date when preceded by "on"', () => {
+      const result = NaturalDateParser.removeDateFromText(
+        'TODO file paperwork on the agenda today',
+      );
+      expect(result).toBe('TODO file paperwork on the agenda');
+    });
+
+    it('should retain non-date words before the date when preceded by "at"', () => {
+      const result = NaturalDateParser.removeDateFromText(
+        'TODO meeting at the office tomorrow',
+      );
+      expect(result).toBe('TODO meeting at the office');
+    });
   });
 
   describe('Detection', () => {
@@ -775,6 +796,53 @@ describe('NaturalDateParser', () => {
       expect(result).not.toBeNull();
       expect(result?.rawExpression).toBe('on Friday');
       expect(result?.matchedText).toBe('Friday');
+    });
+
+    it('should parse "today" when preceded by "in" in task text', () => {
+      const result = NaturalDateParser.parse(
+        'TODO file paperwork in the basement today',
+        referenceDate,
+      );
+      expect(result).not.toBeNull();
+      expect(result?.date?.getDate()).toBe(18);
+      expect(result?.hasTime).toBe(false);
+      expect(result?.matchedText).toBe('today');
+      expect(result?.rawExpression).toBe('today');
+    });
+
+    it('should parse "today" when preceded by "on" in task text', () => {
+      const result = NaturalDateParser.parse(
+        'TODO file paperwork on the agenda today',
+        referenceDate,
+      );
+      expect(result).not.toBeNull();
+      expect(result?.date?.getDate()).toBe(18);
+      expect(result?.hasTime).toBe(false);
+      expect(result?.matchedText).toBe('today');
+      expect(result?.rawExpression).toBe('today');
+    });
+
+    it('should parse "tomorrow" when preceded by "at" in task text', () => {
+      const result = NaturalDateParser.parse(
+        'TODO meeting at the office tomorrow',
+        referenceDate,
+      );
+      expect(result).not.toBeNull();
+      expect(result?.date?.getDate()).toBe(19);
+      expect(result?.hasTime).toBe(false);
+      expect(result?.matchedText).toBe('tomorrow');
+      expect(result?.rawExpression).toBe('tomorrow');
+    });
+
+    it('should parse weekday when preceded by "in" in task text', () => {
+      const result = NaturalDateParser.parse(
+        'TODO test in a meeting Monday',
+        referenceDate,
+      );
+      expect(result).not.toBeNull();
+      expect(result?.date?.getDay()).toBe(1);
+      expect(result?.matchedText).toBe('Monday');
+      expect(result?.rawExpression).toBe('Monday');
     });
 
     it('should not detect "this weekend" as a date (not in sherlockjs supported patterns)', () => {

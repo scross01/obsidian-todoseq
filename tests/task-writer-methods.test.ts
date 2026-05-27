@@ -311,7 +311,7 @@ describe('TaskWriter Instance Methods', () => {
       expect(mockApp.vault.process).toHaveBeenCalled();
     });
 
-    it('should update task priority using vault.process for all files', async () => {
+    it('should update task priority using editor API for active file', async () => {
       const task: Task = createBaseTask();
       const mockEditor = {
         getLine: jest.fn().mockReturnValue('TODO Task text'),
@@ -320,6 +320,8 @@ describe('TaskWriter Instance Methods', () => {
       const mockMarkdownView = {
         file: { path: 'test.md' },
         editor: mockEditor,
+        getViewType: jest.fn().mockReturnValue('markdown'),
+        getMode: jest.fn().mockReturnValue('source'),
       };
 
       mockApp.workspace.getActiveViewOfType = jest
@@ -332,9 +334,8 @@ describe('TaskWriter Instance Methods', () => {
 
       await taskWriter.updateTaskPriority(task, 'med');
 
-      // Always uses vault.process() regardless of whether file is active
-      expect(mockApp.vault.process).toHaveBeenCalled();
-      expect(mockEditor.replaceRange).not.toHaveBeenCalled();
+      expect(mockApp.vault.process).not.toHaveBeenCalled();
+      expect(mockEditor.replaceRange).toHaveBeenCalled();
     });
 
     it('should remove existing priority before adding new one', async () => {

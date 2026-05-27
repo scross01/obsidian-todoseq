@@ -76,100 +76,166 @@ describe('Editor Controller - Operations (copy, move, migrate, context menu)', (
     };
   });
 
-  describe('cleanTaskTextFromSlashCommand', () => {
-    it('should return original text when there is no slash command', () => {
+  describe('cleanSlashCommandFromEditorLine', () => {
+    it('should return null when there is no slash command', () => {
+      const mockReplaceRange = jest.fn();
       const editor = {
         getCursor: () => ({ line: 0, ch: 20 }),
         getLine: () => 'TODO Test task text',
+        replaceRange: mockReplaceRange,
       };
 
-      const result = editorController['cleanTaskTextFromSlashCommand'](
-        'Test task text',
+      const result = editorController['cleanSlashCommandFromEditorLine'](
         editor as any,
         0,
       );
 
-      expect(result).toBe('Test task text');
+      expect(result).toBeNull();
+      expect(mockReplaceRange).not.toHaveBeenCalled();
     });
 
-    it('should remove slash command at end of text before cursor', () => {
+    it('should remove slash word at end of line', () => {
+      const mockReplaceRange = jest.fn();
       const editor = {
-        getCursor: () => ({ line: 0, ch: 25 }),
+        getCursor: () => ({ line: 0, ch: 24 }),
         getLine: () => 'TODO Test task text /high',
+        replaceRange: mockReplaceRange,
       };
 
-      const result = editorController['cleanTaskTextFromSlashCommand'](
-        'Test task text /high',
+      const result = editorController['cleanSlashCommandFromEditorLine'](
         editor as any,
         0,
       );
 
-      expect(result).toBe('Test task text');
+      expect(result).toBe('TODO Test task text');
+      expect(mockReplaceRange).toHaveBeenCalledWith(
+        'TODO Test task text',
+        { line: 0, ch: 0 },
+        { line: 0, ch: 25 },
+      );
     });
 
-    it('should remove slash command with trailing spaces before cursor', () => {
+    it('should remove slash word with trailing space', () => {
+      const mockReplaceRange = jest.fn();
       const editor = {
-        getCursor: () => ({ line: 0, ch: 26 }),
+        getCursor: () => ({ line: 0, ch: 24 }),
         getLine: () => 'TODO Test task text /high ',
+        replaceRange: mockReplaceRange,
       };
 
-      const result = editorController['cleanTaskTextFromSlashCommand'](
-        'Test task text /high ',
+      const result = editorController['cleanSlashCommandFromEditorLine'](
         editor as any,
         0,
       );
 
-      expect(result).toBe('Test task text');
+      expect(result).toBe('TODO Test task text');
+      expect(mockReplaceRange).toHaveBeenCalled();
     });
 
-    it('should remove slash command even after cursor via fallback regex', () => {
-      // The fallback regex in cleanTaskTextFromSlashCommand removes any
-      // slash command in the full taskText, regardless of cursor position
+    it('should remove slash word at the end of line', () => {
+      const mockReplaceRange = jest.fn();
       const editor = {
-        getCursor: () => ({ line: 0, ch: 5 }),
+        getCursor: () => ({ line: 0, ch: 15 }),
         getLine: () => 'TODO Hello /high',
+        replaceRange: mockReplaceRange,
       };
 
-      const result = editorController['cleanTaskTextFromSlashCommand'](
-        'Hello /high',
+      const result = editorController['cleanSlashCommandFromEditorLine'](
         editor as any,
         0,
       );
 
-      expect(result).toBe('Hello');
+      expect(result).toBe('TODO Hello');
+      expect(mockReplaceRange).toHaveBeenCalled();
     });
 
-    it('should handle slash command in middle of text before cursor', () => {
+    it('should remove slash word in middle of text', () => {
+      const mockReplaceRange = jest.fn();
       const editor = {
-        getCursor: () => ({ line: 0, ch: 30 }),
+        getCursor: () => ({ line: 0, ch: 23 }),
         getLine: () => 'TODO Buy groceries /high and milk',
+        replaceRange: mockReplaceRange,
       };
 
-      const result = editorController['cleanTaskTextFromSlashCommand'](
-        'Buy groceries /high and milk',
+      const result = editorController['cleanSlashCommandFromEditorLine'](
         editor as any,
         0,
       );
 
-      // Should remove /high and keep rest
-      expect(result).toContain('Buy groceries');
-      expect(result).toContain('and milk');
-      expect(result).not.toContain('/high');
+      expect(result).toBe('TODO Buy groceries and milk');
+      expect(mockReplaceRange).toHaveBeenCalled();
     });
 
-    it('should handle text without any slash-like pattern', () => {
+    it('should only remove the slash word at cursor when multiple exist', () => {
+      const mockReplaceRange = jest.fn();
+      const editor = {
+        getCursor: () => ({ line: 0, ch: 21 }),
+        getLine: () => 'TODO test 1 /test /low',
+        replaceRange: mockReplaceRange,
+      };
+
+      const result = editorController['cleanSlashCommandFromEditorLine'](
+        editor as any,
+        0,
+      );
+
+      expect(result).toBe('TODO test 1 /test');
+      expect(mockReplaceRange).toHaveBeenCalled();
+    });
+
+    it('should not remove other slash words when cursor is not on one', () => {
+      const mockReplaceRange = jest.fn();
+      const editor = {
+        getCursor: () => ({ line: 0, ch: 10 }),
+        getLine: () => 'TODO test 1 /test /low',
+        replaceRange: mockReplaceRange,
+      };
+
+      const result = editorController['cleanSlashCommandFromEditorLine'](
+        editor as any,
+        0,
+      );
+
+      expect(result).toBeNull();
+      expect(mockReplaceRange).not.toHaveBeenCalled();
+    });
+
+    it('should handle bare trailing slash without text after it', () => {
+      const mockReplaceRange = jest.fn();
+      const editor = {
+        getCursor: () => ({ line: 0, ch: 12 }),
+        getLine: () => 'TODO test 3 /',
+        replaceRange: mockReplaceRange,
+      };
+
+      const result = editorController['cleanSlashCommandFromEditorLine'](
+        editor as any,
+        0,
+      );
+
+      expect(result).toBe('TODO test 3');
+      expect(mockReplaceRange).toHaveBeenCalledWith(
+        'TODO test 3',
+        { line: 0, ch: 0 },
+        { line: 0, ch: 13 },
+      );
+    });
+
+    it('should return null when cursor is not on a slash word', () => {
+      const mockReplaceRange = jest.fn();
       const editor = {
         getCursor: () => ({ line: 0, ch: 5 }),
         getLine: () => 'TODO No slash here',
+        replaceRange: mockReplaceRange,
       };
 
-      const result = editorController['cleanTaskTextFromSlashCommand'](
-        'No slash here',
+      const result = editorController['cleanSlashCommandFromEditorLine'](
         editor as any,
         0,
       );
 
-      expect(result).toBe('No slash here');
+      expect(result).toBeNull();
+      expect(mockReplaceRange).not.toHaveBeenCalled();
     });
   });
 
@@ -719,11 +785,10 @@ describe('Editor Controller - Operations (copy, move, migrate, context menu)', (
       expect(cleanedTask.text).toContain('Buy groceries');
     });
 
-    it('should use fallback slash command removal when primary regex does not match', async () => {
-      // Primary regex checks text before cursor for /\s+\/([a-zA-Z]+)\s*$/
-      // If cursor is early, it won't match, but fallback regex checks full taskText
+    it('should remove slash word at cursor when setting priority', async () => {
+      // Cursor is on /high → should be removed from task text
       mockEditor.getLine = () => 'TODO Task with slash /high in middle';
-      mockEditor.getCursor = () => ({ line: 0, ch: 10 });
+      mockEditor.getCursor = () => ({ line: 0, ch: 23 });
 
       await editorController.handleSetPriorityAtLine(
         false,

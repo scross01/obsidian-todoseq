@@ -301,11 +301,12 @@ export class TaskUpdateCoordinator {
   async updateTaskPriority(
     task: Task,
     newPriority: 'high' | 'med' | 'low' | null,
+    source: UpdateSource = 'task-list',
   ): Promise<void> {
     return this.updateTask({
       task,
       type: 'priority',
-      source: 'task-list',
+      source,
       newPriority,
     });
   }
@@ -510,6 +511,29 @@ export class TaskUpdateCoordinator {
   }
 
   /**
+   * Resolve the stored task from the state manager, with content-based fallback.
+   * Used for non-editor sources where the line number may have shifted.
+   */
+  private resolveStoredTask(context: ProcessingContext): Task {
+    let storedTask = this.taskStateManager.findTaskByPathAndLine(
+      context.filePath,
+      context.fileLine,
+    );
+
+    if (!storedTask || storedTask.rawText !== context.task.rawText) {
+      const validatedTask = this.taskStateManager.findTaskByContent(
+        context.filePath,
+        context.task,
+      );
+      if (validatedTask) {
+        storedTask = validatedTask;
+      }
+    }
+
+    return storedTask || context.task;
+  }
+
+  /**
    * ASYNC PHASE: Perform file write, recurrence, and state finalization.
    */
   private async performAsyncPhase(context: ProcessingContext): Promise<void> {
@@ -521,22 +545,13 @@ export class TaskUpdateCoordinator {
         throw new Error('TaskEditor is not initialized');
       }
 
-      let currentTask = this.taskStateManager.findTaskByPathAndLine(
-        context.filePath,
-        context.fileLine,
-      );
-
-      if (!currentTask || currentTask.rawText !== context.task.rawText) {
-        const validatedTask = this.taskStateManager.findTaskByContent(
-          context.filePath,
-          context.task,
-        );
-        if (validatedTask) {
-          currentTask = validatedTask;
-        }
-      }
-
-      currentTask = currentTask || context.task;
+      // When source is 'editor', use the editor-parsed task directly
+      // The stored vault-scanned task may be stale (e.g. still has slash command text)
+      // and must not be substituted — the editor always has the latest content
+      const currentTask =
+        context.source === 'editor'
+          ? context.task
+          : this.resolveStoredTask(context);
 
       let updatedTask: Task;
       try {
@@ -772,6 +787,9 @@ export class TaskUpdateCoordinator {
           updatedTask.line,
           {
             rawText: updatedTask.rawText,
+            text: updatedTask.text,
+            state: updatedTask.state,
+            completed: updatedTask.completed,
             priority: updatedTask.priority,
             urgency,
           },

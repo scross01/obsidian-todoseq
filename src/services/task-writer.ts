@@ -396,17 +396,49 @@ export class TaskWriter {
     const newTaskLine = `${indent}${footnoteMarker}${listMarkerWithSpace}${state} ${priorityToken}${embedReference}${text}${footnoteReference}`;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
-    if (file && file instanceof TFile) {
-      // Always use vault.process() for atomic background edits
-      // This ensures the file is updated correctly in all modes (editor, reader, etc.)
-      await this.app.vault.process(file, (data) => {
-        const lines = data.split('\n');
-        if (task.line < lines.length) {
-          lines[task.line] = newTaskLine;
-        }
-        return lines.join('\n');
-      });
+    if (!file || !(file instanceof TFile)) {
+      return {
+        ...task,
+        rawText: newTaskLine,
+        priority: newPriority,
+      };
     }
+
+    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const isActive = md?.file?.path === task.path;
+    const editor = md?.editor;
+
+    const isSourceMode =
+      isActive &&
+      editor &&
+      md?.getViewType() === 'markdown' &&
+      md?.getMode &&
+      md.getMode() === 'source';
+
+    if (isSourceMode) {
+      const currentLine = editor.getLine(task.line);
+      if (typeof currentLine === 'string') {
+        const from: EditorPosition = { line: task.line, ch: 0 };
+        const to: EditorPosition = {
+          line: task.line,
+          ch: currentLine.length,
+        };
+        editor.replaceRange(newTaskLine, from, to);
+      }
+      return {
+        ...task,
+        rawText: newTaskLine,
+        priority: newPriority,
+      };
+    }
+
+    await this.app.vault.process(file, (data) => {
+      const lines = data.split('\n');
+      if (task.line < lines.length) {
+        lines[task.line] = newTaskLine;
+      }
+      return lines.join('\n');
+    });
 
     // Return an updated Task snapshot (do not mutate original)
     return {
@@ -666,15 +698,16 @@ export class TaskWriter {
           };
           editor.replaceRange(newLine, from, to);
         }
-      } else {
-        await this.app.vault.process(file, (data) => {
-          const lines = data.split('\n');
-          if (task.line < lines.length) {
-            lines[task.line] = newLine;
-          }
-          return lines.join('\n');
-        });
+        return;
       }
+
+      await this.app.vault.process(file, (data) => {
+        const lines = data.split('\n');
+        if (task.line < lines.length) {
+          lines[task.line] = newLine;
+        }
+        return lines.join('\n');
+      });
     }
   }
 

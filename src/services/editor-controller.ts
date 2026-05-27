@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice } from 'obsidian';
+import { Editor, EditorPosition, MarkdownView, Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from '../types/task';
 import TodoTracker from '../main';
@@ -40,22 +40,6 @@ export class EditorController {
   ) {}
 
   /**
-   * Find a task in the in-memory task list by file path and line number
-   * @param filePath - The path to the file
-   * @param lineNumber - The line number (0-indexed)
-   * @returns The Task object or null if not found
-   */
-  private findTaskByPathAndLine(
-    filePath: string,
-    lineNumber: number,
-  ): Task | null {
-    return this.plugin.taskStateManager.findTaskByPathAndLine(
-      filePath,
-      lineNumber,
-    );
-  }
-
-  /**
    * Parse a task from a line of text
    * @param line - The line of text containing the task
    * @param lineNumber - The line number in the file
@@ -67,19 +51,8 @@ export class EditorController {
     lineNumber: number,
     filePath: string,
   ): Task | null {
-    // First try to get the task from state manager (has full date info)
-    // This ensures we have access to scheduled/deadline dates for recurring tasks
-    if (this.plugin.taskStateManager) {
-      const existingTask = this.plugin.taskStateManager.findTaskByPathAndLine(
-        filePath,
-        lineNumber,
-      );
-      if (existingTask) {
-        return existingTask;
-      }
-    }
-
-    // Fall back to parsing from line (won't have dates for following lines)
+    // Always parse fresh from the editor line to avoid stale text/state
+    // The vault-scanned task may be outdated while the user is typing
     if (!this.plugin.getVaultScanner()) {
       return null;
     }
@@ -89,53 +62,74 @@ export class EditorController {
       return null;
     }
 
-    return parser.parseLineAsTask(line, lineNumber, filePath);
+    const parsedTask = parser.parseLineAsTask(line, lineNumber, filePath);
+    if (!parsedTask) {
+      return null;
+    }
+
+    // Merge in date info from the state manager (scheduled/deadline/closed)
+    // These come from separate lines below the task, so they're not affected
+    // by what the user is typing on the task line itself
+    if (this.plugin.taskStateManager) {
+      const existingTask = this.plugin.taskStateManager.findTaskByPathAndLine(
+        filePath,
+        lineNumber,
+      );
+      if (existingTask) {
+        return {
+          ...parsedTask,
+          scheduledDate: existingTask.scheduledDate,
+          scheduledDateRepeat: existingTask.scheduledDateRepeat,
+          deadlineDate: existingTask.deadlineDate,
+          deadlineDateRepeat: existingTask.deadlineDateRepeat,
+          closedDate: existingTask.closedDate,
+          subtaskCount: existingTask.subtaskCount,
+          subtaskCompletedCount: existingTask.subtaskCompletedCount,
+        };
+      }
+    }
+
+    return parsedTask;
   }
 
   /**
-   * Clean the task text to remove any slash command before the cursor position
-   * This handles the case where user types a slash command like /copy, /move, /high, /med, /low
-   * @param taskText - The task text to clean
-   * @param editor - The editor instance to get cursor position
-   * @param lineNumber - The line number of the task
-   * @returns The cleaned task text
+   * Remove any slash command text from the raw editor line
+   * This handles the case where the user typed /<anything> to trigger the command palette.
+   * Works directly on the raw editor line — never on parsed task text or stale vault data.
+   * @param editor - The editor instance
+   * @param lineNumber - The line number to clean
+   * @returns The cleaned line, or null if no slash command was found
    */
-  private cleanTaskTextFromSlashCommand(
-    taskText: string,
+  private cleanSlashCommandFromEditorLine(
     editor: Editor,
     lineNumber: number,
-  ): string {
+  ): string | null {
+    const line = editor.getLine(lineNumber);
     const cursor = editor.getCursor();
-    const currentLine = editor.getLine(lineNumber);
 
-    // Find the slash command before the cursor position
-    // Look for / followed by letters before the cursor
-    const textBeforeCursor = currentLine.substring(0, cursor.ch);
-
-    // Find the last slash command before the cursor position
-    // This handles cases where user types /copy, /move, /high, /med, /low, etc.
-    // The slash command can be at the end or anywhere in the text before the cursor
-    const slashCommandMatch = textBeforeCursor.match(/\s+\/([a-zA-Z]+)\s*$/);
-
-    if (slashCommandMatch) {
-      // Remove the slash command from the task text
-      // The slash command is in the middle of the text, so we need to remove it
-      const cleanedText = taskText
-        .replace(new RegExp(`\\s+/${slashCommandMatch[1]}\\s*$`), '')
-        .trim();
-      return cleanedText;
+    // Find the word at the cursor
+    let wordStart = cursor.ch;
+    while (wordStart > 0 && line[wordStart - 1] !== ' ') {
+      wordStart--;
+    }
+    let wordEnd = cursor.ch;
+    while (wordEnd < line.length && line[wordEnd] !== ' ') {
+      wordEnd++;
     }
 
-    // Fallback: remove any slash command followed by letters anywhere in the text
-    // This handles cases where the slash command is not at the end of the text before cursor
-    const anySlashCommandMatch = taskText.match(/\s+\/([a-zA-Z]+)/);
-    if (anySlashCommandMatch) {
-      return taskText
-        .replace(new RegExp(`\\s+/${anySlashCommandMatch[1]}\\s*`), ' ')
-        .trim();
+    const word = line.slice(wordStart, wordEnd);
+    if (!word.startsWith('/')) {
+      return null;
     }
 
-    return taskText;
+    const before = line.slice(0, wordStart).trimEnd();
+    const after = line.slice(wordEnd).trimStart();
+    const cleanLine = [before, after].filter(Boolean).join(' ');
+
+    const from: EditorPosition = { line: lineNumber, ch: 0 };
+    const to: EditorPosition = { line: lineNumber, ch: line.length };
+    editor.replaceRange(cleanLine, from, to);
+    return cleanLine;
   }
 
   /**
@@ -533,55 +527,39 @@ export class EditorController {
       return true;
     }
 
-    // Parse the task from the line
-    const task = this.parseTaskFromLine(
-      line,
+    // Remove any slash command from the raw editor line
+    // The user could have typed /<anything> to trigger the command palette
+    // The slash command text must be removed directly from the editor line
+    // BEFORE parsing, so we never use stale parsed content
+    let cleanLine = line;
+    const cleanedLine = this.cleanSlashCommandFromEditorLine(
+      editor,
+      lineNumber,
+    );
+    if (cleanedLine !== null) {
+      cleanLine = cleanedLine;
+    }
+
+    // Parse the task from the cleaned editor line ONLY
+    // Do NOT use parseTaskFromLine() — that merges stored vault data which may be stale
+    // The stored tasks will be updated on the next vault scan
+    const task = parser.parseLineAsTask(
+      cleanLine,
       lineNumber,
       view.file?.path || '',
     );
 
     if (task) {
-      // Clean the task text to remove any slash command
-      // This handles the case where user types a slash command like /high /med /low
-      // The slash command can be at the end or in the middle of the task text
-      const cleanedTask = { ...task };
-
-      // Get the cursor position to find where the slash command is
-      const cursor = editor.getCursor();
-      const currentLine = editor.getLine(lineNumber);
-
-      // Find the slash command before the cursor position
-      // Look for / followed by letters before the cursor
-      const textBeforeCursor = currentLine.substring(0, cursor.ch);
-
-      // Find the last slash command before the cursor position
-      // This handles cases where user types /high, /med, /low, /pri, etc.
-      // The slash command can be at the end or anywhere in the text before cursor
-      const slashCommandMatch = textBeforeCursor.match(/\s+\/([a-zA-Z]+)\s*$/);
-
-      if (slashCommandMatch) {
-        // Remove the slash command from the task text
-        // The slash command is in the middle of the text, so we need to remove it
-        cleanedTask.text = cleanedTask.text
-          .replace(new RegExp(`\\s+/${slashCommandMatch[1]}\\s*`), ' ')
-          .trim();
-      } else {
-        // Fallback: remove any slash command followed by letters anywhere in the text
-        // This handles cases where the slash command is not at the end of the text before cursor
-        const anySlashCommandMatch = cleanedTask.text.match(/\s+\/([a-zA-Z]+)/);
-        if (anySlashCommandMatch) {
-          cleanedTask.text = cleanedTask.text
-            .replace(new RegExp(`\\s+/${anySlashCommandMatch[1]}\\s*`), ' ')
-            .trim();
-        }
-      }
-
       // Use TaskUpdateCoordinator for consistent UI updates
       if (taskUpdateCoordinator) {
-        await taskUpdateCoordinator.updateTaskPriority(cleanedTask, priority);
+        await taskUpdateCoordinator.updateTaskPriority(
+          task,
+          priority,
+          'editor',
+        );
       } else {
         // Fallback to TaskEditor if coordinator not available
-        taskEditor.updateTaskPriority(cleanedTask, priority).catch((error) => {
+        taskEditor.updateTaskPriority(task, priority).catch((error) => {
           new Notice('Failed to update task priority');
           console.error('Error updating task priority:', error);
         });
@@ -894,18 +872,14 @@ export class EditorController {
           return;
         }
 
+        // Remove any slash command text directly from the editor line
+        // before reading content, so we never use stale parsed data
+        this.cleanSlashCommandFromEditorLine(editor, lineNumber);
+
+        // Re-read from the now-cleaned editor
         const editorContent = editor.getValue();
         const editorLines = editorContent.split('\n');
-        let allLines = readTaskBlockFromLines(editorLines, task);
-
-        const cleanedText = this.cleanTaskTextFromSlashCommand(
-          task.text,
-          editor,
-          lineNumber,
-        );
-        if (cleanedText !== task.text && allLines.length > 0) {
-          allLines[0] = allLines[0].replace(task.text, cleanedText);
-        }
+        const allLines = readTaskBlockFromLines(editorLines, task);
 
         const currentContent = await this.plugin.app.vault.read(todayNote);
         const newContent =
@@ -1053,18 +1027,12 @@ export class EditorController {
           return;
         }
 
+        // Remove any slash command text directly from the editor line
+        this.cleanSlashCommandFromEditorLine(editor, lineNumber);
+
         const fileContent = editor.getValue();
         const fileLines = fileContent.split('\n');
-        let allLines = readTaskBlockFromLines(fileLines, task);
-
-        const cleanedText = this.cleanTaskTextFromSlashCommand(
-          task.text,
-          editor,
-          lineNumber,
-        );
-        if (cleanedText !== task.text && allLines.length > 0) {
-          allLines[0] = allLines[0].replace(task.text, cleanedText);
-        }
+        const allLines = readTaskBlockFromLines(fileLines, task);
 
         const todayContent = await this.plugin.app.vault.read(todayNote);
         const newTodayContent =
@@ -1164,18 +1132,12 @@ export class EditorController {
           return;
         }
 
+        // Remove any slash command text directly from the editor line
+        this.cleanSlashCommandFromEditorLine(editor, lineNumber);
+
         const fileContent = editor.getValue();
         const fileLines = fileContent.split('\n');
-        let allLines = readTaskBlockFromLines(fileLines, task);
-
-        const cleanedText = this.cleanTaskTextFromSlashCommand(
-          task.text,
-          editor,
-          lineNumber,
-        );
-        if (cleanedText !== task.text && allLines.length > 0) {
-          allLines[0] = allLines[0].replace(task.text, cleanedText);
-        }
+        const allLines = readTaskBlockFromLines(fileLines, task);
 
         const todayContent = await this.plugin.app.vault.read(todayNote);
         const newTodayContent =

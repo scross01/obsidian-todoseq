@@ -184,6 +184,7 @@ export class TaskStateManager {
     this._tasks[index] = {
       ...existingTask,
       ...updates,
+      ...('text' in updates ? { textDisplay: undefined } : {}),
       _lastUpdateTime: Date.now(),
     };
 

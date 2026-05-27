@@ -367,6 +367,11 @@ export class NaturalDateParser {
       if (overlay) return overlay;
     }
 
+    // Set inside the validation block when Sherlock pulls non-date content
+    // into the suffix (e.g. "in the basement today" → finalText = "in the
+    // basement today").  When set, matchedText uses only the date portion.
+    let dateOnlyText: string | null = null;
+
     // Pass 2 — Sherlock (one-shot date expressions)
     Sherlock._setNow(referenceDate);
     const raw = Sherlock.parse(trimmed);
@@ -457,7 +462,21 @@ export class NaturalDateParser {
         (w) => !DATE_RELATED_WORDS_LIST.includes(w as DateRelatedWord),
       );
       if (invalidWords.length > 0) {
-        return null;
+        // The validation's eventTitle may contain non-date words when Sherlock
+        // treats a connector word (e.g. "in", "on", "at") as a date prefix and
+        // pulls subsequent text into the suffix.  If the eventTitle starts at
+        // position 0 of finalText those words precede the date expression and
+        // are NOT trailing content — accept the match.
+        const etIdx = finalText
+          .toLowerCase()
+          .indexOf(validationTitle.toLowerCase());
+        if (etIdx !== 0) {
+          return null;
+        }
+        // The validation eventTitle is a contiguous prefix — use only the
+        // trailing date text for matchedText so non-task words like "the
+        // basement" are not included in matchedText or rawExpression.
+        dateOnlyText = finalText.substring(validationTitle.length).trim();
       }
     }
 
@@ -479,13 +498,14 @@ export class NaturalDateParser {
     // Using the whole finalText (e.g. "is a problem today") over-includes
     // when there is preceding task text, causing partial removal of the
     // task body (e.g. "TODO there" instead of "TODO there is a problem").
-    const atIdx = finalText.lastIndexOf(' at ');
+    const finalTextForMatch = dateOnlyText ?? finalText;
+    const atIdx = finalTextForMatch.lastIndexOf(' at ');
     let matchedText =
       atIdx > 0
-        ? finalText.substring(0, atIdx)
+        ? finalTextForMatch.substring(0, atIdx)
         : atIdx === 0
-          ? finalText.substring(4)
-          : finalText;
+          ? finalTextForMatch.substring(4)
+          : finalTextForMatch;
 
     // When there's no " at " separator, strip leading connector words from matchedText.
     // These connectors precede the date expression (e.g., "due tomorrow" → "tomorrow").
@@ -550,6 +570,14 @@ export class NaturalDateParser {
           rawExpression = lastTitleWord + ' ' + matchedText;
         }
       }
+    }
+
+    // When a date-only expression was extracted, rawExpression still points
+    // to the full finalText (which includes non-date content from Sherlock's
+    // over-eager split).  Override to use just the date portion when no
+    // connector was prepended by the logic above.
+    if (dateOnlyText && rawExpression === finalText) {
+      rawExpression = matchedText;
     }
 
     return {
