@@ -5,8 +5,8 @@
 - Added natural date extraction from the task description, write tasks like 'TODO put out the garbage today' and automatically set the scheduled date. #59
 - Added smart date highlighting in the editor to visually show which words are detected as dates.
 - Added experimental support for scanning code files (JS, TS, Python, etc.) for TODO comments. #58
-- Added support for the Obsidians 'Readable line length' setting when TODOseq task list is shown in a main tab.
-- Fixed background write causing file changed externally noitification when updating task priority using command palette action in editor.
+- Added support for the Obsidian 'Readable line length' setting when TODOseq task list is shown in a main tab.
+- Fixed background write causing file changed externally notification when updating task priority using command palette action in editor.
 
 ## 0.14.3
 
