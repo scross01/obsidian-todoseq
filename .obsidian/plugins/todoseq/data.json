@@ -28,6 +28,7 @@
   "formatTaskKeywords": true,
   "additionalFileExtensions": [],
   "detectOrgModeFiles": false,
+  "scanCodeFiles": false,
   "migrateToTodayState": "",
   "stateTransitions": {
     "defaultInactive": "",
