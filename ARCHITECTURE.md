@@ -38,6 +38,7 @@ graph TB
              RecurrenceCoordinator["RecurrenceCoordinator<br/>Recurrence Coordination (50ms delay)"]
              RecurrenceManager["RecurrenceManager<br/>Recurrence Logic"]
              TransitionParser["TransitionParser<br/>State Transition Syntax"]
+             SmartDateProcessor["SmartDateProcessor<br/>Date Conversion"]
          end
 
         subgraph "UI Layer"
@@ -55,9 +56,11 @@ graph TB
         subgraph "Parser Layer"
             TaskParser["TaskParser<br/>Markdown Engine"]
             OrgModeParser["OrgModeTaskParser<br/>Org-mode Engine"]
+            CodeCommentParser["CodeCommentTaskParser<br/>Code File Parser"]
             ParserRegistry["ParserRegistry<br/>Parser Router"]
-            LanguageRegistry["LanguageRegistry<br/>Multi-language Support"]
+            LanguageRegistry["LanguageRegistry<br/>Comment Syntax"]
             DateParser["DateParser<br/>Date Recognition"]
+            NaturalDateParser["NaturalDateParser<br/>Natural Date Parsing"]
         end
 
         subgraph "Search Layer"
@@ -88,6 +91,7 @@ graph TB
 
     subgraph "External Dependencies"
         DailyNotes["Daily Notes Interface"]
+        ChronoNode["chrono-node<br/>Date Parsing Library"]
     end
 
     %% Connections
@@ -99,6 +103,7 @@ graph TB
     Main --> PropertySearchEngine
     Main --> ChangeTracker
     Main --> RecurrenceCoordinator
+    Main --> SmartDateProcessor
 
     StateManager --> TaskListView
     StateManager --> EmbeddedProcessor
@@ -107,10 +112,16 @@ graph TB
     VaultScanner --> ParserRegistry
     ParserRegistry --> TaskParser
     ParserRegistry --> OrgModeParser
+    ParserRegistry --> CodeCommentParser
+    CodeCommentParser --> LanguageRegistry
     TaskParser --> LanguageRegistry
     TaskParser --> DateParser
     OrgModeParser --> DateParser
     VaultScanner --> FileSystem
+
+    SmartDateProcessor --> Editor
+    SmartDateProcessor --> NaturalDateParser
+    NaturalDateParser --> ChronoNode
 
     UpdateCoordinator --> StateManager
     UpdateCoordinator --> TaskWriter
@@ -167,11 +178,11 @@ graph TB
     classDef external fill:#f5f5f5
 
     class Main pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator serviceLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor serviceLayer
     class UIManager,TaskListView,TaskWriter,ReaderFormatter,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
-    class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
+    class TaskParser,OrgModeParser,CodeCommentParser,ParserRegistry,LanguageRegistry,DateParser,NaturalDateParser parserLayer
     class Search,SearchParser,SearchEvaluator searchLayer
-    class ObsidianAPI,Workspace,FileSystem,Editor,DailyNotes external
+    class ObsidianAPI,Workspace,FileSystem,Editor,DailyNotes,ChronoNode external
 ```
 
 ### Component initialization
@@ -190,6 +201,8 @@ graph TB
 - `TaskUpdateCoordinator` - Update pipeline (receives `TaskStateManager`, `KeywordManager`, `ChangeTracker`)
 - `EmbeddedTaskListProcessor` - Embedded lists (receives `TaskUpdateCoordinator`)
 - `EventCoordinator` - Event handling (receives `VaultScanner`, `PropertySearchEngine`)
+- `SmartDateProcessor` - Automatic date conversion (created with main plugin instance; `setEnabled()` controlled by setting)
+- `CodeCommentTaskParser` - Code file scanning (conditionally registered with `ParserRegistry` when `scanCodeFiles` setting enabled)
 - Other UI and lifecycle components
 
 **Benefits of this pattern:**
@@ -320,6 +333,17 @@ graph TB
 - **State Independence**: For recurring tasks (those with repeat dates), advances dates regardless of current task state (since DONE state is intentionally skipped during completion)
 - **Used by**: TaskUpdateCoordinator, VaultScanner
 
+**SmartDateProcessor** (`src/services/smart-date-processor.ts`)
+
+- **Responsibility**: Automatic conversion of natural language dates in task text (e.g., "today", "next Monday") to structured org-mode date lines (SCHEDULED/DEADLINE) when the user finishes typing a task line
+- **Key Patterns**: Debounce strategy, cursor-leave detection, editor dispatch
+- **Interface**: `handleEditorUpdate(view, update)`, `handleCursorLeave(view, previousLine)`, `setEnabled(state)`, `destroy()`
+- **Trigger Sources**: Two triggers — `'debounce'` (user presses Enter/Down/Right, cursor leaves line) and `'cursorLeave'` (user presses Up/Left/clicks away)
+- **Implementation**: Uses 1500ms debounce per editor line via `Map<string, number>`; when triggered, consumes `ParsedDateInfo` from `NaturalDateParser` and applies the date transformation via `EditorView.dispatch()` (single CM6 change)
+- **Dependencies**: Uses `NaturalDateParser` for date extraction; `formatOrgDate()` for date formatting; `getDateLineIndent()` for indentation
+- **Ownership**: Created and owned by `PluginLifecycleManager`; stored on main plugin as `smartDateProcessor`
+- **Lifecycle**: `setEnabled()` controlled by `smartDateParsing.enabled` setting; `destroy()` clears all debounce timers
+
 ### 2. UI Layer (User Interaction)
 
 **UIManager** (`src/ui-manager.ts`)
@@ -419,9 +443,27 @@ graph TB
 
 **LanguageRegistry** (`src/parser/language-registry.ts`)
 
-- **Responsibility**: Multi-language comment pattern management
+- **Responsibility**: Defines per-language comment syntax patterns (single-line, multi-line, string literals) used by `CodeCommentTaskParser` to scan code files for TODOseq keywords
 - **Key Patterns**: Registry pattern, factory pattern
-- **Interface**: Language definition storage and resolution
+- **Interface**: `LanguageDefinition`, `LanguageCommentPatterns`, `RegexPair`
+- **Used by**: `CodeCommentTaskParser` for language-specific comment detection and string-literal exclusion
+
+**NaturalDateParser** (`src/parser/natural-date-parser.ts`)
+
+- **Responsibility**: Parses natural language date expressions from task text using chrono-node
+- **Key Patterns**: Two-pass parsing (recurrence overlay + chrono-node fallback)
+- **Interface**: `parse(text, referenceDate?)` returns `ParsedDateInfo | null` with date, type (SCHEDULED/DEADLINE), recurrence info, and matched text range
+- **Output**: Consumed by `SmartDateProcessor` for automatic date line insertion in editor
+- **Dependency**: Uses `chrono-node` library (`chrono.casual.parse()`) for general date expressions
+
+**CodeCommentTaskParser** (`src/parser/code-comment-task-parser.ts`)
+
+- **Responsibility**: Parses tasks from programming language files by detecting TODOseq keywords inside code comments
+- **Key Patterns**: State-machine based line scanning with per-line comment/string context tracking
+- **Interface**: Implements `ITaskParser`; `supportsFile()` matches ~40 file extensions; `parseFile()` scans lines with comment-aware keyword detection
+- **String Literal Exclusion**: Detects and skips keywords found inside string literals to prevent false positives
+- **Registration**: Conditionally registered with `ParserRegistry` in `PluginLifecycleManager` when `scanCodeFiles` setting is enabled (disabled by default)
+- **Language Support**: Covers JS, TS, Python, Ruby, Java, Rust, Go, C/C++, C#, Swift, Kotlin, Shell, YAML, TOML, SQL, INI, R, Dockerfile, PowerShell, and more
 
 ### 4. Search Layer (Query Processing)
 
@@ -471,6 +513,7 @@ graph TD
     PropertySearchEngine[PropertySearchEngine]
     ChangeTracker[ChangeTracker]
     RecurrenceCoordinator[RecurrenceCoordinator]
+    SmartDateProcessor[SmartDateProcessor]
 end
 
      subgraph "UI Layer Dependencies"
@@ -488,9 +531,11 @@ end
     subgraph "Parser Dependencies"
         TaskParser[TaskParser]
         OrgModeParser[OrgModeTaskParser]
+        CodeCommentParser[CodeCommentTaskParser]
         ParserRegistry[ParserRegistry]
         LanguageRegistry[LanguageRegistry]
         DateParser[DateParser]
+        NaturalDateParser[NaturalDateParser]
     end
 
     subgraph "Search Dependencies"
@@ -525,6 +570,7 @@ end
     subgraph "External APIs"
         Obsidian[Obsidian API]
         DailyNotes[Daily Notes Interface]
+        ChronoNode[chrono-node]
     end
 
     %% Dependency arrows (A depends on B)
@@ -539,6 +585,7 @@ end
     Main --> PropertySearchEngine
     Main --> ChangeTracker
     Main --> RecurrenceCoordinator
+    Main --> SmartDateProcessor
 
     StateManager -.-> Main
     VaultScanner -.-> Main
@@ -549,6 +596,7 @@ end
     LifecycleManager -.-> Main
     EventCoordinator -.-> Main
     PropertySearchEngine -.-> Main
+    SmartDateProcessor -.-> Main
 
     UpdateCoordinator --> StateManager
     UpdateCoordinator --> TaskWriter
@@ -570,6 +618,8 @@ end
     VaultScanner --> ParserRegistry
     ParserRegistry --> TaskParser
     ParserRegistry --> OrgModeParser
+    ParserRegistry --> CodeCommentParser
+    CodeCommentParser --> LanguageRegistry
     TaskParser --> LanguageRegistry
     TaskParser --> DateParser
     OrgModeParser --> DateParser
@@ -588,6 +638,9 @@ end
 
     EditorController --> TaskWriter
     EditorController --> StateManager
+
+    SmartDateProcessor --> NaturalDateParser
+    NaturalDateParser --> ChronoNode
 
     TaskWriter --> Obsidian
     VaultScanner --> Obsidian
@@ -624,12 +677,12 @@ end
 
     %% Class styling for component types
     class Main,LifecycleManager pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator serviceLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor serviceLayer
      class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
-    class TaskParser,OrgModeParser,ParserRegistry,LanguageRegistry,DateParser parserLayer
+    class TaskParser,OrgModeParser,CodeCommentParser,ParserRegistry,LanguageRegistry,DateParser,NaturalDateParser parserLayer
     class Search,SearchParser,SearchEvaluator,SearchTokenizer,SearchSuggestions searchLayer
     class TaskUtils,KeywordManager,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils utilityLayer
-    class Obsidian,DailyNotes external
+    class Obsidian,DailyNotes,ChronoNode external
 ```
 
 ## Data Flow Architecture: Task Updates
@@ -904,12 +957,14 @@ The [`ParserRegistry`](src/parser/parser-registry.ts) manages multiple parsers a
 
 ### Supported Parsers
 
-| Parser              | File Extensions    | Features                                                 |
-| ------------------- | ------------------ | -------------------------------------------------------- |
-| `TaskParser`        | `.md`, `.markdown` | Markdown tasks, checkboxes, code blocks, comments        |
-| `OrgModeTaskParser` | `.org`             | Org-mode headlines, priorities, scheduled/deadline dates |
+| Parser                  | File Extensions                                                                          | Features                                                                                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TaskParser`            | `.md`, `.markdown`                                                                       | Markdown tasks, checkboxes, code blocks, comments                                                                                                           |
+| `OrgModeTaskParser`     | `.org`                                                                                   | Org-mode headlines, priorities, scheduled/deadline dates                                                                                                    |
+| `CodeCommentTaskParser` | `.js`, `.ts`, `.py`, `.rs`, `.go`, `.java`, `.cpp`, `.sh`, `.yaml`, `.sql`, and ~30 more | Scans code file comments for TODOseq keywords; uses `LanguageRegistry` for comment syntax; conditionally registered when `scanCodeFiles` setting is enabled |
 
 > **Note**: The `OrgModeTaskParser` is registered conditionally based on the `detectOrgModeFiles` experimental feature setting. When disabled (default), `.org` files are not parsed. Enable it in Settings → TODOseq → Experimental features.
+> **Note**: The `CodeCommentTaskParser` is registered conditionally based on the `scanCodeFiles` experimental feature setting. When disabled (default), code files are not scanned. Enable it in Settings → TODOseq → Experimental features.
 
 ### Extending with New Parsers
 

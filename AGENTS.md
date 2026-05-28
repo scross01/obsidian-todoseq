@@ -34,7 +34,7 @@ This file provides guidance to agents when working with code in this repository.
 
 ## Architecture
 
-- **REVIEW `ARCHITECTURE.md`** before making significant changes the codebase.
+- **REVIEW `ARCHITECTURE.md`** to understand the architecture of this Obsidian plugin.
 - **Single source of truth**: `TaskStateManager` maintains tasks; all views subscribe to changes
 - **Parser lifecycle**: All parsers created in `PluginLifecycleManager` and registered with `ParserRegistry`; `VaultScanner` receives fully configured `ParserRegistry` via constructor
 - **Event-driven**: `VaultScannerEvents` interface defines events; listeners stored in Map
@@ -43,6 +43,8 @@ This file provides guidance to agents when working with code in this repository.
 - **Recurrence management**: `RecurrenceCoordinator` coordinates delayed recurrence updates (50ms delay); `RecurrenceManager` handles recurrence date calculations
 - **State transitions**: `TransitionParser` parses declarative state transition syntax; `TaskStateTransitionManager` manages state cycling
 - **Context menus**: `TaskContextMenu` provides right-click task actions (priority, scheduled date, deadline, copy/move to today)
+- **Smart dates**: `SmartDateProcessor` and `NaturalDateParser` handle auto-conversion of natural language dates (see ARCHITECTURE.md)
+- **Code scanning**: `CodeCommentTaskParser` conditionally scans code files for TODO comments (see ARCHITECTURE.md)
 
 ## Critical Patterns
 
@@ -58,5 +60,4 @@ This file provides guidance to agents when working with code in this repository.
 
 ## Code Style
 
-- **ESLint exceptions**: `@typescript-eslint/no-explicit-any` is "warn" (not error) for all files (line 53 in eslint.config.js)
-- **Import order**: Circular dependency handled between main plugin and parsers
+- **Obsidian Plugins Code**: Follow Obsidian Plugins Code Review guidelines.

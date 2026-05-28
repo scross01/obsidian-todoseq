@@ -18,13 +18,13 @@ Most task managers force you into a separate system. TODOseq meets you where you
 
 **Natural Task Capture** — Write tasks as plain text using keywords: `TODO`, `DOING`, `DONE`, `LATER`, `NOW`, `WAIT`, and more. Add priorities `[#A]`, `[#B]`, `[#C]` and dates using natural language or structured Org-mode syntax.
 
-**Smart Date Recognition** — Type dates using everyday language like "today", "tomorrow", "every Friday", or "daily 20:00". TODOSeq automatically converts them to structured format when you finish typing.
+**Smart Date Recognition** — Type dates using everyday language like "today", "tomorrow", "every Friday", or "daily 20:00". TODOseq automatically converts them to structured format when you finish typing.
 
 **Unified Task List** — See all tasks from across your vault in one searchable, sortable panel. Filter by state, priority, date, tags, or use advanced boolean queries. Sort by urgency to surface what matters most right now.
 
 **Works Everywhere** — Tasks remain functional in both Edit mode and Reader view. Click any keyword to cycle through states. Right-click for direct state selection. Use `Ctrl+Enter` to toggle tasks from your keyboard.
 
-**Code-Aware** — Extracts tasks from code block comments in 20+ languages. Capture `// TODO Refactor this` from JavaScript, `# TODO Optimize query` from SQL, or `<!-- TODO Update docs -->` from HTML.
+**Code-Aware** — Extracts tasks from code comments in 20+ languages. Capture `// TODO Refactor this` from JavaScript, `# TODO Optimize query` from SQL, or `-- TODO Update schema` from SQL.
 
 **Embedded Lists** — Render filtered task lists directly in your notes using `todoseq` code blocks. Create dynamic dashboards showing "High Priority Work Tasks" or "Overdue Items" that update automatically.
 
