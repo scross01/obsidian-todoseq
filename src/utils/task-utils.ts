@@ -1,5 +1,14 @@
 import { Task } from '../types/task';
 
+export type TaskSource = 'markdown' | 'org' | 'code';
+
+export function getTaskSource(path: string): TaskSource {
+  const ext = path.split('.').pop()?.toLowerCase();
+  if (ext === 'org') return 'org';
+  if (ext === 'md') return 'markdown';
+  return 'code';
+}
+
 /**
  * Extract filename from a task path
  * @param path The full file path

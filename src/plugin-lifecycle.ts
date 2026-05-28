@@ -11,6 +11,7 @@ import {
 import { TodoTrackerSettingTab } from './settings/settings';
 import { TaskParser } from './parser/task-parser';
 import { OrgModeTaskParser } from './parser/org-mode-task-parser';
+import { CodeCommentTaskParser } from './parser/code-comment-task-parser';
 import { ParserRegistry } from './parser/parser-registry';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, Platform, Notice } from 'obsidian';
@@ -68,6 +69,14 @@ export class PluginLifecycleManager {
         urgencyCoefficients,
       );
       parserRegistry.register(orgModeParser);
+    }
+
+    // Create and register CodeCommentTaskParser if enabled
+    if (this.plugin.settings.scanCodeFiles) {
+      const codeCommentParser = CodeCommentTaskParser.create(
+        this.plugin.keywordManager,
+      );
+      parserRegistry.register(codeCommentParser);
     }
 
     // VaultScanner - use shared KeywordManager and ChangeTracker from main.ts

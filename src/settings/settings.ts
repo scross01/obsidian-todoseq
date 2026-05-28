@@ -15,6 +15,7 @@ import {
   validateKeywordGroupsDetailed,
 } from '../utils/settings-utils';
 import { TodoTrackerSettings } from './settings-types';
+import { SUPPORTED_EXTENSIONS } from '../parser/code-comment-task-parser';
 import { TaskListView } from '../view/task-list/task-list-view';
 import { KeywordGroup } from '../types/task';
 import { TransitionParser } from '../services/transition-parser';
@@ -1316,6 +1317,68 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
                 }
               }),
           );
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Scan code files for comments')
+          .setDesc(
+            'When enabled, scans code files (.js, .ts, .py, .rb, .java, .rs, .go, .c, .cpp, .cs, .swift, .kt, .sh, .YAML, .yml, .toml, .SQL, .ini, .r, .dockerfile, .ps1) for todo-style comments and detects them as tasks. Supports multi-line comments and skips keywords inside string literals.',
+          )
+          .addToggle((toggle) => {
+            let extensionsBeforeCodeToggle: string[] | null = null;
+
+            toggle
+              .setValue(this.plugin.settings.scanCodeFiles)
+              .onChange(async (value) => {
+                this.plugin.settings.scanCodeFiles = value;
+
+                // Sync code file extensions with additionalFileExtensions
+                const codeExtensions = SUPPORTED_EXTENSIONS;
+                const currentExtensions = [
+                  ...(this.plugin.settings.additionalFileExtensions ?? []),
+                ];
+
+                if (value) {
+                  // Snapshot pre-existing extensions before adding code extensions
+                  extensionsBeforeCodeToggle = [...currentExtensions];
+                  // Add code extensions not already present
+                  for (const ext of codeExtensions) {
+                    if (!currentExtensions.includes(ext)) {
+                      currentExtensions.push(ext);
+                    }
+                  }
+                } else {
+                  // Only remove extensions that were added by this feature,
+                  // preserving any that the user had manually configured before
+                  const snapshot = extensionsBeforeCodeToggle ?? [];
+                  for (const ext of codeExtensions) {
+                    if (!snapshot.includes(ext)) {
+                      const idx = currentExtensions.indexOf(ext);
+                      if (idx !== -1) {
+                        currentExtensions.splice(idx, 1);
+                      }
+                    }
+                  }
+                }
+
+                this.plugin.settings.additionalFileExtensions =
+                  currentExtensions;
+                await this.plugin.saveSettings();
+
+                // Re-create parser with new settings
+                await this.plugin.recreateParser();
+
+                // Rescan vault to pick up or remove code files
+                try {
+                  await this.plugin.scanVault();
+                  await this.refreshAllTaskListViews();
+                  this.plugin.refreshVisibleEditorDecorations();
+                  this.plugin.refreshReaderViewFormatter();
+                } catch (scanError) {
+                  console.error('Failed to rescan vault:', scanError);
+                }
+              });
+          });
       })
       .addSetting((setting) => {
         setting

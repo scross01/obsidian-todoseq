@@ -235,6 +235,23 @@ export default class TodoTracker extends Plugin {
         parserRegistry.unregister(orgModeParserId);
       }
 
+      // Handle dynamic registration/unregistration of CodeCommentTaskParser
+      const codeCommentParserId = 'code-comment';
+      const hasCodeParser =
+        parserRegistry.getParser(codeCommentParserId) !== null;
+
+      if (this.settings.scanCodeFiles && !hasCodeParser) {
+        // Register code comment parser if setting enabled and not already registered
+        const { CodeCommentTaskParser } =
+          await import('./parser/code-comment-task-parser');
+        const keywordManager = this.vaultScanner.getKeywordManager();
+        const codeParser = CodeCommentTaskParser.create(keywordManager);
+        parserRegistry.register(codeParser);
+      } else if (!this.settings.scanCodeFiles && hasCodeParser) {
+        // Unregister code comment parser if setting disabled and currently registered
+        parserRegistry.unregister(codeCommentParserId);
+      }
+
       // Update settings with urgency coefficients to avoid redundant parsing
       await this.vaultScanner.updateSettings(
         this.settings,

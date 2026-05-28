@@ -180,12 +180,121 @@ The following limitations apply to checkbox theming:
 - [x] Deploy to production (completed)
 ```
 
-### Reporting Issues
+## Code File Comment Scanning
 
-If you encounter issues with checkbox theming, please report them on the [GitHub issue tracker](https://github.com/scross01/obsidian-todoseq/issues) with:
+Code file comment scanning allows TODOseq to detect tasks from TODO-style comments in programming language files across your vault.
 
-- The theme you're using (or screenshots if applicable)
-- The markdown task content
-- Expected checkbox marker appearance
-- Actual checkbox marker appearance
-- Whether the issue persists after disabling and re-enabling the feature
+### What It Does
+
+When enabled, TODOseq will:
+
+- Scan code files for registered task keywords found in comments
+- Detect tasks in single-line comments (`//`, `#`, `--`) and multi-line comments (`/* */`, `''' ''`)
+- Skip keywords inside string literals to reduce false positives
+- Display code comment tasks alongside Markdown tasks in the Task List
+- Allow state transitions from the Task List (e.g., `TODO → DOING → DONE`)
+- Support custom keywords configured in TODOseq settings
+
+### How to Enable
+
+1. Open Obsidian Settings
+2. Navigate to "Community plugins" → "TODOseq"
+3. Scroll to the "Experimental features" section
+4. Enable "Scan code files for comments"
+
+Once enabled, code files will be automatically included in vault scans.
+
+### Supported File Types
+
+| Language   | Extensions                    |
+| ---------- | ----------------------------- |
+| JavaScript | `.js`, `.jsx`, `.mjs`, `.cjs` |
+| TypeScript | `.ts`, `.tsx`, `.mts`         |
+| Python     | `.py`                         |
+| Ruby       | `.rb`                         |
+| Java       | `.java`                       |
+| Rust       | `.rs`                         |
+| Go         | `.go`                         |
+| C          | `.c`, `.h`                    |
+| C++        | `.cpp`, `.hpp`, `.cc`, `.cxx` |
+| C#         | `.cs`                         |
+| Swift      | `.swift`                      |
+| Kotlin     | `.kt`, `.kts`                 |
+| Shell      | `.sh`, `.bash`, `.zsh`        |
+| YAML       | `.yaml`, `.yml`               |
+| TOML       | `.toml`                       |
+| SQL        | `.sql`                        |
+| INI        | `.ini`                        |
+| R          | `.r`                          |
+| Dockerfile | `.dockerfile`                 |
+| PowerShell | `.ps1`, `.psm1`, `.psd1`      |
+
+### Supported Comment Syntax
+
+**Single-line comments:**
+
+```javascript
+// TODO: implement error handling
+```
+
+```python
+# TODO: add input validation
+```
+
+```sql
+-- TODO: optimize this query
+```
+
+**Multi-line comments:**
+
+```javascript
+/*
+ * TODO: refactor this module
+ */
+```
+
+```python
+"""
+TODO: update documentation
+"""
+```
+
+### Mixed Code and Comments
+
+Tasks on lines with both code and comments are detected:
+
+```javascript
+const x = 1; // TODO: handle edge case
+```
+
+Keywords inside string literals are **not** detected:
+
+```javascript
+const msg = 'TODO: not a task'; // NOT detected
+// TODO: actual task                    // detected
+const msg2 = `TODO: also not a task`; // NOT detected
+```
+
+### Supported Keywords
+
+All default and custom TODOseq keywords are recognized in code comments:
+
+| Incomplete States | Completed States |
+| ----------------- | ---------------- |
+| `TODO`            | `DONE`           |
+| `DOING`           | `CANCELED`       |
+| `NOW`             | `CANCELLED`      |
+| `LATER`           |                  |
+| `WAIT`            |                  |
+| `WAITING`         |                  |
+| `IN-PROGRESS`     |                  |
+
+Custom keywords added via TODOseq settings (e.g., `FIXME`, `HACK`, `REVIEW`) are also supported.
+
+### Limitations
+
+The following limitations apply to code file scanning:
+
+- **No dates or priorities**: Code comments typically don't have scheduled/deadline dates or priority markers
+- **No subtask tracking**: Code comments don't support subtask counting
+- **False positives possible**: Keywords in certain string contexts may still be detected; string literal filtering covers standard string syntax across all supported languages

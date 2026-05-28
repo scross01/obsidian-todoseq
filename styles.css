@@ -280,6 +280,21 @@
   line-height: 1;
 }
 
+/* Source chip (org/code) on the file info line */
+.todoseq-panel .todoseq-source-chip {
+  font-family: var(--font-monospace);
+  opacity: 0.65;
+  margin-right: var(--size-2-1);
+}
+
+.todoseq-task-item[data-source='org'] .todoseq-source-chip::before {
+  content: '\25CE';
+}
+
+.todoseq-task-item[data-source='code'] .todoseq-source-chip::before {
+  content: '#';
+}
+
 /* File info (path:line) */
 .todoseq-panel .todoseq-task-file-info {
   color: var(--text-muted);

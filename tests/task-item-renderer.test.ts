@@ -643,6 +643,42 @@ describe('TaskItemRenderer', () => {
       expect(indicator?.textContent).toBe('1/3');
     });
 
+    it('should set data-source to org for .org files', () => {
+      const task = createBaseTask({ path: 'tasks.org', line: 3 });
+      const li = renderer.buildTaskListItem(task);
+      expect(li.getAttribute('data-source')).toBe('org');
+    });
+
+    it('should set data-source to code for non-md, non-org files', () => {
+      const task = createBaseTask({ path: 'src/app.ts', line: 10 });
+      const li = renderer.buildTaskListItem(task);
+      expect(li.getAttribute('data-source')).toBe('code');
+    });
+
+    it('should include source chip for org tasks', () => {
+      const task = createBaseTask({ path: 'tasks.org', line: 3 });
+      const li = renderer.buildTaskListItem(task);
+      const chip = li.querySelector('.todoseq-source-chip');
+      expect(chip).not.toBeNull();
+      // Content is rendered via CSS ::before pseudo-element
+      expect(chip?.textContent).toBe('');
+    });
+
+    it('should include source chip for code tasks', () => {
+      const task = createBaseTask({ path: 'src/app.ts', line: 10 });
+      const li = renderer.buildTaskListItem(task);
+      const chip = li.querySelector('.todoseq-source-chip');
+      expect(chip).not.toBeNull();
+      // Content is rendered via CSS ::before pseudo-element
+      expect(chip?.textContent).toBe('');
+    });
+
+    it('should not include source chip for markdown tasks', () => {
+      const task = createBaseTask({ path: 'note.md', line: 0 });
+      const li = renderer.buildTaskListItem(task);
+      expect(li.querySelector('.todoseq-source-chip')).toBeNull();
+    });
+
     it('should not include subtask indicator when task has no subtasks', () => {
       const task = createBaseTask({ subtaskCount: 0 });
       const li = renderer.buildTaskListItem(task);
@@ -686,6 +722,12 @@ describe('TaskItemRenderer', () => {
       const li = renderer.buildTaskListItem(task);
 
       expect(li.querySelector('.todoseq-task-date-container')).toBeNull();
+    });
+
+    it('should set data-source attribute on li', () => {
+      const task = createBaseTask();
+      const li = renderer.buildTaskListItem(task);
+      expect(li.getAttribute('data-source')).toBe('markdown');
     });
 
     it('should show file info with line number', () => {

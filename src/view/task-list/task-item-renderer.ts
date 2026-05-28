@@ -9,6 +9,7 @@ import {
 } from '../../utils/patterns';
 import {
   getFilename,
+  getTaskSource,
   getSubtaskDisplayText,
   hasSubtasks,
   getTaskTextDisplay,
@@ -487,6 +488,8 @@ export class TaskItemRenderer {
    */
   buildTaskListItem(task: Task): HTMLLIElement {
     const li = createEl('li', { cls: 'todoseq-task-item' });
+    const source = getTaskSource(task.path);
+    li.setAttribute('data-source', source);
     li.setAttribute('data-path', task.path);
     li.setAttribute('data-line', String(task.line));
     li.setAttribute('data-raw-text', task.rawText);
@@ -527,7 +530,10 @@ export class TaskItemRenderer {
     const fileInfo = li.createEl('div', { cls: 'todoseq-task-file-info' });
     const fileName = getFilename(task.path);
     const displayName = fileName.replace(/\.md$/, '');
-    fileInfo.setText(`${displayName}:${task.line + 1}`);
+    if (source !== 'markdown') {
+      fileInfo.createEl('span', { cls: 'todoseq-source-chip' });
+    }
+    fileInfo.appendText(`${displayName}:${task.line + 1}`);
     fileInfo.setAttribute('title', task.path);
 
     // Click to open source (avoid checkbox and keyword)
