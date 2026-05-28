@@ -6,6 +6,8 @@ import {
   MarkdownView,
   setIcon,
   Notice,
+  Menu,
+  EventRef,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
 import { Task, DateRepeatInfo } from '../../types/task';
@@ -98,6 +100,12 @@ export class TaskListView extends ItemView {
 
   // Task list filter for filtering and sorting
   private taskListFilter: TaskListFilter;
+
+  // Readable line length tracking for main tab rendering
+  private isInMainTab = false;
+  private layoutChangeObserver: EventRef | null = null;
+  private activeLeafObserver: EventRef | null = null;
+  private backgroundContextMenuHandler: ((e: MouseEvent) => void) | null = null;
 
   // Add generation counter for refreshVisibleList
   private refreshGeneration = 0;
@@ -1866,6 +1874,16 @@ export class TaskListView extends ItemView {
     };
     this.taskListContainer.addEventListener('scroll', this.scrollEventListener);
 
+    // Detect if this view is in the main tab area (not sidebar)
+    // and set up readable line length tracking
+    this.isInMainTab = this.isLeafInMainTab();
+    if (this.isInMainTab) {
+      container.addClass('todoseq-is-main-tab');
+      this.updateReadableLineLength();
+      this.setupLayoutAndConfigListeners();
+      this.setupBackgroundContextMenu();
+    }
+
     // Create aria-live region for screen reader announcements
     this.ariaLiveRegion = container.createEl('div', {
       attr: {
@@ -1929,6 +1947,117 @@ export class TaskListView extends ItemView {
     // Save references for cleanup
     this._searchKeyHandler = keyHandler;
     window.addEventListener('keydown', keyHandler);
+  }
+
+  /**
+   * Detect if this view's leaf is in the main tab area (not sidebar)
+   */
+  private isLeafInMainTab(): boolean {
+    try {
+      const root = this.leaf.getRoot();
+      const container = (root as unknown as { containerEl: HTMLElement })
+        .containerEl;
+      return container.classList.contains('mod-root');
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check whether Obsidian's readable line length setting is enabled
+   * getConfig returns boolean when set via boolean, string when set via string
+   */
+  private getReadableLineLengthEnabled(): boolean {
+    try {
+      const vault = this.app.vault as unknown as {
+        getConfig: (key: string) => unknown;
+      };
+      const val = vault.getConfig('readableLineLength');
+      return val === true || val === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Update the readable line length CSS class based on Obsidian's setting
+   */
+  private updateReadableLineLength(): void {
+    try {
+      this.contentEl.toggleClass(
+        'todoseq-readable-line-length',
+        this.getReadableLineLengthEnabled(),
+      );
+    } catch {
+      // Config API may not be available
+    }
+  }
+
+  /**
+   * Track changes to Obsidian's readable line length setting by listening
+   * for layout changes and re-checking when our tab gains focus.
+   */
+  private setupLayoutAndConfigListeners(): void {
+    const check = () => {
+      this.isInMainTab = this.isLeafInMainTab();
+      this.contentEl.toggleClass('todoseq-is-main-tab', this.isInMainTab);
+      if (this.isInMainTab) {
+        this.updateReadableLineLength();
+      }
+    };
+
+    this.layoutChangeObserver = this.app.workspace.on('layout-change', check);
+
+    // Re-check the config when our tab becomes active (catches setting
+    // changes made from other tabs without polling or DOM observation)
+    this.activeLeafObserver = this.app.workspace.on(
+      'active-leaf-change',
+      (leaf) => {
+        if (leaf === this.leaf) {
+          check();
+        }
+      },
+    );
+  }
+
+  /**
+   * Set up background context menu for toggling readable line length
+   * Only active when view is in a main tab
+   */
+  private setupBackgroundContextMenu(): void {
+    this.backgroundContextMenuHandler = (evt: MouseEvent) => {
+      const target = evt.target as HTMLElement;
+
+      // If right-clicking on a task item, let the task context menu handle it
+      if (target.closest('.todoseq-task-item')) return;
+
+      // Don't interfere with inputs and toolbar interactions
+      if (target.closest('input, textarea, .todoseq-toolbar')) {
+        return;
+      }
+
+      evt.preventDefault();
+
+      const vault = this.app.vault as unknown as {
+        setConfig: (key: string, value: unknown) => void;
+      };
+      const isEnabled = this.getReadableLineLengthEnabled();
+
+      const menu = new Menu();
+      menu.addItem((item) => {
+        item.setTitle('Readable line length');
+        item.setChecked(isEnabled);
+        item.onClick(() => {
+          vault.setConfig('readableLineLength', !isEnabled);
+          this.updateReadableLineLength();
+        });
+      });
+      menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
+    };
+    this.contentEl.addEventListener(
+      'contextmenu',
+      this.backgroundContextMenuHandler,
+    );
   }
 
   private renderTaskTextWithLinks(task: Task, parent: HTMLElement): void {
@@ -2271,6 +2400,25 @@ export class TaskListView extends ItemView {
     if (this.unsubscribeFromStateManager) {
       this.unsubscribeFromStateManager();
       this.unsubscribeFromStateManager = null;
+    }
+
+    // Cleanup layout-change and active-leaf-change listeners
+    if (this.layoutChangeObserver) {
+      this.app.workspace.offref(this.layoutChangeObserver);
+      this.layoutChangeObserver = null;
+    }
+    if (this.activeLeafObserver) {
+      this.app.workspace.offref(this.activeLeafObserver);
+      this.activeLeafObserver = null;
+    }
+
+    // Cleanup background context menu
+    if (this.backgroundContextMenuHandler) {
+      this.contentEl.removeEventListener(
+        'contextmenu',
+        this.backgroundContextMenuHandler,
+      );
+      this.backgroundContextMenuHandler = null;
     }
 
     // Cleanup ResizeObserver

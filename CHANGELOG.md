@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.15.0
+
+- Added natural date extraction from the task description, write tasks like 'TODO put out the garbage today' and automatically set the scheduled date.
+- Added support for the Obsidians 'Readable line length' setting when TODOseq task list is shown in a main tab.
+
 ## 0.14.3
 
 - Fix style regression with mobile context menu.

@@ -25,12 +25,28 @@
   border: 0;
 }
 
-/* Task list container - scrollable area */
+/* Task list container - scrollable area (full width, outer background visible) */
 .todoseq-panel .todoseq-task-list-container {
   overflow-y: auto;
   overflow-x: hidden;
   flex-grow: 1;
   min-height: 0;
+}
+
+/* Main tab: page margins matching Obsidian editor pages */
+.todoseq-panel.todoseq-is-main-tab {
+  padding: var(--file-margins);
+}
+
+/* Main tab with readable line length: constrain toolbar and task list to 700px */
+/* Both children of the column flex panel use width:100% + max-width + align-self:center */
+.todoseq-panel.todoseq-is-main-tab.todoseq-readable-line-length
+  .todoseq-toolbar,
+.todoseq-panel.todoseq-is-main-tab.todoseq-readable-line-length
+  .todoseq-task-list-container {
+  width: 100%;
+  max-width: 700px;
+  align-self: center;
 }
 
 /* List layout */
