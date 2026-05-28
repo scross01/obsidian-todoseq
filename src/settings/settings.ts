@@ -2,6 +2,7 @@ import {
   PluginSettingTab,
   App,
   Setting,
+  SettingGroup,
   ToggleComponent,
   Notice,
   DropdownComponent,
@@ -18,6 +19,13 @@ import { TaskListView } from '../view/task-list/task-list-view';
 import { KeywordGroup } from '../types/task';
 import { TransitionParser } from '../services/transition-parser';
 import { KeywordManager } from '../utils/keyword-manager';
+
+function hideSettingNameAndControl(setting: Setting): void {
+  // eslint-disable-next-line obsidianmd/no-static-styles-assignment
+  setting.nameEl.style.display = 'none';
+  // eslint-disable-next-line obsidianmd/no-static-styles-assignment
+  setting.controlEl.style.display = 'none';
+}
 
 type KeywordSettingKey = keyof Pick<
   TodoTrackerSettings,
@@ -147,77 +155,74 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
    * Create the Task Keywords settings section with sub-sections for each group
    */
   private createTaskKeywordsSettings(containerEl: HTMLElement): void {
-    // Task Keywords heading
-    new Setting(containerEl)
-      .setName('Task keywords')
-      .setHeading()
-      .setDesc('Add custom keywords to extend the built-in task states.');
-
-    // Inactive keywords sub-section
-    this.createKeywordGroupSetting(
-      containerEl,
-      'additionalInactiveKeywords',
-      'Inactive keywords',
-      'Keywords for tasks not yet started (e.g. FIXME, HACK). Built-in: TODO, LATER.',
-      this.plugin.settings.additionalInactiveKeywords,
-    );
-
-    // Active keywords sub-section
-    this.createKeywordGroupSetting(
-      containerEl,
-      'additionalActiveKeywords',
-      'Active keywords',
-      'Keywords for tasks currently being worked on (e.g. STARTED). Built-in: DOING, NOW, IN-PROGRESS.',
-      this.plugin.settings.additionalActiveKeywords,
-    );
-
-    // Waiting keywords sub-section
-    this.createKeywordGroupSetting(
-      containerEl,
-      'additionalWaitingKeywords',
-      'Waiting keywords',
-      'Keywords for blocked or paused tasks (e.g. ON-HOLD). Built-in: WAIT, WAITING.',
-      this.plugin.settings.additionalWaitingKeywords,
-    );
-
-    // Completed keywords sub-section
-    this.createKeywordGroupSetting(
-      containerEl,
-      'additionalCompletedKeywords',
-      'Completed keywords',
-      'Keywords for finished or abandoned tasks (e.g. NEVER). Built-in: DONE, CANCELLED, CANCELED.',
-      this.plugin.settings.additionalCompletedKeywords,
-    );
-
-    // Archived keywords sub-section
-    this.createKeywordGroupSetting(
-      containerEl,
-      'additionalArchivedKeywords',
-      'Archived keywords',
-      'Keywords for archived tasks (e.g. OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED.',
-      this.plugin.settings.additionalArchivedKeywords,
-    );
-
-    // Migrated state keyword setting
-    new Setting(containerEl)
-      .setName('Migrated state keyword')
-      .setDesc(
-        'Keyword or text to set on the source task after migrating to daily note. Leave empty to disable.',
+    new SettingGroup(containerEl)
+      .setHeading('Task keywords')
+      .addSetting((setting) =>
+        this.configureKeywordGroupSetting(
+          setting,
+          'additionalInactiveKeywords',
+          'Inactive keywords',
+          'Keywords for tasks not yet started (e.g. FIXME, HACK). Built-in: TODO, LATER.',
+          this.plugin.settings.additionalInactiveKeywords,
+        ),
       )
-      .addText((text) => {
-        const currentValue = this.plugin.settings.migrateToTodayState;
-        text.setValue(currentValue);
-        text.setPlaceholder(currentValue || '(disabled)');
-        text.onChange(async (value) => {
-          this.plugin.settings.migrateToTodayState = value;
-          await this.plugin.saveSettings();
-          // Update embedded task list settings to refresh context menu
-          if (this.plugin.embeddedTaskListProcessor) {
-            this.plugin.embeddedTaskListProcessor.updateSettings();
-          }
-          // Refresh all task list views to update context menu
-          await this.refreshAllTaskListViews();
-        });
+      .addSetting((setting) =>
+        this.configureKeywordGroupSetting(
+          setting,
+          'additionalActiveKeywords',
+          'Active keywords',
+          'Keywords for tasks currently being worked on (e.g. STARTED). Built-in: DOING, NOW, IN-PROGRESS.',
+          this.plugin.settings.additionalActiveKeywords,
+        ),
+      )
+      .addSetting((setting) =>
+        this.configureKeywordGroupSetting(
+          setting,
+          'additionalWaitingKeywords',
+          'Waiting keywords',
+          'Keywords for blocked or paused tasks (e.g. ON-HOLD). Built-in: WAIT, WAITING.',
+          this.plugin.settings.additionalWaitingKeywords,
+        ),
+      )
+      .addSetting((setting) =>
+        this.configureKeywordGroupSetting(
+          setting,
+          'additionalCompletedKeywords',
+          'Completed keywords',
+          'Keywords for finished or abandoned tasks (e.g. NEVER). Built-in: DONE, CANCELLED, CANCELED.',
+          this.plugin.settings.additionalCompletedKeywords,
+        ),
+      )
+      .addSetting((setting) =>
+        this.configureKeywordGroupSetting(
+          setting,
+          'additionalArchivedKeywords',
+          'Archived keywords',
+          'Keywords for archived tasks (e.g. OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED.',
+          this.plugin.settings.additionalArchivedKeywords,
+        ),
+      )
+      .addSetting((setting) => {
+        setting
+          .setName('Migrated state keyword')
+          .setDesc(
+            'Keyword or text to set on the source task after migrating to daily note. Leave empty to disable.',
+          )
+          .addText((text) => {
+            const currentValue = this.plugin.settings.migrateToTodayState;
+            text.setValue(currentValue);
+            text.setPlaceholder(currentValue || '(disabled)');
+            text.onChange(async (value) => {
+              this.plugin.settings.migrateToTodayState = value;
+              await this.plugin.saveSettings();
+              // Update embedded task list settings to refresh context menu
+              if (this.plugin.embeddedTaskListProcessor) {
+                this.plugin.embeddedTaskListProcessor.updateSettings();
+              }
+              // Refresh all task list views to update context menu
+              await this.refreshAllTaskListViews();
+            });
+          });
       });
 
     // Run initial validation on open so existing warnings/errors are visible
@@ -238,18 +243,18 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
   }
 
   /**
-   * Create a keyword group setting with validation
+   * Configure a keyword group setting with validation
    * Uses flat settings properties: additionalActiveKeywords, additionalInactiveKeywords,
    * additionalWaitingKeywords, additionalCompletedKeywords, additionalArchivedKeywords
    */
-  private createKeywordGroupSetting(
-    containerEl: HTMLElement,
+  private configureKeywordGroupSetting(
+    setting: Setting,
     settingKey: KeywordSettingKey,
     name: string,
     description: string,
     currentValue: string[],
   ): void {
-    const setting = new Setting(containerEl).setName(name).setDesc(description);
+    setting.setName(name).setDesc(description);
 
     setting.addText((text) => {
       text
@@ -511,161 +516,172 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
    * Creates the task state transitions settings section.
    */
   private createStateTransitionsSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName('Task state transitions')
-      .setHeading()
-      .setDesc('Configure how task states transition when clicked or cycled.');
-
     // Get keyword manager to populate dropdown options
     const keywordManager = new KeywordManager(this.plugin.settings);
 
-    // Transition declarations
-    const transitionsSetting = new Setting(containerEl);
-    this.transitionSettings.transitions = transitionsSetting;
-    transitionsSetting
-      .setName('State transitions')
-      .setDesc(
-        'Define how states transition. Each line: STATE -> next_state. Use (a | b) to define multiple initial states.',
-      )
-      .addTextArea((textArea) => {
-        // Set the size of the textarea directly on the underlying element
-        textArea.inputEl.cols = 48;
-        textArea.inputEl.rows = 4;
-        textArea
-          .setValue(
-            this.plugin.settings.stateTransitions.transitionStatements.join(
-              '\n',
-            ),
-          )
-          .setPlaceholder(
-            'Todo -> doing -> done\n(wait | waiting) -> in-progress\nlater -> now -> done',
-          )
-          .onChange(async (value: string) => {
-            const statements = value
-              .split('\n')
-              .map((s: string) => s.trim())
-              .filter((s: string) => s.length > 0);
-            this.plugin.settings.stateTransitions.transitionStatements =
-              statements;
-            await this.plugin.saveSettings();
-
-            // Debounce validation to allow user to finish typing
-            if (this.transitionValidationDebounceTimer) {
-              window.clearTimeout(this.transitionValidationDebounceTimer);
-            }
-            this.transitionValidationDebounceTimer = window.setTimeout(() => {
-              this.transitionValidationDebounceTimer = null;
-              this.validateTransitionSettings();
-              // Update task list views with new state transition settings
-              this.plugin.updateTaskListViewSettings();
-              // Update task update coordinator with new settings
-              this.plugin.updateTaskUpdateCoordinatorSettings();
-            }, this.TRANSITION_VALIDATION_DEBOUNCE_MS);
-          });
-      });
-
-    // Default inactive state
-    const inactiveSetting = new Setting(containerEl);
-    this.transitionSettings.inactive = inactiveSetting;
-    // Compute default value for inactive state
+    // Compute default values for each state
     const defaultInactive = this.getDefaultForGroup(
       keywordManager,
       'inactiveKeywords',
       'TODO',
     );
-    inactiveSetting
-      .setName('Default inactive state')
-      .setDesc(
-        'The default state for inactive tasks when no explicit transition is defined.',
-      )
-      .addDropdown((dropdown) => {
-        this.defaultStateDropdowns.inactive = dropdown;
-        this.populateDefaultStateDropdown(
-          dropdown,
-          keywordManager.getInactiveSet(),
-        );
-        dropdown.setValue(
-          this.plugin.settings.stateTransitions.defaultInactive ||
-            defaultInactive,
-        );
-        dropdown.onChange(async (value) => {
-          this.plugin.settings.stateTransitions.defaultInactive = value;
-          await this.plugin.saveSettings();
-          this.validateTransitionSettings();
-          // Update task list views with new state transition settings
-          this.plugin.updateTaskListViewSettings();
-          // Update task update coordinator with new settings
-          this.plugin.updateTaskUpdateCoordinatorSettings();
-        });
-      });
-
-    // Compute default value for active state
     const defaultActive = this.getDefaultForGroup(
       keywordManager,
       'activeKeywords',
       'DOING',
     );
-    // Default active state
-    const activeSetting = new Setting(containerEl);
-    this.transitionSettings.active = activeSetting;
-    activeSetting
-      .setName('Default active state')
-      .setDesc(
-        'The default state for active tasks when no explicit transition is defined.',
-      )
-      .addDropdown((dropdown) => {
-        this.defaultStateDropdowns.active = dropdown;
-        this.populateDefaultStateDropdown(
-          dropdown,
-          keywordManager.getActiveSet(),
-        );
-        dropdown.setValue(
-          this.plugin.settings.stateTransitions.defaultActive || defaultActive,
-        );
-        dropdown.onChange(async (value) => {
-          this.plugin.settings.stateTransitions.defaultActive = value;
-          await this.plugin.saveSettings();
-          this.validateTransitionSettings();
-          // Update task list views with new state transition settings
-          this.plugin.updateTaskListViewSettings();
-          // Update task update coordinator with new settings
-          this.plugin.updateTaskUpdateCoordinatorSettings();
-        });
-      });
-
-    // Compute default value for completed state
     const defaultCompleted = this.getDefaultForGroup(
       keywordManager,
       'completedKeywords',
       'DONE',
     );
-    // Default completed state
-    const completedSetting = new Setting(containerEl);
-    this.transitionSettings.completed = completedSetting;
-    completedSetting
-      .setName('Default completed state')
-      .setDesc(
-        'The default state for completed tasks when no explicit transition is defined.',
-      )
-      .addDropdown((dropdown) => {
-        this.defaultStateDropdowns.completed = dropdown;
-        this.populateDefaultStateDropdown(
-          dropdown,
-          keywordManager.getCompletedSet(),
-        );
-        dropdown.setValue(
-          this.plugin.settings.stateTransitions.defaultCompleted ||
-            defaultCompleted,
-        );
-        dropdown.onChange(async (value) => {
-          this.plugin.settings.stateTransitions.defaultCompleted = value;
-          await this.plugin.saveSettings();
-          this.validateTransitionSettings();
-          // Update task list views with new state transition settings
-          this.plugin.updateTaskListViewSettings();
-          // Update task update coordinator with new settings
-          this.plugin.updateTaskUpdateCoordinatorSettings();
-        });
+
+    new SettingGroup(containerEl)
+      .setHeading('Task state transitions')
+      .addSetting((setting) => {
+        this.transitionSettings.transitions = setting;
+        setting
+          .setName('State transitions')
+          .setDesc(
+            'Define how states transition. Each line: STATE -> next_state. Use (a | b) to define multiple initial states.',
+          )
+          .addTextArea((textArea) => {
+            // Set the size of the textarea directly on the underlying element
+            textArea.inputEl.cols = 48;
+            textArea.inputEl.rows = 4;
+            textArea
+              .setValue(
+                this.plugin.settings.stateTransitions.transitionStatements.join(
+                  '\n',
+                ),
+              )
+              .setPlaceholder(
+                // eslint-disable-next-line obsidianmd/ui/sentence-case -- states are capitalized
+                'TODO -> DOING -> DONE\n(WAIT | WAITING) -> IN-PROGRESS\nLATER -> NOW -> DONE',
+              )
+              .onChange(async (value: string) => {
+                const statements = value
+                  .split('\n')
+                  .map((s: string) => s.trim())
+                  .filter((s: string) => s.length > 0);
+                this.plugin.settings.stateTransitions.transitionStatements =
+                  statements;
+                await this.plugin.saveSettings();
+
+                // Debounce validation to allow user to finish typing
+                if (this.transitionValidationDebounceTimer) {
+                  window.clearTimeout(this.transitionValidationDebounceTimer);
+                }
+                this.transitionValidationDebounceTimer = window.setTimeout(
+                  () => {
+                    this.transitionValidationDebounceTimer = null;
+                    this.validateTransitionSettings();
+                    // Update task list views with new state transition settings
+                    this.plugin.updateTaskListViewSettings();
+                    // Update task update coordinator with new settings
+                    this.plugin.updateTaskUpdateCoordinatorSettings();
+                  },
+                  this.TRANSITION_VALIDATION_DEBOUNCE_MS,
+                );
+              });
+          });
+      })
+      .addSetting((setting) => {
+        this.transitionSettings.inactive = setting;
+        setting
+          .setName('Default inactive state')
+          .setDesc(
+            'The default state for inactive tasks when no explicit transition is defined.',
+          )
+          .addDropdown((dropdown) => {
+            this.defaultStateDropdowns.inactive = dropdown;
+            this.populateDefaultStateDropdown(
+              dropdown,
+              keywordManager.getInactiveSet(),
+            );
+            dropdown.setValue(
+              this.plugin.settings.stateTransitions.defaultInactive ||
+                defaultInactive,
+            );
+            dropdown.onChange(async (value) => {
+              this.plugin.settings.stateTransitions.defaultInactive = value;
+              await this.plugin.saveSettings();
+              this.validateTransitionSettings();
+              // Update task list views with new state transition settings
+              this.plugin.updateTaskListViewSettings();
+              // Update task update coordinator with new settings
+              this.plugin.updateTaskUpdateCoordinatorSettings();
+            });
+          });
+      })
+      .addSetting((setting) => {
+        this.transitionSettings.active = setting;
+        setting
+          .setName('Default active state')
+          .setDesc(
+            'The default state for active tasks when no explicit transition is defined.',
+          )
+          .addDropdown((dropdown) => {
+            this.defaultStateDropdowns.active = dropdown;
+            this.populateDefaultStateDropdown(
+              dropdown,
+              keywordManager.getActiveSet(),
+            );
+            dropdown.setValue(
+              this.plugin.settings.stateTransitions.defaultActive ||
+                defaultActive,
+            );
+            dropdown.onChange(async (value) => {
+              this.plugin.settings.stateTransitions.defaultActive = value;
+              await this.plugin.saveSettings();
+              this.validateTransitionSettings();
+              // Update task list views with new state transition settings
+              this.plugin.updateTaskListViewSettings();
+              // Update task update coordinator with new settings
+              this.plugin.updateTaskUpdateCoordinatorSettings();
+            });
+          });
+      })
+      .addSetting((setting) => {
+        this.transitionSettings.completed = setting;
+        setting
+          .setName('Default completed state')
+          .setDesc(
+            'The default state for completed tasks when no explicit transition is defined.',
+          )
+          .addDropdown((dropdown) => {
+            this.defaultStateDropdowns.completed = dropdown;
+            this.populateDefaultStateDropdown(
+              dropdown,
+              keywordManager.getCompletedSet(),
+            );
+            dropdown.setValue(
+              this.plugin.settings.stateTransitions.defaultCompleted ||
+                defaultCompleted,
+            );
+            dropdown.onChange(async (value) => {
+              this.plugin.settings.stateTransitions.defaultCompleted = value;
+              await this.plugin.saveSettings();
+              this.validateTransitionSettings();
+              // Update task list views with new state transition settings
+              this.plugin.updateTaskListViewSettings();
+              // Update task update coordinator with new settings
+              this.plugin.updateTaskUpdateCoordinatorSettings();
+            });
+          });
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Track closed date')
+          .setDesc('Add closed: timestamp when tasks are marked as completed.')
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.trackClosedDate)
+              .onChange(async (value) => {
+                this.plugin.settings.trackClosedDate = value;
+                await this.plugin.saveSettings();
+              }),
+          );
       });
 
     // Initial validation
@@ -933,225 +949,210 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
    * Creates the task detection settings section.
    */
   private createTaskDetectionSettings(containerEl: HTMLElement) {
-    new Setting(containerEl)
-      .setName('Task detection')
-      .setHeading()
-      .setDesc('Select where tasks are detected in the vault content.');
-
-    // Include tasks inside callout blocks
-    new Setting(containerEl)
-      .setName('Include tasks inside quote and callout blocks')
-      .setDesc(
-        'When enabled, include tasks inside quote and callout blocks (>, >[!info], >[!todo], etc.).',
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.includeCalloutBlocks)
-          .onChange(async (value) => {
-            this.plugin.settings.includeCalloutBlocks = value;
-            await this.plugin.saveSettings();
-            // Recreate parser to reflect includeCalloutBlocks change and rescan
-            await this.plugin.recreateParser();
-            await this.plugin.scanVault();
-            await this.refreshAllTaskListViews();
-            // Force refresh of visible editor decorations to apply new CSS classes
-            this.plugin.refreshVisibleEditorDecorations();
-            // Force refresh of reader view to apply new formatting
-            this.plugin.refreshReaderViewFormatter();
-          }),
-      );
-
-    // Include tasks inside comment blocks
-    new Setting(containerEl)
-      .setName('Include tasks inside comments')
-      .setDesc('When enabled, include tasks inside comments (%%).')
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.includeCommentBlocks)
-          .onChange(async (value) => {
-            this.plugin.settings.includeCommentBlocks = value;
-            await this.plugin.saveSettings();
-            // Recreate parser to reflect includeCommentBlocks change and rescan
-            await this.plugin.recreateParser();
-            await this.plugin.scanVault();
-            await this.refreshAllTaskListViews();
-            // Force refresh of visible editor decorations to apply new CSS classes
-            this.plugin.refreshVisibleEditorDecorations();
-            // Force refresh of reader view to apply new formatting
-            this.plugin.refreshReaderViewFormatter();
-          }),
-      );
-
-    // Include tasks inside code blocks
-
-    // Include tasks inside code blocks (parent setting)
     let languageToggleComponent: ToggleComponent | null = null;
+    let languageSetting: Setting | null = null;
 
-    new Setting(containerEl)
-      .setName('Include tasks inside code blocks')
-      .setDesc(
-        'When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.',
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.includeCodeBlocks)
-          .onChange(async (value) => {
-            this.plugin.settings.includeCodeBlocks = value;
-            // If disabling code blocks, also disable language comment support
-            if (!value) {
-              this.plugin.settings.languageCommentSupport = false;
-            }
-            await this.plugin.saveSettings();
-            // Update language toggle visual state by recreating it
-            if (languageToggleComponent) {
-              languageToggleComponent.setValue(
-                this.plugin.settings.languageCommentSupport,
-              );
-            }
-            languageSetting.setDisabled(!value);
-            // Recreate parser to reflect includeCodeBlocks change and rescan
-            await this.plugin.recreateParser();
-            await this.plugin.scanVault();
-            await this.refreshAllTaskListViews();
-            // Force refresh of visible editor decorations to apply new CSS classes
-            this.plugin.refreshVisibleEditorDecorations();
-            // Force refresh of reader view to apply new formatting
-            this.plugin.refreshReaderViewFormatter();
-          }),
-      );
-
-    // Language comment support settings (dependent on includeCodeBlocks)
-    const languageSettingContainer = containerEl.createDiv();
-    const languageSetting = new Setting(languageSettingContainer)
-      .setName('Enable language comment support')
-      .setDesc(
-        'When enabled, tasks inside code blocks will be detected using language-specific comment patterns e.g. `// TODO`',
-      )
-      .addToggle((toggle) => {
-        languageToggleComponent = toggle;
-        return toggle
-          .setValue(this.plugin.settings.languageCommentSupport)
-          .onChange(async (value) => {
-            this.plugin.settings.languageCommentSupport = value;
-            await this.plugin.saveSettings();
-            await this.plugin.recreateParser();
-            await this.plugin.scanVault();
-            await this.refreshAllTaskListViews();
-            // Force refresh of visible editor decorations to apply new CSS classes
-            this.plugin.refreshVisibleEditorDecorations();
-            // Force refresh of reader view to apply new formatting
-            this.plugin.refreshReaderViewFormatter();
+    new SettingGroup(containerEl)
+      .setHeading('Task detection')
+      .addSetting((setting) => {
+        setting
+          .setName('Include tasks inside quote and callout blocks')
+          .setDesc(
+            'When enabled, include tasks inside quote and callout blocks (>, >[!info], >[!todo], etc.).',
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.includeCalloutBlocks)
+              .onChange(async (value) => {
+                this.plugin.settings.includeCalloutBlocks = value;
+                await this.plugin.saveSettings();
+                // Recreate parser to reflect includeCalloutBlocks change and rescan
+                await this.plugin.recreateParser();
+                await this.plugin.scanVault();
+                await this.refreshAllTaskListViews();
+                // Force refresh of visible editor decorations to apply new CSS classes
+                this.plugin.refreshVisibleEditorDecorations();
+                // Force refresh of reader view to apply new formatting
+                this.plugin.refreshReaderViewFormatter();
+              }),
+          );
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Include tasks inside comments')
+          .setDesc('When enabled, include tasks inside comments (%%).')
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.includeCommentBlocks)
+              .onChange(async (value) => {
+                this.plugin.settings.includeCommentBlocks = value;
+                await this.plugin.saveSettings();
+                // Recreate parser to reflect includeCommentBlocks change and rescan
+                await this.plugin.recreateParser();
+                await this.plugin.scanVault();
+                await this.refreshAllTaskListViews();
+                // Force refresh of visible editor decorations to apply new CSS classes
+                this.plugin.refreshVisibleEditorDecorations();
+                // Force refresh of reader view to apply new formatting
+                this.plugin.refreshReaderViewFormatter();
+              }),
+          );
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Include tasks inside code blocks')
+          .setDesc(
+            'When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.',
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.includeCodeBlocks)
+              .onChange(async (value) => {
+                this.plugin.settings.includeCodeBlocks = value;
+                // If disabling code blocks, also disable language comment support
+                if (!value) {
+                  this.plugin.settings.languageCommentSupport = false;
+                }
+                await this.plugin.saveSettings();
+                // Update language toggle visual state
+                if (languageToggleComponent) {
+                  languageToggleComponent.setValue(
+                    this.plugin.settings.languageCommentSupport,
+                  );
+                }
+                if (languageSetting) {
+                  languageSetting.setDisabled(!value);
+                }
+                // Recreate parser to reflect includeCodeBlocks change and rescan
+                await this.plugin.recreateParser();
+                await this.plugin.scanVault();
+                await this.refreshAllTaskListViews();
+                // Force refresh of visible editor decorations to apply new CSS classes
+                this.plugin.refreshVisibleEditorDecorations();
+                // Force refresh of reader view to apply new formatting
+                this.plugin.refreshReaderViewFormatter();
+              }),
+          );
+      })
+      .addSetting((setting) => {
+        languageSetting = setting;
+        setting
+          .setName('Enable language comment support')
+          .setDesc(
+            'When enabled, tasks inside code blocks will be detected using language-specific comment patterns e.g. `// TODO`',
+          )
+          .addToggle((toggle) => {
+            languageToggleComponent = toggle;
+            return toggle
+              .setValue(this.plugin.settings.languageCommentSupport)
+              .onChange(async (value) => {
+                this.plugin.settings.languageCommentSupport = value;
+                await this.plugin.saveSettings();
+                await this.plugin.recreateParser();
+                await this.plugin.scanVault();
+                await this.refreshAllTaskListViews();
+                // Force refresh of visible editor decorations to apply new CSS classes
+                this.plugin.refreshVisibleEditorDecorations();
+                // Force refresh of reader view to apply new formatting
+                this.plugin.refreshReaderViewFormatter();
+              });
           });
+
+        // Set initial disabled state based on includeCodeBlocks setting
+        setting.setDisabled(!this.plugin.settings.includeCodeBlocks);
       });
-
-    // Set initial disabled state based on includeCodeBlocks setting
-    languageSetting.setDisabled(!this.plugin.settings.includeCodeBlocks);
-
-    // Update language toggle when includeCodeBlocks changes
-    const updateLanguageToggle = (enabled: boolean) => {
-      const languageToggle = languageSetting.settingEl.querySelector(
-        'input[type="checkbox"]',
-      ) as HTMLInputElement;
-      if (languageToggle) {
-        languageToggle.checked = enabled;
-      }
-      languageSetting.setDisabled(!enabled);
-    };
-
-    // Listen for includeCodeBlocks changes and update language toggle accordingly
-    updateLanguageToggle(this.plugin.settings.includeCodeBlocks);
   }
 
   /**
    * Creates the settings for task list search and filter options
    */
   private createTaskSearchFilterSettings(containerEl: HTMLElement) {
-    new Setting(containerEl)
-      .setName('Task list search and filter')
-      .setHeading()
-      .setDesc(
-        'Set the default search and filter settings for the task list view.',
-      );
-
-    new Setting(containerEl)
-      .setName('Week starts on')
-      .setDesc('Choose which day the week starts on for date filtering.')
-      .addDropdown((drop) => {
-        drop.addOption('Monday', 'Monday');
-        drop.addOption('Sunday', 'Sunday');
-        drop.setValue(this.plugin.settings.weekStartsOn);
-        drop.onChange(async (value: string) => {
-          const weekStart = value as 'Monday' | 'Sunday';
-          this.plugin.settings.weekStartsOn = weekStart;
-          await this.plugin.saveSettings();
-          await this.refreshAllTaskListViews();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName('Completed tasks')
-      .setDesc('Choose how completed items are shown in the task list.')
-      .addDropdown((drop) => {
-        drop.addOption('showAll', 'Show all tasks');
-        drop.addOption('sortCompletedLast', 'Sort completed to end');
-        drop.addOption('hideCompleted', 'Hide completed');
-        drop.setValue(this.plugin.settings.taskListViewMode);
-        drop.onChange(async (value: string) => {
-          const mode = value as
-            | 'showAll'
-            | 'sortCompletedLast'
-            | 'hideCompleted';
-          this.plugin.settings.taskListViewMode = mode;
-          await this.plugin.saveSettings();
-          await this.refreshAllTaskListViews();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName('Future dated tasks')
-      .setDesc(
-        'Choose how tasks with future dates are displayed in the task list.',
-      )
-      .addDropdown((drop) => {
-        drop.addOption('showAll', 'Show all tasks');
-        drop.addOption('showUpcoming', 'Show upcoming (7 days)');
-        drop.addOption('sortToEnd', 'Sort future to end');
-        drop.addOption('hideFuture', 'Hide future');
-        drop.setValue(this.plugin.settings.futureTaskSorting);
-        drop.onChange(async (value: string) => {
-          const mode = value as
-            | 'showAll'
-            | 'showUpcoming'
-            | 'sortToEnd'
-            | 'hideFuture';
-          this.plugin.settings.futureTaskSorting = mode;
-          await this.plugin.saveSettings();
-          await this.refreshAllTaskListViews();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName('Default sort method')
-      .setDesc('Choose the default sort method for the task list.')
-      .addDropdown((drop) => {
-        drop.addOption('default', 'Default (file path)');
-        drop.addOption('sortByScheduled', 'Scheduled date');
-        drop.addOption('sortByDeadline', 'Deadline date');
-        drop.addOption('sortByClosedDate', 'Closed date');
-        drop.addOption('sortByPriority', 'Priority');
-        drop.addOption('sortByUrgency', 'Urgency');
-        drop.setValue(this.plugin.settings.defaultSortMethod);
-        drop.onChange(async (value: string) => {
-          const sortMethod = value as
-            | 'default'
-            | 'sortByScheduled'
-            | 'sortByDeadline'
-            | 'sortByClosedDate'
-            | 'sortByPriority'
-            | 'sortByUrgency';
-          this.plugin.settings.defaultSortMethod = sortMethod;
-          await this.plugin.saveSettings();
-        });
+    new SettingGroup(containerEl)
+      .setHeading('Task list search and filter')
+      .addSetting((setting) => {
+        setting
+          .setName('Week starts on')
+          .setDesc('Choose which day the week starts on for date filtering.')
+          .addDropdown((drop) => {
+            drop.addOption('Monday', 'Monday');
+            drop.addOption('Sunday', 'Sunday');
+            drop.setValue(this.plugin.settings.weekStartsOn);
+            drop.onChange(async (value: string) => {
+              const weekStart = value as 'Monday' | 'Sunday';
+              this.plugin.settings.weekStartsOn = weekStart;
+              await this.plugin.saveSettings();
+              await this.refreshAllTaskListViews();
+            });
+          });
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Completed tasks')
+          .setDesc('Choose how completed items are shown in the task list.')
+          .addDropdown((drop) => {
+            drop.addOption('showAll', 'Show all tasks');
+            drop.addOption('sortCompletedLast', 'Sort completed to end');
+            drop.addOption('hideCompleted', 'Hide completed');
+            drop.setValue(this.plugin.settings.taskListViewMode);
+            drop.onChange(async (value: string) => {
+              const mode = value as
+                | 'showAll'
+                | 'sortCompletedLast'
+                | 'hideCompleted';
+              this.plugin.settings.taskListViewMode = mode;
+              await this.plugin.saveSettings();
+              await this.refreshAllTaskListViews();
+            });
+          });
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Future dated tasks')
+          .setDesc(
+            'Choose how tasks with future dates are displayed in the task list.',
+          )
+          .addDropdown((drop) => {
+            drop.addOption('showAll', 'Show all tasks');
+            drop.addOption('showUpcoming', 'Show upcoming (7 days)');
+            drop.addOption('sortToEnd', 'Sort future to end');
+            drop.addOption('hideFuture', 'Hide future');
+            drop.setValue(this.plugin.settings.futureTaskSorting);
+            drop.onChange(async (value: string) => {
+              const mode = value as
+                | 'showAll'
+                | 'showUpcoming'
+                | 'sortToEnd'
+                | 'hideFuture';
+              this.plugin.settings.futureTaskSorting = mode;
+              await this.plugin.saveSettings();
+              await this.refreshAllTaskListViews();
+            });
+          });
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Default sort method')
+          .setDesc('Choose the default sort method for the task list.')
+          .addDropdown((drop) => {
+            drop.addOption('default', 'Default (file path)');
+            drop.addOption('sortByScheduled', 'Scheduled date');
+            drop.addOption('sortByDeadline', 'Deadline date');
+            drop.addOption('sortByClosedDate', 'Closed date');
+            drop.addOption('sortByPriority', 'Priority');
+            drop.addOption('sortByUrgency', 'Urgency');
+            drop.setValue(this.plugin.settings.defaultSortMethod);
+            drop.onChange(async (value: string) => {
+              const sortMethod = value as
+                | 'default'
+                | 'sortByScheduled'
+                | 'sortByDeadline'
+                | 'sortByClosedDate'
+                | 'sortByPriority'
+                | 'sortByUrgency';
+              this.plugin.settings.defaultSortMethod = sortMethod;
+              await this.plugin.saveSettings();
+            });
+          });
       });
   }
 
@@ -1159,82 +1160,63 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
    * Creates smart date recognition settings
    */
   private createSmartDateRecognitionSettings(containerEl: HTMLElement) {
-    new Setting(containerEl)
-      .setName('Smart date recognition')
-      .setHeading()
-      .setDesc(
-        'Automatically convert natural language dates to structured org-mode dates.',
-      );
-
-    // Remove date keywords toggle component reference (for enabling/disabling)
     let removeKeywordsToggleComponent: ToggleComponent | null = null;
+    let removeKeywordsSetting: Setting | null = null;
 
-    // Enable smart date recognition
-    new Setting(containerEl)
-      .setName('Enable smart date recognition')
-      .setDesc(
-        'Automatically convert natural language dates like "today", "tomorrow", "next week" to org-mode dates.',
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.enableSmartDateRecognition)
-          .onChange(async (value) => {
-            this.plugin.settings.enableSmartDateRecognition = value;
-            // If disabling smart date recognition, also disable remove date keywords
-            if (!value) {
-              this.plugin.settings.smartDateRemoveKeywords = false;
-            }
-            await this.plugin.saveSettings();
-            // Update remove keywords toggle visual state
-            if (removeKeywordsToggleComponent) {
-              removeKeywordsToggleComponent.setValue(
-                this.plugin.settings.smartDateRemoveKeywords,
-              );
-            }
-            removeKeywordsSetting.setDisabled(!value);
-            // Update smart date processor if it exists
-            if (this.plugin.smartDateProcessor) {
-              this.plugin.smartDateProcessor.setEnabled(value);
-            }
-          }),
-      );
-
-    // Remove keywords after conversion (dependent on Enable smart date recognition)
-    const removeKeywordsSettingContainer = containerEl.createDiv();
-    const removeKeywordsSetting = new Setting(removeKeywordsSettingContainer)
-      .setName('Remove date keywords')
-      .setDesc(
-        'Remove natural language text (e.g., "today", "tomorrow") after conversion to structured dates.',
-      )
-      .addToggle((toggle) => {
-        removeKeywordsToggleComponent = toggle;
-        return toggle
-          .setValue(this.plugin.settings.smartDateRemoveKeywords)
-          .onChange(async (value) => {
-            this.plugin.settings.smartDateRemoveKeywords = value;
-            await this.plugin.saveSettings();
+    new SettingGroup(containerEl)
+      .setHeading('Smart date recognition')
+      .addSetting((setting) => {
+        setting
+          .setName('Enable smart date recognition')
+          .setDesc(
+            'Automatically convert natural language dates like "today", "tomorrow", "due next week".',
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.enableSmartDateRecognition)
+              .onChange(async (value) => {
+                this.plugin.settings.enableSmartDateRecognition = value;
+                // If disabling smart date recognition, also disable remove date keywords
+                if (!value) {
+                  this.plugin.settings.smartDateRemoveKeywords = false;
+                }
+                await this.plugin.saveSettings();
+                // Update remove keywords toggle visual state
+                if (removeKeywordsToggleComponent) {
+                  removeKeywordsToggleComponent.setValue(
+                    this.plugin.settings.smartDateRemoveKeywords,
+                  );
+                }
+                if (removeKeywordsSetting) {
+                  removeKeywordsSetting.setDisabled(!value);
+                }
+                // Update smart date processor if it exists
+                if (this.plugin.smartDateProcessor) {
+                  this.plugin.smartDateProcessor.setEnabled(value);
+                }
+              }),
+          );
+      })
+      .addSetting((setting) => {
+        removeKeywordsSetting = setting;
+        setting
+          .setName('Remove date keywords')
+          .setDesc(
+            'Remove natural language text (e.g., "today", "tomorrow") after conversion to structured dates.',
+          )
+          .addToggle((toggle) => {
+            removeKeywordsToggleComponent = toggle;
+            return toggle
+              .setValue(this.plugin.settings.smartDateRemoveKeywords)
+              .onChange(async (value) => {
+                this.plugin.settings.smartDateRemoveKeywords = value;
+                await this.plugin.saveSettings();
+              });
           });
+
+        // Set initial disabled state based on enableSmartDateRecognition setting
+        setting.setDisabled(!this.plugin.settings.enableSmartDateRecognition);
       });
-
-    // Set initial disabled state based on enableSmartDateRecognition setting
-    removeKeywordsSetting.setDisabled(
-      !this.plugin.settings.enableSmartDateRecognition,
-    );
-
-    // Sync remove keywords toggle when enableSmartDateRecognition changes externally
-    const updateRemoveKeywordsToggle = (enabled: boolean) => {
-      const removeKeywordsToggle =
-        removeKeywordsSetting.settingEl.querySelector(
-          'input[type="checkbox"]',
-        ) as HTMLInputElement;
-      if (removeKeywordsToggle) {
-        removeKeywordsToggle.checked = enabled;
-      }
-      removeKeywordsSetting.setDisabled(!enabled);
-    };
-
-    // Initialize toggle state based on current settings
-    updateRemoveKeywordsToggle(this.plugin.settings.enableSmartDateRecognition);
   }
 
   /**
@@ -1261,30 +1243,11 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
-    // Task completion Group
-    new Setting(containerEl)
-      .setName('Task completion')
-      .setHeading()
-      .setDesc('Settings for task completion behavior.');
-
-    // Track closed date toggle
-    new Setting(containerEl)
-      .setName('Track closed date')
-      .setDesc('Add closed: timestamp when tasks are marked as completed.')
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.trackClosedDate)
-          .onChange(async (value) => {
-            this.plugin.settings.trackClosedDate = value;
-            await this.plugin.saveSettings();
-          }),
-      );
+    // Task detection Group
+    this.createTaskDetectionSettings(containerEl);
 
     // Smart date recognition Group
     this.createSmartDateRecognitionSettings(containerEl);
-
-    // Task detection Group
-    this.createTaskDetectionSettings(containerEl);
 
     // Task list search and filter Group
     this.createTaskSearchFilterSettings(containerEl);
@@ -1295,81 +1258,83 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     // Task state transitions section
     this.createStateTransitionsSettings(containerEl);
 
-    // Experimental Features Group
-    new Setting(containerEl)
-      // eslint-disable-next-line obsidianmd/ui/sentence-case -- section header uses emoji prefix
-      .setName('⚠︎ Experimental features')
-      .setHeading()
-      .setDesc(
-        'Experimental features may be changed significantly or removed entirely in future versions.',
-      );
+    // Experimental features section
+    new SettingGroup(containerEl)
+      .setHeading('⚠︎ Experimental features')
+      .addSetting((setting) => {
+        setting.setDesc(
+          'Experimental features may be changed significantly or removed entirely in future versions.',
+        );
+        hideSettingNameAndControl(setting);
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Detect org-mode files')
+          .setDesc(
+            'When enabled, scans for .org files in vault and detects tasks using org-mode syntax.',
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.detectOrgModeFiles)
+              .onChange(async (value) => {
+                this.plugin.settings.detectOrgModeFiles = value;
 
-    // Org-mode file detection toggle
-    new Setting(containerEl)
-      .setName('Detect org-mode files')
-      .setDesc(
-        'When enabled, scans for .org files in vault and detects tasks using org-mode syntax.',
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.detectOrgModeFiles)
-          .onChange(async (value) => {
-            this.plugin.settings.detectOrgModeFiles = value;
+                // Sync .org extension with additionalFileExtensions
+                const currentExtensions = [
+                  ...(this.plugin.settings.additionalFileExtensions ?? []),
+                ];
+                const orgExtension = '.org';
 
-            // Sync .org extension with additionalFileExtensions
-            const currentExtensions = [
-              ...(this.plugin.settings.additionalFileExtensions ?? []),
-            ];
-            const orgExtension = '.org';
+                if (value) {
+                  // Add .org if not already present
+                  if (!currentExtensions.includes(orgExtension)) {
+                    currentExtensions.push(orgExtension);
+                  }
+                } else {
+                  // Remove .org if present
+                  const orgIndex = currentExtensions.indexOf(orgExtension);
+                  if (orgIndex !== -1) {
+                    currentExtensions.splice(orgIndex, 1);
+                  }
+                }
 
-            if (value) {
-              // Add .org if not already present
-              if (!currentExtensions.includes(orgExtension)) {
-                currentExtensions.push(orgExtension);
-              }
-            } else {
-              // Remove .org if present
-              const orgIndex = currentExtensions.indexOf(orgExtension);
-              if (orgIndex !== -1) {
-                currentExtensions.splice(orgIndex, 1);
-              }
-            }
+                this.plugin.settings.additionalFileExtensions =
+                  currentExtensions;
+                await this.plugin.saveSettings();
 
-            this.plugin.settings.additionalFileExtensions = currentExtensions;
-            await this.plugin.saveSettings();
+                // Re-create parser with new settings
+                await this.plugin.recreateParser();
 
-            // Re-create parser with new settings
-            await this.plugin.recreateParser();
-
-            // Rescan vault to pick up or remove .org files
-            try {
-              await this.plugin.scanVault();
-              await this.refreshAllTaskListViews();
-              this.plugin.refreshVisibleEditorDecorations();
-              this.plugin.refreshReaderViewFormatter();
-            } catch (scanError) {
-              console.error('Failed to rescan vault:', scanError);
-            }
-          }),
-      );
-
-    // Use extended checkbox styles toggle
-    new Setting(containerEl)
-      .setName('Use extended Markdown checkbox styles')
-      .setDesc(
-        'When enabled, uses themed checkbox styles ([/], [-]) for active and cancelled tasks.',
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.useExtendedCheckboxStyles)
-          .onChange(async (value) => {
-            this.plugin.settings.useExtendedCheckboxStyles = value;
-            await this.plugin.saveSettings();
-            // Re-create parser to update KeywordManager with new settings
-            await this.plugin.recreateParser();
-            // Update KeywordManager in TaskWriter with new settings
-            this.plugin.updateTaskWriterKeywordManager();
-          }),
-      );
+                // Rescan vault to pick up or remove .org files
+                try {
+                  await this.plugin.scanVault();
+                  await this.refreshAllTaskListViews();
+                  this.plugin.refreshVisibleEditorDecorations();
+                  this.plugin.refreshReaderViewFormatter();
+                } catch (scanError) {
+                  console.error('Failed to rescan vault:', scanError);
+                }
+              }),
+          );
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Use extended Markdown checkbox styles')
+          .setDesc(
+            'When enabled, uses themed checkbox styles ([/], [-]) for active and cancelled tasks.',
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.useExtendedCheckboxStyles)
+              .onChange(async (value) => {
+                this.plugin.settings.useExtendedCheckboxStyles = value;
+                await this.plugin.saveSettings();
+                // Re-create parser to update KeywordManager with new settings
+                await this.plugin.recreateParser();
+                // Update KeywordManager in TaskWriter with new settings
+                this.plugin.updateTaskWriterKeywordManager();
+              }),
+          );
+      });
   }
 }
