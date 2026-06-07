@@ -10,10 +10,12 @@ import { RangeSetBuilder } from '@codemirror/state';
 import { TodoTrackerSettings } from '../../settings/settings-types';
 import { TaskParser } from '../../parser/task-parser';
 import {
+  CODE_BLOCK_REGEX,
   COMMENT_BLOCK_REGEX,
   FOOTNOTE_DEFINITION_REGEX,
   SINGLE_LINE_COMMENT_REGEX,
   PRIORITY_TOKEN_REGEX,
+  stripMarkdownPrefixes,
 } from '../../utils/patterns';
 import {
   LanguageRegistry,
@@ -482,7 +484,8 @@ export class TaskKeywordDecorator {
   }
 
   private updateCodeBlockState(lineText: string): void {
-    const codeBlockMatch = /^\s*(`{3,}|~{3,})\s*(\S+)?$/.exec(lineText);
+    const strippedLine = stripMarkdownPrefixes(lineText);
+    const codeBlockMatch = CODE_BLOCK_REGEX.exec(strippedLine);
     if (codeBlockMatch) {
       const delimiter = codeBlockMatch[1];
       if (!this.inCodeBlock) {

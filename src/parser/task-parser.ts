@@ -32,6 +32,7 @@ import {
   CHECKBOX_DETECTION_REGEX,
   PRIORITY_TOKEN_REGEX,
   SINGLE_LINE_COMMENT_REGEX,
+  stripMarkdownPrefixes,
 } from '../utils/patterns';
 
 type RegexPair = { test: RegExp; capture: RegExp };
@@ -1173,7 +1174,10 @@ export class TaskParser implements ITaskParser {
     language?: string;
     delimiter?: string;
   } | null {
-    const codeMatch = CODE_BLOCK_REGEX.exec(line);
+    // Strip markdown prefixes (blockquotes, list markers) before checking
+    // for code block fences. This handles fences like "- ```" and "> ```".
+    const strippedLine = stripMarkdownPrefixes(line);
+    const codeMatch = CODE_BLOCK_REGEX.exec(strippedLine);
     if (codeMatch) {
       const delimiter = codeMatch[1];
       // If we're already in a code block, check if this line closes it
@@ -1192,7 +1196,7 @@ export class TaskParser implements ITaskParser {
         return null;
       }
       // Starting a new code block
-      return { type: 'code', entering: true, delimiter };
+      return { type: 'code', entering: true, delimiter, language: codeMatch[2] };
     }
 
     const mathMatch = MATH_BLOCK_REGEX.exec(line);
@@ -1260,10 +1264,7 @@ export class TaskParser implements ITaskParser {
         blockMarker = 'code';
         codeDelimiter = transition.delimiter || null;
         if (this.includeCodeBlocks && this.languageCommentSupport) {
-          const line = lines[index];
-          const m = CODE_BLOCK_REGEX.exec(line);
-          const language = m ? m[2] : '';
-          this.detectLanguage(language);
+          this.detectLanguage(transition.language || '');
           if (this.currentLanguage) {
             const regexPair = TaskParser.buildCodeRegex(
               this.allKeywords,

@@ -278,6 +278,34 @@ export const MD_LINK_REGEX_SOURCE = MD_LINK_REGEX.source;
 export const URL_REGEX = /\bhttps?:\/\/[^\s)]+/g;
 export const URL_REGEX_SOURCE = URL_REGEX.source;
 
+/**
+ * Strip markdown blockquote prefixes (>, > >) and list markers (-, *, +, 1))
+ * from the start of a line to reveal the actual content.
+ * This is used for code block fence detection so that fences inside blockquotes
+ * or after list markers are properly recognized.
+ *
+ * Also handles checkbox prefixes: "- [ ] ```", "- [x] ```", "+ [ ] ```", etc.
+ *
+ * Examples:
+ *   "> ```"          → "```"
+ *   "> - ```"        → "```"
+ *   "> > - ```"      → "```"
+ *   "1) ```"         → "```"
+ *   "- ```js"        → "```js"
+ *   "- [ ] ```"      → "```"
+ *   "- [x] ```"      → "```"
+ *   "+ [ ] ```rust"  → "```rust"
+ *   "TODO task"      → "TODO task" (no change)
+ */
+const BLOCKQUOTE_PREFIX_REGEX = /^\s*(?:>\s*)+/;
+const LIST_MARKER_REGEX = /^(?:[-*+]\s+(?:\[.\]\s)?|\d+\)\s+(?:\[.\]\s)?)?/;
+
+export function stripMarkdownPrefixes(line: string): string {
+  let s = line.replace(BLOCKQUOTE_PREFIX_REGEX, '');
+  s = s.replace(LIST_MARKER_REGEX, '');
+  return s;
+}
+
 // ============================================================================
 // Utility Functions
 // ============================================================================

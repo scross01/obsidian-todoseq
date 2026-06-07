@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.15.1
+
+- Fixed issue with identifying codeblocks fences that start with bullet markers.
+
 ## 0.15.0
 
 - Added natural date extraction from the task description, write tasks like 'TODO put out the garbage today' and automatically set the scheduled date. #59

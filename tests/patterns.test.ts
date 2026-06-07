@@ -25,6 +25,7 @@ import {
   NUMBERED_MATCH_REGEX,
   LETTER_MATCH_REGEX,
   CALLOUT_PREFIX_PATTERN,
+  stripMarkdownPrefixes,
 } from '../src/utils/patterns';
 
 describe('patterns', () => {
@@ -287,6 +288,114 @@ describe('patterns', () => {
 
     test('should not match fewer than 3 backticks', () => {
       expect(CODE_BLOCK_REGEX.test('``')).toBe(false);
+    });
+  });
+
+  describe('stripMarkdownPrefixes', () => {
+    test('should strip blockquote prefix', () => {
+      expect(stripMarkdownPrefixes('> ```')).toBe('```');
+    });
+
+    test('should strip blockquote with bullet prefix', () => {
+      expect(stripMarkdownPrefixes('> - ```')).toBe('```');
+    });
+
+    test('should strip blockquote with asterisk bullet', () => {
+      expect(stripMarkdownPrefixes('> * ```')).toBe('```');
+    });
+
+    test('should strip nested blockquote with bullet', () => {
+      expect(stripMarkdownPrefixes('> > - ```')).toBe('```');
+    });
+
+    test('should strip bullet prefix', () => {
+      expect(stripMarkdownPrefixes('- ```')).toBe('```');
+    });
+
+    test('should strip numbered list with paren prefix', () => {
+      expect(stripMarkdownPrefixes('1) ```')).toBe('```');
+    });
+
+    test('should strip numbered list with paren and checkbox', () => {
+      expect(stripMarkdownPrefixes('1) [ ] ```')).toBe('```');
+    });
+
+    test('should strip numbered list with paren and checked checkbox', () => {
+      expect(stripMarkdownPrefixes('1) [x] ```')).toBe('```');
+    });
+
+    test('should not strip letter list prefix (not a valid Obsidian code block start)', () => {
+      expect(stripMarkdownPrefixes('a) ```')).toBe('a) ```');
+    });
+
+    test('should not strip custom list prefix (not a valid Obsidian code block start)', () => {
+      expect(stripMarkdownPrefixes('(A1) ```')).toBe('(A1) ```');
+    });
+
+    test('should not strip numbered list with dot prefix (not a valid Obsidian code block start)', () => {
+      expect(stripMarkdownPrefixes('1. ```')).toBe('1. ```');
+    });
+
+    test('should preserve normal text', () => {
+      expect(stripMarkdownPrefixes('TODO task')).toBe('TODO task');
+    });
+
+    test('should preserve text without prefix', () => {
+      expect(stripMarkdownPrefixes('```javascript')).toBe('```javascript');
+    });
+
+    test('should handle blockquote with numbered list using paren', () => {
+      expect(stripMarkdownPrefixes('> 1) ```javascript')).toBe('```javascript');
+    });
+
+    test('should not strip blockquote with numbered list using dot (not valid)', () => {
+      expect(stripMarkdownPrefixes('> 1. ```javascript')).toBe('1. ```javascript');
+    });
+
+    test('should not strip inside content (only prefix)', () => {
+      expect(stripMarkdownPrefixes('text > ```')).toBe('text > ```');
+    });
+
+    test('should strip checkbox prefix - [ ]', () => {
+      expect(stripMarkdownPrefixes('- [ ] ```')).toBe('```');
+    });
+
+    test('should strip checkbox prefix - [x]', () => {
+      expect(stripMarkdownPrefixes('- [x] ```')).toBe('```');
+    });
+
+    test('should strip checkbox prefix with language', () => {
+      expect(stripMarkdownPrefixes('- [ ] ```javascript')).toBe('```javascript');
+    });
+
+    test('should strip checkbox with plus bullet', () => {
+      expect(stripMarkdownPrefixes('+ [ ] ```')).toBe('```');
+    });
+
+    test('should strip checkbox with asterisk bullet', () => {
+      expect(stripMarkdownPrefixes('* [ ] ```')).toBe('```');
+    });
+
+    test('should strip bullet with multiple spaces', () => {
+      expect(stripMarkdownPrefixes('-   ```')).toBe('```');
+    });
+
+    test('should strip plus bullet prefix', () => {
+      expect(stripMarkdownPrefixes('+ ```')).toBe('```');
+    });
+
+    test('should strip checkbox with any state character', () => {
+      expect(stripMarkdownPrefixes('- [/] ```')).toBe('```');
+      expect(stripMarkdownPrefixes('- [-] ```')).toBe('```');
+      expect(stripMarkdownPrefixes('- [>] ```')).toBe('```');
+    });
+
+    test('should strip multiple spaces between bullet and checkbox', () => {
+      expect(stripMarkdownPrefixes('-   [ ] ```')).toBe('```');
+    });
+
+    test('should strip blockquote with checkbox prefix', () => {
+      expect(stripMarkdownPrefixes('> - [ ] ```')).toBe('```');
     });
   });
 

@@ -420,7 +420,242 @@ TODO task text
     });
   });
 
-  describe('Tasks in quotes and callouts', () => {
+  describe('Tasks in quoted blocks with code fences', () => {
+    test(`should not break parsing when code fence follows bullet in blockquote`, () => {
+      const lines = `
+> TODO task 1
+> - \`\`\`
+> \`\`\`
+> TODO task 2
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('task 1');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('task 2');
+    });
+
+    test(`should not break parsing when code fence follows bullet`, () => {
+      const lines = `
+TODO one
+
+- \`\`\`
+  testing
+\`\`\`
+
+TODO two
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('one');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('two');
+    });
+
+    test(`should not break parsing when code fence has language after bullet`, () => {
+      const lines = `
+TODO before
+
+- \`\`\`javascript
+  test
+\`\`\`
+
+TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
+    test(`should not break parsing after numbered list with paren code fence`, () => {
+      const lines = `
+TODO before
+
+1) \`\`\`
+   test
+\`\`\`
+
+TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
+    test(`should not break parsing after numbered list with paren and checkbox`, () => {
+      const lines = `
+TODO before
+
+1) [ ] \`\`\`
+  testing
+\`\`\`
+
+TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
+    test(`should not treat numbered list with dot as code block`, () => {
+      const lines = `
+TODO before
+
+1. \`\`\`
+   TODO not in a code block
+\`\`\`
+
+TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      // 1. ``` is not a valid code block start in Obsidian.
+      // The content between the fences is not in a code block from the parser's
+      // perspective (because the opening didn't match), so "TODO not in a code
+      // block" is found as a task. The closing ``` starts a new code block,
+      // so "TODO after" is inside it and skipped with includeCodeBlocks=false.
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('not in a code block');
+    });
+
+    test(`should handle blockquote with nested bullet and code fence`, () => {
+      const lines = `
+> TODO before
+> > - \`\`\`
+> > test
+> > \`\`\`
+> TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
+    test(`should not break parsing when code fence follows checkbox`, () => {
+      const lines = `
+TODO before
+- [ ] \`\`\`
+  testing
+\`\`\`
+TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
+    test(`should not break parsing when code fence follows checked checkbox`, () => {
+      const lines = `
+TODO before
+- [x] \`\`\`
+  testing
+\`\`\`
+TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
+    test(`should not break parsing when code fence follows plus bullet`, () => {
+      const lines = `
+TODO before
++ \`\`\`
+  testing
+\`\`\`
+TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
+    test(`should not break parsing when code fence follows plus checkbox`, () => {
+      const lines = `
+TODO before
++ [ ] \`\`\`
+  testing
+\`\`\`
+TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
+    test(`should not break parsing with multiple spaces between bullet and backticks`, () => {
+      const lines = `
+TODO before
+-   \`\`\`
+  testing
+\`\`\`
+TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
+    test(`should not break parsing with checkbox in blockquote`, () => {
+      const lines = `
+> TODO before
+> - [ ] \`\`\`
+> testing
+> \`\`\`
+> TODO after
+`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].text).toBe('before');
+      expect(tasks[1].state).toBe('TODO');
+      expect(tasks[1].text).toBe('after');
+    });
+
     test(`should match quoted tasks`, () => {
       const lines = `
 >TODO task text
