@@ -27,7 +27,7 @@ import { SmartDateProcessor } from './services/smart-date-processor';
 export const TASK_VIEW_ICON = 'list-todo';
 
 export default class TodoTracker extends Plugin {
-  settings: TodoTrackerSettings;
+  declare settings: TodoTrackerSettings;
 
   // Centralized state manager - single source of truth for tasks
   public taskStateManager: TaskStateManager;
