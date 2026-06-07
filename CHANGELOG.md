@@ -2,7 +2,7 @@
 
 ## 0.15.1
 
-- Fixed issue with identifying codeblocks fences that start with bullet markers.
+- Fixed issue with identifying codeblocks fences that start with bullet markers. #69
 
 ## 0.15.0
 
