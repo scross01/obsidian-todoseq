@@ -349,7 +349,9 @@ describe('patterns', () => {
     });
 
     test('should not strip blockquote with numbered list using dot (not valid)', () => {
-      expect(stripMarkdownPrefixes('> 1. ```javascript')).toBe('1. ```javascript');
+      expect(stripMarkdownPrefixes('> 1. ```javascript')).toBe(
+        '1. ```javascript',
+      );
     });
 
     test('should not strip inside content (only prefix)', () => {
@@ -365,7 +367,9 @@ describe('patterns', () => {
     });
 
     test('should strip checkbox prefix with language', () => {
-      expect(stripMarkdownPrefixes('- [ ] ```javascript')).toBe('```javascript');
+      expect(stripMarkdownPrefixes('- [ ] ```javascript')).toBe(
+        '```javascript',
+      );
     });
 
     test('should strip checkbox with plus bullet', () => {

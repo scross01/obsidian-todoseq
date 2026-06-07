@@ -1196,7 +1196,12 @@ export class TaskParser implements ITaskParser {
         return null;
       }
       // Starting a new code block
-      return { type: 'code', entering: true, delimiter, language: codeMatch[2] };
+      return {
+        type: 'code',
+        entering: true,
+        delimiter,
+        language: codeMatch[2],
+      };
     }
 
     const mathMatch = MATH_BLOCK_REGEX.exec(line);
