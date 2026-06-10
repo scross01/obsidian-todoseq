@@ -12,7 +12,7 @@ export default [
       'manifest.json',
       'versions.json',
       'scripts/**',
-      '.obsidian/**',
+      '.*/**',
       'examples/**',
       'docs/**',
       'dist/**',
@@ -29,6 +29,7 @@ export default [
       'obsidianmd/no-unsupported-api': 'off',
       'obsidianmd/prefer-file-manager-trash-file': 'off',
       'obsidianmd/prefer-instanceof': 'off',
+      'obsidianmd/hardcoded-config-path': 'off',
     },
   },
   {

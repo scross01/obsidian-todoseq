@@ -22,9 +22,9 @@ import { TransitionParser } from '../services/transition-parser';
 import { KeywordManager } from '../utils/keyword-manager';
 
 function hideSettingNameAndControl(setting: Setting): void {
-  // eslint-disable-next-line obsidianmd/no-static-styles-assignment
+  // eslint-disable-next-line obsidianmd/no-static-styles-assignment -- nameEl created by Setting API, can't target via CSS class
   setting.nameEl.style.display = 'none';
-  // eslint-disable-next-line obsidianmd/no-static-styles-assignment
+  // eslint-disable-next-line obsidianmd/no-static-styles-assignment -- controlEl created by Setting API, can't target via CSS class
   setting.controlEl.style.display = 'none';
 }
 

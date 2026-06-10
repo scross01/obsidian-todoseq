@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.15.2
+
+- Address Obsidian community scorecard review feedback items.
+
 ## 0.15.1
 
 - Fixed issue with identifying codeblocks fences that start with bullet markers. #69
