@@ -227,6 +227,8 @@ show-scheduled-date: true
 
 When enabled, a calendar icon with the scheduled date appears inline after the task text. In truncated mode, the badge is shown inline; in wrap mode, a "Scheduled: date" row appears below the task text. Both scheduled and deadline can be shown simultaneously — when a task has both dates, only the earliest date badge is shown inline.
 
+If a warning period is active on the scheduled date, a `→` arrow appears after the date, indicating the task is delayed (appears after the scheduled date).
+
 ### Show Deadline Date
 
 The `show-deadline-date:` parameter controls whether an inline deadline date badge is displayed on incomplete tasks:
@@ -242,6 +244,8 @@ show-deadline-date: true
 ````
 
 When enabled, a calendar icon with the deadline date appears inline after the task text. In truncated mode, the badge is shown inline; in wrap mode, a "Deadline: date" row appears below the task text. Both scheduled and deadline can be shown simultaneously — when a task has both dates, only the earliest date badge is shown inline.
+
+If a warning period is active on the deadline date, a `<-` arrow appears after the date, indicating advance notice (task appears before the deadline).
 
 ### Show Closed Date
 
@@ -326,6 +330,13 @@ limit: 10
 The task lists provide subtle visual cues to help you quickly identify task urgency based on scheduled and deadline dates. When a task has either a scheduled or deadline date, you'll see a gentle background color that indicates its time sensitivity without being distracting.
 
 Tasks with dates that have passed appear with a soft red background, making it easy to spot what needs immediate attention. Tasks due today show a warm orange background, helping you focus on today's priorities. For tasks coming up within the next week, you'll see a soft green background that signals they're on your radar. Tasks with dates further out in the future maintain their default appearance, keeping your view clean and uncluttered.
+
+When a task has a warning period set, arrow indicators appear next to the date to provide additional context:
+
+- **`→` (right arrow)** on scheduled dates — the task appears after the scheduled date (delayed notice)
+- **`←` (left arrow)** on deadline dates — the task appears before the deadline (advance notice)
+
+These arrows appear in both inline date badges (truncated/dynamic mode) and date info rows (wrap mode) when `show-scheduled-date:` or `show-deadline-date:` is enabled.
 
 ## Interactive Features
 

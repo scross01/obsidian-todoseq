@@ -789,3 +789,36 @@ export class DateUtils {
     return `[${year}-${month}-${day} ${weekday} ${hours}:${minutes}]`;
   }
 }
+
+/**
+ * Get the effective warning period in days for a task date.
+ * Falls back through: per-task warning period → first-only warning period → global default.
+ */
+export function getEffectiveWarningDays(
+  task: {
+    scheduledWarningPeriod: number | null;
+    scheduledFirstOnlyWarningPeriod: number | null;
+    deadlineWarningPeriod: number | null;
+    deadlineFirstOnlyWarningPeriod: number | null;
+  },
+  type: 'scheduled' | 'deadline',
+  defaults: {
+    defaultScheduledWarningPeriod: number;
+    defaultDeadlineWarningPeriod: number;
+  },
+): number {
+  if (type === 'scheduled') {
+    return (
+      task.scheduledWarningPeriod ??
+      task.scheduledFirstOnlyWarningPeriod ??
+      defaults.defaultScheduledWarningPeriod ??
+      0
+    );
+  }
+  return (
+    task.deadlineWarningPeriod ??
+    task.deadlineFirstOnlyWarningPeriod ??
+    defaults.defaultDeadlineWarningPeriod ??
+    0
+  );
+}

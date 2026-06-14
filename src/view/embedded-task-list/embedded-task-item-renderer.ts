@@ -1,4 +1,5 @@
 import { Task } from '../../types/task';
+import { getEffectiveWarningDays } from '../../utils/date-utils';
 import {
   getSubtaskDisplayText,
   hasSubtasks,
@@ -847,6 +848,7 @@ export class EmbeddedTaskItemRenderer {
       | 'target'
       | 'check-circle',
     parent: HTMLElement,
+    warningArrow?: string,
   ): void {
     const badge = parent.createEl('span', {
       cls: 'todoseq-embedded-task-date-badge',
@@ -858,7 +860,9 @@ export class EmbeddedTaskItemRenderer {
       svg.removeAttribute('height');
     }
     badge.createSpan({
-      text: DateUtils.formatDateForDisplay(date),
+      text:
+        DateUtils.formatDateForDisplay(date) +
+        (warningArrow ? ` ${warningArrow}` : ''),
     });
   }
 
@@ -867,6 +871,7 @@ export class EmbeddedTaskItemRenderer {
     date: Date,
     parent: HTMLElement,
     extraCls?: string,
+    warningArrow?: string,
   ): void {
     const row = parent.createEl('div', {
       cls: 'todoseq-embedded-task-date-info' + (extraCls ? ` ${extraCls}` : ''),
@@ -877,8 +882,26 @@ export class EmbeddedTaskItemRenderer {
     });
     row.createSpan({
       cls: 'todoseq-embedded-task-date-info-value',
-      text: DateUtils.formatDateForDisplay(date),
+      text:
+        DateUtils.formatDateForDisplay(date) +
+        (warningArrow ? ` ${warningArrow}` : ''),
     });
+  }
+
+  private getWarningArrow(
+    task: Task,
+    type: 'scheduled' | 'deadline',
+  ): string | undefined {
+    const settings = this.plugin.keywordManager.getSettings();
+    const warningDays = getEffectiveWarningDays(task, type, {
+      defaultScheduledWarningPeriod:
+        settings.defaultScheduledWarningPeriod ?? 0,
+      defaultDeadlineWarningPeriod: settings.defaultDeadlineWarningPeriod ?? 0,
+    });
+    if (warningDays > 0) {
+      return type === 'scheduled' ? '\u2192' : '\u2190';
+    }
+    return undefined;
   }
 
   private buildInlineDateBadge(
@@ -892,10 +915,20 @@ export class EmbeddedTaskItemRenderer {
     if (!showScheduled && !showDeadline && !showClosed) return;
 
     if (showScheduled && task.scheduledDate && !task.completed) {
-      this.buildDateBadge(task.scheduledDate, 'calendar', parent);
+      this.buildDateBadge(
+        task.scheduledDate,
+        'calendar',
+        parent,
+        this.getWarningArrow(task, 'scheduled'),
+      );
     }
     if (showDeadline && task.deadlineDate && !task.completed) {
-      this.buildDateBadge(task.deadlineDate, 'target', parent);
+      this.buildDateBadge(
+        task.deadlineDate,
+        'target',
+        parent,
+        this.getWarningArrow(task, 'deadline'),
+      );
     }
     if (showClosed && task.closedDate && task.completed) {
       this.buildDateBadge(task.closedDate, 'check-circle', parent);
@@ -914,10 +947,22 @@ export class EmbeddedTaskItemRenderer {
     if (!showScheduled && !showDeadline && !showClosed) return;
 
     if (showScheduled && task.scheduledDate && !task.completed) {
-      this.buildDateInfoRow('Scheduled', task.scheduledDate, parent, extraCls);
+      this.buildDateInfoRow(
+        'Scheduled',
+        task.scheduledDate,
+        parent,
+        extraCls,
+        this.getWarningArrow(task, 'scheduled'),
+      );
     }
     if (showDeadline && task.deadlineDate && !task.completed) {
-      this.buildDateInfoRow('Deadline', task.deadlineDate, parent, extraCls);
+      this.buildDateInfoRow(
+        'Deadline',
+        task.deadlineDate,
+        parent,
+        extraCls,
+        this.getWarningArrow(task, 'deadline'),
+      );
     }
     if (showClosed && task.closedDate && task.completed) {
       this.buildDateInfoRow('Closed', task.closedDate, parent, extraCls);

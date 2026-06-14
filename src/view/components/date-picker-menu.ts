@@ -1,5 +1,6 @@
 import { setIcon } from 'obsidian';
 import { DateUtils } from '../../utils/date-utils';
+import { formatRepeatDescription } from '../../utils/date-repeater';
 import { DateRepeatInfo } from '../../types/task';
 import { isPhoneDevice } from '../../utils/mobile-utils';
 import { BaseDialog } from './base-dialog';
@@ -1151,27 +1152,7 @@ export class DatePicker extends BaseDialog {
   }
 
   private formatRepeat(repeat: DateRepeatInfo): string {
-    const unitLabels: Record<string, string> = {
-      y: 'year',
-      m: 'month',
-      w: 'week',
-      d: 'day',
-      h: 'hour',
-    };
-
-    const unitLabel = unitLabels[repeat.unit];
-    const unitStr = repeat.value === 1 ? unitLabel : `${unitLabel}s`;
-
-    switch (repeat.type) {
-      case '+':
-        return `Every ${repeat.value} ${unitStr}`;
-      case '.+':
-        return `Every ${repeat.value} ${unitStr} (from done)`;
-      case '++':
-        return `Every ${repeat.value} ${unitStr} (catch up)`;
-      default:
-        return `${repeat.raw}`;
-    }
+    return formatRepeatDescription(repeat);
   }
 
   // ─── Warning Period Selection ──────────────────────────────────

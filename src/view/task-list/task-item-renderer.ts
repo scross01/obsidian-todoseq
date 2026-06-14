@@ -1,5 +1,6 @@
-import { Task } from '../../types/task';
-import { DateUtils } from '../../utils/date-utils';
+import { Task, DateRepeatInfo } from '../../types/task';
+import { DateUtils, getEffectiveWarningDays } from '../../utils/date-utils';
+import { formatRepeatDescription } from '../../utils/date-repeater';
 import { setIcon, Platform, Notice } from 'obsidian';
 import {
   TAG_PATTERN,
@@ -784,6 +785,7 @@ export class TaskItemRenderer {
     otherDate: Date | null | undefined,
     label: string,
     offsetDays: number,
+    repeatInfo?: DateRepeatInfo | null,
   ): void {
     const warningDays =
       warningPeriod ?? firstOnlyWarningPeriod ?? defaultWarningPeriod;
@@ -791,10 +793,12 @@ export class TaskItemRenderer {
     if (skipIfOtherDateExists && otherDate) return;
 
     const effectiveDate = DateUtils.addDays(date, offsetDays);
-    dateValueEl.setAttribute(
-      'title',
-      `${label}: ${this.formatDateForDisplay(date, true)}\nWarning period: -${warningDays}d (appears ${this.formatDateForDisplay(effectiveDate, true)})`,
-    );
+    let tooltip = `${label}: ${this.formatDateForDisplay(date, true)}`;
+    if (repeatInfo) {
+      tooltip += `\nRepeat: ${formatRepeatDescription(repeatInfo)}`;
+    }
+    tooltip += `\nWarning period: -${warningDays}d (appears ${this.formatDateForDisplay(effectiveDate, true)})`;
+    dateValueEl.setAttribute('title', tooltip);
   }
 
   /**
@@ -850,16 +854,16 @@ export class TaskItemRenderer {
       });
       dateValue.setText(this.formatDateForDisplay(task.scheduledDate, true));
 
-      // Add warning period tooltip if active
+      // Add warning period tooltip and arrow indicator if active
       const renderSettings = this.keywordManager.getSettings() as Record<
         string,
         unknown
       >;
-      const scheduledWarningDays =
-        task.scheduledWarningPeriod ??
-        task.scheduledFirstOnlyWarningPeriod ??
-        (renderSettings.defaultScheduledWarningPeriod as number) ??
-        0;
+      const scheduledWarningDays = getEffectiveWarningDays(task, 'scheduled', {
+        defaultScheduledWarningPeriod:
+          (renderSettings.defaultScheduledWarningPeriod as number) ?? 0,
+        defaultDeadlineWarningPeriod: 0,
+      });
       if (scheduledWarningDays > 0) {
         this.setWarningPeriodTooltip(
           dateValue,
@@ -871,6 +875,15 @@ export class TaskItemRenderer {
           task.deadlineDate,
           'Scheduled',
           scheduledWarningDays,
+          task.scheduledDateRepeat,
+        );
+        const arrow = dateRow.createEl('span', {
+          cls: 'todoseq-task-date-warning-arrow',
+          text: '\u2192',
+        });
+        arrow.setAttribute(
+          'title',
+          `Warning period: -${scheduledWarningDays}d`,
         );
       }
 
@@ -915,14 +928,14 @@ export class TaskItemRenderer {
       });
       dateValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
 
-      // Add warning period tooltip if active
+      // Add warning period tooltip and arrow indicator if active
       const deadlineRenderSettings =
         this.keywordManager.getSettings() as Record<string, unknown>;
-      const deadlineWarningDays =
-        task.deadlineWarningPeriod ??
-        task.deadlineFirstOnlyWarningPeriod ??
-        (deadlineRenderSettings.defaultDeadlineWarningPeriod as number) ??
-        0;
+      const deadlineWarningDays = getEffectiveWarningDays(task, 'deadline', {
+        defaultScheduledWarningPeriod: 0,
+        defaultDeadlineWarningPeriod:
+          (deadlineRenderSettings.defaultDeadlineWarningPeriod as number) ?? 0,
+      });
       if (deadlineWarningDays > 0) {
         this.setWarningPeriodTooltip(
           dateValue,
@@ -934,7 +947,13 @@ export class TaskItemRenderer {
           task.scheduledDate,
           'Deadline',
           -deadlineWarningDays,
+          task.deadlineDateRepeat,
         );
+        const arrow = dateRow.createEl('span', {
+          cls: 'todoseq-task-date-warning-arrow',
+          text: '\u2190',
+        });
+        arrow.setAttribute('title', `Warning period: -${deadlineWarningDays}d`);
       }
 
       const repeatCell = dateRow.createEl('span', {

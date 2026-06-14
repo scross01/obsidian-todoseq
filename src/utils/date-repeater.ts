@@ -441,3 +441,32 @@ export function formatDateLine(
 
   return line.replace(/<.[^>]*>/, `<${newDateContent}>`);
 }
+
+/**
+ * Format a DateRepeatInfo into a human-readable descriptive string.
+ * @param repeat - The repeat info to format
+ * @returns Descriptive string like "Every 2 days", "Every 1 week (from done)", etc.
+ */
+export function formatRepeatDescription(repeat: DateRepeatInfo): string {
+  const unitLabels: Record<string, string> = {
+    y: 'year',
+    m: 'month',
+    w: 'week',
+    d: 'day',
+    h: 'hour',
+  };
+
+  const unitLabel = unitLabels[repeat.unit] ?? repeat.unit;
+  const unitStr = repeat.value === 1 ? unitLabel : `${unitLabel}s`;
+
+  switch (repeat.type) {
+    case '+':
+      return `Every ${repeat.value} ${unitStr}`;
+    case '.+':
+      return `Every ${repeat.value} ${unitStr} (from done)`;
+    case '++':
+      return `Every ${repeat.value} ${unitStr} (catch up)`;
+    default:
+      return repeat.raw;
+  }
+}

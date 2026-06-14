@@ -476,6 +476,14 @@
   color: var(--text-muted);
 }
 
+/* Warning period arrow indicator */
+.todoseq-panel .todoseq-task-date-warning-arrow {
+  margin-left: var(--size-2-2);
+  font-size: 0.75rem;
+  opacity: 0.7;
+  vertical-align: middle;
+}
+
 /* Settings UI - Shared font size for messages */
 .todoseq-setting-item-error,
 .todoseq-setting-item-warning,

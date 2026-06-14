@@ -79,10 +79,19 @@ Warning periods interact with several TODOseq features:
 - **[Settings](settings.md#warning-period-settings)** — Configure global defaults and skip behavior
 - **[Task Entry Structure](task-entry.md#warning-periods-advance-notice--delayed-notice)** — Full syntax reference with examples for SCHEDULED, DEADLINE, and recurring dates
 - **[Sort Methods](sort-methods.md#note-on-warning-periods)** — Warning periods affect visibility but not sort order
-- **[Task List Date Displays](task-list.md#date-displays)** — Hover tooltips show when a task with a warning period will appear
+- **[Task List Date Displays](task-list.md#date-displays)** — Warning period arrow indicators (`→` and `←`) show at a glance when a task's visibility is shifted
 - **[Date Picker](task-list.md#date-picker)** — Set warning periods via the UI when editing scheduled or deadline dates
 - **[Embedded Task Lists](embedded-task-lists.md#warning-period-overrides)** — Override warning period settings per code block with `upcoming-period:`, `scheduled-warning-period:`, `deadline-warning-period:`, and skip toggles
 - **[Urgency](urgency.md#warning-periods-and-urgency)** — Warning periods do **not** affect urgency calculations; urgency always uses the raw scheduled and deadline dates
+
+### Visual Indicators
+
+When a task has a warning period set, the task list displays small arrow indicators next to the date:
+
+- **`→` (right arrow)** on a scheduled date indicates delayed notice — the task appears _after_ the scheduled date
+- **`←` (left arrow)** on a deadline date indicates advance notice — the task appears _before_ the deadline
+
+These arrows provide an immediate visual cue that a warning period is active, without needing to hover over the date. The arrows also appear in embedded task lists when date badges are enabled.
 
 ## Examples
 

@@ -193,10 +193,40 @@ Tasks can display date information below the task text in the Task List:
 - Orange: Due today
 - Green: Due within 7 days
 
-When a warning period is active, hovering over the date shows when the task will actually appear in the task list.
-
-**Deadline Dates** - Shown for incomplete tasks with a deadline date. Displays "Deadline: [date]" with the same color coding as scheduled dates. Warning period tooltips apply here as well.
+**Deadline Dates** - Shown for incomplete tasks with a deadline date. Displays "Deadline: [date]" with the same color coding as scheduled dates.
 
 **Closed Dates** - Shown for completed tasks with a closed date. Displays "Closed: [date]" in a grey theme, indicating when the task was marked as complete.
 
 Date displays include repeat icons (⟳) when the date has a repeat pattern configured. The time is shown when available (e.g., "Today 10:00 am").
+
+#### Warning Period Indicators
+
+When a task has a warning period set, a small arrow indicator appears after the date:
+
+- **`→` (right arrow)** on scheduled dates — indicates the task appears _later_ than the scheduled date (delayed notice)
+- **`←` (left arrow)** on deadline dates — indicates the task appears _earlier_ than the deadline (advance notice)
+
+These arrows are only shown when a warning period is active (either per-task via `-Nd` syntax or via global default settings).
+
+**Example displays:**
+
+```
+Scheduled: Yesterday →
+Deadline: Jun 22, 2026 ←
+```
+
+#### Hover Tooltips
+
+Hovering over a date in the task list shows detailed information about the warning period and repeat pattern:
+
+```
+Scheduled: Yesterday
+Repeat: Every 2 days (from done)
+Warning period: -1d (appears Today)
+```
+
+The tooltip includes:
+
+- The date label and formatted date
+- The repeat pattern in descriptive format (if set)
+- The warning period with the effective appearance date
