@@ -653,6 +653,18 @@
   padding-left: var(--size-4-2);
 }
 
+/* Search option rows - single line with truncation */
+.todoseq-dropdown .search-suggest-item:not(.mod-group):not(.search-suggest-saved-item):not(.search-suggest-history-item) .suggestion-content {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.todoseq-dropdown .search-suggest-item:not(.mod-group):not(.search-suggest-saved-item):not(.search-suggest-history-item) .suggestion-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Status bar item styling */
 .todoseq-status-bar {
   order: -1;

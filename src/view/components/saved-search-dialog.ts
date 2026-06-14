@@ -97,80 +97,6 @@ export class SavedSearchDialog {
     queryInput.value =
       this.options.existingSearch?.query ?? this.options.query ?? '';
 
-    // View mode field
-    const viewModeGroup = form.createEl('div', {
-      cls: 'todoseq-saved-search-field',
-    });
-    viewModeGroup.createEl('label', { text: 'View mode' });
-    const viewModeSelect = viewModeGroup.createEl('select');
-    const viewModeOptions = [
-      { value: '', label: 'Use current setting' },
-      { value: 'showAll', label: 'Show' },
-      { value: 'sortCompletedLast', label: 'Sort to end' },
-      { value: 'hideCompleted', label: 'Hide' },
-    ];
-    for (const opt of viewModeOptions) {
-      viewModeSelect.createEl('option', {
-        attr: { value: opt.value },
-        text: opt.label,
-      });
-    }
-    viewModeSelect.value =
-      this.options.existingSearch?.viewMode ??
-      this.options.currentViewMode ??
-      '';
-
-    // Sort method field
-    const sortGroup = form.createEl('div', {
-      cls: 'todoseq-saved-search-field',
-    });
-    sortGroup.createEl('label', { text: 'Sort by' });
-    const sortSelect = sortGroup.createEl('select');
-    const sortOptions = [
-      { value: '', label: 'Use current setting' },
-      { value: 'default', label: 'Default (file path)' },
-      { value: 'sortByScheduled', label: 'Scheduled date' },
-      { value: 'sortByDeadline', label: 'Deadline date' },
-      { value: 'sortByClosedDate', label: 'Closed date' },
-      { value: 'sortByPriority', label: 'Priority' },
-      { value: 'sortByUrgency', label: 'Urgency' },
-      { value: 'sortByKeyword', label: 'Keyword' },
-    ];
-    for (const opt of sortOptions) {
-      sortSelect.createEl('option', {
-        attr: { value: opt.value },
-        text: opt.label,
-      });
-    }
-    sortSelect.value =
-      this.options.existingSearch?.sortMethod ??
-      this.options.currentSortMethod ??
-      '';
-
-    // Future task sorting field
-    const futureGroup = form.createEl('div', {
-      cls: 'todoseq-saved-search-field',
-    });
-    futureGroup.createEl('label', { text: 'Future dated tasks' });
-    const futureSelect = futureGroup.createEl('select');
-    const futureOptions = [
-      { value: '', label: 'Use current setting' },
-      { value: 'showAll', label: 'Show' },
-      { value: 'showUpcoming', label: 'Show upcoming' },
-      { value: 'sortToEnd', label: 'Sort to end' },
-      { value: 'hideFuture', label: 'Hide' },
-    ];
-    for (const opt of futureOptions) {
-      futureSelect.createEl('option', {
-        attr: { value: opt.value },
-        text: opt.label,
-      });
-    }
-    futureSelect.value =
-      this.options.existingSearch?.futureTaskSorting ??
-      this.options.currentFutureTaskSorting ??
-      '';
-
     // Match case field
     const matchCaseGroup = form.createEl('div', {
       cls: 'todoseq-saved-search-field',
@@ -197,6 +123,80 @@ export class SavedSearchDialog {
       // Use current match case state if provided, otherwise default to off
       matchCaseSelect.value = this.options.currentMatchCase ? 'on' : 'off';
     }
+
+    // Sort method field
+    const sortGroup = form.createEl('div', {
+      cls: 'todoseq-saved-search-field',
+    });
+    sortGroup.createEl('label', { text: 'Sort tasks by' });
+    const sortSelect = sortGroup.createEl('select');
+    const sortOptions = [
+      { value: '', label: 'Use current setting' },
+      { value: 'default', label: 'Default (file path)' },
+      { value: 'sortByScheduled', label: 'Scheduled date' },
+      { value: 'sortByDeadline', label: 'Deadline date' },
+      { value: 'sortByClosedDate', label: 'Closed date' },
+      { value: 'sortByPriority', label: 'Priority' },
+      { value: 'sortByUrgency', label: 'Urgency' },
+      { value: 'sortByKeyword', label: 'Keyword' },
+    ];
+    for (const opt of sortOptions) {
+      sortSelect.createEl('option', {
+        attr: { value: opt.value },
+        text: opt.label,
+      });
+    }
+    sortSelect.value =
+      this.options.existingSearch?.sortMethod ??
+      this.options.currentSortMethod ??
+      '';
+
+    // Completed tasks view mode field
+    const viewModeGroup = form.createEl('div', {
+      cls: 'todoseq-saved-search-field',
+    });
+    viewModeGroup.createEl('label', { text: 'Completed tasks' });
+    const viewModeSelect = viewModeGroup.createEl('select');
+    const viewModeOptions = [
+      { value: '', label: 'Use current setting' },
+      { value: 'showAll', label: 'Show' },
+      { value: 'sortCompletedLast', label: 'Sort to end' },
+      { value: 'hideCompleted', label: 'Hide' },
+    ];
+    for (const opt of viewModeOptions) {
+      viewModeSelect.createEl('option', {
+        attr: { value: opt.value },
+        text: opt.label,
+      });
+    }
+    viewModeSelect.value =
+      this.options.existingSearch?.viewMode ??
+      this.options.currentViewMode ??
+      '';
+
+    // Future task sorting field
+    const futureGroup = form.createEl('div', {
+      cls: 'todoseq-saved-search-field',
+    });
+    futureGroup.createEl('label', { text: 'Future dated tasks' });
+    const futureSelect = futureGroup.createEl('select');
+    const futureOptions = [
+      { value: '', label: 'Use current setting' },
+      { value: 'showAll', label: 'Show' },
+      { value: 'showUpcoming', label: 'Show upcoming' },
+      { value: 'sortToEnd', label: 'Sort to end' },
+      { value: 'hideFuture', label: 'Hide' },
+    ];
+    for (const opt of futureOptions) {
+      futureSelect.createEl('option', {
+        attr: { value: opt.value },
+        text: opt.label,
+      });
+    }
+    futureSelect.value =
+      this.options.existingSearch?.futureTaskSorting ??
+      this.options.currentFutureTaskSorting ??
+      '';
 
     // Buttons
     const buttons = form.createEl('div', {
