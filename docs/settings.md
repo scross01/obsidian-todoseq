@@ -551,21 +551,21 @@ FIXME Handle edge cases
 
 When a task has both a SCHEDULED date and a DEADLINE date, both warning periods may apply. These two settings control which one takes precedence:
 
-| Ignore Scheduled Delay When Deadline Is Set | Ignore Deadline Advance When Scheduled Is Set | Behavior |
-|---|---|---|
-| Disabled (default) | Disabled (default) | Both apply. The **earlier** effective visibility date wins. (Org Mode default) |
-| Enabled | Disabled | Deadline advance notice wins. Scheduled delay is ignored. |
-| Disabled | Enabled | Scheduled delay wins. Deadline advance notice is ignored. |
-| Enabled | Enabled | Both are ignored. Task uses raw scheduled and deadline dates with no warning period adjustment. |
+| Ignore Scheduled Delay When Deadline Is Set | Ignore Deadline Advance When Scheduled Is Set | Behavior                                                                                        |
+| ------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Disabled (default)                          | Disabled (default)                            | Both apply. The **earlier** effective visibility date wins. (Org Mode default)                  |
+| Enabled                                     | Disabled                                      | Deadline advance notice wins. Scheduled delay is ignored.                                       |
+| Disabled                                    | Enabled                                       | Scheduled delay wins. Deadline advance notice is ignored.                                       |
+| Enabled                                     | Enabled                                       | Both are ignored. Task uses raw scheduled and deadline dates with no warning period adjustment. |
 
 **Example** with `SCHEDULED: <June 10 -3d>` and `DEADLINE: <June 20 -5d>`:
 
-| Settings | Scheduled effective | Deadline effective | Task visible from |
-|---|---|---|---|
-| Default (skip neither) | June 13 (10+3) | June 15 (20−5) | June 13 (earlier wins) |
-| Skip scheduled instead | June 10 (delay ignored) | June 15 (20−5) | June 10 |
-| Skip deadline instead | June 13 (10+3) | June 20 (warning ignored) | June 13 |
-| Skip both | June 10 (raw) | June 20 (raw) | June 10 |
+| Settings               | Scheduled effective     | Deadline effective        | Effective visibility date | Explanation             |
+| ---------------------- | ----------------------- | ------------------------- | ------------------------- | ----------------------- |
+| Default (skip neither) | June 13 (10+3)          | June 15 (20−5)            | June 13                   | Earlier of the two wins |
+| Skip scheduled instead | June 10 (delay ignored) | June 15 (20−5)            | June 10                   | Scheduled uses raw date |
+| Skip deadline instead  | June 13 (10+3)          | June 20 (warning ignored) | June 13                   | Deadline uses raw date  |
+| Skip both              | June 10 (raw)           | June 20 (raw)             | June 10                   | Both use raw dates      |
 
 ### Week Starts On
 

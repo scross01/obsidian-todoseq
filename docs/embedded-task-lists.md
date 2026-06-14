@@ -33,6 +33,11 @@ Using the following parameters within the `todoseq` code block you define which 
 - `show-scheduled-date:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show inline scheduled date badges on incomplete tasks. Defaults to `hide`
 - `show-deadline-date:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show inline deadline date badges on incomplete tasks. Defaults to `hide`
 - `collapse:` (optional) `true` or `false`. When enabled, the task list is collapsible with a chevron toggle. Defaults to `false`. Requires either `title:` to be set OR `show-query: true`
+- `upcoming-period:` (optional) a positive number. Overrides the global "Upcoming period" setting for this code block, controlling how many days ahead tasks are considered "upcoming" when using `show-future: show-upcoming`
+- `scheduled-warning-period:` (optional) a non-negative number. Overrides the global "Scheduled delay" setting for this code block. Tasks appear this many days after their scheduled date
+- `deadline-warning-period:` (optional) a non-negative number. Overrides the global "Deadline advance notice" setting for this code block. Tasks appear this many days before their deadline
+- `skip-scheduled-warning-if-deadline:` (optional) `true` or `false`. Overrides the global "Ignore Scheduled Delay When Deadline Is Set" setting for this code block
+- `skip-deadline-warning-if-scheduled:` (optional) `true` or `false`. Overrides the global "Ignore Deadline Advance Notice When Scheduled Is Set" setting for this code block
 
 Example:
 
@@ -273,6 +278,31 @@ search: tag:project1
 sort: priority
 ```
 ````
+
+### Warning Period Overrides
+
+The warning period parameters override the global [warning period settings](settings.md#warning-period-settings) for a specific embedded task list. This is useful when different views need different visibility rules.
+
+````txt
+```todoseq
+search: tag:project1
+upcoming-period: 14
+scheduled-warning-period: 3
+deadline-warning-period: 5
+```
+````
+
+You can also control the skip behavior per code block:
+
+````txt
+```todoseq
+search: tag:urgent
+skip-scheduled-warning-if-deadline: true
+skip-deadline-warning-if-scheduled: false
+```
+````
+
+> **Note:** When not specified, these parameters fall back to the global settings. See [Warning Period Settings](settings.md#warning-period-settings) for details on how these settings interact.
 
 ### Combined Parameters
 

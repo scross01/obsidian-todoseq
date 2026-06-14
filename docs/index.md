@@ -52,6 +52,7 @@ Open Settings → Community plugins → Browse, search for "TODOseq", then insta
 - [Search Functionality](search.md) - Advanced search syntax and filters
 - [Settings](settings.md) - Configuration options and customization
 - [Task Urgency](urgency.md) - Urgency sorting philosophy, calculation, and configuration
+- [Warning Periods](warning-periods.md) - Control when tasks appear relative to scheduled and deadline dates
 
 ## Support
 

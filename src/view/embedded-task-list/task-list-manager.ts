@@ -216,6 +216,8 @@ export class EmbeddedTaskListManager {
       }
 
       // Use the existing three-block sorting system
+      // Code block params override global settings for warning periods and upcoming period
+      // Use explicit !== undefined checks (not ??) so that 0 and false overrides work correctly
       const sorted = sortTasksWithThreeBlockSystem(
         tasks,
         now,
@@ -225,15 +227,26 @@ export class EmbeddedTaskListManager {
         keywordConfig,
         this.settings
           ? {
-              upcomingPeriod: this.settings.upcomingPeriod,
+              upcomingPeriod:
+                params.upcomingPeriod !== undefined
+                  ? params.upcomingPeriod
+                  : this.settings.upcomingPeriod,
               defaultDeadlineWarningPeriod:
-                this.settings.defaultDeadlineWarningPeriod,
+                params.deadlineWarningPeriod !== undefined
+                  ? params.deadlineWarningPeriod
+                  : this.settings.defaultDeadlineWarningPeriod,
               defaultScheduledWarningPeriod:
-                this.settings.defaultScheduledWarningPeriod,
+                params.scheduledWarningPeriod !== undefined
+                  ? params.scheduledWarningPeriod
+                  : this.settings.defaultScheduledWarningPeriod,
               skipScheduledWarningPeriodIfDeadline:
-                this.settings.skipScheduledWarningPeriodIfDeadline,
+                params.skipScheduledWarningIfDeadline !== undefined
+                  ? params.skipScheduledWarningIfDeadline
+                  : this.settings.skipScheduledWarningPeriodIfDeadline,
               skipDeadlinePrewarningIfScheduled:
-                this.settings.skipDeadlinePrewarningIfScheduled,
+                params.skipDeadlineWarningIfScheduled !== undefined
+                  ? params.skipDeadlineWarningIfScheduled
+                  : this.settings.skipDeadlinePrewarningIfScheduled,
             }
           : undefined,
       );
@@ -299,7 +312,13 @@ export class EmbeddedTaskListManager {
     const futureHash = params.future || 'default';
     const limitHash = params.limit || 'none';
 
-    return `${this.cacheVersion}-${taskCount}-${searchHash}-${sortHash}-${completedHash}-${futureHash}-${limitHash}`;
+    const upcomingHash = params.upcomingPeriod ?? 'global';
+    const schedWarnHash = params.scheduledWarningPeriod ?? 'global';
+    const deadWarnHash = params.deadlineWarningPeriod ?? 'global';
+    const skipSchedHash = params.skipScheduledWarningIfDeadline ?? 'global';
+    const skipDeadHash = params.skipDeadlineWarningIfScheduled ?? 'global';
+
+    return `${this.cacheVersion}-${taskCount}-${searchHash}-${sortHash}-${completedHash}-${futureHash}-${limitHash}-${upcomingHash}-${schedWarnHash}-${deadWarnHash}-${skipSchedHash}-${skipDeadHash}`;
   }
 
   /**

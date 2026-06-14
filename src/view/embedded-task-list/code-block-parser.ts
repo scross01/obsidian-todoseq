@@ -44,6 +44,12 @@ export interface TodoseqParameters {
   showScheduledDate?: boolean;
   showDeadlineDate?: boolean;
   showClosedDate?: boolean;
+  // Warning period overrides (per-code-block)
+  upcomingPeriod?: number;
+  scheduledWarningPeriod?: number;
+  deadlineWarningPeriod?: number;
+  skipScheduledWarningIfDeadline?: boolean;
+  skipDeadlineWarningIfScheduled?: boolean;
   error?: string;
 }
 
@@ -85,6 +91,11 @@ export class TodoseqCodeBlockParser {
       let showScheduledDate: boolean | undefined;
       let showDeadlineDate: boolean | undefined;
       let showClosedDate: boolean | undefined;
+      let upcomingPeriod: number | undefined;
+      let scheduledWarningPeriod: number | undefined;
+      let deadlineWarningPeriod: number | undefined;
+      let skipScheduledWarningIfDeadline: boolean | undefined;
+      let skipDeadlineWarningIfScheduled: boolean | undefined;
 
       // Parse each line for parameters
       for (const line of lines) {
@@ -319,6 +330,67 @@ export class TodoseqCodeBlockParser {
               `Invalid show-closed-date option: ${value}. Valid options: true, false, show, hide`,
             );
           }
+        } else if (trimmed.startsWith('upcoming-period:')) {
+          const periodValue = trimmed
+            .substring('upcoming-period:'.length)
+            .trim();
+          const parsedPeriod = parseInt(periodValue, 10);
+          if (isNaN(parsedPeriod) || parsedPeriod < 1) {
+            throw new Error(
+              `Invalid upcoming-period value: ${periodValue}. Must be a positive number.`,
+            );
+          }
+          upcomingPeriod = parsedPeriod;
+        } else if (trimmed.startsWith('scheduled-warning-period:')) {
+          const periodValue = trimmed
+            .substring('scheduled-warning-period:'.length)
+            .trim();
+          const parsedPeriod = parseInt(periodValue, 10);
+          if (isNaN(parsedPeriod) || parsedPeriod < 0) {
+            throw new Error(
+              `Invalid scheduled-warning-period value: ${periodValue}. Must be a non-negative number.`,
+            );
+          }
+          scheduledWarningPeriod = parsedPeriod;
+        } else if (trimmed.startsWith('deadline-warning-period:')) {
+          const periodValue = trimmed
+            .substring('deadline-warning-period:'.length)
+            .trim();
+          const parsedPeriod = parseInt(periodValue, 10);
+          if (isNaN(parsedPeriod) || parsedPeriod < 0) {
+            throw new Error(
+              `Invalid deadline-warning-period value: ${periodValue}. Must be a non-negative number.`,
+            );
+          }
+          deadlineWarningPeriod = parsedPeriod;
+        } else if (trimmed.startsWith('skip-scheduled-warning-if-deadline:')) {
+          const value = trimmed
+            .substring('skip-scheduled-warning-if-deadline:'.length)
+            .trim()
+            .toLowerCase();
+          if (value === 'false') {
+            skipScheduledWarningIfDeadline = false;
+          } else if (value === 'true') {
+            skipScheduledWarningIfDeadline = true;
+          } else {
+            throw new Error(
+              `Invalid skip-scheduled-warning-if-deadline option: ${value}. Valid options: true, false`,
+            );
+          }
+        } else if (trimmed.startsWith('skip-deadline-warning-if-scheduled:')) {
+          const value = trimmed
+            .substring('skip-deadline-warning-if-scheduled:'.length)
+            .trim()
+            .toLowerCase();
+          if (value === 'false') {
+            skipDeadlineWarningIfScheduled = false;
+          } else if (value === 'true') {
+            skipDeadlineWarningIfScheduled = true;
+          } else {
+            throw new Error(
+              `Invalid skip-deadline-warning-if-scheduled option: ${value}. Valid options: true, false`,
+            );
+          }
         }
       }
 
@@ -357,6 +429,11 @@ export class TodoseqCodeBlockParser {
         showScheduledDate,
         showDeadlineDate,
         showClosedDate,
+        upcomingPeriod,
+        scheduledWarningPeriod,
+        deadlineWarningPeriod,
+        skipScheduledWarningIfDeadline,
+        skipDeadlineWarningIfScheduled,
       };
     } catch (error) {
       const errorMessage =
@@ -374,6 +451,11 @@ export class TodoseqCodeBlockParser {
         showScheduledDate: undefined,
         showDeadlineDate: undefined,
         showClosedDate: undefined,
+        upcomingPeriod: undefined,
+        scheduledWarningPeriod: undefined,
+        deadlineWarningPeriod: undefined,
+        skipScheduledWarningIfDeadline: undefined,
+        skipDeadlineWarningIfScheduled: undefined,
       };
     }
   }

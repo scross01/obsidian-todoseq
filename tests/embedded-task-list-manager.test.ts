@@ -50,6 +50,50 @@ describe('EmbeddedTaskListManager', () => {
 
       expect(key1).not.toBe(key2);
     });
+
+    it('generates different keys for different warning period overrides', () => {
+      const tasks = [createBaseTask()];
+      const params1: TodoseqParameters = {
+        deadlineWarningPeriod: 3,
+      };
+      const params2: TodoseqParameters = {
+        deadlineWarningPeriod: 7,
+      };
+
+      const key1 = (manager as any).generateCacheKey(tasks, params1);
+      const key2 = (manager as any).generateCacheKey(tasks, params2);
+
+      expect(key1).not.toBe(key2);
+    });
+
+    it('generates different keys when one has warning override and other uses global', () => {
+      const tasks = [createBaseTask()];
+      const paramsGlobal: TodoseqParameters = {};
+      const paramsOverride: TodoseqParameters = {
+        scheduledWarningPeriod: 5,
+        upcomingPeriod: 14,
+      };
+
+      const key1 = (manager as any).generateCacheKey(tasks, paramsGlobal);
+      const key2 = (manager as any).generateCacheKey(tasks, paramsOverride);
+
+      expect(key1).not.toBe(key2);
+    });
+
+    it('generates different keys for different skip flags', () => {
+      const tasks = [createBaseTask()];
+      const params1: TodoseqParameters = {
+        skipScheduledWarningIfDeadline: true,
+      };
+      const params2: TodoseqParameters = {
+        skipScheduledWarningIfDeadline: false,
+      };
+
+      const key1 = (manager as any).generateCacheKey(tasks, params1);
+      const key2 = (manager as any).generateCacheKey(tasks, params2);
+
+      expect(key1).not.toBe(key2);
+    });
   });
 
   describe('hashString', () => {
@@ -188,6 +232,198 @@ describe('EmbeddedTaskListManager', () => {
       expect((manager as any).settings.weekStartsOn).toBe('Sunday');
       expect((manager as any).taskCache.size).toBe(0);
       expect((manager as any).cachedKeywordConfig).toBeNull();
+    });
+  });
+
+  describe('warning period code block overrides', () => {
+    it('uses code block upcoming-period over global setting', async () => {
+      // Create a task scheduled 5 days from now — upcoming with period=7, future with period=3
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 5);
+      const futureDateStr = `${futureDate.getFullYear()}-${String(futureDate.getMonth() + 1).padStart(2, '0')}-${String(futureDate.getDate()).padStart(2, '0')}`;
+
+      const task = createBaseTask({
+        scheduledDate: futureDateStr,
+        completed: false,
+      });
+
+      // With global upcomingPeriod=7 and future=show-upcoming, task should be included
+      const paramsGlobal: TodoseqParameters = {
+        future: 'show-upcoming',
+      };
+      const resultGlobal = await manager.filterAndSortTasksWithCount(
+        [task],
+        paramsGlobal,
+      );
+      expect(resultGlobal.tasks.length).toBe(1);
+
+      // With code block upcomingPeriod=3 and future=show-upcoming, task should be excluded
+      const paramsOverride: TodoseqParameters = {
+        future: 'show-upcoming',
+        upcomingPeriod: 3,
+      };
+      const resultOverride = await manager.filterAndSortTasksWithCount(
+        [task],
+        paramsOverride,
+      );
+      expect(resultOverride.tasks.length).toBe(0);
+    });
+
+    it('falls back to global settings when code block params not specified', async () => {
+      const task = createBaseTask({
+        scheduledDate: '2025-01-01',
+        completed: false,
+      });
+
+      // No code block overrides — should use global settings
+      const params: TodoseqParameters = {};
+      const result = await manager.filterAndSortTasksWithCount(
+        [task],
+        params,
+      );
+      expect(result.tasks.length).toBe(1);
+    });
+
+    it('correctly overrides global deadlineWarningPeriod with 0', async () => {
+      // Set global default to non-zero
+      settings = createBaseSettings({
+        defaultDeadlineWarningPeriod: 5,
+      });
+      keywordManager = createTestKeywordManager(settings);
+      manager = new EmbeddedTaskListManager(settings, keywordManager);
+
+      // Create a task whose deadline is 5 days away (use Date object to avoid timezone issues)
+      // With advance notice=5, effective date = today → current
+      // With advance notice=0, effective date = 5 days from now → future
+      const deadlineDate = new Date();
+      deadlineDate.setHours(0, 0, 0, 0);
+      deadlineDate.setDate(deadlineDate.getDate() + 5);
+
+      const task = createBaseTask({
+        deadlineDate,
+        completed: false,
+      });
+
+      // Same upcomingPeriod for both cases — only deadlineWarningPeriod differs
+      const upcomingPeriod = 3;
+
+      // With global default=5, effective date is today (current) → visible
+      const paramsGlobal: TodoseqParameters = {
+        future: 'show-upcoming',
+        upcomingPeriod,
+      };
+      const resultGlobal = await manager.filterAndSortTasksWithCount(
+        [task],
+        paramsGlobal,
+      );
+      expect(resultGlobal.tasks.length).toBe(1);
+
+      // With explicit override=0, effective date is 5 days from now (future, beyond 3-day window) → hidden
+      const paramsOverride: TodoseqParameters = {
+        future: 'show-upcoming',
+        upcomingPeriod,
+        deadlineWarningPeriod: 0,
+      };
+      const resultOverride = await manager.filterAndSortTasksWithCount(
+        [task],
+        paramsOverride,
+      );
+      expect(resultOverride.tasks.length).toBe(0);
+    });
+
+    it('correctly overrides global scheduledWarningPeriod with 0', async () => {
+      // Set global default to non-zero
+      // With delay=10 and scheduled 5 days ago: effective date = 5 days from now (future)
+      // With delay=0: effective date = 5 days ago (current)
+      settings = createBaseSettings({
+        defaultScheduledWarningPeriod: 10,
+      });
+      keywordManager = createTestKeywordManager(settings);
+      manager = new EmbeddedTaskListManager(settings, keywordManager);
+
+      const scheduledDate = new Date();
+      scheduledDate.setHours(0, 0, 0, 0);
+      scheduledDate.setDate(scheduledDate.getDate() - 5);
+
+      const task = createBaseTask({
+        scheduledDate,
+        completed: false,
+      });
+
+      // Use show-upcoming with small window to isolate the scheduled delay behavior
+      const upcomingPeriod = 3;
+
+      // With global default=10, effective date = 5 days from now (beyond 3-day window) → hidden
+      const paramsGlobal: TodoseqParameters = {
+        future: 'show-upcoming',
+        upcomingPeriod,
+      };
+      const resultGlobal = await manager.filterAndSortTasksWithCount(
+        [task],
+        paramsGlobal,
+      );
+      expect(resultGlobal.tasks.length).toBe(0);
+
+      // With explicit override=0, effective date = 5 days ago (current) → visible
+      const paramsOverride: TodoseqParameters = {
+        future: 'show-upcoming',
+        upcomingPeriod,
+        scheduledWarningPeriod: 0,
+      };
+      const resultOverride = await manager.filterAndSortTasksWithCount(
+        [task],
+        paramsOverride,
+      );
+      expect(resultOverride.tasks.length).toBe(1);
+    });
+
+    it('correctly overrides global skip flag with false', async () => {
+      // Set global skip to true, with scheduled delay
+      settings = createBaseSettings({
+        skipScheduledWarningPeriodIfDeadline: true,
+        defaultScheduledWarningPeriod: 10,
+      });
+      keywordManager = createTestKeywordManager(settings);
+      manager = new EmbeddedTaskListManager(settings, keywordManager);
+
+      // Create a task with both scheduled (5 days ago) and deadline (far future)
+      // With delay=10: effective date = 5 days from now (future)
+      // With skip=true: delay ignored → effective date = 5 days ago (current)
+      const scheduledDate = new Date();
+      scheduledDate.setHours(0, 0, 0, 0);
+      scheduledDate.setDate(scheduledDate.getDate() - 5);
+
+      const task = createBaseTask({
+        scheduledDate,
+        deadlineDate: new Date(2099, 11, 31),
+        completed: false,
+      });
+
+      // Use show-upcoming with small window to isolate the skip behavior
+      const upcomingPeriod = 3;
+
+      // With global skip=true, scheduled delay ignored → effective date 5 days ago (current) → visible
+      const paramsGlobal: TodoseqParameters = {
+        future: 'show-upcoming',
+        upcomingPeriod,
+      };
+      const resultGlobal = await manager.filterAndSortTasksWithCount(
+        [task],
+        paramsGlobal,
+      );
+      expect(resultGlobal.tasks.length).toBe(1);
+
+      // With explicit override skip=false, delay=10 applies → effective date 5 days from now (beyond 3-day window) → hidden
+      const paramsOverride: TodoseqParameters = {
+        future: 'show-upcoming',
+        upcomingPeriod,
+        skipScheduledWarningIfDeadline: false,
+      };
+      const resultOverride = await manager.filterAndSortTasksWithCount(
+        [task],
+        paramsOverride,
+      );
+      expect(resultOverride.tasks.length).toBe(0);
     });
   });
 });

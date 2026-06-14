@@ -169,6 +169,14 @@ This creates a linear scale where:
 
 This helps surface older tasks in your daily journal that may need attention, while non-daily-note tasks get the maximum age urgency contribution by default.
 
+## Warning Periods and Urgency
+
+[Warning periods](warning-periods.md) (`-Nd` syntax on SCHEDULED/DEADLINE dates) affect **when a task becomes visible** in the task list, but they do **not** affect urgency calculations. Urgency always uses the raw scheduled and deadline dates.
+
+For example, a task with `DEADLINE: <2026-06-20 -5d>` becomes visible on June 15, but its urgency is calculated from the actual deadline of June 20 — not from the visibility date. This means a task that appears in your list thanks to an advance notice will have lower urgency than a task whose deadline is actually today.
+
+This distinction is intentional: warning periods control _visibility_ (when you see the task), while urgency controls _prioritization_ (how important it is relative to other visible tasks).
+
 ## Using Urgency Sorting
 
 To use urgency sorting:

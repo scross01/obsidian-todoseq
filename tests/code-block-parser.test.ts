@@ -186,6 +186,156 @@ collapse: true`;
       expect(params.error).toBeUndefined();
     });
 
+    it('should parse upcoming-period option', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n upcoming-period: 14',
+      );
+      expect(params.upcomingPeriod).toBe(14);
+      expect(params.error).toBeUndefined();
+    });
+
+    it('should reject upcoming-period with zero value', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n upcoming-period: 0',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('should reject upcoming-period with negative value', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n upcoming-period: -3',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('should reject upcoming-period with non-numeric value', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n upcoming-period: abc',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('should parse scheduled-warning-period option', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n scheduled-warning-period: 3',
+      );
+      expect(params.scheduledWarningPeriod).toBe(3);
+      expect(params.error).toBeUndefined();
+    });
+
+    it('should allow scheduled-warning-period of zero', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n scheduled-warning-period: 0',
+      );
+      expect(params.scheduledWarningPeriod).toBe(0);
+      expect(params.error).toBeUndefined();
+    });
+
+    it('should reject scheduled-warning-period with negative value', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n scheduled-warning-period: -1',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('should parse deadline-warning-period option', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n deadline-warning-period: 5',
+      );
+      expect(params.deadlineWarningPeriod).toBe(5);
+      expect(params.error).toBeUndefined();
+    });
+
+    it('should allow deadline-warning-period of zero', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n deadline-warning-period: 0',
+      );
+      expect(params.deadlineWarningPeriod).toBe(0);
+      expect(params.error).toBeUndefined();
+    });
+
+    it('should reject deadline-warning-period with negative value', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n deadline-warning-period: -2',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('should parse skip-scheduled-warning-if-deadline option', () => {
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n skip-scheduled-warning-if-deadline: true',
+        ).skipScheduledWarningIfDeadline,
+      ).toBe(true);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n skip-scheduled-warning-if-deadline: false',
+        ).skipScheduledWarningIfDeadline,
+      ).toBe(false);
+      expect(
+        TodoseqCodeBlockParser.parse('search: tag:test')
+          .skipScheduledWarningIfDeadline,
+      ).toBeUndefined();
+    });
+
+    it('should reject invalid skip-scheduled-warning-if-deadline values', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n skip-scheduled-warning-if-deadline: yes',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('should parse skip-deadline-warning-if-scheduled option', () => {
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n skip-deadline-warning-if-scheduled: true',
+        ).skipDeadlineWarningIfScheduled,
+      ).toBe(true);
+      expect(
+        TodoseqCodeBlockParser.parse(
+          'search: tag:test\n skip-deadline-warning-if-scheduled: false',
+        ).skipDeadlineWarningIfScheduled,
+      ).toBe(false);
+      expect(
+        TodoseqCodeBlockParser.parse('search: tag:test')
+          .skipDeadlineWarningIfScheduled,
+      ).toBeUndefined();
+    });
+
+    it('should reject invalid skip-deadline-warning-if-scheduled values', () => {
+      const params = TodoseqCodeBlockParser.parse(
+        'search: tag:test\n skip-deadline-warning-if-scheduled: yes',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('should parse all warning period overrides together', () => {
+      const source = [
+        'search: tag:test',
+        'upcoming-period: 14',
+        'scheduled-warning-period: 3',
+        'deadline-warning-period: 5',
+        'skip-scheduled-warning-if-deadline: true',
+        'skip-deadline-warning-if-scheduled: false',
+      ].join('\n');
+      const params = TodoseqCodeBlockParser.parse(source);
+      expect(params.upcomingPeriod).toBe(14);
+      expect(params.scheduledWarningPeriod).toBe(3);
+      expect(params.deadlineWarningPeriod).toBe(5);
+      expect(params.skipScheduledWarningIfDeadline).toBe(true);
+      expect(params.skipDeadlineWarningIfScheduled).toBe(false);
+      expect(params.error).toBeUndefined();
+    });
+
+    it('should leave warning period fields undefined when not specified', () => {
+      const params = TodoseqCodeBlockParser.parse('search: tag:test');
+      expect(params.upcomingPeriod).toBeUndefined();
+      expect(params.scheduledWarningPeriod).toBeUndefined();
+      expect(params.deadlineWarningPeriod).toBeUndefined();
+      expect(params.skipScheduledWarningIfDeadline).toBeUndefined();
+      expect(params.skipDeadlineWarningIfScheduled).toBeUndefined();
+    });
+
     it('should validate collapse option requirements', () => {
       // Should NOT throw error when collapse=true without title or showQuery (showQuery is undefined)
       const source = 'search: tag:test\n collapse: true';
