@@ -1194,7 +1194,8 @@ export class DatePicker extends BaseDialog {
   private openWarningPeriodPicker(): void {
     if (!this.warningPeriodSection || !this.containerEl) return;
 
-    this.warningPeriodPickerSubmenu = window.activeDocument.createElement('div');
+    this.warningPeriodPickerSubmenu =
+      window.activeDocument.createElement('div');
     this.warningPeriodPickerSubmenu.className =
       'menu todoseq-date-picker-submenu';
 
@@ -1350,6 +1351,7 @@ export class DatePicker extends BaseDialog {
     const unitSpan = valueRow.createEl('span', {
       cls: 'todoseq-date-picker-custom-repeat-unit-label',
     });
+    // eslint-disable-next-line obsidianmd/ui/sentence-case -- correct use of case on label
     unitSpan.setText('days');
 
     const buttonRow = dialog.createEl('div', {

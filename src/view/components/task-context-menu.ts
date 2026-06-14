@@ -645,8 +645,12 @@ export class TaskContextMenu extends BaseDialog {
       : null;
     const initialWarningPeriod = currentTask
       ? mode === 'deadline'
-        ? (currentTask.deadlineWarningPeriod ?? currentTask.deadlineFirstOnlyWarningPeriod ?? null)
-        : (currentTask.scheduledWarningPeriod ?? currentTask.scheduledFirstOnlyWarningPeriod ?? null)
+        ? (currentTask.deadlineWarningPeriod ??
+          currentTask.deadlineFirstOnlyWarningPeriod ??
+          null)
+        : (currentTask.scheduledWarningPeriod ??
+          currentTask.scheduledFirstOnlyWarningPeriod ??
+          null)
       : null;
 
     this.datePicker = new DatePicker(

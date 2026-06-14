@@ -434,7 +434,10 @@ export function formatDateLine(
   }
 
   // Add warning period if present
-  newDateContent += buildWarningPeriodString(warningPeriod, firstOnlyWarningPeriod);
+  newDateContent += buildWarningPeriodString(
+    warningPeriod,
+    firstOnlyWarningPeriod,
+  );
 
   return line.replace(/<.[^>]*>/, `<${newDateContent}>`);
 }

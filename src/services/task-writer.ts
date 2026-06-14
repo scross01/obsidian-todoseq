@@ -513,7 +513,10 @@ export class TaskWriter {
         ? ''
         : ` ${hours}:${minutes}`;
     const repeatStr = repeat ? ` ${repeat.raw}` : '';
-    const warningStr = buildWarningPeriodString(warningPeriod, firstOnlyWarningPeriod);
+    const warningStr = buildWarningPeriodString(
+      warningPeriod,
+      firstOnlyWarningPeriod,
+    );
     const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}${warningStr}>`;
     let lineDelta = 0;
 
@@ -614,7 +617,10 @@ export class TaskWriter {
         ? ''
         : ` ${hours}:${minutes}`;
     const repeatStr = repeat ? ` ${repeat.raw}` : '';
-    const warningStr = buildWarningPeriodString(warningPeriod, firstOnlyWarningPeriod);
+    const warningStr = buildWarningPeriodString(
+      warningPeriod,
+      firstOnlyWarningPeriod,
+    );
     const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}${warningStr}>`;
     let lineDelta = 0;
 

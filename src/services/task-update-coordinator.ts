@@ -488,8 +488,10 @@ export class TaskUpdateCoordinator {
       newDeadlineRepeat: context.newDeadlineRepeat,
       newScheduledWarningPeriod: context.newScheduledWarningPeriod,
       newDeadlineWarningPeriod: context.newDeadlineWarningPeriod,
-      newScheduledFirstOnlyWarningPeriod: context.newScheduledFirstOnlyWarningPeriod,
-      newDeadlineFirstOnlyWarningPeriod: context.newDeadlineFirstOnlyWarningPeriod,
+      newScheduledFirstOnlyWarningPeriod:
+        context.newScheduledFirstOnlyWarningPeriod,
+      newDeadlineFirstOnlyWarningPeriod:
+        context.newDeadlineFirstOnlyWarningPeriod,
       newStateForRecurrence: context.newStateForRecurrence,
       filePath: context.task.path,
       fileLine: context.task.line,
@@ -809,8 +811,10 @@ export class TaskUpdateCoordinator {
             deadlineDateRepeat: updatedTask.deadlineDateRepeat,
             scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
             deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
-            scheduledFirstOnlyWarningPeriod: updatedTask.scheduledFirstOnlyWarningPeriod,
-            deadlineFirstOnlyWarningPeriod: updatedTask.deadlineFirstOnlyWarningPeriod,
+            scheduledFirstOnlyWarningPeriod:
+              updatedTask.scheduledFirstOnlyWarningPeriod,
+            deadlineFirstOnlyWarningPeriod:
+              updatedTask.deadlineFirstOnlyWarningPeriod,
             closedDate: updatedTask.closedDate,
             urgency,
           },
@@ -826,7 +830,8 @@ export class TaskUpdateCoordinator {
             scheduledDate: updatedTask.scheduledDate,
             scheduledDateRepeat: updatedTask.scheduledDateRepeat,
             scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
-            scheduledFirstOnlyWarningPeriod: updatedTask.scheduledFirstOnlyWarningPeriod,
+            scheduledFirstOnlyWarningPeriod:
+              updatedTask.scheduledFirstOnlyWarningPeriod,
             urgency,
           },
         );
@@ -841,7 +846,8 @@ export class TaskUpdateCoordinator {
             deadlineDate: updatedTask.deadlineDate,
             deadlineDateRepeat: updatedTask.deadlineDateRepeat,
             deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
-            deadlineFirstOnlyWarningPeriod: updatedTask.deadlineFirstOnlyWarningPeriod,
+            deadlineFirstOnlyWarningPeriod:
+              updatedTask.deadlineFirstOnlyWarningPeriod,
             urgency,
           },
         );

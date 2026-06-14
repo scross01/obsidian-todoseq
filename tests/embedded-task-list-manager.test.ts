@@ -277,10 +277,7 @@ describe('EmbeddedTaskListManager', () => {
 
       // No code block overrides — should use global settings
       const params: TodoseqParameters = {};
-      const result = await manager.filterAndSortTasksWithCount(
-        [task],
-        params,
-      );
+      const result = await manager.filterAndSortTasksWithCount([task], params);
       expect(result.tasks.length).toBe(1);
     });
 

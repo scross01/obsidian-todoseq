@@ -375,7 +375,6 @@ describe('daily-note-utils', () => {
         adapter.read.mockResolvedValue(readResult);
       }
       return {
-         
         vault: { adapter, configDir: '.obsidian' },
       } as unknown as App;
     }
@@ -456,7 +455,7 @@ describe('daily-note-utils', () => {
               .fn()
               .mockResolvedValue(JSON.stringify({ 'daily-notes': true })),
           },
-           
+
           configDir: '.obsidian',
         },
       } as unknown as App;
@@ -487,7 +486,7 @@ describe('daily-note-utils', () => {
               .fn()
               .mockResolvedValue(JSON.stringify({ 'daily-notes': false })),
           },
-           
+
           configDir: '.obsidian',
         },
       } as unknown as App;

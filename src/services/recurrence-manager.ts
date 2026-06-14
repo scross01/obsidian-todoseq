@@ -141,15 +141,11 @@ export class RecurrenceManager {
       newScheduledWarningPeriod: newScheduledDate
         ? task.scheduledWarningPeriod
         : undefined,
-      newScheduledFirstOnlyWarningPeriod: newScheduledDate
-        ? null
-        : undefined,
+      newScheduledFirstOnlyWarningPeriod: newScheduledDate ? null : undefined,
       newDeadlineWarningPeriod: newDeadlineDate
         ? task.deadlineWarningPeriod
         : undefined,
-      newDeadlineFirstOnlyWarningPeriod: newDeadlineDate
-        ? null
-        : undefined,
+      newDeadlineFirstOnlyWarningPeriod: newDeadlineDate ? null : undefined,
     };
   }
 

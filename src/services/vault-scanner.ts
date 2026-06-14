@@ -572,7 +572,8 @@ export class VaultScanner {
         b.deadlineDateRepeat?.raw !== a.deadlineDateRepeat?.raw ||
         b.scheduledWarningPeriod !== a.scheduledWarningPeriod ||
         b.deadlineWarningPeriod !== a.deadlineWarningPeriod ||
-        b.scheduledFirstOnlyWarningPeriod !== a.scheduledFirstOnlyWarningPeriod ||
+        b.scheduledFirstOnlyWarningPeriod !==
+          a.scheduledFirstOnlyWarningPeriod ||
         b.deadlineFirstOnlyWarningPeriod !== a.deadlineFirstOnlyWarningPeriod ||
         b.subtaskCount !== a.subtaskCount ||
         b.subtaskCompletedCount !== a.subtaskCompletedCount

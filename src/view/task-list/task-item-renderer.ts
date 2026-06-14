@@ -851,7 +851,10 @@ export class TaskItemRenderer {
       dateValue.setText(this.formatDateForDisplay(task.scheduledDate, true));
 
       // Add warning period tooltip if active
-      const renderSettings = this.keywordManager.getSettings() as Record<string, unknown>;
+      const renderSettings = this.keywordManager.getSettings() as Record<
+        string,
+        unknown
+      >;
       const scheduledWarningDays =
         task.scheduledWarningPeriod ??
         task.scheduledFirstOnlyWarningPeriod ??
@@ -913,7 +916,8 @@ export class TaskItemRenderer {
       dateValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
 
       // Add warning period tooltip if active
-      const deadlineRenderSettings = this.keywordManager.getSettings() as Record<string, unknown>;
+      const deadlineRenderSettings =
+        this.keywordManager.getSettings() as Record<string, unknown>;
       const deadlineWarningDays =
         task.deadlineWarningPeriod ??
         task.deadlineFirstOnlyWarningPeriod ??
