@@ -40,6 +40,11 @@
   "useExtendedCheckboxStyles": false,
   "enableSmartDateRecognition": true,
   "smartDateRemoveKeywords": true,
+  "upcomingPeriod": 7,
+  "defaultDeadlineWarningPeriod": 0,
+  "defaultScheduledWarningPeriod": 0,
+  "skipScheduledWarningPeriodIfDeadline": false,
+  "skipDeadlinePrewarningIfScheduled": false,
   "_hasShownFirstInstallView": true,
-  "settingsVersion": 3
+  "settingsVersion": 4
 }

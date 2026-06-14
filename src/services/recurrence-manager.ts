@@ -20,6 +20,14 @@ export interface RecurrenceUpdateResult {
   newScheduledDate?: Date;
   /** The new deadline date (if updated) */
   newDeadlineDate?: Date;
+  /** The effective warning period for the new scheduled date */
+  newScheduledWarningPeriod?: number | null;
+  /** The effective warning period for the new deadline date */
+  newDeadlineWarningPeriod?: number | null;
+  /** The effective first-only warning period for the new scheduled date */
+  newScheduledFirstOnlyWarningPeriod?: number | null;
+  /** The effective first-only warning period for the new deadline date */
+  newDeadlineFirstOnlyWarningPeriod?: number | null;
 }
 
 /**
@@ -123,10 +131,25 @@ export class RecurrenceManager {
       return { updated: false };
     }
 
+    // Determine warning periods for next occurrence:
+    // -Nd (scheduledWarningPeriod/deadlineWarningPeriod) is preserved across repeats
+    // --Nd (scheduledFirstOnlyWarningPeriod/deadlineFirstOnlyWarningPeriod) is stripped after first occurrence
     return {
       updated: true,
       newScheduledDate: newScheduledDate ?? undefined,
       newDeadlineDate: newDeadlineDate ?? undefined,
+      newScheduledWarningPeriod: newScheduledDate
+        ? task.scheduledWarningPeriod
+        : undefined,
+      newScheduledFirstOnlyWarningPeriod: newScheduledDate
+        ? null
+        : undefined,
+      newDeadlineWarningPeriod: newDeadlineDate
+        ? task.deadlineWarningPeriod
+        : undefined,
+      newDeadlineFirstOnlyWarningPeriod: newDeadlineDate
+        ? null
+        : undefined,
     };
   }
 

@@ -324,6 +324,10 @@ export class EditorController {
           deadlineDate: null,
           deadlineDateRepeat: null,
           closedDate: null,
+          scheduledWarningPeriod: null,
+          deadlineWarningPeriod: null,
+          scheduledFirstOnlyWarningPeriod: null,
+          deadlineFirstOnlyWarningPeriod: null,
           urgency: null,
           isDailyNote: false,
           dailyNoteDate: null,
@@ -1275,6 +1279,8 @@ export class EditorController {
           task: Task,
           date: Date | null,
           repeat?: DateRepeatInfo | null,
+          warningPeriod?: number | null,
+          firstOnlyWarningPeriod?: number | null,
         ) => {
           const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
           if (taskUpdateCoordinator) {
@@ -1285,6 +1291,8 @@ export class EditorController {
                 source: 'editor',
                 newDate: date,
                 newRepeat: repeat,
+                newWarningPeriod: warningPeriod,
+                newFirstOnlyWarningPeriod: firstOnlyWarningPeriod,
               })
               .catch((error) => {
                 new Notice('Failed to update task date');
@@ -1296,6 +1304,8 @@ export class EditorController {
           task: Task,
           date: Date | null,
           repeat?: DateRepeatInfo | null,
+          warningPeriod?: number | null,
+          firstOnlyWarningPeriod?: number | null,
         ) => {
           const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
           if (taskUpdateCoordinator) {
@@ -1306,6 +1316,8 @@ export class EditorController {
                 source: 'editor',
                 newDate: date,
                 newRepeat: repeat,
+                newWarningPeriod: warningPeriod,
+                newFirstOnlyWarningPeriod: firstOnlyWarningPeriod,
               })
               .catch((error) => {
                 new Notice('Failed to update task deadline');

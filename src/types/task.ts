@@ -17,6 +17,10 @@ export interface Task {
   deadlineDate: Date | null; // deadline date from DEADLINE: line
   deadlineDateRepeat: DateRepeatInfo | null; // repeater info for deadline date
   closedDate: Date | null; // closed date from CLOSED: line (when task was marked as completed)
+  scheduledWarningPeriod: number | null; // -Nd warning period for scheduled date (delayed notice)
+  deadlineWarningPeriod: number | null; // -Nd warning period for deadline date (advance notice)
+  scheduledFirstOnlyWarningPeriod: number | null; // --Nd first-only warning period for scheduled date
+  deadlineFirstOnlyWarningPeriod: number | null; // --Nd first-only warning period for deadline date
   tail?: string; // trailing end characters after the task text (e.g., " */")
   urgency: number | null; // calculated urgency score
   file?: TFile; // reference to the file for daily notes detection

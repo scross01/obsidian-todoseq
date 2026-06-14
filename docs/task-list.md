@@ -119,6 +119,7 @@ Use the Date Picker for selecting and managing task dates. The Date Picker provi
 - **Calendar view**: Visual calendar for selecting specific dates
 - **Time picker**: 30-minute increment time selection (optional)
 - **Repeat options**: Built-in and custom repeat patterns (daily, weekly, monthly, yearly, custom)
+- **Warning period**: Set advance notice for deadlines or delayed notice for scheduled dates
 
 The Date Picker can be accessed from the task context menu by selecting "Pick date..." for either scheduled or deadline dates.
 
@@ -192,7 +193,9 @@ Tasks can display date information below the task text in the Task List:
 - Orange: Due today
 - Green: Due within 7 days
 
-**Deadline Dates** - Shown for incomplete tasks with a deadline date. Displays "Deadline: [date]" with the same color coding as scheduled dates.
+When a warning period is active, hovering over the date shows when the task will actually appear in the task list.
+
+**Deadline Dates** - Shown for incomplete tasks with a deadline date. Displays "Deadline: [date]" with the same color coding as scheduled dates. Warning period tooltips apply here as well.
 
 **Closed Dates** - Shown for completed tasks with a closed date. Displays "Closed: [date]" in a grey theme, indicating when the task was marked as complete.
 

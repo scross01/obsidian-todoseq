@@ -224,6 +224,10 @@ export class OrgModeTaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      scheduledWarningPeriod: null,
+      deadlineWarningPeriod: null,
+      scheduledFirstOnlyWarningPeriod: null,
+      deadlineFirstOnlyWarningPeriod: null,
       tail: '',
       urgency: null,
       file,
@@ -241,11 +245,19 @@ export class OrgModeTaskParser implements ITaskParser {
         deadlineDate,
         scheduledDateRepeat,
         deadlineDateRepeat,
+        scheduledWarningPeriod,
+        deadlineWarningPeriod,
+        scheduledFirstOnlyWarningPeriod,
+        deadlineFirstOnlyWarningPeriod,
       } = this.extractTaskDates(lines, index + 1);
       task.scheduledDate = scheduledDate;
       task.scheduledDateRepeat = scheduledDateRepeat;
       task.deadlineDate = deadlineDate;
       task.deadlineDateRepeat = deadlineDateRepeat;
+      task.scheduledWarningPeriod = scheduledWarningPeriod;
+      task.deadlineWarningPeriod = deadlineWarningPeriod;
+      task.scheduledFirstOnlyWarningPeriod = scheduledFirstOnlyWarningPeriod;
+      task.deadlineFirstOnlyWarningPeriod = deadlineFirstOnlyWarningPeriod;
     }
 
     // Calculate urgency for non-completed tasks
@@ -275,11 +287,19 @@ export class OrgModeTaskParser implements ITaskParser {
     deadlineDate: Date | null;
     scheduledDateRepeat: DateRepeatInfo | null;
     deadlineDateRepeat: DateRepeatInfo | null;
+    scheduledWarningPeriod: number | null;
+    deadlineWarningPeriod: number | null;
+    scheduledFirstOnlyWarningPeriod: number | null;
+    deadlineFirstOnlyWarningPeriod: number | null;
   } {
     let scheduledDate: Date | null = null;
     let scheduledDateRepeat: DateRepeatInfo | null = null;
     let deadlineDate: Date | null = null;
     let deadlineDateRepeat: DateRepeatInfo | null = null;
+    let scheduledWarningPeriod: number | null = null;
+    let deadlineWarningPeriod: number | null = null;
+    let scheduledFirstOnlyWarningPeriod: number | null = null;
+    let deadlineFirstOnlyWarningPeriod: number | null = null;
     let inPropertiesDrawer = false;
 
     for (let i = startIndex; i < lines.length; i++) {
@@ -315,10 +335,13 @@ export class OrgModeTaskParser implements ITaskParser {
       const scheduledMatch = ORG_SCHEDULED_LINE_PATTERN.exec(line);
       if (scheduledMatch && !scheduledDate) {
         const dateContent = scheduledMatch[1];
-        const { date, repeat } = this.parseOrgDateWithRepeater(dateContent);
+        const { date, repeat, warningPeriod, firstOnlyWarningPeriod } =
+          this.parseOrgDateWithRepeater(dateContent);
         if (date) {
           scheduledDate = date;
           scheduledDateRepeat = repeat;
+          scheduledWarningPeriod = warningPeriod;
+          scheduledFirstOnlyWarningPeriod = firstOnlyWarningPeriod;
         }
         continue;
       }
@@ -327,10 +350,13 @@ export class OrgModeTaskParser implements ITaskParser {
       const deadlineMatch = ORG_DEADLINE_LINE_PATTERN.exec(line);
       if (deadlineMatch && !deadlineDate) {
         const dateContent = deadlineMatch[1];
-        const { date, repeat } = this.parseOrgDateWithRepeater(dateContent);
+        const { date, repeat, warningPeriod, firstOnlyWarningPeriod } =
+          this.parseOrgDateWithRepeater(dateContent);
         if (date) {
           deadlineDate = date;
           deadlineDateRepeat = repeat;
+          deadlineWarningPeriod = warningPeriod;
+          deadlineFirstOnlyWarningPeriod = firstOnlyWarningPeriod;
         }
         continue;
       }
@@ -348,6 +374,10 @@ export class OrgModeTaskParser implements ITaskParser {
       deadlineDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
+      scheduledWarningPeriod,
+      deadlineWarningPeriod,
+      scheduledFirstOnlyWarningPeriod,
+      deadlineFirstOnlyWarningPeriod,
     };
   }
 
@@ -358,6 +388,8 @@ export class OrgModeTaskParser implements ITaskParser {
   private parseOrgDateWithRepeater(dateContent: string): {
     date: Date | null;
     repeat: DateRepeatInfo | null;
+    warningPeriod: number | null;
+    firstOnlyWarningPeriod: number | null;
   } {
     // Org-mode uses <...> for active dates and [...] for inactive dates
     // The DateParser expects <...> format, so convert [...] to <...>

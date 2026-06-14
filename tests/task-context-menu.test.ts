@@ -376,7 +376,13 @@ describe('TaskContextMenu', () => {
       );
       (buttons[4] as HTMLElement).click(); // No date
 
-      expect(callbacks.onScheduledDateChange).toHaveBeenCalledWith(task, null);
+      expect(callbacks.onScheduledDateChange).toHaveBeenCalledWith(
+        task,
+        null,
+        undefined,
+        null,
+        null,
+      );
     });
 
     it('should preserve existing time when choosing Tomorrow', async () => {
@@ -606,6 +612,7 @@ describe('TaskContextMenu', () => {
           y: expect.any(Number),
         }),
         'deadline',
+        null,
         null,
         null,
       );
@@ -1072,6 +1079,7 @@ describe('TaskContextMenu', () => {
         'scheduled',
         null,
         null,
+        null,
       );
     });
   });
@@ -1226,6 +1234,9 @@ describe('TaskContextMenu', () => {
       expect(callbacks.onScheduledDateChange).toHaveBeenCalledWith(
         freshTask,
         expect.any(Date),
+        undefined,
+        null,
+        null,
       );
       menuWithState.cleanup();
     });
@@ -1348,6 +1359,7 @@ describe('TaskContextMenu', () => {
         task,
         selectedDate,
         null,
+        null,
       );
     });
 
@@ -1371,6 +1383,7 @@ describe('TaskContextMenu', () => {
       expect(callbacks.onScheduledDateChange).toHaveBeenCalledWith(
         task,
         selectedDate,
+        null,
         null,
       );
     });

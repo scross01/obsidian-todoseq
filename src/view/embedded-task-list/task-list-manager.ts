@@ -223,6 +223,19 @@ export class EmbeddedTaskListManager {
         completedSetting,
         sortMethod,
         keywordConfig,
+        this.settings
+          ? {
+              upcomingPeriod: this.settings.upcomingPeriod,
+              defaultDeadlineWarningPeriod:
+                this.settings.defaultDeadlineWarningPeriod,
+              defaultScheduledWarningPeriod:
+                this.settings.defaultScheduledWarningPeriod,
+              skipScheduledWarningPeriodIfDeadline:
+                this.settings.skipScheduledWarningPeriodIfDeadline,
+              skipDeadlinePrewarningIfScheduled:
+                this.settings.skipDeadlinePrewarningIfScheduled,
+            }
+          : undefined,
       );
 
       return sorted;

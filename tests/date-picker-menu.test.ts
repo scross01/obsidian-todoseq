@@ -1045,6 +1045,7 @@ describe('DatePicker', () => {
         expect.any(Date),
         repeat,
         'scheduled',
+        null,
       );
     });
 
@@ -1060,6 +1061,7 @@ describe('DatePicker', () => {
         expect.any(Date),
         null,
         'deadline',
+        null,
       );
     });
 
@@ -1129,7 +1131,7 @@ describe('DatePicker', () => {
       const separators = activeDocument.querySelectorAll(
         '.todoseq-date-picker-separator',
       );
-      expect(separators.length).toBe(3);
+      expect(separators.length).toBe(4);
     });
   });
 

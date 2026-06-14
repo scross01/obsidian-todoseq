@@ -59,4 +59,6 @@ examples/Test Performance/*
 tsconfig.tsbuildinfo
 
 
-.poolside
+.poolside/
+.agents/
+skills-lock.json

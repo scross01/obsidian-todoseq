@@ -4,7 +4,7 @@
 
 import { DateUtils } from '../utils/date-utils';
 import { DateRepeatInfo } from '../types/task';
-import { extractRepeaterFromDate } from '../utils/date-repeater';
+import { extractDateMetadata } from '../utils/date-repeater';
 
 // Date format types
 export type DateFormat =
@@ -94,8 +94,8 @@ export class DateParser {
    * @returns Parsed Date object or null if parsing fails. Plain YYYY-MM-DD input (without angle brackets) returns null.
    */
   static parseDate(content: string): Date | null {
-    // First extract any repeater to get the base date string
-    const { baseDateStr } = extractRepeaterFromDate(content);
+    // First extract any repeater and warning period to get the base date string
+    const { baseDateStr } = extractDateMetadata(content);
 
     // Try each pattern in order
     for (const pattern of DATE_PATTERNS) {
@@ -124,9 +124,12 @@ export class DateParser {
   static parseDateWithRepeater(content: string): {
     date: Date | null;
     repeat: DateRepeatInfo | null;
+    warningPeriod: number | null;
+    firstOnlyWarningPeriod: number | null;
   } {
-    // Extract repeater from full content
-    const { baseDateStr, repeat } = extractRepeaterFromDate(content);
+    // Extract repeater and warning period from full content
+    const { baseDateStr, repeat, warningPeriod, firstOnlyWarningPeriod } =
+      extractDateMetadata(content);
 
     // Try each pattern in order on base date string
     for (const pattern of DATE_PATTERNS) {
@@ -149,10 +152,15 @@ export class DateParser {
           date = this.parseDateString(dateStr);
         }
 
-        return { date, repeat };
+        return { date, repeat, warningPeriod, firstOnlyWarningPeriod };
       }
     }
 
-    return { date: null, repeat: null };
+    return {
+      date: null,
+      repeat: null,
+      warningPeriod: null,
+      firstOnlyWarningPeriod: null,
+    };
   }
 }

@@ -135,6 +135,17 @@ export class TaskListFilter {
       completedSetting,
       sortMethod,
       keywordConfig,
+      {
+        upcomingPeriod: this.plugin.settings.upcomingPeriod,
+        defaultDeadlineWarningPeriod:
+          this.plugin.settings.defaultDeadlineWarningPeriod,
+        defaultScheduledWarningPeriod:
+          this.plugin.settings.defaultScheduledWarningPeriod,
+        skipScheduledWarningPeriodIfDeadline:
+          this.plugin.settings.skipScheduledWarningPeriodIfDeadline,
+        skipDeadlinePrewarningIfScheduled:
+          this.plugin.settings.skipDeadlinePrewarningIfScheduled,
+      },
     );
 
     return sortedTasks;

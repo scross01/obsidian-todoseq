@@ -496,10 +496,76 @@ FIXME Handle edge cases
 
 - **Show all**: Display all tasks normally (default behavior)
 - **Sort to end**: Show future tasks at the end of the list, after current tasks
-- **Show upcoming (7 days)**: Only show future tasks that are within the next 7 days
+- **Show upcoming**: Only show future tasks that are within the upcoming period (configurable, default: 7 days)
 - **Hide future**: Hide all future tasks completely
 
 **Default**: Show all
+
+### Upcoming Period
+
+**Setting**: "Upcoming period (days)" numeric input
+
+**Description**: Sets how many days ahead tasks are considered "upcoming" when using the Show upcoming option.
+
+**Default**: 7
+
+### Warning Period Settings
+
+#### Deadline Advance Notice
+
+**Setting**: "Deadline advance notice (days)" numeric input
+
+**Description**: Tasks appear this many days before their deadline. Set to 0 to disable.
+
+**Default**: 0 (disabled)
+
+**Example**: Setting to 5 means a task with `DEADLINE: <2026-06-20>` appears in the task list from June 15.
+
+#### Scheduled Delay
+
+**Setting**: "Scheduled delay (days)" numeric input
+
+**Description**: Tasks appear this many days after their scheduled date. Set to 0 to disable.
+
+**Default**: 0 (no delay)
+
+**Example**: Setting to 3 means a task with `SCHEDULED: <2026-06-10>` doesn't appear until June 13.
+
+#### Ignore Scheduled Delay When Deadline Is Set
+
+**Setting**: Toggle
+
+**Description**: If a task has both a scheduled date and a deadline, the scheduled delay is ignored and only the deadline advance notice applies.
+
+**Default**: Disabled (both warning periods apply; earliest effective date wins — matches Org Mode default)
+
+#### Ignore Deadline Advance Notice When Scheduled Is Set
+
+**Setting**: Toggle
+
+**Description**: If a task has both a scheduled date and a deadline, the deadline advance notice is ignored and only the scheduled delay applies.
+
+**Default**: Disabled (both warning periods apply; earliest effective date wins — matches Org Mode default)
+
+#### Setting Permutations
+
+When a task has both a SCHEDULED date and a DEADLINE date, both warning periods may apply. These two settings control which one takes precedence:
+
+| Ignore Scheduled Delay When Deadline Is Set | Ignore Deadline Advance When Scheduled Is Set | Behavior |
+|---|---|---|
+| Disabled (default) | Disabled (default) | Both apply. The **earlier** effective visibility date wins. (Org Mode default) |
+| Enabled | Disabled | Deadline advance notice wins. Scheduled delay is ignored. |
+| Disabled | Enabled | Scheduled delay wins. Deadline advance notice is ignored. |
+| Enabled | Enabled | Both are ignored. Task uses raw scheduled and deadline dates with no warning period adjustment. |
+
+**Example** with `SCHEDULED: <June 10 -3d>` and `DEADLINE: <June 20 -5d>`:
+
+| Settings | Scheduled effective | Deadline effective | Task visible from |
+|---|---|---|---|
+| Default (skip neither) | June 13 (10+3) | June 15 (20−5) | June 13 (earlier wins) |
+| Skip scheduled instead | June 10 (delay ignored) | June 15 (20−5) | June 10 |
+| Skip deadline instead | June 13 (10+3) | June 20 (warning ignored) | June 13 |
+| Skip both | June 10 (raw) | June 20 (raw) | June 10 |
 
 ### Week Starts On
 

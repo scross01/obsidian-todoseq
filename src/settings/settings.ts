@@ -1114,7 +1114,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           )
           .addDropdown((drop) => {
             drop.addOption('showAll', 'Show all tasks');
-            drop.addOption('showUpcoming', 'Show upcoming (7 days)');
+            drop.addOption('showUpcoming', 'Show upcoming');
             drop.addOption('sortToEnd', 'Sort future to end');
             drop.addOption('hideFuture', 'Hide future');
             drop.setValue(this.plugin.settings.futureTaskSorting);
@@ -1128,6 +1128,29 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
               await this.refreshAllTaskListViews();
             });
+          });
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Upcoming period (days)')
+          .setDesc(
+            'Tasks within this many days are shown as "upcoming" when using the show upcoming option.',
+          )
+          .addText((text) => {
+            text
+              .setPlaceholder('7')
+              .setValue(String(this.plugin.settings.upcomingPeriod))
+              .onChange(async (value) => {
+                const num = parseInt(value, 10);
+                if (!isNaN(num) && num >= 1 && num <= 30) {
+                  this.plugin.settings.upcomingPeriod = num;
+                  await this.plugin.saveSettings();
+                  await this.refreshAllTaskListViews();
+                }
+              });
+            text.inputEl.type = 'number';
+            text.inputEl.min = '1';
+            text.inputEl.max = '30';
           });
       })
       .addSetting((setting) => {
@@ -1221,6 +1244,99 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
   }
 
   /**
+   * Creates warning period settings
+   */
+  private createWarningPeriodSettings(containerEl: HTMLElement) {
+    new SettingGroup(containerEl)
+      .setHeading('Warning period')
+      .addSetting((setting) => {
+        setting
+          .setName('Deadline advance notice (days)')
+          .setDesc(
+            'Tasks appear this many days before their deadline. Set to 0 to disable.',
+          )
+          .addText((text) => {
+            text
+              .setPlaceholder('0')
+              .setValue(
+                String(this.plugin.settings.defaultDeadlineWarningPeriod),
+              )
+              .onChange(async (value) => {
+                const num = parseInt(value, 10);
+                if (!isNaN(num) && num >= 0 && num <= 30) {
+                  this.plugin.settings.defaultDeadlineWarningPeriod = num;
+                  await this.plugin.saveSettings();
+                  await this.refreshAllTaskListViews();
+                }
+              });
+            text.inputEl.type = 'number';
+            text.inputEl.min = '0';
+            text.inputEl.max = '30';
+          });
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Scheduled delay (days)')
+          .setDesc(
+            'Tasks appear this many days after their scheduled date. Set to 0 to disable.',
+          )
+          .addText((text) => {
+            text
+              .setPlaceholder('0')
+              .setValue(
+                String(this.plugin.settings.defaultScheduledWarningPeriod),
+              )
+              .onChange(async (value) => {
+                const num = parseInt(value, 10);
+                if (!isNaN(num) && num >= 0 && num <= 30) {
+                  this.plugin.settings.defaultScheduledWarningPeriod = num;
+                  await this.plugin.saveSettings();
+                  await this.refreshAllTaskListViews();
+                }
+              });
+            text.inputEl.type = 'number';
+            text.inputEl.min = '0';
+            text.inputEl.max = '30';
+          });
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Ignore scheduled delay when deadline is set')
+          .setDesc(
+            'If a task has both a scheduled date and a deadline, the scheduled delay is ignored.',
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(
+                this.plugin.settings.skipScheduledWarningPeriodIfDeadline,
+              )
+              .onChange(async (value) => {
+                this.plugin.settings.skipScheduledWarningPeriodIfDeadline =
+                  value;
+                await this.plugin.saveSettings();
+                await this.refreshAllTaskListViews();
+              }),
+          );
+      })
+      .addSetting((setting) => {
+        setting
+          .setName('Ignore deadline advance notice when scheduled is set')
+          .setDesc(
+            'If a task has both a scheduled date and a deadline, the deadline advance notice is ignored.',
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.skipDeadlinePrewarningIfScheduled)
+              .onChange(async (value) => {
+                this.plugin.settings.skipDeadlinePrewarningIfScheduled = value;
+                await this.plugin.saveSettings();
+                await this.refreshAllTaskListViews();
+              }),
+          );
+      });
+  }
+
+  /**
    * Creates main settings
    */
   display(): void {
@@ -1258,6 +1374,9 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     // Task state transitions section
     this.createStateTransitionsSettings(containerEl);
+
+    // Warning period settings
+    this.createWarningPeriodSettings(containerEl);
 
     // Experimental features section
     new SettingGroup(containerEl)

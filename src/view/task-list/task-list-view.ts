@@ -185,12 +185,7 @@ export class TaskListView extends ItemView {
             await this.migrateTaskToToday(freshTask);
           }
         },
-        onPriorityChange: (task, priority) =>
-          this.handleContextMenuPriorityChange(task, priority),
-        onScheduledDateChange: (task, date, repeat) =>
-          this.handleContextMenuScheduledDateChange(task, date, repeat ?? null),
-        onDeadlineDateChange: (task, date, repeat) =>
-          this.handleContextMenuDeadlineDateChange(task, date, repeat ?? null),
+        ...this.getContextMenuSharedCallbacks(),
       },
       {
         weekStartsOn: plugin.settings.weekStartsOn,
@@ -993,6 +988,41 @@ export class TaskListView extends ItemView {
    * Handle priority change from context menu.
    * Uses TaskUpdateCoordinator for optimistic UI updates.
    */
+  private getContextMenuSharedCallbacks() {
+    return {
+      onPriorityChange: (task: Task, priority: 'high' | 'med' | 'low' | null) =>
+        this.handleContextMenuPriorityChange(task, priority),
+      onScheduledDateChange: (
+        task: Task,
+        date: Date | null,
+        repeat?: DateRepeatInfo | null,
+        warningPeriod?: number | null,
+        firstOnlyWarningPeriod?: number | null,
+      ) =>
+        this.handleContextMenuScheduledDateChange(
+          task,
+          date,
+          repeat ?? null,
+          warningPeriod ?? null,
+          firstOnlyWarningPeriod ?? null,
+        ),
+      onDeadlineDateChange: (
+        task: Task,
+        date: Date | null,
+        repeat?: DateRepeatInfo | null,
+        warningPeriod?: number | null,
+        firstOnlyWarningPeriod?: number | null,
+      ) =>
+        this.handleContextMenuDeadlineDateChange(
+          task,
+          date,
+          repeat ?? null,
+          warningPeriod ?? null,
+          firstOnlyWarningPeriod ?? null,
+        ),
+    };
+  }
+
   private async handleContextMenuPriorityChange(
     task: Task,
     priority: 'high' | 'med' | 'low' | null,
@@ -1047,6 +1077,8 @@ export class TaskListView extends ItemView {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
+    warningPeriod?: number | null,
+    firstOnlyWarningPeriod?: number | null,
   ): Promise<void> {
     // Get the TaskUpdateCoordinator from the plugin
     const plugin = (
@@ -1057,6 +1089,8 @@ export class TaskListView extends ItemView {
               task: Task,
               date: Date | null,
               repeat?: DateRepeatInfo | null,
+              warningPeriod?: number | null,
+              firstOnlyWarningPeriod?: number | null,
             ) => Promise<Task>;
           };
         };
@@ -1086,6 +1120,8 @@ export class TaskListView extends ItemView {
         currentTask,
         date,
         repeat,
+        warningPeriod,
+        firstOnlyWarningPeriod,
       );
     } catch (error) {
       console.error('TODOseq: Failed to update scheduled date:', error);
@@ -1100,6 +1136,8 @@ export class TaskListView extends ItemView {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
+    warningPeriod?: number | null,
+    firstOnlyWarningPeriod?: number | null,
   ): Promise<void> {
     // Get the TaskUpdateCoordinator from the plugin
     const plugin = (
@@ -1110,6 +1148,8 @@ export class TaskListView extends ItemView {
               task: Task,
               date: Date | null,
               repeat?: DateRepeatInfo | null,
+              warningPeriod?: number | null,
+              firstOnlyWarningPeriod?: number | null,
             ) => Promise<Task>;
           };
         };
@@ -1139,6 +1179,8 @@ export class TaskListView extends ItemView {
         currentTask,
         date,
         repeat,
+        warningPeriod,
+        firstOnlyWarningPeriod,
       );
     } catch (error) {
       console.error('TODOseq: Failed to update deadline date:', error);
@@ -2324,12 +2366,7 @@ export class TaskListView extends ItemView {
             await this.migrateTaskToToday(freshTask);
           }
         },
-        onPriorityChange: (task, priority) =>
-          this.handleContextMenuPriorityChange(task, priority),
-        onScheduledDateChange: (task, date, repeat) =>
-          this.handleContextMenuScheduledDateChange(task, date, repeat ?? null),
-        onDeadlineDateChange: (task, date, repeat) =>
-          this.handleContextMenuDeadlineDateChange(task, date, repeat ?? null),
+        ...this.getContextMenuSharedCallbacks(),
       },
       {
         weekStartsOn: this.plugin.settings.weekStartsOn,

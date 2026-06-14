@@ -12,6 +12,8 @@ export type DatePickerCallbacks = {
     date: Date | null,
     repeat: DateRepeatInfo | null,
     mode: DatePickerMode,
+    warningPeriod?: number | null,
+    firstOnlyWarningPeriod?: number | null,
   ) => void;
 };
 
@@ -52,6 +54,7 @@ export class DatePicker extends BaseDialog {
   private selectedDate: Date | null = null;
   private selectedTime: { hours: number; minutes: number } | null = null;
   private selectedRepeat: DateRepeatInfo | null = null;
+  private selectedWarningPeriod: number | null = null;
   private currentMonth: Date;
   private mode: DatePickerMode = 'scheduled';
 
@@ -60,10 +63,12 @@ export class DatePicker extends BaseDialog {
   private calendarSection: HTMLElement | null = null;
   private timeSection: HTMLElement | null = null;
   private repeatSection: HTMLElement | null = null;
+  private warningPeriodSection: HTMLElement | null = null;
   private customRepeatDialog: HTMLElement | null = null;
 
   private timePickerSubmenu: HTMLElement | null = null;
   private repeatPickerSubmenu: HTMLElement | null = null;
+  private warningPeriodPickerSubmenu: HTMLElement | null = null;
 
   constructor(callbacks: DatePickerCallbacks, config: DatePickerConfig) {
     super();
@@ -88,6 +93,7 @@ export class DatePicker extends BaseDialog {
     mode: DatePickerMode = 'scheduled',
     initialDate?: Date | null,
     initialRepeat?: DateRepeatInfo | null,
+    initialWarningPeriod?: number | null,
   ): Promise<void> {
     this.mode = mode;
 
@@ -100,6 +106,7 @@ export class DatePicker extends BaseDialog {
 
     // Set initial date/time if provided
     this.selectedRepeat = initialRepeat ?? null;
+    this.selectedWarningPeriod = initialWarningPeriod ?? null;
     if (initialDate) {
       this.selectedDate = DateUtils.getDateOnly(initialDate);
       // Only set time if the date has a time component (not midnight)
@@ -146,6 +153,7 @@ export class DatePicker extends BaseDialog {
     // Close any open submenus
     this.closeTimePicker();
     this.closeRepeatPicker();
+    this.closeWarningPeriodPicker();
     this.closeCustomRepeatDialog();
 
     this.detachGlobalListeners();
@@ -211,6 +219,12 @@ export class DatePicker extends BaseDialog {
 
     // Repeat section
     this.buildRepeatSection();
+
+    // Separator
+    this.addSeparator();
+
+    // Warning period section
+    this.buildWarningPeriodSection();
 
     // Separator
     this.addSeparator();
@@ -469,6 +483,58 @@ export class DatePicker extends BaseDialog {
 
     this.repeatSection.appendChild(repeatRow);
     this.focusableItems.push(repeatRow);
+  }
+
+  private buildWarningPeriodSection(): void {
+    if (!this.containerEl) return;
+
+    this.warningPeriodSection = this.containerEl.createEl('div', {
+      cls: 'todoseq-date-picker-warning-period',
+    });
+
+    const label =
+      this.mode === 'scheduled' ? 'Delayed notice' : 'Advance notice';
+
+    const warningRow = this.createMenuRow(
+      this.selectedWarningPeriod
+        ? `${label}: ${this.selectedWarningPeriod}d`
+        : label,
+      'bell-ring',
+      () => this.toggleWarningPeriodPicker(),
+    );
+    warningRow.setAttribute('role', 'menuitem');
+
+    if (this.selectedWarningPeriod) {
+      const labelEl = warningRow.querySelector(
+        '.todoseq-date-picker-menu-row-label',
+      );
+      if (labelEl) {
+        labelEl.addClass('is-selected');
+      }
+    }
+
+    // Add clear button if warning period is selected
+    if (this.selectedWarningPeriod) {
+      const clearBtn = warningRow.createEl('button', {
+        cls: 'todoseq-date-picker-clear-btn',
+        attr: {
+          'aria-label': 'Clear warning period',
+          role: 'button',
+          tabindex: '-1',
+        },
+      });
+      const clearIcon = clearBtn.createEl('span', {
+        cls: 'menu-item-icon todoseq-date-picker-clear-icon',
+      });
+      setIcon(clearIcon, 'lucide-x');
+      clearBtn.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        this.clearWarningPeriod();
+      });
+    }
+
+    this.warningPeriodSection.appendChild(warningRow);
+    this.focusableItems.push(warningRow);
   }
 
   // ─── Quick Select Options ───────────────────────────────────────
@@ -1108,6 +1174,215 @@ export class DatePicker extends BaseDialog {
     }
   }
 
+  // ─── Warning Period Selection ──────────────────────────────────
+
+  private toggleWarningPeriodPicker(): void {
+    if (this.timePickerSubmenu) {
+      this.closeTimePicker();
+    }
+    if (this.repeatPickerSubmenu) {
+      this.closeRepeatPicker();
+    }
+
+    if (this.warningPeriodPickerSubmenu) {
+      this.closeWarningPeriodPicker();
+    } else {
+      this.openWarningPeriodPicker();
+    }
+  }
+
+  private openWarningPeriodPicker(): void {
+    if (!this.warningPeriodSection || !this.containerEl) return;
+
+    this.warningPeriodPickerSubmenu = window.activeDocument.createElement('div');
+    this.warningPeriodPickerSubmenu.className =
+      'menu todoseq-date-picker-submenu';
+
+    const presetOptions: Array<{ label: string; value: number }> = [
+      { label: 'None', value: 0 },
+      { label: '1 day', value: 1 },
+      { label: '3 days', value: 3 },
+      { label: '5 days', value: 5 },
+      { label: '7 days', value: 7 },
+    ];
+
+    for (const option of presetOptions) {
+      const row = this.warningPeriodPickerSubmenu.createDiv({
+        cls: 'menu-item todoseq-date-picker-submenu-row',
+        attr: { role: 'menuitem', tabindex: '-1' },
+      });
+
+      row.createSpan({
+        cls: 'menu-item-title todoseq-date-picker-submenu-label',
+        text: option.label,
+      });
+
+      if (option.value > 0) {
+        row.createSpan({
+          cls: 'todoseq-date-picker-submenu-value',
+          text: `-${option.value}d`,
+        });
+      }
+
+      if (this.selectedWarningPeriod === option.value) {
+        row.addClass('is-selected');
+      }
+
+      row.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        this.selectWarningPeriod(option.value);
+      });
+
+      this.warningPeriodPickerSubmenu.appendChild(row);
+    }
+
+    // Custom option
+    const customRow = this.warningPeriodPickerSubmenu.createDiv({
+      cls: 'menu-item todoseq-date-picker-submenu-row',
+      attr: { role: 'menuitem', tabindex: '-1' },
+    });
+
+    customRow.createSpan({
+      cls: 'menu-item-title todoseq-date-picker-submenu-label',
+      text: 'Custom...',
+    });
+
+    customRow.addEventListener('click', (evt) => {
+      evt.stopPropagation();
+      this.closeWarningPeriodPicker();
+      this.openCustomWarningPeriodDialog();
+    });
+
+    this.warningPeriodPickerSubmenu.appendChild(customRow);
+
+    // Append and position
+    this.warningPeriodPickerSubmenu.addClass(
+      'todoseq-date-picker-submenu-measuring',
+    );
+    this.containerEl.appendChild(this.warningPeriodPickerSubmenu);
+
+    const submenuHeight = this.warningPeriodPickerSubmenu.offsetHeight;
+    const sectionOffsetTop = this.warningPeriodSection.offsetTop;
+    this.warningPeriodPickerSubmenu.removeClass(
+      'todoseq-date-picker-submenu-measuring',
+    );
+    this.warningPeriodPickerSubmenu.style.setProperty(
+      '--todoseq-submenu-top',
+      `${sectionOffsetTop - submenuHeight}px`,
+    );
+    this.warningPeriodPickerSubmenu.addClass(
+      'todoseq-date-picker-submenu-visible',
+    );
+  }
+
+  private closeWarningPeriodPicker(): void {
+    if (
+      this.warningPeriodPickerSubmenu &&
+      this.warningPeriodPickerSubmenu.parentNode
+    ) {
+      this.warningPeriodPickerSubmenu.remove();
+    }
+    this.warningPeriodPickerSubmenu = null;
+  }
+
+  private selectWarningPeriod(days: number): void {
+    this.selectedWarningPeriod = days > 0 ? days : null;
+    this.closeWarningPeriodPicker();
+    this.refreshWarningPeriodSection();
+  }
+
+  private clearWarningPeriod(): void {
+    this.selectedWarningPeriod = null;
+    this.refreshWarningPeriodSection();
+  }
+
+  private refreshWarningPeriodSection(): void {
+    const section = this.warningPeriodSection;
+    let parent: Node | null = null;
+    let nextSibling: Node | null = null;
+    if (section) {
+      parent = section.parentNode;
+      nextSibling = section.nextSibling;
+      if (parent) {
+        parent.removeChild(section);
+      }
+    }
+    this.buildWarningPeriodSection();
+    if (this.warningPeriodSection && parent) {
+      if (nextSibling) {
+        parent.insertBefore(this.warningPeriodSection, nextSibling);
+      } else {
+        parent.appendChild(this.warningPeriodSection);
+      }
+    }
+  }
+
+  private openCustomWarningPeriodDialog(): void {
+    if (!this.containerEl) return;
+
+    const dialog = window.activeDocument.createElement('div');
+    dialog.className = 'todoseq-date-picker-custom-repeat';
+
+    const header = dialog.createEl('div', {
+      cls: 'todoseq-date-picker-custom-repeat-header',
+    });
+    header.setText('Custom warning period');
+
+    const valueLabel = dialog.createEl('div', {
+      cls: 'todoseq-date-picker-custom-repeat-label',
+    });
+    valueLabel.setText('Warning period');
+
+    const valueRow = dialog.createEl('div', {
+      cls: 'todoseq-date-picker-custom-repeat-value-row',
+    });
+
+    const valueInput = valueRow.createEl('input', {
+      cls: 'todoseq-date-picker-custom-repeat-value-input',
+      attr: {
+        type: 'number',
+        min: '1',
+        max: '30',
+        value: String(this.selectedWarningPeriod ?? 1),
+      },
+    });
+
+    const unitSpan = valueRow.createEl('span', {
+      cls: 'todoseq-date-picker-custom-repeat-unit-label',
+    });
+    unitSpan.setText('days');
+
+    const buttonRow = dialog.createEl('div', {
+      cls: 'todoseq-date-picker-custom-repeat-buttons',
+    });
+
+    const cancelBtn = buttonRow.createEl('button', {
+      cls: 'todoseq-date-picker-custom-repeat-cancel',
+    });
+    cancelBtn.setText('Cancel');
+    cancelBtn.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      dialog.remove();
+    });
+
+    const saveBtn = buttonRow.createEl('button', {
+      cls: 'todoseq-date-picker-custom-repeat-save',
+    });
+    saveBtn.setText('Save');
+    saveBtn.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      const value = parseInt(valueInput.value, 10) || 1;
+      this.selectedWarningPeriod = value;
+      dialog.remove();
+      this.refreshWarningPeriodSection();
+    });
+
+    dialog.addClass('todoseq-date-picker-custom-repeat-centered');
+    this.containerEl.appendChild(dialog);
+  }
+
   // ─── Helpers ───────────────────────────────────────────────────
 
   private createMenuRow(
@@ -1166,6 +1441,7 @@ export class DatePicker extends BaseDialog {
       this.buildSelectedDateTime(),
       this.selectedRepeat,
       this.mode,
+      this.selectedWarningPeriod,
     );
   }
 

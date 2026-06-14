@@ -25,11 +25,15 @@ export type TaskContextMenuCallbacks = {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
+    warningPeriod?: number | null,
+    firstOnlyWarningPeriod?: number | null,
   ) => void | Promise<void>;
   onDeadlineDateChange: (
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
+    warningPeriod?: number | null,
+    firstOnlyWarningPeriod?: number | null,
   ) => void | Promise<void>;
 };
 
@@ -401,8 +405,11 @@ export class TaskContextMenu extends BaseDialog {
               }
             }
 
-            // Preserve existing repeat component
+            // Preserve existing repeat and warning period components
             const repeat = currentTask?.scheduledDateRepeat;
+            const warningPeriod = currentTask?.scheduledWarningPeriod;
+            const firstOnlyWarningPeriod =
+              currentTask?.scheduledFirstOnlyWarningPeriod;
 
             // Only pass repeat argument if it exists
             if (repeat) {
@@ -410,9 +417,17 @@ export class TaskContextMenu extends BaseDialog {
                 currentTask,
                 date,
                 repeat,
+                warningPeriod,
+                firstOnlyWarningPeriod,
               );
             } else {
-              void this.callbacks.onScheduledDateChange(currentTask, date);
+              void this.callbacks.onScheduledDateChange(
+                currentTask,
+                date,
+                undefined,
+                warningPeriod,
+                firstOnlyWarningPeriod,
+              );
             }
             this.hide();
           }
@@ -628,22 +643,29 @@ export class TaskContextMenu extends BaseDialog {
         ? (currentTask.deadlineDateRepeat ?? null)
         : (currentTask.scheduledDateRepeat ?? null)
       : null;
+    const initialWarningPeriod = currentTask
+      ? mode === 'deadline'
+        ? (currentTask.deadlineWarningPeriod ?? currentTask.deadlineFirstOnlyWarningPeriod ?? null)
+        : (currentTask.scheduledWarningPeriod ?? currentTask.scheduledFirstOnlyWarningPeriod ?? null)
+      : null;
 
     this.datePicker = new DatePicker(
       {
-        onDateSelected: (date, repeat, mode) => {
+        onDateSelected: (date, repeat, mode, warningPeriod) => {
           if (currentTask) {
             if (mode === 'deadline') {
               void this.callbacks.onDeadlineDateChange(
                 currentTask,
                 date,
                 repeat ?? null,
+                warningPeriod ?? null,
               );
             } else {
               void this.callbacks.onScheduledDateChange(
                 currentTask,
                 date,
                 repeat ?? null,
+                warningPeriod ?? null,
               );
             }
           }
@@ -655,7 +677,7 @@ export class TaskContextMenu extends BaseDialog {
     );
 
     this.datePicker
-      .show(position, mode, initialDate, initialRepeat)
+      .show(position, mode, initialDate, initialRepeat, initialWarningPeriod)
       .catch((error) => {
         new Notice('Failed to show date picker');
         console.error('Error showing date picker:', error);

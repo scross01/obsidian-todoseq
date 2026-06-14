@@ -568,6 +568,12 @@ export class VaultScanner {
           (a.scheduledDate?.getTime() ?? null) ||
         (b.deadlineDate?.getTime() ?? null) !==
           (a.deadlineDate?.getTime() ?? null) ||
+        b.scheduledDateRepeat?.raw !== a.scheduledDateRepeat?.raw ||
+        b.deadlineDateRepeat?.raw !== a.deadlineDateRepeat?.raw ||
+        b.scheduledWarningPeriod !== a.scheduledWarningPeriod ||
+        b.deadlineWarningPeriod !== a.deadlineWarningPeriod ||
+        b.scheduledFirstOnlyWarningPeriod !== a.scheduledFirstOnlyWarningPeriod ||
+        b.deadlineFirstOnlyWarningPeriod !== a.deadlineFirstOnlyWarningPeriod ||
         b.subtaskCount !== a.subtaskCount ||
         b.subtaskCompletedCount !== a.subtaskCompletedCount
       ) {

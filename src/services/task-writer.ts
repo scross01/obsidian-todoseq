@@ -3,6 +3,7 @@ import { Task, DateRepeatInfo } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { DateUtils } from '../utils/date-utils';
+import { buildWarningPeriodString } from '../utils/date-repeater';
 import { findDateLine, getTaskIndent } from '../utils/task-line-utils';
 import TodoTracker from '../main';
 import { getStateTransitionManager } from './task-update-coordinator';
@@ -497,6 +498,8 @@ export class TaskWriter {
     task: Task,
     newDate: Date,
     repeat?: DateRepeatInfo | null,
+    warningPeriod?: number | null,
+    firstOnlyWarningPeriod?: number | null,
   ): Promise<Task & { lineDelta?: number }> {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const year = newDate.getFullYear();
@@ -510,7 +513,8 @@ export class TaskWriter {
         ? ''
         : ` ${hours}:${minutes}`;
     const repeatStr = repeat ? ` ${repeat.raw}` : '';
-    const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}>`;
+    const warningStr = buildWarningPeriodString(warningPeriod, firstOnlyWarningPeriod);
+    const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}${warningStr}>`;
     let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -534,6 +538,8 @@ export class TaskWriter {
       ...task,
       scheduledDate: newDate,
       scheduledDateRepeat: repeat ?? null,
+      scheduledWarningPeriod: warningPeriod ?? null,
+      scheduledFirstOnlyWarningPeriod: firstOnlyWarningPeriod ?? null,
     };
     if (lineDelta !== 0) {
       result.lineDelta = lineDelta;
@@ -593,6 +599,8 @@ export class TaskWriter {
     task: Task,
     newDate: Date,
     repeat?: DateRepeatInfo | null,
+    warningPeriod?: number | null,
+    firstOnlyWarningPeriod?: number | null,
   ): Promise<Task & { lineDelta?: number }> {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const year = newDate.getFullYear();
@@ -606,7 +614,8 @@ export class TaskWriter {
         ? ''
         : ` ${hours}:${minutes}`;
     const repeatStr = repeat ? ` ${repeat.raw}` : '';
-    const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}>`;
+    const warningStr = buildWarningPeriodString(warningPeriod, firstOnlyWarningPeriod);
+    const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}${warningStr}>`;
     let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -630,6 +639,8 @@ export class TaskWriter {
       ...task,
       deadlineDate: newDate,
       deadlineDateRepeat: repeat ?? null,
+      deadlineWarningPeriod: warningPeriod ?? null,
+      deadlineFirstOnlyWarningPeriod: firstOnlyWarningPeriod ?? null,
     };
     if (lineDelta !== 0) {
       result.lineDelta = lineDelta;

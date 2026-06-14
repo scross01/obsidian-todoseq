@@ -56,6 +56,16 @@ const MIGRATIONS: SettingsMigrations[] = [
       return { ...settings };
     },
   },
+  {
+    version: 4,
+    migrate: (settings: Record<string, unknown>) => {
+      // v4: added warning period settings
+      // (upcomingPeriod, defaultDeadlineWarningPeriod, defaultScheduledWarningPeriod,
+      //  skipScheduledWarningPeriodIfDeadline, skipDeadlinePrewarningIfScheduled)
+      // No structural migration needed — defaults supplied by DefaultSettings.
+      return { ...settings };
+    },
+  },
 ];
 
 export function migrateSettings(

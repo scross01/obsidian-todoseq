@@ -14,6 +14,10 @@ export type KeywordSettings = {
   additionalCompletedKeywords?: string[];
   additionalArchivedKeywords?: string[];
   useExtendedCheckboxStyles?: boolean;
+  defaultScheduledWarningPeriod?: number;
+  defaultDeadlineWarningPeriod?: number;
+  skipScheduledWarningPeriodIfDeadline?: boolean;
+  skipDeadlinePrewarningIfScheduled?: boolean;
 };
 
 const BUILTIN_COMPLETED_SET = new Set<string>(BUILTIN_COMPLETED_KEYWORDS);

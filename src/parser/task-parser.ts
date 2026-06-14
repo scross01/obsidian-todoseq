@@ -721,6 +721,8 @@ export class TaskParser implements ITaskParser {
   parseDateFromLineWithRepeater(line: string): {
     date: Date | null;
     repeat: DateRepeatInfo | null;
+    warningPeriod: number | null;
+    firstOnlyWarningPeriod: number | null;
   } {
     // Remove the SCHEDULED:, DEADLINE:, or CLOSED: prefix and trim
     // The regex needs to account for leading whitespace and callout blocks (>)
@@ -756,12 +758,20 @@ export class TaskParser implements ITaskParser {
     closedDate: Date | null;
     scheduledDateRepeat: DateRepeatInfo | null;
     deadlineDateRepeat: DateRepeatInfo | null;
+    scheduledWarningPeriod: number | null;
+    deadlineWarningPeriod: number | null;
+    scheduledFirstOnlyWarningPeriod: number | null;
+    deadlineFirstOnlyWarningPeriod: number | null;
   } {
     let scheduledDate: Date | null = null;
     let scheduledDateRepeat: DateRepeatInfo | null = null;
     let deadlineDate: Date | null = null;
     let deadlineDateRepeat: DateRepeatInfo | null = null;
     let closedDate: Date | null = null;
+    let scheduledWarningPeriod: number | null = null;
+    let deadlineWarningPeriod: number | null = null;
+    let scheduledFirstOnlyWarningPeriod: number | null = null;
+    let deadlineFirstOnlyWarningPeriod: number | null = null;
     let scheduledFound = false;
     let deadlineFound = false;
     let closedFound = false;
@@ -778,10 +788,13 @@ export class TaskParser implements ITaskParser {
       const dateLineType = this.getDateLineType(nextLine, indent);
 
       if (dateLineType === 'scheduled' && !scheduledFound) {
-        const { date, repeat } = this.parseDateFromLineWithRepeater(nextLine);
+        const { date, repeat, warningPeriod, firstOnlyWarningPeriod } =
+          this.parseDateFromLineWithRepeater(nextLine);
         if (date) {
           scheduledDate = date;
           scheduledDateRepeat = repeat;
+          scheduledWarningPeriod = warningPeriod;
+          scheduledFirstOnlyWarningPeriod = firstOnlyWarningPeriod;
           scheduledFound = true;
         } else {
           console.warn(
@@ -789,10 +802,13 @@ export class TaskParser implements ITaskParser {
           );
         }
       } else if (dateLineType === 'deadline' && !deadlineFound) {
-        const { date, repeat } = this.parseDateFromLineWithRepeater(nextLine);
+        const { date, repeat, warningPeriod, firstOnlyWarningPeriod } =
+          this.parseDateFromLineWithRepeater(nextLine);
         if (date) {
           deadlineDate = date;
           deadlineDateRepeat = repeat;
+          deadlineWarningPeriod = warningPeriod;
+          deadlineFirstOnlyWarningPeriod = firstOnlyWarningPeriod;
           deadlineFound = true;
         } else {
           console.warn(
@@ -827,6 +843,10 @@ export class TaskParser implements ITaskParser {
       closedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
+      scheduledWarningPeriod,
+      deadlineWarningPeriod,
+      scheduledFirstOnlyWarningPeriod,
+      deadlineFirstOnlyWarningPeriod,
     };
   }
 
@@ -1416,6 +1436,10 @@ export class TaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      scheduledWarningPeriod: null,
+      deadlineWarningPeriod: null,
+      scheduledFirstOnlyWarningPeriod: null,
+      deadlineFirstOnlyWarningPeriod: null,
       tail: taskDetails.tail,
       urgency: null,
       isDailyNote,
@@ -1433,6 +1457,10 @@ export class TaskParser implements ITaskParser {
       closedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
+      scheduledWarningPeriod,
+      deadlineWarningPeriod,
+      scheduledFirstOnlyWarningPeriod,
+      deadlineFirstOnlyWarningPeriod,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
@@ -1440,6 +1468,10 @@ export class TaskParser implements ITaskParser {
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
     task.closedDate = closedDate;
+    task.scheduledWarningPeriod = scheduledWarningPeriod;
+    task.deadlineWarningPeriod = deadlineWarningPeriod;
+    task.scheduledFirstOnlyWarningPeriod = scheduledFirstOnlyWarningPeriod;
+    task.deadlineFirstOnlyWarningPeriod = deadlineFirstOnlyWarningPeriod;
 
     // Extract subtasks from lines following date lines
     // Footnote tasks don't have checkboxes
@@ -1540,6 +1572,10 @@ export class TaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      scheduledWarningPeriod: null,
+      deadlineWarningPeriod: null,
+      scheduledFirstOnlyWarningPeriod: null,
+      deadlineFirstOnlyWarningPeriod: null,
       tail: taskDetails.tail,
       urgency: null,
       isDailyNote,
@@ -1557,6 +1593,10 @@ export class TaskParser implements ITaskParser {
       closedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
+      scheduledWarningPeriod,
+      deadlineWarningPeriod,
+      scheduledFirstOnlyWarningPeriod,
+      deadlineFirstOnlyWarningPeriod,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
@@ -1564,6 +1604,10 @@ export class TaskParser implements ITaskParser {
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
     task.closedDate = closedDate;
+    task.scheduledWarningPeriod = scheduledWarningPeriod;
+    task.deadlineWarningPeriod = deadlineWarningPeriod;
+    task.scheduledFirstOnlyWarningPeriod = scheduledFirstOnlyWarningPeriod;
+    task.deadlineFirstOnlyWarningPeriod = deadlineFirstOnlyWarningPeriod;
 
     // Extract subtasks from lines following date lines
     // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
@@ -1685,6 +1729,10 @@ export class TaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      scheduledWarningPeriod: null,
+      deadlineWarningPeriod: null,
+      scheduledFirstOnlyWarningPeriod: null,
+      deadlineFirstOnlyWarningPeriod: null,
       tail: taskDetails.tail,
       urgency: null,
       file,
@@ -1705,6 +1753,10 @@ export class TaskParser implements ITaskParser {
       closedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
+      scheduledWarningPeriod,
+      deadlineWarningPeriod,
+      scheduledFirstOnlyWarningPeriod,
+      deadlineFirstOnlyWarningPeriod,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
@@ -1712,6 +1764,10 @@ export class TaskParser implements ITaskParser {
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
     task.closedDate = closedDate;
+    task.scheduledWarningPeriod = scheduledWarningPeriod;
+    task.deadlineWarningPeriod = deadlineWarningPeriod;
+    task.scheduledFirstOnlyWarningPeriod = scheduledFirstOnlyWarningPeriod;
+    task.deadlineFirstOnlyWarningPeriod = deadlineFirstOnlyWarningPeriod;
 
     // Extract subtasks from lines following date lines
     // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
@@ -1798,6 +1854,10 @@ export class TaskParser implements ITaskParser {
         deadlineDate: null,
         deadlineDateRepeat: null,
         closedDate: null,
+        scheduledWarningPeriod: null,
+        deadlineWarningPeriod: null,
+        scheduledFirstOnlyWarningPeriod: null,
+        deadlineFirstOnlyWarningPeriod: null,
         tail: taskDetails.tail,
         urgency: null,
         isDailyNote: false,
@@ -1864,6 +1924,10 @@ export class TaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      scheduledWarningPeriod: null,
+      deadlineWarningPeriod: null,
+      scheduledFirstOnlyWarningPeriod: null,
+      deadlineFirstOnlyWarningPeriod: null,
       tail,
       urgency: null,
       file: undefined,

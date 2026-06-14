@@ -414,6 +414,79 @@ When you mark a task with a repeating date as completed (default completed state
 
 Tasks with repeating dates display a repeat icon in the task list to indicate they will advance when completed.
 
+### Warning Periods (Advance Notice / Delayed Notice)
+
+TODOseq supports org-mode compatible warning periods for SCHEDULED and DEADLINE dates. Warning periods control when a task becomes visible in the task list.
+
+#### Syntax
+
+Warning periods use the format `-Nd` appended to the date (after the repeater if present):
+
+```markdown
+SCHEDULED: <2026-06-10 Wed -3d>    # Task appears 3 days AFTER scheduled date
+DEADLINE: <2026-06-20 Sat -5d>     # Task appears 5 days BEFORE deadline
+DEADLINE: <2026-01-01 Wed +1m -3d> # Monthly repeat, 3-day advance notice
+```
+
+For first-only warning periods (only affects the first occurrence of a recurring task), use `--Nd`:
+
+```markdown
+SCHEDULED: <2026-06-10 Wed +1w --2d>  # First occurrence delayed 2 days, subsequent weeks on time
+```
+
+#### Behavior by Date Type
+
+| Date Type | Warning Period | Behavior |
+|-----------|---------------|----------|
+| DEADLINE `-Nd` | Advance notice | Task appears N days **before** the deadline |
+| SCHEDULED `-Nd` | Delayed notice | Task appears N days **after** the scheduled date |
+| DEADLINE `--Nd` | First-only advance notice | Advance notice only on first occurrence |
+| SCHEDULED `--Nd` | First-only delayed notice | Delay only on first occurrence |
+
+#### Global Defaults
+
+You can set default warning periods in Settings → Warning period:
+
+- **Deadline advance notice (days)**: Default advance notice for all deadlines (0 = disabled)
+- **Scheduled delay (days)**: Default delayed notice for all scheduled dates (0 = disabled)
+
+Per-task warning periods (set via `-Nd` syntax) override the global defaults. A value of `0` explicitly disables the warning period for that task.
+
+#### Skip Behavior
+
+When a task has both a SCHEDULED and DEADLINE date, both warning periods may apply. Two settings control which takes precedence:
+
+| Ignore Scheduled Delay When Deadline Is Set | Ignore Deadline Advance When Scheduled Is Set | Behavior |
+|---|---|---|
+| Disabled (default) | Disabled (default) | Both apply. The **earlier** effective visibility date wins. (Org Mode default) |
+| Enabled | Disabled | Deadline advance notice wins. Scheduled delay is ignored. |
+| Disabled | Enabled | Scheduled delay wins. Deadline advance notice is ignored. |
+| Enabled | Enabled | Both ignored. Task uses raw dates with no warning period adjustment. |
+
+#### Practical Examples
+
+```markdown
+# Deadline with 5-day advance notice
+TODO Write report
+DEADLINE: <2026-06-20 Sat -5d>
+# Task appears in task list from June 15
+
+# Scheduled with 3-day delay
+TODO Start project
+SCHEDULED: <2026-06-10 Wed -3d>
+# Task appears in task list from June 13
+
+# Combined repeater and warning period
+TODO Pay rent
+DEADLINE: <2026-01-01 Wed +1m -3d>
+# Repeats monthly, 3-day advance notice each time
+
+# First-only warning period (recurring)
+TODO Weekly review
+SCHEDULED: <2026-06-10 Wed +1w --2d>
+# First occurrence delayed 2 days, subsequent weeks on time
+```
+
 ## Tasks in Different Contexts
 
 ### Tasks in Lists

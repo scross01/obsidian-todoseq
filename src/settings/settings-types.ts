@@ -47,6 +47,12 @@ export interface TodoTrackerSettings {
   // Smart date recognition settings
   enableSmartDateRecognition: boolean; // when true, enables natural language date parsing
   smartDateRemoveKeywords: boolean; // when true, removes natural language text after conversion
+  // Warning period settings
+  upcomingPeriod: number; // days for "upcoming" window (default: 7)
+  defaultDeadlineWarningPeriod: number; // default advance notice for deadlines in days (0 = disabled)
+  defaultScheduledWarningPeriod: number; // default delayed notice for scheduled in days (0 = disabled)
+  skipScheduledWarningPeriodIfDeadline: boolean; // ignore scheduled delay when task has deadline
+  skipDeadlinePrewarningIfScheduled: boolean; // ignore deadline advance notice when task has scheduled date
 }
 
 export const DefaultStateTransitionSettings: StateTransitionSettings = {
@@ -81,4 +87,10 @@ export const DefaultSettings: TodoTrackerSettings = {
   // Smart date recognition settings
   enableSmartDateRecognition: true, // Enabled by default
   smartDateRemoveKeywords: true, // Remove natural language text after conversion
+  // Warning period settings
+  upcomingPeriod: 7, // 7-day upcoming window (matches previous hardcoded value)
+  defaultDeadlineWarningPeriod: 0, // Disabled by default
+  defaultScheduledWarningPeriod: 0, // No delay by default
+  skipScheduledWarningPeriodIfDeadline: false, // Don't skip scheduled delay when deadline exists (Org Mode default: nil)
+  skipDeadlinePrewarningIfScheduled: false, // Don't skip deadline warning when scheduled exists (Org Mode default: nil)
 };

@@ -261,42 +261,110 @@ function getEarliestDate(task: Task): Date | null {
 }
 
 /**
+ * Settings subset needed for warning period calculations
+ */
+export interface WarningPeriodSettings {
+  upcomingPeriod: number;
+  defaultDeadlineWarningPeriod: number;
+  defaultScheduledWarningPeriod: number;
+  skipScheduledWarningPeriodIfDeadline: boolean;
+  skipDeadlinePrewarningIfScheduled: boolean;
+}
+
+/**
+ * Get the effective visibility date for a task, accounting for warning periods.
+ * For deadlines: effective date = deadline - warning period (appears earlier)
+ * For scheduled: effective date = scheduled + delay (appears later)
+ *
+ * Both -Nd (all occurrences) and --Nd (first-only) affect visibility the same way.
+ * The difference is only in recurrence: --Nd is stripped after first occurrence,
+ * while -Nd persists across repeats. This function uses whichever is set.
+ *
+ * @param task The task to analyze
+ * @param settings Warning period settings
+ * @returns The effective visibility date or null if no dates
+ */
+export function getEffectiveVisibilityDate(
+  task: Task,
+  settings: WarningPeriodSettings,
+): Date | null {
+  let effectiveScheduled: Date | null = null;
+  let effectiveDeadline: Date | null = null;
+
+  if (task.scheduledDate) {
+    let scheduledDelay =
+      task.scheduledWarningPeriod ??
+      task.scheduledFirstOnlyWarningPeriod ??
+      settings.defaultScheduledWarningPeriod;
+    if (settings.skipScheduledWarningPeriodIfDeadline && task.deadlineDate) {
+      scheduledDelay = 0;
+    }
+    effectiveScheduled = DateUtils.addDays(task.scheduledDate, scheduledDelay);
+  }
+
+  if (task.deadlineDate) {
+    let warningDays =
+      task.deadlineWarningPeriod ??
+      task.deadlineFirstOnlyWarningPeriod ??
+      settings.defaultDeadlineWarningPeriod;
+    if (settings.skipDeadlinePrewarningIfScheduled && task.scheduledDate) {
+      warningDays = 0;
+    }
+    effectiveDeadline = DateUtils.addDays(task.deadlineDate, -warningDays);
+  }
+
+  if (!effectiveScheduled) return effectiveDeadline;
+  if (!effectiveDeadline) return effectiveScheduled;
+  return effectiveScheduled < effectiveDeadline
+    ? effectiveScheduled
+    : effectiveDeadline;
+}
+
+/**
  * Classify a task into a category based on dates and completion status
  * @param task The task to classify
  * @param now Current date/time
+ * @param settings Warning period settings (optional, uses defaults if not provided)
  * @returns Task classification
  */
-function classifyTask(task: Task, now: Date): TaskClassification {
+function classifyTask(
+  task: Task,
+  now: Date,
+  settings?: WarningPeriodSettings,
+): TaskClassification {
   // Completed tasks are always in completed category
   if (task.completed) {
     return { category: 'completed', earliestDate: getEarliestDate(task) };
   }
 
-  const earliestDate = getEarliestDate(task);
+  const effectiveDate = settings
+    ? getEffectiveVisibilityDate(task, settings)
+    : getEarliestDate(task);
 
   // Tasks with no dates are current
-  if (!earliestDate) {
+  if (!effectiveDate) {
     return { category: 'current', earliestDate: null };
   }
 
   // Normalize to day-level comparison to avoid time-of-day misclassification
   const today = DateUtils.getStartOfDay(now);
-  const earliestDay = DateUtils.getStartOfDay(earliestDate);
+  const effectiveDay = DateUtils.getStartOfDay(effectiveDate);
 
-  // Tasks with dates on or before today are current
-  if (earliestDay <= today) {
-    return { category: 'current', earliestDate };
+  // Tasks with effective date on or before today are current
+  if (effectiveDay <= today) {
+    return { category: 'current', earliestDate: effectiveDate };
   }
 
-  // Tasks with dates within 7 days (excluding today) are upcoming
-  const sevenDaysFromToday = DateUtils.addDays(today, 7);
+  // Tasks with effective date within upcoming period are upcoming
+  const upcomingDays = settings?.upcomingPeriod ?? 7;
+  const upcomingBoundary = DateUtils.addDays(today, upcomingDays);
 
-  if (earliestDay <= sevenDaysFromToday) {
-    return { category: 'upcoming', earliestDate };
+  if (effectiveDay <= upcomingBoundary) {
+    return { category: 'upcoming', earliestDate: effectiveDate };
   }
 
-  // Tasks with dates beyond 7 days are future
-  return { category: 'future', earliestDate };
+  // Tasks with dates beyond upcoming period are future
+  return { category: 'future', earliestDate: effectiveDate };
 }
 
 /**
@@ -454,6 +522,7 @@ export function sortTasksInBlocks(
   completedSetting: CompletedTaskSetting,
   sortMethod: SortMethod = 'default',
   keywordConfig?: KeywordSortConfig,
+  warningPeriodSettings?: WarningPeriodSettings,
 ): TaskBlock[] {
   // Classify all tasks - don't sort yet
   const classified: Record<TaskCategory, Task[]> = {
@@ -464,7 +533,7 @@ export function sortTasksInBlocks(
   };
 
   for (const task of tasks) {
-    const { category } = classifyTask(task, now);
+    const { category } = classifyTask(task, now, warningPeriodSettings);
     classified[category].push(task);
   }
 
@@ -571,6 +640,7 @@ export function sortTasksWithThreeBlockSystem(
   completedSetting: CompletedTaskSetting,
   sortMethod: SortMethod = 'default',
   keywordConfig?: KeywordSortConfig,
+  warningPeriodSettings?: WarningPeriodSettings,
 ): Task[] {
   const blocks = sortTasksInBlocks(
     tasks,
@@ -579,6 +649,7 @@ export function sortTasksWithThreeBlockSystem(
     completedSetting,
     sortMethod,
     keywordConfig,
+    warningPeriodSettings,
   );
   return flattenBlocks(blocks);
 }

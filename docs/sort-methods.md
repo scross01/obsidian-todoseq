@@ -48,3 +48,7 @@ If you have current tasks with keywords DOING, TODO, and WAIT, they will be orde
 3. WAIT tasks (Group 3 - Waiting)
 
 Within each group, tasks follow the keyword order currently defined in settings.
+
+### Note on Warning Periods
+
+Warning periods (`-Nd` syntax on SCHEDULED/DEADLINE dates) affect when tasks become visible in the task list (their effective visibility date), but do not change how tasks are sorted within their block. Sort methods use the actual scheduled/deadline dates, not the effective visibility dates.

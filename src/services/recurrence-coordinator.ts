@@ -204,11 +204,16 @@ export class RecurrenceCoordinator {
 
       // Use TaskUpdateCoordinator to update the task
       // This ensures all updates go through the unified flow
+      // Warning periods are determined by RecurrenceManager (preserves -Nd, strips --Nd)
       await this.taskUpdateCoordinator.updateTaskRecurrence(task, {
         newScheduledDate: dateResult.newScheduledDate ?? null,
         newDeadlineDate: dateResult.newDeadlineDate ?? null,
         newScheduledRepeat: task.scheduledDateRepeat,
         newDeadlineRepeat: task.deadlineDateRepeat,
+        newScheduledWarningPeriod: dateResult.newScheduledWarningPeriod ?? null,
+        newDeadlineWarningPeriod: dateResult.newDeadlineWarningPeriod ?? null,
+        newScheduledFirstOnlyWarningPeriod: dateResult.newScheduledFirstOnlyWarningPeriod ?? null,
+        newDeadlineFirstOnlyWarningPeriod: dateResult.newDeadlineFirstOnlyWarningPeriod ?? null,
         newStateForRecurrence: defaultInactive,
       });
 

@@ -375,7 +375,7 @@ describe('daily-note-utils', () => {
         adapter.read.mockResolvedValue(readResult);
       }
       return {
-        // eslint-disable-next-line obsidianmd/hardcoded-config-path
+         
         vault: { adapter, configDir: '.obsidian' },
       } as unknown as App;
     }
@@ -456,7 +456,7 @@ describe('daily-note-utils', () => {
               .fn()
               .mockResolvedValue(JSON.stringify({ 'daily-notes': true })),
           },
-          // eslint-disable-next-line obsidianmd/hardcoded-config-path
+           
           configDir: '.obsidian',
         },
       } as unknown as App;
@@ -487,7 +487,7 @@ describe('daily-note-utils', () => {
               .fn()
               .mockResolvedValue(JSON.stringify({ 'daily-notes': false })),
           },
-          // eslint-disable-next-line obsidianmd/hardcoded-config-path
+           
           configDir: '.obsidian',
         },
       } as unknown as App;

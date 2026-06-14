@@ -39,7 +39,7 @@ describe('settings-utils', () => {
         expect(result).toEqual({
           additionalInactiveKeywords: ['FIXME', 'HACK'],
           otherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -59,7 +59,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           otherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -70,7 +70,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           additionalInactiveKeywords: [],
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
     });
@@ -87,7 +87,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           languageCommentSupport: true,
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -99,7 +99,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           languageCommentSupport: false,
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -111,7 +111,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           languageCommentSupport: true,
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -123,7 +123,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           languageCommentSupport: null,
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -135,7 +135,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           languageCommentSupport: { disabled: false },
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -147,7 +147,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           languageCommentSupport: { enabled: 'true' },
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -159,7 +159,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           otherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
     });
@@ -179,7 +179,7 @@ describe('settings-utils', () => {
           additionalInactiveKeywords: ['FIXME'],
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -193,7 +193,7 @@ describe('settings-utils', () => {
         expect(result).toEqual({
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -201,13 +201,13 @@ describe('settings-utils', () => {
         const settings = {
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         };
         const result = migrateSettings(settings);
         expect(result).toEqual({
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -230,7 +230,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -242,7 +242,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -254,7 +254,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toEqual({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
     });
@@ -282,7 +282,7 @@ describe('settings-utils', () => {
           property3: true,
           property4: ['a', 'b'],
           property5: { nested: 'object' },
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -290,7 +290,7 @@ describe('settings-utils', () => {
         const settings = {};
         const result = migrateSettings(settings);
         expect(result).toEqual({
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -313,7 +313,7 @@ describe('settings-utils', () => {
         expect(result).toEqual({
           additionalInactiveKeywords: ['FIXME'],
           someOtherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -326,7 +326,7 @@ describe('settings-utils', () => {
         expect(result).toEqual({
           languageCommentSupport: false,
           someOtherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -341,7 +341,7 @@ describe('settings-utils', () => {
           additionalInactiveKeywords: ['FIXME', 'HACK'],
           languageCommentSupport: true,
           otherProperty: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -350,14 +350,14 @@ describe('settings-utils', () => {
           additionalInactiveKeywords: ['FIXME'],
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         };
         const result = migrateSettings(settings);
         expect(result).toEqual({
           additionalInactiveKeywords: ['FIXME'],
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
 
@@ -371,7 +371,7 @@ describe('settings-utils', () => {
         // Migration should overwrite additionalInactiveKeywords
         expect(result).toEqual({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 3,
+          settingsVersion: 4,
         });
       });
     });
@@ -383,7 +383,7 @@ describe('settings-utils', () => {
   describe('getLatestSettingsVersion', () => {
     test('should return the latest migration version', () => {
       const latestVersion = getLatestSettingsVersion();
-      expect(latestVersion).toBe(3);
+      expect(latestVersion).toBe(4);
     });
 
     test('should handle empty migrations array', () => {
