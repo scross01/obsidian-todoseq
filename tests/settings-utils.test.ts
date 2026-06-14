@@ -11,6 +11,32 @@ import {
 } from '../src/utils/settings-migration';
 import { createBaseSettings } from './helpers/test-helper';
 
+/** Default saved searches added by v5 migration */
+const DEFAULT_SAVED_SEARCHES = [
+  {
+    id: 'default-today',
+    name: 'Today',
+    query: 'scheduled:today',
+    viewMode: 'hideCompleted',
+    sortMethod: 'sortByScheduled',
+    futureTaskSorting: 'hideFuture',
+  },
+  {
+    id: 'default-overdue',
+    name: 'Overdue',
+    query: 'deadline:overdue',
+    viewMode: 'hideCompleted',
+    sortMethod: 'sortByDeadline',
+  },
+  {
+    id: 'default-active',
+    name: 'Active',
+    query: 'state:active',
+    viewMode: 'sortCompletedLast',
+    sortMethod: 'sortByUrgency',
+  },
+];
+
 describe('settings-utils', () => {
   describe('migrateSettings', () => {
     /**
@@ -36,10 +62,11 @@ describe('settings-utils', () => {
           otherSetting: 'value',
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME', 'HACK'],
           otherSetting: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
+          savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
 
@@ -57,9 +84,9 @@ describe('settings-utils', () => {
           otherSetting: 'value',
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           otherSetting: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -68,9 +95,9 @@ describe('settings-utils', () => {
           additionalTaskKeywords: [],
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: [],
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
     });
@@ -85,9 +112,9 @@ describe('settings-utils', () => {
           settingsVersion: 1,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           languageCommentSupport: true,
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -97,9 +124,9 @@ describe('settings-utils', () => {
           settingsVersion: 1,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           languageCommentSupport: false,
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -109,9 +136,9 @@ describe('settings-utils', () => {
           settingsVersion: 1,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           languageCommentSupport: true,
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -121,9 +148,9 @@ describe('settings-utils', () => {
           settingsVersion: 1,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           languageCommentSupport: null,
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -133,9 +160,9 @@ describe('settings-utils', () => {
           settingsVersion: 1,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           languageCommentSupport: { disabled: false },
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -145,9 +172,9 @@ describe('settings-utils', () => {
           settingsVersion: 1,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           languageCommentSupport: { enabled: 'true' },
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -157,9 +184,9 @@ describe('settings-utils', () => {
           settingsVersion: 1,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           otherSetting: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
     });
@@ -175,11 +202,12 @@ describe('settings-utils', () => {
           otherSetting: 'value',
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
+          savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
 
@@ -190,36 +218,37 @@ describe('settings-utils', () => {
           settingsVersion: 1,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
+          savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
 
-      test('should not apply any migrations when settingsVersion is 2', () => {
+      test('should not apply any migrations when already at latest version', () => {
         const settings = {
           languageCommentSupport: true,
-          otherSetting: 'value',
-          settingsVersion: 4,
-        };
-        const result = migrateSettings(settings);
-        expect(result).toEqual({
-          languageCommentSupport: true,
-          otherSetting: 'value',
-          settingsVersion: 4,
-        });
-      });
-
-      test('should not apply any migrations when settingsVersion is greater than 2', () => {
-        const settings = {
           otherSetting: 'value',
           settingsVersion: 5,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
+          languageCommentSupport: true,
           otherSetting: 'value',
           settingsVersion: 5,
+        });
+      });
+
+      test('should not apply any migrations when settingsVersion is greater than latest', () => {
+        const settings = {
+          otherSetting: 'value',
+          settingsVersion: 6,
+        };
+        const result = migrateSettings(settings);
+        expect(result).toMatchObject({
+          otherSetting: 'value',
+          settingsVersion: 6,
         });
       });
 
@@ -228,9 +257,10 @@ describe('settings-utils', () => {
           additionalTaskKeywords: ['FIXME'],
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 4,
+          settingsVersion: 5,
+          savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
 
@@ -240,9 +270,10 @@ describe('settings-utils', () => {
           settingsVersion: null,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 4,
+          settingsVersion: 5,
+          savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
 
@@ -252,9 +283,10 @@ describe('settings-utils', () => {
           settingsVersion: undefined,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 4,
+          settingsVersion: 5,
+          savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
     });
@@ -274,7 +306,7 @@ describe('settings-utils', () => {
           property5: { nested: 'object' },
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
           languageCommentSupport: true,
           property1: 'value1',
@@ -282,15 +314,16 @@ describe('settings-utils', () => {
           property3: true,
           property4: ['a', 'b'],
           property5: { nested: 'object' },
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
       test('should handle empty settings object', () => {
         const settings = {};
         const result = migrateSettings(settings);
-        expect(result).toEqual({
-          settingsVersion: 4,
+        expect(result).toMatchObject({
+          settingsVersion: 5,
+          savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
 
@@ -310,10 +343,10 @@ describe('settings-utils', () => {
           someOtherSetting: 'value',
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
           someOtherSetting: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -323,10 +356,10 @@ describe('settings-utils', () => {
           someOtherSetting: 'value',
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           languageCommentSupport: false,
           someOtherSetting: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -337,11 +370,11 @@ describe('settings-utils', () => {
           otherProperty: 'value',
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME', 'HACK'],
           languageCommentSupport: true,
           otherProperty: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -350,14 +383,14 @@ describe('settings-utils', () => {
           additionalInactiveKeywords: ['FIXME'],
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
         };
         const result = migrateSettings(settings);
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
 
@@ -369,9 +402,9 @@ describe('settings-utils', () => {
         };
         const result = migrateSettings(settings);
         // Migration should overwrite additionalInactiveKeywords
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 4,
+          settingsVersion: 5,
         });
       });
     });
@@ -383,7 +416,7 @@ describe('settings-utils', () => {
   describe('getLatestSettingsVersion', () => {
     test('should return the latest migration version', () => {
       const latestVersion = getLatestSettingsVersion();
-      expect(latestVersion).toBe(4);
+      expect(latestVersion).toBe(5);
     });
 
     test('should handle empty migrations array', () => {

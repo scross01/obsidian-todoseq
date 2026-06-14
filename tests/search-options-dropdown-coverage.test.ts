@@ -349,7 +349,7 @@ describe('SearchOptionsDropdown - Coverage Gap Tests', () => {
       expect(dropdown.isVisible()).toBe(false);
     });
 
-    it('dispatches input event after history selection', async () => {
+    it('dispatches history-select event after history selection', async () => {
       const dropdown = createDropdown(mockInput);
       dropdown.addToHistory('tag:work');
       await dropdown.showOptionsDropdown();
@@ -358,15 +358,20 @@ describe('SearchOptionsDropdown - Coverage Gap Tests', () => {
         '.search-suggest-history-item',
       );
 
-      const inputListener = jest.fn();
-      mockInput.addEventListener('input', inputListener);
+      const historySelectListener = jest.fn();
+      window.addEventListener('todoseq:history-select', historySelectListener);
 
       historyItems[0].dispatchEvent(
         new MouseEvent('mousedown', { bubbles: true, cancelable: true }),
       );
 
       jest.runAllTimers();
-      expect(inputListener).toHaveBeenCalled();
+      expect(historySelectListener).toHaveBeenCalled();
+
+      window.removeEventListener(
+        'todoseq:history-select',
+        historySelectListener,
+      );
     });
 
     it('stops propagation on history item click', async () => {

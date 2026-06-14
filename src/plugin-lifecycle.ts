@@ -4,10 +4,7 @@ import { SmartDateProcessor } from './services/smart-date-processor';
 import { TaskWriter } from './services/task-writer';
 import { EditorKeywordMenu } from './view/editor-extensions/editor-keyword-menu';
 import { StatusBarManager } from './view/editor-extensions/status-bar';
-import {
-  TaskListView,
-  TaskListViewMode,
-} from './view/task-list/task-list-view';
+import { TaskListView } from './view/task-list/task-list-view';
 import { TodoTrackerSettingTab } from './settings/settings';
 import { TaskParser } from './parser/task-parser';
 import { OrgModeTaskParser } from './parser/org-mode-task-parser';
@@ -168,46 +165,6 @@ export class PluginLifecycleManager {
           this.plugin,
           this.plugin.taskStateManager.getKeywordManager(),
         ),
-    );
-
-    // Persist view-mode changes coming from TodoView toolbars
-    const saveViewMode = async (e: Event) => {
-      const detail = (e as CustomEvent).detail as { mode: TaskListViewMode };
-      if (!detail?.mode) return;
-      this.plugin.settings.taskListViewMode = detail.mode;
-      await this.saveSettings();
-      await this.plugin.uiManager.refreshOpenTaskListViews();
-    };
-    const handler = (e: Event) => {
-      void saveViewMode(e);
-    };
-    window.addEventListener('todoseq:view-mode-change', handler);
-    this.plugin.register(() =>
-      window.removeEventListener('todoseq:view-mode-change', handler),
-    );
-
-    // Persist future task sorting changes coming from TodoView toolbars
-    const saveFutureTaskSorting = async (e: Event) => {
-      const detail = (e as CustomEvent).detail as {
-        mode: 'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture';
-      };
-      if (!detail?.mode) return;
-      this.plugin.settings.futureTaskSorting = detail.mode;
-      await this.saveSettings();
-      await this.plugin.uiManager.refreshOpenTaskListViews();
-    };
-    const futureTaskHandler = (e: Event) => {
-      void saveFutureTaskSorting(e);
-    };
-    window.addEventListener(
-      'todoseq:future-task-sorting-change',
-      futureTaskHandler,
-    );
-    this.plugin.register(() =>
-      window.removeEventListener(
-        'todoseq:future-task-sorting-change',
-        futureTaskHandler,
-      ),
     );
 
     // Add settings tab

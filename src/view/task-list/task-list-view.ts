@@ -12,8 +12,20 @@ import {
 import { TASK_VIEW_ICON } from '../../main';
 import { Task, DateRepeatInfo } from '../../types/task';
 import { Search } from '../../search/search';
-import { SearchOptionsDropdown } from '../components/search-options-dropdown';
+import {
+  SearchOptionsDropdown,
+  SavedSearchCallbacks,
+} from '../components/search-options-dropdown';
 import { SearchSuggestionDropdown } from '../components/search-suggestion-dropdown';
+import { SavedSearchDialog } from '../components/saved-search-dialog';
+import { SavedSearch } from '../../settings/settings-types';
+import {
+  createSavedSearch,
+  addSavedSearch,
+  updateSavedSearch,
+  deleteSavedSearch as removeSavedSearch,
+  findSavedSearchByQuery,
+} from '../../services/saved-search-manager';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
 import TodoTracker from '../../main';
@@ -53,6 +65,7 @@ export class TaskListView extends ItemView {
   private defaultViewMode: TaskListViewMode;
   private defaultSortMethod: SortMethod;
   private searchInputEl: HTMLInputElement | null = null;
+  private saveSearchBtn: HTMLElement | null = null;
   private _searchKeyHandler: ((e: KeyboardEvent) => void) | undefined;
   private isCaseSensitive = false;
   private searchError: string | null = null;
@@ -106,6 +119,7 @@ export class TaskListView extends ItemView {
   private layoutChangeObserver: EventRef | null = null;
   private activeLeafObserver: EventRef | null = null;
   private backgroundContextMenuHandler: ((e: MouseEvent) => void) | null = null;
+  private historySelectHandler: ((e: Event) => void) | null = null;
 
   // Add generation counter for refreshVisibleList
   private refreshGeneration = 0;
@@ -426,6 +440,7 @@ export class TaskListView extends ItemView {
       void (async () => {
         inputEl.value = '';
         this.setSearchQuery('');
+        this.updateSaveSearchBtnVisibility('');
         await this.refreshVisibleList();
       })();
     });
@@ -457,6 +472,7 @@ export class TaskListView extends ItemView {
         this.searchRefreshDebounceTimer = null;
         // Update attribute and re-render list only, preserving focus
         this.setSearchQuery(inputEl.value);
+        this.updateSaveSearchBtnVisibility(inputEl.value);
         void this.refreshVisibleList();
         // Start debounce timer for history capture
         this.handleSearchHistoryDebounce(inputEl.value);
@@ -489,6 +505,26 @@ export class TaskListView extends ItemView {
         }
       }
     });
+
+    // Save/bookmark button for saving current search (outside input, left of settings)
+    this.saveSearchBtn = firstRow.createEl('div', {
+      cls: 'clickable-icon todoseq-save-search-btn',
+      attr: { 'aria-label': 'Save search' },
+    });
+    setIcon(this.saveSearchBtn, 'lucide-bookmark');
+    this.saveSearchBtn.addEventListener('click', () => {
+      const query = this.getSearchQuery();
+      const matchingSaved = query.trim()
+        ? findSavedSearchByQuery(this.plugin.settings, query)
+        : undefined;
+      if (matchingSaved) {
+        this.openEditSavedSearchDialog(matchingSaved);
+      } else {
+        this.openSaveSearchDialog();
+      }
+    });
+    // Initially hidden - shown when search has content
+    this.saveSearchBtn.addClass('todoseq-hidden');
 
     // Add Settings button to the right side of the first row
     const settingsBtn = firstRow.createEl('div', { cls: 'clickable-icon' });
@@ -575,11 +611,9 @@ export class TaskListView extends ItemView {
       const selectedValue = dropdown.value as TaskListViewMode;
       this.setViewMode(selectedValue);
 
-      // Dispatch event for persistence
-      const evt = new CustomEvent('todoseq:view-mode-change', {
-        detail: { mode: selectedValue },
-      });
-      window.dispatchEvent(evt);
+      // Persist settings directly
+      this.plugin.settings.taskListViewMode = selectedValue;
+      void this.plugin.saveSettings();
 
       // Refresh the visible list - preserve scroll position
       this.refreshVisibleList(false).catch((error) => {
@@ -645,12 +679,7 @@ export class TaskListView extends ItemView {
 
         // Update settings and re-render
         this.plugin.settings.futureTaskSorting = selectedValue;
-
-        // Dispatch event for persistence
-        const evt = new CustomEvent('todoseq:future-task-sorting-change', {
-          detail: { mode: selectedValue },
-        });
-        window.dispatchEvent(evt);
+        void this.plugin.saveSettings();
 
         // Re-render with new future task sorting - preserve scroll position
         await this.refreshVisibleList(false);
@@ -725,12 +754,6 @@ export class TaskListView extends ItemView {
       // Update the dropdown to reflect the current sort method
       select.value = sortMethod;
 
-      // Dispatch event for persistence
-      const evt = new CustomEvent('todoseq:sort-method-change', {
-        detail: { sortMethod },
-      });
-      window.dispatchEvent(evt);
-
       // Refresh the visible list (transformForView will handle the sorting)
       // Reset to top since sort order changed fundamentally
       void this.refreshVisibleList(true);
@@ -787,6 +810,26 @@ export class TaskListView extends ItemView {
           this.handleDropdownVisibilityChange(isVisible);
         });
 
+        // Wire up saved search support
+        this.optionsDropdown.setSavedSearches(
+          this.plugin.settings.savedSearches,
+        );
+        const savedSearchCallbacks: SavedSearchCallbacks = {
+          onApply: (search) => {
+            void this.applySavedSearch(search);
+          },
+          onEdit: (search) => {
+            this.openEditSavedSearchDialog(search);
+          },
+          onDelete: (search) => {
+            this.deleteSavedSearch(search);
+          },
+          onSaveFromHistory: (query) => {
+            this.openSaveSearchDialog(query);
+          },
+        };
+        this.optionsDropdown.setSavedSearchCallbacks(savedSearchCallbacks);
+
         // Input event handler for dropdown triggering
         inputEl.addEventListener('input', () => {
           this.handleSearchInputForSuggestions();
@@ -796,6 +839,31 @@ export class TaskListView extends ItemView {
         inputEl.addEventListener('focus', () => {
           this.handleSearchFocus();
         });
+
+        // Listen for history selection to restore match case state
+        this.historySelectHandler = (e: Event) => {
+          const detail = (e as CustomEvent).detail as {
+            query: string;
+            matchCase: boolean;
+          };
+          // Guard: if the user typed a different query before this
+          // setTimeout(0) fired, skip to avoid overwriting their input
+          const currentInput = this.searchInputEl?.value ?? '';
+          if (currentInput !== detail.query) return;
+          this.isCaseSensitive = detail.matchCase;
+          this.setSearchQuery(detail.query);
+          const matchCaseBtn = this.contentEl.querySelector(
+            '.input-right-decorator[aria-label="Match case"]',
+          );
+          if (matchCaseBtn) {
+            matchCaseBtn.toggleClass('is-active', this.isCaseSensitive);
+          }
+          void this.refreshVisibleList();
+        };
+        window.addEventListener(
+          'todoseq:history-select',
+          this.historySelectHandler,
+        );
 
         // Keydown event handler
         inputEl.addEventListener('keydown', (e) => {
@@ -981,7 +1049,192 @@ export class TaskListView extends ItemView {
    */
   private captureSearchToHistory(query: string): void {
     if (!this.optionsDropdown) return;
-    this.optionsDropdown.addToHistory(query);
+    this.optionsDropdown.addToHistory(query, this.isCaseSensitive);
+  }
+
+  /**
+   * Apply a saved search - sets query, view mode, sort method, and future task sorting
+   */
+  private async applySavedSearch(search: SavedSearch): Promise<void> {
+    if (!this.searchInputEl) return;
+
+    // Set the search query
+    this.searchInputEl.value = search.query;
+    this.setSearchQuery(search.query);
+
+    // Apply view mode override if specified
+    if (search.viewMode) {
+      this.setViewMode(search.viewMode);
+    }
+
+    // Apply sort method override if specified
+    if (search.sortMethod) {
+      this.setSortMethod(search.sortMethod);
+      // Sync the sort dropdown in the toolbar
+      const sortDropdown = this.contentEl.querySelector(
+        '.search-results-info select',
+      ) as HTMLSelectElement;
+      if (sortDropdown) {
+        sortDropdown.value = search.sortMethod;
+      }
+    }
+
+    // Apply future task sorting override if specified
+    if (search.futureTaskSorting) {
+      this.plugin.settings.futureTaskSorting = search.futureTaskSorting;
+      void this.plugin.saveSettings();
+      // Sync the future task dropdown in the settings section
+      const futureDropdown = this.contentEl.querySelector(
+        '#future-tasks-dropdown',
+      ) as HTMLSelectElement;
+      if (futureDropdown) {
+        futureDropdown.value = search.futureTaskSorting;
+      }
+    }
+
+    // Apply match case (defaults to false if not set)
+    this.isCaseSensitive = search.matchCase ?? false;
+    // Sync the match case button in the search input
+    const matchCaseBtn = this.contentEl.querySelector(
+      '.input-right-decorator[aria-label="Match case"]',
+    ) as HTMLElement;
+    if (matchCaseBtn) {
+      matchCaseBtn.toggleClass('is-active', this.isCaseSensitive);
+    }
+
+    // Update save button visibility and active indicator
+    this.updateSaveSearchBtnVisibility(search.query);
+
+    // Refresh the list
+    await this.refreshVisibleList(true);
+  }
+
+  /**
+   * Open save dialog for creating a new saved search
+   */
+  private openSaveSearchDialog(prefilledQuery?: string): void {
+    const query =
+      prefilledQuery ?? this.searchInputEl?.value ?? this.getSearchQuery();
+
+    const dialog = new SavedSearchDialog({
+      query,
+      currentViewMode: this.getViewMode(),
+      currentSortMethod: this.getSortMethod(),
+      currentFutureTaskSorting: this.plugin.settings.futureTaskSorting,
+      currentMatchCase: this.isCaseSensitive,
+      onSave: (savedData) => {
+        const newSearch = createSavedSearch(savedData.name, savedData.query, {
+          viewMode: savedData.viewMode,
+          sortMethod: savedData.sortMethod,
+          futureTaskSorting: savedData.futureTaskSorting,
+          matchCase: savedData.matchCase,
+        });
+        addSavedSearch(this.plugin.settings, newSearch);
+        void this.plugin.saveSettings();
+        // Refresh dropdown with updated saved searches
+        this.refreshSavedSearchesInDropdown();
+        new Notice(`Saved search "${newSearch.name}" created`);
+      },
+      onCancel: () => {
+        // No-op
+      },
+    });
+    dialog.open();
+  }
+
+  /**
+   * Open edit dialog for an existing saved search
+   */
+  private openEditSavedSearchDialog(search: SavedSearch): void {
+    const dialog = new SavedSearchDialog({
+      existingSearch: search,
+      currentViewMode: this.getViewMode(),
+      currentSortMethod: this.getSortMethod(),
+      currentFutureTaskSorting: this.plugin.settings.futureTaskSorting,
+      currentMatchCase: this.isCaseSensitive,
+      onSave: (savedData) => {
+        updateSavedSearch(this.plugin.settings, search.id, {
+          name: savedData.name,
+          query: savedData.query,
+          viewMode: savedData.viewMode,
+          sortMethod: savedData.sortMethod,
+          futureTaskSorting: savedData.futureTaskSorting,
+          matchCase: savedData.matchCase,
+        });
+        void this.plugin.saveSettings();
+        this.refreshSavedSearchesInDropdown();
+        // If this saved search was active, update the indicator
+        this.updateSaveSearchBtnVisibility(this.getSearchQuery());
+        new Notice(`Saved search "${savedData.name}" updated`);
+      },
+      onDelete: () => {
+        return this.deleteSavedSearch(search);
+      },
+      onCancel: () => {
+        // No-op
+      },
+    });
+    dialog.open();
+  }
+
+  /**
+   * Delete a saved search after confirmation
+   */
+  private deleteSavedSearch(search: SavedSearch): boolean {
+    // eslint-disable-next-line no-alert -- simple confirmation for destructive action
+    const confirmed = window.confirm(`Delete saved search "${search.name}"?`);
+    if (!confirmed) return false;
+
+    removeSavedSearch(this.plugin.settings, search.id);
+    void this.plugin.saveSettings();
+    this.refreshSavedSearchesInDropdown();
+    // Clear active indicator if the deleted search was active
+    this.updateSaveSearchBtnVisibility(this.getSearchQuery());
+    new Notice(`Saved search "${search.name}" deleted`);
+    return true;
+  }
+
+  /**
+   * Refresh the saved searches in the dropdown
+   */
+  private refreshSavedSearchesInDropdown(): void {
+    if (this.optionsDropdown) {
+      this.optionsDropdown.setSavedSearches(this.plugin.settings.savedSearches);
+    }
+  }
+
+  /**
+   * Update save button visibility and active saved search indicator
+   * Shows save button when search has content, highlights when matching a saved search.
+   * The saved search name is shown as a tooltip on the bookmark icon.
+   */
+  private updateSaveSearchBtnVisibility(query: string): void {
+    const hasContent = query.trim().length > 0;
+
+    if (this.saveSearchBtn) {
+      this.saveSearchBtn.toggleClass('todoseq-hidden', !hasContent);
+
+      const matchingSaved = hasContent
+        ? findSavedSearchByQuery(this.plugin.settings, query)
+        : undefined;
+
+      this.saveSearchBtn.toggleClass(
+        'todoseq-save-search-btn-active',
+        !!matchingSaved,
+      );
+
+      // Show saved search name as tooltip; otherwise use default label
+      if (matchingSaved) {
+        this.saveSearchBtn.setAttr(
+          'aria-label',
+          `Saved search: ${matchingSaved.name}`,
+        );
+        this.saveSearchBtn.setAttr('title', matchingSaved.name);
+      } else {
+        this.saveSearchBtn.setAttr('aria-label', 'Save search');
+        this.saveSearchBtn.setAttr('title', 'Save search');
+      }
+    }
   }
 
   /**
@@ -1980,6 +2233,7 @@ export class TaskListView extends ItemView {
           evt.preventDefault();
           input.value = '';
           this.setSearchQuery('');
+          this.updateSaveSearchBtnVisibility('');
           void this.refreshVisibleList(); // re-render cleared without losing focus context
           queueMicrotask(() => input.blur());
         }
@@ -2458,6 +2712,15 @@ export class TaskListView extends ItemView {
       this.backgroundContextMenuHandler = null;
     }
 
+    // Cleanup history selection listener
+    if (this.historySelectHandler) {
+      window.removeEventListener(
+        'todoseq:history-select',
+        this.historySelectHandler,
+      );
+      this.historySelectHandler = null;
+    }
+
     // Cleanup ResizeObserver
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
@@ -2488,6 +2751,7 @@ export class TaskListView extends ItemView {
     this.renderQueue.clear();
 
     this.searchInputEl = null;
+    this.saveSearchBtn = null;
     this.taskListContainer = null;
     await super.onClose?.();
   }

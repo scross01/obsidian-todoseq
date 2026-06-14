@@ -1546,10 +1546,6 @@
   font-weight: var(--font-semibold);
 }
 
-/* Text rows (Go to task, Deadline) - custom min-height */
-.todoseq-context-menu-row {
-}
-
 /* Icon rows (date shortcuts, priority flags) */
 .todoseq-context-menu-icon-row {
   display: flex;
@@ -1652,9 +1648,6 @@
 }
 
 /* Quick Select Section */
-.todoseq-date-picker-quick-select {
-}
-
 .todoseq-date-picker-quick-select-date {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
@@ -1776,12 +1769,6 @@
 
 .todoseq-date-picker-calendar-day.is-focused {
   background: var(--background-modifier-hover);
-}
-
-/* Time, Repeat, and No Date Sections */
-.todoseq-date-picker-time,
-.todoseq-date-picker-repeat,
-.todoseq-date-picker-no-date {
 }
 
 .todoseq-date-picker-menu-row-label.is-selected {
@@ -2023,4 +2010,307 @@
 
 .todoseq-settings-section-visible {
   display: block;
+}
+
+/* Generic hidden helper (avoids inline style.display assignments) */
+.todoseq-hidden {
+  display: none !important;
+}
+
+/* ============================================================================
+   Saved Searches
+   ============================================================================ */
+
+/* Save/bookmark button in search bar */
+.todoseq-save-search-btn {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.todoseq-save-search-btn:hover {
+  opacity: 1;
+}
+
+/* Active saved search - filled/highlighted bookmark */
+.todoseq-save-search-btn-active {
+  opacity: 1;
+  color: var(--interactive-accent);
+}
+
+/* Header row icons (Search options, Saved Searches, History headers) */
+.todoseq-dropdown .mod-group .suggestion-aux {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.todoseq-dropdown .mod-group .search-suggest-icon svg {
+  width: var(--icon-s);
+  height: var(--icon-s);
+}
+
+/* Entry row icons (saved search items, history items) - compact size */
+.todoseq-dropdown .search-suggest-saved-item .search-suggest-icon svg,
+.todoseq-dropdown .search-suggest-history-item .search-suggest-icon svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+
+/* Saved search item in dropdown - match row height of other suggestion items */
+.todoseq-dropdown .search-suggest-saved-item {
+  cursor: pointer;
+  align-items: center;
+}
+
+.todoseq-dropdown .search-suggest-saved-item .suggestion-content {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.todoseq-dropdown .search-suggest-saved-item .suggestion-aux {
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.todoseq-dropdown
+  .search-suggest-saved-item
+  .suggestion-aux
+  .search-suggest-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.todoseq-dropdown .search-suggest-saved-item:hover,
+.todoseq-dropdown .search-suggest-saved-item.is-selected {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Saved search title - single line with truncation (matches search option rows) */
+.todoseq-dropdown .search-suggest-saved-item .suggestion-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Saved search query (dimmed like search-suggest-info-text) */
+.todoseq-dropdown .search-suggest-saved-query {
+  color: var(--text-muted);
+}
+
+/* History item - match saved search row height */
+.todoseq-dropdown .search-suggest-history-item {
+  align-items: center;
+}
+
+.todoseq-dropdown .search-suggest-history-item .suggestion-content {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.todoseq-dropdown
+  .search-suggest-history-item
+  .suggestion-aux
+  .search-suggest-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* History query text - single line with truncation */
+.todoseq-dropdown .search-suggest-history-item .suggestion-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.todoseq-dropdown .search-suggest-history-query {
+  font-weight: var(--font-normal);
+}
+
+/* History match case indicator (Aa) */
+.todoseq-dropdown .search-suggest-history-matchcase {
+  color: var(--interactive-accent);
+  font-weight: var(--font-semibold);
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+/* Hover action icons (edit/delete) - hidden by default, shown on hover */
+.todoseq-dropdown .search-suggest-saved-item .suggestion-aux {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  max-height: 1em;
+}
+
+.todoseq-dropdown .search-suggest-saved-item:hover .suggestion-aux,
+.todoseq-dropdown .search-suggest-saved-item.is-selected .suggestion-aux {
+  opacity: 1;
+}
+
+/* ============================================================================
+   Saved Search Dialog (Modal)
+   ============================================================================ */
+
+.todoseq-saved-search-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: var(--layer-modal, 100);
+}
+
+.todoseq-saved-search-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: calc(var(--layer-modal, 100) + 1);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-l);
+  min-width: 380px;
+  max-width: 480px;
+  width: 90vw;
+  padding: 0;
+}
+
+.todoseq-saved-search-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--size-4-3) var(--size-4-4);
+  font-weight: var(--font-semibold);
+  font-size: 1rem;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.todoseq-saved-search-close {
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  line-height: 1;
+  padding: var(--size-2-1);
+  border-radius: var(--radius-s);
+}
+
+.todoseq-saved-search-close:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.todoseq-saved-search-form {
+  padding: var(--size-4-3) var(--size-4-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-3);
+}
+
+.todoseq-saved-search-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+}
+
+.todoseq-saved-search-field label {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  color: var(--text-muted);
+}
+
+.todoseq-saved-search-field input,
+.todoseq-saved-search-field select {
+  width: 100%;
+  padding: var(--size-4-1) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+.todoseq-saved-search-field input:focus,
+.todoseq-saved-search-field select:focus {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -1px;
+}
+
+.todoseq-saved-search-field input.todoseq-saved-search-input-error {
+  border-color: var(--error-color, #ff0000);
+  border-width: 2px;
+}
+
+.todoseq-saved-search-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-4-2);
+  padding-top: var(--size-4-2);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.todoseq-saved-search-btn-cancel {
+  padding: var(--size-4-1) var(--size-4-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.todoseq-saved-search-btn-cancel:hover {
+  background: var(--background-modifier-hover);
+}
+
+.todoseq-saved-search-btn-save {
+  padding: var(--size-4-1) var(--size-4-3);
+  border: none;
+  border-radius: var(--radius-s);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.todoseq-saved-search-btn-save:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 85%, white);
+}
+
+/* Delete button - positioned left of Cancel/Save */
+.todoseq-saved-search-btn-delete {
+  padding: var(--size-4-1) var(--size-4-3);
+  border: 1px solid var(--color-red);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-red);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  margin-right: auto;
+}
+
+.todoseq-saved-search-btn-delete:hover {
+  background: color-mix(in srgb, var(--color-red) 10%, transparent);
+}
+
+/* History item save icon - hidden by default, shown on hover */
+.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  max-height: 1em;
+}
+
+.todoseq-dropdown .search-suggest-history-item:hover .suggestion-aux {
+  opacity: 1;
 }

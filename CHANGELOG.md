@@ -2,8 +2,10 @@
 
 ## 0.16.0
 
+- Added support for saving/bookmarking searches in the main task list. #62
 - Added support scheduled and deadline dates with org-mode style warning periods. #70
 - Added setting to change the period for the Upcoming tasks, default is 7 days.
+- Fixed search history entries to now remember and restore the match case setting for each query.
 - Fixed issue with changing repeating value on scheudled or deadline dates in the editor not updating the task list.
 
 ## 0.15.2

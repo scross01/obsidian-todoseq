@@ -508,7 +508,7 @@ describe('TaskListView', () => {
 
       view['captureSearchToHistory']('search term');
 
-      expect(addToHistory).toHaveBeenCalledWith('search term');
+      expect(addToHistory).toHaveBeenCalledWith('search term', false);
     });
 
     it('should not throw when optionsDropdown is null', () => {

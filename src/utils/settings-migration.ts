@@ -1,3 +1,5 @@
+import { DEFAULT_SAVED_SEARCHES } from '../settings/settings-types';
+
 /**
  * Settings migration utilities for TODOseq plugin.
  * Handles migrating settings from older versions to newer versions.
@@ -63,6 +65,22 @@ const MIGRATIONS: SettingsMigrations[] = [
       // (upcomingPeriod, defaultDeadlineWarningPeriod, defaultScheduledWarningPeriod,
       //  skipScheduledWarningPeriodIfDeadline, skipDeadlinePrewarningIfScheduled)
       // No structural migration needed — defaults supplied by DefaultSettings.
+      return { ...settings };
+    },
+  },
+  {
+    version: 5,
+    migrate: (settings: Record<string, unknown>) => {
+      // v5: added saved searches with default presets
+      // If savedSearches is not already present, add the default presets.
+      // Existing users get the initial set of saved searches.
+      // New installs will get them from DefaultSettings.
+      if (!('savedSearches' in settings)) {
+        return {
+          ...settings,
+          savedSearches: DEFAULT_SAVED_SEARCHES,
+        };
+      }
       return { ...settings };
     },
   },

@@ -578,6 +578,95 @@ Find all active tasks on project pages with deadlines this week.
 
 Find high priority tasks scheduled this week that are not yet completed.
 
+## Saved Searches
+
+Saved searches let you save frequently used search queries along with their view settings as named presets. This allows you to quickly switch between custom views like "Agenda", "Overdue", or "Active" with a single click.
+
+### What Gets Saved
+
+A saved search captures the complete view configuration:
+
+- **Name** - a label for the search (e.g., "Today", "Overdue", "Active")
+- **Search query** - the full search string
+- **View mode** - optional override (show all / sort completed last / hide completed)
+- **Sort method** - optional override (scheduled / deadline / priority / urgency / etc.)
+- **Future task sorting** - optional override (show / show upcoming / sort to end / hide)
+- **Match case** - optional override (on / off)
+
+When a saved search has optional settings, those override the current view settings when applied. If a setting is not specified in the saved search, the current global setting is used.
+
+When a saved search has optional settings, those override the current view settings when applied. If a setting is not specified in the saved search, the current global setting is used.
+
+### Default Presets
+
+TODOseq ships with three default saved searches:
+
+| Name    | Query              | Sort           | View Mode      | Future Tasks |
+| ------- | ------------------ | -------------- | -------------- | ------------ |
+| Today   | `scheduled:today`  | Scheduled date | Hide completed | Hide         |
+| Overdue | `deadline:overdue` | Deadline date  | Hide completed | Hide         |
+| Active  | `state:active`     | Urgency        | Sort to end    | Hide         |
+
+Default presets are fully editable and deletable, just like user-created saved searches.
+
+### Saving a Search
+
+1. Type a search query in the search bar and adjust the view settings (sort, view mode, future tasks, match case) to your liking
+2. Click the **bookmark icon** that appears in the search input area
+3. Enter a name for the search in the dialog that opens
+4. Optionally adjust the match case setting in the dialog (On / Off / Use current setting)
+5. Click **Save**
+
+The bookmark icon only appears when the search input is non-empty. If the current search matches an existing saved search, clicking the bookmark icon opens the edit dialog instead.
+
+### Applying a Saved Search
+
+1. Open the search dropdown by clicking on or focusing the search input
+2. Find the **Saved Searches** section in the dropdown
+3. Click on a saved search name to apply it
+
+When a saved search is applied:
+
+- The search query is set in the search input
+- View mode, sort method, and future task settings are applied if specified
+- The list immediately re-renders with the saved configuration
+
+### Editing a Saved Search
+
+1. Open the search dropdown
+2. Hover over a saved search to reveal the **edit** (pencil) icon
+3. Click the edit icon to open the edit dialog
+4. Modify the name, query, or any of the settings (including match case)
+5. Click **Save changes**
+
+### Deleting a Saved Search
+
+There are two ways to delete a saved search:
+
+**From the dropdown:**
+
+1. Open the search dropdown
+2. Hover over a saved search to reveal the **delete** (trash) icon
+3. Click the delete icon
+
+**From the edit dialog:**
+
+1. Open the edit dialog for the saved search (click the pencil icon in the dropdown, or click the bookmark icon when the search input matches a saved search)
+2. Click the **Delete** button
+3. Confirm the deletion
+
+### Saving from Search History
+
+Each search history item has a small **bookmark icon** that appears on hover. Clicking it opens the save dialog with the history query pre-filled, making it easy to promote a recent search to a saved preset.
+
+### Visual Indicator
+
+When viewing a saved search, the bookmark icon in the search bar is highlighted in the accent color, and the saved search name appears as a label near the search input. This helps you know when you're viewing a saved preset.
+
+### Clearing a Saved Search
+
+Pressing Escape or clicking the clear button exits the saved search view, just like clearing any search. The visual indicator disappears and the view returns to default.
+
 ## Search Logic and Behavior
 
 ### Search Matching Rules

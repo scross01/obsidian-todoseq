@@ -1,18 +1,36 @@
 import { Vault, setIcon } from 'obsidian';
 import { Task } from '../../types/task';
 import { SearchSuggestions } from '../../search/search-suggestions';
-import { TodoTrackerSettings } from '../../settings/settings-types';
+import {
+  TodoTrackerSettings,
+  SavedSearch,
+} from '../../settings/settings-types';
 import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
 import { BaseDropdown } from './base-dropdown';
 import { DOCS_SEARCH_URL } from '../../utils/constants';
+
+export interface HistoryEntry {
+  query: string;
+  matchCase: boolean;
+}
+
+export type SavedSearchCallbacks = {
+  onApply: (search: SavedSearch) => void;
+  onEdit: (search: SavedSearch) => void;
+  onDelete: (search: SavedSearch) => void;
+  onSaveFromHistory: (query: string) => void;
+};
 
 export class SearchOptionsDropdown extends BaseDropdown {
   private tasks: Task[];
   private settings: TodoTrackerSettings;
   public isHandlingPrefixSelection = false;
 
-  private searchHistory: string[] = [];
+  private searchHistory: HistoryEntry[] = [];
   private readonly MAX_HISTORY_SIZE = 10;
+
+  private savedSearches: SavedSearch[] = [];
+  private savedSearchCallbacks: SavedSearchCallbacks | null = null;
 
   constructor(
     inputEl: HTMLInputElement,
@@ -28,6 +46,14 @@ export class SearchOptionsDropdown extends BaseDropdown {
     this.setupKeyboardNavigation();
   }
 
+  public setSavedSearches(searches: SavedSearch[]): void {
+    this.savedSearches = searches;
+  }
+
+  public setSavedSearchCallbacks(callbacks: SavedSearchCallbacks): void {
+    this.savedSearchCallbacks = callbacks;
+  }
+
   protected shouldPreventHide(): boolean {
     return this.isHandlingPrefixSelection;
   }
@@ -36,16 +62,19 @@ export class SearchOptionsDropdown extends BaseDropdown {
     this.tasks = tasks;
   }
 
-  public addToHistory(query: string): void {
+  public addToHistory(query: string, matchCase = false): void {
     const trimmed = query.trim();
     if (!trimmed) return;
 
-    const existingIndex = this.searchHistory.indexOf(trimmed);
+    // Remove existing entry with same query
+    const existingIndex = this.searchHistory.findIndex(
+      (e) => e.query === trimmed,
+    );
     if (existingIndex !== -1) {
       this.searchHistory.splice(existingIndex, 1);
     }
 
-    this.searchHistory.unshift(trimmed);
+    this.searchHistory.unshift({ query: trimmed, matchCase });
 
     if (this.searchHistory.length > this.MAX_HISTORY_SIZE) {
       this.searchHistory.pop();
@@ -61,7 +90,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
     }
   }
 
-  public getHistory(): string[] {
+  public getHistory(): HistoryEntry[] {
     return [...this.searchHistory];
   }
 
@@ -136,33 +165,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
       cls: 'list-item-part search-suggest-icon clickable-icon',
       attr: { 'aria-label': 'Read more' },
     });
-
-    const svgEl = iconContainer.createEl(
-      'svg' as unknown as keyof HTMLElementTagNameMap,
-      {
-        attr: {
-          xmlns: 'http://www.w3.org/2000/svg',
-          width: '24',
-          height: '24',
-          viewBox: '0 0 24 24',
-          fill: 'none',
-          stroke: 'currentColor',
-          'stroke-width': '2',
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          class: 'svg-icon lucide-info',
-        },
-      },
-    );
-    svgEl.createEl('circle' as unknown as keyof HTMLElementTagNameMap, {
-      attr: { cx: '12', cy: '12', r: '10' },
-    });
-    svgEl.createEl('path' as unknown as keyof HTMLElementTagNameMap, {
-      attr: { d: 'M12 16v-4' },
-    });
-    svgEl.createEl('path' as unknown as keyof HTMLElementTagNameMap, {
-      attr: { d: 'M12 8h.01' },
-    });
+    setIcon(iconContainer, 'lucide-info');
 
     iconContainer.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -219,9 +222,133 @@ export class SearchOptionsDropdown extends BaseDropdown {
       });
     });
 
+    if (this.savedSearches.length > 0) {
+      this.renderSavedSearchesSection(
+        suggestionEl,
+        this.currentSuggestions.length,
+      );
+    }
+
     if (this.searchHistory.length > 0) {
       this.renderHistorySection(suggestionEl);
     }
+  }
+
+  private renderSavedSearchesSection(
+    parent: HTMLElement,
+    startIndex: number,
+  ): void {
+    const headerItem = parent.createEl('div', {
+      cls: 'suggestion-item mod-complex search-suggest-item mod-group',
+    });
+
+    headerItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    const headerContent = headerItem.createEl('div', {
+      cls: 'suggestion-content',
+    });
+    const headerTitle = headerContent.createEl('div', {
+      cls: 'suggestion-title list-item-part mod-extended',
+    });
+    headerTitle.createSpan({ text: 'Saved searches' });
+
+    const auxEl = headerItem.createEl('div', { cls: 'suggestion-aux' });
+    const iconContainer = auxEl.createEl('div', {
+      cls: 'list-item-part search-suggest-icon clickable-icon',
+      attr: { 'aria-label': 'Add saved search' },
+    });
+    setIcon(iconContainer, 'lucide-bookmark');
+    iconContainer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    iconContainer.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.savedSearchCallbacks?.onSaveFromHistory(this.inputEl.value);
+      this.hide();
+    });
+
+    this.savedSearches.forEach((search, index) => {
+      const adjustedIndex = startIndex + index;
+      const itemEl = parent.createEl('div', {
+        cls: `suggestion-item mod-complex search-suggest-item search-suggest-saved-item ${adjustedIndex === this.selectedIndex ? 'is-selected' : ''}`,
+      });
+
+      const contentEl = itemEl.createEl('div', {
+        cls: 'suggestion-content',
+      });
+      const titleEl = contentEl.createEl('div', {
+        cls: 'suggestion-title',
+      });
+      titleEl.createSpan({
+        cls: 'search-suggest-saved-name',
+        text: `${search.name}:`,
+      });
+      titleEl.createSpan({
+        cls: 'search-suggest-saved-query',
+        text: ` ${search.query}`,
+        attr: { title: search.query },
+      });
+
+      // Hover actions (edit and delete)
+      const auxEl = itemEl.createEl('div', { cls: 'suggestion-aux' });
+
+      const editBtn = auxEl.createEl('div', {
+        cls: 'list-item-part search-suggest-icon clickable-icon',
+        attr: { 'aria-label': 'Edit saved search' },
+      });
+      setIcon(editBtn, 'lucide-pencil');
+      editBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      editBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.savedSearchCallbacks?.onEdit(search);
+        this.hide();
+      });
+
+      const deleteBtn = auxEl.createEl('div', {
+        cls: 'list-item-part search-suggest-icon clickable-icon',
+        attr: { 'aria-label': 'Delete saved search' },
+      });
+      setIcon(deleteBtn, 'lucide-trash-2');
+      deleteBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      deleteBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.savedSearchCallbacks?.onDelete(search);
+        this.hide();
+      });
+
+      // Click on the item itself applies the saved search
+      itemEl.addEventListener('mousedown', (e) => {
+        // Don't apply if clicking on action buttons
+        const target = e.target as HTMLElement;
+        if (target.closest('.clickable-icon')) return;
+        e.preventDefault();
+        this.savedSearchCallbacks?.onApply(search);
+        this.hide();
+      });
+
+      itemEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      itemEl.addEventListener('mouseover', () => {
+        this.selectedIndex = adjustedIndex;
+        this.updateSelectionWithHistory();
+      });
+    });
   }
 
   private renderHistorySection(parent: HTMLElement): void {
@@ -260,8 +387,9 @@ export class SearchOptionsDropdown extends BaseDropdown {
       this.clearHistory();
     });
 
-    const optionsCount = this.currentSuggestions.length;
-    this.searchHistory.forEach((query, index) => {
+    const optionsCount =
+      this.currentSuggestions.length + this.savedSearches.length;
+    this.searchHistory.forEach((entry, index) => {
       const adjustedIndex = optionsCount + index;
       const itemEl = parent.createEl('div', {
         cls: `suggestion-item mod-complex search-suggest-item search-suggest-history-item ${adjustedIndex === this.selectedIndex ? 'is-selected' : ''}`,
@@ -269,11 +397,46 @@ export class SearchOptionsDropdown extends BaseDropdown {
 
       const contentEl = itemEl.createEl('div', { cls: 'suggestion-content' });
       const titleEl = contentEl.createEl('div', { cls: 'suggestion-title' });
-      titleEl.createSpan({ text: query });
+      if (entry.matchCase) {
+        titleEl.createSpan({
+          cls: 'search-suggest-history-matchcase',
+          text: 'Aa',
+          attr: { title: 'Case sensitive' },
+        });
+        titleEl.createSpan({ text: ' ' });
+      }
+      titleEl.createSpan({
+        cls: 'search-suggest-history-query',
+        text: entry.query,
+        attr: { title: entry.query },
+      });
+
+      // Save icon for history items
+      if (this.savedSearchCallbacks) {
+        const auxEl = itemEl.createEl('div', { cls: 'suggestion-aux' });
+        const saveBtn = auxEl.createEl('div', {
+          cls: 'list-item-part search-suggest-icon clickable-icon',
+          attr: { 'aria-label': 'Save as saved search' },
+        });
+        setIcon(saveBtn, 'lucide-bookmark');
+        saveBtn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
+        saveBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.savedSearchCallbacks?.onSaveFromHistory(entry.query);
+          this.hide();
+        });
+      }
 
       itemEl.addEventListener('mousedown', (e) => {
+        // Don't apply history if clicking on save button
+        const target = e.target as HTMLElement;
+        if (target.closest('.clickable-icon')) return;
         e.preventDefault();
-        this.handleHistorySelection(query);
+        this.handleHistorySelection(entry.query, entry.matchCase);
       });
 
       itemEl.addEventListener('click', (e) => {
@@ -288,16 +451,18 @@ export class SearchOptionsDropdown extends BaseDropdown {
     });
   }
 
-  private handleHistorySelection(query: string): void {
+  private handleHistorySelection(query: string, matchCase = false): void {
     this.inputEl.value = query;
     this.inputEl.selectionStart = this.inputEl.selectionEnd = query.length;
 
     this.hide();
 
-    window.setTimeout(() => {
-      const event = new Event('input', { bubbles: true });
-      this.inputEl.dispatchEvent(event);
-    }, 0);
+    // Dispatch a custom event to restore the match case state
+    window.dispatchEvent(
+      new CustomEvent('todoseq:history-select', {
+        detail: { query, matchCase },
+      }),
+    );
 
     this.inputEl.focus();
   }
@@ -344,7 +509,11 @@ export class SearchOptionsDropdown extends BaseDropdown {
   }
 
   protected getTotalItems(): number {
-    return this.currentSuggestions.length + this.searchHistory.length;
+    return (
+      this.currentSuggestions.length +
+      this.savedSearches.length +
+      this.searchHistory.length
+    );
   }
 
   public handleKeyDown(event: KeyboardEvent): boolean {
@@ -368,13 +537,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
       case 'Enter':
         if (this.selectedIndex >= 0) {
           event.preventDefault();
-          const optionsCount = this.currentSuggestions.length;
-          if (this.selectedIndex < optionsCount) {
-            this.handleSelection(this.currentSuggestions[this.selectedIndex]);
-          } else {
-            const historyIndex = this.selectedIndex - optionsCount;
-            this.handleHistorySelection(this.searchHistory[historyIndex]);
-          }
+          this.commitSelectedIndex();
           return true;
         }
         break;
@@ -387,19 +550,34 @@ export class SearchOptionsDropdown extends BaseDropdown {
       case 'Tab':
         if (this.selectedIndex >= 0) {
           event.preventDefault();
-          const optionsCount = this.currentSuggestions.length;
-          if (this.selectedIndex < optionsCount) {
-            this.handleSelection(this.currentSuggestions[this.selectedIndex]);
-          } else {
-            const historyIndex = this.selectedIndex - optionsCount;
-            this.handleHistorySelection(this.searchHistory[historyIndex]);
-          }
+          this.commitSelectedIndex();
           return true;
         }
         break;
     }
 
     return false;
+  }
+
+  private commitSelectedIndex(): void {
+    const optionsCount = this.currentSuggestions.length;
+    const savedCount = this.savedSearches.length;
+    if (this.selectedIndex < optionsCount) {
+      this.handleSelection(this.currentSuggestions[this.selectedIndex]);
+    } else if (this.selectedIndex < optionsCount + savedCount) {
+      const savedIndex = this.selectedIndex - optionsCount;
+      const search = this.savedSearches[savedIndex];
+      if (search) {
+        this.savedSearchCallbacks?.onApply(search);
+      }
+      this.hide();
+    } else {
+      const historyIndex = this.selectedIndex - optionsCount - savedCount;
+      const entry = this.searchHistory[historyIndex];
+      if (entry) {
+        this.handleHistorySelection(entry.query, entry.matchCase);
+      }
+    }
   }
 
   protected handleSelection(suggestion: string): void {

@@ -120,18 +120,25 @@ describe('SearchOptionsDropdown - History Functionality', () => {
   describe('addToHistory', () => {
     it('should add a search query to history', () => {
       dropdown.addToHistory('test query');
-      expect(dropdown.getHistory()).toEqual(['test query']);
+      expect(dropdown.getHistory()).toEqual([
+        { query: 'test query', matchCase: false },
+      ]);
     });
 
     it('should add most recent query at the top', () => {
       dropdown.addToHistory('first query');
       dropdown.addToHistory('second query');
-      expect(dropdown.getHistory()).toEqual(['second query', 'first query']);
+      expect(dropdown.getHistory()).toEqual([
+        { query: 'second query', matchCase: false },
+        { query: 'first query', matchCase: false },
+      ]);
     });
 
     it('should trim whitespace from queries', () => {
       dropdown.addToHistory('  padded query  ');
-      expect(dropdown.getHistory()).toEqual(['padded query']);
+      expect(dropdown.getHistory()).toEqual([
+        { query: 'padded query', matchCase: false },
+      ]);
     });
 
     it('should not add empty queries', () => {
@@ -145,7 +152,11 @@ describe('SearchOptionsDropdown - History Functionality', () => {
       dropdown.addToHistory('second');
       dropdown.addToHistory('third');
       dropdown.addToHistory('first');
-      expect(dropdown.getHistory()).toEqual(['first', 'third', 'second']);
+      expect(dropdown.getHistory()).toEqual([
+        { query: 'first', matchCase: false },
+        { query: 'third', matchCase: false },
+        { query: 'second', matchCase: false },
+      ]);
     });
 
     it('should enforce maximum history size of 10', () => {
@@ -154,15 +165,24 @@ describe('SearchOptionsDropdown - History Functionality', () => {
       }
       const history = dropdown.getHistory();
       expect(history.length).toBe(10);
-      expect(history[0]).toBe('query 15'); // Most recent
-      expect(history[9]).toBe('query 6'); // Oldest kept
+      expect(history[0]).toEqual({ query: 'query 15', matchCase: false });
+      expect(history[9]).toEqual({ query: 'query 6', matchCase: false });
     });
 
     it('should not duplicate queries', () => {
       dropdown.addToHistory('duplicate');
       dropdown.addToHistory('duplicate');
       dropdown.addToHistory('duplicate');
-      expect(dropdown.getHistory()).toEqual(['duplicate']);
+      expect(dropdown.getHistory()).toEqual([
+        { query: 'duplicate', matchCase: false },
+      ]);
+    });
+
+    it('should store matchCase parameter', () => {
+      dropdown.addToHistory('case query', true);
+      expect(dropdown.getHistory()).toEqual([
+        { query: 'case query', matchCase: true },
+      ]);
     });
   });
 

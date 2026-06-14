@@ -1,3 +1,20 @@
+export interface SavedSearch {
+  id: string; // unique identifier
+  name: string; // user-given label, max 50 chars
+  query: string; // full search query string
+  viewMode?: 'showAll' | 'sortCompletedLast' | 'hideCompleted'; // optional override
+  sortMethod?:
+    | 'default'
+    | 'sortByScheduled'
+    | 'sortByDeadline'
+    | 'sortByClosedDate'
+    | 'sortByPriority'
+    | 'sortByUrgency'
+    | 'sortByKeyword'; // optional override
+  futureTaskSorting?: 'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture'; // optional override
+  matchCase?: boolean; // optional: enable case-sensitive search
+}
+
 export interface StateTransitionSettings {
   // Default states for each category
   defaultInactive: string; // e.g., "TODO"
@@ -36,6 +53,8 @@ export interface TodoTrackerSettings {
   migrateToTodayState: string; // keyword to set on source task after migrating to today
   // Property search engine instance
   propertySearchEngine?: import('../services/property-search-engine').PropertySearchEngine; // Property search engine instance
+  // Saved searches
+  savedSearches: SavedSearch[];
   // Hidden setting - not exposed in UI, used to track first install
   _hasShownFirstInstallView?: boolean; // true after first install view has been shown
   // State transition settings
@@ -61,6 +80,33 @@ export const DefaultStateTransitionSettings: StateTransitionSettings = {
   defaultCompleted: 'DONE',
   transitionStatements: [],
 };
+
+export const DEFAULT_SAVED_SEARCHES: SavedSearch[] = [
+  {
+    id: 'default-today',
+    name: 'Today',
+    query: 'scheduled:today',
+    viewMode: 'hideCompleted',
+    sortMethod: 'sortByScheduled',
+    futureTaskSorting: 'hideFuture',
+  },
+  {
+    id: 'default-overdue',
+    name: 'Overdue',
+    query: 'deadline:overdue',
+    viewMode: 'hideCompleted',
+    sortMethod: 'sortByDeadline',
+    futureTaskSorting: 'hideFuture',
+  },
+  {
+    id: 'default-active',
+    name: 'Active',
+    query: 'state:active',
+    viewMode: 'sortCompletedLast',
+    sortMethod: 'sortByUrgency',
+    futureTaskSorting: 'hideFuture',
+  },
+];
 
 export const DefaultSettings: TodoTrackerSettings = {
   additionalInactiveKeywords: [],
@@ -93,4 +139,6 @@ export const DefaultSettings: TodoTrackerSettings = {
   defaultScheduledWarningPeriod: 0, // No delay by default
   skipScheduledWarningPeriodIfDeadline: false, // Don't skip scheduled delay when deadline exists (Org Mode default: nil)
   skipDeadlinePrewarningIfScheduled: false, // Don't skip deadline warning when scheduled exists (Org Mode default: nil)
+  // Saved searches - default presets
+  savedSearches: DEFAULT_SAVED_SEARCHES,
 };
