@@ -6,6 +6,17 @@ import {
   createTestKeywordManager,
   createBaseTask,
 } from './helpers/test-helper';
+import { isDailyNotesPluginEnabledSync } from '../src/utils/daily-note-utils';
+
+jest.mock('../src/utils/daily-note-utils', () => ({
+  ...jest.requireActual('../src/utils/daily-note-utils'),
+  isDailyNotesPluginEnabledSync: jest.fn().mockReturnValue(false),
+  getTodayDailyNote: jest.fn(),
+  isTaskOnTodayDailyNote: jest.fn(),
+}));
+
+const mockIsDailyNotesPluginEnabledSync =
+  isDailyNotesPluginEnabledSync as jest.Mock;
 
 describe('Editor Controller - Operations (copy, move, migrate, context menu)', () => {
   let editorController: EditorController;
@@ -1003,6 +1014,144 @@ describe('Editor Controller - Operations (copy, move, migrate, context menu)', (
       );
 
       expect(spy).toHaveBeenCalledWith(false, 0, mockEditor, mockView);
+    });
+  });
+
+  describe('handleCopyTaskToTodayAtCursor - checking mode', () => {
+    beforeEach(() => {
+      mockIsDailyNotesPluginEnabledSync.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      mockIsDailyNotesPluginEnabledSync.mockReturnValue(false);
+    });
+
+    it('should return false when vaultScanner is null', () => {
+      mockPlugin.getVaultScanner = () => null;
+
+      const result = editorController.handleCopyTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should return false when line does not match task regex', () => {
+      mockEditor.getLine = () => 'Just some text';
+
+      const result = editorController.handleCopyTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should return true in checking mode when all preconditions pass', () => {
+      const result = editorController.handleCopyTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('handleMoveTaskToTodayAtCursor - checking mode', () => {
+    beforeEach(() => {
+      mockIsDailyNotesPluginEnabledSync.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      mockIsDailyNotesPluginEnabledSync.mockReturnValue(false);
+    });
+
+    it('should return false when vaultScanner is null', () => {
+      mockPlugin.getVaultScanner = () => null;
+
+      const result = editorController.handleMoveTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should return false when line does not match task regex', () => {
+      mockEditor.getLine = () => 'Just some text';
+
+      const result = editorController.handleMoveTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should return true in checking mode when all preconditions pass', () => {
+      const result = editorController.handleMoveTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('handleMigrateTaskToTodayAtCursor - checking mode', () => {
+    beforeEach(() => {
+      mockIsDailyNotesPluginEnabledSync.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      mockIsDailyNotesPluginEnabledSync.mockReturnValue(false);
+    });
+
+    it('should return false when migrateToTodayState is not configured', () => {
+      settings.migrateToTodayState = '';
+
+      const result = editorController.handleMigrateTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should return false when vaultScanner is null', () => {
+      settings.migrateToTodayState = 'DONE';
+      mockPlugin.getVaultScanner = () => null;
+
+      const result = editorController.handleMigrateTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should return false when line does not match task regex', () => {
+      settings.migrateToTodayState = 'DONE';
+      mockEditor.getLine = () => 'Just some text';
+
+      const result = editorController.handleMigrateTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(false);
+    });
+
+    it('should return true in checking mode when all preconditions pass', () => {
+      settings.migrateToTodayState = 'DONE';
+
+      const result = editorController.handleMigrateTaskToTodayAtCursor(
+        true,
+        mockEditor as any,
+        mockView as any,
+      );
+      expect(result).toBe(true);
     });
   });
 });
