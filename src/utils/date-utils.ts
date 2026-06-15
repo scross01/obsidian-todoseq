@@ -778,15 +778,24 @@ export class DateUtils {
    * @param date The date to format
    * @returns Formatted date string
    */
-  static formatClosedDate(date: Date): string {
+  /**
+   * Format the date content portion as YYYY-MM-DD DOW.
+   * Single source of truth for weekday arrays and date-part formatting
+   * used across task-writer, date-repeater, and CLOSED timestamps.
+   */
+  static formatDateContent(date: Date): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const weekday = weekdays[date.getDay()];
+    return `${year}-${month}-${day} ${weekday}`;
+  }
+
+  static formatClosedDate(date: Date): string {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `[${year}-${month}-${day} ${weekday} ${hours}:${minutes}]`;
+    return `[${this.formatDateContent(date)} ${hours}:${minutes}]`;
   }
 }
 

@@ -47,6 +47,26 @@ export class TaskWriter {
     return this.plugin.settings;
   }
 
+  private static buildDateLineContent(
+    date: Date,
+    repeat?: DateRepeatInfo | null,
+    warningPeriod?: number | null,
+    firstOnlyWarningPeriod?: number | null,
+  ): string {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const timeStr =
+      date.getHours() === 0 && date.getMinutes() === 0
+        ? ''
+        : ` ${hours}:${minutes}`;
+    const repeatStr = repeat ? ` ${repeat.raw}` : '';
+    const warningStr = buildWarningPeriodString(
+      warningPeriod,
+      firstOnlyWarningPeriod,
+    );
+    return `<${DateUtils.formatDateContent(date)}${timeStr}${repeatStr}${warningStr}>`;
+  }
+
   // Pure formatter of a task line given a new state and optional priority retention
   static generateTaskLine(
     task: Task,
@@ -501,23 +521,12 @@ export class TaskWriter {
     warningPeriod?: number | null,
     firstOnlyWarningPeriod?: number | null,
   ): Promise<Task & { lineDelta?: number }> {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const year = newDate.getFullYear();
-    const month = String(newDate.getMonth() + 1).padStart(2, '0');
-    const day = String(newDate.getDate()).toString().padStart(2, '0');
-    const dayName = days[newDate.getDay()];
-    const hours = String(newDate.getHours()).padStart(2, '0');
-    const minutes = String(newDate.getMinutes()).padStart(2, '0');
-    const timeStr =
-      newDate.getHours() === 0 && newDate.getMinutes() === 0
-        ? ''
-        : ` ${hours}:${minutes}`;
-    const repeatStr = repeat ? ` ${repeat.raw}` : '';
-    const warningStr = buildWarningPeriodString(
+    const dateStr = TaskWriter.buildDateLineContent(
+      newDate,
+      repeat,
       warningPeriod,
       firstOnlyWarningPeriod,
     );
-    const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}${warningStr}>`;
     let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -605,23 +614,12 @@ export class TaskWriter {
     warningPeriod?: number | null,
     firstOnlyWarningPeriod?: number | null,
   ): Promise<Task & { lineDelta?: number }> {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const year = newDate.getFullYear();
-    const month = String(newDate.getMonth() + 1).padStart(2, '0');
-    const day = String(newDate.getDate()).toString().padStart(2, '0');
-    const dayName = days[newDate.getDay()];
-    const hours = String(newDate.getHours()).padStart(2, '0');
-    const minutes = String(newDate.getMinutes()).padStart(2, '0');
-    const timeStr =
-      newDate.getHours() === 0 && newDate.getMinutes() === 0
-        ? ''
-        : ` ${hours}:${minutes}`;
-    const repeatStr = repeat ? ` ${repeat.raw}` : '';
-    const warningStr = buildWarningPeriodString(
+    const dateStr = TaskWriter.buildDateLineContent(
+      newDate,
+      repeat,
       warningPeriod,
       firstOnlyWarningPeriod,
     );
-    const dateStr = `<${year}-${month}-${day} ${dayName}${timeStr}${repeatStr}${warningStr}>`;
     let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);

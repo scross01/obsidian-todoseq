@@ -111,6 +111,10 @@ export class TaskListView extends ItemView {
   private taskRefreshTimeout: number | null = null;
   private readonly TASK_REFRESH_DEBOUNCE_MS = 150;
 
+  // Settings save debounce timer (class property for cleanup)
+  private settingsDebounceTimer: number | null = null;
+  private readonly SETTINGS_DEBOUNCE_MS = 150;
+
   // Task list filter for filtering and sorting
   private taskListFilter: TaskListFilter;
 
@@ -613,7 +617,7 @@ export class TaskListView extends ItemView {
 
       // Persist settings directly
       this.plugin.settings.taskListViewMode = selectedValue;
-      void this.plugin.saveSettings();
+      this.debouncedSaveSettings();
 
       // Refresh the visible list - preserve scroll position
       this.refreshVisibleList(false).catch((error) => {
@@ -679,7 +683,7 @@ export class TaskListView extends ItemView {
 
         // Update settings and re-render
         this.plugin.settings.futureTaskSorting = selectedValue;
-        void this.plugin.saveSettings();
+        this.debouncedSaveSettings();
 
         // Re-render with new future task sorting - preserve scroll position
         await this.refreshVisibleList(false);
@@ -1050,6 +1054,19 @@ export class TaskListView extends ItemView {
   private captureSearchToHistory(query: string): void {
     if (!this.optionsDropdown) return;
     this.optionsDropdown.addToHistory(query, this.isCaseSensitive);
+  }
+
+  /**
+   * Debounced save for settings changes from dropdown handlers.
+   */
+  private debouncedSaveSettings(): void {
+    if (this.settingsDebounceTimer) {
+      window.clearTimeout(this.settingsDebounceTimer);
+    }
+    this.settingsDebounceTimer = window.setTimeout(() => {
+      this.settingsDebounceTimer = null;
+      void this.plugin.saveSettings();
+    }, this.SETTINGS_DEBOUNCE_MS);
   }
 
   /**
@@ -2664,6 +2681,12 @@ export class TaskListView extends ItemView {
     if (this.taskRefreshTimeout) {
       window.clearTimeout(this.taskRefreshTimeout);
       this.taskRefreshTimeout = null;
+    }
+
+    // Cleanup settings save debounce timer
+    if (this.settingsDebounceTimer) {
+      window.clearTimeout(this.settingsDebounceTimer);
+      this.settingsDebounceTimer = null;
     }
 
     // Cleanup suggestion dropdowns

@@ -403,12 +403,6 @@ export function formatDateLine(
   warningPeriod?: number | null,
   firstOnlyWarningPeriod?: number | null,
 ): string {
-  const year = newDate.getFullYear();
-  const month = String(newDate.getMonth() + 1).padStart(2, '0');
-  const day = String(newDate.getDate()).padStart(2, '0');
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const dayName = days[newDate.getDay()];
-
   // Extract the date content from the angle brackets
   const dateContentMatch = line.match(/<(.[^>]*)>/);
   if (!dateContentMatch) {
@@ -425,8 +419,8 @@ export function formatDateLine(
   const timeMatch = oldDateContent.match(/(\d{2}:\d{2})/);
   const timeStr = timeMatch ? ` ${timeMatch[1]}` : '';
 
-  // Build new date content: always DOW before time
-  let newDateContent = `${year}-${month}-${day} ${dayName}${timeStr}`;
+  // Build new date content: always DOW before time, using shared formatter
+  let newDateContent = `${DateUtils.formatDateContent(newDate)}${timeStr}`;
 
   // Add repeater if present
   if (repeat) {

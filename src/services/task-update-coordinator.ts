@@ -720,13 +720,12 @@ export class TaskUpdateCoordinator {
               updatedTask,
               context.newScheduledDate,
               context.newScheduledRepeat ?? updatedTask.scheduledDateRepeat,
+              // Use ?? to coalesce both null and undefined — callers (e.g. RecurrenceCoordinator)
+              // pass null to mean "keep existing", and undefined when not provided.
               context.newScheduledWarningPeriod ??
                 updatedTask.scheduledWarningPeriod,
-              // For firstOnlyWarningPeriod: null means "strip it", undefined means "use existing"
-              context.newScheduledFirstOnlyWarningPeriod !== null
-                ? (context.newScheduledFirstOnlyWarningPeriod ??
-                    updatedTask.scheduledFirstOnlyWarningPeriod)
-                : undefined,
+              context.newScheduledFirstOnlyWarningPeriod ??
+                updatedTask.scheduledFirstOnlyWarningPeriod,
             );
             updatedTask = result;
             totalLineDelta += result.lineDelta ?? 0;
@@ -743,13 +742,12 @@ export class TaskUpdateCoordinator {
               updatedTask,
               context.newDeadlineDate,
               context.newDeadlineRepeat ?? updatedTask.deadlineDateRepeat,
+              // Use ?? to coalesce both null and undefined — callers (e.g. RecurrenceCoordinator)
+              // pass null to mean "keep existing", and undefined when not provided.
               context.newDeadlineWarningPeriod ??
                 updatedTask.deadlineWarningPeriod,
-              // For firstOnlyWarningPeriod: null means "strip it", undefined means "use existing"
-              context.newDeadlineFirstOnlyWarningPeriod !== null
-                ? (context.newDeadlineFirstOnlyWarningPeriod ??
-                    updatedTask.deadlineFirstOnlyWarningPeriod)
-                : undefined,
+              context.newDeadlineFirstOnlyWarningPeriod ??
+                updatedTask.deadlineFirstOnlyWarningPeriod,
             );
             updatedTask = result;
             totalLineDelta += result.lineDelta ?? 0;
