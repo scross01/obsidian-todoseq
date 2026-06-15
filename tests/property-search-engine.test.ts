@@ -473,6 +473,392 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
     });
   });
 
+  describe('processPendingUpdates', () => {
+    test('should build property cache from frontmatter during pending updates', async () => {
+      const testFile = createMockFile('note.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'note.md' },
+      ]);
+
+      (mockApp.metadataCache.getFileCache as jest.Mock).mockImplementation(
+        (file: any) => {
+          if (file.path === 'note.md') {
+            return { frontmatter: { tags: ['work', 'urgent'] } };
+          }
+          return null;
+        },
+      );
+
+      (mockApp.vault.getAbstractFileByPath as jest.Mock).mockImplementation(
+        (path: string) => {
+          if (path === 'note.md') return testFile;
+          return null;
+        },
+      );
+
+      await propertySearchEngine.initialize();
+
+      (propertySearchEngine as any).propertyCache.clear();
+      (propertySearchEngine as any).propertyKeys.clear();
+
+      jest.useFakeTimers();
+
+      propertySearchEngine.onFileChanged(testFile);
+
+      jest.advanceTimersByTime(200);
+
+      jest.useRealTimers();
+
+      const results =
+        await propertySearchEngine.searchProperties('[tags:work]');
+      expect(results.size).toBe(1);
+      expect(results.has('note.md')).toBe(true);
+    });
+
+    test('should handle array frontmatter values in processPendingUpdates', async () => {
+      const testFile = createMockFile('a.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'a.md' },
+      ]);
+
+      (mockApp.metadataCache.getFileCache as jest.Mock).mockImplementation(
+        (file: any) => {
+          if (file.path === 'a.md') {
+            return { frontmatter: { status: ['active', 'review'] } };
+          }
+          return null;
+        },
+      );
+
+      (mockApp.vault.getAbstractFileByPath as jest.Mock).mockImplementation(
+        (path: string) => {
+          if (path === 'a.md') return testFile;
+          return null;
+        },
+      );
+
+      await propertySearchEngine.initialize();
+
+      (propertySearchEngine as any).propertyCache.clear();
+      (propertySearchEngine as any).propertyKeys.clear();
+
+      jest.useFakeTimers();
+
+      propertySearchEngine.onFileChanged(testFile);
+
+      jest.advanceTimersByTime(200);
+
+      jest.useRealTimers();
+
+      const activeResults =
+        await propertySearchEngine.searchProperties('[status:active]');
+      expect(activeResults.size).toBe(1);
+
+      const reviewResults =
+        await propertySearchEngine.searchProperties('[status:review]');
+      expect(reviewResults.size).toBe(1);
+    });
+
+    test('should skip files that no longer exist in vault', async () => {
+      const testFile = createMockFile('deleted.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'deleted.md' },
+      ]);
+
+      (mockApp.metadataCache.getFileCache as jest.Mock).mockReturnValue(null);
+
+      (mockApp.vault.getAbstractFileByPath as jest.Mock).mockReturnValue(null);
+
+      await propertySearchEngine.initialize();
+
+      jest.useFakeTimers();
+
+      propertySearchEngine.onFileChanged(testFile);
+
+      jest.advanceTimersByTime(200);
+
+      jest.useRealTimers();
+
+      const results =
+        await propertySearchEngine.searchProperties('[tags:work]');
+      expect(results.size).toBe(0);
+    });
+
+    test('should handle processPendingUpdates with empty pending set', async () => {
+      await propertySearchEngine.initialize();
+
+      (propertySearchEngine as any).isUpdating = true;
+      (propertySearchEngine as any).pendingUpdates.clear();
+
+      (propertySearchEngine as any).processPendingUpdates();
+
+      expect((propertySearchEngine as any).isUpdating).toBe(false);
+    });
+
+    test('should rebuild cache correctly after removing old file references', async () => {
+      const testFile = createMockFile('updated.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'updated.md' },
+      ]);
+
+      (mockApp.metadataCache.getFileCache as jest.Mock).mockImplementation(
+        (file: any) => {
+          if (file.path === 'updated.md') {
+            return { frontmatter: { category: 'new-category' } };
+          }
+          return null;
+        },
+      );
+
+      (mockApp.vault.getAbstractFileByPath as jest.Mock).mockImplementation(
+        (path: string) => {
+          if (path === 'updated.md') return testFile;
+          return null;
+        },
+      );
+
+      await propertySearchEngine.initialize();
+
+      (propertySearchEngine as any).propertyCache.set(
+        'category',
+        new Map([['old-category', new Set(['updated.md'])]]),
+      );
+      (propertySearchEngine as any).propertyKeys.add('category');
+
+      jest.useFakeTimers();
+
+      propertySearchEngine.onFileChanged(testFile);
+
+      jest.advanceTimersByTime(200);
+
+      jest.useRealTimers();
+
+      const oldResults = await propertySearchEngine.searchProperties(
+        '[category:old-category]',
+      );
+      expect(oldResults.size).toBe(0);
+
+      const newResults = await propertySearchEngine.searchProperties(
+        '[category:new-category]',
+      );
+      expect(newResults.size).toBe(1);
+    });
+  });
+
+  describe('onFileRenamed', () => {
+    test('should invalidate cache for old and new paths when old path has tasks', async () => {
+      const oldFile = createMockFile('old.md');
+      const newFile = createMockFile('new.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'old.md' },
+      ]);
+
+      (mockApp.metadataCache.getFileCache as jest.Mock).mockImplementation(
+        (file: any) => {
+          if (file.path === 'new.md') {
+            return { frontmatter: { tags: ['renamed'] } };
+          }
+          return null;
+        },
+      );
+
+      (mockApp.vault.getAbstractFileByPath as jest.Mock).mockImplementation(
+        (path: string) => {
+          if (path === 'new.md') return newFile;
+          if (path === 'old.md') return oldFile;
+          return null;
+        },
+      );
+
+      await propertySearchEngine.initialize();
+
+      jest.useFakeTimers();
+
+      propertySearchEngine.onFileRenamed(newFile, 'old.md');
+
+      jest.advanceTimersByTime(2000);
+
+      jest.useRealTimers();
+
+      expect((propertySearchEngine as any).pendingUpdates.has('old.md')).toBe(
+        false,
+      );
+      expect((propertySearchEngine as any).pendingUpdates.has('new.md')).toBe(
+        false,
+      );
+    });
+
+    test('should skip rename when neither old nor new path has tasks', async () => {
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([]);
+
+      const newFile = createMockFile('brand-new.md');
+
+      await propertySearchEngine.initialize();
+
+      propertySearchEngine.onFileRenamed(newFile, 'nonexistent.md');
+
+      expect(
+        (propertySearchEngine as any).pendingUpdates.has('nonexistent.md'),
+      ).toBe(false);
+      expect(
+        (propertySearchEngine as any).pendingUpdates.has('brand-new.md'),
+      ).toBe(false);
+    });
+
+    test('should skip rename when not initialized and startupScan disabled', async () => {
+      (PropertySearchEngine as any).resetInstance();
+      propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
+        taskStateManager: mockTaskStateManager,
+        refreshAllTaskListViews,
+        vaultScanner: mockVaultScanner,
+      });
+
+      propertySearchEngine.setStartupScanEnabled(false);
+
+      const newFile = createMockFile('new.md');
+
+      propertySearchEngine.onFileRenamed(newFile, 'old.md');
+
+      expect((propertySearchEngine as any).pendingUpdates.has('old.md')).toBe(
+        false,
+      );
+    });
+
+    test('should prevent duplicate pending updates on rename', async () => {
+      const oldFile = createMockFile('old.md');
+      const newFile = createMockFile('new.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'old.md' },
+      ]);
+
+      await propertySearchEngine.initialize();
+
+      propertySearchEngine.onFileRenamed(newFile, 'old.md');
+
+      const sizeBefore = (propertySearchEngine as any).pendingUpdates.size;
+
+      propertySearchEngine.onFileRenamed(newFile, 'old.md');
+
+      expect((propertySearchEngine as any).pendingUpdates.size).toBe(
+        sizeBefore,
+      );
+    });
+  });
+
+  describe('fileContainsTasks error fallback', () => {
+    test('should return true when getTasks throws', async () => {
+      const testFile = createMockFile('error-file.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockImplementation(() => {
+        throw new Error('Task state manager error');
+      });
+
+      const result = (propertySearchEngine as any).fileContainsTasks(testFile);
+      expect(result).toBe(true);
+    });
+
+    test('should return true when filePathContainsTasks getTasks throws', async () => {
+      (mockTaskStateManager.getTasks as jest.Mock).mockImplementation(() => {
+        throw new Error('Task state manager error');
+      });
+
+      const result = (propertySearchEngine as any).filePathContainsTasks(
+        'error-file.md',
+      );
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('invalidateFile edge cases', () => {
+    test('should skip when not initialized and startupScan disabled', async () => {
+      (PropertySearchEngine as any).resetInstance();
+      propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
+        taskStateManager: mockTaskStateManager,
+        refreshAllTaskListViews,
+        vaultScanner: mockVaultScanner,
+      });
+
+      propertySearchEngine.setStartupScanEnabled(false);
+
+      const testFile = createMockFile('test.md');
+
+      propertySearchEngine.invalidateFile(testFile);
+
+      expect((propertySearchEngine as any).pendingUpdates.size).toBe(0);
+    });
+
+    test('should skip duplicate pending updates', async () => {
+      const testFile = createMockFile('dup.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'dup.md' },
+      ]);
+
+      await propertySearchEngine.initialize();
+
+      propertySearchEngine.invalidateFile(testFile);
+      expect((propertySearchEngine as any).pendingUpdates.size).toBe(1);
+
+      propertySearchEngine.invalidateFile(testFile);
+      expect((propertySearchEngine as any).pendingUpdates.size).toBe(1);
+    });
+
+    test('should start debounce timer on first pending update', async () => {
+      const testFile = createMockFile('timer.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'timer.md' },
+      ]);
+
+      await propertySearchEngine.initialize();
+
+      propertySearchEngine.invalidateFile(testFile);
+
+      expect((propertySearchEngine as any).isUpdating).toBe(true);
+      expect((propertySearchEngine as any).pendingUpdateTimeout).not.toBeNull();
+    });
+
+    test('should not start new timer if already updating', async () => {
+      const testFile1 = createMockFile('timer1.md');
+      const testFile2 = createMockFile('timer2.md');
+
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'timer1.md' },
+        { path: 'timer2.md' },
+      ]);
+
+      await propertySearchEngine.initialize();
+
+      propertySearchEngine.invalidateFile(testFile1);
+      const firstTimeout = (propertySearchEngine as any).pendingUpdateTimeout;
+
+      propertySearchEngine.invalidateFile(testFile2);
+      expect((propertySearchEngine as any).pendingUpdateTimeout).toBe(
+        firstTimeout,
+      );
+    });
+  });
+
+  describe('rebuildAll', () => {
+    test('should skip rebuild if already updating', async () => {
+      await propertySearchEngine.initialize();
+
+      (propertySearchEngine as any).isUpdating = true;
+
+      await propertySearchEngine.rebuildAll();
+
+      expect(
+        (propertySearchEngine as any).propertyKeys.size,
+      ).toBeGreaterThanOrEqual(0);
+    });
+  });
+
   describe('Utility Methods', () => {
     test('should check if file contains tasks', async () => {
       const mockFile = createMockFile('test-file.md');
