@@ -303,7 +303,6 @@ describe('SearchTokenizer', () => {
     });
 
     it('skips characters that do not match any pattern', () => {
-      // The @ character is consumed by the word pattern [^\s"()]+, so still one token
       const tokens = tokenize('hello@world');
       expect(tokens).toHaveLength(1);
       expect(tokens[0].type).toBe('word');
@@ -314,6 +313,79 @@ describe('SearchTokenizer', () => {
       const tokens = tokenize('foo bar');
       expect(tokens[0].position).toBe(0);
       expect(tokens[1].position).toBe(4);
+    });
+
+    it('tokenizes multiple consecutive phrases', () => {
+      const tokens = tokenize('"hello world" "foo bar"');
+      expect(tokens).toHaveLength(2);
+      expect(tokens[0].type).toBe('phrase');
+      expect(tokens[0].value).toBe('hello world');
+      expect(tokens[1].type).toBe('phrase');
+      expect(tokens[1].value).toBe('foo bar');
+    });
+
+    it('tokenizes phrase with only escaped quotes', () => {
+      const tokens = tokenize('"\\""');
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0].type).toBe('phrase');
+      expect(tokens[0].value).toBe('"');
+    });
+
+    it('tokenizes property with escaped quotes in value', () => {
+      const tokens = tokenize('["key":"value with \\"quotes\\""]');
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0].type).toBe('property');
+      expect(tokens[0].value).toBe('key:value with "quotes"');
+    });
+
+    it('tokenizes multiple properties in sequence', () => {
+      const tokens = tokenize('[type:Draft] [status:Todo]');
+      expect(tokens).toHaveLength(2);
+      expect(tokens[0].type).toBe('property');
+      expect(tokens[0].value).toBe('type:Draft');
+      expect(tokens[1].type).toBe('property');
+      expect(tokens[1].value).toBe('status:Todo');
+    });
+
+    it('tokenizes prefix with path containing slashes', () => {
+      const tokens = tokenize('path:notes/meeting.md');
+      expect(tokens).toHaveLength(2);
+      expect(tokens[0].type).toBe('prefix');
+      expect(tokens[0].value).toBe('path');
+      expect(tokens[1].type).toBe('prefix_value');
+      expect(tokens[1].value).toBe('notes/meeting.md');
+    });
+
+    it('tokenizes AND and OR operators in sequence', () => {
+      const tokens = tokenize('a AND b OR c');
+      expect(tokens).toHaveLength(5);
+      expect(tokens[1].type).toBe('and');
+      expect(tokens[3].type).toBe('or');
+    });
+
+    it('tokenizes multiple NOT operators', () => {
+      const tokens = tokenize('-a -b -c');
+      expect(tokens).toHaveLength(6);
+      expect(tokens[0].type).toBe('not');
+      expect(tokens[2].type).toBe('not');
+      expect(tokens[4].type).toBe('not');
+    });
+
+    it('tokenizes empty phrase', () => {
+      const tokens = tokenize('""');
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0].type).toBe('phrase');
+      expect(tokens[0].value).toBe('');
+    });
+
+    it('tokenizes nested parentheses', () => {
+      const tokens = tokenize('((a))');
+      expect(tokens).toHaveLength(5);
+      expect(tokens[0].type).toBe('lparen');
+      expect(tokens[1].type).toBe('lparen');
+      expect(tokens[2].type).toBe('word');
+      expect(tokens[3].type).toBe('rparen');
+      expect(tokens[4].type).toBe('rparen');
     });
   });
 

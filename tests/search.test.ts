@@ -153,6 +153,78 @@ describe('Search functionality', () => {
       expect(result.map((t) => t.path)).toContain('notes/meeting.md');
       expect(result.map((t) => t.path)).toContain('notes/personal.md');
     });
+
+    it('should handle nested parentheses', () => {
+      const result = Search.parse('((meeting OR personal) AND work)');
+      expect(result.type).toBe('and');
+      expect(result.children).toHaveLength(2);
+    });
+
+    it('should handle NOT with parentheses', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('-(meeting OR personal)', task, false);
+        }),
+      );
+      const result = testTasks.filter((_, index) => results[index]);
+      expect(result.length).toBe(2);
+      expect(result.map((t) => t.path)).toContain('notes/work.md');
+      expect(result.map((t) => t.path)).toContain('notes/star-wars.md');
+    });
+
+    it('should handle multiple consecutive NOTs', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate(
+            'project -urgent -personal',
+            task,
+            false,
+          );
+        }),
+      );
+      const result = testTasks.filter((_, index) => results[index]);
+      expect(result.length).toBe(1);
+      expect(result[0].path).toBe('notes/meeting.md');
+    });
+
+    it('should handle implicit AND with three terms', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate('project planning meeting', task, false);
+        }),
+      );
+      const result = testTasks.filter((_, index) => results[index]);
+      expect(result.length).toBe(1);
+      expect(result[0].path).toBe('notes/meeting.md');
+    });
+
+    it('should handle phrase with OR operator', async () => {
+      const results = await Promise.all(
+        testTasks.map(async (task) => {
+          return await Search.evaluate(
+            '"star wars" OR "project planning"',
+            task,
+            false,
+          );
+        }),
+      );
+      const result = testTasks.filter((_, index) => results[index]);
+      expect(result.length).toBe(2);
+      expect(result.map((t) => t.path)).toContain('notes/star-wars.md');
+      expect(result.map((t) => t.path)).toContain('notes/meeting.md');
+    });
+
+    it('should handle escaped quotes in phrase', async () => {
+      const escapedTask = createBaseTask({
+        path: 'notes/test.md',
+        line: 1,
+        rawText: 'TODO say hello world',
+        listMarker: '-',
+        text: 'say hello world',
+      });
+      const result = await Search.evaluate('"say hello"', escapedTask, false);
+      expect(result).toBe(true);
+    });
   });
 
   describe('Case sensitivity', () => {
@@ -463,6 +535,150 @@ describe('Search functionality', () => {
       );
 
       Search.parse = originalParse;
+    });
+  });
+
+  describe('Parser edge cases', () => {
+    it('should respect binding power for AND before OR', () => {
+      const result = Search.parse('a AND b OR c');
+      expect(result.type).toBe('or');
+      expect(result.children).toHaveLength(2);
+      expect(result.children![0].type).toBe('and');
+      expect(result.children![0].children).toHaveLength(2);
+      expect(result.children![1].type).toBe('term');
+    });
+
+    it('should handle three terms with implicit AND', () => {
+      const result = Search.parse('a b c');
+      expect(result.type).toBe('and');
+      expect(result.children).toHaveLength(3);
+    });
+
+    it('should handle NOT after implicit AND chain', () => {
+      const result = Search.parse('a b -c');
+      expect(result.type).toBe('and');
+      expect(result.children).toHaveLength(3);
+      expect(result.children![2].type).toBe('not');
+    });
+
+    it('should handle prefix in implicit AND chain', () => {
+      const result = Search.parse('a b tag:urgent');
+      expect(result.type).toBe('and');
+      expect(result.children).toHaveLength(3);
+      expect(result.children![2].type).toBe('prefix_filter');
+    });
+
+    it('should handle property in implicit AND chain', () => {
+      const result = Search.parse('a b [type:Draft]');
+      expect(result.type).toBe('and');
+      expect(result.children).toHaveLength(3);
+      expect(result.children![2].type).toBe('property_filter');
+    });
+
+    it('should handle lparen after implicit AND chain', () => {
+      const result = Search.parse('a b (c OR d)');
+      expect(result.type).toBe('and');
+      expect(result.children).toHaveLength(3);
+      expect(result.children![2].type).toBe('or');
+    });
+
+    it('should handle missing closing parenthesis after left term', () => {
+      expect(() => Search.parse('a (b')).toThrow(
+        'Expected closing parenthesis',
+      );
+    });
+
+    it('should handle missing closing parenthesis at start', () => {
+      expect(() => Search.parse('(a')).toThrow('Expected closing parenthesis');
+    });
+
+    it('should handle prefix at end of expression', () => {
+      expect(() => Search.parse('path:')).toThrow(
+        'Expected value after prefix',
+      );
+    });
+
+    it('should handle non-value token after prefix', () => {
+      expect(() => Search.parse('path: OR')).toThrow('Expected prefix value');
+    });
+
+    it('should handle missing date after range operator', () => {
+      expect(() => Search.parse('scheduled:2024-01-01..')).toThrow(
+        'Expected date value after range operator',
+      );
+    });
+
+    it('should handle range with non-date prefix', () => {
+      expect(() => Search.parse('priority:high..low')).toThrow(
+        'Range operator can only be used with scheduled:, deadline:, or closed: prefixes',
+      );
+    });
+
+    it('should handle empty expression', () => {
+      expect(() => Search.parse('')).toThrow('Unexpected end of expression');
+    });
+
+    it('should handle standalone OR keyword', () => {
+      expect(() => Search.parse('OR')).toThrow();
+    });
+
+    it('should handle standalone AND keyword', () => {
+      expect(() => Search.parse('AND')).toThrow();
+    });
+
+    it('should handle prefix with quoted value', () => {
+      const result = Search.parse('tag:"urgent task"');
+      expect(result.type).toBe('prefix_filter');
+      expect(result.field).toBe('tag');
+      expect(result.value).toBe('urgent task');
+      expect(result.exact).toBe(true);
+    });
+
+    it('should handle property with quoted key and value', () => {
+      const result = Search.parse('["status":"in progress"]');
+      expect(result.type).toBe('property_filter');
+      expect(result.value).toBe('status:in progress');
+      expect(result.exact).toBe(true);
+    });
+
+    it('should handle property key only', () => {
+      const result = Search.parse('[type]');
+      expect(result.type).toBe('property_filter');
+      expect(result.value).toBe('type');
+    });
+
+    it('should handle property with empty value', () => {
+      const result = Search.parse('[type:]');
+      expect(result.type).toBe('property_filter');
+      expect(result.value).toBe('type');
+    });
+
+    it('should handle deeply nested parentheses', () => {
+      const result = Search.parse('(((a)))');
+      expect(result.type).toBe('term');
+      expect(result.value).toBe('a');
+    });
+
+    it('should handle NOT with parentheses and AND', () => {
+      const result = Search.parse('a -(b OR c)');
+      expect(result.type).toBe('and');
+      expect(result.children).toHaveLength(2);
+      expect(result.children![0].type).toBe('term');
+      expect(result.children![1].type).toBe('not');
+    });
+
+    it('should handle range filter with deadline', () => {
+      const result = Search.parse('deadline:2024-01-01..2024-12-31');
+      expect(result.type).toBe('range_filter');
+      expect(result.field).toBe('deadline');
+      expect(result.start).toBe('2024-01-01');
+      expect(result.end).toBe('2024-12-31');
+    });
+
+    it('should handle range filter with closed', () => {
+      const result = Search.parse('closed:2024-01-01..2024-12-31');
+      expect(result.type).toBe('range_filter');
+      expect(result.field).toBe('closed');
     });
   });
 });
