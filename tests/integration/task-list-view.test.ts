@@ -1,31 +1,22 @@
 import { test, expect } from '@playwright/test';
-import { launchObsidian, closeObsidian } from './helpers/obsidian-launcher';
-import { setupTestVault, cleanupTestVault } from './helpers/vault-setup';
+import { getPage } from './helpers/session';
+import { resetVaultState } from './helpers/test-reset';
 import {
   openTodoseqPanel,
   getTaskCount,
   waitForTaskListVisible,
-  runCommand,
 } from './helpers/assertions';
-import { ElectronApplication, Page } from 'playwright';
+import { Page } from 'playwright';
 
-let app: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
-  setupTestVault();
-  const launched = await launchObsidian();
-  app = launched.app;
-  page = launched.page;
-});
-
-test.afterAll(async () => {
-  await closeObsidian(app);
-  cleanupTestVault();
+  page = await getPage();
 });
 
 test.describe('Task list view', () => {
   test.beforeEach(async () => {
+    await resetVaultState(page);
     await openTodoseqPanel(page);
     await waitForTaskListVisible(page);
   });
@@ -80,10 +71,18 @@ test.describe('Task list view', () => {
   });
 
   test('task click navigates to file', async () => {
+    // Close any dropdowns that may be intercepting clicks.
+    await page.evaluate(() => {
+      document.querySelectorAll('.todoseq-dropdown.show').forEach((el) => {
+        el.classList.remove('show');
+      });
+    });
+    await page.waitForTimeout(200);
+
     const taskItem = page.locator('.todoseq-task-item', {
       hasText: 'Buy groceries',
     });
-    await taskItem.click();
+    await taskItem.click({ force: true });
     await page.waitForTimeout(1000);
 
     const activeFile = await page
@@ -93,20 +92,23 @@ test.describe('Task list view', () => {
   });
 
   test('sort dropdown changes task order', async () => {
-    const getFirstTaskText = async (): Promise<string> => {
-      const firstItem = page.locator('.todoseq-task-item').first();
-      return (await firstItem.textContent()) ?? '';
+    const getAllTaskTexts = async (): Promise<string[]> => {
+      const items = page.locator('.todoseq-task-item');
+      return items.allTextContents();
     };
 
-    const orderBefore = await getFirstTaskText();
+    const orderBefore = await getAllTaskTexts();
 
     const sortDropdown = page.locator('select[aria-label="Sort tasks by"]');
     await sortDropdown.selectOption('sortByKeyword');
     await page.waitForTimeout(500);
 
-    const orderAfter = await getFirstTaskText();
+    const orderAfter = await getAllTaskTexts();
 
-    expect(orderAfter).toBeDefined();
+    // Keyword sort groups by state (active > inactive > waiting > completed),
+    // so the overall order should differ from the default filepath sort.
+    // Compare full task lists rather than just the first item.
+    expect(orderAfter).not.toEqual(orderBefore);
 
     await sortDropdown.selectOption('default');
     await page.waitForTimeout(500);

@@ -1,60 +1,74 @@
 import { test, expect } from '@playwright/test';
-import { launchObsidian, closeObsidian } from './helpers/obsidian-launcher';
-import { setupTestVault, cleanupTestVault } from './helpers/vault-setup';
-import { ElectronApplication, Page } from 'playwright';
+import { getPage } from './helpers/session';
+import { resetVaultState } from './helpers/test-reset';
+import { closeAllModals } from './helpers/assertions';
+import { Page } from 'playwright';
 
-let app: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
-  setupTestVault();
-  const launched = await launchObsidian();
-  app = launched.app;
-  page = launched.page;
-});
-
-test.afterAll(async () => {
-  await closeObsidian(app);
-  cleanupTestVault();
+  page = await getPage();
 });
 
 async function openEmbeddedDemoFile(page: Page): Promise<void> {
-  await page.keyboard.press('Meta+O');
-  await page.waitForSelector('.quick-switcher-input', { timeout: 5_000 });
-  await page.keyboard.type('embedded-demo');
-  await page.waitForTimeout(500);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(1_000);
+  // Close any lingering modals first.
+  await closeAllModals(page);
+
+  await page.evaluate(async () => {
+    const app = (window as any).app;
+    const file = app.vault.getFiles().find((f: any) => f.basename === 'embedded-demo');
+    if (!file) throw new Error('embedded-demo.md not found');
+    const leaf = app.workspace.getLeaf(false);
+    await leaf.openFile(file);
+  });
+
+  // Toggle to reading mode if currently in editing mode.
+  const editButton = page.locator(
+    '.workspace-leaf.mod-active button[aria-label*="read"]',
+  );
+  if (await editButton.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await editButton.click();
+  }
+
+  // Wait for the embedded task list to be rendered in the view.
+  // The plugin processes code blocks asynchronously after the view renders.
+  // Note: offsetParent may be null in Obsidian's source-view DOM, so we
+  // only check for element existence and that it has child content.
+  await page.waitForFunction(
+    () => {
+      const list = document.querySelector('.todoseq-embedded-task-list');
+      return list && list.children.length > 0;
+    },
+    { timeout: 15_000 },
+  );
 }
 
 test.describe('Embedded task list', () => {
+  test.beforeEach(async () => {
+    await resetVaultState(page);
+  });
+
   test('renders tasks from path in reading mode', async () => {
     await openEmbeddedDemoFile(page);
 
-    const codeBlock = page.locator('.markdown-preview-section [data-type="codeblock"]');
-    await expect(codeBlock).toBeVisible({ timeout: 10_000 });
-
-    const embeddedList = codeBlock.locator('.todoseq-embedded-task-list');
-    await expect(embeddedList).toBeVisible({ timeout: 10_000 });
-
+    const embeddedList = page.locator('.todoseq-embedded-task-list').first();
     const taskItems = embeddedList.locator('.todoseq-embedded-task-item');
     const count = await taskItems.count();
-    expect(count).toBeGreaterThanOrEqual(2);
+    // All tasks from projects/ should appear (2 TODO + 1 DONE from alpha.md).
+    expect(count).toBe(3);
 
     const bodyText = await embeddedList.textContent();
     expect(bodyText).toContain('Implement feature A');
     expect(bodyText).toContain('Fix bug in module B');
+    // Tasks outside projects/ must be absent.
+    expect(bodyText).not.toContain('Buy groceries');
+    expect(bodyText).not.toContain('Daily task 1');
   });
 
   test('embedded checkbox toggles task state', async () => {
     await openEmbeddedDemoFile(page);
 
-    const codeBlock = page.locator('.markdown-preview-section [data-type="codeblock"]');
-    await expect(codeBlock).toBeVisible({ timeout: 10_000 });
-
-    const embeddedList = codeBlock.locator('.todoseq-embedded-task-list');
-    await expect(embeddedList).toBeVisible({ timeout: 10_000 });
-
+    const embeddedList = page.locator('.todoseq-embedded-task-list').first();
     const taskItem = embeddedList.locator('.todoseq-embedded-task-item', {
       hasText: 'Implement feature A',
     });

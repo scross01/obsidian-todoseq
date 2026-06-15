@@ -1,0 +1,60 @@
+{
+  "additionalInactiveKeywords": [],
+  "additionalActiveKeywords": [],
+  "additionalWaitingKeywords": [],
+  "additionalCompletedKeywords": [],
+  "additionalArchivedKeywords": [],
+  "includeCodeBlocks": false,
+  "includeCalloutBlocks": true,
+  "includeCommentBlocks": false,
+  "taskListViewMode": "showAll",
+  "futureTaskSorting": "showAll",
+  "defaultSortMethod": "default",
+  "languageCommentSupport": false,
+  "weekStartsOn": "Monday",
+  "formatTaskKeywords": true,
+  "additionalFileExtensions": [],
+  "detectOrgModeFiles": false,
+  "scanCodeFiles": false,
+  "migrateToTodayState": "",
+  "stateTransitions": {
+    "defaultInactive": "",
+    "defaultActive": "",
+    "defaultCompleted": "",
+    "transitionStatements": []
+  },
+  "trackClosedDate": false,
+  "useExtendedCheckboxStyles": false,
+  "enableSmartDateRecognition": true,
+  "smartDateRemoveKeywords": true,
+  "upcomingPeriod": 7,
+  "defaultDeadlineWarningPeriod": 0,
+  "defaultScheduledWarningPeriod": 0,
+  "skipScheduledWarningPeriodIfDeadline": false,
+  "skipDeadlinePrewarningIfScheduled": false,
+  "savedSearches": [
+    {
+      "id": "default-today",
+      "name": "Today",
+      "query": "scheduled:today",
+      "viewMode": "hideCompleted",
+      "sortMethod": "sortByScheduled"
+    },
+    {
+      "id": "default-overdue",
+      "name": "Overdue",
+      "query": "deadline:overdue",
+      "viewMode": "hideCompleted",
+      "sortMethod": "sortByDeadline"
+    },
+    {
+      "id": "default-active",
+      "name": "Active",
+      "query": "state:active",
+      "viewMode": "sortCompletedLast",
+      "sortMethod": "sortByUrgency"
+    }
+  ],
+  "_hasShownFirstInstallView": true,
+  "settingsVersion": 5
+}

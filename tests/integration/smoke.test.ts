@@ -1,22 +1,21 @@
 import { test, expect } from '@playwright/test';
-import { launchObsidian, closeObsidian } from './helpers/obsidian-launcher';
-import { setupTestVault, cleanupTestVault } from './helpers/vault-setup';
-import { openTodoseqPanel, getTaskCount, waitForTaskListVisible } from './helpers/assertions';
-import { ElectronApplication, Page } from 'playwright';
+import { getPage } from './helpers/session';
+import { resetVaultState } from './helpers/test-reset';
+import {
+  openTodoseqPanel,
+  getTaskCount,
+  waitForTaskListVisible,
+} from './helpers/assertions';
+import { Page } from 'playwright';
 
-let app: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
-  setupTestVault();
-  const launched = await launchObsidian();
-  app = launched.app;
-  page = launched.page;
+  page = await getPage();
 });
 
-test.afterAll(async () => {
-  await closeObsidian(app);
-  cleanupTestVault();
+test.beforeEach(async () => {
+  await resetVaultState(page);
 });
 
 test('plugin loads and shows task list panel', async () => {

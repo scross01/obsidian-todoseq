@@ -3,6 +3,7 @@
   "testEnvironment": "node",
   "roots": ["<rootDir>/tests"],
   "testMatch": ["**/*.test.ts"],
+  "testPathIgnorePatterns": ["/node_modules/", "/tests/integration/"],
   "moduleFileExtensions": ["ts", "js", "json"],
   "collectCoverage": true,
   "coverageDirectory": "coverage",

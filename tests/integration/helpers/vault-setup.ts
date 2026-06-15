@@ -1,14 +1,33 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const TEST_VAULT_PATH = path.join(__dirname, '../fixtures/test-vault');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-export function setupTestVault(): void {
-  fs.mkdirSync(path.join(TEST_VAULT_PATH, '.obsidian'), { recursive: true });
-  fs.mkdirSync(path.join(TEST_VAULT_PATH, 'projects'), { recursive: true });
+// helpers/ -> fixtures/  (computed independently to avoid a circular import
+// with harness.ts, which imports writeVaultMarkdown from this module).
+const FIXTURES_DIR = path.resolve(__dirname, '..', 'fixtures');
+
+export const TEST_VAULT_DIR = path.join(FIXTURES_DIR, 'test-vault');
+
+function todayDateStr(): string {
+  const today = new Date();
+  // Local-time methods per AGENTS.md timezone-independence rule.
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Write the markdown fixture files into the test vault.
+ * Does NOT touch `.obsidian/` — that is managed by the harness so that plugin
+ * config stays isolated from these content resets.
+ */
+export function writeVaultMarkdown(): void {
+  fs.mkdirSync(path.join(TEST_VAULT_DIR, 'projects'), { recursive: true });
+  fs.mkdirSync(path.join(TEST_VAULT_DIR, 'daily'), { recursive: true });
 
   fs.writeFileSync(
-    path.join(TEST_VAULT_PATH, 'inbox.md'),
+    path.join(TEST_VAULT_DIR, 'inbox.md'),
     `# Inbox
 
 - [ ] TODO Buy groceries
@@ -19,7 +38,7 @@ export function setupTestVault(): void {
   );
 
   fs.writeFileSync(
-    path.join(TEST_VAULT_PATH, 'projects', 'alpha.md'),
+    path.join(TEST_VAULT_DIR, 'projects', 'alpha.md'),
     `# Project Alpha
 
 - [ ] TODO Implement feature A
@@ -29,7 +48,7 @@ export function setupTestVault(): void {
   );
 
   fs.writeFileSync(
-    path.join(TEST_VAULT_PATH, 'embedded-demo.md'),
+    path.join(TEST_VAULT_DIR, 'embedded-demo.md'),
     `# Embedded Task List Demo
 
 \`\`\`todoseq
@@ -40,11 +59,9 @@ Some text after the code block.
 `,
   );
 
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  fs.mkdirSync(path.join(TEST_VAULT_PATH, 'daily'), { recursive: true });
+  const dateStr = todayDateStr();
   fs.writeFileSync(
-    path.join(TEST_VAULT_PATH, 'daily', `${dateStr}.md`),
+    path.join(TEST_VAULT_DIR, 'daily', `${dateStr}.md`),
     `# ${dateStr}
 
 - [ ] TODO Daily task 1
@@ -52,10 +69,3 @@ Some text after the code block.
   );
 }
 
-export function cleanupTestVault(): void {
-  fs.rmSync(TEST_VAULT_PATH, { recursive: true, force: true });
-}
-
-export function getTestVaultPath(): string {
-  return TEST_VAULT_PATH;
-}

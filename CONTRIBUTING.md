@@ -8,23 +8,34 @@
 
 - `npm run dev` — Run esbuild bundler in watch mode for development
 - `npm run build` — Type-check and build for production
-- `npm run test` — Run unit tests
+- `npm run test` — Run unit tests (Jest)
+- `npm run test:integration` — Run integration tests (Playwright + real Obsidian instance)
+- `npm run test:integration:fast` — Run integration tests without rebuild
 - `npm run lint` — Run ESLint to check code style
 - `npm run format` — Format code using Prettier
 - `npm run docs:dev` — Run dynamic docs site for development
 - `npm run docs:build` — Run VitePress to build production docs
 - `npm run docs:preview` — Preview static production docs
 
-**Git Hooks**:
+## Integration Tests
 
-This project includes a pre-commit hook that automatically runs the following checks:
+Integration tests launch a real isolated Obsidian instance via Electron, connect over CDP (Chrome DevTools Protocol), and run Playwright tests against the actual plugin.
 
-- `npm run build` — Ensures the project builds successfully
-- `npm run lint` — Checks for code style issues
-- `npm run test` — Runs all unit tests
-- `npm run format` — Verifies code formatting is correct
+```bash
+npm run test:integration       # build + run all tests
+npm run test:integration:fast  # run without rebuild
+npx playwright test --config=tests/integration/playwright.config.ts -g "test name"  # single test
+```
 
-The hook only runs when relevant files (TypeScript, JavaScript, JSON) are staged for commit.
+Key details:
+
+- Obsidian is launched with `--user-data-dir` pointing at an ephemeral fixtures directory for full isolation.
+- A single Obsidian instance is shared across all test files via CDP on port 9333.
+- The `obsidian-restart` project tests settings persistence across a real process restart.
+- **No keyboard shortcuts** — all Obsidian commands are invoked via `page.evaluate(() => app.commands.executeCommandById(...))` to avoid triggering unintended actions.
+- DOM selectors are version-specific (e.g. Obsidian 1.12+ uses `.vertical-tab-nav-item`, not `.vertical-tab-list-item`).
+
+See `AGENTS.md` for the full list of critical gotchas and live debugging via CDP.
 
 ## GitHub Actions Workflow for VitePress
 

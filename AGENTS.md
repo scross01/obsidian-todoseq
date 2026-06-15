@@ -61,3 +61,61 @@ This file provides guidance to agents when working with code in this repository.
 ## Code Style
 
 - **Obsidian Plugins Code**: Follow Obsidian Plugins Code Review guidelines.
+
+## Integration Tests
+
+Playwright-based E2E tests that launch a real isolated Obsidian instance via Electron, connect over CDP, and run against the actual plugin.
+
+### Commands
+
+- **Run all**: `npm run test:integration` (builds plugin first)
+- **Skip build**: `npm run test:integration:fast`
+- **Single test**: `npx playwright test --config=tests/integration/playwright.config.ts -g "test name"`
+
+### Architecture
+
+- **Isolation**: `--user-data-dir` points at an ephemeral `fixtures/obsidian-user-data/` directory. Vault registry (`obsidian.json`) points ONLY at the test vault.
+- **Trust bypass**: `vaultTrust` is set in `obsidian.json` registry, but Obsidian 1.12+ still shows the trust dialog. The launcher (`obsidian-launcher.ts`) clicks the "Trust author and enable plugins" button.
+- **Plugin loading**: Plugin is pre-enabled via `community-plugins.json` in the test vault. After trust is accepted, the plugin loads automatically.
+- **Shared instance**: `globalSetup` launches one Obsidian instance; all test files reconnect via CDP (`session.ts`). `obsidian-restart` project manages its own lifecycle.
+- **Between-test reset**: `test-reset.ts` closes lingering modals, restores baseline `data.json`, and triggers a vault rescan.
+
+### Critical Gotchas
+
+- **NO keyboard shortcuts**: Never use `page.keyboard.press('Meta+...')` or `page.keyboard.type()`. All Obsidian commands must be invoked via `page.evaluate(() => app.commands.executeCommandById(...))`. Keyboard events go to the focused element and can trigger unintended Obsidian actions (e.g. theme toggle via `theme:toggle-light-dark`).
+- **DOM selectors are version-specific**: Obsidian 1.12+ uses `.vertical-tab-nav-item` (NOT `.vertical-tab-list-item`) for settings sidebar tabs, with a `.vertical-tab-nav-item-title` child for the label text.
+- **Editor live preview**: Task items in the editor render as native `<input type="checkbox">` inside `<div>` containers — NOT with `.task-list-item` class. Use `div:has-text('task text')` + `input[type="checkbox"]` to find them.
+- **Reading mode toggle**: `leaf.openFile(file, { mode: 'preview' })` doesn't reliably open in reading mode. Use the view mode toggle button (`button[aria-label*="read"]`) or `editor:toggle-preview` command.
+- **Editor content reads stale data**: `app.vault.read(file)` may return pre-edit content. Use `app.workspace.activeLeaf.view.editor.getValue()` to read the live editor buffer.
+- **Theme locking**: Write `appearance.json` with `{"theme": "obsidian"}` in the test vault's `.obsidian/` to prevent light/dark toggling during tests.
+- **Window resize**: Use `page.evaluate(() => require('electron').remote.getCurrentWindow().setSize(1400, 900))` to resize the actual Electron window. `page.setViewportSize()` only changes the web content area.
+- **Strict mode violations**: Multiple `.markdown-source-view` or `.markdown-preview-section` elements may exist from previous file opens. Scope to `.workspace-leaf.mod-active` or use `.first()`.
+- **Modal interception**: Lingering modals and dropdowns (e.g. `.todoseq-dropdown.show`) can intercept pointer events. Close them in `resetVaultState` or before clicking.
+
+### Live Debugging via CDP
+
+Connect Playwright to a running test Obsidian instance:
+
+```typescript
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9333');
+const page = browser.contexts()[0].pages()[0];
+
+// Inspect DOM
+const info = await page.evaluate(() => {
+  const modal = document.querySelector('.modal');
+  const tabs = modal?.querySelectorAll('.vertical-tab-nav-item');
+  return Array.from(tabs ?? []).map(t => t.textContent?.trim());
+});
+
+// Run Obsidian commands
+await page.evaluate(() => {
+  app.commands.executeCommandById('app:open-settings');
+});
+
+// Check plugin state
+await page.evaluate(() => {
+  return Object.keys(app.plugins.plugins);
+});
+```
+
+Or use the inspection script pattern: bootstrap fixtures, launch Obsidian via the test harness, connect via CDP, then `closeObsidian(browser)` when done. See `obsidian-launcher.ts` for the full setup sequence.
