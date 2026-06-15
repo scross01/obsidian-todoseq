@@ -1,6 +1,7 @@
 import {
   SmartDateProcessor,
   InlineDateInfo,
+  hasInlineStructuredDates,
 } from '../src/services/smart-date-processor';
 import TodoTracker from '../src/main';
 import {
@@ -838,5 +839,186 @@ describe('SmartDateProcessor', () => {
       );
       expect(result).toHaveLength(0);
     });
+  });
+});
+
+describe('hasInlineStructuredDates edge cases', () => {
+  it('should return true for SCHEDULED with angle bracket', () => {
+    expect(
+      hasInlineStructuredDates('- [ ] TODO Task SCHEDULED: <2026-06-15>'),
+    ).toBe(true);
+  });
+
+  it('should return true for DEADLINE with angle bracket', () => {
+    expect(
+      hasInlineStructuredDates('- [ ] TODO Task DEADLINE: <2026-06-15>'),
+    ).toBe(true);
+  });
+
+  it('should return false for SCHEDULED without angle bracket', () => {
+    expect(
+      hasInlineStructuredDates('- [ ] TODO Task SCHEDULED: 2026-06-15'),
+    ).toBe(false);
+  });
+
+  it('should return false for empty string', () => {
+    expect(hasInlineStructuredDates('')).toBe(false);
+  });
+
+  it('should return false for plain text', () => {
+    expect(hasInlineStructuredDates('Just a regular line')).toBe(false);
+  });
+});
+
+describe('SmartDateProcessor enable/disable', () => {
+  let mockPlugin: jest.Mocked<TodoTracker>;
+  let processor: SmartDateProcessor;
+
+  function createMockEditorView(
+    cursorHead: number = 0,
+  ): Record<string, unknown> {
+    return {
+      state: {
+        selection: { main: { head: cursorHead } },
+        doc: {
+          lines: 1,
+          lineAt: jest.fn().mockReturnValue({
+            number: 1,
+            text: 'TODO Buy milk tomorrow',
+            from: 0,
+            to: 23,
+          }),
+          line: jest.fn().mockReturnValue({
+            number: 1,
+            text: 'TODO Buy milk tomorrow',
+            from: 0,
+            to: 23,
+          }),
+        },
+      },
+      dispatch: jest.fn(),
+    };
+  }
+
+  function createMockViewUpdate(docChanged: boolean): { docChanged: boolean } {
+    return { docChanged };
+  }
+
+  beforeEach(() => {
+    mockPlugin = createMockPlugin();
+    processor = new SmartDateProcessor(mockPlugin);
+    const mockRaf = jest.fn((cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
+    // @ts-ignore
+    globalThis.requestAnimationFrame = mockRaf;
+    window.requestAnimationFrame = mockRaf;
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).requestAnimationFrame;
+    delete (window as any).requestAnimationFrame;
+  });
+
+  it('should not process when disabled', () => {
+    processor.setEnabled(false);
+    const view = createMockEditorView();
+    const update = createMockViewUpdate(true);
+
+    processor.handleEditorUpdate(view as any, update as any);
+
+    expect((view as any).dispatch).not.toHaveBeenCalled();
+  });
+
+  it('should clear all timers when disabled', () => {
+    processor.setEnabled(true);
+    const view = createMockEditorView();
+    const update = createMockViewUpdate(true);
+
+    mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
+      file: { path: 'test.md' },
+      editor: { cm: view },
+    } as any);
+
+    processor.handleEditorUpdate(view as any, update as any);
+
+    expect(processor['debounceTimers'].size).toBeGreaterThan(0);
+
+    processor.setEnabled(false);
+
+    jest.advanceTimersByTime(3000);
+    expect((view as any).dispatch).not.toHaveBeenCalled();
+    expect(processor['debounceTimers'].size).toBe(0);
+  });
+
+  it('should handle non-doc-changed updates gracefully', () => {
+    processor.setEnabled(true);
+    const view = createMockEditorView();
+    const update = createMockViewUpdate(false);
+
+    processor.handleEditorUpdate(view as any, update as any);
+
+    expect((view as any).dispatch).not.toHaveBeenCalled();
+  });
+
+  it('should handle cursor leave without active view', () => {
+    processor.setEnabled(true);
+    mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue(null);
+
+    const view = createMockEditorView(5);
+    view.state.doc.line = jest.fn().mockReturnValue({
+      number: 1,
+      text: 'TODO Buy milk tomorrow',
+      from: 0,
+      to: 23,
+    });
+    (view.state.doc as any).lines = 10;
+
+    processor.handleCursorLeave(view as any, 1);
+
+    expect((view as any).dispatch).not.toHaveBeenCalled();
+  });
+
+  it('should handle cursor leave when file is null', () => {
+    processor.setEnabled(true);
+    mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
+      file: null,
+    } as any);
+
+    const view = createMockEditorView(5);
+    (view.state.doc as any).lines = 10;
+
+    processor.handleCursorLeave(view as any, 1);
+
+    expect((view as any).dispatch).not.toHaveBeenCalled();
+  });
+
+  it('should handle cursor leave with out-of-range line number', () => {
+    processor.setEnabled(true);
+    mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
+      file: { path: 'test.md' },
+    } as any);
+
+    const view = createMockEditorView(5);
+    (view.state.doc as any).lines = 5;
+
+    processor.handleCursorLeave(view as any, 0);
+
+    expect((view as any).dispatch).not.toHaveBeenCalled();
+  });
+
+  it('should handle cursor leave when line exceeds doc lines', () => {
+    processor.setEnabled(true);
+    mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
+      file: { path: 'test.md' },
+    } as any);
+
+    const view = createMockEditorView(5);
+    (view.state.doc as any).lines = 3;
+
+    processor.handleCursorLeave(view as any, 10);
+
+    expect((view as any).dispatch).not.toHaveBeenCalled();
   });
 });
