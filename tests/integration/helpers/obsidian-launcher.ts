@@ -7,7 +7,7 @@ import {
   CDP_PORT,
   OBSIDIAN_PATH,
 } from './harness';
-import { connectOverCDP } from './session';
+import { connectOverCDP, startCoverageOnPage } from './session';
 import { closeAllModals } from './assertions';
 
 let obsidianProcess: ChildProcess | null = null;
@@ -171,6 +171,9 @@ export async function launchObsidian(): Promise<{
   // Wait for the plugin to finish loading (pre-enabled in community-plugins.json,
   // loaded after trust is accepted).
   await waitForPlugin(page, 'todoseq');
+
+  // Start V8 coverage collection so globalTeardown can take the snapshot.
+  await startCoverageOnPage(page);
 
   return { browser, page };
 }

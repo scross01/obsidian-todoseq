@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { getPage, releaseSession } from './helpers/session';
+import { getPage, releaseSession, saveCoverage } from './helpers/session';
 import { launchObsidian, closeObsidian } from './helpers/obsidian-launcher';
 import { openSettings, navigateToPluginTab } from './helpers/assertions';
 import { Page } from 'playwright';
@@ -24,6 +24,8 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  // Save coverage from the relaunched instance before disconnecting.
+  await saveCoverage();
   await releaseSession();
 });
 
@@ -39,17 +41,20 @@ test('settings persist across Obsidian restart', async () => {
   await waitingKeywordInput.fill('BLOCKED');
   await page.waitForTimeout(700);
 
-  // 2. Disconnect Playwright, then close Obsidian (kills the isolated process
+  // 2. Save coverage from the first Obsidian instance before closing it.
+  await saveCoverage();
+
+  // 3. Disconnect Playwright, then close Obsidian (kills the isolated process
   //    only, via the CDP-port-scoped kill).
   await releaseSession();
   await closeObsidian();
 
-  // 3. Relaunch a fresh isolated instance — same --user-data-dir, so the
+  // 4. Relaunch a fresh isolated instance — same --user-data-dir, so the
   //    persisted data.json is read back in.
   const relaunched = await launchObsidian();
   page = relaunched.page;
 
-  // 4. Verify the value survived.
+  // 5. Verify the value survived.
   await openSettings(page);
   await navigateToPluginTab(page, 'TODOseq');
 

@@ -6,6 +6,9 @@
   "author": "Stephen Cross",
   "main": "main.js",
   "type": "module",
+  "engines": {
+    "node": ">=20.14.0"
+  },
   "devDependencies": {
     "@codemirror/state": "6.5.0",
     "@codemirror/view": "6.38.6",
@@ -21,9 +24,14 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-obsidianmd": "^0.3.0",
     "eslint-plugin-prettier": "^5.5.4",
+    "istanbul-lib-coverage": "^3.2.2",
+    "istanbul-lib-report": "^3.0.1",
+    "istanbul-lib-source-maps": "^5.0.6",
+    "istanbul-reports": "^3.2.0",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",
     "jest-environment-node": "^30.2.0",
+    "nyc": "^18.0.0",
     "obsidian": ">=0.12.12",
     "playwright": "^1.60.0",
     "prettier": "^3.7.4",
@@ -31,6 +39,7 @@
     "ts-node": "^10.9.2",
     "tslib": "2.4.0",
     "typescript": "^5.9.3",
+    "v8-to-istanbul": "^9.3.0",
     "vitepress": "^1.6.4"
   },
   "scripts": {
@@ -48,7 +57,11 @@
     "docs:preview": "vitepress preview docs",
     "generate-content": "ts-node scripts/content-generator.ts",
     "test:integration": "npm run build && NODE_OPTIONS='--disable-warning=DEP0205' npx playwright test --config=tests/integration/playwright.config.ts",
-    "test:integration:fast": "NODE_OPTIONS='--disable-warning=DEP0205' npx playwright test --config=tests/integration/playwright.config.ts"
+    "test:integration:fast": "NODE_OPTIONS='--disable-warning=DEP0205' npx playwright test --config=tests/integration/playwright.config.ts",
+    "test:integration:coverage": "NODE_OPTIONS='--disable-warning=DEP0205' COLLECT_COVERAGE=1 npx playwright test --config=tests/integration/playwright.config.ts --project=obsidian",
+    "test:coverage": "npm test && npm run build:debug && npm run test:integration:coverage && node scripts/convert-v8-to-istanbul.mjs && node scripts/merge-coverage.mjs && node scripts/coverage-gap.mjs",
+    "coverage:merge": "node scripts/merge-coverage.mjs",
+    "coverage:gap": "node scripts/coverage-gap.mjs"
   },
   "dependencies": {
     "chrono-node": "^2.9.1",
