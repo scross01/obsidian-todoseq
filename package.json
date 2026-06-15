@@ -7,6 +7,7 @@
   "main": "main.js",
   "type": "module",
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@codemirror/state": "6.5.0",
     "@codemirror/view": "6.38.6",
     "@eslint/js": "^10.0.1",
@@ -43,7 +44,8 @@
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
-    "generate-content": "ts-node scripts/content-generator.ts"
+    "generate-content": "ts-node scripts/content-generator.ts",
+    "test:integration": "npx playwright test --config=tests/integration/playwright.config.ts"
   },
   "dependencies": {
     "chrono-node": "^2.9.1",
