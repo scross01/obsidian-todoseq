@@ -1,5 +1,6 @@
 import { Browser, Page } from 'playwright';
 import { spawn, execSync, ChildProcess } from 'child_process';
+import http from 'http';
 import {
   USER_DATA_DIR,
   TEST_VAULT_DIR,
@@ -15,12 +16,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function httpGet(url: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, (res) => {
+      resolve(res.statusCode ?? 0);
+      res.resume();
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 async function waitForCDP(timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`);
-      if (res.ok) return;
+      const status = await httpGet(`http://127.0.0.1:${CDP_PORT}/json/version`);
+      if (status === 200) return;
     } catch {
       // not ready yet
     }
@@ -31,8 +43,8 @@ async function waitForCDP(timeoutMs = 60_000): Promise<void> {
 
 async function isCDPUp(): Promise<boolean> {
   try {
-    const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`);
-    return res.ok;
+    const status = await httpGet(`http://127.0.0.1:${CDP_PORT}/json/version`);
+    return status === 200;
   } catch {
     return false;
   }
