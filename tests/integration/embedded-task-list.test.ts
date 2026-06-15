@@ -16,7 +16,9 @@ async function openEmbeddedDemoFile(page: Page): Promise<void> {
 
   await page.evaluate(async () => {
     const app = (window as any).app;
-    const file = app.vault.getFiles().find((f: any) => f.basename === 'embedded-demo');
+    const file = app.vault
+      .getFiles()
+      .find((f: any) => f.basename === 'embedded-demo');
     if (!file) throw new Error('embedded-demo.md not found');
     const leaf = app.workspace.getLeaf(false);
     await leaf.openFile(file);

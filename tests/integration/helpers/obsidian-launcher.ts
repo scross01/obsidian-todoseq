@@ -169,18 +169,25 @@ export async function launchObsidian(): Promise<{
  * loading, so it must be handled before waitForPlugin. No-op if already trusted.
  */
 async function acceptVaultTrust(page: Page): Promise<void> {
-  const trustBtn = page.locator('.modal-button-container button, .modal button', {
-    hasText: 'Trust author and enable plugins',
-  });
+  const trustBtn = page.locator(
+    '.modal-button-container button, .modal button',
+    {
+      hasText: 'Trust author and enable plugins',
+    },
+  );
   // Wait briefly for the trust modal to appear (it gates plugin loading).
   // isVisible() resolves immediately, so we need waitForSelector to handle
   // the case where Obsidian is still rendering the modal.
-  const visible = await trustBtn.first()
+  const visible = await trustBtn
+    .first()
     .waitFor({ state: 'visible', timeout: 5_000 })
     .then(() => true)
     .catch(() => false);
   if (visible) {
-    await trustBtn.first().click().catch(() => {});
+    await trustBtn
+      .first()
+      .click()
+      .catch(() => {});
     // Give Obsidian a moment to exit Restricted Mode and begin loading plugins.
     await sleep(500);
   }
@@ -191,7 +198,11 @@ async function dismissInitialModal(page: Page): Promise<void> {
   await closeAllModals(page);
 }
 
-async function waitForPlugin(page: Page, id: string, timeoutMs = 30_000): Promise<void> {
+async function waitForPlugin(
+  page: Page,
+  id: string,
+  timeoutMs = 30_000,
+): Promise<void> {
   await page.waitForFunction(
     (pluginId) => !!(window as any).app?.plugins?.plugins?.[pluginId],
     id,

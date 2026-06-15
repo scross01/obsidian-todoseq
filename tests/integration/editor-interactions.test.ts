@@ -79,7 +79,9 @@ test.describe('Editor interactions', () => {
     await page.waitForTimeout(500);
 
     const content = await readEditorContent();
-    const taskLine = content.split('\n').find((l) => l.includes('Buy groceries'));
+    const taskLine = content
+      .split('\n')
+      .find((l) => l.includes('Buy groceries'));
     expect(taskLine).toBeDefined();
     expect(taskLine).toMatch(/\[x\]/);
   });
@@ -120,7 +122,9 @@ test.describe('Editor interactions', () => {
     await openFileInEditor('inbox');
 
     // Click directly on the task text to place the cursor on that line.
-    const taskText = page.locator('.workspace-leaf.mod-active .cm-editor').getByText('Buy groceries');
+    const taskText = page
+      .locator('.workspace-leaf.mod-active .cm-editor')
+      .getByText('Buy groceries');
     await taskText.click();
 
     await runCommandById(page, 'todoseq:cycle-task-state');
@@ -128,7 +132,9 @@ test.describe('Editor interactions', () => {
     await page.waitForTimeout(500);
 
     const content = await readEditorContent();
-    const taskLine = content.split('\n').find((l) => l.includes('Buy groceries'));
+    const taskLine = content
+      .split('\n')
+      .find((l) => l.includes('Buy groceries'));
     expect(taskLine).toBeDefined();
     expect(taskLine).not.toMatch(/TODO/);
   });

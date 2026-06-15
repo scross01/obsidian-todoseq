@@ -104,7 +104,7 @@ const page = browser.contexts()[0].pages()[0];
 const info = await page.evaluate(() => {
   const modal = document.querySelector('.modal');
   const tabs = modal?.querySelectorAll('.vertical-tab-nav-item');
-  return Array.from(tabs ?? []).map(t => t.textContent?.trim());
+  return Array.from(tabs ?? []).map((t) => t.textContent?.trim());
 });
 
 // Run Obsidian commands

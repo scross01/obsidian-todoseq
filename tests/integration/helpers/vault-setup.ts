@@ -68,4 +68,3 @@ Some text after the code block.
 `,
   );
 }
-

@@ -11,10 +11,14 @@ export async function getTaskCount(page: Page): Promise<number> {
 /**
  * Run an Obsidian command by ID via the app API.
  */
-export async function runCommandById(page: Page, commandId: string): Promise<void> {
+export async function runCommandById(
+  page: Page,
+  commandId: string,
+): Promise<void> {
   const result = await page.evaluate(async (id) => {
     const app = (window as any).app;
-    if (!app?.commands?.executeCommandById) return { ok: false, error: 'app.commands not available' };
+    if (!app?.commands?.executeCommandById)
+      return { ok: false, error: 'app.commands not available' };
     try {
       app.commands.executeCommandById(id);
       return { ok: true };
@@ -23,7 +27,9 @@ export async function runCommandById(page: Page, commandId: string): Promise<voi
     }
   }, commandId);
   if (!result.ok) {
-    throw new Error(`Failed to execute command "${commandId}": ${result.error}`);
+    throw new Error(
+      `Failed to execute command "${commandId}": ${result.error}`,
+    );
   }
 }
 
@@ -53,7 +59,10 @@ export async function openSettings(page: Page): Promise<void> {
  * Community plugin tabs appear in the sidebar after core plugin tabs.
  * Uses the actual Obsidian DOM class: .vertical-tab-nav-item with .vertical-tab-nav-item-title child.
  */
-export async function navigateToPluginTab(page: Page, pluginName: string): Promise<void> {
+export async function navigateToPluginTab(
+  page: Page,
+  pluginName: string,
+): Promise<void> {
   const clicked = await page.evaluate((name) => {
     const items = document.querySelectorAll('.vertical-tab-nav-item');
     for (const item of items) {

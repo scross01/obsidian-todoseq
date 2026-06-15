@@ -23,7 +23,10 @@ const PLUGIN_BUILD_DIR = REPO_ROOT;
 const PLUGIN_ID = 'todoseq';
 
 /** Baseline plugin settings committed to the repo for deterministic test starts. */
-const BASELINE_SETTINGS_PATH = path.join(FIXTURES_DIR, 'baseline-plugin-data.json');
+const BASELINE_SETTINGS_PATH = path.join(
+  FIXTURES_DIR,
+  'baseline-plugin-data.json',
+);
 
 export function rmrf(target: string): void {
   fs.rmSync(target, { recursive: true, force: true });
@@ -100,7 +103,9 @@ function installPlugin(): void {
 
   // Seed deterministic baseline settings.
   if (!fs.existsSync(BASELINE_SETTINGS_PATH)) {
-    throw new Error(`Baseline settings fixture missing: ${BASELINE_SETTINGS_PATH}`);
+    throw new Error(
+      `Baseline settings fixture missing: ${BASELINE_SETTINGS_PATH}`,
+    );
   }
   copyFile(BASELINE_SETTINGS_PATH, path.join(pluginDir, 'data.json'));
 }
