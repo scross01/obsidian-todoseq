@@ -2033,8 +2033,8 @@
 }
 
 /* Generic hidden helper (avoids inline style.display assignments) */
-.todoseq-hidden {
-  display: none !important;
+.todoseq-panel .todoseq-hidden {
+  display: none;
 }
 
 /* ============================================================================
