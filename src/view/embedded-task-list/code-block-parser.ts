@@ -335,9 +335,9 @@ export class TodoseqCodeBlockParser {
             .substring('upcoming-period:'.length)
             .trim();
           const parsedPeriod = parseInt(periodValue, 10);
-          if (isNaN(parsedPeriod) || parsedPeriod < 1) {
+          if (isNaN(parsedPeriod) || parsedPeriod < 0) {
             throw new Error(
-              `Invalid upcoming-period value: ${periodValue}. Must be a positive number.`,
+              `Invalid upcoming-period value: ${periodValue}. Must be a non-negative number.`,
             );
           }
           upcomingPeriod = parsedPeriod;

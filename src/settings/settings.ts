@@ -1142,14 +1142,14 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               .setValue(String(this.plugin.settings.upcomingPeriod))
               .onChange(async (value) => {
                 const num = parseInt(value, 10);
-                if (!isNaN(num) && num >= 1 && num <= 30) {
+                if (!isNaN(num) && num >= 0 && num <= 30) {
                   this.plugin.settings.upcomingPeriod = num;
                   await this.plugin.saveSettings();
                   await this.refreshAllTaskListViews();
                 }
               });
             text.inputEl.type = 'number';
-            text.inputEl.min = '1';
+            text.inputEl.min = '0';
             text.inputEl.max = '30';
           });
       })

@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.16.1
+
+- Fixed issue with when upcoming periods being ignored when set to 0 days.
+
 ## 0.16.0
 
 - Added support for saving/bookmarking searches in the main task list. #62

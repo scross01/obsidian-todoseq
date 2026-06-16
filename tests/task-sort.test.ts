@@ -247,6 +247,111 @@ describe('Task Sorting System', () => {
         expect(blocks[0].tasks.map((t) => t.text)).not.toContain('Upcoming');
         expect(blocks[0].tasks.map((t) => t.text)).not.toContain('Future');
       });
+
+      it('showUpcoming with upcomingPeriod=0: only shows current tasks', () => {
+        const todayTask = createTask({ scheduledDate: now, text: 'Today' });
+        const tomorrowTask = createTask({
+          scheduledDate: tomorrowDate,
+          text: 'Tomorrow',
+        });
+        const tasks = [todayTask, tomorrowTask];
+        const blocks = sortTasksInBlocks(
+          tasks,
+          now,
+          'showUpcoming',
+          'showAll',
+          'default',
+          undefined,
+          {
+            upcomingPeriod: 0,
+            defaultDeadlineWarningPeriod: 0,
+            defaultScheduledWarningPeriod: 0,
+            skipScheduledWarningPeriodIfDeadline: false,
+            skipDeadlinePrewarningIfScheduled: false,
+          },
+        );
+
+        expect(blocks).toHaveLength(1);
+        expect(blocks[0].type).toBe('main');
+        expect(blocks[0].tasks).toHaveLength(1); // only current
+        expect(blocks[0].tasks.map((t) => t.text)).toContain('Today');
+        expect(blocks[0].tasks.map((t) => t.text)).not.toContain('Tomorrow');
+      });
+
+      it('showUpcoming with upcomingPeriod=1: shows current + tomorrow', () => {
+        const todayTask = createTask({ scheduledDate: now, text: 'Today' });
+        const tomorrowTask = createTask({
+          scheduledDate: tomorrowDate,
+          text: 'Tomorrow',
+        });
+        const dayAfterTask = createTask({
+          scheduledDate: upcomingDate,
+          text: 'DayAfter',
+        });
+        const tasks = [todayTask, tomorrowTask, dayAfterTask];
+        const blocks = sortTasksInBlocks(
+          tasks,
+          now,
+          'showUpcoming',
+          'showAll',
+          'default',
+          undefined,
+          {
+            upcomingPeriod: 1,
+            defaultDeadlineWarningPeriod: 0,
+            defaultScheduledWarningPeriod: 0,
+            skipScheduledWarningPeriodIfDeadline: false,
+            skipDeadlinePrewarningIfScheduled: false,
+          },
+        );
+
+        expect(blocks).toHaveLength(1);
+        expect(blocks[0].type).toBe('main');
+        expect(blocks[0].tasks).toHaveLength(2); // current + tomorrow
+        expect(blocks[0].tasks.map((t) => t.text)).toContain('Today');
+        expect(blocks[0].tasks.map((t) => t.text)).toContain('Tomorrow');
+        expect(blocks[0].tasks.map((t) => t.text)).not.toContain('DayAfter');
+      });
+
+      it('showUpcoming with upcomingPeriod=2: shows current + tomorrow + day after', () => {
+        const todayTask = createTask({ scheduledDate: now, text: 'Today' });
+        const tomorrowTask = createTask({
+          scheduledDate: tomorrowDate,
+          text: 'Tomorrow',
+        });
+        const twoDaysTask = createTask({
+          scheduledDate: new Date('2024-01-17T12:00:00Z'),
+          text: 'TwoDays',
+        });
+        const threeDaysTask = createTask({
+          scheduledDate: upcomingDate,
+          text: 'ThreeDays',
+        });
+        const tasks = [todayTask, tomorrowTask, twoDaysTask, threeDaysTask];
+        const blocks = sortTasksInBlocks(
+          tasks,
+          now,
+          'showUpcoming',
+          'showAll',
+          'default',
+          undefined,
+          {
+            upcomingPeriod: 2,
+            defaultDeadlineWarningPeriod: 0,
+            defaultScheduledWarningPeriod: 0,
+            skipScheduledWarningPeriodIfDeadline: false,
+            skipDeadlinePrewarningIfScheduled: false,
+          },
+        );
+
+        expect(blocks).toHaveLength(1);
+        expect(blocks[0].type).toBe('main');
+        expect(blocks[0].tasks).toHaveLength(3); // current + tomorrow + two days
+        expect(blocks[0].tasks.map((t) => t.text)).toContain('Today');
+        expect(blocks[0].tasks.map((t) => t.text)).toContain('Tomorrow');
+        expect(blocks[0].tasks.map((t) => t.text)).toContain('TwoDays');
+        expect(blocks[0].tasks.map((t) => t.text)).not.toContain('ThreeDays');
+      });
     });
 
     describe('Future Block', () => {

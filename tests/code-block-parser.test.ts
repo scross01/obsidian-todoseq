@@ -194,11 +194,12 @@ collapse: true`;
       expect(params.error).toBeUndefined();
     });
 
-    it('should reject upcoming-period with zero value', () => {
+    it('should parse upcoming-period with zero value', () => {
       const params = TodoseqCodeBlockParser.parse(
         'search: tag:test\n upcoming-period: 0',
       );
-      expect(params.error).toBeDefined();
+      expect(params.upcomingPeriod).toBe(0);
+      expect(params.error).toBeUndefined();
     });
 
     it('should reject upcoming-period with negative value', () => {
