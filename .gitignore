@@ -72,3 +72,4 @@ tests/integration/test-results/
 skills-lock.json
 test-results/.last-run.json
 .mimocode/
+.kilo/
