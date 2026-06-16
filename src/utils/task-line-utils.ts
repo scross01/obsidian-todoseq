@@ -218,14 +218,12 @@ export function findDateLineWithParser(
  * @returns The proper indent string for date lines
  */
 export function getTaskIndent(task: Task): string {
-  const stateIndex = task.rawText.indexOf(task.state);
-  if (stateIndex === -1) {
-    // Fallback to leading whitespace if state not found
-    return task.rawText.match(/^(\s*)/)?.[1] ?? '';
-  }
-  const indent = task.rawText.substring(0, stateIndex);
-  // Replace any characters that are not '>' or whitespace with spaces
-  return indent.replace(/[^>\s]/g, ' ');
+  // Return the task's leading whitespace indent.
+  // Previously computed indent from rawText.indexOf(state) which included
+  // list marker characters (e.g. "- [ ] " → 6 spaces), causing date-line
+  // indent comparisons to fail for tasks with list markers but no leading
+  // whitespace (6 > 2 fails, but 0 < 2 passes correctly).
+  return task.indent ?? '';
 }
 
 /**
