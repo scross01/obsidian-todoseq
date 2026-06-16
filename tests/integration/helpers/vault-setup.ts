@@ -72,7 +72,9 @@ Some text after the code block.
   // Use today's date so that when the task is completed, recurrence
   // advances to a future date that's clearly different from the initial.
   const today = new Date();
-  const todayDayAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][today.getDay()];
+  const todayDayAbbr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][
+    today.getDay()
+  ];
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')} ${todayDayAbbr}`;
 
   fs.writeFileSync(

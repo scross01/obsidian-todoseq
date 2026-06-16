@@ -191,7 +191,7 @@ describe('RecurrenceManager', () => {
         rawText: '- [ ] TODO Recurring daily task',
         text: 'Recurring daily task',
         state: 'TODO',
-        indent: '',                     // no leading whitespace (the fix ensures this is used, not 6 spaces)
+        indent: '', // no leading whitespace (the fix ensures this is used, not 6 spaces)
         completed: false,
         scheduledDate: new Date(2026, 5, 15),
         deadlineDate: null,
@@ -220,8 +220,8 @@ describe('RecurrenceManager', () => {
       // leading whitespace), NOT 6 spaces from the old keyword-position
       // calculation.
       const calls = mockParser.getDateLineType.mock.calls;
-      const scheduledCall = calls.find(
-        ([line]: [string, string]) => line.includes('SCHEDULED'),
+      const scheduledCall = calls.find(([line]: [string, string]) =>
+        line.includes('SCHEDULED'),
       );
       expect(scheduledCall).toBeDefined();
       expect(scheduledCall![1]).toBe('');
@@ -234,7 +234,7 @@ describe('RecurrenceManager', () => {
         rawText: '  - [ ] TODO Indented task',
         text: 'Indented task',
         state: 'TODO',
-        indent: '  ',                    // 2-space leading indent
+        indent: '  ', // 2-space leading indent
         completed: false,
         scheduledDate: new Date(2026, 5, 15),
         deadlineDate: null,
@@ -259,8 +259,8 @@ describe('RecurrenceManager', () => {
       recurrenceManager.calculateNextDates(task, lines, mockParser);
 
       const calls = mockParser.getDateLineType.mock.calls;
-      const scheduledCall = calls.find(
-        ([line]: [string, string]) => line.includes('SCHEDULED'),
+      const scheduledCall = calls.find(([line]: [string, string]) =>
+        line.includes('SCHEDULED'),
       );
       expect(scheduledCall).toBeDefined();
       expect(scheduledCall![1]).toBe('  ');
@@ -292,8 +292,8 @@ describe('RecurrenceManager', () => {
       recurrenceManager.calculateNextDates(task, lines, mockParser);
 
       const calls = mockParser.getDateLineType.mock.calls;
-      const scheduledCall = calls.find(
-        ([line]: [string, string]) => line.includes('SCHEDULED'),
+      const scheduledCall = calls.find(([line]: [string, string]) =>
+        line.includes('SCHEDULED'),
       );
       expect(scheduledCall).toBeDefined();
       // getTaskIndent falls back to '' via task.indent ?? ''

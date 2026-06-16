@@ -17,7 +17,7 @@ test.describe('Editor interactions', () => {
   });
 
   test('task keywords are highlighted in editor', async () => {
-    await openFileInEditor(page,'inbox');
+    await openFileInEditor(page, 'inbox');
 
     const keywords = page.locator(
       '.workspace-leaf.mod-active .cm-editor .todoseq-keyword-formatted[data-task-keyword]',
@@ -33,7 +33,7 @@ test.describe('Editor interactions', () => {
   });
 
   test('checkbox click in editor toggles task state', async () => {
-    await openFileInEditor(page,'inbox');
+    await openFileInEditor(page, 'inbox');
 
     // Find the checkbox near "Buy groceries" text and click it.
     const activeLeaf = page.locator('.workspace-leaf.mod-active');
@@ -89,7 +89,7 @@ test.describe('Editor interactions', () => {
   });
 
   test('priority cycle works from editor command', async () => {
-    await openFileInEditor(page,'inbox');
+    await openFileInEditor(page, 'inbox');
 
     // Click directly on the task text to place the cursor on that line.
     const taskText = page
@@ -110,7 +110,7 @@ test.describe('Editor interactions', () => {
   });
 
   test('full state cycle: TODO → DOING → DONE → TODO', async () => {
-    await openFileInEditor(page,'states');
+    await openFileInEditor(page, 'states');
 
     // Step 1: Cycle TODO → DOING
     const taskText = page
@@ -133,7 +133,9 @@ test.describe('Editor interactions', () => {
     await page.waitForTimeout(500);
 
     content = await readEditorContent(page);
-    taskLine = content.split('\n').find((l) => l.includes('State cycling task'));
+    taskLine = content
+      .split('\n')
+      .find((l) => l.includes('State cycling task'));
     expect(taskLine).toBeDefined();
     expect(taskLine).toMatch(/DONE/);
 
@@ -143,7 +145,9 @@ test.describe('Editor interactions', () => {
     await page.waitForTimeout(500);
 
     content = await readEditorContent(page);
-    taskLine = content.split('\n').find((l) => l.includes('State cycling task'));
+    taskLine = content
+      .split('\n')
+      .find((l) => l.includes('State cycling task'));
     expect(taskLine).toBeDefined();
     // With defaultInactive="" in baseline settings, cycle returns to empty keyword.
     // The line should be "- [ ] State cycling task" with no keyword.
@@ -151,7 +155,7 @@ test.describe('Editor interactions', () => {
   });
 
   test('toggle completed task back to active via cycle command', async () => {
-    await openFileInEditor(page,'states');
+    await openFileInEditor(page, 'states');
 
     // Click on "Completed task" (DONE state) and cycle to TODO
     const taskText = page

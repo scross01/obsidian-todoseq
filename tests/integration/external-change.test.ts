@@ -1,10 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { getPage } from './helpers/session';
 import { resetVaultState } from './helpers/test-reset';
-import {
-  openTodoseqPanel,
-  waitForTaskListVisible,
-} from './helpers/assertions';
+import { openTodoseqPanel, waitForTaskListVisible } from './helpers/assertions';
 import { TEST_VAULT_DIR } from './helpers/vault-setup';
 import fs from 'fs';
 import path from 'path';
@@ -35,9 +32,7 @@ test.describe('External file change', () => {
     await page.waitForTimeout(200);
 
     // Verify the external-change file has no tasks initially.
-    const initialText = await page
-      .locator('.todoseq-task-list')
-      .textContent();
+    const initialText = await page.locator('.todoseq-task-list').textContent();
     expect(initialText).not.toContain('Externally added task');
 
     // Write a new task to the external-change.md file outside of Obsidian.
@@ -56,9 +51,7 @@ test.describe('External file change', () => {
     await page.waitForTimeout(500);
 
     // Verify the new tasks appear in the task list.
-    const updatedText = await page
-      .locator('.todoseq-task-list')
-      .textContent();
+    const updatedText = await page.locator('.todoseq-task-list').textContent();
     expect(updatedText).toContain('Externally added task');
     expect(updatedText).toContain('Another external task');
   });
@@ -75,9 +68,7 @@ test.describe('External file change', () => {
     });
     await page.waitForTimeout(200);
 
-    const initialText = await page
-      .locator('.todoseq-task-list')
-      .textContent();
+    const initialText = await page.locator('.todoseq-task-list').textContent();
     expect(initialText).toContain('Buy groceries');
 
     // Delete the inbox.md file externally.
@@ -92,9 +83,7 @@ test.describe('External file change', () => {
     await waitForTaskListVisible(page);
     await page.waitForTimeout(500);
 
-    const updatedText = await page
-      .locator('.todoseq-task-list')
-      .textContent();
+    const updatedText = await page.locator('.todoseq-task-list').textContent();
     // Inbox tasks should be gone.
     expect(updatedText).not.toContain('Buy groceries');
     expect(updatedText).not.toContain('Review PR #123');
