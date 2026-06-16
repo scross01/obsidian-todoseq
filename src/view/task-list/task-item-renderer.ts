@@ -2,7 +2,7 @@ import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { DateUtils, getEffectiveWarningDays } from '../../utils/date-utils';
 import { formatRepeatDescription } from '../../utils/date-repeater';
 import { warningPeriodToDays } from '../../utils/date-utils';
-import { setIcon, Platform, Notice } from 'obsidian';
+import { setIcon, Platform, Notice, setTooltip } from 'obsidian';
 import {
   TAG_PATTERN,
   WIKI_LINK_REGEX,
@@ -472,7 +472,7 @@ export class TaskItemRenderer {
       });
       badge.setText(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C');
       badge.setAttribute('aria-label', `Priority ${pri}`);
-      badge.setAttribute('title', `Priority ${pri}`);
+      setTooltip(badge, `Priority ${pri}`);
     }
 
     // Remaining text - use lazy-computed textDisplay for better performance
@@ -536,7 +536,7 @@ export class TaskItemRenderer {
       fileInfo.createEl('span', { cls: 'todoseq-source-chip' });
     }
     fileInfo.appendText(`${displayName}:${task.line + 1}`);
-    fileInfo.setAttribute('title', task.path);
+    setTooltip(fileInfo, task.path);
 
     // Click to open source (avoid checkbox and keyword)
     li.addEventListener('click', (evt) => {
@@ -653,7 +653,7 @@ export class TaskItemRenderer {
           });
           badge.setText(priorityText);
           badge.setAttribute('aria-label', `Priority ${task.priority}`);
-          badge.setAttribute('title', `Priority ${task.priority}`);
+          setTooltip(badge, `Priority ${task.priority}`);
           todoText.appendText(' ');
         }
 
@@ -803,7 +803,7 @@ export class TaskItemRenderer {
       ? `-${warningPeriod.value}${warningPeriod.unit}`
       : `-${warningDays}d`;
     tooltip += `\nWarning period: ${wpLabel} (appears ${this.formatDateForDisplay(effectiveDate, true)})`;
-    dateValueEl.setAttribute('title', tooltip);
+    setTooltip(dateValueEl, tooltip);
   }
 
   /**
@@ -889,7 +889,7 @@ export class TaskItemRenderer {
         const schedLabel = schedWp
           ? `-${schedWp.value}${schedWp.unit}`
           : `-${scheduledWarningDays}d`;
-        arrow.setAttribute('title', `Warning period: ${schedLabel}`);
+        setTooltip(arrow, `Warning period: ${schedLabel}`);
       }
 
       const repeatCell = dateRow.createEl('span', {
@@ -906,10 +906,7 @@ export class TaskItemRenderer {
           svg.removeAttribute('width');
           svg.removeAttribute('height');
         }
-        repeatIcon.setAttribute(
-          'title',
-          `Repeats ${task.scheduledDateRepeat.raw}`,
-        );
+        setTooltip(repeatIcon, `Repeats ${task.scheduledDateRepeat.raw}`);
       }
     }
 
@@ -961,7 +958,7 @@ export class TaskItemRenderer {
         const dlLabel = dlWp
           ? `-${dlWp.value}${dlWp.unit}`
           : `-${deadlineWarningDays}d`;
-        arrow.setAttribute('title', `Warning period: ${dlLabel}`);
+        setTooltip(arrow, `Warning period: ${dlLabel}`);
       }
 
       const repeatCell = dateRow.createEl('span', {
@@ -978,10 +975,7 @@ export class TaskItemRenderer {
           svg.removeAttribute('width');
           svg.removeAttribute('height');
         }
-        repeatIcon.setAttribute(
-          'title',
-          `Repeats ${task.deadlineDateRepeat.raw}`,
-        );
+        setTooltip(repeatIcon, `Repeats ${task.deadlineDateRepeat.raw}`);
       }
     }
 
@@ -1022,8 +1016,8 @@ export class TaskItemRenderer {
       cls: 'todoseq-subtask-indicator',
     });
     indicator.setText(getSubtaskDisplayText(task));
-    indicator.setAttribute(
-      'title',
+    setTooltip(
+      indicator,
       `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
     );
   }
@@ -1067,7 +1061,7 @@ export class TaskItemRenderer {
         const span = parent.createEl('span', { cls: 'todoseq-task-tag' });
         const tagName = nextMatch.match[0];
         span.setText(tagName);
-        span.setAttribute('title', tagName);
+        setTooltip(span, tagName);
       } else {
         const span = parent.createEl('span', { cls: 'todoseq-task-link' });
 
@@ -1075,16 +1069,16 @@ export class TaskItemRenderer {
           const target = nextMatch.match[1];
           const alias = nextMatch.match[2];
           span.setText(alias ?? target);
-          span.setAttribute('title', target);
+          setTooltip(span, target);
         } else if (nextMatch.type === 'md') {
           const label = nextMatch.match[1];
           const url = nextMatch.match[2];
           span.setText(label);
-          span.setAttribute('title', url);
+          setTooltip(span, url);
         } else {
           const url = nextMatch.match[0];
           span.setText(url);
-          span.setAttribute('title', url);
+          setTooltip(span, url);
         }
       }
 

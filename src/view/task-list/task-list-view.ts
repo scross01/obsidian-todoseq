@@ -8,6 +8,7 @@ import {
   Notice,
   Menu,
   EventRef,
+  setTooltip,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
@@ -532,7 +533,7 @@ export class TaskListView extends ItemView {
 
     // Add Settings button to the right side of the first row
     const settingsBtn = firstRow.createEl('div', { cls: 'clickable-icon' });
-    settingsBtn.setAttr('title', 'Task List settings');
+    setTooltip(settingsBtn, 'Task List settings');
     settingsBtn.setAttr('aria-label', 'Task List settings');
     settingsBtn.setAttr('aria-expanded', String(false));
     settingsBtn.setAttr('tabindex', '0');
@@ -1246,10 +1247,10 @@ export class TaskListView extends ItemView {
           'aria-label',
           `Saved search: ${matchingSaved.name}`,
         );
-        this.saveSearchBtn.setAttr('title', matchingSaved.name);
+        setTooltip(this.saveSearchBtn, matchingSaved.name);
       } else {
         this.saveSearchBtn.setAttr('aria-label', 'Save search');
-        this.saveSearchBtn.setAttr('title', 'Save search');
+        setTooltip(this.saveSearchBtn, 'Save search');
       }
     }
   }

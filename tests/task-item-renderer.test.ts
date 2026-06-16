@@ -24,6 +24,9 @@ jest.mock('obsidian', () => ({
     );
     el.appendChild(svg);
   }),
+  setTooltip: jest.fn((el: HTMLElement, tooltip: string) => {
+    el.setAttribute('title', tooltip);
+  }),
   Notice: jest.fn(),
   Platform: {
     isMobile: false,

@@ -133,6 +133,10 @@ export function setIcon(_el: HTMLElement, _iconId: string): void {
   // no-op in tests
 }
 
+export function setTooltip(el: HTMLElement, tooltip: string, _options?: Record<string, unknown>): void {
+  el.setAttribute('title', tooltip);
+}
+
 export function requireApiVersion(version: string): boolean {
   return true;
 }

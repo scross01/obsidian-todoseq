@@ -15,6 +15,7 @@ import {
   Platform,
   setIcon,
   Notice,
+  setTooltip,
 } from 'obsidian';
 import {
   TAG_PATTERN,
@@ -148,22 +149,22 @@ export class EmbeddedTaskItemRenderer {
         if (showFile) {
           const fileName = task.path.split('/').pop() || task.path;
           const displayName = fileName.replace(/\.md$/, '');
-          fileInfoRow.createSpan({
+          const fileEl = fileInfoRow.createSpan({
             cls: 'todoseq-embedded-task-file-info-wrap',
             text: `${displayName}:${task.line + 1}`,
-            attr: { title: task.path },
           });
+          setTooltip(fileEl, task.path);
         }
         if (
           showUrgency &&
           urgencyValue !== null &&
           urgencyValue !== undefined
         ) {
-          fileInfoRow.createSpan({
+          const urgEl = fileInfoRow.createSpan({
             cls: 'todoseq-embedded-task-urgency-wrap',
             text: `${urgencyValue.toFixed(2)}`,
-            attr: { title: `Urgency: ${urgencyValue.toFixed(2)}` },
           });
+          setTooltip(urgEl, `Urgency: ${urgencyValue.toFixed(2)}`);
         }
       }
     } else if (isDynamicMode) {
@@ -186,13 +187,14 @@ export class EmbeddedTaskItemRenderer {
           cls: 'todoseq-embedded-task-floating-indicators',
         });
         if (hasSubtask) {
-          floatingIndicators.createSpan({
+          const subtaskEl = floatingIndicators.createSpan({
             cls: 'todoseq-subtask-indicator',
             text: getSubtaskDisplayText(task),
-            attr: {
-              title: `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
-            },
           });
+          setTooltip(
+            subtaskEl,
+            `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
+          );
         }
         if (hasRepeat) {
           this.buildRepeatIcon(task, floatingIndicators);
@@ -221,44 +223,44 @@ export class EmbeddedTaskItemRenderer {
         if (showFile) {
           const fileName = task.path.split('/').pop() || task.path;
           const displayName = fileName.replace(/\.md$/, '');
-          fileInfoRow.createSpan({
+          const fileEl = fileInfoRow.createSpan({
             cls: 'todoseq-embedded-task-file-info-wrap',
             text: `${displayName}:${task.line + 1}`,
-            attr: { title: task.path },
           });
+          setTooltip(fileEl, task.path);
         }
         if (
           showUrgency &&
           urgencyValue !== null &&
           urgencyValue !== undefined
         ) {
-          fileInfoRow.createSpan({
+          const urgEl = fileInfoRow.createSpan({
             cls: 'todoseq-embedded-task-urgency-dynamic',
             text: `${urgencyValue.toFixed(2)}`,
-            attr: { title: `Urgency: ${urgencyValue.toFixed(2)}` },
           });
+          setTooltip(urgEl, `Urgency: ${urgencyValue.toFixed(2)}`);
         }
 
         if (showFile) {
           const fileName = task.path.split('/').pop() || task.path;
           const displayName = fileName.replace(/\.md$/, '');
           const displayText = `${displayName}:${task.line + 1}`;
-          contentWrapper.createDiv({
+          const fileEl2 = contentWrapper.createDiv({
             cls: 'todoseq-embedded-task-file-info',
             text: truncateMiddle(displayText, 32),
-            attr: { title: task.path },
           });
+          setTooltip(fileEl2, task.path);
         }
         if (
           showUrgency &&
           urgencyValue !== null &&
           urgencyValue !== undefined
         ) {
-          contentWrapper.createSpan({
+          const urgEl2 = contentWrapper.createSpan({
             cls: 'todoseq-embedded-task-urgency',
             text: `${urgencyValue.toFixed(2)}`,
-            attr: { title: `Urgency: ${urgencyValue.toFixed(2)}` },
           });
+          setTooltip(urgEl2, `Urgency: ${urgencyValue.toFixed(2)}`);
         }
       }
     } else {
@@ -272,22 +274,22 @@ export class EmbeddedTaskItemRenderer {
         const fileName = task.path.split('/').pop() || task.path;
         const displayName = fileName.replace(/\.md$/, '');
         const displayText = `${displayName}:${task.line + 1}`;
-        li.createDiv({
+        const fileEl = li.createDiv({
           cls: 'todoseq-embedded-task-file-info',
           text: truncateMiddle(displayText, 32),
-          attr: { title: task.path },
         });
+        setTooltip(fileEl, task.path);
 
         if (
           params.showUrgency === true &&
           task.urgency !== null &&
           task.urgency !== undefined
         ) {
-          li.createSpan({
+          const urgEl = li.createSpan({
             cls: 'todoseq-embedded-task-urgency',
             text: `${task.urgency.toFixed(2)}`,
-            attr: { title: `Urgency: ${task.urgency.toFixed(2)}` },
           });
+          setTooltip(urgEl, `Urgency: ${task.urgency.toFixed(2)}`);
         }
       } else {
         if (
@@ -295,23 +297,24 @@ export class EmbeddedTaskItemRenderer {
           task.urgency !== null &&
           task.urgency !== undefined
         ) {
-          li.createSpan({
+          const urgEl = li.createSpan({
             cls: 'todoseq-embedded-task-urgency',
             text: `${task.urgency.toFixed(2)}`,
-            attr: { title: `Urgency: ${task.urgency.toFixed(2)}` },
           });
+          setTooltip(urgEl, `Urgency: ${task.urgency.toFixed(2)}`);
         }
       }
 
-      if (hasSubtask) {
-        textContainer.createSpan({
-          cls: 'todoseq-subtask-indicator',
-          text: getSubtaskDisplayText(task),
-          attr: {
-            title: `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
-          },
-        });
-      }
+        if (hasSubtask) {
+          const subtaskEl = textContainer.createSpan({
+            cls: 'todoseq-subtask-indicator',
+            text: getSubtaskDisplayText(task),
+          });
+          setTooltip(
+            subtaskEl,
+            `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
+          );
+        }
 
       this.buildInlineDateBadge(task, params, textContainer);
 
@@ -443,11 +446,12 @@ export class EmbeddedTaskItemRenderer {
 
     if (task.priority) {
       const pri = task.priority;
-      textContainer.createSpan({
+      const badge = textContainer.createSpan({
         cls: `todoseq-priority-badge priority-${pri}`,
         text: pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C',
-        attr: { 'aria-label': `Priority ${pri}`, title: `Priority ${pri}` },
+        attr: { 'aria-label': `Priority ${pri}` },
       });
+      setTooltip(badge, `Priority ${pri}`);
     }
 
     if (task.text) {
@@ -765,7 +769,7 @@ export class EmbeddedTaskItemRenderer {
         });
         const tagName = nextMatch.match[0];
         span.setText(tagName);
-        span.setAttribute('title', tagName);
+        setTooltip(span, tagName);
       } else {
         const span = parent.createEl('span', {
           cls: 'embedded-task-link-like',
@@ -775,16 +779,16 @@ export class EmbeddedTaskItemRenderer {
           const target = nextMatch.match[1];
           const alias = nextMatch.match[2];
           span.setText(alias ?? target);
-          span.setAttribute('title', target);
+          setTooltip(span, target);
         } else if (nextMatch.type === 'md') {
           const label = nextMatch.match[1];
           const url = nextMatch.match[2];
           span.setText(label);
-          span.setAttribute('title', url);
+          setTooltip(span, url);
         } else {
           const url = nextMatch.match[0];
           span.setText(url);
-          span.setAttribute('title', url);
+          setTooltip(span, url);
         }
       }
 
@@ -992,7 +996,7 @@ export class EmbeddedTaskItemRenderer {
       svg.removeAttribute('width');
       svg.removeAttribute('height');
     }
-    repeatIcon.setAttribute('title', `Repeats ${repeatInfo.raw}`);
+    setTooltip(repeatIcon, `Repeats ${repeatInfo.raw}`);
   }
 
   navigateToTask(task: Task, evt?: MouseEvent): void {

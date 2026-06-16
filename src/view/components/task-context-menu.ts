@@ -1,4 +1,4 @@
-import { setIcon, App, Notice } from 'obsidian';
+import { setIcon, App, Notice, setTooltip } from 'obsidian';
 import { Task, WarningPeriodInfo } from '../../types/task';
 import { DateRepeatInfo } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
@@ -349,11 +349,11 @@ export class TaskContextMenu extends BaseDialog {
         cls: 'todoseq-context-menu-icon-btn',
         attr: {
           'aria-label': option.label,
-          title: this.getScheduledTooltip(option),
           role: 'menuitem',
           tabindex: '-1',
         },
       });
+      setTooltip(btn, this.getScheduledTooltip(option));
 
       const iconEl = btn.createEl('span', {
         cls: 'todoseq-context-menu-icon',
@@ -453,11 +453,11 @@ export class TaskContextMenu extends BaseDialog {
         cls: ['todoseq-context-menu-icon-btn', option.colorClass],
         attr: {
           'aria-label': option.label,
-          title: option.label,
           role: 'menuitem',
           tabindex: '-1',
         },
       });
+      setTooltip(btn, option.label);
 
       const iconEl = btn.createEl('span', {
         cls: 'todoseq-context-menu-icon',

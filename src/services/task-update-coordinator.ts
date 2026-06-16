@@ -922,6 +922,7 @@ export class TaskUpdateCoordinator {
       keywordEl.textContent = newState;
       keywordEl.setAttribute('data-task-keyword', newState);
       keywordEl.setAttribute('aria-label', `Task keyword: ${newState}`);
+      keywordEl.setAttribute('title', `Task keyword: ${newState}`);
 
       const wasCompleted = KeywordManager.isCompletedKeyword(
         oldState,

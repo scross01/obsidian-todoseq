@@ -14,6 +14,7 @@ jest.mock('obsidian', () => ({
   Vault: jest.fn(),
   App: jest.fn(),
   setIcon: jest.fn(),
+  setTooltip: jest.fn(),
 }));
 
 import {

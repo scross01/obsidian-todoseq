@@ -1,4 +1,4 @@
-import { Vault, setIcon } from 'obsidian';
+import { Vault, setIcon, setTooltip } from 'obsidian';
 import { Task } from '../../types/task';
 import { SearchSuggestions } from '../../search/search-suggestions';
 import {
@@ -288,11 +288,11 @@ export class SearchOptionsDropdown extends BaseDropdown {
         cls: 'search-suggest-saved-name',
         text: `${search.name}:`,
       });
-      titleEl.createSpan({
+      const queryEl = titleEl.createSpan({
         cls: 'search-suggest-saved-query',
         text: ` ${search.query}`,
-        attr: { title: search.query },
       });
+      setTooltip(queryEl, search.query);
 
       // Hover actions (edit and delete)
       const auxEl = itemEl.createEl('div', { cls: 'suggestion-aux' });
@@ -398,18 +398,18 @@ export class SearchOptionsDropdown extends BaseDropdown {
       const contentEl = itemEl.createEl('div', { cls: 'suggestion-content' });
       const titleEl = contentEl.createEl('div', { cls: 'suggestion-title' });
       if (entry.matchCase) {
-        titleEl.createSpan({
+        const caseEl = titleEl.createSpan({
           cls: 'search-suggest-history-matchcase',
           text: 'Aa',
-          attr: { title: 'Case sensitive' },
         });
+        setTooltip(caseEl, 'Case sensitive');
         titleEl.createSpan({ text: ' ' });
       }
-      titleEl.createSpan({
+      const queryEl = titleEl.createSpan({
         cls: 'search-suggest-history-query',
         text: entry.query,
-        attr: { title: entry.query },
       });
+      setTooltip(queryEl, entry.query);
 
       // Save icon for history items
       if (this.savedSearchCallbacks) {
