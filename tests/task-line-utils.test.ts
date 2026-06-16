@@ -16,73 +16,73 @@ const keywordManager = new KeywordManager({});
 describe('task-line-utils', () => {
   describe('getTaskIndent', () => {
     it('should return empty string for empty line', () => {
-      const task = { rawText: '', state: 'TODO' } as Task;
+      const task = { rawText: '', state: 'TODO', indent: '' } as Task;
       expect(getTaskIndent(task)).toBe('');
     });
 
     it('should return quote prefix for quoted tasks', () => {
       expect(
-        getTaskIndent({ rawText: '> TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: '> TODO task', state: 'TODO', indent: '> ' } as Task),
       ).toBe('> ');
       expect(
-        getTaskIndent({ rawText: '  > TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: '  > TODO task', state: 'TODO', indent: '  > ' } as Task),
       ).toBe('  > ');
       expect(
-        getTaskIndent({ rawText: '>> TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: '>> TODO task', state: 'TODO', indent: '>> ' } as Task),
       ).toBe('>> ');
       expect(
-        getTaskIndent({ rawText: '>>> TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: '>>> TODO task', state: 'TODO', indent: '>>> ' } as Task),
       ).toBe('>>> ');
     });
 
     it('should return indent for checkbox tasks', () => {
       expect(
-        getTaskIndent({ rawText: '- [ ] TODO task', state: 'TODO' } as Task),
-      ).toBe('      ');
+        getTaskIndent({ rawText: '- [ ] TODO task', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
       expect(
-        getTaskIndent({ rawText: '  - [x] TODO task', state: 'TODO' } as Task),
-      ).toBe('        ');
+        getTaskIndent({ rawText: '  - [x] TODO task', state: 'TODO', indent: '  ' } as Task),
+      ).toBe('  ');
       expect(
-        getTaskIndent({ rawText: '  - [X] TODO task', state: 'TODO' } as Task),
-      ).toBe('        ');
+        getTaskIndent({ rawText: '  - [X] TODO task', state: 'TODO', indent: '  ' } as Task),
+      ).toBe('  ');
     });
 
     it('should return indent for bullet tasks with leading whitespace', () => {
       expect(
-        getTaskIndent({ rawText: '- TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: '- TODO task', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
+      expect(
+        getTaskIndent({ rawText: '  + TODO task', state: 'TODO', indent: '  ' } as Task),
       ).toBe('  ');
       expect(
-        getTaskIndent({ rawText: '  + TODO task', state: 'TODO' } as Task),
-      ).toBe('    ');
+        getTaskIndent({ rawText: '* TODO task', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
       expect(
-        getTaskIndent({ rawText: '* TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: '  - TODO task', state: 'TODO', indent: '  ' } as Task),
       ).toBe('  ');
-      expect(
-        getTaskIndent({ rawText: '  - TODO task', state: 'TODO' } as Task),
-      ).toBe('    ');
     });
 
     it('should return indent for bullet tasks with existing leading whitespace', () => {
       expect(
-        getTaskIndent({ rawText: '  - TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: '  - TODO task', state: 'TODO', indent: '  ' } as Task),
+      ).toBe('  ');
+      expect(
+        getTaskIndent({ rawText: '    - TODO task', state: 'TODO', indent: '    ' } as Task),
       ).toBe('    ');
       expect(
-        getTaskIndent({ rawText: '    - TODO task', state: 'TODO' } as Task),
-      ).toBe('      ');
-      expect(
-        getTaskIndent({ rawText: '  - TODO task', state: 'TODO' } as Task),
-      ).toBe('    ');
+        getTaskIndent({ rawText: '  - TODO task', state: 'TODO', indent: '  ' } as Task),
+      ).toBe('  ');
     });
 
     it('should return leading whitespace for regular tasks', () => {
       expect(
-        getTaskIndent({ rawText: 'TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: 'TODO task', state: 'TODO', indent: '' } as Task),
       ).toBe('');
       expect(
-        getTaskIndent({ rawText: '  TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: '  TODO task', state: 'TODO', indent: '  ' } as Task),
       ).toBe('  ');
       expect(
-        getTaskIndent({ rawText: '    TODO task', state: 'TODO' } as Task),
+        getTaskIndent({ rawText: '    TODO task', state: 'TODO', indent: '    ' } as Task),
       ).toBe('    ');
     });
 
@@ -91,71 +91,77 @@ describe('task-line-utils', () => {
         getTaskIndent({
           rawText: '- SCHEDULED: <2026-03-10>',
           state: 'SCHEDULED',
+          indent: '',
         } as Task),
-      ).toBe('  ');
+      ).toBe('');
       expect(
         getTaskIndent({
           rawText: '- DEADLINE: <2026-03-10>',
           state: 'DEADLINE',
+          indent: '',
         } as Task),
-      ).toBe('  ');
+      ).toBe('');
       expect(
         getTaskIndent({
           rawText: '- CLOSED: <2026-03-10>',
           state: 'CLOSED',
+          indent: '',
         } as Task),
-      ).toBe('  ');
+      ).toBe('');
       expect(
         getTaskIndent({
           rawText: '  - SCHEDULED: <2026-03-10>',
           state: 'SCHEDULED',
+          indent: '  ',
         } as Task),
-      ).toBe('    ');
+      ).toBe('  ');
       expect(
         getTaskIndent({
           rawText: '+ SCHEDULED: <2026-03-10>',
           state: 'SCHEDULED',
+          indent: '',
         } as Task),
-      ).toBe('  ');
+      ).toBe('');
       expect(
         getTaskIndent({
           rawText: '* DEADLINE: <2026-03-10>',
           state: 'DEADLINE',
+          indent: '',
         } as Task),
-      ).toBe('  ');
+      ).toBe('');
     });
 
     it('should return indent for numbered list tasks', () => {
       expect(
-        getTaskIndent({ rawText: '1. TODO test 1', state: 'TODO' } as Task),
-      ).toBe('   ');
+        getTaskIndent({ rawText: '1. TODO test 1', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
       expect(
-        getTaskIndent({ rawText: '10. TODO test 1', state: 'TODO' } as Task),
-      ).toBe('    ');
+        getTaskIndent({ rawText: '10. TODO test 1', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
       expect(
-        getTaskIndent({ rawText: '1) TODO test 1', state: 'TODO' } as Task),
-      ).toBe('   ');
+        getTaskIndent({ rawText: '1) TODO test 1', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
       expect(
-        getTaskIndent({ rawText: '  1. TODO test 1', state: 'TODO' } as Task),
-      ).toBe('     ');
+        getTaskIndent({ rawText: '  1. TODO test 1', state: 'TODO', indent: '  ' } as Task),
+      ).toBe('  ');
     });
 
     it('should return indent for lettered list tasks', () => {
       expect(
-        getTaskIndent({ rawText: 'a. TODO test 1', state: 'TODO' } as Task),
-      ).toBe('   ');
+        getTaskIndent({ rawText: 'a. TODO test 1', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
       expect(
-        getTaskIndent({ rawText: 'b. TODO test 1', state: 'TODO' } as Task),
-      ).toBe('   ');
+        getTaskIndent({ rawText: 'b. TODO test 1', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
       expect(
-        getTaskIndent({ rawText: 'A) TODO test 1', state: 'TODO' } as Task),
-      ).toBe('   ');
+        getTaskIndent({ rawText: 'A) TODO test 1', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
       expect(
-        getTaskIndent({ rawText: 'Z) TODO test 1', state: 'TODO' } as Task),
-      ).toBe('   ');
+        getTaskIndent({ rawText: 'Z) TODO test 1', state: 'TODO', indent: '' } as Task),
+      ).toBe('');
       expect(
-        getTaskIndent({ rawText: '  a. TODO test 1', state: 'TODO' } as Task),
-      ).toBe('     ');
+        getTaskIndent({ rawText: '  a. TODO test 1', state: 'TODO', indent: '  ' } as Task),
+      ).toBe('  ');
     });
   });
 

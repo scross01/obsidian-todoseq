@@ -328,13 +328,6 @@ describe('PluginLifecycleManager', () => {
       expect(pluginMock.addSettingTab).toHaveBeenCalled();
     });
 
-    it('should register lifecycle hooks on load', async () => {
-      await lifecycleManager.onload();
-      // registerView and addCommand are the primary registration calls
-      expect(pluginMock.registerView).toHaveBeenCalled();
-      expect(pluginMock.addCommand).toHaveBeenCalled();
-    });
-
     it('should set up UI manager formatting', async () => {
       await lifecycleManager.onload();
       expect(

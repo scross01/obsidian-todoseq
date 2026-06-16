@@ -176,6 +176,129 @@ describe('RecurrenceManager', () => {
       expect(mockParser.getDateLineType).toHaveBeenCalled();
       expect(result.updated).toBe(true);
     });
+
+    // ── getTaskIndent fix regression tests ──────────────────────────
+    // The getTaskIndent fix changed the function to return task.indent
+    // (leading whitespace) instead of computing from rawText.indexOf(state)
+    // which included list-marker characters as spaces.  These tests verify
+    // that calculateNextDates passes the correct indent to the parser for
+    // both non-indented and indented tasks.
+
+    it('should pass correct indent for non-indented checkbox task', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 2,
+        rawText: '- [ ] TODO Recurring daily task',
+        text: 'Recurring daily task',
+        state: 'TODO',
+        indent: '',                     // no leading whitespace (the fix ensures this is used, not 6 spaces)
+        completed: false,
+        scheduledDate: new Date(2026, 5, 15),
+        deadlineDate: null,
+        scheduledDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+        deadlineDateRepeat: null,
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      // File content matching the integration test fixture.
+      const lines = [
+        '# Recurrence Test',
+        '',
+        '- [ ] TODO Recurring daily task',
+        '  SCHEDULED: <2026-06-15 Mon +1d>',
+        '',
+      ];
+
+      recurrenceManager.calculateNextDates(task, lines, mockParser);
+
+      // The parser should be called with taskIndent = '' (the actual
+      // leading whitespace), NOT 6 spaces from the old keyword-position
+      // calculation.
+      const calls = mockParser.getDateLineType.mock.calls;
+      const scheduledCall = calls.find(
+        ([line]: [string, string]) => line.includes('SCHEDULED'),
+      );
+      expect(scheduledCall).toBeDefined();
+      expect(scheduledCall![1]).toBe('');
+    });
+
+    it('should pass correct indent for indented checkbox task', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 2,
+        rawText: '  - [ ] TODO Indented task',
+        text: 'Indented task',
+        state: 'TODO',
+        indent: '  ',                    // 2-space leading indent
+        completed: false,
+        scheduledDate: new Date(2026, 5, 15),
+        deadlineDate: null,
+        scheduledDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+        deadlineDateRepeat: null,
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      const lines = [
+        '# Test',
+        '',
+        '  - [ ] TODO Indented task',
+        '    SCHEDULED: <2026-06-15 Mon +1d>',
+        '',
+      ];
+
+      recurrenceManager.calculateNextDates(task, lines, mockParser);
+
+      const calls = mockParser.getDateLineType.mock.calls;
+      const scheduledCall = calls.find(
+        ([line]: [string, string]) => line.includes('SCHEDULED'),
+      );
+      expect(scheduledCall).toBeDefined();
+      expect(scheduledCall![1]).toBe('  ');
+    });
+
+    it('should fall back to empty string when task.indent is undefined', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 0,
+        rawText: 'DONE task',
+        text: 'task',
+        state: 'DONE',
+        // indent deliberately omitted — no indent property at all
+        completed: true,
+        scheduledDate: new Date('2026-03-10'),
+        deadlineDate: null,
+        scheduledDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+        deadlineDateRepeat: null,
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      const lines = ['DONE task', '  SCHEDULED: <2026-03-10>'];
+
+      recurrenceManager.calculateNextDates(task, lines, mockParser);
+
+      const calls = mockParser.getDateLineType.mock.calls;
+      const scheduledCall = calls.find(
+        ([line]: [string, string]) => line.includes('SCHEDULED'),
+      );
+      expect(scheduledCall).toBeDefined();
+      // getTaskIndent falls back to '' via task.indent ?? ''
+      expect(scheduledCall![1]).toBe('');
+    });
   });
 
   describe('updateTaskKeyword', () => {

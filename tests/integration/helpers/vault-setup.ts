@@ -67,4 +67,67 @@ Some text after the code block.
 - [ ] TODO Daily task 1
 `,
   );
+
+  // File for recurrence testing (recurring task with +1d repeat)
+  // Use today's date so that when the task is completed, recurrence
+  // advances to a future date that's clearly different from the initial.
+  const today = new Date();
+  const todayDayAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][today.getDay()];
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')} ${todayDayAbbr}`;
+
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'recurrence.md'),
+    `# Recurrence Test
+
+- [ ] TODO Recurring daily task
+  SCHEDULED: <${todayStr} +1d>
+`,
+  );
+
+  // File for state cycling test (all states)
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'states.md'),
+    `# State Cycling Test
+
+- [ ] TODO State cycling task
+- [ ] DOING In-progress task
+- [x] DONE Completed task
+- [ ] WAITING Blocked task
+`,
+  );
+
+  // File for smart date processing test
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'smart-date.md'),
+    `# Smart Date Test
+
+- [ ] TODO Type a task with natural date here
+`,
+  );
+
+  // File with frontmatter properties for property search testing
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'with-properties.md'),
+    `---
+status: active
+project: alpha
+due: ${dateStr}
+---
+
+# Tasks With Properties
+
+- [ ] TODO Property task one
+- [ ] DOING Property task two
+- [x] DONE Property task three
+`,
+  );
+
+  // Empty file for external-change testing (will be modified by test)
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'external-change.md'),
+    `# External Change Test
+
+This file will be modified externally to test vault rescan.
+`,
+  );
 }

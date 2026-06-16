@@ -1,11 +1,16 @@
 /**
  * @jest-environment jsdom
+ *
+ * Tests focusing on pure algorithmic logic: double-click detection timing,
+ * leaf priority ordering, click handler delegation, cleanup, and edge cases.
+ * Setup/formatting/rendering tests that mock everything are covered by
+ * integration tests (smoke, editor-interactions, task-list-view).
  */
 
 import { UIManager } from '../src/ui-manager';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
-// Mock obsidian
+// Mock obsidian - kept minimal, only what the kept tests need
 jest.mock('obsidian', () => ({
   MarkdownView: jest.fn().mockImplementation(function () {
     this.file = null;
@@ -128,39 +133,18 @@ describe('UIManager', () => {
     jest.clearAllMocks();
   });
 
+  // ---------------------------------------------------------------------------
+  // Construction
+  // ---------------------------------------------------------------------------
   describe('constructor', () => {
     it('should create ui manager with plugin reference', () => {
       expect(uiManager).toBeDefined();
     });
   });
 
-  describe('setupTaskFormatting', () => {
-    it('should setup editor decorations when enabled', () => {
-      uiManager.setupTaskFormatting();
-      expect(pluginMock.registerEditorExtension).toHaveBeenCalled();
-    });
-
-    it('should setup checkbox event listeners', () => {
-      uiManager.setupTaskFormatting();
-      // The checkbox listeners setup triggers registerEvent
-      expect(pluginMock.registerEvent).toHaveBeenCalled();
-    });
-  });
-
-  describe('updateTaskFormatting', () => {
-    it('should clear and re-setup decorations', () => {
-      uiManager.updateTaskFormatting();
-      expect(pluginMock.registerEditorExtension).toHaveBeenCalled();
-    });
-  });
-
-  describe('clearEditorDecorations', () => {
-    it('should register empty extension', () => {
-      uiManager.clearEditorDecorations();
-      expect(pluginMock.registerEditorExtension).toHaveBeenCalledWith([]);
-    });
-  });
-
+  // ---------------------------------------------------------------------------
+  // DOM helpers (pure utility)
+  // ---------------------------------------------------------------------------
   describe('getLineForElement', () => {
     it('should return null when no editor view found', () => {
       const element = activeDocument.createElement('div');
@@ -177,60 +161,11 @@ describe('UIManager', () => {
     });
   });
 
-  describe('showTasks', () => {
-    it('should find existing task leaf and reveal it', async () => {
-      const existingLeaf = {
-        view: { getViewType: jest.fn().mockReturnValue('todoseq-view') },
-        getRoot: jest.fn().mockReturnValue({
-          containerEl: activeDocument.createElement('div'),
-        }),
-      };
-      (existingLeaf.getRoot as jest.Mock).mockReturnValue({
-        containerEl: (() => {
-          const el = activeDocument.createElement('div');
-          el.classList.add('mod-right-split');
-          return el;
-        })(),
-      });
-
-      const workspace = (pluginMock.app as any).workspace;
-      workspace.getLeavesOfType = jest.fn().mockReturnValue([existingLeaf]);
-
-      await uiManager.showTasks();
-
-      expect(workspace.getLeavesOfType).toHaveBeenCalledWith('todoseq-view');
-    });
-
-    it('should create new leaf when no existing task list found', async () => {
-      const workspace = (pluginMock.app as any).workspace;
-      workspace.getLeavesOfType = jest.fn().mockReturnValue([]);
-
-      await uiManager.showTasks();
-
-      expect(workspace.getLeaf).toHaveBeenCalled();
-    });
-  });
-
-  describe('showTasksInNewTab', () => {
-    it('should create a new tab with task list view', async () => {
-      const workspace = (pluginMock.app as any).workspace;
-      const newLeaf = {
-        setViewState: jest.fn().mockResolvedValue(undefined),
-      };
-      workspace.getLeaf = jest.fn().mockReturnValue(newLeaf);
-
-      await uiManager.showTasksInNewTab();
-
-      expect(workspace.getLeaf).toHaveBeenCalledWith('tab');
-      expect(newLeaf.setViewState).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'todoseq-view' }),
-      );
-    });
-  });
-
+  // ---------------------------------------------------------------------------
+  // Cleanup (lifecycle)
+  // ---------------------------------------------------------------------------
   describe('cleanup', () => {
     it('should remove all event listeners', () => {
-      // Add a mock listener
       const target = activeDocument.createElement('div');
       const handler = jest.fn();
       target.addEventListener('click', handler);
@@ -241,7 +176,6 @@ describe('UIManager', () => {
 
       uiManager.cleanup();
 
-      // Verify cleanup doesn't throw
       expect(() => uiManager.cleanup()).not.toThrow();
     });
 
@@ -251,33 +185,13 @@ describe('UIManager', () => {
         1000,
       );
       uiManager.cleanup();
-      // Should not throw
       expect(() => uiManager.cleanup()).not.toThrow();
     });
   });
 
-  describe('refreshOpenTaskListViews', () => {
-    it('should refresh all open task list views', async () => {
-      // TaskListView is mocked at the top of the file; instantiate via the mock constructor
-      const TaskListViewMock = (
-        jest.requireMock('../src/view/task-list/task-list-view') as any
-      ).TaskListView;
-      const taskListViewMock = new TaskListViewMock();
-
-      const leafMock = {
-        view: taskListViewMock,
-      };
-
-      const workspace = (pluginMock.app as any).workspace;
-      workspace.getLeavesOfType = jest.fn().mockReturnValue([leafMock]);
-
-      await uiManager.refreshOpenTaskListViews();
-
-      expect(taskListViewMock.updateTasks).toHaveBeenCalled();
-      expect(taskListViewMock.refreshVisibleList).toHaveBeenCalled();
-    });
-  });
-
+  // ---------------------------------------------------------------------------
+  // Leaf priority ordering (pure algorithmic logic)
+  // ---------------------------------------------------------------------------
   describe('findTaskLeafInPriorityOrder', () => {
     it('should prioritize right sidebar leaf', () => {
       const rightLeaf = {
@@ -338,44 +252,9 @@ describe('UIManager', () => {
     });
   });
 
-  describe('setupEditorDecorations', () => {
-    it('should register task formatting and date autocomplete extensions', () => {
-      uiManager.setupEditorDecorations();
-
-      const { taskKeywordPlugin } = jest.requireMock(
-        '../src/view/editor-extensions/task-formatting',
-      );
-      const { dateAutocompleteExtension } = jest.requireMock(
-        '../src/view/editor-extensions/date-autocomplete',
-      );
-
-      expect(taskKeywordPlugin).toHaveBeenCalledWith(
-        pluginMock.settings,
-        expect.any(Function),
-      );
-      expect(dateAutocompleteExtension).toHaveBeenCalledWith(
-        pluginMock.settings,
-      );
-      expect(pluginMock.registerEditorExtension).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.any(Array), expect.any(Array)]),
-      );
-      expect(pluginMock.taskFormatters.has('editor-extension')).toBe(true);
-    });
-  });
-
-  describe('setupCheckboxEventListeners (formatting disabled)', () => {
-    it('should return early when formatTaskKeywords is false', () => {
-      (pluginMock.settings as any).formatTaskKeywords = false;
-      const workspace = (pluginMock.app as any).workspace;
-
-      uiManager.setupCheckboxEventListeners();
-
-      // Should not query leaves or register events when disabled
-      expect(workspace.getLeavesOfType).not.toHaveBeenCalled();
-      expect(pluginMock.registerEvent).not.toHaveBeenCalled();
-    });
-  });
-
+  // ---------------------------------------------------------------------------
+  // Click state management (pure timing logic)
+  // ---------------------------------------------------------------------------
   describe('cancelPendingClick', () => {
     it('should clear pending timeout and reset state', () => {
       const clearTimeoutSpy = jest.spyOn(window, 'clearTimeout');
@@ -421,6 +300,9 @@ describe('UIManager', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Keyword click handler (delegation logic)
+  // ---------------------------------------------------------------------------
   describe('handleTaskKeywordClick', () => {
     it('should call handleUpdateTaskStateAtLine with correct args', async () => {
       const keywordElement = activeDocument.createElement('span');
@@ -486,6 +368,9 @@ describe('UIManager', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Double-click detection (pure timing logic — needs fake timers)
+  // ---------------------------------------------------------------------------
   describe('handleTaskKeywordClickWithDoubleClickDetection', () => {
     beforeEach(() => {
       jest.useFakeTimers();
@@ -633,117 +518,6 @@ describe('UIManager', () => {
         'mouseup',
         expect.any(Function),
       );
-    });
-  });
-
-  describe('setupTaskKeywordContextMenu', () => {
-    it('should register file-open event and add context menu immediately', () => {
-      const addContextMenuSpy = jest.spyOn(
-        uiManager as any,
-        'addContextMenuToEditor',
-      );
-
-      uiManager.setupTaskKeywordContextMenu();
-
-      expect(pluginMock.registerEvent).toHaveBeenCalled();
-      expect(addContextMenuSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it('should trigger addContextMenuToEditor when .md file is opened', () => {
-      jest.useFakeTimers();
-
-      const addContextMenuSpy = jest.spyOn(
-        uiManager as any,
-        'addContextMenuToEditor',
-      );
-
-      uiManager.setupTaskKeywordContextMenu();
-
-      // Reset to count only subsequent calls
-      addContextMenuSpy.mockClear();
-
-      // Get the file-open callback
-      const { TFile } = jest.requireMock('obsidian');
-      const fileOpenCallback = (
-        pluginMock.app.workspace.on as jest.Mock
-      ).mock.calls.find((call: [string]) => call[0] === 'file-open')?.[1];
-
-      expect(fileOpenCallback).toBeDefined();
-
-      // Trigger with a .md file — set extension since mock TFile doesn't define it
-      const mdFile = new TFile('test.md');
-      mdFile.extension = 'md';
-      fileOpenCallback(mdFile);
-
-      // Should not be called yet (waiting for 100ms timeout)
-      expect(addContextMenuSpy).not.toHaveBeenCalled();
-
-      jest.advanceTimersByTime(100);
-
-      expect(addContextMenuSpy).toHaveBeenCalledTimes(1);
-
-      // Non-.md files should not trigger the context menu
-      addContextMenuSpy.mockClear();
-      const nonMdFile = new TFile('notes.txt');
-      nonMdFile.extension = 'txt';
-      fileOpenCallback(nonMdFile);
-      jest.advanceTimersByTime(100);
-      expect(addContextMenuSpy).not.toHaveBeenCalled();
-
-      jest.useRealTimers();
-    });
-  });
-
-  describe('setupCheckboxEventListeners with active editor', () => {
-    it('should attach click/touch listeners to editor DOM', () => {
-      const { MarkdownView } = jest.requireMock('obsidian');
-      const view = new MarkdownView() as any;
-      const editorDom = activeDocument.createElement('div');
-      view.editor = { cm: { dom: editorDom } };
-      view.file = { path: 'test.md' };
-
-      const workspace = (pluginMock.app as any).workspace;
-      workspace.getLeavesOfType = jest
-        .fn()
-        .mockImplementation((type: string) => {
-          if (type === 'markdown') return [{ view }];
-          return [];
-        });
-
-      const addEventListenerSpy = jest.spyOn(editorDom, 'addEventListener');
-
-      uiManager.setupCheckboxEventListeners();
-
-      // Should have registered workspace events
-      expect(pluginMock.registerEvent).toHaveBeenCalled();
-
-      // Should have attached click listener with capture
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        'click',
-        expect.any(Function),
-        { capture: true },
-      );
-
-      // Should have attached touchstart listener with capture + passive
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        'touchstart',
-        expect.any(Function),
-        { capture: true, passive: true },
-      );
-
-      // Should have attached touchend listener with capture
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        'touchend',
-        expect.any(Function),
-        { capture: true },
-      );
-
-      // Should have tracked listeners in registeredEventListeners
-      const registeredListeners = (uiManager as any).registeredEventListeners;
-      const editorListeners = registeredListeners.filter(
-        (l: { target: HTMLElement }) => l.target === editorDom,
-      );
-      expect(editorListeners.length).toBe(3);
     });
   });
 });
