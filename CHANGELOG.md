@@ -7,6 +7,7 @@
 - Added setting to change the period for the Upcoming tasks, default is 7 days.
 - Fixed search history entries to now remember and restore the match case setting for each query.
 - Fixed issue with changing repeating value on scheudled or deadline dates in the editor not updating the task list.
+- Added automated integration test framework.
 
 ## 0.15.2
 
