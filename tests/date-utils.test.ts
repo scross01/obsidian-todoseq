@@ -1,4 +1,4 @@
-import { DateUtils } from '../src/utils/date-utils';
+import { DateUtils, warningPeriodToDays } from '../src/utils/date-utils';
 
 // Timezones to test with
 const testTimezones = ['UTC', 'America/Toronto', 'Asia/Tokyo'];
@@ -697,5 +697,56 @@ testTimezones.forEach((timezone) => {
         });
       });
     });
+  });
+});
+
+describe('warningPeriodToDays', () => {
+  test('should convert days correctly', () => {
+    expect(
+      warningPeriodToDays({ value: 3, unit: 'd', isFirstOnly: false }),
+    ).toBe(3);
+  });
+
+  test('should convert weeks to days', () => {
+    expect(
+      warningPeriodToDays({ value: 2, unit: 'w', isFirstOnly: false }),
+    ).toBe(14);
+  });
+
+  test('should convert months to days (30 days per month)', () => {
+    expect(
+      warningPeriodToDays({ value: 1, unit: 'm', isFirstOnly: false }),
+    ).toBe(30);
+  });
+
+  test('should convert years to days (365 days per year)', () => {
+    expect(
+      warningPeriodToDays({ value: 1, unit: 'y', isFirstOnly: false }),
+    ).toBe(365);
+  });
+
+  test('should handle isFirstOnly flag without affecting conversion', () => {
+    expect(
+      warningPeriodToDays({ value: 5, unit: 'd', isFirstOnly: true }),
+    ).toBe(5);
+    expect(
+      warningPeriodToDays({ value: 5, unit: 'd', isFirstOnly: false }),
+    ).toBe(5);
+  });
+
+  test('should throw on unknown unit (exhaustive switch default)', () => {
+    // Cast to bypass TypeScript type checking to test the exhaustive default
+    const invalidInfo = {
+      value: 1,
+      unit: 'x',
+      isFirstOnly: false,
+    } as unknown as {
+      value: number;
+      unit: 'd' | 'w' | 'm' | 'y';
+      isFirstOnly: boolean;
+    };
+    expect(() => warningPeriodToDays(invalidInfo)).toThrow(
+      'Unknown warning period unit: x',
+    );
   });
 });

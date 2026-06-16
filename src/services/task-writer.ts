@@ -1,5 +1,5 @@
 import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
-import { Task, DateRepeatInfo } from '../types/task';
+import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { DateUtils } from '../utils/date-utils';
@@ -50,8 +50,7 @@ export class TaskWriter {
   private static buildDateLineContent(
     date: Date,
     repeat?: DateRepeatInfo | null,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ): string {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -60,10 +59,7 @@ export class TaskWriter {
         ? ''
         : ` ${hours}:${minutes}`;
     const repeatStr = repeat ? ` ${repeat.raw}` : '';
-    const warningStr = buildWarningPeriodString(
-      warningPeriod,
-      firstOnlyWarningPeriod,
-    );
+    const warningStr = buildWarningPeriodString(warningPeriod);
     return `<${DateUtils.formatDateContent(date)}${timeStr}${repeatStr}${warningStr}>`;
   }
 
@@ -518,14 +514,12 @@ export class TaskWriter {
     task: Task,
     newDate: Date,
     repeat?: DateRepeatInfo | null,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ): Promise<Task & { lineDelta?: number }> {
     const dateStr = TaskWriter.buildDateLineContent(
       newDate,
       repeat,
       warningPeriod,
-      firstOnlyWarningPeriod,
     );
     let lineDelta = 0;
 
@@ -551,7 +545,6 @@ export class TaskWriter {
       scheduledDate: newDate,
       scheduledDateRepeat: repeat ?? null,
       scheduledWarningPeriod: warningPeriod ?? null,
-      scheduledFirstOnlyWarningPeriod: firstOnlyWarningPeriod ?? null,
     };
     if (lineDelta !== 0) {
       result.lineDelta = lineDelta;
@@ -611,14 +604,12 @@ export class TaskWriter {
     task: Task,
     newDate: Date,
     repeat?: DateRepeatInfo | null,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ): Promise<Task & { lineDelta?: number }> {
     const dateStr = TaskWriter.buildDateLineContent(
       newDate,
       repeat,
       warningPeriod,
-      firstOnlyWarningPeriod,
     );
     let lineDelta = 0;
 
@@ -644,7 +635,6 @@ export class TaskWriter {
       deadlineDate: newDate,
       deadlineDateRepeat: repeat ?? null,
       deadlineWarningPeriod: warningPeriod ?? null,
-      deadlineFirstOnlyWarningPeriod: firstOnlyWarningPeriod ?? null,
     };
     if (lineDelta !== 0) {
       result.lineDelta = lineDelta;

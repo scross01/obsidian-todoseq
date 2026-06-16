@@ -212,10 +212,6 @@ export class RecurrenceCoordinator {
         newDeadlineRepeat: task.deadlineDateRepeat,
         newScheduledWarningPeriod: dateResult.newScheduledWarningPeriod ?? null,
         newDeadlineWarningPeriod: dateResult.newDeadlineWarningPeriod ?? null,
-        newScheduledFirstOnlyWarningPeriod:
-          dateResult.newScheduledFirstOnlyWarningPeriod ?? null,
-        newDeadlineFirstOnlyWarningPeriod:
-          dateResult.newDeadlineFirstOnlyWarningPeriod ?? null,
         newStateForRecurrence: defaultInactive,
       });
 

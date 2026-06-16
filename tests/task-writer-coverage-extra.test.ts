@@ -372,11 +372,15 @@ describe('TaskWriter additional coverage', () => {
         task,
         newDate,
         null,
-        3,
+        { value: 3, unit: 'd', isFirstOnly: false },
       );
 
       expect(mockApp.vault.process).toHaveBeenCalled();
-      expect(result.deadlineWarningPeriod).toBe(3);
+      expect(result.deadlineWarningPeriod).toEqual({
+        value: 3,
+        unit: 'd',
+        isFirstOnly: false,
+      });
     });
 
     it('should add DEADLINE with first-only warning period', async () => {
@@ -399,12 +403,15 @@ describe('TaskWriter additional coverage', () => {
         task,
         newDate,
         null,
-        null,
-        1,
+        { value: 1, unit: 'd', isFirstOnly: true },
       );
 
       expect(mockApp.vault.process).toHaveBeenCalled();
-      expect(result.deadlineFirstOnlyWarningPeriod).toBe(1);
+      expect(result.deadlineWarningPeriod).toEqual({
+        value: 1,
+        unit: 'd',
+        isFirstOnly: true,
+      });
     });
 
     it('should include time in DEADLINE when non-midnight', async () => {

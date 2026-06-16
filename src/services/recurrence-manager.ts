@@ -3,7 +3,7 @@
  * Provides centralized calculation and update of recurring task dates.
  */
 
-import { Task } from '../types/task';
+import { Task, WarningPeriodInfo } from '../types/task';
 import { calculateNextRepeatDate } from '../utils/date-repeater';
 import {
   findDateLineWithParser,
@@ -21,13 +21,9 @@ export interface RecurrenceUpdateResult {
   /** The new deadline date (if updated) */
   newDeadlineDate?: Date;
   /** The effective warning period for the new scheduled date */
-  newScheduledWarningPeriod?: number | null;
+  newScheduledWarningPeriod?: WarningPeriodInfo | null;
   /** The effective warning period for the new deadline date */
-  newDeadlineWarningPeriod?: number | null;
-  /** The effective first-only warning period for the new scheduled date */
-  newScheduledFirstOnlyWarningPeriod?: number | null;
-  /** The effective first-only warning period for the new deadline date */
-  newDeadlineFirstOnlyWarningPeriod?: number | null;
+  newDeadlineWarningPeriod?: WarningPeriodInfo | null;
 }
 
 /**
@@ -132,20 +128,22 @@ export class RecurrenceManager {
     }
 
     // Determine warning periods for next occurrence:
-    // -Nd (scheduledWarningPeriod/deadlineWarningPeriod) is preserved across repeats
-    // --Nd (scheduledFirstOnlyWarningPeriod/deadlineFirstOnlyWarningPeriod) is stripped after first occurrence
+    // -Nd (non-firstOnly) is preserved across repeats
+    // --Nd (isFirstOnly) is stripped after first occurrence → null triggers stripping in coordinator
     return {
       updated: true,
       newScheduledDate: newScheduledDate ?? undefined,
       newDeadlineDate: newDeadlineDate ?? undefined,
       newScheduledWarningPeriod: newScheduledDate
-        ? task.scheduledWarningPeriod
+        ? task.scheduledWarningPeriod?.isFirstOnly
+          ? null
+          : task.scheduledWarningPeriod
         : undefined,
-      newScheduledFirstOnlyWarningPeriod: newScheduledDate ? null : undefined,
       newDeadlineWarningPeriod: newDeadlineDate
-        ? task.deadlineWarningPeriod
+        ? task.deadlineWarningPeriod?.isFirstOnly
+          ? null
+          : task.deadlineWarningPeriod
         : undefined,
-      newDeadlineFirstOnlyWarningPeriod: newDeadlineDate ? null : undefined,
     };
   }
 

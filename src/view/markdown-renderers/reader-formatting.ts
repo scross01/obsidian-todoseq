@@ -2409,8 +2409,6 @@ export class ReaderViewFormatter {
           closedDate: null,
           scheduledWarningPeriod: null,
           deadlineWarningPeriod: null,
-          scheduledFirstOnlyWarningPeriod: null,
-          deadlineFirstOnlyWarningPeriod: null,
           urgency: null,
           isDailyNote: false,
           dailyNoteDate: null,

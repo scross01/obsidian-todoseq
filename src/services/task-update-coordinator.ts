@@ -13,7 +13,7 @@
  *
  * This design ensures consistent behavior on both desktop and mobile.
  */
-import { Task, DateRepeatInfo } from '../types/task';
+import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
 import { KeywordManager } from '../utils/keyword-manager';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
@@ -66,9 +66,7 @@ export interface UpdateContext {
   /** New repeat info (for date type updates) */
   newRepeat?: DateRepeatInfo | null;
   /** New warning period (for date type updates) */
-  newWarningPeriod?: number | null;
-  /** New first-only warning period (for date type updates) */
-  newFirstOnlyWarningPeriod?: number | null;
+  newWarningPeriod?: WarningPeriodInfo | null;
   /** New priority (for 'priority' type updates) */
   newPriority?: 'high' | 'med' | 'low' | null;
   /** New scheduled date (for 'recurrence' type updates) */
@@ -80,13 +78,9 @@ export interface UpdateContext {
   /** New deadline repeat (for 'recurrence' type updates) */
   newDeadlineRepeat?: DateRepeatInfo | null;
   /** New scheduled warning period (for 'recurrence' type updates) */
-  newScheduledWarningPeriod?: number | null;
+  newScheduledWarningPeriod?: WarningPeriodInfo | null;
   /** New deadline warning period (for 'recurrence' type updates) */
-  newDeadlineWarningPeriod?: number | null;
-  /** New scheduled first-only warning period (for 'recurrence' type updates) */
-  newScheduledFirstOnlyWarningPeriod?: number | null;
-  /** New deadline first-only warning period (for 'recurrence' type updates) */
-  newDeadlineFirstOnlyWarningPeriod?: number | null;
+  newDeadlineWarningPeriod?: WarningPeriodInfo | null;
   /** New state for recurrence (for 'recurrence' type updates) */
   newStateForRecurrence?: string;
 }
@@ -104,8 +98,7 @@ interface ProcessingContext {
   originalNewState: string;
   newDate?: Date | null;
   newRepeat?: DateRepeatInfo | null;
-  newWarningPeriod?: number | null;
-  newFirstOnlyWarningPeriod?: number | null;
+  newWarningPeriod?: WarningPeriodInfo | null;
   newPriority?: 'high' | 'med' | 'low' | null;
   /** New scheduled date (for 'recurrence' type updates) */
   newScheduledDate?: Date | null;
@@ -116,13 +109,9 @@ interface ProcessingContext {
   /** New deadline repeat (for 'recurrence' type updates) */
   newDeadlineRepeat?: DateRepeatInfo | null;
   /** New scheduled warning period (for 'recurrence' type updates) */
-  newScheduledWarningPeriod?: number | null;
+  newScheduledWarningPeriod?: WarningPeriodInfo | null;
   /** New deadline warning period (for 'recurrence' type updates) */
-  newDeadlineWarningPeriod?: number | null;
-  /** New scheduled first-only warning period (for 'recurrence' type updates) */
-  newScheduledFirstOnlyWarningPeriod?: number | null;
-  /** New deadline first-only warning period (for 'recurrence' type updates) */
-  newDeadlineFirstOnlyWarningPeriod?: number | null;
+  newDeadlineWarningPeriod?: WarningPeriodInfo | null;
   /** New state for recurrence (for 'recurrence' type updates) */
   newStateForRecurrence?: string;
   filePath: string;
@@ -290,8 +279,7 @@ export class TaskUpdateCoordinator {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ): Promise<void> {
     return this.updateTask({
       task,
@@ -300,7 +288,6 @@ export class TaskUpdateCoordinator {
       newDate: date,
       newRepeat: repeat,
       newWarningPeriod: warningPeriod,
-      newFirstOnlyWarningPeriod: firstOnlyWarningPeriod,
     });
   }
 
@@ -311,8 +298,7 @@ export class TaskUpdateCoordinator {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ): Promise<void> {
     return this.updateTask({
       task,
@@ -321,7 +307,6 @@ export class TaskUpdateCoordinator {
       newDate: date,
       newRepeat: repeat,
       newWarningPeriod: warningPeriod,
-      newFirstOnlyWarningPeriod: firstOnlyWarningPeriod,
     });
   }
 
@@ -352,10 +337,8 @@ export class TaskUpdateCoordinator {
       newDeadlineDate?: Date | null;
       newScheduledRepeat?: DateRepeatInfo | null;
       newDeadlineRepeat?: DateRepeatInfo | null;
-      newScheduledWarningPeriod?: number | null;
-      newDeadlineWarningPeriod?: number | null;
-      newScheduledFirstOnlyWarningPeriod?: number | null;
-      newDeadlineFirstOnlyWarningPeriod?: number | null;
+      newScheduledWarningPeriod?: WarningPeriodInfo | null;
+      newDeadlineWarningPeriod?: WarningPeriodInfo | null;
       newStateForRecurrence?: string;
     },
   ): Promise<void> {
@@ -480,7 +463,6 @@ export class TaskUpdateCoordinator {
       newDate: context.newDate,
       newRepeat: context.newRepeat,
       newWarningPeriod: context.newWarningPeriod,
-      newFirstOnlyWarningPeriod: context.newFirstOnlyWarningPeriod,
       newPriority: context.newPriority,
       newScheduledDate: context.newScheduledDate,
       newDeadlineDate: context.newDeadlineDate,
@@ -488,10 +470,6 @@ export class TaskUpdateCoordinator {
       newDeadlineRepeat: context.newDeadlineRepeat,
       newScheduledWarningPeriod: context.newScheduledWarningPeriod,
       newDeadlineWarningPeriod: context.newDeadlineWarningPeriod,
-      newScheduledFirstOnlyWarningPeriod:
-        context.newScheduledFirstOnlyWarningPeriod,
-      newDeadlineFirstOnlyWarningPeriod:
-        context.newDeadlineFirstOnlyWarningPeriod,
       newStateForRecurrence: context.newStateForRecurrence,
       filePath: context.task.path,
       fileLine: context.task.line,
@@ -681,7 +659,6 @@ export class TaskUpdateCoordinator {
           context.newDate,
           context.newRepeat,
           context.newWarningPeriod,
-          context.newFirstOnlyWarningPeriod,
         );
 
       case 'deadline-date':
@@ -693,7 +670,6 @@ export class TaskUpdateCoordinator {
           context.newDate,
           context.newRepeat,
           context.newWarningPeriod,
-          context.newFirstOnlyWarningPeriod,
         );
 
       case 'priority':
@@ -720,15 +696,10 @@ export class TaskUpdateCoordinator {
               updatedTask,
               context.newScheduledDate,
               context.newScheduledRepeat ?? updatedTask.scheduledDateRepeat,
-              // For warningPeriod: null means "keep existing" (recurring periods persist),
-              // undefined means not provided. Both fall back to existing via ??.
-              context.newScheduledWarningPeriod ??
+              this.resolveRecurrenceWarningPeriod(
+                context.newScheduledWarningPeriod,
                 updatedTask.scheduledWarningPeriod,
-              // For firstOnlyWarningPeriod: null means "strip" (--Nd only applies to first
-              // occurrence), undefined means not provided. Use !== undefined to distinguish.
-              context.newScheduledFirstOnlyWarningPeriod !== undefined
-                ? context.newScheduledFirstOnlyWarningPeriod
-                : updatedTask.scheduledFirstOnlyWarningPeriod,
+              ),
             );
             updatedTask = result;
             totalLineDelta += result.lineDelta ?? 0;
@@ -745,15 +716,10 @@ export class TaskUpdateCoordinator {
               updatedTask,
               context.newDeadlineDate,
               context.newDeadlineRepeat ?? updatedTask.deadlineDateRepeat,
-              // For warningPeriod: null means "keep existing" (recurring periods persist),
-              // undefined means not provided. Both fall back to existing via ??.
-              context.newDeadlineWarningPeriod ??
+              this.resolveRecurrenceWarningPeriod(
+                context.newDeadlineWarningPeriod,
                 updatedTask.deadlineWarningPeriod,
-              // For firstOnlyWarningPeriod: null means "strip" (--Nd only applies to first
-              // occurrence), undefined means not provided. Use !== undefined to distinguish.
-              context.newDeadlineFirstOnlyWarningPeriod !== undefined
-                ? context.newDeadlineFirstOnlyWarningPeriod
-                : updatedTask.deadlineFirstOnlyWarningPeriod,
+              ),
             );
             updatedTask = result;
             totalLineDelta += result.lineDelta ?? 0;
@@ -815,10 +781,6 @@ export class TaskUpdateCoordinator {
             deadlineDateRepeat: updatedTask.deadlineDateRepeat,
             scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
             deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
-            scheduledFirstOnlyWarningPeriod:
-              updatedTask.scheduledFirstOnlyWarningPeriod,
-            deadlineFirstOnlyWarningPeriod:
-              updatedTask.deadlineFirstOnlyWarningPeriod,
             closedDate: updatedTask.closedDate,
             urgency,
           },
@@ -834,8 +796,6 @@ export class TaskUpdateCoordinator {
             scheduledDate: updatedTask.scheduledDate,
             scheduledDateRepeat: updatedTask.scheduledDateRepeat,
             scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
-            scheduledFirstOnlyWarningPeriod:
-              updatedTask.scheduledFirstOnlyWarningPeriod,
             urgency,
           },
         );
@@ -850,8 +810,6 @@ export class TaskUpdateCoordinator {
             deadlineDate: updatedTask.deadlineDate,
             deadlineDateRepeat: updatedTask.deadlineDateRepeat,
             deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
-            deadlineFirstOnlyWarningPeriod:
-              updatedTask.deadlineFirstOnlyWarningPeriod,
             urgency,
           },
         );
@@ -886,10 +844,6 @@ export class TaskUpdateCoordinator {
             deadlineDateRepeat: updatedTask.deadlineDateRepeat,
             scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
             deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
-            scheduledFirstOnlyWarningPeriod:
-              updatedTask.scheduledFirstOnlyWarningPeriod,
-            deadlineFirstOnlyWarningPeriod:
-              updatedTask.deadlineFirstOnlyWarningPeriod,
             urgency,
           },
         );
@@ -1132,6 +1086,24 @@ export class TaskUpdateCoordinator {
     for (const path of staleFilePaths) {
       this.fileUpdateQueues.delete(path);
     }
+  }
+
+  /**
+   * Resolve the warning period for recurrence updates.
+   * undefined = keep existing (no change requested)
+   * null + existing is firstOnly = strip (first-only removed after first occurrence)
+   * null + existing is regular = keep (regular periods persist across recurrences)
+   * value = use the provided value
+   */
+  private resolveRecurrenceWarningPeriod(
+    newWp: WarningPeriodInfo | null | undefined,
+    existingWp: WarningPeriodInfo | null,
+  ): WarningPeriodInfo | null {
+    if (newWp === undefined) return existingWp;
+    // null + regular (non-firstOnly) = keep existing (regular periods persist)
+    if (newWp === null && existingWp && !existingWp.isFirstOnly)
+      return existingWp;
+    return newWp;
   }
 
   /**

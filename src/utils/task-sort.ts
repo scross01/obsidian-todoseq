@@ -1,6 +1,7 @@
 import { Task } from '../types/task';
 import { DateUtils } from './date-utils';
 import { KeywordManager } from './keyword-manager';
+import { warningPeriodToDays } from './date-utils';
 
 /**
  * Task Classification Types
@@ -292,25 +293,30 @@ export function getEffectiveVisibilityDate(
   let effectiveDeadline: Date | null = null;
 
   if (task.scheduledDate) {
-    let scheduledDelay =
-      task.scheduledWarningPeriod ??
-      task.scheduledFirstOnlyWarningPeriod ??
-      settings.defaultScheduledWarningPeriod;
+    const scheduledWarningInfo = task.scheduledWarningPeriod;
+    const scheduledDelay = scheduledWarningInfo
+      ? warningPeriodToDays(scheduledWarningInfo)
+      : settings.defaultScheduledWarningPeriod;
     if (settings.skipScheduledWarningPeriodIfDeadline && task.deadlineDate) {
-      scheduledDelay = 0;
+      effectiveScheduled = task.scheduledDate;
+    } else {
+      effectiveScheduled = DateUtils.addDays(
+        task.scheduledDate,
+        scheduledDelay,
+      );
     }
-    effectiveScheduled = DateUtils.addDays(task.scheduledDate, scheduledDelay);
   }
 
   if (task.deadlineDate) {
-    let warningDays =
-      task.deadlineWarningPeriod ??
-      task.deadlineFirstOnlyWarningPeriod ??
-      settings.defaultDeadlineWarningPeriod;
+    const deadlineWarningInfo = task.deadlineWarningPeriod;
+    const warningDays = deadlineWarningInfo
+      ? warningPeriodToDays(deadlineWarningInfo)
+      : settings.defaultDeadlineWarningPeriod;
     if (settings.skipDeadlinePrewarningIfScheduled && task.scheduledDate) {
-      warningDays = 0;
+      effectiveDeadline = task.deadlineDate;
+    } else {
+      effectiveDeadline = DateUtils.addDays(task.deadlineDate, -warningDays);
     }
-    effectiveDeadline = DateUtils.addDays(task.deadlineDate, -warningDays);
   }
 
   if (!effectiveScheduled) return effectiveDeadline;

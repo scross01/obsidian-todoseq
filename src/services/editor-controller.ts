@@ -1,6 +1,6 @@
 import { Editor, EditorPosition, MarkdownView, Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
-import { Task } from '../types/task';
+import { Task, WarningPeriodInfo } from '../types/task';
 import TodoTracker from '../main';
 import { detectListMarker } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
@@ -326,8 +326,6 @@ export class EditorController {
           closedDate: null,
           scheduledWarningPeriod: null,
           deadlineWarningPeriod: null,
-          scheduledFirstOnlyWarningPeriod: null,
-          deadlineFirstOnlyWarningPeriod: null,
           urgency: null,
           isDailyNote: false,
           dailyNoteDate: null,
@@ -1279,8 +1277,7 @@ export class EditorController {
           task: Task,
           date: Date | null,
           repeat?: DateRepeatInfo | null,
-          warningPeriod?: number | null,
-          firstOnlyWarningPeriod?: number | null,
+          warningPeriod?: WarningPeriodInfo | null,
         ) => {
           const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
           if (taskUpdateCoordinator) {
@@ -1292,7 +1289,6 @@ export class EditorController {
                 newDate: date,
                 newRepeat: repeat,
                 newWarningPeriod: warningPeriod,
-                newFirstOnlyWarningPeriod: firstOnlyWarningPeriod,
               })
               .catch((error) => {
                 new Notice('Failed to update task date');
@@ -1304,8 +1300,7 @@ export class EditorController {
           task: Task,
           date: Date | null,
           repeat?: DateRepeatInfo | null,
-          warningPeriod?: number | null,
-          firstOnlyWarningPeriod?: number | null,
+          warningPeriod?: WarningPeriodInfo | null,
         ) => {
           const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
           if (taskUpdateCoordinator) {
@@ -1317,7 +1312,6 @@ export class EditorController {
                 newDate: date,
                 newRepeat: repeat,
                 newWarningPeriod: warningPeriod,
-                newFirstOnlyWarningPeriod: firstOnlyWarningPeriod,
               })
               .catch((error) => {
                 new Notice('Failed to update task deadline');

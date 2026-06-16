@@ -17,10 +17,8 @@ export interface Task {
   deadlineDate: Date | null; // deadline date from DEADLINE: line
   deadlineDateRepeat: DateRepeatInfo | null; // repeater info for deadline date
   closedDate: Date | null; // closed date from CLOSED: line (when task was marked as completed)
-  scheduledWarningPeriod: number | null; // -Nd warning period for scheduled date (delayed notice)
-  deadlineWarningPeriod: number | null; // -Nd warning period for deadline date (advance notice)
-  scheduledFirstOnlyWarningPeriod: number | null; // --Nd first-only warning period for scheduled date
-  deadlineFirstOnlyWarningPeriod: number | null; // --Nd first-only warning period for deadline date
+  scheduledWarningPeriod: WarningPeriodInfo | null; // Warning period for scheduled date (delayed notice). isFirstOnly indicates --Nd syntax.
+  deadlineWarningPeriod: WarningPeriodInfo | null; // Warning period for deadline date (advance notice). isFirstOnly indicates --Nd syntax.
   tail?: string; // trailing end characters after the task text (e.g., " */")
   urgency: number | null; // calculated urgency score
   file?: TFile; // reference to the file for daily notes detection
@@ -59,4 +57,23 @@ export interface DateRepeatInfo {
   value: number;
   /** Original repeater string (e.g., ".+1d", "++1w") */
   raw: string;
+}
+
+/**
+ * Information about a warning period (-Nd, --Nd, -1w, -2m, etc.).
+ * Used for SCHEDULED and DEADLINE dates with org-mode compatible warning periods.
+ *
+ * @example
+ * // For date like <2026-03-05 Wed .+1d -3d>
+ * { value: 3, unit: 'd' }
+ * // For date like <2026-03-05 Wed +1w -1w>
+ * { value: 1, unit: 'w' }
+ */
+export interface WarningPeriodInfo {
+  /** Numeric value (e.g., 3 for -3d, 1 for -1w) */
+  value: number;
+  /** Time unit: d=day, w=week, m=month, y=year */
+  unit: 'd' | 'w' | 'm' | 'y';
+  /** Whether this warning period applies only to the first occurrence (--Nd syntax) */
+  isFirstOnly: boolean;
 }

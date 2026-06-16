@@ -16,24 +16,35 @@ Common use cases:
 
 ## Syntax
 
-Warning periods use the `-Nd` syntax appended after the date (and after a repeater if present):
+Warning periods use the `-Nunit` syntax appended after the date (and after a repeater if present). The unit character determines the time scale:
+
+| Unit | Meaning | Example | Equivalent days |
+| ---- | ------- | ------- | --------------- |
+| `d`  | Days    | `-5d`   | 5 days          |
+| `w`  | Weeks   | `-1w`   | 7 days          |
+| `m`  | Months  | `-1m`   | ~30 days        |
+| `y`  | Years   | `-1y`   | ~365 days       |
+
+The unit character is case-insensitive — `d`, `D`, `w`, `W`, `m`, `M`, `y`, and `Y` all work.
 
 ```markdown
 DEADLINE: <2026-06-20 Sat -5d> # Appears 5 days before deadline
-SCHEDULED: <2026-06-10 Wed -3d> # Appears 3 days after scheduled date
+SCHEDULED: <2026-06-10 Wed -1w> # Appears 1 week after scheduled date
+DEADLINE: <2026-06-20 Sat -1m> # Appears ~30 days before deadline
+DEADLINE: <2026-06-20 Sat -1y> # Appears ~1 year before deadline
 DEADLINE: <2026-01-01 Wed +1m -3d> # Monthly repeat, 3-day advance notice
 ```
 
-### First-Only Warning Periods (`--Nd`)
+### First-Only Warning Periods (`--Nunit`)
 
-For recurring tasks, use `--Nd` (double dash) to apply the warning period only to the first occurrence. Subsequent occurrences ignore the delay:
+For recurring tasks, use `--Nunit` (double dash) to apply the warning period only to the first occurrence. Subsequent occurrences ignore the delay:
 
 ```markdown
 SCHEDULED: <2026-06-10 Wed +1w --2d> # First occurrence delayed 2 days; later weeks on time
-DEADLINE: <2026-03-01 Sun +1m --5d> # First month: 5-day advance notice; later months: none
+DEADLINE: <2026-03-01 Sun +1m --1w> # First month: 1-week advance notice; later months: none
 ```
 
-The `-Nd` form (single dash) persists across all occurrences. The `--Nd` form is stripped after the first recurrence.
+The `-Nunit` form (single dash) persists across all occurrences. The `--Nunit` form is stripped after the first recurrence.
 
 ## How It Works
 

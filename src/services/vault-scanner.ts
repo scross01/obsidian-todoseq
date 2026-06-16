@@ -1,5 +1,5 @@
 import { TFile, TAbstractFile } from 'obsidian';
-import { Task } from '../types/task';
+import { Task, WarningPeriodInfo } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
 import { ParserRegistry } from '../parser/parser-registry';
 import { ParserConfig } from '../parser/types';
@@ -552,6 +552,20 @@ export class VaultScanner {
     this.skipIncrementalChanges.set(filePath, Date.now());
   }
 
+  // Compare two WarningPeriodInfo objects by value (not reference)
+  private static wpEqual(
+    a: WarningPeriodInfo | null,
+    b: WarningPeriodInfo | null,
+  ): boolean {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    return (
+      a.value === b.value &&
+      a.unit === b.unit &&
+      a.isFirstOnly === b.isFirstOnly
+    );
+  }
+
   // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate, subtaskCount, subtaskCompletedCount)
   private tasksIdentical(before: Task[], after: Task[]): boolean {
     if (before.length !== after.length) {
@@ -570,11 +584,14 @@ export class VaultScanner {
           (a.deadlineDate?.getTime() ?? null) ||
         b.scheduledDateRepeat?.raw !== a.scheduledDateRepeat?.raw ||
         b.deadlineDateRepeat?.raw !== a.deadlineDateRepeat?.raw ||
-        b.scheduledWarningPeriod !== a.scheduledWarningPeriod ||
-        b.deadlineWarningPeriod !== a.deadlineWarningPeriod ||
-        b.scheduledFirstOnlyWarningPeriod !==
-          a.scheduledFirstOnlyWarningPeriod ||
-        b.deadlineFirstOnlyWarningPeriod !== a.deadlineFirstOnlyWarningPeriod ||
+        !VaultScanner.wpEqual(
+          b.scheduledWarningPeriod,
+          a.scheduledWarningPeriod,
+        ) ||
+        !VaultScanner.wpEqual(
+          b.deadlineWarningPeriod,
+          a.deadlineWarningPeriod,
+        ) ||
         b.subtaskCount !== a.subtaskCount ||
         b.subtaskCompletedCount !== a.subtaskCompletedCount
       ) {

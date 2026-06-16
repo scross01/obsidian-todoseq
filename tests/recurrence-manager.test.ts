@@ -299,6 +299,253 @@ describe('RecurrenceManager', () => {
       // getTaskIndent falls back to '' via task.indent ?? ''
       expect(scheduledCall![1]).toBe('');
     });
+
+    // ── warning period behavior on recurrence ──────────────────────
+
+    it('should strip first-only scheduled warning period on recurrence', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 0,
+        rawText: 'DONE task',
+        text: 'task',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date('2026-03-10'),
+        deadlineDate: null,
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDateRepeat: null,
+        scheduledWarningPeriod: { value: 2, unit: 'd', isFirstOnly: true },
+        deadlineWarningPeriod: null,
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+      const lines = ['DONE task', '  SCHEDULED: <2026-03-10 Mon +1w --2d>'];
+      const result = recurrenceManager.calculateNextDates(
+        task,
+        lines,
+        mockParser,
+      );
+
+      expect(result.updated).toBe(true);
+      // First-only warning period should be stripped (null triggers stripping in coordinator)
+      expect(result.newScheduledWarningPeriod).toBeNull();
+    });
+
+    it('should preserve regular scheduled warning period on recurrence', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 0,
+        rawText: 'DONE task',
+        text: 'task',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date('2026-03-10'),
+        deadlineDate: null,
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDateRepeat: null,
+        scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: false },
+        deadlineWarningPeriod: null,
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+      const lines = ['DONE task', '  SCHEDULED: <2026-03-10 Mon +1w -3d>'];
+      const result = recurrenceManager.calculateNextDates(
+        task,
+        lines,
+        mockParser,
+      );
+
+      expect(result.updated).toBe(true);
+      // Regular warning period should be preserved across recurrences
+      expect(result.newScheduledWarningPeriod).toEqual({
+        value: 3,
+        unit: 'd',
+        isFirstOnly: false,
+      });
+    });
+
+    it('should return undefined for scheduled warning period when none exists', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 0,
+        rawText: 'DONE task',
+        text: 'task',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date('2026-03-10'),
+        deadlineDate: null,
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDateRepeat: null,
+        scheduledWarningPeriod: null,
+        deadlineWarningPeriod: null,
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+      const lines = ['DONE task', '  SCHEDULED: <2026-03-10 Mon +1w>'];
+      const result = recurrenceManager.calculateNextDates(
+        task,
+        lines,
+        mockParser,
+      );
+
+      expect(result.updated).toBe(true);
+      // No warning period → null (no warning period to carry forward)
+      expect(result.newScheduledWarningPeriod).toBeNull();
+    });
+
+    it('should strip first-only deadline warning period on recurrence', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 0,
+        rawText: 'DONE task',
+        text: 'task',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: null,
+        deadlineDate: new Date('2026-03-10'),
+        scheduledDateRepeat: null,
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        scheduledWarningPeriod: null,
+        deadlineWarningPeriod: { value: 1, unit: 'w', isFirstOnly: true },
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType.mockReturnValue('deadline');
+      const lines = ['DONE task', '  DEADLINE: <2026-03-10 Mon +1w --1w>'];
+      const result = recurrenceManager.calculateNextDates(
+        task,
+        lines,
+        mockParser,
+      );
+
+      expect(result.updated).toBe(true);
+      // First-only deadline warning period should be stripped
+      expect(result.newDeadlineWarningPeriod).toBeNull();
+    });
+
+    it('should preserve regular deadline warning period on recurrence', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 0,
+        rawText: 'DONE task',
+        text: 'task',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: null,
+        deadlineDate: new Date('2026-03-10'),
+        scheduledDateRepeat: null,
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        scheduledWarningPeriod: null,
+        deadlineWarningPeriod: { value: 5, unit: 'd', isFirstOnly: false },
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType.mockReturnValue('deadline');
+      const lines = ['DONE task', '  DEADLINE: <2026-03-10 Mon +1w -5d>'];
+      const result = recurrenceManager.calculateNextDates(
+        task,
+        lines,
+        mockParser,
+      );
+
+      expect(result.updated).toBe(true);
+      // Regular deadline warning period should be preserved
+      expect(result.newDeadlineWarningPeriod).toEqual({
+        value: 5,
+        unit: 'd',
+        isFirstOnly: false,
+      });
+    });
+
+    it('should return undefined for deadline warning period when none exists', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 0,
+        rawText: 'DONE task',
+        text: 'task',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: null,
+        deadlineDate: new Date('2026-03-10'),
+        scheduledDateRepeat: null,
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        scheduledWarningPeriod: null,
+        deadlineWarningPeriod: null,
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType.mockReturnValue('deadline');
+      const lines = ['DONE task', '  DEADLINE: <2026-03-10 Mon +1w>'];
+      const result = recurrenceManager.calculateNextDates(
+        task,
+        lines,
+        mockParser,
+      );
+
+      expect(result.updated).toBe(true);
+      // No warning period → null (no warning period to carry forward)
+      expect(result.newDeadlineWarningPeriod).toBeNull();
+    });
+
+    it('should handle both scheduled and deadline first-only stripping together', () => {
+      const task: Task = {
+        path: 'test.md',
+        line: 0,
+        rawText: 'DONE task',
+        text: 'task',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date('2026-03-10'),
+        deadlineDate: new Date('2026-03-10'),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        scheduledWarningPeriod: { value: 2, unit: 'd', isFirstOnly: true },
+        deadlineWarningPeriod: { value: 5, unit: 'd', isFirstOnly: true },
+        priority: null,
+        tags: [],
+        urgency: 0,
+        closedDate: null,
+      };
+
+      mockParser.getDateLineType
+        .mockReturnValueOnce('scheduled')
+        .mockReturnValueOnce('deadline');
+      const lines = [
+        'DONE task',
+        '  SCHEDULED: <2026-03-10 Mon +1w --2d>',
+        '  DEADLINE: <2026-03-10 Mon +1w --5d>',
+      ];
+      const result = recurrenceManager.calculateNextDates(
+        task,
+        lines,
+        mockParser,
+      );
+
+      expect(result.updated).toBe(true);
+      expect(result.newScheduledWarningPeriod).toBeNull();
+      expect(result.newDeadlineWarningPeriod).toBeNull();
+    });
   });
 
   describe('updateTaskKeyword', () => {

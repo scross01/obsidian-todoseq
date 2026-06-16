@@ -381,7 +381,6 @@ describe('TaskContextMenu', () => {
         null,
         undefined,
         null,
-        null,
       );
     });
 
@@ -1235,7 +1234,6 @@ describe('TaskContextMenu', () => {
         freshTask,
         expect.any(Date),
         undefined,
-        null,
         null,
       );
       menuWithState.cleanup();

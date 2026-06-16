@@ -1,7 +1,7 @@
 import { setIcon } from 'obsidian';
 import { DateUtils } from '../../utils/date-utils';
 import { formatRepeatDescription } from '../../utils/date-repeater';
-import { DateRepeatInfo } from '../../types/task';
+import { DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { isPhoneDevice } from '../../utils/mobile-utils';
 import { BaseDialog } from './base-dialog';
 
@@ -13,8 +13,7 @@ export type DatePickerCallbacks = {
     date: Date | null,
     repeat: DateRepeatInfo | null,
     mode: DatePickerMode,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ) => void;
 };
 
@@ -55,7 +54,7 @@ export class DatePicker extends BaseDialog {
   private selectedDate: Date | null = null;
   private selectedTime: { hours: number; minutes: number } | null = null;
   private selectedRepeat: DateRepeatInfo | null = null;
-  private selectedWarningPeriod: number | null = null;
+  private selectedWarningPeriod: WarningPeriodInfo | null = null;
   private currentMonth: Date;
   private mode: DatePickerMode = 'scheduled';
 
@@ -94,7 +93,7 @@ export class DatePicker extends BaseDialog {
     mode: DatePickerMode = 'scheduled',
     initialDate?: Date | null,
     initialRepeat?: DateRepeatInfo | null,
-    initialWarningPeriod?: number | null,
+    initialWarningPeriod?: WarningPeriodInfo | null,
   ): Promise<void> {
     this.mode = mode;
 
@@ -498,7 +497,7 @@ export class DatePicker extends BaseDialog {
 
     const warningRow = this.createMenuRow(
       this.selectedWarningPeriod
-        ? `${label}: ${this.selectedWarningPeriod}d`
+        ? `${label}: -${this.selectedWarningPeriod.value}${this.selectedWarningPeriod.unit}`
         : label,
       'bell-ring',
       () => this.toggleWarningPeriodPicker(),
@@ -1180,12 +1179,18 @@ export class DatePicker extends BaseDialog {
     this.warningPeriodPickerSubmenu.className =
       'menu todoseq-date-picker-submenu';
 
-    const presetOptions: Array<{ label: string; value: number }> = [
-      { label: 'None', value: 0 },
-      { label: '1 day', value: 1 },
-      { label: '3 days', value: 3 },
-      { label: '5 days', value: 5 },
-      { label: '7 days', value: 7 },
+    const presetOptions: Array<{
+      label: string;
+      wp: WarningPeriodInfo | null;
+    }> = [
+      { label: 'None', wp: null },
+      { label: '1 day', wp: { value: 1, unit: 'd', isFirstOnly: false } },
+      { label: '3 days', wp: { value: 3, unit: 'd', isFirstOnly: false } },
+      { label: '5 days', wp: { value: 5, unit: 'd', isFirstOnly: false } },
+      { label: '7 days', wp: { value: 7, unit: 'd', isFirstOnly: false } },
+      { label: '1 week', wp: { value: 1, unit: 'w', isFirstOnly: false } },
+      { label: '2 weeks', wp: { value: 2, unit: 'w', isFirstOnly: false } },
+      { label: '1 month', wp: { value: 1, unit: 'm', isFirstOnly: false } },
     ];
 
     for (const option of presetOptions) {
@@ -1199,20 +1204,23 @@ export class DatePicker extends BaseDialog {
         text: option.label,
       });
 
-      if (option.value > 0) {
+      if (option.wp) {
         row.createSpan({
           cls: 'todoseq-date-picker-submenu-value',
-          text: `-${option.value}d`,
+          text: `-${option.wp.value}${option.wp.unit}`,
         });
       }
 
-      if (this.selectedWarningPeriod === option.value) {
+      if (
+        this.selectedWarningPeriod?.value === option.wp?.value &&
+        this.selectedWarningPeriod?.unit === option.wp?.unit
+      ) {
         row.addClass('is-selected');
       }
 
       row.addEventListener('click', (evt) => {
         evt.stopPropagation();
-        this.selectWarningPeriod(option.value);
+        this.selectWarningPeriod(option.wp);
       });
 
       this.warningPeriodPickerSubmenu.appendChild(row);
@@ -1267,8 +1275,8 @@ export class DatePicker extends BaseDialog {
     this.warningPeriodPickerSubmenu = null;
   }
 
-  private selectWarningPeriod(days: number): void {
-    this.selectedWarningPeriod = days > 0 ? days : null;
+  private selectWarningPeriod(wp: WarningPeriodInfo | null): void {
+    this.selectedWarningPeriod = wp;
     this.closeWarningPeriodPicker();
     this.refreshWarningPeriodSection();
   }
@@ -1324,16 +1332,25 @@ export class DatePicker extends BaseDialog {
       attr: {
         type: 'number',
         min: '1',
-        max: '30',
-        value: String(this.selectedWarningPeriod ?? 1),
+        max: '99',
+        value: String(this.selectedWarningPeriod?.value ?? 1),
       },
     });
 
-    const unitSpan = valueRow.createEl('span', {
-      cls: 'todoseq-date-picker-custom-repeat-unit-label',
+    const unitSelect = valueRow.createEl('select', {
+      cls: 'todoseq-date-picker-custom-repeat-unit-select',
     });
-    // eslint-disable-next-line obsidianmd/ui/sentence-case -- correct use of case on label
-    unitSpan.setText('days');
+    const unitOptions = [
+      { value: 'd', label: 'day(s)' },
+      { value: 'w', label: 'week(s)' },
+      { value: 'm', label: 'month(s)' },
+      { value: 'y', label: 'year(s)' },
+    ];
+    for (const u of unitOptions) {
+      const opt = unitSelect.createEl('option', { attr: { value: u.value } });
+      opt.setText(u.label);
+    }
+    unitSelect.value = this.selectedWarningPeriod?.unit ?? 'd';
 
     const buttonRow = dialog.createEl('div', {
       cls: 'todoseq-date-picker-custom-repeat-buttons',
@@ -1357,7 +1374,8 @@ export class DatePicker extends BaseDialog {
       evt.preventDefault();
       evt.stopPropagation();
       const value = parseInt(valueInput.value, 10) || 1;
-      this.selectedWarningPeriod = value;
+      const unit = unitSelect.value as WarningPeriodInfo['unit'];
+      this.selectedWarningPeriod = { value, unit, isFirstOnly: false };
       dialog.remove();
       this.refreshWarningPeriodSection();
     });
@@ -1424,7 +1442,7 @@ export class DatePicker extends BaseDialog {
       this.buildSelectedDateTime(),
       this.selectedRepeat,
       this.mode,
-      this.selectedWarningPeriod,
+      this.selectedWarningPeriod ?? null,
     );
   }
 

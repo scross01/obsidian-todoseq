@@ -3,7 +3,7 @@
  */
 
 import { DateUtils } from '../utils/date-utils';
-import { DateRepeatInfo } from '../types/task';
+import { DateRepeatInfo, WarningPeriodInfo } from '../types/task';
 import { extractDateMetadata } from '../utils/date-repeater';
 
 // Date format types
@@ -124,12 +124,10 @@ export class DateParser {
   static parseDateWithRepeater(content: string): {
     date: Date | null;
     repeat: DateRepeatInfo | null;
-    warningPeriod: number | null;
-    firstOnlyWarningPeriod: number | null;
+    warningPeriod: WarningPeriodInfo | null;
   } {
     // Extract repeater and warning period from full content
-    const { baseDateStr, repeat, warningPeriod, firstOnlyWarningPeriod } =
-      extractDateMetadata(content);
+    const { baseDateStr, repeat, warningPeriod } = extractDateMetadata(content);
 
     // Try each pattern in order on base date string
     for (const pattern of DATE_PATTERNS) {
@@ -152,7 +150,7 @@ export class DateParser {
           date = this.parseDateString(dateStr);
         }
 
-        return { date, repeat, warningPeriod, firstOnlyWarningPeriod };
+        return { date, repeat, warningPeriod };
       }
     }
 
@@ -160,7 +158,6 @@ export class DateParser {
       date: null,
       repeat: null,
       warningPeriod: null,
-      firstOnlyWarningPeriod: null,
     };
   }
 }

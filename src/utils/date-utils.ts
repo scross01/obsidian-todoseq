@@ -1,3 +1,5 @@
+import { WarningPeriodInfo } from '../types/task';
+
 /**
  * Date utility class
  */
@@ -800,15 +802,39 @@ export class DateUtils {
 }
 
 /**
+ * Convert a warning period to days for visibility calculations.
+ * Uses approximate conversions: 1 week = 7 days, 1 month = 30 days, 1 year = 365 days.
+ *
+ * @param info Warning period info with value and unit
+ * @returns Equivalent number of days
+ */
+export function warningPeriodToDays(info: WarningPeriodInfo): number {
+  switch (info.unit) {
+    case 'd':
+      return info.value;
+    case 'w':
+      return info.value * 7;
+    case 'm':
+      return info.value * 30;
+    case 'y':
+      return info.value * 365;
+    default: {
+      const _exhaustiveCheck: never = info.unit;
+      throw new Error(
+        `Unknown warning period unit: ${String(_exhaustiveCheck)}`,
+      );
+    }
+  }
+}
+
+/**
  * Get the effective warning period in days for a task date.
  * Falls back through: per-task warning period → first-only warning period → global default.
  */
 export function getEffectiveWarningDays(
   task: {
-    scheduledWarningPeriod: number | null;
-    scheduledFirstOnlyWarningPeriod: number | null;
-    deadlineWarningPeriod: number | null;
-    deadlineFirstOnlyWarningPeriod: number | null;
+    scheduledWarningPeriod: WarningPeriodInfo | null;
+    deadlineWarningPeriod: WarningPeriodInfo | null;
   },
   type: 'scheduled' | 'deadline',
   defaults: {
@@ -817,17 +843,11 @@ export function getEffectiveWarningDays(
   },
 ): number {
   if (type === 'scheduled') {
-    return (
-      task.scheduledWarningPeriod ??
-      task.scheduledFirstOnlyWarningPeriod ??
-      defaults.defaultScheduledWarningPeriod ??
-      0
-    );
+    const wp = task.scheduledWarningPeriod;
+    return wp
+      ? warningPeriodToDays(wp)
+      : defaults.defaultScheduledWarningPeriod;
   }
-  return (
-    task.deadlineWarningPeriod ??
-    task.deadlineFirstOnlyWarningPeriod ??
-    defaults.defaultDeadlineWarningPeriod ??
-    0
-  );
+  const wp = task.deadlineWarningPeriod;
+  return wp ? warningPeriodToDays(wp) : defaults.defaultDeadlineWarningPeriod;
 }

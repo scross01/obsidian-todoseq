@@ -10,7 +10,7 @@ import {
   EventRef,
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
-import { Task, DateRepeatInfo } from '../../types/task';
+import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { Search } from '../../search/search';
 import {
   SearchOptionsDropdown,
@@ -1266,29 +1266,25 @@ export class TaskListView extends ItemView {
         task: Task,
         date: Date | null,
         repeat?: DateRepeatInfo | null,
-        warningPeriod?: number | null,
-        firstOnlyWarningPeriod?: number | null,
+        warningPeriod?: WarningPeriodInfo | null,
       ) =>
         this.handleContextMenuScheduledDateChange(
           task,
           date,
           repeat ?? null,
           warningPeriod ?? null,
-          firstOnlyWarningPeriod ?? null,
         ),
       onDeadlineDateChange: (
         task: Task,
         date: Date | null,
         repeat?: DateRepeatInfo | null,
-        warningPeriod?: number | null,
-        firstOnlyWarningPeriod?: number | null,
+        warningPeriod?: WarningPeriodInfo | null,
       ) =>
         this.handleContextMenuDeadlineDateChange(
           task,
           date,
           repeat ?? null,
           warningPeriod ?? null,
-          firstOnlyWarningPeriod ?? null,
         ),
     };
   }
@@ -1347,8 +1343,7 @@ export class TaskListView extends ItemView {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ): Promise<void> {
     // Get the TaskUpdateCoordinator from the plugin
     const plugin = (
@@ -1359,8 +1354,7 @@ export class TaskListView extends ItemView {
               task: Task,
               date: Date | null,
               repeat?: DateRepeatInfo | null,
-              warningPeriod?: number | null,
-              firstOnlyWarningPeriod?: number | null,
+              warningPeriod?: WarningPeriodInfo | null,
             ) => Promise<Task>;
           };
         };
@@ -1391,7 +1385,6 @@ export class TaskListView extends ItemView {
         date,
         repeat,
         warningPeriod,
-        firstOnlyWarningPeriod,
       );
     } catch (error) {
       console.error('TODOseq: Failed to update scheduled date:', error);
@@ -1406,8 +1399,7 @@ export class TaskListView extends ItemView {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ): Promise<void> {
     // Get the TaskUpdateCoordinator from the plugin
     const plugin = (
@@ -1418,8 +1410,7 @@ export class TaskListView extends ItemView {
               task: Task,
               date: Date | null,
               repeat?: DateRepeatInfo | null,
-              warningPeriod?: number | null,
-              firstOnlyWarningPeriod?: number | null,
+              warningPeriod?: WarningPeriodInfo | null,
             ) => Promise<Task>;
           };
         };
@@ -1450,7 +1441,6 @@ export class TaskListView extends ItemView {
         date,
         repeat,
         warningPeriod,
-        firstOnlyWarningPeriod,
       );
     } catch (error) {
       console.error('TODOseq: Failed to update deadline date:', error);

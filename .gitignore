@@ -71,3 +71,4 @@ tests/integration/test-results/
 .agents/
 skills-lock.json
 test-results/.last-run.json
+.mimocode/

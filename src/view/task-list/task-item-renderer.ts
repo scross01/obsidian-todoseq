@@ -1,6 +1,7 @@
-import { Task, DateRepeatInfo } from '../../types/task';
+import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { DateUtils, getEffectiveWarningDays } from '../../utils/date-utils';
 import { formatRepeatDescription } from '../../utils/date-repeater';
+import { warningPeriodToDays } from '../../utils/date-utils';
 import { setIcon, Platform, Notice } from 'obsidian';
 import {
   TAG_PATTERN,
@@ -778,8 +779,7 @@ export class TaskItemRenderer {
   private setWarningPeriodTooltip(
     dateValueEl: HTMLElement,
     date: Date,
-    warningPeriod: number | null | undefined,
-    firstOnlyWarningPeriod: number | null | undefined,
+    warningPeriod: WarningPeriodInfo | null | undefined,
     defaultWarningPeriod: number,
     skipIfOtherDateExists: boolean,
     otherDate: Date | null | undefined,
@@ -787,8 +787,9 @@ export class TaskItemRenderer {
     offsetDays: number,
     repeatInfo?: DateRepeatInfo | null,
   ): void {
-    const warningDays =
-      warningPeriod ?? firstOnlyWarningPeriod ?? defaultWarningPeriod;
+    // Convert WarningPeriodInfo to days, fall back to default (always days)
+    const wpDays = warningPeriod ? warningPeriodToDays(warningPeriod) : null;
+    const warningDays = wpDays ?? defaultWarningPeriod;
     if (warningDays <= 0) return;
     if (skipIfOtherDateExists && otherDate) return;
 
@@ -797,7 +798,11 @@ export class TaskItemRenderer {
     if (repeatInfo) {
       tooltip += `\nRepeat: ${formatRepeatDescription(repeatInfo)}`;
     }
-    tooltip += `\nWarning period: -${warningDays}d (appears ${this.formatDateForDisplay(effectiveDate, true)})`;
+    // Build warning period label showing original unit (e.g. -1w) when non-day unit
+    const wpLabel = warningPeriod
+      ? `-${warningPeriod.value}${warningPeriod.unit}`
+      : `-${warningDays}d`;
+    tooltip += `\nWarning period: ${wpLabel} (appears ${this.formatDateForDisplay(effectiveDate, true)})`;
     dateValueEl.setAttribute('title', tooltip);
   }
 
@@ -869,7 +874,6 @@ export class TaskItemRenderer {
           dateValue,
           task.scheduledDate,
           task.scheduledWarningPeriod,
-          task.scheduledFirstOnlyWarningPeriod,
           (renderSettings.defaultScheduledWarningPeriod as number) ?? 0,
           !!renderSettings.skipScheduledWarningPeriodIfDeadline,
           task.deadlineDate,
@@ -881,10 +885,11 @@ export class TaskItemRenderer {
           cls: 'todoseq-task-date-warning-arrow',
           text: '\u2192',
         });
-        arrow.setAttribute(
-          'title',
-          `Warning period: -${scheduledWarningDays}d`,
-        );
+        const schedWp = task.scheduledWarningPeriod;
+        const schedLabel = schedWp
+          ? `-${schedWp.value}${schedWp.unit}`
+          : `-${scheduledWarningDays}d`;
+        arrow.setAttribute('title', `Warning period: ${schedLabel}`);
       }
 
       const repeatCell = dateRow.createEl('span', {
@@ -941,7 +946,6 @@ export class TaskItemRenderer {
           dateValue,
           task.deadlineDate,
           task.deadlineWarningPeriod,
-          task.deadlineFirstOnlyWarningPeriod,
           (deadlineRenderSettings.defaultDeadlineWarningPeriod as number) ?? 0,
           !!deadlineRenderSettings.skipDeadlinePrewarningIfScheduled,
           task.scheduledDate,
@@ -953,7 +957,11 @@ export class TaskItemRenderer {
           cls: 'todoseq-task-date-warning-arrow',
           text: '\u2190',
         });
-        arrow.setAttribute('title', `Warning period: -${deadlineWarningDays}d`);
+        const dlWp = task.deadlineWarningPeriod;
+        const dlLabel = dlWp
+          ? `-${dlWp.value}${dlWp.unit}`
+          : `-${deadlineWarningDays}d`;
+        arrow.setAttribute('title', `Warning period: ${dlLabel}`);
       }
 
       const repeatCell = dateRow.createEl('span', {

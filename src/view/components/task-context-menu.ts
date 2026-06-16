@@ -1,5 +1,5 @@
 import { setIcon, App, Notice } from 'obsidian';
-import { Task } from '../../types/task';
+import { Task, WarningPeriodInfo } from '../../types/task';
 import { DateRepeatInfo } from '../../types/task';
 import { DateUtils } from '../../utils/date-utils';
 import { isDailyNotesPluginEnabled } from '../../utils/daily-note-utils';
@@ -25,15 +25,13 @@ export type TaskContextMenuCallbacks = {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ) => void | Promise<void>;
   onDeadlineDateChange: (
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
-    warningPeriod?: number | null,
-    firstOnlyWarningPeriod?: number | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ) => void | Promise<void>;
 };
 
@@ -408,8 +406,6 @@ export class TaskContextMenu extends BaseDialog {
             // Preserve existing repeat and warning period components
             const repeat = currentTask?.scheduledDateRepeat;
             const warningPeriod = currentTask?.scheduledWarningPeriod;
-            const firstOnlyWarningPeriod =
-              currentTask?.scheduledFirstOnlyWarningPeriod;
 
             // Only pass repeat argument if it exists
             if (repeat) {
@@ -418,7 +414,6 @@ export class TaskContextMenu extends BaseDialog {
                 date,
                 repeat,
                 warningPeriod,
-                firstOnlyWarningPeriod,
               );
             } else {
               void this.callbacks.onScheduledDateChange(
@@ -426,7 +421,6 @@ export class TaskContextMenu extends BaseDialog {
                 date,
                 undefined,
                 warningPeriod,
-                firstOnlyWarningPeriod,
               );
             }
             this.hide();
@@ -643,14 +637,10 @@ export class TaskContextMenu extends BaseDialog {
         ? (currentTask.deadlineDateRepeat ?? null)
         : (currentTask.scheduledDateRepeat ?? null)
       : null;
-    const initialWarningPeriod = currentTask
+    const initialWarningPeriod: WarningPeriodInfo | null = currentTask
       ? mode === 'deadline'
-        ? (currentTask.deadlineWarningPeriod ??
-          currentTask.deadlineFirstOnlyWarningPeriod ??
-          null)
-        : (currentTask.scheduledWarningPeriod ??
-          currentTask.scheduledFirstOnlyWarningPeriod ??
-          null)
+        ? (currentTask.deadlineWarningPeriod ?? null)
+        : (currentTask.scheduledWarningPeriod ?? null)
       : null;
 
     this.datePicker = new DatePicker(

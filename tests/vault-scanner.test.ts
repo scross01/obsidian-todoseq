@@ -521,6 +521,408 @@ describe('VaultScanner.tasksIdentical', () => {
       expect(result).toBe(false);
     });
 
+    test('should return true when tasks have identical warning periods (value-based comparison)', () => {
+      const date = new Date(2024, 0, 15);
+      const wpA = { value: 3, unit: 'd' as const, isFirstOnly: false };
+      const wpB = { value: 3, unit: 'd' as const, isFirstOnly: false }; // different reference, same value
+
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: wpA,
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: wpB,
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(true);
+    });
+
+    test('should return false when scheduled warning period value differs', () => {
+      const date = new Date(2024, 0, 15);
+
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: false },
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: { value: 5, unit: 'd', isFirstOnly: false },
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(false);
+    });
+
+    test('should return false when scheduled warning period unit differs', () => {
+      const date = new Date(2024, 0, 15);
+
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: false },
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: { value: 3, unit: 'w', isFirstOnly: false },
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(false);
+    });
+
+    test('should return false when scheduled warning period isFirstOnly differs', () => {
+      const date = new Date(2024, 0, 15);
+
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: false },
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: true },
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(false);
+    });
+
+    test('should return false when one task has warning period and other does not', () => {
+      const date = new Date(2024, 0, 15);
+
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: false },
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: null,
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(false);
+    });
+
+    test('should return true when both tasks have null warning periods', () => {
+      const date = new Date(2024, 0, 15);
+
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: null,
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: null,
+          deadlineWarningPeriod: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(true);
+    });
+
+    test('should return false when deadline warning period differs', () => {
+      const date = new Date(2024, 0, 15);
+
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: null,
+          deadlineWarningPeriod: { value: 1, unit: 'w', isFirstOnly: true },
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: null,
+          deadlineWarningPeriod: { value: 2, unit: 'w', isFirstOnly: true },
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(false);
+    });
+
+    test('should return true when both tasks have identical deadline warning periods (different references)', () => {
+      const date = new Date(2024, 0, 15);
+
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: null,
+          deadlineWarningPeriod: { value: 1, unit: 'w', isFirstOnly: true },
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: date,
+          deadlineDate: null,
+          scheduledWarningPeriod: null,
+          deadlineWarningPeriod: { value: 1, unit: 'w', isFirstOnly: true },
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(true);
+    });
+
     test('should return false when arrays have different lengths', () => {
       const date = new Date(2024, 0, 15);
 

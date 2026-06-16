@@ -3,15 +3,15 @@
  * Supports: + (plain), .+ (shift from now), ++ (catch-up) with y/m/w/d/h units.
  */
 
-import { DateRepeatInfo } from '../types/task';
+import { DateRepeatInfo, WarningPeriodInfo } from '../types/task';
 import { DateUtils } from './date-utils';
 
 // Regex to match repeater cookie: .+1d, ++1w, +1m, .+1h, +1y, etc.
 const REPEATER_REGEX = /(\.\+|\+\+|\+)([1-9]\d*)([yYmMwWdDh])/;
 
-// Regex to match warning period: -Nd or --Nd (after repeater, before closing >)
-// Matches -0d, -3d, -14d, --0d, --3d etc.
-const WARNING_PERIOD_REGEX = /(-{1,2})(\d+)d/;
+// Regex to match warning period: -Nd, --Nd, -1w, -2m, -1y etc. (after repeater, before closing >)
+// Matches -0d, -3d, -14d, --0d, --3d, -1w, -2m, -1y etc.
+const WARNING_PERIOD_REGEX = /(-{1,2})(\d+)([dDwWmMyY])/;
 
 /**
  * Parse a repeater string into DateRepeatInfo.
@@ -80,15 +80,16 @@ export function extractRepeaterFromDate(dateContent: string): {
  *
  * @example
  * extractDateMetadata("<2026-03-05 Wed .+1d -3d>")
- * // { baseDateStr: "<2026-03-05 Wed>", repeat: {...}, warningPeriod: 3, firstOnlyWarningPeriod: null }
+ * // { baseDateStr: "<2026-03-05 Wed>", repeat: {...}, warningPeriod: { value: 3, unit: 'd', isFirstOnly: false } }
  * extractDateMetadata("<2026-03-05 Wed +1w --2d>")
- * // { baseDateStr: "<2026-03-05 Wed>", repeat: {...}, warningPeriod: null, firstOnlyWarningPeriod: 2 }
+ * // { baseDateStr: "<2026-03-05 Wed>", repeat: {...}, warningPeriod: { value: 2, unit: 'd', isFirstOnly: true } }
+ * extractDateMetadata("<2026-03-05 Wed +1w -1w>")
+ * // { baseDateStr: "<2026-03-05 Wed>", repeat: {...}, warningPeriod: { value: 1, unit: 'w', isFirstOnly: false } }
  */
 export function extractDateMetadata(dateContent: string): {
   baseDateStr: string;
   repeat: DateRepeatInfo | null;
-  warningPeriod: number | null;
-  firstOnlyWarningPeriod: number | null;
+  warningPeriod: WarningPeriodInfo | null;
 } {
   // Step 1: Extract repeater (existing logic)
   const { baseDateStr: afterRepeater, repeat } =
@@ -101,13 +102,15 @@ export function extractDateMetadata(dateContent: string): {
       baseDateStr: afterRepeater,
       repeat,
       warningPeriod: null,
-      firstOnlyWarningPeriod: null,
     };
   }
 
   const dashes = warningMatch[1];
   const value = parseInt(warningMatch[2], 10);
+  const unit = warningMatch[3].toLowerCase() as 'd' | 'w' | 'm' | 'y';
   const isFirstOnly = dashes === '--';
+
+  const warningInfo: WarningPeriodInfo = { value, unit, isFirstOnly };
 
   let baseDateStr =
     afterRepeater.slice(0, warningMatch.index) +
@@ -119,28 +122,25 @@ export function extractDateMetadata(dateContent: string): {
   return {
     baseDateStr: baseDateStr.trim(),
     repeat,
-    warningPeriod: isFirstOnly ? null : value,
-    firstOnlyWarningPeriod: isFirstOnly ? value : null,
+    warningPeriod: warningInfo,
   };
 }
 
 /**
  * Build the warning period suffix string for a date line.
  * Returns " -Nd" for recurring warning periods, " --Nd" for first-only, or "" for none.
+ * Supports d (days), w (weeks), m (months), y (years) units.
  *
- * @param warningPeriod -Nd value (all occurrences), or null/0 for none
- * @param firstOnlyWarningPeriod --Nd value (first occurrence only), or null/0 for none
- * @returns The suffix string to append after the repeater (e.g., " -3d" or "")
+ * @param warningPeriod WarningPeriodInfo (all occurrences), or null/0 for none
+ * @param warningPeriod WarningPeriodInfo with isFirstOnly flag, or null/0 for none
+ * @returns The suffix string to append after the repeater (e.g., " -3d", " -1w", "")
  */
 export function buildWarningPeriodString(
-  warningPeriod?: number | null,
-  firstOnlyWarningPeriod?: number | null,
+  warningPeriod?: WarningPeriodInfo | null,
 ): string {
-  if (warningPeriod && warningPeriod > 0) {
-    return ` -${warningPeriod}d`;
-  }
-  if (firstOnlyWarningPeriod && firstOnlyWarningPeriod > 0) {
-    return ` --${firstOnlyWarningPeriod}d`;
+  if (warningPeriod && warningPeriod.value > 0) {
+    const dash = warningPeriod.isFirstOnly ? '--' : '-';
+    return ` ${dash}${warningPeriod.value}${warningPeriod.unit}`;
   }
   return '';
 }
@@ -400,8 +400,7 @@ export function formatDateLine(
   line: string,
   newDate: Date,
   repeat: DateRepeatInfo | null | undefined,
-  warningPeriod?: number | null,
-  firstOnlyWarningPeriod?: number | null,
+  warningPeriod?: WarningPeriodInfo | null,
 ): string {
   // Extract the date content from the angle brackets
   const dateContentMatch = line.match(/<(.[^>]*)>/);
@@ -428,10 +427,7 @@ export function formatDateLine(
   }
 
   // Add warning period if present
-  newDateContent += buildWarningPeriodString(
-    warningPeriod,
-    firstOnlyWarningPeriod,
-  );
+  newDateContent += buildWarningPeriodString(warningPeriod);
 
   return line.replace(/<.[^>]*>/, `<${newDateContent}>`);
 }

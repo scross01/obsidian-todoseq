@@ -362,8 +362,6 @@ export class CodeCommentTaskParser implements ITaskParser {
       closedDate: null,
       scheduledWarningPeriod: null,
       deadlineWarningPeriod: null,
-      scheduledFirstOnlyWarningPeriod: null,
-      deadlineFirstOnlyWarningPeriod: null,
       tail: '',
       urgency: null,
       tags: [],
