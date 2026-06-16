@@ -39,6 +39,8 @@ graph TB
              RecurrenceManager["RecurrenceManager<br/>Recurrence Logic"]
              TransitionParser["TransitionParser<br/>State Transition Syntax"]
              SmartDateProcessor["SmartDateProcessor<br/>Date Conversion"]
+             SavedSearchManager["SavedSearchManager<br/>Saved Searches"]
+             DateLineOperator["DateLineOperator<br/>Date Line Helpers"]
          end
 
         subgraph "UI Layer"
@@ -51,6 +53,17 @@ graph TB
             EmbeddedProcessor["TodoseqCodeBlockProcessor<br/>Embedded Lists"]
             SearchOptionsDropdown["SearchOptionsDropdown<br/>Search Options"]
             SearchSuggestionDropdown["SearchSuggestionDropdown<br/>Search Suggestions"]
+            DatePicker["DatePicker<br/>Date Picker Dialog"]
+            SavedSearchDialog["SavedSearchDialog<br/>Saved Search Dialog"]
+            TaskContextMenu["TaskContextMenu<br/>Task Context Menu"]
+            TaskDragDropHandler["TaskDragDropHandler<br/>Drag & Drop"]
+            TaskItemRenderer["TaskItemRenderer<br/>Task Item Rendering"]
+            TaskListFilter["TaskListFilter<br/>View Mode & Sort"]
+            ChunkedRenderQueue["ChunkedRenderQueue<br/>Chunked Rendering"]
+            TaskElementCache["TaskElementCache<br/>Element Caching"]
+            EmbeddedTaskItemRenderer["EmbeddedTaskItemRenderer<br/>Embedded Item Rendering"]
+            EmbeddedTaskListManager["EmbeddedTaskListManager<br/>Embedded Filtering"]
+            EmbeddedTaskListEventHandler["EmbeddedTaskListEventHandler<br/>Embedded Events"]
         end
 
         subgraph "Parser Layer"
@@ -82,6 +95,12 @@ graph TB
             TaskSort["Task Sorting"]
             TaskUrgency["Task Urgency"]
             DailyNoteUtils["Daily Note Utils"]
+            TaskSubBullets["TaskSubBullets<br/>Subtask Operations"]
+            PropertyEvaluator["PropertyEvaluator<br/>Property Evaluation"]
+            MobileUtils["MobileUtils<br/>Mobile Detection"]
+            OrgPatterns["OrgPatterns<br/>Org-mode Patterns"]
+            DateRepeater["DateRepeater<br/>Date Repeat Logic"]
+            TaskFormat["TaskFormat<br/>Task Formatting"]
         end
 
         subgraph "Lifecycle"
@@ -178,10 +197,11 @@ graph TB
     classDef external fill:#f5f5f5
 
     class Main pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor serviceLayer
-    class UIManager,TaskListView,TaskWriter,ReaderFormatter,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchManager,DateLineOperator serviceLayer
+    class UIManager,TaskListView,TaskWriter,ReaderFormatter,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown,DatePicker,SavedSearchDialog,TaskContextMenu,TaskDragDropHandler,TaskItemRenderer,TaskListFilter,ChunkedRenderQueue,TaskElementCache,EmbeddedTaskItemRenderer,EmbeddedTaskListManager,EmbeddedTaskListEventHandler uiLayer
     class TaskParser,OrgModeParser,CodeCommentParser,ParserRegistry,LanguageRegistry,DateParser,NaturalDateParser parserLayer
     class Search,SearchParser,SearchEvaluator searchLayer
+    class TaskUtils,KeywordManager,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils,TaskSubBullets,PropertyEvaluator,MobileUtils,OrgPatterns,DateRepeater,TaskFormat utilityLayer
     class ObsidianAPI,Workspace,FileSystem,Editor,DailyNotes,ChronoNode external
 ```
 
@@ -344,6 +364,22 @@ graph TB
 - **Ownership**: Created and owned by `PluginLifecycleManager`; stored on main plugin as `smartDateProcessor`
 - **Lifecycle**: `setEnabled()` controlled by `smartDateParsing.enabled` setting; `destroy()` clears all debounce timers
 
+**SavedSearchManager** (`src/services/saved-search-manager.ts`)
+
+- **Responsibility**: CRUD operations for saved searches (create, read, update, delete, reorder)
+- **Key Patterns**: Pure functions operating on settings, validation, unique ID generation
+- **Interface**: `createSavedSearch()`, `addSavedSearch()`, `updateSavedSearch()`, `deleteSavedSearch()`, `getSavedSearches()`, `findSavedSearch()`, `findSavedSearchByQuery()`, `reorderSavedSearches()`, `validateSavedSearchName()`
+- **Validation**: Name length capped at 50 characters; empty names rejected
+- **Used by**: SearchOptionsDropdown, settings UI
+
+**DateLineOperator** (`src/services/date-line-operator.ts`)
+
+- **Responsibility**: Date line operation helpers for TaskWriter, extracting common orchestration logic shared by update/remove methods for SCHEDULED, DEADLINE, and CLOSED date lines
+- **Key Patterns**: Functional composition, insert position calculation, indentation resolution
+- **Interface**: `updateOrInsert()`, `remove()`, `calcInsertIndex()`, `getEffectiveIndent()`, `getExistingIndent()`
+- **Insertion Rules**: SCHEDULED before DEADLINE; DEADLINE after SCHEDULED; CLOSED after both
+- **Used by**: TaskWriter (all date line update/remove operations)
+
 ### 2. UI Layer (User Interaction)
 
 **UIManager** (`src/ui-manager.ts`)
@@ -410,7 +446,110 @@ graph TB
 - **Key Patterns**: Single-instance pattern, keyboard navigation, mobile long-press support
 - **Interface**: `show(task, position)`, `showAtMouseEvent()`, `hide()`, `isVisible()`, `cleanup()`
 - **Features**: Go to task, priority selection, scheduled date shortcuts, deadline date picker, copy/move to today
+- **Used by**: TaskListView, EmbeddedTaskItemRenderer
+
+**DatePicker** (`src/view/components/date-picker-menu.ts`)
+
+- **Responsibility**: Comprehensive date and time picker with repeat options, calendar grid, and warning period support
+- **Key Patterns**: Single-instance pattern, submenu overlay, quick select options, calendar navigation
+- **Interface**: `show(position, mode, initialDate?, initialRepeat?, initialWarningPeriod?)`, `hide()`, `isVisible()`, `cleanup()`
+- **Features**: Quick date selections (Today, Tomorrow, Next weekend, Next week); calendar grid with month navigation; time picker with 30-minute increments; repeat options (Daily, Weekly, Monthly, Yearly, Custom); custom repeat dialog; warning period selection; scheduled/deadline modes
+- **Single-instance**: Only one picker open at a time via `BaseDialog.closeAnyActiveDialog()`
+- **Mobile Support**: Centers dialog on phones, adds backdrop for focus
+- **Used by**: TaskContextMenu, TaskListView
+
+**SavedSearchDialog** (`src/view/components/saved-search-dialog.ts`)
+
+- **Responsibility**: Modal dialog for creating or editing saved searches with form fields for name, query, view mode, sort method, and future task sorting
+- **Key Patterns**: Backdrop management, form validation, edit/create modes
+- **Interface**: `open()`, `close()`
+- **Features**: Pre-filled fields from current view state; validation for name and query; delete button in edit mode; keyboard navigation (Enter to save, Escape to cancel)
+- **Used by**: SearchOptionsDropdown
+
+**BaseDialog** (`src/view/components/base-dialog.ts`)
+
+- **Responsibility**: Abstract base class for modal dialogs providing common functionality for dialog management
+- **Key Patterns**: Single-instance active dialog management, backdrop handling, keyboard navigation, positioning logic
+- **Interface**: `hide()`, `isVisible()`, `cleanup()`, `positionDialog()`, `attachGlobalListeners()`, `detachGlobalListeners()`, `moveFocus()`
+- **Features**: Global menu management (only one menu open at a time); phone-specific backdrop and centered positioning; desktop cursor-based positioning with viewport bounds checking; arrow key navigation; scroll-to-hide behavior; mobile touch suppression delay
+- **Subclasses**: DatePicker, StateMenuBuilder, TaskContextMenu
+
+**BaseDropdown** (`src/view/components/base-dropdown.ts`)
+
+- **Responsibility**: Abstract base class for dropdown components providing common positioning, event handling, and keyboard navigation
+- **Key Patterns**: Input-relative positioning, visibility change callbacks, blur handling
+- **Interface**: `show()`, `hide()`, `isVisible()`, `handleKeyDown()`, `updatePosition()`, `setOnVisibilityChange()`, `cleanup()`
+- **Features**: Positioned below input element; tracks visibility state; keyboard navigation (ArrowDown, ArrowUp, Enter, Escape, Tab); resize and scroll repositioning
+- **Subclasses**: SearchOptionsDropdown, SearchSuggestionDropdown
+
+**TaskDragDropHandler** (`src/view/task-list/task-drag-drop.ts`)
+
+- **Responsibility**: Drag and drop support for tasks between files in the task list view
+- **Key Patterns**: Modifier key detection (copy/move/migrate), editor drop positioning, drag overlay UI
+- **Interface**: `initialize(callbacks)`, `destroy()`
+- **Features**: Copy (default), Move (Alt), Migrate (Alt+Ctrl) actions; custom drag overlay showing task text and action label; editor drop position detection via CodeMirror `posAtCoords()`; source file modification (removal for move, keyword replacement for migrate)
+- **Desktop Only**: Disabled on mobile via `Platform.isMobile` check
 - **Used by**: TaskListView
+
+**TaskItemRenderer** (`src/view/task-list/task-item-renderer.ts`)
+
+- **Responsibility**: Handles rendering individual task items for the Task List View, encapsulating all DOM building logic
+- **Key Patterns**: Component-based rendering, link detection, state menu integration, context menu handlers
+- **Interface**: `buildTaskListItem(task)`, `updateTaskElementContent(task, element)`, `buildCheckbox()`, `buildKeyword()`, `buildText()`, `buildDateDisplay()`, `buildSubtaskIndicator()`, `renderTaskTextWithLinks()`
+- **Features**: Checkbox with extended style support; keyword button with state menu (click, keyboard, context menu, long-press); priority badge; date display with warning period arrows and repeat icons; subtask indicator; file info with source chip; text with clickable wiki links, markdown links, URLs, and tags
+- **Smart Diff**: `updateTaskElementContent()` only rebuilds text portion when rawText actually changes
+- **Used by**: TaskListView
+
+**TaskListFilter** (`src/view/task-list/task-list-filter.ts`)
+
+- **Responsibility**: View mode and sort method management for the task list, including three-block sorting (active, future, completed)
+- **Key Patterns**: Cached keyword sort config, three-block sorting system
+- **Interface**: `getViewMode()`, `setViewMode()`, `getSortMethod()`, `setSortMethod()`, `filterTasksByViewMode()`, `transformForView()`, `getKeywordSortConfig()`
+- **Sort Methods**: default, sortByScheduled, sortByDeadline, sortByClosedDate, sortByPriority, sortByUrgency, sortByKeyword
+- **View Modes**: showAll, sortCompletedLast, hideCompleted
+- **Used by**: TaskListView
+
+**ChunkedRenderQueue** (`src/view/task-list/chunked-render-queue.ts`)
+
+- **Responsibility**: Chunked rendering with yielding for large task lists to prevent UI freezing
+- **Key Patterns**: Batch processing, generation tracking, yield-to-event-loop
+- **Interface**: `enqueue(tasks, renderFn, container)`, `clear()`, `renderToFragment(tasks, renderFn, yieldDuringRender?)`
+- **Configuration**: 15 tasks per batch, yields every 5 tasks, prioritizes first 10 tasks
+- **Generation Tracking**: New `enqueue()` calls invalidate previous renders via generation counter
+- **Used by**: TaskListView
+
+**TaskElementCache** (`src/view/task-list/task-element-cache.ts`)
+
+- **Responsibility**: DOM element caching for task items to avoid redundant re-rendering
+- **Key Patterns**: Path:line key-based cache, Map storage
+- **Interface**: `get(task)`, `set(task, element)`, `invalidate(task)`, `invalidateByKey(key)`, `clear()`, `has(task)`
+- **Cache Key**: `${task.path}:${task.line}`
+- **Used by**: TaskListView
+
+**EmbeddedTaskItemRenderer** (`src/view/embedded-task-list/embedded-task-item-renderer.ts`)
+
+- **Responsibility**: Renders individual task items within embedded task lists (code blocks)
+- **Key Patterns**: State menu integration, context menu handlers, navigation to task source
+- **Interface**: `createTaskListItem(task, index, params)`
+- **Features**: Three layout modes: default (compact), wrap (full-width with date info rows), dynamic (wrap with inline date badges); checkbox with extended style support; state menu on keyword (click, keyboard, context menu, long-press); priority badge; clickable tags and links; subtask indicator; date badges; repeat icons; file info with urgency display; warning period arrows
+- **Navigation**: Click-to-navigate with support for new tab (Ctrl/Cmd+click), split (Shift+click), and middle-click
+- **Used by**: EmbeddedTaskListRenderer
+
+**EmbeddedTaskListManager** (`src/view/embedded-task-list/task-list-manager.ts`)
+
+- **Responsibility**: Manages task filtering and sorting for embedded task lists with caching
+- **Key Patterns**: Cache with TTL, version-based invalidation, search-based filtering
+- **Interface**: `filterAndSortTasks(tasks, params)`, `getTotalTasksCount(tasks, params)`, `filterAndSortTasksWithCount(tasks, params)`, `clearCache()`, `invalidateCache()`, `updateSettings()`
+- **Cache**: 5-second TTL with version-based invalidation; cache key includes task count, search hash, sort method, and all parameters
+- **Used by**: EmbeddedTaskListEventHandler, TodoseqCodeBlockProcessor
+
+**EmbeddedTaskListEventHandler** (`src/view/embedded-task-list/event-handler.ts`)
+
+- **Responsibility**: Handles real-time updates for embedded task lists, monitoring vault events and triggering re-rendering
+- **Key Patterns**: Code block tracking, collapse state management, file-based refresh
+- **Interface**: `trackCodeBlock()`, `untrackCodeBlock()`, `toggleCollapse()`, `getCollapseState()`, `refreshAllCodeBlocks()`, `handleFileDeleted()`, `handleFileRenamed()`, `updateSettings()`
+- **Features**: Tracks active code blocks by ID; collapse/expand toggle; refreshes code blocks on file open, delete, and rename
+- **Used by**: TodoseqCodeBlockProcessor
 
 ### 3. Parser Layer (Data Extraction)
 
@@ -497,6 +636,41 @@ graph TB
 - **Key Patterns**: Suggestion ranking, prefix matching
 - **Interface**: Suggestion generation, completion lists
 
+### 5. Editor Extensions (CodeMirror Plugins)
+
+**smartDateHighlightPlugin** (`src/view/editor-extensions/smart-date-extension.ts`)
+
+- **Responsibility**: Highlights natural-language date expressions on the active task line using a subtle outline and background
+- **Key Patterns**: ViewPlugin, Decoration marks, rightmost isolated match
+- **Interface**: CodeMirror ViewPlugin via `buildSmartDateDecorations()`
+- **Features**: Rebuilds decorations on every document change and selection move; finds rightmost isolated occurrence of matched date expression; skips when inline structured dates are present; case-insensitive matching for naturally-capitalized expressions
+- **Dependencies**: Uses `NaturalDateParser`, `SmartDateProcessor.hasInlineStructuredDates()`, `TaskParser.isTaskLine()`
+
+**smartDatePlugin** (`src/view/editor-extensions/smart-date-extension.ts`)
+
+- **Responsibility**: Monitors editor changes and cursor movements to trigger smart date conversion via `SmartDateProcessor`
+- **Key Patterns**: ViewPlugin, cursor line tracking, cursor-leave detection
+- **Interface**: CodeMirror ViewPlugin
+- **Features**: Tracks cursor line across document changes and cursor movements; calls `SmartDateProcessor.handleCursorLeave()` when cursor leaves a line; calls `SmartDateProcessor.handleEditorUpdate()` on document changes
+- **Lifecycle**: Does NOT call `smartDateProcessor.destroy()` in `destroy()` — global lifecycle cleanup is handled by `PluginLifecycleManager.onunload()`
+
+**taskKeywordPlugin** (`src/view/editor-extensions/task-formatting.ts`)
+
+- **Responsibility**: CodeMirror extension for task keyword formatting, priority pills, and date line styling in the editor
+- **Key Patterns**: ViewPlugin, Decoration marks and widgets, state machine for block tracking
+- **Interface**: `TaskKeywordDecorator` class, `PriorityWidget` widget
+- **Features**: Keyword highlighting with CSS classes (completed, archived, code block, comment, quote, callout, footnote); priority pills rendered as widgets in Live Preview (raw text when cursor is near); SCHEDULED/DEADLINE/CLOSED date line decoration; language-aware keyword detection in code blocks; code block, comment block, quote block, and footnote state tracking
+- **Settings Change Detection**: Uses `SettingsChangeDetector` to detect when formatting settings change
+- **Mode Detection**: Handles Source mode vs Live Preview mode transitions
+
+**DateAutocompleteExtension** (`src/view/editor-extensions/date-autocomplete.ts`)
+
+- **Responsibility**: Automatically inserts current date after SCHEDULED: and DEADLINE: keywords when the user types a colon
+- **Key Patterns**: Keymap extension, colon detection, context validation
+- **Interface**: `dateAutocompleteExtension(settings)` returns CodeMirror Extension
+- **Features**: Detects colon after SCHEDULED or DEADLINE; validates keyword position (start of line with optional indentation); validates line context (must follow a task line or another date line); inserts date in YYYY-MM-DD format with selection highlighting
+- **Used by**: EditorController (registered as editor extension)
+
 ## Component Dependency Diagram
 
 ```mermaid
@@ -526,6 +700,17 @@ end
          EmbeddedProcessor[TodoseqCodeBlockProcessor]
          SearchOptionsDropdown[SearchOptionsDropdown]
          SearchSuggestionDropdown[SearchSuggestionDropdown]
+         DatePickerComp[DatePicker]
+         SavedSearchDialogComp[SavedSearchDialog]
+         TaskContextMenuComp[TaskContextMenu]
+         TaskDragDrop[TaskDragDropHandler]
+         TaskItemRendererComp[TaskItemRenderer]
+         TaskListFilterComp[TaskListFilter]
+         ChunkedRender[ChunkedRenderQueue]
+         ElementCache[TaskElementCache]
+         EmbeddedItemRenderer[EmbeddedTaskItemRenderer]
+         EmbeddedListManager[EmbeddedTaskListManager]
+         EmbeddedEventHandler[EmbeddedTaskListEventHandler]
      end
 
     subgraph "Parser Dependencies"
@@ -556,11 +741,19 @@ end
         TaskSort[TaskSort]
         TaskUrgency[TaskUrgency]
         DailyNoteUtils[DailyNoteUtils]
+        TaskSubBulletsComp[TaskSubBullets]
+        PropertyEvaluatorComp[PropertyEvaluator]
+        MobileUtilsComp[MobileUtils]
+        OrgPatternsComp[OrgPatterns]
+        DateRepeaterComp[DateRepeater]
+        TaskFormatComp[TaskFormat]
     end
 
     subgraph "Service Layer Dependencies"
         EditorController[EditorController]
         TaskWriter[TaskWriter]
+        SavedSearchMgr[SavedSearchManager]
+        DateLineOp[DateLineOperator]
     end
 
     subgraph "Lifecycle Dependencies"
@@ -677,11 +870,11 @@ end
 
     %% Class styling for component types
     class Main,LifecycleManager pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor serviceLayer
-     class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown uiLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchMgr,DateLineOp serviceLayer
+     class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown,DatePickerComp,SavedSearchDialogComp,TaskContextMenuComp,TaskDragDrop,TaskItemRendererComp,TaskListFilterComp,ChunkedRender,ElementCache,EmbeddedItemRenderer,EmbeddedListManager,EmbeddedEventHandler uiLayer
     class TaskParser,OrgModeParser,CodeCommentParser,ParserRegistry,LanguageRegistry,DateParser,NaturalDateParser parserLayer
     class Search,SearchParser,SearchEvaluator,SearchTokenizer,SearchSuggestions searchLayer
-    class TaskUtils,KeywordManager,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils utilityLayer
+    class TaskUtils,KeywordManager,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils,TaskSubBulletsComp,PropertyEvaluatorComp,MobileUtilsComp,OrgPatternsComp,DateRepeaterComp,TaskFormatComp utilityLayer
     class Obsidian,DailyNotes,ChronoNode external
 ```
 
@@ -892,7 +1085,7 @@ graph LR
 - **Race Condition Prevention**: Per-task locking in `TaskUpdateCoordinator` serializes rapid updates; per-file queueing ensures serialized writes; timestamp-based skip set in `VaultScanner` handles chained updates
 - **Change Tracking**: `ChangeTracker` uses cross-platform content hashing (not Node.js crypto) to track expected file changes
 
-### 3. Plugin Architecture
+### 4. Plugin Architecture
 
 - **Language Registry**: Extensible language support via `LanguageRegistry`
 - **Editor Extensions**: Pluggable CodeMirror decorations and commands
@@ -900,7 +1093,63 @@ graph LR
 - **Format Extensions**: Configurable task formatting options
 - **Property Search**: Extensible property-based search via `PropertySearchEngine`
 
-### 4. Performance Patterns
+### 5. Utility Components
+
+**TaskSubBullets** (`src/utils/task-sub-bullets.ts`)
+
+- **Responsibility**: Subtask/sub-bullet operations for drag-and-drop migration and task block extraction
+- **Key Patterns**: Line range calculation, indentation-based hierarchy
+- **Interface**: `taskHasCheckbox()`, `buildRemovalRange()`, `findSubtaskEnd()`, `extractSubtaskLines()`, `getTaskRemovalRange()`, `modifyLinesForMigration()`, `readTaskBlockFromLines()`, `readTaskBlockFromVault()`, `readSubtaskLinesFromVault()`
+- **Used by**: TaskDragDropHandler, TaskUpdateCoordinator
+
+**PropertyEvaluator** (`src/utils/property-evaluator.ts`)
+
+- **Responsibility**: Utility class for evaluating property values in search queries, centralizing date parsing, comparison, and evaluation logic
+- **Key Patterns**: Static utility methods, date parsing, comparison operators
+- **Interface**: `parsePropertyValueAsDate()`, `parseDateForComparison()`, `compareDate()`, `evaluateDateComparison()`
+- **Date Formats**: YYYY-MM-DD, YYYY-MM, YYYY, relative dates (today, tomorrow, overdue), date ranges
+- **Used by**: SearchEvaluator, PropertySearchEngine
+
+**MobileUtils** (`src/utils/mobile-utils.ts`)
+
+- **Responsibility**: Mobile device detection utilities for distinguishing phones from tablets
+- **Key Patterns**: Viewport-based detection, platform check
+- **Interface**: `isPhoneDevice()`
+- **Logic**: Phone = `Platform.isMobile` AND viewport width ≤ 768px (TABLET_BREAKPOINT)
+- **Used by**: BaseDialog, DatePicker, TaskContextMenu
+
+**OrgPatterns** (`src/utils/org-patterns.ts`)
+
+- **Responsibility**: Org-mode regex patterns for task parsing (headlines, priorities, date lines, properties drawers)
+- **Key Patterns**: RegexCache-aware pattern building, capture groups
+- **Interface**: `buildOrgHeadlineRegex()`, `extractOrgPriority()`, `getNestingLevel()`, `isInPropertiesDrawer()`, and regex constants for headlines, priorities, scheduled/deadline lines, properties drawers, closed timestamps, and file directives
+- **Used by**: OrgModeTaskParser
+
+**DateRepeater** (`src/utils/date-repeater.ts`)
+
+- **Responsibility**: Date repeater utility functions for org-mode compatible repeating dates (+, .+, ++) with warning period support
+- **Key Patterns**: Regex parsing, date calculation, three repeat types
+- **Interface**: `parseRepeater()`, `extractRepeaterFromDate()`, `extractDateMetadata()`, `buildWarningPeriodString()`, `calculateNextRepeatDate()`, `hasRepeater()`, `getEffectiveDate()`, `formatDateLine()`, `formatRepeatDescription()`
+- **Repeat Types**: `+` (plain), `.+` (delay from now), `++` (catch-up) with units h, d, w, m, y
+- **Warning Periods**: `-Nd` (recurring), `--Nd` (first-only only)
+- **Used by**: DateParser, TaskParser, TaskUpdateCoordinator, RecurrenceManager
+
+**TaskFormat** (`src/utils/task-format.ts`)
+
+- **Responsibility**: Task line formatting utilities for generating formatted task lines with date lines
+- **Key Patterns**: Template-based formatting, org-mode date formatting
+- **Interface**: `formatTaskLines(task)`, `formatOrgDate(date, repeat?, time?)`
+- **Used by**: TaskWriter, search export features
+
+**SettingsUtils** (`src/utils/settings-utils.ts`)
+
+- **Responsibility**: Settings change detection and keyword input parsing utilities
+- **Key Patterns**: Fingerprint-based change detection, comma-separated parsing
+- **Interface**: `SettingsChangeDetector` class (`initialize()`, `hasFormattingSettingsChanged()`, `updatePreviousState()`, `reset()`), `parseKeywordInput()`, `formatKeywordsForInput()`, `validateKeywordGroupsDetailed()`
+- **Settings Fingerprint**: Tracks formatTaskKeywords, includeCodeBlocks, includeCalloutBlocks, includeCommentBlocks, languageCommentSupport, additional keywords, and smart date settings
+- **Used by**: TaskKeywordDecorator, ReaderViewFormatter, settings UI
+
+### 6. Performance Patterns
 
 - **Incremental Scanning**: Only re-scan changed files
 - **Yielding to Event Loop**: Prevent UI freezing during large operations
@@ -915,7 +1164,7 @@ graph LR
 - **Element Caching**: TaskListView caches DOM elements to avoid redundant re-rendering
 - **Debounced Refresh**: TaskListView uses debounced refresh to handle rapid state changes
 
-### 5. Security Patterns
+### 7. Security Patterns
 
 - **Input Validation**: All user inputs validated before processing
 - **Regex Injection Prevention**: User input sanitized before regex compilation
@@ -992,7 +1241,20 @@ interface Task {
   completed: boolean; // Completion status
   priority: 'high' | 'med' | 'low' | null;
   scheduledDate: Date | null;
+  scheduledDateRepeat: DateRepeatInfo | null; // Repeat info for scheduled date
   deadlineDate: Date | null;
+  deadlineDateRepeat: DateRepeatInfo | null; // Repeat info for deadline date
+  closedDate: Date | null; // Closed date (for completed tasks)
+
+  // Date repeat info (org-mode compatible repeating dates)
+  scheduledDateRepeat: DateRepeatInfo | null; // Repeat info for scheduled date
+  deadlineDateRepeat: DateRepeatInfo | null; // Repeat info for deadline date
+
+  // Warning periods
+  scheduledWarningPeriod: number | null; // Warning period for scheduled date
+  deadlineWarningPeriod: number | null; // Warning period for deadline date
+  scheduledFirstOnlyWarningPeriod: number | null; // First-only warning period for scheduled
+  deadlineFirstOnlyWarningPeriod: number | null; // First-only warning period for deadline
   tail?: string; // Trailing characters
   urgency: number | null; // Calculated urgency score
   file?: TFile; // Obsidian file reference
@@ -1039,6 +1301,7 @@ type SortMethod =
   | 'default'
   | 'sortByScheduled'
   | 'sortByDeadline'
+  | 'sortByClosedDate'
   | 'sortByPriority'
   | 'sortByUrgency'
   | 'sortByKeyword';
