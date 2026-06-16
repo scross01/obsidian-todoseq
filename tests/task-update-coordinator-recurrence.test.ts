@@ -108,11 +108,13 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
     );
 
     mockPlugin.taskEditor.updateTaskScheduledDate.mockImplementation(
-      async (task, newDate, repeat) => {
+      async (task, newDate, repeat, warningPeriod, firstOnlyWarningPeriod) => {
         return {
           ...task,
           scheduledDate: newDate,
           scheduledDateRepeat: repeat,
+          scheduledWarningPeriod: warningPeriod,
+          scheduledFirstOnlyWarningPeriod: firstOnlyWarningPeriod,
           lineDelta: 1,
         };
       },
@@ -130,11 +132,13 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
     );
 
     mockPlugin.taskEditor.updateTaskDeadlineDate.mockImplementation(
-      async (task, newDate, repeat) => {
+      async (task, newDate, repeat, warningPeriod, firstOnlyWarningPeriod) => {
         return {
           ...task,
           deadlineDate: newDate,
           deadlineDateRepeat: repeat,
+          deadlineWarningPeriod: warningPeriod,
+          deadlineFirstOnlyWarningPeriod: firstOnlyWarningPeriod,
           lineDelta: 1,
         };
       },
@@ -271,6 +275,219 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newDeadlineDate.getTime(),
       );
       expect(updatedTask?.state).toBe(newStateForRecurrence);
+    });
+  });
+
+  describe('first-only warning period stripping on recurrence', () => {
+    it('should strip scheduled first-only warning period when null is passed', async () => {
+      const task: Task = {
+        ...createBaseTask(),
+        path: 'test.md',
+        line: 0,
+        scheduledDate: new Date('2026-03-10'),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        scheduledFirstOnlyWarningPeriod: 3, // --Nd present on first occurrence
+        scheduledWarningPeriod: null,
+      };
+
+      const newScheduledDate = new Date('2026-03-17');
+
+      await taskUpdateCoordinator.updateTaskRecurrence(task, {
+        newScheduledDate,
+        newScheduledFirstOnlyWarningPeriod: null, // strip --Nd
+      });
+
+      // The mock should have received null for firstOnlyWarningPeriod,
+      // not the original value of 3
+      const calls = mockPlugin.taskEditor.updateTaskScheduledDate.mock.calls;
+      expect(calls.length).toBe(1);
+      const args = calls[0];
+      // args: [task, newDate, repeat, warningPeriod, firstOnlyWarningPeriod]
+      expect(args[4]).toBeNull();
+    });
+
+    it('should strip deadline first-only warning period when null is passed', async () => {
+      const task: Task = {
+        ...createBaseTask(),
+        path: 'test.md',
+        line: 0,
+        deadlineDate: new Date('2026-03-10'),
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineFirstOnlyWarningPeriod: 5, // --Nd present on first occurrence
+        deadlineWarningPeriod: null,
+      };
+
+      const newDeadlineDate = new Date('2026-03-17');
+
+      await taskUpdateCoordinator.updateTaskRecurrence(task, {
+        newDeadlineDate,
+        newDeadlineFirstOnlyWarningPeriod: null, // strip --Nd
+      });
+
+      const calls = mockPlugin.taskEditor.updateTaskDeadlineDate.mock.calls;
+      expect(calls.length).toBe(1);
+      const args = calls[0];
+      // args: [task, newDate, repeat, warningPeriod, firstOnlyWarningPeriod]
+      expect(args[4]).toBeNull();
+    });
+
+    it('should preserve existing first-only warning period when undefined is passed', async () => {
+      const task: Task = {
+        ...createBaseTask(),
+        path: 'test.md',
+        line: 0,
+        scheduledDate: new Date('2026-03-10'),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        scheduledFirstOnlyWarningPeriod: 3,
+        scheduledWarningPeriod: null,
+      };
+
+      const newScheduledDate = new Date('2026-03-17');
+
+      // Don't pass newScheduledFirstOnlyWarningPeriod (undefined)
+      await taskUpdateCoordinator.updateTaskRecurrence(task, {
+        newScheduledDate,
+      });
+
+      const calls = mockPlugin.taskEditor.updateTaskScheduledDate.mock.calls;
+      expect(calls.length).toBe(1);
+      const args = calls[0];
+      // Should fall back to the existing value (3)
+      expect(args[4]).toBe(3);
+    });
+
+    it('should pass through a new numeric first-only warning period', async () => {
+      const task: Task = {
+        ...createBaseTask(),
+        path: 'test.md',
+        line: 0,
+        scheduledDate: new Date('2026-03-10'),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        scheduledFirstOnlyWarningPeriod: 3,
+        scheduledWarningPeriod: null,
+      };
+
+      const newScheduledDate = new Date('2026-03-17');
+
+      await taskUpdateCoordinator.updateTaskRecurrence(task, {
+        newScheduledDate,
+        newScheduledFirstOnlyWarningPeriod: 7, // change from 3 to 7
+      });
+
+      const calls = mockPlugin.taskEditor.updateTaskScheduledDate.mock.calls;
+      expect(calls.length).toBe(1);
+      const args = calls[0];
+      expect(args[4]).toBe(7);
+    });
+
+    it('should preserve existing deadline first-only warning period when undefined is passed', async () => {
+      const task: Task = {
+        ...createBaseTask(),
+        path: 'test.md',
+        line: 0,
+        deadlineDate: new Date('2026-03-10'),
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineFirstOnlyWarningPeriod: 5,
+        deadlineWarningPeriod: null,
+      };
+
+      const newDeadlineDate = new Date('2026-03-17');
+
+      // Don't pass newDeadlineFirstOnlyWarningPeriod (undefined)
+      await taskUpdateCoordinator.updateTaskRecurrence(task, {
+        newDeadlineDate,
+      });
+
+      const calls = mockPlugin.taskEditor.updateTaskDeadlineDate.mock.calls;
+      expect(calls.length).toBe(1);
+      const args = calls[0];
+      // Should fall back to the existing value (5)
+      expect(args[4]).toBe(5);
+    });
+
+    it('should preserve regular -Nd warning period when null is passed (recurring periods persist)', async () => {
+      const task: Task = {
+        ...createBaseTask(),
+        path: 'test.md',
+        line: 0,
+        scheduledDate: new Date('2026-03-10'),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        scheduledWarningPeriod: 3, // -Nd present
+        scheduledFirstOnlyWarningPeriod: null,
+      };
+
+      const newScheduledDate = new Date('2026-03-17');
+
+      await taskUpdateCoordinator.updateTaskRecurrence(task, {
+        newScheduledDate,
+        newScheduledWarningPeriod: null, // null means "keep existing" for regular -Nd
+      });
+
+      const calls = mockPlugin.taskEditor.updateTaskScheduledDate.mock.calls;
+      expect(calls.length).toBe(1);
+      const args = calls[0];
+      // Regular warningPeriod should fall through ?? to existing value (3)
+      expect(args[3]).toBe(3);
+    });
+
+    it('should update state manager with stripped first-only warning period', async () => {
+      const task: Task = {
+        ...createBaseTask(),
+        path: 'test.md',
+        line: 0,
+        state: 'DONE',
+        scheduledDate: new Date('2026-03-10'),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        scheduledFirstOnlyWarningPeriod: 3,
+        scheduledWarningPeriod: null,
+      };
+
+      // Add task to state manager
+      taskStateManager.setTasks([task]);
+
+      // Verify the task initially has firstOnlyWarningPeriod
+      const beforeTask = taskStateManager.findTaskByPathAndLine('test.md', 0);
+      expect(beforeTask?.scheduledFirstOnlyWarningPeriod).toBe(3);
+
+      await taskUpdateCoordinator.updateTaskRecurrence(task, {
+        newScheduledDate: new Date('2026-03-17'),
+        newScheduledFirstOnlyWarningPeriod: null, // strip
+        newStateForRecurrence: 'TODO',
+      });
+
+      // State manager should reflect the stripped value
+      const afterTask = taskStateManager.findTaskByPathAndLine('test.md', 0);
+      expect(afterTask?.scheduledFirstOnlyWarningPeriod).toBeNull();
+    });
+
+    it('should update state manager with stripped deadline first-only warning period', async () => {
+      const task: Task = {
+        ...createBaseTask(),
+        path: 'test.md',
+        line: 0,
+        state: 'DONE',
+        deadlineDate: new Date('2026-03-10'),
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineFirstOnlyWarningPeriod: 5,
+        deadlineWarningPeriod: null,
+      };
+
+      // Add task to state manager
+      taskStateManager.setTasks([task]);
+
+      // Verify the task initially has firstOnlyWarningPeriod
+      const beforeTask = taskStateManager.findTaskByPathAndLine('test.md', 0);
+      expect(beforeTask?.deadlineFirstOnlyWarningPeriod).toBe(5);
+
+      await taskUpdateCoordinator.updateTaskRecurrence(task, {
+        newDeadlineDate: new Date('2026-03-17'),
+        newDeadlineFirstOnlyWarningPeriod: null, // strip
+        newStateForRecurrence: 'TODO',
+      });
+
+      // State manager should reflect the stripped value
+      const afterTask = taskStateManager.findTaskByPathAndLine('test.md', 0);
+      expect(afterTask?.deadlineFirstOnlyWarningPeriod).toBeNull();
     });
   });
 

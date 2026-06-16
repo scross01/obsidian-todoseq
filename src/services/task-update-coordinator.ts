@@ -720,12 +720,15 @@ export class TaskUpdateCoordinator {
               updatedTask,
               context.newScheduledDate,
               context.newScheduledRepeat ?? updatedTask.scheduledDateRepeat,
-              // Use ?? to coalesce both null and undefined — callers (e.g. RecurrenceCoordinator)
-              // pass null to mean "keep existing", and undefined when not provided.
+              // For warningPeriod: null means "keep existing" (recurring periods persist),
+              // undefined means not provided. Both fall back to existing via ??.
               context.newScheduledWarningPeriod ??
                 updatedTask.scheduledWarningPeriod,
-              context.newScheduledFirstOnlyWarningPeriod ??
-                updatedTask.scheduledFirstOnlyWarningPeriod,
+              // For firstOnlyWarningPeriod: null means "strip" (--Nd only applies to first
+              // occurrence), undefined means not provided. Use !== undefined to distinguish.
+              context.newScheduledFirstOnlyWarningPeriod !== undefined
+                ? context.newScheduledFirstOnlyWarningPeriod
+                : updatedTask.scheduledFirstOnlyWarningPeriod,
             );
             updatedTask = result;
             totalLineDelta += result.lineDelta ?? 0;
@@ -742,12 +745,15 @@ export class TaskUpdateCoordinator {
               updatedTask,
               context.newDeadlineDate,
               context.newDeadlineRepeat ?? updatedTask.deadlineDateRepeat,
-              // Use ?? to coalesce both null and undefined — callers (e.g. RecurrenceCoordinator)
-              // pass null to mean "keep existing", and undefined when not provided.
+              // For warningPeriod: null means "keep existing" (recurring periods persist),
+              // undefined means not provided. Both fall back to existing via ??.
               context.newDeadlineWarningPeriod ??
                 updatedTask.deadlineWarningPeriod,
-              context.newDeadlineFirstOnlyWarningPeriod ??
-                updatedTask.deadlineFirstOnlyWarningPeriod,
+              // For firstOnlyWarningPeriod: null means "strip" (--Nd only applies to first
+              // occurrence), undefined means not provided. Use !== undefined to distinguish.
+              context.newDeadlineFirstOnlyWarningPeriod !== undefined
+                ? context.newDeadlineFirstOnlyWarningPeriod
+                : updatedTask.deadlineFirstOnlyWarningPeriod,
             );
             updatedTask = result;
             totalLineDelta += result.lineDelta ?? 0;
@@ -878,6 +884,12 @@ export class TaskUpdateCoordinator {
             deadlineDate: updatedTask.deadlineDate,
             scheduledDateRepeat: updatedTask.scheduledDateRepeat,
             deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+            scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
+            deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
+            scheduledFirstOnlyWarningPeriod:
+              updatedTask.scheduledFirstOnlyWarningPeriod,
+            deadlineFirstOnlyWarningPeriod:
+              updatedTask.deadlineFirstOnlyWarningPeriod,
             urgency,
           },
         );
