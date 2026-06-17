@@ -35,8 +35,7 @@ graph TB
              PropertySearchEngine["PropertySearchEngine<br/>Property Search"]
              StateTransitionManager["TaskStateTransitionManager<br/>State Transitions"]
              ChangeTracker["ChangeTracker<br/>Expected Change Tracking"]
-             RecurrenceCoordinator["RecurrenceCoordinator<br/>Recurrence Coordination (50ms delay)"]
-             RecurrenceManager["RecurrenceManager<br/>Recurrence Logic"]
+             RecurrenceCoordinator["RecurrenceCoordinator<br/>Recurrence Coordination + Date Math"]
              TransitionParser["TransitionParser<br/>State Transition Syntax"]
              SmartDateProcessor["SmartDateProcessor<br/>Date Conversion"]
              SavedSearchManager["SavedSearchManager<br/>Saved Searches"]
@@ -303,14 +302,6 @@ graph TB
 - **Key Patterns**: Singleton, caching, async initialization
 - **Interface**: `searchProperties()`, `isReady()`, `onFileChanged()`, property cache management
 
-**RecurrenceManager** (`src/services/recurrence-manager.ts`)
-
-- **Responsibility**: Handles all recurrence-related logic for tasks, providing centralized calculation and update of recurring task dates
-- **Key Patterns**: Date calculation, recurrence detection, date line formatting
-- **Interface**: `calculateNextDates()`, `updateTaskKeyword()`
-- **Used by**: RecurrenceCoordinator, VaultScanner
-- **Output**: Returns `RecurrenceUpdateResult` with updated lines and new dates
-
 **TransitionParser** (`src/services/transition-parser.ts`)
 
 - **Responsibility**: Parser for declarative state transition syntax, supporting chain transitions, group alternatives, and terminal states
@@ -345,9 +336,10 @@ graph TB
 
 **RecurrenceCoordinator** (`src/services/recurrence-coordinator.ts`)
 
-- **Responsibility**: Centralized coordination for recurrence updates (date advancement for recurring tasks)
-- **Key Patterns**: Per-task tracking, delayed updates, vault-based file operations
-- **Interface**: `scheduleRecurrence()`, `performRecurrenceUpdate()`, `destroy()`, `setTaskUpdateCoordinator()`
+- **Responsibility**: Centralized coordination for recurrence updates (date advancement for recurring tasks) **and** owns the recurrence date math (next-date calculation + warning-period carry-over for repeats)
+- **Key Patterns**: Per-task tracking, delayed updates, vault-based file operations, pure-math date calculation
+- **Interface**: `scheduleRecurrence()`, `cancelRecurrence()`, `performRecurrenceUpdate()`, `calculateNextDates()`, `destroy()`, `setTaskUpdateCoordinator()`, `setKeywordManager()`
+- **Inline Date Math**: `calculateNextDates()` is an inlined public method on `RecurrenceCoordinator` (the previous delegation to a separate `RecurrenceManager` service has been removed). It accepts the structural `RecurrenceDateLineParser` interface — which replaces the deleted `DateLineParser` interface — and any object satisfying its `getDateLineType(line, indent)` shape is accepted. The pure-math result is typed as `RecurrenceDateCalculationResult`, while the orchestration result (`performRecurrenceUpdate`) is typed as `RecurrenceUpdateResult`. The two result types are intentionally separate shapes (no field overlap — cross-assignment is a compile error) to prevent accidental confusion between math output and orchestration outcome. Warning-period semantics: `-Nd` (non-firstOnly) is preserved across repeats; `--Nd` (isFirstOnly) is stripped after first occurrence (returned as `null` to signal stripping downstream).
 - **Vault-Based Reads**: `getFileContent()` always reads from vault (not editor buffer) to ensure latest content
 - **TaskUpdateCoordinator Integration**: Uses `setTaskUpdateCoordinator()` to avoid circular dependency, delegates all updates to `TaskUpdateCoordinator`
 - **State Independence**: For recurring tasks (those with repeat dates), advances dates regardless of current task state (since DONE state is intentionally skipped during completion)
@@ -1132,7 +1124,7 @@ graph LR
 - **Interface**: `parseRepeater()`, `extractRepeaterFromDate()`, `extractDateMetadata()`, `buildWarningPeriodString()`, `calculateNextRepeatDate()`, `hasRepeater()`, `getEffectiveDate()`, `formatDateLine()`, `formatRepeatDescription()`
 - **Repeat Types**: `+` (plain), `.+` (delay from now), `++` (catch-up) with units h, d, w, m, y
 - **Warning Periods**: `-Nd` (recurring), `--Nd` (first-only only)
-- **Used by**: DateParser, TaskParser, TaskUpdateCoordinator, RecurrenceManager
+- **Used by**: DateParser, TaskParser, TaskUpdateCoordinator, RecurrenceCoordinator
 
 **TaskFormat** (`src/utils/task-format.ts`)
 
