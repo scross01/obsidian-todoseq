@@ -473,7 +473,10 @@ export class TaskItemRenderer {
       });
       badge.setText(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C');
       badge.setAttribute('aria-label', `Priority ${pri}`);
-      setTooltip(badge, `Priority ${getPriorityLevelName(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C')}`);
+      setTooltip(
+        badge,
+        `Priority ${getPriorityLevelName(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C')}`,
+      );
     }
 
     // Remaining text - use lazy-computed textDisplay for better performance
@@ -654,7 +657,10 @@ export class TaskItemRenderer {
           });
           badge.setText(priorityText);
           badge.setAttribute('aria-label', `Priority ${task.priority}`);
-          setTooltip(badge, `Priority ${getPriorityLevelName(task.priority === 'high' ? 'A' : task.priority === 'med' ? 'B' : 'C')}`);
+          setTooltip(
+            badge,
+            `Priority ${getPriorityLevelName(task.priority === 'high' ? 'A' : task.priority === 'med' ? 'B' : 'C')}`,
+          );
           todoText.appendText(' ');
         }
 
@@ -933,7 +939,10 @@ export class TaskItemRenderer {
           svg.removeAttribute('width');
           svg.removeAttribute('height');
         }
-        setTooltip(repeatIcon, `Repeats: ${formatRepeatDescription(task.scheduledDateRepeat)}`);
+        setTooltip(
+          repeatIcon,
+          `Repeats: ${formatRepeatDescription(task.scheduledDateRepeat)}`,
+        );
       }
     }
 
@@ -1004,7 +1013,10 @@ export class TaskItemRenderer {
           svg.removeAttribute('width');
           svg.removeAttribute('height');
         }
-        setTooltip(repeatIcon, `Repeats: ${formatRepeatDescription(task.deadlineDateRepeat)}`);
+        setTooltip(
+          repeatIcon,
+          `Repeats: ${formatRepeatDescription(task.deadlineDateRepeat)}`,
+        );
       }
     }
 

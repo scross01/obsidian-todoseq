@@ -1130,7 +1130,9 @@ describe('TaskItemRenderer', () => {
         '.todoseq-task-date-repeat-icon',
       );
       expect(repeatIcon).not.toBeNull();
-      expect(repeatIcon?.getAttribute('title')).toBe('Repeats: Every 2 weeks (from done)');
+      expect(repeatIcon?.getAttribute('title')).toBe(
+        'Repeats: Every 2 weeks (from done)',
+      );
     });
 
     it('should create closed date display for completed tasks', () => {

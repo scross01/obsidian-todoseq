@@ -54,16 +54,41 @@
   font-family: var(--font-text);
   font-size: var(--font-text-size);
   margin: 0;
-  padding-left: var(--size-2-2);
+  padding-left: 0;
   list-style-type: none;
 }
 
 /* List item */
 .todoseq-panel .todoseq-task-item {
-  padding: var(--size-2-2) 0;
-  border-bottom: 1px solid var(--background-modifier-border, rgba(0, 0, 0, 0.1));
+  position: relative;
+  padding: var(--size-2-2) 0 var(--size-2-2) var(--size-2-2);
   content-visibility: auto;
   contain-intrinsic-size: 0 100px;
+  transition: background-color 100ms ease;
+}
+
+.todoseq-panel .todoseq-task-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-s);
+  background-color: transparent;
+  transition: background-color 100ms ease;
+  z-index: -1;
+}
+
+.todoseq-panel .todoseq-task-item:hover::before {
+  background-color: var(--background-modifier-hover);
+}
+
+.todoseq-panel .todoseq-task-item::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: var(--radius-s);
+  right: var(--radius-s);
+  height: 1px;
+  background: var(--background-modifier-border, rgba(0, 0, 0, 0.1));
 }
 
 /* Drag-and-drop */
@@ -124,6 +149,7 @@
 /* Hover hint */
 .todoseq-panel .todo-task-keyword:hover {
   text-decoration: underline;
+  background-color: var(--background-modifier-hover);
 }
 
 /* Keyboard focus highlight for state keyword when tabbing elements */
@@ -572,14 +598,14 @@
   font-weight: var(--font-normal);
 }
 
-/* Hover effect for better UX - underline and background highlight */
-.todoseq-keyword-formatted:hover {
+/* Hover effect for task keywords - underline and background highlight */
+:is(
+  .todoseq-keyword-formatted,
+  .cm-editor .todoseq-footnote-task-keyword,
+  .cm-editor [class^='todoseq-quote-block-task-keyword-']
+):hover {
   text-decoration: underline;
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 15%,
-    transparent
-  );
+  background-color: var(--background-modifier-hover);
 }
 
 /* Ensure formatting works in both light and dark themes */
@@ -764,7 +790,7 @@
   border-radius: var(--radius-s);
   margin-bottom: var(--size-2-1);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color 100ms ease;
 }
 
 .todoseq-embedded-task-item:hover {
@@ -1345,29 +1371,12 @@
   border-radius: 2px;
 }
 
-/* Hover effect for footnote task keywords */
-.cm-editor .todoseq-footnote-task-keyword:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 15%,
-    transparent
-  );
-}
-
 /* Nested quote task keyword styling - consolidated using attribute selector */
 .cm-editor [class^='todoseq-quote-block-task-keyword-'] {
   font-weight: var(--font-bold);
   color: var(--interactive-accent);
   font-size: 0.9rem;
   border-radius: 2px;
-}
-
-.cm-editor [class^='todoseq-quote-block-task-keyword-']:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent) 15%,
-    transparent
-  );
 }
 
 .todoseq-embedded-task-item-date-soon {

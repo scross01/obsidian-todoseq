@@ -40,7 +40,7 @@ test.describe('Date operations', () => {
 
     // Click "Today" scheduled date button
     const todayBtn = contextMenu.locator(
-      '.todoseq-context-menu-icon-btn[aria-label="Today"]',
+      '.todoseq-context-menu-icon-btn[aria-label^="Today"]',
     );
     await expect(todayBtn).toBeVisible();
     await todayBtn.click();
@@ -86,7 +86,7 @@ test.describe('Date operations', () => {
     await expect(contextMenu).toBeVisible({ timeout: 5_000 });
 
     const noDateBtn = contextMenu.locator(
-      '.todoseq-context-menu-icon-btn[aria-label="No date"]',
+      '.todoseq-context-menu-icon-btn[aria-label^="No date"]',
     );
     await expect(noDateBtn).toBeVisible();
     await noDateBtn.click();

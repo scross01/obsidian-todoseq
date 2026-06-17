@@ -4,6 +4,7 @@
 
 - Updated tooltips style. Date tooltips show consistent full dates with time, warning periods, and repeat details.
 - Fixed issue with when upcoming periods being ignored when set to 0 days.
+- Standardized hover effect styling across the plugin, added row highlight to main task list.
 
 ## 0.16.0
 

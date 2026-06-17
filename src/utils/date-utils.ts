@@ -84,13 +84,17 @@ export class DateUtils {
       return time.replace(/AM|PM/i, (m) => m.toLowerCase());
     };
 
-    const hasTime = includeTime && (normalizedDate.getHours() !== 0 || normalizedDate.getMinutes() !== 0);
+    const hasTime =
+      includeTime &&
+      (normalizedDate.getHours() !== 0 || normalizedDate.getMinutes() !== 0);
     const absoluteDate = normalizedDate.toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-    const absoluteWithTime = hasTime ? `${absoluteDate} ${formatTime(normalizedDate)}` : absoluteDate;
+    const absoluteWithTime = hasTime
+      ? `${absoluteDate} ${formatTime(normalizedDate)}`
+      : absoluteDate;
 
     const now = new Date();
     const today = this.getDateOnly(now);
@@ -99,13 +103,19 @@ export class DateUtils {
     const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
 
     if (diffDays === 0) {
-      return hasTime ? `Today ${formatTime(normalizedDate)} (${absoluteDate})` : `Today (${absoluteDate})`;
+      return hasTime
+        ? `Today ${formatTime(normalizedDate)} (${absoluteDate})`
+        : `Today (${absoluteDate})`;
     } else if (diffDays === 1) {
-      return hasTime ? `Tomorrow ${formatTime(normalizedDate)} (${absoluteDate})` : `Tomorrow (${absoluteDate})`;
+      return hasTime
+        ? `Tomorrow ${formatTime(normalizedDate)} (${absoluteDate})`
+        : `Tomorrow (${absoluteDate})`;
     } else if (diffDays === -1) {
       return `Yesterday (${absoluteDate})`;
     } else if (diffDays > 0 && diffDays <= 7) {
-      return hasTime ? `${diffDays} days from now ${formatTime(normalizedDate)} (${absoluteDate})` : `${diffDays} days from now (${absoluteDate})`;
+      return hasTime
+        ? `${diffDays} days from now ${formatTime(normalizedDate)} (${absoluteDate})`
+        : `${diffDays} days from now (${absoluteDate})`;
     } else if (diffDays < 0) {
       return `${Math.abs(diffDays)} days ago (${absoluteDate})`;
     } else {
@@ -131,7 +141,10 @@ export class DateUtils {
   ): string {
     if (warningDays <= 0) return '';
 
-    const effectiveDate = this.addDays(date, isScheduled ? warningDays : -warningDays);
+    const effectiveDate = this.addDays(
+      date,
+      isScheduled ? warningDays : -warningDays,
+    );
     const wpLabel = warningPeriod
       ? `-${warningPeriod.value}${warningPeriod.unit}`
       : `-${warningDays}d`;

@@ -307,16 +307,16 @@ export class EmbeddedTaskItemRenderer {
         }
       }
 
-        if (hasSubtask) {
-          const subtaskEl = textContainer.createSpan({
-            cls: 'todoseq-subtask-indicator',
-            text: getSubtaskDisplayText(task),
-          });
-          setTooltip(
-            subtaskEl,
-            `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
-          );
-        }
+      if (hasSubtask) {
+        const subtaskEl = textContainer.createSpan({
+          cls: 'todoseq-subtask-indicator',
+          text: getSubtaskDisplayText(task),
+        });
+        setTooltip(
+          subtaskEl,
+          `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
+        );
+      }
 
       this.buildInlineDateBadge(task, params, textContainer);
 
@@ -938,11 +938,15 @@ export class EmbeddedTaskItemRenderer {
     const parts: string[] = [];
 
     if (hasScheduled) {
-      parts.push(`Scheduled: ${DateUtils.formatDateTooltip(task.scheduledDate, true)}`);
+      parts.push(
+        `Scheduled: ${DateUtils.formatDateTooltip(task.scheduledDate, true)}`,
+      );
     }
 
     if (hasDeadline) {
-      parts.push(`Deadline: ${DateUtils.formatDateTooltip(task.deadlineDate, true)}`);
+      parts.push(
+        `Deadline: ${DateUtils.formatDateTooltip(task.deadlineDate, true)}`,
+      );
     }
 
     return parts.join('\n');
@@ -957,12 +961,16 @@ export class EmbeddedTaskItemRenderer {
   ): string | undefined {
     const settings = this.plugin.keywordManager.getSettings();
     const warningDays = getEffectiveWarningDays(task, type, {
-      defaultScheduledWarningPeriod: settings.defaultScheduledWarningPeriod ?? 0,
+      defaultScheduledWarningPeriod:
+        settings.defaultScheduledWarningPeriod ?? 0,
       defaultDeadlineWarningPeriod: settings.defaultDeadlineWarningPeriod ?? 0,
     });
     if (warningDays <= 0) return undefined;
 
-    const wp = type === 'scheduled' ? task.scheduledWarningPeriod : task.deadlineWarningPeriod;
+    const wp =
+      type === 'scheduled'
+        ? task.scheduledWarningPeriod
+        : task.deadlineWarningPeriod;
     const date = type === 'scheduled' ? task.scheduledDate : task.deadlineDate;
     if (!date) return undefined;
 
@@ -1067,10 +1075,18 @@ export class EmbeddedTaskItemRenderer {
     const hasBoth = scheduledRepeat && deadlineRepeat;
     const parts: string[] = [];
     if (scheduledRepeat) {
-      parts.push(hasBoth ? `Scheduled: ${formatRepeatDescription(scheduledRepeat)}` : formatRepeatDescription(scheduledRepeat));
+      parts.push(
+        hasBoth
+          ? `Scheduled: ${formatRepeatDescription(scheduledRepeat)}`
+          : formatRepeatDescription(scheduledRepeat),
+      );
     }
     if (deadlineRepeat) {
-      parts.push(hasBoth ? `Deadline: ${formatRepeatDescription(deadlineRepeat)}` : formatRepeatDescription(deadlineRepeat));
+      parts.push(
+        hasBoth
+          ? `Deadline: ${formatRepeatDescription(deadlineRepeat)}`
+          : formatRepeatDescription(deadlineRepeat),
+      );
     }
 
     const icon = parent.createEl('span', {
