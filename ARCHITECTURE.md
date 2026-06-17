@@ -39,7 +39,6 @@ graph TB
              TransitionParser["TransitionParser<br/>State Transition Syntax"]
              SmartDateProcessor["SmartDateProcessor<br/>Date Conversion"]
              SavedSearchManager["SavedSearchManager<br/>Saved Searches"]
-             DateLineOperator["DateLineOperator<br/>Date Line Helpers"]
          end
 
         subgraph "UI Layer"
@@ -196,7 +195,7 @@ graph TB
     classDef external fill:#f5f5f5
 
     class Main pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchManager,DateLineOperator serviceLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchManager serviceLayer
     class UIManager,TaskListView,TaskWriter,ReaderFormatter,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown,DatePicker,SavedSearchDialog,TaskContextMenu,TaskDragDropHandler,TaskItemRenderer,TaskListFilter,ChunkedRenderQueue,TaskElementCache,EmbeddedTaskItemRenderer,EmbeddedTaskListManager,EmbeddedTaskListEventHandler uiLayer
     class TaskParser,OrgModeParser,CodeCommentParser,ParserRegistry,LanguageRegistry,DateParser,NaturalDateParser parserLayer
     class Search,SearchParser,SearchEvaluator searchLayer
@@ -284,6 +283,7 @@ graph TB
 - **Responsibility**: Atomic file operations, state preservation, formatting, editor-aware writes
 - **Key Patterns**: Strategy pattern, atomic operations, editor/vault API handling
 - **Interface**: `updateTaskState()`, `applyLineUpdate()`, `writeLines()`, `generateTaskLine()`, file persistence, date update methods
+- **Inline Date-Line Helpers**: SCHEDULED/DEADLINE/CLOSED line insertion/removal is inlined as private methods on `TaskWriter` (`updateOrInsertDateLine`, `removeDateLine`, `calcDateLineInsertIndex`, `getEffectiveDateLineIndent`, `getExistingDateLineIndent` — formerly a separate `DateLineOperator` module). Insertion rules: SCHEDULED before DEADLINE; DEADLINE after SCHEDULED; CLOSED after both. Both Editor-API and Vault-API paths route through these shared helpers for consistent indent preservation.
 - **Editor Awareness**: Uses Editor API (`editor.replaceRange()`) for active files in source mode to preserve cursor/selection/folds; falls back to Vault API for inactive files or preview mode
 - **Multiple Line Writes**: `writeLines()` method for writing multiple lines while maintaining editor awareness
 - **Atomic CLOSED Date Handling**: For non-source mode, CLOSED date is handled atomically with task line update in a single `vault.process()` operation
@@ -363,14 +363,6 @@ graph TB
 - **Interface**: `createSavedSearch()`, `addSavedSearch()`, `updateSavedSearch()`, `deleteSavedSearch()`, `getSavedSearches()`, `findSavedSearch()`, `findSavedSearchByQuery()`, `reorderSavedSearches()`, `validateSavedSearchName()`
 - **Validation**: Name length capped at 50 characters; empty names rejected
 - **Used by**: SearchOptionsDropdown, settings UI
-
-**DateLineOperator** (`src/services/date-line-operator.ts`)
-
-- **Responsibility**: Date line operation helpers for TaskWriter, extracting common orchestration logic shared by update/remove methods for SCHEDULED, DEADLINE, and CLOSED date lines
-- **Key Patterns**: Functional composition, insert position calculation, indentation resolution
-- **Interface**: `updateOrInsert()`, `remove()`, `calcInsertIndex()`, `getEffectiveIndent()`, `getExistingIndent()`
-- **Insertion Rules**: SCHEDULED before DEADLINE; DEADLINE after SCHEDULED; CLOSED after both
-- **Used by**: TaskWriter (all date line update/remove operations)
 
 ### 2. UI Layer (User Interaction)
 
@@ -745,7 +737,6 @@ end
         EditorController[EditorController]
         TaskWriter[TaskWriter]
         SavedSearchMgr[SavedSearchManager]
-        DateLineOp[DateLineOperator]
     end
 
     subgraph "Lifecycle Dependencies"
@@ -862,7 +853,7 @@ end
 
     %% Class styling for component types
     class Main,LifecycleManager pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchMgr,DateLineOp serviceLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchMgr serviceLayer
      class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown,DatePickerComp,SavedSearchDialogComp,TaskContextMenuComp,TaskDragDrop,TaskItemRendererComp,TaskListFilterComp,ChunkedRender,ElementCache,EmbeddedItemRenderer,EmbeddedListManager,EmbeddedEventHandler uiLayer
     class TaskParser,OrgModeParser,CodeCommentParser,ParserRegistry,LanguageRegistry,DateParser,NaturalDateParser parserLayer
     class Search,SearchParser,SearchEvaluator,SearchTokenizer,SearchSuggestions searchLayer

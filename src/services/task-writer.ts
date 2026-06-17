@@ -4,15 +4,16 @@ import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { DateUtils } from '../utils/date-utils';
 import { buildWarningPeriodString } from '../utils/date-repeater';
-import { findDateLine, getTaskIndent } from '../utils/task-line-utils';
+import {
+  findDateLine,
+  getTaskIndent,
+  getDateLineIndent,
+} from '../utils/task-line-utils';
 import TodoTracker from '../main';
 import { getStateTransitionManager } from './task-update-coordinator';
-import {
-  updateOrInsert as updateOrInsertDateLine,
-  remove as removeDateLine,
-  calcInsertIndex,
-  getEffectiveIndent,
-} from './date-line-operator';
+
+/** A SCHEDULED/DEADLINE/CLOSED date line kind. */
+type DateLineType = 'SCHEDULED' | 'DEADLINE' | 'CLOSED';
 
 export interface DateLineUpdateResult {
   task: Task;
@@ -274,21 +275,19 @@ export class TaskWriter {
 
           // Handle CLOSED date atomically using helper
           if (dateStr !== null) {
-            updateOrInsertDateLine(
+            this.updateOrInsertDateLine(
               lines,
               task.line,
               'CLOSED',
               dateStr,
               task,
-              this.keywordManager,
             );
           } else if (shouldRemoveClosed) {
-            removeDateLine(
+            this.removeDateLine(
               lines,
               task.line,
               'CLOSED',
               task,
-              this.keywordManager,
             );
           }
 
@@ -527,13 +526,12 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const result = updateOrInsertDateLine(
+        const result = this.updateOrInsertDateLine(
           lines,
           task.line,
           'SCHEDULED',
           dateStr,
           task,
-          this.keywordManager,
         );
         lineDelta = result.lineDelta;
         return lines.join('\n');
@@ -570,12 +568,11 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const result = removeDateLine(
+        const result = this.removeDateLine(
           lines,
           task.line,
           'SCHEDULED',
           task,
-          this.keywordManager,
         );
         lineDelta = result.lineDelta;
         return lines.join('\n');
@@ -617,13 +614,12 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const result = updateOrInsertDateLine(
+        const result = this.updateOrInsertDateLine(
           lines,
           task.line,
           'DEADLINE',
           dateStr,
           task,
-          this.keywordManager,
         );
         lineDelta = result.lineDelta;
         return lines.join('\n');
@@ -660,12 +656,11 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const result = removeDateLine(
+        const result = this.removeDateLine(
           lines,
           task.line,
           'DEADLINE',
           task,
-          this.keywordManager,
         );
         lineDelta = result.lineDelta;
         return lines.join('\n');
@@ -759,15 +754,14 @@ export class TaskWriter {
         );
 
         // Find insert position using helper (after DEADLINE/SCHEDULED if present, otherwise after task)
-        const insertIndex = calcInsertIndex(
+        const insertIndex = this.calcDateLineInsertIndex(
           lines,
           task.line,
           'CLOSED',
           taskIndent,
-          this.keywordManager,
         );
 
-        const closedIndent = getEffectiveIndent(lines, closedLineIndex, task);
+        const closedIndent = this.getEffectiveDateLineIndent(lines, closedLineIndex, task);
 
         if (closedLineIndex >= 0) {
           // Update existing CLOSED line, preserving its indentation
@@ -789,13 +783,12 @@ export class TaskWriter {
         // Vault API path
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
-          const result = updateOrInsertDateLine(
+          const result = this.updateOrInsertDateLine(
             lines,
             task.line,
             'CLOSED',
             dateStr,
             task,
-            this.keywordManager,
           );
           lineDelta = result.lineDelta;
           return lines.join('\n');
@@ -872,12 +865,11 @@ export class TaskWriter {
         // Use Vault API for background edits
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
-          const result = removeDateLine(
+          const result = this.removeDateLine(
             lines,
             task.line,
             'CLOSED',
             task,
-            this.keywordManager,
           );
           lineDelta = result.lineDelta;
           return lines.join('\n');
@@ -892,5 +884,163 @@ export class TaskWriter {
       },
       lineDelta,
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Inlined date-line helpers (formerly src/services/date-line-operator.ts)
+  // All methods are private; they capture `this.keywordManager` from the
+  // owning TaskWriter instance. The math here is pure and identical to the
+  // prior module — just relocated behind the class boundary.
+  // ─────────────────────────────────────────────────────────────────────
+
+  /**
+   * Extract the effective indentation from a date line.
+   * Handles both plain indentation and quoted lines ("> " prefixes).
+   */
+  private getExistingDateLineIndent(line: string): string {
+    const lineIndent = line.match(/^(\s*)/)?.[1] ?? '';
+    const lineQuotePrefix = line.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
+    return lineQuotePrefix || lineIndent;
+  }
+
+  /**
+   * Resolve the indent to use for a date line operation.
+   * If the line already exists, preserves its current indent.
+   * Otherwise, computes the default indent for the task.
+   */
+  private getEffectiveDateLineIndent(
+    lines: string[],
+    existingLineIndex: number,
+    task: Task,
+  ): string {
+    if (existingLineIndex >= 0) {
+      return this.getExistingDateLineIndent(lines[existingLineIndex]);
+    }
+    return getDateLineIndent(task);
+  }
+
+  /**
+   * Calculate the line index where a new date line should be inserted.
+   *
+   * Insertion rules (all indices relative to task.line):
+   * - SCHEDULED: before DEADLINE (if exists), else after task
+   * - DEADLINE:  after SCHEDULED (if exists), else after task
+   * - CLOSED:    after DEADLINE (if exists), else after SCHEDULED (if exists), else after task
+   */
+  private calcDateLineInsertIndex(
+    lines: string[],
+    taskLineIndex: number,
+    dateType: DateLineType,
+    taskIndent: string,
+  ): number {
+    const kwManager = this.keywordManager;
+    if (dateType === 'SCHEDULED') {
+      const deadlineIdx = findDateLine(
+        lines,
+        taskLineIndex + 1,
+        'DEADLINE',
+        taskIndent,
+        kwManager,
+      );
+      return deadlineIdx >= 0 ? deadlineIdx : taskLineIndex + 1;
+    }
+    if (dateType === 'DEADLINE') {
+      const scheduledIdx = findDateLine(
+        lines,
+        taskLineIndex + 1,
+        'SCHEDULED',
+        taskIndent,
+        kwManager,
+      );
+      return scheduledIdx >= 0 ? scheduledIdx + 1 : taskLineIndex + 1;
+    }
+    // CLOSED
+    const deadlineIdx = findDateLine(
+      lines,
+      taskLineIndex + 1,
+      'DEADLINE',
+      taskIndent,
+      kwManager,
+    );
+    if (deadlineIdx >= 0) {
+      return deadlineIdx + 1;
+    }
+    const scheduledIdx = findDateLine(
+      lines,
+      taskLineIndex + 1,
+      'SCHEDULED',
+      taskIndent,
+      kwManager,
+    );
+    if (scheduledIdx >= 0) {
+      return scheduledIdx + 1;
+    }
+    return taskLineIndex + 1;
+  }
+
+  /**
+   * Update an existing date line or insert a new one.
+   * Returns the resulting lines and the line delta.
+   */
+  private updateOrInsertDateLine(
+    lines: string[],
+    taskLineIndex: number,
+    dateType: DateLineType,
+    dateStr: string,
+    task: Task,
+  ): { lines: string[]; lineDelta: number } {
+    const kwManager = this.keywordManager;
+    const taskIndent = getTaskIndent(task);
+    const existingIdx = findDateLine(
+      lines,
+      taskLineIndex + 1,
+      dateType,
+      taskIndent,
+      kwManager,
+    );
+
+    if (existingIdx >= 0) {
+      const indent = this.getEffectiveDateLineIndent(lines, existingIdx, task);
+      lines[existingIdx] = `${indent}${dateType}: ${dateStr}`;
+      return { lines, lineDelta: 0 };
+    }
+
+    const insertIdx = this.calcDateLineInsertIndex(
+      lines,
+      taskLineIndex,
+      dateType,
+      taskIndent,
+    );
+    const indent = this.getEffectiveDateLineIndent(lines, -1, task);
+    lines.splice(insertIdx, 0, `${indent}${dateType}: ${dateStr}`);
+    return { lines, lineDelta: 1 };
+  }
+
+  /**
+   * Remove a date line.
+   * Returns the resulting lines and the line delta.
+   */
+  private removeDateLine(
+    lines: string[],
+    taskLineIndex: number,
+    dateType: DateLineType,
+    task: Task,
+  ): { lines: string[]; lineDelta: number } {
+    const kwManager = this.keywordManager;
+    const taskIndent = getTaskIndent(task);
+    const existingIdx = findDateLine(
+      lines,
+      taskLineIndex + 1,
+      dateType,
+      taskIndent,
+      kwManager,
+    );
+
+    if (existingIdx >= 0) {
+      lines.splice(existingIdx, 1);
+      return { lines, lineDelta: -1 };
+    }
+
+    return { lines, lineDelta: 0 };
   }
 }
