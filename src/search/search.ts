@@ -1,50 +1,22 @@
 import { SearchParser } from './search-parser';
 import { SearchEvaluator } from './search-evaluator';
-import { SearchNode, SearchError } from './search-types';
+import { SearchError, SearchNode } from './search-types';
 import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings-types';
 import { PropertySearchEngine } from '../services/property-search-engine';
 
+/**
+ * Thin facade over SearchParser and SearchEvaluator.
+ *
+ * The AST cache lives in SearchParser (alongside parse()), so any
+ * repeated parse — even via Search.validate() or Search.getError() —
+ * pre-warms the cache transparently. This class is kept as a façade
+ * to preserve the public API used by views, dropdowns, and the saved
+ * search manager; the cache machinery has moved into SearchParser.
+ */
 export class Search {
-  // Cache for parsed search query ASTs
-  private static astCache = new Map<string, SearchNode>();
-  private static readonly AST_CACHE_MAX_SIZE = 50;
-
   static parse(query: string): SearchNode {
     return SearchParser.parse(query);
-  }
-
-  /**
-   * Get cached AST or parse and cache it
-   */
-  private static getCachedAst(query: string): SearchNode {
-    const cached = this.astCache.get(query);
-    if (cached) {
-      return cached;
-    }
-
-    // Parse and cache
-    const ast = this.parse(query);
-
-    // Prevent unbounded cache growth
-    if (this.astCache.size >= this.AST_CACHE_MAX_SIZE) {
-      // Clear oldest entry (first key in map)
-      const iterator = this.astCache.keys();
-      const firstResult = iterator.next();
-      if (!firstResult.done && firstResult.value) {
-        this.astCache.delete(firstResult.value);
-      }
-    }
-
-    this.astCache.set(query, ast);
-    return ast;
-  }
-
-  /**
-   * Clear the AST cache
-   */
-  static clearCache(): void {
-    this.astCache.clear();
   }
 
   static async evaluate(
@@ -55,7 +27,11 @@ export class Search {
     propertySearchEngine?: PropertySearchEngine,
   ): Promise<boolean> {
     try {
-      const ast = this.getCachedAst(query);
+      // Route through Search.parse (not SearchParser.parse) so jest.spyOn on
+      // Search.parse continues to intercept in tests that inject errors via
+      // the parse path. The cache is preserved transparently because
+      // Search.parse delegates to the cached SearchParser.parse.
+      const ast = Search.parse(query);
       return await SearchEvaluator.evaluate(
         ast,
         task,
@@ -78,7 +54,9 @@ export class Search {
 
   static getError(query: string): string | null {
     try {
-      this.parse(query);
+      // See note in evaluate(): route through Search.parse to keep the
+      // jest.spyOn(Search, 'parse') test contract intact.
+      Search.parse(query);
       return null;
     } catch (error) {
       if (error instanceof SearchError) {
@@ -86,5 +64,9 @@ export class Search {
       }
       return 'Invalid search query';
     }
+  }
+
+  static clearCache(): void {
+    SearchParser.clearCache();
   }
 }

@@ -592,15 +592,17 @@ graph TB
 
 **Search System** (`src/search/search.ts`)
 
-- **Responsibility**: Query parsing and evaluation
-- **Key Patterns**: Compiler pattern (parsing → AST → evaluation)
-- **Interface**: `parse()`, `evaluate()`, `validate()`, `getError()`, `clearCache()`, query validation, error handling
+- **Responsibility**: Thin façade over SearchParser and SearchEvaluator — single public entry point for query parsing and evaluation used by views, dropdowns, and the saved-search manager
+- **Key Patterns**: Compiler pattern (parsing → AST → evaluation), façade pattern
+- **Interface**: `parse()`, `evaluate()`, `validate()`, `getError()`, `clearCache()` (delegates to `SearchParser.clearCache()`), query validation, error handling
+- **Note**: All AST caching lives in SearchParser (see below). The cache is transparent — `Search.validate()` and `Search.getError()` pre-warm the cache transparently, so subsequent `Search.evaluate()` calls hit warm ASTs without re-parsing.
 
 **SearchParser** (`src/search/search-parser.ts`)
 
-- **Responsibility**: AST building from query tokens
-- **Key Patterns**: Parser combinators, syntax tree construction
-- **Interface**: Query parsing, AST generation, property filter parsing
+- **Responsibility**: AST building from query tokens, **and** owns the parsed-AST cache (formerly a private field on `Search`)
+- **Key Patterns**: Parser combinators, syntax tree construction, AST caching with FIFO eviction
+- **Interface**: Query parsing, AST generation, property filter parsing, `clearCache()` for AST cache invalidation
+- **AST Cache**: `astCache: Map<string, SearchNode>` capped at 50 entries (`AST_CACHE_MAX_SIZE`) with strict FIFO eviction on insertion (`astCache.keys().next().value → delete`) when the size cap is reached. Repeat calls for the same query string return the identical AST instance — the AST is immutable post-parse (SearchEvaluator never mutates it), so sharing is safe. Invalid queries are not cached: the parser throws `SearchError` before reaching the cache-write branch, so invalid-query evaluation still re-parses on each call.
 
 **SearchEvaluator** (`src/search/search-evaluator.ts`)
 

@@ -7,9 +7,33 @@ import {
 import { SearchTokenizer } from './search-tokenizer';
 
 export class SearchParser {
+  // Cache for parsed search query ASTs (formerly a private field on Search).
+  // SearchParser is the natural home because parsing is the expensive step,
+  // and any repeat parse — including via Search.validate() or
+  // Search.getError() — should benefit transparently.
+  private static astCache = new Map<string, SearchNode>();
+  private static readonly AST_CACHE_MAX_SIZE = 50;
+
   static parse(query: string): SearchNode {
+    const cached = this.astCache.get(query);
+    if (cached) {
+      return cached;
+    }
+
     const tokens = SearchTokenizer.tokenize(query);
-    return this.parseTokens(tokens);
+    const ast = this.parseTokens(tokens);
+
+    // Prevent unbounded cache growth (strict FIFO eviction via Map iteration order)
+    if (this.astCache.size >= this.AST_CACHE_MAX_SIZE) {
+      const iterator = this.astCache.keys();
+      const firstResult = iterator.next();
+      if (!firstResult.done && firstResult.value) {
+        this.astCache.delete(firstResult.value);
+      }
+    }
+
+    this.astCache.set(query, ast);
+    return ast;
   }
 
   static parseTokens(tokens: SearchToken[]): SearchNode {
@@ -24,6 +48,10 @@ export class SearchParser {
     } catch {
       return false;
     }
+  }
+
+  static clearCache(): void {
+    this.astCache.clear();
   }
 }
 
