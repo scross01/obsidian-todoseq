@@ -23,7 +23,6 @@ import { EditorView } from '@codemirror/view';
 import { ChangeTracker } from './change-tracker';
 import { RecurrenceCoordinator } from './recurrence-coordinator';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
-import { RecurrenceManager } from './recurrence-manager';
 import {
   calculateTaskUrgency,
   getDefaultCoefficients,
@@ -140,7 +139,6 @@ interface PendingFileQueue {
 
 export class TaskUpdateCoordinator {
   private recurrenceCoordinator: RecurrenceCoordinator;
-  private recurrenceManager: RecurrenceManager;
   private urgencyCoefficients: UrgencyCoefficients = getDefaultCoefficients();
   private transitionSettings?: StateTransitionSettings;
   public stateTransitionManager: TaskStateTransitionManager;
@@ -170,8 +168,6 @@ export class TaskUpdateCoordinator {
     private keywordManager: KeywordManager,
     private changeTracker: ChangeTracker,
   ) {
-    this.recurrenceManager = new RecurrenceManager(this.keywordManager);
-
     this.recurrenceCoordinator = new RecurrenceCoordinator(
       this.plugin,
       this.taskStateManager,
@@ -204,7 +200,6 @@ export class TaskUpdateCoordinator {
    */
   setKeywordManager(keywordManager: KeywordManager): void {
     this.keywordManager = keywordManager;
-    this.recurrenceManager = new RecurrenceManager(keywordManager);
     this.recurrenceCoordinator.setKeywordManager(keywordManager);
     // Recreate state transition manager with new keyword manager but same transition settings
     this.stateTransitionManager = new TaskStateTransitionManager(
