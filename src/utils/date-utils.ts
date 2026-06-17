@@ -67,6 +67,79 @@ export class DateUtils {
   }
 
   /**
+   * Format a date for tooltip display: "Tomorrow, 10:00 (Jun 17, 2026)" or "Jun 17, 2026" if beyond relative range.
+   * @param date The date to format
+   * @param includeTime Whether to include time if available
+   * @returns Formatted date string with both relative and absolute when applicable
+   */
+  static formatDateTooltip(date: Date | null, includeTime = false): string {
+    if (!date) return '';
+    const normalizedDate = this.normalizeDateForTimezone(date);
+
+    const formatTime = (d: Date) => {
+      const time = d.toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+      return time.replace(/AM|PM/i, (m) => m.toLowerCase());
+    };
+
+    const hasTime = includeTime && (normalizedDate.getHours() !== 0 || normalizedDate.getMinutes() !== 0);
+    const absoluteDate = normalizedDate.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    const absoluteWithTime = hasTime ? `${absoluteDate} ${formatTime(normalizedDate)}` : absoluteDate;
+
+    const now = new Date();
+    const today = this.getDateOnly(now);
+    const taskDate = this.getDateOnly(normalizedDate);
+    const diffTime = taskDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
+
+    if (diffDays === 0) {
+      return hasTime ? `Today ${formatTime(normalizedDate)} (${absoluteDate})` : `Today (${absoluteDate})`;
+    } else if (diffDays === 1) {
+      return hasTime ? `Tomorrow ${formatTime(normalizedDate)} (${absoluteDate})` : `Tomorrow (${absoluteDate})`;
+    } else if (diffDays === -1) {
+      return `Yesterday (${absoluteDate})`;
+    } else if (diffDays > 0 && diffDays <= 7) {
+      return hasTime ? `${diffDays} days from now ${formatTime(normalizedDate)} (${absoluteDate})` : `${diffDays} days from now (${absoluteDate})`;
+    } else if (diffDays < 0) {
+      return `${Math.abs(diffDays)} days ago (${absoluteDate})`;
+    } else {
+      return absoluteWithTime;
+    }
+  }
+
+  /**
+   * Build a warning period tooltip string.
+   * @param date The base date (scheduled or deadline)
+   * @param warningPeriod The warning period info (may be null if using default)
+   * @param warningDays The effective warning period in days
+   * @param isScheduled Whether this is a scheduled (true) or deadline (false) date
+   * @param includeTime Whether to include time in the effective date display
+   * @returns Formatted tooltip string, or empty if no warning period
+   */
+  static buildWarningPeriodTooltip(
+    date: Date,
+    warningPeriod: { value: number; unit: string } | null | undefined,
+    warningDays: number,
+    isScheduled: boolean,
+    includeTime = false,
+  ): string {
+    if (warningDays <= 0) return '';
+
+    const effectiveDate = this.addDays(date, isScheduled ? warningDays : -warningDays);
+    const wpLabel = warningPeriod
+      ? `-${warningPeriod.value}${warningPeriod.unit}`
+      : `-${warningDays}d`;
+    const noticeLabel = isScheduled ? 'Delayed notice' : 'Advanced notice';
+    return `${noticeLabel}: ${wpLabel}\n(appears ${this.formatDateForDisplay(effectiveDate, includeTime)})`;
+  }
+
+  /**
    * Parse various date formats from search queries
    * @param value Date value from search query
    * @param referenceDate Reference date for relative calculations (default: now)

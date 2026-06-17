@@ -1113,7 +1113,7 @@ describe('TaskItemRenderer', () => {
         '.todoseq-task-date-repeat-icon',
       );
       expect(repeatIcon).not.toBeNull();
-      expect(repeatIcon?.getAttribute('title')).toBe('Repeats +1d');
+      expect(repeatIcon?.getAttribute('title')).toBe('Repeats: Every 1 day');
     });
 
     it('should create deadline date display with repeat icon', () => {
@@ -1130,7 +1130,7 @@ describe('TaskItemRenderer', () => {
         '.todoseq-task-date-repeat-icon',
       );
       expect(repeatIcon).not.toBeNull();
-      expect(repeatIcon?.getAttribute('title')).toBe('Repeats .+2w');
+      expect(repeatIcon?.getAttribute('title')).toBe('Repeats: Every 2 weeks (from done)');
     });
 
     it('should create closed date display for completed tasks', () => {
@@ -1170,6 +1170,52 @@ describe('TaskItemRenderer', () => {
       const container = renderer.buildDateDisplay(task, parent);
 
       expect(container.textContent).not.toContain('Closed:');
+    });
+
+    it('should always show date tooltip with actual date on scheduled date', () => {
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 3, 1, 10, 0),
+        completed: false,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      const dateValue = container.querySelector('.todoseq-task-date-value');
+      expect(dateValue).not.toBeNull();
+      const tooltip = dateValue?.getAttribute('title');
+      expect(tooltip).toContain('Scheduled:');
+      expect(tooltip).toContain('2026');
+    });
+
+    it('should always show date tooltip with actual date on deadline date', () => {
+      const task = createBaseTask({
+        deadlineDate: new Date(2026, 3, 15, 14, 0),
+        completed: false,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      const dateValue = container.querySelector('.todoseq-task-date-value');
+      expect(dateValue).not.toBeNull();
+      const tooltip = dateValue?.getAttribute('title');
+      expect(tooltip).toContain('Deadline:');
+      expect(tooltip).toContain('2026');
+    });
+
+    it('should include repeat info in date tooltip', () => {
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 3, 1, 10, 0),
+        scheduledDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+        completed: false,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      const dateValue = container.querySelector('.todoseq-task-date-value');
+      expect(dateValue).not.toBeNull();
+      const tooltip = dateValue?.getAttribute('title');
+      expect(tooltip).toContain('Repeats:');
+      expect(tooltip).toContain('Every 1 day');
     });
 
     it('should create date container with no dates when task has none', () => {

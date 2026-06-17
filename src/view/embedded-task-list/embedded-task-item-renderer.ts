@@ -24,6 +24,8 @@ import {
   URL_REGEX,
 } from '../../utils/patterns';
 import { DateUtils } from '../../utils/date-utils';
+import { formatRepeatDescription } from '../../utils/date-repeater';
+import { getPriorityLevelName } from '../../utils/task-format';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
 import { BaseDialog } from '../components/base-dialog';
@@ -446,12 +448,13 @@ export class EmbeddedTaskItemRenderer {
 
     if (task.priority) {
       const pri = task.priority;
+      const letter = pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C';
       const badge = textContainer.createSpan({
         cls: `todoseq-priority-badge priority-${pri}`,
-        text: pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C',
+        text: letter,
         attr: { 'aria-label': `Priority ${pri}` },
       });
-      setTooltip(badge, `Priority ${pri}`);
+      setTooltip(badge, `Priority ${getPriorityLevelName(letter)}`);
     }
 
     if (task.text) {
@@ -853,6 +856,7 @@ export class EmbeddedTaskItemRenderer {
       | 'check-circle',
     parent: HTMLElement,
     warningArrow?: string,
+    warningTooltip?: string,
   ): void {
     const badge = parent.createEl('span', {
       cls: 'todoseq-embedded-task-date-badge',
@@ -864,10 +868,9 @@ export class EmbeddedTaskItemRenderer {
       svg.removeAttribute('height');
     }
     badge.createSpan({
-      text:
-        DateUtils.formatDateForDisplay(date) +
-        (warningArrow ? ` ${warningArrow}` : ''),
+      text: DateUtils.formatDateForDisplay(date, true),
     });
+    this.renderWarningArrow(badge, warningArrow, warningTooltip);
   }
 
   private buildDateInfoRow(
@@ -876,6 +879,7 @@ export class EmbeddedTaskItemRenderer {
     parent: HTMLElement,
     extraCls?: string,
     warningArrow?: string,
+    warningTooltip?: string,
   ): void {
     const row = parent.createEl('div', {
       cls: 'todoseq-embedded-task-date-info' + (extraCls ? ` ${extraCls}` : ''),
@@ -886,10 +890,24 @@ export class EmbeddedTaskItemRenderer {
     });
     row.createSpan({
       cls: 'todoseq-embedded-task-date-info-value',
-      text:
-        DateUtils.formatDateForDisplay(date) +
-        (warningArrow ? ` ${warningArrow}` : ''),
+      text: DateUtils.formatDateForDisplay(date, true),
     });
+    this.renderWarningArrow(row, warningArrow, warningTooltip);
+  }
+
+  private renderWarningArrow(
+    parent: HTMLElement,
+    warningArrow?: string,
+    warningTooltip?: string,
+  ): void {
+    if (warningArrow) {
+      const arrowEl = parent.createSpan({
+        text: ` ${warningArrow}`,
+      });
+      if (warningTooltip) {
+        setTooltip(arrowEl, warningTooltip);
+      }
+    }
   }
 
   private getWarningArrow(
@@ -908,6 +926,55 @@ export class EmbeddedTaskItemRenderer {
     return undefined;
   }
 
+  /**
+   * Build a combined tooltip string for scheduled and/or deadline dates.
+   * Shows date info only (repeat and warning period are on their own icons).
+   */
+  private buildCombinedDateTooltip(task: Task): string | undefined {
+    const hasScheduled = task.scheduledDate && !task.completed;
+    const hasDeadline = task.deadlineDate && !task.completed;
+    if (!hasScheduled && !hasDeadline) return undefined;
+
+    const parts: string[] = [];
+
+    if (hasScheduled) {
+      parts.push(`Scheduled: ${DateUtils.formatDateTooltip(task.scheduledDate, true)}`);
+    }
+
+    if (hasDeadline) {
+      parts.push(`Deadline: ${DateUtils.formatDateTooltip(task.deadlineDate, true)}`);
+    }
+
+    return parts.join('\n');
+  }
+
+  /**
+   * Build a warning period tooltip string.
+   */
+  private buildWarningPeriodTooltip(
+    task: Task,
+    type: 'scheduled' | 'deadline',
+  ): string | undefined {
+    const settings = this.plugin.keywordManager.getSettings();
+    const warningDays = getEffectiveWarningDays(task, type, {
+      defaultScheduledWarningPeriod: settings.defaultScheduledWarningPeriod ?? 0,
+      defaultDeadlineWarningPeriod: settings.defaultDeadlineWarningPeriod ?? 0,
+    });
+    if (warningDays <= 0) return undefined;
+
+    const wp = type === 'scheduled' ? task.scheduledWarningPeriod : task.deadlineWarningPeriod;
+    const date = type === 'scheduled' ? task.scheduledDate : task.deadlineDate;
+    if (!date) return undefined;
+
+    const tooltip = DateUtils.buildWarningPeriodTooltip(
+      date,
+      wp,
+      warningDays,
+      type === 'scheduled',
+    );
+    return tooltip || undefined;
+  }
+
   private buildInlineDateBadge(
     task: Task,
     params: TodoseqParameters,
@@ -924,6 +991,7 @@ export class EmbeddedTaskItemRenderer {
         'calendar',
         parent,
         this.getWarningArrow(task, 'scheduled'),
+        this.buildWarningPeriodTooltip(task, 'scheduled'),
       );
     }
     if (showDeadline && task.deadlineDate && !task.completed) {
@@ -932,10 +1000,17 @@ export class EmbeddedTaskItemRenderer {
         'target',
         parent,
         this.getWarningArrow(task, 'deadline'),
+        this.buildWarningPeriodTooltip(task, 'deadline'),
       );
     }
     if (showClosed && task.closedDate && task.completed) {
       this.buildDateBadge(task.closedDate, 'check-circle', parent);
+    }
+
+    // Add combined date tooltip to the row
+    const tooltip = this.buildCombinedDateTooltip(task);
+    if (tooltip) {
+      setTooltip(parent, tooltip);
     }
   }
 
@@ -957,6 +1032,7 @@ export class EmbeddedTaskItemRenderer {
         parent,
         extraCls,
         this.getWarningArrow(task, 'scheduled'),
+        this.buildWarningPeriodTooltip(task, 'scheduled'),
       );
     }
     if (showDeadline && task.deadlineDate && !task.completed) {
@@ -966,10 +1042,17 @@ export class EmbeddedTaskItemRenderer {
         parent,
         extraCls,
         this.getWarningArrow(task, 'deadline'),
+        this.buildWarningPeriodTooltip(task, 'deadline'),
       );
     }
     if (showClosed && task.closedDate && task.completed) {
       this.buildDateInfoRow('Closed', task.closedDate, parent, extraCls);
+    }
+
+    // Add combined date tooltip to the row
+    const tooltip = this.buildCombinedDateTooltip(task);
+    if (tooltip) {
+      setTooltip(parent, tooltip);
     }
   }
 
@@ -981,22 +1064,25 @@ export class EmbeddedTaskItemRenderer {
       return;
     }
 
-    const repeatInfo = scheduledRepeat ?? deadlineRepeat;
-
-    if (!repeatInfo) {
-      return;
+    const hasBoth = scheduledRepeat && deadlineRepeat;
+    const parts: string[] = [];
+    if (scheduledRepeat) {
+      parts.push(hasBoth ? `Scheduled: ${formatRepeatDescription(scheduledRepeat)}` : formatRepeatDescription(scheduledRepeat));
+    }
+    if (deadlineRepeat) {
+      parts.push(hasBoth ? `Deadline: ${formatRepeatDescription(deadlineRepeat)}` : formatRepeatDescription(deadlineRepeat));
     }
 
-    const repeatIcon = parent.createEl('span', {
+    const icon = parent.createEl('span', {
       cls: 'todoseq-task-date-repeat-icon',
     });
-    setIcon(repeatIcon, 'repeat-2');
-    const svg = repeatIcon.querySelector('svg');
+    setIcon(icon, 'repeat-2');
+    const svg = icon.querySelector('svg');
     if (svg) {
       svg.removeAttribute('width');
       svg.removeAttribute('height');
     }
-    setTooltip(repeatIcon, `Repeats ${repeatInfo.raw}`);
+    setTooltip(icon, parts.join('\n'));
   }
 
   navigateToTask(task: Task, evt?: MouseEvent): void {

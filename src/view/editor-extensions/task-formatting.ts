@@ -9,6 +9,8 @@ import {
 import { RangeSetBuilder } from '@codemirror/state';
 import { TodoTrackerSettings } from '../../settings/settings-types';
 import { TaskParser } from '../../parser/task-parser';
+import { getPriorityLevelName } from '../../utils/task-format';
+import { setTooltip } from 'obsidian';
 import {
   CODE_BLOCK_REGEX,
   COMMENT_BLOCK_REGEX,
@@ -56,7 +58,8 @@ export class PriorityWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     const tempContainer = window.activeDocument.createElement('div');
-    return tempContainer.createSpan({
+    const priorityName = getPriorityLevelName(this.letter);
+    const el = tempContainer.createSpan({
       cls: `todoseq-edit-priority-pill todoseq-priority-badge priority-${this.priority}`,
       text: this.letter,
       attr: {
@@ -65,6 +68,8 @@ export class PriorityWidget extends WidgetType {
         role: 'badge',
       },
     });
+    setTooltip(el, `Priority ${priorityName}`);
+    return el;
   }
 
   ignoreEvent(): boolean {

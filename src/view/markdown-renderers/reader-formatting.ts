@@ -6,7 +6,8 @@ import { stripMarkdownForDisplay } from '../../utils/task-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { SettingsChangeDetector } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
-import { TFile } from 'obsidian';
+import { getPriorityLevelName } from '../../utils/task-format';
+import { TFile, setTooltip } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { getStateTransitionManager } from '../../services/task-update-coordinator';
 
@@ -928,6 +929,7 @@ export class ReaderViewFormatter {
         : letter === 'B'
           ? 'priority-med'
           : 'priority-low';
+    const priorityName = getPriorityLevelName(letter);
 
     const container = window.activeDocument.createElement('div');
     const span = container.createSpan({
@@ -938,6 +940,7 @@ export class ReaderViewFormatter {
         role: 'badge',
       },
     });
+    setTooltip(span, `Priority ${priorityName}`);
 
     span.textContent = letter;
 

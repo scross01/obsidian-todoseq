@@ -2,6 +2,19 @@ import { DateRepeatInfo, Task } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX } from './patterns';
 import { getDateLineIndent } from './task-line-utils';
 
+/**
+ * Get the priority level name from a priority letter.
+ * @param letter - 'A', 'B', 'C', or null
+ * @returns The priority level name ('high', 'medium', 'low'), or empty string if null
+ */
+export function getPriorityLevelName(letter: string | null): string {
+  if (!letter) return '';
+  if (letter === 'A') return 'high';
+  if (letter === 'B') return 'medium';
+  if (letter === 'C') return 'low';
+  return '';
+}
+
 export function formatTaskLines(task: Task): string[] {
   const lines: string[] = [];
 

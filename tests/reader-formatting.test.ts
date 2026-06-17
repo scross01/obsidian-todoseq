@@ -86,6 +86,9 @@ jest.mock('obsidian', () => ({
       getFiles: jest.fn().mockReturnValue([]),
     };
   },
+  setTooltip: jest.fn((el: HTMLElement, tooltip: string) => {
+    el.setAttribute('title', tooltip);
+  }),
 }));
 
 // Mock TodoTracker plugin

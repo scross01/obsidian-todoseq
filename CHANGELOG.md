@@ -2,6 +2,7 @@
 
 ## 0.16.1
 
+- Updated tooltips style. Date tooltips show consistent full dates with time, warning periods, and repeat details.
 - Fixed issue with when upcoming periods being ignored when set to 0 days.
 
 ## 0.16.0
