@@ -4,6 +4,7 @@
 import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { PropertyEvaluator } from '../src/utils/property-evaluator';
 import { TFile } from 'obsidian';
+import { createTestPropertySearchEngine } from './helpers/test-helper';
 
 // Create mock files
 const createMockFile = (path: string): TFile => {
@@ -57,10 +58,7 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
     refreshAllTaskListViews = jest.fn();
     mockApp = { ...baseMockApp };
 
-    // Reset the singleton instance
-    (PropertySearchEngine as any).resetInstance();
-
-    propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
+    propertySearchEngine = createTestPropertySearchEngine(mockApp, {
       taskStateManager: mockTaskStateManager,
       refreshAllTaskListViews,
       vaultScanner: mockVaultScanner,
@@ -68,25 +66,20 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
   });
 
   describe('Initialization', () => {
-    test('should reset instance properly', () => {
-      // Create an instance first
-      const initialInstance = PropertySearchEngine.getInstance(mockApp, {
+    test('should allow multiple independent instances', () => {
+      const initialInstance = createTestPropertySearchEngine(mockApp, {
         taskStateManager: mockTaskStateManager,
         refreshAllTaskListViews,
         vaultScanner: mockVaultScanner,
       });
 
-      // Reset it
-      (PropertySearchEngine as any).resetInstance();
-
-      // Create a new instance
-      const newInstance = PropertySearchEngine.getInstance(mockApp, {
+      const anotherInstance = createTestPropertySearchEngine(mockApp, {
         taskStateManager: mockTaskStateManager,
         refreshAllTaskListViews,
         vaultScanner: mockVaultScanner,
       });
 
-      expect(initialInstance).not.toBe(newInstance);
+      expect(initialInstance).not.toBe(anotherInstance);
     });
 
     test('should handle startup scan settings', async () => {
@@ -108,9 +101,7 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
     });
 
     test('should handle vault scanner availability', async () => {
-      // Test without vault scanner
-      (PropertySearchEngine as any).resetInstance();
-      const engineWithoutScanner = PropertySearchEngine.getInstance(mockApp, {
+      const engineWithoutScanner = createTestPropertySearchEngine(mockApp, {
         taskStateManager: mockTaskStateManager,
         refreshAllTaskListViews,
       });
@@ -711,22 +702,19 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
     });
 
     test('should skip rename when not initialized and startupScan disabled', async () => {
-      (PropertySearchEngine as any).resetInstance();
-      propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
+      const newEngine = createTestPropertySearchEngine(mockApp, {
         taskStateManager: mockTaskStateManager,
         refreshAllTaskListViews,
         vaultScanner: mockVaultScanner,
       });
 
-      propertySearchEngine.setStartupScanEnabled(false);
+      newEngine.setStartupScanEnabled(false);
 
       const newFile = createMockFile('new.md');
 
-      propertySearchEngine.onFileRenamed(newFile, 'old.md');
+      newEngine.onFileRenamed(newFile, 'old.md');
 
-      expect((propertySearchEngine as any).pendingUpdates.has('old.md')).toBe(
-        false,
-      );
+      expect((newEngine as any).pendingUpdates.has('old.md')).toBe(false);
     });
 
     test('should prevent duplicate pending updates on rename', async () => {
@@ -777,20 +765,19 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
 
   describe('invalidateFile edge cases', () => {
     test('should skip when not initialized and startupScan disabled', async () => {
-      (PropertySearchEngine as any).resetInstance();
-      propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
+      const newEngine = createTestPropertySearchEngine(mockApp, {
         taskStateManager: mockTaskStateManager,
         refreshAllTaskListViews,
         vaultScanner: mockVaultScanner,
       });
 
-      propertySearchEngine.setStartupScanEnabled(false);
+      newEngine.setStartupScanEnabled(false);
 
       const testFile = createMockFile('test.md');
 
-      propertySearchEngine.invalidateFile(testFile);
+      newEngine.invalidateFile(testFile);
 
-      expect((propertySearchEngine as any).pendingUpdates.size).toBe(0);
+      expect((newEngine as any).pendingUpdates.size).toBe(0);
     });
 
     test('should skip duplicate pending updates', async () => {

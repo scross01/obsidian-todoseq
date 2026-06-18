@@ -3,6 +3,7 @@
  */
 import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { App, TFile } from 'obsidian';
+import { createTestPropertySearchEngine } from './helpers/test-helper';
 
 // Create mock files with date properties
 const createMockFile = (path: string): TFile => {
@@ -108,16 +109,8 @@ describe('PropertySearchEngine Date Comparison Operators', () => {
   let propertySearchEngine: PropertySearchEngine;
 
   beforeEach(() => {
-    // Reset singleton - first get instance with dependencies to call reset
-    PropertySearchEngine.getInstance(mockApp, {
+    propertySearchEngine = createTestPropertySearchEngine(mockApp, {
       taskStateManager: mockTaskStateManager,
-      refreshAllTaskListViews: jest.fn(),
-      vaultScanner: undefined,
-    }).reset();
-    propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
-      taskStateManager: mockTaskStateManager,
-      refreshAllTaskListViews: jest.fn(),
-      vaultScanner: undefined,
     });
   });
 

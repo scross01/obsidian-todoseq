@@ -64,42 +64,62 @@ jest.mock('obsidian', () => {
   };
 });
 
+/**
+ * Shared env: builds mocks (vault, metadataCache, App, TaskStateManager) so the
+ * caller can construct one EventCoordinator from env and trigger events on the
+ * SAME mockVault it registered listeners on.
+ */
+function createTestEnv() {
+  const mockVault = new (Vault as any)();
+  const mockMetadataCache = new (MetadataCache as any)();
+  const mockApp = {
+    vault: mockVault,
+    metadataCache: mockMetadataCache,
+  } as unknown as App;
+
+  const settings = createBaseSettings();
+  const keywordManager = createTestKeywordManager(settings);
+  const taskStateManager = new TaskStateManager(keywordManager);
+
+  return { mockApp, mockVault, mockMetadataCache, taskStateManager };
+}
+
+type TestEnv = ReturnType<typeof createTestEnv>;
+
+/**
+ * Builds the EventCoordinator from the given env. Pass mocked deps for the
+ * vaultScanner / propertySearchEngine slots exercised by integration tests —
+ * avoids the null, null, mockEngine shuffle at every call site.
+ */
+function buildCoordinator(
+  env: TestEnv,
+  vaultScanner?: unknown,
+  propertySearchEngine?: unknown,
+): EventCoordinator {
+  return new EventCoordinator(
+    env.mockApp,
+    env.taskStateManager,
+    vaultScanner as Parameters<EventCoordinator['constructor']>[2],
+    propertySearchEngine as Parameters<EventCoordinator['constructor']>[3],
+  );
+}
+
 describe('EventCoordinator', () => {
-  let coordinator: EventCoordinator;
-  let mockApp: App;
-  let mockVault: Vault;
-  let mockMetadataCache: MetadataCache;
-  let taskStateManager: TaskStateManager;
-
-  beforeEach(() => {
-    mockVault = new (Vault as any)();
-    mockMetadataCache = new (MetadataCache as any)();
-    mockApp = {
-      vault: mockVault,
-      metadataCache: mockMetadataCache,
-    } as unknown as App;
-
-    const settings = createBaseSettings();
-    const keywordManager = createTestKeywordManager(settings);
-    taskStateManager = new TaskStateManager(keywordManager);
-
-    coordinator = new EventCoordinator(mockApp, taskStateManager);
-  });
-
-  afterEach(async () => {
-    await coordinator.destroy();
-  });
-
   describe('initialization', () => {
     it('should become ready after initialize', () => {
+      const env = createTestEnv();
+      const coordinator = buildCoordinator(env);
       expect(coordinator.isCoordinatorReady()).toBe(false);
       coordinator.initialize();
       expect(coordinator.isCoordinatorReady()).toBe(true);
     });
 
     it('should not register vault listeners on duplicate initialize', () => {
+      const env = createTestEnv();
+      const coordinator = buildCoordinator(env);
+
       coordinator.initialize();
-      const vaultOnSpy = jest.spyOn(mockVault, 'on');
+      const vaultOnSpy = jest.spyOn(env.mockVault, 'on');
       coordinator.initialize();
       expect(vaultOnSpy).not.toHaveBeenCalled();
       vaultOnSpy.mockRestore();
@@ -107,6 +127,18 @@ describe('EventCoordinator', () => {
   });
 
   describe('delete event handling', () => {
+    let env: TestEnv;
+    let coordinator: EventCoordinator;
+
+    beforeEach(() => {
+      env = createTestEnv();
+      coordinator = buildCoordinator(env);
+    });
+
+    afterEach(async () => {
+      await coordinator.destroy();
+    });
+
     it('should process delete events immediately without debouncing', async () => {
       const file = new TFile('test.md', 'test.md', 'md');
       let receivedEvent: any = null;
@@ -117,7 +149,7 @@ describe('EventCoordinator', () => {
 
       coordinator.initialize();
 
-      (mockVault as any).triggerEvent('delete', file);
+      (env.mockVault as any).triggerEvent('delete', file);
 
       await coordinator.flush();
 
@@ -136,7 +168,7 @@ describe('EventCoordinator', () => {
 
       coordinator.initialize();
 
-      (mockVault as any).triggerEvent('delete', file);
+      (env.mockVault as any).triggerEvent('delete', file);
 
       await coordinator.flush();
 
@@ -154,9 +186,9 @@ describe('EventCoordinator', () => {
 
       coordinator.initialize();
 
-      (mockVault as any).triggerEvent('modify', file);
-      (mockVault as any).triggerEvent('modify', file);
-      (mockVault as any).triggerEvent('modify', file);
+      (env.mockVault as any).triggerEvent('modify', file);
+      (env.mockVault as any).triggerEvent('modify', file);
+      (env.mockVault as any).triggerEvent('modify', file);
 
       await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -176,9 +208,9 @@ describe('EventCoordinator', () => {
 
       coordinator.initialize();
 
-      (mockVault as any).triggerEvent('create', file);
-      (mockVault as any).triggerEvent('create', file);
-      (mockVault as any).triggerEvent('create', file);
+      (env.mockVault as any).triggerEvent('create', file);
+      (env.mockVault as any).triggerEvent('create', file);
+      (env.mockVault as any).triggerEvent('create', file);
 
       await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -202,8 +234,8 @@ describe('EventCoordinator', () => {
 
       coordinator.initialize();
 
-      (mockVault as any).triggerEvent('modify', file);
-      (mockVault as any).triggerEvent('delete', file);
+      (env.mockVault as any).triggerEvent('modify', file);
+      (env.mockVault as any).triggerEvent('delete', file);
 
       await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -216,13 +248,25 @@ describe('EventCoordinator', () => {
   });
 
   describe('rename event handling', () => {
+    let env: TestEnv;
+    let coordinator: EventCoordinator;
+
+    beforeEach(() => {
+      env = createTestEnv();
+      coordinator = buildCoordinator(env);
+    });
+
+    afterEach(async () => {
+      await coordinator.destroy();
+    });
+
     it('should process rename events with oldPath', async () => {
       const listener = jest.fn();
       coordinator.on('file-changed', listener);
       coordinator.initialize();
 
       const file = new TFile('new.md', 'new.md', 'md');
-      (mockVault as any).triggerEvent('rename', file, 'old.md');
+      (env.mockVault as any).triggerEvent('rename', file, 'old.md');
       await coordinator.flush();
 
       expect(listener).toHaveBeenCalledWith(
@@ -239,7 +283,7 @@ describe('EventCoordinator', () => {
       coordinator.initialize();
 
       const nonMdFile = new TFile('test.txt', 'test.txt', 'txt');
-      (mockVault as any).triggerEvent('rename', nonMdFile, 'old.txt');
+      (env.mockVault as any).triggerEvent('rename', nonMdFile, 'old.txt');
       await coordinator.flush();
 
       expect(listener).not.toHaveBeenCalled();
@@ -247,54 +291,79 @@ describe('EventCoordinator', () => {
   });
 
   describe('metadata change handling', () => {
+    let env: TestEnv;
+    let coordinator: EventCoordinator | null = null;
+
+    afterEach(async () => {
+      if (coordinator) {
+        await coordinator.destroy();
+      }
+    });
+
     it('should call propertySearchEngine on metadata change when ready', () => {
+      env = createTestEnv();
       const mockEngine = {
         isReady: jest.fn().mockReturnValue(true),
         onFileChanged: jest.fn(),
       };
-      coordinator.setPropertySearchEngine(mockEngine as any);
+      coordinator = buildCoordinator(env, null, mockEngine);
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
-      (mockMetadataCache as any).triggerEvent('changed', file);
+      (env.mockMetadataCache as any).triggerEvent('changed', file);
 
       expect(mockEngine.isReady).toHaveBeenCalled();
       expect(mockEngine.onFileChanged).toHaveBeenCalledWith(file);
     });
 
     it('should not call onFileChanged when propertySearchEngine is not ready', () => {
+      env = createTestEnv();
       const mockEngine = {
         isReady: jest.fn().mockReturnValue(false),
         onFileChanged: jest.fn(),
       };
-      coordinator.setPropertySearchEngine(mockEngine as any);
+      coordinator = buildCoordinator(env, null, mockEngine);
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
-      (mockMetadataCache as any).triggerEvent('changed', file);
+      (env.mockMetadataCache as any).triggerEvent('changed', file);
 
       expect(mockEngine.isReady).toHaveBeenCalled();
       expect(mockEngine.onFileChanged).not.toHaveBeenCalled();
     });
 
     it('should not fail when propertySearchEngine is not set', () => {
+      env = createTestEnv();
+      coordinator = buildCoordinator(env);
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
       expect(() => {
-        (mockMetadataCache as any).triggerEvent('changed', file);
+        (env.mockMetadataCache as any).triggerEvent('changed', file);
       }).not.toThrow();
     });
   });
 
   describe('non-md file filtering', () => {
+    let env: TestEnv;
+    let coordinator: EventCoordinator;
+
+    beforeEach(() => {
+      env = createTestEnv();
+      coordinator = buildCoordinator(env);
+    });
+
+    afterEach(async () => {
+      await coordinator.destroy();
+    });
+
     it('should ignore modify events for non-markdown files', async () => {
       const listener = jest.fn();
       coordinator.on('file-changed', listener);
       coordinator.initialize();
 
       const nonMdFile = new TFile('test.txt', 'test.txt', 'txt');
-      (mockVault as any).triggerEvent('modify', nonMdFile);
+      (env.mockVault as any).triggerEvent('modify', nonMdFile);
       await new Promise((resolve) => setTimeout(resolve, 200));
       await coordinator.flush();
 
@@ -307,7 +376,7 @@ describe('EventCoordinator', () => {
       coordinator.initialize();
 
       const nonMdFile = new TFile('test.txt', 'test.txt', 'txt');
-      (mockVault as any).triggerEvent('delete', nonMdFile);
+      (env.mockVault as any).triggerEvent('delete', nonMdFile);
       await coordinator.flush();
 
       expect(listener).not.toHaveBeenCalled();
@@ -315,50 +384,59 @@ describe('EventCoordinator', () => {
   });
 
   describe('vaultScanner integration', () => {
+    let env: TestEnv;
+
+    beforeEach(() => {
+      env = createTestEnv();
+    });
+
     it('should call processIncrementalChange on modify', async () => {
       const mockScanner = {
         processIncrementalChange: jest.fn().mockResolvedValue(undefined),
       };
-      coordinator.setVaultScanner(mockScanner as any);
+      const coordinator = buildCoordinator(env, mockScanner);
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
-      (mockVault as any).triggerEvent('modify', file);
+      (env.mockVault as any).triggerEvent('modify', file);
       await new Promise((resolve) => setTimeout(resolve, 200));
       await coordinator.flush();
 
       expect(mockScanner.processIncrementalChange).toHaveBeenCalledWith(file);
+      await coordinator.destroy();
     });
 
     it('should call processFileDelete on delete', async () => {
       const mockScanner = {
         processFileDelete: jest.fn().mockResolvedValue(undefined),
       };
-      coordinator.setVaultScanner(mockScanner as any);
+      const coordinator = buildCoordinator(env, mockScanner);
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
-      (mockVault as any).triggerEvent('delete', file);
+      (env.mockVault as any).triggerEvent('delete', file);
       await coordinator.flush();
 
       expect(mockScanner.processFileDelete).toHaveBeenCalledWith(file);
+      await coordinator.destroy();
     });
 
     it('should call processFileRename on rename with oldPath', async () => {
       const mockScanner = {
         processFileRename: jest.fn().mockResolvedValue(undefined),
       };
-      coordinator.setVaultScanner(mockScanner as any);
+      const coordinator = buildCoordinator(env, mockScanner);
       coordinator.initialize();
 
       const file = new TFile('new.md', 'new.md', 'md');
-      (mockVault as any).triggerEvent('rename', file, 'old.md');
+      (env.mockVault as any).triggerEvent('rename', file, 'old.md');
       await coordinator.flush();
 
       expect(mockScanner.processFileRename).toHaveBeenCalledWith(
         file,
         'old.md',
       );
+      await coordinator.destroy();
     });
 
     it('should continue processing after vaultScanner errors', async () => {
@@ -368,44 +446,52 @@ describe('EventCoordinator', () => {
           .mockRejectedValueOnce(new Error('scan failed'))
           .mockResolvedValueOnce(undefined),
       };
-      coordinator.setVaultScanner(mockScanner as any);
+      const coordinator = buildCoordinator(env, mockScanner);
 
       const listener = jest.fn();
       coordinator.on('file-changed', listener);
       coordinator.initialize();
 
       const file1 = new TFile('test1.md', 'test1.md', 'md');
-      (mockVault as any).triggerEvent('modify', file1);
+      (env.mockVault as any).triggerEvent('modify', file1);
       await new Promise((resolve) => setTimeout(resolve, 200));
       await coordinator.flush();
 
       expect(listener).not.toHaveBeenCalled();
 
       const file2 = new TFile('test2.md', 'test2.md', 'md');
-      (mockVault as any).triggerEvent('modify', file2);
+      (env.mockVault as any).triggerEvent('modify', file2);
       await new Promise((resolve) => setTimeout(resolve, 200));
       await coordinator.flush();
 
       expect(listener).toHaveBeenCalledTimes(1);
+      await coordinator.destroy();
     });
   });
 
   describe('propertySearchEngine integration', () => {
+    let env: TestEnv;
+
+    beforeEach(() => {
+      env = createTestEnv();
+    });
+
     it('should call onFileChanged on modify', async () => {
       const mockEngine = {
         isReady: jest.fn().mockReturnValue(true),
         onFileChanged: jest.fn(),
       };
-      coordinator.setPropertySearchEngine(mockEngine as any);
+      const coordinator = buildCoordinator(env, null, mockEngine);
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
-      (mockVault as any).triggerEvent('modify', file);
+      (env.mockVault as any).triggerEvent('modify', file);
       await new Promise((resolve) => setTimeout(resolve, 200));
       await coordinator.flush();
 
       expect(mockEngine.isReady).toHaveBeenCalled();
       expect(mockEngine.onFileChanged).toHaveBeenCalledWith(file);
+      await coordinator.destroy();
     });
 
     it('should call onFileDeleted on delete', async () => {
@@ -413,15 +499,16 @@ describe('EventCoordinator', () => {
         isReady: jest.fn().mockReturnValue(true),
         onFileDeleted: jest.fn(),
       };
-      coordinator.setPropertySearchEngine(mockEngine as any);
+      const coordinator = buildCoordinator(env, null, mockEngine);
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
-      (mockVault as any).triggerEvent('delete', file);
+      (env.mockVault as any).triggerEvent('delete', file);
       await coordinator.flush();
 
       expect(mockEngine.isReady).toHaveBeenCalled();
       expect(mockEngine.onFileDeleted).toHaveBeenCalledWith(file);
+      await coordinator.destroy();
     });
 
     it('should call onFileRenamed on rename', async () => {
@@ -429,26 +516,39 @@ describe('EventCoordinator', () => {
         isReady: jest.fn().mockReturnValue(true),
         onFileRenamed: jest.fn(),
       };
-      coordinator.setPropertySearchEngine(mockEngine as any);
+      const coordinator = buildCoordinator(env, null, mockEngine);
       coordinator.initialize();
 
       const file = new TFile('new.md', 'new.md', 'md');
-      (mockVault as any).triggerEvent('rename', file, 'old.md');
+      (env.mockVault as any).triggerEvent('rename', file, 'old.md');
       await coordinator.flush();
 
       expect(mockEngine.isReady).toHaveBeenCalled();
       expect(mockEngine.onFileRenamed).toHaveBeenCalledWith(file, 'old.md');
+      await coordinator.destroy();
     });
   });
 
   describe('external file change callbacks', () => {
+    let env: TestEnv;
+    let coordinator: EventCoordinator;
+
+    beforeEach(() => {
+      env = createTestEnv();
+      coordinator = buildCoordinator(env);
+    });
+
+    afterEach(async () => {
+      await coordinator.destroy();
+    });
+
     it('should call registered callbacks after batch processing', async () => {
       const callback = jest.fn();
       coordinator.onFileChange(callback);
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
-      (mockVault as any).triggerEvent('delete', file);
+      (env.mockVault as any).triggerEvent('delete', file);
       await coordinator.flush();
 
       expect(callback).toHaveBeenCalledWith(
@@ -472,7 +572,7 @@ describe('EventCoordinator', () => {
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
-      (mockVault as any).triggerEvent('delete', file);
+      (env.mockVault as any).triggerEvent('delete', file);
       await coordinator.flush();
 
       expect(throwingCallback).toHaveBeenCalled();
@@ -481,20 +581,32 @@ describe('EventCoordinator', () => {
   });
 
   describe('event listener management', () => {
+    let env: TestEnv;
+    let coordinator: EventCoordinator;
+
+    beforeEach(() => {
+      env = createTestEnv();
+      coordinator = buildCoordinator(env);
+    });
+
+    afterEach(async () => {
+      await coordinator.destroy();
+    });
+
     it('should remove listeners via off()', async () => {
       const listener = jest.fn();
       coordinator.on('file-changed', listener);
       coordinator.initialize();
 
       const file1 = new TFile('test1.md', 'test1.md', 'md');
-      (mockVault as any).triggerEvent('rename', file1, 'old1.md');
+      (env.mockVault as any).triggerEvent('rename', file1, 'old1.md');
       await coordinator.flush();
       expect(listener).toHaveBeenCalledTimes(1);
 
       coordinator.off('file-changed', listener);
 
       const file2 = new TFile('test2.md', 'test2.md', 'md');
-      (mockVault as any).triggerEvent('rename', file2, 'old2.md');
+      (env.mockVault as any).triggerEvent('rename', file2, 'old2.md');
       await coordinator.flush();
       expect(listener).toHaveBeenCalledTimes(1);
     });
@@ -510,7 +622,7 @@ describe('EventCoordinator', () => {
       coordinator.initialize();
 
       const file = new TFile('test.md', 'test.md', 'md');
-      (mockVault as any).triggerEvent('delete', file);
+      (env.mockVault as any).triggerEvent('delete', file);
       await coordinator.flush();
 
       expect(throwingListener).toHaveBeenCalledTimes(1);
@@ -519,13 +631,25 @@ describe('EventCoordinator', () => {
   });
 
   describe('cleanup', () => {
+    let env: TestEnv;
+    let coordinator: EventCoordinator;
+
+    beforeEach(() => {
+      env = createTestEnv();
+      coordinator = buildCoordinator(env);
+    });
+
+    afterEach(async () => {
+      await coordinator.destroy();
+    });
+
     it('should stop processing events after destroy', async () => {
       const listener = jest.fn();
       coordinator.on('file-changed', listener);
       coordinator.initialize();
 
       const file1 = new TFile('test1.md', 'test1.md', 'md');
-      (mockVault as any).triggerEvent('modify', file1);
+      (env.mockVault as any).triggerEvent('modify', file1);
       await new Promise((resolve) => setTimeout(resolve, 200));
       await coordinator.flush();
       expect(listener).toHaveBeenCalledTimes(1);
@@ -533,7 +657,7 @@ describe('EventCoordinator', () => {
       await coordinator.destroy();
 
       const file2 = new TFile('test2.md', 'test2.md', 'md');
-      (mockVault as any).triggerEvent('modify', file2);
+      (env.mockVault as any).triggerEvent('modify', file2);
       await new Promise((resolve) => setTimeout(resolve, 200));
       await coordinator.flush();
 

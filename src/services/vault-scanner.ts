@@ -12,7 +12,7 @@ import {
 } from '../utils/task-urgency';
 import { TaskStateManager } from './task-state-manager';
 import { RegexCache } from '../utils/regex-cache';
-import { PropertySearchEngine } from './property-search-engine';
+import { IVaultScannerStatusProvider } from './property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
 import { ChangeTracker } from './change-tracker';
 import { EventEmitter } from '../utils/event-emitter';
@@ -27,14 +27,16 @@ export interface VaultScannerEvents {
   'file-deleted': (file: TAbstractFile) => void;
 }
 
-export class VaultScanner extends EventEmitter<VaultScannerEvents> {
+export class VaultScanner
+  extends EventEmitter<VaultScannerEvents>
+  implements IVaultScannerStatusProvider
+{
   private _isScanning = false;
   private _isInitializing = true; // Track Obsidian initialization state
   private urgencyCoefficients!: UrgencyCoefficients;
   private regexCache = new RegexCache();
   private parserRegistry: ParserRegistry;
   private keywordManager: KeywordManager;
-  private propertySearchEngine?: PropertySearchEngine;
   private skipIncrementalChanges = new Map<string, number>();
 
   constructor(
@@ -99,11 +101,6 @@ export class VaultScanner extends EventEmitter<VaultScannerEvents> {
       // Failed to load urgency coefficients
       // Fallback to defaults handled in parseUrgencyCoefficients
     }
-  }
-
-  // Set property search engine (called by EventCoordinator)
-  setPropertySearchEngine(propertySearchEngine: PropertySearchEngine): void {
-    this.propertySearchEngine = propertySearchEngine;
   }
 
   // Core scanning methods

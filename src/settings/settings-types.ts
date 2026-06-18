@@ -52,8 +52,6 @@ export interface TodoTrackerSettings {
   scanCodeFiles: boolean; // experimental: when enabled, scans code files for TODO-style comments
   // Migrate to today settings
   migrateToTodayState: string; // keyword to set on source task after migrating to today
-  // Property search engine instance
-  propertySearchEngine?: import('../services/property-search-engine').PropertySearchEngine; // Property search engine instance
   // Saved searches
   savedSearches: SavedSearch[];
   // Hidden setting - not exposed in UI, used to track first install

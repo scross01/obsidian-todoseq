@@ -22,8 +22,8 @@ export interface EventCoordinatorEvents {
 export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
   private app: App;
   private taskStateManager: TaskStateManager;
-  private vaultScanner: VaultScanner | null = null;
-  private propertySearchEngine: PropertySearchEngine | null = null;
+  private vaultScanner: VaultScanner | null;
+  private propertySearchEngine: PropertySearchEngine | null;
 
   private readonly FILE_DEBOUNCE_MS = 150;
 
@@ -43,10 +43,17 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
   private isReady = false;
   private isProcessing = false;
 
-  constructor(app: App, taskStateManager: TaskStateManager) {
+  constructor(
+    app: App,
+    taskStateManager: TaskStateManager,
+    vaultScanner: VaultScanner | null = null,
+    propertySearchEngine: PropertySearchEngine | null = null,
+  ) {
     super('EventCoordinator');
     this.app = app;
     this.taskStateManager = taskStateManager;
+    this.vaultScanner = vaultScanner;
+    this.propertySearchEngine = propertySearchEngine;
   }
 
   initialize(): void {
@@ -54,14 +61,6 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
 
     this.registerVaultListeners();
     this.isReady = true;
-  }
-
-  setVaultScanner(vaultScanner: VaultScanner): void {
-    this.vaultScanner = vaultScanner;
-  }
-
-  setPropertySearchEngine(engine: PropertySearchEngine): void {
-    this.propertySearchEngine = engine;
   }
 
   /**

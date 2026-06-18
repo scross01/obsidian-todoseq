@@ -3,18 +3,20 @@ import { DateUtils } from '../utils/date-utils';
 import { PropertyEvaluator } from '../utils/property-evaluator';
 import { TaskStateManager } from './task-state-manager';
 
+// Minimal interface for the vault scanner status this engine polls during init
+export interface IVaultScannerStatusProvider {
+  isScanning: () => boolean;
+  isObsidianInitializing: () => boolean;
+}
+
 // Interface for dependencies needed by PropertySearchEngine
-interface PropertySearchEngineDependencies {
+export interface PropertySearchEngineDependencies {
   taskStateManager: TaskStateManager;
   refreshAllTaskListViews: () => void;
-  vaultScanner?: {
-    isScanning: () => boolean;
-    isObsidianInitializing: () => boolean;
-  };
+  vaultScanner?: IVaultScannerStatusProvider;
 }
 
 export class PropertySearchEngine {
-  private static instance: PropertySearchEngine;
   private propertyCache = new Map<string, Map<unknown, Set<string>>>();
   private propertyKeys = new Set<string>();
   private isInitialized = false;
@@ -30,51 +32,15 @@ export class PropertySearchEngine {
   // Dependencies
   private taskStateManager: TaskStateManager;
   private refreshAllTaskListViews: () => void;
-  private vaultScanner?: {
-    isScanning: () => boolean;
-    isObsidianInitializing: () => boolean;
-  };
+  private vaultScanner?: IVaultScannerStatusProvider;
 
-  private constructor(
+  constructor(
     private app: App,
     dependencies: PropertySearchEngineDependencies,
   ) {
     this.taskStateManager = dependencies.taskStateManager;
     this.refreshAllTaskListViews = dependencies.refreshAllTaskListViews;
     this.vaultScanner = dependencies.vaultScanner;
-  }
-
-  public static getInstance(
-    app: App,
-    dependencies: PropertySearchEngineDependencies,
-  ): PropertySearchEngine {
-    // Check if the app reference has changed (plugin reload scenario)
-    if (
-      PropertySearchEngine.instance &&
-      PropertySearchEngine.instance.app !== app
-    ) {
-      // Reset the instance if the app reference has changed
-      PropertySearchEngine.resetInstance();
-    }
-
-    if (!PropertySearchEngine.instance) {
-      PropertySearchEngine.instance = new PropertySearchEngine(
-        app,
-        dependencies,
-      );
-    }
-    return PropertySearchEngine.instance;
-  }
-
-  /**
-   * Reset the singleton instance. This should be called during plugin cleanup
-   * to prevent stale references when the plugin is reloaded.
-   */
-  public static resetInstance(): void {
-    if (PropertySearchEngine.instance) {
-      PropertySearchEngine.instance.destroy();
-      PropertySearchEngine.instance = null as unknown as PropertySearchEngine;
-    }
   }
 
   // Initialize on first use

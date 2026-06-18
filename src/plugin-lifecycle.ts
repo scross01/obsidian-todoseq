@@ -87,8 +87,9 @@ export class PluginLifecycleManager {
       this.plugin.changeTracker,
     );
 
-    // Initialize property search engine after vault scanner
-    this.plugin.propertySearchEngine = PropertySearchEngine.getInstance(
+    // Initialize property search engine after vault scanner (it polls vault
+    // scanner status during init, so the scanner must exist first).
+    this.plugin.propertySearchEngine = new PropertySearchEngine(
       this.plugin.app,
       {
         taskStateManager: this.plugin.taskStateManager,
@@ -101,9 +102,7 @@ export class PluginLifecycleManager {
     this.eventCoordinator = new EventCoordinator(
       this.plugin.app,
       this.plugin.taskStateManager,
-    );
-    this.eventCoordinator.setVaultScanner(this.plugin.vaultScanner);
-    this.eventCoordinator.setPropertySearchEngine(
+      this.plugin.vaultScanner,
       this.plugin.propertySearchEngine,
     );
     this.eventCoordinator.initialize();
@@ -512,13 +511,6 @@ export class PluginLifecycleManager {
       // progressive LCP tasks down securely behind it!
       const scanPromise = this.plugin.vaultScanner?.scanVault();
 
-      // Set property search engine on vault scanner and register listeners (but don't initialize yet - lazy initialize)
-      if (this.plugin.propertySearchEngine) {
-        this.plugin.vaultScanner?.setPropertySearchEngine(
-          this.plugin.propertySearchEngine,
-        );
-      }
-
       // Auto-open behavior:
       // - First install: always show the task list (with reveal/focus)
       // - Plugin reload (hot reload/update): recreate the task list (without focus)
@@ -590,8 +582,10 @@ export class PluginLifecycleManager {
     // Clean up VaultScanner resources
     this.plugin.vaultScanner?.destroy();
 
-    // Reset PropertySearchEngine singleton to prevent stale references on reload
-    PropertySearchEngine.resetInstance();
+    // Destroy PropertySearchEngine and clear plugin reference.
+    // The instance is owned by this lifecycle manager - no static singleton to reset.
+    this.plugin.propertySearchEngine?.destroy();
+    this.plugin.propertySearchEngine = null;
 
     // Clean up UI manager resources
     this.plugin.uiManager?.cleanup();

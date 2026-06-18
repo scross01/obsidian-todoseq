@@ -24,6 +24,7 @@ export class TodoseqCodeBlockProcessor {
     this.manager = new EmbeddedTaskListManager(
       plugin.settings,
       plugin.keywordManager,
+      plugin.propertySearchEngine,
     );
     this.eventHandler = new EmbeddedTaskListEventHandler(
       plugin,
@@ -156,6 +157,7 @@ export class TodoseqCodeBlockProcessor {
       (
         this.plugin as TodoTracker & { vaultScanner: VaultScanner }
       ).vaultScanner.getKeywordManager(),
+      this.plugin.propertySearchEngine,
     );
     // Update event handler's manager reference
     this.eventHandler.setManager(this.manager);

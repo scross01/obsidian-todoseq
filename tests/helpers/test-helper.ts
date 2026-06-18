@@ -5,6 +5,10 @@ import {
 } from '../../src/settings/settings-types';
 import { KeywordManager } from '../../src/utils/keyword-manager';
 import { TaskParser } from '../../src/parser/task-parser';
+import {
+  PropertySearchEngine,
+  PropertySearchEngineDependencies,
+} from '../../src/services/property-search-engine';
 
 /**
  * Creates a date in local timezone using human-friendly 1-based month indexing.
@@ -120,4 +124,41 @@ export function createTestKeywordManager(
     TaskParser.validateKeywords(allCustomKeywords);
   }
   return new KeywordManager(settings);
+}
+
+/**
+ * Default dependencies for constructing a PropertySearchEngine in tests.
+ * Spreads empty vi: jest.fn() so each test gets a fresh tracker that
+ * still satisfies the dependency shape.
+ */
+export function createTestPropertySearchEngineDependencies(
+  overrides: Partial<PropertySearchEngineDependencies> = {},
+): PropertySearchEngineDependencies {
+  return {
+    taskStateManager: {
+      getTasks: jest.fn(() => []),
+    } as unknown as PropertySearchEngineDependencies['taskStateManager'],
+    refreshAllTaskListViews: jest.fn(),
+    ...overrides,
+  };
+}
+
+/**
+ * Builds a PropertySearchEngine from default test dependencies. Pass `app` to use
+ * a specific mocked App (most tests need this for vault and metadataCache access),
+ * and override any dependency you need to drive.
+ *
+ * Usage:
+ *   const engine = createTestPropertySearchEngine(mockApp, {
+ *     taskStateManager: myStateManager,
+ *   });
+ */
+export function createTestPropertySearchEngine(
+  app: PropertySearchEngine['app'] | { vault: unknown; metadataCache: unknown },
+  overrides: Partial<PropertySearchEngineDependencies> = {},
+): PropertySearchEngine {
+  return new PropertySearchEngine(
+    app as PropertySearchEngine['app'],
+    createTestPropertySearchEngineDependencies(overrides),
+  );
 }

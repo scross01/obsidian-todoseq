@@ -3,6 +3,7 @@
  */
 import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { App, TFile } from 'obsidian';
+import { createTestPropertySearchEngine } from './helpers/test-helper';
 
 // Create mock file objects
 const createMockFile = (index: number): TFile => {
@@ -115,10 +116,8 @@ describe('PropertySearchEngine Performance', () => {
   let propertySearchEngine: PropertySearchEngine;
 
   beforeEach(() => {
-    propertySearchEngine = PropertySearchEngine.getInstance(mockApp, {
+    propertySearchEngine = createTestPropertySearchEngine(mockApp, {
       taskStateManager: mockTaskStateManager,
-      refreshAllTaskListViews: jest.fn(),
-      vaultScanner: undefined,
     });
   });
 

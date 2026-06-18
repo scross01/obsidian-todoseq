@@ -91,7 +91,6 @@ jest.mock('../src/services/vault-scanner', () => ({
     this.on = jest.fn();
     this.getKeywordManager = jest.fn().mockReturnValue({});
     this.getParser = jest.fn().mockReturnValue(null);
-    this.setPropertySearchEngine = jest.fn();
     this.setInitializationComplete = jest.fn();
   }),
 }));
@@ -156,19 +155,18 @@ jest.mock('../src/view/markdown-renderers/reader-formatting', () => ({
   }),
 }));
 
-jest.mock('../src/services/property-search-engine', () => ({
-  PropertySearchEngine: {
-    getInstance: jest.fn().mockReturnValue({}),
-    resetInstance: jest.fn(),
-  },
-}));
+jest.mock('../src/services/property-search-engine', () => {
+  const PropertySearchEngine = jest.fn().mockImplementation(function () {
+    this.destroy = jest.fn();
+    this.rebuildAll = jest.fn().mockResolvedValue(undefined);
+  });
+  return { PropertySearchEngine };
+});
 
 jest.mock('../src/services/event-coordinator', () => ({
   EventCoordinator: jest.fn().mockImplementation(function () {
     this.initialize = jest.fn();
     this.destroy = jest.fn().mockResolvedValue(undefined);
-    this.setVaultScanner = jest.fn();
-    this.setPropertySearchEngine = jest.fn();
     this.onFileChange = jest.fn();
   }),
 }));
@@ -386,12 +384,17 @@ describe('PluginLifecycleManager', () => {
       expect(vaultScannerMock.destroy).toHaveBeenCalled();
     });
 
-    it('should reset property search engine', async () => {
+    it('should destroy property search engine', async () => {
+      // Simulate the plugin having a propertySearchEngine instance on unload
+      const destroyMock = jest.fn();
+      const previous = pluginMock.propertySearchEngine;
+      pluginMock.propertySearchEngine = { destroy: destroyMock };
+
       await lifecycleManager.onunload();
-      expect(
-        (PropertySearchEngine as unknown as { resetInstance: jest.Mock })
-          .resetInstance,
-      ).toHaveBeenCalled();
+
+      expect(destroyMock).toHaveBeenCalled();
+
+      pluginMock.propertySearchEngine = previous;
     });
 
     it('should cleanup UI manager', async () => {

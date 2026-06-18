@@ -2,7 +2,6 @@ import { VaultScanner } from '../src/services/vault-scanner';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { TaskParser } from '../src/parser/task-parser';
 import { ParserRegistry } from '../src/parser/parser-registry';
-import { PropertySearchEngine } from '../src/services/property-search-engine';
 import {
   createBaseSettings,
   createTestKeywordManager,
@@ -527,21 +526,6 @@ TODO task outside blocks
       expect(tasks[2].text).toBe('task outside blocks');
 
       newVaultScanner.destroy();
-    });
-  });
-
-  describe('Property Search Engine', () => {
-    it('should set property search engine', () => {
-      const mockPropertySearchEngine = {
-        buildIndex: jest.fn(),
-        search: jest.fn(),
-      } as unknown as PropertySearchEngine;
-
-      vaultScanner.setPropertySearchEngine(mockPropertySearchEngine);
-
-      expect(vaultScanner['propertySearchEngine']).toBe(
-        mockPropertySearchEngine,
-      );
     });
   });
 

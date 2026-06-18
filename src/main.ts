@@ -134,17 +134,13 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called when the plugin is unloaded
   onunload(): void {
-    // Clean up property search engine
-    if (this.propertySearchEngine) {
-      this.propertySearchEngine.destroy();
-    }
-
     // Clean up change tracker
     if (this.changeTracker) {
       this.changeTracker.destroy();
     }
 
-    // Delegate cleanup to lifecycle manager (which handles embedded task list processor, smart date processor, etc.)
+    // Delegate cleanup to lifecycle manager (which owns propertySearchEngine,
+    // event coordinator, vault scanner, etc.)
     void this.lifecycleManager?.onunload();
   }
 
@@ -163,7 +159,7 @@ export default class TodoTracker extends Plugin {
       migrated as Partial<TodoTrackerSettings>,
     );
 
-    // Add app instance to settings for PropertySearchEngine access
+    // Add app instance to settings (kept in memory, not saved)
     (this.settings as TodoTrackerSettings & { app: typeof this.app }).app =
       this.app;
 
@@ -323,9 +319,8 @@ export default class TodoTracker extends Plugin {
       app?: typeof this.app;
     };
     delete settingsToSave.app; // Remove app instance before saving
-    delete settingsToSave.propertySearchEngine; // Remove non-serializable property
 
-    // Add app instance to settings for PropertySearchEngine access (kept in memory, not saved)
+    // Add app instance to settings (kept in memory, not saved)
     (this.settings as TodoTrackerSettings & { app: typeof this.app }).app =
       this.app;
 
