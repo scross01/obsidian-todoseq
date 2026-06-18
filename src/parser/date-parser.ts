@@ -7,7 +7,7 @@ import { DateRepeatInfo, WarningPeriodInfo } from '../types/task';
 import { extractDateMetadata } from '../utils/date-repeater';
 
 // Date format types
-export type DateFormat =
+type DateFormat =
   | 'DATE_ONLY'
   | 'DATE_WITH_DOW'
   | 'DATE_WITH_DOW_ONLY'

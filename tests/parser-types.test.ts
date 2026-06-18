@@ -19,14 +19,10 @@ describe('Parser type definitions', () => {
     expect(config.includeCalloutBlocks).toBeUndefined();
   });
 
-  it('ParserConfig accepts all optional fields', () => {
+  it('ParserConfig accepts remaining optional fields', () => {
     const config: ParserConfig = {
       keywords: ['TODO', 'DOING', 'DONE', 'ARCHIVED'],
       completedKeywords: ['DONE'],
-      activeKeywords: ['DOING', 'NOW'],
-      waitingKeywords: ['WAIT', 'WAITING'],
-      inactiveKeywords: ['TODO', 'LATER'],
-      archivedKeywords: ['ARCHIVED'],
       urgencyCoefficients: {} as UrgencyCoefficients,
       includeCalloutBlocks: true,
       includeCodeBlocks: false,
@@ -34,10 +30,6 @@ describe('Parser type definitions', () => {
       languageCommentSupport: true,
     };
 
-    expect(config.activeKeywords).toEqual(['DOING', 'NOW']);
-    expect(config.waitingKeywords).toEqual(['WAIT', 'WAITING']);
-    expect(config.inactiveKeywords).toEqual(['TODO', 'LATER']);
-    expect(config.archivedKeywords).toEqual(['ARCHIVED']);
     expect(config.includeCalloutBlocks).toBe(true);
     expect(config.includeCodeBlocks).toBe(false);
     expect(config.languageCommentSupport).toBe(true);

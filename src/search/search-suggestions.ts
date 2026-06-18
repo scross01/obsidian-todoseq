@@ -409,11 +409,4 @@ export class SearchSuggestions {
       suggestion.toLowerCase().includes(searchText),
     );
   }
-
-  /**
-   * Clear cached data (useful when vault changes)
-   */
-  static clearCache(): void {
-    // Cache has been removed, this method is now a no-op for backward compatibility
-  }
 }

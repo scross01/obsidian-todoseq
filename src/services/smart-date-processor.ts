@@ -137,7 +137,7 @@ export class SmartDateProcessor {
    * Used to detect when cursor leaves a line with styling (highlight) on the date.
    */
   private hasNaturalLanguageDate(lineText: string): boolean {
-    if (this.hasInlineStructuredDates(lineText)) return false;
+    if (hasInlineStructuredDates(lineText)) return false;
     if (this.isDateLine(lineText)) return false;
     const parsed = NaturalDateParser.parse(lineText);
     return parsed !== null && parsed.matchedText !== null;
@@ -242,7 +242,7 @@ export class SmartDateProcessor {
     const existingDateLines: { lineNumber: number; type: InlineDateType }[] =
       this.findExistingDateLines(filePath, lineNumber, view);
 
-    const hasInlineDates = this.hasInlineStructuredDates(lineText);
+    const hasInlineDates = hasInlineStructuredDates(lineText);
     const parsedDate = hasInlineDates
       ? null
       : NaturalDateParser.parse(lineText);
@@ -336,13 +336,6 @@ export class SmartDateProcessor {
       /^\s*(SCHEDULED|DEADLINE):\s*[<[]/.test(lineText) ||
       /^\s*CLOSED:\s*\[/.test(lineText)
     );
-  }
-
-  /**
-   * Check if a line has inline structured dates (SCHEDULED: or DEADLINE: on the task line)
-   */
-  private hasInlineStructuredDates(lineText: string): boolean {
-    return hasInlineStructuredDates(lineText);
   }
 
   /**

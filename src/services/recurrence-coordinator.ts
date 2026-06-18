@@ -65,8 +65,6 @@ export interface RecurrenceUpdateResult {
 export interface RecurrenceCoordinatorOptions {
   /** Default delay for recurrence updates in milliseconds (default: 50) */
   defaultDelayMs?: number;
-  /** Whether to enable debug logging (default: false) */
-  debug?: boolean;
 }
 
 /**

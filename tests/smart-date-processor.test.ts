@@ -238,36 +238,31 @@ describe('SmartDateProcessor', () => {
 
   describe('Inline date detection', () => {
     it('should detect SCHEDULED inline on task line', () => {
-      const result = processor['hasInlineStructuredDates'](
+      const result = hasInlineStructuredDates(
         'TODO test SCHEDULED: <2026-08-11>',
       );
       expect(result).toBe(true);
     });
 
     it('should detect DEADLINE inline on task line', () => {
-      const result = processor['hasInlineStructuredDates'](
+      const result = hasInlineStructuredDates(
         'TODO test DEADLINE: <2026-08-11>',
       );
       expect(result).toBe(true);
     });
 
     it('should NOT detect standalone date lines (SCHEDULED at start)', () => {
-      const result = processor['hasInlineStructuredDates'](
-        '  SCHEDULED: <2026-08-11>',
-      );
+      const result = hasInlineStructuredDates('  SCHEDULED: <2026-08-11>');
       expect(result).toBe(false);
     });
 
     it('should NOT detect standalone date lines (DEADLINE at start)', () => {
-      const result = processor['hasInlineStructuredDates'](
-        'DEADLINE: <2026-08-11>',
-      );
+      const result = hasInlineStructuredDates('DEADLINE: <2026-08-11>');
       expect(result).toBe(false);
     });
 
     it('should not detect dates in regular task text', () => {
-      const result =
-        processor['hasInlineStructuredDates']('TODO task tomorrow');
+      const result = hasInlineStructuredDates('TODO task tomorrow');
       expect(result).toBe(false);
     });
   });

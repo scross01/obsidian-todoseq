@@ -161,7 +161,7 @@ class PrattParser {
           this.position >= this.tokens.length ||
           this.tokens[this.position].type !== 'rparen'
         ) {
-          throw new SearchError('Expected closing parenthesis', this.position);
+          throw new SearchError('Expected closing parenthesis');
         }
 
         this.position++; // consume rparen
@@ -209,7 +209,7 @@ class PrattParser {
 
   private parsePrefix(): SearchNode {
     if (this.position >= this.tokens.length) {
-      throw new SearchError('Unexpected end of expression', this.position);
+      throw new SearchError('Unexpected end of expression');
     }
 
     const token = this.tokens[this.position];
@@ -233,10 +233,7 @@ class PrattParser {
             this.position >= this.tokens.length ||
             this.tokens[this.position].type !== 'rparen'
           ) {
-            throw new SearchError(
-              'Expected closing parenthesis',
-              this.position,
-            );
+            throw new SearchError('Expected closing parenthesis');
           }
 
           this.position++; // consume rparen
@@ -255,38 +252,26 @@ class PrattParser {
         return this.createTermNode(token);
 
       default:
-        throw new SearchError(
-          `Unexpected token: ${token.original}`,
-          token.position,
-        );
+        throw new SearchError(`Unexpected token: ${token.original}`);
     }
   }
 
   private parsePrefixFilter(): SearchNode {
     // Expecting a prefix token followed by a prefix_value token
     if (this.position >= this.tokens.length) {
-      throw new SearchError(
-        'Unexpected end of expression after prefix',
-        this.position,
-      );
+      throw new SearchError('Unexpected end of expression after prefix');
     }
 
     const prefixToken = this.tokens[this.position];
     if (prefixToken.type !== 'prefix') {
-      throw new SearchError(
-        `Expected prefix token, got ${prefixToken.type}`,
-        prefixToken.position,
-      );
+      throw new SearchError(`Expected prefix token, got ${prefixToken.type}`);
     }
 
     this.position++;
 
     // Check if there's a value after the prefix
     if (this.position >= this.tokens.length) {
-      throw new SearchError(
-        'Expected value after prefix',
-        prefixToken.position,
-      );
+      throw new SearchError('Expected value after prefix');
     }
 
     const valueToken = this.tokens[this.position];
@@ -313,27 +298,20 @@ class PrattParser {
         exact: exact,
       };
     } else {
-      throw new SearchError(
-        `Expected prefix value, got ${valueToken.type}`,
-        valueToken.position,
-      );
+      throw new SearchError(`Expected prefix value, got ${valueToken.type}`);
     }
   }
 
   private parsePropertyFilter(): SearchNode {
     // Expecting a property token with value in "key:value" format
     if (this.position >= this.tokens.length) {
-      throw new SearchError(
-        'Unexpected end of expression after property',
-        this.position,
-      );
+      throw new SearchError('Unexpected end of expression after property');
     }
 
     const propertyToken = this.tokens[this.position];
     if (propertyToken.type !== 'property') {
       throw new SearchError(
         `Expected property token, got ${propertyToken.type}`,
-        propertyToken.position,
       );
     }
 
@@ -428,10 +406,7 @@ class PrattParser {
               rightToken.type !== 'word' &&
               rightToken.type !== 'phrase')
           ) {
-            throw new SearchError(
-              'Expected date value after range operator',
-              operator.position,
-            );
+            throw new SearchError('Expected date value after range operator');
           }
 
           this.position++;
@@ -446,7 +421,6 @@ class PrattParser {
         } else {
           throw new SearchError(
             'Range operator can only be used with scheduled:, deadline:, or closed: prefixes',
-            operator.position,
           );
         }
       }
@@ -454,7 +428,6 @@ class PrattParser {
       default:
         throw new SearchError(
           `Unexpected infix operator: ${operator.original}`,
-          operator.position,
         );
     }
   }
@@ -471,25 +444,7 @@ class PrattParser {
       default:
         throw new SearchError(
           `Cannot create term from token type: ${token.type}`,
-          token.position,
         );
     }
-  }
-
-  // Post-processing to handle implicit AND operations
-  static postProcessAST(node: SearchNode): SearchNode {
-    if (node.type === 'and' || node.type === 'or') {
-      // Already explicit, just process children
-      if (node.children) {
-        node.children = node.children.map((child) =>
-          this.postProcessAST(child),
-        );
-      }
-      return node;
-    }
-
-    // For other node types, we need to handle implicit AND
-    // This would be handled at a higher level during evaluation
-    return node;
   }
 }

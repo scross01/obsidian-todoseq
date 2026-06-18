@@ -405,11 +405,6 @@ export class VaultScanner extends EventEmitter<VaultScannerEvents> {
       completedKeywords:
         this.keywordManager.getKeywordsForGroup('completedKeywords'),
       keywordManager: this.keywordManager,
-      activeKeywords: this.keywordManager.getKeywordsForGroup('activeKeywords'),
-      waitingKeywords:
-        this.keywordManager.getKeywordsForGroup('waitingKeywords'),
-      archivedKeywords:
-        this.keywordManager.getKeywordsForGroup('archivedKeywords'),
       urgencyCoefficients: this.urgencyCoefficients,
       includeCalloutBlocks: newSettings.includeCalloutBlocks,
       includeCodeBlocks: newSettings.includeCodeBlocks,

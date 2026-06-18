@@ -25,19 +25,6 @@ export interface LanguageDefinition {
   patterns: LanguageCommentPatterns;
 }
 
-export interface LanguageCommentSupportSettings {
-  /** Enable/disable language comment support */
-  enabled: boolean;
-}
-
-export interface RegexPair {
-  /** Test regex to check if a line contains a task */
-  test: RegExp;
-
-  /** Capture regex to extract task components */
-  capture: RegExp;
-}
-
 // Base comment patterns for C-style languages
 const C_STYLE_COMMENTS: LanguageCommentPatterns = {
   singleLine: /\/\//, // starts with //

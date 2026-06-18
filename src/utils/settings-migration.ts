@@ -10,6 +10,10 @@ export interface SettingsMigrations {
   migrate: (settings: Record<string, unknown>) => Record<string, unknown>;
 }
 
+// Note: Migrations v3 and v4 (smart date settings, warning periods) were
+// no-op migrations that have been removed for simplicity. Existing users
+// with settingsVersion < 5 jump straight to v5, which supplies all defaults
+// via DefaultSettings.
 const MIGRATIONS: SettingsMigrations[] = [
   {
     version: 1,
@@ -45,27 +49,6 @@ const MIGRATIONS: SettingsMigrations[] = [
       }
 
       return migrated;
-    },
-  },
-  {
-    version: 3,
-    migrate: (settings: Record<string, unknown>) => {
-      // v3: added smart date recognition settings
-      // (enableSmartDateRecognition,
-
-      //  smartDateRemoveKeywords)
-      // No structural migration needed — defaults supplied by DefaultSettings.
-      return { ...settings };
-    },
-  },
-  {
-    version: 4,
-    migrate: (settings: Record<string, unknown>) => {
-      // v4: added warning period settings
-      // (upcomingPeriod, defaultDeadlineWarningPeriod, defaultScheduledWarningPeriod,
-      //  skipScheduledWarningPeriodIfDeadline, skipDeadlinePrewarningIfScheduled)
-      // No structural migration needed — defaults supplied by DefaultSettings.
-      return { ...settings };
     },
   },
   {

@@ -26,7 +26,6 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
   private propertySearchEngine: PropertySearchEngine | null = null;
 
   private readonly FILE_DEBOUNCE_MS = 150;
-  private readonly BATCH_DELAY_MS = 0;
 
   // External callbacks for file change notifications (e.g., embedded task lists)
   private fileChangeCallbacks: ((event: FileChangeEvent) => void)[] = [];
@@ -154,23 +153,9 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
   private queueFileEvent(event: FileChangeEvent): void {
     this.pendingEvents.set(event.file.path, event);
 
-    if (this.BATCH_DELAY_MS === 0) {
-      // Process immediately without debounce
-      this.processBatch().catch((error) => {
-        console.error('Error processing file event batch:', error);
-      });
-      return;
-    }
-
-    if (this.batchTimeout) {
-      window.clearTimeout(this.batchTimeout);
-    }
-
-    this.batchTimeout = window.setTimeout(() => {
-      this.processBatch().catch((error) => {
-        console.error('Error processing file event batch:', error);
-      });
-    }, this.BATCH_DELAY_MS);
+    this.processBatch().catch((error) => {
+      console.error('Error processing file event batch:', error);
+    });
   }
 
   private async processBatch(): Promise<void> {

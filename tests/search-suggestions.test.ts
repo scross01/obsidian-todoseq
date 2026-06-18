@@ -132,7 +132,6 @@ describe('Search Suggestions', () => {
 
     it('should extract and filter paths correctly for examples folder', async () => {
       // Clear cache to ensure we get fresh data
-      SearchSuggestions.clearCache();
 
       // Mock Vault with examples folder
       class MockVaultWithExamples implements Partial<Vault> {
@@ -202,7 +201,6 @@ describe('Search Suggestions', () => {
 
     it('should handle cache clearing and reloading', async () => {
       // Clear cache to start fresh
-      SearchSuggestions.clearCache();
 
       // Mock Vault 1
       class MockVault1 implements Partial<Vault> {
@@ -224,7 +222,6 @@ describe('Search Suggestions', () => {
       }
 
       // Clear cache and get new paths
-      SearchSuggestions.clearCache();
       const mockVault2 = new MockVault2() as Vault;
       allPaths = await SearchSuggestions.getAllPaths(mockVault2);
 
@@ -258,7 +255,6 @@ describe('Search Suggestions', () => {
 
     it('should extract and handle paths with spaces correctly', async () => {
       // Clear cache to ensure we get fresh data
-      SearchSuggestions.clearCache();
 
       // Mock Vault with folders that have spaces in names
       class MockVaultWithSpaces implements Partial<Vault> {
@@ -1001,7 +997,6 @@ describe('Search Suggestions', () => {
   describe('Edge case coverage', () => {
     it('should handle files with single-level paths in vault', async () => {
       // Clear cache first
-      SearchSuggestions.clearCache();
 
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
@@ -1021,7 +1016,6 @@ describe('Search Suggestions', () => {
 
     it('should handle duplicate filenames in vault', async () => {
       // Clear cache first
-      SearchSuggestions.clearCache();
 
       class MockVault implements Partial<Vault> {
         getMarkdownFiles() {
