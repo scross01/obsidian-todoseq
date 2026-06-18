@@ -697,4 +697,140 @@ describe('EmbeddedTaskListRenderer', () => {
       expect(() => renderer.updateSettings()).not.toThrow();
     });
   });
+
+  // ---------------------------------------------------------------------
+  // Regression: handlePriorityChange must call plugin.taskUpdateCoordinator
+  // directly, NOT through window.todoSeqPlugin. Mirrors the pattern enforced
+  // by the constructor-injection refactor in the main task list view.
+  // ---------------------------------------------------------------------
+  describe('handlePriorityChange (no window globals)', () => {
+    let originalWindowPlugin: unknown;
+    let coordinatorMock: {
+      updateTaskPriority: jest.Mock;
+      updateTaskScheduledDate: jest.Mock;
+      updateTaskDeadlineDate: jest.Mock;
+      updateTaskState: jest.Mock;
+    };
+
+    beforeEach(() => {
+      coordinatorMock = {
+        updateTaskPriority: jest.fn().mockResolvedValue(undefined),
+        updateTaskScheduledDate: jest.fn().mockResolvedValue(undefined),
+        updateTaskDeadlineDate: jest.fn().mockResolvedValue(undefined),
+        updateTaskState: jest.fn().mockResolvedValue(undefined),
+      };
+      renderer.plugin.taskUpdateCoordinator = coordinatorMock;
+      renderer.plugin.taskStateManager = {
+        findTaskByPathAndLine: jest
+          .fn()
+          .mockReturnValue(createBaseTask({ path: 'embedded-1.md', line: 0 })),
+      };
+
+      // Plant a poisoned window.todoSeqPlugin. Any code path that still reads
+      // the global would call the mocks below; we then assert those were
+      // never touched.
+      originalWindowPlugin = (window as unknown as Record<string, unknown>)
+        .todoSeqPlugin;
+      (window as unknown as Record<string, unknown>).todoSeqPlugin = {
+        taskUpdateCoordinator: {
+          updateTaskPriority: jest
+            .fn()
+            .mockRejectedValue(
+              new Error('REGRESSION: window global was consulted'),
+            ),
+        },
+      };
+    });
+
+    afterEach(() => {
+      if (originalWindowPlugin === undefined) {
+        delete (window as unknown as Record<string, unknown>).todoSeqPlugin;
+      } else {
+        (window as unknown as Record<string, unknown>).todoSeqPlugin =
+          originalWindowPlugin;
+      }
+    });
+
+    it('delegates to plugin.taskUpdateCoordinator, not the window global', async () => {
+      const task = createBaseTask({ path: 'embedded-1.md', line: 0 });
+      await renderer['handlePriorityChange'](task, 'high');
+
+      expect(coordinatorMock.updateTaskPriority).toHaveBeenCalledTimes(1);
+      const args = coordinatorMock.updateTaskPriority.mock.calls[0];
+      expect(args[0]).toEqual(
+        expect.objectContaining({ path: 'embedded-1.md', line: 0 }),
+      );
+      expect(args[1]).toBe('high');
+
+      const windowCoord = (
+        window as unknown as {
+          todoSeqPlugin: {
+            taskUpdateCoordinator: { updateTaskPriority: jest.Mock };
+          };
+        }
+      ).todoSeqPlugin.taskUpdateCoordinator;
+      expect(windowCoord.updateTaskPriority).not.toHaveBeenCalled();
+    });
+
+    it('logs and returns when plugin.taskUpdateCoordinator is null', async () => {
+      const errSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+      renderer.plugin.taskUpdateCoordinator = null;
+
+      const task = createBaseTask({ path: 'embedded-1.md', line: 0 });
+      await renderer['handlePriorityChange'](task, 'low');
+
+      expect(errSpy).toHaveBeenCalled();
+      const allMessages = errSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+      expect(allMessages).toMatch(/TaskUpdateCoordinator/);
+      expect(coordinatorMock.updateTaskPriority).not.toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
+
+    it('logs and returns when the task cannot be resolved in the state manager', async () => {
+      const errSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+      (
+        renderer.plugin.taskStateManager as { findTaskByPathAndLine: jest.Mock }
+      ).findTaskByPathAndLine = jest.fn().mockReturnValue(null);
+
+      const task = createBaseTask({ path: 'missing.md', line: 5 });
+      await renderer['handlePriorityChange'](task, 'med');
+
+      expect(errSpy).toHaveBeenCalled();
+      const allMessages = errSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+      expect(allMessages).toMatch(/Task not found/);
+      expect(coordinatorMock.updateTaskPriority).not.toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
+
+    it('logs failures from the coordinator without consulting the window global', async () => {
+      const errSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+      coordinatorMock.updateTaskPriority.mockRejectedValueOnce(
+        new Error('boom'),
+      );
+
+      const task = createBaseTask({ path: 'embedded-1.md', line: 0 });
+      await renderer['handlePriorityChange'](task, 'med');
+
+      expect(errSpy).toHaveBeenCalled();
+      const allMessages = errSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+      expect(allMessages).toMatch(/Failed to update task priority/);
+      expect(coordinatorMock.updateTaskPriority).toHaveBeenCalledTimes(1);
+
+      const windowCoord = (
+        window as unknown as {
+          todoSeqPlugin: {
+            taskUpdateCoordinator: { updateTaskPriority: jest.Mock };
+          };
+        }
+      ).todoSeqPlugin.taskUpdateCoordinator;
+      expect(windowCoord.updateTaskPriority).not.toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
+  });
 });

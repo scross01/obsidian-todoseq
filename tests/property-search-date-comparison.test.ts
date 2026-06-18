@@ -104,11 +104,6 @@ const mockApp = {
   },
 } as unknown as App;
 
-// Expose plugin instance
-(window as unknown as { todoSeqPlugin?: unknown }).todoSeqPlugin = {
-  taskStateManager: mockTaskStateManager,
-};
-
 describe('PropertySearchEngine Date Comparison Operators', () => {
   let propertySearchEngine: PropertySearchEngine;
 

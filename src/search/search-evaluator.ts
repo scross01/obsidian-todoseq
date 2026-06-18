@@ -21,37 +21,13 @@ const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
 export class SearchEvaluator {
   private static regexCache = new RegexCache();
 
-  /**
-   * Get the app instance from settings or global window
-   * Used as fallback when PropertySearchEngine is not available
-   */
+  /** Get the app instance from settings.app (populated by Plugin.loadSettings). */
   private static getApp(settings?: TodoTrackerSettings): App | undefined {
-    type SettingsWithApp = TodoTrackerSettings & {
-      app: App;
-    };
-    type WindowWithPlugin = Window & {
-      todoSeqPlugin?: {
-        app: App;
-      };
-    };
-
-    if (settings && (settings as SettingsWithApp).app) {
-      return (settings as SettingsWithApp).app;
-    } else if (
-      typeof window !== 'undefined' &&
-      (window as WindowWithPlugin).todoSeqPlugin
-    ) {
-      const plugin = (window as WindowWithPlugin).todoSeqPlugin;
-      if (plugin) {
-        return plugin.app;
-      }
-    }
-
-    return undefined;
+    return (settings as TodoTrackerSettings & { app?: App })?.app;
   }
 
   /**
-   * Get the file for a task, using the app instance from settings or global window
+   * Get the file for a task, using the app instance from settings.
    * Used as fallback when PropertySearchEngine is not available
    */
   private static getFileForTask(
@@ -842,7 +818,7 @@ export class SearchEvaluator {
       }
     }
 
-    // Fall back to direct metadata access (simplified, no global state access)
+    // Fall back to direct metadata access
     // Get file cache and frontmatter
     let file;
     try {

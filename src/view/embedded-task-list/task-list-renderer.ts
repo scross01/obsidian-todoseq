@@ -190,21 +190,11 @@ export class EmbeddedTaskListRenderer {
     task: Task,
     priority: 'high' | 'med' | 'low' | null,
   ): Promise<void> {
-    // Get the TaskUpdateCoordinator from the plugin (same pattern as main task list)
-    const plugin = (
-      window as unknown as {
-        todoSeqPlugin?: {
-          taskUpdateCoordinator?: {
-            updateTaskPriority: (
-              task: Task,
-              priority: 'high' | 'med' | 'low' | null,
-            ) => Promise<Task>;
-          };
-        };
-      }
-    ).todoSeqPlugin;
+    // Get the coordinator from the plugin (no window-cast needed; this.plugin
+    // is the same instance exposed globally and is reliably available here).
+    const coordinator = this.plugin.taskUpdateCoordinator;
 
-    if (!plugin?.taskUpdateCoordinator) {
+    if (!coordinator) {
       console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
     }
@@ -221,11 +211,9 @@ export class EmbeddedTaskListRenderer {
         return;
       }
 
-      // Use TaskUpdateCoordinator for optimistic UI updates
-      await plugin.taskUpdateCoordinator.updateTaskPriority(
-        currentTask,
-        priority,
-      );
+      // Use TaskUpdateCoordinator for optimistic UI updates.
+      // Mirrors the date-change handlers in this class, which already use the plugin reference.
+      await coordinator.updateTaskPriority(currentTask, priority);
     } catch (error) {
       console.error('TODOseq: Failed to update task priority:', error);
     }

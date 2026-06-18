@@ -111,11 +111,6 @@ const mockApp = {
   },
 } as unknown as App;
 
-// Expose plugin instance with task state manager for testing
-(window as unknown as { todoSeqPlugin?: any }).todoSeqPlugin = {
-  taskStateManager: mockTaskStateManager,
-};
-
 describe('PropertySearchEngine Performance', () => {
   let propertySearchEngine: PropertySearchEngine;
 

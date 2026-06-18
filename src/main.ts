@@ -81,9 +81,6 @@ export default class TodoTracker extends Plugin {
 
   // Obsidian lifecycle method called when the plugin is loaded.
   async onload() {
-    // Expose plugin instance globally for easy access
-    (window as unknown as { todoSeqPlugin?: TodoTracker }).todoSeqPlugin = this;
-
     // Expose developer utility to reset first-install flag via console
     // Usage: todoSeqResetFirstInstall()
     (

@@ -33,7 +33,10 @@ import TodoTracker from '../../main';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { VaultScanner } from '../../services/vault-scanner';
 import type { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
-import { getStateTransitionManager } from '../../services/task-update-coordinator';
+import {
+  getStateTransitionManager,
+  TaskUpdateCoordinator,
+} from '../../services/task-update-coordinator';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TaskElementCache } from './task-element-cache';
 import { ChunkedRenderQueue } from './chunked-render-queue';
@@ -136,6 +139,8 @@ export class TaskListView extends ItemView {
   private keywordManager: KeywordManager;
   private stateManager: TaskStateTransitionManager;
   private taskStateManager: TaskStateManager;
+  // Captured from plugin in constructor; refresh in updateSettings()
+  private taskUpdateCoordinator: TaskUpdateCoordinator | null;
 
   // Lazy loading state
   private loadedTaskCount = 0;
@@ -158,6 +163,9 @@ export class TaskListView extends ItemView {
     this.defaultViewMode = defaultViewMode;
     this.defaultSortMethod = plugin.settings.defaultSortMethod;
     this.keywordManager = keywordManager;
+    // Capture the coordinator from the plugin (set by PluginLifecycleManager).
+    // Mirrors how this.taskStateManager is passed explicitly via the constructor.
+    this.taskUpdateCoordinator = plugin.taskUpdateCoordinator;
     this.stateManager = getStateTransitionManager(
       plugin.taskUpdateCoordinator,
       keywordManager,
@@ -1294,21 +1302,7 @@ export class TaskListView extends ItemView {
     task: Task,
     priority: 'high' | 'med' | 'low' | null,
   ): Promise<void> {
-    // Get the TaskUpdateCoordinator from the plugin
-    const plugin = (
-      window as unknown as {
-        todoSeqPlugin?: {
-          taskUpdateCoordinator?: {
-            updateTaskPriority: (
-              task: Task,
-              priority: 'high' | 'med' | 'low' | null,
-            ) => Promise<Task>;
-          };
-        };
-      }
-    ).todoSeqPlugin;
-
-    if (!plugin?.taskUpdateCoordinator) {
+    if (!this.taskUpdateCoordinator) {
       console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
     }
@@ -1327,7 +1321,7 @@ export class TaskListView extends ItemView {
 
       // Use the centralized coordinator for the update
       // This handles optimistic updates, file writes, and embed refreshes
-      await plugin.taskUpdateCoordinator.updateTaskPriority(
+      await this.taskUpdateCoordinator.updateTaskPriority(
         currentTask,
         priority,
       );
@@ -1346,23 +1340,7 @@ export class TaskListView extends ItemView {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ): Promise<void> {
-    // Get the TaskUpdateCoordinator from the plugin
-    const plugin = (
-      window as unknown as {
-        todoSeqPlugin?: {
-          taskUpdateCoordinator?: {
-            updateTaskScheduledDate: (
-              task: Task,
-              date: Date | null,
-              repeat?: DateRepeatInfo | null,
-              warningPeriod?: WarningPeriodInfo | null,
-            ) => Promise<Task>;
-          };
-        };
-      }
-    ).todoSeqPlugin;
-
-    if (!plugin?.taskUpdateCoordinator) {
+    if (!this.taskUpdateCoordinator) {
       console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
     }
@@ -1381,7 +1359,7 @@ export class TaskListView extends ItemView {
 
       // Use the centralized coordinator for the update
       // This handles optimistic updates, file writes, and embed refreshes
-      await plugin.taskUpdateCoordinator.updateTaskScheduledDate(
+      await this.taskUpdateCoordinator.updateTaskScheduledDate(
         currentTask,
         date,
         repeat,
@@ -1402,23 +1380,7 @@ export class TaskListView extends ItemView {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ): Promise<void> {
-    // Get the TaskUpdateCoordinator from the plugin
-    const plugin = (
-      window as unknown as {
-        todoSeqPlugin?: {
-          taskUpdateCoordinator?: {
-            updateTaskDeadlineDate: (
-              task: Task,
-              date: Date | null,
-              repeat?: DateRepeatInfo | null,
-              warningPeriod?: WarningPeriodInfo | null,
-            ) => Promise<Task>;
-          };
-        };
-      }
-    ).todoSeqPlugin;
-
-    if (!plugin?.taskUpdateCoordinator) {
+    if (!this.taskUpdateCoordinator) {
       console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
     }
@@ -1437,7 +1399,7 @@ export class TaskListView extends ItemView {
 
       // Use the centralized coordinator for the update
       // This handles optimistic updates, file writes, and embed refreshes
-      await plugin.taskUpdateCoordinator.updateTaskDeadlineDate(
+      await this.taskUpdateCoordinator.updateTaskDeadlineDate(
         currentTask,
         date,
         repeat,
@@ -1450,38 +1412,7 @@ export class TaskListView extends ItemView {
 
   // Cycle state via NEXT_STATE - delegates to taskUpdateCoordinator
   private async updateTaskState(task: Task, nextState: string): Promise<void> {
-    // Get the plugin instance
-    const plugin = (
-      window as unknown as {
-        todoSeqPlugin?: {
-          taskStateManager?: {
-            optimisticUpdate: (task: Task, newState: string) => string;
-            adjustLineIndices: (
-              path: string,
-              fromLine: number,
-              delta: number,
-            ) => void;
-            findTaskByPathAndLine: (path: string, line: number) => Task | null;
-          };
-          taskEditor?: {
-            updateTaskState: (
-              task: Task,
-              newState: string,
-              forceVaultApi?: boolean,
-            ) => Promise<Task>;
-          };
-          taskUpdateCoordinator?: {
-            updateTaskState: (
-              task: Task,
-              newState: string,
-              source?: 'task-list',
-            ) => Promise<void>;
-          };
-        };
-      }
-    ).todoSeqPlugin;
-
-    if (!plugin?.taskUpdateCoordinator) {
+    if (!this.taskUpdateCoordinator) {
       console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
     }
@@ -1489,7 +1420,7 @@ export class TaskListView extends ItemView {
     try {
       // Use unified updateTaskState method - handles fresh lookup, optimistic update,
       // file write, recurrence, line adjustment, and UI refresh
-      await plugin.taskUpdateCoordinator.updateTaskState(
+      await this.taskUpdateCoordinator.updateTaskState(
         task,
         nextState,
         'task-list',
@@ -1947,18 +1878,8 @@ export class TaskListView extends ItemView {
 
     // Empty-state guidance UI
     // Check scan status first - show scanning message even when tasks exist
-    const plugin = (
-      window as unknown as {
-        todoSeqPlugin?: {
-          vaultScanner?: {
-            isScanning: () => boolean;
-            shouldShowScanningMessage: () => boolean;
-          };
-        };
-      }
-    ).todoSeqPlugin;
     const isScanning =
-      plugin?.vaultScanner?.shouldShowScanningMessage() ?? false;
+      this.plugin.vaultScanner?.shouldShowScanningMessage() ?? false;
 
     // Check if we're in initial load state (before first scan has started)
     // This prevents "No tasks found" from flashing before the scan begins
@@ -2564,6 +2485,11 @@ export class TaskListView extends ItemView {
     this.keywordManager = (
       this.plugin as TodoTracker & { vaultScanner: VaultScanner }
     ).vaultScanner.getKeywordManager();
+
+    // Keep our stored coordinator reference in sync with the plugin.
+    // The coordinator is normally set once during onload, but re-syncing here
+    // guards against any future reload paths that swap the coordinator.
+    this.taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
 
     // Use the shared state transition manager from the coordinator
     this.stateManager = getStateTransitionManager(

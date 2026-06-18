@@ -1406,6 +1406,55 @@ describe('SearchEvaluator - Comprehensive', () => {
       );
       expect(result).toBe(false);
     });
+
+    // Regression guard: previously SearchEvaluator.getApp had a
+    // window.todoSeqPlugin fallback. After that path was removed,
+    // the property-filter fallback must NOT consult the window global.
+    it('should not consult window.todoSeqPlugin when settings.app is missing', async () => {
+      const poisonedApp = {
+        vault: {
+          getAbstractFileByPath: jest.fn(() => {
+            throw new Error('LEGACY FALLBACK STILL WIRED');
+          }),
+        },
+      };
+
+      const originalPlugin = (window as Record<string, unknown>).todoSeqPlugin;
+      (window as Record<string, unknown>).todoSeqPlugin = {
+        app: poisonedApp,
+      };
+      try {
+        const settings = createBaseSettings(); // no .app set
+        const task = createBaseTask({
+          path: 'test.md',
+          line: 1,
+          rawText: 'TODO test task',
+          text: 'test task',
+        });
+        const node = {
+          type: 'property_filter' as const,
+          field: 'property',
+          value: 'type:Project',
+          exact: false,
+        };
+
+        const result = await SearchEvaluator.evaluate(
+          node,
+          task,
+          false,
+          settings,
+          undefined, // no propertySearchEngine -> hits fallback path
+        );
+        expect(result).toBe(false);
+        expect(poisonedApp.vault.getAbstractFileByPath).not.toHaveBeenCalled();
+      } finally {
+        if (originalPlugin !== undefined) {
+          (window as Record<string, unknown>).todoSeqPlugin = originalPlugin;
+        } else {
+          delete (window as Record<string, unknown>).todoSeqPlugin;
+        }
+      }
+    });
   });
 
   describe('Priority Filter Edge Cases', () => {
@@ -1492,80 +1541,6 @@ describe('SearchEvaluator - Comprehensive', () => {
       const node = parseQuery('scheduled:2026-06-20');
       const result = await SearchEvaluator.evaluate(node, task, false);
       expect(result).toBe(false);
-    });
-  });
-
-  describe('getApp window fallback (lines 40-50)', () => {
-    it('should use window.todoSeqPlugin as fallback when no settings app', async () => {
-      const mockApp = {
-        vault: {
-          getAbstractFileByPath: jest.fn().mockReturnValue(null),
-        },
-        metadataCache: {
-          getFileCache: jest.fn(),
-        },
-      };
-
-      const originalPlugin = (window as Record<string, unknown>).todoSeqPlugin;
-      (window as Record<string, unknown>).todoSeqPlugin = {
-        app: mockApp,
-      };
-
-      try {
-        const task = createBaseTask({
-          path: 'test.md',
-          line: 1,
-          rawText: 'TODO test task',
-          text: 'test task',
-        });
-
-        const node = {
-          type: 'property_filter' as const,
-          field: 'property',
-          value: 'type:Project',
-          exact: false,
-        };
-
-        const result = await SearchEvaluator.evaluate(node, task, false);
-        expect(result).toBe(false);
-        expect(mockApp.vault.getAbstractFileByPath).toHaveBeenCalledWith(
-          'test.md',
-        );
-      } finally {
-        if (originalPlugin !== undefined) {
-          (window as Record<string, unknown>).todoSeqPlugin = originalPlugin;
-        } else {
-          delete (window as Record<string, unknown>).todoSeqPlugin;
-        }
-      }
-    });
-
-    it('should return false when no settings app and no window plugin', async () => {
-      const originalPlugin = (window as Record<string, unknown>).todoSeqPlugin;
-      delete (window as Record<string, unknown>).todoSeqPlugin;
-
-      try {
-        const task = createBaseTask({
-          path: 'test.md',
-          line: 1,
-          rawText: 'TODO test task',
-          text: 'test task',
-        });
-
-        const node = {
-          type: 'property_filter' as const,
-          field: 'property',
-          value: 'type:Project',
-          exact: false,
-        };
-
-        const result = await SearchEvaluator.evaluate(node, task, false);
-        expect(result).toBe(false);
-      } finally {
-        if (originalPlugin !== undefined) {
-          (window as Record<string, unknown>).todoSeqPlugin = originalPlugin;
-        }
-      }
     });
   });
 

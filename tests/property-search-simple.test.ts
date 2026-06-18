@@ -100,11 +100,6 @@ for (let i = 0; i < 20; i++) {
   testFilesCache.set(file.path, file);
 }
 
-// Expose plugin instance with task state manager for testing
-(window as unknown as { todoSeqPlugin?: any }).todoSeqPlugin = {
-  taskStateManager: mockTaskStateManager,
-};
-
 describe('PropertySearchEngine Simple Tests', () => {
   let propertySearchEngine: PropertySearchEngine;
 

@@ -641,4 +641,287 @@ describe('TaskListView', () => {
       openTaskLocationSpy.mockRestore();
     });
   });
+
+  // ---------------------------------------------------------------------
+  // Regression: handlers must read taskUpdateCoordinator from the field
+  // captured in the constructor, NOT from window.todoSeqPlugin. This is
+  // the contract enforced by the constructor-injection refactor.
+  // ---------------------------------------------------------------------
+  describe('taskUpdateCoordinator injection (no window globals)', () => {
+    let originalWindowPlugin: unknown;
+
+    // Build the fake "tasks" that the state manager will resolve to, so we
+    // can assert the call args without leaking through private members.
+    const innerTasks = [
+      createBaseTask({
+        path: 'inner-1.md',
+        line: 0,
+        text: 'Inner 1',
+        state: 'TODO',
+      }),
+      createBaseTask({
+        path: 'inner-2.md',
+        line: 1,
+        text: 'Inner 2',
+        state: 'DOING',
+      }),
+    ];
+
+    beforeEach(() => {
+      // Force the state manager to return innerTasks[0] for any lookup
+      taskStateManagerMock.findTaskByPathAndLine = jest
+        .fn()
+        .mockReturnValue(innerTasks[0]);
+
+      // updateSettings() reads plugin.vaultScanner.getKeywordManager() —
+      // add a stub so the test that exercises updateSettings does not throw.
+      // Other tests in this describe don't call updateSettings, but having
+      // the stub doesn't affect them.
+      (pluginMock as Record<string, unknown>).vaultScanner = {
+        getKeywordManager: jest.fn().mockReturnValue({
+          getSettings: jest.fn().mockReturnValue({}),
+          getAllKeywords: jest.fn().mockReturnValue([]),
+          getCheckboxState: jest.fn().mockReturnValue(' '),
+          isActive: jest.fn().mockReturnValue(false),
+          isCompleted: jest.fn().mockReturnValue(false),
+          isArchived: jest.fn().mockReturnValue(false),
+          getActiveSet: jest.fn().mockReturnValue(new Set()),
+          getWaitingSet: jest.fn().mockReturnValue(new Set()),
+        }),
+      };
+
+      // Plant a poisoned window.todoSeqPlugin. Any code path that still
+      // reads the global would invoke the mock fns below, which we then
+      // assert were never called.
+      originalWindowPlugin = (window as unknown as Record<string, unknown>)
+        .todoSeqPlugin;
+      (window as unknown as Record<string, unknown>).todoSeqPlugin = {
+        taskUpdateCoordinator: {
+          updateTaskPriority: jest.fn().mockResolvedValue(undefined),
+          updateTaskScheduledDate: jest.fn().mockResolvedValue(undefined),
+          updateTaskDeadlineDate: jest.fn().mockResolvedValue(undefined),
+          updateTaskState: jest.fn().mockResolvedValue(undefined),
+          updateTask: jest.fn().mockResolvedValue(undefined),
+        },
+      };
+    });
+
+    afterEach(() => {
+      delete (pluginMock as Record<string, unknown>).vaultScanner;
+      if (originalWindowPlugin === undefined) {
+        delete (window as unknown as Record<string, unknown>).todoSeqPlugin;
+      } else {
+        (window as unknown as Record<string, unknown>).todoSeqPlugin =
+          originalWindowPlugin;
+      }
+    });
+
+    it('captures plugin.taskUpdateCoordinator into a field in the constructor', () => {
+      expect(view['taskUpdateCoordinator']).toBe(
+        pluginMock.taskUpdateCoordinator,
+      );
+    });
+
+    it('re-syncs the field from the plugin inside updateSettings', () => {
+      const replacement = {
+        updateTaskPriority: jest.fn().mockResolvedValue(undefined),
+        updateTaskScheduledDate: jest.fn().mockResolvedValue(undefined),
+        updateTaskDeadlineDate: jest.fn().mockResolvedValue(undefined),
+        updateTaskState: jest.fn().mockResolvedValue(undefined),
+      };
+      pluginMock.taskUpdateCoordinator = replacement;
+      view.updateSettings();
+
+      expect(view['taskUpdateCoordinator']).toBe(replacement);
+    });
+
+    describe('handleContextMenuPriorityChange', () => {
+      it('delegates to the captured field (not the window global)', async () => {
+        const task = createBaseTask({ path: 'inner-1.md', line: 0 });
+        await view['handleContextMenuPriorityChange'](task, 'high');
+
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskPriority,
+        ).toHaveBeenCalledTimes(1);
+        const args = (
+          pluginMock.taskUpdateCoordinator.updateTaskPriority as jest.Mock
+        ).mock.calls[0];
+        expect(args[0]).toBe(innerTasks[0]); // resolved by TaskStateManager
+        expect(args[1]).toBe('high');
+
+        const windowCoord = (
+          window as unknown as {
+            todoSeqPlugin: {
+              taskUpdateCoordinator: { updateTaskPriority: jest.Mock };
+            };
+          }
+        ).todoSeqPlugin.taskUpdateCoordinator;
+        expect(windowCoord.updateTaskPriority).not.toHaveBeenCalled();
+      });
+
+      it('logs and returns when the coordinator field is null', async () => {
+        const errSpy = jest
+          .spyOn(console, 'error')
+          .mockImplementation(() => undefined);
+        view['taskUpdateCoordinator'] = null;
+
+        const task = createBaseTask({ path: 'inner-1.md', line: 0 });
+        await view['handleContextMenuPriorityChange'](task, 'high');
+
+        expect(errSpy).toHaveBeenCalled();
+        const allMessages = errSpy.mock.calls
+          .map((c) => c.join(' '))
+          .join('\n');
+        expect(allMessages).toMatch(/TaskUpdateCoordinator/);
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskPriority,
+        ).not.toHaveBeenCalled();
+        errSpy.mockRestore();
+      });
+
+      it('logs and returns when the task cannot be resolved in the state manager', async () => {
+        const errSpy = jest
+          .spyOn(console, 'error')
+          .mockImplementation(() => undefined);
+        taskStateManagerMock.findTaskByPathAndLine = jest
+          .fn()
+          .mockReturnValue(null);
+
+        const task = createBaseTask({ path: 'missing.md', line: 5 });
+        await view['handleContextMenuPriorityChange'](task, 'low');
+
+        expect(errSpy).toHaveBeenCalled();
+        const allMessages = errSpy.mock.calls
+          .map((c) => c.join(' '))
+          .join('\n');
+        expect(allMessages).toMatch(/Task not found/);
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskPriority,
+        ).not.toHaveBeenCalled();
+        errSpy.mockRestore();
+      });
+
+      it('logs failures from the coordinator without leaking window access', async () => {
+        const errSpy = jest
+          .spyOn(console, 'error')
+          .mockImplementation(() => undefined);
+        (
+          pluginMock.taskUpdateCoordinator.updateTaskPriority as jest.Mock
+        ).mockRejectedValueOnce(new Error('boom'));
+
+        const task = createBaseTask({ path: 'inner-1.md', line: 0 });
+        await view['handleContextMenuPriorityChange'](task, 'med');
+
+        expect(errSpy).toHaveBeenCalled();
+        const allMessages = errSpy.mock.calls
+          .map((c) => c.join(' '))
+          .join('\n');
+        expect(allMessages).toMatch(/Failed to update task priority/);
+        errSpy.mockRestore();
+      });
+    });
+
+    describe('handleContextMenuScheduledDateChange', () => {
+      it('delegates to the captured field (not the window global)', async () => {
+        const task = createBaseTask({ path: 'inner-1.md', line: 0 });
+        const date = new Date(2026, 0, 1);
+
+        await view['handleContextMenuScheduledDateChange'](
+          task,
+          date,
+          null,
+          null,
+        );
+
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskScheduledDate,
+        ).toHaveBeenCalledTimes(1);
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskScheduledDate,
+        ).toHaveBeenCalledWith(innerTasks[0], date, null, null);
+
+        const windowCoord = (
+          window as unknown as {
+            todoSeqPlugin: {
+              taskUpdateCoordinator: { updateTaskScheduledDate: jest.Mock };
+            };
+          }
+        ).todoSeqPlugin.taskUpdateCoordinator;
+        expect(windowCoord.updateTaskScheduledDate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('handleContextMenuDeadlineDateChange', () => {
+      it('delegates to the captured field (not the window global)', async () => {
+        const task = createBaseTask({ path: 'inner-1.md', line: 0 });
+        const date = new Date(2026, 0, 15);
+
+        await view['handleContextMenuDeadlineDateChange'](
+          task,
+          date,
+          null,
+          null,
+        );
+
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskDeadlineDate,
+        ).toHaveBeenCalledTimes(1);
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskDeadlineDate,
+        ).toHaveBeenCalledWith(innerTasks[0], date, null, null);
+
+        const windowCoord = (
+          window as unknown as {
+            todoSeqPlugin: {
+              taskUpdateCoordinator: { updateTaskDeadlineDate: jest.Mock };
+            };
+          }
+        ).todoSeqPlugin.taskUpdateCoordinator;
+        expect(windowCoord.updateTaskDeadlineDate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('updateTaskState', () => {
+      it('delegates to the captured field (not the window global)', async () => {
+        const task = createBaseTask({ path: 'inner-1.md', line: 0 });
+        await view['updateTaskState'](task, 'DOING');
+
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskState,
+        ).toHaveBeenCalledTimes(1);
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskState,
+        ).toHaveBeenCalledWith(task, 'DOING', 'task-list');
+
+        const windowCoord = (
+          window as unknown as {
+            todoSeqPlugin: {
+              taskUpdateCoordinator: { updateTaskState: jest.Mock };
+            };
+          }
+        ).todoSeqPlugin.taskUpdateCoordinator;
+        expect(windowCoord.updateTaskState).not.toHaveBeenCalled();
+      });
+
+      it('logs and returns when the coordinator field is null', async () => {
+        const errSpy = jest
+          .spyOn(console, 'error')
+          .mockImplementation(() => undefined);
+        view['taskUpdateCoordinator'] = null;
+
+        const task = createBaseTask({ path: 'inner-1.md', line: 0 });
+        await view['updateTaskState'](task, 'DOING');
+
+        expect(errSpy).toHaveBeenCalled();
+        const allMessages = errSpy.mock.calls
+          .map((c) => c.join(' '))
+          .join('\n');
+        expect(allMessages).toMatch(/TaskUpdateCoordinator/);
+        expect(
+          pluginMock.taskUpdateCoordinator.updateTaskState,
+        ).not.toHaveBeenCalled();
+        errSpy.mockRestore();
+      });
+    });
+  });
 });
