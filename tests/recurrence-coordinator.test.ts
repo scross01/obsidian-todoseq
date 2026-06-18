@@ -9,7 +9,7 @@
 
 import { RecurrenceCoordinator } from '../src/services/recurrence-coordinator';
 import { TaskStateManager } from '../src/services/task-state-manager';
-import { App, TFile } from 'obsidian';
+import { App, MarkdownView, TFile } from 'obsidian';
 import { Task } from '../src/types/task';
 import {
   createTestKeywordManager,
@@ -1120,6 +1120,219 @@ describe('RecurrenceCoordinator', () => {
       expect(result.updated).toBe(true);
       expect(result.newScheduledWarningPeriod).toBeNull();
       expect(result.newDeadlineWarningPeriod).toBeNull();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // getFileContent — live editor buffer preference. Previously read only
+  // from on-disk (vault.read()), which silently destroyed any unsaved edits
+  // the user made while the 50ms-delayed recurrence fired. Now reads from
+  // the active source-mode editor buffer when available, falling back to
+  // vault.read() otherwise.
+  // ─────────────────────────────────────────────────────────────────────
+  describe('getFileContent prefers live editor buffer', () => {
+    /**
+     * Build a real MarkdownView-shaped leaf whose editor.getValue() returns
+     * `content`. The view is an actual `MarkdownView` instance so the
+     * `view instanceof MarkdownView` guard inside `getLiveEditorBuffer`
+     * recognizes it; the editor mock is wired onto its `editor` slot.
+     */
+    const buildLeaf = (params: {
+      path: string;
+      content: string;
+      mode?: 'source' | 'preview';
+    }) => {
+      const editor = {
+        getValue: jest.fn().mockReturnValue(params.content),
+      };
+      const view = new MarkdownView();
+      view.file = new TFile(params.path, params.path, 'md');
+      view.editor = editor;
+      if (params.mode && params.mode !== 'source') {
+        view.getMode = jest.fn().mockReturnValue(params.mode);
+      }
+      return { leaf: { view }, editor, view };
+    };
+
+    beforeEach(() => {
+      // Each new test sets up its own workspace mock; start from a clean slate.
+      (mockApp as Record<string, unknown>).workspace = {
+        getLeavesOfType: jest.fn(),
+      };
+    });
+
+    afterEach(() => {
+      delete (mockApp as Record<string, unknown>).workspace;
+    });
+
+    it('reads from the editor buffer when the file is open in a source-mode MarkdownView', async () => {
+      const editorBuffer =
+        '- [x] Test task\n  SCHEDULED: <2024-01-01 Mon +1w>\n';
+      const { leaf } = buildLeaf({
+        path: 'test.md',
+        content: editorBuffer,
+      });
+      (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([leaf]);
+
+      const mockUpdateCoordinator = {
+        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+      };
+      coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      // calculateNextRepeatDate expects a structured DateRepeatInfo, not the
+      // loose string '+1w' carried by the default mockTask.
+      const task = createMockTask({
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDateRepeat: null,
+      });
+
+      const result = await coordinator.performRecurrenceUpdate(task);
+
+      expect(result.success).toBe(true);
+      // On-disk read must NOT have been called when the editor buffer is
+      // authoritative — otherwise we would lose unsaved edits at write-back.
+      expect(mockApp.vault.read).not.toHaveBeenCalled();
+    });
+
+    it('falls back to vault.read() when no markdown leaf has this file', async () => {
+      const { leaf: otherLeaf } = buildLeaf({
+        path: 'other.md',
+        content: 'unrelated',
+      });
+      (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([
+        otherLeaf,
+      ]);
+
+      const mockUpdateCoordinator = {
+        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+      };
+      coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      await coordinator.performRecurrenceUpdate(mockTask);
+
+      // Disk read should happen because no source-mode editor has 'test.md'.
+      expect(mockApp.vault.read).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to vault.read() when the matching leaf is in preview mode', async () => {
+      // The file is open only as a reading view — the editor buffer is not
+      // authoritative there, so we should not trust it.
+      const { leaf } = buildLeaf({
+        path: 'test.md',
+        content: 'preview-rendered-content-not-source',
+        mode: 'preview',
+      });
+      (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([leaf]);
+
+      const mockUpdateCoordinator = {
+        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+      };
+      coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      await coordinator.performRecurrenceUpdate(mockTask);
+
+      expect(mockApp.vault.read).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to vault.read() when getLeavesOfType returns no leaves', async () => {
+      (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([]);
+
+      const mockUpdateCoordinator = {
+        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+      };
+      coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      await coordinator.performRecurrenceUpdate(mockTask);
+
+      expect(mockApp.vault.read).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses the editor buffer from the first matching source leaf when the file is open in multiple panes', async () => {
+      const firstBuffer =
+        '- [x] Test task\n  SCHEDULED: <2024-01-01 Mon +1w>\n';
+      const secondBuffer =
+        '- [x] Test task\n  SCHEDULED: <2099-01-01 Mon +1w>\n';
+      const first = buildLeaf({ path: 'test.md', content: firstBuffer });
+      const second = buildLeaf({ path: 'test.md', content: secondBuffer });
+      (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([
+        first.leaf,
+        second.leaf,
+      ]);
+
+      const mockUpdateCoordinator = {
+        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+      };
+      coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      // Use the first buffer's SCHEDULED date so calculateNextDates picks
+      // the right hint and returns success.
+      const task = createMockTask({
+        scheduledDate: new Date('2024-01-01'),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDateRepeat: null,
+      });
+
+      const result = await coordinator.performRecurrenceUpdate(task);
+
+      expect(result.success).toBe(true);
+      // First pane was consulted (its buffer is used); second pane is left
+      // alone — disk write-back through TaskWriter will refresh both.
+      expect(first.editor.getValue).toHaveBeenCalled();
+      expect(second.editor.getValue).not.toHaveBeenCalled();
+      expect(mockApp.vault.read).not.toHaveBeenCalled();
+    });
+
+    it('falls back to vault.read() when the matching MarkdownView has no usable editor.getValue()', async () => {
+      // Real-world scenario: the buffer wouldn't crash on a missing getter;
+      // guard with a typeof check.
+      const view = new MarkdownView();
+      view.file = new TFile('test.md', 'test.md', 'md');
+      view.editor = {
+        /* no getValue */
+      };
+      (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([
+        { view },
+      ]);
+
+      const mockUpdateCoordinator = {
+        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+      };
+      coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      await coordinator.performRecurrenceUpdate(mockTask);
+
+      expect(mockApp.vault.read).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves on-disk fallback behavior when app.workspace is undefined (legacy mock)', async () => {
+      // Existing tests in this file define mockApp WITHOUT workspace.
+      // This regression guard ensures the end-to-end getFileContent →
+      // vault.read() path still works when workspace is missing.
+      delete (mockApp as Record<string, unknown>).workspace;
+
+      const mockUpdateCoordinator = {
+        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+      };
+      coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
+      mockParser.getDateLineType.mockReturnValue('scheduled');
+
+      // Use structured repeat so calculateNextDates can compute a next
+      // occurrence (the default mockTask carries the loose string '+1w').
+      const task = createMockTask({
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDateRepeat: null,
+      });
+
+      const result = await coordinator.performRecurrenceUpdate(task);
+
+      expect(result.success).toBe(true);
+      expect(mockApp.vault.read).toHaveBeenCalledTimes(1);
     });
   });
 });
