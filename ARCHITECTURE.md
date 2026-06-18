@@ -246,7 +246,7 @@ graph TB
 
 - **Responsibility**: File system monitoring, incremental scanning, owns KeywordManager
 - **Key Patterns**: Event-driven architecture, performance optimization, yielding to event loop
-- **Interface**: `scanVault()`, `updateSettings()`, `getKeywordManager()`, `getParserRegistry()`, `getParser()`, event emission
+- **Interface**: `scanVault()`, `updateSettings()`, `getKeywordManager()`, `getParserRegistry()`, `getParser()`, plus inherited `on/off/emit/removeAllListeners` from `EventEmitter<VaultScannerEvents>` for typed event subscription (see [EventEmitter](#eventemittert-src-utilsevent-emitterts))
 - **Ownership**: Receives and uses KeywordManager instance; receives fully configured ParserRegistry via constructor
 - **Skip Set**: Uses timestamp-based expiration for `skipIncrementalChanges` set (5-second window) to handle chained rapid updates properly
 
@@ -294,7 +294,7 @@ graph TB
 
 - **Responsibility**: Unified vault event handling with debouncing and batching
 - **Key Patterns**: Event aggregation, debouncing, batch processing
-- **Interface**: `onFileChange()`, `initialize()`, `setVaultScanner()`, `setPropertySearchEngine()`, event coordination
+- **Interface**: `onFileChange()`, `initialize()`, `setVaultScanner()`, `setPropertySearchEngine()`, plus inherited `on/off/removeAllListeners` from `EventEmitter<EventCoordinatorEvents>` (typed event subscription; emit is protected). See [EventEmitter](#eventemittert-src-utilsevent-emitterts).
 
 **PropertySearchEngine** (`src/services/property-search-engine.ts`)
 
@@ -1133,6 +1133,16 @@ graph LR
 - **Interface**: `SettingsChangeDetector` class (`initialize()`, `hasFormattingSettingsChanged()`, `updatePreviousState()`, `reset()`), `parseKeywordInput()`, `formatKeywordsForInput()`, `validateKeywordGroupsDetailed()`
 - **Settings Fingerprint**: Tracks formatTaskKeywords, includeCodeBlocks, includeCalloutBlocks, includeCommentBlocks, languageCommentSupport, additional keywords, and smart date settings
 - **Used by**: TaskKeywordDecorator, ReaderViewFormatter, settings UI
+
+**<a id="eventemittert-src-utilsevent-emitterts"></a>EventEmitter\<T\>** (`src/utils/event-emitter.ts`)
+
+- **Responsibility**: Shared typed pub/sub base class used by services that need to fan out typed events to multiple subscribers (currently `VaultScanner` and `EventCoordinator`).
+- **Key Patterns**: Generic-typed listener signatures (`T extends Record<keyof T, (...args: unknown[]) => void>`); inheritance-based reuse; lazy listener-array init on first `on()` call; per-listener try/catch isolation so one failing subscriber can't break the rest.
+- **Interface**: `on\<K extends keyof T\>(event: K, listener: T[K])`, `off\<K extends keyof T\>(event: K, listener: T[K])`, `protected emit\<K extends keyof T\>(event: K, ...args: Parameters<T[K]>)`, `removeAllListeners()`.
+- **Log Format**: `Error in ${emitterName} event listener for ${String(event)}:` — `emitterName` is passed via the `super(name)` call in each subclass.
+- **Visibility Model**: `on/off/removeAllListeners` are public. `emit` is `protected` by default — subclasses call it internally to fire events. `VaultScanner` widens `emit` to `public` via a one-line override because its test suite calls `vaultScanner.emit(...)` directly. `EventCoordinator` keeps `emit` protected because its tests subscribe via `coordinator.on(...)`.
+- **Used by**: `VaultScanner`, `EventCoordinator`
+- **Test-Only Follow-up**: `'file-changed'` and `'file-deleted'` on `VaultScannerEvents` are exercised only by `tests/vault-scanner-comprehensive.test.ts` (10+ emit/on calls); production code never emits or subscribes to them. Pruning them would require a parallel test update; deferred to a separate PR.
 
 ### 6. Performance Patterns
 

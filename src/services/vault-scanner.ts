@@ -15,6 +15,7 @@ import { RegexCache } from '../utils/regex-cache';
 import { PropertySearchEngine } from './property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
 import { ChangeTracker } from './change-tracker';
+import { EventEmitter } from '../utils/event-emitter';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -26,13 +27,9 @@ export interface VaultScannerEvents {
   'file-deleted': (file: TAbstractFile) => void;
 }
 
-export class VaultScanner {
+export class VaultScanner extends EventEmitter<VaultScannerEvents> {
   private _isScanning = false;
   private _isInitializing = true; // Track Obsidian initialization state
-  private eventListeners: Map<
-    keyof VaultScannerEvents,
-    ((...args: unknown[]) => void)[]
-  > = new Map();
   private urgencyCoefficients!: UrgencyCoefficients;
   private regexCache = new RegexCache();
   private parserRegistry: ParserRegistry;
@@ -49,21 +46,9 @@ export class VaultScanner {
     parserRegistry: ParserRegistry,
     private changeTracker: ChangeTracker,
   ) {
+    super('VaultScanner');
     this.keywordManager = keywordManager;
     this.parserRegistry = parserRegistry;
-
-    // Initialize event listeners map
-    const eventKeys: Array<keyof VaultScannerEvents> = [
-      'tasks-changed',
-      'scan-started',
-      'scan-completed',
-      'scan-error',
-      'file-changed',
-      'file-deleted',
-    ];
-    eventKeys.forEach((event) => {
-      this.eventListeners.set(event, []);
-    });
 
     // Use provided urgency coefficients or load them if not provided
     if (urgencyCoefficients) {
@@ -74,6 +59,16 @@ export class VaultScanner {
         console.error('Error loading urgency coefficients:', error);
       });
     }
+  }
+
+  // Widens inherited protected `emit` to public for tests that fire events
+  // directly. Internal call sites inside VaultScanner use the protected form
+  // through this same override.
+  public override emit<K extends keyof VaultScannerEvents>(
+    event: K,
+    ...args: Parameters<VaultScannerEvents[K]>
+  ): void {
+    super.emit(event, ...args);
   }
 
   /**
@@ -109,42 +104,6 @@ export class VaultScanner {
   // Set property search engine (called by EventCoordinator)
   setPropertySearchEngine(propertySearchEngine: PropertySearchEngine): void {
     this.propertySearchEngine = propertySearchEngine;
-  }
-
-  // Event management methods
-  on<T extends keyof VaultScannerEvents>(
-    event: T,
-    listener: VaultScannerEvents[T],
-  ): void {
-    const listeners = this.eventListeners.get(event) || [];
-    listeners.push(listener);
-    this.eventListeners.set(event, listeners);
-  }
-
-  off<T extends keyof VaultScannerEvents>(
-    event: T,
-    listener: VaultScannerEvents[T],
-  ): void {
-    const listeners = this.eventListeners.get(event) || [];
-    const filteredListeners = listeners.filter((l) => l !== listener);
-    this.eventListeners.set(event, filteredListeners);
-  }
-
-  emit<T extends keyof VaultScannerEvents>(
-    event: T,
-    ...args: Parameters<VaultScannerEvents[T]>
-  ): void {
-    const listeners = this.eventListeners.get(event) || [];
-    listeners.forEach((listener) => {
-      try {
-        listener(...args);
-      } catch (error) {
-        console.error(
-          `Error in VaultScanner event listener for ${String(event)}`,
-          error,
-        );
-      }
-    });
   }
 
   // Core scanning methods
@@ -654,7 +613,6 @@ export class VaultScanner {
 
   // Clean up resources
   destroy(): void {
-    // Clear all event listeners
-    this.eventListeners.clear();
+    this.removeAllListeners();
   }
 }

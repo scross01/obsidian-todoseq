@@ -2,6 +2,7 @@ import { App, TFile, TAbstractFile, EventRef } from 'obsidian';
 import { TaskStateManager } from './task-state-manager';
 import { VaultScanner } from './vault-scanner';
 import { PropertySearchEngine } from './property-search-engine';
+import { EventEmitter } from '../utils/event-emitter';
 
 export type FileChangeType = 'create' | 'modify' | 'delete' | 'rename';
 
@@ -18,7 +19,7 @@ export interface EventCoordinatorEvents {
   'batch-complete': (events: FileChangeEvent[]) => void;
 }
 
-export class EventCoordinator {
+export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
   private app: App;
   private taskStateManager: TaskStateManager;
   private vaultScanner: VaultScanner | null = null;
@@ -43,23 +44,10 @@ export class EventCoordinator {
   private isReady = false;
   private isProcessing = false;
 
-  private eventListeners: Map<
-    keyof EventCoordinatorEvents,
-    ((...args: unknown[]) => void)[]
-  > = new Map();
-
   constructor(app: App, taskStateManager: TaskStateManager) {
+    super('EventCoordinator');
     this.app = app;
     this.taskStateManager = taskStateManager;
-
-    const eventKeys: Array<keyof EventCoordinatorEvents> = [
-      'file-changed',
-      'file-deleted',
-      'batch-complete',
-    ];
-    eventKeys.forEach((event) => {
-      this.eventListeners.set(event, []);
-    });
   }
 
   initialize(): void {
@@ -272,41 +260,6 @@ export class EventCoordinator {
     await this.processBatch();
   }
 
-  on<T extends keyof EventCoordinatorEvents>(
-    event: T,
-    listener: EventCoordinatorEvents[T],
-  ): void {
-    const listeners = this.eventListeners.get(event) || [];
-    listeners.push(listener);
-    this.eventListeners.set(event, listeners);
-  }
-
-  off<T extends keyof EventCoordinatorEvents>(
-    event: T,
-    listener: EventCoordinatorEvents[T],
-  ): void {
-    const listeners = this.eventListeners.get(event) || [];
-    const filtered = listeners.filter((l) => l !== listener);
-    this.eventListeners.set(event, filtered);
-  }
-
-  private emit<T extends keyof EventCoordinatorEvents>(
-    event: T,
-    ...args: Parameters<EventCoordinatorEvents[T]>
-  ): void {
-    const listeners = this.eventListeners.get(event) || [];
-    listeners.forEach((listener) => {
-      try {
-        listener(...args);
-      } catch (error) {
-        console.error(
-          `Error in EventCoordinator listener for ${String(event)}:`,
-          error,
-        );
-      }
-    });
-  }
-
   async destroy(): Promise<void> {
     // Flush any pending events before clearing timeouts
     await this.flush();
@@ -330,7 +283,7 @@ export class EventCoordinator {
       this.app.metadataCache.offref(this.metadataChangeRef);
     }
 
-    this.eventListeners.clear();
+    this.removeAllListeners();
   }
 
   isCoordinatorReady(): boolean {
