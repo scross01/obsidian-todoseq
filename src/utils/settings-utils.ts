@@ -2,94 +2,59 @@ import { TodoTrackerSettings } from '../settings/settings-types';
 import { KeywordManager } from './keyword-manager';
 
 /**
- * Utility class for managing settings change detection
- * Centralizes the logic for detecting when settings that affect task formatting have changed
+ * Compute a stable string fingerprint of the settings fields that affect task
+ * formatting. Returned string is empty when JSON serialization fails (e.g. a
+ * circular reference in a keyword array); callers compare against an earlier
+ * fingerprint to detect edits.
  */
-export class SettingsChangeDetector {
-  private prevSettingsState = '';
-  private isInitialized = false;
-
-  /**
-   * Initialize the detector with current settings
-   * @param settings Current settings to track
-   * @throws Error if detector is already initialized
-   */
-  initialize(settings: TodoTrackerSettings): void {
-    if (this.isInitialized) {
-      throw new Error(
-        'SettingsChangeDetector is already initialized. Create a new instance instead.',
-      );
-    }
-
-    this.prevSettingsState = this.getSettingsFingerprint(settings);
-    this.isInitialized = true;
+export function getSettingsFingerprint(settings: TodoTrackerSettings): string {
+  try {
+    return JSON.stringify({
+      formatTaskKeywords: settings.formatTaskKeywords,
+      includeCodeBlocks: settings.includeCodeBlocks,
+      includeCalloutBlocks: settings.includeCalloutBlocks,
+      includeCommentBlocks: settings.includeCommentBlocks,
+      languageCommentSupport: settings.languageCommentSupport,
+      additionalInactiveKeywords: settings.additionalInactiveKeywords,
+      additionalActiveKeywords: settings.additionalActiveKeywords,
+      additionalWaitingKeywords: settings.additionalWaitingKeywords,
+      additionalCompletedKeywords: settings.additionalCompletedKeywords,
+      enableSmartDateRecognition: settings.enableSmartDateRecognition,
+      smartDateRemoveKeywords: settings.smartDateRemoveKeywords,
+    });
+  } catch (error) {
+    console.warn('Failed to create settings fingerprint:', error);
+    return '';
   }
+}
 
-  /**
-   * Check if settings that affect task formatting have changed
-   * @param settings Current settings to compare against
-   * @returns true if settings have changed, false otherwise
-   * @throws Error if detector has not been initialized
-   */
-  hasFormattingSettingsChanged(settings: TodoTrackerSettings): boolean {
-    if (!this.isInitialized) {
-      throw new Error(
-        'SettingsChangeDetector must be initialized before use. Call initialize() first.',
-      );
-    }
+/**
+ * Closure-backed change detector for task-formatting settings. Replaces the
+ * previous `SettingsChangeDetector` class — no init/reset guards are needed
+ * because the previous fingerprint is captured at construction time.
+ */
+export interface SettingsChangeDetector {
+  /** Returns true when `settings` produces a fingerprint different from the last mark. */
+  hasChanged(settings: TodoTrackerSettings): boolean;
+  /** Records `settings` as the new baseline for subsequent `hasChanged` calls. */
+  markCurrent(settings: TodoTrackerSettings): void;
+}
 
-    const currentState = this.getSettingsFingerprint(settings);
-    return currentState !== this.prevSettingsState;
-  }
-
-  /**
-   * Update the previous settings state to the current state
-   * @param settings Current settings to store as previous
-   * @throws Error if detector has not been initialized
-   */
-  updatePreviousState(settings: TodoTrackerSettings): void {
-    if (!this.isInitialized) {
-      throw new Error(
-        'SettingsChangeDetector must be initialized before use. Call initialize() first.',
-      );
-    }
-
-    this.prevSettingsState = this.getSettingsFingerprint(settings);
-  }
-
-  /**
-   * Reset the detector to uninitialized state
-   */
-  reset(): void {
-    this.prevSettingsState = '';
-    this.isInitialized = false;
-  }
-
-  /**
-   * Get a fingerprint of the settings that affect task formatting
-   * @param settings Settings to create fingerprint from
-   * @returns String representation of relevant settings
-   */
-  private getSettingsFingerprint(settings: TodoTrackerSettings): string {
-    try {
-      return JSON.stringify({
-        formatTaskKeywords: settings.formatTaskKeywords,
-        includeCodeBlocks: settings.includeCodeBlocks,
-        includeCalloutBlocks: settings.includeCalloutBlocks,
-        includeCommentBlocks: settings.includeCommentBlocks,
-        languageCommentSupport: settings.languageCommentSupport,
-        additionalInactiveKeywords: settings.additionalInactiveKeywords,
-        additionalActiveKeywords: settings.additionalActiveKeywords,
-        additionalWaitingKeywords: settings.additionalWaitingKeywords,
-        additionalCompletedKeywords: settings.additionalCompletedKeywords,
-        enableSmartDateRecognition: settings.enableSmartDateRecognition,
-        smartDateRemoveKeywords: settings.smartDateRemoveKeywords,
-      });
-    } catch (error) {
-      console.warn('Failed to create settings fingerprint:', error);
-      return '';
-    }
-  }
+/**
+ * Create a settings-change detector seeded with `initial` as the baseline.
+ * Typical use: build one in a constructor, call `hasChanged(settings)` on each
+ * update cycle and `markCurrent(settings)` after applying changes.
+ */
+export function createSettingsChangeDetector(
+  initial: TodoTrackerSettings,
+): SettingsChangeDetector {
+  let prev = getSettingsFingerprint(initial);
+  return {
+    hasChanged: (settings) => getSettingsFingerprint(settings) !== prev,
+    markCurrent: (settings) => {
+      prev = getSettingsFingerprint(settings);
+    },
+  };
 }
 
 /**

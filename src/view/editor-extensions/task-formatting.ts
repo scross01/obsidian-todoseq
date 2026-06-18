@@ -23,7 +23,10 @@ import {
   LanguageRegistry,
   LanguageDefinition,
 } from '../../parser/language-registry';
-import { SettingsChangeDetector } from '../../utils/settings-utils';
+import {
+  createSettingsChangeDetector,
+  SettingsChangeDetector,
+} from '../../utils/settings-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
 
 /**
@@ -838,8 +841,7 @@ export const taskKeywordPlugin = (
       constructor(view: EditorView) {
         this.settings = settings;
         this.getParser = getParser;
-        this.settingsDetector = new SettingsChangeDetector();
-        this.settingsDetector.initialize(settings);
+        this.settingsDetector = createSettingsChangeDetector(settings);
         // Initialize the mode state
         this.wasLivePreviewMode = this.isLivePreviewMode(view);
         this.updateDecorations(view);
@@ -900,11 +902,11 @@ export const taskKeywordPlugin = (
           update.docChanged ||
           update.viewportChanged ||
           update.selectionSet ||
-          this.settingsDetector.hasFormattingSettingsChanged(this.settings) ||
+          this.settingsDetector.hasChanged(this.settings) ||
           this.hasModeChanged(update.view)
         ) {
           this.updateDecorations(update.view);
-          this.settingsDetector.updatePreviousState(this.settings);
+          this.settingsDetector.markCurrent(this.settings);
         }
       }
     },

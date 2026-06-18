@@ -4,7 +4,10 @@ import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
 import { stripMarkdownForDisplay } from '../../utils/task-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
-import { SettingsChangeDetector } from '../../utils/settings-utils';
+import {
+  createSettingsChangeDetector,
+  SettingsChangeDetector,
+} from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { getPriorityLevelName } from '../../utils/task-format';
 import { TFile, setTooltip } from 'obsidian';
@@ -39,8 +42,7 @@ export class ReaderViewFormatter {
     private vaultScanner: VaultScanner,
   ) {
     // Initialize settings change detector
-    this.settingsDetector = new SettingsChangeDetector();
-    this.settingsDetector.initialize(this.plugin.settings);
+    this.settingsDetector = createSettingsChangeDetector(this.plugin.settings);
 
     // Initialize menu builder for state selection dropdown
     this.menuBuilder = new StateMenuBuilder(this.plugin);
@@ -140,11 +142,9 @@ export class ReaderViewFormatter {
    */
   private ensureParserUpToDate(): void {
     // Check if settings have changed using the change detector
-    if (
-      this.settingsDetector.hasFormattingSettingsChanged(this.plugin.settings)
-    ) {
+    if (this.settingsDetector.hasChanged(this.plugin.settings)) {
       // Update the previous state to match current settings
-      this.settingsDetector.updatePreviousState(this.plugin.settings);
+      this.settingsDetector.markCurrent(this.plugin.settings);
     }
   }
 

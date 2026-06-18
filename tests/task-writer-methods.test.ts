@@ -2440,19 +2440,35 @@ describe('TaskWriter Instance Methods', () => {
   describe('inlined date-line helpers', () => {
     describe('getExistingDateLineIndent', () => {
       it('returns the line indent for an unquoted line', () => {
-        expect((taskWriter as any).getExistingDateLineIndent('  SCHEDULED: <2026-01-01>')).toBe('  ');
+        expect(
+          (taskWriter as any).getExistingDateLineIndent(
+            '  SCHEDULED: <2026-01-01>',
+          ),
+        ).toBe('  ');
       });
 
       it('returns the quote prefix for a quoted line', () => {
-        expect((taskWriter as any).getExistingDateLineIndent('> SCHEDULED: <2026-01-01>')).toBe('> ');
+        expect(
+          (taskWriter as any).getExistingDateLineIndent(
+            '> SCHEDULED: <2026-01-01>',
+          ),
+        ).toBe('> ');
       });
 
       it('returns the nested quote prefix', () => {
-        expect((taskWriter as any).getExistingDateLineIndent('> > SCHEDULED: <2026-01-01>')).toBe('> > ');
+        expect(
+          (taskWriter as any).getExistingDateLineIndent(
+            '> > SCHEDULED: <2026-01-01>',
+          ),
+        ).toBe('> > ');
       });
 
       it('returns empty string for a flat line', () => {
-        expect((taskWriter as any).getExistingDateLineIndent('SCHEDULED: <2026-01-01>')).toBe('');
+        expect(
+          (taskWriter as any).getExistingDateLineIndent(
+            'SCHEDULED: <2026-01-01>',
+          ),
+        ).toBe('');
       });
     });
 
@@ -2466,7 +2482,9 @@ describe('TaskWriter Instance Methods', () => {
           listMarker: '- ',
         });
         // Existing line has 4-space indent; default for the task would be 2.
-        expect((taskWriter as any).getEffectiveDateLineIndent(lines, 1, task)).toBe('    ');
+        expect(
+          (taskWriter as any).getEffectiveDateLineIndent(lines, 1, task),
+        ).toBe('    ');
       });
 
       it('preserves the quote prefix on a quoted existing line', () => {
@@ -2477,7 +2495,9 @@ describe('TaskWriter Instance Methods', () => {
           indent: '> ',
           listMarker: '',
         });
-        expect((taskWriter as any).getEffectiveDateLineIndent(lines, 1, task)).toBe('>   ');
+        expect(
+          (taskWriter as any).getEffectiveDateLineIndent(lines, 1, task),
+        ).toBe('>   ');
       });
 
       it('falls back to the task default indent when no existing date line', () => {
@@ -2489,7 +2509,9 @@ describe('TaskWriter Instance Methods', () => {
           listMarker: '- ',
         });
         // For a bulleted task with no leading indent, default is 2-space indent
-        expect((taskWriter as any).getEffectiveDateLineIndent(lines, -1, task)).toBe('  ');
+        expect(
+          (taskWriter as any).getEffectiveDateLineIndent(lines, -1, task),
+        ).toBe('  ');
       });
     });
 
@@ -2498,22 +2520,50 @@ describe('TaskWriter Instance Methods', () => {
 
       it('places SCHEDULED before DEADLINE when DEADLINE exists', () => {
         const lines = ['TODO task', '  DEADLINE: <2026-01-01>'];
-        expect((taskWriter as any).calcDateLineInsertIndex(lines, 0, 'SCHEDULED', taskIndent)).toBe(1);
+        expect(
+          (taskWriter as any).calcDateLineInsertIndex(
+            lines,
+            0,
+            'SCHEDULED',
+            taskIndent,
+          ),
+        ).toBe(1);
       });
 
       it('places SCHEDULED after task when no DEADLINE exists', () => {
         const lines = ['TODO task'];
-        expect((taskWriter as any).calcDateLineInsertIndex(lines, 0, 'SCHEDULED', taskIndent)).toBe(1);
+        expect(
+          (taskWriter as any).calcDateLineInsertIndex(
+            lines,
+            0,
+            'SCHEDULED',
+            taskIndent,
+          ),
+        ).toBe(1);
       });
 
       it('places DEADLINE after SCHEDULED when SCHEDULED exists', () => {
         const lines = ['TODO task', '  SCHEDULED: <2026-01-01>'];
-        expect((taskWriter as any).calcDateLineInsertIndex(lines, 0, 'DEADLINE', taskIndent)).toBe(2);
+        expect(
+          (taskWriter as any).calcDateLineInsertIndex(
+            lines,
+            0,
+            'DEADLINE',
+            taskIndent,
+          ),
+        ).toBe(2);
       });
 
       it('places DEADLINE after task when no SCHEDULED exists', () => {
         const lines = ['TODO task'];
-        expect((taskWriter as any).calcDateLineInsertIndex(lines, 0, 'DEADLINE', taskIndent)).toBe(1);
+        expect(
+          (taskWriter as any).calcDateLineInsertIndex(
+            lines,
+            0,
+            'DEADLINE',
+            taskIndent,
+          ),
+        ).toBe(1);
       });
 
       it('places CLOSED after DEADLINE when both SCHEDULED and DEADLINE exist (DEADLINE wins)', () => {
@@ -2522,24 +2572,49 @@ describe('TaskWriter Instance Methods', () => {
           '  SCHEDULED: <2026-01-01>',
           '  DEADLINE: <2026-02-01>',
         ];
-        expect((taskWriter as any).calcDateLineInsertIndex(lines, 0, 'CLOSED', taskIndent)).toBe(3);
+        expect(
+          (taskWriter as any).calcDateLineInsertIndex(
+            lines,
+            0,
+            'CLOSED',
+            taskIndent,
+          ),
+        ).toBe(3);
       });
 
       it('places CLOSED after SCHEDULED when only SCHEDULED exists', () => {
         const lines = ['TODO task', '  SCHEDULED: <2026-01-01>'];
-        expect((taskWriter as any).calcDateLineInsertIndex(lines, 0, 'CLOSED', taskIndent)).toBe(2);
+        expect(
+          (taskWriter as any).calcDateLineInsertIndex(
+            lines,
+            0,
+            'CLOSED',
+            taskIndent,
+          ),
+        ).toBe(2);
       });
 
       it('places CLOSED after task when no SCHEDULED/DEADLINE exists', () => {
         const lines = ['TODO task'];
-        expect((taskWriter as any).calcDateLineInsertIndex(lines, 0, 'CLOSED', taskIndent)).toBe(1);
+        expect(
+          (taskWriter as any).calcDateLineInsertIndex(
+            lines,
+            0,
+            'CLOSED',
+            taskIndent,
+          ),
+        ).toBe(1);
       });
     });
 
     describe('updateOrInsertDateLine', () => {
       it('updates an existing SCHEDULED line in place (lineDelta: 0)', () => {
         const lines = ['TODO task', '  SCHEDULED: <2026-01-01>'];
-        const task: Task = createBaseTask({ line: 0, indent: '', listMarker: '' });
+        const task: Task = createBaseTask({
+          line: 0,
+          indent: '',
+          listMarker: '',
+        });
         const result = (taskWriter as any).updateOrInsertDateLine(
           lines,
           0,
@@ -2548,7 +2623,9 @@ describe('TaskWriter Instance Methods', () => {
           task,
         );
         expect(result.lineDelta).toBe(0);
-        expect(result.lines.join('\n')).toBe('TODO task\n  SCHEDULED: <2026-02-01>');
+        expect(result.lines.join('\n')).toBe(
+          'TODO task\n  SCHEDULED: <2026-02-01>',
+        );
       });
 
       it('inserts a new SCHEDULED line after a bulleted task (lineDelta: +1)', () => {
@@ -2567,7 +2644,9 @@ describe('TaskWriter Instance Methods', () => {
           task,
         );
         expect(result.lineDelta).toBe(1);
-        expect(result.lines.join('\n')).toBe('- TODO task\n  SCHEDULED: <2026-02-01>');
+        expect(result.lines.join('\n')).toBe(
+          '- TODO task\n  SCHEDULED: <2026-02-01>',
+        );
       });
 
       it('inserts SCHEDULED before an existing DEADLINE', () => {
@@ -2628,7 +2707,9 @@ describe('TaskWriter Instance Methods', () => {
           task,
         );
         expect(result.lineDelta).toBe(0);
-        expect(result.lines.join('\n')).toBe('> TODO task\n>   SCHEDULED: <2026-02-01>');
+        expect(result.lines.join('\n')).toBe(
+          '> TODO task\n>   SCHEDULED: <2026-02-01>',
+        );
       });
 
       it('inserts CLOSED after DEADLINE (or SCHEDULED) or task', () => {

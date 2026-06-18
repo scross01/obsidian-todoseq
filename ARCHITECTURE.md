@@ -1128,10 +1128,10 @@ graph LR
 
 **SettingsUtils** (`src/utils/settings-utils.ts`)
 
-- **Responsibility**: Settings change detection and keyword input parsing utilities
-- **Key Patterns**: Fingerprint-based change detection, comma-separated parsing
-- **Interface**: `SettingsChangeDetector` class (`initialize()`, `hasFormattingSettingsChanged()`, `updatePreviousState()`, `reset()`), `parseKeywordInput()`, `formatKeywordsForInput()`, `validateKeywordGroupsDetailed()`
-- **Settings Fingerprint**: Tracks formatTaskKeywords, includeCodeBlocks, includeCalloutBlocks, includeCommentBlocks, languageCommentSupport, additional keywords, and smart date settings
+- **Responsibility**: Settings change detection (closure-based factory that captures a previous fingerprint) and keyword input parsing utilities
+- **Key Patterns**: Closure-based change detection — `createSettingsChangeDetector(initial)` returns a `SettingsChangeDetector` interface pairing `hasChanged(settings)` (compares current fingerprint to the closure-captured previous) and `markCurrent(settings)` (updates the closure's previous). Replaces the former class-based detector; no init/reset guards are needed because the previous fingerprint is captured at construction.
+- **Interface**: `getSettingsFingerprint(settings)` (top-level helper for direct calls), `createSettingsChangeDetector(initial)` returns the `SettingsChangeDetector` interface (`hasChanged`, `markCurrent`), `parseKeywordInput()`, `formatKeywordsForInput()`, `validateKeywordGroupsDetailed()`
+- **Settings Fingerprint**: Tracks formatTaskKeywords, includeCodeBlocks, includeCalloutBlocks, includeCommentBlocks, languageCommentSupport, additional keywords, and smart date settings. `JSON.stringify` failures (e.g. circular references in a keyword array) return an empty string — when that side changes while the other side is valid, `hasChanged` returns true (conservative — re-decorate rather than silently miss a real change).
 - **Used by**: TaskKeywordDecorator, ReaderViewFormatter, settings UI
 
 **<a id="eventemittert-src-utilsevent-emitterts"></a>EventEmitter\<T\>** (`src/utils/event-emitter.ts`)

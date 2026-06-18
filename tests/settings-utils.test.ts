@@ -1,5 +1,7 @@
 import {
   SettingsChangeDetector,
+  createSettingsChangeDetector,
+  getSettingsFingerprint,
   parseKeywordInput,
   formatKeywordsForInput,
   validateKeywordGroupsDetailed,
@@ -428,32 +430,53 @@ describe('settings-utils', () => {
     });
   });
 
-  describe('SettingsChangeDetector', () => {
+  describe('getSettingsFingerprint', () => {
+    test('returns a stable string for identical settings', () => {
+      const a = createBaseSettings({ languageCommentSupport: true });
+      const b = createBaseSettings({ languageCommentSupport: true });
+      expect(getSettingsFingerprint(a)).toBe(getSettingsFingerprint(b));
+    });
+
+    test('returns a different string for changed formatting fields', () => {
+      const a = createBaseSettings({ formatTaskKeywords: true });
+      const b = createBaseSettings({ formatTaskKeywords: false });
+      expect(getSettingsFingerprint(a)).not.toBe(getSettingsFingerprint(b));
+    });
+
+    test('ignores non-formatting fields (defaultSortMethod, etc.)', () => {
+      const a = createBaseSettings({ defaultSortMethod: 'sortByDeadline' });
+      const b = createBaseSettings({ defaultSortMethod: 'sortByPriority' });
+      expect(getSettingsFingerprint(a)).toBe(getSettingsFingerprint(b));
+    });
+
+    test('returns empty string when JSON.stringify fails (circular ref)', () => {
+      const circularArr: unknown[] = [];
+      circularArr.push(circularArr);
+      const settings = createBaseSettings({
+        additionalInactiveKeywords: circularArr as unknown as string[],
+      });
+      expect(getSettingsFingerprint(settings)).toBe('');
+    });
+  });
+
+  describe('createSettingsChangeDetector', () => {
     let detector: SettingsChangeDetector;
     let baseSettings: TodoTrackerSettings;
 
     beforeEach(() => {
-      detector = new SettingsChangeDetector();
       baseSettings = createBaseSettings({ languageCommentSupport: true });
+      detector = createSettingsChangeDetector(baseSettings);
     });
 
     describe('formatting settings detection', () => {
-      beforeEach(() => {
-        detector.initialize(baseSettings);
-      });
-
       test('should detect changes in formatTaskKeywords', () => {
         const changedSettings = { ...baseSettings, formatTaskKeywords: false };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(true);
       });
 
       test('should detect changes in includeCodeBlocks', () => {
         const changedSettings = { ...baseSettings, includeCodeBlocks: true };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(true);
       });
 
       test('should detect changes in includeCalloutBlocks', () => {
@@ -461,16 +484,12 @@ describe('settings-utils', () => {
           ...baseSettings,
           includeCalloutBlocks: false,
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(true);
       });
 
       test('should detect changes in includeCommentBlocks', () => {
         const changedSettings = { ...baseSettings, includeCommentBlocks: true };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(true);
       });
 
       test('should detect changes in languageCommentSupport', () => {
@@ -478,9 +497,7 @@ describe('settings-utils', () => {
           ...baseSettings,
           languageCommentSupport: false,
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(true);
       });
 
       test('should detect changes in additionalInactiveKeywords', () => {
@@ -488,9 +505,7 @@ describe('settings-utils', () => {
           ...baseSettings,
           additionalInactiveKeywords: ['FIXME', 'HACK'],
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(true);
       });
 
       test('should NOT detect changes in defaultSortMethod', () => {
@@ -498,9 +513,7 @@ describe('settings-utils', () => {
           ...baseSettings,
           defaultSortMethod: 'sortByPriority' as const,
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(false);
       });
 
       test('should NOT detect changes in taskListViewMode', () => {
@@ -508,9 +521,7 @@ describe('settings-utils', () => {
           ...baseSettings,
           taskListViewMode: 'hideCompleted',
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(false);
       });
 
       test('should NOT detect changes in weekStartsOn', () => {
@@ -518,9 +529,7 @@ describe('settings-utils', () => {
           ...baseSettings,
           weekStartsOn: 'Sunday',
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(false);
       });
 
       test('should detect multiple formatting setting changes', () => {
@@ -530,9 +539,7 @@ describe('settings-utils', () => {
           includeCodeBlocks: true,
           languageCommentSupport: false,
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(true);
       });
 
       test('should not detect changes when only non-formatting settings change', () => {
@@ -542,152 +549,64 @@ describe('settings-utils', () => {
           taskListViewMode: 'sortCompletedLast',
           weekStartsOn: 'Sunday',
         };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(false);
       });
     });
 
     describe('complete workflow', () => {
-      test('should handle initialize → detect change → update state → detect no change', () => {
-        // Initialize
-        detector.initialize(baseSettings);
-        expect(detector.hasFormattingSettingsChanged(baseSettings)).toBe(false);
+      test('should handle detect change → markCurrent → detect no change', () => {
+        // Baseline already seeded with baseSettings; no change yet
+        expect(detector.hasChanged(baseSettings)).toBe(false);
 
         // Detect change
         const changedSettings = { ...baseSettings, formatTaskKeywords: false };
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          true,
-        );
+        expect(detector.hasChanged(changedSettings)).toBe(true);
 
-        // Update state
-        detector.updatePreviousState(changedSettings);
-        expect(detector.hasFormattingSettingsChanged(changedSettings)).toBe(
-          false,
-        );
+        // Mark changed settings as the new baseline
+        detector.markCurrent(changedSettings);
+        expect(detector.hasChanged(changedSettings)).toBe(false);
 
-        // Detect new change
+        // Detect a further change
         const newSettings = { ...changedSettings, includeCodeBlocks: true };
-        expect(detector.hasFormattingSettingsChanged(newSettings)).toBe(true);
+        expect(detector.hasChanged(newSettings)).toBe(true);
       });
 
       test('should handle multiple consecutive changes', () => {
-        detector.initialize(baseSettings);
-
         let currentSettings = baseSettings;
 
         // First change
         currentSettings = { ...currentSettings, formatTaskKeywords: false };
-        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
-          true,
-        );
-        detector.updatePreviousState(currentSettings);
+        expect(detector.hasChanged(currentSettings)).toBe(true);
+        detector.markCurrent(currentSettings);
 
         // Second change
         currentSettings = { ...currentSettings, includeCodeBlocks: true };
-        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
-          true,
-        );
-        detector.updatePreviousState(currentSettings);
+        expect(detector.hasChanged(currentSettings)).toBe(true);
+        detector.markCurrent(currentSettings);
 
         // Third change
         currentSettings = {
           ...currentSettings,
           languageCommentSupport: false,
         };
-        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
-          true,
-        );
-        detector.updatePreviousState(currentSettings);
+        expect(detector.hasChanged(currentSettings)).toBe(true);
+        detector.markCurrent(currentSettings);
 
-        // No change after final update
-        expect(detector.hasFormattingSettingsChanged(currentSettings)).toBe(
-          false,
-        );
-      });
-    });
-
-    describe('initialization errors', () => {
-      test('should throw when hasFormattingSettingsChanged called before initialize', () => {
-        expect(() =>
-          detector.hasFormattingSettingsChanged(baseSettings),
-        ).toThrow(
-          'SettingsChangeDetector must be initialized before use. Call initialize() first.',
-        );
-      });
-
-      test('should throw when updatePreviousState called before initialize', () => {
-        expect(() => detector.updatePreviousState(baseSettings)).toThrow(
-          'SettingsChangeDetector must be initialized before use. Call initialize() first.',
-        );
-      });
-
-      test('should throw when initialize called twice', () => {
-        detector.initialize(baseSettings);
-        expect(() => detector.initialize(baseSettings)).toThrow(
-          'SettingsChangeDetector is already initialized. Create a new instance instead.',
-        );
-      });
-    });
-
-    describe('reset', () => {
-      test('should allow re-initialization after reset', () => {
-        detector.initialize(baseSettings);
-        detector.reset();
-        expect(() => detector.initialize(baseSettings)).not.toThrow();
-      });
-
-      test('should throw on hasFormattingSettingsChanged after reset', () => {
-        detector.initialize(baseSettings);
-        detector.reset();
-        expect(() =>
-          detector.hasFormattingSettingsChanged(baseSettings),
-        ).toThrow(
-          'SettingsChangeDetector must be initialized before use. Call initialize() first.',
-        );
-      });
-
-      test('should throw on updatePreviousState after reset', () => {
-        detector.initialize(baseSettings);
-        detector.reset();
-        expect(() => detector.updatePreviousState(baseSettings)).toThrow(
-          'SettingsChangeDetector must be initialized before use. Call initialize() first.',
-        );
-      });
-
-      test('should detect changes correctly after reset and re-initialization with different settings', () => {
-        detector.initialize(baseSettings);
-        detector.reset();
-
-        const differentSettings = {
-          ...baseSettings,
-          formatTaskKeywords: false,
-        };
-        detector.initialize(differentSettings);
-        expect(detector.hasFormattingSettingsChanged(differentSettings)).toBe(
-          false,
-        );
-        expect(detector.hasFormattingSettingsChanged(baseSettings)).toBe(true);
+        // No change after final markCurrent
+        expect(detector.hasChanged(currentSettings)).toBe(false);
       });
     });
 
     describe('edge cases', () => {
       test('should handle settings with circular references gracefully', () => {
-        detector.initialize(baseSettings);
-
         const problematicSettings = { ...baseSettings };
-        // Create a circular reference
+        // Create a circular reference on a non-tracked field — fingerprint ignores it
         (problematicSettings as any).circular = problematicSettings;
 
-        // Should not throw, but return false (no change detected due to error)
-        expect(() => {
-          detector.hasFormattingSettingsChanged(problematicSettings);
-        }).not.toThrow();
+        expect(() => detector.hasChanged(problematicSettings)).not.toThrow();
       });
 
-      test('should return empty fingerprint when JSON.stringify throws on circular fingerprinted property', () => {
-        detector.initialize(baseSettings);
-
+      test('should treat fingerprint-on-circular-keyword-array as a conservative change (no false negative)', () => {
         const circularArr: any[] = [];
         circularArr.push(circularArr);
         const settingsWithCircularKeyword = {
@@ -695,37 +614,33 @@ describe('settings-utils', () => {
           additionalInactiveKeywords: circularArr as any,
         };
 
-        expect(() => {
-          detector.hasFormattingSettingsChanged(settingsWithCircularKeyword);
-        }).not.toThrow();
+        // getSettingsFingerprint swallows the JSON.stringify error and returns ''.
+        // Since prev is the real fingerprint of baseSettings, hasChanged returns
+        // true — better to re-decorate than silently miss a real change.
+        expect(() =>
+          detector.hasChanged(settingsWithCircularKeyword),
+        ).not.toThrow();
+        expect(detector.hasChanged(settingsWithCircularKeyword)).toBe(true);
       });
 
-      test('should handle undefined values in settings', () => {
-        detector.initialize(baseSettings);
-
+      test('should detect changes when undefined replaces a formatting field value', () => {
         const settingsWithUndefined = {
           ...baseSettings,
           formatTaskKeywords: undefined as any,
         };
 
-        // Should detect as change (undefined is different from true)
-        expect(
-          detector.hasFormattingSettingsChanged(settingsWithUndefined),
-        ).toBe(true);
+        // undefined vs true is a real change
+        expect(detector.hasChanged(settingsWithUndefined)).toBe(true);
       });
 
-      test('should handle null values in settings', () => {
-        detector.initialize(baseSettings);
-
+      test('should detect changes when null replaces a formatting field value', () => {
         const settingsWithNull = {
           ...baseSettings,
           languageCommentSupport: null as any,
         };
 
-        // Should detect as change (null is different from object)
-        expect(detector.hasFormattingSettingsChanged(settingsWithNull)).toBe(
-          true,
-        );
+        // null vs the original value is a real change
+        expect(detector.hasChanged(settingsWithNull)).toBe(true);
       });
     });
   });

@@ -38,10 +38,7 @@ export class EventEmitter<
     this.eventListeners.set(event, filteredListeners);
   }
 
-  protected emit<K extends keyof T>(
-    event: K,
-    ...args: Parameters<T[K]>
-  ): void {
+  protected emit<K extends keyof T>(event: K, ...args: Parameters<T[K]>): void {
     const listeners = this.eventListeners.get(event) ?? [];
     listeners.forEach((listener) => {
       try {

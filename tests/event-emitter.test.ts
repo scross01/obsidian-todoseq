@@ -111,9 +111,7 @@ describe('EventEmitter', () => {
 
     it('is a no-op when no matching listener exists', () => {
       expect(() => emitter.off('completed', jest.fn())).not.toThrow();
-      expect(() =>
-        emitter.emit('completed', 'ok'),
-      ).not.toThrow();
+      expect(() => emitter.emit('completed', 'ok')).not.toThrow();
     });
   });
 
@@ -130,9 +128,7 @@ describe('EventEmitter', () => {
 
     it('is a no-op (and does not throw) when no listeners are registered', () => {
       expect(() => emitter.emit('started', 1)).not.toThrow();
-      expect(() =>
-        emitter.emit('failed', new Error('x')),
-      ).not.toThrow();
+      expect(() => emitter.emit('failed', new Error('x'))).not.toThrow();
       expect(() => emitter.emit('completed', 'ok')).not.toThrow();
     });
   });
@@ -141,11 +137,9 @@ describe('EventEmitter', () => {
     let consoleErrorSpy: jest.SpyInstance;
 
     beforeEach(() => {
-      consoleErrorSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {
-          /* silence during test */
-        });
+      consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {
+        /* silence during test */
+      });
     });
 
     afterEach(() => {

@@ -283,12 +283,7 @@ export class TaskWriter {
               task,
             );
           } else if (shouldRemoveClosed) {
-            this.removeDateLine(
-              lines,
-              task.line,
-              'CLOSED',
-              task,
-            );
+            this.removeDateLine(lines, task.line, 'CLOSED', task);
           }
 
           return lines.join('\n');
@@ -568,12 +563,7 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const result = this.removeDateLine(
-          lines,
-          task.line,
-          'SCHEDULED',
-          task,
-        );
+        const result = this.removeDateLine(lines, task.line, 'SCHEDULED', task);
         lineDelta = result.lineDelta;
         return lines.join('\n');
       });
@@ -656,12 +646,7 @@ export class TaskWriter {
     if (file && file instanceof TFile) {
       await this.app.vault.process(file, (data) => {
         const lines = data.split('\n');
-        const result = this.removeDateLine(
-          lines,
-          task.line,
-          'DEADLINE',
-          task,
-        );
+        const result = this.removeDateLine(lines, task.line, 'DEADLINE', task);
         lineDelta = result.lineDelta;
         return lines.join('\n');
       });
@@ -761,7 +746,11 @@ export class TaskWriter {
           taskIndent,
         );
 
-        const closedIndent = this.getEffectiveDateLineIndent(lines, closedLineIndex, task);
+        const closedIndent = this.getEffectiveDateLineIndent(
+          lines,
+          closedLineIndex,
+          task,
+        );
 
         if (closedLineIndex >= 0) {
           // Update existing CLOSED line, preserving its indentation
@@ -865,12 +854,7 @@ export class TaskWriter {
         // Use Vault API for background edits
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
-          const result = this.removeDateLine(
-            lines,
-            task.line,
-            'CLOSED',
-            task,
-          );
+          const result = this.removeDateLine(lines, task.line, 'CLOSED', task);
           lineDelta = result.lineDelta;
           return lines.join('\n');
         });
