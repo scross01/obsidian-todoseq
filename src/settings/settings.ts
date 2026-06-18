@@ -1164,6 +1164,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             drop.addOption('sortByClosedDate', 'Closed date');
             drop.addOption('sortByPriority', 'Priority');
             drop.addOption('sortByUrgency', 'Urgency');
+            drop.addOption('sortByKeyword', 'Keyword');
             drop.setValue(this.plugin.settings.defaultSortMethod);
             drop.onChange(async (value: string) => {
               const sortMethod = value as
@@ -1172,7 +1173,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
                 | 'sortByDeadline'
                 | 'sortByClosedDate'
                 | 'sortByPriority'
-                | 'sortByUrgency';
+                | 'sortByUrgency'
+                | 'sortByKeyword';
               this.plugin.settings.defaultSortMethod = sortMethod;
               await this.plugin.saveSettings();
             });

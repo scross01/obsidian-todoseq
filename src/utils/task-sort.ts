@@ -13,7 +13,7 @@ export type BlockType = 'main' | 'future' | 'completed';
  * Keyword Group type for keyword-based sorting
  * Groups are sorted in priority order: 1 (highest) to 5 (lowest)
  */
-export type KeywordGroup = 1 | 2 | 3 | 4 | 5;
+export type KeywordSortGroup = 1 | 2 | 3 | 4 | 5;
 
 /**
  * Configuration for keyword-based sorting
@@ -105,7 +105,7 @@ export const taskComparator = (a: Task, b: Task): number => {
 export function getKeywordGroup(
   task: Task,
   config: KeywordSortConfig,
-): KeywordGroup {
+): KeywordSortGroup {
   // Completed flag takes precedence - always group 5
   if (task.completed) {
     return 5;
@@ -156,7 +156,7 @@ export function getKeywordGroup(
  */
 function getKeywordPosition(
   stateUpper: string,
-  group: KeywordGroup,
+  group: KeywordSortGroup,
   config: KeywordSortConfig,
 ): number {
   switch (group) {

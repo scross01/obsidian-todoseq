@@ -42,7 +42,8 @@ export interface TodoTrackerSettings {
     | 'sortByDeadline'
     | 'sortByClosedDate'
     | 'sortByPriority'
-    | 'sortByUrgency'; // default sort method for task list view
+    | 'sortByUrgency'
+    | 'sortByKeyword'; // default sort method for task list view
   languageCommentSupport: boolean; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
