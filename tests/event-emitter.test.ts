@@ -27,6 +27,22 @@ class TestEmitter extends EventEmitter<TestEvents> {
 describe('EventEmitter', () => {
   let emitter: TestEmitter;
 
+  // Reflection helper: borrows the production cast convention
+  // (`as unknown as { ... }`) used elsewhere in the codebase so tests can
+  // assert against the private `eventListeners` map directly.
+  function internalListeners(
+    e: TestEmitter,
+  ): Map<keyof TestEvents, Array<(...args: unknown[]) => void>> {
+    return (
+      e as unknown as {
+        eventListeners: Map<
+          keyof TestEvents,
+          Array<(...args: unknown[]) => void>
+        >;
+      }
+    ).eventListeners;
+  }
+
   beforeEach(() => {
     emitter = new TestEmitter('TestEmitter');
   });
@@ -94,11 +110,10 @@ describe('EventEmitter', () => {
     });
 
     it('removes all instances of a duplicate-registered listener', () => {
-      // Note: the helper's `off` uses Array.filter, which matches the
-      // pre-refactor inline behavior — all matching listeners are removed in
-      // one call. This is intentionally different from Node's standard
-      // removeListener behavior; if that becomes desirable, switch to
-      // splice-based removal.
+      // The helper removes every matching listener in a single `off` call
+      // (preserved from the pre-refactor inline behavior). Note this is
+      // intentionally different from Node's standard removeListener behavior,
+      // which only removes the first match per call.
       const spy = jest.fn();
       emitter.on('completed', spy);
       emitter.on('completed', spy);
@@ -112,6 +127,48 @@ describe('EventEmitter', () => {
     it('is a no-op when no matching listener exists', () => {
       expect(() => emitter.off('completed', jest.fn())).not.toThrow();
       expect(() => emitter.emit('completed', 'ok')).not.toThrow();
+    });
+
+    it('is a no-op when no listeners are registered for the event', () => {
+      // off() must not allocate a map entry when one does not already exist.
+      expect(internalListeners(emitter).has('completed')).toBe(false);
+
+      emitter.off('completed', jest.fn());
+
+      expect(internalListeners(emitter).has('completed')).toBe(false);
+    });
+
+    it('deletes the map entry when the last listener unsubscribes', () => {
+      // Implementation invariant: once a key's listener array drains to zero,
+      // the entry is removed from `eventListeners` instead of left as an
+      // empty array. This keeps long-lived emitters from retaining vestigial
+      // keys for events that have been fully torn down.
+      const spy = jest.fn();
+      emitter.on('completed', spy);
+
+      expect(internalListeners(emitter).has('completed')).toBe(true);
+
+      emitter.off('completed', spy);
+
+      expect(internalListeners(emitter).has('completed')).toBe(false);
+    });
+
+    it('keeps the map entry when some listeners remain for the event', () => {
+      // Removing one of multiple subscribers must not collapse the entry.
+      const kept = jest.fn();
+      const removed = jest.fn();
+      emitter.on('completed', kept);
+      emitter.on('completed', removed);
+
+      emitter.off('completed', removed);
+
+      const listenerMap = internalListeners(emitter);
+      expect(listenerMap.has('completed')).toBe(true);
+      expect(listenerMap.get('completed')).toHaveLength(1);
+
+      emitter.emit('completed', 'ok');
+      expect(kept).toHaveBeenCalledWith('ok');
+      expect(removed).not.toHaveBeenCalled();
     });
   });
 

@@ -33,9 +33,24 @@ export class EventEmitter<
   }
 
   off<K extends keyof T>(event: K, listener: T[K]): void {
-    const listeners = this.eventListeners.get(event) ?? [];
-    const filteredListeners = listeners.filter((l) => l !== listener);
-    this.eventListeners.set(event, filteredListeners);
+    const listeners = this.eventListeners.get(event);
+    if (!listeners) {
+      // No listeners for this event key — off is a no-op without allocating.
+      return;
+    }
+    // In-place splice loop preserves the all-matches-removed semantics the
+    // previous `filter` implementation provided, without allocating a new
+    // array on every unsubscribe.
+    let idx = listeners.indexOf(listener);
+    while (idx >= 0) {
+      listeners.splice(idx, 1);
+      idx = listeners.indexOf(listener, idx);
+    }
+    // Drop the map entry once empty — keeps `eventListeners` from retaining
+    // empty arrays for events that have been fully torn down.
+    if (listeners.length === 0) {
+      this.eventListeners.delete(event);
+    }
   }
 
   protected emit<K extends keyof T>(event: K, ...args: Parameters<T[K]>): void {
