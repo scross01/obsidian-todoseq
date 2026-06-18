@@ -214,12 +214,52 @@ describe('EmbeddedTaskListManager', () => {
       expect((manager as any).taskCache.size).toBe(0);
     });
 
-    it('invalidateCacheForFile increments version', () => {
-      const initialVersion = (manager as any).cacheVersion;
+    describe('invalidateCacheForFile', () => {
+      // Seed the cache with two distinct entries — one whose filtered tasks
+      // reference 'note-a.md' and one whose filtered tasks reference 'note-b.md'.
+      // filterAndSortTasks (not WithCount) is what populates taskCache.
+      async function seedCacheWithEntriesFromTwoFiles() {
+        const taskA = createBaseTask({ path: 'note-a.md' });
+        const taskB = createBaseTask({ path: 'note-b.md' });
 
-      manager.invalidateCacheForFile('test.md');
+        await manager.filterAndSortTasks([taskA], { searchQuery: 'a' });
+        await manager.filterAndSortTasks([taskB], { searchQuery: 'b' });
 
-      expect((manager as any).cacheVersion).toBe(initialVersion + 1);
+        // Sanity: two distinct keys have been populated
+        const cache = (manager as any).taskCache as Map<string, unknown>;
+        expect(cache.size).toBe(2);
+      }
+
+      it('does not bump cacheVersion', () => {
+        const initialVersion = (manager as any).cacheVersion;
+
+        manager.invalidateCacheForFile('note-a.md');
+
+        expect((manager as any).cacheVersion).toBe(initialVersion);
+      });
+
+      it('removes only entries whose cached tasks reference the changed file', async () => {
+        await seedCacheWithEntriesFromTwoFiles();
+
+        manager.invalidateCacheForFile('note-a.md');
+
+        const cache = (manager as any).taskCache as Map<
+          string,
+          { tasks: { path: string }[] }
+        >;
+        expect(cache.size).toBe(1);
+        const remaining = Array.from(cache.values()).flatMap((e) => e.tasks);
+        expect(remaining.every((t) => t.path !== 'note-a.md')).toBe(true);
+      });
+
+      it('leaves cache untouched when no entries reference the file', async () => {
+        await seedCacheWithEntriesFromTwoFiles();
+
+        manager.invalidateCacheForFile('note-does-not-exist.md');
+
+        const cache = (manager as any).taskCache as Map<string, unknown>;
+        expect(cache.size).toBe(2);
+      });
     });
   });
 

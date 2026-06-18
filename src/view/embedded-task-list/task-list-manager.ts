@@ -360,12 +360,25 @@ export class EmbeddedTaskListManager {
   }
 
   /**
-   * Invalidate cache for specific file path
+   * Invalidate cache entries for a specific file path.
+   * Removes only entries whose filtered tasks reference the changed file;
+   * entries for unchanged files remain valid. Does not bump cacheVersion, so
+   * unaffected entries stay reusable across this invalidation.
+   *
+   * Note: if a change causes a previously-filtered-out task from this file
+   * to now match a search query, that entry will still resolve to stale data
+   * until the cacheTTL expires. This is acceptable because the TTL is short
+   * (5s) and the alternative (full cache wipe) is the perf regression we are
+   * avoiding here.
+   *
    * @param filePath Path of the file that changed
    */
   invalidateCacheForFile(filePath: string): void {
-    // Increment version and clear cache when any file changes
-    this.invalidateCache();
+    for (const [key, entry] of this.taskCache) {
+      if (entry.tasks.some((task) => task.path === filePath)) {
+        this.taskCache.delete(key);
+      }
+    }
   }
 
   /**
