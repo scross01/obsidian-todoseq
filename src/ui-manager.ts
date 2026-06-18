@@ -206,9 +206,23 @@ export class UIManager {
     checkbox: HTMLInputElement,
     event?: MouseEvent,
   ): Promise<void> {
+    // Snapshot the checkbox state at handler entry so early-return paths
+    // can restore it. Obsidian's CodeMirror-based task checkbox may toggle
+    // visually outside of our control, and `event.preventDefault()` does
+    // not always undo that. If we bail out before writing an update, leave
+    // the DOM consistent with the original click intent so the checkbox
+    // does not remain visually wrong until the next Obsidian re-render.
+    const originalChecked = checkbox.checked;
+    const restoreCheckboxIfChanged = () => {
+      if (checkbox.checked !== originalChecked) {
+        checkbox.checked = originalChecked;
+      }
+    };
+
     // Find the task keyword span in the same line first
     const lineElement = checkbox.closest('.cm-line, .HyperMD-task-line');
     if (!lineElement) {
+      restoreCheckboxIfChanged();
       return;
     }
 
@@ -261,6 +275,7 @@ export class UIManager {
     // Get current keyword
     const currentKeyword = keywordSpan.getAttribute('data-task-keyword');
     if (!currentKeyword) {
+      restoreCheckboxIfChanged();
       return;
     }
 
@@ -302,6 +317,7 @@ export class UIManager {
       newKeyword === freshState &&
       checkbox.checked === stateManager.isCompletedState(freshState)
     ) {
+      restoreCheckboxIfChanged();
       return;
     }
 

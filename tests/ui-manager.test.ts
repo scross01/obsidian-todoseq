@@ -8,6 +8,7 @@
  */
 
 import { UIManager } from '../src/ui-manager';
+import { getStateTransitionManager } from '../src/services/task-update-coordinator';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
 // Mock obsidian - kept minimal, only what the kept tests need
@@ -365,6 +366,166 @@ describe('UIManager', () => {
 
       expect(preventDefaultSpy).toHaveBeenCalled();
       expect(stopPropagationSpy).toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Checkbox toggle handler — defensive checkbox restoration
+  // ---------------------------------------------------------------------------
+  describe('handleCheckboxToggle', () => {
+    let checkbox: HTMLInputElement;
+    let lineElement: HTMLElement;
+    let keywordSpan: HTMLElement;
+    let stubEvent: MouseEvent;
+
+    // Build a fake checkbox whose `checked` property is read-time controlled:
+    // the first read returns the original (pre-toggle) value, every other
+    // read returns the post-toggle value. This mimics the bug scenario where
+    // the browser (or Obsidian/CodeMirror) toggles the checkbox visually
+    // before/during our handler. Setter calls are recorded so we can assert
+    // whether restoreCheckboxIfChanged() actually undoes a stale toggle.
+    const installSimulatedCheckbox = () => {
+      const setterCalls: boolean[] = [];
+      let readCount = 0;
+      Object.defineProperty(checkbox, 'checked', {
+        configurable: true,
+        get() {
+          readCount++;
+          // First read happens at handler entry (pre-toggle = unchecked).
+          // Subsequent reads simulate the DOM being post-toggle (checked).
+          return readCount === 1 ? false : true;
+        },
+        set(v: boolean) {
+          setterCalls.push(v);
+        },
+      });
+      return setterCalls;
+    };
+
+    beforeEach(() => {
+      lineElement = activeDocument.createElement('div');
+      lineElement.classList.add('cm-line');
+
+      keywordSpan = activeDocument.createElement('span');
+      keywordSpan.classList.add('todoseq-keyword-formatted');
+      lineElement.appendChild(keywordSpan);
+
+      checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = false;
+      lineElement.appendChild(checkbox);
+
+      stubEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+
+      // Reset the coordinator spy so existing mock call counts don't leak.
+      (
+        pluginMock.taskUpdateCoordinator as { updateTaskByPath: jest.Mock }
+      ).updateTaskByPath.mockClear();
+    });
+
+    it('restores checkbox state on !lineElement early return when DOM was toggled externally', async () => {
+      // A detached checkbox has no nearest .cm-line ancestor → triggers the
+      // !lineElement early-return path (which runs BEFORE preventDefault).
+      const detached = activeDocument.createElement('input');
+      detached.type = 'checkbox';
+
+      const setterCalls: boolean[] = [];
+      let readCount = 0;
+      Object.defineProperty(detached, 'checked', {
+        configurable: true,
+        get() {
+          readCount++;
+          return readCount === 1 ? false : true;
+        },
+        set(v: boolean) {
+          setterCalls.push(v);
+        },
+      });
+
+      await (uiManager as any).handleCheckboxToggle(detached, stubEvent);
+
+      // Restore is called with originalChecked (false) to undo the simulated toggle.
+      expect(setterCalls).toEqual([false]);
+      expect(
+        (pluginMock.taskUpdateCoordinator as any).updateTaskByPath,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('restores checkbox state on !currentKeyword early return when DOM was toggled externally', async () => {
+      // keyword span exists but has no data-task-keyword attribute.
+      const setterCalls = installSimulatedCheckbox();
+
+      await (uiManager as any).handleCheckboxToggle(checkbox, stubEvent);
+
+      expect(setterCalls).toEqual([false]);
+      expect(
+        (pluginMock.taskUpdateCoordinator as any).updateTaskByPath,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('restores checkbox state on state-matches no-op early return when DOM was toggled externally', async () => {
+      keywordSpan.setAttribute('data-task-keyword', 'DONE');
+
+      // Force the early return 2 condition to fire:
+      //   newKeyword  === freshState        (getNextState returns 'DONE' which equals freshState)
+      //   checkbox.checked === isCompletedState(freshState)  (both true in this run)
+      (getStateTransitionManager as jest.Mock).mockReturnValueOnce({
+        getNextState: jest.fn().mockReturnValue('DONE'),
+        getNextCompletedOrArchivedState: jest.fn().mockReturnValue('DONE'),
+        isCompletedState: jest.fn().mockReturnValue(true),
+      });
+
+      const setterCalls = installSimulatedCheckbox();
+
+      await (uiManager as any).handleCheckboxToggle(checkbox, stubEvent);
+
+      expect(setterCalls).toEqual([false]);
+      expect(
+        (pluginMock.taskUpdateCoordinator as any).updateTaskByPath,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does not programmatically restore the checkbox on the normal update path', async () => {
+      // Normal flow: newKeyword='DONE' (default mock) ≠ freshState='TODO',
+      // so neither early return fires and the coordinator update is queued.
+      keywordSpan.setAttribute('data-task-keyword', 'TODO');
+
+      // Route the line lookup and active view mock so the bottom-of-function
+      // update path is reachable (default mocks return null otherwise).
+      jest
+        .spyOn(uiManager as any, 'getLineForElement')
+        .mockReturnValue(5);
+      (
+        pluginMock.app.workspace.getActiveViewOfType as jest.Mock
+      ).mockReturnValue({
+        editor: {
+          getLine: jest.fn().mockReturnValue('- [ ] TODO task'),
+        },
+        file: { path: 'test.md' },
+      });
+
+      const setterCalls = installSimulatedCheckbox();
+
+      await (uiManager as any).handleCheckboxToggle(checkbox, stubEvent);
+
+      // The normal path will trigger a re-render that re-syncs the DOM,
+      // so we deliberately leave the simulated external toggle alone here.
+      expect(setterCalls).toEqual([]);
+      expect(
+        (pluginMock.taskUpdateCoordinator as any).updateTaskByPath,
+      ).toHaveBeenCalledWith('test.md', 4, 'DONE', 'editor');
+    });
+
+    it('does not restore the checkbox on the no-keywordSpan subtask path (Obsidian owns the toggle)', async () => {
+      // Remove the keyword span so the handler enters the subtask branch,
+      // which intentionally lets Obsidian's native checkbox toggle stand.
+      keywordSpan.remove();
+
+      const setterCalls = installSimulatedCheckbox();
+
+      await (uiManager as any).handleCheckboxToggle(checkbox, stubEvent);
+
+      expect(setterCalls).toEqual([]);
     });
   });
 
