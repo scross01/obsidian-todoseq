@@ -507,7 +507,18 @@ export class TaskUpdateCoordinator {
 
     const asyncWork = async (): Promise<void> => {
       if (existingUpdate) {
-        await existingUpdate.promise;
+        try {
+          await existingUpdate.promise;
+        } catch (priorError) {
+          // Swallow previous rejection: the new update must still run
+          // even when the previous update threw, otherwise rapid edits to
+          // the same task would silently drop the next update. Logged at
+          // debug level for diagnosability without surfacing as error.
+          console.debug(
+            '[TaskUpdateCoordinator] Prior task-update rejected; continuing with queued update.',
+            priorError,
+          );
+        }
       }
       await this.performAsyncPhase(context);
     };
@@ -613,8 +624,20 @@ export class TaskUpdateCoordinator {
       }
     };
 
+    // Run doAsyncWork regardless of whether the previous file update
+    // fulfilled or rejected. Using .then(doAsyncWork, doAsyncWork) ensures
+    // a transient error in one update (e.g., finalizeTaskState throwing)
+    // cannot silently drop the very next queued update for this file.
     const queuePromise = existingQueue
-      ? existingQueue.promise.then(() => doAsyncWork())
+      ? existingQueue.promise.then(doAsyncWork, (priorError: unknown) => {
+          // Mirror the per-task queue: log the swallowed rejection at
+          // debug level for diagnosability while still running the new work.
+          console.debug(
+            '[TaskUpdateCoordinator] Prior file-update rejected; continuing with queued update.',
+            priorError,
+          );
+          return doAsyncWork();
+        })
       : doAsyncWork();
 
     this.fileUpdateQueues.set(context.filePath, {
