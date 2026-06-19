@@ -128,9 +128,23 @@ export async function launchObsidian(): Promise<{
   await killSpawned();
   await killObsidianOnCDP();
 
+  // Build the launch command. OBSIDIAN_COMMAND (a full command string like
+  // `flatpak run md.obsidian.Obsidian` or `snap run obsidian`) is split into
+  // program + prefix args; otherwise fall back to OBSIDIAN_PATH (the default is
+  // the macOS .app binary).
+  const commandParts = (process.env.OBSIDIAN_COMMAND?.trim() ?? '').split(
+    /\s+/,
+  );
+  const launchArgs =
+    commandParts.length > 0 && commandParts[0]
+      ? commandParts
+      : [OBSIDIAN_PATH];
+  const [program, ...prefixArgs] = launchArgs;
+
   obsidianProcess = spawn(
-    OBSIDIAN_PATH,
+    program,
     [
+      ...prefixArgs,
       `--user-data-dir=${USER_DATA_DIR}`,
       `--remote-debugging-port=${CDP_PORT}`,
       TEST_VAULT_DIR,

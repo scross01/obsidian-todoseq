@@ -71,6 +71,7 @@ Playwright-based E2E tests that launch a real isolated Obsidian instance via Ele
 - **Run all**: `npm run test:integration` (builds plugin first)
 - **Skip build**: `npm run test:integration:fast`
 - **Single test**: `npx playwright test --config=tests/integration/playwright.config.ts -g "test name"`
+- **Linux**: set `OBSIDIAN_COMMAND` to the launch command for wrapper/sandbox installs (e.g. `OBSIDIAN_COMMAND='flatpak run md.obsidian.Obsidian' npm run test:integration`, or `OBSIDIAN_COMMAND='snap run obsidian'`); for a native binary, `OBSIDIAN_PATH=/usr/bin/obsidian` works too. On headless CI wrap with `xvfb-run -a`.
 
 ### Architecture
 
