@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.16.2
+
+- Added sortByKeyword sort option for task list view.
+- Fixed issue with unsaved editor changes being lost during recurrence updates.
+- Improved performance by implementing selective cache invalidation for file changes in embedded task lists.
+- Fixed visual inconsistency when checkbox toggle handler returns early.
+- Fixed issue with queued updates being silently dropped after prior rejection.
+- Updated undici dependency to address security alerts.
+
 ## 0.16.1
 
 - Updated tooltips style. Date tooltips show consistent full dates with time, warning periods, and repeat details.
