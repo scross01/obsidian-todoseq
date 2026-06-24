@@ -83,6 +83,8 @@ export class EditorController {
           deadlineDate: existingTask.deadlineDate,
           deadlineDateRepeat: existingTask.deadlineDateRepeat,
           closedDate: existingTask.closedDate,
+          scheduledWarningPeriod: existingTask.scheduledWarningPeriod,
+          deadlineWarningPeriod: existingTask.deadlineWarningPeriod,
           subtaskCount: existingTask.subtaskCount,
           subtaskCompletedCount: existingTask.subtaskCompletedCount,
         };

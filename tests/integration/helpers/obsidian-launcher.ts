@@ -136,9 +136,7 @@ export async function launchObsidian(): Promise<{
     /\s+/,
   );
   const launchArgs =
-    commandParts.length > 0 && commandParts[0]
-      ? commandParts
-      : [OBSIDIAN_PATH];
+    commandParts.length > 0 && commandParts[0] ? commandParts : [OBSIDIAN_PATH];
   const [program, ...prefixArgs] = launchArgs;
 
   obsidianProcess = spawn(

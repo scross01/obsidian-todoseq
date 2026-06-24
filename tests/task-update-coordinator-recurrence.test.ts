@@ -40,6 +40,7 @@ const mockPlugin = {
     removeTaskScheduledDate: jest.fn(),
     updateTaskDeadlineDate: jest.fn(),
     removeTaskDeadlineDate: jest.fn(),
+    applyRecurrenceUpdate: jest.fn(),
   },
   taskStateManager: null as any,
   embeddedTaskListProcessor: {
@@ -152,6 +153,36 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         };
       },
     );
+
+    mockPlugin.taskEditor.applyRecurrenceUpdate.mockImplementation(
+      async (task, options) => {
+        const result = { ...task };
+        if (options.newScheduledDate !== undefined) {
+          result.scheduledDate = options.newScheduledDate;
+          result.scheduledDateRepeat =
+            options.newScheduledRepeat ?? task.scheduledDateRepeat;
+          result.scheduledWarningPeriod =
+            options.newScheduledWarningPeriod !== undefined
+              ? options.newScheduledWarningPeriod
+              : task.scheduledWarningPeriod;
+        }
+        if (options.newDeadlineDate !== undefined) {
+          result.deadlineDate = options.newDeadlineDate;
+          result.deadlineDateRepeat =
+            options.newDeadlineRepeat ?? task.deadlineDateRepeat;
+          result.deadlineWarningPeriod =
+            options.newDeadlineWarningPeriod !== undefined
+              ? options.newDeadlineWarningPeriod
+              : task.deadlineWarningPeriod;
+        }
+        if (options.newState !== undefined) {
+          result.state = options.newState;
+          result.completed = false;
+          result.rawText = task.rawText.replace(task.state, options.newState);
+        }
+        return result;
+      },
+    );
   });
 
   describe('updateTaskRecurrence', () => {
@@ -170,10 +201,12 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newScheduledDate,
       });
 
-      expect(mockPlugin.taskEditor.updateTaskScheduledDate).toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.applyRecurrenceUpdate).toHaveBeenCalled();
+      const args = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls[0];
+      expect(args[1].newScheduledDate).toEqual(newScheduledDate);
     });
 
-    it('should call removeTaskScheduledDate when newScheduledDate is null', async () => {
+    it('should call applyRecurrenceUpdate when newScheduledDate is null to remove', async () => {
       const task: Task = {
         ...createBaseTask(),
         path: 'test.md',
@@ -186,10 +219,12 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newScheduledDate: null,
       });
 
-      expect(mockPlugin.taskEditor.removeTaskScheduledDate).toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.applyRecurrenceUpdate).toHaveBeenCalled();
+      const args = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls[0];
+      expect(args[1].newScheduledDate).toBeNull();
     });
 
-    it('should call updateTaskDeadlineDate when newDeadlineDate is provided', async () => {
+    it('should call applyRecurrenceUpdate when newDeadlineDate is provided', async () => {
       const task: Task = {
         ...createBaseTask(),
         path: 'test.md',
@@ -204,10 +239,12 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newDeadlineDate,
       });
 
-      expect(mockPlugin.taskEditor.updateTaskDeadlineDate).toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.applyRecurrenceUpdate).toHaveBeenCalled();
+      const args = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls[0];
+      expect(args[1].newDeadlineDate).toEqual(newDeadlineDate);
     });
 
-    it('should call removeTaskDeadlineDate when newDeadlineDate is null', async () => {
+    it('should call applyRecurrenceUpdate when newDeadlineDate is null to remove', async () => {
       const task: Task = {
         ...createBaseTask(),
         path: 'test.md',
@@ -220,10 +257,12 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newDeadlineDate: null,
       });
 
-      expect(mockPlugin.taskEditor.removeTaskDeadlineDate).toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.applyRecurrenceUpdate).toHaveBeenCalled();
+      const args = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls[0];
+      expect(args[1].newDeadlineDate).toBeNull();
     });
 
-    it('should call updateTaskState when newStateForRecurrence is provided', async () => {
+    it('should call applyRecurrenceUpdate when newStateForRecurrence is provided', async () => {
       const task: Task = {
         ...createBaseTask(),
         path: 'test.md',
@@ -235,7 +274,9 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newStateForRecurrence: 'TODO',
       });
 
-      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+      expect(mockPlugin.taskEditor.applyRecurrenceUpdate).toHaveBeenCalled();
+      const args = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls[0];
+      expect(args[1].newState).toBe('TODO');
     });
 
     it('should update state manager with all updated fields', async () => {
@@ -294,11 +335,10 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newScheduledWarningPeriod: null, // strip --Nd
       });
 
-      const calls = mockPlugin.taskEditor.updateTaskScheduledDate.mock.calls;
+      const calls = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls;
       expect(calls.length).toBe(1);
-      const args = calls[0];
-      // args: [task, newDate, repeat, warningPeriod]
-      expect(args[3]).toBeNull();
+      const options = calls[0][1];
+      expect(options.newScheduledWarningPeriod).toBeNull();
     });
 
     it('should strip deadline warning period when null is passed', async () => {
@@ -318,10 +358,10 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newDeadlineWarningPeriod: null, // strip --Nd
       });
 
-      const calls = mockPlugin.taskEditor.updateTaskDeadlineDate.mock.calls;
+      const calls = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls;
       expect(calls.length).toBe(1);
-      const args = calls[0];
-      expect(args[3]).toBeNull();
+      const options = calls[0][1];
+      expect(options.newDeadlineWarningPeriod).toBeNull();
     });
 
     it('should preserve existing warning period when undefined is passed', async () => {
@@ -341,11 +381,15 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newScheduledDate,
       });
 
-      const calls = mockPlugin.taskEditor.updateTaskScheduledDate.mock.calls;
+      const calls = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls;
       expect(calls.length).toBe(1);
-      const args = calls[0];
-      // Should fall back to the existing value
-      expect(args[3]).toEqual({ value: 3, unit: 'd', isFirstOnly: true });
+      const options = calls[0][1];
+      // resolveRecurrenceWarningPeriod(undefined, existing) => existing
+      expect(options.newScheduledWarningPeriod).toEqual({
+        value: 3,
+        unit: 'd',
+        isFirstOnly: true,
+      });
     });
 
     it('should pass through a new warning period', async () => {
@@ -365,10 +409,14 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newScheduledWarningPeriod: { value: 7, unit: 'w', isFirstOnly: false },
       });
 
-      const calls = mockPlugin.taskEditor.updateTaskScheduledDate.mock.calls;
+      const calls = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls;
       expect(calls.length).toBe(1);
-      const args = calls[0];
-      expect(args[3]).toEqual({ value: 7, unit: 'w', isFirstOnly: false });
+      const options = calls[0][1];
+      expect(options.newScheduledWarningPeriod).toEqual({
+        value: 7,
+        unit: 'w',
+        isFirstOnly: false,
+      });
     });
 
     it('should preserve existing deadline warning period when undefined is passed', async () => {
@@ -388,11 +436,15 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newDeadlineDate,
       });
 
-      const calls = mockPlugin.taskEditor.updateTaskDeadlineDate.mock.calls;
+      const calls = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls;
       expect(calls.length).toBe(1);
-      const args = calls[0];
-      // Should fall back to the existing value
-      expect(args[3]).toEqual({ value: 5, unit: 'd', isFirstOnly: true });
+      const options = calls[0][1];
+      // resolveRecurrenceWarningPeriod(undefined, existing) => existing
+      expect(options.newDeadlineWarningPeriod).toEqual({
+        value: 5,
+        unit: 'd',
+        isFirstOnly: true,
+      });
     });
 
     it('should preserve regular -Nd warning period when null is passed (recurring periods persist)', async () => {
@@ -412,11 +464,15 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         newScheduledWarningPeriod: null, // null means "keep existing" for regular -Nd
       });
 
-      const calls = mockPlugin.taskEditor.updateTaskScheduledDate.mock.calls;
+      const calls = mockPlugin.taskEditor.applyRecurrenceUpdate.mock.calls;
       expect(calls.length).toBe(1);
-      const args = calls[0];
-      // Regular warningPeriod should fall through to existing value
-      expect(args[3]).toEqual({ value: 3, unit: 'd', isFirstOnly: false });
+      const options = calls[0][1];
+      // resolveRecurrenceWarningPeriod(null, non-firstOnly) => existing (regular periods persist)
+      expect(options.newScheduledWarningPeriod).toEqual({
+        value: 3,
+        unit: 'd',
+        isFirstOnly: false,
+      });
     });
 
     it('should update state manager with stripped warning period', async () => {

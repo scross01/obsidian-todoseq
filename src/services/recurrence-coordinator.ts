@@ -10,7 +10,7 @@
 import { Task, WarningPeriodInfo } from '../types/task';
 import { TaskStateManager } from './task-state-manager';
 import { TaskUpdateCoordinator } from './task-update-coordinator';
-import { App, MarkdownView, TFile } from 'obsidian';
+import { App, TFile } from 'obsidian';
 import TodoTracker from '../main';
 import { KeywordManager } from '../utils/keyword-manager';
 import { calculateNextRepeatDate } from '../utils/date-repeater';
@@ -119,61 +119,29 @@ export class RecurrenceCoordinator {
   }
 
   private async getFileContent(path: string): Promise<string> {
-    // Prefer the live editor buffer when the file is open in a source-mode
-    // MarkdownView. Without this, getFileContent reads the on-disk version via
-    // vault.read() and the subsequent write-back through TaskWriter would
-    // silently destroy any unsaved edits the user made (including edits to the
-    // recurring task itself) when the 50ms-delayed recurrence fires.
-    //
-    // We only consult the editor in "source" mode; in preview/reading mode the
-    // editor buffer is not actively maintained, so reading from disk is no
-    // worse than reading from the editor.
-    const buffer = this.getLiveEditorBuffer(path);
-    if (buffer !== null) {
-      return buffer;
+    // Prefer the live editor buffer; reading disk inside the 50 ms
+    // recurrence window would overwrite the user's unsaved edits.
+    const workspace = this.app.workspace;
+    if (workspace) {
+      for (const leaf of workspace.getLeavesOfType('markdown')) {
+        const view = leaf?.view as unknown as
+          | {
+              file?: { path?: string };
+              getMode: () => string;
+              editor?: { getValue: () => string };
+            }
+          | null
+          | undefined;
+        if (!view || view.file?.path !== path) continue;
+        if (view.getMode() !== 'source') continue;
+        const buffer = view.editor?.getValue?.();
+        if (typeof buffer === 'string') return buffer;
+      }
     }
 
-    // Fall back to disk when the file is not open in any source-mode editor.
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (file instanceof TFile) {
-      return this.app.vault.read(file);
-    }
+    if (file instanceof TFile) return this.app.vault.read(file);
     throw new Error(`File not found: ${path}`);
-  }
-
-  /**
-   * Return the live editor buffer for `path` if it is open in any source-mode
-   * MarkdownView, otherwise null. Picks the first matching markdown leaf when
-   * the file is open in multiple panes — recurrence handling does not care
-   * which copy is consulted because the on-disk write backs both panes
-   * through Obsidian's file-changed events.
-   */
-  private getLiveEditorBuffer(path: string): string | null {
-    const workspace = this.app?.workspace;
-    if (!workspace || typeof workspace.getLeavesOfType !== 'function') {
-      return null;
-    }
-
-    const leaves = workspace.getLeavesOfType('markdown');
-    for (const leaf of leaves) {
-      const view = leaf?.view;
-      if (!(view instanceof MarkdownView)) continue;
-      if (view.file?.path !== path) continue;
-      // Editor is only authoritative in source mode; preview/reading mode
-      // does not actively reflect the source buffer. MarkdownView always
-      // exposes getMode(), so no defensive check is needed here.
-      if (view.getMode() !== 'source') {
-        continue;
-      }
-      const editor = view.editor;
-      if (!editor || typeof editor.getValue !== 'function') continue;
-      const value = editor.getValue();
-      if (typeof value === 'string') {
-        return value;
-      }
-    }
-
-    return null;
   }
 
   /**
@@ -361,8 +329,34 @@ export class RecurrenceCoordinator {
         };
       }
 
+      // Rapid cycling inside the 50 ms recurrence window can stale the closure snapshot.
+      // Re-resolve when rawText diverges, keeping trigger's date/repeat fields.
+      const storedTask = this.taskStateManager.findTaskByPathAndLine(
+        task.path,
+        task.line,
+      );
+      let taskForUpdate: Task = task;
+      if (storedTask && storedTask.rawText !== task.rawText) {
+        // Trigger's date/repeat fields anchor the recurrence math; stored-task
+        // content (rawText, state, tags, etc.) overlays on top so the
+        // write-back reflects what the file actually shows now.
+        taskForUpdate = {
+          ...storedTask,
+          scheduledDate: task.scheduledDate,
+          scheduledDateRepeat: task.scheduledDateRepeat,
+          scheduledWarningPeriod: task.scheduledWarningPeriod,
+          deadlineDate: task.deadlineDate,
+          deadlineDateRepeat: task.deadlineDateRepeat,
+          deadlineWarningPeriod: task.deadlineWarningPeriod,
+          closedDate: task.closedDate,
+          dailyNoteDate: task.dailyNoteDate,
+          // Defend against a parser defect leaving text undefined.
+          text: storedTask.text ?? task.text,
+        };
+      }
+
       // Calculate next recurrence dates (pure math)
-      const dateResult = this.calculateNextDates(task, lines, parser);
+      const dateResult = this.calculateNextDates(taskForUpdate, lines, parser);
 
       if (!dateResult.updated) {
         return {
@@ -374,11 +368,11 @@ export class RecurrenceCoordinator {
       // Use TaskUpdateCoordinator to update the task
       // This ensures all updates go through the unified flow
       // Warning periods are determined here (preserves -Nd, strips --Nd)
-      await this.taskUpdateCoordinator.updateTaskRecurrence(task, {
+      await this.taskUpdateCoordinator.updateTaskRecurrence(taskForUpdate, {
         newScheduledDate: dateResult.newScheduledDate ?? null,
         newDeadlineDate: dateResult.newDeadlineDate ?? null,
-        newScheduledRepeat: task.scheduledDateRepeat,
-        newDeadlineRepeat: task.deadlineDateRepeat,
+        newScheduledRepeat: taskForUpdate.scheduledDateRepeat,
+        newDeadlineRepeat: taskForUpdate.deadlineDateRepeat,
         newScheduledWarningPeriod: dateResult.newScheduledWarningPeriod ?? null,
         newDeadlineWarningPeriod: dateResult.newDeadlineWarningPeriod ?? null,
         newStateForRecurrence: defaultInactive,

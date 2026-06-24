@@ -2433,6 +2433,277 @@ describe('TaskWriter Instance Methods', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────
+  // applyRecurrenceUpdate — atomic recurrence file writes
+  // ─────────────────────────────────────────────────────────────────────
+  describe('applyRecurrenceUpdate', () => {
+    // Helper: set up vault.process to capture the written content
+    function setupVaultProcess(initialContent: string) {
+      let writtenContent = '';
+      mockApp.vault.process = jest
+        .fn()
+        .mockImplementation(
+          (_file: any, updateFn: (content: string) => string) => {
+            writtenContent = updateFn(initialContent);
+            return Promise.resolve(writtenContent);
+          },
+        );
+      return () => writtenContent;
+    }
+
+    it('should make exactly ONE vault.process call for all changes (state + dates)', async () => {
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date(2026, 2, 10),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDate: new Date(2026, 2, 10),
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+      });
+
+      const getContent = setupVaultProcess(
+        'DONE Task text\n  SCHEDULED: <2026-03-10 Tue +1w>\n  DEADLINE: <2026-03-10 Tue +1w>',
+      );
+
+      await taskWriter.applyRecurrenceUpdate(task, {
+        newScheduledDate: new Date(2026, 2, 17),
+        newDeadlineDate: new Date(2026, 2, 17),
+        newState: 'TODO',
+      });
+
+      // This is THE key assertion for Bug #72: only one undo entry
+      expect(mockApp.vault.process).toHaveBeenCalledTimes(1);
+    });
+
+    it('should update task state, scheduled date, and deadline in a single write', async () => {
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date(2026, 2, 10),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDate: new Date(2026, 2, 10),
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+      });
+
+      const getContent = setupVaultProcess(
+        'DONE Task text\n  SCHEDULED: <2026-03-10 Tue +1w>\n  DEADLINE: <2026-03-10 Tue +1w>',
+      );
+
+      const result = await taskWriter.applyRecurrenceUpdate(task, {
+        newScheduledDate: new Date(2026, 2, 17),
+        newDeadlineDate: new Date(2026, 2, 17),
+        newState: 'TODO',
+      });
+
+      // State changed
+      expect(result.state).toBe('TODO');
+      expect(result.completed).toBe(false);
+
+      // Dates advanced
+      expect(result.scheduledDate).toEqual(new Date(2026, 2, 17));
+      expect(result.deadlineDate).toEqual(new Date(2026, 2, 17));
+
+      // rawText updated with new state
+      expect(result.rawText).toContain('TODO');
+      expect(result.rawText).not.toContain('DONE');
+
+      // File content has all three changes
+      const content = getContent();
+      expect(content).toContain('TODO Task text');
+      expect(content).toContain('SCHEDULED: <2026-03-17 Tue +1w>');
+      expect(content).toContain('DEADLINE: <2026-03-17 Tue +1w>');
+    });
+
+    it('should preserve regular warning period (-Nd) through recurrence', async () => {
+      // Bug #71: warning period should be carried over
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        deadlineDate: new Date(2026, 5, 24),
+        deadlineDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+        deadlineWarningPeriod: { value: 3, unit: 'd', isFirstOnly: false },
+      });
+
+      setupVaultProcess('DONE Task text\n  DEADLINE: <2026-06-24 Wed +1d -3d>');
+
+      const result = await taskWriter.applyRecurrenceUpdate(task, {
+        newDeadlineDate: new Date(2026, 5, 25),
+        newDeadlineWarningPeriod: { value: 3, unit: 'd', isFirstOnly: false },
+        newState: 'TODO',
+      });
+
+      // Warning period preserved in result
+      expect(result.deadlineWarningPeriod).toEqual({
+        value: 3,
+        unit: 'd',
+        isFirstOnly: false,
+      });
+    });
+
+    it('should strip first-only warning period (--Nd) when null is passed', async () => {
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        deadlineDate: new Date(2026, 5, 24),
+        deadlineDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+        deadlineWarningPeriod: { value: 3, unit: 'd', isFirstOnly: true },
+      });
+
+      setupVaultProcess(
+        'DONE Task text\n  DEADLINE: <2026-06-24 Wed +1d --3d>',
+      );
+
+      const result = await taskWriter.applyRecurrenceUpdate(task, {
+        newDeadlineDate: new Date(2026, 5, 25),
+        newDeadlineWarningPeriod: null, // strip first-only
+        newState: 'TODO',
+      });
+
+      expect(result.deadlineWarningPeriod).toBeNull();
+    });
+
+    it('should update existing SCHEDULED and DEADLINE lines in place without duplicates', async () => {
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date(2026, 2, 10),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDate: new Date(2026, 2, 12),
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+      });
+
+      const getContent = setupVaultProcess(
+        'DONE Task text\n  SCHEDULED: <2026-03-10 Tue +1w>\n  DEADLINE: <2026-03-12 Thu +1w>',
+      );
+
+      await taskWriter.applyRecurrenceUpdate(task, {
+        newScheduledDate: new Date(2026, 2, 17),
+        newDeadlineDate: new Date(2026, 2, 19),
+        newState: 'TODO',
+      });
+
+      const content = getContent();
+      // No duplicate lines
+      const scheduledCount = (content.match(/SCHEDULED:/g) || []).length;
+      const deadlineCount = (content.match(/DEADLINE:/g) || []).length;
+      expect(scheduledCount).toBe(1);
+      expect(deadlineCount).toBe(1);
+      // Values updated
+      expect(content).toContain('SCHEDULED: <2026-03-17 Tue +1w>');
+      expect(content).toContain('DEADLINE: <2026-03-19 Thu +1w>');
+    });
+
+    it('should remove SCHEDULED and DEADLINE lines when null is passed', async () => {
+      const task = createBaseTask({
+        rawText: 'TODO Task text',
+        state: 'TODO',
+        completed: false,
+        scheduledDate: new Date(2026, 2, 10),
+        deadlineDate: new Date(2026, 2, 12),
+      });
+
+      const getContent = setupVaultProcess(
+        'TODO Task text\n  SCHEDULED: <2026-03-10 Tue>\n  DEADLINE: <2026-03-12 Thu>',
+      );
+
+      const result = await taskWriter.applyRecurrenceUpdate(task, {
+        newScheduledDate: null,
+        newDeadlineDate: null,
+      });
+
+      expect(result.scheduledDate).toBeNull();
+      expect(result.deadlineDate).toBeNull();
+      const content = getContent();
+      expect(content).not.toContain('SCHEDULED');
+      expect(content).not.toContain('DEADLINE');
+    });
+
+    it('should handle recurrence with only scheduled date update (no state change)', async () => {
+      const task = createBaseTask({
+        rawText: 'TODO Task text',
+        state: 'TODO',
+        completed: false,
+        scheduledDate: new Date(2026, 2, 10),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+      });
+
+      setupVaultProcess('TODO Task text\n  SCHEDULED: <2026-03-10 Tue +1w>');
+
+      const result = await taskWriter.applyRecurrenceUpdate(task, {
+        newScheduledDate: new Date(2026, 2, 17),
+      });
+
+      expect(result.scheduledDate).toEqual(new Date(2026, 2, 17));
+      // State unchanged
+      expect(result.state).toBe('TODO');
+      // rawText unchanged (no state change)
+      expect(result.rawText).toBe('TODO Task text');
+      // Only one vault.process call
+      expect(mockApp.vault.process).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle null file gracefully', async () => {
+      mockApp.vault.getAbstractFileByPath = jest.fn().mockReturnValue(null);
+
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        deadlineDate: new Date(2026, 5, 24),
+      });
+
+      const result = await taskWriter.applyRecurrenceUpdate(task, {
+        newDeadlineDate: new Date(2026, 5, 25),
+        newState: 'TODO',
+      });
+
+      // Should still return correct snapshot even without file write
+      expect(result.state).toBe('TODO');
+      expect(result.deadlineDate).toEqual(new Date(2026, 5, 25));
+      expect(mockApp.vault.process).not.toHaveBeenCalled();
+    });
+
+    it('should pass through repeat info when updating dates', async () => {
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date(2026, 2, 10),
+        deadlineDate: new Date(2026, 2, 10),
+      });
+
+      setupVaultProcess(
+        'DONE Task text\n  SCHEDULED: <2026-03-10 Tue>\n  DEADLINE: <2026-03-10 Tue>',
+      );
+
+      const result = await taskWriter.applyRecurrenceUpdate(task, {
+        newScheduledDate: new Date(2026, 2, 17),
+        newScheduledRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        newDeadlineDate: new Date(2026, 2, 17),
+        newDeadlineRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        newState: 'TODO',
+      });
+
+      expect(result.scheduledDateRepeat).toEqual({
+        type: '+',
+        unit: 'w',
+        value: 1,
+        raw: '+1w',
+      });
+      expect(result.deadlineDateRepeat).toEqual({
+        type: '+',
+        unit: 'w',
+        value: 1,
+        raw: '+1w',
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
   // Inlined date-line helpers (formerly src/services/date-line-operator.ts).
   // Access via `as any` since they are private — these tests guard against
   // regressions in the pure helpers that back TaskWriter's public API.

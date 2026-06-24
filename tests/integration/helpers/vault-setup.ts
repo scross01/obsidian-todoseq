@@ -124,6 +124,17 @@ due: ${dateStr}
 `,
   );
 
+  // File for recurrence-deadline testing (DEADLINE + repeat + warning period)
+  // Uses today's date so recurrence advances to a clearly different date.
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'recurrence-deadline.md'),
+    `# Recurrence Deadline Test
+
+- [ ] TODO Daily deadline task
+  DEADLINE: <${todayStr} +1d -3d>
+`,
+  );
+
   // Empty file for external-change testing (will be modified by test)
   fs.writeFileSync(
     path.join(TEST_VAULT_DIR, 'external-change.md'),

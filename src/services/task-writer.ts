@@ -870,6 +870,159 @@ export class TaskWriter {
     };
   }
 
+  /**
+   * Atomically apply all recurrence updates (scheduled date, deadline date,
+   * and state) in a single `vault.process` call. This ensures the entire
+   * recurrence update is one undo entry, preventing partial-undo bugs where
+   * dates are advanced but state is reverted (or vice versa).
+   *
+   * NOTE: This method intentionally uses Vault.process instead of the Editor API
+   * (editor.replaceRange) used by other methods. Atomicity requires a single
+   * vault.process call — using the Editor API per-line would create separate
+   * undo entries and defeat the purpose. The tradeoff is that cursor position
+   * and editor folds may be disrupted during recurrence updates, which is
+   * acceptable since recurrence fires automatically in the background.
+   *
+   * Returns the updated task snapshot with accumulated lineDelta.
+   */
+  async applyRecurrenceUpdate(
+    task: Task,
+    options: {
+      newScheduledDate?: Date | null;
+      newDeadlineDate?: Date | null;
+      newScheduledRepeat?: DateRepeatInfo | null;
+      newDeadlineRepeat?: DateRepeatInfo | null;
+      newScheduledWarningPeriod?: WarningPeriodInfo | null;
+      newDeadlineWarningPeriod?: WarningPeriodInfo | null;
+      newState?: string;
+    },
+  ): Promise<Task & { lineDelta?: number }> {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    let lineDelta = 0;
+
+    let newRawText: string | undefined;
+
+    if (file && file instanceof TFile) {
+      await this.app.vault.process(file, (data) => {
+        const lines = data.split('\n');
+        let totalDelta = 0;
+
+        // Update SCHEDULED date if requested
+        if (options.newScheduledDate !== undefined) {
+          if (options.newScheduledDate === null) {
+            const result = this.removeDateLine(
+              lines,
+              task.line,
+              'SCHEDULED',
+              task,
+            );
+            totalDelta += result.lineDelta;
+          } else {
+            const dateStr = TaskWriter.buildDateLineContent(
+              options.newScheduledDate,
+              options.newScheduledRepeat ?? task.scheduledDateRepeat,
+              options.newScheduledWarningPeriod ?? task.scheduledWarningPeriod,
+            );
+            const result = this.updateOrInsertDateLine(
+              lines,
+              task.line,
+              'SCHEDULED',
+              dateStr,
+              task,
+            );
+            totalDelta += result.lineDelta;
+          }
+        }
+
+        // Update DEADLINE date if requested
+        if (options.newDeadlineDate !== undefined) {
+          if (options.newDeadlineDate === null) {
+            const result = this.removeDateLine(
+              lines,
+              task.line,
+              'DEADLINE',
+              task,
+            );
+            totalDelta += result.lineDelta;
+          } else {
+            const dateStr = TaskWriter.buildDateLineContent(
+              options.newDeadlineDate,
+              options.newDeadlineRepeat ?? task.deadlineDateRepeat,
+              options.newDeadlineWarningPeriod ?? task.deadlineWarningPeriod,
+            );
+            const result = this.updateOrInsertDateLine(
+              lines,
+              task.line,
+              'DEADLINE',
+              dateStr,
+              task,
+            );
+            totalDelta += result.lineDelta;
+          }
+        }
+
+        // Update task state if requested
+        if (options.newState !== undefined) {
+          const generated = TaskWriter.generateTaskLine(
+            task,
+            options.newState,
+            true,
+            this.keywordManager,
+          );
+          if (task.line < lines.length) {
+            lines[task.line] = generated.newLine;
+          }
+          // Capture for the snapshot returned below
+          newRawText = generated.newLine;
+        }
+
+        lineDelta = totalDelta;
+        return lines.join('\n');
+      });
+    }
+
+    // Build the updated task snapshot
+    const completed =
+      options.newState !== undefined
+        ? this.keywordManager.isCompleted(options.newState)
+        : task.completed;
+
+    const result: Task & { lineDelta?: number } = {
+      ...task,
+      rawText: newRawText ?? task.rawText,
+      state: options.newState ?? task.state,
+      completed,
+      scheduledDate:
+        options.newScheduledDate !== undefined
+          ? options.newScheduledDate
+          : task.scheduledDate,
+      scheduledDateRepeat:
+        options.newScheduledRepeat !== undefined
+          ? options.newScheduledRepeat
+          : task.scheduledDateRepeat,
+      scheduledWarningPeriod:
+        options.newScheduledWarningPeriod !== undefined
+          ? options.newScheduledWarningPeriod
+          : task.scheduledWarningPeriod,
+      deadlineDate:
+        options.newDeadlineDate !== undefined
+          ? options.newDeadlineDate
+          : task.deadlineDate,
+      deadlineDateRepeat:
+        options.newDeadlineRepeat !== undefined
+          ? options.newDeadlineRepeat
+          : task.deadlineDateRepeat,
+      deadlineWarningPeriod:
+        options.newDeadlineWarningPeriod !== undefined
+          ? options.newDeadlineWarningPeriod
+          : task.deadlineWarningPeriod,
+    };
+    if (lineDelta !== 0) {
+      result.lineDelta = lineDelta;
+    }
+    return result;
+  }
+
   // ─────────────────────────────────────────────────────────────────────
   // Inlined date-line helpers (formerly src/services/date-line-operator.ts)
   // All methods are private; they capture `this.keywordManager` from the

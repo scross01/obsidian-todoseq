@@ -38,6 +38,7 @@ const mockPlugin = {
     removeTaskScheduledDate: jest.fn(),
     removeTaskDeadlineDate: jest.fn(),
     removeTaskPriority: jest.fn(),
+    applyRecurrenceUpdate: jest.fn(),
   },
   taskStateManager: null as any,
   embeddedTaskListProcessor: {
@@ -92,6 +93,23 @@ describe('TaskUpdateCoordinator - Archived State Removal', () => {
         state: newState,
         rawText: task.rawText.replace(/TODO/, newState),
       }),
+    );
+
+    mockPlugin.taskEditor.applyRecurrenceUpdate.mockImplementation(
+      async (task, options) => {
+        const result = { ...task };
+        if (options.newState !== undefined) {
+          result.state = options.newState;
+          result.rawText = task.rawText.replace(task.state, options.newState);
+        }
+        if (options.newScheduledDate !== undefined) {
+          result.scheduledDate = options.newScheduledDate;
+        }
+        if (options.newDeadlineDate !== undefined) {
+          result.deadlineDate = options.newDeadlineDate;
+        }
+        return result;
+      },
     );
   });
 

@@ -492,9 +492,7 @@ describe('UIManager', () => {
 
       // Route the line lookup and active view mock so the bottom-of-function
       // update path is reachable (default mocks return null otherwise).
-      jest
-        .spyOn(uiManager as any, 'getLineForElement')
-        .mockReturnValue(5);
+      jest.spyOn(uiManager as any, 'getLineForElement').mockReturnValue(5);
       (
         pluginMock.app.workspace.getActiveViewOfType as jest.Mock
       ).mockReturnValue({

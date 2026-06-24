@@ -1,11 +1,6 @@
 import { Page } from 'playwright';
 
 /**
- * Shared editor utilities for integration tests.
- * These functions open files, read content, and manipulate the Obsidian editor.
- */
-
-/**
  * Open a file in the editor (source mode).
  */
 export async function openFileInEditor(
@@ -42,19 +37,24 @@ export async function readEditorContent(page: Page): Promise<string> {
   return content;
 }
 
-/**
- * Read vault file content from disk (not the editor buffer).
- * Note: `page.evaluate` auto-awaits the returned promise, so the async
- * callback inside evaluate correctly resolves to the file content.
- */
+/** Read vault file content. Prefers the live editor buffer over disk
+ *  because source-mode writes lag disk until Obsidian's autosave. */
 export async function readVaultFile(
   page: Page,
   basename: string,
 ): Promise<string | null> {
-  return page.evaluate(async (name) => {
+  return page.evaluate(async (name: string) => {
     const app = (window as any).app;
     const file = app.vault.getFiles().find((f: any) => f.basename === name);
     if (!file) return null;
-    return app.vault.read(file) as Promise<string>;
+    const leaf = app.workspace
+      .getLeavesOfType('markdown')
+      .find(
+        (l: any) =>
+          l?.view?.file?.path === file.path &&
+          l?.view?.getMode?.() === 'source',
+      );
+    const buffer = leaf?.view?.editor?.getValue?.();
+    return typeof buffer === 'string' ? buffer : await app.vault.read(file);
   }, basename);
 }

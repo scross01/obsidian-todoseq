@@ -700,62 +700,25 @@ export class TaskUpdateCoordinator {
         return task;
 
       case 'recurrence': {
-        let updatedTask = task;
-        let totalLineDelta = 0;
-        // Update scheduled date if needed
-        if (context.newScheduledDate !== undefined) {
-          if (context.newScheduledDate === null) {
-            const result =
-              await taskEditor.removeTaskScheduledDate(updatedTask);
-            updatedTask = result;
-            totalLineDelta += result.lineDelta ?? 0;
-          } else {
-            const result = await taskEditor.updateTaskScheduledDate(
-              updatedTask,
-              context.newScheduledDate,
-              context.newScheduledRepeat ?? updatedTask.scheduledDateRepeat,
-              this.resolveRecurrenceWarningPeriod(
-                context.newScheduledWarningPeriod,
-                updatedTask.scheduledWarningPeriod,
-              ),
-            );
-            updatedTask = result;
-            totalLineDelta += result.lineDelta ?? 0;
-          }
-        }
-        // Update deadline date if needed
-        if (context.newDeadlineDate !== undefined) {
-          if (context.newDeadlineDate === null) {
-            const result = await taskEditor.removeTaskDeadlineDate(updatedTask);
-            updatedTask = result;
-            totalLineDelta += result.lineDelta ?? 0;
-          } else {
-            const result = await taskEditor.updateTaskDeadlineDate(
-              updatedTask,
-              context.newDeadlineDate,
-              context.newDeadlineRepeat ?? updatedTask.deadlineDateRepeat,
-              this.resolveRecurrenceWarningPeriod(
-                context.newDeadlineWarningPeriod,
-                updatedTask.deadlineWarningPeriod,
-              ),
-            );
-            updatedTask = result;
-            totalLineDelta += result.lineDelta ?? 0;
-          }
-        }
-        // Update state if needed
-        if (context.newStateForRecurrence) {
-          updatedTask = await taskEditor.updateTaskState(
-            updatedTask,
-            context.newStateForRecurrence,
-          );
-        }
-        // Store accumulated lineDelta for the async phase to handle
-        if (totalLineDelta !== 0) {
-          (updatedTask as Task & { lineDelta?: number }).lineDelta =
-            totalLineDelta;
-        }
-        return updatedTask;
+        // Use atomic update to apply all recurrence changes in a single
+        // vault.process call. This creates one undo entry instead of 2-3
+        // separate ones, preventing partial-undo bugs where dates are
+        // advanced but state is reverted (or vice versa).
+        return taskEditor.applyRecurrenceUpdate(task, {
+          newScheduledDate: context.newScheduledDate,
+          newDeadlineDate: context.newDeadlineDate,
+          newScheduledRepeat: context.newScheduledRepeat,
+          newDeadlineRepeat: context.newDeadlineRepeat,
+          newScheduledWarningPeriod: this.resolveRecurrenceWarningPeriod(
+            context.newScheduledWarningPeriod,
+            task.scheduledWarningPeriod,
+          ),
+          newDeadlineWarningPeriod: this.resolveRecurrenceWarningPeriod(
+            context.newDeadlineWarningPeriod,
+            task.deadlineWarningPeriod,
+          ),
+          newState: context.newStateForRecurrence,
+        });
       }
 
       default: {

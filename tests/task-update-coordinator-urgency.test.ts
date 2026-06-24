@@ -39,6 +39,7 @@ const mockPlugin = {
     removeTaskScheduledDate: jest.fn(),
     removeTaskDeadlineDate: jest.fn(),
     removeTaskPriority: jest.fn(),
+    applyRecurrenceUpdate: jest.fn(),
   },
   taskStateManager: null as any,
   embeddedTaskListProcessor: {
@@ -384,11 +385,11 @@ describe('TaskUpdateCoordinator - Urgency Recalculation', () => {
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(0, 0, 0, 0);
 
-      mockPlugin.taskEditor.updateTaskRecurrence.mockImplementation(
-        async (task) => ({
+      mockPlugin.taskEditor.applyRecurrenceUpdate.mockImplementation(
+        async (task, options) => ({
           ...task,
-          state: 'TODO',
-          scheduledDate: tomorrow,
+          state: options.newState ?? 'TODO',
+          scheduledDate: options.newScheduledDate ?? task.scheduledDate,
           rawText: task.rawText,
         }),
       );
