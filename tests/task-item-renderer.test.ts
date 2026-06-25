@@ -1204,7 +1204,7 @@ describe('TaskItemRenderer', () => {
       expect(tooltip).toContain('2026');
     });
 
-    it('should include repeat info in date tooltip', () => {
+    it('should NOT include repeat info in date tooltip (repeat details live on repeat icon)', () => {
       const task = createBaseTask({
         scheduledDate: new Date(2026, 3, 1, 10, 0),
         scheduledDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
@@ -1216,8 +1216,130 @@ describe('TaskItemRenderer', () => {
       const dateValue = container.querySelector('.todoseq-task-date-value');
       expect(dateValue).not.toBeNull();
       const tooltip = dateValue?.getAttribute('title');
+      expect(tooltip).toContain('Scheduled:');
+      expect(tooltip).not.toContain('Repeats:');
+      expect(tooltip).not.toContain('Every 1 day');
+    });
+
+    it('should expose repeat info via the repeat icon hover', () => {
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 3, 1, 10, 0),
+        scheduledDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+        completed: false,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      const repeatIcon = container.querySelector(
+        '.todoseq-task-date-repeat-icon',
+      );
+      expect(repeatIcon).not.toBeNull();
+      const tooltip = repeatIcon?.getAttribute('title');
       expect(tooltip).toContain('Repeats:');
       expect(tooltip).toContain('Every 1 day');
+    });
+
+    it('should NOT include warning period info in scheduled date tooltip', () => {
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 3, 1, 10, 0),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      const dateValue = container.querySelector('.todoseq-task-date-value');
+      const tooltip = dateValue?.getAttribute('title');
+      expect(tooltip).toContain('Scheduled:');
+      expect(tooltip).not.toContain('Delayed notice');
+      expect(tooltip).not.toContain('Advanced notice');
+    });
+
+    it('should NOT include warning period info in deadline date tooltip', () => {
+      const task = createBaseTask({
+        deadlineDate: new Date(2026, 3, 15, 14, 0),
+        deadlineWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      const dateValue = container.querySelector('.todoseq-task-date-value');
+      const tooltip = dateValue?.getAttribute('title');
+      expect(tooltip).toContain('Deadline:');
+      expect(tooltip).not.toContain('Advanced notice');
+      expect(tooltip).not.toContain('Delayed notice');
+    });
+
+    it('should include the adjusted date in the scheduled warning arrow tooltip', () => {
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 3, 1, 10, 0),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      const arrow = container.querySelector('.todoseq-task-date-warning-arrow');
+      expect(arrow?.textContent).toBe('\u2192');
+      const tooltip = arrow?.getAttribute('title');
+      expect(tooltip).toContain('Delayed notice');
+      expect(tooltip).toContain('-3d');
+      expect(tooltip).toContain('(appears');
+    });
+
+    it('should include the adjusted date in the deadline warning arrow tooltip', () => {
+      const task = createBaseTask({
+        deadlineDate: new Date(2026, 3, 15, 14, 0),
+        deadlineWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      const arrow = container.querySelector('.todoseq-task-date-warning-arrow');
+      expect(arrow?.textContent).toBe('\u2190');
+      const tooltip = arrow?.getAttribute('title');
+      expect(tooltip).toContain('Advanced notice');
+      expect(tooltip).toContain('-3d');
+      expect(tooltip).toContain('(appears');
+    });
+
+    it('should still omit adjusted date when no warning period is set', () => {
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 3, 1, 10, 0),
+        scheduledWarningPeriod: null,
+        completed: false,
+      });
+      const parent = activeDocument.createElement('div');
+      const container = renderer.buildDateDisplay(task, parent);
+
+      // No arrow when there's no warning period
+      expect(
+        container.querySelector('.todoseq-task-date-warning-arrow'),
+      ).toBeNull();
+
+      // Date tooltip stays clean
+      const dateValue = container.querySelector('.todoseq-task-date-value');
+      const tooltip = dateValue?.getAttribute('title');
+      expect(tooltip).not.toContain('Delayed notice');
+      expect(tooltip).not.toContain('Advanced notice');
     });
 
     it('should create date container with no dates when task has none', () => {

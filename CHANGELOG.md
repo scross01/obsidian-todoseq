@@ -3,10 +3,14 @@
 ## 0.16.2
 
 - Added sortByKeyword sort option for task list view.
+- Fixed warning period not carried over when marking repeating tasks as done. #71
+- Fixes forward dates remains cached when undoing repeating task advancement. #72 
 - Fixed issue with unsaved editor changes being lost during recurrence updates.
-- Improved performance by implementing selective cache invalidation for file changes in embedded task lists.
 - Fixed visual inconsistency when checkbox toggle handler returns early.
 - Fixed issue with queued updates being silently dropped after prior rejection.
+- Fixed warning periods from the date picker being dropped when updated from embedded task list context menu.
+- Adjusted task tooltips on hover the for date, repeat, and warning periods. 
+- Improved performance by implementing selective cache invalidation for file changes in embedded task lists.
 - Updated undici dependency to address security alerts.
 
 ## 0.16.1

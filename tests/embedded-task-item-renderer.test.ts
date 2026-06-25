@@ -6,6 +6,18 @@ import { EmbeddedTaskItemRenderer } from '../src/view/embedded-task-list/embedde
 import { createBaseTask } from './helpers/test-helper';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
+/**
+ * Update `renderer.plugin.keywordManager.getSettings` to a specific
+ * warning-period settings object for the duration of a single test.
+ * Must be called *after* the `beforeEach` setup (so `renderer` exists).
+ */
+function mockPluginKeywordSettings(renderer: any, settings: object) {
+  renderer.plugin.keywordManager.getSettings.mockReturnValue({
+    useExtendedCheckboxStyles: false,
+    ...settings,
+  });
+}
+
 describe('EmbeddedTaskItemRenderer', () => {
   let renderer: any;
 
@@ -327,6 +339,275 @@ describe('EmbeddedTaskItemRenderer', () => {
     });
   });
 
+  describe('hasStandaloneWarning', () => {
+    it('returns true when scheduled has warning but showScheduledDate is false', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      expect(
+        renderer.hasStandaloneWarning(task, {
+          showScheduledDate: false,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        }),
+      ).toBe(true);
+    });
+
+    it('returns false when showScheduledDate is true (arrow shown next to date)', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      expect(
+        renderer.hasStandaloneWarning(task, {
+          showScheduledDate: true,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        }),
+      ).toBe(false);
+    });
+
+    it('returns false when task has no warning period', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        deadlineDate: new Date(2026, 5, 20),
+        completed: false,
+      });
+      expect(
+        renderer.hasStandaloneWarning(task, {
+          showScheduledDate: false,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        }),
+      ).toBe(false);
+    });
+
+    it('returns false when task is completed', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: true,
+      });
+      expect(
+        renderer.hasStandaloneWarning(task, {
+          showScheduledDate: false,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        }),
+      ).toBe(false);
+    });
+
+    it('returns true on global default when task has no per-task warning period', () => {
+      mockPluginKeywordSettings(renderer, { defaultDeadlineWarningPeriod: 5 });
+      const task = createBaseTask({
+        deadlineDate: new Date(2026, 5, 20),
+        deadlineWarningPeriod: null,
+        completed: false,
+      });
+      expect(
+        renderer.hasStandaloneWarning(task, {
+          showScheduledDate: false,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe('buildWarningIndicators', () => {
+    it('renders scheduled arrow (→) as standalone when date is hidden', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const parent = document.createElement('div');
+      renderer.buildWarningIndicators(
+        task,
+        {
+          showScheduledDate: false,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        },
+        parent,
+      );
+
+      const arrow = parent.querySelector(
+        '.todoseq-embedded-task-warning-arrow',
+      );
+      expect(arrow).toBeTruthy();
+      expect(arrow?.textContent).toBe('→');
+    });
+
+    it('renders deadline arrow (←) as standalone when date is hidden', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        deadlineDate: new Date(2026, 5, 20),
+        deadlineWarningPeriod: {
+          value: 5,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const parent = document.createElement('div');
+      renderer.buildWarningIndicators(
+        task,
+        {
+          showScheduledDate: false,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        },
+        parent,
+      );
+
+      const arrows = parent.querySelectorAll(
+        '.todoseq-embedded-task-warning-arrow',
+      );
+      expect(arrows.length).toBe(1);
+      expect(arrows[0]?.textContent).toBe('←');
+    });
+
+    it('renders both scheduled and deadline arrows when both are hidden', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        deadlineDate: new Date(2026, 5, 20),
+        deadlineWarningPeriod: {
+          value: 5,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const parent = document.createElement('div');
+      renderer.buildWarningIndicators(
+        task,
+        {
+          showScheduledDate: false,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        },
+        parent,
+      );
+
+      const arrows = Array.from(
+        parent.querySelectorAll('.todoseq-embedded-task-warning-arrow'),
+      ).map((el) => el.textContent);
+      expect(arrows).toEqual(['→', '←']);
+    });
+
+    it('does NOT render standalone arrow when showScheduledDate is true', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const parent = document.createElement('div');
+      renderer.buildWarningIndicators(
+        task,
+        {
+          showScheduledDate: true,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        },
+        parent,
+      );
+
+      expect(
+        parent.querySelector('.todoseq-embedded-task-warning-arrow'),
+      ).toBeFalsy();
+    });
+
+    it('does NOT render anything when task is completed', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: true,
+      });
+      const parent = document.createElement('div');
+      renderer.buildWarningIndicators(
+        task,
+        {
+          showScheduledDate: false,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        },
+        parent,
+      );
+
+      expect(
+        parent.querySelector('.todoseq-embedded-task-warning-arrow'),
+      ).toBeFalsy();
+    });
+
+    it('does NOT render when warningDays is 0', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 0,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const parent = document.createElement('div');
+      renderer.buildWarningIndicators(
+        task,
+        {
+          showScheduledDate: false,
+          showDeadlineDate: false,
+          showClosedDate: false,
+        },
+        parent,
+      );
+
+      expect(
+        parent.querySelector('.todoseq-embedded-task-warning-arrow'),
+      ).toBeFalsy();
+    });
+  });
+
   describe('renderTaskTextWithLinks', () => {
     it('renders plain text without links', () => {
       const parent = document.createElement('span');
@@ -448,6 +729,242 @@ describe('EmbeddedTaskItemRenderer', () => {
       expect(
         li.classList.contains('todoseq-embedded-task-item-date-overdue'),
       ).toBe(false);
+    });
+
+    it('renders standalone scheduled arrow with default (no-show) settings', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const li = renderer.createTaskListItem(task, 0, {});
+
+      expect(
+        li.querySelector('.todoseq-embedded-task-warning-arrow'),
+      ).toBeTruthy();
+    });
+
+    it('renders standalone deadline arrow with default (no-show) settings', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        deadlineDate: new Date(2026, 5, 20),
+        deadlineWarningPeriod: {
+          value: 5,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const li = renderer.createTaskListItem(task, 0, {});
+
+      expect(
+        li.querySelector('.todoseq-embedded-task-warning-arrow'),
+      ).toBeTruthy();
+    });
+
+    it('renders warning arrows in floating indicators when in wrap mode', () => {
+      mockPluginKeywordSettings(renderer, {});
+      const task = createBaseTask({
+        scheduledDate: new Date(2026, 5, 15),
+        scheduledWarningPeriod: {
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        },
+        completed: false,
+      });
+      const li = renderer.createTaskListItem(task, 0, { wrapContent: true });
+
+      const floating = li.querySelector(
+        '.todoseq-embedded-task-floating-indicators',
+      );
+      expect(floating).toBeTruthy();
+      expect(
+        floating?.querySelector('.todoseq-embedded-task-warning-arrow'),
+      ).toBeTruthy();
+    });
+
+    describe('row date tooltip', () => {
+      it('sets title on textContainer with scheduled date when show-scheduled-date is false (truncate mode)', () => {
+        const task = createBaseTask({
+          scheduledDate: new Date(2026, 5, 15),
+          completed: false,
+        });
+        const li = renderer.createTaskListItem(task, 0, {
+          wrapContent: false,
+          showScheduledDate: false,
+          showDeadlineDate: false,
+        });
+
+        const textContainer = li.querySelector(
+          '.todoseq-embedded-task-text-container',
+        );
+        const title = textContainer?.getAttribute('title');
+        expect(title?.startsWith('Scheduled:')).toBe(true);
+        // Tooltip should NOT leak to the <li> root to avoid overlap with
+        // sibling element tooltips (file info, urgency, etc.).
+        expect(li.getAttribute('title')).toBeNull();
+      });
+
+      it('sets title on textContainer with deadline date when show-deadline-date is false (truncate mode)', () => {
+        const task = createBaseTask({
+          deadlineDate: new Date(2026, 5, 20),
+          completed: false,
+        });
+        const li = renderer.createTaskListItem(task, 0, {
+          wrapContent: false,
+          showScheduledDate: false,
+          showDeadlineDate: false,
+        });
+
+        const textContainer = li.querySelector(
+          '.todoseq-embedded-task-text-container',
+        );
+        const title = textContainer?.getAttribute('title');
+        expect(title?.startsWith('Deadline:')).toBe(true);
+      });
+
+      it('sets title with both dates when both show flags are false (truncate mode)', () => {
+        const task = createBaseTask({
+          scheduledDate: new Date(2026, 5, 15),
+          deadlineDate: new Date(2026, 5, 20),
+          completed: false,
+        });
+        const li = renderer.createTaskListItem(task, 0, {
+          wrapContent: false,
+          showScheduledDate: false,
+          showDeadlineDate: false,
+        });
+
+        const textContainer = li.querySelector(
+          '.todoseq-embedded-task-text-container',
+        );
+        const title = textContainer?.getAttribute('title');
+        expect(title?.includes('Scheduled:')).toBe(true);
+        expect(title?.includes('Deadline:')).toBe(true);
+      });
+
+      it('still sets title when show flags are true (consolidation, truncate mode)', () => {
+        const task = createBaseTask({
+          scheduledDate: new Date(2026, 5, 15),
+          deadlineDate: new Date(2026, 5, 20),
+          completed: false,
+        });
+        const li = renderer.createTaskListItem(task, 0, {
+          wrapContent: false,
+          showScheduledDate: true,
+          showDeadlineDate: true,
+        });
+
+        const textContainer = li.querySelector(
+          '.todoseq-embedded-task-text-container',
+        );
+        const title = textContainer?.getAttribute('title');
+        expect(title?.includes('Scheduled:')).toBe(true);
+        expect(title?.includes('Deadline:')).toBe(true);
+      });
+
+      it('sets title on contentWrapper in wrap mode without show flags', () => {
+        const task = createBaseTask({
+          scheduledDate: new Date(2026, 5, 15),
+          deadlineDate: new Date(2026, 5, 20),
+          completed: false,
+        });
+        const li = renderer.createTaskListItem(task, 0, { wrapContent: true });
+
+        const contentWrapper = li.querySelector(
+          '.todoseq-embedded-task-content-wrapper',
+        );
+        const title = contentWrapper?.getAttribute('title');
+        expect(title?.includes('Scheduled:')).toBe(true);
+        expect(title?.includes('Deadline:')).toBe(true);
+        expect(li.getAttribute('title')).toBeNull();
+      });
+
+      it('sets title on contentWrapper in dynamic mode without show flags', () => {
+        const task = createBaseTask({
+          scheduledDate: new Date(2026, 5, 15),
+          completed: false,
+        });
+        const li = renderer.createTaskListItem(task, 0, {});
+
+        const contentWrapper = li.querySelector(
+          '.todoseq-embedded-task-content-wrapper',
+        );
+        const title = contentWrapper?.getAttribute('title');
+        expect(title?.startsWith('Scheduled:')).toBe(true);
+        expect(li.getAttribute('title')).toBeNull();
+      });
+
+      it('dynamic mode with both show flags: title on contentWrapper only, not textContainer', () => {
+        const task = createBaseTask({
+          scheduledDate: new Date(2026, 5, 15),
+          deadlineDate: new Date(2026, 5, 20),
+          completed: false,
+        });
+        const li = renderer.createTaskListItem(task, 0, {
+          showScheduledDate: true,
+          showDeadlineDate: true,
+        });
+
+        const contentWrapper = li.querySelector(
+          '.todoseq-embedded-task-content-wrapper',
+        );
+        const textContainer = li.querySelector(
+          '.todoseq-embedded-task-text-container',
+        );
+        expect(contentWrapper?.getAttribute('title')).toContain('Scheduled:');
+        expect(contentWrapper?.getAttribute('title')).toContain('Deadline:');
+        // Consolidation: tooltip should NOT also be on textContainer, to
+        // avoid duplicate floating UIs in real Obsidian.
+        expect(textContainer?.getAttribute('title')).toBeNull();
+        expect(li.getAttribute('title')).toBeNull();
+      });
+
+      it('does NOT set the row tooltip when task has no dates (truncate mode)', () => {
+        const task = createBaseTask({ completed: false });
+        const li = renderer.createTaskListItem(task, 0, {
+          wrapContent: false,
+        });
+
+        const textContainer = li.querySelector(
+          '.todoseq-embedded-task-text-container',
+        );
+        expect(textContainer?.getAttribute('title')).toBeNull();
+        expect(li.getAttribute('title')).toBeNull();
+      });
+
+      it('does NOT set the row tooltip when task has no dates (dynamic mode)', () => {
+        const task = createBaseTask({ completed: false });
+        const li = renderer.createTaskListItem(task, 0, {});
+
+        const contentWrapper = li.querySelector(
+          '.todoseq-embedded-task-content-wrapper',
+        );
+        expect(contentWrapper?.getAttribute('title')).toBeNull();
+        expect(li.getAttribute('title')).toBeNull();
+      });
+
+      it('does NOT set the row tooltip for completed tasks (even with closed date)', () => {
+        const task = createBaseTask({
+          scheduledDate: new Date(2026, 5, 15),
+          deadlineDate: new Date(2026, 5, 20),
+          closedDate: new Date(2026, 5, 21),
+          completed: true,
+        });
+        const li = renderer.createTaskListItem(task, 0, {});
+
+        expect(li.getAttribute('title')).toBeNull();
+        const anyTooltipHost = li.querySelector(
+          '[title^="Scheduled:"], [title^="Deadline:"]',
+        );
+        expect(anyTooltipHost).toBeFalsy();
+      });
     });
   });
 });

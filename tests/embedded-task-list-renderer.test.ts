@@ -6,6 +6,10 @@ import { EmbeddedTaskListRenderer } from '../src/view/embedded-task-list/task-li
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 import { createBaseSettings, createBaseTask } from './helpers/test-helper';
 import { TodoseqParameters } from '../src/view/embedded-task-list/code-block-parser';
+import {
+  DateRepeatInfo,
+  WarningPeriodInfo,
+} from '../src/types/task';
 
 describe('EmbeddedTaskListRenderer', () => {
   let renderer: any;
@@ -831,6 +835,125 @@ describe('EmbeddedTaskListRenderer', () => {
       ).todoSeqPlugin.taskUpdateCoordinator;
       expect(windowCoord.updateTaskPriority).not.toHaveBeenCalled();
       errSpy.mockRestore();
+    });
+  });
+
+  describe('warning period propagation from context menu', () => {
+    // Regression: TaskContextMenu.showDatePicker() invokes the on{Scheduled,Deadline}DateChange
+    // callback with 4 args (task, date, repeat, warningPeriod). The embedded renderer must
+    // forward all four through to TaskUpdateCoordinator so warning periods actually get written
+    // to disk — both the main task list already does this and embedded should too.
+
+    function installCoordinatorSpies(): {
+      updateTaskScheduledDate: jest.Mock;
+      updateTaskDeadlineDate: jest.Mock;
+    } {
+      const updateTaskScheduledDate = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      const updateTaskDeadlineDate = jest.fn().mockResolvedValue(undefined);
+      (renderer as any).plugin.taskUpdateCoordinator = {
+        updateTaskScheduledDate,
+        updateTaskDeadlineDate,
+      };
+      return { updateTaskScheduledDate, updateTaskDeadlineDate };
+    }
+
+    it('forwards warningPeriod to updateTaskScheduledDate', async () => {
+      const { updateTaskScheduledDate } = installCoordinatorSpies();
+
+      const task = createBaseTask();
+      const date = new Date(2026, 5, 1);
+      const repeat: DateRepeatInfo = {
+        type: '+',
+        unit: 'd',
+        value: 1,
+        raw: '+1d',
+      };
+      const warningPeriod: WarningPeriodInfo = {
+        value: 3,
+        unit: 'd',
+        isFirstOnly: false,
+      };
+
+      const tmCb = (renderer as any).taskContextMenu.callbacks;
+      await tmCb.onScheduledDateChange(task, date, repeat, warningPeriod);
+
+      expect(updateTaskScheduledDate).toHaveBeenCalledTimes(1);
+      expect(updateTaskScheduledDate).toHaveBeenCalledWith(
+        task,
+        date,
+        repeat,
+        warningPeriod,
+      );
+    });
+
+    it('forwards warningPeriod to updateTaskDeadlineDate', async () => {
+      const { updateTaskDeadlineDate } = installCoordinatorSpies();
+
+      const task = createBaseTask();
+      const date = new Date(2026, 5, 15);
+      const repeat: DateRepeatInfo = null;
+      const warningPeriod: WarningPeriodInfo = {
+        value: 2,
+        unit: 'w',
+        isFirstOnly: false,
+      };
+
+      const tmCb = (renderer as any).taskContextMenu.callbacks;
+      await tmCb.onDeadlineDateChange(task, date, repeat, warningPeriod);
+
+      expect(updateTaskDeadlineDate).toHaveBeenCalledTimes(1);
+      expect(updateTaskDeadlineDate).toHaveBeenCalledWith(
+        task,
+        date,
+        repeat,
+        warningPeriod,
+      );
+    });
+
+    it('passes through null repeat and warningPeriod for clearing both', async () => {
+      const { updateTaskScheduledDate } = installCoordinatorSpies();
+
+      const task = createBaseTask();
+      const date = new Date(2026, 5, 1);
+
+      const tmCb = (renderer as any).taskContextMenu.callbacks;
+      await tmCb.onScheduledDateChange(task, date, null, null);
+
+      expect(updateTaskScheduledDate).toHaveBeenCalledTimes(1);
+      expect(updateTaskScheduledDate).toHaveBeenCalledWith(
+        task,
+        date,
+        null,
+        null,
+      );
+    });
+
+    it('passes through undefined warningPeriod when callback omits it', async () => {
+      const { updateTaskDeadlineDate, updateTaskScheduledDate } =
+        installCoordinatorSpies();
+
+      const task = createBaseTask();
+      const date = new Date(2026, 5, 15);
+
+      // Simulate callback being invoked with only 3 args (legacy/jit paths)
+      const tmCb = (renderer as any).taskContextMenu.callbacks;
+      await tmCb.onScheduledDateChange(task, date, undefined, undefined);
+      await tmCb.onDeadlineDateChange(task, date, undefined, undefined);
+
+      expect(updateTaskScheduledDate).toHaveBeenCalledWith(
+        task,
+        date,
+        undefined,
+        undefined,
+      );
+      expect(updateTaskDeadlineDate).toHaveBeenCalledWith(
+        task,
+        date,
+        undefined,
+        undefined,
+      );
     });
   });
 });

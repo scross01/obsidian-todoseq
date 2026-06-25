@@ -510,6 +510,26 @@
   vertical-align: middle;
 }
 
+/* Standalone warning period arrow indicator (shown when the corresponding
+   date is hidden by embedded list settings). Appears in floating-indicators
+   (wrap/dynamic modes) or inline in the text container (truncate mode). */
+.todoseq-embedded-task-warning-arrow {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.todoseq-embedded-task-text-container .todoseq-embedded-task-warning-arrow {
+  margin-left: var(--size-4-2);
+}
+
+.todoseq-embedded-task-floating-indicators
+  .todoseq-embedded-task-warning-arrow {
+  margin-left: 0;
+}
+
 /* Settings UI - Shared font size for messages */
 .todoseq-setting-item-error,
 .todoseq-setting-item-warning,

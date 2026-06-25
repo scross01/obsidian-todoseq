@@ -1,4 +1,4 @@
-import { Task, DateRepeatInfo } from '../../types/task';
+import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import { TFile, setIcon, Notice } from 'obsidian';
@@ -40,10 +40,10 @@ export class EmbeddedTaskListRenderer {
           await this.migrateTaskToToday(task),
         onPriorityChange: (task, priority) =>
           this.handlePriorityChange(task, priority),
-        onScheduledDateChange: (task, date, repeat) =>
-          this.handleScheduledDateChange(task, date, repeat),
-        onDeadlineDateChange: (task, date, repeat) =>
-          this.handleDeadlineDateChange(task, date, repeat),
+        onScheduledDateChange: (task, date, repeat, warningPeriod) =>
+          this.handleScheduledDateChange(task, date, repeat, warningPeriod),
+        onDeadlineDateChange: (task, date, repeat, warningPeriod) =>
+          this.handleDeadlineDateChange(task, date, repeat, warningPeriod),
       },
       {
         weekStartsOn: plugin.settings.weekStartsOn,
@@ -227,6 +227,7 @@ export class EmbeddedTaskListRenderer {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ): Promise<void> {
     try {
       // Use TaskUpdateCoordinator for optimistic UI updates
@@ -234,6 +235,7 @@ export class EmbeddedTaskListRenderer {
         task,
         date,
         repeat,
+        warningPeriod,
       );
     } catch (error) {
       console.error('TODOseq: Failed to update scheduled date:', error);
@@ -248,6 +250,7 @@ export class EmbeddedTaskListRenderer {
     task: Task,
     date: Date | null,
     repeat?: DateRepeatInfo | null,
+    warningPeriod?: WarningPeriodInfo | null,
   ): Promise<void> {
     try {
       // Use TaskUpdateCoordinator for optimistic UI updates
@@ -255,6 +258,7 @@ export class EmbeddedTaskListRenderer {
         task,
         date,
         repeat,
+        warningPeriod,
       );
     } catch (error) {
       console.error('TODOseq: Failed to update deadline date:', error);

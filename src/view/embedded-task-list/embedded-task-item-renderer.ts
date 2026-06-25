@@ -97,8 +97,15 @@ export class EmbeddedTaskItemRenderer {
     const hasSubtask = hasSubtasks(task);
     const hasRepeat =
       !task.completed && (task.scheduledDateRepeat || task.deadlineDateRepeat);
+    const hasStandaloneWarning = this.hasStandaloneWarning(task, params);
     const needsFloatingIndicators =
-      (isTrueWrapMode || isDynamicMode) && (hasSubtask || hasRepeat);
+      (isTrueWrapMode || isDynamicMode) &&
+      (hasSubtask || hasRepeat || hasStandaloneWarning);
+
+    // Element that should host the row-level date tooltip. Hovering this
+    // element reveals scheduled/deadline dates even when the date badges are
+    // hidden by `show-scheduled-date` / `show-deadline-date` settings.
+    let tooltipHost: HTMLElement = li;
 
     if (isTrueWrapMode) {
       li.classList.add('todoseq-embedded-task-item-wrap');
@@ -106,6 +113,7 @@ export class EmbeddedTaskItemRenderer {
       const contentWrapper = li.createDiv({
         cls: 'todoseq-embedded-task-content-wrapper',
       });
+      tooltipHost = contentWrapper;
       const textRow = contentWrapper.createDiv({
         cls: 'todoseq-embedded-task-text-row',
       });
@@ -128,6 +136,7 @@ export class EmbeddedTaskItemRenderer {
             },
           });
         }
+        this.buildWarningIndicators(task, params, floatingIndicators);
         if (hasRepeat) {
           this.buildRepeatIcon(task, floatingIndicators);
         }
@@ -175,6 +184,7 @@ export class EmbeddedTaskItemRenderer {
       const contentWrapper = li.createDiv({
         cls: 'todoseq-embedded-task-content-wrapper',
       });
+      tooltipHost = contentWrapper;
       const textRow = contentWrapper.createDiv({
         cls: 'todoseq-embedded-task-text-row',
       });
@@ -198,6 +208,7 @@ export class EmbeddedTaskItemRenderer {
             `${task.subtaskCompletedCount} of ${task.subtaskCount} subtasks complete`,
           );
         }
+        this.buildWarningIndicators(task, params, floatingIndicators);
         if (hasRepeat) {
           this.buildRepeatIcon(task, floatingIndicators);
         }
@@ -269,6 +280,7 @@ export class EmbeddedTaskItemRenderer {
       const textContainer = li.createDiv({
         cls: 'todoseq-embedded-task-text-container',
       });
+      tooltipHost = textContainer;
 
       this.buildItemContents(textContainer, task, li);
 
@@ -323,9 +335,20 @@ export class EmbeddedTaskItemRenderer {
       if (!task.completed) {
         this.buildRepeatIcon(task, textContainer);
       }
+
+      this.buildWarningIndicators(task, params, textContainer);
     }
 
     this.addTaskEventListeners(li, checkbox, task);
+
+    // Always show scheduled/deadline dates via hover tooltip on a row-level
+    // container, regardless of `show-scheduled-date` / `show-deadline-date`
+    // settings. The container used (contentWrapper / textContainer / li)
+    // mirrors the previous behaviour and avoids creating a duplicate
+    // floating-tooltip UI on top of the <li> root that would overlap with
+    // sibling element tooltips (file info, urgency, subtask, warning arrow,
+    // priority badge, repeat icon).
+    this.setRowDateTooltip(tooltipHost, task);
 
     return li;
   }
@@ -927,6 +950,80 @@ export class EmbeddedTaskItemRenderer {
   }
 
   /**
+   * Determine whether a task has warning period arrow indicators that are
+   * NOT rendered alongside their date (because the date is hidden by
+   * `showScheduledDate`/`showDeadlineDate` settings) and should therefore be
+   * surfaced as standalone indicators elsewhere on the row.
+   */
+  private hasStandaloneWarning(
+    task: Task,
+    params: TodoseqParameters,
+  ): boolean {
+    if (task.completed) return false;
+
+    const showScheduled = params.showScheduledDate === true;
+    const showDeadline = params.showDeadlineDate === true;
+
+    const hasScheduledArrow =
+      !!task.scheduledDate &&
+      !showScheduled &&
+      this.getWarningArrow(task, 'scheduled') !== undefined;
+    const hasDeadlineArrow =
+      !!task.deadlineDate &&
+      !showDeadline &&
+      this.getWarningArrow(task, 'deadline') !== undefined;
+
+    return hasScheduledArrow || hasDeadlineArrow;
+  }
+
+  /**
+   * Build standalone warning period arrow indicators for any dates whose
+   * visibility is hidden by `showScheduledDate`/`showDeadlineDate` settings.
+   * Each arrow includes a tooltip with the warning period details.
+   */
+  private buildWarningIndicators(
+    task: Task,
+    params: TodoseqParameters,
+    parent: HTMLElement,
+  ): void {
+    if (task.completed) return;
+
+    const showScheduled = params.showScheduledDate === true;
+    const showDeadline = params.showDeadlineDate === true;
+
+    if (!showScheduled && task.scheduledDate) {
+      this.renderStandaloneWarningArrow(
+        parent,
+        this.getWarningArrow(task, 'scheduled'),
+        this.buildWarningPeriodTooltip(task, 'scheduled'),
+      );
+    }
+
+    if (!showDeadline && task.deadlineDate) {
+      this.renderStandaloneWarningArrow(
+        parent,
+        this.getWarningArrow(task, 'deadline'),
+        this.buildWarningPeriodTooltip(task, 'deadline'),
+      );
+    }
+  }
+
+  private renderStandaloneWarningArrow(
+    parent: HTMLElement,
+    arrow: string | undefined,
+    tooltip: string | undefined,
+  ): void {
+    if (!arrow) return;
+    const indicator = parent.createSpan({
+      cls: 'todoseq-embedded-task-warning-arrow',
+      text: arrow,
+    });
+    if (tooltip) {
+      setTooltip(indicator, tooltip);
+    }
+  }
+
+  /**
    * Build a combined tooltip string for scheduled and/or deadline dates.
    * Shows date info only (repeat and warning period are on their own icons).
    */
@@ -950,6 +1047,23 @@ export class EmbeddedTaskItemRenderer {
     }
 
     return parts.join('\n');
+  }
+
+  /**
+   * Apply the combined date tooltip to a row-level container so the
+   * scheduled/deadline dates are visible on hover regardless of the
+   * `show-scheduled-date` / `show-deadline-date` settings. No-op when the
+   * task has no usable dates (or is completed).
+   *
+   * The tooltip is attached to the main content container rather than the
+   * `<li>` root so it doesn't add a duplicate floating UI that could overlap
+   * with sibling tooltips (file info, urgency, subtask indicator, etc.).
+   */
+  private setRowDateTooltip(parent: HTMLElement, task: Task): void {
+    const tooltip = this.buildCombinedDateTooltip(task);
+    if (tooltip) {
+      setTooltip(parent, tooltip);
+    }
   }
 
   /**
@@ -1014,12 +1128,6 @@ export class EmbeddedTaskItemRenderer {
     if (showClosed && task.closedDate && task.completed) {
       this.buildDateBadge(task.closedDate, 'check-circle', parent);
     }
-
-    // Add combined date tooltip to the row
-    const tooltip = this.buildCombinedDateTooltip(task);
-    if (tooltip) {
-      setTooltip(parent, tooltip);
-    }
   }
 
   private buildWrapDateInfoRows(
@@ -1055,12 +1163,6 @@ export class EmbeddedTaskItemRenderer {
     }
     if (showClosed && task.closedDate && task.completed) {
       this.buildDateInfoRow('Closed', task.closedDate, parent, extraCls);
-    }
-
-    // Add combined date tooltip to the row
-    const tooltip = this.buildCombinedDateTooltip(task);
-    if (tooltip) {
-      setTooltip(parent, tooltip);
     }
   }
 

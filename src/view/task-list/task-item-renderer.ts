@@ -1,7 +1,6 @@
-import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
+import { Task } from '../../types/task';
 import { DateUtils, getEffectiveWarningDays } from '../../utils/date-utils';
 import { formatRepeatDescription } from '../../utils/date-repeater';
-import { warningPeriodToDays } from '../../utils/date-utils';
 import { getPriorityLevelName } from '../../utils/task-format';
 import { setIcon, Platform, Notice, setTooltip } from 'obsidian';
 import {
@@ -780,57 +779,15 @@ export class TaskItemRenderer {
   }
 
   /**
-   * Build a comprehensive tooltip string for a date value element.
-   * Always includes the actual date and relative date (if applicable).
-   * Optionally includes repeat info and warning period info.
+   * Build tooltip string for a date value element.
+   * Contains only the label and the formatted date. Warning period details
+   * live on the warning arrow `(`<-` / `->`)` hover and repeat details live
+   * on the repeat icon hover so this tooltip stays minimal.
    * @param label The date label (e.g. "Scheduled" or "Deadline")
    * @param date The actual date
-   * @param repeatInfo Optional repeat information
-   * @param warningPeriod Optional warning period info
-   * @param defaultWarningPeriod Default warning period in days
-   * @param offsetDays Signed offset: positive for scheduled, negative for deadline
-   * @param skipIfOtherDateExists If true, skip warning period when other date exists
-   * @param otherDate The other date (deadline for scheduled, scheduled for deadline)
    */
-  private buildDateTooltip(
-    label: string,
-    date: Date,
-    repeatInfo?: DateRepeatInfo | null,
-    warningPeriod?: WarningPeriodInfo | null,
-    defaultWarningPeriod?: number,
-    offsetDays?: number,
-    skipIfOtherDateExists?: boolean,
-    otherDate?: Date | null,
-  ): string {
-    // Build the date line: "Scheduled: Tomorrow, 10:00 (Jun 17, 2026)"
-    let tooltip = `${label}: ${DateUtils.formatDateTooltip(date, true)}`;
-
-    // Add warning period info if applicable
-    if (defaultWarningPeriod !== undefined && offsetDays !== undefined) {
-      const wpDays = warningPeriod ? warningPeriodToDays(warningPeriod) : null;
-      const warningDays = wpDays ?? defaultWarningPeriod;
-      if (warningDays > 0) {
-        if (!skipIfOtherDateExists || !otherDate) {
-          const wpTooltip = DateUtils.buildWarningPeriodTooltip(
-            date,
-            warningPeriod,
-            warningDays,
-            offsetDays > 0,
-            true,
-          );
-          if (wpTooltip) {
-            tooltip += `\n${wpTooltip}`;
-          }
-        }
-      }
-    }
-
-    // Add repeat info if present
-    if (repeatInfo) {
-      tooltip += `\nRepeats: ${formatRepeatDescription(repeatInfo)}`;
-    }
-
-    return tooltip;
+  private buildDateTooltip(label: string, date: Date): string {
+    return `${label}: ${DateUtils.formatDateTooltip(date, true)}`;
   }
 
   /**
@@ -899,16 +856,6 @@ export class TaskItemRenderer {
       const scheduledTooltip = this.buildDateTooltip(
         'Scheduled',
         task.scheduledDate,
-        task.scheduledDateRepeat,
-        task.scheduledWarningPeriod,
-        (renderSettings.defaultScheduledWarningPeriod as number) ?? 0,
-        getEffectiveWarningDays(task, 'scheduled', {
-          defaultScheduledWarningPeriod:
-            (renderSettings.defaultScheduledWarningPeriod as number) ?? 0,
-          defaultDeadlineWarningPeriod: 0,
-        }),
-        !!renderSettings.skipScheduledWarningPeriodIfDeadline,
-        task.deadlineDate,
       );
       setTooltip(dateValue, scheduledTooltip);
 
@@ -918,11 +865,16 @@ export class TaskItemRenderer {
           cls: 'todoseq-task-date-warning-arrow',
           text: '\u2192',
         });
-        const schedWp = task.scheduledWarningPeriod;
-        const schedLabel = schedWp
-          ? `-${schedWp.value}${schedWp.unit}`
-          : `-${scheduledWarningDays}d`;
-        setTooltip(arrow, `Delayed notice: ${schedLabel}`);
+        setTooltip(
+          arrow,
+          DateUtils.buildWarningPeriodTooltip(
+            task.scheduledDate,
+            task.scheduledWarningPeriod,
+            scheduledWarningDays,
+            true,
+            true,
+          ),
+        );
       }
 
       const repeatCell = dateRow.createEl('span', {
@@ -977,12 +929,6 @@ export class TaskItemRenderer {
       const deadlineTooltip = this.buildDateTooltip(
         'Deadline',
         task.deadlineDate,
-        task.deadlineDateRepeat,
-        task.deadlineWarningPeriod,
-        (deadlineRenderSettings.defaultDeadlineWarningPeriod as number) ?? 0,
-        -deadlineWarningDays,
-        !!deadlineRenderSettings.skipDeadlinePrewarningIfScheduled,
-        task.scheduledDate,
       );
       setTooltip(dateValue, deadlineTooltip);
 
@@ -992,11 +938,16 @@ export class TaskItemRenderer {
           cls: 'todoseq-task-date-warning-arrow',
           text: '\u2190',
         });
-        const dlWp = task.deadlineWarningPeriod;
-        const dlLabel = dlWp
-          ? `-${dlWp.value}${dlWp.unit}`
-          : `-${deadlineWarningDays}d`;
-        setTooltip(arrow, `Advanced notice: ${dlLabel}`);
+        setTooltip(
+          arrow,
+          DateUtils.buildWarningPeriodTooltip(
+            task.deadlineDate,
+            task.deadlineWarningPeriod,
+            deadlineWarningDays,
+            false,
+            true,
+          ),
+        );
       }
 
       const repeatCell = dateRow.createEl('span', {
