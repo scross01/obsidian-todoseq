@@ -1,4 +1,4 @@
-import { App, TFile, MarkdownView, EditorPosition } from 'obsidian';
+import { App, TFile, MarkdownView, EditorPosition, Editor } from 'obsidian';
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
@@ -872,16 +872,12 @@ export class TaskWriter {
 
   /**
    * Atomically apply all recurrence updates (scheduled date, deadline date,
-   * and state) in a single `vault.process` call. This ensures the entire
-   * recurrence update is one undo entry, preventing partial-undo bugs where
-   * dates are advanced but state is reverted (or vice versa).
+   * and state).
    *
-   * NOTE: This method intentionally uses Vault.process instead of the Editor API
-   * (editor.replaceRange) used by other methods. Atomicity requires a single
-   * vault.process call — using the Editor API per-line would create separate
-   * undo entries and defeat the purpose. The tradeoff is that cursor position
-   * and editor folds may be disrupted during recurrence updates, which is
-   * acceptable since recurrence fires automatically in the background.
+   * File Operation Strategy:
+   * - For active files in source mode: Uses Editor API (editor.replaceRange)
+   *   to avoid triggering Obsidian's external file modification warning.
+   * - For inactive files: Uses Vault.process() for atomic background operations.
    *
    * Returns the updated task snapshot with accumulated lineDelta.
    */
@@ -902,66 +898,24 @@ export class TaskWriter {
 
     let newRawText: string | undefined;
 
+    // Check if target is the active file in source mode
+    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const isActive = md?.file?.path === task.path;
+    const editor = md?.editor;
+    const isSourceMode =
+      isActive &&
+      editor &&
+      md?.getViewType() === 'markdown' &&
+      md?.getMode &&
+      md.getMode() === 'source';
+
     if (file && file instanceof TFile) {
-      await this.app.vault.process(file, (data) => {
-        const lines = data.split('\n');
+      if (isSourceMode && editor) {
+        // Use Editor API to avoid external file modification warning
+        const taskIndent = getTaskIndent(task);
         let totalDelta = 0;
 
-        // Update SCHEDULED date if requested
-        if (options.newScheduledDate !== undefined) {
-          if (options.newScheduledDate === null) {
-            const result = this.removeDateLine(
-              lines,
-              task.line,
-              'SCHEDULED',
-              task,
-            );
-            totalDelta += result.lineDelta;
-          } else {
-            const dateStr = TaskWriter.buildDateLineContent(
-              options.newScheduledDate,
-              options.newScheduledRepeat ?? task.scheduledDateRepeat,
-              options.newScheduledWarningPeriod ?? task.scheduledWarningPeriod,
-            );
-            const result = this.updateOrInsertDateLine(
-              lines,
-              task.line,
-              'SCHEDULED',
-              dateStr,
-              task,
-            );
-            totalDelta += result.lineDelta;
-          }
-        }
-
-        // Update DEADLINE date if requested
-        if (options.newDeadlineDate !== undefined) {
-          if (options.newDeadlineDate === null) {
-            const result = this.removeDateLine(
-              lines,
-              task.line,
-              'DEADLINE',
-              task,
-            );
-            totalDelta += result.lineDelta;
-          } else {
-            const dateStr = TaskWriter.buildDateLineContent(
-              options.newDeadlineDate,
-              options.newDeadlineRepeat ?? task.deadlineDateRepeat,
-              options.newDeadlineWarningPeriod ?? task.deadlineWarningPeriod,
-            );
-            const result = this.updateOrInsertDateLine(
-              lines,
-              task.line,
-              'DEADLINE',
-              dateStr,
-              task,
-            );
-            totalDelta += result.lineDelta;
-          }
-        }
-
-        // Update task state if requested
+        // Update task state first if requested
         if (options.newState !== undefined) {
           const generated = TaskWriter.generateTaskLine(
             task,
@@ -969,16 +923,140 @@ export class TaskWriter {
             true,
             this.keywordManager,
           );
-          if (task.line < lines.length) {
-            lines[task.line] = generated.newLine;
+          const currentLine = editor.getLine(task.line);
+          if (typeof currentLine === 'string') {
+            const from: EditorPosition = { line: task.line, ch: 0 };
+            const to: EditorPosition = {
+              line: task.line,
+              ch: currentLine.length,
+            };
+            editor.replaceRange(generated.newLine, from, to);
+            newRawText = generated.newLine;
           }
-          // Capture for the snapshot returned below
-          newRawText = generated.newLine;
+        }
+
+        // Update SCHEDULED date if requested
+        if (options.newScheduledDate !== undefined) {
+          const dateStr =
+            options.newScheduledDate === null
+              ? null
+              : TaskWriter.buildDateLineContent(
+                  options.newScheduledDate,
+                  options.newScheduledRepeat ?? task.scheduledDateRepeat,
+                  options.newScheduledWarningPeriod ??
+                    task.scheduledWarningPeriod,
+                );
+          const delta = this.updateDateLineInEditor(
+            editor,
+            task,
+            'SCHEDULED',
+            dateStr,
+            taskIndent,
+          );
+          totalDelta += delta;
+        }
+
+        // Update DEADLINE date if requested
+        if (options.newDeadlineDate !== undefined) {
+          const dateStr =
+            options.newDeadlineDate === null
+              ? null
+              : TaskWriter.buildDateLineContent(
+                  options.newDeadlineDate,
+                  options.newDeadlineRepeat ?? task.deadlineDateRepeat,
+                  options.newDeadlineWarningPeriod ??
+                    task.deadlineWarningPeriod,
+                );
+          const delta = this.updateDateLineInEditor(
+            editor,
+            task,
+            'DEADLINE',
+            dateStr,
+            taskIndent,
+          );
+          totalDelta += delta;
         }
 
         lineDelta = totalDelta;
-        return lines.join('\n');
-      });
+      } else {
+        // Vault API path for inactive files
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          let totalDelta = 0;
+
+          // Update SCHEDULED date if requested
+          if (options.newScheduledDate !== undefined) {
+            if (options.newScheduledDate === null) {
+              const result = this.removeDateLine(
+                lines,
+                task.line,
+                'SCHEDULED',
+                task,
+              );
+              totalDelta += result.lineDelta;
+            } else {
+              const dateStr = TaskWriter.buildDateLineContent(
+                options.newScheduledDate,
+                options.newScheduledRepeat ?? task.scheduledDateRepeat,
+                options.newScheduledWarningPeriod ??
+                  task.scheduledWarningPeriod,
+              );
+              const result = this.updateOrInsertDateLine(
+                lines,
+                task.line,
+                'SCHEDULED',
+                dateStr,
+                task,
+              );
+              totalDelta += result.lineDelta;
+            }
+          }
+
+          // Update DEADLINE date if requested
+          if (options.newDeadlineDate !== undefined) {
+            if (options.newDeadlineDate === null) {
+              const result = this.removeDateLine(
+                lines,
+                task.line,
+                'DEADLINE',
+                task,
+              );
+              totalDelta += result.lineDelta;
+            } else {
+              const dateStr = TaskWriter.buildDateLineContent(
+                options.newDeadlineDate,
+                options.newDeadlineRepeat ?? task.deadlineDateRepeat,
+                options.newDeadlineWarningPeriod ?? task.deadlineWarningPeriod,
+              );
+              const result = this.updateOrInsertDateLine(
+                lines,
+                task.line,
+                'DEADLINE',
+                dateStr,
+                task,
+              );
+              totalDelta += result.lineDelta;
+            }
+          }
+
+          // Update task state if requested
+          if (options.newState !== undefined) {
+            const generated = TaskWriter.generateTaskLine(
+              task,
+              options.newState,
+              true,
+              this.keywordManager,
+            );
+            if (task.line < lines.length) {
+              lines[task.line] = generated.newLine;
+            }
+            newRawText = generated.newLine;
+          }
+
+          lineDelta = totalDelta;
+          return lines.join('\n');
+        });
+      }
     }
 
     // Build the updated task snapshot
@@ -1021,6 +1099,65 @@ export class TaskWriter {
       result.lineDelta = lineDelta;
     }
     return result;
+  }
+
+  /**
+   * Update, insert, or remove a date line (SCHEDULED/DEADLINE) via the Editor API.
+   * Returns the line delta (+1 insert, -1 remove, 0 update).
+   */
+  private updateDateLineInEditor(
+    editor: Editor,
+    task: Task,
+    dateType: DateLineType,
+    dateStr: string | null,
+    taskIndent: string,
+  ): number {
+    const lines = Array.from({ length: editor.lineCount() }, (_, i) =>
+      editor.getLine(i),
+    );
+    const existingIdx = findDateLine(
+      lines,
+      task.line + 1,
+      dateType,
+      taskIndent,
+      this.keywordManager,
+    );
+
+    if (dateStr === null) {
+      if (existingIdx >= 0) {
+        editor.replaceRange(
+          '',
+          { line: existingIdx, ch: 0 },
+          { line: existingIdx + 1, ch: 0 },
+        );
+        return -1;
+      }
+      return 0;
+    }
+
+    if (existingIdx >= 0) {
+      const indent = this.getEffectiveDateLineIndent(lines, existingIdx, task);
+      editor.replaceRange(
+        `${indent}${dateType}: ${dateStr}`,
+        { line: existingIdx, ch: 0 },
+        { line: existingIdx, ch: editor.getLine(existingIdx).length },
+      );
+      return 0;
+    }
+
+    const insertIdx = this.calcDateLineInsertIndex(
+      lines,
+      task.line,
+      dateType,
+      taskIndent,
+    );
+    const indent = this.getEffectiveDateLineIndent(lines, -1, task);
+    editor.replaceRange(
+      `${indent}${dateType}: ${dateStr}\n`,
+      { line: insertIdx, ch: 0 },
+      { line: insertIdx, ch: 0 },
+    );
+    return 1;
   }
 
   // ─────────────────────────────────────────────────────────────────────

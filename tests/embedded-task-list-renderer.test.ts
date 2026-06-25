@@ -6,10 +6,7 @@ import { EmbeddedTaskListRenderer } from '../src/view/embedded-task-list/task-li
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 import { createBaseSettings, createBaseTask } from './helpers/test-helper';
 import { TodoseqParameters } from '../src/view/embedded-task-list/code-block-parser';
-import {
-  DateRepeatInfo,
-  WarningPeriodInfo,
-} from '../src/types/task';
+import { DateRepeatInfo, WarningPeriodInfo } from '../src/types/task';
 
 describe('EmbeddedTaskListRenderer', () => {
   let renderer: any;
@@ -848,9 +845,7 @@ describe('EmbeddedTaskListRenderer', () => {
       updateTaskScheduledDate: jest.Mock;
       updateTaskDeadlineDate: jest.Mock;
     } {
-      const updateTaskScheduledDate = jest
-        .fn()
-        .mockResolvedValue(undefined);
+      const updateTaskScheduledDate = jest.fn().mockResolvedValue(undefined);
       const updateTaskDeadlineDate = jest.fn().mockResolvedValue(undefined);
       (renderer as any).plugin.taskUpdateCoordinator = {
         updateTaskScheduledDate,

@@ -955,10 +955,7 @@ export class EmbeddedTaskItemRenderer {
    * `showScheduledDate`/`showDeadlineDate` settings) and should therefore be
    * surfaced as standalone indicators elsewhere on the row.
    */
-  private hasStandaloneWarning(
-    task: Task,
-    params: TodoseqParameters,
-  ): boolean {
+  private hasStandaloneWarning(task: Task, params: TodoseqParameters): boolean {
     if (task.completed) return false;
 
     const showScheduled = params.showScheduledDate === true;

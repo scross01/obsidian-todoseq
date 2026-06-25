@@ -135,6 +135,18 @@ due: ${dateStr}
 `,
   );
 
+  // File for DOING → DONE recurrence test (SCHEDULED + repeat)
+  // Starts in DOING state to reproduce the bug where cycling from DOING
+  // through DONE triggers recurrence but the vault.write bypasses the editor.
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'recurrence-doing.md'),
+    `# Recurrence DOING Test
+
+- [ ] DOING Recurring DOING task
+  SCHEDULED: <${todayStr} +1m>
+`,
+  );
+
   // Empty file for external-change testing (will be modified by test)
   fs.writeFileSync(
     path.join(TEST_VAULT_DIR, 'external-change.md'),
