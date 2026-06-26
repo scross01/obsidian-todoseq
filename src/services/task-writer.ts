@@ -519,18 +519,31 @@ export class TaskWriter {
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
-      await this.app.vault.process(file, (data) => {
-        const lines = data.split('\n');
-        const result = this.updateOrInsertDateLine(
-          lines,
-          task.line,
+      const editor = this.getEditorForTask(task);
+
+      if (editor) {
+        const taskIndent = getTaskIndent(task);
+        lineDelta = this.updateDateLineInEditor(
+          editor,
+          task,
           'SCHEDULED',
           dateStr,
-          task,
+          taskIndent,
         );
-        lineDelta = result.lineDelta;
-        return lines.join('\n');
-      });
+      } else {
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          const result = this.updateOrInsertDateLine(
+            lines,
+            task.line,
+            'SCHEDULED',
+            dateStr,
+            task,
+          );
+          lineDelta = result.lineDelta;
+          return lines.join('\n');
+        });
+      }
     }
 
     const result: Task & { lineDelta?: number } = {
@@ -561,12 +574,30 @@ export class TaskWriter {
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
-      await this.app.vault.process(file, (data) => {
-        const lines = data.split('\n');
-        const result = this.removeDateLine(lines, task.line, 'SCHEDULED', task);
-        lineDelta = result.lineDelta;
-        return lines.join('\n');
-      });
+      const editor = this.getEditorForTask(task);
+
+      if (editor) {
+        const taskIndent = getTaskIndent(task);
+        lineDelta = this.updateDateLineInEditor(
+          editor,
+          task,
+          'SCHEDULED',
+          null,
+          taskIndent,
+        );
+      } else {
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          const result = this.removeDateLine(
+            lines,
+            task.line,
+            'SCHEDULED',
+            task,
+          );
+          lineDelta = result.lineDelta;
+          return lines.join('\n');
+        });
+      }
     }
 
     const result: Task & { lineDelta?: number } = {
@@ -602,18 +633,31 @@ export class TaskWriter {
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
-      await this.app.vault.process(file, (data) => {
-        const lines = data.split('\n');
-        const result = this.updateOrInsertDateLine(
-          lines,
-          task.line,
+      const editor = this.getEditorForTask(task);
+
+      if (editor) {
+        const taskIndent = getTaskIndent(task);
+        lineDelta = this.updateDateLineInEditor(
+          editor,
+          task,
           'DEADLINE',
           dateStr,
-          task,
+          taskIndent,
         );
-        lineDelta = result.lineDelta;
-        return lines.join('\n');
-      });
+      } else {
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          const result = this.updateOrInsertDateLine(
+            lines,
+            task.line,
+            'DEADLINE',
+            dateStr,
+            task,
+          );
+          lineDelta = result.lineDelta;
+          return lines.join('\n');
+        });
+      }
     }
 
     const result: Task & { lineDelta?: number } = {
@@ -644,12 +688,30 @@ export class TaskWriter {
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
-      await this.app.vault.process(file, (data) => {
-        const lines = data.split('\n');
-        const result = this.removeDateLine(lines, task.line, 'DEADLINE', task);
-        lineDelta = result.lineDelta;
-        return lines.join('\n');
-      });
+      const editor = this.getEditorForTask(task);
+
+      if (editor) {
+        const taskIndent = getTaskIndent(task);
+        lineDelta = this.updateDateLineInEditor(
+          editor,
+          task,
+          'DEADLINE',
+          null,
+          taskIndent,
+        );
+      } else {
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          const result = this.removeDateLine(
+            lines,
+            task.line,
+            'DEADLINE',
+            task,
+          );
+          lineDelta = result.lineDelta;
+          return lines.join('\n');
+        });
+      }
     }
 
     const result: Task & { lineDelta?: number } = {
@@ -1099,6 +1161,23 @@ export class TaskWriter {
       result.lineDelta = lineDelta;
     }
     return result;
+  }
+
+  /**
+   * Check if the task's file is active in source mode and return the editor.
+   * Returns null if the file is not active or not in source mode.
+   */
+  private getEditorForTask(task: Task): Editor | null {
+    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const isActive = md?.file?.path === task.path;
+    const editor = md?.editor;
+    const isSourceMode =
+      isActive &&
+      editor &&
+      md?.getViewType() === 'markdown' &&
+      md?.getMode &&
+      md.getMode() === 'source';
+    return isSourceMode && editor ? editor : null;
   }
 
   /**

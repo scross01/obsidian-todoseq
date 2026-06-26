@@ -22,6 +22,30 @@ class MockTFile extends TFile {
   name = 'test.md';
 }
 
+function setupEditorMock(
+  mockApp: any,
+  lines: string[],
+): { mockEditor: any; mockMarkdownView: any } {
+  const mockEditor = {
+    lineCount: jest.fn().mockReturnValue(lines.length),
+    getLine: jest.fn((i: number) => lines[i]),
+    replaceRange: jest.fn(),
+  };
+  const mockMarkdownView = {
+    file: { path: 'test.md' },
+    editor: mockEditor,
+    getViewType: jest.fn().mockReturnValue('markdown'),
+    getMode: jest.fn().mockReturnValue('source'),
+  };
+  mockApp.workspace.getActiveViewOfType = jest
+    .fn()
+    .mockReturnValue(mockMarkdownView);
+  mockApp.vault.getAbstractFileByPath = jest
+    .fn()
+    .mockReturnValue(new MockTFile());
+  return { mockEditor, mockMarkdownView };
+}
+
 describe('TaskWriter Instance Methods', () => {
   let mockApp: any;
   let mockPlugin: any;
@@ -1339,6 +1363,45 @@ describe('TaskWriter Instance Methods', () => {
     });
   });
 
+  describe('updateTaskScheduledDate - editor API path', () => {
+    it('should use editor API for active file in source mode', async () => {
+      const task: Task = createBaseTask({
+        rawText: 'TODO Task text',
+        scheduledDate: null,
+      });
+      const { mockEditor } = setupEditorMock(mockApp, ['TODO Task text']);
+
+      const newDate = new Date(2026, 2, 10);
+      const result = await taskWriter.updateTaskScheduledDate(task, newDate);
+
+      expect(mockEditor.replaceRange).toHaveBeenCalled();
+      expect(mockApp.vault.process).not.toHaveBeenCalled();
+      expect(result.scheduledDate).toEqual(newDate);
+    });
+  });
+
+  describe('removeTaskScheduledDate - editor API path', () => {
+    it('should use editor API for active file in source mode', async () => {
+      const task: Task = createBaseTask({
+        rawText: '- TODO Task text',
+        line: 0,
+        scheduledDate: new Date(2026, 2, 5),
+        indent: '',
+        listMarker: '- ',
+      });
+      const { mockEditor } = setupEditorMock(mockApp, [
+        '- TODO Task text',
+        '  SCHEDULED: <2026-03-05 Thu>',
+      ]);
+
+      const result = await taskWriter.removeTaskScheduledDate(task);
+
+      expect(mockEditor.replaceRange).toHaveBeenCalled();
+      expect(mockApp.vault.process).not.toHaveBeenCalled();
+      expect(result.scheduledDate).toBeNull();
+    });
+  });
+
   describe('updateTaskScheduledDate with various task types', () => {
     it('should add SCHEDULED with 2-space indent for bulleted task', async () => {
       const task: Task = createBaseTask({
@@ -2012,6 +2075,45 @@ describe('TaskWriter Instance Methods', () => {
 
       expect(result.deadlineDate).toBeNull();
       expect(result.lineDelta).toBeUndefined();
+    });
+  });
+
+  describe('updateTaskDeadlineDate - editor API path', () => {
+    it('should use editor API for active file in source mode', async () => {
+      const task: Task = createBaseTask({
+        rawText: 'TODO Task text',
+        deadlineDate: null,
+      });
+      const { mockEditor } = setupEditorMock(mockApp, ['TODO Task text']);
+
+      const newDate = new Date(2026, 5, 15, 14, 30);
+      const result = await taskWriter.updateTaskDeadlineDate(task, newDate);
+
+      expect(mockEditor.replaceRange).toHaveBeenCalled();
+      expect(mockApp.vault.process).not.toHaveBeenCalled();
+      expect(result.deadlineDate).toEqual(newDate);
+    });
+  });
+
+  describe('removeTaskDeadlineDate - editor API path', () => {
+    it('should use editor API for active file in source mode', async () => {
+      const task: Task = createBaseTask({
+        rawText: '- TODO Task text',
+        line: 0,
+        deadlineDate: new Date(2026, 5, 10),
+        indent: '',
+        listMarker: '- ',
+      });
+      const { mockEditor } = setupEditorMock(mockApp, [
+        '- TODO Task text',
+        '  DEADLINE: <2026-06-10 Tue>',
+      ]);
+
+      const result = await taskWriter.removeTaskDeadlineDate(task);
+
+      expect(mockEditor.replaceRange).toHaveBeenCalled();
+      expect(mockApp.vault.process).not.toHaveBeenCalled();
+      expect(result.deadlineDate).toBeNull();
     });
   });
 
