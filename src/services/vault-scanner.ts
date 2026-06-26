@@ -33,6 +33,7 @@ export class VaultScanner
 {
   private _isScanning = false;
   private _isInitializing = true; // Track Obsidian initialization state
+  private _hasCompletedInitialScan = false; // Track if the first scan has completed
   private urgencyCoefficients!: UrgencyCoefficients;
   private regexCache = new RegexCache();
   private parserRegistry: ParserRegistry;
@@ -195,6 +196,7 @@ export class VaultScanner
         error instanceof Error ? error : new Error(String(error)),
       );
     } finally {
+      this._hasCompletedInitialScan = true;
       this._isScanning = false;
     }
   }
@@ -347,6 +349,14 @@ export class VaultScanner
    */
   setInitializationComplete(): void {
     this._isInitializing = false;
+  }
+
+  /**
+   * Check if the initial vault scan has completed at least once.
+   * Returns false before the first scan finishes, true afterwards.
+   */
+  hasCompletedInitialScan(): boolean {
+    return this._hasCompletedInitialScan;
   }
 
   /**

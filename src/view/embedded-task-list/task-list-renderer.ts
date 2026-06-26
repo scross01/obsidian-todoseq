@@ -998,10 +998,17 @@ export class EmbeddedTaskListRenderer {
     const isScanning =
       this.plugin.vaultScanner?.shouldShowScanningMessage() ?? false;
 
+    // Check if the initial scan has completed at least once
+    const hasCompletedInitialScan =
+      this.plugin.vaultScanner?.hasCompletedInitialScan() ?? false;
+
     // Check if we're in initial load state (before first scan has started)
     // This prevents "No tasks found" from flashing before the scan begins
     const allTasks = this.plugin.vaultScanner?.getTasks() ?? [];
-    const isInitialLoad = !isScanning && allTasks.length === 0;
+    const isInitialLoad =
+      !isScanning &&
+      !hasCompletedInitialScan &&
+      allTasks.length === 0;
 
     if (isScanning || isInitialLoad) {
       emptyState.createEl('div', {

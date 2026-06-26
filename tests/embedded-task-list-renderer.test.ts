@@ -21,6 +21,7 @@ describe('EmbeddedTaskListRenderer', () => {
       app: {},
       vaultScanner: {
         shouldShowScanningMessage: jest.fn().mockReturnValue(false),
+        hasCompletedInitialScan: jest.fn().mockReturnValue(false),
         getTasks: jest.fn().mockReturnValue([]),
       },
       taskStateManager: {},

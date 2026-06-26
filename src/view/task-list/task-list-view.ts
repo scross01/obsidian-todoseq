@@ -1881,10 +1881,17 @@ export class TaskListView extends ItemView {
     const isScanning =
       this.plugin.vaultScanner?.shouldShowScanningMessage() ?? false;
 
+    // Check if the initial scan has completed at least once
+    const hasCompletedInitialScan =
+      this.plugin.vaultScanner?.hasCompletedInitialScan() ?? false;
+
     // Check if we're in initial load state (before first scan has started)
     // This prevents "No tasks found" from flashing before the scan begins
     const isInitialLoad =
-      !isScanning && visible.length === 0 && allTasks.length === 0;
+      !isScanning &&
+      !hasCompletedInitialScan &&
+      visible.length === 0 &&
+      allTasks.length === 0;
 
     if (isScanning || isInitialLoad) {
       // Remove any previous empty-state
@@ -1948,7 +1955,7 @@ export class TaskListView extends ItemView {
         // No tasks in vault at all
         title.setText('No tasks found');
         subtitle.setText(
-          'Create tasks in your notes using "todo your task". They will appear here automatically.',
+          'Create tasks in your notes using "TODO your task". They will appear here automatically.',
         );
       } else if (isHideCompleted && !hasAnyIncomplete) {
         // b) Hide-completed enabled, but only completed tasks exist

@@ -228,6 +228,15 @@ describe('VaultScanner', () => {
       expect(vaultScanner.shouldShowScanningMessage()).toBe(false);
     });
 
+    it('should return false for hasCompletedInitialScan before scan', () => {
+      expect(vaultScanner.hasCompletedInitialScan()).toBe(false);
+    });
+
+    it('should return true for hasCompletedInitialScan after scan', async () => {
+      vaultScanner['_hasCompletedInitialScan'] = true;
+      expect(vaultScanner.hasCompletedInitialScan()).toBe(true);
+    });
+
     it('should get tasks from state manager with getTasks()', () => {
       const task = createBaseTask();
       taskStateManager.setTasks([task]);
