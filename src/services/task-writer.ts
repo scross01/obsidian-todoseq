@@ -393,11 +393,13 @@ export class TaskWriter {
     const state = task.state;
     const text = task.text ? ` ${task.text}` : '';
 
-    // For checkbox tasks, add a space after the list marker
-    // The listMarker for checkboxes is "- [ ]" but format requires "- [ ] "
-    // Check for '[' instead of '-[' to avoid footnote issues
+    // For checkbox tasks, ensure a space after the list marker
+    // The listMarker may or may not include trailing whitespace depending on regex capture
     const isCheckboxTask = listMarker.includes('[');
-    const listMarkerWithSpace = isCheckboxTask ? `${listMarker} ` : listMarker;
+    const listMarkerWithSpace =
+      isCheckboxTask && !listMarker.endsWith(' ')
+        ? `${listMarker} `
+        : listMarker;
 
     // Preserve embed and footnote references if they exist
     // Embed reference comes before the text, footnote reference comes after the text

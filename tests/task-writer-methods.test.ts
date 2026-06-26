@@ -934,6 +934,37 @@ describe('TaskWriter Instance Methods', () => {
       expect(mockApp.vault.process).toHaveBeenCalled();
     });
 
+    it('should not add extra space for checkbox tasks with trailing space in listMarker', async () => {
+      // The parser captures listMarker as "- [ ]" (with trailing space from regex)
+      // This test ensures we don't add a double space
+      const task: Task = createBaseTask({
+        rawText: '- [ ] TODO Task text',
+        listMarker: '- [ ] ',
+        text: 'Task text',
+        priority: null,
+      });
+      mockApp.workspace.getActiveViewOfType = jest.fn().mockReturnValue(null);
+      const mockTFile = new MockTFile();
+      mockApp.vault.getAbstractFileByPath = jest
+        .fn()
+        .mockReturnValue(mockTFile);
+      mockApp.vault.process.mockImplementation(
+        (_file: any, updateFn: (content: string) => string) => {
+          return Promise.resolve(updateFn('- [ ] TODO Task text'));
+        },
+      );
+
+      await taskWriter.updateTaskPriority(task, 'high');
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      const processCall = mockApp.vault.process.mock.calls[0];
+      const updateFn = processCall[1];
+      const result = updateFn('- [ ] TODO Task text');
+      // Should have exactly one space between checkbox and keyword
+      expect(result).toBe('- [ ] TODO [#A] Task text');
+      expect(result).not.toMatch(/\[ \]\s{2}/);
+    });
+
     // Bulleted task priority handling
     it('should handle bulleted tasks with dash marker', async () => {
       const task: Task = createBaseTask({

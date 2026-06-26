@@ -3,6 +3,8 @@
 ## 0.16.3
 
 - Fixed cycle task state on recurring tasks causing "file modified externally" warning and corrupted state text.
+- Editor commands (toggle state, cycle state, priority) now work when cursor is on a SCHEDULED, DEADLINE, or CLOSED date line.
+- Fixed extra space inserted when updating priority on checkbox tasks.
 
 ## 0.16.2
 
