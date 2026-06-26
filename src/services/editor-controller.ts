@@ -95,6 +95,40 @@ export class EditorController {
   }
 
   /**
+   * Resolve the task line number from a cursor position.
+   * If the cursor is on a date line (SCHEDULED, DEADLINE, CLOSED), walk upward
+   * to find the parent task line. Otherwise, return the original line number.
+   */
+  private resolveTaskLineFromCursor(
+    editor: Editor,
+    lineNumber: number,
+  ): number {
+    const line = editor.getLine(lineNumber);
+    const parser = this.plugin.getVaultScanner()?.getParser();
+
+    // Already a task line
+    if (parser?.testRegex.test(line)) return lineNumber;
+
+    // Check if it's a date line
+    const trimmed = line.trimStart();
+    const isDateLine =
+      /^(SCHEDULED|DEADLINE|CLOSED):/.test(trimmed) ||
+      /^(>\s*)+(SCHEDULED|DEADLINE|CLOSED):/.test(trimmed);
+
+    if (!isDateLine) return lineNumber;
+
+    // Walk upward to find parent task
+    for (let i = lineNumber - 1; i >= 0; i--) {
+      const prev = editor.getLine(i);
+      if (parser?.testRegex.test(prev)) return i;
+      // Stop at empty line
+      if (prev.trim() === '') break;
+    }
+
+    return lineNumber;
+  }
+
+  /**
    * Remove any slash command text from the raw editor line
    * This handles the case where the user typed /<anything> to trigger the command palette.
    * Works directly on the raw editor line — never on parsed task text or stale vault data.
@@ -155,6 +189,9 @@ export class EditorController {
     if (!vaultScanner) {
       return false;
     }
+
+    // Resolve to parent task if cursor is on a date line
+    lineNumber = this.resolveTaskLineFromCursor(editor, lineNumber);
 
     // Get the line from the editor
     const line = editor.getLine(lineNumber);
@@ -266,13 +303,16 @@ export class EditorController {
       return false;
     }
 
-    // Get the line from the editor
-    const line = editor.getLine(lineNumber);
-
     if (checking) {
       // For cycle task state, the command should be available on any line
       return true;
     }
+
+    // Resolve to parent task if cursor is on a date line
+    lineNumber = this.resolveTaskLineFromCursor(editor, lineNumber);
+
+    // Get the line from the editor
+    const line = editor.getLine(lineNumber);
 
     // Parse the task from the line (this will return null for lines without task keywords)
     const task = this.parseTaskFromLine(
@@ -517,6 +557,9 @@ export class EditorController {
     if (!taskEditor || !vaultScanner) {
       return false;
     }
+
+    // Resolve to parent task if cursor is on a date line
+    lineNumber = this.resolveTaskLineFromCursor(editor, lineNumber);
 
     // Get the line from the editor
     const line = editor.getLine(lineNumber);

@@ -236,4 +236,65 @@ describe('Editor Controller - Date Line Handling', () => {
       expect(mockMoveCursorToDateLine).toHaveBeenCalled();
     });
   });
+
+  describe('resolveTaskLineFromCursor', () => {
+    function setupMockEditor(lines: string[]) {
+      mockEditor = {
+        getLine: (lineNumber: number) => lines[lineNumber] || '',
+      };
+    }
+
+    it('should return same line for task line', () => {
+      setupMockEditor(['TODO Test task', 'SCHEDULED: <2024-01-15>']);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 0),
+      ).toBe(0);
+    });
+
+    it('should resolve SCHEDULED line to parent task', () => {
+      setupMockEditor(['TODO Test task', 'SCHEDULED: <2024-01-15>']);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 1),
+      ).toBe(0);
+    });
+
+    it('should resolve DEADLINE line to parent task', () => {
+      setupMockEditor(['DOING Another task', 'DEADLINE: <2024-06-30>']);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 1),
+      ).toBe(0);
+    });
+
+    it('should resolve CLOSED line to parent task', () => {
+      setupMockEditor(['DONE Finished task', 'CLOSED: <2024-01-10>']);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 1),
+      ).toBe(0);
+    });
+
+    it('should resolve nested date line to parent task', () => {
+      setupMockEditor([
+        'TODO Parent task',
+        '  SCHEDULED: <2024-01-15>',
+        '  DEADLINE: <2024-06-30>',
+      ]);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 2),
+      ).toBe(0);
+    });
+
+    it('should stop at empty line when walking up', () => {
+      setupMockEditor(['', 'SCHEDULED: <2024-01-15>']);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 1),
+      ).toBe(1);
+    });
+
+    it('should return original line for non-date, non-task line', () => {
+      setupMockEditor(['Some random text', 'Another line']);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 0),
+      ).toBe(0);
+    });
+  });
 });
