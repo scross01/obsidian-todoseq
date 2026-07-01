@@ -1097,9 +1097,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             drop.setValue(this.plugin.settings.taskListViewMode);
             drop.onChange(async (value: string) => {
               const mode = value as
-                | 'showAll'
-                | 'sortCompletedLast'
-                | 'hideCompleted';
+                'showAll' | 'sortCompletedLast' | 'hideCompleted';
               this.plugin.settings.taskListViewMode = mode;
               await this.plugin.saveSettings();
               await this.refreshAllTaskListViews();
@@ -1120,10 +1118,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             drop.setValue(this.plugin.settings.futureTaskSorting);
             drop.onChange(async (value: string) => {
               const mode = value as
-                | 'showAll'
-                | 'showUpcoming'
-                | 'sortToEnd'
-                | 'hideFuture';
+                'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture';
               this.plugin.settings.futureTaskSorting = mode;
               await this.plugin.saveSettings();
               await this.refreshAllTaskListViews();

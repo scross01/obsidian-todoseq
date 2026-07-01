@@ -53,10 +53,7 @@ export type SortMethod =
  * Future task display options
  */
 export type FutureTaskSetting =
-  | 'showAll'
-  | 'showUpcoming'
-  | 'sortToEnd'
-  | 'hideFuture';
+  'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture';
 
 /**
  * Completed task display options

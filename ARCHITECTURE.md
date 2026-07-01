@@ -1306,10 +1306,7 @@ type TaskListViewMode = 'showAll' | 'sortCompletedLast' | 'hideCompleted';
 
 // Future task sorting options
 type FutureTaskSorting =
-  | 'showAll'
-  | 'showUpcoming'
-  | 'sortToEnd'
-  | 'hideFuture';
+  'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture';
 ```
 
 ### Key Type Definitions

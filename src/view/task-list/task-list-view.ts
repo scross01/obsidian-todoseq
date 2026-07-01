@@ -685,10 +685,7 @@ export class TaskListView extends ItemView {
     futureDropdown.addEventListener('change', () => {
       void (async () => {
         const selectedValue = futureDropdown.value as
-          | 'showAll'
-          | 'showUpcoming'
-          | 'sortToEnd'
-          | 'hideFuture';
+          'showAll' | 'showUpcoming' | 'sortToEnd' | 'hideFuture';
 
         // Update settings and re-render
         this.plugin.settings.futureTaskSorting = selectedValue;
@@ -1955,6 +1952,7 @@ export class TaskListView extends ItemView {
         // No tasks in vault at all
         title.setText('No tasks found');
         subtitle.setText(
+          // eslint-disable-next-line obsidianmd/ui/sentence-case -- correct case for test.
           'Create tasks in your notes using "TODO your task". They will appear here automatically.',
         );
       } else if (isHideCompleted && !hasAnyIncomplete) {

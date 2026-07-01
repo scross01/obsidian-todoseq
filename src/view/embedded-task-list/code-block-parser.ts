@@ -21,10 +21,7 @@ export type CompletedOption = 'show' | 'hide' | 'sort-to-end';
  * Valid future task display options
  */
 export type FutureOption =
-  | 'show-all'
-  | 'show-upcoming'
-  | 'hide'
-  | 'sort-to-end';
+  'show-all' | 'show-upcoming' | 'hide' | 'sort-to-end';
 
 /**
  * Parsed parameters from a todoseq code block

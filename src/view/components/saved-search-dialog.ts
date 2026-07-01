@@ -247,12 +247,10 @@ export class SavedSearchDialog {
         name,
         query,
         viewMode: (viewModeSelect.value || undefined) as
-          | TaskListViewMode
-          | undefined,
+          TaskListViewMode | undefined,
         sortMethod: (sortSelect.value || undefined) as SortMethod | undefined,
         futureTaskSorting: (futureSelect.value || undefined) as
-          | TodoTrackerSettings['futureTaskSorting']
-          | undefined,
+          TodoTrackerSettings['futureTaskSorting'] | undefined,
         matchCase:
           matchCaseSelect.value === 'on'
             ? true

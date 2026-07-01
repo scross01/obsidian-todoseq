@@ -1292,9 +1292,7 @@ describe('RecurrenceCoordinator', () => {
       // guard with a typeof check.
       const view = new MarkdownView();
       view.file = new TFile('test.md', 'test.md', 'md');
-      view.editor = {
-        /* no getValue */
-      };
+      view.editor = {/* no getValue */};
       (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([
         { view },
       ]);

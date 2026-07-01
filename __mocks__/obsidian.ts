@@ -121,8 +121,7 @@ export const Platform = { isMobile: false };
 export class Notice {
   constructor(message: string, timeout?: number) {
     const instances = (Notice as any).instances as
-      | Array<{ message: string; timeout?: number }>
-      | undefined;
+      Array<{ message: string; timeout?: number }> | undefined;
     if (instances) {
       instances.push({ message, timeout });
     }

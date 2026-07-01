@@ -185,9 +185,7 @@ export function findDateLineWithParser(
   if (parser) {
     const maxLines = Math.min(startIndex + 9, lines.length);
     const targetDateType = dateType.toLowerCase() as
-      | 'scheduled'
-      | 'deadline'
-      | 'closed';
+      'scheduled' | 'deadline' | 'closed';
 
     for (let i = startIndex; i < maxLines; i++) {
       const line = lines[i];

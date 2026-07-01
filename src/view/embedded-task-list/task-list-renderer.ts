@@ -1006,9 +1006,7 @@ export class EmbeddedTaskListRenderer {
     // This prevents "No tasks found" from flashing before the scan begins
     const allTasks = this.plugin.vaultScanner?.getTasks() ?? [];
     const isInitialLoad =
-      !isScanning &&
-      !hasCompletedInitialScan &&
-      allTasks.length === 0;
+      !isScanning && !hasCompletedInitialScan && allTasks.length === 0;
 
     if (isScanning || isInitialLoad) {
       emptyState.createEl('div', {

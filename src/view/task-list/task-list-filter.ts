@@ -8,9 +8,7 @@ import TodoTracker from '../../main';
 import { KeywordManager } from '../../utils/keyword-manager';
 
 export type TaskListViewMode =
-  | 'showAll'
-  | 'sortCompletedLast'
-  | 'hideCompleted';
+  'showAll' | 'sortCompletedLast' | 'hideCompleted';
 export type SortMethod =
   | 'default'
   | 'sortByScheduled'
