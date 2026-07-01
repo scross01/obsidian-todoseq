@@ -17,6 +17,9 @@ main.js
 
 # obsidian
 data.json
+.obsidian/plugins/
+.obsidian/themes/
+.obsidian/workspace.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
@@ -27,33 +30,13 @@ data.json
 # exclude coverage report
 coverage/
 
-# exclude roo files
-.roo/
-.rooignore
-.roomodes
-plans/
-
-# exclude kilocode files
-.kilocode/
-.kilocodemodes
-
-# ignore feature planning docs
-FEAT*.md
-
+# local dev files
 Makefile
-
-.obsidian/plugins/
-.obsidian/workspace.json
+test-results/.last-run.json
 
 # VitePress build output
 docs/.vitepress/dist
 docs/.vitepress/cache
-
-# Claude Code
-CLAUDE.md
-.claude/
-.obsidian/themes/
-examples/Test Performance/*
 
 # TypeScript build info
 tsconfig.tsbuildinfo
@@ -67,9 +50,15 @@ tests/integration/test-results/
 # Keep the committed baseline plugin-settings fixture (deterministic test start)
 !tests/integration/fixtures/baseline-plugin-data.json
 
-.poolside/
+
+# AI agents and skills
+# exclude kilocode files
+CLAUDE.md
 .agents/
-skills-lock.json
-test-results/.last-run.json
-.mimocode/
+.claude/
 .kilo/
+.poolside/
+.mimocode/
+
+skills-lock.json
+wiki/

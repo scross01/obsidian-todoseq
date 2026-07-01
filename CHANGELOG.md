@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.16.4
+
+- Fixed show 'No tasks found' instead of 'Loading...' when vault has no tasks after scan.
+- Fixed task not removed from task list when last task deleted from vault.
+
 ## 0.16.3
 
 - Fixed cycle task state on recurring tasks causing "file modified externally" warning and corrupted state text.
