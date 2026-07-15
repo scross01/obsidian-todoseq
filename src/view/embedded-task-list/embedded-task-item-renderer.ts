@@ -538,6 +538,7 @@ export class EmbeddedTaskItemRenderer {
           const freshTask = this.plugin.taskStateManager.findTaskByPathAndLine(
             task.path,
             task.line,
+            task.tableCell?.cellIndex,
           );
           const currentTask = freshTask || task;
           const currentState = currentTask.state;
@@ -779,6 +780,7 @@ export class EmbeddedTaskItemRenderer {
           task.line,
           newState,
           'embedded',
+          task.tableCell?.cellIndex,
         );
       } else if (this.plugin.taskEditor) {
         await this.plugin.taskEditor.updateTaskState(task, newState, true);

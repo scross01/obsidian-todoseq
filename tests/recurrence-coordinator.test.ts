@@ -11,6 +11,7 @@ import { RecurrenceCoordinator } from '../src/services/recurrence-coordinator';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { App, MarkdownView, TFile } from 'obsidian';
 import { Task } from '../src/types/task';
+import { getTaskKey } from '../src/utils/task-utils';
 import {
   createTestKeywordManager,
   createBaseSettings,
@@ -454,11 +455,7 @@ describe('RecurrenceCoordinator', () => {
       const task2 = createMockTask({ path: 'test2.md', line: 0 });
       const task3 = createMockTask({ path: 'test1.md', line: 5 });
 
-      const keys = [
-        coordinator['getTaskKey'](task1),
-        coordinator['getTaskKey'](task2),
-        coordinator['getTaskKey'](task3),
-      ];
+      const keys = [getTaskKey(task1), getTaskKey(task2), getTaskKey(task3)];
 
       expect(new Set(keys).size).toBe(3);
     });
@@ -466,8 +463,8 @@ describe('RecurrenceCoordinator', () => {
     it('should create same key for same task', () => {
       const task = createMockTask({ path: 'test.md', line: 3 });
 
-      const key1 = coordinator['getTaskKey'](task);
-      const key2 = coordinator['getTaskKey'](task);
+      const key1 = getTaskKey(task);
+      const key2 = getTaskKey(task);
 
       expect(key1).toBe(key2);
     });

@@ -118,9 +118,20 @@ export class TaskStateManager {
    * @param line Line number (0-indexed)
    * @returns Task or null if not found
    */
-  findTaskByPathAndLine(path: string, line: number): Task | null {
+  findTaskByPathAndLine(
+    path: string,
+    line: number,
+    cellIndex?: number,
+  ): Task | null {
     const foundTask =
-      this._tasks.find((t) => t.path === path && t.line === line) || null;
+      this._tasks.find(
+        (t) =>
+          t.path === path &&
+          t.line === line &&
+          (cellIndex === undefined
+            ? true
+            : t.tableCell?.cellIndex === cellIndex),
+      ) || null;
     return foundTask;
   }
 
@@ -165,8 +176,9 @@ export class TaskStateManager {
     path: string,
     line: number,
     updates: Partial<Task>,
+    cellIndex?: number,
   ): boolean {
-    const existingTask = this.findTaskByPathAndLine(path, line);
+    const existingTask = this.findTaskByPathAndLine(path, line, cellIndex);
     if (!existingTask) {
       return false;
     }
@@ -219,11 +231,16 @@ export class TaskStateManager {
 
     // Update using path+line lookup for safety
     // Note: updateTaskByPathAndLine already handles parent subtask count updates
-    this.updateTaskByPathAndLine(task.path, task.line, {
-      state: newState,
-      completed: isCompleted,
-      rawText: newLine,
-    });
+    this.updateTaskByPathAndLine(
+      task.path,
+      task.line,
+      {
+        state: newState,
+        completed: isCompleted,
+        rawText: newLine,
+      },
+      task.tableCell?.cellIndex,
+    );
 
     // Notify subscribers of the change
     this.notifySubscribers();

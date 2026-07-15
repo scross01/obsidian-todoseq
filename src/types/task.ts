@@ -32,6 +32,8 @@ export interface Task {
   subtaskCount: number; // total number of subtasks (checkbox lines indented under this task)
   subtaskCompletedCount: number; // number of completed subtasks
   _lastUpdateTime?: number; // timestamp of last task update by TODOseq (used for race condition prevention)
+  isTableTask?: boolean; // true if task was parsed from a markdown table cell
+  tableCell?: { cellIndex: number }; // position info for table cell tasks
 }
 
 export type KeywordGroup =

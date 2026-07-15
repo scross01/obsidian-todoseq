@@ -20,6 +20,9 @@ import {
   findDescriptionLine,
   getTaskIndent,
   getDateLineIndent,
+  parseTableCells,
+  isTableRow,
+  getCellTaskLine,
 } from '../utils/task-line-utils';
 import { TaskContextMenu } from '../view/components/task-context-menu';
 import {
@@ -72,10 +75,18 @@ export class EditorController {
     // These come from separate lines below the task, so they're not affected
     // by what the user is typing on the task line itself
     if (this.plugin.taskStateManager) {
-      const existingTask = this.plugin.taskStateManager.findTaskByPathAndLine(
-        filePath,
-        lineNumber,
-      );
+      // For table tasks, match by cell index to avoid merging wrong cell's dates
+      const existingTask =
+        parsedTask.isTableTask && parsedTask.tableCell
+          ? this.plugin.taskStateManager.findTaskByPathAndLine(
+              filePath,
+              lineNumber,
+              parsedTask.tableCell.cellIndex,
+            )
+          : this.plugin.taskStateManager.findTaskByPathAndLine(
+              filePath,
+              lineNumber,
+            );
       if (existingTask) {
         return {
           ...parsedTask,
@@ -88,6 +99,8 @@ export class EditorController {
           deadlineWarningPeriod: existingTask.deadlineWarningPeriod,
           subtaskCount: existingTask.subtaskCount,
           subtaskCompletedCount: existingTask.subtaskCompletedCount,
+          isTableTask: existingTask.isTableTask,
+          tableCell: existingTask.tableCell,
         };
       }
     }
@@ -200,6 +213,105 @@ export class EditorController {
     // Check if this line contains a valid task using VaultScanner's parser
     const parser = vaultScanner.getParser();
 
+    // Table cell task detection (experimental)
+    if (
+      this.plugin.settings?.experimentalTableTasks &&
+      isTableRow(line) &&
+      parser &&
+      !parser.testRegex.test(line)
+    ) {
+      const cursor = editor.getCursor();
+      const cells = parseTableCells(line);
+
+      // First pass: find the cell the cursor is in
+      let foundTask = false;
+      for (let i = 0; i < cells.length; i++) {
+        const { content, start, end } = cells[i];
+        if (!content) continue;
+        if (cursor.ch >= start && cursor.ch < end) {
+          const taskLine = getCellTaskLine(content);
+          if (taskLine && parser.testRegex.test(taskLine)) {
+            const task = parser.parseLineAsTask(
+              taskLine,
+              lineNumber,
+              view.file?.path ?? '',
+            );
+            if (task) {
+              task.isTableTask = true;
+              task.tableCell = { cellIndex: i };
+              if (checking) return true;
+              let targetState: string = newState ?? '';
+              if (!newState) {
+                const stateManager = getStateTransitionManager(
+                  this.plugin.taskUpdateCoordinator,
+                  this.keywordManager,
+                  this.plugin.settings?.stateTransitions,
+                );
+                targetState = stateManager.getNextState(task.state);
+              }
+              this.plugin.taskUpdateCoordinator
+                ?.updateTask({
+                  task,
+                  type: 'state',
+                  source: 'editor',
+                  newState: targetState,
+                })
+                .catch((error) => {
+                  new Notice('Failed to update task');
+                  console.error('Error updating task:', error);
+                });
+              foundTask = true;
+            }
+          }
+          break;
+        }
+      }
+
+      // Second pass: cursor not in any cell — find first task cell on the line
+      // Handles command palette, right-click keyword, and other non-cursor-based invocations
+      if (!foundTask) {
+        for (let i = 0; i < cells.length; i++) {
+          const { content } = cells[i];
+          if (!content) continue;
+          const taskLine = getCellTaskLine(content);
+          if (taskLine && parser.testRegex.test(taskLine)) {
+            const task = parser.parseLineAsTask(
+              taskLine,
+              lineNumber,
+              view.file?.path ?? '',
+            );
+            if (task) {
+              task.isTableTask = true;
+              task.tableCell = { cellIndex: i };
+              if (checking) return true;
+              let targetState: string = newState ?? '';
+              if (!newState) {
+                const stateManager = getStateTransitionManager(
+                  this.plugin.taskUpdateCoordinator,
+                  this.keywordManager,
+                  this.plugin.settings?.stateTransitions,
+                );
+                targetState = stateManager.getNextState(task.state);
+              }
+              this.plugin.taskUpdateCoordinator
+                ?.updateTask({
+                  task,
+                  type: 'state',
+                  source: 'editor',
+                  newState: targetState,
+                })
+                .catch((error) => {
+                  new Notice('Failed to update task');
+                  console.error('Error updating task:', error);
+                });
+              break;
+            }
+          }
+        }
+        return true;
+      }
+    }
+
     if (!parser?.testRegex.test(line)) {
       // Try footnote regex specifically
       const footnoteRegex =
@@ -237,7 +349,13 @@ export class EditorController {
       const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
       if (taskUpdateCoordinator) {
         taskUpdateCoordinator
-          .updateTaskByPath(filePath, lineNumber, targetState, 'editor')
+          .updateTaskByPath(
+            filePath,
+            lineNumber,
+            targetState,
+            'editor',
+            task.tableCell?.cellIndex,
+          )
           .catch((error) => {
             new Notice('Failed to update task');
             console.error('Error updating task:', error);
@@ -1529,6 +1647,89 @@ export class EditorController {
 
     // Check if this line contains a valid task using VaultScanner's parser
     const parser = vaultScanner.getParser();
+
+    // Table cell task detection (experimental) for date pickers
+    if (
+      this.plugin.settings?.experimentalTableTasks &&
+      isTableRow(line) &&
+      parser &&
+      !parser.testRegex.test(line)
+    ) {
+      const cells = parseTableCells(line);
+
+      for (let i = 0; i < cells.length; i++) {
+        const { content, start, end } = cells[i];
+        if (!content) continue;
+        if (cursor.ch >= start && cursor.ch < end) {
+          const taskLine = getCellTaskLine(content);
+          if (taskLine && parser.testRegex.test(taskLine)) {
+            const task = parser.parseLineAsTask(
+              taskLine,
+              cursor.line,
+              view.file?.path ?? '',
+            );
+            if (task) {
+              task.isTableTask = true;
+              task.tableCell = { cellIndex: i };
+              if (checking) return true;
+              const cmEditor = (view.editor as { cm?: EditorView })?.cm;
+              if (!cmEditor) return false;
+              const pos2 = editor.posToOffset({ line: cursor.line, ch: 0 });
+              const coords = cmEditor.coordsAtPos(pos2);
+              if (!coords) return false;
+              const initialDate =
+                mode === 'scheduled' ? task.scheduledDate : task.deadlineDate;
+              const initialRepeat =
+                mode === 'scheduled'
+                  ? task.scheduledDateRepeat
+                  : task.deadlineDateRepeat;
+              const datePicker = new DatePicker(
+                {
+                  onDateSelected: (
+                    date: Date | null,
+                    repeat: DateRepeatInfo | null,
+                    selectedMode: DatePickerMode,
+                  ) => {
+                    const taskUpdateCoordinator =
+                      this.plugin.taskUpdateCoordinator;
+                    if (taskUpdateCoordinator) {
+                      const updateType =
+                        selectedMode === 'scheduled'
+                          ? 'scheduled-date'
+                          : 'deadline-date';
+                      taskUpdateCoordinator
+                        .updateTask({
+                          task,
+                          type: updateType,
+                          source: 'editor',
+                          newDate: date,
+                          newRepeat: repeat,
+                        })
+                        .catch((error) => {
+                          console.error('Error updating task date:', error);
+                        });
+                    }
+                  },
+                },
+                { weekStartsOn: this.plugin.settings.weekStartsOn },
+              );
+              datePicker
+                .show(
+                  { x: coords.left, y: coords.top + 20 },
+                  mode,
+                  initialDate ?? undefined,
+                  initialRepeat ?? undefined,
+                )
+                .catch((error) => {
+                  console.error('Error showing date picker:', error);
+                });
+              return true;
+            }
+          }
+          break;
+        }
+      }
+    }
 
     if (!parser?.testRegex.test(line)) {
       // Try footnote regex specifically

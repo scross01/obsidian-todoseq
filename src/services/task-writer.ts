@@ -201,6 +201,15 @@ export class TaskWriter {
     keepPriority = true,
     forceVaultApi = false,
   ): Promise<Task> {
+    // Table tasks use vault.process for cell-level writes
+    if (
+      task.isTableTask &&
+      this.settings?.experimentalTableTasks &&
+      task.tableCell
+    ) {
+      return this.applyTableCellUpdate(task, newState, keepPriority);
+    }
+
     const settings = this.settings;
     const { newLine, completed } = TaskWriter.generateTaskLine(
       task,
@@ -338,6 +347,192 @@ export class TaskWriter {
     return result;
   }
 
+  /**
+   * Update a table cell task's state via vault.process().
+   * Extracts just the keyword+text part from generateTaskLine() output
+   * and replaces the cell content in the table row.
+   */
+  private isTableCellDateUpdate(task: Task): boolean {
+    return !!(
+      task.isTableTask &&
+      this.settings?.experimentalTableTasks &&
+      task.tableCell
+    );
+  }
+
+  private async modifyTableCell(
+    task: Task,
+    mutate: (cellContent: string) => string,
+  ): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) return;
+
+    await this.app.vault.process(file, (data) => {
+      const lines = data.split('\n');
+      if (task.line >= lines.length) return data;
+      const line = lines[task.line];
+      const cells = line.split('|');
+      let start = 0;
+      if (cells.length > 0 && cells[0].trim() === '') start = 1;
+      const idx = start + task.tableCell!.cellIndex;
+      if (idx >= cells.length) return data;
+      const origCell = cells[idx].trim();
+      const newCell = mutate(origCell);
+      cells[idx] = ` ${newCell} `;
+      lines[task.line] = cells.join('|');
+      return lines.join('\n');
+    });
+  }
+
+  private async applyTableCellUpdate(
+    task: Task,
+    newState: string,
+    keepPriority: boolean,
+  ): Promise<Task> {
+    const { newLine, completed } = TaskWriter.generateTaskLine(
+      task,
+      newState,
+      keepPriority,
+      this.keywordManager,
+    );
+
+    // Extract just the keyword + text part (strip indent + listMarker)
+    let cellContent = newLine;
+    if (cellContent.startsWith(task.indent)) {
+      cellContent = cellContent.slice(task.indent.length);
+    }
+    if (cellContent.startsWith(task.listMarker)) {
+      cellContent = cellContent.slice(task.listMarker.length);
+    }
+    cellContent = cellContent.trim();
+
+    let fullCellContent = cellContent;
+    await this.modifyTableCell(task, (origCell) => {
+      const brIdx = origCell.indexOf('<br');
+      let dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
+
+      // Add or update CLOSED date when trackClosedDate is enabled
+      if (completed && this.settings?.trackClosedDate) {
+        const closedDateStr = DateUtils.formatClosedDate(new Date());
+        const closedPattern = /\s*<br\s*\/?>\s*CLOSED:\s*<[^>]+>/i;
+        const closedTag = `<br>CLOSED: [${closedDateStr}]`;
+        if (closedPattern.test(dateSuffix)) {
+          dateSuffix = dateSuffix.replace(closedPattern, closedTag);
+        } else {
+          dateSuffix = `${dateSuffix}${closedTag}`;
+        }
+      } else if (!completed && task.closedDate) {
+        // Remove CLOSED date when un-completing a task
+        dateSuffix = dateSuffix.replace(
+          /\s*<br\s*\/?>\s*CLOSED:\s*<[^>]+>/i,
+          '',
+        );
+      }
+
+      fullCellContent = `${cellContent}${dateSuffix}`;
+      return fullCellContent;
+    });
+
+    let closedDate = task.closedDate;
+    if (completed && this.settings?.trackClosedDate) closedDate = new Date();
+    else if (!completed && task.closedDate) closedDate = null;
+
+    return {
+      ...task,
+      rawText: fullCellContent,
+      state: newState,
+      completed,
+      closedDate,
+    };
+  }
+
+  /**
+   * Replace cell content while preserving inline date lines.
+   * Used by priority and other non-state updates on table tasks.
+   */
+  private async applyTableCellContent(
+    task: Task,
+    cellContent: string,
+    extraUpdates: Partial<Task>,
+  ): Promise<Task> {
+    await this.modifyTableCell(task, (origCell) => {
+      const brIdx = origCell.indexOf('<br');
+      const dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
+      return `${cellContent}${dateSuffix}`;
+    });
+
+    return { ...task, rawText: cellContent, ...extraUpdates };
+  }
+
+  /**
+   * Update a SCHEDULED/DEADLINE date inside a table cell.
+   * Dates are stored inline as <br>SCHEDULED: <date> within the cell.
+   */
+  private async applyTableCellDateUpdate(
+    task: Task,
+    newDate: Date,
+    dateType: 'SCHEDULED' | 'DEADLINE',
+    repeat?: DateRepeatInfo | null,
+    warningPeriod?: WarningPeriodInfo | null,
+  ): Promise<Task & { lineDelta?: number }> {
+    const dateStr = TaskWriter.buildDateLineContent(
+      newDate,
+      repeat,
+      warningPeriod,
+    );
+
+    await this.modifyTableCell(task, (cell) => {
+      const dateTag = `${dateType}: ${dateStr}`;
+      const existing = new RegExp(`<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`, 'i');
+      return existing.test(cell)
+        ? cell.replace(existing, `<br>${dateTag}`)
+        : `${cell}<br>${dateTag}`;
+    });
+
+    const result: Task & { lineDelta?: number } = {
+      ...task,
+      ...(dateType === 'SCHEDULED'
+        ? {
+            scheduledDate: newDate,
+            scheduledDateRepeat: repeat ?? null,
+            scheduledWarningPeriod: warningPeriod ?? null,
+          }
+        : {
+            deadlineDate: newDate,
+            deadlineDateRepeat: repeat ?? null,
+            deadlineWarningPeriod: warningPeriod ?? null,
+          }),
+    };
+    return result;
+  }
+
+  /**
+   * Remove a date (SCHEDULED or DEADLINE) from a table cell.
+   * Strips the <br>DATE_TYPE: <date> from the cell content.
+   */
+  private async removeTableCellDate(
+    task: Task,
+    dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED',
+  ): Promise<Task & { lineDelta?: number }> {
+    await this.modifyTableCell(task, (cell) => {
+      const datePattern = new RegExp(
+        `\\s*<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`,
+        'i',
+      );
+      return cell.replace(datePattern, '');
+    });
+
+    const result: Task & { lineDelta?: number } = {
+      ...task,
+      ...(dateType === 'SCHEDULED'
+        ? { scheduledDate: null }
+        : dateType === 'DEADLINE'
+          ? { deadlineDate: null }
+          : { closedDate: null }),
+    };
+    return result;
+  }
+
   // Cycles a task to its next state using TaskStateTransitionManager and persists change
   async updateTaskState(
     task: Task,
@@ -383,6 +578,25 @@ export class TaskWriter {
     task: Task,
     newPriority: 'high' | 'med' | 'low',
   ): Promise<Task> {
+    // Table tasks: update cell content only
+    if (
+      task.isTableTask &&
+      this.settings?.experimentalTableTasks &&
+      task.tableCell
+    ) {
+      const priorityToken =
+        newPriority === 'high'
+          ? '[#A]'
+          : newPriority === 'med'
+            ? '[#B]'
+            : '[#C]';
+      const text = task.text ? ` ${task.text}` : '';
+      const cellContent = `${task.state} ${priorityToken}${text}`;
+      return this.applyTableCellContent(task, cellContent, {
+        priority: newPriority,
+      });
+    }
+
     // Generate priority token
     const priorityToken =
       newPriority === 'high' ? '[#A]' : newPriority === 'med' ? '[#B]' : '[#C]';
@@ -468,8 +682,18 @@ export class TaskWriter {
    */
   async removeTaskPriority(task: Task): Promise<Task> {
     if (!task.priority) {
-      // No priority to remove — return unchanged
       return { ...task };
+    }
+
+    // Table tasks: update cell content only
+    if (
+      task.isTableTask &&
+      this.settings?.experimentalTableTasks &&
+      task.tableCell
+    ) {
+      const text = task.text ? ` ${task.text}` : '';
+      const cellContent = `${task.state}${text}`;
+      return this.applyTableCellContent(task, cellContent, { priority: null });
     }
 
     // Reconstruct task line from task attributes (without priority)
@@ -513,6 +737,17 @@ export class TaskWriter {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ): Promise<Task & { lineDelta?: number }> {
+    // Table tasks store dates inline with <br> separators
+    if (this.isTableCellDateUpdate(task)) {
+      return this.applyTableCellDateUpdate(
+        task,
+        newDate,
+        'SCHEDULED',
+        repeat,
+        warningPeriod,
+      );
+    }
+
     const dateStr = TaskWriter.buildDateLineContent(
       newDate,
       repeat,
@@ -573,6 +808,11 @@ export class TaskWriter {
   async removeTaskScheduledDate(
     task: Task,
   ): Promise<Task & { lineDelta?: number }> {
+    // Table tasks store dates inline — strip from cell
+    if (this.isTableCellDateUpdate(task)) {
+      return this.removeTableCellDate(task, 'SCHEDULED');
+    }
+
     let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -627,6 +867,17 @@ export class TaskWriter {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ): Promise<Task & { lineDelta?: number }> {
+    // Table tasks store dates inline with <br> separators
+    if (this.isTableCellDateUpdate(task)) {
+      return this.applyTableCellDateUpdate(
+        task,
+        newDate,
+        'DEADLINE',
+        repeat,
+        warningPeriod,
+      );
+    }
+
     const dateStr = TaskWriter.buildDateLineContent(
       newDate,
       repeat,
@@ -687,6 +938,11 @@ export class TaskWriter {
   async removeTaskDeadlineDate(
     task: Task,
   ): Promise<Task & { lineDelta?: number }> {
+    // Table tasks store dates inline — strip from cell
+    if (this.isTableCellDateUpdate(task)) {
+      return this.removeTableCellDate(task, 'DEADLINE');
+    }
+
     let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -873,6 +1129,15 @@ export class TaskWriter {
     task: Task,
     forceVaultApi = false,
   ): Promise<DateLineUpdateResult> {
+    // Table tasks store dates inline — strip from cell
+    if (this.isTableCellDateUpdate(task)) {
+      await this.removeTableCellDate(task, 'CLOSED');
+      return {
+        task: { ...task, closedDate: null },
+        lineDelta: 0,
+      };
+    }
+
     let lineDelta = 0;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);

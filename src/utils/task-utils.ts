@@ -2,6 +2,16 @@ import { Task } from '../types/task';
 
 export type TaskSource = 'markdown' | 'org' | 'code';
 
+/**
+ * Get a unique key for a task. For table tasks, includes cell index.
+ */
+export function getTaskKey(task: Task): string {
+  const base = `${task.path}:${task.line}`;
+  return task.isTableTask && task.tableCell
+    ? `${base}:${task.tableCell.cellIndex}`
+    : base;
+}
+
 export function getTaskSource(path: string): TaskSource {
   const ext = path.split('.').pop()?.toLowerCase();
   if (ext === 'org') return 'org';

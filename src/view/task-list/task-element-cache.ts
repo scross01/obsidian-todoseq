@@ -1,4 +1,5 @@
 import { Task } from '../../types/task';
+import { getTaskKey } from '../../utils/task-utils';
 
 interface CachedTaskElement {
   element: HTMLLIElement;
@@ -8,21 +9,17 @@ interface CachedTaskElement {
 export class TaskElementCache {
   private cache = new Map<string, CachedTaskElement>();
 
-  private getKey(task: Task): string {
-    return `${task.path}:${task.line}`;
-  }
-
   get(task: Task): HTMLLIElement | null {
-    const cached = this.cache.get(this.getKey(task));
+    const cached = this.cache.get(getTaskKey(task));
     return cached?.element ?? null;
   }
 
   set(task: Task, element: HTMLLIElement): void {
-    this.cache.set(this.getKey(task), { element, task });
+    this.cache.set(getTaskKey(task), { element, task });
   }
 
   invalidate(task: Task): void {
-    this.cache.delete(this.getKey(task));
+    this.cache.delete(getTaskKey(task));
   }
 
   invalidateByKey(key: string): void {
@@ -34,6 +31,6 @@ export class TaskElementCache {
   }
 
   has(task: Task): boolean {
-    return this.cache.has(this.getKey(task));
+    return this.cache.has(getTaskKey(task));
   }
 }

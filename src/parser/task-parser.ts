@@ -11,7 +11,12 @@ import {
   UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
-import { getIndentLength } from '../utils/task-line-utils';
+import {
+  getIndentLength,
+  parseTableCells,
+  isSeparatorCell,
+  getCellTaskLine,
+} from '../utils/task-line-utils';
 import {
   BULLET_LIST_PATTERN_SOURCE,
   NUMBERED_LIST_PATTERN_SOURCE,
@@ -50,6 +55,7 @@ export class TaskParser implements ITaskParser {
   private readonly includeCodeBlocks: boolean;
   private readonly includeCommentBlocks: boolean;
   private readonly languageCommentSupport: boolean;
+  private experimentalTableTasks: boolean;
   private keywordManager: KeywordManager;
   public allKeywords: string[];
 
@@ -81,6 +87,7 @@ export class TaskParser implements ITaskParser {
     includeCodeBlocks: boolean,
     includeCommentBlocks: boolean,
     languageCommentSupport: boolean,
+    experimentalTableTasks: boolean,
     keywordManager: KeywordManager,
     app: App,
     urgencyCoefficients?: UrgencyCoefficients,
@@ -95,6 +102,7 @@ export class TaskParser implements ITaskParser {
     this.includeCodeBlocks = includeCodeBlocks;
     this.includeCommentBlocks = includeCommentBlocks;
     this.languageCommentSupport = languageCommentSupport;
+    this.experimentalTableTasks = experimentalTableTasks;
     this.app = app;
 
     // Use provided urgency coefficients or defaults
@@ -117,6 +125,7 @@ export class TaskParser implements ITaskParser {
       includeCodeBlocks?: boolean;
       includeCommentBlocks?: boolean;
       languageCommentSupport?: boolean;
+      experimentalTableTasks?: boolean;
     },
   ): TaskParser {
     const allKeywords = keywordManager.getAllKeywords();
@@ -128,6 +137,7 @@ export class TaskParser implements ITaskParser {
       parserSettings?.includeCodeBlocks ?? true,
       parserSettings?.includeCommentBlocks ?? false,
       parserSettings?.languageCommentSupport ?? false,
+      parserSettings?.experimentalTableTasks ?? false,
       keywordManager,
       app,
       urgencyCoefficients,
@@ -565,6 +575,13 @@ export class TaskParser implements ITaskParser {
           languageCommentSupport: boolean;
         }
       ).languageCommentSupport = config.languageCommentSupport;
+    }
+    if (config.experimentalTableTasks !== undefined) {
+      (
+        this as unknown as {
+          experimentalTableTasks: boolean;
+        }
+      ).experimentalTableTasks = config.experimentalTableTasks;
     }
   }
 
@@ -1162,6 +1179,16 @@ export class TaskParser implements ITaskParser {
         continue;
       }
 
+      // Table cell task detection (experimental)
+      if (
+        this.experimentalTableTasks &&
+        /^\s*\|/.test(line) &&
+        !this.testRegex.test(line)
+      ) {
+        tasks.push(...this.parseTasksFromTableCells(line, index, path));
+        continue;
+      }
+
       // Determine which regex to use
       const useCodeRegex =
         inBlock &&
@@ -1197,6 +1224,93 @@ export class TaskParser implements ITaskParser {
       }
     }
 
+    return tasks;
+  }
+
+  /**
+   * Parse tasks from table cells in a single table row.
+   * Each cell is split by `|`, and the first `<br>`-separated part is checked for task keywords.
+   * Inline dates (SCHEDULED, DEADLINE, CLOSED) are parsed from subsequent `<br>` parts.
+   */
+  private parseTasksFromTableCells(
+    line: string,
+    rowIndex: number,
+    filePath: string,
+  ): Task[] {
+    const cells = parseTableCells(line);
+    const tasks: Task[] = [];
+
+    for (let i = 0; i < cells.length; i++) {
+      const { content } = cells[i];
+      if (!content || isSeparatorCell(content)) continue;
+
+      const taskLine = getCellTaskLine(content);
+      if (!taskLine || !this.testRegex.test(taskLine)) continue;
+
+      const match = this.captureRegex.exec(taskLine);
+      if (!match) continue;
+
+      const { priority, cleanedText, embedReference, footnoteReference } =
+        this.extractPriority(match[5] || '');
+
+      const task: Task = {
+        path: filePath,
+        line: rowIndex,
+        rawText: taskLine,
+        indent: match[1] || '',
+        listMarker: (match[2] || '') + (match[3] || ''),
+        text: cleanedText,
+        state: match[4],
+        completed: this.keywordManager.isCompleted(match[4]),
+        priority,
+        scheduledDate: null,
+        scheduledDateRepeat: null,
+        deadlineDate: null,
+        deadlineDateRepeat: null,
+        closedDate: null,
+        scheduledWarningPeriod: null,
+        deadlineWarningPeriod: null,
+        urgency: null,
+        isDailyNote: false,
+        dailyNoteDate: null,
+        embedReference,
+        footnoteReference,
+        quoteNestingLevel: 0,
+        subtaskCount: 0,
+        subtaskCompletedCount: 0,
+        isTableTask: true,
+        tableCell: { cellIndex: i },
+      };
+
+      // Parse inline dates from <br>-separated parts
+      const parts = content.split(/<br\s*\/?>/i);
+      for (let j = 1; j < parts.length; j++) {
+        const dl = parts[j].trim();
+        const dateContent = dl
+          .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/i, '')
+          .trim();
+        if (/^SCHEDULED:/i.test(dl)) {
+          const p = DateParser.parseDateWithRepeater(dateContent);
+          if (p.date) {
+            task.scheduledDate = p.date;
+            task.scheduledDateRepeat = p.repeat;
+            task.scheduledWarningPeriod = p.warningPeriod;
+          }
+        } else if (/^DEADLINE:/i.test(dl)) {
+          const p = DateParser.parseDateWithRepeater(dateContent);
+          if (p.date) {
+            task.deadlineDate = p.date;
+            task.deadlineDateRepeat = p.repeat;
+            task.deadlineWarningPeriod = p.warningPeriod;
+          }
+        } else if (/^CLOSED:/i.test(dl)) {
+          const p = DateParser.parseDateWithRepeater(dateContent);
+          if (p.date) task.closedDate = p.date;
+        }
+      }
+
+      tasks.push(task);
+    }
     return tasks;
   }
 

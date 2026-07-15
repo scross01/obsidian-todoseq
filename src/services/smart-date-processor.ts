@@ -16,7 +16,12 @@ import {
 } from '../parser/natural-date-parser';
 import { Task } from '../types/task';
 import { formatOrgDate } from '../utils/task-format';
-import { getDateLineIndent } from '../utils/task-line-utils';
+import {
+  getDateLineIndent,
+  parseTableCells,
+  isSeparatorCell,
+  getCellTaskLine,
+} from '../utils/task-line-utils';
 
 export type InlineDateType = 'SCHEDULED' | 'DEADLINE';
 
@@ -197,6 +202,15 @@ export class SmartDateProcessor {
 
     const parser = this.plugin.getVaultScanner()?.getParser();
     if (!parser) {
+      return;
+    }
+
+    // Table cell tasks: process natural language dates within cells
+    if (
+      this.plugin.settings?.experimentalTableTasks &&
+      /^\s*\|/.test(lineText)
+    ) {
+      await this.processTableCellDates(filePath, lineNumber, lineText, view);
       return;
     }
 
@@ -598,6 +612,44 @@ export class SmartDateProcessor {
     });
 
     return true;
+  }
+
+  /**
+   * Process natural language dates inside table cells.
+   * Converts expressions like "today" to SCHEDULED: <date> within the cell.
+   */
+  private async processTableCellDates(
+    filePath: string,
+    lineNumber: number,
+    lineText: string,
+    view: EditorView,
+  ): Promise<void> {
+    const cells = parseTableCells(lineText);
+    const parser = this.plugin.getVaultScanner()?.getParser();
+    if (!parser) return;
+
+    for (let i = 0; i < cells.length; i++) {
+      const { content, start, end } = cells[i];
+      if (!content || isSeparatorCell(content)) continue;
+      const firstPart = getCellTaskLine(content);
+      if (!parser.testRegex.test(firstPart)) continue;
+      // Check entire cell (all <br>-separated parts) for existing date keywords
+      if (hasInlineStructuredDates(content)) continue;
+      const parsed = NaturalDateParser.parse(firstPart);
+      if (!parsed || !parsed.date) continue;
+
+      const dateStr = formatOrgDate(parsed.date, parsed.repeat);
+      const lineObj = view.state.doc.line(lineNumber);
+      const newCell = `${content}<br>SCHEDULED: ${dateStr}`;
+      view.dispatch({
+        changes: {
+          from: lineObj.from + start,
+          to: lineObj.from + end,
+          insert: ` ${newCell} `,
+        },
+      });
+      break; // one cell per trigger
+    }
   }
 
   private clearAllTimers(): void {

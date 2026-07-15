@@ -50,6 +50,7 @@ export interface TodoTrackerSettings {
   additionalFileExtensions: string[]; // additional file extensions to scan for tasks (e.g., ['.org', '.txt']) - hidden from UI, managed by detectOrgModeFiles
   detectOrgModeFiles: boolean; // experimental: when enabled, adds .org to additionalFileExtensions and registers org-mode parser
   scanCodeFiles: boolean; // experimental: when enabled, scans code files for TODO-style comments
+  experimentalTableTasks: boolean; // experimental: when enabled, parses tasks inside markdown table cells
   // Migrate to today settings
   migrateToTodayState: string; // keyword to set on source task after migrating to today
   // Saved searches
@@ -127,6 +128,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   additionalFileExtensions: [], // No additional extensions by default - managed by detectOrgModeFiles
   detectOrgModeFiles: false, // Experimental feature - disabled by default
   scanCodeFiles: false, // Experimental feature - disabled by default
+  experimentalTableTasks: false, // Experimental feature - disabled by default
   migrateToTodayState: '', // Default state to set on source task after migrating (empty = disabled)
   stateTransitions: DefaultStateTransitionSettings,
   trackClosedDate: false, // Disabled by default

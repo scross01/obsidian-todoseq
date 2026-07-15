@@ -417,6 +417,7 @@ export class VaultScanner
       includeCodeBlocks: newSettings.includeCodeBlocks,
       includeCommentBlocks: newSettings.includeCommentBlocks,
       languageCommentSupport: newSettings.languageCommentSupport,
+      experimentalTableTasks: newSettings.experimentalTableTasks,
     };
 
     // Update all registered parsers with new config

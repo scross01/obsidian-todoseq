@@ -1198,6 +1198,7 @@ describe('TaskContextMenu', () => {
       expect(tsm.findTaskByPathAndLine).toHaveBeenCalledWith(
         task.path,
         task.line,
+        undefined,
       );
       expect(callbacks.onPriorityChange).toHaveBeenCalledWith(
         freshTask,
@@ -1232,6 +1233,7 @@ describe('TaskContextMenu', () => {
       expect(tsm.findTaskByPathAndLine).toHaveBeenCalledWith(
         task.path,
         task.line,
+        undefined,
       );
       expect(callbacks.onScheduledDateChange).toHaveBeenCalledWith(
         freshTask,
@@ -1334,6 +1336,7 @@ describe('TaskContextMenu', () => {
       expect(tsm.findTaskByPathAndLine).toHaveBeenCalledWith(
         task.path,
         task.line,
+        undefined,
       );
       menuWithState.cleanup();
     });

@@ -305,3 +305,66 @@ export function getDateLineIndent(task: Task): string {
   // For keyword-only tasks, use the same indent as the task
   return hasListMarker ? task.indent + '  ' : task.indent;
 }
+
+// ─── Table cell utilities ─────────────────────────────────────────────────────
+
+export interface TableCellInfo {
+  /** Raw cell content (with leading/trailing whitespace) */
+  raw: string;
+  /** Trimmed cell content */
+  content: string;
+  /** Character offset of this cell's content start within the line (after opening |) */
+  start: number;
+  /** Character offset of this cell's content end within the line (before closing |) */
+  end: number;
+}
+
+/**
+ * Parse a pipe-delimited table line into its cells.
+ * Returns cell info with character offsets for precise DOM/edit operations.
+ */
+export function parseTableCells(line: string): TableCellInfo[] {
+  const cells: TableCellInfo[] = [];
+  const parts = line.split('|');
+  let start = 0;
+  if (parts.length > 0 && parts[0].trim() === '') start = 1;
+  let end = parts.length;
+  if (end > start && parts[end - 1].trim() === '') end--;
+
+  // Account for leading whitespace before the first |
+  let pos = parts[0].length;
+  for (let i = start; i < end; i++) {
+    const raw = parts[i];
+    const contentStart = pos + 1; // after the |
+    const contentEnd = contentStart + raw.length;
+    cells.push({
+      raw,
+      content: raw.trim(),
+      start: contentStart,
+      end: contentEnd,
+    });
+    pos = contentEnd; // past this cell's content, before next |
+  }
+  return cells;
+}
+
+/**
+ * Check if a line is a markdown table row (starts with |).
+ */
+export function isTableRow(line: string): boolean {
+  return /^\s*\|/.test(line);
+}
+
+/**
+ * Check if a cell content is a separator row (e.g., ---, :---:).
+ */
+export function isSeparatorCell(content: string): boolean {
+  return /^[-:]+$/.test(content);
+}
+
+/**
+ * Extract the first <br>-split part of a cell (the task line portion).
+ */
+export function getCellTaskLine(content: string): string {
+  return content.split(/<br\s*\/?>/i)[0]?.trim() || content.trim();
+}

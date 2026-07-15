@@ -34,6 +34,9 @@ export interface ParserConfig {
   /** Language comment support settings */
   languageCommentSupport?: boolean;
 
+  /** Experimental: parse tasks inside markdown table cells */
+  experimentalTableTasks?: boolean;
+
   /**
    * Shared keyword manager instance.
    * When settings change, parsers should replace their keyword manager reference

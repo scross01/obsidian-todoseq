@@ -61,7 +61,11 @@ export class TaskItemRenderer {
   private getStateManager: () => TaskStateTransitionManager;
   private getMenuBuilder: () => StateMenuBuilder;
   private getTaskStateManager: () => {
-    findTaskByPathAndLine: (path: string, line: number) => Task | null;
+    findTaskByPathAndLine: (
+      path: string,
+      line: number,
+      cellIndex?: number,
+    ) => Task | null;
   } | null;
   private onStateChange: TaskStateChangeCallback;
   private onLocationOpen: TaskLocationOpenCallback;
@@ -75,7 +79,11 @@ export class TaskItemRenderer {
     onLocationOpen: TaskLocationOpenCallback,
     onContextMenu: TaskContextMenuCallback | null = null,
     getTaskStateManager: () => {
-      findTaskByPathAndLine: (path: string, line: number) => Task | null;
+      findTaskByPathAndLine: (
+        path: string,
+        line: number,
+        cellIndex?: number,
+      ) => Task | null;
     } | null = () => null,
   ) {
     this.getKeywordManager = getKeywordManager;
@@ -147,6 +155,7 @@ export class TaskItemRenderer {
         const freshTask = this.getTaskStateManager()?.findTaskByPathAndLine(
           task.path,
           task.line,
+          task.tableCell?.cellIndex,
         );
         const currentTask = freshTask || task;
         const currentState = currentTask.state;
@@ -499,6 +508,9 @@ export class TaskItemRenderer {
     li.setAttribute('data-source', source);
     li.setAttribute('data-path', task.path);
     li.setAttribute('data-line', String(task.line));
+    if (task.isTableTask && task.tableCell) {
+      li.setAttribute('data-cell-index', String(task.tableCell.cellIndex));
+    }
     li.setAttribute('data-raw-text', task.rawText);
     li.draggable = !Platform.isMobile;
 
@@ -556,7 +568,13 @@ export class TaskItemRenderer {
     if (source !== 'markdown') {
       fileInfo.createEl('span', { cls: 'todoseq-source-chip' });
     }
-    fileInfo.appendText(`${displayName}:${task.line + 1}`);
+    if (task.isTableTask && task.tableCell) {
+      fileInfo.appendText(
+        `${displayName}:${task.line + 1}.${task.tableCell.cellIndex + 1}`,
+      );
+    } else {
+      fileInfo.appendText(`${displayName}:${task.line + 1}`);
+    }
     setTooltip(fileInfo, task.path);
 
     // Click to open source (avoid checkbox and keyword)

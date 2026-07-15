@@ -1526,6 +1526,32 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       })
       .addSetting((setting) => {
         setting
+          .setName('Parse tasks in Markdown tables')
+          .setDesc(
+            // eslint-disable-next-line obsidianmd/ui/sentence-case -- states are capitalized
+            'When enabled, detects tasks inside markdown table cells (e.g., "| TODO fix this |").',
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.experimentalTableTasks)
+              .onChange(async (value) => {
+                this.plugin.settings.experimentalTableTasks = value;
+                await this.plugin.saveSettings();
+                await this.plugin.recreateParser();
+                this.plugin.updateTaskWriterKeywordManager();
+                try {
+                  await this.plugin.scanVault();
+                  await this.refreshAllTaskListViews();
+                  this.plugin.refreshVisibleEditorDecorations();
+                  this.plugin.refreshReaderViewFormatter();
+                } catch (scanError) {
+                  console.error('Failed to rescan vault:', scanError);
+                }
+              }),
+          );
+      })
+      .addSetting((setting) => {
+        setting
           .setName('Use extended Markdown checkbox styles')
           .setDesc(
             'When enabled, uses themed checkbox styles ([/], [-]) for active and cancelled tasks.',

@@ -298,3 +298,101 @@ The following limitations apply to code file scanning:
 - **No dates or priorities**: Code comments typically don't have scheduled/deadline dates or priority markers
 - **No subtask tracking**: Code comments don't support subtask counting
 - **False positives possible**: Keywords in certain string contexts may still be detected; string literal filtering covers standard string syntax across all supported languages
+
+## Markdown Table Tasks
+
+Markdown table tasks allow TODOseq to detect and manage tasks inside markdown table cells, enabling structured task tracking within tables.
+
+### What It Does
+
+When enabled, TODOseq will:
+
+- Detect task keywords (e.g., `TODO`, `DOING`, `DONE`) inside table cells
+- Display table tasks in the Task List alongside regular tasks
+- Support scheduled and deadline dates stored inline within cells
+- Support priority markers (e.g., `[#A]`) inside table cells
+- Allow state transitions (e.g., toggling `TODO` to `DONE`) from the Task List
+- Style task keywords and dates in both editor and reader views
+
+### How to Enable
+
+1. Open Obsidian Settings
+2. Navigate to "Community plugins" → "TODOseq"
+3. Scroll to the "Experimental features" section
+4. Enable "Parse tasks in Markdown tables"
+
+Once enabled, tasks inside table cells will be automatically detected during vault scans.
+
+### Supported Syntax
+
+Tasks in table cells follow the same keyword syntax as regular tasks:
+
+**Basic tasks:**
+
+```markdown
+| TODO fix the bug | DOING review code | DONE deploy |
+```
+
+**With priorities:**
+
+```markdown
+| TODO [#A] critical fix | DOING [#B] refactor | TODO [#C] cleanup |
+```
+
+**With dates (inline):**
+
+Dates are stored inside the cell using `<br>` separators:
+
+```markdown
+| TODO write docs<br>SCHEDULED: <2026-03-01> | DOING review PRs<br>DEADLINE: <2026-02-28> |
+```
+
+**Combined:**
+
+```markdown
+| TODO [#A] ship feature<br>SCHEDULED: <2026-03-01><br>DEADLINE: <2026-03-15> |
+```
+
+### How Dates Work
+
+Unlike regular tasks where dates appear on separate lines below the task, table task dates are stored inline within the cell, separated by `<br>` tags. This is a limitation of the table format — there are no separate lines available for date entries.
+
+When you add a scheduled or deadline date via the context menu or date picker, the date is appended to the cell content:
+
+```markdown
+| TODO submit report<br>SCHEDULED: <2026-03-01> |
+```
+
+### Interacting with Table Tasks
+
+- **Toggle state**: Click the checkbox in the Task List to cycle through states
+- **Set dates**: Right-click a table task in the Task List to access the date picker
+- **Change priority**: Right-click to access priority options
+- **Open source**: Click the task location link to jump to the table in the editor
+
+### Limitations
+
+The following limitations apply to Markdown table tasks:
+
+- **Inline dates only**: Dates are stored within the cell using `<br>` separators, not on separate lines
+- **Single-line cells**: Each cell is treated as a single task; multi-line content within a cell is not fully supported
+- **No subtask support**: Subtask counting does not apply to table tasks
+- **Limited navigation**: The goto task action only located the source table, the specific task cell is not highlighted.
+
+### Example
+
+```markdown
+| Task            | Status           | Notes                  |
+| --------------- | ---------------- | ---------------------- |
+| TODO write docs | DOING review PRs | TODO [#A] ship feature |
+| DONE deploy     | CANCELED revert  | WAIT [#B] approval     |
+```
+
+### Reporting Issues
+
+If you encounter issues with Markdown table tasks, please report them on the [GitHub issue tracker](https://github.com/scross01/obsidian-todoseq/issues) with:
+
+- The markdown table content (or a sample that reproduces the issue)
+- Expected behavior
+- Actual behavior
+- Whether the issue persists after disabling and re-enabling the feature

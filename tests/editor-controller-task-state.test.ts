@@ -167,6 +167,7 @@ describe('Editor Controller - Task State Methods', () => {
         expect.any(Number), // line
         'DOING',
         'editor',
+        undefined,
       );
     });
 

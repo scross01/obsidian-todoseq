@@ -1428,3 +1428,97 @@ TODO 🇨🇦 Canadian flag
     });
   });
 });
+
+describe('table task parsing', () => {
+  let parser: TaskParser;
+
+  beforeEach(() => {
+    const keywordManager = createTestKeywordManager();
+    parser = TaskParser.create(keywordManager, null, undefined, {
+      experimentalTableTasks: true,
+    });
+  });
+
+  test('parses task from table cell', () => {
+    const tasks = parser.parseFile('| TODO fix this |', 'test.md');
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].state).toBe('TODO');
+    expect(tasks[0].isTableTask).toBe(true);
+    expect(tasks[0].tableCell?.cellIndex).toBe(0);
+    expect(tasks[0].path).toBe('test.md');
+  });
+
+  test('parses multiple cells with unique keys', () => {
+    const tasks = parser.parseFile('| TODO a | TODO b |', 'test.md');
+    expect(tasks).toHaveLength(2);
+    expect(tasks[0].text).toBe('a');
+    expect(tasks[1].text).toBe('b');
+    expect(tasks[0].tableCell?.cellIndex).toBe(0);
+    expect(tasks[1].tableCell?.cellIndex).toBe(1);
+    expect(tasks[0].path).toBe('test.md');
+    expect(tasks[1].path).toBe('test.md');
+    expect(tasks[0].tableCell?.cellIndex).not.toBe(
+      tasks[1].tableCell?.cellIndex,
+    );
+  });
+
+  test('parses inline SCHEDULED date', () => {
+    const tasks = parser.parseFile(
+      '| TODO task<br>SCHEDULED: <2026-07-11> |',
+      'test.md',
+    );
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].scheduledDate).toBeTruthy();
+  });
+
+  test('parses inline DEADLINE date', () => {
+    const tasks = parser.parseFile(
+      '| TODO task<br>DEADLINE: <2026-07-15> |',
+      'test.md',
+    );
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].deadlineDate).toBeTruthy();
+  });
+
+  test('skips separator rows', () => {
+    expect(parser.parseFile('| --- | --- |', 'test.md')).toHaveLength(0);
+  });
+
+  test('skips header separator rows', () => {
+    expect(parser.parseFile('| ---: | :--- |', 'test.md')).toHaveLength(0);
+  });
+
+  test('respects disabled setting', () => {
+    const keywordManager = createTestKeywordManager();
+    const disabledParser = TaskParser.create(keywordManager, null, undefined, {
+      experimentalTableTasks: false,
+    });
+    expect(disabledParser.parseFile('| TODO task |', 'test.md')).toHaveLength(
+      0,
+    );
+  });
+
+  test('does not parse non-task table content', () => {
+    const tasks = parser.parseFile('| regular text | data |', 'test.md');
+    expect(tasks).toHaveLength(0);
+  });
+
+  test('sets line to file line number', () => {
+    const tasks = parser.parseFile('text\n| TODO task |', 'test.md');
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].line).toBe(1);
+  });
+
+  test('skips empty cells', () => {
+    const tasks = parser.parseFile('| | TODO task | |', 'test.md');
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].tableCell?.cellIndex).toBe(1);
+    expect(tasks[0].path).toBe('test.md');
+  });
+
+  test('parses completed task', () => {
+    const tasks = parser.parseFile('| DONE task |', 'test.md');
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].completed).toBe(true);
+  });
+});

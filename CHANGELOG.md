@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.18.0
+
+- Added experimental support for defining tasks in tables. Enable in the settings.
+
 ## 0.17.0
 
 - Adds Task descriptions via new `DESCRIPTION:` keyword. #73

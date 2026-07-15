@@ -378,6 +378,7 @@ export class TaskContextMenu extends BaseDialog {
               const freshTask = this.taskStateManager.findTaskByPathAndLine(
                 this.task.path,
                 this.task.line,
+                this.task.tableCell?.cellIndex,
               );
               if (freshTask) {
                 currentTask = freshTask;
@@ -475,6 +476,7 @@ export class TaskContextMenu extends BaseDialog {
             const freshTask = this.taskStateManager.findTaskByPathAndLine(
               this.task.path,
               this.task.line,
+              this.task.tableCell?.cellIndex,
             );
             if (freshTask) {
               currentTask = freshTask;
@@ -620,6 +622,7 @@ export class TaskContextMenu extends BaseDialog {
       const freshTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
+        task.tableCell?.cellIndex,
       );
       if (freshTask) {
         currentTask = freshTask;

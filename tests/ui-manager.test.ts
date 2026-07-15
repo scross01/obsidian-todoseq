@@ -511,7 +511,7 @@ describe('UIManager', () => {
       expect(setterCalls).toEqual([]);
       expect(
         (pluginMock.taskUpdateCoordinator as any).updateTaskByPath,
-      ).toHaveBeenCalledWith('test.md', 4, 'DONE', 'editor');
+      ).toHaveBeenCalledWith('test.md', 4, 'DONE', 'editor', undefined);
     });
 
     it('does not restore the checkbox on the no-keywordSpan subtask path (Obsidian owns the toggle)', async () => {

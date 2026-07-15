@@ -31,6 +31,7 @@ import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
 import TodoTracker from '../../main';
 import { KeywordManager } from '../../utils/keyword-manager';
+import { getTaskKey } from '../../utils/task-utils';
 import { VaultScanner } from '../../services/vault-scanner';
 import type { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import {
@@ -1372,6 +1373,7 @@ export class TaskListView extends ItemView {
       const currentTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
+        task.tableCell?.cellIndex,
       );
       if (!currentTask) {
         console.error('TODOseq: Task not found in state manager');
@@ -1410,6 +1412,7 @@ export class TaskListView extends ItemView {
       const currentTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
+        task.tableCell?.cellIndex,
       );
       if (!currentTask) {
         console.error('TODOseq: Task not found in state manager');
@@ -1450,6 +1453,7 @@ export class TaskListView extends ItemView {
       const currentTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
+        task.tableCell?.cellIndex,
       );
       if (!currentTask) {
         console.error('TODOseq: Task not found in state manager');
@@ -2050,14 +2054,19 @@ export class TaskListView extends ItemView {
       // Smart diff: reuse existing DOM elements instead of full rebuild
       // This prevents visible flicker when tasks are updated
 
-      // Get all existing elements by their stable ID (path:line)
+      // Get all existing elements by their stable ID (path:line[:cellIndex])
       const existingElements = new Map<string, HTMLElement>();
       const existingKeys = new Set<string>();
       list.querySelectorAll('li.todoseq-task-item').forEach((el) => {
         const path = el.getAttribute('data-path');
         const line = el.getAttribute('data-line');
+        const cellIndex = el.getAttribute('data-cell-index');
         if (path && line) {
-          const key = `${path}:${line}`;
+          // Key format must match getTaskKey() in task-utils.ts
+          const key =
+            cellIndex !== null
+              ? `${path}:${line}:${cellIndex}`
+              : `${path}:${line}`;
           existingElements.set(key, el as HTMLElement);
           existingKeys.add(key);
         }
@@ -2070,7 +2079,7 @@ export class TaskListView extends ItemView {
       // Build a set of keys we're keeping
       const keepKeys = new Set<string>();
       toRender.forEach((t) => {
-        keepKeys.add(`${t.path}:${t.line}`);
+        keepKeys.add(getTaskKey(t));
       });
 
       // Track which elements we've already used this render cycle
@@ -2081,7 +2090,7 @@ export class TaskListView extends ItemView {
       const fragment = await this.renderQueue.renderToFragment(
         toRender,
         (task) => {
-          const key = `${task.path}:${task.line}`;
+          const key = getTaskKey(task);
           let element: HTMLLIElement;
 
           if (existingElements.has(key)) {

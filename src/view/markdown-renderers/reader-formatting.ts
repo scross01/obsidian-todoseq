@@ -293,6 +293,7 @@ export class ReaderViewFormatter {
     const freshTask = this.plugin.taskStateManager.findTaskByPathAndLine(
       task.path,
       task.line,
+      task.tableCell?.cellIndex,
     );
     // Use fresh task if found, otherwise fall back to captured task
     const taskToUpdate = freshTask || task;
@@ -329,6 +330,7 @@ export class ReaderViewFormatter {
         taskToUpdate.line,
         newState,
         'reader',
+        taskToUpdate.tableCell?.cellIndex,
       );
     } else if (this.plugin.taskEditor) {
       // Fallback to TaskEditor if coordinator not available
@@ -436,6 +438,11 @@ export class ReaderViewFormatter {
 
     // Process bullet list items without checkboxes (checking each individually for quote/callout context)
     this.processBulletListItems(element, includeCalloutBlocks);
+
+    // Process table cells with task keywords (experimental)
+    if (this.plugin.settings?.experimentalTableTasks) {
+      this.processTableCells(element);
+    }
   }
 
   /**
@@ -620,6 +627,87 @@ export class ReaderViewFormatter {
   }
 
   /**
+   * Process table cells with task keywords (experimental).
+   * Markdown renders table cells as <td> elements. We check each cell's text
+   * for task keywords and apply the same keyword formatting as other task types.
+   */
+  private processTableCells(element: HTMLElement): void {
+    const taskParser = this.getTaskParser();
+    if (!taskParser) return;
+
+    const cells = element.querySelectorAll('td');
+    cells.forEach((cell) => {
+      if (!cell.instanceOf(HTMLElement)) return;
+
+      const text = cell.textContent || '';
+      if (!text.trim()) return;
+
+      // Split on <br> for multi-line cells, check first part for task keyword
+      const firstPart =
+        text.split(/\s*<br\s*\/?>\s*/i)[0]?.trim() || text.trim();
+      if (!taskParser.testRegex.test(firstPart)) return;
+
+      const match = taskParser.testRegex.exec(firstPart);
+      if (!match || !match[4]) return;
+
+      const keyword = match[4];
+      const isCompleted = KeywordManager.isCompletedKeyword(
+        keyword,
+        this.plugin.settings,
+      );
+      const isArchived = KeywordManager.isArchivedKeyword(
+        keyword,
+        this.plugin.settings,
+      );
+
+      const keywordSpan = this.createKeywordSpan(
+        keyword,
+        isCompleted,
+        isArchived,
+      );
+
+      // Find keyword position in the first part text
+      const keywordStart =
+        (match[1]?.length || 0) +
+        (match[2]?.length || 0) +
+        (match[3]?.length || 0);
+
+      // Find and replace the keyword in the cell's text nodes
+      this.replaceKeywordInTaskElement(
+        cell,
+        keyword,
+        keywordStart,
+        keywordSpan,
+      );
+
+      // Style completed/archived task text after keyword
+      if (isCompleted || isArchived) {
+        const kwSpan = cell.querySelector('.todoseq-keyword-formatted');
+        if (kwSpan && kwSpan.nextSibling) {
+          const completedContainer =
+            window.activeDocument.createElement('span');
+          completedContainer.classList.add(
+            isCompleted
+              ? 'todoseq-completed-task-text'
+              : 'todoseq-archived-task-text',
+          );
+          const remaining: ChildNode[] = [];
+          let cur: ChildNode | null = kwSpan.nextSibling;
+          while (cur !== null) {
+            remaining.push(cur);
+            cur = cur.nextSibling;
+          }
+          remaining.forEach((n) => completedContainer.appendChild(n));
+          kwSpan.parentNode?.insertBefore(
+            completedContainer,
+            kwSpan.nextSibling,
+          );
+        }
+      }
+    });
+  }
+
+  /**
    * Process priority tokens [#A], [#B], [#C] in task lines and replace with styled pills
    * Called after task keyword processing to avoid interference
    */
@@ -720,6 +808,15 @@ export class ReaderViewFormatter {
       // Process priority tokens in this paragraph
       this.processPriorityPillsInElement(paragraph);
     });
+
+    // Process table cells with task keywords (experimental)
+    if (this.plugin.settings?.experimentalTableTasks) {
+      const tableCells = element.querySelectorAll('td');
+      tableCells.forEach((cell) => {
+        if (!cell.instanceOf(HTMLElement)) return;
+        this.processPriorityPillsInElement(cell);
+      });
+    }
   }
 
   /**
@@ -1780,6 +1877,23 @@ export class ReaderViewFormatter {
       // Process date keywords in this task container
       this.processDateKeywordsInElement(taskContainer);
     });
+
+    // Process date keywords inside table cells (experimental)
+    if (this.plugin.settings?.experimentalTableTasks) {
+      const tableCells = element.querySelectorAll('.table-cell-wrapper, td');
+      tableCells.forEach((cell) => {
+        if (!cell.instanceOf(HTMLElement)) return;
+        const text = cell.textContent || '';
+        if (
+          !text.includes('SCHEDULED:') &&
+          !text.includes('DEADLINE:') &&
+          !text.includes('CLOSED:')
+        ) {
+          return;
+        }
+        this.processDateKeywordsInElement(cell);
+      });
+    }
   }
 
   /**
@@ -1810,6 +1924,26 @@ export class ReaderViewFormatter {
         this.wrapDescriptionLine(paragraph, result.node, result.index);
       }
     });
+
+    // Process DESCRIPTION: inside table cells (experimental)
+    if (this.plugin.settings?.experimentalTableTasks) {
+      const tableCells = element.querySelectorAll('td');
+      tableCells.forEach((cell) => {
+        if (!cell.instanceOf(HTMLElement)) return;
+        const text = cell.textContent || '';
+        if (!text.includes('DESCRIPTION:')) return;
+
+        // Find the text node containing DESCRIPTION: and wrap it
+        const result = this.findDateKeywordNode(cell, 'DESCRIPTION:');
+        if (result) {
+          this.wrapDescriptionLine(
+            cell,
+            result.node,
+            result.index,
+          );
+        }
+      });
+    }
   }
 
   /**
@@ -2365,6 +2499,7 @@ export class ReaderViewFormatter {
     const freshTask = this.plugin.taskStateManager.findTaskByPathAndLine(
       task.path,
       task.line,
+      task.tableCell?.cellIndex,
     );
     // Use fresh task if found, otherwise fall back to captured task
     const taskToUpdate = freshTask || task;
@@ -2377,6 +2512,7 @@ export class ReaderViewFormatter {
         taskToUpdate.line,
         newState,
         'reader',
+        taskToUpdate.tableCell?.cellIndex,
       );
     } else if (this.plugin.taskEditor) {
       // Fallback to TaskEditor if coordinator not available

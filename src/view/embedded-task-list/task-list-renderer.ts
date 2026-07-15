@@ -205,6 +205,7 @@ export class EmbeddedTaskListRenderer {
       const currentTask = this.plugin.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
+        task.tableCell?.cellIndex,
       );
       if (!currentTask) {
         console.error('TODOseq: Task not found in state manager');

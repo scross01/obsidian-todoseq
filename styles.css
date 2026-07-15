@@ -612,6 +612,15 @@
   display: inline-block; /* Ensure it doesn't affect the entire paragraph */
 }
 
+/* Table cell date line styling in editor Live Preview rendered tables */
+.markdown-source-view .table-cell-wrapper .todoseq-scheduled-line,
+.markdown-source-view .table-cell-wrapper .todoseq-deadline-line,
+.markdown-source-view .table-cell-wrapper .todoseq-closed-line {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  display: inline;
+}
+
 /* Description line - editor and reader preview */
 :is(.cm-editor, .markdown-preview-view) .todoseq-task-description {
   font-size: 0.9rem;
@@ -675,7 +684,10 @@
 
 :is(.cm-editor, .markdown-preview-view) .todoseq-scheduled-keyword,
 :is(.cm-editor, .markdown-preview-view) .todoseq-deadline-keyword,
-:is(.cm-editor, .markdown-preview-view) .todoseq-closed-keyword {
+:is(.cm-editor, .markdown-preview-view) .todoseq-closed-keyword,
+.markdown-source-view .table-cell-wrapper .todoseq-scheduled-keyword,
+.markdown-source-view .table-cell-wrapper .todoseq-deadline-keyword,
+.markdown-source-view .table-cell-wrapper .todoseq-closed-keyword {
   font-weight: var(--font-normal);
 }
 
@@ -690,7 +702,8 @@
 }
 
 /* Ensure formatting works in both light and dark themes */
-:is(.cm-editor, .markdown-preview-view) .todoseq-keyword-formatted {
+:is(.cm-editor, .markdown-preview-view) .todoseq-keyword-formatted,
+.markdown-source-view .table-cell-wrapper .todoseq-keyword-formatted {
   text-shadow: 0 0 1px
     color-mix(in srgb, var(--interactive-accent) 50%, transparent);
 }
@@ -730,6 +743,12 @@
   color: var(--text-muted);
   text-decoration: line-through;
   opacity: 0.7;
+}
+
+/* Table cell task keyword styling */
+:is(.cm-editor, .markdown-preview-view) .todoseq-table-task-keyword {
+  font-weight: var(--font-bold);
+  color: var(--interactive-accent);
 }
 
 /* Dropdown containers for search suggestions and options */

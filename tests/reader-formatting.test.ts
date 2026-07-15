@@ -3576,7 +3576,7 @@ describe('ReaderViewFormatter', () => {
 
       expect(
         mockPlugin.taskUpdateCoordinator.updateTaskByPath,
-      ).toHaveBeenCalledWith('test.md', 0, 'DOING', 'reader');
+      ).toHaveBeenCalledWith('test.md', 0, 'DOING', 'reader', undefined);
 
       activeDocument.body.removeChild(container);
     });

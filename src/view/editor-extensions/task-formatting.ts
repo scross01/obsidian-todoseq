@@ -28,6 +28,12 @@ import {
   SettingsChangeDetector,
 } from '../../utils/settings-utils';
 import { KeywordManager } from '../../utils/keyword-manager';
+import {
+  parseTableCells,
+  isTableRow,
+  isSeparatorCell,
+  getCellTaskLine,
+} from '../../utils/task-line-utils';
 
 /**
  * Cached regex for priority tokens with global flag.
@@ -104,6 +110,10 @@ export class TaskKeywordDecorator {
   // Proximity buffer for cursor detection (in characters)
   // Set to 0 for exact token overlap detection (no buffer)
   private readonly PROXIMITY_BUFFER = 0;
+
+  // Cached regex for matching keywords in table cells (compiled once)
+  private cachedKeywordRegex: RegExp | null = null;
+  private cachedKeywords: string[] = [];
 
   constructor(
     private view: EditorView,
@@ -473,6 +483,84 @@ export class TaskKeywordDecorator {
                 }),
               );
             }
+          }
+        }
+
+        // Table cell task detection (experimental)
+        if (
+          !match &&
+          this.settings.experimentalTableTasks &&
+          isTableRow(lineText) &&
+          !this.parser.testRegex.test(lineText)
+        ) {
+          const cells = parseTableCells(lineText);
+
+          for (let ci = 0; ci < cells.length; ci++) {
+            const { content, start: cellStart, end: cellEnd } = cells[ci];
+            if (!content || isSeparatorCell(content)) continue;
+
+            const absStart = line.from + cellStart;
+            const absEnd = line.from + cellEnd;
+
+            const firstPart = getCellTaskLine(content);
+            if (this.parser.testRegex.test(firstPart)) {
+              // Cache keyword regex — only rebuild if keywords change
+              if (this.cachedKeywords !== this.parser.allKeywords) {
+                this.cachedKeywords = this.parser.allKeywords;
+                this.cachedKeywordRegex = new RegExp(
+                  `(${this.parser.allKeywords.join('|')})`,
+                  'i',
+                );
+              }
+              const kw = firstPart.match(this.cachedKeywordRegex!);
+              if (kw && kw.index !== undefined) {
+                const kwStart = absStart + kw.index;
+                const kwEnd = kwStart + kw[0].length;
+                let cssClasses =
+                  'todoseq-keyword-formatted todoseq-table-task-keyword';
+                if (KeywordManager.isCompletedKeyword(kw[0], this.settings)) {
+                  cssClasses += ' todoseq-completed-keyword';
+                }
+                if (KeywordManager.isArchivedKeyword(kw[0], this.settings)) {
+                  cssClasses += ' todoseq-archived-keyword';
+                }
+                builder.add(
+                  kwStart,
+                  kwEnd,
+                  Decoration.mark({
+                    class: cssClasses,
+                    attributes: { 'data-task-keyword': kw[0] },
+                  }),
+                );
+                if (
+                  KeywordManager.isCompletedKeyword(kw[0], this.settings) &&
+                  kwEnd < absEnd
+                ) {
+                  builder.add(
+                    kwEnd,
+                    absEnd,
+                    Decoration.mark({ class: 'todoseq-completed-task-text' }),
+                  );
+                }
+                if (
+                  KeywordManager.isArchivedKeyword(kw[0], this.settings) &&
+                  kwEnd < absEnd
+                ) {
+                  builder.add(
+                    kwEnd,
+                    absEnd,
+                    Decoration.mark({ class: 'todoseq-archived-task-text' }),
+                  );
+                }
+              }
+            }
+
+            this.processPriorityTokensInCell(
+              firstPart,
+              absStart,
+              absEnd,
+              builder,
+            );
           }
         }
 
@@ -859,6 +947,48 @@ export class TaskKeywordDecorator {
     }
   }
 
+  /**
+   * Process priority tokens within a table cell's content range.
+   * Reuses the same regex and widget logic as processPriorityTokens
+   * but constrains decorations to the cell's absolute character range.
+   */
+  private processPriorityTokensInCell(
+    text: string,
+    from: number,
+    to: number,
+    builder: RangeSetBuilder<Decoration>,
+  ): void {
+    const isLivePreview = this.isLivePreviewMode();
+    const regex = PRIORITY_TOKEN_REGEX_GLOBAL;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(text)) !== null) {
+      const letter = match[2];
+      const s = from + match.index;
+      const e = s + match[0].length;
+
+      if (isLivePreview && !this.isCursorNearPriority(s, e)) {
+        builder.add(
+          s,
+          e,
+          Decoration.replace({
+            widget: new PriorityWidget(letter, this.getPriorityLevel(letter)),
+            inclusive: false,
+          }),
+        );
+      } else {
+        builder.add(
+          s,
+          e,
+          Decoration.mark({
+            class: `todoseq-edit-priority-raw todoseq-edit-priority-${letter.toLowerCase()}`,
+            attributes: { 'data-priority': letter },
+          }),
+        );
+      }
+    }
+  }
+
   public updateDecorations(): void {
     this.decorations = this.createDecorations();
   }
@@ -889,6 +1019,8 @@ export const taskKeywordPlugin = (
       private getParser: () => TaskParser | null;
       private settingsDetector: SettingsChangeDetector;
       private wasLivePreviewMode: boolean | null = null;
+      private tableCellStylingTimer: number | null = null;
+      private tableCellStylingLateTimer: number | null = null;
 
       constructor(view: EditorView) {
         this.settings = settings;
@@ -897,6 +1029,12 @@ export const taskKeywordPlugin = (
         // Initialize the mode state
         this.wasLivePreviewMode = this.isLivePreviewMode(view);
         this.updateDecorations(view);
+
+        // Style table cells on initial load — the DOM isn't ready yet during
+        // construction so defer to allow Obsidian to render the table.
+        if (this.settings.experimentalTableTasks) {
+          window.setTimeout(() => this.styleTableTaskCells(view), 100);
+        }
       }
 
       /**
@@ -959,6 +1097,376 @@ export const taskKeywordPlugin = (
         ) {
           this.updateDecorations(update.view);
           this.settingsDetector.markCurrent(this.settings);
+        }
+
+        // Style table cells in Live Preview after decorations are applied.
+        // Use setTimeout to let Obsidian finish re-rendering the table DOM first.
+        // Trigger on doc/selection changes — Obsidian re-renders tables on cursor
+        // movement between cells, which destroys previously styled spans.
+        // NOT on viewportChanged (scroll) — that would re-style on every scroll tick.
+        if (
+          this.settings.experimentalTableTasks &&
+          (update.docChanged || update.selectionSet)
+        ) {
+          this.scheduleTableTaskCellStyling(update.view);
+        }
+      }
+
+      private scheduleTableTaskCellStyling(view: EditorView): void {
+        if (this.tableCellStylingTimer !== null) {
+          window.clearTimeout(this.tableCellStylingTimer);
+        }
+        if (this.tableCellStylingLateTimer !== null) {
+          window.clearTimeout(this.tableCellStylingLateTimer);
+        }
+        // Fire twice: early (50ms) catches initial render, late (200ms) catches
+        // Obsidian's async re-render that destroys previously styled spans.
+        this.tableCellStylingTimer = window.setTimeout(() => {
+          this.tableCellStylingTimer = null;
+          this.styleTableTaskCells(view);
+        }, 50);
+        this.tableCellStylingLateTimer = window.setTimeout(() => {
+          this.tableCellStylingLateTimer = null;
+          this.styleTableTaskCells(view);
+        }, 200);
+      }
+
+      /**
+       * Style table cells containing task keywords in the editor's rendered table view.
+       * Obsidian renders tables as separate DOM trees in Live Preview, so CodeMirror
+       * decorations don't reach them. This method walks the rendered table DOM and
+       * wraps keywords in styled spans.
+       */
+      private styleTableTaskCells(view: EditorView): void {
+        const parser = this.getParser();
+        if (!parser) return;
+
+        // Search the entire markdown view, not just .cm-editor
+        // In Live Preview, rendered tables live outside the CodeMirror DOM
+        const mdView = view.dom.closest('.markdown-source-view');
+        if (!mdView) return;
+
+        const tableCells = mdView.querySelectorAll('.table-cell-wrapper');
+        tableCells.forEach((cell) => {
+          if (!cell.instanceOf(HTMLElement)) return;
+
+          const text = cell.textContent || '';
+          if (!text.trim()) return;
+
+          // Style task keyword (skip if already styled)
+          if (!cell.querySelector('.todoseq-keyword-formatted')) {
+            // Check first <br>-split part for task keyword
+            const firstPart = getCellTaskLine(text);
+            if (parser.testRegex.test(firstPart)) {
+              const match = parser.testRegex.exec(firstPart);
+              if (match && match[4]) {
+                const keyword = match[4];
+                const isCompleted = KeywordManager.isCompletedKeyword(
+                  keyword,
+                  this.settings,
+                );
+                const isArchived = KeywordManager.isArchivedKeyword(
+                  keyword,
+                  this.settings,
+                );
+
+                let cssClasses = 'todoseq-keyword-formatted';
+                if (isCompleted) cssClasses += ' todoseq-completed-keyword';
+                if (isArchived) cssClasses += ' todoseq-archived-keyword';
+
+                const keywordStart =
+                  (match[1]?.length || 0) +
+                  (match[2]?.length || 0) +
+                  (match[3]?.length || 0);
+                this.wrapKeywordInNode(cell, keyword, keywordStart, cssClasses);
+
+                // Style completed/archived task text after keyword
+                if (isCompleted || isArchived) {
+                  const kwSpan = cell.querySelector(
+                    '.todoseq-keyword-formatted',
+                  );
+                  if (kwSpan && kwSpan.nextSibling) {
+                    const completedContainer =
+                      window.activeDocument.createElement('span');
+                    completedContainer.classList.add(
+                      isCompleted
+                        ? 'todoseq-completed-task-text'
+                        : 'todoseq-archived-task-text',
+                    );
+                    const remaining: ChildNode[] = [];
+                    let cur: ChildNode | null = kwSpan.nextSibling;
+                    while (cur !== null) {
+                      remaining.push(cur);
+                      cur = cur.nextSibling;
+                    }
+                    remaining.forEach((n) => completedContainer.appendChild(n));
+                    kwSpan.parentNode?.insertBefore(
+                      completedContainer,
+                      kwSpan.nextSibling,
+                    );
+                  }
+                }
+              }
+            }
+          }
+
+          // Style date keywords (SCHEDULED:, DEADLINE:, CLOSED:) — independent of task keyword
+          if (
+            !cell.querySelector(
+              '.todoseq-scheduled-line, .todoseq-deadline-line, .todoseq-closed-line',
+            )
+          ) {
+            if (
+              text.includes('SCHEDULED:') ||
+              text.includes('DEADLINE:') ||
+              text.includes('CLOSED:')
+            ) {
+              this.wrapDateKeywordsInNode(cell);
+            }
+          }
+
+          // Style priority tokens ([#A], [#B], [#C])
+          if (!cell.querySelector('[data-priority]')) {
+            this.wrapPriorityTokensInNode(cell);
+          }
+
+          // Style DESCRIPTION: keyword inside table cells
+          if (
+            !cell.querySelector('.todoseq-task-description') &&
+            text.includes('DESCRIPTION:')
+          ) {
+            this.wrapDescriptionInNode(cell);
+          }
+        });
+      }
+
+      /**
+       * Walk text nodes and wrap the keyword in a styled span.
+       */
+      private wrapKeywordInNode(
+        container: HTMLElement,
+        keyword: string,
+        keywordStart: number,
+        cssClasses: string,
+      ): void {
+        let offset = 0;
+        const walker = window.activeDocument.createTreeWalker(
+          container,
+          NodeFilter.SHOW_TEXT,
+        );
+        let node: Text | null;
+        while ((node = walker.nextNode() as Text | null)) {
+          const text = node.textContent || '';
+          const idx = keywordStart - offset;
+          if (idx >= 0 && idx < text.length) {
+            const kwEnd = idx + keyword.length;
+            // Bail out if keyword spans across multiple text nodes
+            // (Obsidian may split/merge nodes, making raw offsets unreliable)
+            if (kwEnd > text.length) break;
+            const before = text.substring(0, idx);
+            const after = text.substring(kwEnd);
+            const span = window.activeDocument.createElement('span');
+            span.className = cssClasses;
+            span.textContent = keyword;
+            span.setAttribute('data-task-keyword', keyword);
+            const parent = node.parentNode;
+            if (parent) {
+              if (before)
+                parent.insertBefore(
+                  window.activeDocument.createTextNode(before),
+                  node,
+                );
+              parent.insertBefore(span, node);
+              if (after)
+                parent.insertBefore(
+                  window.activeDocument.createTextNode(after),
+                  node,
+                );
+              parent.removeChild(node);
+            }
+            break;
+          }
+          offset += text.length;
+        }
+      }
+
+      /**
+       * Wrap date lines in table cells to match reader view structure.
+       * Creates: <span class="todoseq-{type}-line"><span class="todoseq-{type}-keyword">KEYWORD:</span> date text</span>
+       * The outer span styles the entire line (muted, smaller font).
+       */
+      private wrapDateKeywordsInNode(container: HTMLElement): void {
+        const dateKeywords = [
+          { keyword: 'SCHEDULED:', type: 'scheduled' },
+          { keyword: 'DEADLINE:', type: 'deadline' },
+          { keyword: 'CLOSED:', type: 'closed' },
+        ];
+
+        for (const { keyword, type } of dateKeywords) {
+          const walker = window.activeDocument.createTreeWalker(
+            container,
+            NodeFilter.SHOW_TEXT,
+          );
+          let node: Text | null;
+          while ((node = walker.nextNode() as Text | null)) {
+            const text = node.textContent || '';
+            const idx = text.indexOf(keyword);
+            if (idx === -1) continue;
+
+            const parent = node.parentNode;
+            if (!parent) continue;
+
+            // Build the date line span (outer wrapper — gets muted styling)
+            const lineSpan = window.activeDocument.createElement('span');
+            lineSpan.className = `todoseq-${type}-line`;
+            lineSpan.setAttribute('data-date-line-type', type);
+
+            // Before keyword text
+            const beforeText = text.substring(0, idx);
+            if (beforeText) {
+              lineSpan.appendChild(
+                window.activeDocument.createTextNode(beforeText),
+              );
+            }
+
+            // Keyword sub-span (gets keyword-specific styling)
+            const kwSpan = window.activeDocument.createElement('span');
+            kwSpan.className = `todoseq-${type}-keyword`;
+            kwSpan.textContent = keyword;
+            kwSpan.setAttribute('data-date-keyword', keyword);
+            lineSpan.appendChild(kwSpan);
+
+            // After keyword text in same text node
+            const afterText = text.substring(idx + keyword.length);
+            if (afterText) {
+              lineSpan.appendChild(
+                window.activeDocument.createTextNode(afterText),
+              );
+            }
+
+            // Collect following text nodes until we hit a <br> or non-text node
+            // These are the date value nodes (e.g., "<2026-07-11>")
+            let nextSibling: ChildNode | null = node.nextSibling;
+            while (nextSibling) {
+              const next = nextSibling.nextSibling;
+              if (nextSibling.nodeName === 'BR') break;
+              if (nextSibling.nodeType === Node.TEXT_NODE) {
+                lineSpan.appendChild(nextSibling);
+              } else {
+                break;
+              }
+              nextSibling = next;
+            }
+
+            // Replace the original keyword text node with the assembled line span
+            parent.replaceChild(lineSpan, node);
+            break; // restart walker for next keyword since DOM changed
+          }
+        }
+      }
+
+      /**
+       * Style priority tokens in table cells.
+       * Obsidian renders [#A] as [ <a class="tag" href="#A">#A</a> ].
+       * We strip the brackets and wrap the <a> in a pill-styled span.
+       */
+      private wrapPriorityTokensInNode(container: HTMLElement): void {
+        const tagLinks = container.querySelectorAll('a.tag[href^="#"]');
+        tagLinks.forEach((link) => {
+          const href = link.getAttribute('href') || '';
+          const letter = href.substring(1).toUpperCase();
+          if (letter !== 'A' && letter !== 'B' && letter !== 'C') return;
+          if (link.closest('.todoseq-edit-priority-raw')) return;
+
+          // Strip opening bracket from previous text node
+          const prev = link.previousSibling;
+          if (prev && prev.nodeType === Node.TEXT_NODE) {
+            const t = prev.textContent || '';
+            const m = t.match(/\[\s*$/);
+            if (m) prev.textContent = t.substring(0, t.length - m[0].length);
+          }
+
+          // Strip closing bracket from next text node
+          const next = link.nextSibling;
+          if (next && next.nodeType === Node.TEXT_NODE) {
+            const t = next.textContent || '';
+            const m = t.match(/^\s*\]/);
+            if (m) next.textContent = t.substring(m[0].length);
+          }
+
+          // Strip the # from the link text and remove Obsidian tag styling
+          link.textContent = letter;
+          link.classList.remove('tag');
+          link.removeAttribute('href');
+          link.removeAttribute('target');
+          link.removeAttribute('rel');
+
+          // Replace the <a> with plain text in the pill span
+          const span = window.activeDocument.createElement('span');
+          const priorityClass =
+            letter === 'A'
+              ? 'priority-high'
+              : letter === 'B'
+                ? 'priority-med'
+                : 'priority-low';
+          span.className = `todoseq-edit-priority-pill todoseq-priority-badge ${priorityClass}`;
+          span.setAttribute('data-priority', letter);
+          span.setAttribute('aria-label', `Priority ${letter}`);
+          span.textContent = letter;
+          link.parentNode?.replaceChild(span, link);
+        });
+      }
+
+      /**
+       * Wrap DESCRIPTION: keyword in a table cell with styled spans.
+       */
+      private wrapDescriptionInNode(container: HTMLElement): void {
+        const walker = window.activeDocument.createTreeWalker(
+          container,
+          NodeFilter.SHOW_TEXT,
+        );
+        let node: Text | null;
+        while ((node = walker.nextNode() as Text | null)) {
+          const text = node.textContent || '';
+          const idx = text.indexOf('DESCRIPTION:');
+          if (idx === -1) continue;
+
+          const parent = node.parentNode;
+          if (!parent) continue;
+
+          const beforeText = text.substring(0, idx);
+          const afterText = text.substring(idx + 'DESCRIPTION:'.length);
+
+          // Create description container
+          const descContainer = window.activeDocument.createElement('span');
+          descContainer.className = 'todoseq-task-description';
+          descContainer.setAttribute('data-description-line', 'true');
+          descContainer.setAttribute('role', 'note');
+
+          // Add text before DESCRIPTION:
+          if (beforeText) {
+            parent.insertBefore(
+              window.activeDocument.createTextNode(beforeText),
+              node,
+            );
+          }
+
+          // Add the keyword
+          descContainer.createSpan({
+            cls: 'todoseq-description-keyword',
+            text: 'DESCRIPTION:',
+          });
+
+          // Add text after DESCRIPTION:
+          if (afterText) {
+            descContainer.appendChild(
+              window.activeDocument.createTextNode(afterText),
+            );
+          }
+
+          parent.insertBefore(descContainer, node);
+          parent.removeChild(node);
+          break;
         }
       }
     },

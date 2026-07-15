@@ -8,6 +8,7 @@
  */
 
 import { Task, WarningPeriodInfo } from '../types/task';
+import { getTaskKey } from '../utils/task-utils';
 import { TaskStateManager } from './task-state-manager';
 import { TaskUpdateCoordinator } from './task-update-coordinator';
 import { App, TFile } from 'obsidian';
@@ -151,7 +152,7 @@ export class RecurrenceCoordinator {
    * @param delayMs - Delay in milliseconds
    */
   scheduleRecurrence(task: Task, delayMs: number = this.defaultDelayMs): void {
-    const key = this.getTaskKey(task);
+    const key = getTaskKey(task);
 
     // Cancel any existing timeout for this task
     this.cancelRecurrence(task);
@@ -171,7 +172,7 @@ export class RecurrenceCoordinator {
    * @param task - The task to cancel recurrence for
    */
   cancelRecurrence(task: Task): void {
-    const key = this.getTaskKey(task);
+    const key = getTaskKey(task);
     const timeout = this.recurrenceTimeouts.get(key);
 
     if (timeout) {
@@ -334,6 +335,7 @@ export class RecurrenceCoordinator {
       const storedTask = this.taskStateManager.findTaskByPathAndLine(
         task.path,
         task.line,
+        task.tableCell?.cellIndex,
       );
       let taskForUpdate: Task = task;
       if (storedTask && storedTask.rawText !== task.rawText) {
@@ -391,16 +393,6 @@ export class RecurrenceCoordinator {
         error: error instanceof Error ? error.message : String(error),
       };
     }
-  }
-
-  /**
-   * Get a unique key for a task.
-   *
-   * @param task - The task to get a key for
-   * @returns Unique key for the task
-   */
-  private getTaskKey(task: Task): string {
-    return `${task.path}:${task.line}`;
   }
 
   /**

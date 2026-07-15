@@ -15,6 +15,7 @@
  */
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
 import { KeywordManager } from '../utils/keyword-manager';
+import { getTaskKey } from '../utils/task-utils';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 import { TaskWriter } from './task-writer';
@@ -157,10 +158,6 @@ export class TaskUpdateCoordinator {
 
   /** Timeout after which an entry is considered stale (30 seconds) */
   private readonly STALE_ENTRY_TIMEOUT_MS = 30000;
-
-  private getTaskKey(path: string, line: number): string {
-    return `${path}:${line}`;
-  }
 
   constructor(
     private plugin: TodoTracker,
@@ -355,11 +352,16 @@ export class TaskUpdateCoordinator {
     taskLine: number,
     newState: string,
     source: UpdateSource = 'editor',
+    cellIndex?: number,
   ): Promise<void> {
-    let task = this.taskStateManager.findTaskByPathAndLine(taskPath, taskLine);
+    let task = this.taskStateManager.findTaskByPathAndLine(
+      taskPath,
+      taskLine,
+      cellIndex,
+    );
 
     if (!task && !this.keywordManager.isArchived(newState)) {
-      task = await this.reAddTaskFromFile(taskPath, taskLine);
+      task = await this.reAddTaskFromFile(taskPath, taskLine, cellIndex);
     }
 
     if (!task) {
@@ -384,6 +386,7 @@ export class TaskUpdateCoordinator {
   private async reAddTaskFromFile(
     taskPath: string,
     taskLine: number,
+    cellIndex?: number,
   ): Promise<Task | null> {
     const parser = this.plugin.vaultScanner?.getParser();
     if (!parser) {
@@ -410,6 +413,7 @@ export class TaskUpdateCoordinator {
         const existingTask = this.taskStateManager.findTaskByPathAndLine(
           taskPath,
           taskLine,
+          cellIndex,
         );
         if (!existingTask) {
           this.taskStateManager.addTask(parsedTask);
@@ -502,7 +506,7 @@ export class TaskUpdateCoordinator {
    * ASYNC PHASE: Queue for background execution.
    */
   private async queueAsyncPhase(context: ProcessingContext): Promise<void> {
-    const taskKey = this.getTaskKey(context.filePath, context.fileLine);
+    const taskKey = getTaskKey(context.task);
     const existingUpdate = this.pendingTaskUpdates.get(taskKey);
 
     const asyncWork = async (): Promise<void> => {
@@ -544,6 +548,7 @@ export class TaskUpdateCoordinator {
     let storedTask = this.taskStateManager.findTaskByPathAndLine(
       context.filePath,
       context.fileLine,
+      context.task.tableCell?.cellIndex,
     );
 
     if (!storedTask || storedTask.rawText !== context.task.rawText) {
@@ -746,6 +751,7 @@ export class TaskUpdateCoordinator {
     }
 
     const urgency = this.calculateUrgencyForTask(updatedTask);
+    const cellIndex = updatedTask.tableCell?.cellIndex;
 
     switch (context.type) {
       case 'state':
@@ -765,6 +771,7 @@ export class TaskUpdateCoordinator {
             closedDate: updatedTask.closedDate,
             urgency,
           },
+          cellIndex,
         );
         break;
 
@@ -779,6 +786,7 @@ export class TaskUpdateCoordinator {
             scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
             urgency,
           },
+          cellIndex,
         );
         break;
 
@@ -793,6 +801,7 @@ export class TaskUpdateCoordinator {
             deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
             urgency,
           },
+          cellIndex,
         );
         break;
 
@@ -808,6 +817,7 @@ export class TaskUpdateCoordinator {
             priority: updatedTask.priority,
             urgency,
           },
+          cellIndex,
         );
         break;
 
@@ -827,6 +837,7 @@ export class TaskUpdateCoordinator {
             deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
             urgency,
           },
+          cellIndex,
         );
         break;
     }
@@ -1023,7 +1034,12 @@ export class TaskUpdateCoordinator {
    */
   private removeTaskFromStateManager(task: Task): void {
     this.taskStateManager.removeTasks(
-      (t) => t.path === task.path && t.line === task.line,
+      (t) =>
+        t.path === task.path &&
+        t.line === task.line &&
+        (task.tableCell?.cellIndex === undefined
+          ? true
+          : t.tableCell?.cellIndex === task.tableCell.cellIndex),
     );
   }
 

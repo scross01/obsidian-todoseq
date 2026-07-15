@@ -144,6 +144,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     expect(mockTaskStateManager.findTaskByPathAndLine).toHaveBeenCalledWith(
       'test.md',
       0,
+      undefined,
     );
     expect(mockUpdateCoordinator.updateTaskRecurrence).toHaveBeenCalledTimes(1);
     const [passedTask, _options] =

@@ -209,6 +209,7 @@ describe('TaskItemRenderer', () => {
       expect(mockFindTaskByPathAndLine).toHaveBeenCalledWith(
         task.path,
         task.line,
+        undefined,
       );
       expect(mockOnStateChange).toHaveBeenCalledWith(freshTask, 'DONE');
     });
