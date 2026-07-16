@@ -436,6 +436,9 @@ export class ReaderViewFormatter {
     // Process regular paragraphs with task keywords (checking each individually for quote/callout context)
     this.processRegularParagraphs(element, includeCalloutBlocks);
 
+    // Process heading elements with task keywords (h1-h6)
+    this.processHeadings(element, includeCalloutBlocks);
+
     // Process bullet list items without checkboxes (checking each individually for quote/callout context)
     this.processBulletListItems(element, includeCalloutBlocks);
 
@@ -575,6 +578,32 @@ export class ReaderViewFormatter {
           return;
         }
         this.processParagraphForTasks(paragraph);
+      }
+    });
+  }
+
+  /**
+   * Process heading elements (h1-h6) with task keywords
+   * Headings containing task keywords should be styled with the heading font size
+   */
+  private processHeadings(
+    element: HTMLElement,
+    includeCalloutBlocks: boolean,
+  ): void {
+    const headings = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
+
+    headings.forEach((heading) => {
+      // Skip if element is inside an embedded task list container
+      if (heading.closest('.todoseq-embedded-task-list-container')) {
+        return;
+      }
+
+      if (heading.instanceOf(HTMLElement)) {
+        // Skip if quote/callout blocks are disabled and this heading is inside one
+        if (!includeCalloutBlocks && this.isInQuoteOrCalloutBlock(heading)) {
+          return;
+        }
+        this.processParagraphForTasks(heading);
       }
     });
   }
@@ -800,13 +829,56 @@ export class ReaderViewFormatter {
       const taskParser = this.getTaskParser();
       if (
         taskParser &&
-        !taskParser.testRegex.test(paragraph.textContent || '')
+        !taskParser.testRegex.test(paragraph.textContent || '') &&
+        !(
+          taskParser.isHeadingTaskLine &&
+          taskParser.isHeadingTaskLine(paragraph.textContent || '')
+        )
       ) {
         return;
       }
 
       // Process priority tokens in this paragraph
       this.processPriorityPillsInElement(paragraph);
+    });
+
+    // Process heading elements that might contain tasks
+    const headings = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
+
+    headings.forEach((heading) => {
+      // Skip if element is inside an embedded task list container
+      if (heading.closest('.todoseq-embedded-task-list-container')) {
+        return;
+      }
+
+      // Skip if quote/callout blocks are disabled and this heading is inside one
+      if (
+        !includeCalloutBlocks &&
+        heading.instanceOf(HTMLElement) &&
+        this.isInQuoteOrCalloutBlock(heading)
+      ) {
+        return;
+      }
+
+      if (!heading.instanceOf(HTMLElement)) {
+        return;
+      }
+
+      // Only process priority pills in lines that contain task keywords
+      const taskParser = this.getTaskParser();
+      if (
+        taskParser &&
+        !taskParser.testRegex.test(heading.textContent || '') &&
+        !(
+          taskParser.isHeadingTaskLine &&
+          taskParser.isHeadingTaskLine(heading.textContent || '')
+        )
+      ) {
+        return;
+      }
+
+      // Process priority tokens in this heading
+      this.processPriorityPillsInElement(heading);
     });
 
     // Process table cells with task keywords (experimental)
@@ -1553,16 +1625,46 @@ export class ReaderViewFormatter {
       return;
     }
 
+    // Check if parent element is a heading (h1-h6) — in reader view, the # is stripped
+    const isHeadingElement = paragraph.tagName?.match(/^H[1-6]$/) !== null;
+
     // Use the task parser to test this line
-    const testResult = taskParser.testRegex.test(lineText);
+    let testResult = taskParser.testRegex.test(lineText);
+
+    // Detect heading tasks — always true when parent is a heading element with a keyword
+    let isHeadingTask = false;
+    let headingMatch: RegExpExecArray | null = null;
+    let keywordFromMatch: string | undefined;
+    if (isHeadingElement) {
+      // For headings, use the parser's cached headingRegex (handles escaping)
+      const headingText = paragraph.textContent || '';
+      if (taskParser.headingRegex) {
+        headingMatch = taskParser.headingRegex.exec(headingText);
+      }
+      if (headingMatch && headingMatch[2]) {
+        isHeadingTask = true;
+        keywordFromMatch = headingMatch[2]; // group 2 = keyword in headingRegex
+        testResult = true;
+      }
+    } else if (!testResult && taskParser.isHeadingTaskLine(lineText)) {
+      headingMatch = taskParser.headingRegex?.exec(lineText) ?? null;
+      if (headingMatch && headingMatch[2]) {
+        isHeadingTask = true;
+        keywordFromMatch = headingMatch[2]; // group 2 = keyword in headingRegex
+        testResult = true;
+      }
+    }
 
     if (testResult) {
-      const match = taskParser.testRegex.exec(lineText);
+      const match =
+        isHeadingTask && headingMatch
+          ? headingMatch
+          : taskParser.testRegex.exec(lineText);
 
-      if (match && match[4]) {
-        // match[4] contains the keyword
-        const keyword = match[4];
+      // For heading tasks, keyword is in match[2]; for regex matches, keyword is in match[4]
+      const keyword = keywordFromMatch ?? match?.[4];
 
+      if (match && keyword) {
         // Check if this is a completed keyword for styling
         const isCompleted = KeywordManager.isCompletedKeyword(
           keyword,
@@ -1581,6 +1683,11 @@ export class ReaderViewFormatter {
           isCompleted,
           isArchived,
         );
+
+        // Add heading task class for heading font size styling
+        if (isHeadingTask) {
+          keywordSpan.addClass('todoseq-heading-task-keyword');
+        }
 
         // Create a container for the entire task line using helper method
         const taskContainer = this.createTaskContainer();
@@ -1841,8 +1948,10 @@ export class ReaderViewFormatter {
         return;
       }
 
-      // Check if this date line is associated with a task
-      if (!this.hasPrecedingTask(paragraph)) {
+      // If paragraph contains DESCRIPTION: plus date keywords, it's definitely task metadata
+      // (the DESCRIPTION: keyword only appears in task metadata blocks)
+      const isMetadataBlock = text.includes('DESCRIPTION:');
+      if (!isMetadataBlock && !this.hasPrecedingTask(paragraph)) {
         return;
       }
 
@@ -1936,11 +2045,7 @@ export class ReaderViewFormatter {
         // Find the text node containing DESCRIPTION: and wrap it
         const result = this.findDateKeywordNode(cell, 'DESCRIPTION:');
         if (result) {
-          this.wrapDescriptionLine(
-            cell,
-            result.node,
-            result.index,
-          );
+          this.wrapDescriptionLine(cell, result.node, result.index);
         }
       });
     }
@@ -2018,16 +2123,31 @@ export class ReaderViewFormatter {
   private hasTaskInPreviousSiblings(paragraph: HTMLParagraphElement): boolean {
     let previousElement = paragraph.previousElementSibling;
 
-    while (previousElement) {
-      const prevText = previousElement.textContent || '';
+    // If no previous siblings, walk up to find a previous sibling
+    // Handles paragraphs wrapped in divs (e.g., <div class="el-p"><p>...</p></div>)
+    if (!previousElement && paragraph.parentElement) {
+      previousElement = paragraph.parentElement.previousElementSibling;
+    }
+    // Keep walking up if still no sibling found
+    if (!previousElement && paragraph.parentElement?.parentElement) {
+      previousElement =
+        paragraph.parentElement.parentElement.previousElementSibling;
+    }
 
-      // Check if the previous element contains a task keyword
-      if (this.containsTaskKeyword(prevText)) {
+    while (previousElement) {
+      // Check if element contains a keyword span (most reliable)
+      if (previousElement.querySelector('.todoseq-keyword-formatted')) {
         return true;
       }
 
-      // Check if this is a task list item
+      // Check if element is a task list item
       if (previousElement.classList.contains('task-list-item')) {
+        return true;
+      }
+
+      // Check text content for task keywords
+      const prevText = previousElement.textContent || '';
+      if (this.containsTaskKeyword(prevText)) {
         return true;
       }
 

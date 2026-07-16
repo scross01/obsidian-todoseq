@@ -135,6 +135,13 @@ export const CALLOUT_BLOCK_SOURCE = CALLOUT_BLOCK_REGEX.source;
 export const FOOTNOTE_DEFINITION_REGEX = /^\[\^\d+\]:\s*/;
 export const FOOTNOTE_DEFINITION_SOURCE = FOOTNOTE_DEFINITION_REGEX.source;
 
+/**
+ * Heading prefix pattern for Markdown heading tasks.
+ * Matches: "# ", "## ", "### ", etc. (1-6 hashes followed by whitespace)
+ */
+export const HEADING_PREFIX_PATTERN = /#{1,6}\s+/;
+export const HEADING_PREFIX_SOURCE = HEADING_PREFIX_PATTERN.source;
+
 // ============================================================================
 // Task Content Patterns
 // ============================================================================

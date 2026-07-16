@@ -529,6 +529,25 @@ TODOseq preserves list structure and markers:
 3. DONE Third numbered task
 ```
 
+### Tasks in Headings
+
+TODOseq recognizes task keywords in Markdown headings (H1–H6). This lets you structure your notes hierarchically with projects as headings and tasks as sub-headings, similar to Org-mode and Logseq.
+
+```markdown
+# TODO Project Alpha
+## DOING Design phase
+### DONE Research completed
+## TODO Implementation
+```
+
+Heading tasks support all the same features as regular tasks — priority tokens, SCHEDULED/DEADLINE dates, and DESCRIPTION lines. Date and description lines go on the next line without indentation.
+
+```markdown
+# TODO Launch new feature
+SCHEDULED: <2026-07-20>
+DEADLINE: <2026-08-01>
+```
+
 ### Tasks in Quotes and Callouts
 
 When "Include tasks inside quote and callout blocks" is enabled:

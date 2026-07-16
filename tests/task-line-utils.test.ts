@@ -8,6 +8,7 @@ import {
   findDateLineWithParser,
   findDescriptionLine,
   getIndentLength,
+  getDateLineIndent,
 } from '../src/utils/task-line-utils';
 import { Task } from '../src/types/task';
 import { KeywordManager } from '../src/utils/keyword-manager';
@@ -688,6 +689,56 @@ describe('task-line-utils', () => {
         'DESCRIPTION: After other task',
       ];
       expect(findDescriptionLine(lines, 1, '')).toBe(-1);
+    });
+  });
+
+  describe('getDateLineIndent', () => {
+    it('should return empty string for H1 heading tasks', () => {
+      const task = {
+        rawText: '# TODO Project',
+        state: 'TODO',
+        indent: '# ',
+        headingLevel: 1,
+      } as Task;
+      expect(getDateLineIndent(task)).toBe('');
+    });
+
+    it('should return empty string for H2 heading tasks', () => {
+      const task = {
+        rawText: '## DOING Task',
+        state: 'DOING',
+        indent: '## ',
+        headingLevel: 2,
+      } as Task;
+      expect(getDateLineIndent(task)).toBe('');
+    });
+
+    it('should return empty string for H3 heading tasks', () => {
+      const task = {
+        rawText: '### DONE Subtask',
+        state: 'DONE',
+        indent: '### ',
+        headingLevel: 3,
+      } as Task;
+      expect(getDateLineIndent(task)).toBe('');
+    });
+
+    it('should return indent + 2 spaces for checkbox tasks', () => {
+      const task = {
+        rawText: '- [ ] TODO task',
+        state: 'TODO',
+        indent: '',
+      } as Task;
+      expect(getDateLineIndent(task)).toBe('  ');
+    });
+
+    it('should return indent for keyword-only tasks', () => {
+      const task = {
+        rawText: 'TODO task',
+        state: 'TODO',
+        indent: '',
+      } as Task;
+      expect(getDateLineIndent(task)).toBe('');
     });
   });
 });

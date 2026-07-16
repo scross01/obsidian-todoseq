@@ -152,7 +152,6 @@ describe('Regular task parsing', () => {
 - TODO task
 + TODO task
 * TODO task
-# TODO invalid task
 `;
       const tasks = parser.parseFile(lines, 'test.md');
 
@@ -160,6 +159,15 @@ describe('Regular task parsing', () => {
       const task = tasks[0];
       expect(task.state).toBe('TODO');
       expect(task.text).toBe('task');
+    });
+
+    test(`should not treat # as a bullet marker`, () => {
+      const lines = `# TODO not a bullet`;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      // # is not a valid bullet, but it IS a valid heading task
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].headingLevel).toBe(1);
     });
 
     test(`should match valid lists`, () => {

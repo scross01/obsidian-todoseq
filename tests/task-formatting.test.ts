@@ -371,7 +371,11 @@ describe('TaskKeywordDecorator block state tracking', () => {
       const decorator = new (TaskKeywordDecorator as any)(
         mockEditorView,
         createBaseSettings(),
-        { testRegex: taskRegex },
+        {
+          testRegex: taskRegex,
+          isHeadingTaskLine: () => false,
+          headingRegex: null,
+        },
       );
 
       const decorations = decorator.getDecorations();
@@ -454,7 +458,11 @@ describe('TaskKeywordDecorator block state tracking', () => {
       const decorator = new (TaskKeywordDecorator as any)(
         mockEditorView,
         createBaseSettings(),
-        { testRegex: taskRegex },
+        {
+          testRegex: taskRegex,
+          isHeadingTaskLine: () => false,
+          headingRegex: null,
+        },
       );
 
       const decorations = decorator.getDecorations();

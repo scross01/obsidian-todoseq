@@ -296,6 +296,11 @@ export function getDateLineIndent(task: Task): string {
     return quotePrefix;
   }
 
+  // For heading tasks, no indent - metadata goes on its own line
+  if (task.headingLevel && task.headingLevel > 0) {
+    return '';
+  }
+
   // Check if task has a list marker (bullet, checkbox, numbered, etc.)
   const hasListMarker = /^\s*[-*]\s|^\s*\d+[.)]\s|^\s*[a-zA-Z][.)]\s/i.test(
     task.rawText,

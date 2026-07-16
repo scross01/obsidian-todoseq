@@ -648,7 +648,8 @@ export class EditorController {
 
     // Insert new DESCRIPTION: line after the task line
     const insertLine = lineNumber + 1;
-    const descLine = `${taskIndent}DESCRIPTION: `;
+    const descIndent = task ? getDateLineIndent(task) : taskIndent;
+    const descLine = `${descIndent}DESCRIPTION: `;
     const lineBeforeInsert = editor.getLine(insertLine - 1);
     const newlineBefore = lineBeforeInsert.endsWith('\n') ? '' : '\n';
     editor.replaceRange(

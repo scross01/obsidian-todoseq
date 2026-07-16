@@ -38,6 +38,7 @@ import {
   PRIORITY_TOKEN_REGEX,
   SINGLE_LINE_COMMENT_REGEX,
   stripMarkdownPrefixes,
+  HEADING_PREFIX_SOURCE,
 } from '../utils/patterns';
 
 type RegexPair = { test: RegExp; capture: RegExp };
@@ -75,6 +76,9 @@ export class TaskParser implements ITaskParser {
   // Language state tracking
   private currentLanguage: LanguageDefinition | null = null;
 
+  // Heading task regex (built with keywords)
+  public headingRegex: RegExp;
+
   // Urgency coefficients (loaded on startup)
   private urgencyCoefficients: UrgencyCoefficients;
 
@@ -97,6 +101,7 @@ export class TaskParser implements ITaskParser {
 
     this.testRegex = regex.test;
     this.captureRegex = regex.capture;
+    this.headingRegex = TaskParser.buildHeadingRegex(this.allKeywords);
 
     this.includeCalloutBlocks = includeCalloutBlocks;
     this.includeCodeBlocks = includeCodeBlocks;
@@ -224,7 +229,7 @@ export class TaskParser implements ITaskParser {
     const escaped_keywords = TaskParser.escapeKeywords(keywords);
 
     const test = new RegExp(
-      `^(${STANDARD_PREFIX_SOURCE}|${QUOTED_PREFIX_SOURCE}|${CALLOUT_PREFIX_SOURCE})?` +
+      `^(${HEADING_PREFIX_SOURCE}|${STANDARD_PREFIX_SOURCE}|${QUOTED_PREFIX_SOURCE}|${CALLOUT_PREFIX_SOURCE})?` +
         `(${BULLET_LIST_PATTERN_SOURCE}|${NUMBERED_LIST_PATTERN_SOURCE}|${LETTER_LIST_PATTERN_SOURCE}|${CUSTOM_LIST_PATTERN_SOURCE})??` +
         `(${CHECKBOX_PATTERN_SOURCE})?` +
         `(${escaped_keywords})\\s+` +
@@ -232,6 +237,24 @@ export class TaskParser implements ITaskParser {
     );
     const capture = test;
     return { test, capture };
+  }
+
+  /**
+   * Build heading task regex with dynamic keywords.
+   * Matches: "# TODO task", "## DONE task", "### DOING", etc.
+   * Capture groups: 1=hashes, 2=keyword, 3=text (optional)
+   */
+  private static buildHeadingRegex(keywords: string[]): RegExp {
+    const escaped = TaskParser.escapeKeywords(keywords);
+    return new RegExp(`^(#{1,6})\\s+(${escaped})(?:\\s+(.+))?$`);
+  }
+
+  /**
+   * Check if a line is a heading task (e.g., "# TODO task").
+   * Public for use by editor formatting extensions.
+   */
+  public isHeadingTaskLine(line: string): boolean {
+    return this.headingRegex.test(line);
   }
 
   /**
@@ -366,6 +389,7 @@ export class TaskParser implements ITaskParser {
     tail: string;
     state: string;
     quoteNestingLevel: number;
+    headingLevel: number;
   } {
     // Use language-aware regex if applicable or callout regex for callout tasks
     const m = regex.exec(line);
@@ -390,6 +414,10 @@ export class TaskParser implements ITaskParser {
     // Extract quote nesting level
     const quoteNestingLevel = TaskParser.extractQuoteNestingLevel(line);
 
+    // Extract heading level from prefix (e.g., "# " → 1, "## " → 2)
+    const headingMatch = indent.match(/^(#{1,6})\s/);
+    const headingLevel = headingMatch ? headingMatch[1].length : 0;
+
     return {
       indent,
       listMarker,
@@ -397,6 +425,7 @@ export class TaskParser implements ITaskParser {
       tail,
       state,
       quoteNestingLevel,
+      headingLevel,
     };
   }
 
@@ -516,7 +545,7 @@ export class TaskParser implements ITaskParser {
    * @returns true if line appears to be a task
    */
   public isTaskLine(line: string): boolean {
-    return this.testRegex.test(line);
+    return this.testRegex.test(line) || this.headingRegex.test(line);
   }
 
   /**
@@ -551,6 +580,9 @@ export class TaskParser implements ITaskParser {
     const regex = TaskParser.buildRegex(this.allKeywords);
     (this as { testRegex: RegExp }).testRegex = regex.test;
     (this as { captureRegex: RegExp }).captureRegex = regex.capture;
+
+    // Rebuild heading regex with new keywords
+    this.headingRegex = TaskParser.buildHeadingRegex(this.allKeywords);
 
     this.urgencyCoefficients = config.urgencyCoefficients;
 
@@ -693,7 +725,11 @@ export class TaskParser implements ITaskParser {
     // For regular tasks, check indent matching
     const lineIndent = line.substring(0, line.length - trimmedLine.length);
     const lineIndentLength = getIndentLength(lineIndent);
-    const taskIndentLength = getIndentLength(taskIndent);
+
+    // For heading tasks, the task indent is "# " but date lines have no indent
+    // Accept date lines at indent level 0 (no indent) for heading tasks
+    const isHeadingIndent = /^#{1,6}\s+$/.test(taskIndent);
+    const taskIndentLength = isHeadingIndent ? 0 : getIndentLength(taskIndent);
 
     // Date line must be at same or deeper indent level
     if (lineIndentLength < taskIndentLength) {
@@ -1189,6 +1225,22 @@ export class TaskParser implements ITaskParser {
         continue;
       }
 
+      // Heading task detection (e.g., "# TODO task", "## DONE")
+      if (!inBlock && this.headingRegex.test(line)) {
+        const headingTask = this.tryParseHeadingTask(
+          line,
+          path,
+          index,
+          lines,
+          processedLines,
+          file,
+        );
+        if (headingTask) {
+          tasks.push(headingTask);
+        }
+        continue;
+      }
+
       // Determine which regex to use
       const useCodeRegex =
         inBlock &&
@@ -1201,6 +1253,7 @@ export class TaskParser implements ITaskParser {
         !this.shouldParseLine(
           line,
           useCodeRegex && codeRegex ? codeRegex : undefined,
+          inBlock,
         )
       ) {
         continue;
@@ -1504,14 +1557,20 @@ export class TaskParser implements ITaskParser {
    * Check if a line matches the task regex
    * @param line The line to check
    * @param codeRegex Optional code-specific regex
+   * @param inCodeBlock Whether we're inside a code block
    * @returns True if line should be parsed as a task
    */
   private shouldParseLine(
     line: string,
     codeRegex?: { test: (str: string) => boolean },
+    inCodeBlock = false,
   ): boolean {
     if (codeRegex) {
       return codeRegex.test(line);
+    }
+    // Inside code blocks, don't match heading tasks (# TODO is a comment, not a heading)
+    if (inCodeBlock && /^#{1,6}\s+/.test(line)) {
+      return false;
     }
     return this.testRegex.test(line);
   }
@@ -1768,6 +1827,116 @@ export class TaskParser implements ITaskParser {
   }
 
   /**
+   * Try to parse a heading task (e.g., "# TODO task", "## DONE").
+   * Heading tasks use Markdown heading syntax instead of list markers.
+   */
+  private tryParseHeadingTask(
+    line: string,
+    path: string,
+    index: number,
+    lines: string[],
+    processedLines: Set<number>,
+    file?: TFile,
+  ): Task | null {
+    const match = this.headingRegex.exec(line);
+    if (!match) return null;
+
+    const hashes = match[1]; // e.g., "##"
+    const state = match[2]; // e.g., "TODO"
+    const taskText = match[3] || ''; // e.g., "Project name"
+    const headingLevel = hashes.length;
+
+    // Extract priority from text
+    const { priority, cleanedText, embedReference, footnoteReference } =
+      this.extractPriority(taskText);
+
+    // Extract tags
+    const tags = this.extractTags(taskText);
+
+    // Detect daily note information
+    let isDailyNote = false;
+    let dailyNoteDate: Date | null = null;
+    if (file && this.app) {
+      try {
+        const dailyNoteInfo = getDailyNoteInfo(this.app, file);
+        isDailyNote = dailyNoteInfo.isDailyNote;
+        dailyNoteDate = dailyNoteInfo.dailyNoteDate;
+      } catch (error) {
+        console.warn('Daily note detection failed:', error);
+      }
+    }
+
+    const indent = hashes + ' '; // Store heading prefix as indent
+
+    const task: Task = {
+      path,
+      line: index,
+      rawText: line,
+      indent,
+      listMarker: '',
+      text: cleanedText,
+      state,
+      completed: this.keywordManager.isCompleted(state),
+      priority,
+      scheduledDate: null,
+      scheduledDateRepeat: null,
+      deadlineDate: null,
+      deadlineDateRepeat: null,
+      closedDate: null,
+      scheduledWarningPeriod: null,
+      deadlineWarningPeriod: null,
+      tail: '',
+      urgency: null,
+      file,
+      tags,
+      isDailyNote,
+      dailyNoteDate,
+      embedReference,
+      footnoteReference,
+      quoteNestingLevel: 0,
+      headingLevel,
+      subtaskCount: 0,
+      subtaskCompletedCount: 0,
+    };
+
+    // Extract dates from following lines
+    const {
+      scheduledDate,
+      deadlineDate,
+      closedDate,
+      scheduledDateRepeat,
+      deadlineDateRepeat,
+      scheduledWarningPeriod,
+      deadlineWarningPeriod,
+      description,
+    } = this.extractTaskDates(lines, index + 1, indent);
+
+    task.scheduledDate = scheduledDate;
+    task.scheduledDateRepeat = scheduledDateRepeat;
+    task.deadlineDate = deadlineDate;
+    task.deadlineDateRepeat = deadlineDateRepeat;
+    task.closedDate = closedDate;
+    task.scheduledWarningPeriod = scheduledWarningPeriod;
+    task.deadlineWarningPeriod = deadlineWarningPeriod;
+    task.description = description ?? undefined;
+
+    // Calculate urgency for non-completed tasks
+    if (!task.completed) {
+      const urgencyContext: UrgencyContext = {
+        activeKeywordsSet: this.keywordManager.getActiveSet(),
+        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
+      };
+      task.urgency = calculateTaskUrgency(
+        task,
+        this.urgencyCoefficients,
+        urgencyContext,
+      );
+    }
+
+    return task;
+  }
+
+  /**
    * Extract tags from task text
    * @param taskText The task text to parse
    * @returns Array of tag strings (without #)
@@ -1804,6 +1973,7 @@ export class TaskParser implements ITaskParser {
       tail: string;
       state: string;
       quoteNestingLevel: number;
+      headingLevel: number;
     },
     lines: string[],
     processedLines: Set<number>,
@@ -1871,6 +2041,7 @@ export class TaskParser implements ITaskParser {
       embedReference,
       footnoteReference,
       quoteNestingLevel: taskDetails.quoteNestingLevel,
+      headingLevel: taskDetails.headingLevel || undefined,
       subtaskCount: 0,
       subtaskCompletedCount: 0,
     };
@@ -1946,6 +2117,17 @@ export class TaskParser implements ITaskParser {
   ): Task | null {
     // Check if line matches task regex
     if (!this.testRegex.test(line)) {
+      // Check if it's a heading task
+      if (this.headingRegex.test(line)) {
+        return this.tryParseHeadingTask(
+          line,
+          filePath,
+          lineNumber,
+          [],
+          new Set(),
+        );
+      }
+
       // Check if it's a footnote task
       const footnoteRegex = TaskParser.buildFootnoteRegex(this.allKeywords);
       if (!footnoteRegex.test.test(line)) {
@@ -2019,6 +2201,10 @@ export class TaskParser implements ITaskParser {
     // Extract quote nesting level
     const quoteNestingLevel = TaskParser.extractQuoteNestingLevel(line);
 
+    // Extract heading level from prefix (e.g., "# " → 1, "## " → 2)
+    const headingMatch = indent.match(/^(#{1,6})\s/);
+    const headingLevel = headingMatch ? headingMatch[1].length : 0;
+
     // Extract priority using instance method (with footnote and embed reference support)
     const { priority, cleanedText, embedReference, footnoteReference } =
       this.extractPriority(taskText);
@@ -2060,6 +2246,7 @@ export class TaskParser implements ITaskParser {
       isDailyNote: false,
       dailyNoteDate: null,
       quoteNestingLevel,
+      headingLevel: headingLevel || undefined,
       subtaskCount: 0,
       subtaskCompletedCount: 0,
     };

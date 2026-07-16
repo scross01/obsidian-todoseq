@@ -8,6 +8,8 @@ TODOseq brings the same interactive task experience from the editor into Obsidia
 
 When the "Format task keywords" setting is enabled, TODOseq transforms how tasks appear in Reader view. Task keywords like `TODO`, `DOING`, and `DONE` receive distinctive styling with bold formatting and your theme's accent color. Completed tasks display with a line-through effect, making it immediately obvious which items are finished. SCHEDULED, DEADLINE, and CLOSED lines also receive special formatting to stand out from regular text.
 
+Tasks declared in headings are also fully supported in Reader view, with keywords styled to match the heading size.
+
 ## Interacting with Tasks
 
 In the Reader view you can update the tasks state without switching back to edit mode.

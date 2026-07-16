@@ -308,15 +308,38 @@ export class TaskKeywordDecorator {
           }
         }
 
-        if (match && match[4]) {
-          // match[4] contains the keyword
-          const keyword = match[4];
+        // Check for heading tasks (e.g., "# TODO task", "## DONE")
+        // Heading tasks match the main regex via HEADING_PREFIX_SOURCE in match[1]
+        let isHeadingTask = false;
+        if (match && match[1] && /^#{1,6}\s/.test(match[1])) {
+          isHeadingTask = true;
+        } else if (
+          !match &&
+          !this.inCodeBlock &&
+          this.parser.isHeadingTaskLine(lineText)
+        ) {
+          const headingMatch = this.parser.headingRegex?.exec(lineText);
+          if (headingMatch && headingMatch[2]) {
+            isHeadingTask = true;
+            match = headingMatch;
+          }
+        }
+
+        if (match && (match[4] || (isHeadingTask && match[2]))) {
+          // match[4] contains the keyword for regular tasks AND heading tasks matching main regex
+          // match[2] contains the keyword only for heading tasks matching the separate heading regex
+          const keyword = match[4] || (isHeadingTask ? match[2] : '');
 
           // For footnotes, we need to find the keyword position directly in the original line text
           let keywordStart = 0;
           let keywordEnd = 0;
 
-          if (this.inFootnote) {
+          if (isHeadingTask && !match[4]) {
+            // Heading task matched the separate heading regex - find keyword after hashes
+            const hashes = match[1] || '';
+            keywordStart = hashes.length + 1; // +1 for the space after hashes
+            keywordEnd = keywordStart + keyword.length;
+          } else if (this.inFootnote) {
             // Find the actual position of the keyword in the original line text
             const footnoteMarkerMatch = lineText.match(
               FOOTNOTE_DEFINITION_REGEX,
@@ -427,6 +450,11 @@ export class TaskKeywordDecorator {
             cssClasses += ' callout-block-task-keyword';
           } else if (this.inFootnote) {
             cssClasses += ' todoseq-footnote-task-keyword';
+          }
+
+          // Add heading task class for heading font size styling
+          if (isHeadingTask) {
+            cssClasses += ' todoseq-heading-task-keyword';
           }
 
           builder.add(
