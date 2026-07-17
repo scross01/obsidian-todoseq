@@ -198,7 +198,7 @@ export class TaskContextMenu extends BaseDialog {
   // ─── DOM Building ──────────────────────────────────────────────
 
   private async buildMenu(): Promise<void> {
-    this.containerEl = activeDocument.body.createEl('div', {
+    this.containerEl = activeDocument.body.createDiv({
       cls: 'menu todoseq-task-context-menu',
       attr: { role: 'menu' },
     });
@@ -331,13 +331,13 @@ export class TaskContextMenu extends BaseDialog {
     if (!this.containerEl || !this.task) return;
 
     // Section header
-    const header = this.containerEl.createEl('div', {
+    const header = this.containerEl.createDiv({
       cls: 'menu-item menu-item-title todoseq-context-menu-header',
     });
     header.setText('Scheduled');
 
     // Icon row
-    const iconRow = this.containerEl.createEl('div', {
+    const iconRow = this.containerEl.createDiv({
       cls: 'todoseq-context-menu-icon-row',
     });
 
@@ -354,7 +354,7 @@ export class TaskContextMenu extends BaseDialog {
       });
       setTooltip(btn, this.getScheduledTooltip(option));
 
-      const iconEl = btn.createEl('span', {
+      const iconEl = btn.createSpan({
         cls: 'todoseq-context-menu-icon',
       });
       setIcon(iconEl, option.icon);
@@ -436,13 +436,13 @@ export class TaskContextMenu extends BaseDialog {
     if (!this.containerEl || !this.task) return;
 
     // Section header
-    const header = this.containerEl.createEl('div', {
+    const header = this.containerEl.createDiv({
       cls: 'menu-item menu-item-title todoseq-context-menu-header',
     });
     header.setText('Priority');
 
     // Icon row
-    const iconRow = this.containerEl.createEl('div', {
+    const iconRow = this.containerEl.createDiv({
       cls: 'todoseq-context-menu-icon-row',
     });
 
@@ -459,7 +459,7 @@ export class TaskContextMenu extends BaseDialog {
       });
       setTooltip(btn, option.label);
 
-      const iconEl = btn.createEl('span', {
+      const iconEl = btn.createSpan({
         cls: 'todoseq-context-menu-icon',
       });
       setIcon(iconEl, option.icon);
@@ -516,19 +516,19 @@ export class TaskContextMenu extends BaseDialog {
       throw new Error('Container element not initialized');
     }
 
-    const row = this.containerEl.createEl('div', {
+    const row = this.containerEl.createDiv({
       cls: 'menu-item todoseq-context-menu-row',
       attr: {
         tabindex: '-1',
       },
     });
 
-    const iconEl = row.createEl('span', {
+    const iconEl = row.createSpan({
       cls: 'menu-item-icon todoseq-context-menu-row-icon',
     });
     setIcon(iconEl, iconName);
 
-    const labelEl = row.createEl('span', {
+    const labelEl = row.createSpan({
       cls: 'menu-item-title todoseq-context-menu-row-label',
     });
     labelEl.setText(label);
@@ -552,7 +552,7 @@ export class TaskContextMenu extends BaseDialog {
 
   private addSeparator(): void {
     if (!this.containerEl) return;
-    this.containerEl.createEl('div', {
+    this.containerEl.createDiv({
       cls: 'menu-separator',
     });
   }

@@ -66,9 +66,8 @@ export class PriorityWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const tempContainer = window.activeDocument.createElement('div');
     const priorityName = getPriorityLevelName(this.letter);
-    const el = tempContainer.createSpan({
+    const el = createSpan({
       cls: `todoseq-edit-priority-pill todoseq-priority-badge priority-${this.priority}`,
       text: this.letter,
       attr: {
@@ -1214,13 +1213,11 @@ export const taskKeywordPlugin = (
                     '.todoseq-keyword-formatted',
                   );
                   if (kwSpan && kwSpan.nextSibling) {
-                    const completedContainer =
-                      window.activeDocument.createElement('span');
-                    completedContainer.classList.add(
-                      isCompleted
+                    const completedContainer = createSpan({
+                      cls: isCompleted
                         ? 'todoseq-completed-task-text'
                         : 'todoseq-archived-task-text',
-                    );
+                    });
                     const remaining: ChildNode[] = [];
                     let cur: ChildNode | null = kwSpan.nextSibling;
                     while (cur !== null) {
@@ -1293,10 +1290,11 @@ export const taskKeywordPlugin = (
             if (kwEnd > text.length) break;
             const before = text.substring(0, idx);
             const after = text.substring(kwEnd);
-            const span = window.activeDocument.createElement('span');
-            span.classList.add(cssClasses);
-            span.textContent = keyword;
-            span.setAttribute('data-task-keyword', keyword);
+            const span = createSpan({
+              cls: cssClasses,
+              text: keyword,
+              attr: { 'data-task-keyword': keyword },
+            });
             const parent = node.parentNode;
             if (parent) {
               if (before)
@@ -1345,9 +1343,10 @@ export const taskKeywordPlugin = (
             if (!parent) continue;
 
             // Build the date line span (outer wrapper — gets muted styling)
-            const lineSpan = window.activeDocument.createElement('span');
-            lineSpan.classList.add(`todoseq-${type}-line`);
-            lineSpan.setAttribute('data-date-line-type', type);
+            const lineSpan = createSpan({
+              cls: `todoseq-${type}-line`,
+              attr: { 'data-date-line-type': type },
+            });
 
             // Before keyword text
             const beforeText = text.substring(0, idx);
@@ -1358,7 +1357,7 @@ export const taskKeywordPlugin = (
             }
 
             // Keyword sub-span (gets keyword-specific styling)
-            lineSpan.createEl('span', {
+            lineSpan.createSpan({
               cls: `todoseq-${type}-keyword`,
               text: keyword,
               attr: { 'data-date-keyword': keyword },
@@ -1436,13 +1435,14 @@ export const taskKeywordPlugin = (
               : letter === 'B'
                 ? 'priority-med'
                 : 'priority-low';
-          const span = window.activeDocument.createElement('span');
-          span.classList.add(
-            `todoseq-edit-priority-pill todoseq-priority-badge ${priorityClass}`,
-          );
-          span.setAttribute('data-priority', letter);
-          span.setAttribute('aria-label', `Priority ${letter}`);
-          span.textContent = letter;
+          const span = createSpan({
+            cls: `todoseq-edit-priority-pill todoseq-priority-badge ${priorityClass}`,
+            text: letter,
+            attr: {
+              'data-priority': letter,
+              'aria-label': `Priority ${letter}`,
+            },
+          });
           link.parentNode?.replaceChild(span, link);
         });
       }
@@ -1468,10 +1468,13 @@ export const taskKeywordPlugin = (
           const afterText = text.substring(idx + 'DESCRIPTION:'.length);
 
           // Create description container
-          const descContainer = window.activeDocument.createElement('span');
-          descContainer.classList.add('todoseq-task-description');
-          descContainer.setAttribute('data-description-line', 'true');
-          descContainer.setAttribute('role', 'note');
+          const descContainer = createSpan({
+            cls: 'todoseq-task-description',
+            attr: {
+              'data-description-line': 'true',
+              role: 'note',
+            },
+          });
 
           // Add text before DESCRIPTION:
           if (beforeText) {

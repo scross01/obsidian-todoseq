@@ -219,4 +219,67 @@ export function installObsidianDomMocks(): void {
   };
   (globalThis as any).createEl = globalCreateEl;
   (window as any).createEl = globalCreateEl;
+
+  // Global createDiv - creates a detached div element
+  const globalCreateDiv = function (options?: {
+    cls?: string | string[];
+    attr?: Record<string, string>;
+    text?: string;
+    [key: string]: unknown;
+  }): HTMLDivElement {
+    const el = activeDocument.createElement('div');
+    if (options?.cls) {
+      if (Array.isArray(options.cls)) {
+        for (const c of options.cls) {
+          if (c) el.classList.add(c);
+        }
+      } else {
+        el.className = options.cls;
+      }
+    }
+    if (options?.attr) {
+      for (const [key, value] of Object.entries(options.attr)) {
+        el.setAttribute(key, value);
+      }
+    }
+    if (options?.text) el.textContent = options.text;
+    return el;
+  };
+  (globalThis as any).createDiv = globalCreateDiv;
+  (window as any).createDiv = globalCreateDiv;
+
+  // Global createSpan - creates a detached span element
+  const globalCreateSpan = function (options?: {
+    cls?: string | string[];
+    attr?: Record<string, string>;
+    text?: string;
+    [key: string]: unknown;
+  }): HTMLSpanElement {
+    const el = activeDocument.createElement('span');
+    if (options?.cls) {
+      if (Array.isArray(options.cls)) {
+        for (const c of options.cls) {
+          if (c) el.classList.add(c);
+        }
+      } else {
+        el.className = options.cls;
+      }
+    }
+    if (options?.attr) {
+      for (const [key, value] of Object.entries(options.attr)) {
+        el.setAttribute(key, value);
+      }
+    }
+    if (options?.text) el.textContent = options.text;
+    return el;
+  };
+  (globalThis as any).createSpan = globalCreateSpan;
+  (window as any).createSpan = globalCreateSpan;
+
+  // Global createFragment - creates a detached document fragment
+  const globalCreateFragment = function (): DocumentFragment {
+    return activeDocument.createDocumentFragment();
+  };
+  (globalThis as any).createFragment = globalCreateFragment;
+  (window as any).createFragment = globalCreateFragment;
 }

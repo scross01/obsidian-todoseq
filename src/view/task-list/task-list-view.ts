@@ -425,17 +425,17 @@ export class TaskListView extends ItemView {
 
   /** Build toolbar with icon-only mode buttons plus right-aligned search; dispatch event for persistence */
   private buildToolbar(container: HTMLElement) {
-    const toolbar = container.createEl('div', { cls: 'todoseq-toolbar' });
+    const toolbar = container.createDiv({ cls: 'todoseq-toolbar' });
 
     // First row: search input with mode icons on the right
-    const firstRow = toolbar.createEl('div', { cls: 'search-row' });
+    const firstRow = toolbar.createDiv({ cls: 'search-row' });
 
     // Right-aligned search input with icon
     const searchId = `todoseq-search-${Math.random().toString(36).slice(2, 8)}`;
     const searchLabel = firstRow.createEl('label', { attr: { for: searchId } });
     searchLabel.setText('Search');
     searchLabel.addClass('sr-only');
-    const searchInputWrap = firstRow.createEl('div', {
+    const searchInputWrap = firstRow.createDiv({
       cls: 'search-input-container global-search-input-container',
     });
     const inputEl = searchInputWrap.createEl('input', {
@@ -446,7 +446,7 @@ export class TaskListView extends ItemView {
         'aria-label': 'Search tasks',
       },
     });
-    const clearSearch = searchInputWrap.createEl('div', {
+    const clearSearch = searchInputWrap.createDiv({
       cls: 'search-input-clear-button',
       attr: { 'aria-label': 'Clear search' },
     });
@@ -458,7 +458,7 @@ export class TaskListView extends ItemView {
         await this.refreshVisibleList();
       })();
     });
-    const matchCase = searchInputWrap.createEl('div', {
+    const matchCase = searchInputWrap.createDiv({
       cls: 'input-right-decorator clickable-icon',
       attr: { 'aria-label': 'Match case' },
     });
@@ -521,7 +521,7 @@ export class TaskListView extends ItemView {
     });
 
     // Save/bookmark button for saving current search (outside input, left of settings)
-    this.saveSearchBtn = firstRow.createEl('div', {
+    this.saveSearchBtn = firstRow.createDiv({
       cls: 'clickable-icon todoseq-save-search-btn',
       attr: { 'aria-label': 'Save search' },
     });
@@ -541,7 +541,7 @@ export class TaskListView extends ItemView {
     this.saveSearchBtn.addClass('todoseq-hidden');
 
     // Add Settings button to the right side of the first row
-    const settingsBtn = firstRow.createEl('div', { cls: 'clickable-icon' });
+    const settingsBtn = firstRow.createDiv({ cls: 'clickable-icon' });
     setTooltip(settingsBtn, 'Task List settings');
     settingsBtn.setAttr('aria-label', 'Task List settings');
     settingsBtn.setAttr('aria-expanded', String(false));
@@ -549,23 +549,23 @@ export class TaskListView extends ItemView {
     setIcon(settingsBtn, 'lucide-sliders-horizontal');
 
     // Create expandable settings section below the first row
-    const settingsSection = toolbar.createEl('div', { cls: 'search-params' });
+    const settingsSection = toolbar.createDiv({ cls: 'search-params' });
     settingsSection.addClass('todoseq-settings-section-hidden'); // Start hidden
 
     // Add "Show completed tasks" dropdown
-    const completedTasksSetting = settingsSection.createEl('div', {
+    const completedTasksSetting = settingsSection.createDiv({
       cls: 'setting-item',
     });
-    const completedTasksSettingInfo = completedTasksSetting.createEl('div', {
+    const completedTasksSettingInfo = completedTasksSetting.createDiv({
       cls: 'setting-item-info',
     });
-    completedTasksSettingInfo.createEl('div', {
+    completedTasksSettingInfo.createDiv({
       cls: 'setting-item-name',
       text: 'Completed tasks:',
       attr: { for: 'completed-tasks-dropdown' },
     });
 
-    const completedTasksSettingControl = completedTasksSetting.createEl('div', {
+    const completedTasksSettingControl = completedTasksSetting.createDiv({
       cls: 'setting-item-control',
     });
     const dropdown = completedTasksSettingControl.createEl('select', {
@@ -637,13 +637,13 @@ export class TaskListView extends ItemView {
     });
 
     // Add Future Task Sorting dropdown
-    const futureTasksSetting = settingsSection.createEl('div', {
+    const futureTasksSetting = settingsSection.createDiv({
       cls: 'setting-item',
     });
-    const futureTasksSettingInfo = futureTasksSetting.createEl('div', {
+    const futureTasksSettingInfo = futureTasksSetting.createDiv({
       cls: 'setting-item-info',
     });
-    futureTasksSettingInfo.createEl('div', {
+    futureTasksSettingInfo.createDiv({
       cls: 'setting-item-name',
       text: 'Future dated tasks:',
       attr: { for: 'future-tasks-dropdown' },
@@ -653,7 +653,7 @@ export class TaskListView extends ItemView {
     //    text: 'Control how tasks with future dates are displayed',
     //  });
 
-    const futureTasksSettingControl = futureTasksSetting.createEl('div', {
+    const futureTasksSettingControl = futureTasksSetting.createDiv({
       cls: 'setting-item-control',
     });
     const futureDropdown = futureTasksSettingControl.createEl('select', {
@@ -698,18 +698,18 @@ export class TaskListView extends ItemView {
     });
 
     // Add "Task descriptions" dropdown
-    const descriptionsSetting = settingsSection.createEl('div', {
+    const descriptionsSetting = settingsSection.createDiv({
       cls: 'setting-item',
     });
-    const descriptionsSettingInfo = descriptionsSetting.createEl('div', {
+    const descriptionsSettingInfo = descriptionsSetting.createDiv({
       cls: 'setting-item-info',
     });
-    descriptionsSettingInfo.createEl('div', {
+    descriptionsSettingInfo.createDiv({
       cls: 'setting-item-name',
       text: 'Task descriptions:',
     });
 
-    const descriptionsSettingControl = descriptionsSetting.createEl('div', {
+    const descriptionsSettingControl = descriptionsSetting.createDiv({
       cls: 'setting-item-control',
     });
     const descriptionsDropdown = descriptionsSettingControl.createEl('select', {
@@ -760,15 +760,15 @@ export class TaskListView extends ItemView {
     });
 
     // Add search results info bar (second row)
-    const searchResultsInfo = toolbar.createEl('div', {
+    const searchResultsInfo = toolbar.createDiv({
       cls: 'search-results-info',
     });
 
     // Left side: task count
-    const searchResultsWarp = searchResultsInfo.createEl('div', {
+    const searchResultsWarp = searchResultsInfo.createDiv({
       cls: 'search-results-result-count',
     });
-    const searchResultsCount = searchResultsWarp.createEl('span');
+    const searchResultsCount = searchResultsWarp.createSpan();
     searchResultsCount.setText('0 Of 0 tasks');
 
     // Right side: sort dropdown
@@ -1701,7 +1701,7 @@ export class TaskListView extends ItemView {
 
     // Create sentinel element if not exists
     if (!this.sentinelElement) {
-      this.sentinelElement = list.createEl('div', {
+      this.sentinelElement = list.createDiv({
         cls: 'todo-sentinel',
         attr: { 'aria-hidden': 'true' },
       });
@@ -1927,10 +1927,10 @@ export class TaskListView extends ItemView {
     );
     if (this.searchError) {
       if (!searchErrorContainer) {
-        const errorContainer = container.createEl('div', {
+        const errorContainer = container.createDiv({
           cls: 'search-error-container',
         });
-        const errorEl = errorContainer.createEl('div', { cls: 'search-error' });
+        const errorEl = errorContainer.createDiv({ cls: 'search-error' });
         errorEl.setText(this.searchError);
       }
     } else {
@@ -1963,12 +1963,12 @@ export class TaskListView extends ItemView {
 
       // Build empty message container (below toolbar, above list)
       const emptyContainer = this.taskListContainer || container;
-      const empty = emptyContainer.createEl('div', {
+      const empty = emptyContainer.createDiv({
         cls: 'todoseq-panel-empty',
       });
 
-      const title = empty.createEl('div', { cls: 'todoseq-panel-empty-title' });
-      const subtitle = empty.createEl('div', {
+      const title = empty.createDiv({ cls: 'todoseq-panel-empty-title' });
+      const subtitle = empty.createDiv({
         cls: 'todoseq-panel-empty-subtitle',
       });
 
@@ -2000,12 +2000,12 @@ export class TaskListView extends ItemView {
 
       // Build empty message container (below toolbar, above list)
       const emptyContainer = this.taskListContainer || container;
-      const empty = emptyContainer.createEl('div', {
+      const empty = emptyContainer.createDiv({
         cls: 'todoseq-panel-empty',
       });
 
-      const title = empty.createEl('div', { cls: 'todoseq-panel-empty-title' });
-      const subtitle = empty.createEl('div', {
+      const title = empty.createDiv({ cls: 'todoseq-panel-empty-title' });
+      const subtitle = empty.createDiv({
         cls: 'todoseq-panel-empty-subtitle',
       });
 
@@ -2161,7 +2161,7 @@ export class TaskListView extends ItemView {
     this.buildToolbar(container);
 
     // Create scrollable container for task list
-    this.taskListContainer = container.createEl('div', {
+    this.taskListContainer = container.createDiv({
       cls: 'todoseq-task-list-container',
     });
 
@@ -2185,7 +2185,7 @@ export class TaskListView extends ItemView {
     }
 
     // Create aria-live region for screen reader announcements
-    this.ariaLiveRegion = container.createEl('div', {
+    this.ariaLiveRegion = container.createDiv({
       attr: {
         role: 'status',
         'aria-live': 'polite',

@@ -152,19 +152,19 @@ export class SearchSuggestionDropdown extends BaseDropdown {
   protected async renderDropdown(): Promise<void> {
     this.containerEl.empty();
 
-    const suggestionContainerEl = this.containerEl.createEl('div', {
+    const suggestionContainerEl = this.containerEl.createDiv({
       cls: 'suggestion-container mod-search-suggestion',
       attr: { style: 'width: 300px;' },
     });
-    const suggestionEl = suggestionContainerEl.createEl('div', {
+    const suggestionEl = suggestionContainerEl.createDiv({
       cls: 'suggestion',
     });
 
     if (this.currentSuggestions.length === 0) {
-      const emptyItem = suggestionEl.createEl('div', {
+      const emptyItem = suggestionEl.createDiv({
         cls: 'suggestion-item mod-complex search-suggest-item',
       });
-      emptyItem.createEl('div', {
+      emptyItem.createDiv({
         cls: 'suggestion-content',
         text: 'No suggestions found',
       });
@@ -172,12 +172,12 @@ export class SearchSuggestionDropdown extends BaseDropdown {
     }
 
     this.currentSuggestions.forEach((suggestion, index) => {
-      const itemEl = suggestionEl.createEl('div', {
+      const itemEl = suggestionEl.createDiv({
         cls: `suggestion-item mod-complex search-suggest-item ${index === this.selectedIndex ? 'is-selected' : ''}`,
       });
 
-      const contentEl = itemEl.createEl('div', { cls: 'suggestion-content' });
-      const titleEl = contentEl.createEl('div', { cls: 'suggestion-title' });
+      const contentEl = itemEl.createDiv({ cls: 'suggestion-content' });
+      const titleEl = contentEl.createDiv({ cls: 'suggestion-title' });
 
       const displayText = suggestion.endsWith('/')
         ? suggestion.slice(0, -1)

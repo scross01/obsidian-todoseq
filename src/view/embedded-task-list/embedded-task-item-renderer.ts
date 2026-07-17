@@ -45,17 +45,19 @@ export class EmbeddedTaskItemRenderer {
     index: number,
     params: TodoseqParameters,
   ): HTMLLIElement {
-    const li = window.activeDocument.createElement('li');
-    li.classList.add('todoseq-embedded-task-item');
+    const li = createEl('li', {
+      cls: 'todoseq-embedded-task-item',
+      attr: {
+        'data-path': task.path,
+        'data-line': String(task.line),
+        'data-index': String(index),
+      },
+    });
 
     const dateCategory = this.getDateCategory(task);
     if (dateCategory !== 'none' && !task.completed) {
-      li.classList.add(`todoseq-embedded-task-item-date-${dateCategory}`);
+      li.addClass(`todoseq-embedded-task-item-date-${dateCategory}`);
     }
-
-    li.setAttribute('data-path', task.path);
-    li.setAttribute('data-line', String(task.line));
-    li.setAttribute('data-index', String(index));
 
     const checkbox = li.createEl('input', {
       cls: 'todoseq-embedded-task-checkbox task-list-item-checkbox',
@@ -826,14 +828,14 @@ export class EmbeddedTaskItemRenderer {
       }
 
       if (nextMatch.type === 'tag') {
-        const span = parent.createEl('span', {
+        const span = parent.createSpan({
           cls: 'todoseq-embedded-task-tag',
         });
         const tagName = nextMatch.match[0];
         span.setText(tagName);
         setTooltip(span, tagName);
       } else {
-        const span = parent.createEl('span', {
+        const span = parent.createSpan({
           cls: 'embedded-task-link-like',
         });
 
@@ -917,7 +919,7 @@ export class EmbeddedTaskItemRenderer {
     warningArrow?: string,
     warningTooltip?: string,
   ): void {
-    const badge = parent.createEl('span', {
+    const badge = parent.createSpan({
       cls: 'todoseq-embedded-task-date-badge',
     });
     setIcon(badge, iconName);
@@ -940,7 +942,7 @@ export class EmbeddedTaskItemRenderer {
     warningArrow?: string,
     warningTooltip?: string,
   ): void {
-    const row = parent.createEl('div', {
+    const row = parent.createDiv({
       cls: 'todoseq-embedded-task-date-info' + (extraCls ? ` ${extraCls}` : ''),
     });
     row.createSpan({
@@ -1224,7 +1226,7 @@ export class EmbeddedTaskItemRenderer {
       );
     }
 
-    const icon = parent.createEl('span', {
+    const icon = parent.createSpan({
       cls: 'todoseq-task-date-repeat-icon',
     });
     setIcon(icon, 'repeat-2');

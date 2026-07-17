@@ -73,14 +73,13 @@ export class ReaderViewFormatter {
     isCompleted = false,
     isArchived = false,
   ): HTMLSpanElement {
-    const tempContainer = window.activeDocument.createElement('div');
     let cssClasses = 'todoseq-keyword-formatted';
     if (isArchived) {
       cssClasses += ' todoseq-archived-keyword';
     } else if (isCompleted) {
       cssClasses += ' todoseq-completed-keyword';
     }
-    const span = tempContainer.createSpan({
+    const span = createSpan({
       cls: cssClasses,
       text: keyword,
       attr: {
@@ -97,37 +96,31 @@ export class ReaderViewFormatter {
    * Create a task container span element using Obsidian DOM helpers
    */
   private createTaskContainer(): HTMLSpanElement {
-    const tempContainer = window.activeDocument.createElement('div');
-    const container = tempContainer.createSpan({ cls: 'todoseq-task' });
-    return container;
+    return createSpan({ cls: 'todoseq-task' });
   }
 
   /**
    * Create a completed task container span element using Obsidian DOM helpers
    */
   private createCompletedTaskContainer(): HTMLSpanElement {
-    const tempContainer = window.activeDocument.createElement('div');
-    const container = tempContainer.createSpan({
+    return createSpan({
       cls: 'todoseq-completed-task-text',
       attr: {
         'data-completed-task': 'true',
       },
     });
-    return container;
   }
 
   /**
    * Create an archived task container span element using Obsidian DOM helpers
    */
   private createArchivedTaskContainer(): HTMLSpanElement {
-    const tempContainer = window.activeDocument.createElement('div');
-    const container = tempContainer.createSpan({
+    return createSpan({
       cls: 'todoseq-archived-task-text',
       attr: {
         'data-archived-task': 'true',
       },
     });
-    return container;
   }
 
   /**
@@ -736,13 +729,11 @@ export class ReaderViewFormatter {
       if (isCompleted || isArchived) {
         const kwSpan = cell.querySelector('.todoseq-keyword-formatted');
         if (kwSpan && kwSpan.nextSibling) {
-          const completedContainer =
-            window.activeDocument.createElement('span');
-          completedContainer.classList.add(
-            isCompleted
+          const completedContainer = createSpan({
+            cls: isCompleted
               ? 'todoseq-completed-task-text'
               : 'todoseq-archived-task-text',
-          );
+          });
           const remaining: ChildNode[] = [];
           let cur: ChildNode | null = kwSpan.nextSibling;
           while (cur !== null) {
@@ -1126,8 +1117,7 @@ export class ReaderViewFormatter {
           : 'priority-low';
     const priorityName = getPriorityLevelName(letter);
 
-    const container = window.activeDocument.createElement('div');
-    const span = container.createSpan({
+    const span = createSpan({
       cls: `todoseq-priority-badge ${priorityClass}`,
       attr: {
         'data-priority': letter,
@@ -2138,10 +2128,13 @@ export class ReaderViewFormatter {
     const nodeText = keywordNode.textContent || '';
     const beforeText = nodeText.substring(0, keywordIndex);
 
-    const descContainer = window.activeDocument.createElement('span');
-    descContainer.classList.add('todoseq-task-description');
-    descContainer.setAttribute('data-description-line', 'true');
-    descContainer.setAttribute('role', 'note');
+    const descContainer = createSpan({
+      cls: 'todoseq-task-description',
+      attr: {
+        'data-description-line': 'true',
+        role: 'note',
+      },
+    });
 
     // Add text before DESCRIPTION:
     if (beforeText) {
@@ -2652,8 +2645,7 @@ export class ReaderViewFormatter {
     const afterText = nodeText.substring(keywordIndex + keyword.length);
 
     // Create a date container
-    const tempContainer = window.activeDocument.createElement('div');
-    const dateContainer = tempContainer.createSpan({
+    const dateContainer = createSpan({
       cls: `todoseq-${type}-line`,
       attr: {
         'data-date-line-type': type,

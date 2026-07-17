@@ -312,7 +312,7 @@ export class EmbeddedTaskListRenderer {
       container.empty();
 
       // Create task list container
-      const newContainer = container.createEl('div', {
+      const newContainer = container.createDiv({
         cls: 'todoseq-embedded-task-list-container',
       });
 
@@ -382,7 +382,7 @@ export class EmbeddedTaskListRenderer {
       container.empty();
 
       // Create task list container
-      const taskListContainer = container.createEl('div', {
+      const taskListContainer = container.createDiv({
         cls: 'todoseq-embedded-task-list-container',
       });
 
@@ -502,7 +502,7 @@ export class EmbeddedTaskListRenderer {
     toggleCollapse?: (containerId: string) => void,
     containerId?: string,
   ): HTMLElement {
-    const titleEl = container.createEl('div', {
+    const titleEl = container.createDiv({
       cls: 'todoseq-embedded-task-list-title',
       text: params.title,
       attr: {
@@ -532,7 +532,7 @@ export class EmbeddedTaskListRenderer {
     }
 
     // Create chevron icon container inside the title element
-    const chevronSpan = titleEl.createEl('span', {
+    const chevronSpan = titleEl.createSpan({
       cls: 'todoseq-collapse-toggle-icon',
     });
     setIcon(chevronSpan, 'chevron-right');
@@ -559,13 +559,13 @@ export class EmbeddedTaskListRenderer {
     }
 
     if (parts.length > 0) {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-query-summary',
         text: parts.join(' • '),
       });
     } else {
       // Default text when no query is specified
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-query-summary',
         text: 'All tasks',
       });
@@ -585,7 +585,7 @@ export class EmbeddedTaskListRenderer {
     toggleCollapse?: (containerId: string) => void,
     containerId?: string,
   ): HTMLElement {
-    const header = container.createEl('div', {
+    const header = container.createDiv({
       cls: 'todoseq-embedded-task-list-header',
       attr: {
         role: 'button',
@@ -615,7 +615,7 @@ export class EmbeddedTaskListRenderer {
 
     // Show search query using the same format for both states
     if (params.showQuery !== false && params.searchQuery) {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-search',
         text: `Search: ${params.searchQuery}`,
       });
@@ -623,7 +623,7 @@ export class EmbeddedTaskListRenderer {
 
     // Show sort method if specified
     if (params.sortMethod !== 'default') {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-sort',
         text: `Sort: ${params.sortMethod}`,
       });
@@ -631,7 +631,7 @@ export class EmbeddedTaskListRenderer {
 
     // Show completed filter if specified
     if (params.completed !== undefined) {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-completed',
         text: `Completed: ${params.completed}`,
       });
@@ -639,7 +639,7 @@ export class EmbeddedTaskListRenderer {
 
     // Show future filter if specified
     if (params.future !== undefined) {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-future',
         text: `Future: ${params.future}`,
       });
@@ -647,14 +647,14 @@ export class EmbeddedTaskListRenderer {
 
     // Show limit if specified
     if (params.limit !== undefined) {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-limit',
         text: `Limit: ${params.limit}`,
       });
     }
 
     // Create chevron icon container after the header content
-    const chevronSpan = header.createEl('span', {
+    const chevronSpan = header.createSpan({
       cls: 'todoseq-collapse-toggle-icon',
     });
     setIcon(chevronSpan, 'chevron-right');
@@ -697,7 +697,7 @@ export class EmbeddedTaskListRenderer {
       totalTasksCount !== undefined &&
       totalTasksCount > params.limit
     ) {
-      const truncatedIndicator = container.createEl('div', {
+      const truncatedIndicator = container.createDiv({
         cls: 'todoseq-embedded-task-list-truncated',
       });
       const moreTasksCount = totalTasksCount - params.limit;
@@ -719,7 +719,7 @@ export class EmbeddedTaskListRenderer {
     totalTasksCount?: number,
   ): void {
     const count = totalTasksCount ?? taskCount;
-    const footer = container.createEl('div', {
+    const footer = container.createDiv({
       cls: 'todoseq-result-count-footer',
     });
     footer.textContent = `${count} matching task${count !== 1 ? 's' : ''}`;
@@ -752,35 +752,35 @@ export class EmbeddedTaskListRenderer {
     params: TodoseqParameters,
   ): void {
     if (params.searchQuery) {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-search',
         text: `Search: ${params.searchQuery}`,
       });
     }
 
     if (params.sortMethod !== 'default') {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-sort',
         text: `Sort: ${params.sortMethod}`,
       });
     }
 
     if (params.completed !== undefined) {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-completed',
         text: `Completed: ${params.completed}`,
       });
     }
 
     if (params.future !== undefined) {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-future',
         text: `Future: ${params.future}`,
       });
     }
 
     if (params.limit !== undefined) {
-      header.createEl('span', {
+      header.createSpan({
         cls: 'todoseq-embedded-task-list-limit',
         text: `Limit: ${params.limit}`,
       });
@@ -795,7 +795,7 @@ export class EmbeddedTaskListRenderer {
     container: HTMLElement,
     params: TodoseqParameters,
   ): void {
-    const header = container.createEl('div', {
+    const header = container.createDiv({
       cls: 'todoseq-embedded-task-list-header',
     });
     this.renderHeaderContentSpans(header, params);
@@ -812,7 +812,7 @@ export class EmbeddedTaskListRenderer {
     containerId: string,
     isCollapsed: boolean,
   ): void {
-    const header = container.createEl('div', {
+    const header = container.createDiv({
       cls: 'todoseq-embedded-task-list-header',
       attr: {
         role: 'button',
@@ -837,7 +837,7 @@ export class EmbeddedTaskListRenderer {
     this.renderHeaderContentSpans(header, params);
 
     // Add chevron icon for toggle functionality
-    const chevronSpan = header.createEl('span', {
+    const chevronSpan = header.createSpan({
       cls: 'todoseq-collapse-toggle-icon',
     });
     setIcon(chevronSpan, 'chevron-right');
@@ -906,7 +906,7 @@ export class EmbeddedTaskListRenderer {
       totalTasksCount !== undefined &&
       totalTasksCount > params.limit
     ) {
-      const truncatedIndicator = container.createEl('div', {
+      const truncatedIndicator = container.createDiv({
         cls: 'todoseq-embedded-task-list-truncated',
       });
       const moreTasksCount = totalTasksCount - params.limit;
@@ -930,7 +930,7 @@ export class EmbeddedTaskListRenderer {
   ): void {
     // Add title if provided
     if (params.title) {
-      container.createEl('div', {
+      container.createDiv({
         cls: 'todoseq-embedded-task-list-title',
         text: params.title,
       });
@@ -973,7 +973,7 @@ export class EmbeddedTaskListRenderer {
       totalTasksCount !== undefined &&
       totalTasksCount > params.limit
     ) {
-      const truncatedIndicator = container.createEl('div', {
+      const truncatedIndicator = container.createDiv({
         cls: 'todoseq-embedded-task-list-truncated',
       });
       const moreTasksCount = totalTasksCount - params.limit;
@@ -990,7 +990,7 @@ export class EmbeddedTaskListRenderer {
    * Render empty state message
    */
   private renderEmptyState(container: HTMLElement): void {
-    const emptyState = container.createEl('div', {
+    const emptyState = container.createDiv({
       cls: 'todoseq-embedded-task-list-empty',
     });
 
@@ -1010,22 +1010,22 @@ export class EmbeddedTaskListRenderer {
       !isScanning && !hasCompletedInitialScan && allTasks.length === 0;
 
     if (isScanning || isInitialLoad) {
-      emptyState.createEl('div', {
+      emptyState.createDiv({
         cls: 'todoseq-embedded-task-list-empty-title',
         text: isScanning ? 'Scanning vault...' : 'Loading tasks...',
       });
-      emptyState.createEl('div', {
+      emptyState.createDiv({
         cls: 'todoseq-embedded-task-list-empty-subtitle',
         text: isScanning
           ? 'Please wait while your tasks are being indexed'
           : 'Please wait while your vault is being indexed',
       });
     } else {
-      emptyState.createEl('div', {
+      emptyState.createDiv({
         cls: 'todoseq-embedded-task-list-empty-title',
         text: 'No tasks found',
       });
-      emptyState.createEl('div', {
+      emptyState.createDiv({
         cls: 'todoseq-embedded-task-list-empty-subtitle',
         text: 'Try adjusting your search or sort parameters',
       });
@@ -1040,21 +1040,21 @@ export class EmbeddedTaskListRenderer {
   renderError(container: HTMLElement, errorMessage: string): void {
     container.empty();
 
-    const errorContainer = container.createEl('div', {
+    const errorContainer = container.createDiv({
       cls: 'todoseq-embedded-task-list-error',
     });
 
-    errorContainer.createEl('div', {
+    errorContainer.createDiv({
       cls: 'todoseq-embedded-task-list-error-title',
       text: 'Error rendering task list',
     });
 
-    errorContainer.createEl('div', {
+    errorContainer.createDiv({
       cls: 'todoseq-embedded-task-list-error-message',
       text: errorMessage,
     });
 
-    errorContainer.createEl('div', {
+    errorContainer.createDiv({
       cls: 'todoseq-embedded-task-list-error-help',
       text: 'Check your search and sort parameters for syntax errors.',
     });

@@ -71,8 +71,7 @@ export abstract class BaseDialog {
   protected addBackdrop(): void {
     if (!this.containerEl) return;
 
-    this.backdropEl = window.activeDocument.createElement('div');
-    this.backdropEl.classList.add('todoseq-backdrop');
+    this.backdropEl = createDiv({ cls: 'todoseq-backdrop' });
     this.backdropEl.addEventListener('click', () => {
       this.hide();
     });

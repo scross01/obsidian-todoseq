@@ -189,7 +189,7 @@ export class TaskItemRenderer {
    * Build keyword span element for a task
    */
   buildKeyword(task: Task, parent: HTMLElement): HTMLSpanElement {
-    const todoSpan = parent.createEl('span', { cls: 'todo-task-keyword' });
+    const todoSpan = parent.createSpan({ cls: 'todo-task-keyword' });
     todoSpan.setText(task.state);
     todoSpan.setAttr('role', 'button');
     todoSpan.setAttr('tabindex', '0');
@@ -470,7 +470,7 @@ export class TaskItemRenderer {
    * Build text content (keyword + priority + task text) for a task
    */
   buildText(task: Task, container: HTMLElement): HTMLSpanElement {
-    const taskText = container.createEl('span', { cls: 'todoseq-task-text' });
+    const taskText = container.createSpan({ cls: 'todoseq-task-text' });
 
     // Keyword button
     this.buildKeyword(task, taskText);
@@ -478,7 +478,7 @@ export class TaskItemRenderer {
     // Priority badge
     if (task.priority) {
       const pri = task.priority;
-      const badge = taskText.createEl('span', {
+      const badge = taskText.createSpan({
         cls: ['todoseq-priority-badge', `priority-${pri}`],
       });
       badge.setText(pri === 'high' ? 'A' : pri === 'med' ? 'B' : 'C');
@@ -515,7 +515,7 @@ export class TaskItemRenderer {
     li.draggable = !Platform.isMobile;
 
     // Create a flex container for checkbox + text + indicator (all on same row)
-    const mainContent = li.createEl('div', { cls: 'todo-main-content' });
+    const mainContent = li.createDiv({ cls: 'todo-main-content' });
 
     const checkbox = this.buildCheckbox(task, mainContent);
 
@@ -526,7 +526,7 @@ export class TaskItemRenderer {
     li.setAttribute('data-task', checkbox.getAttribute('data-task') || ' ');
 
     // Create wrapper div for checkbox + text (they stay together)
-    const textWrapper = mainContent.createEl('div', {
+    const textWrapper = mainContent.createDiv({
       cls: 'todoseq-task-text-wrapper',
     });
     textWrapper.appendChild(checkbox);
@@ -562,11 +562,11 @@ export class TaskItemRenderer {
     }
 
     // File info
-    const fileInfo = li.createEl('div', { cls: 'todoseq-task-file-info' });
+    const fileInfo = li.createDiv({ cls: 'todoseq-task-file-info' });
     const fileName = getFilename(task.path);
     const displayName = fileName.replace(/\.md$/, '');
     if (source !== 'markdown') {
-      fileInfo.createEl('span', { cls: 'todoseq-source-chip' });
+      fileInfo.createSpan({ cls: 'todoseq-source-chip' });
     }
     if (task.isTableTask && task.tableCell) {
       fileInfo.appendText(
@@ -671,7 +671,7 @@ export class TaskItemRenderer {
         todoText.empty();
 
         // Re-add keyword span
-        const newKeywordSpan = todoText.createEl('span', {
+        const newKeywordSpan = todoText.createSpan({
           cls: 'todo-task-keyword',
         });
         newKeywordSpan.setText(keywordState);
@@ -689,7 +689,7 @@ export class TaskItemRenderer {
               : task.priority === 'med'
                 ? 'B'
                 : 'C';
-          const badge = todoText.createEl('span', {
+          const badge = todoText.createSpan({
             cls: ['todoseq-priority-badge', `priority-${task.priority}`],
           });
           badge.setText(priorityText);
@@ -736,7 +736,7 @@ export class TaskItemRenderer {
         this.buildSubtaskIndicator(task, contentWrapper as HTMLElement);
       } else {
         // Fallback: create main content wrapper and add indicator
-        const newWrapper = element.createEl('div', {
+        const newWrapper = element.createDiv({
           cls: 'todo-main-content',
         });
         const todoText = element.querySelector('.todoseq-task-text');
@@ -904,26 +904,26 @@ export class TaskItemRenderer {
    * Build date display element for a task
    */
   buildDateDisplay(task: Task, parent: HTMLElement): HTMLElement {
-    const dateContainer = parent.createEl('div', {
+    const dateContainer = parent.createDiv({
       cls: 'todoseq-task-date-container',
     });
 
     // Display scheduled date (only for non-completed tasks)
     if (task.scheduledDate && !task.completed) {
-      const scheduledDiv = dateContainer.createEl('div', {
+      const scheduledDiv = dateContainer.createDiv({
         cls: this.getDateStatusClasses(task.scheduledDate, false),
       });
 
-      const dateRow = scheduledDiv.createEl('div', {
+      const dateRow = scheduledDiv.createDiv({
         cls: 'todoseq-task-date-row',
       });
 
-      const dateLabel = dateRow.createEl('span', {
+      const dateLabel = dateRow.createSpan({
         cls: 'todoseq-task-date-label',
       });
       dateLabel.setText('Scheduled: ');
 
-      const dateValue = dateRow.createEl('span', {
+      const dateValue = dateRow.createSpan({
         cls: 'todoseq-task-date-value',
       });
       dateValue.setText(this.formatDateForDisplay(task.scheduledDate, true));
@@ -946,7 +946,7 @@ export class TaskItemRenderer {
 
       // Add warning period arrow indicator if active
       if (scheduledWarningDays > 0) {
-        const arrow = dateRow.createEl('span', {
+        const arrow = dateRow.createSpan({
           cls: 'todoseq-task-date-warning-arrow',
           text: '\u2192',
         });
@@ -962,12 +962,12 @@ export class TaskItemRenderer {
         );
       }
 
-      const repeatCell = dateRow.createEl('span', {
+      const repeatCell = dateRow.createSpan({
         cls: 'todoseq-task-date-repeat-cell',
       });
 
       if (task.scheduledDateRepeat) {
-        const repeatIcon = repeatCell.createEl('span', {
+        const repeatIcon = repeatCell.createSpan({
           cls: 'todoseq-task-date-repeat-icon',
         });
         setIcon(repeatIcon, 'repeat-2');
@@ -985,20 +985,20 @@ export class TaskItemRenderer {
 
     // Display deadline date (only for non-completed tasks)
     if (task.deadlineDate && !task.completed) {
-      const deadlineDiv = dateContainer.createEl('div', {
+      const deadlineDiv = dateContainer.createDiv({
         cls: this.getDateStatusClasses(task.deadlineDate, true),
       });
 
-      const dateRow = deadlineDiv.createEl('div', {
+      const dateRow = deadlineDiv.createDiv({
         cls: 'todoseq-task-date-row',
       });
 
-      const dateLabel = dateRow.createEl('span', {
+      const dateLabel = dateRow.createSpan({
         cls: 'todoseq-task-date-label',
       });
       dateLabel.setText('Deadline: ');
 
-      const dateValue = dateRow.createEl('span', {
+      const dateValue = dateRow.createSpan({
         cls: 'todoseq-task-date-value',
       });
       dateValue.setText(this.formatDateForDisplay(task.deadlineDate, true));
@@ -1019,7 +1019,7 @@ export class TaskItemRenderer {
 
       // Add warning period arrow indicator if active
       if (deadlineWarningDays > 0) {
-        const arrow = dateRow.createEl('span', {
+        const arrow = dateRow.createSpan({
           cls: 'todoseq-task-date-warning-arrow',
           text: '\u2190',
         });
@@ -1035,12 +1035,12 @@ export class TaskItemRenderer {
         );
       }
 
-      const repeatCell = dateRow.createEl('span', {
+      const repeatCell = dateRow.createSpan({
         cls: 'todoseq-task-date-repeat-cell',
       });
 
       if (task.deadlineDateRepeat) {
-        const repeatIcon = repeatCell.createEl('span', {
+        const repeatIcon = repeatCell.createSpan({
           cls: 'todoseq-task-date-repeat-icon',
         });
         setIcon(repeatIcon, 'repeat-2');
@@ -1058,26 +1058,26 @@ export class TaskItemRenderer {
 
     // Display closed date (only for completed tasks with closed date)
     if (task.closedDate && task.completed) {
-      const closedDiv = dateContainer.createEl('div', {
+      const closedDiv = dateContainer.createDiv({
         cls: ['todoseq-task-date', 'todoseq-task-date-closed'],
       });
 
-      const dateRow = closedDiv.createEl('div', {
+      const dateRow = closedDiv.createDiv({
         cls: 'todoseq-task-date-row',
       });
 
-      const dateLabel = dateRow.createEl('span', {
+      const dateLabel = dateRow.createSpan({
         cls: 'todoseq-task-date-label',
       });
       dateLabel.setText('Closed: ');
 
-      const dateValue = dateRow.createEl('span', {
+      const dateValue = dateRow.createSpan({
         cls: 'todoseq-task-date-value',
       });
       dateValue.setText(this.formatDateForDisplay(task.closedDate, true));
 
       // Add empty repeat cell to match scheduled/deadline layout
-      dateRow.createEl('span', {
+      dateRow.createSpan({
         cls: 'todoseq-task-date-repeat-cell',
       });
     }
@@ -1101,7 +1101,7 @@ export class TaskItemRenderer {
    * Build subtask indicator element showing completed/total count
    */
   buildSubtaskIndicator(task: Task, parent: HTMLElement): void {
-    const indicator = parent.createEl('span', {
+    const indicator = parent.createSpan({
       cls: 'todoseq-subtask-indicator',
     });
     indicator.setText(getSubtaskDisplayText(task));
@@ -1147,12 +1147,12 @@ export class TaskItemRenderer {
       }
 
       if (nextMatch.type === 'tag') {
-        const span = parent.createEl('span', { cls: 'todoseq-task-tag' });
+        const span = parent.createSpan({ cls: 'todoseq-task-tag' });
         const tagName = nextMatch.match[0];
         span.setText(tagName);
         setTooltip(span, tagName);
       } else {
-        const span = parent.createEl('span', { cls: 'todoseq-task-link' });
+        const span = parent.createSpan({ cls: 'todoseq-task-link' });
 
         if (nextMatch.type === 'wiki') {
           const target = nextMatch.match[1];

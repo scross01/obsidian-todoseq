@@ -499,21 +499,21 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       }
 
       if (groupErrors.length > 0) {
-        const errorDiv = settingInfo.createEl('div', {
+        const errorDiv = settingInfo.createDiv({
           cls: 'todoseq-setting-item-error',
         });
         for (const message of groupErrors) {
-          errorDiv.createEl('div', { text: message });
+          errorDiv.createDiv({ text: message });
         }
         binding.inputEl.classList.add('todoseq-invalid-input');
       }
 
       if (groupWarnings.length > 0) {
-        const warningDiv = settingInfo.createEl('div', {
+        const warningDiv = settingInfo.createDiv({
           cls: 'todoseq-setting-item-warning',
         });
         for (const message of groupWarnings) {
-          warningDiv.createEl('div', { text: message });
+          warningDiv.createDiv({ text: message });
         }
       }
     }
@@ -914,12 +914,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     let infoDiv = settingInfo.querySelector('.todoseq-info-message');
     if (!infoDiv) {
-      infoDiv = settingInfo.createEl('div', {
+      infoDiv = settingInfo.createDiv({
         cls: 'todoseq-setting-item-warning',
       });
     }
 
-    infoDiv.createEl('div', { text: message });
+    infoDiv.createDiv({ text: message });
   }
 
   /**
@@ -934,11 +934,11 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     const settingInfo = setting.settingEl.querySelector('.setting-item-info');
     if (!settingInfo) return;
 
-    const errorDiv = settingInfo.createEl('div', {
+    const errorDiv = settingInfo.createDiv({
       cls: 'todoseq-setting-item-error',
     });
     for (const message of messages) {
-      errorDiv.createEl('div', { text: message });
+      errorDiv.createDiv({ text: message });
     }
 
     // Highlight the input field

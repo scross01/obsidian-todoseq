@@ -37,13 +37,13 @@ export class SavedSearchDialog {
 
   open(): void {
     // Create backdrop
-    this.backdropEl = activeDocument.body.createEl('div', {
+    this.backdropEl = activeDocument.body.createDiv({
       cls: 'todoseq-saved-search-backdrop',
     });
     this.backdropEl.addEventListener('click', () => this.cancel());
 
     // Create modal
-    this.modalEl = activeDocument.body.createEl('div', {
+    this.modalEl = activeDocument.body.createDiv({
       cls: 'todoseq-saved-search-modal',
     });
     this.modalEl.addEventListener('click', (e) => e.stopPropagation());
@@ -52,25 +52,25 @@ export class SavedSearchDialog {
     const title = isEdit ? 'Edit saved search' : 'Save search';
 
     // Title
-    const titleEl = this.modalEl.createEl('div', {
+    const titleEl = this.modalEl.createDiv({
       cls: 'todoseq-saved-search-title',
     });
     titleEl.createSpan({ text: title });
 
     // Close button
-    const closeBtn = titleEl.createEl('div', {
+    const closeBtn = titleEl.createDiv({
       cls: 'todoseq-saved-search-close clickable-icon',
     });
     closeBtn.createSpan({ text: '\u00D7' });
     closeBtn.addEventListener('click', () => this.cancel());
 
     // Form
-    const form = this.modalEl.createEl('div', {
+    const form = this.modalEl.createDiv({
       cls: 'todoseq-saved-search-form',
     });
 
     // Name field
-    const nameGroup = form.createEl('div', {
+    const nameGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
     nameGroup.createEl('label', { text: 'Name' });
@@ -85,7 +85,7 @@ export class SavedSearchDialog {
     nameInput.value = this.options.existingSearch?.name ?? '';
 
     // Query field
-    const queryGroup = form.createEl('div', {
+    const queryGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
     queryGroup.createEl('label', { text: 'Search query' });
@@ -100,7 +100,7 @@ export class SavedSearchDialog {
       this.options.existingSearch?.query ?? this.options.query ?? '';
 
     // Match case field
-    const matchCaseGroup = form.createEl('div', {
+    const matchCaseGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
     matchCaseGroup.createEl('label', { text: 'Match case' });
@@ -127,7 +127,7 @@ export class SavedSearchDialog {
     }
 
     // Sort method field
-    const sortGroup = form.createEl('div', {
+    const sortGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
     sortGroup.createEl('label', { text: 'Sort tasks by' });
@@ -154,7 +154,7 @@ export class SavedSearchDialog {
       '';
 
     // Completed tasks view mode field
-    const viewModeGroup = form.createEl('div', {
+    const viewModeGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
     viewModeGroup.createEl('label', { text: 'Completed tasks' });
@@ -177,7 +177,7 @@ export class SavedSearchDialog {
       '';
 
     // Future task sorting field
-    const futureGroup = form.createEl('div', {
+    const futureGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
     futureGroup.createEl('label', { text: 'Future dated tasks' });
@@ -201,7 +201,7 @@ export class SavedSearchDialog {
       '';
 
     // Buttons
-    const buttons = form.createEl('div', {
+    const buttons = form.createDiv({
       cls: 'todoseq-saved-search-buttons',
     });
 

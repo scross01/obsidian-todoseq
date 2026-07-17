@@ -131,11 +131,11 @@ export class SearchOptionsDropdown extends BaseDropdown {
   protected async renderDropdown(): Promise<void> {
     this.containerEl.empty();
 
-    const suggestionContainerEl = this.containerEl.createEl('div', {
+    const suggestionContainerEl = this.containerEl.createDiv({
       cls: 'suggestion-container mod-search-suggestion',
       attr: { style: 'width: 300px;' },
     });
-    const suggestionEl = suggestionContainerEl.createEl('div', {
+    const suggestionEl = suggestionContainerEl.createDiv({
       cls: 'suggestion',
     });
 
@@ -143,7 +143,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
       return;
     }
 
-    const titleItem = suggestionEl.createEl('div', {
+    const titleItem = suggestionEl.createDiv({
       cls: 'suggestion-item mod-complex search-suggest-item mod-group',
     });
 
@@ -152,16 +152,16 @@ export class SearchOptionsDropdown extends BaseDropdown {
       e.stopPropagation();
     });
 
-    const titleContent = titleItem.createEl('div', {
+    const titleContent = titleItem.createDiv({
       cls: 'suggestion-content',
     });
-    const titleText = titleContent.createEl('div', {
+    const titleText = titleContent.createDiv({
       cls: 'suggestion-title list-item-part mod-extended',
     });
     titleText.createSpan({ text: 'Search options' });
 
-    const auxEl = titleItem.createEl('div', { cls: 'suggestion-aux' });
-    const iconContainer = auxEl.createEl('div', {
+    const auxEl = titleItem.createDiv({ cls: 'suggestion-aux' });
+    const iconContainer = auxEl.createDiv({
       cls: 'list-item-part search-suggest-icon clickable-icon',
       attr: { 'aria-label': 'Read more' },
     });
@@ -184,12 +184,12 @@ export class SearchOptionsDropdown extends BaseDropdown {
     });
 
     this.currentSuggestions.forEach((suggestion, index) => {
-      const itemEl = suggestionEl.createEl('div', {
+      const itemEl = suggestionEl.createDiv({
         cls: `suggestion-item mod-complex search-suggest-item ${index === this.selectedIndex ? 'is-selected' : ''}`,
       });
 
-      const contentEl = itemEl.createEl('div', { cls: 'suggestion-content' });
-      const titleEl = contentEl.createEl('div', { cls: 'suggestion-title' });
+      const contentEl = itemEl.createDiv({ cls: 'suggestion-content' });
+      const titleEl = contentEl.createDiv({ cls: 'suggestion-title' });
 
       titleEl.createSpan({ text: this.getOptionLabel(suggestion) });
 
@@ -238,7 +238,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
     parent: HTMLElement,
     startIndex: number,
   ): void {
-    const headerItem = parent.createEl('div', {
+    const headerItem = parent.createDiv({
       cls: 'suggestion-item mod-complex search-suggest-item mod-group',
     });
 
@@ -247,16 +247,16 @@ export class SearchOptionsDropdown extends BaseDropdown {
       e.stopPropagation();
     });
 
-    const headerContent = headerItem.createEl('div', {
+    const headerContent = headerItem.createDiv({
       cls: 'suggestion-content',
     });
-    const headerTitle = headerContent.createEl('div', {
+    const headerTitle = headerContent.createDiv({
       cls: 'suggestion-title list-item-part mod-extended',
     });
     headerTitle.createSpan({ text: 'Saved searches' });
 
-    const auxEl = headerItem.createEl('div', { cls: 'suggestion-aux' });
-    const iconContainer = auxEl.createEl('div', {
+    const auxEl = headerItem.createDiv({ cls: 'suggestion-aux' });
+    const iconContainer = auxEl.createDiv({
       cls: 'list-item-part search-suggest-icon clickable-icon',
       attr: { 'aria-label': 'Add saved search' },
     });
@@ -274,14 +274,14 @@ export class SearchOptionsDropdown extends BaseDropdown {
 
     this.savedSearches.forEach((search, index) => {
       const adjustedIndex = startIndex + index;
-      const itemEl = parent.createEl('div', {
+      const itemEl = parent.createDiv({
         cls: `suggestion-item mod-complex search-suggest-item search-suggest-saved-item ${adjustedIndex === this.selectedIndex ? 'is-selected' : ''}`,
       });
 
-      const contentEl = itemEl.createEl('div', {
+      const contentEl = itemEl.createDiv({
         cls: 'suggestion-content',
       });
-      const titleEl = contentEl.createEl('div', {
+      const titleEl = contentEl.createDiv({
         cls: 'suggestion-title',
       });
       titleEl.createSpan({
@@ -295,9 +295,9 @@ export class SearchOptionsDropdown extends BaseDropdown {
       setTooltip(queryEl, search.query);
 
       // Hover actions (edit and delete)
-      const auxEl = itemEl.createEl('div', { cls: 'suggestion-aux' });
+      const auxEl = itemEl.createDiv({ cls: 'suggestion-aux' });
 
-      const editBtn = auxEl.createEl('div', {
+      const editBtn = auxEl.createDiv({
         cls: 'list-item-part search-suggest-icon clickable-icon',
         attr: { 'aria-label': 'Edit saved search' },
       });
@@ -313,7 +313,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
         this.hide();
       });
 
-      const deleteBtn = auxEl.createEl('div', {
+      const deleteBtn = auxEl.createDiv({
         cls: 'list-item-part search-suggest-icon clickable-icon',
         attr: { 'aria-label': 'Delete saved search' },
       });
@@ -352,7 +352,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
   }
 
   private renderHistorySection(parent: HTMLElement): void {
-    const headerItem = parent.createEl('div', {
+    const headerItem = parent.createDiv({
       cls: 'suggestion-item mod-complex search-suggest-item mod-group',
     });
 
@@ -361,16 +361,16 @@ export class SearchOptionsDropdown extends BaseDropdown {
       e.stopPropagation();
     });
 
-    const headerContent = headerItem.createEl('div', {
+    const headerContent = headerItem.createDiv({
       cls: 'suggestion-content',
     });
-    const headerTitle = headerContent.createEl('div', {
+    const headerTitle = headerContent.createDiv({
       cls: 'suggestion-title list-item-part mod-extended',
     });
     headerTitle.createSpan({ text: 'History' });
 
-    const auxEl = headerItem.createEl('div', { cls: 'suggestion-aux' });
-    const clearBtn = auxEl.createEl('div', {
+    const auxEl = headerItem.createDiv({ cls: 'suggestion-aux' });
+    const clearBtn = auxEl.createDiv({
       cls: 'list-item-part search-suggest-icon clickable-icon',
       attr: { 'aria-label': 'Clear history' },
     });
@@ -391,12 +391,12 @@ export class SearchOptionsDropdown extends BaseDropdown {
       this.currentSuggestions.length + this.savedSearches.length;
     this.searchHistory.forEach((entry, index) => {
       const adjustedIndex = optionsCount + index;
-      const itemEl = parent.createEl('div', {
+      const itemEl = parent.createDiv({
         cls: `suggestion-item mod-complex search-suggest-item search-suggest-history-item ${adjustedIndex === this.selectedIndex ? 'is-selected' : ''}`,
       });
 
-      const contentEl = itemEl.createEl('div', { cls: 'suggestion-content' });
-      const titleEl = contentEl.createEl('div', { cls: 'suggestion-title' });
+      const contentEl = itemEl.createDiv({ cls: 'suggestion-content' });
+      const titleEl = contentEl.createDiv({ cls: 'suggestion-title' });
       if (entry.matchCase) {
         const caseEl = titleEl.createSpan({
           cls: 'search-suggest-history-matchcase',
@@ -413,8 +413,8 @@ export class SearchOptionsDropdown extends BaseDropdown {
 
       // Save icon for history items
       if (this.savedSearchCallbacks) {
-        const auxEl = itemEl.createEl('div', { cls: 'suggestion-aux' });
-        const saveBtn = auxEl.createEl('div', {
+        const auxEl = itemEl.createDiv({ cls: 'suggestion-aux' });
+        const saveBtn = auxEl.createDiv({
           cls: 'list-item-part search-suggest-icon clickable-icon',
           attr: { 'aria-label': 'Save as saved search' },
         });

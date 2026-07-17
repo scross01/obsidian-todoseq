@@ -193,7 +193,7 @@ export class DatePicker extends BaseDialog {
   // ─── DOM Building ──────────────────────────────────────────────
 
   private async buildPicker(): Promise<void> {
-    this.containerEl = activeDocument.body.createEl('div', {
+    this.containerEl = activeDocument.body.createDiv({
       cls: 'menu todoseq-date-picker',
       attr: { role: 'menu' },
     });
@@ -237,7 +237,7 @@ export class DatePicker extends BaseDialog {
   private buildHeaderSection(): void {
     if (!this.containerEl) return;
 
-    const header = this.containerEl.createEl('div', {
+    const header = this.containerEl.createDiv({
       cls: 'menu-item menu-item-title todoseq-date-picker-header',
     });
 
@@ -250,7 +250,7 @@ export class DatePicker extends BaseDialog {
     if (!this.containerEl) return;
 
     // Create a section for the no date option to match other sections
-    const noDateSection = this.containerEl.createEl('div', {
+    const noDateSection = this.containerEl.createDiv({
       cls: 'todoseq-date-picker-no-date',
     });
 
@@ -267,7 +267,7 @@ export class DatePicker extends BaseDialog {
   private buildQuickSelectSection(): void {
     if (!this.containerEl) return;
 
-    this.quickSelectSection = this.containerEl.createEl('div', {
+    this.quickSelectSection = this.containerEl.createDiv({
       cls: 'todoseq-date-picker-quick-select',
     });
 
@@ -282,12 +282,12 @@ export class DatePicker extends BaseDialog {
   private buildCalendarSection(): void {
     if (!this.containerEl) return;
 
-    this.calendarSection = this.containerEl.createEl('div', {
+    this.calendarSection = this.containerEl.createDiv({
       cls: 'todoseq-date-picker-calendar',
     });
 
     // Month header with navigation
-    const monthHeader = this.calendarSection.createEl('div', {
+    const monthHeader = this.calendarSection.createDiv({
       cls: 'todoseq-date-picker-calendar-header',
     });
 
@@ -299,7 +299,7 @@ export class DatePicker extends BaseDialog {
         tabindex: '-1',
       },
     });
-    const prevIcon = prevBtn.createEl('span', {
+    const prevIcon = prevBtn.createSpan({
       cls: 'menu-item-icon todoseq-date-picker-calendar-nav-icon',
     });
     setIcon(prevIcon, 'lucide-chevron-left');
@@ -308,7 +308,7 @@ export class DatePicker extends BaseDialog {
       this.previousMonth();
     });
 
-    const monthYearLabel = monthHeader.createEl('span', {
+    const monthYearLabel = monthHeader.createSpan({
       cls: 'todoseq-date-picker-calendar-month',
     });
     monthYearLabel.setText(this.formatMonthYear(this.currentMonth));
@@ -321,7 +321,7 @@ export class DatePicker extends BaseDialog {
         tabindex: '-1',
       },
     });
-    const nextIcon = nextBtn.createEl('span', {
+    const nextIcon = nextBtn.createSpan({
       cls: 'menu-item-icon todoseq-date-picker-calendar-nav-icon',
     });
     setIcon(nextIcon, 'lucide-chevron-right');
@@ -331,20 +331,20 @@ export class DatePicker extends BaseDialog {
     });
 
     // Weekday headers
-    const weekdayHeader = this.calendarSection.createEl('div', {
+    const weekdayHeader = this.calendarSection.createDiv({
       cls: 'todoseq-date-picker-calendar-weekdays',
     });
 
     const weekdays = this.getWeekdayLabels();
     for (const weekday of weekdays) {
-      const dayLabel = weekdayHeader.createEl('span', {
+      const dayLabel = weekdayHeader.createSpan({
         cls: 'todoseq-date-picker-calendar-weekday',
       });
       dayLabel.setText(weekday);
     }
 
     // Days grid
-    const daysGrid = this.calendarSection.createEl('div', {
+    const daysGrid = this.calendarSection.createDiv({
       cls: 'todoseq-date-picker-calendar-days',
     });
 
@@ -353,7 +353,7 @@ export class DatePicker extends BaseDialog {
 
     // Empty cells for days before the first day of the month
     for (let i = 0; i < firstDayOffset; i++) {
-      daysGrid.createEl('div', {
+      daysGrid.createDiv({
         cls: 'todoseq-date-picker-calendar-day empty',
       });
     }
@@ -365,7 +365,7 @@ export class DatePicker extends BaseDialog {
         this.currentMonth.getMonth(),
         day,
       );
-      const dayCell = daysGrid.createEl('div', {
+      const dayCell = daysGrid.createDiv({
         cls: 'todoseq-date-picker-calendar-day',
         attr: {
           'aria-label': date.toLocaleDateString(),
@@ -393,7 +393,7 @@ export class DatePicker extends BaseDialog {
   private buildTimeSection(): void {
     if (!this.containerEl) return;
 
-    this.timeSection = this.containerEl.createEl('div', {
+    this.timeSection = this.containerEl.createDiv({
       cls: 'todoseq-date-picker-time',
     });
 
@@ -423,7 +423,7 @@ export class DatePicker extends BaseDialog {
           tabindex: '-1',
         },
       });
-      const clearIcon = clearBtn.createEl('span', {
+      const clearIcon = clearBtn.createSpan({
         cls: 'menu-item-icon todoseq-date-picker-clear-icon',
       });
       setIcon(clearIcon, 'lucide-x');
@@ -440,7 +440,7 @@ export class DatePicker extends BaseDialog {
   private buildRepeatSection(): void {
     if (!this.containerEl) return;
 
-    this.repeatSection = this.containerEl.createEl('div', {
+    this.repeatSection = this.containerEl.createDiv({
       cls: 'todoseq-date-picker-repeat',
     });
 
@@ -470,7 +470,7 @@ export class DatePicker extends BaseDialog {
           tabindex: '-1',
         },
       });
-      const clearIcon = clearBtn.createEl('span', {
+      const clearIcon = clearBtn.createSpan({
         cls: 'menu-item-icon todoseq-date-picker-clear-icon',
       });
       setIcon(clearIcon, 'lucide-x');
@@ -487,7 +487,7 @@ export class DatePicker extends BaseDialog {
   private buildWarningPeriodSection(): void {
     if (!this.containerEl) return;
 
-    this.warningPeriodSection = this.containerEl.createEl('div', {
+    this.warningPeriodSection = this.containerEl.createDiv({
       cls: 'todoseq-date-picker-warning-period',
     });
 
@@ -522,7 +522,7 @@ export class DatePicker extends BaseDialog {
           tabindex: '-1',
         },
       });
-      const clearIcon = clearBtn.createEl('span', {
+      const clearIcon = clearBtn.createSpan({
         cls: 'menu-item-icon todoseq-date-picker-clear-icon',
       });
       setIcon(clearIcon, 'lucide-x');
@@ -576,22 +576,22 @@ export class DatePicker extends BaseDialog {
     label: string;
     getDate: () => Date;
   }): HTMLElement {
-    const row = window.activeDocument.createElement('div');
-    row.classList.add('menu-item', 'todoseq-date-picker-quick-select-row');
-    row.setAttribute('role', 'menuitem');
-    row.setAttribute('tabindex', '-1');
+    const row = createDiv({
+      cls: 'menu-item todoseq-date-picker-quick-select-row',
+      attr: { role: 'menuitem', tabindex: '-1' },
+    });
 
-    const iconEl = row.createEl('span', {
+    const iconEl = row.createSpan({
       cls: 'menu-item-icon todoseq-date-picker-quick-select-icon',
     });
     setIcon(iconEl, option.icon);
 
-    const labelEl = row.createEl('span', {
+    const labelEl = row.createSpan({
       cls: 'menu-item-title todoseq-date-picker-quick-select-label',
     });
     labelEl.setText(option.label);
 
-    const dateEl = row.createEl('span', {
+    const dateEl = row.createSpan({
       cls: 'todoseq-date-picker-quick-select-date',
     });
     const date = option.getDate();
@@ -740,7 +740,7 @@ export class DatePicker extends BaseDialog {
     if (!this.timeSection || !this.containerEl) return;
 
     // Create submenu
-    this.timePickerSubmenu = this.containerEl.createEl('div', {
+    this.timePickerSubmenu = this.containerEl.createDiv({
       cls: 'menu todoseq-date-picker-submenu',
     });
 
@@ -756,7 +756,7 @@ export class DatePicker extends BaseDialog {
         const time: { hours: number; minutes: number } = { hours, minutes };
         const timeStr = this.formatTime(time);
 
-        const row = this.timePickerSubmenu.createEl('div', {
+        const row = this.timePickerSubmenu.createDiv({
           cls: 'menu-item todoseq-date-picker-submenu-row',
           text: timeStr,
           attr: { role: 'menuitem', tabindex: '-1' },
@@ -869,7 +869,7 @@ export class DatePicker extends BaseDialog {
     if (!this.repeatSection || !this.containerEl) return;
 
     // Create submenu
-    this.repeatPickerSubmenu = this.containerEl.createEl('div', {
+    this.repeatPickerSubmenu = this.containerEl.createDiv({
       cls: 'menu todoseq-date-picker-submenu',
     });
 
@@ -977,23 +977,23 @@ export class DatePicker extends BaseDialog {
     if (!this.containerEl) return;
 
     // Create custom repeat dialog
-    this.customRepeatDialog = this.containerEl.createEl('div', {
+    this.customRepeatDialog = this.containerEl.createDiv({
       cls: 'todoseq-date-picker-custom-repeat',
     });
 
     // Header
-    const header = this.customRepeatDialog.createEl('div', {
+    const header = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-header',
     });
     header.setText('Custom repeat');
 
     // Repeat type section
-    const typeLabel = this.customRepeatDialog.createEl('div', {
+    const typeLabel = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-label',
     });
     typeLabel.setText('Repeat type');
 
-    const typeOptions = this.customRepeatDialog.createEl('div', {
+    const typeOptions = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-type-options',
     });
 
@@ -1036,12 +1036,12 @@ export class DatePicker extends BaseDialog {
     }
 
     // Repeat value section
-    const valueLabel = this.customRepeatDialog.createEl('div', {
+    const valueLabel = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-label',
     });
     valueLabel.setText('Repeat every');
 
-    const valueRow = this.customRepeatDialog.createEl('div', {
+    const valueRow = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-value-row',
     });
 
@@ -1075,7 +1075,7 @@ export class DatePicker extends BaseDialog {
     }
 
     // Buttons
-    const buttonRow = this.customRepeatDialog.createEl('div', {
+    const buttonRow = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-buttons',
     });
 
@@ -1174,7 +1174,7 @@ export class DatePicker extends BaseDialog {
   private openWarningPeriodPicker(): void {
     if (!this.warningPeriodSection || !this.containerEl) return;
 
-    this.warningPeriodPickerSubmenu = this.containerEl.createEl('div', {
+    this.warningPeriodPickerSubmenu = this.containerEl.createDiv({
       cls: 'menu todoseq-date-picker-submenu',
     });
 
@@ -1309,21 +1309,21 @@ export class DatePicker extends BaseDialog {
   private openCustomWarningPeriodDialog(): void {
     if (!this.containerEl) return;
 
-    const dialog = this.containerEl.createEl('div', {
+    const dialog = this.containerEl.createDiv({
       cls: 'todoseq-date-picker-custom-repeat',
     });
 
-    const header = dialog.createEl('div', {
+    const header = dialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-header',
     });
     header.setText('Custom warning period');
 
-    const valueLabel = dialog.createEl('div', {
+    const valueLabel = dialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-label',
     });
     valueLabel.setText('Warning period');
 
-    const valueRow = dialog.createEl('div', {
+    const valueRow = dialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-value-row',
     });
 
@@ -1352,7 +1352,7 @@ export class DatePicker extends BaseDialog {
     }
     unitSelect.value = this.selectedWarningPeriod?.unit ?? 'd';
 
-    const buttonRow = dialog.createEl('div', {
+    const buttonRow = dialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-buttons',
     });
 
@@ -1395,16 +1395,17 @@ export class DatePicker extends BaseDialog {
       throw new Error('Container element not initialized');
     }
 
-    const row = window.activeDocument.createElement('div');
-    row.classList.add('menu-item', 'todoseq-date-picker-menu-row');
-    row.setAttribute('tabindex', '-1');
+    const row = createDiv({
+      cls: 'menu-item todoseq-date-picker-menu-row',
+      attr: { tabindex: '-1' },
+    });
 
-    const iconEl = row.createEl('span', {
+    const iconEl = row.createSpan({
       cls: 'menu-item-icon todoseq-date-picker-menu-row-icon',
     });
     setIcon(iconEl, iconName);
 
-    const labelEl = row.createEl('span', {
+    const labelEl = row.createSpan({
       cls: 'menu-item-title todoseq-date-picker-menu-row-label',
     });
     labelEl.setText(label);
@@ -1428,7 +1429,7 @@ export class DatePicker extends BaseDialog {
 
   private addSeparator(): void {
     if (!this.containerEl) return;
-    this.containerEl.createEl('div', {
+    this.containerEl.createDiv({
       cls: 'menu-separator todoseq-date-picker-separator',
     });
   }

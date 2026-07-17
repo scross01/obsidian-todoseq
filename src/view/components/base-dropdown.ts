@@ -19,7 +19,7 @@ export abstract class BaseDropdown {
     this.inputEl = inputEl;
     this.vault = vault;
 
-    this.containerEl = activeDocument.body.createEl('div', {
+    this.containerEl = activeDocument.body.createDiv({
       cls: 'todoseq-dropdown',
     });
 

@@ -165,18 +165,18 @@ export class TaskDragDropHandler {
     x: number,
     y: number,
   ): HTMLElement {
-    const el = activeDocument.body.createEl('div', {
+    const el = activeDocument.body.createDiv({
       cls: 'todoseq-drag-overlay',
     });
     el.style.left = x + 'px';
     el.style.top = y + 'px';
 
-    el.createEl('div', {
+    el.createDiv({
       cls: 'todoseq-drag-overlay-task',
       text: task.state + ' ' + task.text,
     });
 
-    const actionLine = el.createEl('div', {
+    const actionLine = el.createDiv({
       cls: 'todoseq-drag-overlay-action',
     });
     this.setActionText(actionLine, action);
