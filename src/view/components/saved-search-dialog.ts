@@ -37,13 +37,15 @@ export class SavedSearchDialog {
 
   open(): void {
     // Create backdrop
-    this.backdropEl = activeDocument.createElement('div');
-    this.backdropEl.className = 'todoseq-saved-search-backdrop';
+    this.backdropEl = activeDocument.body.createEl('div', {
+      cls: 'todoseq-saved-search-backdrop',
+    });
     this.backdropEl.addEventListener('click', () => this.cancel());
 
     // Create modal
-    this.modalEl = activeDocument.createElement('div');
-    this.modalEl.className = 'todoseq-saved-search-modal';
+    this.modalEl = activeDocument.body.createEl('div', {
+      cls: 'todoseq-saved-search-modal',
+    });
     this.modalEl.addEventListener('click', (e) => e.stopPropagation());
 
     const isEdit = !!this.options.existingSearch;
@@ -287,10 +289,6 @@ export class SavedSearchDialog {
         this.cancel();
       }
     });
-
-    // Append to DOM
-    activeDocument.body.appendChild(this.backdropEl);
-    activeDocument.body.appendChild(this.modalEl);
 
     // Focus the name input
     window.setTimeout(() => {

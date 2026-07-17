@@ -10,7 +10,7 @@ import {
 } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { getPriorityLevelName } from '../../utils/task-format';
-import { TFile, setTooltip } from 'obsidian';
+import { MarkdownPostProcessorContext, TFile, setTooltip } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { getStateTransitionManager } from '../../services/task-update-coordinator';
 
@@ -30,6 +30,12 @@ const PRIORITY_TOKEN_REGEX_GLOBAL = new RegExp(
 export class ReaderViewFormatter {
   private settingsDetector: SettingsChangeDetector;
   private menuBuilder: StateMenuBuilder;
+
+  // Per-callback cache of source-file lines keyed by `context.sourcePath`.
+  // Cleared at the top of every markdown post-processor invocation so that
+  // file reads are amortized across all metadata paragraphs and date
+  // paragraphs in the same render pass.
+  private readonly sourceLinesCache: Map<string, string[]> = new Map();
 
   // Double-click detection state
   private lastClickTime = 0;
@@ -152,10 +158,14 @@ export class ReaderViewFormatter {
    * Register the markdown post processor for reader view formatting
    */
   registerPostProcessor(): void {
-    this.plugin.registerMarkdownPostProcessor((element, context) => {
+    this.plugin.registerMarkdownPostProcessor(async (element, context) => {
       if (!this.plugin.settings.formatTaskKeywords) {
         return;
       }
+
+      // Clear any stale cache from a previous post-processor invocation
+      // before reading the source file for the new render pass.
+      this.sourceLinesCache.clear();
 
       // Check if we need to update the parser (e.g., if settings changed)
       this.ensureParserUpToDate();
@@ -166,11 +176,24 @@ export class ReaderViewFormatter {
       // Process priority pills in task lines
       this.processPriorityPills(element);
 
-      // Process SCHEDULED and DEADLINE lines
-      this.processDateLines(element);
+      // Process SCHEDULED and DEADLINE lines. May need to consult the source
+      // file (via context) to find a preceding task when Obsidian chunked the
+      // rendered DOM such that the heading task and the metadata paragraph
+      // are in separate post-processor invocations (close+reopen path).
+      try {
+        await this.processDateLines(element, context);
 
-      // Process DESCRIPTION lines
-      this.processDescriptionLines(element);
+        // Process DESCRIPTION lines. Same chunked-render caveat as above.
+        await this.processDescriptionLines(element, context);
+      } catch (error) {
+        // Don't let a failed async source-file read tear down the rest of
+        // the post-processor — checkbox / keyword handlers must still
+        // attach so the user can still interact with the rendered task.
+        console.debug(
+          '[TODOseq] Source-file fallback in markdown post-processor failed:',
+          error,
+        );
+      }
 
       // Attach checkbox click handlers for task state toggling
       this.attachCheckboxClickHandlers(element, context);
@@ -1636,7 +1659,9 @@ export class ReaderViewFormatter {
     let headingMatch: RegExpExecArray | null = null;
     let keywordFromMatch: string | undefined;
     if (isHeadingElement) {
-      // For headings, use the parser's cached headingRegex (handles escaping)
+      // In reader view, the # is stripped from headings, so headingRegex won't match.
+      // Try headingRegex first (works if # is present), then fall back to checking
+      // if the heading text starts with a known keyword.
       const headingText = paragraph.textContent || '';
       if (taskParser.headingRegex) {
         headingMatch = taskParser.headingRegex.exec(headingText);
@@ -1645,6 +1670,17 @@ export class ReaderViewFormatter {
         isHeadingTask = true;
         keywordFromMatch = headingMatch[2]; // group 2 = keyword in headingRegex
         testResult = true;
+      } else {
+        // Reader view: # is stripped, so check if text starts with a keyword
+        const trimmedText = headingText.trimStart();
+        for (const kw of taskParser.allKeywords) {
+          if (trimmedText.startsWith(kw)) {
+            isHeadingTask = true;
+            keywordFromMatch = kw;
+            testResult = true;
+            break;
+          }
+        }
       }
     } else if (!testResult && taskParser.isHeadingTaskLine(lineText)) {
       headingMatch = taskParser.headingRegex?.exec(lineText) ?? null;
@@ -1930,13 +1966,21 @@ export class ReaderViewFormatter {
 
   /**
    * Process SCHEDULED, DEADLINE, and CLOSED lines in the rendered HTML
-   * Applies appropriate styling to date-related lines
+   * Applies appropriate styling to date-related lines.
+   *
+   * Accepts the post-processor `context` so the preceding-task check can
+   * fall back to reading the source file when Obsidian's reader view
+   * chunked the heading task and the metadata paragraph into separate
+   * post-processor invocations (the close-and-reopen code path).
    */
-  private processDateLines(element: HTMLElement): void {
+  private async processDateLines(
+    element: HTMLElement,
+    context?: MarkdownPostProcessorContext,
+  ): Promise<void> {
     // Find all paragraphs that might contain SCHEDULED, DEADLINE, or CLOSED
     const paragraphs = element.querySelectorAll('p');
 
-    paragraphs.forEach((paragraph) => {
+    for (const paragraph of Array.from(paragraphs)) {
       const text = paragraph.textContent || '';
 
       // Quick check: skip paragraphs without date keywords
@@ -1945,19 +1989,28 @@ export class ReaderViewFormatter {
         !text.includes('DEADLINE:') &&
         !text.includes('CLOSED:')
       ) {
-        return;
+        continue;
       }
 
-      // If paragraph contains DESCRIPTION: plus date keywords, it's definitely task metadata
-      // (the DESCRIPTION: keyword only appears in task metadata blocks)
+      // If paragraph contains DESCRIPTION:, it's definitely task metadata
       const isMetadataBlock = text.includes('DESCRIPTION:');
-      if (!isMetadataBlock && !this.hasPrecedingTask(paragraph)) {
-        return;
+      if (
+        !isMetadataBlock &&
+        !(await this.hasPrecedingTaskAsync(paragraph, context))
+      ) {
+        continue;
+      }
+
+      // After awaiting an async fallback above the paragraph may have
+      // been detached by a re-render. Skip mutation in that case so we
+      // don't wrap a stale node that won't end up in the final DOM.
+      if (!paragraph.isConnected) {
+        continue;
       }
 
       // Process date keywords in this paragraph
       this.processDateKeywordsInParagraph(paragraph);
-    });
+    }
 
     // Also process date lines inside task containers (e.g., when sub-bullets follow immediately)
     // This handles cases like:
@@ -2007,24 +2060,46 @@ export class ReaderViewFormatter {
 
   /**
    * Process DESCRIPTION: lines in reader view.
+   *
+   * Accepts the post-processor `context` so the preceding-task check can
+   * fall back to reading the source file when Obsidian's reader view
+   * chunked the heading task and the DESCRIPTION paragraph into separate
+   * post-processor invocations (close-and-reopen code path).
    */
-  private processDescriptionLines(element: HTMLElement): void {
+  private async processDescriptionLines(
+    element: HTMLElement,
+    context?: MarkdownPostProcessorContext,
+  ): Promise<void> {
     // Fast precheck: skip if no DESCRIPTION: in document
     if (!element.textContent?.includes('DESCRIPTION:')) return;
 
     const paragraphs = element.querySelectorAll('p');
 
-    paragraphs.forEach((paragraph) => {
+    for (const paragraph of Array.from(paragraphs)) {
       const text = paragraph.textContent || '';
 
       // Quick check: skip paragraphs without DESCRIPTION keyword
       if (!text.includes('DESCRIPTION:')) {
-        return;
+        continue;
       }
 
-      // Check if this description line is associated with a task
-      if (!this.hasPrecedingTask(paragraph)) {
-        return;
+      // If paragraph also contains date keywords, it's definitely task metadata
+      const isMetadataBlock =
+        text.includes('SCHEDULED:') ||
+        text.includes('DEADLINE:') ||
+        text.includes('CLOSED:');
+
+      if (
+        !isMetadataBlock &&
+        !(await this.hasPrecedingTaskAsync(paragraph, context))
+      ) {
+        continue;
+      }
+
+      // After awaiting an async fallback above the paragraph may have
+      // been detached by a re-render. Skip mutation in that case.
+      if (!paragraph.isConnected) {
+        continue;
       }
 
       // Find the text node containing DESCRIPTION: and wrap all content after it
@@ -2032,7 +2107,7 @@ export class ReaderViewFormatter {
       if (result) {
         this.wrapDescriptionLine(paragraph, result.node, result.index);
       }
-    });
+    }
 
     // Process DESCRIPTION: inside table cells (experimental)
     if (this.plugin.settings?.experimentalTableTasks) {
@@ -2064,7 +2139,7 @@ export class ReaderViewFormatter {
     const beforeText = nodeText.substring(0, keywordIndex);
 
     const descContainer = window.activeDocument.createElement('span');
-    descContainer.className = 'todoseq-task-description';
+    descContainer.classList.add('todoseq-task-description');
     descContainer.setAttribute('data-description-line', 'true');
     descContainer.setAttribute('role', 'note');
 
@@ -2118,42 +2193,284 @@ export class ReaderViewFormatter {
   }
 
   /**
-   * Check previous sibling elements for tasks
+   * Async version of {@link hasPrecedingTask} that additionally falls back
+   * to reading the source file when the DOM walk fails. On reader-mode
+   * close-and-reopen Obsidian can render a heading task and its metadata
+   * line in separate post-processor invocations, leaving the metadata
+   * paragraph with no reachable preceding task in the DOM tree. The source
+   * file still tells us whether the line above is a task — we just need
+   * to look at the underlying markdown instead of the rendered HTML.
+   *
+   * The source-file read is cached per `context.sourcePath` for the
+   * duration of a single post-processor callback so a page with N
+   * metadata lines triggers at most one file read.
+   */
+  private async hasPrecedingTaskAsync(
+    paragraph: HTMLParagraphElement,
+    context?: MarkdownPostProcessorContext,
+  ): Promise<boolean> {
+    // Phase 1: cheap DOM walk (preserves the existing fast-path behavior).
+    if (this.hasPrecedingTask(paragraph)) {
+      return true;
+    }
+
+    if (!context || !context.sourcePath) {
+      return false;
+    }
+
+    try {
+      const lines = await this.getSourceLinesCached(context);
+      if (!lines) {
+        return false;
+      }
+
+      const parser = this.getTaskParser();
+      if (!parser) {
+        return false;
+      }
+
+      // Determine the metadata's source-line index. Prefer the section
+      // bounds from getSectionInfo (so substring search is scoped to the
+      // current chunk and won't pick the wrong occurrence in a long file),
+      // then fall back to a bottom-up full-file substring search.
+      const scope = this.computeMetadataLineScope(paragraph, lines, context);
+      if (!scope) {
+        return false;
+      }
+
+      // Walk upward from the metadata line, skipping blank lines, looking
+      // for a task line (either a regular task or a heading task). We
+      // scan the entire upward scope so intervening non-task lines do not
+      // hide a valid preceding task further up.
+      for (let i = scope.metadataLineIdx - 1; i >= scope.scopeStart; i--) {
+        const prev = (lines[i] ?? '').trim();
+        if (!prev) {
+          continue;
+        }
+        if (this.isTaskSourceLine(prev, parser)) {
+          return true;
+        }
+      }
+    } catch (error) {
+      console.debug(
+        '[TODOseq] Source-file fallback for preceding-task check failed:',
+        error,
+      );
+    }
+    return false;
+  }
+
+  /**
+   * Get the source-file lines for the current post-processor callback.
+   * Cached per sourcePath on the formatter instance for the duration of
+   * a single callback so repeated reads within the same render pass hit
+   * the cache. Cleared at the top of each post-processor invocation.
+   */
+  private async getSourceLinesCached(
+    context: MarkdownPostProcessorContext,
+  ): Promise<string[] | null> {
+    if (this.sourceLinesCache.has(context.sourcePath)) {
+      return this.sourceLinesCache.get(context.sourcePath) ?? null;
+    }
+    const file = this.plugin.app.vault.getAbstractFileByPath(
+      context.sourcePath,
+    );
+    if (!(file instanceof TFile)) {
+      return null;
+    }
+    const content = await this.plugin.app.vault.cachedRead(file);
+    const lines = content.split('\n');
+    this.sourceLinesCache.set(context.sourcePath, lines);
+    return lines;
+  }
+
+  /**
+   * Locate the metadata paragraph inside the source file and define
+   * the upward search *scope* for finding a preceding task line.
+   *
+   * Two paths:
+   * - When `context.getSectionInfo(paragraph)` returns section bounds,
+   *   `scopeStart`/`scopeEnd` are `[lineStart, lineEnd+1)` (slice
+   *   convention). The metadata line is NOT `section.lineStart` — it's
+   *   found via `lastIndexOf` of the paragraph's text inside the
+   *   extracted section text, then converted back to a file index by
+   *   adding `scopeStart` and the local newline offset.
+   * - When `getSectionInfo` is unavailable, `scopeStart = 0` and
+   *   `scopeEnd = lines.length`; the metadata line is `lastIndexOf`
+   *   of the paragraph text in the whole file.
+   *
+   * Returns `null` when the metadata paragraph's text cannot be
+   * uniquely located inside the scope (e.g. text changed since render
+   * or appears multiple times in identical form).
+   */
+  private computeMetadataLineScope(
+    paragraph: HTMLElement,
+    lines: string[],
+    context: MarkdownPostProcessorContext,
+  ): { metadataLineIdx: number; scopeStart: number } | null {
+    let scopeStart = 0;
+    let sectionLocalText: string | null = null;
+
+    if (typeof context.getSectionInfo === 'function') {
+      try {
+        const section = context.getSectionInfo(paragraph);
+        if (
+          section &&
+          typeof section.lineStart === 'number' &&
+          typeof section.lineEnd === 'number'
+        ) {
+          scopeStart = Math.max(0, section.lineStart);
+          sectionLocalText = lines
+            .slice(scopeStart, section.lineEnd + 1)
+            .join('\n');
+        }
+      } catch {
+        // Drop through to a full-file search below.
+        sectionLocalText = null;
+      }
+    }
+
+    const firstLine = (paragraph.textContent || '')
+      .trim()
+      .split('\n')[0]
+      ?.trim();
+    if (!firstLine || firstLine.length < 3) {
+      return null;
+    }
+
+    // Phase 1: section-bounded search. Only runs when getSectionInfo
+    // returned a section with valid bounds (`sectionLocalText !== null`).
+    // On close+reopen Obsidian often hands us a section whose bounds do
+    // NOT contain the metadata paragraph because the heading task and
+    // its metadata paragraph were chunked into separate post-processor
+    // invocations — Phase 1 misses in that case and we fall through.
+    // Phase 2 (below) is the unified full-file search that handles both
+    // "no section available" and "section missed the metadata" cases.
+    if (sectionLocalText !== null) {
+      const sectionAttempt = this.tryLocateMetadataLine(
+        firstLine,
+        sectionLocalText,
+        lines,
+        scopeStart,
+      );
+      if (sectionAttempt) {
+        return sectionAttempt;
+      }
+    }
+    // Phase 2: full-file search (no section available, or section-bounded
+    // search in Phase 1 returned null because the metadata text was
+    // outside the section's bounds).
+    return this.tryLocateMetadataLine(firstLine, null, lines, 0);
+  }
+
+  /**
+   * Find the metadata paragraph's source-line index inside a search
+   * haystack. Returns `null` when the paragraph's text is not present
+   * or when the resulting index would not leave room for a preceding
+   * line within the supplied `scopeStart`.
+   *
+   * `sectionLocalText` (when non-null) restricts the substring search
+   * to a portion of the file; null scopes the search to the whole
+   * `lines` array.
+   */
+  private tryLocateMetadataLine(
+    firstLine: string,
+    sectionLocalText: string | null,
+    lines: string[],
+    scopeStart: number,
+  ): { metadataLineIdx: number; scopeStart: number } | null {
+    const searchHaystack = sectionLocalText ?? lines.join('\n');
+    const localIdx = searchHaystack.lastIndexOf(firstLine);
+    if (localIdx < 0) {
+      return null;
+    }
+    const metadataLineIdx = sectionLocalText
+      ? scopeStart +
+        (sectionLocalText.substring(0, localIdx).match(/\n/g)?.length ?? 0)
+      : (searchHaystack.substring(0, localIdx).match(/\n/g)?.length ?? 0);
+    if (metadataLineIdx <= scopeStart) {
+      return null;
+    }
+    return { metadataLineIdx, scopeStart };
+  }
+
+  /**
+   * Whether a single source line counts as a preceding task line.
+   * Checks both the regular task regex and the heading task regex/method.
+   */
+  private isTaskSourceLine(line: string, parser: TaskParser): boolean {
+    if (!line) {
+      return false;
+    }
+    // TaskParser constructs testRegex and headingRegex without the `g`
+    // flag, so .test() is stateless and we don't need to reset lastIndex.
+    if (parser.testRegex && parser.testRegex.test(line)) {
+      return true;
+    }
+    if (parser.headingRegex && parser.headingRegex.test(line)) {
+      return true;
+    }
+    if (typeof parser.isHeadingTaskLine === 'function') {
+      return parser.isHeadingTaskLine(line);
+    }
+    return false;
+  }
+
+  /**
+   * Check whether a single sibling element indicates a previous task.
+   * Matching criteria: contains a wrapped `.todoseq-keyword-formatted`
+   * span anywhere in its subtree, carries the `.task-list-item` class,
+   * or whose text content starts with a known task keyword.
+   */
+  private siblingHasTask(sibling: Element): boolean {
+    return Boolean(
+      sibling.querySelector('.todoseq-keyword-formatted') ||
+      sibling.classList.contains('task-list-item') ||
+      this.containsTaskKeyword(sibling.textContent || ''),
+    );
+  }
+
+  /**
+   * Check previous sibling elements for tasks.
+   *
+   * Walks the paragraph's own previous siblings first, then walks up the
+   * parent chain so that metadata paragraphs nested inside Obsidian
+   * wrapper divs (e.g. `<div class="el-p"><p>SCHEDULED: ...</p></div>`
+   * under `<div class="el-h6"><h6>TODO ...</h6></div>`) are still detected
+   * as belonging to a preceding task. This fixes a reader-mode styling
+   * bug where, after closing and reopening a markdown file, metadata
+   * lines (SCHEDULED: / DEADLINE: / CLOSED:) that are NOT bundled with a
+   * DESCRIPTION: line on the same paragraph lose their wrapping (e.g.
+   * `todoseq-scheduled-line`) because Obsidian's chunked post-processor
+   * invocation places the metadata paragraph in a DOM tree whose sibling
+   * relationship to the preceding task may not be directly visible.
    */
   private hasTaskInPreviousSiblings(paragraph: HTMLParagraphElement): boolean {
-    let previousElement = paragraph.previousElementSibling;
-
-    // If no previous siblings, walk up to find a previous sibling
-    // Handles paragraphs wrapped in divs (e.g., <div class="el-p"><p>...</p></div>)
-    if (!previousElement && paragraph.parentElement) {
-      previousElement = paragraph.parentElement.previousElementSibling;
-    }
-    // Keep walking up if still no sibling found
-    if (!previousElement && paragraph.parentElement?.parentElement) {
-      previousElement =
-        paragraph.parentElement.parentElement.previousElementSibling;
-    }
-
-    while (previousElement) {
-      // Check if element contains a keyword span (most reliable)
-      if (previousElement.querySelector('.todoseq-keyword-formatted')) {
+    // Phase 1: walk the paragraph's own previous-element-sibling chain.
+    let sibling: Element | null = paragraph.previousElementSibling;
+    while (sibling) {
+      if (this.siblingHasTask(sibling)) {
         return true;
       }
-
-      // Check if element is a task list item
-      if (previousElement.classList.contains('task-list-item')) {
-        return true;
-      }
-
-      // Check text content for task keywords
-      const prevText = previousElement.textContent || '';
-      if (this.containsTaskKeyword(prevText)) {
-        return true;
-      }
-
-      previousElement = previousElement.previousElementSibling;
+      sibling = sibling.previousElementSibling;
     }
 
+    // Phase 2: walk up the parent chain. At every level, walk back through
+    // that ancestor's previous element siblings looking for a task
+    // indicator. Catches the typical layout (`<el-h6>` and `<el-p>`
+    // siblings inside the markdown section) as well as more deeply
+    // nested wrappers like multiple section outline divs.
+    let ancestor: HTMLElement | null = paragraph.parentElement;
+    while (ancestor) {
+      let prev: Element | null = ancestor.previousElementSibling;
+      while (prev) {
+        if (this.siblingHasTask(prev)) {
+          return true;
+        }
+        prev = prev.previousElementSibling;
+      }
+      ancestor = ancestor.parentElement;
+    }
     return false;
   }
 

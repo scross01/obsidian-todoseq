@@ -72,7 +72,7 @@ export abstract class BaseDialog {
     if (!this.containerEl) return;
 
     this.backdropEl = window.activeDocument.createElement('div');
-    this.backdropEl.className = 'todoseq-backdrop';
+    this.backdropEl.classList.add('todoseq-backdrop');
     this.backdropEl.addEventListener('click', () => {
       this.hide();
     });

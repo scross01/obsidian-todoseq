@@ -1294,7 +1294,7 @@ export const taskKeywordPlugin = (
             const before = text.substring(0, idx);
             const after = text.substring(kwEnd);
             const span = window.activeDocument.createElement('span');
-            span.className = cssClasses;
+            span.classList.add(cssClasses);
             span.textContent = keyword;
             span.setAttribute('data-task-keyword', keyword);
             const parent = node.parentNode;
@@ -1346,7 +1346,7 @@ export const taskKeywordPlugin = (
 
             // Build the date line span (outer wrapper — gets muted styling)
             const lineSpan = window.activeDocument.createElement('span');
-            lineSpan.className = `todoseq-${type}-line`;
+            lineSpan.classList.add(`todoseq-${type}-line`);
             lineSpan.setAttribute('data-date-line-type', type);
 
             // Before keyword text
@@ -1358,11 +1358,11 @@ export const taskKeywordPlugin = (
             }
 
             // Keyword sub-span (gets keyword-specific styling)
-            const kwSpan = window.activeDocument.createElement('span');
-            kwSpan.className = `todoseq-${type}-keyword`;
-            kwSpan.textContent = keyword;
-            kwSpan.setAttribute('data-date-keyword', keyword);
-            lineSpan.appendChild(kwSpan);
+            lineSpan.createEl('span', {
+              cls: `todoseq-${type}-keyword`,
+              text: keyword,
+              attr: { 'data-date-keyword': keyword },
+            });
 
             // After keyword text in same text node
             const afterText = text.substring(idx + keyword.length);
@@ -1430,14 +1430,16 @@ export const taskKeywordPlugin = (
           link.removeAttribute('rel');
 
           // Replace the <a> with plain text in the pill span
-          const span = window.activeDocument.createElement('span');
           const priorityClass =
             letter === 'A'
               ? 'priority-high'
               : letter === 'B'
                 ? 'priority-med'
                 : 'priority-low';
-          span.className = `todoseq-edit-priority-pill todoseq-priority-badge ${priorityClass}`;
+          const span = window.activeDocument.createElement('span');
+          span.classList.add(
+            `todoseq-edit-priority-pill todoseq-priority-badge ${priorityClass}`,
+          );
           span.setAttribute('data-priority', letter);
           span.setAttribute('aria-label', `Priority ${letter}`);
           span.textContent = letter;
@@ -1467,7 +1469,7 @@ export const taskKeywordPlugin = (
 
           // Create description container
           const descContainer = window.activeDocument.createElement('span');
-          descContainer.className = 'todoseq-task-description';
+          descContainer.classList.add('todoseq-task-description');
           descContainer.setAttribute('data-description-line', 'true');
           descContainer.setAttribute('role', 'note');
 

@@ -165,22 +165,21 @@ export class TaskDragDropHandler {
     x: number,
     y: number,
   ): HTMLElement {
-    const el = window.activeDocument.createElement('div');
-    el.className = 'todoseq-drag-overlay';
+    const el = activeDocument.body.createEl('div', {
+      cls: 'todoseq-drag-overlay',
+    });
     el.style.left = x + 'px';
     el.style.top = y + 'px';
 
-    const taskLine = window.activeDocument.createElement('div');
-    taskLine.className = 'todoseq-drag-overlay-task';
-    taskLine.textContent = task.state + ' ' + task.text;
-    el.appendChild(taskLine);
+    el.createEl('div', {
+      cls: 'todoseq-drag-overlay-task',
+      text: task.state + ' ' + task.text,
+    });
 
-    const actionLine = window.activeDocument.createElement('div');
-    actionLine.className = 'todoseq-drag-overlay-action';
+    const actionLine = el.createEl('div', {
+      cls: 'todoseq-drag-overlay-action',
+    });
     this.setActionText(actionLine, action);
-    el.appendChild(actionLine);
-
-    window.activeDocument.body.appendChild(el);
     return el;
   }
 

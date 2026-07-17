@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.18.1
+
+- Fixed SCHEDULED / DEADLINE / CLOSED / DESCRIPTION lines after heading-based tasks losing their CSS wrapping in reader mode after a close+reopen.
+- Addressed latest Obsidian plugin review feedback items.
+
 ## 0.18.0
 
 - Added support for declaring tasks in markdown headings. #74

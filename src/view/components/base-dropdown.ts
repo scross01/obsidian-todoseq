@@ -19,10 +19,9 @@ export abstract class BaseDropdown {
     this.inputEl = inputEl;
     this.vault = vault;
 
-    this.containerEl = window.activeDocument.createElement('div');
-    this.containerEl.addClass('todoseq-dropdown');
-
-    window.activeDocument.body.appendChild(this.containerEl);
+    this.containerEl = activeDocument.body.createEl('div', {
+      cls: 'todoseq-dropdown',
+    });
 
     this.updateWidth();
     this.setupBaseEventListeners();

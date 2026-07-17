@@ -499,26 +499,22 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       }
 
       if (groupErrors.length > 0) {
-        const errorDiv = window.activeDocument.createElement('div');
-        errorDiv.className = 'todoseq-setting-item-error';
+        const errorDiv = settingInfo.createEl('div', {
+          cls: 'todoseq-setting-item-error',
+        });
         for (const message of groupErrors) {
-          const row = window.activeDocument.createElement('div');
-          row.textContent = message;
-          errorDiv.appendChild(row);
+          errorDiv.createEl('div', { text: message });
         }
-        settingInfo.appendChild(errorDiv);
         binding.inputEl.classList.add('todoseq-invalid-input');
       }
 
       if (groupWarnings.length > 0) {
-        const warningDiv = window.activeDocument.createElement('div');
-        warningDiv.className = 'todoseq-setting-item-warning';
+        const warningDiv = settingInfo.createEl('div', {
+          cls: 'todoseq-setting-item-warning',
+        });
         for (const message of groupWarnings) {
-          const row = window.activeDocument.createElement('div');
-          row.textContent = message;
-          warningDiv.appendChild(row);
+          warningDiv.createEl('div', { text: message });
         }
-        settingInfo.appendChild(warningDiv);
       }
     }
   }
@@ -712,10 +708,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     // Add keywords in sorted order
     const sortedKeywords = Array.from(keywords).sort();
     for (const keyword of sortedKeywords) {
-      const option = window.activeDocument.createElement('option');
-      option.value = keyword;
-      option.textContent = keyword;
-      dropdown.selectEl.appendChild(option);
+      dropdown.selectEl.createEl('option', {
+        text: keyword,
+        attr: { value: keyword },
+      });
     }
   }
 
@@ -918,14 +914,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     let infoDiv = settingInfo.querySelector('.todoseq-info-message');
     if (!infoDiv) {
-      infoDiv = window.activeDocument.createElement('div');
-      infoDiv.className = 'todoseq-setting-item-warning';
-      settingInfo.appendChild(infoDiv);
+      infoDiv = settingInfo.createEl('div', {
+        cls: 'todoseq-setting-item-warning',
+      });
     }
 
-    const row = window.activeDocument.createElement('div');
-    row.textContent = `${message}`;
-    infoDiv.appendChild(row);
+    infoDiv.createEl('div', { text: message });
   }
 
   /**
@@ -940,14 +934,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     const settingInfo = setting.settingEl.querySelector('.setting-item-info');
     if (!settingInfo) return;
 
-    const errorDiv = window.activeDocument.createElement('div');
-    errorDiv.className = 'todoseq-setting-item-error';
+    const errorDiv = settingInfo.createEl('div', {
+      cls: 'todoseq-setting-item-error',
+    });
     for (const message of messages) {
-      const row = window.activeDocument.createElement('div');
-      row.textContent = message;
-      errorDiv.appendChild(row);
+      errorDiv.createEl('div', { text: message });
     }
-    settingInfo.appendChild(errorDiv);
 
     // Highlight the input field
     const textArea = setting.settingEl.querySelector('textarea');

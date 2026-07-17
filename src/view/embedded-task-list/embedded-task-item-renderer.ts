@@ -46,7 +46,7 @@ export class EmbeddedTaskItemRenderer {
     params: TodoseqParameters,
   ): HTMLLIElement {
     const li = window.activeDocument.createElement('li');
-    li.className = 'todoseq-embedded-task-item';
+    li.classList.add('todoseq-embedded-task-item');
 
     const dateCategory = this.getDateCategory(task);
     if (dateCategory !== 'none' && !task.completed) {

@@ -29,6 +29,21 @@ import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
 installObsidianDomMocks();
 
+/**
+ * Minimal constraint shape used by tests when calling processDateLines /
+ * processDescriptionLines with a context argument. Mirrors the bits of
+ * Obsidian's MarkdownPostProcessorContext the formatter actually reads.
+ */
+type MarkdownPostProcessorContextLike = {
+  sourcePath: string;
+  getSectionInfo?: (el: HTMLElement) => {
+    lineStart: number;
+    lineEnd: number;
+    text?: string;
+  } | null;
+  frontmatter?: Record<string, unknown> | null;
+};
+
 // Mock Obsidian's createSpan helper on HTMLElement prototype
 if (!HTMLElement.prototype.createSpan) {
   HTMLElement.prototype.createSpan = function (config?: {
@@ -679,6 +694,258 @@ describe('ReaderViewFormatter', () => {
 
       expect(result).toBe(true);
       activeDocument.body.removeChild(container);
+    }); // Regression: tasks (heading-based or normal-paragraph-based) whose
+    // metadata lines do NOT contain DESCRIPTION: render in reader mode
+    // as a separate paragraph outside the task container. After closing
+    // and reopening a markdown file in reader mode, those metadata
+    // paragraphs were losing their CSS wrapping because the sibling/
+    // ancestor walk only inspected one parent level. The walker must
+    // climb the parent chain so any reachable preceding heading task is
+    // detected, regardless of how many wrapper divs Obsidian inserts.
+    describe('close+reopen metadata without DESCRIPTION', () => {
+      const makeDateOnlySection = (headingLevel: 1 | 2 | 3 | 4 | 5 | 6) => {
+        const section = activeDocument.createElement('div');
+        section.className = 'markdown-preview-section';
+
+        const headingWrapper = activeDocument.createElement('div');
+        headingWrapper.className = `el-h${headingLevel}`;
+        const heading = activeDocument.createElement(`h${headingLevel}`);
+        const taskContainer = activeDocument.createElement('span');
+        taskContainer.className = 'todoseq-task';
+        const taskKeyword = activeDocument.createElement('span');
+        taskKeyword.className = 'todoseq-keyword-formatted';
+        taskKeyword.setAttribute('data-task-keyword', 'TODO');
+        taskKeyword.textContent = 'TODO';
+        taskContainer.appendChild(taskKeyword);
+        taskContainer.appendChild(
+          activeDocument.createTextNode(` task in heading ${headingLevel}`),
+        );
+        heading.appendChild(taskContainer);
+        headingWrapper.appendChild(heading);
+
+        const paragraphWrapper = activeDocument.createElement('div');
+        paragraphWrapper.className = 'el-p';
+        const paragraph = activeDocument.createElement('p');
+        paragraph.textContent = 'SCHEDULED: <2026-07-18 Sat>';
+        paragraphWrapper.appendChild(paragraph);
+
+        section.appendChild(headingWrapper);
+        section.appendChild(paragraphWrapper);
+        activeDocument.body.appendChild(section);
+
+        return { section, headingWrapper, paragraphWrapper, paragraph };
+      };
+
+      const expectDetected = (headingLevel: 1 | 2 | 3 | 4 | 5 | 6) => {
+        const { section, paragraph } = makeDateOnlySection(headingLevel);
+
+        const result = (
+          formatter as unknown as {
+            hasTaskInPreviousSiblings: (p: HTMLParagraphElement) => boolean;
+          }
+        ).hasTaskInPreviousSiblings.call(formatter, paragraph);
+
+        expect(result).toBe(true);
+        activeDocument.body.removeChild(section);
+      };
+
+      test.each([1, 2, 3, 4, 5, 6])(
+        'detects a heading task at level %i whose metadata lacks DESCRIPTION',
+        (level) => {
+          expectDetected(level as 1 | 2 | 3 | 4 | 5 | 6);
+        },
+      );
+
+      test('detects a normal-paragraph task (no heading) whose metadata lacks DESCRIPTION', () => {
+        const section = activeDocument.createElement('div');
+        section.className = 'markdown-preview-section';
+
+        const taskParagraph = activeDocument.createElement('p');
+        const taskContainer = activeDocument.createElement('span');
+        taskContainer.className = 'todoseq-task';
+        const taskKeyword = activeDocument.createElement('span');
+        taskKeyword.className = 'todoseq-keyword-formatted';
+        taskKeyword.setAttribute('data-task-keyword', 'TODO');
+        taskKeyword.textContent = 'TODO';
+        taskContainer.appendChild(taskKeyword);
+        taskContainer.appendChild(activeDocument.createTextNode(' normal'));
+        taskParagraph.appendChild(taskContainer);
+        section.appendChild(taskParagraph);
+
+        const paragraphWrapper = activeDocument.createElement('div');
+        paragraphWrapper.className = 'el-p';
+        const paragraph = activeDocument.createElement('p');
+        paragraph.textContent = 'SCHEDULED: <2026-07-20 Mon>';
+        paragraphWrapper.appendChild(paragraph);
+        section.appendChild(paragraphWrapper);
+
+        activeDocument.body.appendChild(section);
+
+        const result = (
+          formatter as unknown as {
+            hasTaskInPreviousSiblings: (p: HTMLParagraphElement) => boolean;
+          }
+        ).hasTaskInPreviousSiblings.call(formatter, paragraph);
+
+        expect(result).toBe(true);
+        activeDocument.body.removeChild(section);
+      });
+
+      test('processDateLines wraps the SCHEDULED metadata when the task preceding it has no DESCRIPTION', async () => {
+        const { section, paragraph } = makeDateOnlySection(6);
+
+        const processDateLines = (
+          formatter as unknown as {
+            processDateLines: (
+              el: HTMLElement,
+              ctx?: MarkdownPostProcessorContextLike,
+            ) => Promise<void>;
+          }
+        ).processDateLines;
+        await processDateLines.call(formatter, section);
+
+        const dateContainer = paragraph.querySelector(
+          '.todoseq-scheduled-line',
+        );
+        expect(dateContainer).not.toBeNull();
+        expect(
+          paragraph.querySelector('.todoseq-scheduled-keyword'),
+        ).not.toBeNull();
+        activeDocument.body.removeChild(section);
+      });
+
+      test.each([
+        ['DEADLINE:', 'todoseq-deadline-line', 'todoseq-deadline-keyword'],
+        ['CLOSED:', 'todoseq-closed-line', 'todoseq-closed-keyword'],
+      ] as const)(
+        'processDateLines wraps %s metadata after a heading task with no DESCRIPTION',
+        async (keyword, lineClass, kwClass) => {
+          const section = activeDocument.createElement('div');
+          section.className = 'markdown-preview-section';
+
+          const headingWrapper = activeDocument.createElement('div');
+          headingWrapper.className = 'el-h1';
+          const heading = activeDocument.createElement('h1');
+          const taskContainer = activeDocument.createElement('span');
+          taskContainer.className = 'todoseq-task';
+          const taskKeyword = activeDocument.createElement('span');
+          taskKeyword.className = 'todoseq-keyword-formatted';
+          taskKeyword.setAttribute('data-task-keyword', 'TODO');
+          taskKeyword.textContent = 'TODO';
+          taskContainer.appendChild(taskKeyword);
+          taskContainer.appendChild(activeDocument.createTextNode(' task'));
+          heading.appendChild(taskContainer);
+          headingWrapper.appendChild(heading);
+
+          const paragraphWrapper = activeDocument.createElement('div');
+          paragraphWrapper.className = 'el-p';
+          const paragraph = activeDocument.createElement('p');
+          paragraph.textContent = `${keyword} <2026-07-18 Sat>`;
+          paragraphWrapper.appendChild(paragraph);
+
+          section.appendChild(headingWrapper);
+          section.appendChild(paragraphWrapper);
+          activeDocument.body.appendChild(section);
+
+          const processDateLines = (
+            formatter as unknown as {
+              processDateLines: (
+                el: HTMLElement,
+                ctx?: MarkdownPostProcessorContextLike,
+              ) => Promise<void>;
+            }
+          ).processDateLines;
+          await processDateLines.call(formatter, section);
+
+          expect(paragraph.querySelector(`.${lineClass}`)).not.toBeNull();
+          expect(paragraph.querySelector(`.${kwClass}`)).not.toBeNull();
+          activeDocument.body.removeChild(section);
+        },
+      );
+
+      test('processDateLines wraps SCHEDULED metadata after a plain-paragraph task (no heading wrapper)', async () => {
+        // Fixture case: `TODO [#A] test\\nSCHEDULED: <2026-07-20 Mon>`
+        // The task is in a `<p>` (no `el-h*` wrapper). Make sure the fix
+        // is not accidentally dependent on heading wrappers.
+        const section = activeDocument.createElement('div');
+        section.className = 'markdown-preview-section';
+
+        const taskParagraph = activeDocument.createElement('p');
+        const taskContainer = activeDocument.createElement('span');
+        taskContainer.className = 'todoseq-task';
+        const taskKeyword = activeDocument.createElement('span');
+        taskKeyword.className = 'todoseq-keyword-formatted';
+        taskKeyword.setAttribute('data-task-keyword', 'TODO');
+        taskKeyword.textContent = 'TODO';
+        taskContainer.appendChild(taskKeyword);
+        taskContainer.appendChild(activeDocument.createTextNode(' normal'));
+        taskParagraph.appendChild(taskContainer);
+        section.appendChild(taskParagraph);
+
+        const paragraphWrapper = activeDocument.createElement('div');
+        paragraphWrapper.className = 'el-p';
+        const paragraph = activeDocument.createElement('p');
+        paragraph.textContent = 'SCHEDULED: <2026-07-20 Mon>';
+        paragraphWrapper.appendChild(paragraph);
+        section.appendChild(paragraphWrapper);
+        activeDocument.body.appendChild(section);
+        const processDateLines = (
+          formatter as unknown as {
+            processDateLines: (
+              el: HTMLElement,
+              ctx?: MarkdownPostProcessorContextLike,
+            ) => Promise<void>;
+          }
+        ).processDateLines;
+        await processDateLines.call(formatter, section);
+
+        expect(
+          paragraph.querySelector('.todoseq-scheduled-line'),
+        ).not.toBeNull();
+        activeDocument.body.removeChild(section);
+      });
+
+      test('returns false when no reachable preceding task exists', () => {
+        const paragraphWrapper = activeDocument.createElement('div');
+        paragraphWrapper.className = 'el-p';
+        const paragraph = activeDocument.createElement('p');
+        paragraph.textContent = 'SCHEDULED: <2026-07-18 Sat>';
+        paragraphWrapper.appendChild(paragraph);
+        activeDocument.body.appendChild(paragraphWrapper);
+
+        const result = (
+          formatter as unknown as {
+            hasTaskInPreviousSiblings: (p: HTMLParagraphElement) => boolean;
+          }
+        ).hasTaskInPreviousSiblings.call(formatter, paragraph);
+
+        expect(result).toBe(false);
+        activeDocument.body.removeChild(paragraphWrapper);
+      });
+
+      test('detects a heading task via ancestor walk when post-processor chunks isolate the el-p wrapper', () => {
+        // Simulate a chunked post-processor invocation: the metadata
+        // paragraph and its el-p wrapper have been moved into a separate
+        // wrapper div, but the heading task remains in the same body so
+        // the ancestor walk can still reach it via previousElementSibling.
+        const { section, paragraphWrapper } = makeDateOnlySection(6);
+        const isolatedWrapper = activeDocument.createElement('div');
+        isolatedWrapper.appendChild(paragraphWrapper);
+        activeDocument.body.appendChild(isolatedWrapper);
+        const clonedParagraph = paragraphWrapper.querySelector(
+          'p',
+        ) as HTMLParagraphElement;
+
+        const result = (
+          formatter as unknown as {
+            hasTaskInPreviousSiblings: (p: HTMLParagraphElement) => boolean;
+          }
+        ).hasTaskInPreviousSiblings.call(formatter, clonedParagraph);
+
+        expect(result).toBe(true);
+        activeDocument.body.removeChild(isolatedWrapper);
+        activeDocument.body.removeChild(section);
+      });
     });
   });
 
@@ -1962,7 +2229,7 @@ describe('ReaderViewFormatter', () => {
   });
 
   describe('processDateLines', () => {
-    test('should process paragraphs with SCHEDULED:', () => {
+    test('should process paragraphs with SCHEDULED:', async () => {
       const container = activeDocument.createElement('div');
       const taskParagraph = activeDocument.createElement('p');
       taskParagraph.textContent = 'TODO something';
@@ -1974,9 +2241,14 @@ describe('ReaderViewFormatter', () => {
       activeDocument.body.appendChild(container);
 
       const processDateLines = (
-        formatter as unknown as { processDateLines: (el: HTMLElement) => void }
+        formatter as unknown as {
+          processDateLines: (
+            el: HTMLElement,
+            ctx?: MarkdownPostProcessorContextLike,
+          ) => Promise<void>;
+        }
       ).processDateLines;
-      processDateLines.call(formatter, container);
+      await processDateLines.call(formatter, container);
 
       const dateContainer = dateParagraph.querySelector(
         '.todoseq-scheduled-line',
@@ -1986,7 +2258,7 @@ describe('ReaderViewFormatter', () => {
       activeDocument.body.removeChild(container);
     });
 
-    test('should process paragraphs with DEADLINE:', () => {
+    test('should process paragraphs with DEADLINE:', async () => {
       const container = activeDocument.createElement('div');
       const taskParagraph = activeDocument.createElement('p');
       taskParagraph.textContent = 'TODO something';
@@ -1998,9 +2270,14 @@ describe('ReaderViewFormatter', () => {
       activeDocument.body.appendChild(container);
 
       const processDateLines = (
-        formatter as unknown as { processDateLines: (el: HTMLElement) => void }
+        formatter as unknown as {
+          processDateLines: (
+            el: HTMLElement,
+            ctx?: MarkdownPostProcessorContextLike,
+          ) => Promise<void>;
+        }
       ).processDateLines;
-      processDateLines.call(formatter, container);
+      await processDateLines.call(formatter, container);
 
       const dateContainer = dateParagraph.querySelector(
         '.todoseq-deadline-line',
@@ -2010,7 +2287,7 @@ describe('ReaderViewFormatter', () => {
       activeDocument.body.removeChild(container);
     });
 
-    test('should skip paragraphs without date keywords', () => {
+    test('should skip paragraphs without date keywords', async () => {
       const container = activeDocument.createElement('div');
       const paragraph = activeDocument.createElement('p');
       paragraph.textContent = 'Just regular text';
@@ -2018,9 +2295,14 @@ describe('ReaderViewFormatter', () => {
       activeDocument.body.appendChild(container);
 
       const processDateLines = (
-        formatter as unknown as { processDateLines: (el: HTMLElement) => void }
+        formatter as unknown as {
+          processDateLines: (
+            el: HTMLElement,
+            ctx?: MarkdownPostProcessorContextLike,
+          ) => Promise<void>;
+        }
       ).processDateLines;
-      processDateLines.call(formatter, container);
+      await processDateLines.call(formatter, container);
 
       // Paragraph should remain unchanged
       expect(paragraph.textContent).toBe('Just regular text');
@@ -2028,7 +2310,7 @@ describe('ReaderViewFormatter', () => {
       activeDocument.body.removeChild(container);
     });
 
-    test('should skip date lines without preceding task', () => {
+    test('should skip date lines without preceding task', async () => {
       const container = activeDocument.createElement('div');
       const dateParagraph = activeDocument.createElement('p');
       dateParagraph.textContent = 'SCHEDULED: today';
@@ -2036,14 +2318,271 @@ describe('ReaderViewFormatter', () => {
       activeDocument.body.appendChild(container);
 
       const processDateLines = (
-        formatter as unknown as { processDateLines: (el: HTMLElement) => void }
+        formatter as unknown as {
+          processDateLines: (
+            el: HTMLElement,
+            ctx?: MarkdownPostProcessorContextLike,
+          ) => Promise<void>;
+        }
       ).processDateLines;
-      processDateLines.call(formatter, container);
+      await processDateLines.call(formatter, container);
 
       // Paragraph should remain unchanged (no preceding task)
       expect(dateParagraph.querySelector('.todoseq-scheduled-line')).toBeNull();
 
       activeDocument.body.removeChild(container);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Source-file fallback for preceding-task detection
+  //
+  // On close+reopen, Obsidian's reader view invokes our markdown
+  // post-processor per section, so the heading-based task and its
+  // metadata paragraph can end up in different invocations with no
+  // reachable DOM relationship. `hasPrecedingTask` (sync) therefore
+  // misses the task and the metadata loses its CSS wrapping.
+  //
+  // `hasPrecedingTaskAsync` falls back to reading the source file via
+  // `context.getSectionInfo` + `vault.cachedRead` so metadata lines
+  // whose text appears in the source on a line *after* a task line
+  // (regular `- [ ]` task or heading task) still get styled.
+  // ---------------------------------------------------------------------
+  describe('hasPrecedingTaskAsync source-file fallback', () => {
+    // Reset the per-instance cache between tests so a cached entry from
+    // a prior test doesn't leak into the next one's read count.
+    function clearCache(): void {
+      (
+        formatter as unknown as {
+          sourceLinesCache: Map<string, string[]>;
+        }
+      ).sourceLinesCache.clear();
+    }
+
+    // Replace the plugin's vault methods so the fallback can read a
+    // fake file keyed by `sourcePath`.
+    function mockVault(
+      contents: Record<string, string>,
+      options: { rejectGet?: boolean } = {},
+    ): { cachedRead: jest.Mock } {
+      const cachedRead = jest.fn(
+        async (file: { path: string }) => contents[file.path] ?? '',
+      );
+      formatter.plugin.app.vault.getAbstractFileByPath = ((p: string) => {
+        if (options.rejectGet) return null;
+        if (p in contents) return new TFile(p);
+        return null;
+      }) as unknown as typeof App.prototype.vault.getAbstractFileByPath;
+      formatter.plugin.app.vault.cachedRead =
+        cachedRead as unknown as typeof App.prototype.vault.cachedRead;
+      return { cachedRead };
+    }
+
+    function makeBareMetadataParagraph(text: string): HTMLParagraphElement {
+      // No preceding siblings — fast DOM walk must return false.
+      const paragraph = activeDocument.createElement('p');
+      paragraph.textContent = text;
+      activeDocument.body.appendChild(paragraph);
+      return paragraph;
+    }
+
+    function invoke(
+      paragraph: HTMLParagraphElement,
+      context: MarkdownPostProcessorContextLike,
+    ): Promise<boolean> {
+      const hasPrecedingTaskAsync = (
+        formatter as unknown as {
+          hasPrecedingTaskAsync: (
+            p: HTMLParagraphElement,
+            c: MarkdownPostProcessorContextLike,
+          ) => Promise<boolean>;
+        }
+      ).hasPrecedingTaskAsync;
+      return hasPrecedingTaskAsync.call(formatter, paragraph, context);
+    }
+
+    test('returns true via section-bounded substring search when heading task sits two lines up', async () => {
+      clearCache();
+      const sourcePath = 'fallback-section.md';
+      const source = [
+        'Preamble paragraph that is just filler.', // line 0
+        '', // line 1
+        'Another line of filler.', // line 2
+        '', // line 3
+        '### TODO task in heading 3', // line 4 (task)
+        'SCHEDULED: <2026-07-18 Sat>', // line 5 (metadata)
+        '', // line 6
+      ].join('\n');
+      const { cachedRead } = mockVault({ [sourcePath]: source });
+
+      const paragraph = makeBareMetadataParagraph(
+        'SCHEDULED: <2026-07-18 Sat>',
+      );
+
+      const result = await invoke(paragraph, {
+        sourcePath,
+        // Section empirically marks lines 4–5 as the rendered chunk.
+        getSectionInfo: () => ({ lineStart: 4, lineEnd: 5 }),
+      });
+
+      expect(result).toBe(true);
+      expect(cachedRead).toHaveBeenCalledTimes(1);
+
+      activeDocument.body.removeChild(paragraph);
+    });
+
+    test('returns false via section-bounded scan when no task sits above the metadata', async () => {
+      clearCache();
+      const sourcePath = 'fallback-section-no-task.md';
+      const source = [
+        'Preamble paragraph.', // 0
+        '', // 1
+        'Random prose line, definitely not a task.', // 2
+        'SCHEDULED: <2026-07-18 Sat>', // 3 (metadata)
+        '', // 4
+      ].join('\n');
+      const { cachedRead } = mockVault({ [sourcePath]: source });
+
+      const paragraph = makeBareMetadataParagraph(
+        'SCHEDULED: <2026-07-18 Sat>',
+      );
+
+      const result = await invoke(paragraph, {
+        sourcePath,
+        getSectionInfo: () => ({ lineStart: 2, lineEnd: 3 }),
+      });
+
+      expect(result).toBe(false);
+      expect(cachedRead).toHaveBeenCalledTimes(1);
+
+      activeDocument.body.removeChild(paragraph);
+    });
+
+    test('falls back to full-file scan when getSectionInfo is unavailable', async () => {
+      clearCache();
+      const sourcePath = 'fallback-full-file.md';
+      // Heading task sits far above the metadata so a section-only search
+      // would miss it. Full-file scan must still find it.
+      const source = [
+        'Long preamble that pushes the task down the file.', // 0
+        'More filler.', // 1
+        '', // 2
+        '### TODO inline heading task at line 3', // 3
+        'Regular prose line.', // 4
+        'More prose.', // 5
+        '', // 6
+        'Yet another filler line.', // 7
+        'SCHEDULED: <2026-07-18 Sat>', // 8 (metadata)
+        '', // 9
+      ].join('\n');
+      const { cachedRead } = mockVault({ [sourcePath]: source });
+
+      const paragraph = makeBareMetadataParagraph(
+        'SCHEDULED: <2026-07-18 Sat>',
+      );
+
+      const result = await invoke(paragraph, {
+        sourcePath,
+        getSectionInfo: () => null,
+      });
+
+      expect(result).toBe(true);
+      expect(cachedRead).toHaveBeenCalledTimes(1);
+
+      activeDocument.body.removeChild(paragraph);
+    });
+
+    test('caches cachedRead per sourcePath within a single callback pass', async () => {
+      clearCache();
+      const sourcePath = 'fallback-cache.md';
+      const source = [
+        '### TODO heading task', // 0
+        'SCHEDULED: <2026-07-15 Wed>', // 1
+        '', // 2
+        'Another task line.', // 3
+        '### TODO second heading task', // 4
+        'DEADLINE: <2026-07-20 Mon>', // 5
+        '', // 6
+      ].join('\n');
+      const { cachedRead } = mockVault({ [sourcePath]: source });
+
+      const p1 = makeBareMetadataParagraph('SCHEDULED: <2026-07-15 Wed>');
+      const p2 = makeBareMetadataParagraph('DEADLINE: <2026-07-20 Mon>');
+
+      const r1 = await invoke(p1, {
+        sourcePath,
+        getSectionInfo: () => ({ lineStart: 0, lineEnd: 1 }),
+      });
+      const r2 = await invoke(p2, {
+        sourcePath,
+        getSectionInfo: () => ({ lineStart: 4, lineEnd: 5 }),
+      });
+
+      expect(r1).toBe(true);
+      expect(r2).toBe(true);
+      // Critical: same sourcePath means a single cachedRead call even
+      // though we made two independent invocations.
+      expect(cachedRead).toHaveBeenCalledTimes(1);
+
+      activeDocument.body.removeChild(p1);
+      activeDocument.body.removeChild(p2);
+    });
+
+    test('returns false (and skips cachedRead) when the file cannot be resolved', async () => {
+      clearCache();
+      const sourcePath = 'fallback-missing.md';
+      // rejectGet=true forces getAbstractFileByPath to return null for
+      // every path, so getSourceLinesCached must short-circuit.
+      const { cachedRead } = mockVault({}, { rejectGet: true });
+
+      const paragraph = makeBareMetadataParagraph(
+        'SCHEDULED: <2026-07-15 Wed>',
+      );
+
+      const result = await invoke(paragraph, { sourcePath });
+
+      expect(result).toBe(false);
+      expect(cachedRead).not.toHaveBeenCalled();
+
+      activeDocument.body.removeChild(paragraph);
+    });
+
+    // Regression: on close+reopen Obsidian can hand us a section that
+    // does NOT contain the metadata paragraph (heading task and metadata
+    // are in separate post-processor invocations). `computeMetadataLineScope`
+    // must fall back to a full-file scan in that case so the task above
+    // is still detected. Without the secondary fallback,
+    // `hasPrecedingTaskAsync` would short-circuit to false.
+    test('falls back to full-file scan when the section-bounded search misses the metadata (close+reopen chunk split)', async () => {
+      clearCache();
+      const sourcePath = 'chunked-render.md';
+      const source = [
+        '### TODO task heading on line 0', // line 0 (task, but NOT in section below)
+        '', // line 1
+        '## regular prose line', // line 2
+        '', // line 3
+        'random filler', // line 4
+        'SCHEDULED: <2026-07-18 Sat>', // line 5 (metadata, NOT in section below)
+      ].join('\n');
+      const { cachedRead } = mockVault({ [sourcePath]: source });
+
+      const paragraph = makeBareMetadataParagraph(
+        'SCHEDULED: <2026-07-18 Sat>',
+      );
+
+      // Intentionally returns a section whose bounds contain ONLY the
+      // heading line — mirrors the close+reopen chunk split where the
+      // metadata paragraph gets its own invocation with a section that
+      // excludes the preceding heading.
+      const result = await invoke(paragraph, {
+        sourcePath,
+        getSectionInfo: () => ({ lineStart: 0, lineEnd: 0 }),
+      });
+
+      expect(result).toBe(true);
+      expect(cachedRead).toHaveBeenCalledTimes(1);
+
+      activeDocument.body.removeChild(paragraph);
     });
   });
 
