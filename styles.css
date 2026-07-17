@@ -1,3 +1,7 @@
+.todoseq-hidden {
+  display: none;
+}
+
 /* TodoView theme-aligned styles. Inherit fonts/colors from the active Obsidian theme. */
 .todoseq-panel {
   color: var(--text-normal);

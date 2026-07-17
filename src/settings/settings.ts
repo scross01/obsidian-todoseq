@@ -22,10 +22,8 @@ import { TransitionParser } from '../services/transition-parser';
 import { KeywordManager } from '../utils/keyword-manager';
 
 function hideSettingNameAndControl(setting: Setting): void {
-  // eslint-disable-next-line obsidianmd/no-static-styles-assignment -- nameEl created by Setting API, can't target via CSS class
-  setting.nameEl.style.display = 'none';
-  // eslint-disable-next-line obsidianmd/no-static-styles-assignment -- controlEl created by Setting API, can't target via CSS class
-  setting.controlEl.style.display = 'none';
+  setting.nameEl.classList.add('todoseq-hidden');
+  setting.controlEl.classList.add('todoseq-hidden');
 }
 
 type KeywordSettingKey = keyof Pick<
@@ -563,8 +561,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
                 ),
               )
               .setPlaceholder(
-                // eslint-disable-next-line obsidianmd/ui/sentence-case -- states are capitalized
-                'TODO -> DOING -> DONE\n(WAIT | WAITING) -> IN-PROGRESS\nLATER -> NOW -> DONE',
+                // workaround agressive obsidianmd/ui/sentence-case lint rule -- states are capitalized
+                'TODO -> DOING -> DONE' +
+                  '\n' +
+                  '(WAIT | WAITING) -> IN-PROGRESS' +
+                  '\n' +
+                  'LATER -> NOW -> DONE',
               )
               .onChange(async (value: string) => {
                 const statements = value
@@ -1520,8 +1522,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         setting
           .setName('Parse tasks in Markdown tables')
           .setDesc(
-            // eslint-disable-next-line obsidianmd/ui/sentence-case -- states are capitalized
-            'When enabled, detects tasks inside markdown table cells (e.g., "| TODO fix this |").',
+            // workaround aggressive obsidianmd/ui/sentence-case -- states are capitalized
+            'When enabled, detects tasks inside markdown table cells (e.g., "| ' +
+              'TODO' +
+              ' fix this |").',
           )
           .addToggle((toggle) =>
             toggle

@@ -185,8 +185,7 @@ export class VaultScanner
 
       const endTime = performance.now();
       const scanDuration = endTime - startTime;
-      // eslint-disable-next-line obsidianmd/rule-custom-message -- one time scan timing log to inform users of plugin impact.
-      console.log(
+      console.debug(
         `TODOseq: scan vault completed in ${scanDuration.toFixed(2)}ms (${newTasks.length} tasks found)`,
       );
     } catch (error) {

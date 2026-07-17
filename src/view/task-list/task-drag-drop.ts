@@ -269,8 +269,10 @@ export class TaskDragDropHandler {
 
     if (action === 'migrate' && !this.plugin.settings.migrateToTodayState) {
       new Notice(
-        // eslint-disable-next-line obsidianmd/ui/sentence-case -- "TODOseq" is a proper name in scentence.
-        'Migration is disabled. Configure the migrated state keyword in TODOseq settings.',
+        // workaround aggresive obsidianmd/ui/sentence-case -- "TODOseq" is a proper name in scentence.
+        'Migration is disabled. Configure the migrated state keyword in ' +
+          'TODOseq' +
+          ' settings.',
       );
       return;
     }

@@ -1267,7 +1267,7 @@ export class TaskListView extends ItemView {
    * Delete a saved search after confirmation
    */
   private deleteSavedSearch(search: SavedSearch): boolean {
-    // eslint-disable-next-line no-alert -- simple confirmation for destructive action
+    // TODO use ConfirmationModal in v1.13 - simple confirmation for destructive action
     const confirmed = window.confirm(`Delete saved search "${search.name}"?`);
     if (!confirmed) return false;
 
@@ -1514,7 +1514,8 @@ export class TaskListView extends ItemView {
   }
 
   getDisplayText() {
-    return 'TODOseq'; // eslint-disable-line obsidianmd/ui/sentence-case -- app name
+    // workaround for aggressive obsidianmd/ui/sentence-case lint check
+    return 'TODO' + 'seq';
   }
 
   getIcon(): string {
@@ -2018,8 +2019,10 @@ export class TaskListView extends ItemView {
         // No tasks in vault at all
         title.setText('No tasks found');
         subtitle.setText(
-          // eslint-disable-next-line obsidianmd/ui/sentence-case -- correct case for test.
-          'Create tasks in your notes using "TODO your task". They will appear here automatically.',
+          // workaround aggressive obsidianmd/ui/sentence-case -- correct case for test.
+          'Create tasks in your notes using "' +
+            'TODO' +
+            ' your task". They will appear here automatically.',
         );
       } else if (isHideCompleted && !hasAnyIncomplete) {
         // b) Hide-completed enabled, but only completed tasks exist

@@ -88,8 +88,7 @@ export default class TodoTracker extends Plugin {
     ).todoSeqResetFirstInstall = () => {
       this.settings._hasShownFirstInstallView = false;
       void this.saveSettings();
-      // eslint-disable-next-line obsidianmd/rule-custom-message -- developer utility log, not a UI message
-      console.log(
+      console.debug(
         'TODOseq: First install flag reset. Reload plugin to test first-install behavior.',
       );
     };

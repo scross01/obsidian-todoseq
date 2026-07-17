@@ -77,8 +77,7 @@ export class SavedSearchDialog {
     const nameInput = nameGroup.createEl('input', {
       attr: {
         type: 'text',
-        // eslint-disable-next-line obsidianmd/ui/sentence-case -- placeholder examples
-        placeholder: 'e.g., agenda, overdue, work active',
+        placeholder: 'E.g., agenda, overdue, work active',
         maxlength: '50',
       },
     });
@@ -92,8 +91,7 @@ export class SavedSearchDialog {
     const queryInput = queryGroup.createEl('input', {
       attr: {
         type: 'text',
-        // eslint-disable-next-line obsidianmd/ui/sentence-case -- placeholder examples
-        placeholder: 'e.g., scheduled:today, state:active, tag:work',
+        placeholder: 'E.g., scheduled:today, state:active, tag:work',
       },
     });
     queryInput.value =
