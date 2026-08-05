@@ -31,15 +31,15 @@ test.afterAll(async () => {
 
 test('settings persist across Obsidian restart', async () => {
   // 1. Edit and save a settings value on the shared instance.
-  await openSettings(page);
-  await navigateToPluginTab(page, 'TODOseq');
+  const settingsPage = await openSettings(page);
+  await navigateToPluginTab(settingsPage, 'TODOseq');
 
-  const waitingKeywordInput = page
+  const waitingKeywordInput = settingsPage
     .locator('.setting-item', { hasText: 'Waiting keywords' })
     .locator('input');
   await waitingKeywordInput.fill('');
   await waitingKeywordInput.fill('BLOCKED');
-  await page.waitForTimeout(700);
+  await settingsPage.waitForTimeout(700);
 
   // 2. Save coverage from the first Obsidian instance before closing it.
   await saveCoverage();
@@ -55,10 +55,10 @@ test('settings persist across Obsidian restart', async () => {
   page = relaunched.page;
 
   // 5. Verify the value survived.
-  await openSettings(page);
-  await navigateToPluginTab(page, 'TODOseq');
+  const settingsPage2 = await openSettings(page);
+  await navigateToPluginTab(settingsPage2, 'TODOseq');
 
-  const waitingInput = page
+  const waitingInput = settingsPage2
     .locator('.setting-item', { hasText: 'Waiting keywords' })
     .locator('input');
   const value = await waitingInput.inputValue();

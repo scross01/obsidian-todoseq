@@ -45,13 +45,31 @@ export async function openTodoseqPanel(page: Page): Promise<void> {
 
 /**
  * Open Obsidian settings via the command API.
- * This is more reliable than app.setting.open().
+ *
+ * On Obsidian 1.13+ this opens a separate Electron settings window (a second
+ * CDP page, no `window.app` there). Returns that settings page so callers can
+ * navigate it. Falls back to polling the other pages for the settings DOM.
  */
-export async function openSettings(page: Page): Promise<void> {
+export async function openSettings(page: Page): Promise<Page> {
   await runCommandById(page, 'app:open-settings');
-  // Wait for any modal to appear.
-  await page.waitForSelector('.modal', { timeout: 10_000 });
-  await page.waitForTimeout(300);
+  const browser = page.context().browser();
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const pages = browser ? browser.contexts().flatMap((c) => c.pages()) : [];
+    for (const candidate of pages) {
+      if (candidate === page) continue;
+      const isSettings = await candidate
+        .evaluate(
+          () =>
+            !(window as any).app &&
+            !!document.querySelector('.vertical-tab-nav-item'),
+        )
+        .catch(() => false);
+      if (isSettings) return candidate;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error('Settings window did not open within 10s');
 }
 
 /**
@@ -83,8 +101,16 @@ export async function navigateToPluginTab(
 
 /**
  * Close all open Obsidian modals by clicking their close buttons via DOM.
+ * Best-effort: also closes the 1.13+ settings window via the app API first so
+ * a lingering settings window can't block modal-driven suites.
  */
 export async function closeAllModals(page: Page): Promise<void> {
+  await page
+    .evaluate(() => {
+      const app = (window as any).app;
+      if (app?.setting?.close) app.setting.close();
+    })
+    .catch(() => {});
   await page.evaluate(() => {
     document.querySelectorAll('.modal-close-button').forEach((btn) => {
       (btn as HTMLElement).click();
@@ -94,8 +120,19 @@ export async function closeAllModals(page: Page): Promise<void> {
 }
 
 /**
- * Close the settings modal.
+ * Close the settings window. Always called with the MAIN page (which has
+ * `window.app`); closes via the app API, falling back to window.close().
  */
 export async function closeSettings(page: Page): Promise<void> {
-  await closeAllModals(page);
+  await page
+    .evaluate(() => {
+      const app = (window as any).app;
+      if (app?.setting?.close) {
+        app.setting.close();
+        return;
+      }
+      window.close();
+    })
+    .catch(() => {});
+  await page.waitForTimeout(200);
 }

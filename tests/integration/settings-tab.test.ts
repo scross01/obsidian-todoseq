@@ -24,11 +24,13 @@ test.describe('Settings tab', () => {
   });
 
   test('settings tab opens and displays all sections', async () => {
-    await openSettings(page);
-    await navigateToPluginTab(page, 'TODOseq');
+    const settingsPage = await openSettings(page);
+    await navigateToPluginTab(settingsPage, 'TODOseq');
 
     // Check for recognizable setting labels from the plugin settings.
-    const allText = await page.locator('.setting-item').allTextContents();
+    const allText = await settingsPage
+      .locator('.setting-item')
+      .allTextContents();
     const text = allText.join(' ');
 
     // Keyword settings
@@ -51,16 +53,16 @@ test.describe('Settings tab', () => {
   });
 
   test('keyword settings can be modified via input fields', async () => {
-    await openSettings(page);
-    await navigateToPluginTab(page, 'TODOseq');
+    const settingsPage = await openSettings(page);
+    await navigateToPluginTab(settingsPage, 'TODOseq');
 
-    const activeKeywordInput = page
+    const activeKeywordInput = settingsPage
       .locator('.setting-item', { hasText: 'Active keywords' })
       .locator('input')
       .first();
     await activeKeywordInput.fill('');
     await activeKeywordInput.fill('IN-PROGRESS');
-    await page.waitForTimeout(700);
+    await settingsPage.waitForTimeout(700);
 
     const currentValue = await activeKeywordInput.inputValue();
     expect(currentValue).toBe('IN-PROGRESS');

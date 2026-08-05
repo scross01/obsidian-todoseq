@@ -6,6 +6,8 @@ import { TodoTrackerSettingTab } from '../src/settings/settings';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 import { createBaseSettings } from './helpers/test-helper';
 import { DefaultSettings } from '../src/settings/settings-types';
+import { SUPPORTED_EXTENSIONS } from '../src/parser/code-comment-task-parser';
+import type { SettingDefinitionItem } from 'obsidian';
 
 // Mock obsidian
 jest.mock('obsidian', () => ({
@@ -16,6 +18,15 @@ jest.mock('obsidian', () => ({
       this.app = app;
       this.plugin = plugin;
     }
+    getSettingDefinitions() {
+      return [];
+    }
+    getControlValue(_key: string) {
+      return undefined;
+    }
+    setControlValue(_key: string, _value: unknown) {}
+    update() {}
+    refreshDomState() {}
   },
   Setting: class MockSetting {
     private nameText = '';
@@ -141,7 +152,11 @@ jest.mock('../src/utils/keyword-manager', () => ({
     getActiveSet: jest.fn().mockReturnValue(new Set(['DOING', 'NOW'])),
     getCompletedSet: jest.fn().mockReturnValue(new Set(['DONE', 'CANCELLED'])),
     getAllKeywords: jest.fn().mockReturnValue(['TODO', 'DOING', 'DONE']),
-    getKeywordsForGroup: jest.fn().mockReturnValue(['TODO', 'LATER']),
+    getKeywordsForGroup: jest.fn().mockImplementation((group: string) => {
+      if (group === 'completedKeywords') return ['DONE', 'CANCELLED'];
+      if (group === 'activeKeywords') return ['DOING', 'NOW'];
+      return ['TODO', 'LATER'];
+    }),
   })),
 }));
 
@@ -176,6 +191,11 @@ describe('TodoTrackerSettingTab', () => {
       updateTaskListViewSettings: jest.fn(),
       updateTaskUpdateCoordinatorSettings: jest.fn(),
       updateTaskWriterKeywordManager: jest.fn(),
+      updateTaskFormatting: jest.fn(),
+      getTasks: jest.fn().mockReturnValue([]),
+      smartDateProcessor: {
+        setEnabled: jest.fn(),
+      },
       embeddedTaskListProcessor: {
         updateSettings: jest.fn(),
       },
@@ -694,6 +714,291 @@ describe('TodoTrackerSettingTab', () => {
       expect(result.additionalInactiveKeywords).toContain('FIXME');
       // Groups without bindings should use fallback settings
       expect(Array.isArray(result.additionalWaitingKeywords)).toBe(true);
+    });
+  });
+
+  describe('declarative settings', () => {
+    type GroupDef = {
+      type: 'group';
+      heading?: string;
+      items: SettingDefinitionItem[];
+    };
+
+    const findSetting = (
+      definitions: SettingDefinitionItem[],
+      name: string,
+    ): SettingDefinitionItem | undefined => {
+      for (const def of definitions) {
+        if ('name' in def && def.name === name) {
+          return def;
+        }
+        if ('items' in def && Array.isArray(def.items)) {
+          const found = findSetting(def.items, name);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+
+    const controlOf = (
+      def: SettingDefinitionItem | undefined,
+    ): Record<string, unknown> | undefined =>
+      def && 'control' in def
+        ? (def as { control: Record<string, unknown> }).control
+        : undefined;
+
+    it('returns formatTaskKeywords first and exactly 7 groups with expected headings', () => {
+      const defs = settingTab.getSettingDefinitions();
+
+      expect(defs[0]).toMatchObject({
+        name: 'Format task keywords',
+        control: { type: 'toggle', key: 'formatTaskKeywords' },
+      });
+
+      const groups = defs.filter((d): d is GroupDef => {
+        return 'type' in d && d.type === 'group';
+      });
+      expect(groups).toHaveLength(7);
+      expect(groups.map((g) => g.heading)).toEqual([
+        'Task detection',
+        'Smart date recognition',
+        'Task list search and filter',
+        'Task keywords',
+        'Task state transitions',
+        'Warning period',
+        '⚠︎ Experimental features',
+      ]);
+    });
+
+    it('uses the expected control shapes for spot-checked settings', () => {
+      const defs = settingTab.getSettingDefinitions();
+
+      const defaultSort = controlOf(findSetting(defs, 'Default sort method'));
+      expect(defaultSort).toMatchObject({
+        type: 'dropdown',
+        key: 'defaultSortMethod',
+      });
+      const defaultSortOptions = defaultSort?.options as Record<string, string>;
+      expect(Object.keys(defaultSortOptions)).toHaveLength(7);
+
+      expect(
+        controlOf(findSetting(defs, 'Upcoming period (days)')),
+      ).toMatchObject({
+        type: 'number',
+        key: 'upcomingPeriod',
+        min: 0,
+        max: 30,
+      });
+
+      const removeKeywords = controlOf(
+        findSetting(defs, 'Remove date keywords'),
+      );
+      expect(typeof removeKeywords?.disabled).toBe('function');
+
+      expect(controlOf(findSetting(defs, 'Track closed date'))).toMatchObject({
+        type: 'toggle',
+        key: 'trackClosedDate',
+      });
+    });
+
+    it('setControlValue writes the value, persists, and refreshes task list views', async () => {
+      const settings = pluginMock.settings as unknown as {
+        upcomingPeriod: number;
+      };
+
+      await (settingTab as any).setControlValue('upcomingPeriod', 14);
+
+      expect(settings.upcomingPeriod).toBe(14);
+      expect(pluginMock.saveSettings as jest.Mock).toHaveBeenCalledTimes(1);
+      expect(
+        appMock.workspace.getLeavesOfType as jest.Mock,
+      ).toHaveBeenCalledWith('todoseq-view');
+    });
+
+    it('setControlValue for formatTaskKeywords triggers updateTaskFormatting', async () => {
+      await (settingTab as any).setControlValue('formatTaskKeywords', true);
+
+      expect(
+        pluginMock.updateTaskFormatting as jest.Mock,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('setControlValue for includeCodeBlocks disables language comment support and rescans', async () => {
+      const settings = pluginMock.settings as unknown as {
+        languageCommentSupport: boolean;
+      };
+      settings.languageCommentSupport = true;
+      const snapshots: Array<Record<string, unknown>> = [];
+      (pluginMock.saveSettings as jest.Mock).mockImplementation(async () => {
+        snapshots.push(JSON.parse(JSON.stringify(pluginMock.settings)));
+      });
+
+      await (settingTab as any).setControlValue('includeCodeBlocks', false);
+
+      expect(settings.languageCommentSupport).toBe(false);
+      expect(snapshots.at(-1)).toMatchObject({ languageCommentSupport: false });
+      expect(pluginMock.recreateParser as jest.Mock).toHaveBeenCalledTimes(1);
+      expect(pluginMock.scanVault as jest.Mock).toHaveBeenCalledTimes(1);
+      expect(
+        pluginMock.refreshVisibleEditorDecorations as jest.Mock,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        pluginMock.refreshReaderViewFormatter as jest.Mock,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('setControlValue for enableSmartDateRecognition disables remove date keywords and updates the processor', async () => {
+      const settings = pluginMock.settings as unknown as {
+        smartDateRemoveKeywords: boolean;
+      };
+      const snapshots: Array<Record<string, unknown>> = [];
+      (pluginMock.saveSettings as jest.Mock).mockImplementation(async () => {
+        snapshots.push(JSON.parse(JSON.stringify(pluginMock.settings)));
+      });
+
+      await (settingTab as any).setControlValue(
+        'enableSmartDateRecognition',
+        false,
+      );
+
+      expect(settings.smartDateRemoveKeywords).toBe(false);
+      expect(snapshots.at(-1)).toMatchObject({
+        smartDateRemoveKeywords: false,
+      });
+      expect(
+        (pluginMock.smartDateProcessor as { setEnabled: jest.Mock }).setEnabled,
+      ).toHaveBeenCalledWith(false);
+    });
+
+    it('detectOrgModeFiles toggles .org in additionalFileExtensions', async () => {
+      const settings = pluginMock.settings as unknown as {
+        additionalFileExtensions: string[];
+      };
+      const snapshots: Array<Record<string, unknown>> = [];
+      (pluginMock.saveSettings as jest.Mock).mockImplementation(async () => {
+        snapshots.push(JSON.parse(JSON.stringify(pluginMock.settings)));
+      });
+
+      await (settingTab as any).setControlValue('detectOrgModeFiles', true);
+      expect(settings.additionalFileExtensions).toContain('.org');
+      expect(
+        (snapshots.at(-1)?.additionalFileExtensions as string[]).includes(
+          '.org',
+        ),
+      ).toBe(true);
+
+      await (settingTab as any).setControlValue('detectOrgModeFiles', false);
+      expect(settings.additionalFileExtensions).not.toContain('.org');
+      expect(
+        (snapshots.at(-1)?.additionalFileExtensions as string[]).includes(
+          '.org',
+        ),
+      ).toBe(false);
+    });
+
+    it('scanCodeFiles adds and removes SUPPORTED_EXTENSIONS preserving user extensions', async () => {
+      const settings = pluginMock.settings as unknown as {
+        additionalFileExtensions: string[];
+      };
+      settings.additionalFileExtensions = ['.custom'];
+      const snapshots: Array<Record<string, unknown>> = [];
+      (pluginMock.saveSettings as jest.Mock).mockImplementation(async () => {
+        snapshots.push(JSON.parse(JSON.stringify(pluginMock.settings)));
+      });
+
+      await (settingTab as any).setControlValue('scanCodeFiles', true);
+      for (const ext of SUPPORTED_EXTENSIONS) {
+        expect(settings.additionalFileExtensions).toContain(ext);
+      }
+      expect(settings.additionalFileExtensions).toContain('.custom');
+
+      await (settingTab as any).setControlValue('scanCodeFiles', false);
+      for (const ext of SUPPORTED_EXTENSIONS) {
+        expect(settings.additionalFileExtensions).not.toContain(ext);
+      }
+      expect(settings.additionalFileExtensions).toEqual(['.custom']);
+      expect(snapshots.at(-1)?.additionalFileExtensions).toEqual(['.custom']);
+    });
+
+    describe('cross-field transition validation', () => {
+      it('warns when a stored default-state override is not in the keyword set', () => {
+        const completedEl = activeDocument.createElement('div');
+        completedEl.className = 'setting-item';
+        const completedInfo = activeDocument.createElement('div');
+        completedInfo.className = 'setting-item-info';
+        completedEl.appendChild(completedInfo);
+
+        const transitionsEl = activeDocument.createElement('div');
+        transitionsEl.className = 'setting-item';
+        const transitionsInfo = activeDocument.createElement('div');
+        transitionsInfo.className = 'setting-item-info';
+        transitionsEl.appendChild(transitionsInfo);
+
+        (settingTab as any).transitionSettings = {
+          completed: { settingEl: completedEl },
+          transitions: { settingEl: transitionsEl },
+        };
+
+        const settings = pluginMock.settings as unknown as {
+          stateTransitions: { defaultCompleted: string };
+        };
+        settings.stateTransitions.defaultCompleted = 'NOT-A-KEYWORD';
+
+        (settingTab as any).validateTransitionSettings();
+
+        const warning = completedEl.querySelector(
+          '.todoseq-setting-item-warning',
+        );
+        expect(warning).toBeTruthy();
+        expect(warning?.textContent).toContain('Default completed state');
+        expect(
+          transitionsEl.querySelector('.todoseq-setting-item-error'),
+        ).toBeFalsy();
+      });
+
+      it('does not warn when the default-state override is a real keyword', () => {
+        const completedEl = activeDocument.createElement('div');
+        completedEl.className = 'setting-item';
+        const completedInfo = activeDocument.createElement('div');
+        completedInfo.className = 'setting-item-info';
+        completedEl.appendChild(completedInfo);
+
+        (settingTab as any).transitionSettings = {
+          completed: { settingEl: completedEl },
+        };
+
+        const settings = pluginMock.settings as unknown as {
+          stateTransitions: { defaultCompleted: string };
+        };
+        settings.stateTransitions.defaultCompleted = 'DONE';
+
+        (settingTab as any).validateTransitionSettings();
+
+        expect(
+          completedEl.querySelector('.todoseq-setting-item-warning'),
+        ).toBeFalsy();
+      });
+    });
+
+    it('updateDefaultStateDropdowns rewrites a stored default override no longer in the keyword set', async () => {
+      const selectEl = activeDocument.createElement('select');
+      const dropdown = {
+        selectEl,
+        getValue: jest.fn().mockReturnValue('NOT-A-KEYWORD'),
+        setValue: jest.fn(),
+      };
+      (settingTab as any).defaultStateDropdowns.completed = dropdown;
+
+      const settings = pluginMock.settings as unknown as {
+        stateTransitions: { defaultCompleted: string };
+      };
+      settings.stateTransitions.defaultCompleted = 'NOT-A-KEYWORD';
+
+      await (settingTab as any).updateDefaultStateDropdowns();
+
+      expect(dropdown.setValue).toHaveBeenCalledWith('DONE');
+      expect(settings.stateTransitions.defaultCompleted).toBe('DONE');
+      expect(pluginMock.saveSettings as jest.Mock).toHaveBeenCalledTimes(1);
     });
   });
 });

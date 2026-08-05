@@ -73,6 +73,14 @@ export class PluginSettingTab {
   }
 
   display(): void {}
+  getSettingDefinitions() {
+    return [];
+  }
+  getControlValue(_key: string) {
+    return undefined;
+  }
+  setControlValue(_key: string, _value: unknown) {}
+  update() {}
 }
 
 export class ItemView {

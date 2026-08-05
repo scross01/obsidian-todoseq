@@ -30,8 +30,22 @@ export async function connectOverCDP(
 ): Promise<{ browser: Browser; page: Page }> {
   const b = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   const contexts = b.contexts();
-  const p = contexts[0]?.pages()[0] ?? (await contexts[0].newPage());
-  return { browser: b, page: p };
+  // Prefer the page that has the Obsidian `app` global (the main window).
+  // On Obsidian 1.13+, Settings opens in a separate Electron window that has no
+  // `window.app`, so pages[0] must not be assumed to be the main window.
+  const pages = contexts.flatMap((c) => c.pages());
+  let p: Page | null = pages[0] ?? null;
+  for (const candidate of pages) {
+    const hasApp = await candidate
+      .evaluate(() => !!(window as any).app)
+      .catch(() => false);
+    if (hasApp) {
+      p = candidate;
+      break;
+    }
+  }
+  const page = p ?? (await contexts[0].newPage());
+  return { browser: b, page };
 }
 
 /**
