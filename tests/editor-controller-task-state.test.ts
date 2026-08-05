@@ -24,6 +24,7 @@ describe('Editor Controller - Task State Methods', () => {
         defaultCompleted: 'DONE',
         transitionStatements: ['WAIT -> IN-PROGRESS'],
       },
+      experimentalTableTasks: true,
     });
 
     const keywordManager = createTestKeywordManager(settings);
@@ -442,9 +443,95 @@ describe('Editor Controller - Task State Methods', () => {
 
         editorController['moveCursorToDateLine'](mockEditor as any, 1);
 
-        expect(mockEditor.setCursor).toHaveBeenCalled();
-        expect(mockEditor.setSelection).toHaveBeenCalled();
-      });
-    });
-  });
+       expect(mockEditor.setCursor).toHaveBeenCalled();
+       expect(mockEditor.setSelection).toHaveBeenCalled();
+     });
+   });
+
+   describe('handleUpdateTaskStateAtLine - table cell tasks', () => {
+     it('should use provided cellIndex to find the correct table cell', async () => {
+       mockEditor.getLine = () =>
+         '| TODO task one | TODO task two |';
+       mockEditor.getCursor = () => ({ line: 0, ch: 0 });
+       mockView.file = { path: 'test.md' };
+
+       await editorController.handleUpdateTaskStateAtLine(
+         false,
+         0,
+         mockEditor as any,
+         mockView as any,
+         'DOING',
+         1,
+       );
+
+       expect(
+         mockPlugin.taskUpdateCoordinator.updateTask,
+       ).toHaveBeenCalledWith(
+         expect.objectContaining({
+           task: expect.objectContaining({
+             path: expect.any(String),
+             line: expect.any(Number),
+             isTableTask: true,
+             tableCell: { cellIndex: 1 },
+           }),
+           type: 'state',
+           source: 'editor',
+           newState: 'DOING',
+         }),
+       );
+     });
+
+     it('should return true for table row when checking with cellIndex', async () => {
+       mockEditor.getLine = () => '| TODO task |';
+       mockView.file = { path: 'test.md' };
+
+       const result = await editorController.handleUpdateTaskStateAtLine(
+         true,
+         0,
+         mockEditor as any,
+         mockView as any,
+         'DOING',
+         0,
+       );
+
+       expect(result).toBe(true);
+     });
+   });
+
+   describe('handleUpdateTaskCycleStateAtLine - table cell tasks', () => {
+     it('should handle table cell tasks with cursor in correct cell', async () => {
+       mockEditor.getLine = () => '| TODO task |';
+       mockEditor.getCursor = () => ({ line: 0, ch: 5 });
+       mockView.file = { path: 'test.md' };
+
+       await editorController.handleUpdateTaskCycleStateAtLine(
+         false,
+         0,
+         mockEditor as any,
+         mockView as any,
+       );
+
+       expect(
+         mockPlugin.taskUpdateCoordinator.updateTaskState,
+       ).toHaveBeenCalled();
+     });
+
+     it('should handle table cell tasks when cursor is not in any cell', async () => {
+       mockEditor.getLine = () => '| TODO task one | TODO task two |';
+       mockEditor.getCursor = () => ({ line: 0, ch: 0 });
+       mockView.file = { path: 'test.md' };
+
+       await editorController.handleUpdateTaskCycleStateAtLine(
+         false,
+         0,
+         mockEditor as any,
+         mockView as any,
+       );
+
+       expect(
+         mockPlugin.taskUpdateCoordinator.updateTaskState,
+       ).toHaveBeenCalled();
+     });
+   });
+ });
 });

@@ -155,4 +155,18 @@ due: ${dateStr}
 This file will be modified externally to test vault rescan.
 `,
   );
+
+  // File with table cell tasks for experimental table task testing
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'table-tasks.md'),
+    `# Table Tasks Test
+
+| Task | Status | Priority |
+|------|--------|----------|
+| - [ ] TODO Table task one | | |
+| - [ ] DOING Table task two with description | | |
+| - [x] DONE Table task three | | |
+| - [ ] WAITING Table task four | | |
+`,
+  );
 }

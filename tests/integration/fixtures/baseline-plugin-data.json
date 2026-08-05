@@ -56,5 +56,6 @@
     }
   ],
   "_hasShownFirstInstallView": true,
-  "settingsVersion": 5
+  "settingsVersion": 5,
+  "experimentalTableTasks": true
 }

@@ -1524,9 +1524,28 @@ describe('table task parsing', () => {
     expect(tasks[0].path).toBe('test.md');
   });
 
-  test('parses completed task', () => {
-    const tasks = parser.parseFile('| DONE task |', 'test.md');
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].completed).toBe(true);
-  });
-});
+test('parses completed task', () => {
+     const tasks = parser.parseFile('| DONE task |', 'test.md');
+     expect(tasks).toHaveLength(1);
+     expect(tasks[0].completed).toBe(true);
+   });
+
+   test('parses DESCRIPTION in table cell', () => {
+     const tasks = parser.parseFile(
+       '| TODO task<br>DESCRIPTION: This is a description |',
+       'test.md',
+     );
+     expect(tasks).toHaveLength(1);
+     expect(tasks[0].description).toBe('This is a description');
+   });
+
+   test('parses DESCRIPTION with SCHEDULED date in table cell', () => {
+     const tasks = parser.parseFile(
+       '| TODO task<br>DESCRIPTION: A description<br>SCHEDULED: <2026-08-10> |',
+       'test.md',
+     );
+     expect(tasks).toHaveLength(1);
+     expect(tasks[0].description).toBe('A description');
+     expect(tasks[0].scheduledDate).toBeTruthy();
+   });
+ });

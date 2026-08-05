@@ -1359,7 +1359,7 @@ export class TaskParser implements ITaskParser {
         } else if (/^CLOSED:/i.test(part)) {
           const p = DateParser.parseDateWithRepeater(dateContent);
           if (p.date) task.closedDate = p.date;
-        } else if (task.description === null) {
+        } else if (task.description === undefined) {
           const descText = this.getDescriptionText(part);
           if (descText !== null) {
             task.description = descText || undefined;
