@@ -19,8 +19,8 @@ export interface SavedSearchDialogOptions {
   currentMatchCase?: boolean;
   /** Called when user saves */
   onSave: (search: Omit<SavedSearch, 'id'>) => void;
-  /** Called when user deletes (only in edit mode). Return true to close dialog. */
-  onDelete?: () => boolean;
+  /** Called when user deletes (only in edit mode). Opens the confirmation flow; dialog is closed by the caller on confirmed delete. */
+  onDelete?: () => void;
   /** Called when user cancels */
   onCancel: () => void;
 }
@@ -210,10 +210,7 @@ export class SavedSearchDialog {
         cls: 'todoseq-saved-search-btn-delete',
       });
       deleteBtn.addEventListener('click', () => {
-        const shouldClose = this.options.onDelete?.() ?? false;
-        if (shouldClose) {
-          this.close();
-        }
+        this.options.onDelete?.();
       });
     }
 
@@ -303,7 +300,7 @@ export class SavedSearchDialog {
     this.close();
   }
 
-  private close(): void {
+  public close(): void {
     if (this.modalEl) {
       this.modalEl.remove();
       this.modalEl = null;

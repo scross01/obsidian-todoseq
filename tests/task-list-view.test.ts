@@ -10,6 +10,7 @@ import {
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 import { Task } from '../src/types/task';
+import { createSavedSearch } from '../src/services/saved-search-manager';
 
 // Mock obsidian
 jest.mock('obsidian', () => ({
@@ -42,6 +43,28 @@ jest.mock('obsidian', () => ({
   MarkdownView: jest.fn(),
   setIcon: jest.fn(),
   Notice: jest.fn(),
+  ConfirmationModal: jest.fn().mockImplementation(() => {
+    const instance: any = {
+      setTitle: jest.fn().mockReturnThis(),
+      setContent: jest.fn().mockReturnThis(),
+      addButton: jest.fn(function (this: any, cb: (btn: any) => void) {
+        const btn: any = {
+          setButtonText: jest.fn().mockReturnThis(),
+          setDestructive: jest.fn().mockReturnThis(),
+          onClick: jest.fn(function (this: any, handler: () => void) {
+            this._clickHandler = handler;
+            return this;
+          }),
+        };
+        cb(btn);
+        this._lastButton = btn;
+        return this;
+      }),
+      addCancelButton: jest.fn().mockReturnThis(),
+      open: jest.fn(),
+    };
+    return instance;
+  }),
 }));
 
 // Mock dependencies
@@ -164,6 +187,7 @@ describe('TaskListView', () => {
 
     pluginMock = {
       settings: createBaseSettings(),
+      saveSettings: jest.fn().mockResolvedValue(undefined),
       app: {
         workspace: {
           getLeavesOfType: jest.fn().mockReturnValue([]),
@@ -922,6 +946,107 @@ describe('TaskListView', () => {
         ).not.toHaveBeenCalled();
         errSpy.mockRestore();
       });
+    });
+  });
+
+  describe('saved search delete', () => {
+    it('confirmed delete removes the search', () => {
+      const search = createSavedSearch('Agenda', 'state:active');
+      pluginMock.settings.savedSearches = [search];
+
+      (view as any).deleteSavedSearch(search);
+
+      const { ConfirmationModal } = jest.requireMock('obsidian') as {
+        ConfirmationModal: jest.Mock;
+      };
+      expect(ConfirmationModal).toHaveBeenCalled();
+      const modal = ConfirmationModal.mock.results.at(-1)!.value;
+      expect(modal.setTitle).toHaveBeenCalledWith('Delete saved search');
+      expect(modal.setContent).toHaveBeenCalledWith(
+        'Are you sure you want to delete the saved search "Agenda"?',
+      );
+      expect(modal.open).toHaveBeenCalled();
+
+      modal._lastButton._clickHandler(new MouseEvent('click'));
+
+      expect(
+        pluginMock.settings.savedSearches.find((s) => s.id === search.id),
+      ).toBeUndefined();
+      expect(pluginMock.saveSettings).toHaveBeenCalled();
+      const { Notice } = jest.requireMock('obsidian') as {
+        Notice: jest.Mock;
+      };
+      expect(Notice).toHaveBeenCalledWith('Saved search "Agenda" deleted');
+    });
+
+    it('cancel (no confirm) does nothing', () => {
+      const search = createSavedSearch('Agenda', 'state:active');
+      pluginMock.settings.savedSearches = [search];
+
+      (view as any).deleteSavedSearch(search);
+
+      const { ConfirmationModal } = jest.requireMock('obsidian') as {
+        ConfirmationModal: jest.Mock;
+      };
+      expect(ConfirmationModal).toHaveBeenCalled();
+
+      expect(
+        pluginMock.settings.savedSearches.find((s) => s.id === search.id),
+      ).toBeDefined();
+      expect(pluginMock.saveSettings).not.toHaveBeenCalled();
+    });
+
+    it('edit-dialog confirmed delete closes dialog and removes search', () => {
+      const search = createSavedSearch('Agenda', 'state:active');
+      pluginMock.settings.savedSearches = [search];
+
+      (view as any).openEditSavedSearchDialog(search);
+
+      const deleteBtn = document.querySelector(
+        '.todoseq-saved-search-btn-delete',
+      );
+      expect(deleteBtn).not.toBeNull();
+      deleteBtn!.click();
+
+      const { ConfirmationModal } = jest.requireMock('obsidian') as {
+        ConfirmationModal: jest.Mock;
+      };
+      expect(ConfirmationModal).toHaveBeenCalled();
+
+      const modal = ConfirmationModal.mock.results.at(-1)!.value;
+      modal._lastButton._clickHandler(new MouseEvent('click'));
+
+      expect(document.querySelector('.todoseq-saved-search-modal')).toBeNull();
+      expect(
+        pluginMock.settings.savedSearches.find((s) => s.id === search.id),
+      ).toBeUndefined();
+      expect(pluginMock.saveSettings).toHaveBeenCalled();
+    });
+
+    it('edit-dialog cancel keeps both the dialog and the search', () => {
+      const search = createSavedSearch('Agenda', 'state:active');
+      pluginMock.settings.savedSearches = [search];
+
+      (view as any).openEditSavedSearchDialog(search);
+
+      const deleteBtn = document.querySelector(
+        '.todoseq-saved-search-btn-delete',
+      );
+      expect(deleteBtn).not.toBeNull();
+      deleteBtn!.click();
+
+      const { ConfirmationModal } = jest.requireMock('obsidian') as {
+        ConfirmationModal: jest.Mock;
+      };
+      expect(ConfirmationModal).toHaveBeenCalled();
+
+      expect(
+        document.querySelector('.todoseq-saved-search-modal'),
+      ).not.toBeNull();
+      expect(
+        pluginMock.settings.savedSearches.find((s) => s.id === search.id),
+      ).toBeDefined();
+      expect(pluginMock.saveSettings).not.toHaveBeenCalled();
     });
   });
 });

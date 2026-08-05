@@ -7,6 +7,7 @@ import {
   setIcon,
   Notice,
   Menu,
+  ConfirmationModal,
   EventRef,
   setTooltip,
 } from 'obsidian';
@@ -1254,7 +1255,7 @@ export class TaskListView extends ItemView {
         new Notice(`Saved search "${savedData.name}" updated`);
       },
       onDelete: () => {
-        return this.deleteSavedSearch(search);
+        this.deleteSavedSearch(search, () => dialog.close());
       },
       onCancel: () => {
         // No-op
@@ -1264,20 +1265,28 @@ export class TaskListView extends ItemView {
   }
 
   /**
-   * Delete a saved search after confirmation
+   * Delete a saved search after confirmation via Obsidian ConfirmationModal
    */
-  private deleteSavedSearch(search: SavedSearch): boolean {
-    // TODO use ConfirmationModal in v1.13 - simple confirmation for destructive action
-    const confirmed = window.confirm(`Delete saved search "${search.name}"?`);
-    if (!confirmed) return false;
-
-    removeSavedSearch(this.plugin.settings, search.id);
-    void this.plugin.saveSettings();
-    this.refreshSavedSearchesInDropdown();
-    // Clear active indicator if the deleted search was active
-    this.updateSaveSearchBtnVisibility(this.getSearchQuery());
-    new Notice(`Saved search "${search.name}" deleted`);
-    return true;
+  private deleteSavedSearch(search: SavedSearch, onDeleted?: () => void): void {
+    const modal = new ConfirmationModal(this.app);
+    modal.setTitle('Delete saved search');
+    modal.setContent(
+      `Are you sure you want to delete the saved search "${search.name}"?`,
+    );
+    modal.addButton((btn) => {
+      btn.setButtonText('Delete');
+      btn.setDestructive();
+      btn.onClick(() => {
+        removeSavedSearch(this.plugin.settings, search.id);
+        void this.plugin.saveSettings();
+        this.refreshSavedSearchesInDropdown();
+        this.updateSaveSearchBtnVisibility(this.getSearchQuery());
+        new Notice(`Saved search "${search.name}" deleted`);
+        onDeleted?.();
+      });
+    });
+    modal.addCancelButton();
+    modal.open();
   }
 
   /**
