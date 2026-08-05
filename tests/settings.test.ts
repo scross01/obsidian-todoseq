@@ -878,8 +878,14 @@ describe('TodoTrackerSettingTab', () => {
       const updateSpy = jest.spyOn(settingTab, 'update');
 
       await (settingTab as any).setControlValue('upcomingPeriod', 14);
-      await (settingTab as any).setControlValue('defaultDeadlineWarningPeriod', 5);
-      await (settingTab as any).setControlValue('defaultScheduledWarningPeriod', 5);
+      await (settingTab as any).setControlValue(
+        'defaultDeadlineWarningPeriod',
+        5,
+      );
+      await (settingTab as any).setControlValue(
+        'defaultScheduledWarningPeriod',
+        5,
+      );
 
       expect(updateSpy).not.toHaveBeenCalled();
     });
