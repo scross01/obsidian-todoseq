@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.19.0
+
+- Updated settings to use the new Obisdian 1.13 APIs, enabled settings search.
+
 ## 0.18.1
 
 - Fixed SCHEDULED / DEADLINE / CLOSED / DESCRIPTION lines after heading-based tasks losing their CSS wrapping in reader mode after a close+reopen.

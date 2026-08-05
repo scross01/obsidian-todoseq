@@ -22,9 +22,15 @@ export async function resetVaultState(page: Page): Promise<void> {
   // Force the running plugin to re-read the reset markdown + settings.
   await page.evaluate(async () => {
     const app = (window as any).app;
+    const plugin = app?.plugins?.plugins?.todoseq;
     // Reload plugin settings from the restored data.json.
-    if (app?.plugins?.plugins?.todoseq) {
-      await app.plugins.plugins.todoseq.loadSettings?.();
+    if (plugin) {
+      await plugin.loadSettings?.();
+      // loadSettings does not re-apply runtime side effects, so re-sync the
+      // smart date processor enabled state with the restored settings.
+      plugin.smartDateProcessor?.setEnabled?.(
+        Boolean(plugin.settings.enableSmartDateRecognition),
+      );
     }
   });
 

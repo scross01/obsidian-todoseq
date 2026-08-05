@@ -182,6 +182,11 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
   private codeExtensionsSnapshot: string[] | null = null;
 
+  private readonly controlsRequiringTabUpdate = new Set<string>([
+    'includeCodeBlocks',
+    'enableSmartDateRecognition',
+  ]);
+
   constructor(app: App, plugin: TodoTracker) {
     super(app, plugin);
     this.plugin = plugin;
@@ -238,6 +243,9 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
     await this.sideEffectHandlers[key]?.(value);
     await this.plugin.saveSettings();
+    if (this.controlsRequiringTabUpdate.has(key)) {
+      this.update();
+    }
   }
 
   getSettingDefinitions(): SettingDefinitionItem[] {
@@ -377,6 +385,10 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               min: 0,
               max: 30,
               defaultValue: 7,
+              // Accept every committed value: Obsidian's runtime shows the
+              // range warning for out-of-range commits and calls `validate` on
+              // valid ones to deterministically clear that warning.
+              validate: () => undefined,
             },
           },
           {
@@ -668,6 +680,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               min: 0,
               max: 30,
               defaultValue: 0,
+              validate: () => undefined,
             },
           },
           {
@@ -679,6 +692,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
               min: 0,
               max: 30,
               defaultValue: 0,
+              validate: () => undefined,
             },
           },
           {

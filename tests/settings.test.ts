@@ -832,11 +832,13 @@ describe('TodoTrackerSettingTab', () => {
       (pluginMock.saveSettings as jest.Mock).mockImplementation(async () => {
         snapshots.push(JSON.parse(JSON.stringify(pluginMock.settings)));
       });
+      const updateSpy = jest.spyOn(settingTab, 'update');
 
       await (settingTab as any).setControlValue('includeCodeBlocks', false);
 
       expect(settings.languageCommentSupport).toBe(false);
       expect(snapshots.at(-1)).toMatchObject({ languageCommentSupport: false });
+      expect(updateSpy).toHaveBeenCalledTimes(1);
       expect(pluginMock.recreateParser as jest.Mock).toHaveBeenCalledTimes(1);
       expect(pluginMock.scanVault as jest.Mock).toHaveBeenCalledTimes(1);
       expect(
@@ -855,6 +857,7 @@ describe('TodoTrackerSettingTab', () => {
       (pluginMock.saveSettings as jest.Mock).mockImplementation(async () => {
         snapshots.push(JSON.parse(JSON.stringify(pluginMock.settings)));
       });
+      const updateSpy = jest.spyOn(settingTab, 'update');
 
       await (settingTab as any).setControlValue(
         'enableSmartDateRecognition',
@@ -865,9 +868,53 @@ describe('TodoTrackerSettingTab', () => {
       expect(snapshots.at(-1)).toMatchObject({
         smartDateRemoveKeywords: false,
       });
+      expect(updateSpy).toHaveBeenCalledTimes(1);
       expect(
         (pluginMock.smartDateProcessor as { setEnabled: jest.Mock }).setEnabled,
       ).toHaveBeenCalledWith(false);
+    });
+
+    it('setControlValue for number fields does not re-render the tab', async () => {
+      const updateSpy = jest.spyOn(settingTab, 'update');
+
+      await (settingTab as any).setControlValue('upcomingPeriod', 14);
+      await (settingTab as any).setControlValue('defaultDeadlineWarningPeriod', 5);
+      await (settingTab as any).setControlValue('defaultScheduledWarningPeriod', 5);
+
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it('number controls define a validate hook so the runtime clears stale range warnings', () => {
+      const defs = settingTab.getSettingDefinitions();
+      const numberControls = [
+        controlOf(findSetting(defs, 'Upcoming period (days)')),
+        controlOf(findSetting(defs, 'Deadline advance notice (days)')),
+        controlOf(findSetting(defs, 'Scheduled delay (days)')),
+      ];
+
+      expect(numberControls.map((c) => c?.key)).toEqual([
+        'upcomingPeriod',
+        'defaultDeadlineWarningPeriod',
+        'defaultScheduledWarningPeriod',
+      ]);
+      for (const control of numberControls) {
+        expect(control).toMatchObject({
+          type: 'number',
+          min: 0,
+          max: 30,
+        });
+        expect(typeof control?.validate).toBe('function');
+        expect(control.validate(50)).toBeUndefined();
+      }
+    });
+
+    it('setControlValue for unrelated controls does not re-render the tab', async () => {
+      const updateSpy = jest.spyOn(settingTab, 'update');
+
+      await (settingTab as any).setControlValue('formatTaskKeywords', true);
+      await (settingTab as any).setControlValue('detectOrgModeFiles', true);
+
+      expect(updateSpy).not.toHaveBeenCalled();
     });
 
     it('detectOrgModeFiles toggles .org in additionalFileExtensions', async () => {
