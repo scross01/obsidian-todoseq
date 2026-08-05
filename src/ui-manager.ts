@@ -704,7 +704,7 @@ export class UIManager {
 
             if (keyword && activeView.file && this.plugin.editorKeywordMenu) {
               evt.preventDefault();
-              evt.stopPropagation();
+              evt.stopImmediatePropagation();
 
               // Open the context menu
               this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(

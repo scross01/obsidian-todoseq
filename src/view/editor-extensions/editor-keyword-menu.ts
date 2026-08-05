@@ -53,15 +53,40 @@ export class EditorKeywordMenu {
     if (currentLine !== null) {
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
       if (view && view.editor) {
+        const cellIndex = this.getCellIndexFromKeywordElement(keywordElement);
         this.plugin.editorController.handleUpdateTaskStateAtLine(
           false,
           currentLine - 1,
           view.editor,
           view,
           newState,
+          cellIndex,
         );
       }
     }
+  }
+
+  /**
+   * Find the cell index of a keyword element within its table row.
+   * Returns undefined if the element is not inside a table cell.
+   */
+  private getCellIndexFromKeywordElement(
+    keywordElement: HTMLElement,
+  ): number | undefined {
+    const cell = keywordElement.closest('td, .table-cell-wrapper');
+    if (!cell) return undefined;
+
+    const row = cell.parentElement;
+    if (!row) return undefined;
+
+    const cells = row.querySelectorAll('td, .table-cell-wrapper');
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i] === cell) {
+        return i;
+      }
+    }
+
+    return undefined;
   }
 
   /**

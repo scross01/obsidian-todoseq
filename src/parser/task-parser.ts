@@ -1335,30 +1335,35 @@ export class TaskParser implements ITaskParser {
         tableCell: { cellIndex: i },
       };
 
-      // Parse inline dates from <br>-separated parts
+      // Parse inline dates and description from <br>-separated parts
       const parts = content.split(/<br\s*\/?>/i);
       for (let j = 1; j < parts.length; j++) {
-        const dl = parts[j].trim();
-        const dateContent = dl
+        const part = parts[j].trim();
+        const dateContent = part
           .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/i, '')
           .trim();
-        if (/^SCHEDULED:/i.test(dl)) {
+        if (/^SCHEDULED:/i.test(part)) {
           const p = DateParser.parseDateWithRepeater(dateContent);
           if (p.date) {
             task.scheduledDate = p.date;
             task.scheduledDateRepeat = p.repeat;
             task.scheduledWarningPeriod = p.warningPeriod;
           }
-        } else if (/^DEADLINE:/i.test(dl)) {
+        } else if (/^DEADLINE:/i.test(part)) {
           const p = DateParser.parseDateWithRepeater(dateContent);
           if (p.date) {
             task.deadlineDate = p.date;
             task.deadlineDateRepeat = p.repeat;
             task.deadlineWarningPeriod = p.warningPeriod;
           }
-        } else if (/^CLOSED:/i.test(dl)) {
+        } else if (/^CLOSED:/i.test(part)) {
           const p = DateParser.parseDateWithRepeater(dateContent);
           if (p.date) task.closedDate = p.date;
+        } else if (task.description === null) {
+          const descText = this.getDescriptionText(part);
+          if (descText !== null) {
+            task.description = descText || undefined;
+          }
         }
       }
 

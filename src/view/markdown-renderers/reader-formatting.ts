@@ -2959,6 +2959,21 @@ export class ReaderViewFormatter {
   }
 
   /**
+   * Get the cell index of a table cell element within its row.
+   */
+  private getCellIndex(cell: HTMLElement): number {
+    const row = cell.parentElement;
+    if (!row) return 0;
+    const cells = row.querySelectorAll('td, .table-cell-wrapper');
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i] === cell) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  /**
    * Find the task associated with a keyword element
    */
   private async findTaskForKeyword(
@@ -2992,28 +3007,65 @@ export class ReaderViewFormatter {
 
     // Get the task container
     const taskContainer = keywordElement.closest('.todoseq-task');
-    if (!taskContainer) {
-      return null;
-    }
 
-    // Get the line number from the parent list item (data-line attribute)
-    const listItem = taskContainer.closest('li[data-line]');
-    const lineNumberAttr = listItem?.getAttribute('data-line');
-    const lineNumber = lineNumberAttr ? parseInt(lineNumberAttr, 10) : null;
+    // For table cell tasks, the keyword element is inside a <td>, not a .todoseq-task
+    const tableCell = taskContainer
+      ? null
+      : keywordElement.closest('td, .table-cell-wrapper');
+
+    let lineNumber: number | null = null;
+
+    if (taskContainer) {
+      // Get the line number from the parent list item (data-line attribute)
+      const listItem = taskContainer.closest('li[data-line]');
+      const lineNumberAttr = listItem?.getAttribute('data-line');
+      lineNumber = lineNumberAttr ? parseInt(lineNumberAttr, 10) : null;
+    } else if (tableCell) {
+      // For table cell tasks, find the line number from the table row
+      const tableRow = tableCell.parentElement;
+      if (tableRow) {
+        const tableRows = tableRow.parentElement?.querySelectorAll('tr');
+        if (tableRows) {
+          for (let i = 0; i < tableRows.length; i++) {
+            if (tableRows[i] === tableRow) {
+              // Try to find the line number from the data-line attribute on the row
+              const rowLineAttr = tableRow.getAttribute('data-line');
+              if (rowLineAttr) {
+                lineNumber = parseInt(rowLineAttr, 10);
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
 
     // If we have a line number, try to find the task at that exact line first
     if (lineNumber !== null && lineNumber >= 0 && lineNumber < lines.length) {
       const line = lines[lineNumber];
       // Check if this line contains the keyword
       if (line.includes(keyword)) {
-        // Find matching task from parsed tasks
-        const matchingTask = allTasks.find((t) => t.line === lineNumber);
-        if (matchingTask) {
-          return matchingTask;
+        // For table cell tasks, match by cell index
+        if (tableCell) {
+          const cellIndex = this.getCellIndex(tableCell as HTMLElement);
+          const matchingTask = allTasks.find(
+            (t) =>
+              t.line === lineNumber &&
+              t.tableCell?.cellIndex === cellIndex,
+          );
+          if (matchingTask) {
+            return matchingTask;
+          }
+        } else {
+          // Find matching task from parsed tasks
+          const matchingTask = allTasks.find((t) => t.line === lineNumber);
+          if (matchingTask) {
+            return matchingTask;
+          }
         }
         // If no parsed task found, return a minimal task for this line
         const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        return {
+        const minimalTask: Task = {
           path: file.path,
           line: lineNumber,
           rawText: line,
@@ -3038,13 +3090,19 @@ export class ReaderViewFormatter {
           subtaskCount: 0,
           subtaskCompletedCount: 0,
         };
+        if (tableCell) {
+          minimalTask.isTableTask = true;
+          minimalTask.tableCell = { cellIndex: this.getCellIndex(tableCell as HTMLElement) };
+        }
+        return minimalTask;
       }
     }
 
     // Fallback: use text-based matching if line number is not available
     // Get the full task text from DOM using stripMarkdownForDisplay for consistent normalization
     const domFullText = stripMarkdownForDisplay(
-      taskContainer.textContent || '',
+      ((taskContainer ?? tableCell) as HTMLElement | null)?.textContent ||
+        '',
     );
 
     // Use stripMarkdownForDisplay for consistent text normalization
@@ -3090,7 +3148,9 @@ export class ReaderViewFormatter {
       const allTaskContainers =
         keywordElement.closest('div')?.querySelectorAll('.todoseq-task') || [];
       const containerIndex =
-        Array.from(allTaskContainers).indexOf(taskContainer);
+        taskContainer
+          ? Array.from(allTaskContainers).indexOf(taskContainer)
+          : -1;
 
       if (containerIndex >= 0 && containerIndex < tasksWithKeyword.length) {
         return tasksWithKeyword[containerIndex];
