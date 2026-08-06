@@ -61,6 +61,7 @@ describe('EditorKeywordMenu', () => {
 
     const uiManagerMock = {
       getLineForElement: jest.fn().mockReturnValue(5),
+      getEditorViewFromElement: jest.fn().mockReturnValue(null),
     };
 
     const editorControllerMock = {
@@ -120,6 +121,45 @@ describe('EditorKeywordMenu', () => {
 
       // Verify that the editor controller was called as a result of the callback
       expect(pluginMock.editorController).toBeDefined();
+    });
+
+    it('should resolve cell index via posAtDOM for source-mode keyword decorations', () => {
+      const keywordElement = activeDocument.createElement('span');
+      const lineText = '| TODO | DOING |';
+      const editorViewMock = {
+        posAtDOM: jest.fn().mockReturnValue(2),
+        state: {
+          doc: {
+            lineAt: jest.fn().mockReturnValue({ from: 0, text: lineText }),
+          },
+        },
+      };
+
+      (
+        pluginMock.uiManager as {
+          getEditorViewFromElement: jest.Mock;
+        }
+      ).getEditorViewFromElement = jest.fn().mockReturnValue(editorViewMock);
+
+      const evt = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 100,
+        clientY: 100,
+      });
+
+      menu.openStateMenuAtMouseEvent('TODO', keywordElement, evt);
+
+      expect(
+        pluginMock.editorController.handleUpdateTaskStateAtLine,
+      ).toHaveBeenCalledWith(
+        false,
+        4,
+        expect.anything(),
+        expect.anything(),
+        'DOING',
+        0,
+      );
     });
   });
 

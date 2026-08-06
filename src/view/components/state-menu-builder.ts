@@ -98,6 +98,12 @@ export class StateMenuBuilder {
     onStateSelected: (state: string) => void | Promise<void>,
   ): Menu {
     const menu = new Menu();
+
+    // Force the DOM menu: on macOS Obsidian defaults the `nativeMenus` vault
+    // config to true, which makes showAtPosition render a native menu (and no
+    // .menu element in the DOM, breaking DOM-based interaction/tests).
+    menu.setUseNativeMenu(false);
+
     const groups = this.getSelectableStatesForMenu(currentState);
 
     for (const g of groups) {

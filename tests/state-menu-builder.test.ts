@@ -372,6 +372,9 @@ describe('StateMenuBuilder', () => {
         addSeparator() {
           return this;
         }
+        setUseNativeMenu() {
+          return this;
+        }
       }
 
       // Replace the mock Menu with our new implementation
@@ -412,6 +415,9 @@ jest.mock('obsidian', () => {
       return this;
     }
     addSeparator() {
+      return this;
+    }
+    setUseNativeMenu() {
       return this;
     }
   }

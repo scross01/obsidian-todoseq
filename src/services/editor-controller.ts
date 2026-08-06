@@ -191,14 +191,14 @@ export class EditorController {
    * @param newState - Optional new state to set (if not provided, will cycle to next state)
    * @returns boolean indicating if the operation was successful
    */
-handleUpdateTaskStateAtLine(
-     checking: boolean,
-     lineNumber: number,
-     editor: Editor,
-     view: MarkdownView,
-     newState?: string,
-     cellIndex?: number,
-   ): boolean {
+  handleUpdateTaskStateAtLine(
+    checking: boolean,
+    lineNumber: number,
+    editor: Editor,
+    view: MarkdownView,
+    newState?: string,
+    cellIndex?: number,
+  ): boolean {
     const vaultScanner = this.plugin.getVaultScanner();
 
     if (!vaultScanner) {
@@ -224,7 +224,11 @@ handleUpdateTaskStateAtLine(
       const cells = parseTableCells(line);
 
       // If cellIndex is provided (e.g., from keyword context menu), use it directly
-      if (cellIndex !== undefined && cellIndex >= 0 && cellIndex < cells.length) {
+      if (
+        cellIndex !== undefined &&
+        cellIndex >= 0 &&
+        cellIndex < cells.length
+      ) {
         const { content } = cells[cellIndex];
         if (content) {
           const taskLine = getCellTaskLine(content);
@@ -453,125 +457,132 @@ handleUpdateTaskStateAtLine(
    * @param newState - Optional specific state to set
    * @returns boolean indicating if the command is available (checking returns true without verifying vault scanner)
    */
-handleUpdateTaskCycleStateAtLine(
-     checking: boolean,
-     lineNumber: number,
-     editor: Editor,
-     view: MarkdownView,
-     newState?: string,
-   ): boolean {
-     const vaultScanner = this.plugin.getVaultScanner();
+  handleUpdateTaskCycleStateAtLine(
+    checking: boolean,
+    lineNumber: number,
+    editor: Editor,
+    view: MarkdownView,
+    newState?: string,
+  ): boolean {
+    const vaultScanner = this.plugin.getVaultScanner();
 
-     if (!vaultScanner) {
-       return false;
-     }
+    if (!vaultScanner) {
+      return false;
+    }
 
-     if (checking) {
-       // For cycle task state, the command should be available on any line
-       return true;
-     }
+    if (checking) {
+      // For cycle task state, the command should be available on any line
+      return true;
+    }
 
-     // Resolve to parent task if cursor is on a date line
-     lineNumber = this.resolveTaskLineFromCursor(editor, lineNumber);
+    // Resolve to parent task if cursor is on a date line
+    lineNumber = this.resolveTaskLineFromCursor(editor, lineNumber);
 
-     // Get the line from the editor
-     const line = editor.getLine(lineNumber);
+    // Get the line from the editor
+    const line = editor.getLine(lineNumber);
 
-     // Table cell task detection (experimental)
-     if (
-       this.plugin.settings?.experimentalTableTasks &&
-       isTableRow(line) &&
-       vaultScanner.getParser() &&
-       !vaultScanner.getParser()!.testRegex.test(line)
-     ) {
-       const cursor = editor.getCursor();
-       const cells = parseTableCells(line);
-       const parser = vaultScanner.getParser()!;
+    // Table cell task detection (experimental)
+    if (
+      this.plugin.settings?.experimentalTableTasks &&
+      isTableRow(line) &&
+      vaultScanner.getParser() &&
+      !vaultScanner.getParser()!.testRegex.test(line)
+    ) {
+      const cursor = editor.getCursor();
+      const cells = parseTableCells(line);
+      const parser = vaultScanner.getParser()!;
 
-       // First pass: find the cell the cursor is in
-       let foundTask = false;
-       for (let i = 0; i < cells.length; i++) {
-         const { content, start, end } = cells[i];
-         if (!content) continue;
-         if (cursor.ch >= start && cursor.ch < end) {
-           const taskLine = getCellTaskLine(content);
-           if (taskLine && parser.testRegex.test(taskLine)) {
-             const task = parser.parseLineAsTask(
-               taskLine,
-               lineNumber,
-               view.file?.path ?? '',
-             );
-             if (task) {
-               task.isTableTask = true;
-               task.tableCell = { cellIndex: i };
-               if (checking) return true;
-               let targetState: string = newState ?? '';
-               if (!newState) {
-                 const stateManager = getStateTransitionManager(
-                   this.plugin.taskUpdateCoordinator,
-                   this.keywordManager,
-                   this.plugin.settings?.stateTransitions,
-                 );
-                 targetState = stateManager.getCycleState(task.state);
-               }
-               this.plugin.taskUpdateCoordinator
-                 ?.updateTaskState(task, targetState, 'editor')
-                 .catch((error) => {
-                   new Notice('Failed to update task');
-                   console.error('Error updating task:', error);
-                 });
-               foundTask = true;
-             }
-           }
-           break;
-         }
-       }
+      // First pass: find the cell the cursor is in
+      let foundTask = false;
+      for (let i = 0; i < cells.length; i++) {
+        const { content, start, end } = cells[i];
+        if (!content) continue;
+        if (cursor.ch >= start && cursor.ch < end) {
+          const taskLine = getCellTaskLine(content);
+          if (taskLine && parser.testRegex.test(taskLine)) {
+            const task = parser.parseLineAsTask(
+              taskLine,
+              lineNumber,
+              view.file?.path ?? '',
+            );
+            if (task) {
+              task.isTableTask = true;
+              task.tableCell = { cellIndex: i };
+              if (checking) return true;
+              let targetState: string = newState ?? '';
+              if (!newState) {
+                const stateManager = getStateTransitionManager(
+                  this.plugin.taskUpdateCoordinator,
+                  this.keywordManager,
+                  this.plugin.settings?.stateTransitions,
+                );
+                targetState = stateManager.getCycleState(task.state);
+              }
+              this.plugin.taskUpdateCoordinator
+                ?.updateTaskState(task, targetState, 'editor')
+                .catch((error) => {
+                  new Notice('Failed to update task');
+                  console.error('Error updating task:', error);
+                });
+              foundTask = true;
+            }
+          }
+          break;
+        }
+      }
 
-       // Second pass: cursor not in any cell — find first task cell on the line
-       if (!foundTask) {
-         for (let i = 0; i < cells.length; i++) {
-           const { content } = cells[i];
-           if (!content) continue;
-           const taskLine = getCellTaskLine(content);
-           if (taskLine && parser.testRegex.test(taskLine)) {
-             const task = parser.parseLineAsTask(
-               taskLine,
-               lineNumber,
-               view.file?.path ?? '',
-             );
-             if (task) {
-               task.isTableTask = true;
-               task.tableCell = { cellIndex: i };
-               if (checking) return true;
-               let targetState: string = newState ?? '';
-               if (!newState) {
-                 const stateManager = getStateTransitionManager(
-                   this.plugin.taskUpdateCoordinator,
-                   this.keywordManager,
-                   this.plugin.settings?.stateTransitions,
-                 );
-                 targetState = stateManager.getCycleState(task.state);
-               }
-               this.plugin.taskUpdateCoordinator
-                 ?.updateTaskState(task, targetState, 'editor')
-                 .catch((error) => {
-                   new Notice('Failed to update task');
-                   console.error('Error updating task:', error);
-                 });
-             }
-             break;
-           }
-         }
-         return true;
-       }
-     }
+      // First pass found the task — dispatch is already queued. Return now so
+      // the non-table fallback below does not also fire and rewrite the row as
+      // a plain task (which would corrupt it, e.g. "TODO | TODO ... |").
+      if (foundTask) {
+        return true;
+      }
 
-     // Parse the task from the line (this will return null for lines without task keywords)
-     const task = this.parseTaskFromLine(
-       line,
-       lineNumber,
-       view.file?.path || '',
-     );
+      // Second pass: cursor not in any cell — find first task cell on the line
+      if (!foundTask) {
+        for (let i = 0; i < cells.length; i++) {
+          const { content } = cells[i];
+          if (!content) continue;
+          const taskLine = getCellTaskLine(content);
+          if (taskLine && parser.testRegex.test(taskLine)) {
+            const task = parser.parseLineAsTask(
+              taskLine,
+              lineNumber,
+              view.file?.path ?? '',
+            );
+            if (task) {
+              task.isTableTask = true;
+              task.tableCell = { cellIndex: i };
+              if (checking) return true;
+              let targetState: string = newState ?? '';
+              if (!newState) {
+                const stateManager = getStateTransitionManager(
+                  this.plugin.taskUpdateCoordinator,
+                  this.keywordManager,
+                  this.plugin.settings?.stateTransitions,
+                );
+                targetState = stateManager.getCycleState(task.state);
+              }
+              this.plugin.taskUpdateCoordinator
+                ?.updateTaskState(task, targetState, 'editor')
+                .catch((error) => {
+                  new Notice('Failed to update task');
+                  console.error('Error updating task:', error);
+                });
+            }
+            break;
+          }
+        }
+        return true;
+      }
+    }
+
+    // Parse the task from the line (this will return null for lines without task keywords)
+    const task = this.parseTaskFromLine(
+      line,
+      lineNumber,
+      view.file?.path || '',
+    );
 
     // Determine the target state using cycle task state logic
     let targetState: string = newState ?? '';
@@ -602,6 +613,11 @@ handleUpdateTaskCycleStateAtLine(
           });
       } else {
         // For lines without existing task keywords, create a basic task and update it
+        // Table rows must never be treated as plain tasks here — writing a keyword
+        // prefix would corrupt the row (e.g. "TODO | TODO Table task one | | |")
+        if (this.plugin.settings?.experimentalTableTasks && isTableRow(line)) {
+          return true;
+        }
         const markerInfo = detectListMarker(line);
         const basicTask: Task = {
           path: view.file?.path || '',

@@ -367,19 +367,50 @@ export class TaskWriter {
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (!(file instanceof TFile)) return;
 
-    await this.app.vault.process(file, (data) => {
-      const lines = data.split('\n');
-      if (task.line >= lines.length) return data;
-      const line = lines[task.line];
+    const mutateLine = (line: string): string | null => {
       const cells = line.split('|');
       let start = 0;
       if (cells.length > 0 && cells[0].trim() === '') start = 1;
       const idx = start + task.tableCell!.cellIndex;
-      if (idx >= cells.length) return data;
+      if (idx >= cells.length) return null;
       const origCell = cells[idx].trim();
       const newCell = mutate(origCell);
       cells[idx] = ` ${newCell} `;
-      lines[task.line] = cells.join('|');
+      return cells.join('|');
+    };
+
+    // If the file is open in the active source-mode editor, update the buffer
+    // directly via the Editor API. This mirrors applyLineUpdate's checkbox path
+    // and avoids Obsidian's vault.process merge corrupting the table row.
+    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const isActive = md?.file?.path === task.path;
+    const editor = md?.editor;
+    const isSourceMode =
+      isActive &&
+      !!editor &&
+      md?.getViewType() === 'markdown' &&
+      !!md?.getMode &&
+      md.getMode() === 'source';
+
+    if (isSourceMode) {
+      const line = editor.getLine(task.line);
+      if (typeof line !== 'string') return;
+      const newLine = mutateLine(line);
+      if (newLine === null) return;
+      editor.replaceRange(
+        newLine,
+        { line: task.line, ch: 0 },
+        { line: task.line, ch: line.length },
+      );
+      return;
+    }
+
+    await this.app.vault.process(file, (data) => {
+      const lines = data.split('\n');
+      if (task.line >= lines.length) return data;
+      const newLine = mutateLine(lines[task.line]);
+      if (newLine === null) return data;
+      lines[task.line] = newLine;
       return lines.join('\n');
     });
   }

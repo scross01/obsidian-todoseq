@@ -3050,8 +3050,7 @@ export class ReaderViewFormatter {
           const cellIndex = this.getCellIndex(tableCell as HTMLElement);
           const matchingTask = allTasks.find(
             (t) =>
-              t.line === lineNumber &&
-              t.tableCell?.cellIndex === cellIndex,
+              t.line === lineNumber && t.tableCell?.cellIndex === cellIndex,
           );
           if (matchingTask) {
             return matchingTask;
@@ -3092,7 +3091,9 @@ export class ReaderViewFormatter {
         };
         if (tableCell) {
           minimalTask.isTableTask = true;
-          minimalTask.tableCell = { cellIndex: this.getCellIndex(tableCell as HTMLElement) };
+          minimalTask.tableCell = {
+            cellIndex: this.getCellIndex(tableCell as HTMLElement),
+          };
         }
         return minimalTask;
       }
@@ -3101,8 +3102,7 @@ export class ReaderViewFormatter {
     // Fallback: use text-based matching if line number is not available
     // Get the full task text from DOM using stripMarkdownForDisplay for consistent normalization
     const domFullText = stripMarkdownForDisplay(
-      ((taskContainer ?? tableCell) as HTMLElement | null)?.textContent ||
-        '',
+      ((taskContainer ?? tableCell) as HTMLElement | null)?.textContent || '',
     );
 
     // Use stripMarkdownForDisplay for consistent text normalization
@@ -3147,10 +3147,9 @@ export class ReaderViewFormatter {
       // Get the task container's position relative to other task containers
       const allTaskContainers =
         keywordElement.closest('div')?.querySelectorAll('.todoseq-task') || [];
-      const containerIndex =
-        taskContainer
-          ? Array.from(allTaskContainers).indexOf(taskContainer)
-          : -1;
+      const containerIndex = taskContainer
+        ? Array.from(allTaskContainers).indexOf(taskContainer)
+        : -1;
 
       if (containerIndex >= 0 && containerIndex < tasksWithKeyword.length) {
         return tasksWithKeyword[containerIndex];

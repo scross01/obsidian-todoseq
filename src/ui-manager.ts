@@ -665,67 +665,93 @@ export class UIManager {
    * Setup task keyword context menu
    */
   setupTaskKeywordContextMenu(): void {
-    // Add event listener for right-click on task keywords
+    // Track which editors have had the context menu handler attached to
+    // avoid stacking duplicate handlers when setup re-runs (layout-change,
+    // file-open, editor rebuilds).
+    const attachedEditors = new Set<HTMLElement>();
+
+    // Set up context menu listeners on all markdown editors
+    const setupContextMenuListeners = () => {
+      const leaves = this.plugin.app.workspace.getLeavesOfType('markdown');
+      leaves.forEach((leaf) => {
+        const view = leaf.view;
+        if (view instanceof MarkdownView && view.editor) {
+          const cmEditor = (view.editor as { cm?: EditorView })?.cm;
+          if (cmEditor && cmEditor.dom) {
+            const editorContent = cmEditor.dom;
+
+            // Skip if we've already attached listeners to this editor
+            if (attachedEditors.has(editorContent)) {
+              return;
+            }
+            attachedEditors.add(editorContent);
+
+            const contextMenuHandler = (evt: MouseEvent) => {
+              const target = evt.target as HTMLElement;
+
+              // Use .closest() to reliably find the keyword element regardless of nesting
+              // This handles cases where the click target is a child element of the keyword span
+              const keywordElement = target.closest(
+                '.todoseq-keyword-formatted',
+              );
+
+              if (keywordElement) {
+                const keyword =
+                  keywordElement.getAttribute('data-task-keyword');
+
+                if (keyword && view.file && this.plugin.editorKeywordMenu) {
+                  evt.preventDefault();
+                  evt.stopImmediatePropagation();
+
+                  // Open the context menu
+                  this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
+                    keyword,
+                    keywordElement as HTMLElement,
+                    evt,
+                  );
+                }
+              }
+            };
+
+            // Store cleanup information for manual cleanup
+            this.registeredEventListeners.push({
+              target: editorContent,
+              type: 'contextmenu',
+              handler: contextMenuHandler,
+            });
+
+            // Capture phase so we run before CodeMirror's own contextmenu
+            // handler on .cm-content (which stops propagation, letting the
+            // native menu through) while still defaulting to preventDefault.
+            editorContent.addEventListener('contextmenu', contextMenuHandler, {
+              capture: true,
+            });
+          }
+        }
+      });
+    };
+
+    setupContextMenuListeners();
+
+    // Re-attach when the layout changes: toggling source/live-preview mode
+    // rebuilds the .cm-editor DOM node and drops the previously attached
+    // handler (without a handler, right-click falls through to the native
+    // menu instead of the plugin's DOM menu).
+    this.plugin.registerEvent(
+      this.plugin.app.workspace.on('layout-change', setupContextMenuListeners),
+    );
+
+    // Set up listeners when a new file is opened (for the first editor)
     this.plugin.registerEvent(
       this.plugin.app.workspace.on('file-open', (file) => {
         if (file instanceof TFile && file.extension === 'md') {
-          // Small delay to allow editor to fully load
+          // Small delay to allow the editor to fully load
           window.setTimeout(() => {
-            this.addContextMenuToEditor();
+            setupContextMenuListeners();
           }, 100);
         }
       }),
     );
-
-    // Also add to currently active editor if any
-    this.addContextMenuToEditor();
-  }
-
-  /**
-   * Add context menu to the current editor
-   */
-  private addContextMenuToEditor(): void {
-    const activeView =
-      this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    if (activeView) {
-      const editorContainer = activeView.containerEl;
-      const cmEditor = editorContainer.querySelector('.cm-editor');
-
-      if (cmEditor) {
-        const contextMenuHandler = (evt: MouseEvent) => {
-          const target = evt.target as HTMLElement;
-
-          // Use .closest() to reliably find the keyword element regardless of nesting
-          // This handles cases where the click target is a child element of the keyword span
-          const keywordElement = target.closest('.todoseq-keyword-formatted');
-
-          if (keywordElement) {
-            const keyword = keywordElement.getAttribute('data-task-keyword');
-
-            if (keyword && activeView.file && this.plugin.editorKeywordMenu) {
-              evt.preventDefault();
-              evt.stopImmediatePropagation();
-
-              // Open the context menu
-              this.plugin.editorKeywordMenu.openStateMenuAtMouseEvent(
-                keyword,
-                keywordElement as HTMLElement,
-                evt,
-              );
-            }
-          }
-        };
-
-        // Store cleanup information for manual cleanup
-        this.registeredEventListeners.push({
-          target: cmEditor,
-          type: 'contextmenu',
-          handler: contextMenuHandler,
-        });
-
-        cmEditor.addEventListener('contextmenu', contextMenuHandler);
-      }
-    }
   }
 
   /**

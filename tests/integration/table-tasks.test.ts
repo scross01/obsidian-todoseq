@@ -1,0 +1,153 @@
+import { test, expect } from '@playwright/test';
+import { getPage } from './helpers/session';
+import { resetVaultState } from './helpers/test-reset';
+import {
+  openTodoseqPanel,
+  getTaskCount,
+  waitForTaskListVisible,
+} from './helpers/assertions';
+import { Page } from 'playwright';
+import { readEditorContent } from './helpers/editor-utils';
+
+let page: Page;
+
+/** Close any editor leaves showing table-tasks.md so the next open reads
+ *  the baseline content reset by resetVaultState (stale editor buffers
+ *  otherwise leak modifications between tests). */
+async function closeTableTasksLeaves(): Promise<void> {
+  await page.evaluate(() => {
+    const app = (window as any).app;
+    app.workspace
+      .getLeavesOfType('markdown')
+      .filter((l) => l.view?.file?.path === 'table-tasks.md')
+      .forEach((l) => l.detach());
+  });
+}
+
+test.beforeAll(async () => {
+  page = await getPage();
+});
+
+test.describe('Table cell tasks (experimental)', () => {
+  test.beforeEach(async () => {
+    await closeTableTasksLeaves();
+    await resetVaultState(page);
+    await openTodoseqPanel(page);
+    await waitForTaskListVisible(page);
+  });
+
+  // Close table-tasks.md leaves so the shared instance is not left with a
+  // source-mode active leaf — that slows/focus-shifts later tests (e.g. the
+  // task-list-view "task click navigates" test that asserts on the active leaf).
+  test.afterEach(async () => {
+    await closeTableTasksLeaves();
+  });
+
+  test('shows table cell tasks with descriptions in the task list', async () => {
+    const bodyText = await page.locator('.todoseq-task-list').textContent();
+    expect(bodyText).toContain('Table task one');
+    expect(bodyText).toContain('Table task two with description');
+    expect(bodyText).toContain('Table task three');
+    expect(bodyText).toContain('Table task four');
+  });
+
+  test('displays description icon for table cell tasks with descriptions', async () => {
+    const descIcons = page.locator('.todoseq-task-description-icon');
+    const count = await descIcons.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  test('command palette cycle changes state for table cell task in editor', async () => {
+    // Open in TRUE source mode so the cursor stays in the row: Live Preview
+    // re-aligns the table on cursor placement and moves the cursor to the
+    // header row, so the cycle command operates on the wrong line there.
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const file = app.vault.getAbstractFileByPath('table-tasks.md');
+      const leaf = app.workspace.getLeaf('tab');
+      await leaf.openFile(file, { state: { mode: 'source', source: true } });
+    });
+
+    await page.waitForTimeout(500);
+
+    await page.evaluate(() => {
+      const app = (window as any).app;
+      const leaf = app.workspace.getMostRecentLeaf();
+      const editor = leaf.view.editor;
+      let line = -1;
+      for (let i = 0; i < editor.lineCount(); i++) {
+        if (editor.getLine(i).includes('Table task one')) {
+          line = i;
+          break;
+        }
+      }
+      if (line === -1) throw new Error('table task line not found');
+      // Cursor at end of the row: the cycle handler falls back to the first
+      // task cell on the line.
+      editor.setCursor({ line, ch: editor.getLine(line).length });
+    });
+
+    await page.evaluate(() => {
+      const app = (window as any).app;
+      const cmd = app.commands.executeCommandById.bind(app.commands);
+      cmd('todoseq:cycle-task-state');
+    });
+
+    await page.waitForTimeout(500);
+
+    // Read the live editor buffer — app.vault.read can return pre-edit content
+    // until Obsidian's autosave flushes source-mode writes to disk.
+    const content = await readEditorContent(page);
+    expect(content).toContain('DOING Table task one');
+  });
+
+  test('right-click keyword menu changes state for table cell task in source mode', async () => {
+    // Open the table file in TRUE source mode so keywords render as CodeMirror
+    // decoration spans inside .cm-line (not as styled spans inside the rendered
+    // .table-cell-wrapper tree of Live Preview).
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const file = app.vault.getAbstractFileByPath('table-tasks.md');
+      if (!file) throw new Error('table-tasks.md not found');
+      const leaf = app.workspace.getLeaf('tab');
+      await leaf.openFile(file, { state: { mode: 'source', source: true } });
+    });
+
+    // getMode() === 'source' is ALSO true for Live Preview, so verify the
+    // actual source sub-mode by checking for the .is-live-preview class.
+    const isLivePreview = await page.evaluate(() => {
+      const app = (window as any).app;
+      const view = app.workspace.getMostRecentLeaf()?.view;
+      const sourceView = view?.containerEl?.querySelector(
+        '.markdown-source-view',
+      );
+      return sourceView?.classList.contains('is-live-preview') ?? false;
+    });
+    expect(isLivePreview).toBe(false);
+
+    const keyword = page.locator(
+      '.workspace-leaf.mod-active .todoseq-table-task-keyword[data-task-keyword="TODO"]',
+    );
+    await keyword.waitFor({ state: 'visible', timeout: 10_000 });
+
+    // Allow the plugin's file-open contextmenu handler to attach (100ms delay).
+    await page.waitForTimeout(300);
+
+    // Right-click the keyword span with a real trusted mouse event (synthetic
+    // dispatchEvent produces the native Electron menu, not the plugin's DOM menu).
+    await keyword.click({ button: 'right' });
+
+    // The state menu renders as an Obsidian .menu; click the DOING item.
+    const doingItem = page
+      .locator('.menu .menu-item-title', { hasText: 'DOING' })
+      .first();
+    await doingItem.waitFor({ state: 'visible', timeout: 5_000 });
+    await doingItem.click();
+
+    // Read the live editor buffer (source-mode writes lag disk until autosave).
+    await page.waitForTimeout(300);
+    const content = await readEditorContent(page);
+    expect(content).toContain('DOING Table task one');
+    expect(content).not.toContain('TODO Table task one');
+  });
+});

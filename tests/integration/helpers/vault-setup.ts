@@ -163,10 +163,10 @@ This file will be modified externally to test vault rescan.
 
 | Task | Status | Priority |
 |------|--------|----------|
-| - [ ] TODO Table task one | | |
-| - [ ] DOING Table task two with description | | |
-| - [x] DONE Table task three | | |
-| - [ ] WAITING Table task four | | |
+| TODO Table task one | | |
+| DOING Table task two with description<br>DESCRIPTION: Task two has a description | | |
+| DONE Table task three | | |
+| WAITING Table task four | | |
 `,
   );
 }

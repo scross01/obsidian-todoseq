@@ -1,6 +1,7 @@
 import { MarkdownView } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { BaseDialog } from '../components/base-dialog';
+import { parseTableCells } from '../../utils/task-line-utils';
 import TodoTracker from '../../main';
 
 export class EditorKeywordMenu {
@@ -69,21 +70,50 @@ export class EditorKeywordMenu {
   /**
    * Find the cell index of a keyword element within its table row.
    * Returns undefined if the element is not inside a table cell.
+   * Handles both Live Preview mode (where keywords are inside <td> elements)
+   * and source mode (where keywords are CodeMirror decorations).
    */
   private getCellIndexFromKeywordElement(
     keywordElement: HTMLElement,
   ): number | undefined {
+    // Live Preview mode: keyword is inside a <td> or .table-cell-wrapper
     const cell = keywordElement.closest('td, .table-cell-wrapper');
-    if (!cell) return undefined;
-
-    const row = cell.parentElement;
-    if (!row) return undefined;
-
-    const cells = row.querySelectorAll('td, .table-cell-wrapper');
-    for (let i = 0; i < cells.length; i++) {
-      if (cells[i] === cell) {
-        return i;
+    if (cell) {
+      const row = cell.parentElement;
+      if (!row) return undefined;
+      const cells = row.querySelectorAll('td, .table-cell-wrapper');
+      for (let i = 0; i < cells.length; i++) {
+        if (cells[i] === cell) {
+          return i;
+        }
       }
+      return undefined;
+    }
+
+    // Source mode: keyword is a CodeMirror decoration (<span> inside .cm-line).
+    // Use posAtDOM to find the character offset, then map it to a cell index.
+    const editorView =
+      this.plugin.uiManager.getEditorViewFromElement(keywordElement);
+    if (!editorView) return undefined;
+
+    try {
+      const pos = editorView.posAtDOM(keywordElement);
+      const line = editorView.state.doc.lineAt(pos);
+      const lineText = line.text;
+
+      if (!parseTableCells(lineText).length) return undefined;
+
+      const cells = parseTableCells(lineText);
+      const offsetInLine = pos - line.from;
+
+      for (let i = 0; i < cells.length; i++) {
+        const { start, end } = cells[i];
+        if (offsetInLine >= start && offsetInLine < end) {
+          return i;
+        }
+      }
+    } catch {
+      return undefined;
     }
 
     return undefined;
