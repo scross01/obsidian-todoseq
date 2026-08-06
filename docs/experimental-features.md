@@ -300,3 +300,11 @@ The following limitations apply to code file scanning:
 - **False positives possible**: Keywords in certain string contexts may still be detected; string literal filtering covers standard string syntax across all supported languages
 
 ### Reporting Issues
+
+If you encounter issues with code file scanning, please report them on the [GitHub issue tracker](https://github.com/scross01/obsidian-todoseq/issues) with:
+
+- The code file content (or a sample that reproduces the issue)
+- The file extension (e.g., `.js`, `.py`, `.sql`)
+- Expected behavior
+- Actual behavior
+- Whether the issue persists after disabling and re-enabling the feature

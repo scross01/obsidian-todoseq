@@ -29,7 +29,7 @@ export default {
           { text: 'Settings', link: '/settings' },
           { text: 'Sort Methods', link: '/sort-methods' },
           { text: 'Task Urgency', link: '/urgency' },
-          { text: 'Experiemental', link: '/experiemental-features' },
+          { text: 'Experimental', link: '/experimental-features' },
         ],
       },
     ],

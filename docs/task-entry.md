@@ -108,7 +108,139 @@ TODOseq automatically syncs checkbox state with task keywords when updated from 
 
 \*Note: If you modify the checkbox directly in the Obsidian editor, the task state keyword will not be automatically updated.
 
-**Additional formats** may be available. See [Experimental Features](experimental-features.md) for details.
+## Task Keywords
+
+### Additional Formats
+
+TODOseq supports tasks in Markdown tables, headings, quotes, callouts, code blocks, and comments. Tasks in tables follow the same keyword syntax as regular tasks. For tasks in programming language files, enable "Scan code files for comments" in experimental features.
+
+### Tasks in Tables
+
+Tasks can be defined inside Markdown table cells:
+
+```markdown
+| COL1            | COL2             | COL3        |
+|-----------------|------------------|-------------|
+| TODO write docs | DOING review PRs | DONE deploy |
+```
+
+With dates (inline, separated by `<br>`):
+
+```markdown
+| TODO feature<br>SCHEDULED: <2026-03-01> | DOING review<br>DEADLINE: <2026-02-28> |
+```
+
+With priorities:
+
+```markdown
+| TODO [#A] critical | DOING [#B] important | DONE [#C] done |
+```
+
+See [Editor Integration](editor.md#tasks-in-tables) for full details on table cell tasks.
+
+### Tasks in Headings
+
+TODOseq recognizes task keywords in Markdown headings (H1–H6). This lets you structure your notes hierarchically with projects as headings and tasks as sub-headings, similar to Org-mode and Logseq.
+
+```markdown
+# TODO Project Alpha
+## DOING Design phase
+### DONE Research completed
+## TODO Implementation
+```
+
+Heading tasks support all the same features as regular tasks — priority tokens, SCHEDULED/DEADLINE dates, and DESCRIPTION lines. Date and description lines go on the next line without indentation.
+
+```markdown
+# TODO Launch new feature
+SCHEDULED: <2026-07-20>
+DEADLINE: <2026-08-01>
+```
+
+### Tasks in Quotes and Callouts
+
+When "Include tasks inside quote and callout blocks" is enabled:
+
+```markdown
+> TODO Task in a quote block
+
+> > TODO Task in a nested quote block
+
+> > > TODO Task in three level nested quote block
+
+> [!info]
+> TODO Task in an info callout
+
+> [!todo]-
+>
+> - [ ] TODO Checkbox task in collapsible todo block
+```
+
+### Tasks in Comment Blocks
+
+When "Include tasks inside comment blocks" is enabled:
+
+```markdown
+%% TODO Task in single-line comment block %%
+
+%%
+TODO Task in multi-line comment block
+DEADLINE: <2025-11-01>
+%%
+```
+
+### Tasks in Code Blocks
+
+When "Include tasks inside code blocks" is enabled:
+
+<pre>
+```txt
+TODO task in code block
+TODO another task in code block
+```
+</pre>
+
+### Tasks in Footnotes
+
+TODOseq can detect tasks in footnote definitions:
+
+```markdown
+This text has a footnote[^1]
+
+[^1]: TODO task in the footnote
+```
+
+### Language-Aware Comment Tasks
+
+TODOseq supports extracting tasks from comments in 20+ programming languages when "Enable language comment support" is enabled:
+
+**Python, Ruby, Shell, YAML, TOML, Dockerfile:**
+
+```python
+# TODO Write documentation
+# FIXME Handle edge cases
+```
+
+**JavaScript, Java, C++, C#, Go, Swift, Kotlin, Rust, PowerShell:**
+
+```javascript
+// TODO Implement feature
+// HACK Temporary fix
+```
+
+**SQL:**
+
+```sql
+-- TODO Optimize query
+-- DOING Add indexes
+```
+
+**INI:**
+
+```ini
+; TODO Configure settings
+; FIXME Broken config
+```
 
 ## Task Keywords
 

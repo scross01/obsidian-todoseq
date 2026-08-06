@@ -85,15 +85,18 @@ TODOseq allows you to maintain the same task format across both Logseq and Obsid
 - **Same priority system**: `[#A]`, `[#B]`, `[#C]` tokens work the same
 - **Same date formats**: SCHEDULED and DEADLINE dates are parsed identically
 
-Some TODOseq features are not available in Logseq. The use of checkboxes before the task keyword, custom state keywords, and the capture of tasks within code, quotes, and callouts blocks will not get identified as tasks if you return to Logseq.
+Some TODOseq features are not available in Logseq. The use of checkboxes before the task keyword, custom state keywords, and the capture of tasks within code, quotes, callouts, and tables will not get identified as tasks if you return to Logseq.
 
 \*Note: the Logseq import relates to the original Markdown based version of Logseq. Migration from the newer Logseq database version format has not been tested.
 
 ## Experimental Features
 
-TODOseq offers features for advanced use cases. These features are provided for testing but may not be fully polished and could change in future versions.
+TODOseq offers some experimental features that may not be fully polished and could change in future versions:
 
-See [Experimental Features](experimental-features.md) for details on available experimental functionality, including Org-mode file support.
+- **Org-mode file support**: Parse tasks from `.org` files
+- **Code file scanning**: Detect tasks in programming language comments
+
+See [Experimental Features](experimental-features.md) for details on these features.
 
 ## Getting Started
 

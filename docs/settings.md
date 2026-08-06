@@ -678,4 +678,24 @@ The experimental features section contains settings for features that are still 
 
 See [Experimental Features](experimental-features.md) for detailed documentation on Org-mode support.
 
-See [Experimental Features](experimental-features.md) for detailed documentation on Org-mode support.
+### Scan Code Files for Comments
+
+**Setting**: "Scan code files for comments" (toggle)
+
+**Description**: Enable detection of tasks from comments in programming language files.
+
+**Default**: Disabled
+
+**When Enabled:**
+
+- Code files (`.js`, `.ts`, `.py`, `.rb`, `.java`, `.rs`, `.go`, `.c`, `.cpp`, `.cs`, `.swift`, `.kt`, `.sh`, `.yaml`, `.yml`, `.toml`, `.sql`, `.ini`, `.r`, `.dockerfile`, `.ps1`) are scanned for task keywords in comments
+- Tasks appear in the Task List alongside Markdown tasks
+- Single-line comments (`//`, `#`, `--`): and multi-line comments (`/* */`, `''' '''`) are recognized
+- Keywords inside string literals are skipped to reduce false positives
+
+**Limitations:**
+
+- No dates or priorities: Code comments typically don't have scheduled/deadline dates or priority markers
+- No subtask tracking: Code comments don't support subtask counting
+
+See [Experimental Features](experimental-features.md) for detailed documentation on code file scanning.

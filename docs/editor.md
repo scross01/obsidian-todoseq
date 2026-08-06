@@ -194,6 +194,83 @@ Task formatting appears as you type in Edit mode. As soon as you type a valid ta
 
 When "Include tasks inside code blocks" is enabled, TODOseq can apply styling to task keywords within code blocks in the editor. This makes tasks in code examples visually distinct. Note that code block styling is only applied in Edit mode; Reader view always displays code blocks without task formatting to preserve code readability.
 
+### Tasks in Tables
+
+TODOseq can detect and manage tasks defined within Markdown table cells. This allows you to track tasks in a structured tabular format.
+
+#### How It Works
+
+When you define tasks inside table cells using standard TODOseq syntax, the following behavior applies:
+
+```markdown
+| Task             | Notes | Comments |
+| ---------------- | ----- | -------- |
+| TODO write docs  |       |          |
+| DOING review PRs |       |          |
+| DONE deploy      |       |          |
+```
+
+#### Supported Syntax
+
+Table cell tasks support the same keyword syntax as regular tasks:
+
+**Basic tasks:**
+
+```markdown
+| TODO fix the bug | DOING review code | DONE deploy |
+```
+
+**With priorities:**
+
+```markdown
+| TODO [#A] critical fix | DOING [#B] refactor | TODO [#C] cleanup |
+```
+
+**With dates (inline):**
+
+Dates are stored inside the cell using `<br>` separators:
+
+```markdown
+| TODO write docs<br>SCHEDULED: <2026-03-01> | DOING review PRs<br>DEADLINE: <2026-02-28> |
+```
+
+**Combined:**
+
+```markdown
+| TODO [#A] ship feature<br>SCHEDULED: <2026-03-01><br>DEADLINE: <2026-03-15> |
+```
+
+#### Date Handling in Tables
+
+Unlike regular tasks where dates appear on separate lines below the task, table task dates are stored inline within the cell, separated by `<br>` tags. This is a limitation of the table format — there are no separate lines available for date entries.
+
+When you add a scheduled or deadline date via the context menu or date picker, the date is appended to the cell content.
+
+#### Interacting with Table Tasks
+
+- **Toggle state**: Click the checkbox in the Task List to cycle through states
+- **Set dates**: Right-click a table task in the Task List to access the date picker
+- **Change priority**: Right-click to access priority options
+- **Open source**: Click the task location link to jump to the table in the editor
+
+#### Limitations
+
+The following limitations apply to Markdown table tasks:
+
+- **Inline dates only**: Dates are stored within the cell using `<br>` separators, not on separate lines
+- **Single-line cells**: Each cell is treated as a single task; multi-line content within a cell is not fully supported
+- **No subtask support**: Subtask counting does not apply to table tasks
+- **Limited navigation**: The goto task action locates the source table, but not the specific task cell
+
+#### Example
+
+```markdown
+| COL1            | COL2             | COL3                   |
+| --------------- | ---------------- | ---------------------- |
+| TODO write docs | DOING review PRs | TODO [#A] ship feature |
+| DONE deploy     | CANCELED revert  | WAIT [#B] approval     |
+```
+
 ### Cursor Position Awareness
 
 Editor interactions respect your cursor position. The Ctrl+Enter keyboard shortcut works based on where your cursor is placed, allowing you to toggle task states without precisely clicking on keywords.
