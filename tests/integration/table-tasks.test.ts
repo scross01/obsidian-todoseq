@@ -181,4 +181,94 @@ test.describe('Table cell tasks (experimental)', () => {
     expect(content).toContain('DONE Table task two with description');
     expect(content).not.toContain('DOING Table task two with description');
   });
+
+  test('keyword menu state change in Live Preview removes CLOSED date when un-completing', async () => {
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const file = app.vault.getAbstractFileByPath('table-tasks.md');
+      if (!file) throw new Error('table-tasks.md not found');
+      const leaf = app.workspace.getLeaf('tab');
+      await leaf.openFile(file);
+    });
+
+    // First complete the DOING task to add a CLOSED date
+    await page.evaluate(() => {
+      const app = (window as any).app;
+      const cmd = app.commands.executeCommandById.bind(app.commands);
+      app.plugins.plugins.todoseq.settings.trackClosedDate = true;
+      const editor = app.workspace.activeLeaf?.view?.editor;
+      for (let i = 0; i < editor.lineCount(); i++) {
+        if (editor.getLine(i).includes('DOING Table task two with description')) {
+          editor.setCursor({ line: i, ch: 5 });
+          break;
+        }
+      }
+      cmd('todoseq:cycle-task-state');
+    });
+    await page.waitForTimeout(600);
+    let content = await readEditorContent(page);
+    expect(content).toContain('DONE Table task two with description');
+    expect(content).toContain('CLOSED:');
+
+    // Now un-complete: DONE → TODO. Find the DONE keyword in the
+    // description row (the row whose cell also contains DESCRIPTION:).
+    const descRow = page
+      .locator('.workspace-leaf.mod-active tr')
+      .filter({ hasText: 'DESCRIPTION:' });
+    // The description row's DONE keyword is inside a .table-cell-wrapper.
+    // Use the wrapper to scope the search.
+    const keyword = descRow
+      .locator('.table-cell-wrapper')
+      .first()
+      .locator('.todoseq-keyword-formatted[data-task-keyword="DONE"]');
+    await keyword.waitFor({ state: 'visible', timeout: 10_000 });
+    await page.waitForTimeout(300);
+
+    await keyword.click({ button: 'right' });
+    await page
+      .locator('.menu .menu-item-title', { hasText: 'TODO' })
+      .first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+    await page
+      .locator('.menu .menu-item-title', { hasText: 'TODO' })
+      .first()
+      .click();
+
+    await page.waitForTimeout(600);
+    content = await readEditorContent(page);
+    expect(content).toContain('TODO Table task two with description');
+    expect(content).not.toContain('CLOSED:');
+  });
+
+  test('keyword menu changes state for multi-column table cells', async () => {
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const file = app.vault.getAbstractFileByPath('table-tasks.md');
+      if (!file) throw new Error('table-tasks.md not found');
+      const leaf = app.workspace.getLeaf('tab');
+      await leaf.openFile(file);
+    });
+
+    // Find the NOW keyword directly (unique in the fixture).
+    const keyword = page
+      .locator('.workspace-leaf.mod-active .todoseq-keyword-formatted')
+      .filter({ hasText: 'NOW' });
+    await keyword.waitFor({ state: 'visible', timeout: 10_000 });
+    await page.waitForTimeout(300);
+
+    await keyword.click({ button: 'right' });
+    await page
+      .locator('.menu .menu-item-title', { hasText: 'DONE' })
+      .first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+    await page
+      .locator('.menu .menu-item-title', { hasText: 'DONE' })
+      .first()
+      .click();
+
+    await page.waitForTimeout(600);
+    const content = await readEditorContent(page);
+    expect(content).toContain('DONE [#B] five<br>DEADLINE:');
+    expect(content).not.toContain('NOW [#B] five');
+  });
 });

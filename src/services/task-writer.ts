@@ -445,17 +445,22 @@ export class TaskWriter {
       // Add or update CLOSED date when trackClosedDate is enabled
       if (completed && this.settings?.trackClosedDate) {
         const closedDateStr = DateUtils.formatClosedDate(new Date());
-        const closedPattern = /\s*<br\s*\/?>\s*CLOSED:\s*<[^>]+>/i;
-        const closedTag = `<br>CLOSED: [${closedDateStr}]`;
+        // CLOSED dates in cells use [[...]] wikilink format.
+        const closedPattern = /\s*<br\s*\/?>\s*CLOSED:\s*\[\[[^\]]+\]\]/i;
+        const closedTag = `<br>CLOSED: [[${closedDateStr}]]`;
         if (closedPattern.test(dateSuffix)) {
           dateSuffix = dateSuffix.replace(closedPattern, closedTag);
         } else {
           dateSuffix = `${dateSuffix}${closedTag}`;
         }
-      } else if (!completed && task.closedDate) {
-        // Remove CLOSED date when un-completing a task
+      } else if (!completed) {
+        // Remove CLOSED date when un-completing, regardless of whether
+        // task.closedDate is set. For table cells, task.closedDate is
+        // parsed only from the first <br> segment (before the CLOSED tag),
+        // so it is always null even when the cell has a CLOSED date.
+        // CLOSED dates use [[...]] wikilink format in cells.
         dateSuffix = dateSuffix.replace(
-          /\s*<br\s*\/?>\s*CLOSED:\s*<[^>]+>/i,
+          /\s*<br\s*\/?>\s*CLOSED:\s*\[\[[^\]]+\]\]/i,
           '',
         );
       }

@@ -172,6 +172,7 @@ describe('UIManager', () => {
     const keyword = activeDocument.createElement('span');
     keyword.className = 'todoseq-keyword-formatted';
     keyword.textContent = children[0] as string;
+    keyword.setAttribute('data-task-keyword', children[0] as string);
     wrapper.appendChild(keyword);
     for (const child of children.slice(1)) {
       if (child === 'BR') {
@@ -181,6 +182,16 @@ describe('UIManager', () => {
       }
     }
     return { wrapper, keyword };
+  }
+
+  function makeTableRow(cells: { wrapper: HTMLElement }[]): HTMLElement {
+    const tr = activeDocument.createElement('tr');
+    for (const cell of cells) {
+      const td = activeDocument.createElement('td');
+      td.appendChild(cell.wrapper);
+      tr.appendChild(td);
+    }
+    return tr;
   }
 
   describe('getTableRowLineFromDocument', () => {
@@ -193,7 +204,8 @@ describe('UIManager', () => {
         '| TODO Table task one | | |',
       ]);
       const editorView = { state: { doc } } as any;
-      const { keyword } = makeCell(['TODO', ' Table task one']);
+      const { wrapper, keyword } = makeCell(['TODO', ' Table task one']);
+      makeTableRow([{ wrapper }]);
       const result = (uiManager as any).getTableRowLineFromDocument(
         editorView,
         keyword,
@@ -201,17 +213,15 @@ describe('UIManager', () => {
       expect(result).toBe(5);
     });
 
-    it('stops at the rendered <br> for cells with descriptions', () => {
+    it('finds the keyword in the correct cell index', () => {
       const doc = makeDoc([
-        '| DOING Table task two with description<br>DESCRIPTION: desc | | |',
+        '| TODO Table task one | | |',
+        '| DONE Other task | | |',
       ]);
       const editorView = { state: { doc } } as any;
-      const { keyword } = makeCell([
-        'DOING',
-        ' Table task two with description',
-        'BR',
-        'DESCRIPTION: desc',
-      ]);
+      // Keyword "TODO" is in cell 0 of line 1
+      const { wrapper, keyword } = makeCell(['TODO', ' Table task one']);
+      makeTableRow([{ wrapper }]);
       const result = (uiManager as any).getTableRowLineFromDocument(
         editorView,
         keyword,
@@ -219,10 +229,14 @@ describe('UIManager', () => {
       expect(result).toBe(1);
     });
 
-    it('returns null when no line matches', () => {
-      const doc = makeDoc(['| TODO Table task one | | |']);
+    it('returns null when the keyword is not in the right cell', () => {
+      const doc = makeDoc([
+        '| TODO Table task one | | |',
+      ]);
       const editorView = { state: { doc } } as any;
-      const { keyword } = makeCell(['UNKNOWN', ' text']);
+      // Keyword "DONE" is not in any cell of this line
+      const { wrapper, keyword } = makeCell(['DONE', ' missing']);
+      makeTableRow([{ wrapper }]);
       const result = (uiManager as any).getTableRowLineFromDocument(
         editorView,
         keyword,
@@ -230,26 +244,20 @@ describe('UIManager', () => {
       expect(result).toBeNull();
     });
 
-    it('rebuilds the cache when the document changes', () => {
-      const doc1 = makeDoc(['| TODO Table task one | | |']);
-      const editorView1 = { state: { doc: doc1 } } as any;
-      const { keyword } = makeCell(['TODO', ' Table task one']);
-      expect(
-        (uiManager as any).getTableRowLineFromDocument(editorView1, keyword),
-      ).toBe(1);
-
-      const doc2 = makeDoc([
-        'something else',
-        '| TODO Table task one | | |',
-      ]);
-      const editorView2 = { state: { doc: doc2 } } as any;
-      expect(
-        (uiManager as any).getTableRowLineFromDocument(editorView2, keyword),
-      ).toBe(2);
+    it('returns null when no table row matches', () => {
+      const doc = makeDoc(['| TODO Table task one | | |']);
+      const editorView = { state: { doc } } as any;
+      const { keyword } = makeCell(['UNKNOWN', ' text']);
+      makeTableRow([{ wrapper: keyword.parentElement! }]);
+      const result = (uiManager as any).getTableRowLineFromDocument(
+        editorView,
+        keyword,
+      );
+      expect(result).toBeNull();
     });
   });
 
-  describe('getLineForElement', () => {
+  describe('getLineForElement (table cells)', () => {
     it('resolves rendered table cell keywords from the document, not posAtDOM', () => {
       const doc = makeDoc([
         '# heading',
@@ -266,13 +274,13 @@ describe('UIManager', () => {
         .spyOn(uiManager as any, 'getEditorViewFromElement')
         .mockReturnValue(editorView);
       const { wrapper, keyword } = makeCell(['TODO', ' Table task one']);
+      makeTableRow([{ wrapper }]);
 
       const result = uiManager.getLineForElement(keyword);
       expect(result).toBe(5);
       // Live Preview table elements must not be resolved via posAtDOM — it
       // maps to the start of the rendered block (header line), not the row.
       expect(editorView.posAtDOM).not.toHaveBeenCalled();
-      expect(wrapper).toBeDefined();
     });
   });
 

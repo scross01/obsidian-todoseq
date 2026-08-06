@@ -3,6 +3,7 @@ import { EditorView } from '@codemirror/view';
 import TodoTracker from './main';
 import { taskKeywordPlugin } from './view/editor-extensions/task-formatting';
 import { dateAutocompleteExtension } from './view/editor-extensions/date-autocomplete';
+import { parseTableCells } from './utils/task-line-utils';
 import { TaskListView } from './view/task-list/task-list-view';
 import { getStateTransitionManager } from './services/task-update-coordinator';
 
@@ -583,6 +584,13 @@ export class UIManager {
    * rendered table lives outside the CodeMirror content tree, so the position
    * resolves to the start of the whole block instead of the specific row.
    */
+  /**
+   * Find the source line of a Live Preview rendered table cell by
+   * searching document lines for the keyword in the correct cell
+   * index. posAtDOM cannot be used: the rendered table lives
+   * outside the CodeMirror content tree, so the position resolves
+   * to the start of the whole block instead of the specific row.
+   */
   private getTableRowLineFromDocument(
     editorView: EditorView,
     element: HTMLElement,
@@ -590,48 +598,40 @@ export class UIManager {
     const tableCell = element.closest('.table-cell-wrapper');
     if (!tableCell) return null;
 
-    // Extract text up to the first <br> (the rendered description separator).
-    // textContent concatenates both sides of a <br> without a separator, so it
-    // cannot be split on the literal "<br>" marker.
-    let firstPart = '';
-    for (const node of (tableCell as HTMLElement).childNodes) {
-      if ((node as HTMLElement).nodeName === 'BR') break;
-      firstPart += node.textContent ?? '';
-    }
-    firstPart = firstPart.trim();
-    if (!firstPart) return null;
+    const keyword = element.getAttribute('data-task-keyword');
+    if (!keyword) return null;
+
+    const cellIndex = this.getCellIndexFromWrapper(tableCell);
+    if (cellIndex === null) return null;
 
     const doc = editorView.state.doc;
-    // Rebuild cache if document changed since last lookup
-    // Use doc object identity (O(1)) instead of doc.toString() (O(n))
-    if (!this.tableLineCache || this.tableLineCacheDoc !== doc) {
-      this.tableLineCache = new Map();
-      this.tableLineCacheDoc = doc;
-      for (let i = 1; i <= doc.lines; i++) {
-        const line = doc.line(i);
-        if (line.text.includes('|')) {
-          // Cache each cell's first part → line numbers (array for duplicates)
-          const cells = line.text.split('|');
-          for (const cell of cells) {
-            const cellFirstPart = cell
-              .trim()
-              .split(/\s*<br\s*\/?>\s*/i)[0]
-              ?.trim();
-            if (cellFirstPart) {
-              const existing = this.tableLineCache.get(cellFirstPart);
-              if (existing) {
-                existing.push(i);
-              } else {
-                this.tableLineCache.set(cellFirstPart, [i]);
-              }
-            }
-          }
-        }
+    for (let i = 1; i <= doc.lines; i++) {
+      const line = doc.line(i);
+      if (!line.text.includes('|')) continue;
+      const cells = parseTableCells(line.text);
+      const targetCell = cells[cellIndex];
+      if (!targetCell) continue;
+      if (targetCell.content.includes(keyword)) {
+        return i;
       }
     }
-    const cached = this.tableLineCache.get(firstPart);
-    // Return first match — deduplication by caller ensures uniqueness
-    if (cached && cached.length > 0) return cached[0];
+    return null;
+  }
+
+  /**
+   * Determine the cell index of a .table-cell-wrapper within its
+   * table row. Returns null if the wrapper is not inside a row.
+   * We only count .table-cell-wrapper siblings within the same row.
+   */
+  private getCellIndexFromWrapper(
+    tableCell: Element | null,
+  ): number | null {
+    const row = tableCell?.closest('tr');
+    if (!row) return null;
+    const wrappers = row.querySelectorAll('.table-cell-wrapper');
+    for (let i = 0; i < wrappers.length; i++) {
+      if (wrappers[i] === tableCell) return i;
+    }
     return null;
   }
 

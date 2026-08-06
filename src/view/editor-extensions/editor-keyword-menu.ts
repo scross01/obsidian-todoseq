@@ -76,19 +76,20 @@ export class EditorKeywordMenu {
   private getCellIndexFromKeywordElement(
     keywordElement: HTMLElement,
   ): number | undefined {
-    // Live Preview mode: keyword is inside a <td> or .table-cell-wrapper
-    const cell = keywordElement.closest('td, .table-cell-wrapper');
-    if (cell) {
-      const row = cell.parentElement;
-      if (!row) return undefined;
-      const cells = row.querySelectorAll('td, .table-cell-wrapper');
-      for (let i = 0; i < cells.length; i++) {
-        if (cells[i] === cell) {
-          return i;
-        }
-      }
-      return undefined;
-    }
+     // Live Preview mode: keyword is inside a <td> or .table-cell-wrapper.
+     // Walk up to the <tr> to count all cells in the row.
+     const cell = keywordElement.closest('td, .table-cell-wrapper');
+     if (cell) {
+       const row = cell.closest('tr');
+       if (!row) return undefined;
+       const cells = row.querySelectorAll('td, .table-cell-wrapper');
+       for (let i = 0; i < cells.length; i++) {
+         if (cells[i] === cell) {
+           return i;
+         }
+       }
+       return undefined;
+     }
 
     // Source mode: keyword is a CodeMirror decoration (<span> inside .cm-line).
     // Use posAtDOM to find the character offset, then map it to a cell index.

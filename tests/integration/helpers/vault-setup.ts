@@ -167,6 +167,13 @@ This file will be modified externally to test vault rescan.
 | DOING Table task two with description<br>DESCRIPTION: Task two has a description | | |
 | DONE Table task three | | |
 | WAITING Table task four | | |
+
+## Multi-column table
+
+| ONE             | TWO                                                                        | THREE                                                                                        |
+| --------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| DOING [#A] four | NOW [#B] five<br>DEADLINE: <2026-07-16 Thu><br>SCHEDULED: <2026-07-08 Wed> | IN-PROGRESS [#C] six<br>SCHEDULED: <2026-07-15 Wed 10:00 .+1y><br>DEADLINE: <2026-07-15 Wed> |
+| seven           | eight                                                                      | nine                                                                                         |
 `,
   );
 }
