@@ -523,26 +523,27 @@ export class TaskKeywordDecorator {
           const cells = parseTableCells(lineText);
 
           for (let ci = 0; ci < cells.length; ci++) {
-            const { content, start: cellStart, end: cellEnd } = cells[ci];
-            if (!content || isSeparatorCell(content)) continue;
+           const { raw, content, start: cellStart, end: cellEnd } = cells[ci];
+             if (!content || isSeparatorCell(content)) continue;
 
-            const absStart = line.from + cellStart;
-            const absEnd = line.from + cellEnd;
+             const leadingWhitespace = raw.indexOf(raw.trimStart());
+             const absStart = line.from + cellStart + leadingWhitespace;
+             const absEnd = line.from + cellEnd;
 
-            const firstPart = getCellTaskLine(content);
-            if (this.parser.testRegex.test(firstPart)) {
-              // Cache keyword regex — only rebuild if keywords change
-              if (this.cachedKeywords !== this.parser.allKeywords) {
-                this.cachedKeywords = this.parser.allKeywords;
-                this.cachedKeywordRegex = new RegExp(
-                  `(${this.parser.allKeywords.join('|')})`,
-                  'i',
-                );
-              }
-              const kw = firstPart.match(this.cachedKeywordRegex!);
-              if (kw && kw.index !== undefined) {
-                const kwStart = absStart + kw.index;
-                const kwEnd = kwStart + kw[0].length;
+             const firstPart = getCellTaskLine(content);
+             if (this.parser.testRegex.test(firstPart)) {
+               // Cache keyword regex — only rebuild if keywords change
+               if (this.cachedKeywords !== this.parser.allKeywords) {
+                 this.cachedKeywords = this.parser.allKeywords;
+                 this.cachedKeywordRegex = new RegExp(
+                   `(${this.parser.allKeywords.join('|')})`,
+                   'i',
+                 );
+               }
+               const kw = firstPart.match(this.cachedKeywordRegex!);
+               if (kw && kw.index !== undefined) {
+                 const kwStart = absStart + kw.index;
+                 const kwEnd = kwStart + kw[0].length;
                 let cssClasses =
                   'todoseq-keyword-formatted todoseq-table-task-keyword';
                 if (KeywordManager.isCompletedKeyword(kw[0], this.settings)) {
