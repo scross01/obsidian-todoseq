@@ -101,20 +101,19 @@ test.describe('Table cell tasks (experimental)', () => {
     expect(content).toContain('DOING Table task one');
   });
 
-  test('right-click keyword menu changes state for table cell task in source mode', async () => {
-    // Open the table file in TRUE source mode so keywords render as CodeMirror
-    // decoration spans inside .cm-line (not as styled spans inside the rendered
-    // .table-cell-wrapper tree of Live Preview).
+  test('keyword menu changes table cell task state in Live Preview', async () => {
+    // Open in default Live Preview mode (not true source mode). Table keywords
+    // render as styled spans inside Obsidian's .table-cell-wrapper tree.
     await page.evaluate(async () => {
       const app = (window as any).app;
       const file = app.vault.getAbstractFileByPath('table-tasks.md');
       if (!file) throw new Error('table-tasks.md not found');
       const leaf = app.workspace.getLeaf('tab');
-      await leaf.openFile(file, { state: { mode: 'source', source: true } });
+      await leaf.openFile(file);
     });
 
-    // getMode() === 'source' is ALSO true for Live Preview, so verify the
-    // actual source sub-mode by checking for the .is-live-preview class.
+    // Confirm we are really in Live Preview (getMode() === 'source' is true in
+    // both Live Preview and true source mode).
     const isLivePreview = await page.evaluate(() => {
       const app = (window as any).app;
       const view = app.workspace.getMostRecentLeaf()?.view;
@@ -123,31 +122,63 @@ test.describe('Table cell tasks (experimental)', () => {
       );
       return sourceView?.classList.contains('is-live-preview') ?? false;
     });
-    expect(isLivePreview).toBe(false);
+    expect(isLivePreview).toBe(true);
 
-    const keyword = page.locator(
-      '.workspace-leaf.mod-active .todoseq-table-task-keyword[data-task-keyword="TODO"]',
-    );
+    const keyword = page
+      .locator(
+        '.workspace-leaf.mod-active .table-cell-wrapper .todoseq-keyword-formatted[data-task-keyword="TODO"]',
+      )
+      .first();
     await keyword.waitFor({ state: 'visible', timeout: 10_000 });
 
     // Allow the plugin's file-open contextmenu handler to attach (100ms delay).
     await page.waitForTimeout(300);
 
-    // Right-click the keyword span with a real trusted mouse event (synthetic
-    // dispatchEvent produces the native Electron menu, not the plugin's DOM menu).
     await keyword.click({ button: 'right' });
 
-    // The state menu renders as an Obsidian .menu; click the DOING item.
     const doingItem = page
       .locator('.menu .menu-item-title', { hasText: 'DOING' })
       .first();
     await doingItem.waitFor({ state: 'visible', timeout: 5_000 });
     await doingItem.click();
 
-    // Read the live editor buffer (source-mode writes lag disk until autosave).
     await page.waitForTimeout(300);
     const content = await readEditorContent(page);
     expect(content).toContain('DOING Table task one');
     expect(content).not.toContain('TODO Table task one');
+  });
+
+  test('keyword menu changes table cell task state in Live Preview for cell with description', async () => {
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const file = app.vault.getAbstractFileByPath('table-tasks.md');
+      if (!file) throw new Error('table-tasks.md not found');
+      const leaf = app.workspace.getLeaf('tab');
+      await leaf.openFile(file);
+    });
+
+    // Scope to the row containing the description so the DOING keyword there
+    // is not confused with other DOING cells.
+    const descRow = page
+      .locator('.workspace-leaf.mod-active tr')
+      .filter({ hasText: 'DESCRIPTION:' });
+    const keyword = descRow.locator(
+      '.todoseq-keyword-formatted[data-task-keyword="DOING"]',
+    );
+    await keyword.waitFor({ state: 'visible', timeout: 10_000 });
+    await page.waitForTimeout(300);
+
+    await keyword.click({ button: 'right' });
+
+    const doneItem = page
+      .locator('.menu .menu-item-title', { hasText: 'DONE' })
+      .first();
+    await doneItem.waitFor({ state: 'visible', timeout: 5_000 });
+    await doneItem.click();
+
+    await page.waitForTimeout(300);
+    const content = await readEditorContent(page);
+    expect(content).toContain('DONE Table task two with description');
+    expect(content).not.toContain('DOING Table task two with description');
   });
 });

@@ -550,6 +550,15 @@ export class UIManager {
       return null;
     }
 
+    // Live Preview renders tables as a DOM tree separate from the CodeMirror
+    // content view. posAtDOM on elements in that tree does NOT throw — it
+    // resolves to the start of the rendered block (the table header line),
+    // which is the wrong source line for the keyword. Resolve the row line
+    // from the document text instead.
+    if (element.closest('.table-cell-wrapper')) {
+      return this.getTableRowLineFromDocument(editorView, element);
+    }
+
     try {
       // Use CodeMirror 6's posAtDOM to get the position of the element
       const pos = editorView.posAtDOM(targetElement);
@@ -560,48 +569,70 @@ export class UIManager {
       return lineNumber;
     } catch (error) {
       // Table cells are in a separate DOM tree — posAtDOM fails.
-      // Find the line by searching the document for the table row content.
-      const tableCell = element.closest('.table-cell-wrapper');
-      if (tableCell) {
-        const cellText = (tableCell as HTMLElement).textContent || '';
-        const firstPart = cellText.split(/\s*<br\s*\/?>\s*/i)[0]?.trim();
-        if (firstPart) {
-          const doc = editorView.state.doc;
-          // Rebuild cache if document changed since last lookup
-          // Use doc object identity (O(1)) instead of doc.toString() (O(n))
-          if (!this.tableLineCache || this.tableLineCacheDoc !== doc) {
-            this.tableLineCache = new Map();
-            this.tableLineCacheDoc = doc;
-            for (let i = 1; i <= doc.lines; i++) {
-              const line = doc.line(i);
-              if (line.text.includes('|')) {
-                // Cache each cell's first part → line numbers (array for duplicates)
-                const cells = line.text.split('|');
-                for (const cell of cells) {
-                  const cellFirstPart = cell
-                    .trim()
-                    .split(/\s*<br\s*\/?>\s*/i)[0]
-                    ?.trim();
-                  if (cellFirstPart) {
-                    const existing = this.tableLineCache.get(cellFirstPart);
-                    if (existing) {
-                      existing.push(i);
-                    } else {
-                      this.tableLineCache.set(cellFirstPart, [i]);
-                    }
-                  }
-                }
-              }
-            }
-          }
-          const cached = this.tableLineCache.get(firstPart);
-          // Return first match — deduplication by caller ensures uniqueness
-          if (cached && cached.length > 0) return cached[0];
-        }
+      if (element.closest('.table-cell-wrapper')) {
+        return this.getTableRowLineFromDocument(editorView, element);
       }
       console.debug('Failed to get line number for element:', error);
       return null;
     }
+  }
+
+  /**
+   * Find the source line of a Live Preview rendered table cell by matching its
+   * text against the cells of each document line. posAtDOM cannot be used: the
+   * rendered table lives outside the CodeMirror content tree, so the position
+   * resolves to the start of the whole block instead of the specific row.
+   */
+  private getTableRowLineFromDocument(
+    editorView: EditorView,
+    element: HTMLElement,
+  ): number | null {
+    const tableCell = element.closest('.table-cell-wrapper');
+    if (!tableCell) return null;
+
+    // Extract text up to the first <br> (the rendered description separator).
+    // textContent concatenates both sides of a <br> without a separator, so it
+    // cannot be split on the literal "<br>" marker.
+    let firstPart = '';
+    for (const node of (tableCell as HTMLElement).childNodes) {
+      if ((node as HTMLElement).nodeName === 'BR') break;
+      firstPart += node.textContent ?? '';
+    }
+    firstPart = firstPart.trim();
+    if (!firstPart) return null;
+
+    const doc = editorView.state.doc;
+    // Rebuild cache if document changed since last lookup
+    // Use doc object identity (O(1)) instead of doc.toString() (O(n))
+    if (!this.tableLineCache || this.tableLineCacheDoc !== doc) {
+      this.tableLineCache = new Map();
+      this.tableLineCacheDoc = doc;
+      for (let i = 1; i <= doc.lines; i++) {
+        const line = doc.line(i);
+        if (line.text.includes('|')) {
+          // Cache each cell's first part → line numbers (array for duplicates)
+          const cells = line.text.split('|');
+          for (const cell of cells) {
+            const cellFirstPart = cell
+              .trim()
+              .split(/\s*<br\s*\/?>\s*/i)[0]
+              ?.trim();
+            if (cellFirstPart) {
+              const existing = this.tableLineCache.get(cellFirstPart);
+              if (existing) {
+                existing.push(i);
+              } else {
+                this.tableLineCache.set(cellFirstPart, [i]);
+              }
+            }
+          }
+        }
+      }
+    }
+    const cached = this.tableLineCache.get(firstPart);
+    // Return first match — deduplication by caller ensures uniqueness
+    if (cached && cached.length > 0) return cached[0];
+    return null;
   }
 
   /**

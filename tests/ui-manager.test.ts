@@ -154,6 +154,128 @@ describe('UIManager', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // getTableRowLineFromDocument (Live Preview rendered table cells)
+  // ---------------------------------------------------------------------------
+  function makeDoc(lines: string[]) {
+    return {
+      lines: lines.length,
+      line: jest.fn((i: number) => ({ text: lines[i - 1] })),
+    };
+  }
+
+  function makeCell(
+    children: Array<string | 'BR'>,
+  ): { wrapper: HTMLElement; keyword: HTMLElement } {
+    const wrapper = activeDocument.createElement('div');
+    wrapper.className = 'table-cell-wrapper';
+    const keyword = activeDocument.createElement('span');
+    keyword.className = 'todoseq-keyword-formatted';
+    keyword.textContent = children[0] as string;
+    wrapper.appendChild(keyword);
+    for (const child of children.slice(1)) {
+      if (child === 'BR') {
+        wrapper.appendChild(activeDocument.createElement('br'));
+      } else {
+        wrapper.appendChild(activeDocument.createTextNode(child));
+      }
+    }
+    return { wrapper, keyword };
+  }
+
+  describe('getTableRowLineFromDocument', () => {
+    it('resolves the source line of a rendered table cell', () => {
+      const doc = makeDoc([
+        '# heading',
+        '',
+        '| Task | Status | Priority |',
+        '|------|--------|----------|',
+        '| TODO Table task one | | |',
+      ]);
+      const editorView = { state: { doc } } as any;
+      const { keyword } = makeCell(['TODO', ' Table task one']);
+      const result = (uiManager as any).getTableRowLineFromDocument(
+        editorView,
+        keyword,
+      );
+      expect(result).toBe(5);
+    });
+
+    it('stops at the rendered <br> for cells with descriptions', () => {
+      const doc = makeDoc([
+        '| DOING Table task two with description<br>DESCRIPTION: desc | | |',
+      ]);
+      const editorView = { state: { doc } } as any;
+      const { keyword } = makeCell([
+        'DOING',
+        ' Table task two with description',
+        'BR',
+        'DESCRIPTION: desc',
+      ]);
+      const result = (uiManager as any).getTableRowLineFromDocument(
+        editorView,
+        keyword,
+      );
+      expect(result).toBe(1);
+    });
+
+    it('returns null when no line matches', () => {
+      const doc = makeDoc(['| TODO Table task one | | |']);
+      const editorView = { state: { doc } } as any;
+      const { keyword } = makeCell(['UNKNOWN', ' text']);
+      const result = (uiManager as any).getTableRowLineFromDocument(
+        editorView,
+        keyword,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('rebuilds the cache when the document changes', () => {
+      const doc1 = makeDoc(['| TODO Table task one | | |']);
+      const editorView1 = { state: { doc: doc1 } } as any;
+      const { keyword } = makeCell(['TODO', ' Table task one']);
+      expect(
+        (uiManager as any).getTableRowLineFromDocument(editorView1, keyword),
+      ).toBe(1);
+
+      const doc2 = makeDoc([
+        'something else',
+        '| TODO Table task one | | |',
+      ]);
+      const editorView2 = { state: { doc: doc2 } } as any;
+      expect(
+        (uiManager as any).getTableRowLineFromDocument(editorView2, keyword),
+      ).toBe(2);
+    });
+  });
+
+  describe('getLineForElement', () => {
+    it('resolves rendered table cell keywords from the document, not posAtDOM', () => {
+      const doc = makeDoc([
+        '# heading',
+        '',
+        '| Task | Status | Priority |',
+        '|------|--------|----------|',
+        '| TODO Table task one | | |',
+      ]);
+      const editorView = {
+        state: { doc },
+        posAtDOM: jest.fn().mockReturnValue(2),
+      };
+      jest
+        .spyOn(uiManager as any, 'getEditorViewFromElement')
+        .mockReturnValue(editorView);
+      const { wrapper, keyword } = makeCell(['TODO', ' Table task one']);
+
+      const result = uiManager.getLineForElement(keyword);
+      expect(result).toBe(5);
+      // Live Preview table elements must not be resolved via posAtDOM — it
+      // maps to the start of the rendered block (header line), not the row.
+      expect(editorView.posAtDOM).not.toHaveBeenCalled();
+      expect(wrapper).toBeDefined();
+    });
+  });
+
   describe('getEditorViewFromElement', () => {
     it('should return null when no editor container found', () => {
       const element = activeDocument.createElement('span');
