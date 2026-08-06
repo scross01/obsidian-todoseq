@@ -70,8 +70,8 @@ export class EditorKeywordMenu {
   /**
    * Find the cell index of a keyword element within its table row.
    * Returns undefined if the element is not inside a table cell.
-   * Handles both Live Preview mode (where keywords are inside <td> elements)
-   * and source mode (where keywords are CodeMirror decorations).
+   * In Live Preview mode, keywords are inside .table-cell-wrapper divs
+   * nested within <td> elements.
    */
   private getCellIndexFromKeywordElement(
     keywordElement: HTMLElement,
@@ -82,7 +82,7 @@ export class EditorKeywordMenu {
      if (cell) {
        const row = cell.closest('tr');
        if (!row) return undefined;
-       const cells = row.querySelectorAll('td, .table-cell-wrapper');
+        const cells = row.querySelectorAll('.table-cell-wrapper');
        for (let i = 0; i < cells.length; i++) {
          if (cells[i] === cell) {
            return i;
