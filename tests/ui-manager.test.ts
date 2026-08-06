@@ -164,9 +164,10 @@ describe('UIManager', () => {
     };
   }
 
-  function makeCell(
-    children: Array<string | 'BR'>,
-  ): { wrapper: HTMLElement; keyword: HTMLElement } {
+  function makeCell(children: Array<string | 'BR'>): {
+    wrapper: HTMLElement;
+    keyword: HTMLElement;
+  } {
     const wrapper = activeDocument.createElement('div');
     wrapper.className = 'table-cell-wrapper';
     const keyword = activeDocument.createElement('span');
@@ -230,9 +231,7 @@ describe('UIManager', () => {
     });
 
     it('returns null when the keyword is not in the right cell', () => {
-      const doc = makeDoc([
-        '| TODO Table task one | | |',
-      ]);
+      const doc = makeDoc(['| TODO Table task one | | |']);
       const editorView = { state: { doc } } as any;
       // Keyword "DONE" is not in any cell of this line
       const { wrapper, keyword } = makeCell(['DONE', ' missing']);

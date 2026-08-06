@@ -411,12 +411,12 @@ export class VaultScanner
       completedKeywords:
         this.keywordManager.getKeywordsForGroup('completedKeywords'),
       keywordManager: this.keywordManager,
-urgencyCoefficients: this.urgencyCoefficients,
-        includeCalloutBlocks: newSettings.includeCalloutBlocks,
-        includeCodeBlocks: newSettings.includeCodeBlocks,
-        includeCommentBlocks: newSettings.includeCommentBlocks,
-        languageCommentSupport: newSettings.languageCommentSupport,
-      };
+      urgencyCoefficients: this.urgencyCoefficients,
+      includeCalloutBlocks: newSettings.includeCalloutBlocks,
+      includeCodeBlocks: newSettings.includeCodeBlocks,
+      includeCommentBlocks: newSettings.includeCommentBlocks,
+      languageCommentSupport: newSettings.languageCommentSupport,
+    };
 
     // Update all registered parsers with new config
     for (const parser of this.parserRegistry.getAllParsers()) {

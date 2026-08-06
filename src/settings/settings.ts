@@ -414,14 +414,28 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           {
             name: 'Inactive keywords',
             desc: 'Keywords for tasks not yet started (e.g. FIXME, HACK). Built-in: TODO, LATER.',
-            render: (setting) =>
+            render: (setting) => {
               this.configureKeywordGroupSetting(
                 setting,
                 'additionalInactiveKeywords',
                 'Inactive keywords',
                 'Keywords for tasks not yet started (e.g. FIXME, HACK). Built-in: TODO, LATER.',
                 this.plugin.settings.additionalInactiveKeywords,
-              ),
+              );
+              // Run initial validation on open so existing warnings/errors are visible
+              // for all keyword groups, not just archived keywords
+              window.setTimeout(() => {
+                const parsed = this.parseKeywordInputsFromUI();
+                const regex = this.validateKeywordRegexForAllGroups(parsed);
+                const groups = this.toGroupKeywordInput(regex.validBySetting);
+                const validation = validateKeywordGroupsDetailed(groups);
+                this.renderKeywordValidationState(
+                  regex.errorsByGroup,
+                  validation.errors,
+                  validation.warnings,
+                );
+              }, 0);
+            },
           },
           {
             name: 'Active keywords',
@@ -462,27 +476,14 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           {
             name: 'Archived keywords',
             desc: 'Keywords for archived tasks (e.g. OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED.',
-            render: (setting) => {
+            render: (setting) =>
               this.configureKeywordGroupSetting(
                 setting,
                 'additionalArchivedKeywords',
                 'Archived keywords',
                 'Keywords for archived tasks (e.g. OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED.',
                 this.plugin.settings.additionalArchivedKeywords,
-              );
-              // Run initial validation on open so existing warnings/errors are visible
-              window.setTimeout(() => {
-                const parsed = this.parseKeywordInputsFromUI();
-                const regex = this.validateKeywordRegexForAllGroups(parsed);
-                const groups = this.toGroupKeywordInput(regex.validBySetting);
-                const validation = validateKeywordGroupsDetailed(groups);
-                this.renderKeywordValidationState(
-                  regex.errorsByGroup,
-                  validation.errors,
-                  validation.warnings,
-                );
-              }, 0);
-            },
+              ),
           },
           {
             name: 'Migrated state keyword',

@@ -45,6 +45,11 @@ const PRIORITY_TOKEN_REGEX_GLOBAL = new RegExp(
 );
 
 /**
+ * Interval for debouncing table cell styling
+ */
+const TABLE_CELL_STYLE_DEBOUNCE_DELAY = 50;
+
+/**
  * Priority type definition
  */
 type PriorityLevel = 'high' | 'med' | 'low';
@@ -513,35 +518,32 @@ export class TaskKeywordDecorator {
           }
         }
 
-// Table cell task detection
-          if (
-          isTableRow(lineText) &&
-          !this.parser.testRegex.test(lineText)
-        ) {
+        // Table cell task detection
+        if (isTableRow(lineText) && !this.parser.testRegex.test(lineText)) {
           const cells = parseTableCells(lineText);
 
           for (let ci = 0; ci < cells.length; ci++) {
-           const { raw, content, start: cellStart, end: cellEnd } = cells[ci];
-             if (!content || isSeparatorCell(content)) continue;
+            const { raw, content, start: cellStart, end: cellEnd } = cells[ci];
+            if (!content || isSeparatorCell(content)) continue;
 
-             const leadingWhitespace = raw.indexOf(raw.trimStart());
-             const absStart = line.from + cellStart + leadingWhitespace;
-             const absEnd = line.from + cellEnd;
+            const leadingWhitespace = raw.indexOf(raw.trimStart());
+            const absStart = line.from + cellStart + leadingWhitespace;
+            const absEnd = line.from + cellEnd;
 
-             const firstPart = getCellTaskLine(content);
-             if (this.parser.testRegex.test(firstPart)) {
-               // Cache keyword regex — only rebuild if keywords change
-               if (this.cachedKeywords !== this.parser.allKeywords) {
-                 this.cachedKeywords = this.parser.allKeywords;
-                 this.cachedKeywordRegex = new RegExp(
-                   `(${this.parser.allKeywords.join('|')})`,
-                   'i',
-                 );
-               }
-               const kw = firstPart.match(this.cachedKeywordRegex!);
-               if (kw && kw.index !== undefined) {
-                 const kwStart = absStart + kw.index;
-                 const kwEnd = kwStart + kw[0].length;
+            const firstPart = getCellTaskLine(content);
+            if (this.parser.testRegex.test(firstPart)) {
+              // Cache keyword regex — only rebuild if keywords change
+              if (this.cachedKeywords !== this.parser.allKeywords) {
+                this.cachedKeywords = this.parser.allKeywords;
+                this.cachedKeywordRegex = new RegExp(
+                  `(${this.parser.allKeywords.join('|')})`,
+                  'i',
+                );
+              }
+              const kw = firstPart.match(this.cachedKeywordRegex!);
+              if (kw && kw.index !== undefined) {
+                const kwStart = absStart + kw.index;
+                const kwEnd = kwStart + kw[0].length;
                 let cssClasses =
                   'todoseq-keyword-formatted todoseq-table-task-keyword';
                 if (KeywordManager.isCompletedKeyword(kw[0], this.settings)) {
@@ -1128,14 +1130,32 @@ export const taskKeywordPlugin = (
         // Trigger on doc/selection changes — Obsidian re-renders tables on cursor
         // movement between cells, which destroys previously styled spans.
         // NOT on viewportChanged (scroll) — that would re-style on every scroll tick.
-        if (
-          update.docChanged || update.selectionSet
-        ) {
+        if (update.docChanged || update.selectionSet) {
           this.scheduleTableTaskCellStyling(update.view);
         }
       }
 
+      private tableHasTablesCache: { doc: unknown; hasTables: boolean } | null =
+        null;
+
       private scheduleTableTaskCellStyling(view: EditorView): void {
+        const doc = view.state.doc;
+
+        // Check cache first
+        if (this.tableHasTablesCache && this.tableHasTablesCache.doc === doc) {
+          if (!this.tableHasTablesCache.hasTables) return;
+        } else {
+          // Build cache - check if document contains any tables
+          let hasTable = false;
+          for (let i = 1; i <= doc.lines && !hasTable; i++) {
+            if (isTableRow(doc.line(i).text)) {
+              hasTable = true;
+            }
+          }
+          this.tableHasTablesCache = { doc, hasTables: hasTable };
+          if (!hasTable) return;
+        }
+
         if (this.tableCellStylingTimer !== null) {
           window.clearTimeout(this.tableCellStylingTimer);
         }
@@ -1147,7 +1167,7 @@ export const taskKeywordPlugin = (
         this.tableCellStylingTimer = window.setTimeout(() => {
           this.tableCellStylingTimer = null;
           this.styleTableTaskCells(view);
-        }, 50);
+        }, TABLE_CELL_STYLE_DEBOUNCE_DELAY);
         this.tableCellStylingLateTimer = window.setTimeout(() => {
           this.tableCellStylingLateTimer = null;
           this.styleTableTaskCells(view);
@@ -1169,7 +1189,10 @@ export const taskKeywordPlugin = (
         const mdView = view.dom.closest('.markdown-source-view');
         if (!mdView) return;
 
+        // Quick check - skip if no table cells exist
         const tableCells = mdView.querySelectorAll('.table-cell-wrapper');
+        if (tableCells.length === 0) return;
+
         tableCells.forEach((cell) => {
           if (!cell.instanceOf(HTMLElement)) return;
 

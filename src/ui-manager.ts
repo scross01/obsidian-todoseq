@@ -3,7 +3,7 @@ import { EditorView } from '@codemirror/view';
 import TodoTracker from './main';
 import { taskKeywordPlugin } from './view/editor-extensions/task-formatting';
 import { dateAutocompleteExtension } from './view/editor-extensions/date-autocomplete';
-import { parseTableCells } from './utils/task-line-utils';
+import { parseTableCells, getTableCellIndex } from './utils/task-line-utils';
 import { TaskListView } from './view/task-list/task-list-view';
 import { getStateTransitionManager } from './services/task-update-coordinator';
 
@@ -11,9 +11,8 @@ import { getStateTransitionManager } from './services/task-update-coordinator';
  * Manages UI elements and interactions in the editor
  */
 export class UIManager {
-  // Cache for table cell text → line number lookups (invalidated on doc change)
-  // Stores arrays because multiple cells in the same row can have identical text
-  private tableLineCache: Map<string, number[]> | null = null;
+  // Cache for table cell lookups: compositeKey (keyword|cellIndex) -> line number
+  private tableLineCache: Map<string, number> | null = null;
   private tableLineCacheDoc: unknown = null;
 
   constructor(private plugin: TodoTracker) {}
@@ -584,13 +583,6 @@ export class UIManager {
    * rendered table lives outside the CodeMirror content tree, so the position
    * resolves to the start of the whole block instead of the specific row.
    */
-  /**
-   * Find the source line of a Live Preview rendered table cell by
-   * searching document lines for the keyword in the correct cell
-   * index. posAtDOM cannot be used: the rendered table lives
-   * outside the CodeMirror content tree, so the position resolves
-   * to the start of the whole block instead of the specific row.
-   */
   private getTableRowLineFromDocument(
     editorView: EditorView,
     element: HTMLElement,
@@ -605,6 +597,21 @@ export class UIManager {
     if (cellIndex === null) return null;
 
     const doc = editorView.state.doc;
+
+    // Invalidate cache if document changed (use doc object identity)
+    if (this.tableLineCacheDoc !== doc) {
+      this.tableLineCache = new Map();
+      this.tableLineCacheDoc = doc;
+    }
+
+    // Cache lookup key
+    const cacheKey = `${keyword}|${cellIndex}`;
+    const cachedLine = this.tableLineCache!.get(cacheKey);
+    if (cachedLine !== undefined) {
+      return cachedLine;
+    }
+
+    // Cache miss: scan document lines
     for (let i = 1; i <= doc.lines; i++) {
       const line = doc.line(i);
       if (!line.text.includes('|')) continue;
@@ -612,27 +619,23 @@ export class UIManager {
       const targetCell = cells[cellIndex];
       if (!targetCell) continue;
       if (targetCell.content.includes(keyword)) {
+        // Cache the result for future lookups
+        this.tableLineCache!.set(cacheKey, i);
         return i;
       }
     }
+
+    // Not found - cache null-equivalent by not setting it
     return null;
   }
 
   /**
    * Determine the cell index of a .table-cell-wrapper within its
-   * table row. Returns null if the wrapper is not inside a row.
-   * We only count .table-cell-wrapper siblings within the same row.
+   * table row. Returns 0 if the wrapper is not inside a row.
    */
-  private getCellIndexFromWrapper(
-    tableCell: Element | null,
-  ): number | null {
-    const row = tableCell?.closest('tr');
-    if (!row) return null;
-    const wrappers = row.querySelectorAll('.table-cell-wrapper');
-    for (let i = 0; i < wrappers.length; i++) {
-      if (wrappers[i] === tableCell) return i;
-    }
-    return null;
+  private getCellIndexFromWrapper(tableCell: Element | null): number | null {
+    if (!tableCell) return null;
+    return getTableCellIndex(tableCell as HTMLElement);
   }
 
   /**
@@ -764,12 +767,23 @@ export class UIManager {
 
     setupContextMenuListeners();
 
+    let layoutChangeDebounceTimer: number | null = null;
+
     // Re-attach when the layout changes: toggling source/live-preview mode
     // rebuilds the .cm-editor DOM node and drops the previously attached
     // handler (without a handler, right-click falls through to the native
     // menu instead of the plugin's DOM menu).
     this.plugin.registerEvent(
-      this.plugin.app.workspace.on('layout-change', setupContextMenuListeners),
+      this.plugin.app.workspace.on('layout-change', () => {
+        // Debounce to avoid running on every layout event (pane moves, mode toggles, etc.)
+        if (layoutChangeDebounceTimer !== null) {
+          window.clearTimeout(layoutChangeDebounceTimer);
+        }
+        layoutChangeDebounceTimer = window.setTimeout(() => {
+          layoutChangeDebounceTimer = null;
+          setupContextMenuListeners();
+        }, 50);
+      }),
     );
 
     // Set up listeners when a new file is opened (for the first editor)

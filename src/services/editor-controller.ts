@@ -215,11 +215,7 @@ export class EditorController {
     const parser = vaultScanner.getParser();
 
     // Table cell task detection
-    if (
-      isTableRow(line) &&
-      parser &&
-      !parser.testRegex.test(line)
-    ) {
+    if (isTableRow(line) && parser && !parser.testRegex.test(line)) {
       const cells = parseTableCells(line);
 
       // If cellIndex is provided (e.g., from keyword context menu), use it directly
@@ -1797,11 +1793,7 @@ export class EditorController {
     const parser = vaultScanner.getParser();
 
     // Table cell task detection for date pickers
-    if (
-      isTableRow(line) &&
-      parser &&
-      !parser.testRegex.test(line)
-    ) {
+    if (isTableRow(line) && parser && !parser.testRegex.test(line)) {
       const cells = parseTableCells(line);
 
       for (let i = 0; i < cells.length; i++) {

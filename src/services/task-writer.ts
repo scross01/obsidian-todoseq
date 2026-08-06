@@ -202,10 +202,7 @@ export class TaskWriter {
     forceVaultApi = false,
   ): Promise<Task> {
     // Table tasks use vault.process for cell-level writes
-    if (
-      task.isTableTask &&
-      task.tableCell
-    ) {
+    if (task.isTableTask && task.tableCell) {
       return this.applyTableCellUpdate(task, newState, keepPriority);
     }
 
@@ -352,10 +349,7 @@ export class TaskWriter {
    * and replaces the cell content in the table row.
    */
   private isTableCellDateUpdate(task: Task): boolean {
-    return !!(
-      task.isTableTask &&
-      task.tableCell
-    );
+    return !!(task.isTableTask && task.tableCell);
   }
 
   private async modifyTableCell(
@@ -444,7 +438,8 @@ export class TaskWriter {
       if (completed && this.settings?.trackClosedDate) {
         const closedDateStr = DateUtils.formatClosedDate(new Date());
         // CLOSED dates in cells use [[...]] wikilink format.
-        const closedPattern = /\s*<br\s*\/?>\s*CLOSED:\s*\[\[[^\]]+\]\]/i;
+        // Support both old [date] and new [[date]] formats for migration
+        const closedPattern = /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,2}[^\]]+\]{1,2}/i;
         const closedTag = `<br>CLOSED: [[${closedDateStr}]]`;
         if (closedPattern.test(dateSuffix)) {
           dateSuffix = dateSuffix.replace(closedPattern, closedTag);
@@ -456,9 +451,9 @@ export class TaskWriter {
         // task.closedDate is set. For table cells, task.closedDate is
         // parsed only from the first <br> segment (before the CLOSED tag),
         // so it is always null even when the cell has a CLOSED date.
-        // CLOSED dates use [[...]] wikilink format in cells.
+        // Support both old [date] and new [[date]] formats for migration
         dateSuffix = dateSuffix.replace(
-          /\s*<br\s*\/?>\s*CLOSED:\s*\[\[[^\]]+\]\]/i,
+          /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,2}[^\]]+\]{1,2}/i,
           '',
         );
       }
@@ -549,6 +544,15 @@ export class TaskWriter {
     dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED',
   ): Promise<Task & { lineDelta?: number }> {
     await this.modifyTableCell(task, (cell) => {
+      if (dateType === 'CLOSED') {
+        // CLOSED dates use [[date]] wikilink format in table cells
+        const datePattern = new RegExp(
+          `\\s*<br\\s*/?>\\s*${dateType}:\\s*(?:\\[\\[[^\\]]+\\]\\]|\\[[^\\]]+\\])`,
+          'i',
+        );
+        return cell.replace(datePattern, '');
+      }
+      // SCHEDULED and DEADLINE use <date> format
       const datePattern = new RegExp(
         `\\s*<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`,
         'i',
@@ -613,10 +617,7 @@ export class TaskWriter {
     newPriority: 'high' | 'med' | 'low',
   ): Promise<Task> {
     // Table tasks: update cell content only
-    if (
-      task.isTableTask &&
-      task.tableCell
-    ) {
+    if (task.isTableTask && task.tableCell) {
       const priorityToken =
         newPriority === 'high'
           ? '[#A]'
@@ -719,10 +720,7 @@ export class TaskWriter {
     }
 
     // Table tasks: update cell content only
-    if (
-      task.isTableTask &&
-      task.tableCell
-    ) {
+    if (task.isTableTask && task.tableCell) {
       const text = task.text ? ` ${task.text}` : '';
       const cellContent = `${task.state}${text}`;
       return this.applyTableCellContent(task, cellContent, { priority: null });

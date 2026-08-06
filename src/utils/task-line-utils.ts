@@ -373,3 +373,37 @@ export function isSeparatorCell(content: string): boolean {
 export function getCellTaskLine(content: string): string {
   return content.split(/<br\s*\/?>/i)[0]?.trim() || content.trim();
 }
+
+/**
+ * Get the cell index of a table cell element within its row.
+ * Uses a consistent selector that works for both reader view (td elements)
+ * and live preview/editor view (.table-cell-wrapper elements).
+ * @param element The table cell element (td or .table-cell-wrapper)
+ * @returns The cell index (0-based), or 0 if the element is not in a table
+ */
+export function getTableCellIndex(element: HTMLElement): number {
+  // First, find the parent <tr> element
+  let row: HTMLElement | null = element.closest('tr');
+
+  // If no row found, try finding via td parent
+  if (!row) {
+    const parentTd = element.closest('td');
+    if (parentTd) {
+      row = parentTd.parentElement;
+    }
+  }
+
+  if (!row) return 0;
+
+  // Count td siblings to determine cell index
+  const cells = Array.from(row.querySelectorAll<HTMLElement>('td'));
+
+  for (let i = 0; i < cells.length; i++) {
+    // Check if the element is inside this td or if the element itself is the td
+    if (cells[i] === element || cells[i].contains(element)) {
+      return i;
+    }
+  }
+
+  return 0;
+}

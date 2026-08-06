@@ -11,6 +11,7 @@ import {
   UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
+import { extractDateMetadata } from '../utils/date-repeater';
 import {
   getIndentLength,
   parseTableCells,
@@ -52,11 +53,11 @@ export class TaskParser implements ITaskParser {
   readonly parserId = 'markdown';
   readonly supportedExtensions = ['.md'];
 
-private readonly includeCalloutBlocks: boolean;
-   private readonly includeCodeBlocks: boolean;
-   private readonly includeCommentBlocks: boolean;
-   private readonly languageCommentSupport: boolean;
-   private keywordManager: KeywordManager;
+  private readonly includeCalloutBlocks: boolean;
+  private readonly includeCodeBlocks: boolean;
+  private readonly includeCommentBlocks: boolean;
+  private readonly languageCommentSupport: boolean;
+  private keywordManager: KeywordManager;
   public allKeywords: string[];
 
   /**
@@ -603,7 +604,7 @@ private readonly includeCalloutBlocks: boolean;
         }
       ).languageCommentSupport = config.languageCommentSupport;
     }
-    }
+  }
 
   /**
    * Parse a single line as a task.
@@ -1341,8 +1342,26 @@ private readonly includeCalloutBlocks: boolean;
             task.deadlineWarningPeriod = p.warningPeriod;
           }
         } else if (/^CLOSED:/i.test(part)) {
-          const p = DateParser.parseDateWithRepeater(dateContent);
-          if (p.date) task.closedDate = p.date;
+          // Handle both [[date]] and <date> formats for table cells
+          const content = dateContent;
+          let processedContent = content;
+          // Convert [[date]] wikilink format to <date> format for DateParser
+          if (content.startsWith('[[') && content.endsWith(']]')) {
+            const innerContent = content.slice(2, -2);
+            // Extract just the date string (without repeater/warning period)
+            const { baseDateStr } = extractDateMetadata(innerContent);
+            processedContent = baseDateStr;
+            const p = DateParser.parseDateWithRepeater(processedContent);
+            if (p.date) {
+              task.closedDate = p.date;
+            }
+          } else {
+            // Use original content for regular <date> format
+            const p = DateParser.parseDateWithRepeater(content);
+            if (p.date) {
+              task.closedDate = p.date;
+            }
+          }
         } else if (task.description === undefined) {
           const descText = this.getDescriptionText(part);
           if (descText !== null) {

@@ -127,8 +127,8 @@ export const DefaultSettings: TodoTrackerSettings = {
   formatTaskKeywords: true, // Default to enabled
   additionalFileExtensions: [], // No additional extensions by default - managed by detectOrgModeFiles
   detectOrgModeFiles: false, // Experimental feature - disabled by default
-scanCodeFiles: false, // Experimental feature - disabled by default
-   migrateToTodayState: '', // Default state to set on source task after migrating (empty = disabled)
+  scanCodeFiles: false, // Experimental feature - disabled by default
+  migrateToTodayState: '', // Default state to set on source task after migrating (empty = disabled)
   stateTransitions: DefaultStateTransitionSettings,
   trackClosedDate: false, // Disabled by default
   useExtendedCheckboxStyles: false, // Experimental feature - disabled by default

@@ -13,6 +13,7 @@ import { getPriorityLevelName } from '../../utils/task-format';
 import { MarkdownPostProcessorContext, TFile, setTooltip } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { getStateTransitionManager } from '../../services/task-update-coordinator';
+import { getTableCellIndex } from '../../utils/task-line-utils';
 
 /**
  * Cached regex for priority tokens with global flag.
@@ -678,7 +679,10 @@ export class ReaderViewFormatter {
     const taskParser = this.getTaskParser();
     if (!taskParser) return;
 
+    // Quick check - skip if no table cells exist in this element
     const cells = element.querySelectorAll('td');
+    if (cells.length === 0) return;
+
     cells.forEach((cell) => {
       if (!cell.instanceOf(HTMLElement)) return;
 
@@ -2954,15 +2958,7 @@ export class ReaderViewFormatter {
    * Get the cell index of a table cell element within its row.
    */
   private getCellIndex(cell: HTMLElement): number {
-    const row = cell.parentElement;
-    if (!row) return 0;
-    const cells = row.querySelectorAll('td, .table-cell-wrapper');
-    for (let i = 0; i < cells.length; i++) {
-      if (cells[i] === cell) {
-        return i;
-      }
-    }
-    return 0;
+    return getTableCellIndex(cell);
   }
 
   /**

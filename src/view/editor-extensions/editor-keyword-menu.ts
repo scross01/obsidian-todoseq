@@ -1,7 +1,10 @@
 import { MarkdownView } from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { BaseDialog } from '../components/base-dialog';
-import { parseTableCells } from '../../utils/task-line-utils';
+import {
+  parseTableCells,
+  getTableCellIndex,
+} from '../../utils/task-line-utils';
 import TodoTracker from '../../main';
 
 export class EditorKeywordMenu {
@@ -76,20 +79,13 @@ export class EditorKeywordMenu {
   private getCellIndexFromKeywordElement(
     keywordElement: HTMLElement,
   ): number | undefined {
-     // Live Preview mode: keyword is inside a <td> or .table-cell-wrapper.
-     // Walk up to the <tr> to count all cells in the row.
-     const cell = keywordElement.closest('td, .table-cell-wrapper');
-     if (cell) {
-       const row = cell.closest('tr');
-       if (!row) return undefined;
-        const cells = row.querySelectorAll('.table-cell-wrapper');
-       for (let i = 0; i < cells.length; i++) {
-         if (cells[i] === cell) {
-           return i;
-         }
-       }
-       return undefined;
-     }
+    // Live Preview mode: keyword is inside a <td> or .table-cell-wrapper.
+    // Source mode: keyword is a CodeMirror decoration (<span> inside .cm-line).
+    const cell = keywordElement.closest('td, .table-cell-wrapper');
+    if (cell) {
+      const index = getTableCellIndex(cell as HTMLElement);
+      return index;
+    }
 
     // Source mode: keyword is a CodeMirror decoration (<span> inside .cm-line).
     // Use posAtDOM to find the character offset, then map it to a cell index.

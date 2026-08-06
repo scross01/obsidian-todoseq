@@ -198,7 +198,9 @@ test.describe('Table cell tasks', () => {
       app.plugins.plugins.todoseq.settings.trackClosedDate = true;
       const editor = app.workspace.activeLeaf?.view?.editor;
       for (let i = 0; i < editor.lineCount(); i++) {
-        if (editor.getLine(i).includes('DOING Table task two with description')) {
+        if (
+          editor.getLine(i).includes('DOING Table task two with description')
+        ) {
           editor.setCursor({ line: i, ch: 5 });
           break;
         }
