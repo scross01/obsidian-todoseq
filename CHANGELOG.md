@@ -2,7 +2,14 @@
 
 ## 0.19.0
 
-- Updated settings to use the new Obisdian 1.13 APIs, enabled settings search.
+- Updated settings to use the new Obsidian 1.13 declarative settings API, enabled settings search.
+- Promoted table cell tasks from experimental to fully supported feature. #72
+- Fixed CLOSED date format parsing and migration for table cells.
+- Fixed table cell keyword decoration and menu issues in Live Preview mode.
+- Fixed row corruption when cycling table cell tasks.
+- Added ConfirmationModal for saved search deletion.
+- Fixed settings number range warnings; dependent toggles now persist correctly.
+- Minimum Obsidian version raised to 1.13.0.
 
 ## 0.18.1
 
