@@ -204,7 +204,6 @@ export class TaskWriter {
     // Table tasks use vault.process for cell-level writes
     if (
       task.isTableTask &&
-      this.settings?.experimentalTableTasks &&
       task.tableCell
     ) {
       return this.applyTableCellUpdate(task, newState, keepPriority);
@@ -355,7 +354,6 @@ export class TaskWriter {
   private isTableCellDateUpdate(task: Task): boolean {
     return !!(
       task.isTableTask &&
-      this.settings?.experimentalTableTasks &&
       task.tableCell
     );
   }
@@ -617,7 +615,6 @@ export class TaskWriter {
     // Table tasks: update cell content only
     if (
       task.isTableTask &&
-      this.settings?.experimentalTableTasks &&
       task.tableCell
     ) {
       const priorityToken =
@@ -724,7 +721,6 @@ export class TaskWriter {
     // Table tasks: update cell content only
     if (
       task.isTableTask &&
-      this.settings?.experimentalTableTasks &&
       task.tableCell
     ) {
       const text = task.text ? ` ${task.text}` : '';

@@ -206,10 +206,7 @@ export class SmartDateProcessor {
     }
 
     // Table cell tasks: process natural language dates within cells
-    if (
-      this.plugin.settings?.experimentalTableTasks &&
-      /^\s*\|/.test(lineText)
-    ) {
+    if (/^\s*\|/.test(lineText)) {
       await this.processTableCellDates(filePath, lineNumber, lineText, view);
       return;
     }

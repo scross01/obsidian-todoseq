@@ -214,9 +214,8 @@ export class EditorController {
     // Check if this line contains a valid task using VaultScanner's parser
     const parser = vaultScanner.getParser();
 
-    // Table cell task detection (experimental)
+    // Table cell task detection
     if (
-      this.plugin.settings?.experimentalTableTasks &&
       isTableRow(line) &&
       parser &&
       !parser.testRegex.test(line)
@@ -481,9 +480,8 @@ export class EditorController {
     // Get the line from the editor
     const line = editor.getLine(lineNumber);
 
-    // Table cell task detection (experimental)
+    // Table cell task detection
     if (
-      this.plugin.settings?.experimentalTableTasks &&
       isTableRow(line) &&
       vaultScanner.getParser() &&
       !vaultScanner.getParser()!.testRegex.test(line)
@@ -615,7 +613,7 @@ export class EditorController {
         // For lines without existing task keywords, create a basic task and update it
         // Table rows must never be treated as plain tasks here — writing a keyword
         // prefix would corrupt the row (e.g. "TODO | TODO Table task one | | |")
-        if (this.plugin.settings?.experimentalTableTasks && isTableRow(line)) {
+        if (isTableRow(line)) {
           return true;
         }
         const markerInfo = detectListMarker(line);
@@ -1798,9 +1796,8 @@ export class EditorController {
     // Check if this line contains a valid task using VaultScanner's parser
     const parser = vaultScanner.getParser();
 
-    // Table cell task detection (experimental) for date pickers
+    // Table cell task detection for date pickers
     if (
-      this.plugin.settings?.experimentalTableTasks &&
       isTableRow(line) &&
       parser &&
       !parser.testRegex.test(line)

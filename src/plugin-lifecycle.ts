@@ -54,7 +54,6 @@ export class PluginLifecycleManager {
         includeCodeBlocks: this.plugin.settings.includeCodeBlocks,
         includeCommentBlocks: this.plugin.settings.includeCommentBlocks,
         languageCommentSupport: this.plugin.settings.languageCommentSupport,
-        experimentalTableTasks: this.plugin.settings.experimentalTableTasks,
       },
     );
     parserRegistry.register(taskParser);

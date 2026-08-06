@@ -156,7 +156,7 @@ This file will be modified externally to test vault rescan.
 `,
   );
 
-  // File with table cell tasks for experimental table task testing
+  // File with table cell tasks for testing
   fs.writeFileSync(
     path.join(TEST_VAULT_DIR, 'table-tasks.md'),
     `# Table Tasks Test

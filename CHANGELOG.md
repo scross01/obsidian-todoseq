@@ -12,7 +12,7 @@
 ## 0.18.0
 
 - Added support for declaring tasks in markdown headings. #74
-- Added experimental support for defining tasks in tables. Enable in the settings.
+- Added support for defining tasks in markdown table cells.
 
 ## 0.17.0
 

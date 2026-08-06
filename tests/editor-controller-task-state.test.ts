@@ -24,7 +24,6 @@ describe('Editor Controller - Task State Methods', () => {
         defaultCompleted: 'DONE',
         transitionStatements: ['WAIT -> IN-PROGRESS'],
       },
-      experimentalTableTasks: true,
     });
 
     const keywordManager = createTestKeywordManager(settings);

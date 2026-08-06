@@ -168,10 +168,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       this.plugin.settings.additionalFileExtensions = currentExtensions;
       return this.rescanAndRefresh();
     },
-    experimentalTableTasks: () => {
-      this.plugin.updateTaskWriterKeywordManager();
-      return this.rescanAndRefresh();
-    },
     useExtendedCheckboxStyles: async () => {
       // Re-create parser to update KeywordManager with new settings
       await this.plugin.recreateParser();
@@ -735,15 +731,6 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             name: 'Scan code files for comments',
             desc: 'When enabled, scans code files (.js, .ts, .py, .rb, .java, .rs, .go, .c, .cpp, .cs, .swift, .kt, .sh, .YAML, .yml, .toml, .SQL, .ini, .r, .dockerfile, .ps1) for todo-style comments and detects them as tasks. Supports multi-line comments and skips keywords inside string literals.',
             control: { type: 'toggle', key: 'scanCodeFiles' },
-          },
-          {
-            name: 'Parse tasks in Markdown tables',
-            desc:
-              // workaround aggressive obsidianmd/ui/sentence-case -- states are capitalized
-              'When enabled, detects tasks inside markdown table cells (e.g., "| ' +
-              'TODO' +
-              ' fix this |").',
-            control: { type: 'toggle', key: 'experimentalTableTasks' },
           },
           {
             name: 'Use extended Markdown checkbox styles',

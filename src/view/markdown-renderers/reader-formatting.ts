@@ -458,10 +458,8 @@ export class ReaderViewFormatter {
     // Process bullet list items without checkboxes (checking each individually for quote/callout context)
     this.processBulletListItems(element, includeCalloutBlocks);
 
-    // Process table cells with task keywords (experimental)
-    if (this.plugin.settings?.experimentalTableTasks) {
-      this.processTableCells(element);
-    }
+    // Process table cells with task keywords
+    this.processTableCells(element);
   }
 
   /**
@@ -672,7 +670,7 @@ export class ReaderViewFormatter {
   }
 
   /**
-   * Process table cells with task keywords (experimental).
+   * Process table cells containing task keywords.
    * Markdown renders table cells as <td> elements. We check each cell's text
    * for task keywords and apply the same keyword formatting as other task types.
    */
@@ -895,14 +893,12 @@ export class ReaderViewFormatter {
       this.processPriorityPillsInElement(heading);
     });
 
-    // Process table cells with task keywords (experimental)
-    if (this.plugin.settings?.experimentalTableTasks) {
-      const tableCells = element.querySelectorAll('td');
-      tableCells.forEach((cell) => {
-        if (!cell.instanceOf(HTMLElement)) return;
-        this.processPriorityPillsInElement(cell);
-      });
-    }
+    // Process table cells with task keywords
+    const tableCells = element.querySelectorAll('td');
+    tableCells.forEach((cell) => {
+      if (!cell.instanceOf(HTMLElement)) return;
+      this.processPriorityPillsInElement(cell);
+    });
   }
 
   /**
@@ -2030,22 +2026,20 @@ export class ReaderViewFormatter {
       this.processDateKeywordsInElement(taskContainer);
     });
 
-    // Process date keywords inside table cells (experimental)
-    if (this.plugin.settings?.experimentalTableTasks) {
-      const tableCells = element.querySelectorAll('.table-cell-wrapper, td');
-      tableCells.forEach((cell) => {
-        if (!cell.instanceOf(HTMLElement)) return;
-        const text = cell.textContent || '';
-        if (
-          !text.includes('SCHEDULED:') &&
-          !text.includes('DEADLINE:') &&
-          !text.includes('CLOSED:')
-        ) {
-          return;
-        }
-        this.processDateKeywordsInElement(cell);
-      });
-    }
+    // Process date keywords inside table cells
+    const tableCells = element.querySelectorAll('.table-cell-wrapper, td');
+    tableCells.forEach((cell) => {
+      if (!cell.instanceOf(HTMLElement)) return;
+      const text = cell.textContent || '';
+      if (
+        !text.includes('SCHEDULED:') &&
+        !text.includes('DEADLINE:') &&
+        !text.includes('CLOSED:')
+      ) {
+        return;
+      }
+      this.processDateKeywordsInElement(cell);
+    });
   }
 
   /**
@@ -2099,21 +2093,19 @@ export class ReaderViewFormatter {
       }
     }
 
-    // Process DESCRIPTION: inside table cells (experimental)
-    if (this.plugin.settings?.experimentalTableTasks) {
-      const tableCells = element.querySelectorAll('td');
-      tableCells.forEach((cell) => {
-        if (!cell.instanceOf(HTMLElement)) return;
-        const text = cell.textContent || '';
-        if (!text.includes('DESCRIPTION:')) return;
+    // Process DESCRIPTION: inside table cells
+    const tableCells = element.querySelectorAll('td');
+    tableCells.forEach((cell) => {
+      if (!cell.instanceOf(HTMLElement)) return;
+      const text = cell.textContent || '';
+      if (!text.includes('DESCRIPTION:')) return;
 
-        // Find the text node containing DESCRIPTION: and wrap it
-        const result = this.findDateKeywordNode(cell, 'DESCRIPTION:');
-        if (result) {
-          this.wrapDescriptionLine(cell, result.node, result.index);
-        }
-      });
-    }
+      // Find the text node containing DESCRIPTION: and wrap it
+      const result = this.findDateKeywordNode(cell, 'DESCRIPTION:');
+      if (result) {
+        this.wrapDescriptionLine(cell, result.node, result.index);
+      }
+    });
   }
 
   /**

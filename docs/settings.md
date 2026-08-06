@@ -678,24 +678,4 @@ The experimental features section contains settings for features that are still 
 
 See [Experimental Features](experimental-features.md) for detailed documentation on Org-mode support.
 
-### Parse Tasks in Markdown Tables
-
-**Setting**: "Parse tasks in Markdown tables" (toggle)
-
-**Description**: Enable detection and management of tasks inside markdown table cells.
-
-**Default**: Disabled
-
-**When Enabled:**
-
-- Table cells containing task keywords (e.g., `TODO`, `DOING`, `DONE`) are detected
-- Table tasks appear in the Task List alongside regular tasks
-- Scheduled and deadline dates are supported inline within cells
-- Priority markers (e.g., `[#A]`) are recognized inside table cells
-
-**Limitations:**
-
-- Dates are stored inline within cells using `<br>` separators, not on separate lines
-- Subtask counting and description syntax are not supported for table tasks
-
-See [Experimental Features](experimental-features.md) for detailed documentation on Markdown table tasks.
+See [Experimental Features](experimental-features.md) for detailed documentation on Org-mode support.

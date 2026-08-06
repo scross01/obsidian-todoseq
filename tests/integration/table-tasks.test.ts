@@ -28,7 +28,7 @@ test.beforeAll(async () => {
   page = await getPage();
 });
 
-test.describe('Table cell tasks (experimental)', () => {
+test.describe('Table cell tasks', () => {
   test.beforeEach(async () => {
     await closeTableTasksLeaves();
     await resetVaultState(page);

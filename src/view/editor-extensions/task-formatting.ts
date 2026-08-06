@@ -513,10 +513,8 @@ export class TaskKeywordDecorator {
           }
         }
 
-        // Table cell task detection (experimental)
-        if (
-          !match &&
-          this.settings.experimentalTableTasks &&
+// Table cell task detection
+          if (
           isTableRow(lineText) &&
           !this.parser.testRegex.test(lineText)
         ) {
@@ -1060,9 +1058,7 @@ export const taskKeywordPlugin = (
 
         // Style table cells on initial load — the DOM isn't ready yet during
         // construction so defer to allow Obsidian to render the table.
-        if (this.settings.experimentalTableTasks) {
-          window.setTimeout(() => this.styleTableTaskCells(view), 100);
-        }
+        window.setTimeout(() => this.styleTableTaskCells(view), 100);
       }
 
       /**
@@ -1133,8 +1129,7 @@ export const taskKeywordPlugin = (
         // movement between cells, which destroys previously styled spans.
         // NOT on viewportChanged (scroll) — that would re-style on every scroll tick.
         if (
-          this.settings.experimentalTableTasks &&
-          (update.docChanged || update.selectionSet)
+          update.docChanged || update.selectionSet
         ) {
           this.scheduleTableTaskCellStyling(update.view);
         }

@@ -52,12 +52,11 @@ export class TaskParser implements ITaskParser {
   readonly parserId = 'markdown';
   readonly supportedExtensions = ['.md'];
 
-  private readonly includeCalloutBlocks: boolean;
-  private readonly includeCodeBlocks: boolean;
-  private readonly includeCommentBlocks: boolean;
-  private readonly languageCommentSupport: boolean;
-  private experimentalTableTasks: boolean;
-  private keywordManager: KeywordManager;
+private readonly includeCalloutBlocks: boolean;
+   private readonly includeCodeBlocks: boolean;
+   private readonly includeCommentBlocks: boolean;
+   private readonly languageCommentSupport: boolean;
+   private keywordManager: KeywordManager;
   public allKeywords: string[];
 
   /**
@@ -91,7 +90,6 @@ export class TaskParser implements ITaskParser {
     includeCodeBlocks: boolean,
     includeCommentBlocks: boolean,
     languageCommentSupport: boolean,
-    experimentalTableTasks: boolean,
     keywordManager: KeywordManager,
     app: App,
     urgencyCoefficients?: UrgencyCoefficients,
@@ -107,7 +105,6 @@ export class TaskParser implements ITaskParser {
     this.includeCodeBlocks = includeCodeBlocks;
     this.includeCommentBlocks = includeCommentBlocks;
     this.languageCommentSupport = languageCommentSupport;
-    this.experimentalTableTasks = experimentalTableTasks;
     this.app = app;
 
     // Use provided urgency coefficients or defaults
@@ -130,7 +127,6 @@ export class TaskParser implements ITaskParser {
       includeCodeBlocks?: boolean;
       includeCommentBlocks?: boolean;
       languageCommentSupport?: boolean;
-      experimentalTableTasks?: boolean;
     },
   ): TaskParser {
     const allKeywords = keywordManager.getAllKeywords();
@@ -142,7 +138,6 @@ export class TaskParser implements ITaskParser {
       parserSettings?.includeCodeBlocks ?? true,
       parserSettings?.includeCommentBlocks ?? false,
       parserSettings?.languageCommentSupport ?? false,
-      parserSettings?.experimentalTableTasks ?? false,
       keywordManager,
       app,
       urgencyCoefficients,
@@ -608,14 +603,7 @@ export class TaskParser implements ITaskParser {
         }
       ).languageCommentSupport = config.languageCommentSupport;
     }
-    if (config.experimentalTableTasks !== undefined) {
-      (
-        this as unknown as {
-          experimentalTableTasks: boolean;
-        }
-      ).experimentalTableTasks = config.experimentalTableTasks;
     }
-  }
 
   /**
    * Parse a single line as a task.
@@ -1215,12 +1203,8 @@ export class TaskParser implements ITaskParser {
         continue;
       }
 
-      // Table cell task detection (experimental)
-      if (
-        this.experimentalTableTasks &&
-        /^\s*\|/.test(line) &&
-        !this.testRegex.test(line)
-      ) {
+      // Table cell task detection
+      if (/^\s*\|/.test(line) && !this.testRegex.test(line)) {
         tasks.push(...this.parseTasksFromTableCells(line, index, path));
         continue;
       }

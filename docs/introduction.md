@@ -91,7 +91,7 @@ Some TODOseq features are not available in Logseq. The use of checkboxes before 
 
 ## Experimental Features
 
-TODOseq offers experimental features for advanced use cases. These features are provided for testing but may not be fully polished and could change in future versions.
+TODOseq offers features for advanced use cases. These features are provided for testing but may not be fully polished and could change in future versions.
 
 See [Experimental Features](experimental-features.md) for details on available experimental functionality, including Org-mode file support.
 

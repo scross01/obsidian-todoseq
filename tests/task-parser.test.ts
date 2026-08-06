@@ -1442,9 +1442,7 @@ describe('table task parsing', () => {
 
   beforeEach(() => {
     const keywordManager = createTestKeywordManager();
-    parser = TaskParser.create(keywordManager, null, undefined, {
-      experimentalTableTasks: true,
-    });
+    parser = TaskParser.create(keywordManager, null, undefined);
   });
 
   test('parses task from table cell', () => {
@@ -1494,16 +1492,6 @@ describe('table task parsing', () => {
 
   test('skips header separator rows', () => {
     expect(parser.parseFile('| ---: | :--- |', 'test.md')).toHaveLength(0);
-  });
-
-  test('respects disabled setting', () => {
-    const keywordManager = createTestKeywordManager();
-    const disabledParser = TaskParser.create(keywordManager, null, undefined, {
-      experimentalTableTasks: false,
-    });
-    expect(disabledParser.parseFile('| TODO task |', 'test.md')).toHaveLength(
-      0,
-    );
   });
 
   test('does not parse non-task table content', () => {
