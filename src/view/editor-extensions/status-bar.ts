@@ -5,11 +5,15 @@ import { TFile, Notice } from 'obsidian';
 
 export class StatusBarManager {
   private statusBarItem: HTMLElement | null = null;
+  private unsubscribeFromStateManager: (() => void) | null = null;
+  private statusBarTimeout: number | null = null;
 
   constructor(private plugin: TodoTracker) {}
 
   // Setup status bar item for task count
   setupStatusBarItem(): void {
+    if (this.statusBarItem || this.unsubscribeFromStateManager) return;
+
     // Create status bar item
     this.statusBarItem = this.plugin.addStatusBarItem();
     this.statusBarItem.addClass('mod-clickable');
@@ -24,19 +28,20 @@ export class StatusBarManager {
 
     // Subscribe to TaskStateManager for task changes
     // Use debouncing to prevent excessive updates during rapid changes
-    let statusBarTimeout: number | null = null;
     const STATUS_BAR_DEBOUNCE_MS = 150;
 
-    this.plugin.taskStateManager.subscribe((tasks: Task[]) => {
-      if (statusBarTimeout) {
-        window.clearTimeout(statusBarTimeout);
-      }
-      statusBarTimeout = window.setTimeout(() => {
-        // Clear timeout reference to indicate no pending debounced update
-        statusBarTimeout = null;
-        this.updateStatusBarItem(tasks);
-      }, STATUS_BAR_DEBOUNCE_MS);
-    });
+    this.unsubscribeFromStateManager = this.plugin.taskStateManager.subscribe(
+      (tasks: Task[]) => {
+        if (this.statusBarTimeout !== null) {
+          window.clearTimeout(this.statusBarTimeout);
+        }
+        this.statusBarTimeout = window.setTimeout(() => {
+          // Clear timeout reference to indicate no pending debounced update
+          this.statusBarTimeout = null;
+          this.updateStatusBarItem(tasks);
+        }, STATUS_BAR_DEBOUNCE_MS);
+      },
+    );
 
     // Update status bar item when active file changes
     this.plugin.registerEvent(
@@ -129,6 +134,16 @@ export class StatusBarManager {
 
   // Clean up status bar item
   cleanup(): void {
+    if (this.statusBarTimeout !== null) {
+      window.clearTimeout(this.statusBarTimeout);
+      this.statusBarTimeout = null;
+    }
+
+    if (this.unsubscribeFromStateManager) {
+      this.unsubscribeFromStateManager();
+      this.unsubscribeFromStateManager = null;
+    }
+
     if (this.statusBarItem) {
       this.statusBarItem.remove();
       this.statusBarItem = null;
