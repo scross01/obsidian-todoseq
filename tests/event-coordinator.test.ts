@@ -421,6 +421,116 @@ describe('EventCoordinator', () => {
       await coordinator.destroy();
     });
 
+    it('should drain events queued while processing an active batch', async () => {
+      let resolveFirstStarted: () => void = () => {};
+      let releaseFirst: () => void = () => {};
+      const firstStarted = new Promise<void>((resolve) => {
+        resolveFirstStarted = resolve;
+      });
+      const firstReleased = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      let resolveSecondProcessed: () => void = () => {};
+      const secondProcessed = new Promise<void>((resolve) => {
+        resolveSecondProcessed = resolve;
+      });
+
+      const mockScanner = {
+        processFileDelete: jest.fn((file: TFile) => {
+          if (file.path === 'first.md') {
+            resolveFirstStarted();
+            return firstReleased;
+          }
+          return Promise.resolve();
+        }),
+      };
+      const coordinator = buildCoordinator(env, mockScanner);
+      const processedPaths: string[] = [];
+      coordinator.on('file-deleted', (event) => {
+        processedPaths.push(event.file.path);
+        if (event.file.path === 'second.md') {
+          resolveSecondProcessed();
+        }
+      });
+      coordinator.initialize();
+
+      (env.mockVault as any).triggerEvent(
+        'delete',
+        new TFile('first.md', 'first.md', 'md'),
+      );
+      await firstStarted;
+
+      (env.mockVault as any).triggerEvent(
+        'delete',
+        new TFile('second.md', 'second.md', 'md'),
+      );
+      releaseFirst();
+
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          secondProcessed,
+          new Promise<never>((_, reject) => {
+            timeout = setTimeout(
+              () => reject(new Error('second event was not drained')),
+              100,
+            );
+          }),
+        ]);
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+      }
+
+      expect(mockScanner.processFileDelete).toHaveBeenCalledTimes(2);
+      expect(processedPaths).toEqual(['first.md', 'second.md']);
+      await coordinator.destroy();
+    });
+
+    it('should await an active batch during destroy', async () => {
+      let resolveFirstStarted: () => void = () => {};
+      let releaseFirst: () => void = () => {};
+      const firstStarted = new Promise<void>((resolve) => {
+        resolveFirstStarted = resolve;
+      });
+      const firstReleased = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      const mockScanner = {
+        processFileDelete: jest.fn((file: TFile) => {
+          if (file.path === 'first.md') {
+            resolveFirstStarted();
+            return firstReleased;
+          }
+          return Promise.resolve();
+        }),
+      };
+      const coordinator = buildCoordinator(env, mockScanner);
+      coordinator.initialize();
+
+      (env.mockVault as any).triggerEvent(
+        'delete',
+        new TFile('first.md', 'first.md', 'md'),
+      );
+      await firstStarted;
+      (env.mockVault as any).triggerEvent(
+        'delete',
+        new TFile('second.md', 'second.md', 'md'),
+      );
+
+      let destroyResolved = false;
+      const destroyPromise = coordinator.destroy().then(() => {
+        destroyResolved = true;
+      });
+      await Promise.resolve();
+      expect(destroyResolved).toBe(false);
+
+      releaseFirst();
+      await destroyPromise;
+      expect(mockScanner.processFileDelete).toHaveBeenCalledTimes(2);
+    });
+
     it('should call processFileRename on rename with oldPath', async () => {
       const mockScanner = {
         processFileRename: jest.fn().mockResolvedValue(undefined),
