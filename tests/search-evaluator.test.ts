@@ -1250,6 +1250,25 @@ describe('SearchEvaluator - Comprehensive', () => {
       expect(result).toBe(false);
     });
 
+    it('should not leak cached phrase regex state between tasks', async () => {
+      const node = { type: 'phrase', value: 'stateful phrase' };
+      const firstTask = createBaseTask({
+        rawText: 'prefix stateful phrase',
+        text: '',
+        path: '',
+      });
+      const secondTask = createBaseTask({
+        rawText: 'stateful phrase',
+        text: '',
+        path: '',
+      });
+
+      expect(await SearchEvaluator.evaluate(node, firstTask, false)).toBe(true);
+      expect(await SearchEvaluator.evaluate(node, secondTask, false)).toBe(
+        true,
+      );
+    });
+
     it('should return false for empty term', async () => {
       const node = { type: 'term', value: '' };
       const task = createBaseTask();

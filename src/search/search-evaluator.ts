@@ -135,7 +135,7 @@ export class SearchEvaluator {
   ): boolean {
     // Escape regex special characters in the phrase
     const escapedPhrase = this.escapeRegex(phrase);
-    const regexFlags = caseSensitive ? 'g' : 'gi';
+    const regexFlags = caseSensitive ? '' : 'i';
 
     // Use word boundaries to ensure exact phrase matching
     // Cache the compiled regex to avoid repeated compilation
