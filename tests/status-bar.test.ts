@@ -44,15 +44,41 @@ describe('StatusBarManager', () => {
   });
 
   describe('cleanup', () => {
-    it('removes status bar item safely', () => {
+    it('removes status bar item and unsubscribes safely', () => {
       manager.setupStatusBarItem();
+      const unsubscribe =
+        mockPlugin.taskStateManager.subscribe.mock.results[0].value;
+
       manager.cleanup();
-      // Should not throw
+      manager.cleanup();
+
+      expect(unsubscribe).toHaveBeenCalledTimes(1);
       expect(manager).toBeDefined();
     });
 
+    it('cancels a pending debounce during cleanup', () => {
+      jest.useFakeTimers();
+      try {
+        const mockFile = { path: 'test.md' };
+        mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
+        manager.setupStatusBarItem();
+
+        const callback = mockPlugin.taskStateManager.subscribe.mock.calls[0][0];
+        callback([createBaseTask({ path: 'test.md', completed: false })]);
+
+        const item = mockPlugin.addStatusBarItem.mock.results[0].value;
+        manager.cleanup();
+        jest.advanceTimersByTime(150);
+
+        expect(item.textContent).toBe('');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('handles cleanup when status bar item is null', () => {
-      // Don't call setup, so statusBarItem is null
+      // Don't call setup, so statusBarItem and subscription are null
+      manager.cleanup();
       manager.cleanup();
       expect(manager).toBeDefined();
     });
@@ -208,6 +234,14 @@ describe('StatusBarManager', () => {
       expect(mockPlugin.taskStateManager.subscribe).toHaveBeenCalled();
     });
 
+    it('does not create duplicate subscriptions when setup repeats', () => {
+      manager.setupStatusBarItem();
+      manager.setupStatusBarItem();
+
+      expect(mockPlugin.addStatusBarItem).toHaveBeenCalledTimes(1);
+      expect(mockPlugin.taskStateManager.subscribe).toHaveBeenCalledTimes(1);
+    });
+
     it('registers active-leaf-change event', () => {
       manager.setupStatusBarItem();
 
@@ -218,53 +252,57 @@ describe('StatusBarManager', () => {
 
     it('debounces status bar updates via timeout', () => {
       jest.useFakeTimers();
-      const pathStr = 'test.md';
-      const mockFile = {
-        path: pathStr,
-        basename: 'test',
-        extension: 'md',
-        parent: null,
-      };
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
-      manager.setupStatusBarItem();
+      try {
+        const pathStr = 'test.md';
+        const mockFile = {
+          path: pathStr,
+          basename: 'test',
+          extension: 'md',
+          parent: null,
+        };
+        mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
+        manager.setupStatusBarItem();
 
-      const callback = mockPlugin.taskStateManager.subscribe.mock.calls[0][0];
-      callback([createBaseTask({ path: 'test.md', completed: false })]);
+        const callback = mockPlugin.taskStateManager.subscribe.mock.calls[0][0];
+        callback([createBaseTask({ path: 'test.md', completed: false })]);
 
-      // Should not update immediately
-      const item = mockPlugin.addStatusBarItem.mock.results[0].value;
-      expect(item.textContent).toBe('');
+        // Should not update immediately
+        const item = mockPlugin.addStatusBarItem.mock.results[0].value;
+        expect(item.textContent).toBe('');
 
-      // Advance timers to trigger debounce
-      jest.advanceTimersByTime(150);
-      expect(item.textContent).toBe('1 task');
-
-      jest.useRealTimers();
+        // Advance timers to trigger debounce
+        jest.advanceTimersByTime(150);
+        expect(item.textContent).toBe('1 task');
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('cancels previous debounce when new update arrives', () => {
       jest.useFakeTimers();
-      const mockFile = {
-        path: 'test.md',
-        basename: 'test',
-        extension: 'md',
-        parent: null,
-      };
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
-      manager.setupStatusBarItem();
+      try {
+        const mockFile = {
+          path: 'test.md',
+          basename: 'test',
+          extension: 'md',
+          parent: null,
+        };
+        mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
+        manager.setupStatusBarItem();
 
-      const callback = mockPlugin.taskStateManager.subscribe.mock.calls[0][0];
-      // First update (starts debounce)
-      callback([createBaseTask({ path: 'test.md', completed: false })]);
-      // Second update before debounce fires (cancels previous)
-      callback([createBaseTask({ path: 'test.md', completed: true })]);
+        const callback = mockPlugin.taskStateManager.subscribe.mock.calls[0][0];
+        // First update (starts debounce)
+        callback([createBaseTask({ path: 'test.md', completed: false })]);
+        // Second update before debounce fires (cancels previous)
+        callback([createBaseTask({ path: 'test.md', completed: true })]);
 
-      // Advance timers — should use the latest task list
-      jest.advanceTimersByTime(150);
-      const item = mockPlugin.addStatusBarItem.mock.results[0].value;
-      expect(item.textContent).toBe('0 tasks');
-
-      jest.useRealTimers();
+        // Advance timers — should use the latest task list
+        jest.advanceTimersByTime(150);
+        const item = mockPlugin.addStatusBarItem.mock.results[0].value;
+        expect(item.textContent).toBe('0 tasks');
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 

@@ -42,6 +42,7 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
 
   private isReady = false;
   private isProcessing = false;
+  private processingPromise: Promise<void> | null = null;
 
   constructor(
     app: App,
@@ -152,51 +153,77 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
   private queueFileEvent(event: FileChangeEvent): void {
     this.pendingEvents.set(event.file.path, event);
 
-    this.processBatch().catch((error) => {
+    void this.processBatch().catch((error) => {
       console.error('Error processing file event batch:', error);
     });
   }
 
   private async processBatch(): Promise<void> {
-    if (this.isProcessing || this.pendingEvents.size === 0) {
+    if (this.isProcessing) {
+      if (this.processingPromise) {
+        await this.processingPromise;
+      }
+      return;
+    }
+
+    if (this.pendingEvents.size === 0) {
       return;
     }
 
     this.isProcessing = true;
+    const processingPromise = this.drainPendingEvents();
+    this.processingPromise = processingPromise;
 
-    const events = Array.from(this.pendingEvents.values());
-    this.pendingEvents.clear();
-
-    const processedPaths = new Set<string>();
-
-    for (const event of events) {
-      if (processedPaths.has(event.file.path)) {
-        continue;
-      }
-      processedPaths.add(event.file.path);
-
-      try {
-        await this.processFileEvent(event);
-      } catch (error) {
-        console.error(
-          `Error processing file event for ${event.file.path}:`,
-          error,
-        );
+    try {
+      await processingPromise;
+    } finally {
+      if (this.processingPromise === processingPromise) {
+        this.processingPromise = null;
       }
     }
+  }
 
-    this.emit('batch-complete', events);
+  private async drainPendingEvents(): Promise<void> {
+    try {
+      while (this.pendingEvents.size > 0) {
+        const events = Array.from(this.pendingEvents.values());
+        this.pendingEvents.clear();
 
-    // Notify external callbacks (e.g., embedded task lists)
-    for (const callback of this.fileChangeCallbacks) {
-      try {
-        events.forEach(callback);
-      } catch (error) {
-        console.error('Error in EventCoordinator file change callback:', error);
+        const processedPaths = new Set<string>();
+
+        for (const event of events) {
+          if (processedPaths.has(event.file.path)) {
+            continue;
+          }
+          processedPaths.add(event.file.path);
+
+          try {
+            await this.processFileEvent(event);
+          } catch (error) {
+            console.error(
+              `Error processing file event for ${event.file.path}:`,
+              error,
+            );
+          }
+        }
+
+        this.emit('batch-complete', events);
+
+        // Notify external callbacks (e.g., embedded task lists)
+        for (const callback of this.fileChangeCallbacks) {
+          try {
+            events.forEach(callback);
+          } catch (error) {
+            console.error(
+              'Error in EventCoordinator file change callback:',
+              error,
+            );
+          }
+        }
       }
+    } finally {
+      this.isProcessing = false;
     }
-
-    this.isProcessing = false;
   }
 
   private async processFileEvent(event: FileChangeEvent): Promise<void> {
@@ -241,7 +268,11 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
       window.clearTimeout(this.batchTimeout);
       this.batchTimeout = null;
     }
-    await this.processBatch();
+    if (this.processingPromise) {
+      await this.processingPromise;
+    } else {
+      await this.processBatch();
+    }
   }
 
   async destroy(): Promise<void> {

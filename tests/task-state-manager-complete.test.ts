@@ -189,6 +189,35 @@ describe('TaskStateManager - Complete Coverage', () => {
       expect(consoleError).toHaveBeenCalled();
       consoleError.mockRestore();
     });
+
+    it('should handle rejected async subscribers without blocking other subscribers', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation();
+      const subscriberError = new Error('Async subscriber error');
+      const asyncCallback = jest.fn(() => Promise.reject(subscriberError));
+      const secondCallback = jest.fn();
+
+      try {
+        stateManager.subscribe(asyncCallback);
+        stateManager.subscribe(secondCallback);
+        await Promise.resolve();
+
+        expect(asyncCallback).toHaveBeenCalledTimes(1);
+        expect(secondCallback).toHaveBeenCalledTimes(1);
+        expect(consoleError).toHaveBeenCalledWith(
+          'Error in TaskStateManager subscriber:',
+          subscriberError,
+        );
+
+        stateManager.addTask(createBaseTask());
+        await Promise.resolve();
+
+        expect(asyncCallback).toHaveBeenCalledTimes(2);
+        expect(secondCallback).toHaveBeenCalledTimes(2);
+        expect(consoleError).toHaveBeenCalledTimes(2);
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
   });
 
   describe('optimisticUpdate fallback', () => {

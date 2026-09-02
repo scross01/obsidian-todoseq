@@ -34,7 +34,7 @@ export class TaskStateManager {
    */
   subscribe(callback: (tasks: Task[]) => void | Promise<void>): () => void {
     this.subscribers.add(callback);
-    void callback(this._tasks);
+    this.invokeSubscriberSafely(callback);
     return () => {
       this.subscribers.delete(callback);
     };
@@ -533,6 +533,26 @@ export class TaskStateManager {
   }
 
   /**
+   * Invoke a subscriber synchronously while observing rejected async results.
+   * The notification contract remains synchronous; rejected promises are logged
+   * without creating an unhandled rejection.
+   */
+  private invokeSubscriberSafely(
+    callback: (tasks: Task[]) => void | Promise<void>,
+  ): void {
+    try {
+      const result = callback(this._tasks);
+      if (result !== undefined) {
+        void Promise.resolve(result).catch((error) => {
+          console.error('Error in TaskStateManager subscriber:', error);
+        });
+      }
+    } catch (error) {
+      console.error('Error in TaskStateManager subscriber:', error);
+    }
+  }
+
+  /**
    * Notify all subscribers of task changes.
    * Guards against re-entrant notifications and queues pending notifications.
    */
@@ -546,11 +566,7 @@ export class TaskStateManager {
       do {
         this.pendingNotification = false;
         this.subscribers.forEach((callback) => {
-          try {
-            void callback(this._tasks);
-          } catch (error) {
-            console.error('Error in TaskStateManager subscriber:', error);
-          }
+          this.invokeSubscriberSafely(callback);
         });
       } while (this.pendingNotification);
     } finally {
