@@ -8,6 +8,7 @@ export type SortOption =
   | 'scheduled'
   | 'deadline'
   | 'closed'
+  | 'started'
   | 'priority'
   | 'urgency'
   | 'keyword';
@@ -122,13 +123,14 @@ export class TodoseqCodeBlockParser {
             keyword: 'keyword',
             keywords: 'keyword',
             closed: 'closed',
+            started: 'started',
           };
           const mappedSort = sortMap[sortValue];
           if (mappedSort) {
             sortMethod = mappedSort;
           } else {
             throw new Error(
-              `Invalid sort method: ${sortValue}. Valid options: filepath, scheduled, deadline, closed, priority, urgency, keyword`,
+              `Invalid sort method: ${sortValue}. Valid options: filepath, scheduled, deadline, closed, started, priority, urgency, keyword`,
             );
           }
         } else if (trimmed.startsWith('show-completed:')) {
@@ -530,6 +532,7 @@ export class TodoseqCodeBlockParser {
       scheduled: 'sortByScheduled',
       deadline: 'sortByDeadline',
       closed: 'sortByClosedDate',
+      started: 'sortByStarted',
       priority: 'sortByPriority',
       urgency: 'sortByUrgency',
       keyword: 'sortByKeyword',

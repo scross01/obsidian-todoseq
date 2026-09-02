@@ -779,7 +779,8 @@ describe('TodoTrackerSettingTab', () => {
         key: 'defaultSortMethod',
       });
       const defaultSortOptions = defaultSort?.options as Record<string, string>;
-      expect(Object.keys(defaultSortOptions)).toHaveLength(7);
+      expect(Object.keys(defaultSortOptions)).toHaveLength(8);
+      expect(Object.keys(defaultSortOptions)).toContain('sortByStarted');
 
       expect(
         controlOf(findSetting(defs, 'Upcoming period (days)')),

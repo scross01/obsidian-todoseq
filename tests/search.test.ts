@@ -610,7 +610,7 @@ describe('Search functionality', () => {
 
     it('should handle range with non-date prefix', () => {
       expect(() => Search.parse('priority:high..low')).toThrow(
-        'Range operator can only be used with scheduled:, deadline:, or closed: prefixes',
+        'Range operator can only be used with scheduled:, deadline:, closed:, or started: prefixes',
       );
     });
 

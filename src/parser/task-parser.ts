@@ -683,30 +683,34 @@ export class TaskParser implements ITaskParser {
   getDateLineType(
     line: string,
     taskIndent: string,
-  ): 'scheduled' | 'deadline' | 'closed' | null {
+  ): 'scheduled' | 'deadline' | 'closed' | 'started' | null {
     const trimmedLine = line.trim();
 
-    // For quoted lines, check if the line starts with > and the rest starts with SCHEDULED:, DEADLINE:, or CLOSED:
+    // For quoted lines, check if the line starts with > and the rest starts with SCHEDULED:, DEADLINE:, CLOSED:, or STARTED:
     if (line.startsWith('>')) {
       const contentAfterArrow = trimmedLine.substring(1).trim();
       if (
         contentAfterArrow.startsWith('SCHEDULED:') ||
         contentAfterArrow.startsWith('DEADLINE:') ||
-        contentAfterArrow.startsWith('CLOSED:')
+        contentAfterArrow.startsWith('CLOSED:') ||
+        contentAfterArrow.startsWith('STARTED:')
       ) {
         return contentAfterArrow.startsWith('SCHEDULED:')
           ? 'scheduled'
           : contentAfterArrow.startsWith('DEADLINE:')
             ? 'deadline'
-            : 'closed';
+            : contentAfterArrow.startsWith('STARTED:')
+              ? 'started'
+              : 'closed';
       }
     }
 
-    // For regular tasks, check if the trimmed line starts with SCHEDULED:, DEADLINE:, or CLOSED:
+    // For regular tasks, check if the trimmed line starts with SCHEDULED:, DEADLINE:, CLOSED:, or STARTED:
     if (
       !trimmedLine.startsWith('SCHEDULED:') &&
       !trimmedLine.startsWith('DEADLINE:') &&
-      !trimmedLine.startsWith('CLOSED:')
+      !trimmedLine.startsWith('CLOSED:') &&
+      !trimmedLine.startsWith('STARTED:')
     ) {
       return null;
     }
@@ -729,7 +733,9 @@ export class TaskParser implements ITaskParser {
       ? 'scheduled'
       : trimmedLine.startsWith('DEADLINE:')
         ? 'deadline'
-        : 'closed';
+        : trimmedLine.startsWith('STARTED:')
+          ? 'started'
+          : 'closed';
   }
 
   /**
@@ -738,11 +744,11 @@ export class TaskParser implements ITaskParser {
    * @returns Parsed Date object or null if parsing fails
    */
   parseDateFromLine(line: string): Date | null {
-    // Remove the SCHEDULED:, DEADLINE:, or CLOSED: prefix and trim
+    // Remove the SCHEDULED:, DEADLINE:, CLOSED:, or STARTED: prefix and trim
     // The regex needs to account for leading whitespace and callout blocks (>)
     let content = line
-      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED):\s*/, '')
-      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/, '')
+      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
+      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
       .trim();
 
     // CLOSED dates use [...] format, convert to <...> for DateParser compatibility
@@ -765,11 +771,11 @@ export class TaskParser implements ITaskParser {
     repeat: DateRepeatInfo | null;
     warningPeriod: WarningPeriodInfo | null;
   } {
-    // Remove the SCHEDULED:, DEADLINE:, or CLOSED: prefix and trim
+    // Remove the SCHEDULED:, DEADLINE:, CLOSED:, or STARTED: prefix and trim
     // The regex needs to account for leading whitespace and callout blocks (>)
     let content = line
-      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED):\s*/, '')
-      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/, '')
+      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
+      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
       .trim();
 
     // CLOSED dates use [...] format, convert to <...> for DateParser compatibility
@@ -797,6 +803,7 @@ export class TaskParser implements ITaskParser {
     scheduledDate: Date | null;
     deadlineDate: Date | null;
     closedDate: Date | null;
+    startedDate: Date | null;
     scheduledDateRepeat: DateRepeatInfo | null;
     deadlineDateRepeat: DateRepeatInfo | null;
     scheduledWarningPeriod: WarningPeriodInfo | null;
@@ -808,6 +815,7 @@ export class TaskParser implements ITaskParser {
     let deadlineDate: Date | null = null;
     let deadlineDateRepeat: DateRepeatInfo | null = null;
     let closedDate: Date | null = null;
+    let startedDate: Date | null = null;
     let scheduledWarningPeriod: WarningPeriodInfo | null = null;
     let deadlineWarningPeriod: WarningPeriodInfo | null = null;
     let description: string | null = null;
@@ -815,6 +823,7 @@ export class TaskParser implements ITaskParser {
     let scheduledFound = false;
     let deadlineFound = false;
     let closedFound = false;
+    let startedFound = false;
 
     for (let i = startIndex; i < lines.length; i++) {
       const nextLine = lines[i];
@@ -863,6 +872,16 @@ export class TaskParser implements ITaskParser {
             `Invalid closed date format at line ${i + 1}: "${nextLine.trim()}"`,
           );
         }
+      } else if (dateLineType === 'started' && !startedFound) {
+        const { date } = this.parseDateFromLineWithRepeater(nextLine);
+        if (date) {
+          startedDate = date;
+          startedFound = true;
+        } else {
+          console.warn(
+            `Invalid started date format at line ${i + 1}: "${nextLine.trim()}"`,
+          );
+        }
       } else {
         // Check for DESCRIPTION: line
         const descText = this.getDescriptionText(nextLine);
@@ -874,10 +893,10 @@ export class TaskParser implements ITaskParser {
         }
 
         // Stop looking for date lines if we encounter a non-empty line that's not a date line
-        // or if we've already found scheduled, deadline, and closed dates
+        // or if we've already found scheduled, deadline, closed, and started dates
         if (
           dateLineType === null ||
-          (scheduledFound && deadlineFound && closedFound)
+          (scheduledFound && deadlineFound && closedFound && startedFound)
         ) {
           break;
         }
@@ -888,6 +907,7 @@ export class TaskParser implements ITaskParser {
       scheduledDate,
       deadlineDate,
       closedDate,
+      startedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
       scheduledWarningPeriod,
@@ -1306,6 +1326,7 @@ export class TaskParser implements ITaskParser {
         deadlineDate: null,
         deadlineDateRepeat: null,
         closedDate: null,
+        startedDate: null,
         scheduledWarningPeriod: null,
         deadlineWarningPeriod: null,
         urgency: null,
@@ -1642,6 +1663,7 @@ export class TaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      startedDate: null,
       scheduledWarningPeriod: null,
       deadlineWarningPeriod: null,
 
@@ -1660,6 +1682,7 @@ export class TaskParser implements ITaskParser {
       scheduledDate,
       deadlineDate,
       closedDate,
+      startedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
       scheduledWarningPeriod,
@@ -1671,6 +1694,7 @@ export class TaskParser implements ITaskParser {
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
     task.closedDate = closedDate;
+    task.startedDate = startedDate;
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
 
@@ -1773,6 +1797,7 @@ export class TaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      startedDate: null,
       scheduledWarningPeriod: null,
       deadlineWarningPeriod: null,
 
@@ -1791,6 +1816,7 @@ export class TaskParser implements ITaskParser {
       scheduledDate,
       deadlineDate,
       closedDate,
+      startedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
       scheduledWarningPeriod,
@@ -1802,6 +1828,7 @@ export class TaskParser implements ITaskParser {
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
     task.closedDate = closedDate;
+    task.startedDate = startedDate;
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
 
@@ -1891,6 +1918,7 @@ export class TaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      startedDate: null,
       scheduledWarningPeriod: null,
       deadlineWarningPeriod: null,
       tail: '',
@@ -1912,6 +1940,7 @@ export class TaskParser implements ITaskParser {
       scheduledDate,
       deadlineDate,
       closedDate,
+      startedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
       scheduledWarningPeriod,
@@ -1924,6 +1953,7 @@ export class TaskParser implements ITaskParser {
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
     task.closedDate = closedDate;
+    task.startedDate = startedDate;
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
     task.description = description ?? undefined;
@@ -2037,6 +2067,7 @@ export class TaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      startedDate: null,
       scheduledWarningPeriod: null,
       deadlineWarningPeriod: null,
 
@@ -2059,6 +2090,7 @@ export class TaskParser implements ITaskParser {
       scheduledDate,
       deadlineDate,
       closedDate,
+      startedDate,
       scheduledDateRepeat,
       deadlineDateRepeat,
       scheduledWarningPeriod,
@@ -2071,6 +2103,7 @@ export class TaskParser implements ITaskParser {
     task.deadlineDate = deadlineDate;
     task.deadlineDateRepeat = deadlineDateRepeat;
     task.closedDate = closedDate;
+    task.startedDate = startedDate;
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
     task.description = description ?? undefined;
@@ -2171,6 +2204,7 @@ export class TaskParser implements ITaskParser {
         deadlineDate: null,
         deadlineDateRepeat: null,
         closedDate: null,
+        startedDate: null,
         scheduledWarningPeriod: null,
         deadlineWarningPeriod: null,
         tail: taskDetails.tail,
@@ -2243,6 +2277,7 @@ export class TaskParser implements ITaskParser {
       deadlineDate: null,
       deadlineDateRepeat: null,
       closedDate: null,
+      startedDate: null,
       scheduledWarningPeriod: null,
       deadlineWarningPeriod: null,
 

@@ -30,7 +30,7 @@ export function getIndentLength(indent: string): number {
  *
  * @param lines - Array of lines to search
  * @param startIndex - Starting line index (typically task.line + 1)
- * @param dateType - Type of date to find ('SCHEDULED', 'DEADLINE', or 'CLOSED')
+ * @param dateType - Type of date to find ('SCHEDULED', 'DEADLINE', 'CLOSED', or 'STARTED')
  * @param taskIndent - The task's indent level (for proper nesting detection)
  * @param keywordManager - KeywordManager for dynamic keyword detection
  * @returns Line index of found date line, or -1 if not found
@@ -42,7 +42,7 @@ export function getIndentLength(indent: string): number {
 export function findDateLine(
   lines: string[],
   startIndex: number,
-  dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED',
+  dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED' | 'STARTED',
   taskIndent: string,
   keywordManager: KeywordManager,
 ): number {
@@ -117,7 +117,7 @@ function isTaskLine(line: string, keywordManager: KeywordManager): boolean {
  *
  * @param lines - Array of lines to search
  * @param startIndex - Starting line index (typically task.line + 1)
- * @param dateType - Type of date to find ('SCHEDULED', 'DEADLINE', or 'CLOSED')
+ * @param dateType - Type of date to find ('SCHEDULED', 'DEADLINE', 'CLOSED', or 'STARTED')
  * @param taskIndent - The task's indent level (for proper nesting detection)
  * @param parser - Optional TaskParser for enhanced date line detection
  * @param keywordManager - KeywordManager for dynamic keyword detection (used when parser is null)
@@ -130,14 +130,14 @@ function isTaskLine(line: string, keywordManager: KeywordManager): boolean {
 export function findDateLineWithParser(
   lines: string[],
   startIndex: number,
-  dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED',
+  dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED' | 'STARTED',
   taskIndent: string,
   parser:
     | {
         getDateLineType: (
           line: string,
           indent: string,
-        ) => 'scheduled' | 'deadline' | 'closed' | null;
+        ) => 'scheduled' | 'deadline' | 'closed' | 'started' | null;
       }
     | null
     | undefined,
@@ -147,7 +147,7 @@ export function findDateLineWithParser(
   if (parser) {
     const maxLines = Math.min(startIndex + 9, lines.length);
     const targetDateType = dateType.toLowerCase() as
-      'scheduled' | 'deadline' | 'closed';
+      'scheduled' | 'deadline' | 'closed' | 'started';
 
     for (let i = startIndex; i < maxLines; i++) {
       const line = lines[i];
@@ -216,7 +216,7 @@ function findKeywordLine(
 }
 
 /**
- * Check if a line is a date keyword line (SCHEDULED:, DEADLINE:, CLOSED:, DESCRIPTION:).
+ * Check if a line is a date keyword line (SCHEDULED:, DEADLINE:, CLOSED:, STARTED:, DESCRIPTION:).
  * Handles both bare and quoted (>, > >) forms.
  */
 function isDateKeywordLine(line: string): boolean {
@@ -226,6 +226,7 @@ function isDateKeywordLine(line: string): boolean {
     trimmed.startsWith('SCHEDULED:') ||
     trimmed.startsWith('DEADLINE:') ||
     trimmed.startsWith('CLOSED:') ||
+    trimmed.startsWith('STARTED:') ||
     trimmed.startsWith('DESCRIPTION:')
   ) {
     return true;
@@ -233,7 +234,7 @@ function isDateKeywordLine(line: string): boolean {
   // Slow path: quoted keywords (only test regex for lines starting with >)
   return (
     trimmed.startsWith('>') &&
-    /^(>\s*)+(SCHEDULED|DEADLINE|CLOSED|DESCRIPTION):/.test(trimmed)
+    /^(>\s*)+(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(trimmed)
   );
 }
 

@@ -285,6 +285,24 @@ export class SearchSuggestions {
   }
 
   /**
+   * Get date suggestion options for started date filter.
+   * Mirrors the closed-date set minus any 'overdue'/'due' entries:
+   * under first-ever-start semantics those have no meaningful definition.
+   * @returns Array of date suggestion options
+   */
+  static getStartedDateSuggestions(): string[] {
+    return [
+      'today',
+      'yesterday',
+      'this week',
+      'last 7 days',
+      'last week',
+      'last month',
+      'none',
+    ];
+  }
+
+  /**
    * Extract all unique scheduled dates from tasks
    * @param tasks Array of tasks to analyze
    * @param mode Current view mode (optional)
@@ -364,6 +382,36 @@ export class SearchSuggestions {
     filteredTasks.forEach((task) => {
       if (task.closedDate) {
         const dateStr = task.closedDate.toISOString().split('T')[0];
+        datesSet.add(dateStr);
+      }
+    });
+
+    // Convert to array and sort chronologically
+    const dates = Array.from(datesSet);
+    dates.sort((a, b) => a.localeCompare(b));
+    return dates;
+  }
+
+  /**
+   * Extract all unique started dates from tasks
+   * @param tasks Array of tasks to analyze
+   * @param mode Current view mode (optional)
+   * @returns Array of unique started dates in YYYY-MM-DD format, sorted chronologically
+   */
+  static getStartedDateSuggestionsFromTasks(
+    tasks: Task[],
+    mode?: TaskListViewMode,
+  ): string[] {
+    const datesSet = new Set<string>();
+
+    // Filter tasks based on view mode
+    const filteredTasks = mode
+      ? this.filterTasksByViewMode(tasks, mode)
+      : tasks;
+
+    filteredTasks.forEach((task) => {
+      if (task.startedDate) {
+        const dateStr = task.startedDate.toISOString().split('T')[0];
         datesSet.add(dateStr);
       }
     });

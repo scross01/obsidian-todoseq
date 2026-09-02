@@ -27,7 +27,7 @@ DONE [#C] Fix critical bug in payment processing
 - **State keywords** (TODO, DOING, DONE, etc.) are highlighted with bold font and your theme's accent color
 - **Completed tasks** (DONE, CANCELED, CANCELLED) display with a line-through decoration
 - **Checkboxes** (when used) are synchronized with the task state
-- SCHEDULED and DEADLINE date lines are formatted with special styling
+- SCHEDULED and DEADLINE date lines are formatted with special styling (CLOSED and STARTED date lines too)
 - The styling is applied in real-time as you type
 
 ## Interactive Task Management

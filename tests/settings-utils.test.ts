@@ -67,7 +67,7 @@ describe('settings-utils', () => {
         expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME', 'HACK'],
           otherSetting: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
           savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
@@ -88,7 +88,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           otherSetting: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -99,7 +99,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           additionalInactiveKeywords: [],
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
     });
@@ -116,7 +116,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           languageCommentSupport: true,
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -128,7 +128,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           languageCommentSupport: false,
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -140,7 +140,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           languageCommentSupport: true,
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -152,7 +152,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           languageCommentSupport: null,
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -164,7 +164,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           languageCommentSupport: { disabled: false },
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -176,7 +176,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           languageCommentSupport: { enabled: 'true' },
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -188,7 +188,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           otherSetting: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
     });
@@ -208,7 +208,7 @@ describe('settings-utils', () => {
           additionalInactiveKeywords: ['FIXME'],
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
           savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
@@ -223,7 +223,7 @@ describe('settings-utils', () => {
         expect(result).toMatchObject({
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
           savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
@@ -238,7 +238,7 @@ describe('settings-utils', () => {
         expect(result).toMatchObject({
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -261,7 +261,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 5,
+          settingsVersion: 6,
           savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
@@ -274,7 +274,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 5,
+          settingsVersion: 6,
           savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
@@ -287,7 +287,7 @@ describe('settings-utils', () => {
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 5,
+          settingsVersion: 6,
           savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
@@ -316,7 +316,7 @@ describe('settings-utils', () => {
           property3: true,
           property4: ['a', 'b'],
           property5: { nested: 'object' },
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -324,7 +324,7 @@ describe('settings-utils', () => {
         const settings = {};
         const result = migrateSettings(settings);
         expect(result).toMatchObject({
-          settingsVersion: 5,
+          settingsVersion: 6,
           savedSearches: DEFAULT_SAVED_SEARCHES,
         });
       });
@@ -348,7 +348,7 @@ describe('settings-utils', () => {
         expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
           someOtherSetting: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -361,7 +361,7 @@ describe('settings-utils', () => {
         expect(result).toMatchObject({
           languageCommentSupport: false,
           someOtherSetting: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -376,7 +376,7 @@ describe('settings-utils', () => {
           additionalInactiveKeywords: ['FIXME', 'HACK'],
           languageCommentSupport: true,
           otherProperty: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -392,7 +392,7 @@ describe('settings-utils', () => {
           additionalInactiveKeywords: ['FIXME'],
           languageCommentSupport: true,
           otherSetting: 'value',
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
 
@@ -406,7 +406,7 @@ describe('settings-utils', () => {
         // Migration should overwrite additionalInactiveKeywords
         expect(result).toMatchObject({
           additionalInactiveKeywords: ['FIXME'],
-          settingsVersion: 5,
+          settingsVersion: 6,
         });
       });
     });
@@ -418,7 +418,7 @@ describe('settings-utils', () => {
   describe('getLatestSettingsVersion', () => {
     test('should return the latest migration version', () => {
       const latestVersion = getLatestSettingsVersion();
-      expect(latestVersion).toBe(5);
+      expect(latestVersion).toBe(6);
     });
 
     test('should handle empty migrations array', () => {

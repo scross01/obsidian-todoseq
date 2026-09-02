@@ -1050,5 +1050,146 @@ describe('VaultScanner.tasksIdentical', () => {
       const result = vaultScanner.tasksIdentical(tasks1, tasks2);
       expect(result).toBe(true);
     });
+
+    test('should return false when started date changes (manual STARTED line edit)', () => {
+      // Regression: tasksIdentical did not compare startedDate, so a manual
+      // edit of a STARTED: line (in place, no line shift) was treated as a
+      // no-change and the cached task kept the stale date.
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          startedDate: new Date(2026, 0, 10),
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          startedDate: new Date(2026, 0, 11),
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(false);
+    });
+
+    test('should return false when started date is added', () => {
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          startedDate: null,
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- TODO test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          startedDate: new Date(2026, 0, 11),
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(false);
+    });
+
+    test('should return false when closed date changes (manual CLOSED line edit)', () => {
+      const tasks1: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- DONE test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'DONE',
+          completed: true,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          closedDate: new Date(2026, 0, 10),
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      const tasks2: Task[] = [
+        {
+          path: 'test.md',
+          line: 0,
+          rawText: '- DONE test task',
+          indent: '',
+          listMarker: '- ',
+          text: 'test task',
+          state: 'DONE',
+          completed: true,
+          priority: null,
+          scheduledDate: null,
+          deadlineDate: null,
+          closedDate: new Date(2026, 0, 11),
+          urgency: null,
+          isDailyNote: false,
+          dailyNoteDate: null,
+        },
+      ];
+
+      // @ts-ignore - Accessing private method for testing
+      const result = vaultScanner.tasksIdentical(tasks1, tasks2);
+      expect(result).toBe(false);
+    });
   });
 });

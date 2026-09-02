@@ -13,8 +13,8 @@ import {
 import TodoTracker from '../main';
 import { getStateTransitionManager } from './task-update-coordinator';
 
-/** A SCHEDULED/DEADLINE/CLOSED date line kind. */
-type DateLineType = 'SCHEDULED' | 'DEADLINE' | 'CLOSED';
+/** A SCHEDULED/DEADLINE/CLOSED/STARTED date line kind. */
+type DateLineType = 'SCHEDULED' | 'DEADLINE' | 'CLOSED' | 'STARTED';
 
 export interface DateLineUpdateResult {
   task: Task;
@@ -214,6 +214,10 @@ export class TaskWriter {
       this.keywordManager,
     );
 
+    // STARTED tracking: trigger on first entry into an active state.
+    // Idempotent and one-way — never removed on reactivation (first-ever-start).
+    const isActiveState = this.keywordManager.isActive(newState);
+
     // Check if target is the active file in a MarkdownView
     // Using getActiveViewOfType() is safer than accessing workspace.activeLeaf directly
     const md = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -228,6 +232,15 @@ export class TaskWriter {
       md?.getViewType() === 'markdown' &&
       md?.getMode &&
       md.getMode() === 'source';
+
+    // Mutable accumulators for the vault.process callback below.
+    // NOTE: these MUST be declared before the callback runs (the callback
+    // assigns to startedInserted); declaring them after the callback body
+    // but before .process() would still be a temporal-dead-zone error.
+    let lineDelta = 0;
+    let updatedClosedDate = task.closedDate;
+    let updatedStartedDate = task.startedDate;
+    let startedInserted = false;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
@@ -292,6 +305,24 @@ export class TaskWriter {
             this.removeDateLine(lines, task.line, 'CLOSED', task);
           }
 
+          // Handle STARTED date atomically (first entry into active state).
+          // updateOrInsertStartedDateLine is idempotent: an existing STARTED
+          // line is retained untouched (no duplicate, no overwrite).
+          if (
+            isActiveState &&
+            settings?.trackStartedDate &&
+            !task.startedDate
+          ) {
+            const startedDateStr = DateUtils.formatStartedDate(new Date());
+            const startedResult = this.updateOrInsertStartedDateLine(
+              lines,
+              task.line,
+              startedDateStr,
+              task,
+            );
+            startedInserted = startedResult.lineDelta > 0;
+          }
+
           return lines.join('\n');
         });
       }
@@ -300,9 +331,7 @@ export class TaskWriter {
     // For source mode, handle CLOSED date separately via individual Editor API calls
     // The main editor.replaceRange above only replaces a single line, so CLOSED date
     // insertion/removal requires its own editor operations
-    // Calculate line delta: +1 if new line inserted, -1 if removed, 0 if updated or no change
-    let lineDelta = 0;
-    let updatedClosedDate = task.closedDate;
+    // Line delta and date accumulators were declared above (before vault.process)
     if (isSourceMode && !forceVaultApi) {
       if (completed && settings?.trackClosedDate) {
         const closedResult = await this.updateTaskClosedDate(
@@ -317,6 +346,19 @@ export class TaskWriter {
         lineDelta += closedResult.lineDelta;
         updatedClosedDate = closedResult.task.closedDate;
       }
+
+      // STARTED: insert via Editor API on first entry into an active state.
+      // updateTaskStartedDate is idempotent (retains existing STARTED line)
+      // and there is NO removal branch — insertion is one-way.
+      if (isActiveState && settings?.trackStartedDate && !task.startedDate) {
+        const startedResult = await this.updateTaskStartedDate(
+          task,
+          new Date(),
+          false,
+        );
+        lineDelta += startedResult.lineDelta;
+        updatedStartedDate = startedResult.task.startedDate;
+      }
     } else if (!isSourceMode || forceVaultApi) {
       // For non-source mode, CLOSED date was handled atomically above
       if (completed && settings?.trackClosedDate) {
@@ -325,6 +367,14 @@ export class TaskWriter {
       } else if (!completed && task.closedDate) {
         lineDelta = -1;
         updatedClosedDate = null;
+      }
+
+      // STARTED was handled atomically above; account for the inserted line
+      if (isActiveState && settings?.trackStartedDate && !task.startedDate) {
+        lineDelta += startedInserted ? 1 : 0;
+        updatedStartedDate = startedInserted
+          ? new Date()
+          : (task.startedDate ?? null);
       }
     }
 
@@ -336,6 +386,7 @@ export class TaskWriter {
       state: newState,
       completed,
       closedDate: updatedClosedDate,
+      startedDate: updatedStartedDate,
     };
     if (lineDelta !== 0) {
       result.lineDelta = lineDelta;
@@ -1048,6 +1099,148 @@ export class TaskWriter {
   }
 
   /**
+   * Updates or adds a STARTED date line below the task.
+   *
+   * IDEMPOTENT and ONE-WAY (first-ever-start semantics):
+   * - If a STARTED line already exists, this method does NOTHING — the
+   *   original timestamp is retained (no duplicate, no update).
+   * - There is intentionally NO removal path. STARTED is never removed by
+   *   state transitions; only manual user editing can remove the line.
+   *
+   * The line is inserted first in the date-line sequence (before
+   * SCHEDULED/DEADLINE/CLOSED), mirroring CLOSED handling for both the
+   * Editor and Vault API paths.
+   *
+   * Returns both the updated task and the line delta (+1 if inserted, 0 if
+   * a STARTED line already existed).
+   */
+  async updateTaskStartedDate(
+    task: Task,
+    startedDate: Date | null,
+    forceVaultApi = false,
+  ): Promise<DateLineUpdateResult> {
+    // Idempotent: if a STARTED line already exists, do nothing.
+    // STARTED is never removed once set (first-ever-start semantics).
+    const dateStr = startedDate
+      ? DateUtils.formatStartedDate(startedDate)
+      : null;
+
+    let lineDelta = 0;
+
+    if (!dateStr) {
+      return {
+        task: { ...task, startedDate: task.startedDate ?? null },
+        lineDelta,
+      };
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file && file instanceof TFile) {
+      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+      // Use Editor API only if NOT forcing Vault API AND file is active in editor (source mode)
+      const isActive = !forceVaultApi && md?.file?.path === task.path;
+      const editor = md?.editor;
+
+      if (isActive && editor) {
+        // Use Editor API when file is open in editor to avoid triggering file watcher
+        const lines = Array.from({ length: editor.lineCount() }, (_, i) =>
+          editor.getLine(i),
+        );
+
+        // Get the proper indent including quote prefix, bullet, or checkbox marker
+        const taskIndent = getTaskIndent(task);
+
+        // Idempotency check: search for an existing STARTED line regardless of
+        // task.startedDate (file may contain one the parser hasn't picked up).
+        const startedLineIndex = findDateLine(
+          lines,
+          task.line + 1,
+          'STARTED',
+          taskIndent,
+          this.keywordManager,
+        );
+
+        if (startedLineIndex >= 0) {
+          // Existing STARTED line found: retain original, do nothing.
+          lineDelta = 0;
+        } else {
+          // Insert new STARTED line first in the date-line sequence
+          const insertIndex = this.calcDateLineInsertIndex(
+            lines,
+            task.line,
+            'STARTED',
+            taskIndent,
+          );
+          const indent = this.getEffectiveDateLineIndent(lines, -1, task);
+          const from: EditorPosition = { line: insertIndex, ch: 0 };
+          const to: EditorPosition = { line: insertIndex, ch: 0 };
+          editor.replaceRange(`${indent}STARTED: ${dateStr}\n`, from, to);
+          lineDelta = 1;
+        }
+      } else {
+        // Vault API path (atomic)
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split('\n');
+          const result = this.updateOrInsertStartedDateLine(
+            lines,
+            task.line,
+            dateStr,
+            task,
+          );
+          lineDelta = result.lineDelta;
+          return lines.join('\n');
+        });
+      }
+    }
+
+    return {
+      task: {
+        ...task,
+        startedDate:
+          lineDelta > 0 ? startedDate : (task.startedDate ?? startedDate),
+      },
+      lineDelta,
+    };
+  }
+
+  /**
+   * Vault-API variant of idempotent STARTED insertion.
+   * Unlike updateOrInsertDateLine, this NEVER updates an existing STARTED line —
+   * the first-ever-start timestamp is preserved.
+   */
+  private updateOrInsertStartedDateLine(
+    lines: string[],
+    taskLineIndex: number,
+    dateStr: string,
+    task: Task,
+  ): { lines: string[]; lineDelta: number } {
+    const kwManager = this.keywordManager;
+    const taskIndent = getTaskIndent(task);
+    const existingIdx = findDateLine(
+      lines,
+      taskLineIndex + 1,
+      'STARTED',
+      taskIndent,
+      kwManager,
+    );
+
+    if (existingIdx >= 0) {
+      // Idempotent: retain the original STARTED line untouched.
+      return { lines, lineDelta: 0 };
+    }
+
+    const insertIdx = this.calcDateLineInsertIndex(
+      lines,
+      taskLineIndex,
+      'STARTED',
+      taskIndent,
+    );
+    const indent = this.getEffectiveDateLineIndent(lines, -1, task);
+    lines.splice(insertIdx, 0, `${indent}STARTED: ${dateStr}`);
+    return { lines, lineDelta: 1 };
+  }
+
+  /**
    * Updates or adds a CLOSED date line below the task.
    * If a CLOSED line already exists, it is updated in place.
    * If no CLOSED line exists, a new one is inserted after DEADLINE (or after task if no DEADLINE).
@@ -1575,9 +1768,14 @@ export class TaskWriter {
    *
    * Insertion rules (all indices relative to task.line):
    * - DESCRIPTION: always inserted at taskLineIndex + 1
-   * - SCHEDULED: before DEADLINE (if exists), else after DESCRIPTION (if exists), else after task
-   * - DEADLINE:  after SCHEDULED (if exists), else after DESCRIPTION (if exists), else after task
-   * - CLOSED:    after DEADLINE (if exists), else after SCHEDULED (if exists), else after task
+   * - STARTED:     first in the date-line sequence — immediately after the task
+   *                line/description, BEFORE any SCHEDULED line (pushes SCHEDULED down)
+   * - SCHEDULED: before DEADLINE (if exists), else after STARTED (if exists),
+   *              else after DESCRIPTION (if exists), else after task
+   * - DEADLINE:  after SCHEDULED (if exists), else after STARTED (if exists),
+   *              else after DESCRIPTION (if exists), else after task
+   * - CLOSED:    after DEADLINE (if exists), else after SCHEDULED (if exists),
+   *              else after STARTED (if exists), else after task
    */
   private calcDateLineInsertIndex(
     lines: string[],
@@ -1592,19 +1790,8 @@ export class TaskWriter {
     const descIdx = findDescriptionLine(lines, afterTask, taskIndent);
     const afterDesc = descIdx >= 0 ? descIdx + 1 : afterTask;
 
-    if (dateType === 'SCHEDULED') {
-      // Insert before DEADLINE (if exists), else after DESCRIPTION
-      const deadlineIdx = findDateLine(
-        lines,
-        afterTask,
-        'DEADLINE',
-        taskIndent,
-        kwManager,
-      );
-      return deadlineIdx >= 0 ? deadlineIdx : afterDesc;
-    }
-    if (dateType === 'DEADLINE') {
-      // Insert after SCHEDULED (if exists), else after DESCRIPTION
+    if (dateType === 'STARTED') {
+      // STARTED goes FIRST among date lines: before SCHEDULED/DEADLINE/CLOSED.
       const scheduledIdx = findDateLine(
         lines,
         afterTask,
@@ -1612,9 +1799,68 @@ export class TaskWriter {
         taskIndent,
         kwManager,
       );
-      return scheduledIdx >= 0 ? scheduledIdx + 1 : afterDesc;
+      if (scheduledIdx >= 0) return scheduledIdx;
+      const deadlineIdx = findDateLine(
+        lines,
+        afterTask,
+        'DEADLINE',
+        taskIndent,
+        kwManager,
+      );
+      if (deadlineIdx >= 0) return deadlineIdx;
+      const closedIdx = findDateLine(
+        lines,
+        afterTask,
+        'CLOSED',
+        taskIndent,
+        kwManager,
+      );
+      if (closedIdx >= 0) return closedIdx;
+      return afterDesc;
     }
-    // CLOSED - insert after DEADLINE or SCHEDULED
+    if (dateType === 'SCHEDULED') {
+      // Insert before DEADLINE (if exists), else after STARTED (if exists),
+      // else after DESCRIPTION. Checking STARTED keeps the sequence order
+      // STARTED → SCHEDULED: inserting before an existing STARTED line would
+      // violate the STARTED-first invariant.
+      const deadlineIdx = findDateLine(
+        lines,
+        afterTask,
+        'DEADLINE',
+        taskIndent,
+        kwManager,
+      );
+      if (deadlineIdx >= 0) return deadlineIdx;
+      const startedIdx = findDateLine(
+        lines,
+        afterTask,
+        'STARTED',
+        taskIndent,
+        kwManager,
+      );
+      return startedIdx >= 0 ? startedIdx + 1 : afterDesc;
+    }
+    if (dateType === 'DEADLINE') {
+      // Insert after SCHEDULED (if exists), else after STARTED (if exists),
+      // else after DESCRIPTION. Checking STARTED keeps STARTED above DEADLINE.
+      const scheduledIdx = findDateLine(
+        lines,
+        afterTask,
+        'SCHEDULED',
+        taskIndent,
+        kwManager,
+      );
+      if (scheduledIdx >= 0) return scheduledIdx + 1;
+      const startedIdx = findDateLine(
+        lines,
+        afterTask,
+        'STARTED',
+        taskIndent,
+        kwManager,
+      );
+      return startedIdx >= 0 ? startedIdx + 1 : afterDesc;
+    }
+    // CLOSED - insert after DEADLINE, SCHEDULED, or STARTED (whichever is last)
     const deadlineIdx = findDateLine(
       lines,
       afterTask,
@@ -1631,6 +1877,16 @@ export class TaskWriter {
       kwManager,
     );
     if (scheduledIdx >= 0) return scheduledIdx + 1;
+    // No SCHEDULED/DEADLINE: place CLOSED after STARTED (if present) so a
+    // CLOSED line is never positioned before a STARTED line.
+    const startedIdx = findDateLine(
+      lines,
+      afterTask,
+      'STARTED',
+      taskIndent,
+      kwManager,
+    );
+    if (startedIdx >= 0) return startedIdx + 1;
     return afterDesc;
   }
 

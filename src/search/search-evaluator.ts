@@ -257,6 +257,8 @@ export class SearchEvaluator {
         );
       case 'closed':
         return this.evaluateClosedFilter(value, task, caseSensitive, settings);
+      case 'started':
+        return this.evaluateStartedFilter(value, task, caseSensitive, settings);
       default:
         return false;
     }
@@ -493,6 +495,33 @@ export class SearchEvaluator {
   }
 
   /**
+   * Evaluate started date filter
+   * @param value Filter value
+   * @param task Task to evaluate
+   * @param caseSensitive Whether matching should be case sensitive
+   * @param settings Application settings
+   * @returns True if task matches the started filter
+   * Note: 'overdue' and 'due' are intentionally NOT meaningful for started
+   * dates (first-ever-start is a one-way record); they never match, regardless
+   * of the date's value.
+   */
+  private static evaluateStartedFilter(
+    value: string,
+    task: Task,
+    caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
+  ): boolean {
+    // 'overdue' and 'due' describe planning dates (SCHEDULED/DEADLINE). A
+    // STARTED date records when work first began, so these expressions have
+    // no meaning here — reject them before generic date evaluation.
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'overdue' || normalized === 'due') {
+      return false;
+    }
+    return this.evaluateDateFilter(value, task.startedDate, settings);
+  }
+
+  /**
    * Common date filter evaluation logic
    * @param value Filter value
    * @param taskDate Task date to evaluate against
@@ -672,7 +701,9 @@ export class SearchEvaluator {
           ? task.deadlineDate
           : field === 'closed'
             ? task.closedDate
-            : null;
+            : field === 'started'
+              ? task.startedDate
+              : null;
 
     // Handle tasks without the specified date
     if (!taskDate) {

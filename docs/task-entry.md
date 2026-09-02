@@ -466,12 +466,36 @@ The CLOSED date uses square brackets `[]` instead of angle brackets `<>` to dist
 - **Recurring Tasks**: CLOSED dates are not removed from recurring tasks when they are reactivated, as they preserve a record of when the task was last completed.
 - **Manual Editing**: You can manually add or remove CLOSED dates directly in your notes.
 
+### STARTED Date
+
+TODOseq supports a STARTED date that records when a task *first* entered an active state (e.g., TODO → DOING), completing the task lifecycle: SCHEDULED → STARTED → CLOSED.
+
+#### STARTED Date Format
+
+```markdown
+TODO Write documentation
+STARTED: [2025-01-18 Fri 09:00]
+SCHEDULED: <2025-01-15>
+DEADLINE: <2025-01-20>
+CLOSED: [2025-01-19 Sat 14:30]
+```
+
+The STARTED date uses square brackets `[]` (the same inactive-timestamp convention as CLOSED) to distinguish it from planning dates. It includes the date, day of week, and time when work on the task first began. Among the date lines, STARTED is written first (immediately below the task, before SCHEDULED/DEADLINE/CLOSED).
+
+#### STARTED Date Behavior
+
+- **Automatic Addition**: When a task transitions into an active state (e.g., TODO → DOING), a STARTED date is automatically added if the "Track started date" setting is enabled.
+- **Idempotent**: The STARTED date is written once. It is never updated, duplicated, or removed by later state changes.
+- **First-ever semantics**: STARTED records when a task first became active. If you pause (DOING → WAIT), reactivate, or resume a task, the original STARTED date is retained — it spans the task's whole life, across multiple work sessions.
+- **Duration**: Together with the CLOSED date, STARTED enables duration calculation (STARTED to CLOSED) and "what did I start today?" queries via the `started:` search filter.
+- **Manual Editing**: You can manually add or remove STARTED dates directly in your notes.
+
 #### Date Usage Rules
 
 1. **Placement**: Date lines must be immediately after the task line
 2. **Indentation**: Must match or be more indented than the task
-3. **Format**: Must use angle brackets `<>` for SCHEDULED/DEADLINE or square brackets `[]` for CLOSED
-4. **Limit**: Only first occurrence of each type (SCHEDULED/DEADLINE/CLOSED) is recognized
+3. **Format**: Must use angle brackets `<>` for SCHEDULED/DEADLINE or square brackets `[]` for CLOSED and STARTED
+4. **Limit**: Only first occurrence of each type (SCHEDULED/DEADLINE/CLOSED/STARTED) is recognized
 
 **Correct Date Usage:**
 

@@ -605,28 +605,32 @@
 /* Source mode - simpler styling without size for date lines */
 .markdown-source-view:not(.is-live-preview) .todoseq-scheduled-line,
 .markdown-source-view:not(.is-live-preview) .todoseq-deadline-line,
-.markdown-source-view:not(.is-live-preview) .todoseq-closed-line {
+.markdown-source-view:not(.is-live-preview) .todoseq-closed-line,
+.markdown-source-view:not(.is-live-preview) .todoseq-started-line {
   font-size: inherit;
 }
 
-/* Scheduled, Deadline, and Closed line styling - editor and reader (consolidated) */
+/* Scheduled, Deadline, Closed, and Started line styling - editor and reader (consolidated) */
 :is(.cm-editor, .markdown-preview-view) .todoseq-scheduled-line,
 :is(.cm-editor, .markdown-preview-view) .todoseq-deadline-line,
-:is(.cm-editor, .markdown-preview-view) .todoseq-closed-line {
+:is(.cm-editor, .markdown-preview-view) .todoseq-closed-line,
+:is(.cm-editor, .markdown-preview-view) .todoseq-started-line {
   font-size: 0.9rem;
   color: var(--text-muted);
 }
 
 .markdown-preview-view .todoseq-scheduled-line,
 .markdown-preview-view .todoseq-deadline-line,
-.markdown-preview-view .todoseq-closed-line {
+.markdown-preview-view .todoseq-closed-line,
+.markdown-preview-view .todoseq-started-line {
   display: inline-block; /* Ensure it doesn't affect the entire paragraph */
 }
 
 /* Table cell date line styling in editor Live Preview rendered tables */
 .markdown-source-view .table-cell-wrapper .todoseq-scheduled-line,
 .markdown-source-view .table-cell-wrapper .todoseq-deadline-line,
-.markdown-source-view .table-cell-wrapper .todoseq-closed-line {
+.markdown-source-view .table-cell-wrapper .todoseq-closed-line,
+.markdown-source-view .table-cell-wrapper .todoseq-started-line {
   font-size: 0.9rem;
   color: var(--text-muted);
   display: inline;
@@ -696,9 +700,11 @@
 :is(.cm-editor, .markdown-preview-view) .todoseq-scheduled-keyword,
 :is(.cm-editor, .markdown-preview-view) .todoseq-deadline-keyword,
 :is(.cm-editor, .markdown-preview-view) .todoseq-closed-keyword,
+:is(.cm-editor, .markdown-preview-view) .todoseq-started-keyword,
 .markdown-source-view .table-cell-wrapper .todoseq-scheduled-keyword,
 .markdown-source-view .table-cell-wrapper .todoseq-deadline-keyword,
-.markdown-source-view .table-cell-wrapper .todoseq-closed-keyword {
+.markdown-source-view .table-cell-wrapper .todoseq-closed-keyword,
+.markdown-source-view .table-cell-wrapper .todoseq-started-keyword {
   font-weight: var(--font-normal);
 }
 
@@ -723,7 +729,7 @@
 .markdown-preview-view
   p:not(.todoseq-scheduled-line):not(.todoseq-deadline-line):not(
     .todoseq-closed-line
-  ) {
+  ):not(.todoseq-started-line) {
   font-size: var(--font-text-size);
   color: var(--text-normal);
 }

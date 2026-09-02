@@ -687,7 +687,7 @@ export class TaskKeywordDecorator {
   }
 
   /**
-   * Check if a line contains SCHEDULED:, DEADLINE:, or CLOSED: and apply appropriate decorations
+   * Check if a line contains SCHEDULED:, DEADLINE:, CLOSED:, or STARTED: and apply appropriate decorations
    * if it follows a task line at the same indent level
    */
   private checkAndDecorateDateLine(
@@ -712,9 +712,10 @@ export class TaskKeywordDecorator {
       return;
     }
 
-    // Check if this line contains SCHEDULED:, DEADLINE:, CLOSED:, or DESCRIPTION:
+    // Check if this line contains SCHEDULED:, DEADLINE:, CLOSED:, STARTED:, or DESCRIPTION:
     const trimmedLine = lineText.trim();
-    let dateLineType: 'scheduled' | 'deadline' | 'closed' | null = null;
+    let dateLineType: 'scheduled' | 'deadline' | 'closed' | 'started' | null =
+      null;
     let isDescriptionLine = false;
 
     // Handle callout blocks (lines starting with >)
@@ -726,6 +727,8 @@ export class TaskKeywordDecorator {
         dateLineType = 'deadline';
       } else if (contentAfterArrow.startsWith('CLOSED:')) {
         dateLineType = 'closed';
+      } else if (contentAfterArrow.startsWith('STARTED:')) {
+        dateLineType = 'started';
       } else if (contentAfterArrow.startsWith('DESCRIPTION:')) {
         isDescriptionLine = true;
       }
@@ -735,6 +738,8 @@ export class TaskKeywordDecorator {
       dateLineType = 'deadline';
     } else if (trimmedLine.startsWith('CLOSED:')) {
       dateLineType = 'closed';
+    } else if (trimmedLine.startsWith('STARTED:')) {
+      dateLineType = 'started';
     } else if (trimmedLine.startsWith('DESCRIPTION:')) {
       isDescriptionLine = true;
     }
@@ -761,13 +766,17 @@ export class TaskKeywordDecorator {
             ? 'todoseq-scheduled-line'
             : dateLineType === 'deadline'
               ? 'todoseq-deadline-line'
-              : 'todoseq-closed-line';
+              : dateLineType === 'started'
+                ? 'todoseq-started-line'
+                : 'todoseq-closed-line';
         const keywordClass =
           dateLineType === 'scheduled'
             ? 'todoseq-scheduled-keyword'
             : dateLineType === 'deadline'
               ? 'todoseq-deadline-keyword'
-              : 'todoseq-closed-keyword';
+              : dateLineType === 'started'
+                ? 'todoseq-started-keyword'
+                : 'todoseq-closed-keyword';
 
         // Apply decoration to the entire line
         builder.add(
@@ -789,7 +798,9 @@ export class TaskKeywordDecorator {
             ? 'SCHEDULED:'
             : dateLineType === 'deadline'
               ? 'DEADLINE:'
-              : 'CLOSED:';
+              : dateLineType === 'started'
+                ? 'STARTED:'
+                : 'CLOSED:';
         const keywordStart = trimmedLine.indexOf(keyword);
         // const keywordEnd = keywordStart + keyword.length;
         const keywordStartPos =
@@ -809,7 +820,7 @@ export class TaskKeywordDecorator {
           }),
         );
 
-        // Continue tracking for additional date lines (both SCHEDULED, DEADLINE, and CLOSED)
+        // Continue tracking for additional date lines (SCHEDULED, DEADLINE, CLOSED, and STARTED)
         // Don't reset tracking here, allow finding multiple date lines after a single task
       }
     } else if (isDescriptionLine) {
@@ -1254,16 +1265,17 @@ export const taskKeywordPlugin = (
             }
           }
 
-          // Style date keywords (SCHEDULED:, DEADLINE:, CLOSED:) — independent of task keyword
+          // Style date keywords (SCHEDULED:, DEADLINE:, CLOSED:, STARTED:) — independent of task keyword
           if (
             !cell.querySelector(
-              '.todoseq-scheduled-line, .todoseq-deadline-line, .todoseq-closed-line',
+              '.todoseq-scheduled-line, .todoseq-deadline-line, .todoseq-closed-line, .todoseq-started-line',
             )
           ) {
             if (
               text.includes('SCHEDULED:') ||
               text.includes('DEADLINE:') ||
-              text.includes('CLOSED:')
+              text.includes('CLOSED:') ||
+              text.includes('STARTED:')
             ) {
               this.wrapDateKeywordsInNode(cell);
             }
@@ -1345,6 +1357,7 @@ export const taskKeywordPlugin = (
           { keyword: 'SCHEDULED:', type: 'scheduled' },
           { keyword: 'DEADLINE:', type: 'deadline' },
           { keyword: 'CLOSED:', type: 'closed' },
+          { keyword: 'STARTED:', type: 'started' },
         ];
 
         for (const { keyword, type } of dateKeywords) {

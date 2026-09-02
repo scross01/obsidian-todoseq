@@ -57,6 +57,7 @@ export function createBaseTask(overrides: Partial<Task> = {}): Task {
     deadlineDate: null,
     deadlineDateRepeat: null,
     closedDate: null,
+    startedDate: null,
     scheduledWarningPeriod: null,
     deadlineWarningPeriod: null,
     scheduledFirstOnlyWarningPeriod: null,

@@ -885,6 +885,17 @@ export class DateUtils {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `[${this.formatDateContent(date)} ${hours}:${minutes}]`;
   }
+
+  /**
+   * Format a date for STARTED timestamp in Org-inspired inactive format:
+   * [YYYY-MM-DD DOW HH:mm]. Identical format to CLOSED — STARTED is a record,
+   * not a planning signal, so it uses the same inactive bracket convention.
+   * @param date The date to format
+   * @returns Formatted date string
+   */
+  static formatStartedDate(date: Date): string {
+    return this.formatClosedDate(date);
+  }
 }
 
 /**

@@ -8,6 +8,7 @@ export interface SavedSearch {
     | 'sortByScheduled'
     | 'sortByDeadline'
     | 'sortByClosedDate'
+    | 'sortByStarted'
     | 'sortByPriority'
     | 'sortByUrgency'
     | 'sortByKeyword'; // optional override
@@ -41,6 +42,7 @@ export interface TodoTrackerSettings {
     | 'sortByScheduled'
     | 'sortByDeadline'
     | 'sortByClosedDate'
+    | 'sortByStarted'
     | 'sortByPriority'
     | 'sortByUrgency'
     | 'sortByKeyword'; // default sort method for task list view
@@ -61,6 +63,7 @@ export interface TodoTrackerSettings {
   stateTransitions: StateTransitionSettings;
   // Task completion settings
   trackClosedDate: boolean; // when true, adds CLOSED: timestamp when tasks are marked as completed
+  trackStartedDate: boolean; // when true, adds STARTED: timestamp when tasks first enter active state
   // Experimental features
   useExtendedCheckboxStyles: boolean; // when true, uses themed markdown checkbox styles ([/], [-]) for active and cancelled tasks
   // Smart date recognition settings
@@ -131,6 +134,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   migrateToTodayState: '', // Default state to set on source task after migrating (empty = disabled)
   stateTransitions: DefaultStateTransitionSettings,
   trackClosedDate: false, // Disabled by default
+  trackStartedDate: false, // Disabled by default
   useExtendedCheckboxStyles: false, // Experimental feature - disabled by default
   // Smart date recognition settings
   enableSmartDateRecognition: true, // Enabled by default

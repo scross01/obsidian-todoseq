@@ -370,6 +370,7 @@ export class TaskListView extends ItemView {
         attr === 'sortByScheduled' ||
         attr === 'sortByDeadline' ||
         attr === 'sortByClosedDate' ||
+        attr === 'sortByStarted' ||
         attr === 'sortByPriority' ||
         attr === 'sortByUrgency' ||
         attr === 'sortByKeyword'
@@ -382,6 +383,7 @@ export class TaskListView extends ItemView {
       this.defaultSortMethod === 'sortByScheduled' ||
       this.defaultSortMethod === 'sortByDeadline' ||
       this.defaultSortMethod === 'sortByClosedDate' ||
+      this.defaultSortMethod === 'sortByStarted' ||
       this.defaultSortMethod === 'sortByPriority' ||
       this.defaultSortMethod === 'sortByUrgency' ||
       this.defaultSortMethod === 'sortByKeyword'
@@ -787,6 +789,7 @@ export class TaskListView extends ItemView {
       { value: 'sortByScheduled', label: 'Scheduled date' },
       { value: 'sortByDeadline', label: 'Deadline date' },
       { value: 'sortByClosedDate', label: 'Closed date' },
+      { value: 'sortByStarted', label: 'Started date' },
       { value: 'sortByPriority', label: 'Priority' },
       { value: 'sortByUrgency', label: 'Urgency' },
       { value: 'sortByKeyword', label: 'Keyword' },
@@ -820,6 +823,8 @@ export class TaskListView extends ItemView {
         sortMethod = 'sortByKeyword';
       } else if (selectedValue === 'sortByClosedDate') {
         sortMethod = 'sortByClosedDate';
+      } else if (selectedValue === 'sortByStarted') {
+        sortMethod = 'sortByStarted';
       }
 
       // Update the sort method (keep the current view mode)

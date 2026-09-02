@@ -18,6 +18,7 @@ export interface Task {
   deadlineDate: Date | null; // deadline date from DEADLINE: line
   deadlineDateRepeat: DateRepeatInfo | null; // repeater info for deadline date
   closedDate: Date | null; // closed date from CLOSED: line (when task was marked as completed)
+  startedDate: Date | null; // started date from STARTED: line (when task first entered active state)
   scheduledWarningPeriod: WarningPeriodInfo | null; // Warning period for scheduled date (delayed notice). isFirstOnly indicates --Nd syntax.
   deadlineWarningPeriod: WarningPeriodInfo | null; // Warning period for deadline date (advance notice). isFirstOnly indicates --Nd syntax.
   tail?: string; // trailing end characters after the task text (e.g., " */")

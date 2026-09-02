@@ -52,6 +52,20 @@ collapse: true`;
       expect(params.error).toBeUndefined();
     });
 
+    it('should parse started sort method', () => {
+      const source = 'sort: started';
+      const params = TodoseqCodeBlockParser.parse(source);
+      expect(params.sortMethod).toBe('started');
+      expect(params.error).toBeUndefined();
+    });
+
+    it('should reject an invalid sort method with started in the message', () => {
+      const source = 'sort: bogus';
+      const params = TodoseqCodeBlockParser.parse(source);
+      expect(params.error).toBeDefined();
+      expect(params.error).toContain('started');
+    });
+
     it('should handle invalid parameters gracefully', () => {
       const source =
         'search: invalid query syntax\n sort: invalid\n completed: invalid\n future: invalid\n limit: -1';
@@ -438,6 +452,9 @@ collapse: true`;
       expect(
         TodoseqCodeBlockParser.getSortMethod({ sortMethod: 'closed' }),
       ).toBe('sortByClosedDate');
+      expect(
+        TodoseqCodeBlockParser.getSortMethod({ sortMethod: 'started' }),
+      ).toBe('sortByStarted');
     });
 
     it('should return default for unknown sort method', () => {

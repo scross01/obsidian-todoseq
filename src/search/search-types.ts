@@ -8,6 +8,7 @@ export type SearchPrefix =
   | 'scheduled'
   | 'deadline'
   | 'closed'
+  | 'started'
   | 'property';
 
 export interface SearchToken {

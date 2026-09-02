@@ -20,7 +20,7 @@ export class SearchTokenizer {
     {
       type: 'prefix' as const,
       regex:
-        /\b(path|file|tag|state|priority|content|scheduled|deadline|closed):/y,
+        /\b(path|file|tag|state|priority|content|scheduled|deadline|closed|started):/y,
     },
     // Property bracket syntax: [key:value], ["key":"value"], [type], [type:Draft OR Published]
     {

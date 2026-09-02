@@ -125,6 +125,7 @@ TODOseq supports filter keywords similar to Obsidian's general vault search for 
 | `scheduled:` | Find tasks with scheduled dates           | `scheduled:due`           |
 | `deadline:`  | Find tasks with deadline dates            | `deadline:"this week"`    |
 | `closed:`    | Find tasks by closed date                 | `closed:yesterday`        |
+| `started:`   | Find tasks by start date                  | `started:today`           |
 | `property:`  | Find tasks based on page properties       | `property:[type:Project]` |
 
 ### Using Search Filters
@@ -246,6 +247,26 @@ deadline:"next month"
 ```
 
 Find tasks with deadlines in the next month.
+
+```txt
+started:today
+```
+
+Find tasks that were started today (first entry into an active state).
+
+```txt
+started:"this week"
+```
+
+Find tasks started during the current week.
+
+```txt
+started:yesterday
+```
+
+Find tasks started yesterday.
+
+> `started:` supports the same date expressions as `scheduled:` and `deadline:` (today, yesterday, this week, date literals, and ranges). Note that "overdue" is intentionally not supported for this prefix — the STARTED date records when work first began, so "overdue" has no meaning for it.
 
 ### Next N Days Expression
 

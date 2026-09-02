@@ -136,6 +136,7 @@ export class SavedSearchDialog {
       { value: 'sortByScheduled', label: 'Scheduled date' },
       { value: 'sortByDeadline', label: 'Deadline date' },
       { value: 'sortByClosedDate', label: 'Closed date' },
+      { value: 'sortByStarted', label: 'Started date' },
       { value: 'sortByPriority', label: 'Priority' },
       { value: 'sortByUrgency', label: 'Urgency' },
       { value: 'sortByKeyword', label: 'Keyword' },

@@ -394,7 +394,8 @@ class PrattParser {
           left.field &&
           (left.field === 'scheduled' ||
             left.field === 'deadline' ||
-            left.field === 'closed')
+            left.field === 'closed' ||
+            left.field === 'started')
         ) {
           // Parse the right side of the range
           // Note: position was already incremented in parseExpression before calling parseInfix
@@ -420,7 +421,7 @@ class PrattParser {
           };
         } else {
           throw new SearchError(
-            'Range operator can only be used with scheduled:, deadline:, or closed: prefixes',
+            'Range operator can only be used with scheduled:, deadline:, closed:, or started: prefixes',
           );
         }
       }

@@ -18,15 +18,19 @@ Tasks sorted by their DEADLINE date. Tasks without deadline dates appear at the 
 
 Tasks sorted by their CLOSED date (the date when the task was marked as completed). Tasks without a closed date appear at the end, with earlier closed dates appearing first. When two tasks have the same closed date, they are sorted by keyword group and position, then by file path and line number.
 
-### 5. Priority
+### 5. Started Date
+
+Tasks sorted by their STARTED date (when the task first entered an active state). Tasks without a started date appear at the end, with earlier started dates appearing first. When two tasks have the same started date, they are sorted by keyword group and position, then by file path and line number.
+
+### 6. Priority
 
 Tasks sorted by priority: High (`[#A]`) > Medium (`[#B]`) > Low (`[#C]`) > No priority. Within each priority level, tasks are sorted by keyword group and position, then by file path and line number.
 
-### 6. Urgency
+### 7. Urgency
 
 Tasks sorted by calculated urgency score (highest to lowest). Urgency is calculated based on multiple factors including due dates, priority, tags, and task state. Tasks with no urgency score appear at the end, and completed tasks are not included in urgency sorting. When two tasks have the same urgency score, they are sorted by keyword group and position, then by file path and line number.
 
-### 7. Keyword
+### 8. Keyword
 
 Tasks are sorted by effective keyword group and keyword order from your settings. That means custom keywords and advanced built-in overrides both affect this sort.
 

@@ -126,6 +126,20 @@ export class SearchSuggestionDropdown extends BaseDropdown {
           allSuggestions = [...closedSuggestions, ...taskClosedDates];
         }
         break;
+      case 'started':
+        {
+          const startedSuggestions =
+            SearchSuggestions.getStartedDateSuggestions();
+          const taskStartedDates =
+            this.tasks && this.tasks.length > 0
+              ? SearchSuggestions.getStartedDateSuggestionsFromTasks(
+                  this.tasks,
+                  this.viewMode,
+                )
+              : [];
+          allSuggestions = [...startedSuggestions, ...taskStartedDates];
+        }
+        break;
       case 'property':
         allSuggestions = SearchSuggestions.getAllPropertyKeys(this.app);
         break;

@@ -543,6 +543,10 @@ export class VaultScanner
           (a.scheduledDate?.getTime() ?? null) ||
         (b.deadlineDate?.getTime() ?? null) !==
           (a.deadlineDate?.getTime() ?? null) ||
+        (b.startedDate?.getTime() ?? null) !==
+          (a.startedDate?.getTime() ?? null) ||
+        (b.closedDate?.getTime() ?? null) !==
+          (a.closedDate?.getTime() ?? null) ||
         b.scheduledDateRepeat?.raw !== a.scheduledDateRepeat?.raw ||
         b.deadlineDateRepeat?.raw !== a.deadlineDateRepeat?.raw ||
         !VaultScanner.wpEqual(

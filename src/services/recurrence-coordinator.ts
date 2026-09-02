@@ -351,6 +351,7 @@ export class RecurrenceCoordinator {
           deadlineDateRepeat: task.deadlineDateRepeat,
           deadlineWarningPeriod: task.deadlineWarningPeriod,
           closedDate: task.closedDate,
+          startedDate: task.startedDate,
           dailyNoteDate: task.dailyNoteDate,
           // Defend against a parser defect leaving text undefined.
           text: storedTask.text ?? task.text,

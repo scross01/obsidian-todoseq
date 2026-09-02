@@ -67,6 +67,21 @@ const MIGRATIONS: SettingsMigrations[] = [
       return { ...settings };
     },
   },
+  {
+    version: 6,
+    migrate: (settings: Record<string, unknown>) => {
+      // v6: added trackStartedDate setting (opt-in, default false)
+      // DefaultSettings supplies the value; this migration just stamps the
+      // version so we can distinguish pre/post-STARTED settings files.
+      if (!('trackStartedDate' in settings)) {
+        return {
+          ...settings,
+          trackStartedDate: false,
+        };
+      }
+      return { ...settings };
+    },
+  },
 ];
 
 export function migrateSettings(

@@ -217,7 +217,8 @@ export class EmbeddedTaskListManager {
         sortMethod === 'sortByPriority' ||
         sortMethod === 'sortByScheduled' ||
         sortMethod === 'sortByDeadline' ||
-        sortMethod === 'sortByClosedDate'
+        sortMethod === 'sortByClosedDate' ||
+        sortMethod === 'sortByStarted'
       ) {
         keywordConfig = this.getKeywordSortConfig();
       }
@@ -291,6 +292,7 @@ export class EmbeddedTaskListManager {
       scheduled: 'sortByScheduled',
       deadline: 'sortByDeadline',
       closed: 'sortByClosedDate',
+      started: 'sortByStarted',
       priority: 'sortByPriority',
       urgency: 'sortByUrgency',
       keyword: 'sortByKeyword',

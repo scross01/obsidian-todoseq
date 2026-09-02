@@ -409,6 +409,26 @@ FIXME Handle edge cases
 - No CLOSED date is added or removed automatically
 - Manual CLOSED dates in notes are still recognized and parsed
 
+### Track Started Date
+
+**Setting**: "Track started date" (toggle)
+
+**Description**: Enable or disable automatic STARTED date tracking for tasks entering an active state.
+
+**Default**: Disabled
+
+**When Enabled:**
+
+- Adds a STARTED date when a task first enters an active state (e.g., TODO → DOING)
+- STARTED date uses the same square-bracket syntax as CLOSED: `STARTED: [2025-01-18 Fri 09:00]`
+- Records when the task _first_ became active — written once, idempotently
+- Does NOT remove the STARTED date when tasks are reactivated (unlike CLOSED); only manual editing removes it
+
+**When Disabled:**
+
+- No STARTED date is added automatically
+- Manual STARTED dates in notes are still recognized and parsed
+
 ### Smart Date Recognition
 
 **Setting**: "Smart date recognition" section

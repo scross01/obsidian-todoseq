@@ -45,6 +45,7 @@ export type SortMethod =
   | 'sortByScheduled'
   | 'sortByDeadline'
   | 'sortByClosedDate'
+  | 'sortByStarted'
   | 'sortByPriority'
   | 'sortByUrgency'
   | 'sortByKeyword';
@@ -446,6 +447,31 @@ function getSortFunction(
         }
 
         // If closed dates are equal, use keyword sort as secondary
+        if (keywordConfig) {
+          return keywordSortComparator(a, b, keywordConfig);
+        }
+        return taskComparator(a, b);
+      };
+
+    case 'sortByStarted':
+      return (a, b) => {
+        // Tasks without started dates go to the end (matches sortByClosedDate convention)
+        if (!a.startedDate && !b.startedDate) {
+          if (keywordConfig) {
+            return keywordSortComparator(a, b, keywordConfig);
+          }
+          return taskComparator(a, b);
+        }
+        if (!a.startedDate) return 1;
+        if (!b.startedDate) return -1;
+
+        // Compare started dates (earlier first)
+        const dateDiff = a.startedDate.getTime() - b.startedDate.getTime();
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
+
+        // If started dates are equal, use keyword sort as secondary
         if (keywordConfig) {
           return keywordSortComparator(a, b, keywordConfig);
         }
