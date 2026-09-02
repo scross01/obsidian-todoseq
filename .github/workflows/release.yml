@@ -26,10 +26,17 @@ jobs:
         with:
           node-version: '24.x'
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
       - name: Build plugin
-        run: |
-          npm ci
-          npm run build
+        run: npm run build
 
       - name: Generate artifact attestations
         uses: actions/attest@v4

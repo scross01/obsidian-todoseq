@@ -46,8 +46,8 @@ describe('StatusBarManager', () => {
   describe('cleanup', () => {
     it('removes status bar item and unsubscribes safely', () => {
       manager.setupStatusBarItem();
-      const unsubscribe = mockPlugin.taskStateManager.subscribe.mock.results[0]
-        .value;
+      const unsubscribe =
+        mockPlugin.taskStateManager.subscribe.mock.results[0].value;
 
       manager.cleanup();
       manager.cleanup();
