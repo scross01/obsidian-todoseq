@@ -19,6 +19,7 @@ import { TaskListView } from '../view/task-list/task-list-view';
 import { KeywordGroup } from '../types/task';
 import { TransitionParser } from '../services/transition-parser';
 import { KeywordManager } from '../utils/keyword-manager';
+import { t } from '../i18n';
 
 function hideSettingNameAndControl(setting: Setting): void {
   setting.nameEl.classList.add('todoseq-hidden');
@@ -212,7 +213,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         taskListView.updateContextMenuConfig();
         // Use lighter refresh instead of full onOpen rebuild
         taskListView.refreshVisibleList().catch((error) => {
-          new Notice('Failed to refresh task list');
+          new Notice(t('notices.failedToRefreshTaskList'));
           console.error('Error refreshing task list:', error);
         });
       }
@@ -265,32 +266,32 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
     return [
       {
-        name: 'Format task keywords',
-        desc: 'Highlight task keywords (todo, doing, etc.) in bold with accent color in the editor.',
+        name: t('settings.general.formatTaskKeywords.name'),
+        desc: t('settings.general.formatTaskKeywords.desc'),
         control: { type: 'toggle', key: 'formatTaskKeywords' },
       },
       {
         type: 'group',
-        heading: 'Task detection',
+        heading: t('settings.headings.taskDetection'),
         items: [
           {
-            name: 'Include tasks inside quote and callout blocks',
-            desc: 'When enabled, include tasks inside quote and callout blocks (>, >[!info], >[!todo], etc.).',
+            name: t('settings.taskDetection.includeCalloutBlocks.name'),
+            desc: t('settings.taskDetection.includeCalloutBlocks.desc'),
             control: { type: 'toggle', key: 'includeCalloutBlocks' },
           },
           {
-            name: 'Include tasks inside comments',
-            desc: 'When enabled, include tasks inside comments (%%).',
+            name: t('settings.taskDetection.includeCommentBlocks.name'),
+            desc: t('settings.taskDetection.includeCommentBlocks.desc'),
             control: { type: 'toggle', key: 'includeCommentBlocks' },
           },
           {
-            name: 'Include tasks inside code blocks',
-            desc: 'When enabled, tasks inside fenced code blocks (``` or ~~~) will be included.',
+            name: t('settings.taskDetection.includeCodeBlocks.name'),
+            desc: t('settings.taskDetection.includeCodeBlocks.desc'),
             control: { type: 'toggle', key: 'includeCodeBlocks' },
           },
           {
-            name: 'Enable language comment support',
-            desc: 'When enabled, tasks inside code blocks will be detected using language-specific comment patterns e.g. `// TODO`',
+            name: t('settings.taskDetection.languageCommentSupport.name'),
+            desc: t('settings.taskDetection.languageCommentSupport.desc'),
             control: {
               type: 'toggle',
               key: 'languageCommentSupport',
@@ -301,16 +302,16 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       },
       {
         type: 'group',
-        heading: 'Smart date recognition',
+        heading: t('settings.headings.smartDates'),
         items: [
           {
-            name: 'Enable smart date recognition',
-            desc: 'Automatically convert natural language dates like "today", "tomorrow", "due next week".',
+            name: t('settings.smartDates.enableSmartDateRecognition.name'),
+            desc: t('settings.smartDates.enableSmartDateRecognition.desc'),
             control: { type: 'toggle', key: 'enableSmartDateRecognition' },
           },
           {
-            name: 'Remove date keywords',
-            desc: 'Remove natural language text (e.g., "today", "tomorrow") after conversion to structured dates.',
+            name: t('settings.smartDates.smartDateRemoveKeywords.name'),
+            desc: t('settings.smartDates.smartDateRemoveKeywords.desc'),
             control: {
               type: 'toggle',
               key: 'smartDateRemoveKeywords',
@@ -321,60 +322,66 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       },
       {
         type: 'group',
-        heading: 'Task list search and filter',
+        heading: t('settings.headings.searchFilter'),
         items: [
           {
-            name: 'Week starts on',
-            desc: 'Choose which day the week starts on for date filtering.',
+            name: t('settings.searchFilter.weekStartsOn.name'),
+            desc: t('settings.searchFilter.weekStartsOn.desc'),
             control: {
               type: 'dropdown',
               key: 'weekStartsOn',
-              options: { Monday: 'Monday', Sunday: 'Sunday' },
+              options: {
+                Monday: t('settings.options.monday'),
+                Sunday: t('settings.options.sunday'),
+              },
               defaultValue: 'Monday',
             },
           },
           {
-            name: 'Completed tasks',
-            desc: 'Choose how completed items are shown in the task list.',
+            name: t('settings.searchFilter.taskListViewMode.name'),
+            desc: t('settings.searchFilter.taskListViewMode.desc'),
             control: {
               type: 'dropdown',
               key: 'taskListViewMode',
               options: {
-                showAll: 'Show all tasks',
-                sortCompletedLast: 'Sort completed to end',
-                hideCompleted: 'Hide completed',
+                showAll: t('settings.options.showAllTasks'),
+                sortCompletedLast: t('settings.options.sortCompletedToEnd'),
+                hideCompleted: t('settings.options.hideCompleted'),
               },
               defaultValue: 'showAll',
             },
           },
           {
-            name: 'Future dated tasks',
-            desc: 'Choose how tasks with future dates are displayed in the task list.',
+            name: t('settings.searchFilter.futureTaskSorting.name'),
+            desc: t('settings.searchFilter.futureTaskSorting.desc'),
             control: {
               type: 'dropdown',
               key: 'futureTaskSorting',
               options: {
-                showAll: 'Show all tasks',
-                showUpcoming: 'Show upcoming',
-                sortToEnd: 'Sort future to end',
-                hideFuture: 'Hide future',
+                showAll: t('settings.options.showAllTasks'),
+                showUpcoming: t('settings.options.showUpcoming'),
+                sortToEnd: t('settings.options.sortFutureToEnd'),
+                hideFuture: t('settings.options.hideFuture'),
               },
               defaultValue: 'showAll',
             },
           },
           {
-            name: 'Task descriptions',
-            desc: 'Controls how task descriptions (description: lines) are displayed in the task list.',
+            name: t('settings.searchFilter.taskDescriptionDisplay.name'),
+            desc: t('settings.searchFilter.taskDescriptionDisplay.desc'),
             control: {
               type: 'dropdown',
               key: 'taskDescriptionDisplay',
-              options: { hide: 'Hide', show: 'Show' },
+              options: {
+                hide: t('settings.options.hide'),
+                show: t('settings.options.show'),
+              },
               defaultValue: 'show',
             },
           },
           {
-            name: 'Upcoming period (days)',
-            desc: 'Tasks within this many days are shown as "upcoming" when using the show upcoming option.',
+            name: t('settings.searchFilter.upcomingPeriod.name'),
+            desc: t('settings.searchFilter.upcomingPeriod.desc'),
             control: {
               type: 'number',
               key: 'upcomingPeriod',
@@ -388,20 +395,20 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: 'Default sort method',
-            desc: 'Choose the default sort method for the task list.',
+            name: t('settings.searchFilter.defaultSortMethod.name'),
+            desc: t('settings.searchFilter.defaultSortMethod.desc'),
             control: {
               type: 'dropdown',
               key: 'defaultSortMethod',
               options: {
-                default: 'Default (file path)',
-                sortByScheduled: 'Scheduled date',
-                sortByDeadline: 'Deadline date',
-                sortByClosedDate: 'Closed date',
-                sortByStarted: 'Started date',
-                sortByPriority: 'Priority',
-                sortByUrgency: 'Urgency',
-                sortByKeyword: 'Keyword',
+                default: t('settings.options.defaultFilePath'),
+                sortByScheduled: t('settings.options.scheduledDate'),
+                sortByDeadline: t('settings.options.deadlineDate'),
+                sortByClosedDate: t('settings.options.closedDate'),
+                sortByStarted: t('settings.options.startedDate'),
+                sortByPriority: t('settings.options.priority'),
+                sortByUrgency: t('settings.options.urgency'),
+                sortByKeyword: t('settings.options.keyword'),
               },
               defaultValue: 'default',
             },
@@ -410,17 +417,17 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       },
       {
         type: 'group',
-        heading: 'Task keywords',
+        heading: t('settings.headings.taskKeywords'),
         items: [
           {
-            name: 'Inactive keywords',
-            desc: 'Keywords for tasks not yet started (e.g. FIXME, HACK). Built-in: TODO, LATER.',
+            name: t('settings.keywords.inactive.name'),
+            desc: t('settings.keywords.inactive.desc'),
             render: (setting) => {
               this.configureKeywordGroupSetting(
                 setting,
                 'additionalInactiveKeywords',
-                'Inactive keywords',
-                'Keywords for tasks not yet started (e.g. FIXME, HACK). Built-in: TODO, LATER.',
+                t('settings.keywords.inactive.name'),
+                t('settings.keywords.inactive.desc'),
                 this.plugin.settings.additionalInactiveKeywords,
               );
               // Run initial validation on open so existing warnings/errors are visible
@@ -439,78 +446,76 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: 'Active keywords',
-            desc: 'Keywords for tasks currently being worked on (e.g. STARTED). Built-in: DOING, NOW, IN-PROGRESS.',
+            name: t('settings.keywords.active.name'),
+            desc: t('settings.keywords.active.desc'),
             render: (setting) =>
               this.configureKeywordGroupSetting(
                 setting,
                 'additionalActiveKeywords',
-                'Active keywords',
-                'Keywords for tasks currently being worked on (e.g. STARTED). Built-in: DOING, NOW, IN-PROGRESS.',
+                t('settings.keywords.active.name'),
+                t('settings.keywords.active.desc'),
                 this.plugin.settings.additionalActiveKeywords,
               ),
           },
           {
-            name: 'Waiting keywords',
-            desc: 'Keywords for blocked or paused tasks (e.g. ON-HOLD). Built-in: WAIT, WAITING.',
+            name: t('settings.keywords.waiting.name'),
+            desc: t('settings.keywords.waiting.desc'),
             render: (setting) =>
               this.configureKeywordGroupSetting(
                 setting,
                 'additionalWaitingKeywords',
-                'Waiting keywords',
-                'Keywords for blocked or paused tasks (e.g. ON-HOLD). Built-in: WAIT, WAITING.',
+                t('settings.keywords.waiting.name'),
+                t('settings.keywords.waiting.desc'),
                 this.plugin.settings.additionalWaitingKeywords,
               ),
           },
           {
-            name: 'Completed keywords',
-            desc: 'Keywords for finished or abandoned tasks (e.g. NEVER). Built-in: DONE, CANCELLED, CANCELED.',
+            name: t('settings.keywords.completed.name'),
+            desc: t('settings.keywords.completed.desc'),
             render: (setting) =>
               this.configureKeywordGroupSetting(
                 setting,
                 'additionalCompletedKeywords',
-                'Completed keywords',
-                'Keywords for finished or abandoned tasks (e.g. NEVER). Built-in: DONE, CANCELLED, CANCELED.',
+                t('settings.keywords.completed.name'),
+                t('settings.keywords.completed.desc'),
                 this.plugin.settings.additionalCompletedKeywords,
               ),
           },
           {
-            name: 'Archived keywords',
-            desc: 'Keywords for archived tasks (e.g. OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED.',
+            name: t('settings.keywords.archived.name'),
+            desc: t('settings.keywords.archived.desc'),
             render: (setting) =>
               this.configureKeywordGroupSetting(
                 setting,
                 'additionalArchivedKeywords',
-                'Archived keywords',
-                'Keywords for archived tasks (e.g. OLD). These tasks are styled but NOT collected during vault scans. Built-in: ARCHIVED.',
+                t('settings.keywords.archived.name'),
+                t('settings.keywords.archived.desc'),
                 this.plugin.settings.additionalArchivedKeywords,
               ),
           },
           {
-            name: 'Migrated state keyword',
-            desc: 'Keyword or text to set on the source task after migrating to daily note. Leave empty to disable.',
+            name: t('settings.keywords.migratedState.name'),
+            desc: t('settings.keywords.migratedState.desc'),
             control: {
               type: 'text',
               key: 'migrateToTodayState',
-              placeholder: '(disabled)',
+              placeholder: t('settings.placeholders.disabled'),
             },
           },
         ],
       },
       {
         type: 'group',
-        heading: 'Task state transitions',
+        heading: t('settings.headings.transitions'),
         items: [
           {
-            name: 'State transitions',
-            desc: 'Define how states transition. Each line: STATE -> next_state. Use (a | b) to define multiple initial states.',
+            name: t('settings.transitions.stateTransitions.name'),
+            desc: t('settings.transitions.stateTransitions.desc'),
             render: (setting) => {
               this.transitionSettings.transitions = setting;
               setting
-                .setName('State transitions')
-                .setDesc(
-                  'Define how states transition. Each line: STATE -> next_state. Use (a | b) to define multiple initial states.',
-                )
+                .setName(t('settings.transitions.stateTransitions.name'))
+                .setDesc(t('settings.transitions.stateTransitions.desc'))
                 .addTextArea((textArea) => {
                   // Set the size of the textarea directly on the underlying element
                   textArea.inputEl.cols = 48;
@@ -558,15 +563,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: 'Default inactive state',
-            desc: 'The default state for inactive tasks when no explicit transition is defined.',
+            name: t('settings.transitions.defaultInactive.name'),
+            desc: t('settings.transitions.defaultInactive.desc'),
             render: (setting) => {
               this.transitionSettings.inactive = setting;
               setting
-                .setName('Default inactive state')
-                .setDesc(
-                  'The default state for inactive tasks when no explicit transition is defined.',
-                )
+                .setName(t('settings.transitions.defaultInactive.name'))
+                .setDesc(t('settings.transitions.defaultInactive.desc'))
                 .addDropdown((dropdown) => {
                   this.defaultStateDropdowns.inactive = dropdown;
                   this.populateDefaultStateDropdown(
@@ -591,15 +594,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: 'Default active state',
-            desc: 'The default state for active tasks when no explicit transition is defined.',
+            name: t('settings.transitions.defaultActive.name'),
+            desc: t('settings.transitions.defaultActive.desc'),
             render: (setting) => {
               this.transitionSettings.active = setting;
               setting
-                .setName('Default active state')
-                .setDesc(
-                  'The default state for active tasks when no explicit transition is defined.',
-                )
+                .setName(t('settings.transitions.defaultActive.name'))
+                .setDesc(t('settings.transitions.defaultActive.desc'))
                 .addDropdown((dropdown) => {
                   this.defaultStateDropdowns.active = dropdown;
                   this.populateDefaultStateDropdown(
@@ -623,15 +624,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: 'Default completed state',
-            desc: 'The default state for completed tasks when no explicit transition is defined.',
+            name: t('settings.transitions.defaultCompleted.name'),
+            desc: t('settings.transitions.defaultCompleted.desc'),
             render: (setting) => {
               this.transitionSettings.completed = setting;
               setting
-                .setName('Default completed state')
-                .setDesc(
-                  'The default state for completed tasks when no explicit transition is defined.',
-                )
+                .setName(t('settings.transitions.defaultCompleted.name'))
+                .setDesc(t('settings.transitions.defaultCompleted.desc'))
                 .addDropdown((dropdown) => {
                   this.defaultStateDropdowns.completed = dropdown;
                   this.populateDefaultStateDropdown(
@@ -659,24 +658,24 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: 'Track closed date',
-            desc: 'Add closed: timestamp when tasks are marked as completed.',
+            name: t('settings.transitions.trackClosedDate.name'),
+            desc: t('settings.transitions.trackClosedDate.desc'),
             control: { type: 'toggle', key: 'trackClosedDate' },
           },
           {
-            name: 'Track started date',
-            desc: 'Add started: timestamp when tasks first enter an active state. Written once and never removed automatically.',
+            name: t('settings.transitions.trackStartedDate.name'),
+            desc: t('settings.transitions.trackStartedDate.desc'),
             control: { type: 'toggle', key: 'trackStartedDate' },
           },
         ],
       },
       {
         type: 'group',
-        heading: 'Warning period',
+        heading: t('settings.headings.warningPeriod'),
         items: [
           {
-            name: 'Deadline advance notice (days)',
-            desc: 'Tasks appear this many days before their deadline. Set to 0 to disable.',
+            name: t('settings.warningPeriod.defaultDeadlineWarningPeriod.name'),
+            desc: t('settings.warningPeriod.defaultDeadlineWarningPeriod.desc'),
             control: {
               type: 'number',
               key: 'defaultDeadlineWarningPeriod',
@@ -687,8 +686,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: 'Scheduled delay (days)',
-            desc: 'Tasks appear this many days after their scheduled date. Set to 0 to disable.',
+            name: t(
+              'settings.warningPeriod.defaultScheduledWarningPeriod.name',
+            ),
+            desc: t(
+              'settings.warningPeriod.defaultScheduledWarningPeriod.desc',
+            ),
             control: {
               type: 'number',
               key: 'defaultScheduledWarningPeriod',
@@ -699,16 +702,24 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: 'Ignore scheduled delay when deadline is set',
-            desc: 'If a task has both a scheduled date and a deadline, the scheduled delay is ignored.',
+            name: t(
+              'settings.warningPeriod.skipScheduledWarningPeriodIfDeadline.name',
+            ),
+            desc: t(
+              'settings.warningPeriod.skipScheduledWarningPeriodIfDeadline.desc',
+            ),
             control: {
               type: 'toggle',
               key: 'skipScheduledWarningPeriodIfDeadline',
             },
           },
           {
-            name: 'Ignore deadline advance notice when scheduled is set',
-            desc: 'If a task has both a scheduled date and a deadline, the deadline advance notice is ignored.',
+            name: t(
+              'settings.warningPeriod.skipDeadlinePrewarningIfScheduled.name',
+            ),
+            desc: t(
+              'settings.warningPeriod.skipDeadlinePrewarningIfScheduled.desc',
+            ),
             control: {
               type: 'toggle',
               key: 'skipDeadlinePrewarningIfScheduled',
@@ -718,30 +729,30 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       },
       {
         type: 'group',
-        heading: '⚠︎ Experimental features',
+        heading: t('settings.headings.experimental'),
         items: [
           {
-            name: 'Experimental features',
+            name: t('settings.experimental.experimentalFeatures.name'),
             render: (setting) => {
               setting.setDesc(
-                'Experimental features may be changed significantly or removed entirely in future versions.',
+                t('settings.experimental.experimentalFeatures.desc'),
               );
               hideSettingNameAndControl(setting);
             },
           },
           {
-            name: 'Detect org-mode files',
-            desc: 'When enabled, scans for .org files in vault and detects tasks using org-mode syntax.',
+            name: t('settings.experimental.detectOrgModeFiles.name'),
+            desc: t('settings.experimental.detectOrgModeFiles.desc'),
             control: { type: 'toggle', key: 'detectOrgModeFiles' },
           },
           {
-            name: 'Scan code files for comments',
-            desc: 'When enabled, scans code files (.js, .ts, .py, .rb, .java, .rs, .go, .c, .cpp, .cs, .swift, .kt, .sh, .YAML, .yml, .toml, .SQL, .ini, .r, .dockerfile, .ps1) for todo-style comments and detects them as tasks. Supports multi-line comments and skips keywords inside string literals.',
+            name: t('settings.experimental.scanCodeFiles.name'),
+            desc: t('settings.experimental.scanCodeFiles.desc'),
             control: { type: 'toggle', key: 'scanCodeFiles' },
           },
           {
-            name: 'Use extended Markdown checkbox styles',
-            desc: 'When enabled, uses themed checkbox styles ([/], [-]) for active and cancelled tasks.',
+            name: t('settings.experimental.useExtendedCheckboxStyles.name'),
+            desc: t('settings.experimental.useExtendedCheckboxStyles.desc'),
             control: { type: 'toggle', key: 'useExtendedCheckboxStyles' },
           },
         ],
@@ -810,7 +821,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     setting.addText((text) => {
       text
         .setValue(formatKeywordsForInput(currentValue))
-        .setPlaceholder('KEYWORD')
+        .setPlaceholder(t('settings.placeholders.keyword'))
         .onChange((value) => {
           this.keywordFieldBindings.set(settingKey, {
             settingKey,

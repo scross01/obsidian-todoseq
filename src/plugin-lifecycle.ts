@@ -22,6 +22,7 @@ import {
   smartDatePlugin,
   smartDateHighlightPlugin,
 } from './view/editor-extensions/smart-date-extension';
+import { detectLanguage, setLang } from './i18n';
 
 /** Window flag key to detect hot reload vs fresh Obsidian startup */
 const TODOSEQ_HOT_RELOAD_FLAG = '__todoseq_wasUnloaded';
@@ -37,6 +38,11 @@ export class PluginLifecycleManager {
    */
   async onload() {
     await this.loadSettings();
+
+    // Detect Obsidian's UI language exactly once at startup. Obsidian forces
+    // a relaunch after the user changes the UI language, so a startup read is
+    // always correct (no runtime re-detection needed).
+    setLang(detectLanguage());
 
     // Load urgency coefficients on startup
     const urgencyCoefficients = await parseUrgencyCoefficients(this.plugin.app);
