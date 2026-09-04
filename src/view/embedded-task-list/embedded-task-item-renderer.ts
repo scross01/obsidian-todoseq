@@ -481,9 +481,12 @@ export class EmbeddedTaskItemRenderer {
       const badge = textContainer.createSpan({
         cls: `todoseq-priority-badge priority-${pri}`,
         text: letter,
-        attr: { 'aria-label': `Priority ${pri}` },
+        attr: { 'aria-label': t('embedded.priorityAria', { priority: pri }) },
       });
-      setTooltip(badge, `Priority ${getPriorityLevelName(letter)}`);
+      setTooltip(
+        badge,
+        t('embedded.priorityAria', { priority: getPriorityLevelName(letter) }),
+      );
     }
 
     if (task.text) {

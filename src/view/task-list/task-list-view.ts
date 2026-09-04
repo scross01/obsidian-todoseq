@@ -437,7 +437,7 @@ export class TaskListView extends ItemView {
     // Right-aligned search input with icon
     const searchId = `todoseq-search-${Math.random().toString(36).slice(2, 8)}`;
     const searchLabel = firstRow.createEl('label', { attr: { for: searchId } });
-    searchLabel.setText('Search');
+    searchLabel.setText(t('taskList.searchLabel'));
     searchLabel.addClass('sr-only');
     const searchInputWrap = firstRow.createDiv({
       cls: 'search-input-container global-search-input-container',
@@ -446,13 +446,13 @@ export class TaskListView extends ItemView {
       attr: {
         id: searchId,
         type: 'search',
-        placeholder: 'Search tasks…',
-        'aria-label': 'Search tasks',
+        placeholder: t('taskList.searchPlaceholder'),
+        'aria-label': t('taskList.searchAriaLabel'),
       },
     });
     const clearSearch = searchInputWrap.createDiv({
       cls: 'search-input-clear-button',
-      attr: { 'aria-label': 'Clear search' },
+      attr: { 'aria-label': t('taskList.clearSearch') },
     });
     clearSearch.addEventListener('click', () => {
       void (async () => {
@@ -464,7 +464,7 @@ export class TaskListView extends ItemView {
     });
     const matchCase = searchInputWrap.createDiv({
       cls: 'input-right-decorator clickable-icon',
-      attr: { 'aria-label': 'Match case' },
+      attr: { 'aria-label': t('taskList.matchCase') },
     });
     setIcon(matchCase, 'uppercase-lowercase-a');
 
@@ -527,7 +527,7 @@ export class TaskListView extends ItemView {
     // Save/bookmark button for saving current search (outside input, left of settings)
     this.saveSearchBtn = firstRow.createDiv({
       cls: 'clickable-icon todoseq-save-search-btn',
-      attr: { 'aria-label': 'Save search' },
+      attr: { 'aria-label': t('taskList.saveSearch') },
     });
     setIcon(this.saveSearchBtn, 'lucide-bookmark');
     this.saveSearchBtn.addEventListener('click', () => {
@@ -546,8 +546,8 @@ export class TaskListView extends ItemView {
 
     // Add Settings button to the right side of the first row
     const settingsBtn = firstRow.createDiv({ cls: 'clickable-icon' });
-    setTooltip(settingsBtn, 'Task List settings');
-    settingsBtn.setAttr('aria-label', 'Task List settings');
+    setTooltip(settingsBtn, t('taskList.taskListSettings'));
+    settingsBtn.setAttr('aria-label', t('taskList.taskListSettings'));
     settingsBtn.setAttr('aria-expanded', String(false));
     settingsBtn.setAttr('tabindex', '0');
     setIcon(settingsBtn, 'lucide-sliders-horizontal');
@@ -565,7 +565,7 @@ export class TaskListView extends ItemView {
     });
     completedTasksSettingInfo.createDiv({
       cls: 'setting-item-name',
-      text: 'Completed tasks:',
+      text: t('settings.searchFilter.taskListViewMode.name'),
       attr: { for: 'completed-tasks-dropdown' },
     });
 
@@ -576,15 +576,15 @@ export class TaskListView extends ItemView {
       cls: 'mod-small ',
       attr: {
         id: 'completed-tasks-dropdown',
-        'aria-label': 'Show completed tasks',
+        'aria-label': t('taskList.showCompletedTasks'),
       },
     });
 
     // Add dropdown options
     const options = [
-      { value: 'showAll', label: 'Show' },
-      { value: 'sortCompletedLast', label: 'Sort to end' },
-      { value: 'hideCompleted', label: 'Hide' },
+      { value: 'showAll', label: t('savedSearch.viewModeShow') },
+      { value: 'sortCompletedLast', label: t('savedSearch.viewModeSortToEnd') },
+      { value: 'hideCompleted', label: t('savedSearch.viewModeHide') },
     ];
 
     for (const option of options) {
@@ -649,7 +649,7 @@ export class TaskListView extends ItemView {
     });
     futureTasksSettingInfo.createDiv({
       cls: 'setting-item-name',
-      text: 'Future dated tasks:',
+      text: t('taskList.futureDatedTasksLabel'),
       attr: { for: 'future-tasks-dropdown' },
     });
     //  futureTasksSettingInfo.createEl('div', {
@@ -664,16 +664,16 @@ export class TaskListView extends ItemView {
       cls: 'mod-small',
       attr: {
         id: 'future-tasks-dropdown',
-        'aria-label': 'Future task sorting',
+        'aria-label': t('taskList.futureTaskSorting'),
       },
     });
 
     // Add future task sorting options
     const futureOptions = [
-      { value: 'showAll', label: 'Show' },
-      { value: 'showUpcoming', label: 'Show upcoming' },
-      { value: 'sortToEnd', label: 'Sort to end' },
-      { value: 'hideFuture', label: 'Hide' },
+      { value: 'showAll', label: t('savedSearch.viewModeShow') },
+      { value: 'showUpcoming', label: t('savedSearch.showUpcoming') },
+      { value: 'sortToEnd', label: t('savedSearch.viewModeSortToEnd') },
+      { value: 'hideFuture', label: t('savedSearch.viewModeHide') },
     ];
 
     for (const option of futureOptions) {
@@ -710,7 +710,7 @@ export class TaskListView extends ItemView {
     });
     descriptionsSettingInfo.createDiv({
       cls: 'setting-item-name',
-      text: 'Task descriptions:',
+      text: t('taskList.taskDescriptionsLabel'),
     });
 
     const descriptionsSettingControl = descriptionsSetting.createDiv({
@@ -720,14 +720,14 @@ export class TaskListView extends ItemView {
       cls: 'mod-small',
       attr: {
         id: 'task-descriptions-dropdown',
-        'aria-label': 'Task description display',
+        'aria-label': t('taskList.taskDescriptionDisplay'),
       },
     });
 
     // Add description display options
     const descriptionOptions = [
-      { value: 'hide', label: 'Hide' },
-      { value: 'show', label: 'Show' },
+      { value: 'hide', label: t('settings.options.hide') },
+      { value: 'show', label: t('settings.options.show') },
     ];
 
     for (const option of descriptionOptions) {
@@ -773,27 +773,27 @@ export class TaskListView extends ItemView {
       cls: 'search-results-result-count',
     });
     const searchResultsCount = searchResultsWarp.createSpan();
-    searchResultsCount.setText('0 Of 0 tasks');
+    searchResultsCount.setText(t('taskList.taskCount', { done: 0, total: 0 }));
 
     // Right side: sort dropdown
     // const sortDropdown = searchResultsInfo.createEl('div');
     const select = searchResultsInfo.createEl('select', {
       cls: 'dropdown',
       attr: {
-        'aria-label': 'Sort tasks by',
+        'aria-label': t('taskList.sortTasksBy'),
         'data-sort-mode': 'default',
       },
     });
 
     const sortOptions = [
-      { value: 'default', label: 'Default (file path)' },
-      { value: 'sortByScheduled', label: 'Scheduled date' },
-      { value: 'sortByDeadline', label: 'Deadline date' },
-      { value: 'sortByClosedDate', label: 'Closed date' },
-      { value: 'sortByStarted', label: 'Started date' },
-      { value: 'sortByPriority', label: 'Priority' },
-      { value: 'sortByUrgency', label: 'Urgency' },
-      { value: 'sortByKeyword', label: 'Keyword' },
+      { value: 'default', label: t('settings.options.defaultFilePath') },
+      { value: 'sortByScheduled', label: t('settings.options.scheduledDate') },
+      { value: 'sortByDeadline', label: t('settings.options.deadlineDate') },
+      { value: 'sortByClosedDate', label: t('settings.options.closedDate') },
+      { value: 'sortByStarted', label: t('settings.options.startedDate') },
+      { value: 'sortByPriority', label: t('settings.options.priority') },
+      { value: 'sortByUrgency', label: t('settings.options.urgency') },
+      { value: 'sortByKeyword', label: t('settings.options.keyword') },
     ];
 
     for (const option of sortOptions) {
@@ -933,7 +933,7 @@ export class TaskListView extends ItemView {
           this.isCaseSensitive = detail.matchCase;
           this.setSearchQuery(detail.query);
           const matchCaseBtn = this.contentEl.querySelector(
-            '.input-right-decorator[aria-label="Match case"]',
+            `.input-right-decorator[aria-label="${t('taskList.matchCase')}"]`,
           );
           if (matchCaseBtn) {
             matchCaseBtn.toggleClass('is-active', this.isCaseSensitive);
@@ -1189,7 +1189,7 @@ export class TaskListView extends ItemView {
     this.isCaseSensitive = search.matchCase ?? false;
     // Sync the match case button in the search input
     const matchCaseBtn = this.contentEl.querySelector(
-      '.input-right-decorator[aria-label="Match case"]',
+      `.input-right-decorator[aria-label="${t('taskList.matchCase')}"]`,
     ) as HTMLElement;
     if (matchCaseBtn) {
       matchCaseBtn.toggleClass('is-active', this.isCaseSensitive);
@@ -1328,12 +1328,12 @@ export class TaskListView extends ItemView {
       if (matchingSaved) {
         this.saveSearchBtn.setAttr(
           'aria-label',
-          `Saved search: ${matchingSaved.name}`,
+          `${t('taskList.saveSearch')}: ${matchingSaved.name}`,
         );
         setTooltip(this.saveSearchBtn, matchingSaved.name);
       } else {
-        this.saveSearchBtn.setAttr('aria-label', 'Save search');
-        setTooltip(this.saveSearchBtn, 'Save search');
+        this.saveSearchBtn.setAttr('aria-label', t('taskList.saveSearch'));
+        setTooltip(this.saveSearchBtn, t('taskList.saveSearch'));
       }
     }
   }
@@ -1932,8 +1932,15 @@ export class TaskListView extends ItemView {
     if (searchResultsCount) {
       const filteredAllTasks = this.filterTasksByViewMode(allTasks, mode);
       searchResultsCount.setText(
-        `${visible.length} of ${filteredAllTasks.length} task` +
-          (filteredAllTasks.length === 1 ? '' : 's'),
+        t(
+          filteredAllTasks.length === 1
+            ? 'taskList.taskCountOne'
+            : 'taskList.taskCount',
+          {
+            done: visible.length,
+            total: filteredAllTasks.length,
+          },
+        ),
       );
     }
 
@@ -1991,12 +1998,12 @@ export class TaskListView extends ItemView {
       // Show appropriate message based on state
       if (isScanning) {
         // Vault scan in progress with no visible tasks
-        title.setText('Scanning vault...');
-        subtitle.setText('Please wait while your tasks are being indexed.');
+        title.setText(t('taskList.scanningTitle'));
+        subtitle.setText(t('taskList.scanningSubtitle'));
       } else {
         // Initial load state (Obsidian starting up, no tasks loaded yet)
-        title.setText('Loading tasks...');
-        subtitle.setText('Please wait while your vault is being indexed.');
+        title.setText(t('taskList.loadingTitle'));
+        subtitle.setText(t('taskList.loadingSubtitle'));
       }
 
       // Keep toolbar enabled: do not disable or overlay; list remains empty
@@ -2032,23 +2039,16 @@ export class TaskListView extends ItemView {
 
       if (!hasAnyTasks) {
         // No tasks in vault at all
-        title.setText('No tasks found');
-        subtitle.setText(
-          // workaround aggressive obsidianmd/ui/sentence-case -- correct case for test.
-          'Create tasks in your notes using "' +
-            'TODO' +
-            ' your task". They will appear here automatically.',
-        );
+        title.setText(t('taskList.noTasksFound'));
+        subtitle.setText(t('taskList.noTasksSubtitle'));
       } else if (isHideCompleted && !hasAnyIncomplete) {
         // b) Hide-completed enabled, but only completed tasks exist
-        title.setText('All tasks are completed');
-        subtitle.setText(
-          'You are hiding completed tasks. Switch view mode or add new tasks to see more.',
-        );
+        title.setText(t('taskList.allTasksCompleted'));
+        subtitle.setText(t('taskList.allCompletedSubtitle'));
       } else {
         // General empty from search filter or other modes
-        title.setText('No matching tasks');
-        subtitle.setText('Try clearing the search or switching view modes.');
+        title.setText(t('taskList.noMatchingTasks'));
+        subtitle.setText(t('taskList.noMatchingSubtitle'));
       }
 
       // Keep toolbar enabled: do not disable or overlay; list remains empty

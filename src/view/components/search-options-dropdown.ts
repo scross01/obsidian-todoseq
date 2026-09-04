@@ -8,6 +8,7 @@ import {
 import { SearchSuggestionDropdown } from './search-suggestion-dropdown';
 import { BaseDropdown } from './base-dropdown';
 import { DOCS_SEARCH_URL } from '../../utils/constants';
+import { t } from '../../i18n';
 
 export interface HistoryEntry {
   query: string;
@@ -158,12 +159,12 @@ export class SearchOptionsDropdown extends BaseDropdown {
     const titleText = titleContent.createDiv({
       cls: 'suggestion-title list-item-part mod-extended',
     });
-    titleText.createSpan({ text: 'Search options' });
+    titleText.createSpan({ text: t('searchOptions.title') });
 
     const auxEl = titleItem.createDiv({ cls: 'suggestion-aux' });
     const iconContainer = auxEl.createDiv({
       cls: 'list-item-part search-suggest-icon clickable-icon',
-      attr: { 'aria-label': 'Read more' },
+      attr: { 'aria-label': t('searchOptions.readMore') },
     });
     setIcon(iconContainer, 'lucide-info');
 
@@ -253,12 +254,12 @@ export class SearchOptionsDropdown extends BaseDropdown {
     const headerTitle = headerContent.createDiv({
       cls: 'suggestion-title list-item-part mod-extended',
     });
-    headerTitle.createSpan({ text: 'Saved searches' });
+    headerTitle.createSpan({ text: t('searchOptions.savedSearches') });
 
     const auxEl = headerItem.createDiv({ cls: 'suggestion-aux' });
     const iconContainer = auxEl.createDiv({
       cls: 'list-item-part search-suggest-icon clickable-icon',
-      attr: { 'aria-label': 'Add saved search' },
+      attr: { 'aria-label': t('searchOptions.addSavedSearch') },
     });
     setIcon(iconContainer, 'lucide-bookmark');
     iconContainer.addEventListener('mousedown', (e) => {
@@ -299,7 +300,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
 
       const editBtn = auxEl.createDiv({
         cls: 'list-item-part search-suggest-icon clickable-icon',
-        attr: { 'aria-label': 'Edit saved search' },
+        attr: { 'aria-label': t('searchOptions.editSavedSearch') },
       });
       setIcon(editBtn, 'lucide-pencil');
       editBtn.addEventListener('mousedown', (e) => {
@@ -315,7 +316,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
 
       const deleteBtn = auxEl.createDiv({
         cls: 'list-item-part search-suggest-icon clickable-icon',
-        attr: { 'aria-label': 'Delete saved search' },
+        attr: { 'aria-label': t('searchOptions.deleteSavedSearch') },
       });
       setIcon(deleteBtn, 'lucide-trash-2');
       deleteBtn.addEventListener('mousedown', (e) => {
@@ -367,12 +368,12 @@ export class SearchOptionsDropdown extends BaseDropdown {
     const headerTitle = headerContent.createDiv({
       cls: 'suggestion-title list-item-part mod-extended',
     });
-    headerTitle.createSpan({ text: 'History' });
+    headerTitle.createSpan({ text: t('searchOptions.history') });
 
     const auxEl = headerItem.createDiv({ cls: 'suggestion-aux' });
     const clearBtn = auxEl.createDiv({
       cls: 'list-item-part search-suggest-icon clickable-icon',
-      attr: { 'aria-label': 'Clear history' },
+      attr: { 'aria-label': t('searchOptions.clearHistory') },
     });
     setIcon(clearBtn, 'lucide-x');
 
@@ -402,7 +403,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
           cls: 'search-suggest-history-matchcase',
           text: 'Aa',
         });
-        setTooltip(caseEl, 'Case sensitive');
+        setTooltip(caseEl, t('searchOptions.caseSensitive'));
         titleEl.createSpan({ text: ' ' });
       }
       const queryEl = titleEl.createSpan({
@@ -416,7 +417,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
         const auxEl = itemEl.createDiv({ cls: 'suggestion-aux' });
         const saveBtn = auxEl.createDiv({
           cls: 'list-item-part search-suggest-icon clickable-icon',
-          attr: { 'aria-label': 'Save as saved search' },
+          attr: { 'aria-label': t('searchOptions.saveAsSavedSearch') },
         });
         setIcon(saveBtn, 'lucide-bookmark');
         saveBtn.addEventListener('mousedown', (e) => {
@@ -470,25 +471,25 @@ export class SearchOptionsDropdown extends BaseDropdown {
   private getPrefixDescription(prefix: string): string {
     switch (prefix) {
       case 'path:':
-        return 'match path of the file';
+        return t('searchOptions.prefixPath');
       case 'file:':
-        return 'match file name';
+        return t('searchOptions.prefixFile');
       case 'tag:':
-        return 'search for tags';
+        return t('searchOptions.prefixTag');
       case 'state:':
-        return 'match task state';
+        return t('searchOptions.prefixState');
       case 'priority:':
-        return 'match task priority';
+        return t('searchOptions.prefixPriority');
       case 'content:':
-        return 'match task content';
+        return t('searchOptions.prefixContent');
       case 'scheduled:':
-        return 'filter by scheduled date';
+        return t('searchOptions.prefixScheduled');
       case 'deadline:':
-        return 'filter by deadline date';
+        return t('searchOptions.prefixDeadline');
       case 'closed:':
-        return 'filter by closed date';
+        return t('searchOptions.prefixClosed');
       case '[]':
-        return 'match page property';
+        return t('searchOptions.prefixPageProperty');
       default:
         return '';
     }

@@ -73,7 +73,9 @@ export class StatusBarManager {
     // Format as "X tasks" instead of "Tasks: X"
     const taskCount = incompleteTasks.length;
     this.statusBarItem.setText(
-      `${taskCount} task${taskCount !== 1 ? 's' : ''}`,
+      t(taskCount === 1 ? 'statusBar.taskCountOne' : 'statusBar.taskCount', {
+        count: taskCount,
+      }),
     );
   }
 

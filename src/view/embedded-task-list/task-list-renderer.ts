@@ -511,8 +511,8 @@ export class EmbeddedTaskListRenderer {
         tabindex: '0',
         'aria-expanded': String(!isCollapsed),
         'aria-label': isCollapsed
-          ? `Expand task list, ${taskCount} tasks`
-          : 'Collapse task list',
+          ? t('embedded.expandTaskListAria', { count: String(taskCount) })
+          : t('embedded.collapseTaskList'),
       },
     });
 
@@ -568,7 +568,7 @@ export class EmbeddedTaskListRenderer {
       // Default text when no query is specified
       header.createSpan({
         cls: 'todoseq-query-summary',
-        text: 'All tasks',
+        text: t('embedded.allTasks'),
       });
     }
   }
@@ -593,8 +593,8 @@ export class EmbeddedTaskListRenderer {
         tabindex: '0',
         'aria-expanded': String(!isCollapsed),
         'aria-label': isCollapsed
-          ? `Expand task list, ${taskCount} tasks`
-          : 'Collapse task list',
+          ? t('embedded.expandTaskListAria', { count: String(taskCount) })
+          : t('embedded.collapseTaskList'),
       },
     });
 
@@ -819,7 +819,7 @@ export class EmbeddedTaskListRenderer {
         role: 'button',
         tabindex: '0',
         'aria-expanded': String(!isCollapsed),
-        'aria-label': 'Collapse task list',
+        'aria-label': t('embedded.collapseTaskList'),
       },
     });
 
@@ -1018,17 +1018,17 @@ export class EmbeddedTaskListRenderer {
       emptyState.createDiv({
         cls: 'todoseq-embedded-task-list-empty-subtitle',
         text: isScanning
-          ? 'Please wait while your tasks are being indexed'
-          : 'Please wait while your vault is being indexed',
+          ? t('taskList.scanningSubtitle')
+          : t('taskList.loadingSubtitle'),
       });
     } else {
       emptyState.createDiv({
         cls: 'todoseq-embedded-task-list-empty-title',
-        text: 'No tasks found',
+        text: t('taskList.noTasksFound'),
       });
       emptyState.createDiv({
         cls: 'todoseq-embedded-task-list-empty-subtitle',
-        text: 'Try adjusting your search or sort parameters',
+        text: t('taskList.noMatchingSubtitle'),
       });
     }
   }
@@ -1047,7 +1047,7 @@ export class EmbeddedTaskListRenderer {
 
     errorContainer.createDiv({
       cls: 'todoseq-embedded-task-list-error-title',
-      text: 'Error rendering task list',
+      text: t('embedded.errorTitle'),
     });
 
     errorContainer.createDiv({
@@ -1057,7 +1057,7 @@ export class EmbeddedTaskListRenderer {
 
     errorContainer.createDiv({
       cls: 'todoseq-embedded-task-list-error-help',
-      text: 'Check your search and sort parameters for syntax errors.',
+      text: t('embedded.errorHelp'),
     });
   }
 

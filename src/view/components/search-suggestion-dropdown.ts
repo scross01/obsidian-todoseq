@@ -4,6 +4,7 @@ import { SearchSuggestions } from '../../search/search-suggestions';
 import { TodoTrackerSettings } from '../../settings/settings-types';
 import { TaskListViewMode } from '../task-list/task-list-view';
 import { BaseDropdown } from './base-dropdown';
+import { t } from '../../i18n';
 
 export class SearchSuggestionDropdown extends BaseDropdown {
   private app: App;
@@ -180,7 +181,7 @@ export class SearchSuggestionDropdown extends BaseDropdown {
       });
       emptyItem.createDiv({
         cls: 'suggestion-content',
-        text: 'No suggestions found',
+        text: t('searchOptions.noSuggestions'),
       });
       return;
     }

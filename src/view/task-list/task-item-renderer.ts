@@ -922,7 +922,7 @@ export class TaskItemRenderer {
       const dateLabel = dateRow.createSpan({
         cls: 'todoseq-task-date-label',
       });
-      dateLabel.setText('Scheduled: ');
+      dateLabel.setText(t('taskItem.scheduledPrefix'));
 
       const dateValue = dateRow.createSpan({
         cls: 'todoseq-task-date-value',
@@ -940,7 +940,7 @@ export class TaskItemRenderer {
         defaultDeadlineWarningPeriod: 0,
       });
       const scheduledTooltip = this.buildDateTooltip(
-        'Scheduled',
+        t('taskItem.scheduled'),
         task.scheduledDate,
       );
       setTooltip(dateValue, scheduledTooltip);
@@ -997,7 +997,7 @@ export class TaskItemRenderer {
       const dateLabel = dateRow.createSpan({
         cls: 'todoseq-task-date-label',
       });
-      dateLabel.setText('Deadline: ');
+      dateLabel.setText(t('taskItem.deadlinePrefix'));
 
       const dateValue = dateRow.createSpan({
         cls: 'todoseq-task-date-value',
@@ -1013,7 +1013,7 @@ export class TaskItemRenderer {
           (deadlineRenderSettings.defaultDeadlineWarningPeriod as number) ?? 0,
       });
       const deadlineTooltip = this.buildDateTooltip(
-        'Deadline',
+        t('taskItem.deadline'),
         task.deadlineDate,
       );
       setTooltip(dateValue, deadlineTooltip);
@@ -1070,7 +1070,7 @@ export class TaskItemRenderer {
       const dateLabel = dateRow.createSpan({
         cls: 'todoseq-task-date-label',
       });
-      dateLabel.setText('Closed: ');
+      dateLabel.setText(t('taskItem.closedPrefix'));
 
       const dateValue = dateRow.createSpan({
         cls: 'todoseq-task-date-value',

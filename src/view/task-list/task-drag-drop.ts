@@ -189,9 +189,9 @@ export class TaskDragDropHandler {
     action: 'copy' | 'move' | 'migrate',
   ): void {
     const labels: Record<string, string> = {
-      copy: 'Copy task here',
-      move: 'Move task here',
-      migrate: 'Migrate task here',
+      copy: t('dragDrop.copyHere'),
+      move: t('dragDrop.moveHere'),
+      migrate: t('dragDrop.migrateHere'),
     };
     el.textContent = labels[action];
   }

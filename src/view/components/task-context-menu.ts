@@ -246,7 +246,7 @@ export class TaskContextMenu extends BaseDialog {
   private buildGoToTaskRow(): void {
     if (!this.containerEl || !this.task) return;
 
-    const row = this.createMenuRow('Go to task', 'locate', () => {
+    const row = this.createMenuRow(t('contextMenu.goToTask'), 'locate', () => {
       if (this.task) {
         void this.callbacks.onGoToTask(this.task);
       }
@@ -259,7 +259,7 @@ export class TaskContextMenu extends BaseDialog {
   private buildCopyTaskRow(): void {
     if (!this.containerEl || !this.task) return;
 
-    const row = this.createMenuRow('Copy', 'copy', () => {
+    const row = this.createMenuRow(t('contextMenu.copy'), 'copy', () => {
       if (this.task) {
         void this.callbacks.onCopyTask(this.task);
       }
@@ -277,12 +277,16 @@ export class TaskContextMenu extends BaseDialog {
       return;
     }
 
-    const row = this.createMenuRow('Copy to today', 'clipboard-paste', () => {
-      if (this.task) {
-        void this.callbacks.onCopyTaskToToday(this.task);
-      }
-      this.hide();
-    });
+    const row = this.createMenuRow(
+      t('contextMenu.copyToToday'),
+      'clipboard-paste',
+      () => {
+        if (this.task) {
+          void this.callbacks.onCopyTaskToToday(this.task);
+        }
+        this.hide();
+      },
+    );
     row.setAttribute('role', 'menuitem');
     this.focusableItems.push(row);
   }
@@ -295,12 +299,16 @@ export class TaskContextMenu extends BaseDialog {
       return;
     }
 
-    const row = this.createMenuRow('Move to today', 'arrow-right', () => {
-      if (this.task) {
-        void this.callbacks.onMoveTaskToToday(this.task);
-      }
-      this.hide();
-    });
+    const row = this.createMenuRow(
+      t('contextMenu.moveToToday'),
+      'arrow-right',
+      () => {
+        if (this.task) {
+          void this.callbacks.onMoveTaskToToday(this.task);
+        }
+        this.hide();
+      },
+    );
     row.setAttribute('role', 'menuitem');
     this.focusableItems.push(row);
   }
@@ -318,12 +326,16 @@ export class TaskContextMenu extends BaseDialog {
       return;
     }
 
-    const row = this.createMenuRow('Migrate to today', 'arrow-up-right', () => {
-      if (this.task) {
-        void this.callbacks.onMigrateTaskToToday(this.task);
-      }
-      this.hide();
-    });
+    const row = this.createMenuRow(
+      t('contextMenu.migrateToToday'),
+      'arrow-up-right',
+      () => {
+        if (this.task) {
+          void this.callbacks.onMigrateTaskToToday(this.task);
+        }
+        this.hide();
+      },
+    );
     row.setAttribute('role', 'menuitem');
     this.focusableItems.push(row);
   }
@@ -335,7 +347,7 @@ export class TaskContextMenu extends BaseDialog {
     const header = this.containerEl.createDiv({
       cls: 'menu-item menu-item-title todoseq-context-menu-header',
     });
-    header.setText('Scheduled');
+    header.setText(t('contextMenu.scheduled'));
 
     // Icon row
     const iconRow = this.containerEl.createDiv({
@@ -440,7 +452,7 @@ export class TaskContextMenu extends BaseDialog {
     const header = this.containerEl.createDiv({
       cls: 'menu-item menu-item-title todoseq-context-menu-header',
     });
-    header.setText('Priority');
+    header.setText(t('contextMenu.priority'));
 
     // Icon row
     const iconRow = this.containerEl.createDiv({
@@ -494,7 +506,7 @@ export class TaskContextMenu extends BaseDialog {
   private buildDeadlineRow(): void {
     if (!this.containerEl || !this.task) return;
 
-    const row = this.createMenuRow('Deadline', 'target', () => {
+    const row = this.createMenuRow(t('contextMenu.deadline'), 'target', () => {
       // Show date picker for deadline
       if (this.task) {
         this.showDatePicker('deadline');
@@ -562,12 +574,12 @@ export class TaskContextMenu extends BaseDialog {
     return [
       {
         icon: 'sun',
-        label: 'Today',
+        label: t('datePicker.today'),
         getDate: () => DateUtils.getDateOnly(new Date()),
       },
       {
         icon: 'sunrise',
-        label: 'Tomorrow',
+        label: t('datePicker.tomorrow'),
         getDate: () => {
           const d = DateUtils.getDateOnly(new Date());
           d.setDate(d.getDate() + 1);
@@ -576,22 +588,22 @@ export class TaskContextMenu extends BaseDialog {
       },
       {
         icon: 'calendar-arrow-up',
-        label: 'Next week',
+        label: t('datePicker.nextWeek'),
         getDate: () => this.getNextWeekStart(),
       },
       {
         icon: 'sofa',
-        label: 'Next weekend',
+        label: t('datePicker.nextWeekend'),
         getDate: () => this.getNextWeekend(),
       },
       {
         icon: 'circle-off',
-        label: 'No date',
+        label: t('datePicker.noDate'),
         getDate: () => null,
       },
       {
         icon: 'calendar',
-        label: 'Pick date...',
+        label: t('datePicker.pickDate'),
         getDate: () => null, // Return null, but the isDatePicker flag will handle the special case
         isDatePicker: true,
       },
@@ -685,25 +697,25 @@ export class TaskContextMenu extends BaseDialog {
     return [
       {
         icon: 'flag',
-        label: 'Priority A (high)',
+        label: t('contextMenu.priorityA'),
         priority: 'high',
         colorClass: 'todoseq-priority-high',
       },
       {
         icon: 'flag',
-        label: 'Priority B (medium)',
+        label: t('contextMenu.priorityB'),
         priority: 'med',
         colorClass: 'todoseq-priority-med',
       },
       {
         icon: 'flag',
-        label: 'Priority C (low)',
+        label: t('contextMenu.priorityC'),
         priority: 'low',
         colorClass: 'todoseq-priority-low',
       },
       {
         icon: 'flag-off',
-        label: 'No priority',
+        label: t('contextMenu.noPriority'),
         priority: null,
         colorClass: 'todoseq-priority-none',
       },
@@ -711,9 +723,6 @@ export class TaskContextMenu extends BaseDialog {
   }
 
   private getScheduledTooltip(option: ScheduledDateOption): string {
-    if (option.label === 'No date' || option.label === 'Pick date...') {
-      return option.label;
-    }
     const date = option.getDate();
     if (!date) return option.label;
     return `${option.label} — ${DateUtils.formatDateForDisplay(date)}`;

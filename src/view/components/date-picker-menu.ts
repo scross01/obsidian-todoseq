@@ -4,6 +4,7 @@ import { formatRepeatDescription } from '../../utils/date-repeater';
 import { DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { isPhoneDevice } from '../../utils/mobile-utils';
 import { BaseDialog } from './base-dialog';
+import { t } from '../../i18n';
 
 /**
  * Callback types for date picker actions
@@ -242,7 +243,9 @@ export class DatePicker extends BaseDialog {
     });
 
     const headerText =
-      this.mode === 'scheduled' ? 'Scheduled Date' : 'Deadline Date';
+      this.mode === 'scheduled'
+        ? t('datePicker.scheduledDate')
+        : t('datePicker.deadlineDate');
     header.setText(headerText);
   }
 
@@ -254,10 +257,14 @@ export class DatePicker extends BaseDialog {
       cls: 'todoseq-date-picker-no-date',
     });
 
-    const noDateRow = this.createMenuRow('No date', 'circle-off', () => {
-      this.hide();
-      this.callbacks.onDateSelected(null, null, this.mode);
-    });
+    const noDateRow = this.createMenuRow(
+      t('datePicker.noDate'),
+      'circle-off',
+      () => {
+        this.hide();
+        this.callbacks.onDateSelected(null, null, this.mode);
+      },
+    );
     noDateRow.setAttribute('role', 'menuitem');
 
     noDateSection.appendChild(noDateRow);
@@ -294,7 +301,7 @@ export class DatePicker extends BaseDialog {
     const prevBtn = monthHeader.createEl('button', {
       cls: 'todoseq-date-picker-calendar-nav',
       attr: {
-        'aria-label': 'Previous month',
+        'aria-label': t('datePicker.previousMonth'),
         role: 'menuitem',
         tabindex: '-1',
       },
@@ -316,7 +323,7 @@ export class DatePicker extends BaseDialog {
     const nextBtn = monthHeader.createEl('button', {
       cls: 'todoseq-date-picker-calendar-nav',
       attr: {
-        'aria-label': 'Next month',
+        'aria-label': t('datePicker.nextMonth'),
         role: 'menuitem',
         tabindex: '-1',
       },
@@ -398,7 +405,9 @@ export class DatePicker extends BaseDialog {
     });
 
     const timeRow = this.createMenuRow(
-      this.selectedTime ? this.formatTime(this.selectedTime) : 'Time',
+      this.selectedTime
+        ? this.formatTime(this.selectedTime)
+        : t('datePicker.time'),
       'clock',
       () => this.toggleTimePicker(),
     );
@@ -418,7 +427,7 @@ export class DatePicker extends BaseDialog {
       const clearBtn = timeRow.createEl('button', {
         cls: 'todoseq-date-picker-clear-btn',
         attr: {
-          'aria-label': 'Clear time',
+          'aria-label': t('datePicker.clearTime'),
           role: 'button',
           tabindex: '-1',
         },
@@ -445,7 +454,9 @@ export class DatePicker extends BaseDialog {
     });
 
     const repeatRow = this.createMenuRow(
-      this.selectedRepeat ? this.formatRepeat(this.selectedRepeat) : 'Repeat',
+      this.selectedRepeat
+        ? this.formatRepeat(this.selectedRepeat)
+        : t('datePicker.repeat'),
       'rotate-ccw',
       () => this.toggleRepeatPicker(),
     );
@@ -465,7 +476,7 @@ export class DatePicker extends BaseDialog {
       const clearBtn = repeatRow.createEl('button', {
         cls: 'todoseq-date-picker-clear-btn',
         attr: {
-          'aria-label': 'Clear repeat',
+          'aria-label': t('datePicker.clearRepeat'),
           role: 'button',
           tabindex: '-1',
         },
@@ -492,7 +503,9 @@ export class DatePicker extends BaseDialog {
     });
 
     const label =
-      this.mode === 'scheduled' ? 'Delayed notice' : 'Advance notice';
+      this.mode === 'scheduled'
+        ? t('datePicker.delayedNotice')
+        : t('datePicker.advanceNotice');
 
     const warningRow = this.createMenuRow(
       this.selectedWarningPeriod
@@ -517,7 +530,7 @@ export class DatePicker extends BaseDialog {
       const clearBtn = warningRow.createEl('button', {
         cls: 'todoseq-date-picker-clear-btn',
         attr: {
-          'aria-label': 'Clear warning period',
+          'aria-label': t('datePicker.clearWarningPeriod'),
           role: 'button',
           tabindex: '-1',
         },
@@ -546,12 +559,12 @@ export class DatePicker extends BaseDialog {
     return [
       {
         icon: 'sun',
-        label: 'Today',
+        label: t('datePicker.today'),
         getDate: () => DateUtils.getDateOnly(new Date()),
       },
       {
         icon: 'sunrise',
-        label: 'Tomorrow',
+        label: t('datePicker.tomorrow'),
         getDate: () => {
           const d = DateUtils.getDateOnly(new Date());
           d.setDate(d.getDate() + 1);
@@ -560,12 +573,12 @@ export class DatePicker extends BaseDialog {
       },
       {
         icon: 'sofa',
-        label: 'Next weekend',
+        label: t('datePicker.nextWeekend'),
         getDate: () => this.getNextWeekend(),
       },
       {
         icon: 'calendar-arrow-up',
-        label: 'Next week',
+        label: t('datePicker.nextWeek'),
         getDate: () => this.getNextWeekStart(),
       },
     ];
@@ -879,19 +892,19 @@ export class DatePicker extends BaseDialog {
       repeat: DateRepeatInfo;
     }> = [
       {
-        label: 'Daily',
+        label: t('datePicker.daily'),
         repeat: { type: '.+', unit: 'd', value: 1, raw: '.+1d' },
       },
       {
-        label: 'Weekly',
+        label: t('datePicker.weekly'),
         repeat: { type: '++', unit: 'w', value: 1, raw: '++1w' },
       },
       {
-        label: 'Monthly',
+        label: t('datePicker.monthly'),
         repeat: { type: '.+', unit: 'm', value: 1, raw: '.+1m' },
       },
       {
-        label: 'Yearly',
+        label: t('datePicker.yearly'),
         repeat: { type: '.+', unit: 'y', value: 1, raw: '.+1y' },
       },
     ];
@@ -932,7 +945,7 @@ export class DatePicker extends BaseDialog {
 
     customRow.createSpan({
       cls: 'menu-item-title todoseq-date-picker-submenu-label',
-      text: 'Custom...',
+      text: t('datePicker.custom'),
     });
 
     customRow.addEventListener('click', (evt) => {
@@ -985,22 +998,22 @@ export class DatePicker extends BaseDialog {
     const header = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-header',
     });
-    header.setText('Custom repeat');
+    header.setText(t('datePicker.customRepeat'));
 
     // Repeat type section
     const typeLabel = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-label',
     });
-    typeLabel.setText('Repeat type');
+    typeLabel.setText(t('datePicker.repeatType'));
 
     const typeOptions = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-type-options',
     });
 
     const typeChoices = [
-      { value: '+', label: '+ (from original)' },
-      { value: '.+', label: '.+ (from done)' },
-      { value: '++', label: '++ (catch up)' },
+      { value: '+', label: t('datePicker.repeatFromOriginal') },
+      { value: '.+', label: t('datePicker.repeatFromDone') },
+      { value: '++', label: t('datePicker.repeatCatchUp') },
     ];
 
     let selectedType: '+' | '.+' | '++' = '.+';
@@ -1039,7 +1052,7 @@ export class DatePicker extends BaseDialog {
     const valueLabel = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-label',
     });
-    valueLabel.setText('Repeat every');
+    valueLabel.setText(t('datePicker.repeatEvery'));
 
     const valueRow = this.customRepeatDialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-value-row',
@@ -1060,11 +1073,11 @@ export class DatePicker extends BaseDialog {
     });
 
     const unitOptions = [
-      { value: 'h', label: 'hour(s)' },
-      { value: 'd', label: 'day(s)' },
-      { value: 'w', label: 'week(s)' },
-      { value: 'm', label: 'month(s)' },
-      { value: 'y', label: 'year(s)' },
+      { value: 'h', label: t('datePicker.unitHour') },
+      { value: 'd', label: t('datePicker.unitDay') },
+      { value: 'w', label: t('datePicker.unitWeek') },
+      { value: 'm', label: t('datePicker.unitMonth') },
+      { value: 'y', label: t('datePicker.unitYear') },
     ];
 
     for (const unit of unitOptions) {
@@ -1082,7 +1095,7 @@ export class DatePicker extends BaseDialog {
     const cancelBtn = buttonRow.createEl('button', {
       cls: 'todoseq-date-picker-custom-repeat-cancel',
     });
-    cancelBtn.setText('Cancel');
+    cancelBtn.setText(t('datePicker.cancel'));
     cancelBtn.addEventListener('click', (evt) => {
       evt.preventDefault();
       evt.stopPropagation();
@@ -1092,7 +1105,7 @@ export class DatePicker extends BaseDialog {
     const saveBtn = buttonRow.createEl('button', {
       cls: 'todoseq-date-picker-custom-repeat-save',
     });
-    saveBtn.setText('Save');
+    saveBtn.setText(t('datePicker.save'));
     saveBtn.addEventListener('click', (evt) => {
       evt.preventDefault();
       evt.stopPropagation();
@@ -1182,14 +1195,35 @@ export class DatePicker extends BaseDialog {
       label: string;
       wp: WarningPeriodInfo | null;
     }> = [
-      { label: 'None', wp: null },
-      { label: '1 day', wp: { value: 1, unit: 'd', isFirstOnly: false } },
-      { label: '3 days', wp: { value: 3, unit: 'd', isFirstOnly: false } },
-      { label: '5 days', wp: { value: 5, unit: 'd', isFirstOnly: false } },
-      { label: '7 days', wp: { value: 7, unit: 'd', isFirstOnly: false } },
-      { label: '1 week', wp: { value: 1, unit: 'w', isFirstOnly: false } },
-      { label: '2 weeks', wp: { value: 2, unit: 'w', isFirstOnly: false } },
-      { label: '1 month', wp: { value: 1, unit: 'm', isFirstOnly: false } },
+      { label: t('datePicker.warningNone'), wp: null },
+      {
+        label: t('datePicker.warning1Day'),
+        wp: { value: 1, unit: 'd', isFirstOnly: false },
+      },
+      {
+        label: t('datePicker.warning3Days'),
+        wp: { value: 3, unit: 'd', isFirstOnly: false },
+      },
+      {
+        label: t('datePicker.warning5Days'),
+        wp: { value: 5, unit: 'd', isFirstOnly: false },
+      },
+      {
+        label: t('datePicker.warning7Days'),
+        wp: { value: 7, unit: 'd', isFirstOnly: false },
+      },
+      {
+        label: t('datePicker.warning1Week'),
+        wp: { value: 1, unit: 'w', isFirstOnly: false },
+      },
+      {
+        label: t('datePicker.warning2Weeks'),
+        wp: { value: 2, unit: 'w', isFirstOnly: false },
+      },
+      {
+        label: t('datePicker.warning1Month'),
+        wp: { value: 1, unit: 'm', isFirstOnly: false },
+      },
     ];
 
     for (const option of presetOptions) {
@@ -1233,7 +1267,7 @@ export class DatePicker extends BaseDialog {
 
     customRow.createSpan({
       cls: 'menu-item-title todoseq-date-picker-submenu-label',
-      text: 'Custom...',
+      text: t('datePicker.custom'),
     });
 
     customRow.addEventListener('click', (evt) => {
@@ -1316,12 +1350,12 @@ export class DatePicker extends BaseDialog {
     const header = dialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-header',
     });
-    header.setText('Custom warning period');
+    header.setText(t('datePicker.customWarningPeriod'));
 
     const valueLabel = dialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-label',
     });
-    valueLabel.setText('Warning period');
+    valueLabel.setText(t('datePicker.warningPeriod'));
 
     const valueRow = dialog.createDiv({
       cls: 'todoseq-date-picker-custom-repeat-value-row',
@@ -1341,10 +1375,10 @@ export class DatePicker extends BaseDialog {
       cls: 'todoseq-date-picker-custom-repeat-unit-select',
     });
     const unitOptions = [
-      { value: 'd', label: 'day(s)' },
-      { value: 'w', label: 'week(s)' },
-      { value: 'm', label: 'month(s)' },
-      { value: 'y', label: 'year(s)' },
+      { value: 'd', label: t('datePicker.unitDay') },
+      { value: 'w', label: t('datePicker.unitWeek') },
+      { value: 'm', label: t('datePicker.unitMonth') },
+      { value: 'y', label: t('datePicker.unitYear') },
     ];
     for (const u of unitOptions) {
       const opt = unitSelect.createEl('option', { attr: { value: u.value } });
@@ -1359,7 +1393,7 @@ export class DatePicker extends BaseDialog {
     const cancelBtn = buttonRow.createEl('button', {
       cls: 'todoseq-date-picker-custom-repeat-cancel',
     });
-    cancelBtn.setText('Cancel');
+    cancelBtn.setText(t('datePicker.cancel'));
     cancelBtn.addEventListener('click', (evt) => {
       evt.preventDefault();
       evt.stopPropagation();
@@ -1369,7 +1403,7 @@ export class DatePicker extends BaseDialog {
     const saveBtn = buttonRow.createEl('button', {
       cls: 'todoseq-date-picker-custom-repeat-save',
     });
-    saveBtn.setText('Save');
+    saveBtn.setText(t('datePicker.save'));
     saveBtn.addEventListener('click', (evt) => {
       evt.preventDefault();
       evt.stopPropagation();

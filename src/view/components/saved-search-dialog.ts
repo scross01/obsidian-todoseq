@@ -3,6 +3,7 @@ import {
   TodoTrackerSettings,
 } from '../../settings/settings-types';
 import { TaskListViewMode, SortMethod } from '../task-list/task-list-filter';
+import { t } from '../../i18n';
 
 export interface SavedSearchDialogOptions {
   /** Existing saved search to edit (undefined for create mode) */
@@ -49,7 +50,9 @@ export class SavedSearchDialog {
     this.modalEl.addEventListener('click', (e) => e.stopPropagation());
 
     const isEdit = !!this.options.existingSearch;
-    const title = isEdit ? 'Edit saved search' : 'Save search';
+    const title = isEdit
+      ? t('savedSearch.editTitle')
+      : t('savedSearch.saveTitle');
 
     // Title
     const titleEl = this.modalEl.createDiv({
@@ -73,11 +76,11 @@ export class SavedSearchDialog {
     const nameGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
-    nameGroup.createEl('label', { text: 'Name' });
+    nameGroup.createEl('label', { text: t('savedSearch.nameLabel') });
     const nameInput = nameGroup.createEl('input', {
       attr: {
         type: 'text',
-        placeholder: 'E.g., agenda, overdue, work active',
+        placeholder: t('savedSearch.namePlaceholder'),
         maxlength: '50',
       },
     });
@@ -87,11 +90,11 @@ export class SavedSearchDialog {
     const queryGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
-    queryGroup.createEl('label', { text: 'Search query' });
+    queryGroup.createEl('label', { text: t('savedSearch.queryLabel') });
     const queryInput = queryGroup.createEl('input', {
       attr: {
         type: 'text',
-        placeholder: 'E.g., scheduled:today, state:active, tag:work',
+        placeholder: t('savedSearch.queryPlaceholder'),
       },
     });
     queryInput.value =
@@ -101,12 +104,14 @@ export class SavedSearchDialog {
     const matchCaseGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
-    matchCaseGroup.createEl('label', { text: 'Match case' });
+    matchCaseGroup.createEl('label', {
+      text: t('savedSearch.matchCaseLabel'),
+    });
     const matchCaseSelect = matchCaseGroup.createEl('select');
     const matchCaseOptions = [
-      { value: '', label: 'Use current setting' },
-      { value: 'off', label: 'Off' },
-      { value: 'on', label: 'On' },
+      { value: '', label: t('savedSearch.matchCaseUseCurrent') },
+      { value: 'off', label: t('savedSearch.matchCaseOff') },
+      { value: 'on', label: t('savedSearch.matchCaseOn') },
     ];
     for (const opt of matchCaseOptions) {
       matchCaseSelect.createEl('option', {
@@ -128,18 +133,18 @@ export class SavedSearchDialog {
     const sortGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
-    sortGroup.createEl('label', { text: 'Sort tasks by' });
+    sortGroup.createEl('label', { text: t('savedSearch.sortLabel') });
     const sortSelect = sortGroup.createEl('select');
     const sortOptions = [
-      { value: '', label: 'Use current setting' },
-      { value: 'default', label: 'Default (file path)' },
-      { value: 'sortByScheduled', label: 'Scheduled date' },
-      { value: 'sortByDeadline', label: 'Deadline date' },
-      { value: 'sortByClosedDate', label: 'Closed date' },
-      { value: 'sortByStarted', label: 'Started date' },
-      { value: 'sortByPriority', label: 'Priority' },
-      { value: 'sortByUrgency', label: 'Urgency' },
-      { value: 'sortByKeyword', label: 'Keyword' },
+      { value: '', label: t('savedSearch.useCurrentSetting') },
+      { value: 'default', label: t('settings.options.defaultFilePath') },
+      { value: 'sortByScheduled', label: t('settings.options.scheduledDate') },
+      { value: 'sortByDeadline', label: t('settings.options.deadlineDate') },
+      { value: 'sortByClosedDate', label: t('settings.options.closedDate') },
+      { value: 'sortByStarted', label: t('settings.options.startedDate') },
+      { value: 'sortByPriority', label: t('settings.options.priority') },
+      { value: 'sortByUrgency', label: t('settings.options.urgency') },
+      { value: 'sortByKeyword', label: t('settings.options.keyword') },
     ];
     for (const opt of sortOptions) {
       sortSelect.createEl('option', {
@@ -156,13 +161,15 @@ export class SavedSearchDialog {
     const viewModeGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
-    viewModeGroup.createEl('label', { text: 'Completed tasks' });
+    viewModeGroup.createEl('label', {
+      text: t('savedSearch.completedTasksLabel'),
+    });
     const viewModeSelect = viewModeGroup.createEl('select');
     const viewModeOptions = [
-      { value: '', label: 'Use current setting' },
-      { value: 'showAll', label: 'Show' },
-      { value: 'sortCompletedLast', label: 'Sort to end' },
-      { value: 'hideCompleted', label: 'Hide' },
+      { value: '', label: t('savedSearch.useCurrentSetting') },
+      { value: 'showAll', label: t('savedSearch.viewModeShow') },
+      { value: 'sortCompletedLast', label: t('savedSearch.viewModeSortToEnd') },
+      { value: 'hideCompleted', label: t('savedSearch.viewModeHide') },
     ];
     for (const opt of viewModeOptions) {
       viewModeSelect.createEl('option', {
@@ -179,14 +186,16 @@ export class SavedSearchDialog {
     const futureGroup = form.createDiv({
       cls: 'todoseq-saved-search-field',
     });
-    futureGroup.createEl('label', { text: 'Future dated tasks' });
+    futureGroup.createEl('label', {
+      text: t('savedSearch.futureTasksLabel'),
+    });
     const futureSelect = futureGroup.createEl('select');
     const futureOptions = [
-      { value: '', label: 'Use current setting' },
-      { value: 'showAll', label: 'Show' },
-      { value: 'showUpcoming', label: 'Show upcoming' },
-      { value: 'sortToEnd', label: 'Sort to end' },
-      { value: 'hideFuture', label: 'Hide' },
+      { value: '', label: t('savedSearch.useCurrentSetting') },
+      { value: 'showAll', label: t('savedSearch.viewModeShow') },
+      { value: 'showUpcoming', label: t('savedSearch.showUpcoming') },
+      { value: 'sortToEnd', label: t('savedSearch.viewModeSortToEnd') },
+      { value: 'hideFuture', label: t('savedSearch.viewModeHide') },
     ];
     for (const opt of futureOptions) {
       futureSelect.createEl('option', {
@@ -207,7 +216,7 @@ export class SavedSearchDialog {
     // Delete button (only in edit mode)
     if (isEdit && this.options.onDelete) {
       const deleteBtn = buttons.createEl('button', {
-        text: 'Delete',
+        text: t('savedSearch.deleteButton'),
         cls: 'todoseq-saved-search-btn-delete',
       });
       deleteBtn.addEventListener('click', () => {
@@ -216,13 +225,13 @@ export class SavedSearchDialog {
     }
 
     const cancelBtn = buttons.createEl('button', {
-      text: 'Cancel',
+      text: t('savedSearch.cancel'),
       cls: 'todoseq-saved-search-btn-cancel',
     });
     cancelBtn.addEventListener('click', () => this.cancel());
 
     const saveBtn = buttons.createEl('button', {
-      text: isEdit ? 'Save changes' : 'Save',
+      text: isEdit ? t('savedSearch.saveChanges') : t('savedSearch.save'),
       cls: 'todoseq-saved-search-btn-save',
     });
     saveBtn.addEventListener('click', () => {
