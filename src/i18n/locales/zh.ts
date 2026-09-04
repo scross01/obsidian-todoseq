@@ -3,6 +3,20 @@
  * compile time via `WidenStrings<typeof en>` — a missing or extra key is a
  * type error.
  *
+ * Translation policy:
+ * - Translate UI chrome only: headings, labels, descriptions, notices,
+ *   buttons, and placeholder prose.
+ * - NEVER translate syntax or user data: task state keywords (TODO, DOING,
+ *   DONE, FIXME, ...), metadata labels (SCHEDULED:, DEADLINE:, CLOSED:,
+ *   STARTED:, DESCRIPTION:), repeat syntax (+, .+, ++), and the embedded
+ *   query language (scheduled:, state:, tag:, path:, [], ...). Users type
+ *   these literals in their notes; translated keywords would not match and
+ *   translated labels would desync from the file syntax. Mention them
+ *   literally in prose instead (e.g. 内置：TODO、LATER).
+ * - Follow Obsidian's official zh terms: vault = 仓库, daily note = 日记.
+ * - Use full-width CJK punctuation in prose: …… for trailing ellipsis,
+ *   （）：、, and curly quotes “ ”.
+ *
  * Text baseline: the FEI352 fork's Simplified Chinese translation
  * (src/i18n/base.ts), reconciled to the current English strings; strings the
  * fork did not cover are translated fresh.
@@ -23,7 +37,7 @@ export const zh: WidenStrings<typeof en> = {
       searchFilter: '任务列表搜索与过滤',
       taskKeywords: '任务关键词',
       transitions: '任务状态转换',
-      warningPeriod: '警告期限',
+      warningPeriod: '提前提醒与延迟警告',
       experimental: '⚠︎ 实验性功能',
     },
     taskDetection: {
@@ -47,11 +61,11 @@ export const zh: WidenStrings<typeof en> = {
     smartDates: {
       enableSmartDateRecognition: {
         name: '启用智能日期识别',
-        desc: '自动将自然语言日期（如"今天"、"明天"、"下周三"）转换为结构化日期。',
+        desc: '自动将自然语言日期（如“今天”、“明天”、“下周三”）转换为结构化日期。',
       },
       smartDateRemoveKeywords: {
         name: '转换后移除日期关键词',
-        desc: '将自然语言日期（如"今天"、"明天"）转换为结构化日期后，删除原有的自然语言文本。',
+        desc: '将自然语言日期（如“今天”、“明天”）转换为结构化日期后，删除原有的自然语言文本。',
       },
     },
     searchFilter: {
@@ -99,7 +113,7 @@ export const zh: WidenStrings<typeof en> = {
       },
       archived: {
         name: '已归档关键词',
-        desc: '已归档任务的关键词（如 OLD）。这些任务会被设置样式，但不会在库扫描时收集。内置：ARCHIVED。',
+        desc: '已归档任务的关键词（如 OLD）。这些任务会被设置样式，但不会在仓库扫描时收集。内置：ARCHIVED。',
       },
       migratedState: {
         name: '迁移后状态关键词',
@@ -223,14 +237,14 @@ export const zh: WidenStrings<typeof en> = {
     dragTaskCopied: '任务已复制',
     dragTaskMoved: '任务已移动',
     dragTaskMigrated: '任务已迁移',
-    savedSearchCreated: '已创建保存的搜索"{name}"',
-    savedSearchUpdated: '已更新保存的搜索"{name}"',
-    savedSearchDeleted: '已删除保存的搜索"{name}"',
+    savedSearchCreated: '已创建保存的搜索“{name}”',
+    savedSearchUpdated: '已更新保存的搜索“{name}”',
+    savedSearchDeleted: '已删除保存的搜索“{name}”',
   },
   commands: {
     showTaskList: '显示任务列表',
     showTaskListInNewTab: '在新标签页中打开任务列表',
-    rescanVault: '重新扫描库',
+    rescanVault: '重新扫描仓库',
     toggleTaskState: '切换任务状态',
     cycleTaskState: '循环切换任务状态',
     addScheduledDate: '添加计划日期',
@@ -265,14 +279,14 @@ export const zh: WidenStrings<typeof en> = {
     deadlineDate: '截止日期',
     today: '今天',
     tomorrow: '明天',
-    pickDate: '选择日期...',
+    pickDate: '选择日期…',
     nextWeekend: '下周末',
     nextWeek: '下周',
     daily: '每天',
     weekly: '每周',
     monthly: '每月',
     yearly: '每年',
-    custom: '自定义...',
+    custom: '自定义…',
     customRepeat: '自定义重复',
     repeat: '重复',
     repeatType: '重复类型',
@@ -309,23 +323,23 @@ export const zh: WidenStrings<typeof en> = {
   },
   taskList: {
     searchLabel: '搜索',
-    searchPlaceholder: '搜索任务...',
+    searchPlaceholder: '搜索任务…',
     searchAriaLabel: '搜索任务',
     clearSearch: '清除搜索',
     matchCase: '区分大小写',
     saveSearch: '保存搜索',
     taskListSettings: '任务列表设置',
     showCompletedTasks: '显示已完成任务',
-    futureTaskSorting: '未来任务排序',
+    futureTaskSorting: '未来日期任务排序',
     taskDescriptionDisplay: '任务描述显示',
     sortTasksBy: '排序方式',
-    scanningTitle: '正在扫描库...',
+    scanningTitle: '正在扫描仓库…',
     scanningSubtitle: '请稍候，正在为任务建立索引。',
-    loadingTitle: '正在加载任务...',
-    loadingSubtitle: '请稍候，正在为库建立索引。',
+    loadingTitle: '正在加载任务…',
+    loadingSubtitle: '请稍候，正在为仓库建立索引。',
     noTasksFound: '没有任务',
     noTasksSubtitle:
-      '在笔记中使用"TODO 你的任务"创建任务，它们会自动显示在这里。',
+      '在笔记中使用“TODO 你的任务”创建任务，它们会自动显示在这里。',
     allTasksCompleted: '所有任务已完成',
     allCompletedSubtitle:
       '您正在隐藏已完成任务。切换视图模式或添加新任务以查看更多。',

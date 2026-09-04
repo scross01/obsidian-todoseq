@@ -108,7 +108,7 @@ export const en = {
     transitions: {
       stateTransitions: {
         name: 'State transitions',
-        desc: 'Define how states transition. Each line: STATE -> next_state. Use (a | b) to define multiple initial states.',
+        desc: 'Define how states transition. Each line: STATE -> next_state. Use (a | b) to define a keyword group on either side.',
       },
       defaultInactive: {
         name: 'Default inactive state',
