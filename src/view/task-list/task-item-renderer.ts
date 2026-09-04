@@ -22,6 +22,7 @@ import { KeywordManager } from '../../utils/keyword-manager';
 import type { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { BaseDialog } from '../components/base-dialog';
+import { t } from '../../i18n';
 
 interface LinkPattern {
   type: 'wiki' | 'md' | 'url' | 'tag';
@@ -224,7 +225,7 @@ export class TaskItemRenderer {
         evt.preventDefault();
         evt.stopPropagation();
         activate(evt).catch((error) => {
-          new Notice('Failed to activate task');
+          new Notice(t('notices.failedToActivateTask'));
           console.error('Error activating task:', error);
         });
       }

@@ -14,6 +14,7 @@ import {
   readTaskBlockFromVault,
 } from '../../utils/task-sub-bullets';
 import { EmbeddedTaskItemRenderer } from './embedded-task-item-renderer';
+import { t } from '../../i18n';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -68,10 +69,10 @@ export class EmbeddedTaskListRenderer {
     const textToCopy = allLines.join('\n');
     navigator.clipboard.writeText(textToCopy).then(
       () => {
-        new Notice('Task copied to clipboard');
+        new Notice(t('notices.taskCopiedToClipboard'));
       },
       () => {
-        new Notice('Failed to copy task');
+        new Notice(t('notices.failedToCopyTask'));
       },
     );
   }
@@ -82,12 +83,12 @@ export class EmbeddedTaskListRenderer {
   private async copyTaskToToday(task: Task): Promise<void> {
     const todayNote = await getTodayDailyNote(this.plugin.app);
     if (!todayNote) {
-      new Notice('Failed to get or create today daily note');
+      new Notice(t('notices.failedToGetTodayNote'));
       return;
     }
 
     if (isTaskOnTodayDailyNote(task, todayNote)) {
-      new Notice('Task is already on today daily note');
+      new Notice(t('notices.taskAlreadyOnToday'));
       return;
     }
 
@@ -96,7 +97,7 @@ export class EmbeddedTaskListRenderer {
     const newContent =
       currentContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
     await this.plugin.app.vault.modify(todayNote, newContent);
-    new Notice('Task copied to today daily note');
+    new Notice(t('notices.taskCopiedToToday'));
   }
 
   /**
@@ -105,12 +106,12 @@ export class EmbeddedTaskListRenderer {
   private async moveTaskToToday(task: Task): Promise<void> {
     const todayNote = await getTodayDailyNote(this.plugin.app);
     if (!todayNote) {
-      new Notice('Failed to get or create today daily note');
+      new Notice(t('notices.failedToGetTodayNote'));
       return;
     }
 
     if (isTaskOnTodayDailyNote(task, todayNote)) {
-      new Notice('Task is already on today daily note');
+      new Notice(t('notices.taskAlreadyOnToday'));
       return;
     }
 
@@ -123,7 +124,7 @@ export class EmbeddedTaskListRenderer {
 
     const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
     if (!(sourceFile instanceof TFile)) {
-      new Notice('Failed to find source file');
+      new Notice(t('notices.failedToFindSourceFile'));
       return;
     }
 
@@ -135,7 +136,7 @@ export class EmbeddedTaskListRenderer {
       ...sourceLines.slice(end + 1),
     ];
     await this.plugin.app.vault.modify(sourceFile, newSourceLines.join('\n'));
-    new Notice('Task moved to today daily note');
+    new Notice(t('notices.taskMovedToToday'));
   }
 
   /**
@@ -146,12 +147,12 @@ export class EmbeddedTaskListRenderer {
   private async migrateTaskToToday(task: Task): Promise<void> {
     const todayNote = await getTodayDailyNote(this.plugin.app);
     if (!todayNote) {
-      new Notice('Failed to get or create today daily note');
+      new Notice(t('notices.failedToGetTodayNote'));
       return;
     }
 
     if (isTaskOnTodayDailyNote(task, todayNote)) {
-      new Notice('Task is already on today daily note');
+      new Notice(t('notices.taskAlreadyOnToday'));
       return;
     }
 
@@ -164,7 +165,7 @@ export class EmbeddedTaskListRenderer {
 
     const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
     if (!(sourceFile instanceof TFile)) {
-      new Notice('Failed to find source file');
+      new Notice(t('notices.failedToFindSourceFile'));
       return;
     }
 
@@ -179,7 +180,7 @@ export class EmbeddedTaskListRenderer {
       migrateState,
     );
     await this.plugin.app.vault.modify(sourceFile, modified.join('\n'));
-    new Notice('Task migrated to today daily note');
+    new Notice(t('notices.taskMigratedToToday'));
   }
 
   /**

@@ -32,6 +32,7 @@ import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
 import { BaseDialog } from '../components/base-dialog';
 import { getStateTransitionManager } from '../../services/task-update-coordinator';
+import { t } from '../../i18n';
 
 export class EmbeddedTaskItemRenderer {
   constructor(
@@ -686,7 +687,7 @@ export class EmbeddedTaskItemRenderer {
           this.taskContextMenu
             .showAtMouseEvent(task, syntheticEvt)
             .catch((error) => {
-              new Notice('Failed to show context menu');
+              new Notice(t('notices.failedToShowContextMenu'));
               console.error('Error showing context menu:', error);
             });
         }, LONG_PRESS_MS);

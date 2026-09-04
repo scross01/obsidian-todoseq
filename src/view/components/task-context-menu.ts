@@ -7,6 +7,7 @@ import { isPhoneDevice } from '../../utils/mobile-utils';
 import { DatePicker, DatePickerMode } from './date-picker-menu';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { BaseDialog } from './base-dialog';
+import { t } from '../../i18n';
 
 /**
  * Callback types for context menu actions
@@ -675,7 +676,7 @@ export class TaskContextMenu extends BaseDialog {
     this.datePicker
       .show(position, mode, initialDate, initialRepeat, initialWarningPeriod)
       .catch((error) => {
-        new Notice('Failed to show date picker');
+        new Notice(t('notices.failedToShowDatePicker'));
         console.error('Error showing date picker:', error);
       });
   }

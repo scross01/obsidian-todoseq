@@ -23,6 +23,7 @@ import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { ChangeTracker } from './services/change-tracker';
 import { SmartDateProcessor } from './services/smart-date-processor';
+import { t } from './i18n';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -124,7 +125,7 @@ export default class TodoTracker extends Plugin {
         leaf.view.updateTasks(tasks);
         // Lighter refresh: only update the visible list rather than full onOpen re-init
         leaf.view.refreshVisibleList().catch((error) => {
-          new Notice('Failed to refresh task list');
+          new Notice(t('notices.failedToRefreshTaskList'));
           console.error('Error refreshing task list:', error);
         });
       }

@@ -17,6 +17,7 @@ import {
   readTaskBlockFromVault,
   taskHasCheckbox,
 } from '../../utils/task-sub-bullets';
+import { t } from '../../i18n';
 
 export interface TaskDragDropCallbacks {
   onGetTask: (path: string, line: number) => Task | undefined;
@@ -255,7 +256,7 @@ export class TaskDragDropHandler {
     if (!targetFile) return;
 
     if (task.path === targetFile.path) {
-      new Notice('Task is already in this file');
+      new Notice(t('notices.taskAlreadyInFile'));
       return;
     }
 
@@ -268,12 +269,7 @@ export class TaskDragDropHandler {
     );
 
     if (action === 'migrate' && !this.plugin.settings.migrateToTodayState) {
-      new Notice(
-        // workaround aggresive obsidianmd/ui/sentence-case -- "TODOseq" is a proper name in scentence.
-        'Migration is disabled. Configure the migrated state keyword in ' +
-          'TODOseq' +
-          ' settings.',
-      );
+      new Notice(t('notices.migrationDisabled'));
       return;
     }
 
@@ -319,9 +315,9 @@ export class TaskDragDropHandler {
 
   private showActionNotice(action: 'copy' | 'move' | 'migrate'): void {
     const messages: Record<string, string> = {
-      copy: 'Task copied',
-      move: 'Task moved',
-      migrate: 'Task migrated',
+      copy: t('notices.dragTaskCopied'),
+      move: t('notices.dragTaskMoved'),
+      migrate: t('notices.dragTaskMigrated'),
     };
     new Notice(messages[action]);
   }
@@ -444,7 +440,7 @@ export class TaskDragDropHandler {
       }
     } catch (error) {
       console.error('[TODOseq] Failed to modify source task:', error);
-      new Notice('Failed to update source task');
+      new Notice(t('notices.failedToUpdateSourceTask'));
     }
   }
 }
