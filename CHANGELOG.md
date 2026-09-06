@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.2.0
+
+- Added new option to track STARTED date when a task enters an active state.
+
 ## 0.19.0
 
 - Updated settings to use the new Obsidian 1.13 declarative settings API, enabled settings search.
