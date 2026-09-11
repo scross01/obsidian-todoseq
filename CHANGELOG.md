@@ -1,6 +1,6 @@
 # Change Log
 
-## 0.2.0
+## 0.20.0
 
 - Added new option to track STARTED date when a task enters an active state.
 
