@@ -4,25 +4,23 @@ outline: false
 ---
 
 <div class="ts-hero">
-  <div class="ts-hero-grid">
-    <div class="ts-hero-copy">
-      <h1 class="ts-h1">TODOseq for Obsidian</h1>
-      <p class="ts-tagline">Keyword-based task management. No checkboxes required.</p>
-      <p class="ts-sub">
-        Scan your vault for plain lines that start with
-        <code>TODO</code>, <code>DOING</code>, and <code>DONE</code>.
-        Collect them into one Task List. Keep writing in ordinary notes —
-        inspired by Emacs Org-mode and Logseq. Free and open source.
-      </p>
-      <p class="ts-ctas">
-        <a class="ts-btn ts-btn-primary" href="https://obsidian.md/plugins?id=todoseq">Install TODOseq</a>
-        <a class="ts-btn ts-btn-ghost" href="./introduction.html">View docs</a>
-        <a class="ts-btn ts-btn-ghost" href="https://github.com/scross01/obsidian-todoseq">Star on GitHub</a>
-      </p>
-    </div>
-    <div class="ts-hero-media ts-media">
-      <img class="ts-hero-gif" src="./assets/todoseq-task-entry.gif" alt="Click a TODO keyword in Obsidian to cycle its task state" />
-    </div>
+  <div class="ts-hero-copy">
+    <h1 class="ts-h1">TODOseq for Obsidian</h1>
+    <p class="ts-tagline">Keyword-based task management. No checkboxes required.</p>
+    <p class="ts-sub">
+      Scan your vault for plain lines that start with
+      <code>TODO</code>, <code>DOING</code>, and <code>DONE</code>.
+      Collect them into one Task List. Keep writing in ordinary notes —
+      inspired by Emacs Org-mode and Logseq. Free and open source.
+    </p>
+    <p class="ts-ctas">
+      <a class="ts-btn ts-btn-primary" href="https://obsidian.md/plugins?id=todoseq">Install TODOseq</a>
+      <a class="ts-btn ts-btn-ghost" href="./introduction.html">View docs</a>
+      <a class="ts-btn ts-btn-ghost" href="https://github.com/scross01/obsidian-todoseq">Star on GitHub</a>
+    </p>
+  </div>
+  <div class="ts-hero-media ts-media">
+    <img class="ts-hero-gif" src="./assets/todoseq-task-entry.gif" alt="Click a TODO keyword in Obsidian to cycle its task state" />
   </div>
 </div>
 

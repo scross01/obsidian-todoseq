@@ -94,27 +94,14 @@ a.ts-btn-ghost:hover {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
-/* Hero — left-aligned Persuade layout */
+/* Hero — stacked: copy + CTAs, then full-width demo */
 .ts-hero {
-  padding: 2rem 0 0.5rem;
-}
-
-.ts-hero-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.75rem;
-  align-items: center;
-}
-
-@media (min-width: 900px) {
-  .ts-hero-grid {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    gap: 2.25rem;
-  }
+  padding: 2rem 0 0.75rem;
 }
 
 .ts-hero-copy {
   max-width: 40rem;
+  margin-bottom: 1.5rem;
 }
 
 .ts-h1 {
@@ -156,6 +143,7 @@ a.ts-btn-ghost:hover {
 .ts-hero-media {
   position: relative;
   line-height: 0;
+  width: 100%;
 }
 
 .ts-hero-media img {

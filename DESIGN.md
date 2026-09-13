@@ -128,7 +128,7 @@ Plugin UI (in Obsidian) continues to use theme variables (`--interactive-accent`
 
 ## Layout
 
-Docs site is VitePress: nav, optional sidebar on guides, single content column. Landing uses a two-column hero from ~900px (copy left, media right); stacks copy → CTAs → media on small screens. Spacing rhythm is 8px-based; section gaps 2.5–3.5rem. Feature grids use auto-fit columns with ~10px card radius. Guide pages inherit default VP density; this system only adds chrome consistency (images, tables), not a new grid.
+Docs site is VitePress: nav, optional sidebar on guides, single content column. Landing hero is **stacked**: left-aligned promise + CTAs, then the animated demo at **full content width** beneath the buttons (not a side-by-side media column). Spacing rhythm is 8px-based; section gaps 2.5–3.5rem. Feature grids use auto-fit columns with ~10px card radius. Guide pages inherit default VP density; this system only adds chrome consistency (images, tables), not a new grid.
 
 ## Elevation & Depth
 
