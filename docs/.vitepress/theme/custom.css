@@ -1,43 +1,44 @@
 /* TODOseq docs — shared tokens (see DESIGN.md) */
 
 :root {
-  --ts-accent: #7c3aed;
-  --ts-accent-hover: #6d28d9;
+  /* Darker violet + white ink for AA contrast on filled buttons */
+  --ts-accent: #6d28d9;
+  --ts-accent-hover: #5b21b6;
   --ts-accent-ink: #ffffff;
   --ts-ink: #1f1f1f;
   --ts-ink-muted: #5c5c66;
   --ts-surface: #f6f6f8;
   --ts-line: #e4e4ec;
-  --ts-kw-todo: #c2410c;
-  --ts-kw-doing: #1d4ed8;
-  --ts-kw-done: #15803d;
-  --ts-kw-wait: #6d28d9;
 }
 
 .dark {
-  --ts-accent: #a78bfa;
-  --ts-accent-hover: #c4b5fd;
-  --ts-accent-ink: #1e1b2e;
+  --ts-accent: #7c3aed;
+  --ts-accent-hover: #8b5cf6;
+  --ts-accent-ink: #ffffff;
   --ts-ink: #ececf1;
   --ts-ink-muted: #b3b3c0;
   --ts-surface: #1e1e23;
   --ts-line: #2c2c33;
-  --ts-kw-todo: #fb923c;
-  --ts-kw-doing: #93c5fd;
-  --ts-kw-done: #86efac;
-  --ts-kw-wait: #c4b5fd;
 }
 
-/* Buttons */
-.ts-btn {
+/* Buttons — beat VitePress .vp-doc a link colors */
+.vp-doc a.ts-btn,
+.vp-doc a.ts-btn:hover,
+a.ts-btn,
+a.ts-btn:hover {
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.vp-doc a.ts-btn,
+a.ts-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   padding: 0.62rem 1.35rem;
   border-radius: 8px;
-  font-weight: 600;
   font-size: 0.95rem;
-  text-decoration: none;
+  line-height: 1.3;
   border: 1px solid transparent;
   transition:
     background-color 0.2s,
@@ -45,31 +46,38 @@
     color 0.2s;
 }
 
-.ts-btn:focus-visible {
+.vp-doc a.ts-btn:focus-visible,
+a.ts-btn:focus-visible {
   outline: 2px solid var(--ts-accent);
   outline-offset: 2px;
 }
 
-.ts-btn-primary {
-  background: var(--ts-accent);
-  color: var(--ts-accent-ink);
+.vp-doc a.ts-btn-primary,
+a.ts-btn-primary {
+  background-color: var(--ts-accent);
+  border-color: var(--ts-accent);
+  color: var(--ts-accent-ink) !important;
 }
 
-.ts-btn-primary:hover {
-  background: var(--ts-accent-hover);
-  color: var(--ts-accent-ink);
+.vp-doc a.ts-btn-primary:hover,
+a.ts-btn-primary:hover {
+  background-color: var(--ts-accent-hover);
+  border-color: var(--ts-accent-hover);
+  color: var(--ts-accent-ink) !important;
   text-decoration: none;
 }
 
-.ts-btn-ghost {
-  background: transparent;
-  color: var(--ts-ink);
-  border: 1px solid var(--ts-line);
+.vp-doc a.ts-btn-ghost,
+a.ts-btn-ghost {
+  background-color: transparent;
+  border-color: var(--ts-line);
+  color: var(--ts-ink) !important;
 }
 
-.ts-btn-ghost:hover {
+.vp-doc a.ts-btn-ghost:hover,
+a.ts-btn-ghost:hover {
   border-color: var(--ts-accent);
-  color: var(--ts-accent);
+  color: var(--ts-accent) !important;
   text-decoration: none;
 }
 
@@ -107,13 +115,6 @@
 
 .ts-hero-copy {
   max-width: 40rem;
-}
-
-.ts-eyebrows {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0 0 0.9rem;
 }
 
 .ts-h1 {
@@ -165,77 +166,6 @@
   border: 0;
   border-radius: 0;
   box-shadow: none;
-}
-
-.ts-hero-still {
-  display: none;
-}
-
-.ts-hero-gif {
-  display: block;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ts-hero-still {
-    display: block;
-  }
-
-  .ts-hero-gif {
-    display: none;
-  }
-}
-
-/* Keyword chips */
-.ts-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 1.5rem 0 0.5rem;
-}
-
-.ts-chip {
-  display: inline-flex;
-  align-items: center;
-  font-family: var(--vp-font-family-mono);
-  font-size: 0.8rem;
-  font-weight: 600;
-  line-height: 1.2;
-  padding: 0.22rem 0.55rem;
-  border-radius: 999px;
-  background: var(--ts-surface);
-  color: var(--ts-ink-muted);
-  border: 1px solid var(--ts-line);
-}
-
-.ts-chip-todo {
-  color: var(--ts-kw-todo);
-  border-color: color-mix(in srgb, var(--ts-kw-todo) 35%, transparent);
-  background: color-mix(in srgb, var(--ts-kw-todo) 10%, transparent);
-}
-
-.ts-chip-doing {
-  color: var(--ts-kw-doing);
-  border-color: color-mix(in srgb, var(--ts-kw-doing) 35%, transparent);
-  background: color-mix(in srgb, var(--ts-kw-doing) 10%, transparent);
-}
-
-.ts-chip-done {
-  color: var(--ts-kw-done);
-  border-color: color-mix(in srgb, var(--ts-kw-done) 35%, transparent);
-  background: color-mix(in srgb, var(--ts-kw-done) 10%, transparent);
-}
-
-.ts-chip-wait {
-  color: var(--ts-kw-wait);
-  border-color: color-mix(in srgb, var(--ts-kw-wait) 35%, transparent);
-  background: color-mix(in srgb, var(--ts-kw-wait) 10%, transparent);
-}
-
-.ts-chips-note {
-  margin-left: 0.35rem;
-  font-size: 0.9rem;
-  color: var(--ts-ink-muted);
 }
 
 /* Cards & grids */

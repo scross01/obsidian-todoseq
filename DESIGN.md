@@ -2,12 +2,12 @@
 name: TODOseq
 description: Keyword-based task management for Obsidian. No checkboxes required.
 colors:
-  accent: "#7C3AED"
-  accent-hover: "#6D28D9"
+  accent: "#6D28D9"
+  accent-hover: "#5B21B6"
   accent-ink: "#FFFFFF"
-  accent-dark: "#A78BFA"
-  accent-hover-dark: "#C4B5FD"
-  accent-ink-dark: "#1E1B2E"
+  accent-dark: "#7C3AED"
+  accent-hover-dark: "#8B5CF6"
+  accent-ink-dark: "#FFFFFF"
   ink: "#1F1F1F"
   ink-muted: "#5C5C66"
   ink-dark: "#ECECF1"
@@ -60,11 +60,6 @@ components:
     textColor: "{colors.ink}"
     rounded: "{rounded.sm}"
     padding: "0.62rem 1.35rem"
-  chip:
-    backgroundColor: "tinted state color"
-    textColor: "state color"
-    rounded: "{rounded.pill}"
-    padding: "0.2rem 0.55rem"
   media:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.md}"
@@ -77,25 +72,26 @@ components:
 
 **Creative North Star: "The Quiet Journal"**
 
-TODOseq’s visual world is the calm of a well-kept paper journal opened inside Obsidian: plain lines, clear state words, no ceremony. Personality is not decoration — it is the product’s own vocabulary (`TODO`, `DOING`, `DONE`) treated as small monospace marks on the page. Surfaces stay quiet so the keyword and the note text can lead.
+TODOseq’s visual world is the calm of a well-kept paper journal opened inside Obsidian: plain lines, quiet surfaces, no ceremony. Personality stays out of the chrome — product truth lives in real UI demos and the note syntax itself, not in decorative keyword pills (those read as plugin UI and are misleading).
 
-Aesthetic philosophy: **restrained and Obsidian-adjacent.** Docs and marketing should feel native to the Obsidian ecosystem without cloning Obsidian chrome. One saturated accent (violet), neutral paper/ink, hairline borders, soft elevation only on product media. Anti-references confirmed by the brief: purple gradient heroes, emoji section headers, six equal feature-card walls, competing filled CTAs, center-stacked marketing paragraphs.
+Aesthetic philosophy: **restrained and Obsidian-adjacent.** Docs and marketing should feel native to the Obsidian ecosystem without cloning Obsidian chrome. One saturated accent (violet), neutral paper/ink, hairline borders, soft elevation only on product media. Anti-references: purple gradient heroes, emoji section headers, six equal feature-card walls, marketing keyword chips that fake plugin appearance, competing filled CTAs, center-stacked marketing paragraphs.
 
 **Key Characteristics:**
 
-- Keyword chips as the only signature motif
+- No decorative keyword-chip motif on marketing surfaces
 - Left-aligned editorial reading path on Persuade surfaces
-- Single primary action (Install) per conversion zone
-- Product screenshots/GIF framed, never filtered
+- One filled primary CTA (Install); View docs + Star as secondary
+- Product media is the animated demo only; framed, never filtered
+- Filled buttons use high-contrast violet + white ink in both themes
 - VitePress/Inter as the workhorse type; no second display face required
 
 ## Colors
 
-Palette character: neutral journal paper and ink, with one Obsidian-family violet accent used sparingly, plus semantic state colors that echo task keywords.
+Palette character: neutral journal paper and ink, with one Obsidian-family violet accent used sparingly. Decorative keyword-state colors are not used on marketing chrome.
 
 ### Primary
 
-- **Journal Violet** (`#7C3AED` light / `#A78BFA` dark): Primary filled CTAs, focus rings, link emphasis on docs surfaces. Dark-theme ink on filled violet is `#1E1B2E` (`--ts-accent-ink`), never raw `#fff`.
+- **Journal Violet** (`#6D28D9` light / `#7C3AED` dark): Primary filled CTAs and focus rings. Ink on filled violet is always `#FFFFFF` (`--ts-accent-ink`) for readable contrast in both themes. Hover `#5B21B6` light / `#8B5CF6` dark.
 
 ### Neutral
 
@@ -104,27 +100,20 @@ Palette character: neutral journal paper and ink, with one Obsidian-family viole
 - **Paper / soft surface** (`#F6F6F8` / `#1E1E23`): Cards, image wells, table headers.
 - **Rule** (`#E4E4EC` / `#2C2C33`): Borders and dividers.
 
-### Keyword state accents
-
-- **TODO orange** (`#C2410C` / `#FB923C`): `TODO` chips.
-- **DOING blue** (`#1D4ED8` / `#93C5FD`): `DOING` / `NOW` chips.
-- **DONE green** (`#15803D` / `#86EFAC`): `DONE` chips.
-- **WAIT/LATER violet** (`#6D28D9` / `#C4B5FD`): waiting/deferred chips.
-
 Plugin UI (in Obsidian) continues to use theme variables (`--interactive-accent`, fallback `#7f6df2` in `styles.css`) rather than inventing a second brand purple inside the app.
 
 ### Named Rules
 
-**The One Violet Rule.** Filled violet is reserved for the primary Install action (hero + at most one mid-page repeat). Secondary actions are outline or text links.
+**The One Violet Rule.** Filled violet is reserved for the primary Install action (hero + at most one mid-page repeat). Secondary actions (View docs, Star) are outline buttons.
 
-**The Chip Cap Rule.** Keyword chips appear as at most one cluster per section. They are a signature, not wallpaper.
+**The No-Fake-UI Rule.** Do not render marketing pills that imitate plugin keyword styling; show real product media instead.
 
 ## Typography
 
 **Display / Body Font:** Inter (VitePress default) with `ui-sans-serif, system-ui, sans-serif` fallback  
-**Label / Mono Font:** VitePress mono stack for keywords, chips, and code
+**Label / Mono Font:** VitePress mono stack for code samples only
 
-**Character:** Workhorse UI type with a quiet journal register — tight tracking on the landing H1, generous measure on supporting copy. Personality comes from layout and chips, not a decorative display face.
+**Character:** Workhorse UI type with a quiet journal register — tight tracking on the landing H1, generous measure on supporting copy. Personality comes from layout and real product media, not a decorative display face or chip motif.
 
 ### Hierarchy
 
@@ -132,7 +121,6 @@ Plugin UI (in Obsidian) continues to use theme variables (`--interactive-accent`
 - **Tagline** (700, ~1.9rem / 1.55rem mobile): One-line product promise.
 - **Body** (400, ~1.02rem, lh 1.6): Hero subcopy max ~36–44rem measure.
 - **Card title** (600–700, ~1.02rem): Feature cards.
-- **Label / chip** (600, ~0.8rem, mono): Keyword chips and eyebrow labels.
 
 ### Named Rules
 
@@ -157,21 +145,16 @@ Hybrid: flat journal surfaces by default; soft elevation only under product medi
 
 ## Shapes
 
-Corner language: buttons `8px`, cards/media `10px`, keyword chips fully pill (`999px`). Borders are 1px hairlines in the rule color. No gradient blobs, no large radii on page sections.
+Corner language: buttons `8px`, cards/media `10px`. Borders are 1px hairlines in the rule color. No gradient blobs, no large radii on page sections.
 
 ## Components
 
 ### Buttons
 
 - **Shape:** 8px radius; padding `0.62rem 1.35rem`; 600 weight.
-- **Primary:** `background: var(--ts-accent)`, `color: var(--ts-accent-ink)`. Hover uses `--ts-accent-hover`. Visible `:focus-visible` ring in accent.
-- **Ghost / secondary:** transparent or soft surface, 1px `--ts-line` border, ink text; hover borders/text shift to accent.
+- **Primary:** `background: var(--ts-accent)`, `color: var(--ts-accent-ink)` (**white** in both themes). Must beat VitePress `.vp-doc a` link colors (use `a.ts-btn-primary` specificity). Hover uses `--ts-accent-hover`. Visible `:focus-visible` ring in accent.
+- **Ghost / secondary:** transparent, 1px `--ts-line` border, ink text; hover borders/text shift to accent. Used for View docs and Star on GitHub.
 - **Text link:** default VP link treatment; underline offset for readability.
-
-### Chips
-
-- **Style:** mono ~0.8rem, 600, pill radius, soft tinted background using the matching keyword state token.
-- **Use:** eyebrow labels (neutral surface + muted ink) and one keyword strip on the landing page.
 
 ### Cards / Containers
 
@@ -183,9 +166,10 @@ Corner language: buttons `8px`, cards/media `10px`, keyword chips fully pill (`9
 
 ### Media
 
-- Product images/GIF: 10px radius, 1px `--ts-line`, media lift shadow, `background: var(--ts-surface)`
+- Prefer the animated product demo (`todoseq-task-entry.gif`) on the landing hero; do not stack a static still beside it
+- 10px radius, 1px `--ts-line`, media lift shadow, `background: var(--ts-surface)`
 - Never invert, filter, or recolor real Obsidian screenshots
-- Animated demos respect `prefers-reduced-motion` (static still fallback)
+- Respect `prefers-reduced-motion` if a still fallback is ever reintroduced
 
 ### Navigation
 
@@ -196,16 +180,16 @@ Corner language: buttons `8px`, cards/media `10px`, keyword chips fully pill (`9
 
 ### Do:
 
-- **Do** use `--ts-accent` / `--ts-accent-ink` for filled primary CTAs in both themes.
-- **Do** lead Persuade surfaces with a left-aligned promise, one primary CTA, and real product media (prefer the animated demo).
-- **Do** keep keyword chips rare and semantic.
-- **Do** frame every product screenshot with the shared media treatment.
+- **Do** use `--ts-accent` + white `--ts-accent-ink` for filled primary CTAs in both themes; override VP link colors on `a.ts-btn`.
+- **Do** lead Persuade surfaces with a left-aligned promise, Install primary, View docs + Star secondary, and the animated product demo.
+- **Do** frame product media with the shared treatment.
 - **Do** leave plugin UI on Obsidian theme variables.
 
 ### Don't:
 
 - **Don't** center long hero paragraph stacks or stack four equal filled CTAs.
-- **Don't** use `var(--vp-c-brand-1)` + hardcoded `#fff` for docs primary buttons.
-- **Don't** add purple gradients, emoji headers, or isometric illustration systems.
+- **Don't** put Star/GitHub as a lone CTA in a bottom Support section.
+- **Don't** use `var(--vp-c-brand-1)` or light-on-light / dark-on-dark button pairings.
+- **Don't** add purple gradients, emoji headers, decorative keyword pills, or isometric illustration systems.
 - **Don't** filter screenshots or invent testimonials/metrics.
 - **Don't** ship a second display font from a CDN unless product truth requires it.

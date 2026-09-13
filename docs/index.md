@@ -6,11 +6,6 @@ outline: false
 <div class="ts-hero">
   <div class="ts-hero-grid">
     <div class="ts-hero-copy">
-      <p class="ts-eyebrows">
-        <span class="ts-chip">Obsidian plugin</span>
-        <span class="ts-chip">Logseq &amp; Org compatible</span>
-        <span class="ts-chip">MIT</span>
-      </p>
       <h1 class="ts-h1">TODOseq for Obsidian</h1>
       <p class="ts-tagline">Keyword-based task management. No checkboxes required.</p>
       <p class="ts-sub">
@@ -22,24 +17,14 @@ outline: false
       <p class="ts-ctas">
         <a class="ts-btn ts-btn-primary" href="https://obsidian.md/plugins?id=todoseq">Install TODOseq</a>
         <a class="ts-btn ts-btn-ghost" href="./introduction.html">View docs</a>
+        <a class="ts-btn ts-btn-ghost" href="https://github.com/scross01/obsidian-todoseq">Star on GitHub</a>
       </p>
     </div>
     <div class="ts-hero-media ts-media">
-      <img class="ts-hero-still" src="./assets/todoseq-screenshot-dark.png" alt="TODOseq Task List beside plain-text notes in Obsidian" />
       <img class="ts-hero-gif" src="./assets/todoseq-task-entry.gif" alt="Click a TODO keyword in Obsidian to cycle its task state" />
     </div>
   </div>
 </div>
-
-<p class="ts-chips ts-chips-row" aria-label="Example task keywords">
-  <span class="ts-chip ts-chip-todo">TODO</span>
-  <span class="ts-chip ts-chip-doing">DOING</span>
-  <span class="ts-chip ts-chip-done">DONE</span>
-  <span class="ts-chip ts-chip-wait">LATER</span>
-  <span class="ts-chip ts-chip-wait">WAIT</span>
-  <span class="ts-chip ts-chip-doing">NOW</span>
-  <span class="ts-chips-note">Keywords are the task. Notes stay plain text.</span>
-</p>
 
 ## Why TODOseq?
 
@@ -137,11 +122,9 @@ Once enabled, the Task List opens in the right sidebar. You can always reopen it
 
 </div>
 
-## Support
+## Contributing
 
-TODOseq is free, open-source software. If it saves you time, the best support is starring the repo or contributing.
-
-<a class="ts-btn ts-btn-ghost" href="https://github.com/scross01/obsidian-todoseq">Star TODOseq on GitHub</a>
+TODOseq is free, open-source software.
 
 - Found a bug? Open an [issue](https://github.com/scross01/obsidian-todoseq/issues)
 - Want to improve it? See [Contributing](https://github.com/scross01/obsidian-todoseq/blob/main/CONTRIBUTING.md)
