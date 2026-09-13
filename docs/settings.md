@@ -2,7 +2,7 @@
 
 TODOseq provides configuration options to customize the plugin to your workflow. This guide covers all available settings and their impact on functionality.
 
-![TODOseq Settings](./assets/todoseq-settings.png)
+![TODOseq Settings](./assets/todoseq-settings.png){.ts-img-full}
 
 ## Accessing Settings
 

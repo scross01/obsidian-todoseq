@@ -2,7 +2,7 @@
 
 The Task List is the central interface for managing all your tasks across your Obsidian vault. It provides a comprehensive overview of your tasks and powerful tools for task management.
 
-![TODOseq with task list side panel](./assets/todoseq-editor-sidepanel-with-context-menu.png)
+![TODOseq with task list side panel](./assets/todoseq-editor-sidepanel-with-context-menu.png){.ts-img-full}
 
 ## Opening the Task List
 
@@ -16,7 +16,7 @@ The Task List automatically opens in the right sidebar when the TODOseq plugin i
 2. Search for "TODOseq: Show task list"
 3. Select the command to open/show the Task List in the right sidebar
 
-![Command Palette Example](./assets/todoseq-command-palette.png)
+![Command Palette Example](./assets/todoseq-command-palette.png){.ts-img-wide}
 
 ### Keyboard Shortcut
 
@@ -30,7 +30,7 @@ The Task List consists of several key components:
 
 Located at the top of the Task List, the toolbar contains:
 
-![Search and Settings Toolbar](./assets/todoseq-search-and-settings-toolbar.png)
+![Search and Settings Toolbar](./assets/todoseq-search-and-settings-toolbar.png){.ts-img-wide}
 
 - **Search field**: Live filtering of tasks as you type
 - **Case sensitivity toggle**: Button to toggle case-sensitive search
@@ -42,7 +42,7 @@ Located at the top of the Task List, the toolbar contains:
 
 The main area displays all detected tasks with the following information:
 
-![Task List Example](./assets/todoseq-task-list-example.png)
+![Task List Example](./assets/todoseq-task-list-example.png){.ts-img-wide}
 
 - **Checkbox**: Visual indicator of completion status
 - **State keyword**: Colored badge showing task state (TODO, DOING, DONE, etc.). Right-click the badge to see all next state options
@@ -74,7 +74,7 @@ The checkbox provides a simple toggle between completed and incomplete states:
 
 Right-click any **task keyword** to see all available state options in a popup menu. This shows all possible states for the current task type, allows direct selection of any state, and provides quick access to less commonly used states.
 
-![TODOseq task content menu](./assets/todoseq-context-menu.png){width=50% height=50%}
+![TODOseq task context menu](./assets/todoseq-context-menu.png){.ts-img-detail}
 
 ### Task Context Menu
 
@@ -111,7 +111,7 @@ The context menu supports keyboard navigation with arrow keys and Enter to selec
 
 ### Date Picker
 
-![TODOseq task content menu](./assets/todoseq-date-picker.png){width=50% height=50%}
+![TODOseq date picker](./assets/todoseq-date-picker.png){.ts-img-detail}
 
 Use the Date Picker for selecting and managing task dates. The Date Picker provides:
 

@@ -2,7 +2,7 @@
 
 The TODOseq plugin supports rendering filtered task lists directly within your notes using special code blocks. This feature allows you to create dynamic, interactive task lists that are filtered and sorted according to your specifications.
 
-![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist.png)
+![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist.png){.ts-img-full}
 
 ## Basic Usage
 
@@ -15,7 +15,7 @@ sort: priority
 ```
 ````
 
-![TODOseq embedded task list example](assets/todoseq-embedded-list-example.png)
+![TODOseq embedded task list example](assets/todoseq-embedded-list-example.png){.ts-img-wide}
 
 ## Code Block Parameters
 
@@ -369,7 +369,7 @@ In all cases, TODOseq navigates to the exact line containing the task and focuse
 
 If no tasks are found or the search query is invalid:
 
-![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty.png)
+![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty.png){.ts-img-wide}
 
 If there's an error with one of the sort or filter options, an error message will be displayed accordingly. The error message indicates what went wrong and suggests how to fix it.
 

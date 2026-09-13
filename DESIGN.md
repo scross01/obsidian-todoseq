@@ -166,8 +166,11 @@ Corner language: buttons `8px`, cards/media `10px`. Borders are 1px hairlines in
 
 ### Media
 
-- Prefer the animated product demo (`todoseq-task-entry.gif`) on the landing hero; do not stack a static still beside it
+- Prefer the animated product demo (`todoseq-task-entry.gif`) on the **landing hero only**; guide pages use stills (full workspace shots via `{.ts-img-full}`)
+- Landing hero is the only full-bleed media under CTAs; do not stack a static still beside it
 - 10px radius, 1px `--ts-line`, media lift shadow, `background: var(--ts-surface)`
+- Guide image scale: **unclassified default `min(100%, 400px)`**; popup menus/pickers `{.ts-img-detail}` (`min(100%, 320px)`); horizontal strips `{.ts-img-wide}` (`min(100%, 480px)`); full workspace captures `{.ts-img-full}` (100%)
+- Variants must use `:not(.ts-hero-gif):not(.ts-hero-still)` so they outrank the default rule
 - Never invert, filter, or recolor real Obsidian screenshots
 - Respect `prefers-reduced-motion` if a still fallback is ever reintroduced
 

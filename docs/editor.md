@@ -4,7 +4,7 @@ TODOseq seamlessly integrates with Obsidian's Markdown editor, providing visual 
 
 For information about task display and interaction in Reader view (Reading/Preview mode), see the [Reader View documentation](reader.md).
 
-![TODOseq in editor view](./assets/todoseq-editor-view.png)
+![TODOseq in editor view](./assets/todoseq-editor-view.png){.ts-img-full}
 
 ## Task Display in the Editor
 
@@ -22,7 +22,7 @@ DONE [#C] Fix critical bug in payment processing
 
 **What you see in the editor:**
 
-![Editor Task Styling Example](./assets/todoseq-editor-task-styling.png)
+![Editor Task Styling Example](./assets/todoseq-editor-task-styling.png){.ts-img-wide}
 
 - **State keywords** (TODO, DOING, DONE, etc.) are highlighted with bold font and your theme's accent color
 - **Completed tasks** (DONE, CANCELED, CANCELLED) display with a line-through decoration
@@ -77,7 +77,7 @@ When tasks use the checkbox format, you have additional interaction options:
 - [x] DONE Task with checked checkbox
 ```
 
-![Checkbox Interaction Example](./assets/todoseq-editor-checkbox-interaction.png)
+![Checkbox Interaction Example](./assets/todoseq-editor-checkbox-interaction.png){.ts-img-wide}
 
 Clicking the checkbox toggles between empty `[ ]` and checked `[x]` states. The task keyword is automatically synchronized with the checkbox state.
 
@@ -89,7 +89,7 @@ TODOseq provides multiple ways to add scheduled and deadline dates to your tasks
 
 When adding a `SCHEDULED:` or `DEADLINE:` date after a task, the editor will autocomplete after the keyword with the required date format, e.g. `<2026-01-01>`, with the date auto-filled to the current date and selected for easy replacement or editing.
 
-![Date Autocomplete Example](./assets/todoseq-editor-date-autocomplete.png)
+![Date Autocomplete Example](./assets/todoseq-editor-date-autocomplete.png){.ts-img-wide}
 
 #### Smart Date Recognition
 

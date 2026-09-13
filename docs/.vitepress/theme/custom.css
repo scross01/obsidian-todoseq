@@ -241,3 +241,89 @@ a.ts-btn-ghost:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Read-mode guide chrome (Plan 006 + image scale pass) */
+.vp-doc img:not(.ts-hero-gif):not(.ts-hero-still) {
+  border: 1px solid var(--ts-line);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  background: var(--ts-surface);
+  margin: 1.25rem 0 0.5rem;
+  /* Unclassified guide shots stay modest; opt into full/wide/detail */
+  max-width: min(100%, 400px);
+  height: auto;
+}
+
+.dark .vp-doc img:not(.ts-hero-gif):not(.ts-hero-still) {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+/* Scale variants must outrank the :not() default selector */
+.vp-doc img.ts-img-full:not(.ts-hero-gif):not(.ts-hero-still) {
+  max-width: 100%;
+}
+
+/* Horizontal strips — still narrower than the text column */
+.vp-doc img.ts-img-wide:not(.ts-hero-gif):not(.ts-hero-still) {
+  max-width: min(100%, 480px);
+}
+
+.vp-doc img.ts-img-detail:not(.ts-hero-gif):not(.ts-hero-still) {
+  max-width: min(100%, 320px);
+}
+
+.vp-doc img[style*='width'] {
+  min-width: min(100%, 280px);
+  max-width: min(100%, 480px);
+}
+
+.vp-doc table {
+  width: 100%;
+}
+
+.vp-doc th {
+  background: var(--ts-surface);
+  font-weight: 600;
+  text-align: left;
+}
+
+.vp-doc tr:hover td {
+  background: color-mix(in srgb, var(--ts-accent) 6%, transparent);
+}
+
+.vp-doc :not(pre) > code {
+  font-weight: 600;
+}
+
+.vp-doc a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.vp-doc .custom-block {
+  border-radius: 10px;
+}
+
+.vp-doc h2 {
+  margin-top: 2.25rem;
+}
+
+.vp-doc h3 {
+  margin-top: 1.75rem;
+}
+
+.vp-doc a:focus-visible,
+.VPSidebar a:focus-visible {
+  outline: 2px solid var(--ts-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Keep landing hero media chrome on the .ts-media frame, not the img */
+.vp-doc .ts-hero-media img {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  margin: 0;
+}
