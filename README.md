@@ -6,177 +6,79 @@
 
 **Keyword-based task management for Obsidian. No checkboxes required.**
 
-TODOseq ("to-do-seek") scans your vault for tasks marked with simple state keywords like `TODO`, `DOING`, and `DONE`, then presents them in a unified Task List view. Inspired by [Logseq](https://logseq.com/) and [Org-mode](https://orgmode.org/), it lets you capture tasks naturally within your notes without disrupting your writing flow.
+TODOseq ("to-do-seek") scans your vault for plain lines that start with `TODO`, `DOING`, and `DONE`, then collects them into one Task List. Keep writing in ordinary notes — inspired by Emacs Org-mode and Logseq. Free and open source (MIT).
 
-![TODOseq Screenshot](screenshot.png)
+[Install from Community Plugins](https://obsidian.md/plugins?id=todoseq) · [Documentation](https://scross01.github.io/obsidian-todoseq/) · [Report an issue](https://github.com/scross01/obsidian-todoseq/issues)
+
+![Click a TODO keyword in Obsidian to cycle its task state](docs/assets/todoseq-task-entry.gif)
 
 ## Why TODOseq?
 
-Most task managers force you into a separate system. TODOseq meets you where you already work—inside your Obsidian notes. Type `TODO Write report` anywhere in your vault, and it appears instantly in your Task List. No switching contexts, no special syntax to remember, no checkboxes to click.
+Most task managers force you into a separate system. TODOseq meets you where you already work — inside your Obsidian notes. Type `TODO Write report` anywhere, and it appears in the Task List. No second app, no checkbox ceremony.
 
-## Core Features
+- Plain keywords instead of `- [ ]` checkbox syntax
+- Logseq / Org-mode compatible, including natural-language dates
+- Vault-wide Task List: search, urgency, priorities, embedded lists
 
-**Natural Task Capture** — Write tasks as plain text using keywords: `TODO`, `DOING`, `DONE`, `LATER`, `NOW`, `WAIT`, and more. Add priorities `[#A]`, `[#B]`, `[#C]` and dates using natural language or structured Org-mode syntax.
+## What you get
 
-**Smart Date Recognition** — Type dates using everyday language like "today", "tomorrow", "every Friday", or "daily 20:00". TODOseq automatically converts them to structured format when you finish typing.
+- Keywords `TODO` / `DOING` / `DONE` / … with `[#A]` priorities
+- Natural language dates converted to structured Org dates
+- Unified Task List with filters, urgency sort, and advanced queries
+- Works in Edit and Reading views; click a keyword or `Ctrl+Enter`
+- Code-comment TODOs in 20+ languages
+- `todoseq` embedded lists in notes
+- Subtasks, repeating tasks, optional CLOSED dates
+- Logseq-compatible format for dual-use vaults
 
-**Unified Task List** — See all tasks from across your vault in one searchable, sortable panel. Filter by state, priority, date, tags, or use advanced boolean queries. Sort by urgency to surface what matters most right now.
+More detail in the [documentation](https://scross01.github.io/obsidian-todoseq/).
 
-**Works Everywhere** — Tasks remain functional in both Edit mode and Reader view. Click any keyword to cycle through states. Right-click for direct state selection. Use `Ctrl+Enter` to toggle tasks from your keyboard.
+## Quick start
 
-**Code-Aware** — Extracts tasks from code comments in 20+ languages. Capture `// TODO Refactor this` from JavaScript, `# TODO Optimize query` from SQL, or `-- TODO Update schema` from SQL.
-
-**Embedded Lists** — Render filtered task lists directly in your notes using `todoseq` code blocks. Create dynamic dashboards showing "High Priority Work Tasks" or "Overdue Items" that update automatically.
-
-**Subtasks** — Break down complex tasks with indented checkbox items. The Task List shows subtask progress as `[1/3]` indicating completed and total subtasks.
-
-**Repeating Tasks** — Automatically advance scheduled and deadline dates when completed. Use natural language like "every day" or Org-mode repeaters like `.+1d`, `++1w`, or `+1m` to create recurring tasks.
-
-**Closed Date Tracking** — Optional CLOSED date on completed tasks, following Org-mode syntax. Records when tasks were marked as done and automatically manages the date when tasks are reactivated.
-
-**Logseq Compatible** — Use the same task format across both tools. Existing Logseq tasks work without modification. Dual-use your vault or migrate at your own pace.
-
-**Experimental Features** — Additional capabilities including Org-mode file support are available as experimental features. See [documentation](docs/experimental-features.md) for details.
-
-## Quick Start
-
-### Basic Tasks with Natural Language Dates
+1. **Install:** Settings → Community plugins → Browse → search **TODOseq** → Install → Enable
+2. **Type a task** in any note:
 
 ```markdown
 TODO [#A] Finish quarterly report #work tomorrow
-DOING [#B] Review pull requests #coding
+DOING Review pull requests #coding
 DONE Submit expense report
 ```
 
-Or use structured Org-mode dates:
-
-```markdown
-TODO [#A] Finish quarterly report #work
-SCHEDULED: <2025-03-15>
-
-DOING [#B] Review pull requests #coding
-
-DONE Submit expense report
-DEADLINE: <2025-03-10>
-```
-
-1. **Install** from Obsidian Community Plugins (search "TODOseq")
-2. **Create tasks** by typing `TODO`, `DOING`, `DONE`, etc. in any note
-3. **Add dates** using natural language ("today", "tomorrow", "every Friday") or structured format
-4. **Open Task List** — it appears automatically in the right sidebar (or use Command Palette → "TODOseq: Show task list")
-5. **Click keywords** to cycle states, or click task text to jump to source
-6. **Search** using natural language or advanced filters like `priority:high deadline:this week`
-
-## Installation
-
-### From Obsidian Community Plugins (Recommended)
-
-Settings → Community plugins → Browse → Search "TODOseq" → Install → Enable
-
-### Manual Installation
-
-```bash
-cd /path/to/your/vault/.obsidian/plugins
-git clone https://github.com/scross01/obsidian-todoseq.git todoseq
-cd todoseq
-npm install
-npm run build
-```
-
-Then enable "TODOseq" in Settings → Community plugins.
+3. **Open the Task List** — right sidebar, or Command Palette → “TODOseq: Show task list”
 
 ## Documentation
 
-Comprehensive documentation is available at **[scross01.github.io/obsidian-todoseq](https://scross01.github.io/obsidian-todoseq/)**
+Full guides: **[scross01.github.io/obsidian-todoseq](https://scross01.github.io/obsidian-todoseq/)**
 
-- [Introduction & Philosophy](https://scross01.github.io/obsidian-todoseq/introduction.html) — Task management approach and Logseq compatibility
-- [Task List](https://scross01.github.io/obsidian-todoseq/task-list.html) — Using the dedicated task panel
-- [Task Entry](https://scross01.github.io/obsidian-todoseq/task-entry.html) — Task syntax, keywords, and lifecycle
-- [Editor Integration](https://scross01.github.io/obsidian-todoseq/editor.html) — Working with tasks in Edit mode
-- [Reader View](https://scross01.github.io/obsidian-todoseq/reader.html) — Working with tasks in Reading mode
-- [Search](https://scross01.github.io/obsidian-todoseq/search.html) — Advanced search syntax and filters
-- [Embedded Lists](https://scross01.github.io/obsidian-todoseq/embedded-task-lists.html) — Dynamic task lists in notes
-- [Settings](https://scross01.github.io/obsidian-todoseq/settings.html) — Configuration and customization
+Start here:
 
-## Examples
+- [Introduction](https://scross01.github.io/obsidian-todoseq/introduction.html) — approach and Logseq compatibility
+- [Task List](https://scross01.github.io/obsidian-todoseq/task-list.html) — using the panel
+- [Task Entry](https://scross01.github.io/obsidian-todoseq/task-entry.html) — syntax and lifecycle
+- [Search](https://scross01.github.io/obsidian-todoseq/search.html) — filters and advanced queries
 
-### Basic Tasks
+## Development
 
-```markdown
-TODO Draft proposal
-DOING Review feedback
-DONE Submit final version
-```
+Requires Node.js 20+.
 
-### With Priorities and Dates
+| Command | Purpose |
+| --- | --- |
+| `npm install` | Install dependencies |
+| `npm run dev` | esbuild watch mode |
+| `npm run build` | Typecheck + production bundle |
+| `npm test` | Unit tests |
+| `npm run lint` / `npm run format` | ESLint / Prettier |
+| `npm run docs:dev` | VitePress docs dev server |
 
-**Natural Language Dates:**
+Integration tests, CDP debugging, and PR expectations: see [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 
-```markdown
-TODO [#A] Critical security patch tomorrow
-DOING [#B] Update documentation next Friday
-DONE [#C] Quarterly review monthly
-```
+## Contributing
 
-**Structured Org-mode Dates:**
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```markdown
-TODO [#A] Critical security patch
-DEADLINE: <2025-03-12>
-
-DOING [#B] Update documentation
-SCHEDULED: <2025-03-15>
-```
-
-**Recurring Tasks:**
-
-```markdown
-TODO Daily standup every day 9am
-DOING Weekly team meeting every Friday 14:00
-DONE Monthly review every month
-```
-
-### In Code Blocks
-
-```python
-# TODO Add input validation
-# FIXME Handle edge case when user is null
-def process_user(user):
-    pass
-```
-
-### In Org-Mode Files _(Experimental)_
-
-> **Note**: Org-mode support is an experimental feature. Enable it in Settings → TODOseq → Experimental features.
-
-```org
-* TODO [#A] Critical security patch
-  DEADLINE: <2025-03-12>
-
-** DOING [#B] Update documentation
-   SCHEDULED: <2025-03-15>
-
-*** DONE Submit expense report
-```
-
-### Embedded Task List
-
-````markdown
-```todoseq
-search: tag:work priority:high
-sort: urgency
-show-completed: hide
-limit: 10
-title: High Priority Work
-```
-````
-
-## Support
-
-- ⭐ Star this repo if you find it useful
-- 🐛 [Report issues](https://github.com/scross01/obsidian-todoseq/issues) or request features
-- 📝 [Contribute](CONTRIBUTING.md) improvements via pull requests
+- [Report issues](https://github.com/scross01/obsidian-todoseq/issues) or request features
+- Star the repo if TODOseq is useful to you
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE).
