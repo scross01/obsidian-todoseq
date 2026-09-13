@@ -1,5 +1,3 @@
-import { text } from 'stream/consumers';
-
 export default {
   title: 'TODOseq',
   description: 'Lightweight, keyword-based task tracker for Obsidian',
@@ -29,14 +27,13 @@ export default {
           { text: 'Settings', link: '/settings' },
           { text: 'Sort Methods', link: '/sort-methods' },
           { text: 'Task Urgency', link: '/urgency' },
+          { text: 'Warning Periods', link: '/warning-periods' },
           { text: 'Experimental', link: '/experimental-features' },
         ],
       },
     ],
 
-    socialLinks: [
-      { icon: 'github', link: 'https://github.com/scross01/obsidian-todoseq' },
-    ],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/scross01/obsidian-todoseq' }],
 
     search: {
       provider: 'local',
