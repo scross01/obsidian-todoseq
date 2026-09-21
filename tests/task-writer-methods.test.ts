@@ -310,6 +310,11 @@ describe('TaskWriter Instance Methods', () => {
       const result = await taskWriter.applyLineUpdate(task, 'DONE');
 
       expect(result.lineDelta).toBeUndefined();
+      // Re-completing an already-completed task must not inject a CLOSED line:
+      // the matrix resolves completed→completed to 'keep' (write-once rule).
+      expect(
+        mockApp.vault.process.mock.calls[0][1]('DONE Task text'),
+      ).not.toContain('CLOSED:');
     });
 
     it('should insert CLOSED via editor when completing in source mode', async () => {
@@ -433,6 +438,244 @@ describe('TaskWriter Instance Methods', () => {
       const result = await taskWriter.applyLineUpdate(task, 'DONE');
 
       expect(result.lineDelta).toBeUndefined();
+    });
+  });
+
+  describe('applyLineUpdate — CLOSED date transition matrix', () => {
+    // Fixture: task line + CLOSED line, as the file would contain after
+    // completing a task with tracking enabled (CLOSED at line 1, task at 0).
+    const FILE_WITH_CLOSED =
+      '- [x] DONE Task text\n  CLOSED: [2026-03-14 Sat 10:00]';
+    const FILE_PLAIN = '- [x] TODO Task text';
+
+    const makeDoneTask = (overrides: Partial<Task> = {}) =>
+      createBaseTask({
+        rawText: '- [x] DONE Task text',
+        state: 'DONE',
+        completed: true,
+        closedDate: new Date('2026-03-14'),
+        ...overrides,
+      });
+
+    const makeTodoTask = (overrides: Partial<Task> = {}) =>
+      createBaseTask({
+        rawText: '- [ ] TODO Task text',
+        state: 'TODO',
+        completed: false,
+        closedDate: null,
+        ...overrides,
+      });
+
+    // Uses the real KeywordManager (defaults include ARCHIVED as archived
+    // keyword and CANCELED/CANCELLED as completed keywords).
+    const useRealKeywords = () => {
+      taskWriter.updateKeywordManager(createTestKeywordManager({}));
+    };
+
+    const useVaultPathWithContent = (content: string) => {
+      mockApp.workspace.getActiveViewOfType = jest.fn().mockReturnValue(null);
+      mockApp.vault.process = jest
+        .fn()
+        .mockImplementation((_file: any, updateFn: (c: string) => string) =>
+          Promise.resolve(updateFn(content)),
+        );
+    };
+
+    // Returns the content the vault.process callback produced for `input`.
+    const processedContent = (input: string): string =>
+      mockApp.vault.process.mock.calls[0][1](input);
+
+    // 1. THE REPORTED BUG: tracking disabled, DONE → ARCHIVED keeps CLOSED.
+    it('keeps CLOSED line when archiving with trackClosedDate disabled', async () => {
+      mockPlugin.settings.trackClosedDate = false;
+      useRealKeywords();
+      useVaultPathWithContent(FILE_WITH_CLOSED);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeDoneTask(),
+        'ARCHIVED',
+      );
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      expect(processedContent(FILE_WITH_CLOSED)).toContain(
+        'CLOSED: [2026-03-14',
+      );
+      expect(result.closedDate).not.toBeNull();
+      expect(result.lineDelta).toBeUndefined();
+    });
+
+    // 2. Tracking enabled, DONE → ARCHIVED: preserve original timestamp.
+    it('keeps original CLOSED timestamp when archiving with tracking enabled', async () => {
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      useVaultPathWithContent(FILE_WITH_CLOSED);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeDoneTask(),
+        'ARCHIVED',
+      );
+
+      expect(processedContent(FILE_WITH_CLOSED)).toContain(
+        'CLOSED: [2026-03-14',
+      );
+      expect(result.closedDate).toEqual(new Date('2026-03-14'));
+      expect(result.lineDelta).toBeUndefined();
+    });
+
+    // 3. Completed → completed (DONE → CANCELED): keep, never rewrite.
+    it('keeps CLOSED line and timestamp when moving DONE to CANCELED', async () => {
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      useVaultPathWithContent(FILE_WITH_CLOSED);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeDoneTask(),
+        'CANCELED',
+      );
+
+      expect(processedContent(FILE_WITH_CLOSED)).toContain(
+        'CLOSED: [2026-03-14',
+      );
+      expect(result.closedDate).toEqual(new Date('2026-03-14'));
+      expect(result.lineDelta).toBeUndefined();
+    });
+
+    // 4. Completed → active/inactive/waiting: remove, regardless of setting.
+    it.each(['TODO', 'DOING', 'WAIT'])(
+      'removes CLOSED line on DONE → %s (tracking enabled)',
+      async (target) => {
+        mockPlugin.settings.trackClosedDate = true;
+        useRealKeywords();
+        useVaultPathWithContent(FILE_WITH_CLOSED);
+
+        const result = await taskWriter.applyLineUpdate(
+          makeDoneTask(),
+          target as string,
+        );
+
+        expect(processedContent(FILE_WITH_CLOSED)).not.toContain('CLOSED:');
+        expect(result.closedDate).toBeNull();
+        expect(result.lineDelta).toBe(-1);
+      },
+    );
+
+    it('removes CLOSED line on DONE → TODO with tracking disabled', async () => {
+      mockPlugin.settings.trackClosedDate = false;
+      useRealKeywords();
+      useVaultPathWithContent(FILE_WITH_CLOSED);
+
+      const result = await taskWriter.applyLineUpdate(makeDoneTask(), 'TODO');
+
+      expect(processedContent(FILE_WITH_CLOSED)).not.toContain('CLOSED:');
+      expect(result.closedDate).toBeNull();
+      expect(result.lineDelta).toBe(-1);
+    });
+
+    // 5. Non-completed → non-completed with a CLOSED line present: untouched.
+    it('leaves CLOSED line untouched on TODO → LATER with tracking disabled', async () => {
+      mockPlugin.settings.trackClosedDate = false;
+      useRealKeywords();
+      useVaultPathWithContent(FILE_WITH_CLOSED);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeTodoTask({
+          rawText: '- [ ] TODO Task text\n  CLOSED: [2026-03-14 Sat 10:00]',
+          closedDate: new Date('2026-03-14'),
+        }),
+        'LATER',
+      );
+
+      expect(processedContent(FILE_WITH_CLOSED)).toContain(
+        'CLOSED: [2026-03-14',
+      );
+      expect(result.closedDate).not.toBeNull();
+      expect(result.lineDelta).toBeUndefined();
+    });
+
+    // 6. Archived transitions never ADD a CLOSED line.
+    it('does not add CLOSED line when TODO → ARCHIVED', async () => {
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      useVaultPathWithContent(FILE_PLAIN);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeTodoTask(),
+        'ARCHIVED',
+      );
+
+      expect(processedContent(FILE_PLAIN)).not.toContain('CLOSED:');
+      expect(result.closedDate).toBeNull();
+    });
+
+    // 7. Insertion still works: TODO → DONE with tracking on adds CLOSED.
+    it('adds CLOSED line on TODO → DONE with tracking enabled', async () => {
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      useVaultPathWithContent(FILE_PLAIN);
+
+      const result = await taskWriter.applyLineUpdate(makeTodoTask(), 'DONE');
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      expect(processedContent(FILE_PLAIN)).toContain('CLOSED:');
+      expect(result.closedDate).toBeInstanceOf(Date);
+      expect(result.lineDelta).toBe(1);
+    });
+
+    // 8. Editor-API path parity.
+    const useEditorPathWithLines = (lines: string[]) => {
+      const mockEditor = {
+        getLine: jest.fn((i: number) => lines[i]),
+        lineCount: jest.fn().mockReturnValue(lines.length),
+        getCursor: jest.fn().mockReturnValue({ line: 0, ch: 0 }),
+        replaceRange: jest.fn(),
+        setCursor: jest.fn(),
+      };
+      const mockMarkdownView = {
+        file: { path: 'test.md' },
+        editor: mockEditor,
+        getViewType: jest.fn().mockReturnValue('markdown'),
+        getMode: jest.fn().mockReturnValue('source'),
+      };
+      mockApp.workspace.getActiveViewOfType = jest
+        .fn()
+        .mockReturnValue(mockMarkdownView);
+      mockApp.vault.getAbstractFileByPath = jest
+        .fn()
+        .mockReturnValue(new MockTFile());
+      return mockEditor;
+    };
+
+    it('editor path: keeps CLOSED when archiving with tracking disabled', async () => {
+      mockPlugin.settings.trackClosedDate = false;
+      useRealKeywords();
+      const mockEditor = useEditorPathWithLines([
+        '- [x] DONE Task text',
+        '  CLOSED: [2026-03-14 Sat 10:00]',
+      ]);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeDoneTask(),
+        'ARCHIVED',
+      );
+
+      expect(mockEditor.replaceRange).toHaveBeenCalled();
+      expect(result.closedDate).toEqual(new Date('2026-03-14'));
+      expect(result.lineDelta).toBeUndefined();
+    });
+
+    it('editor path: removes CLOSED on DONE → TODO with tracking enabled', async () => {
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      const mockEditor = useEditorPathWithLines([
+        '- [x] DONE Task text',
+        '  CLOSED: [2026-03-14 Sat 10:00]',
+      ]);
+
+      const result = await taskWriter.applyLineUpdate(makeDoneTask(), 'TODO');
+
+      expect(mockEditor.replaceRange).toHaveBeenCalled();
+      expect(result.closedDate).toBeNull();
+      expect(result.lineDelta).toBe(-1);
     });
   });
 
