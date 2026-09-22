@@ -37,6 +37,7 @@
     "transitionStatements": []
   },
   "trackClosedDate": false,
+  "trackStartedDate": false,
   "useExtendedCheckboxStyles": false,
   "enableSmartDateRecognition": true,
   "smartDateRemoveKeywords": true,
@@ -70,5 +71,5 @@
     }
   ],
   "_hasShownFirstInstallView": true,
-  "settingsVersion": 5
+  "settingsVersion": 6
 }

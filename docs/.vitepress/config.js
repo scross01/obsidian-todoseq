@@ -44,7 +44,9 @@ export default {
       },
     ],
 
-    socialLinks: [{ icon: 'github', link: 'https://github.com/scross01/obsidian-todoseq' }],
+    socialLinks: [
+      { icon: 'github', link: 'https://github.com/scross01/obsidian-todoseq' },
+    ],
 
     search: {
       provider: 'local',

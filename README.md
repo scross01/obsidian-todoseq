@@ -61,14 +61,14 @@ Start here:
 
 Requires Node.js 20+.
 
-| Command | Purpose |
-| --- | --- |
-| `npm install` | Install dependencies |
-| `npm run dev` | esbuild watch mode |
-| `npm run build` | Typecheck + production bundle |
-| `npm test` | Unit tests |
-| `npm run lint` / `npm run format` | ESLint / Prettier |
-| `npm run docs:dev` | VitePress docs dev server |
+| Command                           | Purpose                       |
+| --------------------------------- | ----------------------------- |
+| `npm install`                     | Install dependencies          |
+| `npm run dev`                     | esbuild watch mode            |
+| `npm run build`                   | Typecheck + production bundle |
+| `npm test`                        | Unit tests                    |
+| `npm run lint` / `npm run format` | ESLint / Prettier             |
+| `npm run docs:dev`                | VitePress docs dev server     |
 
 Integration tests, CDP debugging, and PR expectations: see [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 

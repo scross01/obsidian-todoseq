@@ -1,198 +1,189 @@
 ---
 name: TODOseq
-description: Keyword-based task management for Obsidian. No checkboxes required.
-colors:
-  accent: "#6D28D9"
-  accent-hover: "#5B21B6"
-  accent-ink: "#FFFFFF"
-  accent-dark: "#7C3AED"
-  accent-hover-dark: "#8B5CF6"
-  accent-ink-dark: "#FFFFFF"
-  ink: "#1F1F1F"
-  ink-muted: "#5C5C66"
-  ink-dark: "#ECECF1"
-  ink-muted-dark: "#B3B3C0"
-  surface: "#F6F6F8"
-  surface-dark: "#1E1E23"
-  line: "#E4E4EC"
-  line-dark: "#2C2C33"
-  kw-todo: "#C2410C"
-  kw-doing: "#1D4ED8"
-  kw-done: "#15803D"
-  kw-wait: "#6D28D9"
-  kw-todo-dark: "#FB923C"
-  kw-doing-dark: "#93C5FD"
-  kw-done-dark: "#86EFAC"
-  kw-wait-dark: "#C4B5FD"
-typography:
-  body:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "16px"
-    fontWeight: "400"
-    lineHeight: "1.6"
-  display:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "2.25rem"
-    fontWeight: "700"
-    lineHeight: "1.2"
-    letterSpacing: "-0.02em"
-  mono:
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
-    fontSize: "0.8rem"
-    fontWeight: "600"
-rounded:
-  sm: "8px"
-  md: "10px"
-  pill: "999px"
-spacing:
-  sm: "8px"
-  md: "16px"
-  lg: "24px"
-  xl: "40px"
-components:
-  button-primary:
-    backgroundColor: "{colors.accent}"
-    textColor: "{colors.accent-ink}"
-    rounded: "{rounded.sm}"
-    padding: "0.62rem 1.35rem"
-  button-ghost:
-    backgroundColor: "transparent"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.sm}"
-    padding: "0.62rem 1.35rem"
-  media:
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.md}"
-    padding: "0"
+description: Obsidian plugin UI design system. Theme-native Operate surface; docs brand lives in docs/DESIGN.md.
 ---
 
-# Design System: TODOseq
+# Design System: TODOseq (plugin UI)
 
 ## Overview
 
-**Creative North Star: "The Quiet Journal"**
+**Scope:** This file governs the **Obsidian plugin UI** — Task List panel, toolbar/search, task rows, context menus, date pickers, editor and reader formatting, embedded task lists, settings and dialogs, and `styles.css`. It is the default design context for coding tasks in this repo.
 
-TODOseq’s visual world is the calm of a well-kept paper journal opened inside Obsidian: plain lines, quiet surfaces, no ceremony. Personality stays out of the chrome — product truth lives in real UI demos and the note syntax itself, not in decorative keyword pills (those read as plugin UI and are misleading).
+**Docs/marketing visual system is out of scope here.** The VitePress site uses a separate branded world in [`docs/DESIGN.md`](docs/DESIGN.md). Do not load or apply docs tokens (`--ts-*`, Journal Violet, Inter marketing type) when changing plugin UI.
 
-Aesthetic philosophy: **restrained and Obsidian-adjacent.** Docs and marketing should feel native to the Obsidian ecosystem without cloning Obsidian chrome. One saturated accent (violet), neutral paper/ink, hairline borders, soft elevation only on product media. Anti-references: purple gradient heroes, emoji section headers, six equal feature-card walls, marketing keyword chips that fake plugin appearance, competing filled CTAs, center-stacked marketing paragraphs.
+**Creative North Star: "Theme-native Operate"**
+
+The plugin is a view inside someone else's shell. It inherits fonts, density, accent, hover, focus, and surface language from the active Obsidian theme. Brand lives in precise task affordances — keyword state, priority, dates, subtask progress — not in a second product palette.
+
+Aesthetic philosophy: **Obsidian-native, scanable, and quiet under load.** Prefer Obsidian patterns (search chrome, menus, tooltips, tags, settings rows) over invented components. TODOseq-specific UI must still read as Obsidian components that happen to understand keywords.
 
 **Key Characteristics:**
 
-- No decorative keyword-chip motif on marketing surfaces
-- Left-aligned editorial reading path on Persuade surfaces
-- One filled primary CTA (Install); View docs + Star as secondary
-- Product media is the animated demo only; framed, never filtered
-- Filled buttons use high-contrast violet + white ink in both themes
-- VitePress/Inter as the workhorse type; no second display face required
+- Color, type, radius, and spacing come from Obsidian CSS variables — never fixed brand hexes
+- Search mirrors Obsidian search conventions (input chrome, clear, match-case, suggestions, history)
+- Context menus use `BaseDialog` (intended shell) with Obsidian `.menu` visual language: icons, keyboard nav, single instance, mobile long-press
+- Task list is dense, scannable, and performance-minded (`content-visibility`, chunked render)
+- Unique features (keywords, priorities, dates, subtask progress) are theme-native tokens, not marketing chips
+- Desktop and mobile both first-class
+
+**The Two-World Rule.** Never port docs brand chrome into the plugin. Inside Obsidian, accent is always the user's theme (`--interactive-accent`).
+
+**The Theme-Variable Rule.** Plugin CSS references Obsidian variables (with safe fallbacks only where a variable may be absent). Never inject Journal Violet or docs `--ts-*` tokens into `styles.css`.
+
+**The No-Second-Accent Rule.** Accent in plugin chrome is `--interactive-accent`. Keyword color follows the theme; it is not a fixed TODO/DOING/DONE marketing palette.
 
 ## Colors
 
-Palette character: neutral journal paper and ink, with one Obsidian-family violet accent used sparingly. Decorative keyword-state colors are not used on marketing chrome.
+Palette character: **whatever the user's theme is.** TODOseq does not define a brand palette inside Obsidian. Frontmatter omits fixed color tokens on purpose — they would contradict theme inheritance.
 
-### Primary
+### Authority tokens (use these; do not hardcode hex)
 
-- **Journal Violet** (`#6D28D9` light / `#7C3AED` dark): Primary filled CTAs and focus rings. Ink on filled violet is always `#FFFFFF` (`--ts-accent-ink`) for readable contrast in both themes. Hover `#5B21B6` light / `#8B5CF6` dark.
+| Role                       | Obsidian variable                                                                   | Plugin use                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Body text                  | `--text-normal`                                                                     | Task text, titles                                             |
+| Secondary text             | `--text-muted`                                                                      | File paths, dates, completed text, meta                       |
+| Interactive accent         | `--interactive-accent` (fallback `#7f6df2`)                                         | Keywords, medium priority, focus rings, active accents        |
+| On-accent text             | `--text-on-accent`                                                                  | Filled accent badges                                          |
+| Link                       | `--link-color`                                                                      | In-text task links                                            |
+| Hover / active / selection | `--background-modifier-hover` / `--active` / `--selection`                          | Row hover, pressed states                                     |
+| Borders                    | `--background-modifier-border`                                                      | Separators, dashed empty states                               |
+| Focus border               | `--background-modifier-border-focus`                                                | Keyboard focus outlines                                       |
+| Surfaces                   | `--background-primary` / `--background-secondary`                                   | Panel, drag overlay, embedded list well                       |
+| Semantic                   | `--color-red`, `--color-orange`, `--color-green`, `--error-color`, `--text-warning` | Overdue / today / soon dates, priority A, settings validation |
+| Tags                       | `--tag-background`, `--tag-color`, `--tag-radius`, …                                | Task tags inherit full Obsidian tag chip styling              |
 
-### Neutral
+### TODOseq semantic mapping (theme-native)
 
-- **Ink** (`#1F1F1F` / `#ECECF1`): Headings and strong text.
-- **Muted ink** (`#5C5C66` / `#B3B3C0`): Supporting copy.
-- **Paper / soft surface** (`#F6F6F8` / `#1E1E23`): Cards, image wells, table headers.
-- **Rule** (`#E4E4EC` / `#2C2C33`): Borders and dividers.
-
-Plugin UI (in Obsidian) continues to use theme variables (`--interactive-accent`, fallback `#7f6df2` in `styles.css`) rather than inventing a second brand purple inside the app.
+- **State keywords** (panel, editor, reader): bold, `--interactive-accent`; hover underline + `--background-modifier-hover`
+- **Priority A / B / C badges:** A `--color-red`, B `--interactive-accent`, C muted border + `--text-muted`
+- **Date rails:** 3px left border + low-alpha `color-mix` fill — overdue red, today orange, soon green, closed muted
+- **Completed tasks:** `--text-muted` + line-through; archived slightly dimmer
+- **Active-task checkbox tint:** `color-mix` of `--interactive-accent` (~33%)
 
 ### Named Rules
 
-**The One Violet Rule.** Filled violet is reserved for the primary Install action (hero + at most one mid-page repeat). Secondary actions (View docs, Star) are outline buttons.
+**The Theme-Variable Rule.** (See Overview.) Prefer an Obsidian variable over a literal.
 
-**The No-Fake-UI Rule.** Do not render marketing pills that imitate plugin keyword styling; show real product media instead.
+**The No-Hardcoded-Brand Rule.** No Journal Violet, no `#6D28D9` / `#7C3AED` brand pair, no `--ts-*` in plugin styles or view chrome.
 
 ## Typography
 
-**Display / Body Font:** Inter (VitePress default) with `ui-sans-serif, system-ui, sans-serif` fallback  
-**Label / Mono Font:** VitePress mono stack for code samples only
+**Font authority:** Active theme — `--font-text`, `--font-text-size`, `--font-ui-small`, `--font-smallest`, `--font-monospace` / `--font-mono`, `--font-normal` / `--font-medium` / `--font-semibold` / `--font-bold`. Do not load Inter or any CDN face in the plugin.
 
-**Character:** Workhorse UI type with a quiet journal register — tight tracking on the landing H1, generous measure on supporting copy. Personality comes from layout and real product media, not a decorative display face or chip motif.
+**Character:** Editor-adjacent list density. Task body uses editor text metrics; chrome and meta use UI/small sizes. Keywords slightly smaller than body (~0.85–0.9rem) so they read as state tokens, not headings.
 
 ### Hierarchy
 
-- **Display** (700, ~2.25rem, lh 1.2, tracking -0.02em): Landing H1 only; left-aligned.
-- **Tagline** (700, ~1.9rem / 1.55rem mobile): One-line product promise.
-- **Body** (400, ~1.02rem, lh 1.6): Hero subcopy max ~36–44rem measure.
-- **Card title** (600–700, ~1.02rem): Feature cards.
+- **Task title:** `--font-text` / `--font-text-size`; completed muted + strike
+- **Keyword:** bold, accent, ~0.85–0.9rem; heading keywords scale to 0.9em of heading size
+- **File info / date meta / subtask progress:** ~0.75–0.8rem, `--text-muted` or mono for counts
+- **Priority badge:** ~0.7em, `--font-medium`
+- **Empty state:** title `--font-bold` 1rem; subtitle 0.875rem muted
+- **Settings messages:** 0.7rem; error / warning / info use theme semantic colors
 
 ### Named Rules
 
-**The No-Center-Wall Rule.** Long persuasive paragraphs are not center-aligned stacks. Read surfaces may center short titles if VitePress does; body measure stays scannable.
+**The Inherit-Type Rule.** Never override theme font stacks. Size and weight may be tuned; family does not change.
 
 ## Layout
 
-Docs site is VitePress: nav, optional sidebar on guides, single content column. Landing hero is **stacked**: left-aligned promise + CTAs, then the animated demo at **full content width** beneath the buttons (not a side-by-side media column). Spacing rhythm is 8px-based; section gaps 2.5–3.5rem. Feature grids use auto-fit columns with ~10px card radius. Guide pages inherit default VP density; this system only adds chrome consistency (images, tables), not a new grid.
+Spatial model is **Obsidian panel + editor page**, not a web marketing grid.
+
+- **Task List panel:** flex column, full height; toolbar on top; scrollable list (`overflow-y: auto`) below
+- **Main-tab mode:** page margins from `--file-margins`; optional readable line length caps toolbar + list at `700px` centered
+- **Task row:** relative row, hover fill via `::before`, hairline separator via `::after`; virtualization-friendly (`content-visibility: auto`)
+- **Embedded lists:** well with `--background-secondary`, `--code-radius`, 1px border; lives in note context, not a floating brand card
+- **Density:** Obsidian size scale (`--size-2-*`, `--size-4-*`); mobile rows get larger hit targets and suppress text selection / callouts
+- **Drag:** opacity on dragged row; fixed overlay chip using `--background-secondary` + menu shadow, not docs media lift
 
 ## Elevation & Depth
 
-Hybrid: flat journal surfaces by default; soft elevation only under product media and landing cards.
-
-### Shadow Vocabulary
-
-- **Media lift** (`box-shadow: 0 12px 40px rgba(0,0,0,.12)` light; softer in dark): Screenshots and hero GIF only.
-- **Card rest**: border on soft surface; no heavy drop shadow.
-
-### Named Rules
-
-**The Product-Only Lift Rule.** Shadows lift evidence (real UI), not decorative panels.
+Depth is **tonal and theme-native**: hover/active/selection backgrounds, 1px borders, and Obsidian menu/dialog elevation where the shell already provides it. Avoid large marketing-style drop shadows on task rows or list wells. Small functional shadows are allowed only when they match existing menu/drag affordances (e.g. drag overlay).
 
 ## Shapes
 
-Corner language: buttons `8px`, cards/media `10px`. Borders are 1px hairlines in the rule color. No gradient blobs, no large radii on page sections.
+Corner language follows theme radii: `--radius-s` (rows, badges, chips), `--radius-l` / `--input-radius` (dialogs, inputs), `--code-radius` (embedded well), `--tag-radius` (tags). Borders are `--background-modifier-border` hairlines. Empty state may use a dashed border — functional, not decorative.
 
 ## Components
 
-### Buttons
+### Search (Obsidian-consistent)
 
-- **Shape:** 8px radius; padding `0.62rem 1.35rem`; 600 weight.
-- **Primary:** `background: var(--ts-accent)`, `color: var(--ts-accent-ink)` (**white** in both themes). Must beat VitePress `.vp-doc a` link colors (use `a.ts-btn-primary` specificity). Hover uses `--ts-accent-hover`. Visible `:focus-visible` ring in accent.
-- **Ghost / secondary:** transparent, 1px `--ts-line` border, ink text; hover borders/text shift to accent. Used for View docs and Star on GitHub.
-- **Text link:** default VP link treatment; underline offset for readability.
+Search is a first-class Operate surface and must **feel like Obsidian search**, not a custom web filter bar.
 
-### Cards / Containers
+- **Input chrome:** reuse Obsidian classes (`search-input-container`, `global-search-input-container`, `search-input-clear-button`) so theme, focus, and clear affordances match core search
+- **Labeling:** visible or `sr-only` label; `aria-label` on icon-only controls (clear, save search, match case, settings)
+- **Match case / clear / options:** icon buttons in the input or immediately adjacent; tooltips via Obsidian `setTooltip`
+- **Suggestions:** dropdown under the field (`--layer-menu`), grouped like search suggest (options / history / saved); selected and hovered rows use `--background-modifier-hover`; truncation on long titles
+- **Saved searches + history:** bookmark affordance; apply/edit/delete without leaving the panel
+- **Feedback:** results count bar (`N of M tasks`); invalid query shows a short error without restyling the whole panel
+- **Behavior:** debounced filter (~250ms), Enter applies immediately, mobile keyboard `search` event supported
+- **Don't** invent a brand-colored search pill or floating glass filter UI
 
-- **Corner:** 10px
-- **Background:** `--ts-surface`
-- **Border:** 1px `--ts-line`
-- **Padding:** ~1.2rem 1.25rem
-- **Shadow:** none at rest
+### Task list rows
 
-### Media
+- Hover: `--background-modifier-hover` on a rounded inset layer
+- Focus: `--background-modifier-border-focus` or accent outline with offset
+- Separator: 1px `--background-modifier-border` inset under the row
+- Checkbox: native/theme checkbox alignment; active tint via accent `color-mix`
+- Keyword: clickable state control (not a static badge); keyboard focus ring in accent
+- Meta line: path + line, source chip (org/code) in mono at reduced opacity
+- Priority / tags / dates / subtask progress: compact secondary affordances on the row, not marketing chips
+- Empty state: dashed well, short title + guidance subtitle, theme surfaces only
 
-- Prefer the animated product demo (`todoseq-task-entry.gif`) on the **landing hero only**; guide pages use stills (full workspace shots via `{.ts-img-full}`)
-- Landing hero is the only full-bleed media under CTAs; do not stack a static still beside it
-- 10px radius, 1px `--ts-line`, media lift shadow, `background: var(--ts-surface)`
-- Guide image scale: **unclassified default `min(100%, 400px)`**; popup menus/pickers `{.ts-img-detail}` (`min(100%, 320px)`); horizontal strips `{.ts-img-wide}` (`min(100%, 480px)`); full workspace captures `{.ts-img-full}` (100%)
-- Variants must use `:not(.ts-hero-gif):not(.ts-hero-still)` so they outrank the default rule
-- Never invert, filter, or recolor real Obsidian screenshots
-- Respect `prefers-reduced-motion` if a still fallback is ever reintroduced
+### Context menus
 
-### Navigation
+- **Shell is `BaseDialog` on purpose.** Obsidian's `Menu` API cannot express the needed UX (icon rows, date shortcuts, nested pickers, keyboard model, mobile long-press density). `BaseDialog` is the intended enhancement over base Obsidian capabilities — **not** tech debt to migrate to `Menu`.
+- Still **theme-native**: render as `.menu` / `.menu-item` visual language, Obsidian spacing/focus/hover vars, not a web-app card
+- Icon + label rows; priority A/B/C use semantic colors on icon buttons
+- Date shortcuts (Today, Tomorrow, Next week, weekend, clear) then a full date picker submenu/dialog
+- Keyboard: Escape closes, arrows/Enter select; single open menu at a time
+- Mobile: long-press opens the same menu; larger hit targets under `.is-mobile`
+- Focus styles match plugin focus language (`:focus-visible` / `.is-focused`)
 
-- VitePress default nav/sidebar; Install remains an external link
-- Sidebar may group destinations but must not invent new product IA
+### Editor & reader formatting
+
+- Keywords: bold + `--interactive-accent`; source mode stays simpler (no size jump)
+- Completed / archived: strike + muted opacity; archived slightly dimmer without inventing a new gray
+- Date lines (`SCHEDULED` / `DEADLINE` / `CLOSED` / `STARTED`): muted, ~0.9rem, keyword vs value weight split
+- Smart-date highlight: low-alpha accent fill + thin outline — a temporary cursor cue, not a brand marker
+- Never recolor note prose beyond task-related tokens
+
+### Embedded task lists
+
+- Container reads as a code-block sibling: secondary background, theme border, `--code-radius`
+- Header chips for active search/sort/completed/future/limit use selection background + mono
+- Rows match panel hover/active language
+- Truncation footer stays muted and quiet
+
+### Settings & dialogs
+
+- Use Obsidian Setting API rows, toggles, textareas
+- Validation: `--error-color` border on invalid inputs; warning/info messages in theme semantic colors at small size
+- Dialogs inherit theme modal chrome; do not re-skin with docs cards
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** use `--ts-accent` + white `--ts-accent-ink` for filled primary CTAs in both themes; override VP link colors on `a.ts-btn`.
-- **Do** lead Persuade surfaces with a left-aligned promise, Install primary, View docs + Star secondary, and the animated product demo.
-- **Do** frame product media with the shared treatment.
-- **Do** leave plugin UI on Obsidian theme variables.
+- **Do** style everything with Obsidian theme variables and component classes first; add TODOseq-specific CSS only for task semantics the shell does not provide.
+- **Do** keep search consistent with Obsidian search UX (input classes, clear, match case, suggestions, history, saved searches).
+- **Do** keep context menus on the intentional `BaseDialog` shell, styled as Obsidian `.menu` (icons, keyboard nav, mobile long-press).
+- **Do** preserve theme under custom themes and light/dark — including accent, tags, hover, and focus.
+- **Do** prioritize scanability and performance in the Task List (density, virtualization-friendly rows, no heavy shadows).
+- **Do** test desktop and mobile (`.is-mobile`) behaviors for any new interactive chrome.
 
 ### Don't:
 
-- **Don't** center long hero paragraph stacks or stack four equal filled CTAs.
-- **Don't** put Star/GitHub as a lone CTA in a bottom Support section.
-- **Don't** use `var(--vp-c-brand-1)` or light-on-light / dark-on-dark button pairings.
-- **Don't** add purple gradients, emoji headers, decorative keyword pills, or isometric illustration systems.
-- **Don't** filter screenshots or invent testimonials/metrics.
-- **Don't** ship a second display font from a CDN unless product truth requires it.
+- **Don't** hardcode Journal Violet or any `--ts-*` docs token in plugin CSS.
+- **Don't** paint task UI with fixed marketing hexes for TODO/DOING/DONE.
+- **Don't** invent non-Obsidian search/filter chrome or web-app card shells inside the panel.
+- **Don't** break mobile: no hover-only affordances, no tiny targets, no desktop-only overlays without `.is-mobile` handling.
+- **Don't** restyle native editor chrome beyond task keyword/date decorations.
+- **Don't** apply docs-site composition rules (CTA hierarchy, media lift, Inter display type) to plugin UI.
+
+### Boundary checklist (any plugin UI change)
+
+1. Confirm this is plugin surface (`styles.css`, `src/view/**`, settings UI) — not `docs/`.
+2. Does Obsidian already have a variable or component for this? Reuse it.
+3. Would this look correct under a non-default theme and on mobile? If not, fix before shipping.
+4. Docs screenshots must show this real theme-native UI — never a branded mock (see [`docs/DESIGN.md`](docs/DESIGN.md)).
