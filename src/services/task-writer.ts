@@ -483,42 +483,45 @@ export class TaskWriter {
     }
     cellContent = cellContent.trim();
 
+    // Table cells follow the same CLOSED matrix as list tasks
+    // (resolveClosedDateAction). The parser DOES read CLOSED from <br>
+    // segments into task.closedDate (TaskParser.parseTasksFromTableCells),
+    // so preserve/remove decisions apply to cells exactly as to lines.
+    const closedAction = this.resolveClosedDateAction(task, newState);
+
     let fullCellContent = cellContent;
     await this.modifyTableCell(task, (origCell) => {
       const brIdx = origCell.indexOf('<br');
       let dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
 
-      // Add or update CLOSED date when trackClosedDate is enabled
-      if (completed && this.settings?.trackClosedDate) {
+      if (closedAction === 'add') {
         const closedDateStr = DateUtils.formatClosedDate(new Date());
         // CLOSED dates in cells use [[...]] wikilink format.
         // Support both old [date] and new [[date]] formats for migration
         const closedPattern = /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,2}[^\]]+\]{1,2}/i;
         const closedTag = `<br>CLOSED: [[${closedDateStr}]]`;
-        if (closedPattern.test(dateSuffix)) {
-          dateSuffix = dateSuffix.replace(closedPattern, closedTag);
-        } else {
-          dateSuffix = `${dateSuffix}${closedTag}`;
-        }
-      } else if (!completed) {
-        // Remove CLOSED date when un-completing, regardless of whether
-        // task.closedDate is set. For table cells, task.closedDate is
-        // parsed only from the first <br> segment (before the CLOSED tag),
-        // so it is always null even when the cell has a CLOSED date.
+        dateSuffix = closedPattern.test(dateSuffix)
+          ? dateSuffix.replace(closedPattern, closedTag)
+          : `${dateSuffix}${closedTag}`;
+      } else if (closedAction === 'remove') {
         // Support both old [date] and new [[date]] formats for migration
         dateSuffix = dateSuffix.replace(
           /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,2}[^\]]+\]{1,2}/i,
           '',
         );
       }
+      // closedAction === 'keep': leave any existing CLOSED tag untouched.
 
       fullCellContent = `${cellContent}${dateSuffix}`;
       return fullCellContent;
     });
 
-    let closedDate = task.closedDate;
-    if (completed && this.settings?.trackClosedDate) closedDate = new Date();
-    else if (!completed && task.closedDate) closedDate = null;
+    const closedDate =
+      closedAction === 'add'
+        ? new Date()
+        : closedAction === 'remove'
+          ? null
+          : task.closedDate;
 
     return {
       ...task,
@@ -1373,10 +1376,15 @@ export class TaskWriter {
     const isTargetCompleted = this.keywordManager.isCompleted(newState);
 
     if (isTargetCompleted || this.keywordManager.isArchived(newState)) {
+      // Fresh completion only: the source must not already be completed
+      // (completed → completed keeps — never stamps a NEW timestamp).
+      const sourceCompleted =
+        task.completed || this.keywordManager.isCompleted(task.state);
       if (
         isTargetCompleted &&
         this.settings?.trackClosedDate &&
-        !task.closedDate
+        !task.closedDate &&
+        !sourceCompleted
       ) {
         return 'add';
       }

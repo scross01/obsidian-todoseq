@@ -679,6 +679,153 @@ describe('TaskWriter Instance Methods', () => {
     });
   });
 
+  describe('applyTableCellUpdate — CLOSED date transition matrix', () => {
+    // A table row whose cell already carries a CLOSED tag (wikilink format,
+    // as applyTableCellUpdate itself writes).
+    const CELL_WITH_CLOSED =
+      '| DONE Task text <br>CLOSED: [[2026-03-14 Sat 10:00]] |';
+    const CELL_PLAIN = '| TODO Task text |';
+
+    const makeCellTask = (overrides: Partial<Task> = {}) =>
+      createCheckboxTask({
+        isTableTask: true,
+        tableCell: { cellIndex: 0 },
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        closedDate: new Date('2026-03-14'),
+        ...overrides,
+      });
+
+    const useRealKeywords = () => {
+      taskWriter.updateKeywordManager(createTestKeywordManager({}));
+    };
+
+    const useVaultCell = (fixtureLine: string) => {
+      mockApp.workspace.getActiveViewOfType = jest.fn().mockReturnValue(null);
+      mockApp.vault.process = jest
+        .fn()
+        .mockImplementation((_file: any, updateFn: (c: string) => string) =>
+          Promise.resolve(updateFn(fixtureLine)),
+        );
+    };
+
+    const processedCell = (fixtureLine: string): string =>
+      mockApp.vault.process.mock.calls[0][1](fixtureLine);
+
+    // 1. THE OVERWRITE BUG: completed → completed must preserve the original.
+    it('keeps original CLOSED timestamp on DONE → CANCELED (tracking on)', async () => {
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      useVaultCell(CELL_WITH_CLOSED);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeCellTask(),
+        'CANCELED',
+      );
+
+      expect(mockApp.vault.process).toHaveBeenCalled();
+      expect(processedCell(CELL_WITH_CLOSED)).toContain(
+        'CLOSED: [[2026-03-14 Sat 10:00]]',
+      );
+      expect(result.closedDate).toEqual(new Date('2026-03-14'));
+    });
+
+    // 2. Never add on completed → completed without an existing CLOSED.
+    it('does not add CLOSED on DONE → CANCELED when none existed', async () => {
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      useVaultCell('| DONE Task text |');
+
+      const result = await taskWriter.applyLineUpdate(
+        makeCellTask({ rawText: 'DONE Task text', closedDate: null }),
+        'CANCELED',
+      );
+
+      expect(processedCell('| DONE Task text |')).not.toContain('CLOSED:');
+      expect(result.closedDate).toBeNull();
+    });
+
+    // 3. THE STRIP BUG: non-completed → non-completed keeps the user's line.
+    it.each([true, false])(
+      'keeps CLOSED on TODO → LATER (tracking %p)',
+      async (tracking) => {
+        mockPlugin.settings.trackClosedDate = tracking;
+        useRealKeywords();
+        useVaultCell(CELL_WITH_CLOSED);
+
+        const result = await taskWriter.applyLineUpdate(
+          makeCellTask({
+            rawText: 'TODO Task text',
+            state: 'TODO',
+            completed: false,
+          }),
+          'LATER',
+        );
+
+        expect(processedCell(CELL_WITH_CLOSED)).toContain(
+          'CLOSED: [[2026-03-14 Sat 10:00]]',
+        );
+        expect(result.closedDate).not.toBeNull();
+      },
+    );
+
+    // 4. Un-complete still removes (both settings) — regression guard.
+    it.each([true, false])(
+      'removes CLOSED on DONE → TODO (tracking %p)',
+      async (tracking) => {
+        mockPlugin.settings.trackClosedDate = tracking;
+        useRealKeywords();
+        useVaultCell(CELL_WITH_CLOSED);
+
+        const result = await taskWriter.applyLineUpdate(makeCellTask(), 'TODO');
+
+        expect(processedCell(CELL_WITH_CLOSED)).not.toContain('CLOSED:');
+        expect(result.closedDate).toBeNull();
+      },
+    );
+
+    // 5. Fresh completion still stamps (wikilink format) — regression guard.
+    it('adds CLOSED on TODO → DONE with tracking enabled', async () => {
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      useVaultCell(CELL_PLAIN);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeCellTask({
+          rawText: 'TODO Task text',
+          state: 'TODO',
+          completed: false,
+          closedDate: null,
+        }),
+        'DONE',
+      );
+
+      expect(processedCell(CELL_PLAIN)).toMatch(/CLOSED: \[\[/);
+      expect(result.closedDate).toBeInstanceOf(Date);
+    });
+
+    // 6. Archived targets never add.
+    it('does not add CLOSED on TODO → ARCHIVED', async () => {
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      useVaultCell(CELL_PLAIN);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeCellTask({
+          rawText: 'TODO Task text',
+          state: 'TODO',
+          completed: false,
+          closedDate: null,
+        }),
+        'ARCHIVED',
+      );
+
+      expect(processedCell(CELL_PLAIN)).not.toContain('CLOSED:');
+      expect(result.closedDate).toBeNull();
+    });
+  });
+
   describe('updateKeywordManager', () => {
     it('should update the keyword manager instance', async () => {
       const newKeywordManager = createTestKeywordManager({
