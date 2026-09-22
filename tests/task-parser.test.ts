@@ -1,5 +1,6 @@
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
+import { Task } from '../src/types/task';
 import {
   createBaseSettings,
   createTestKeywordManager,
@@ -1535,5 +1536,43 @@ describe('table task parsing', () => {
     expect(tasks).toHaveLength(1);
     expect(tasks[0].description).toBe('A description');
     expect(tasks[0].scheduledDate).toBeTruthy();
+  });
+
+  describe('CLOSED dates in table cells', () => {
+    // The writer stamps cell CLOSED dates as <br>CLOSED: [2026-09-21 Mon 20:48]
+    // (single brackets — formatClosedDate output, exactly like non-cell CLOSED
+    // lines). Historic files may also carry [[[...]]] from the old
+    // double-wrapping bug and [[...]] from earlier writers; the parser must
+    // read all three bracket depths.
+    const parseCell = (cell: string): Task | null =>
+      parser.parseFile(`| Testing | ${cell} |`, 'test.md')[0] ?? null;
+
+    it('parses CLOSED from the canonical single-bracket format', () => {
+      const task = parseCell('DONE task 2<br>CLOSED: [2026-09-21 Mon 20:48]');
+      expect(task?.closedDate).not.toBeNull();
+      expect(task?.closedDate!.getFullYear()).toBe(2026);
+      expect(task?.closedDate!.getMonth()).toBe(8);
+      expect(task?.closedDate!.getDate()).toBe(21);
+      expect(task?.closedDate!.getHours()).toBe(20);
+      expect(task?.closedDate!.getMinutes()).toBe(48);
+    });
+
+    it('parses CLOSED from legacy [[...]] wikilink format', () => {
+      const task = parseCell('DONE task 2<br>CLOSED: [[2026-03-14 Sat 10:00]]');
+      expect(task?.closedDate).not.toBeNull();
+      expect(task?.closedDate!.getFullYear()).toBe(2026);
+      expect(task?.closedDate!.getMonth()).toBe(2);
+      expect(task?.closedDate!.getDate()).toBe(14);
+    });
+
+    it('parses CLOSED from legacy [[[...]]] triple-bracket format (old bug output)', () => {
+      const task = parseCell(
+        'DONE task 2<br>CLOSED: [[[2026-03-14 Sat 10:00]]]',
+      );
+      expect(task?.closedDate).not.toBeNull();
+      expect(task?.closedDate!.getFullYear()).toBe(2026);
+      expect(task?.closedDate!.getMonth()).toBe(2);
+      expect(task?.closedDate!.getDate()).toBe(14);
+    });
   });
 });

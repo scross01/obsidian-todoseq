@@ -11,7 +11,6 @@ import {
   UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
-import { extractDateMetadata } from '../utils/date-repeater';
 import {
   getIndentLength,
   parseTableCells,
@@ -1363,25 +1362,15 @@ export class TaskParser implements ITaskParser {
             task.deadlineWarningPeriod = p.warningPeriod;
           }
         } else if (/^CLOSED:/i.test(part)) {
-          // Handle both [[date]] and <date> formats for table cells
-          const content = dateContent;
-          let processedContent = content;
-          // Convert [[date]] wikilink format to <date> format for DateParser
-          if (content.startsWith('[[') && content.endsWith(']]')) {
-            const innerContent = content.slice(2, -2);
-            // Extract just the date string (without repeater/warning period)
-            const { baseDateStr } = extractDateMetadata(innerContent);
-            processedContent = baseDateStr;
-            const p = DateParser.parseDateWithRepeater(processedContent);
-            if (p.date) {
-              task.closedDate = p.date;
-            }
-          } else {
-            // Use original content for regular <date> format
-            const p = DateParser.parseDateWithRepeater(content);
-            if (p.date) {
-              task.closedDate = p.date;
-            }
+          // CLOSED dates use [date] brackets (inactive-date convention, same
+          // as non-cell CLOSED lines). DateParser only matches <date>, so
+          // normalize — tolerating historic bracket depths ([date], [[date]],
+          // [[[date]]] from an earlier double-wrapping writer bug) by
+          // stripping ALL leading/trailing brackets first.
+          const content = dateContent.replace(/^\[+/, '').replace(/\]+$/, '');
+          const p = DateParser.parseDateWithRepeater(`<${content}>`);
+          if (p.date) {
+            task.closedDate = p.date;
           }
         } else if (task.description === undefined) {
           const descText = this.getDescriptionText(part);

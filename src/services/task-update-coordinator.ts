@@ -116,6 +116,19 @@ interface ProcessingContext {
   newStateForRecurrence?: string;
   filePath: string;
   fileLine: number;
+  /**
+   * Source-state fields captured BEFORE the sync phase's optimistic update.
+   * performSyncPhase replaces the stored task (state/completed flipped to the
+   * target) for instant UI feedback; the async file write must still classify
+   * the transition from the PRE-transition values (e.g. to distinguish fresh
+   * completion from completed → completed for CLOSED stamping). Captured for
+   * state and recurrence updates, where the sync phase rewrites state.
+   */
+  originalSourceState?: {
+    state: string;
+    completed: boolean;
+    closedDate: Date | null;
+  };
 }
 
 /**
@@ -459,6 +472,16 @@ export class TaskUpdateCoordinator {
       source: context.source,
       newState,
       originalNewState,
+      // Capture BEFORE performSyncPhase's optimisticUpdate replaces the
+      // stored task — the file write still needs the pre-transition values.
+      originalSourceState:
+        context.type === 'state' || context.type === 'recurrence'
+          ? {
+              state: context.task.state,
+              completed: context.task.completed,
+              closedDate: context.task.closedDate,
+            }
+          : undefined,
       newDate: context.newDate,
       newRepeat: context.newRepeat,
       newWarningPeriod: context.newWarningPeriod,
@@ -579,10 +602,25 @@ export class TaskUpdateCoordinator {
       // When source is 'editor', use the editor-parsed task directly
       // The stored vault-scanned task may be stale (e.g. still has slash command text)
       // and must not be substituted — the editor always has the latest content
-      const currentTask =
+      let currentTask =
         context.source === 'editor'
           ? context.task
           : this.resolveStoredTask(context);
+
+      // The sync phase's optimisticUpdate already replaced the stored task
+      // with target-state values (state/completed flipped for instant UI
+      // feedback). The file write must classify the transition from the
+      // PRE-transition source state — e.g. to distinguish fresh completion
+      // from completed → completed when stamping CLOSED — so restore the
+      // values buildProcessingContext captured before the optimistic rewrite.
+      if (context.originalSourceState) {
+        currentTask = {
+          ...currentTask,
+          state: context.originalSourceState.state,
+          completed: context.originalSourceState.completed,
+          closedDate: context.originalSourceState.closedDate,
+        };
+      }
 
       let updatedTask: Task;
       try {

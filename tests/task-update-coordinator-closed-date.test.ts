@@ -97,12 +97,11 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
     );
 
     // Mock the task editor methods to return the task
-    // Track original task to determine if transition is completed->non-completed
+    // Mirror the real TaskWriter: the transition direction is derived from
+    // the task ACTUALLY PASSED to the writer, not from a captured copy —
+    // this keeps the mock sensitive to what the coordinator hands over.
     mockPlugin.taskEditor.updateTaskState.mockImplementation(
       async (task, newState) => {
-        // Use originalTask if available to determine transition direction
-        const taskForTransition = originalTask || task;
-
         const keywordManager = createTestKeywordManager(
           createBaseSettings({
             trackClosedDate: true,
@@ -110,9 +109,8 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
           }),
         );
         const isCompleted = keywordManager.isCompleted(newState);
-        const wasCompleted = keywordManager.isCompleted(
-          taskForTransition.state,
-        );
+        const wasCompleted =
+          task.completed || keywordManager.isCompleted(task.state);
         const isArchived = keywordManager.isArchived(newState);
 
         // Simplified CLOSED date handling for tests:
@@ -647,6 +645,95 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
       const result = await lastEditorResult();
       expect(result.closedDate).toEqual(new Date('2026-03-09'));
+    });
+  });
+
+  describe('fresh completion via task-list (optimistic-update regression)', () => {
+    // Regression: performSyncPhase optimistically replaces the stored task
+    // (state/completed flipped to the target) BEFORE the async file write.
+    // resolveStoredTask then handed that poisoned object to the writer, so
+    // resolveClosedDateAction's fresh-completion check saw an already-completed
+    // source and returned 'keep' — CLOSED was never stamped when completing
+    // from the task list or reader view (the editor source bypasses
+    // resolveStoredTask, which is why it worked there).
+    const todoTask = () =>
+      createBaseTask({
+        state: 'TODO' as Task['state'],
+        completed: false,
+        closedDate: null,
+        rawText: '- [ ] TODO Task text',
+      });
+
+    const lastWrittenResult = async (): Promise<
+      Task & { lineDelta?: number }
+    > => {
+      const results = mockPlugin.taskEditor.updateTaskState.mock.results;
+      expect(results.length).toBeGreaterThan(0);
+      return results[results.length - 1].value;
+    };
+
+    it('task-list source: TODO → DONE stamps CLOSED (fresh completion)', async () => {
+      const task = todoTask();
+      taskStateManager.addTask(task);
+      originalTask = task;
+
+      await taskUpdateCoordinator.updateTaskState(task, 'DONE', 'task-list');
+
+      // The optimistic update must not leak into the file write: the writer
+      // must still observe the PRE-transition source state.
+      const written = await lastWrittenResult();
+      expect(written.closedDate).toBeInstanceOf(Date);
+      expect(written.completed).toBe(true);
+    });
+
+    it('reader source: TODO → DONE stamps CLOSED via updateTaskByPath', async () => {
+      const task = todoTask();
+      taskStateManager.addTask(task);
+      originalTask = task;
+
+      await taskUpdateCoordinator.updateTaskByPath(
+        task.path,
+        task.line,
+        'DONE',
+        'reader',
+      );
+
+      const written = await lastWrittenResult();
+      expect(written.closedDate).toBeInstanceOf(Date);
+    });
+
+    it('completed → completed via task-list still preserves (no re-stamp)', async () => {
+      const task = createBaseTask({
+        state: 'DONE' as Task['state'],
+        completed: true,
+        closedDate: new Date('2026-03-09'),
+      });
+      taskStateManager.addTask(task);
+      originalTask = task;
+
+      await taskUpdateCoordinator.updateTaskState(
+        task,
+        'CANCELED',
+        'task-list',
+      );
+
+      const written = await lastWrittenResult();
+      expect(written.closedDate).toEqual(new Date('2026-03-09'));
+    });
+
+    it('un-complete via task-list still removes CLOSED', async () => {
+      const task = createBaseTask({
+        state: 'DONE' as Task['state'],
+        completed: true,
+        closedDate: new Date('2026-03-09'),
+      });
+      taskStateManager.addTask(task);
+      originalTask = task;
+
+      await taskUpdateCoordinator.updateTaskState(task, 'TODO', 'task-list');
+
+      const written = await lastWrittenResult();
+      expect(written.closedDate).toBeNull();
     });
   });
 });
