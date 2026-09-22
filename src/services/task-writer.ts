@@ -214,6 +214,11 @@ export class TaskWriter {
       this.keywordManager,
     );
 
+    // CLOSED date action for this transition (see resolveClosedDateAction).
+    // Computed once here: it reads only `task` and `newState`, both immutable
+    // inputs, and is consumed by the vault, editor, and accumulator branches.
+    const closedAction = this.resolveClosedDateAction(task, newState);
+
     // STARTED tracking: trigger on first entry into an active state.
     // Idempotent and one-way — never removed on reactivation (first-ever-start).
     const isActiveState = this.keywordManager.isActive(newState);
@@ -280,28 +285,24 @@ export class TaskWriter {
       } else {
         // Not in source mode (preview/reader mode) or not active or forceVaultApi: use atomic background edit
         // Include CLOSED date handling atomically in the same operation for consistency
-        const dateStr =
-          completed && settings?.trackClosedDate
-            ? DateUtils.formatClosedDate(new Date())
-            : null;
-        const shouldRemoveClosed = !completed && task.closedDate;
-
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
           if (task.line < lines.length) {
             lines[task.line] = newLine;
           }
 
-          // Handle CLOSED date atomically using helper
-          if (dateStr !== null) {
+          // Handle CLOSED date atomically using the resolved action.
+          // 'keep' leaves any existing CLOSED line exactly as the user wrote it
+          // (the trackClosedDate setting gates insertion only, never removal).
+          if (closedAction === 'add') {
             this.updateOrInsertDateLine(
               lines,
               task.line,
               'CLOSED',
-              dateStr,
+              DateUtils.formatClosedDate(new Date()),
               task,
             );
-          } else if (shouldRemoveClosed) {
+          } else if (closedAction === 'remove') {
             this.removeDateLine(lines, task.line, 'CLOSED', task);
           }
 
@@ -333,7 +334,7 @@ export class TaskWriter {
     // insertion/removal requires its own editor operations
     // Line delta and date accumulators were declared above (before vault.process)
     if (isSourceMode && !forceVaultApi) {
-      if (completed && settings?.trackClosedDate) {
+      if (closedAction === 'add') {
         const closedResult = await this.updateTaskClosedDate(
           task,
           new Date(),
@@ -341,11 +342,13 @@ export class TaskWriter {
         );
         lineDelta += closedResult.lineDelta;
         updatedClosedDate = closedResult.task.closedDate;
-      } else if (!completed && task.closedDate) {
+      } else if (closedAction === 'remove') {
         const closedResult = await this.removeTaskClosedDate(task, false);
         lineDelta += closedResult.lineDelta;
         updatedClosedDate = closedResult.task.closedDate;
       }
+      // 'keep': leave the CLOSED line alone; updatedClosedDate keeps
+      // task.closedDate — an existing timestamp is never rewritten.
 
       // STARTED: insert via Editor API on first entry into an active state.
       // updateTaskStartedDate is idempotent (retains existing STARTED line)
@@ -361,10 +364,10 @@ export class TaskWriter {
       }
     } else if (!isSourceMode || forceVaultApi) {
       // For non-source mode, CLOSED date was handled atomically above
-      if (completed && settings?.trackClosedDate) {
-        lineDelta = task.closedDate ? 0 : 1;
+      if (closedAction === 'add') {
+        lineDelta = 1;
         updatedClosedDate = new Date();
-      } else if (!completed && task.closedDate) {
+      } else if (closedAction === 'remove') {
         lineDelta = -1;
         updatedClosedDate = null;
       }
@@ -1336,6 +1339,54 @@ export class TaskWriter {
       },
       lineDelta,
     };
+  }
+
+  /**
+   * Decide what should happen to the CLOSED date line for a state transition.
+   *
+   * Matrix (maintainer-clarified, 2026-09-21):
+   * - target is completed and trackClosedDate is enabled and the task has no
+   *   CLOSED date yet:
+   *       'add'    — fresh completion stamps CLOSED with the current time.
+   * - target is completed or archived (all other cases):
+   *       'keep'   — never add (archived targets never stamp CLOSED), never
+   *                  overwrite an existing timestamp, never remove. This covers
+   *                  DONE→CANCELED, DONE→ARCHIVED, re-completing an already
+   *                  completed task, and archiving with tracking disabled.
+   * - target is active/inactive/waiting AND the task was completed:
+   *       'remove' — the task is no longer completed, so the record of closure
+   *                  goes with it. This applies regardless of the
+   *                  trackClosedDate setting: removal is a consequence of
+   *                  leaving the completed state, not of the tracking
+   *                  preference.
+   * - otherwise (non-completed → non-completed):
+   *       'keep'   — never touch a CLOSED line the user wrote.
+   *
+   * The trackClosedDate setting gates insertion only; it never gates removal.
+   * An existing CLOSED line is user data (see docs/task-entry.md) and must not
+   * be deleted merely because tracking is disabled.
+   */
+  private resolveClosedDateAction(
+    task: Task,
+    newState: string,
+  ): 'add' | 'remove' | 'keep' {
+    const isTargetCompleted = this.keywordManager.isCompleted(newState);
+
+    if (isTargetCompleted || this.keywordManager.isArchived(newState)) {
+      if (
+        isTargetCompleted &&
+        this.settings?.trackClosedDate &&
+        !task.closedDate
+      ) {
+        return 'add';
+      }
+      return 'keep';
+    }
+
+    if (task.completed || this.keywordManager.isCompleted(task.state)) {
+      return 'remove';
+    }
+    return 'keep';
   }
 
   /**

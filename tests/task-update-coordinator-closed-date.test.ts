@@ -124,6 +124,10 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
         let lineDelta = 0;
         if (isArchived) {
           closedDate = task.closedDate;
+        } else if (isCompleted && wasCompleted) {
+          // Completed → completed: preserve the original timestamp (write-once)
+          closedDate = task.closedDate;
+          lineDelta = 0;
         } else if (isCompleted) {
           closedDate = new Date();
           // If task didn't have a closedDate before, a new line will be added
@@ -566,6 +570,83 @@ describe('TaskUpdateCoordinator - CLOSED Date Behavior', () => {
       await taskUpdateCoordinator.updateTaskState(task, 'TODO');
 
       expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+    });
+  });
+
+  describe('matrix parity', () => {
+    // The coordinator delegates CLOSED handling to the task editor
+    // (TaskWriter), which is mocked here; these tests pin the coordinator
+    // contract for each transition class of the CLOSED matrix. The writer
+    // implementation itself is pinned by the
+    // "applyLineUpdate — CLOSED date transition matrix" tests in
+    // tests/task-writer-methods.test.ts.
+    const doneTask = () =>
+      createBaseTask({
+        state: 'DONE' as Task['state'],
+        completed: true,
+        closedDate: new Date('2026-03-09'),
+      });
+
+    // The coordinator's updateTaskState resolves void; the CLOSED outcome is
+    // observable through the mocked editor's recorded return value.
+    const lastEditorResult = async (): Promise<
+      Task & { lineDelta?: number }
+    > => {
+      const results = mockPlugin.taskEditor.updateTaskState.mock.results;
+      expect(results.length).toBeGreaterThan(0);
+      return results[results.length - 1].value;
+    };
+
+    it('completed → archived: CLOSED preserved', async () => {
+      const task = doneTask();
+      taskStateManager.addTask(task);
+      originalTask = task;
+
+      await taskUpdateCoordinator.updateTaskState(task, 'ARCHIVED');
+
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+      const result = await lastEditorResult();
+      expect(result.closedDate).toEqual(new Date('2026-03-09'));
+    });
+
+    it('completed → completed: CLOSED timestamp preserved (write-once)', async () => {
+      const task = doneTask();
+      taskStateManager.addTask(task);
+      originalTask = task;
+
+      await taskUpdateCoordinator.updateTaskState(task, 'CANCELED');
+
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+      const result = await lastEditorResult();
+      expect(result.closedDate).toEqual(new Date('2026-03-09'));
+    });
+
+    it('completed → active: CLOSED removed', async () => {
+      const task = doneTask();
+      taskStateManager.addTask(task);
+      originalTask = task;
+
+      await taskUpdateCoordinator.updateTaskState(task, 'DOING');
+
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+      const result = await lastEditorResult();
+      expect(result.closedDate).toBeNull();
+    });
+
+    it('non-completed → non-completed with CLOSED: preserved', async () => {
+      const task = createBaseTask({
+        state: 'TODO' as Task['state'],
+        completed: false,
+        closedDate: new Date('2026-03-09'),
+      });
+      taskStateManager.addTask(task);
+      originalTask = task;
+
+      await taskUpdateCoordinator.updateTaskState(task, 'LATER');
+
+      expect(mockPlugin.taskEditor.updateTaskState).toHaveBeenCalled();
+      const result = await lastEditorResult();
+      expect(result.closedDate).toEqual(new Date('2026-03-09'));
     });
   });
 });
