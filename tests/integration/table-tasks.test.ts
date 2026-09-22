@@ -211,6 +211,12 @@ test.describe('Table cell tasks', () => {
     let content = await readEditorContent(page);
     expect(content).toContain('DONE Table task two with description');
     expect(content).toContain('CLOSED:');
+    // Canonical single-bracket format: cells write the same [date] form as
+    // non-cell CLOSED lines — never double-wrapped into [[[...]]].
+    expect(content).toMatch(
+      /CLOSED: \[\d{4}-\d{2}-\d{2} [A-Za-z]{3} \d{2}:\d{2}\]/,
+    );
+    expect(content).not.toContain('CLOSED: [[');
 
     // Now un-complete: DONE → TODO. Find the DONE keyword in the
     // description row (the row whose cell also contains DESCRIPTION:).
@@ -240,6 +246,65 @@ test.describe('Table cell tasks', () => {
     content = await readEditorContent(page);
     expect(content).toContain('TODO Table task two with description');
     expect(content).not.toContain('CLOSED:');
+  });
+
+  test('legacy triple-bracket cell CLOSED is removed with no residue on un-complete', async () => {
+    // Seed the fixture row with the historic [[[...]]] tag produced by the
+    // old double-wrapping writer, then rescan so the plugin re-parses it.
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const file = app.vault.getAbstractFileByPath('table-tasks.md');
+      await app.vault.process(file, (data: string) =>
+        data.replace(
+          '| DOING Table task two with description<br>',
+          '| DONE Table task two with description<br>CLOSED: [[[2026-09-21 Mon 20:48]]]<br>',
+        ),
+      );
+      const plugin = app.plugins.plugins.todoseq;
+      plugin.settings.trackClosedDate = true;
+      await plugin.vaultScanner.scanVault();
+    });
+
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const file = app.vault.getAbstractFileByPath('table-tasks.md');
+      const leaf = app.workspace.getLeaf('tab');
+      await leaf.openFile(file);
+    });
+
+    // Un-complete via the keyword menu (DONE → TODO), same flow as the
+    // canonical-format test above.
+    const descRow = page
+      .locator('.workspace-leaf.mod-active tr')
+      .filter({ hasText: 'DESCRIPTION:' });
+    const keyword = descRow
+      .locator('.table-cell-wrapper')
+      .first()
+      .locator('.todoseq-keyword-formatted[data-task-keyword="DONE"]');
+    await keyword.waitFor({ state: 'visible', timeout: 10_000 });
+    await page.waitForTimeout(300);
+
+    await keyword.click({ button: 'right' });
+    await page
+      .locator('.menu .menu-item-title', { hasText: 'TODO' })
+      .first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+    await page
+      .locator('.menu .menu-item-title', { hasText: 'TODO' })
+      .first()
+      .click();
+
+    await page.waitForTimeout(600);
+    const content = await readEditorContent(page);
+    expect(content).toContain('TODO Table task two with description');
+    // The whole legacy tag is gone: no CLOSED, no orphaned bracket.
+    expect(content).not.toContain('CLOSED:');
+    expect(content).not.toContain(']]]');
+    expect(
+      content.includes(
+        '| TODO Table task two with description<br>DESCRIPTION: Task two has a description |',
+      ),
+    ).toBe(true);
   });
 
   test('keyword menu changes state for multi-column table cells', async () => {
