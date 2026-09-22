@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.20.1
+
+- Fixed CLOSED date being deleted when archiving or re-completing a completed task while "Track closed date" is disabled; existing timestamps are now preserved.
+- Fixed CLOSED dates not being stamped or removed when completing/un-completing tasks from the task list or reader view.
+- Fixed table cell CLOSED dates being written with a malformed `[[[date]]]` format; cells now use the canonical `[date]` format matching regular CLOSED lines, and legacy bracketed formats migrate cleanly on re-stamp with no leftover brackets on removal.
+- Fixed table cell CLOSED dates not being parsed when reading tasks.
+
 ## 0.20.0
 
 - Added new option to track STARTED date when a task enters an active state.
