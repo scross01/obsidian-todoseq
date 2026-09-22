@@ -785,6 +785,26 @@ describe('TaskWriter Instance Methods', () => {
       },
     );
 
+    // 4b. THE RESIDUE BUG: historic files carry [[[...]]] (output of the old
+    // double-wrapping writer). Removal must swallow the whole tag — a
+    // shallow matcher orphaned a trailing ']' after DONE → TODO.
+    it('removes legacy triple-bracket CLOSED with no residue on DONE → TODO', async () => {
+      const LEGACY_TRIPLE =
+        '| DONE task 2<br>CLOSED: [[[2026-09-21 Mon 20:48]]] |';
+      mockPlugin.settings.trackClosedDate = true;
+      useRealKeywords();
+      useVaultCell(LEGACY_TRIPLE);
+
+      const result = await taskWriter.applyLineUpdate(
+        makeCellTask({ rawText: 'DONE task 2' }),
+        'TODO',
+      );
+
+      expect(processedCell(LEGACY_TRIPLE)).not.toContain('CLOSED:');
+      expect(processedCell(LEGACY_TRIPLE)).not.toContain(']');
+      expect(result.closedDate).toBeNull();
+    });
+
     // 5. Fresh completion still stamps (wikilink format) — regression guard.
     it('adds CLOSED on TODO → DONE with tracking enabled', async () => {
       mockPlugin.settings.trackClosedDate = true;
@@ -801,7 +821,10 @@ describe('TaskWriter Instance Methods', () => {
         'DONE',
       );
 
-      expect(processedCell(CELL_PLAIN)).toMatch(/CLOSED: \[\[/);
+      // Canonical format: single brackets, same as non-cell CLOSED lines
+      // (formatClosedDate output; not re-wrapped in [[...]]).
+      expect(processedCell(CELL_PLAIN)).toMatch(/CLOSED: \[\d{4}-\d{2}-\d{2}/);
+      expect(processedCell(CELL_PLAIN)).not.toContain('[[[');
       expect(result.closedDate).toBeInstanceOf(Date);
     });
 

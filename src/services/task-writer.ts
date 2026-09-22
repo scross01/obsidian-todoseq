@@ -496,17 +496,22 @@ export class TaskWriter {
 
       if (closedAction === 'add') {
         const closedDateStr = DateUtils.formatClosedDate(new Date());
-        // CLOSED dates in cells use [[...]] wikilink format.
-        // Support both old [date] and new [[date]] formats for migration
-        const closedPattern = /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,2}[^\]]+\]{1,2}/i;
-        const closedTag = `<br>CLOSED: [[${closedDateStr}]]`;
+        // Cell CLOSED dates use the same [date] single-bracket format as
+        // non-cell CLOSED lines (formatClosedDate output is already
+        // bracketed — do NOT wrap again). The pattern tolerates historic
+        // bracket depths ([date], [[date]], [[[date]]]) from earlier
+        // writers so re-stamping migrates them in place.
+        const closedPattern = /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,3}[^\]]*\]{1,3}/i;
+        const closedTag = `<br>CLOSED: ${closedDateStr}`;
         dateSuffix = closedPattern.test(dateSuffix)
           ? dateSuffix.replace(closedPattern, closedTag)
           : `${dateSuffix}${closedTag}`;
       } else if (closedAction === 'remove') {
-        // Support both old [date] and new [[date]] formats for migration
+        // Tolerate historic bracket depths: [[[date]]] (double-wrapping bug
+        // output), [[date]], [date]. Matching {1,3} on both sides removes
+        // the whole tag — a {1,2} matcher would orphan trailing ']'s.
         dateSuffix = dateSuffix.replace(
-          /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,2}[^\]]+\]{1,2}/i,
+          /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,3}[^\]]*\]{1,3}/i,
           '',
         );
       }
@@ -602,9 +607,10 @@ export class TaskWriter {
   ): Promise<Task & { lineDelta?: number }> {
     await this.modifyTableCell(task, (cell) => {
       if (dateType === 'CLOSED') {
-        // CLOSED dates use [[date]] wikilink format in table cells
+        // Tolerate historic bracket depths: [date], [[date]], [[[date]]]
+        // (the triple form is output of an earlier double-wrapping bug).
         const datePattern = new RegExp(
-          `\\s*<br\\s*/?>\\s*${dateType}:\\s*(?:\\[\\[[^\\]]+\\]\\]|\\[[^\\]]+\\])`,
+          `\\s*<br\\s*/?>\\s*${dateType}:\\s*\\[{1,3}[^\\]]*\\]{1,3}`,
           'i',
         );
         return cell.replace(datePattern, '');
