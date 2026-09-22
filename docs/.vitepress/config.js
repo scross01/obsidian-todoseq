@@ -3,6 +3,7 @@ export default {
   description: 'Lightweight, keyword-based task tracker for Obsidian',
   base: '/obsidian-todoseq/',
   outline: [2, 3],
+  srcExclude: ['**/DESIGN.md'],
 
   themeConfig: {
     nav: [
