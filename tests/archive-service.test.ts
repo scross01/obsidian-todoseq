@@ -273,3 +273,246 @@ describe('ArchiveService.evaluateArchiveCriteria', () => {
     });
   });
 });
+
+describe('ArchiveService.applyArchives', () => {
+  class FakeCoordinator {
+    calls: { state: string; target: string; rawText: string }[] = [];
+    async updateTaskState(
+      task: { state: string; rawText: string },
+      newState: string,
+    ): Promise<void> {
+      this.calls.push({ state: task.state, target: newState, rawText: task.rawText });
+    }
+  }
+
+  function setup() {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const coordinator = new FakeCoordinator();
+    const store = new Map<string, ArchiveCandidate>();
+    const deps = {
+      getTask: (path: string, line: number) => store.get(`${path}:${line}`) ?? null,
+      apply: async (task: { state: string }, target: string) => {
+        await coordinator.updateTaskState(task, target);
+      },
+    };
+    return { service, coordinator, store, deps };
+  }
+
+  it('applies to all matches and journals one record per apply', async () => {
+    const { service, coordinator, store, deps } = setup();
+    const tasks = [
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100), rawText: '- [x] DONE first' }),
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 120), rawText: '- [x] DONE second' }),
+    ];
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    const matches = service.evaluateArchiveCriteria(tasks, makeConfig(), REFERENCE);
+
+    const result = await service.applyArchives(matches, deps);
+
+    expect(result.archived).toHaveLength(2);
+    expect(result.skipped).toHaveLength(0);
+    expect(coordinator.calls).toHaveLength(2);
+    expect(coordinator.calls.every((c) => c.target === 'ARCHIVED')).toBe(true);
+    expect(service.hasUndoableRun()).toBe(true);
+    expect(result.archived[0]).toMatchObject({
+      path: tasks[0].path,
+      line: tasks[0].line,
+      originalState: 'DONE',
+      target: 'ARCHIVED',
+      rawTextBefore: '- [x] DONE first',
+    });
+  });
+
+  it('skips stale tasks (no longer present) without applying or journaling', async () => {
+    const { service, coordinator, deps } = setup();
+    const task = makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) });
+    const matches = service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE);
+
+    const result = await service.applyArchives(matches, deps); // store empty → getTask returns null
+
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toEqual([{ path: task.path, line: task.line, reason: 'stale' }]);
+    expect(coordinator.calls).toHaveLength(0);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
+  it('skips tasks whose state changed since evaluation', async () => {
+    const { service, coordinator, store, deps } = setup();
+    const task = makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) });
+    store.set(`${task.path}:${task.line}`, { ...task, state: 'DOING' }); // changed underneath us
+    const matches = service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE);
+
+    const result = await service.applyArchives(matches, deps);
+
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toBe('stale');
+    expect(coordinator.calls).toHaveLength(0);
+  });
+
+  it('reports isRunning during the batch and false after', async () => {
+    const { service, store, deps } = setup();
+    const task = makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) });
+    store.set(`${task.path}:${task.line}`, task);
+    const matches = service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE);
+
+    const runningDuring: boolean[] = [];
+    await service.applyArchives(matches, {
+      ...deps,
+      apply: async (t, target) => {
+        runningDuring.push(service.isRunning());
+        await Promise.resolve();
+      },
+    });
+
+    expect(runningDuring).toEqual([true]);
+    expect(service.isRunning()).toBe(false);
+  });
+
+  it('a new successful run overwrites the journal', async () => {
+    const { service, store, deps } = setup();
+    const first = makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100), rawText: '- [x] DONE first run' });
+    const second = makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 200), rawText: '- [x] DONE second run' });
+
+    store.set(`${first.path}:${first.line}`, first);
+    await service.applyArchives(service.evaluateArchiveCriteria([first], makeConfig(), REFERENCE), deps);
+
+    store.delete(`${first.path}:${first.line}`);
+    store.set(`${second.path}:${second.line}`, second);
+    await service.applyArchives(service.evaluateArchiveCriteria([second], makeConfig(), REFERENCE), deps);
+
+    expect(service.hasUndoableRun()).toBe(true);
+    // Journal must contain ONLY the second run's record.
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => `- [ ] ARCHIVED second run`,
+      apply: async () => undefined,
+    });
+    expect(outcome.reverted).toHaveLength(1);
+    expect(outcome.reverted[0].rawTextBefore).toBe('- [x] DONE second run');
+  });
+
+  it('an empty apply clears any previous journal (no-op run is not undoable)', async () => {
+    const { service, store, deps } = setup();
+    const first = makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) });
+    store.set(`${first.path}:${first.line}`, first);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([first], makeConfig(), REFERENCE),
+      deps,
+    );
+    expect(service.hasUndoableRun()).toBe(true);
+
+    // Second run with all matches stale → empty archived list overwrites journal.
+    store.delete(`${first.path}:${first.line}`);
+    const staleMatch = { ...first, target: 'ARCHIVED' };
+    const result = await service.applyArchives([staleMatch], deps);
+
+    expect(result.archived).toHaveLength(0);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+});
+
+describe('ArchiveService.undoLastRun', () => {
+  function setupWithJournal() {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const coordinator = {
+      calls: [] as { state: string; originalState: string }[],
+    };
+    const task = makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100), rawText: '- [x] DONE original text' });
+    const archivedLine = '- [x] ARCHIVED original text';
+
+    // Seed the journal directly through a successful apply.
+    const store = new Map<string, ArchiveCandidate>([[`${task.path}:${task.line}`, task]]);
+    return { service, coordinator, task, archivedLine, store };
+  }
+
+  it('reverts each journaled record to its original state and clears the journal', async () => {
+    const { service, coordinator, task, archivedLine, store } = setupWithJournal();
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    const applied: string[] = [];
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => archivedLine,
+      apply: async (t, originalState) => {
+        applied.push(originalState);
+        await coordinator.calls.push({ state: t.state, originalState });
+      },
+    });
+
+    expect(outcome.reverted).toHaveLength(1);
+    expect(outcome.skipped).toHaveLength(0);
+    expect(applied).toEqual(['DONE']);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
+  it('skips records whose line is missing', async () => {
+    const { service, task } = setupWithJournal();
+    const store = new Map<string, ArchiveCandidate>([[`${task.path}:${task.line}`, task]]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      { getTask: (p, l) => store.get(`${p}:${l}`) ?? null, apply: async () => undefined },
+    );
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => null,
+      apply: async () => undefined,
+    });
+
+    expect(outcome.reverted).toHaveLength(0);
+    expect(outcome.skipped).toEqual([{ record: expect.objectContaining({ path: task.path }), reason: 'line-missing' }]);
+  });
+
+  it('skips records whose line content changed since the archive', async () => {
+    const { service, task } = setupWithJournal();
+    const store = new Map<string, ArchiveCandidate>([[`${task.path}:${task.line}`, task]]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      { getTask: (p, l) => store.get(`${p}:${l}`) ?? null, apply: async () => undefined },
+    );
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [x] DONE user edited this line completely',
+      apply: async () => undefined,
+    });
+
+    expect(outcome.reverted).toHaveLength(0);
+    expect(outcome.skipped).toHaveLength(1);
+    expect(outcome.skipped[0].reason).toBe('line-changed');
+  });
+
+  it('treats a line still matching the pre-archive shape as changed (never archived or reverted out-of-band)', async () => {
+    const { service, task } = setupWithJournal();
+    const store = new Map<string, ArchiveCandidate>([[`${task.path}:${task.line}`, task]]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      { getTask: (p, l) => store.get(`${p}:${l}`) ?? null, apply: async () => undefined },
+    );
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => task.rawText, // identical to rawTextBefore
+      apply: async () => undefined,
+    });
+
+    expect(outcome.reverted).toHaveLength(0);
+    expect(outcome.skipped[0].reason).toBe('line-changed');
+  });
+
+  it('is a no-op when there is no journal', async () => {
+    const { service } = makeService();
+    let applyCalls = 0;
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [x] ARCHIVED whatever',
+      apply: async () => {
+        applyCalls += 1;
+      },
+    });
+    expect(outcome.reverted).toHaveLength(0);
+    expect(applyCalls).toBe(0);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+});
