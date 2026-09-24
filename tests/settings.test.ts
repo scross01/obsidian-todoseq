@@ -199,7 +199,15 @@ describe('TodoTrackerSettingTab', () => {
       embeddedTaskListProcessor: {
         updateSettings: jest.fn(),
       },
-      keywordManager: {},
+      keywordManager: {
+        getKeywordsForGroup: jest.fn((group: string) =>
+          group === 'completedKeywords'
+            ? ['DONE', 'CANCELED', 'CANCELLED']
+            : group === 'archivedKeywords'
+              ? ['ARCHIVED']
+              : [],
+        ),
+      },
     };
 
     settingTab = new TodoTrackerSettingTab(appMock as any, pluginMock as any);
