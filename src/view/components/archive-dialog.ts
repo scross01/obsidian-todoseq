@@ -226,9 +226,9 @@ export class ArchiveDialog {
   }
 
   private renderCriteriaInputs(container: HTMLElement): void {
-    container.querySelectorAll('.todoseq-archive-criteria-input').forEach((el) =>
-      el.remove(),
-    );
+    container
+      .querySelectorAll('.todoseq-archive-criteria-input')
+      .forEach((el) => el.remove());
     const archive = this.plugin.settings.taskArchive;
 
     if (archive.criterionMode === 'days') {
@@ -289,8 +289,10 @@ export class ArchiveDialog {
   private buildMappingSection(): void {
     if (!this.modalEl) return;
     const archive = this.plugin.settings.taskArchive;
-    const completed = this.keywordManager.getKeywordsForGroup('completedKeywords');
-    const archived = this.keywordManager.getKeywordsForGroup('archivedKeywords');
+    const completed =
+      this.keywordManager.getKeywordsForGroup('completedKeywords');
+    const archived =
+      this.keywordManager.getKeywordsForGroup('archivedKeywords');
     const defaultTarget = archived[0] ?? 'ARCHIVED';
 
     this.rows = buildArchiveMappingRows(
@@ -388,9 +390,9 @@ export class ArchiveDialog {
     this.previewListEl.empty();
 
     if (matches.length === 0) {
-      this.previewListEl.createDiv({ cls: 'todoseq-archive-empty' }).setText(
-        'No tasks match the current criteria.',
-      );
+      this.previewListEl
+        .createDiv({ cls: 'todoseq-archive-empty' })
+        .setText('No tasks match the current criteria.');
     } else {
       const visible = matches.slice(0, PREVIEW_RENDER_LIMIT);
       for (const match of visible) {
@@ -399,9 +401,7 @@ export class ArchiveDialog {
       if (matches.length > PREVIEW_RENDER_LIMIT) {
         this.previewListEl
           .createDiv({ cls: 'todoseq-archive-more' })
-          .setText(
-            `+${matches.length - PREVIEW_RENDER_LIMIT} more not shown`,
-          );
+          .setText(`+${matches.length - PREVIEW_RENDER_LIMIT} more not shown`);
       }
     }
 
@@ -547,7 +547,9 @@ export class ArchiveDialog {
       this.close();
       new Notice(
         `Archived ${archivedCount} tasks` +
-          (skippedCount > 0 ? `, skipped ${skippedCount} (changed since preview)` : ''),
+          (skippedCount > 0
+            ? `, skipped ${skippedCount} (changed since preview)`
+            : ''),
       );
       await this.plugin.scanVault();
     } catch (error) {

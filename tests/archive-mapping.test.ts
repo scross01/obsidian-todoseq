@@ -9,7 +9,11 @@ describe('buildArchiveMappingRows', () => {
 
   it('creates one row per completed keyword, in order', () => {
     const rows = buildArchiveMappingRows(completed, archived, [], 'ARCHIVED');
-    expect(rows.map((r) => r.source)).toEqual(['DONE', 'CANCELLED', 'WAIT-DONE']);
+    expect(rows.map((r) => r.source)).toEqual([
+      'DONE',
+      'CANCELLED',
+      'WAIT-DONE',
+    ]);
   });
 
   it('carries over stored mapping enabled/target when present', () => {
@@ -17,9 +21,22 @@ describe('buildArchiveMappingRows', () => {
       { source: 'DONE', enabled: true, target: 'ARCHIVED' },
       { source: 'CANCELLED', enabled: false, target: 'ARCHIVED' },
     ];
-    const rows = buildArchiveMappingRows(completed, archived, stored, 'ARCHIVED');
-    expect(rows[0]).toMatchObject({ source: 'DONE', enabled: true, target: 'ARCHIVED' });
-    expect(rows[1]).toMatchObject({ source: 'CANCELLED', enabled: false, target: 'ARCHIVED' });
+    const rows = buildArchiveMappingRows(
+      completed,
+      archived,
+      stored,
+      'ARCHIVED',
+    );
+    expect(rows[0]).toMatchObject({
+      source: 'DONE',
+      enabled: true,
+      target: 'ARCHIVED',
+    });
+    expect(rows[1]).toMatchObject({
+      source: 'CANCELLED',
+      enabled: false,
+      target: 'ARCHIVED',
+    });
   });
 
   it('defaults unmapped sources to disabled with the default target', () => {
@@ -43,7 +60,12 @@ describe('buildArchiveMappingRows', () => {
 
   it('flags stored targets that are no longer valid archived keywords', () => {
     const stored = [{ source: 'DONE', enabled: true, target: 'OBSOLETE' }];
-    const rows = buildArchiveMappingRows(['DONE'], archived, stored, 'ARCHIVED');
+    const rows = buildArchiveMappingRows(
+      ['DONE'],
+      archived,
+      stored,
+      'ARCHIVED',
+    );
     expect(rows[0].targetInvalid).toBe(true);
     expect(rows[0].target).toBe('OBSOLETE'); // untouched until the user changes it
     expect(rows[0].validTargets).toEqual(['ARCHIVED']);
@@ -51,7 +73,12 @@ describe('buildArchiveMappingRows', () => {
 
   it('does not flag valid stored targets', () => {
     const stored = [{ source: 'DONE', enabled: true, target: 'ARCHIVED' }];
-    const rows = buildArchiveMappingRows(['DONE'], archived, stored, 'ARCHIVED');
+    const rows = buildArchiveMappingRows(
+      ['DONE'],
+      archived,
+      stored,
+      'ARCHIVED',
+    );
     expect(rows[0].targetInvalid).toBe(false);
   });
 
@@ -60,7 +87,12 @@ describe('buildArchiveMappingRows', () => {
       { source: 'DONE', enabled: true, target: 'ARCHIVED' },
       { source: 'DONE', enabled: false, target: 'ARCHIVED' },
     ];
-    const rows = buildArchiveMappingRows(['DONE'], archived, stored, 'ARCHIVED');
+    const rows = buildArchiveMappingRows(
+      ['DONE'],
+      archived,
+      stored,
+      'ARCHIVED',
+    );
     expect(rows).toHaveLength(1);
     expect(rows[0].enabled).toBe(true);
   });
@@ -77,7 +109,9 @@ describe('buildArchiveMappingRows', () => {
 
   it('handles empty inputs', () => {
     expect(buildArchiveMappingRows([], archived, [], 'ARCHIVED')).toEqual([]);
-    expect(buildArchiveMappingRows(completed, [], [], 'ARCHIVED')).toHaveLength(3);
+    expect(buildArchiveMappingRows(completed, [], [], 'ARCHIVED')).toHaveLength(
+      3,
+    );
   });
 });
 
