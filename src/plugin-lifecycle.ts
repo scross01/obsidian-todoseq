@@ -1,4 +1,6 @@
 import TodoTracker from './main';
+import { TFile } from 'obsidian';
+import { ArchiveDialog } from './view/components/archive-dialog';
 import { VaultScanner } from './services/vault-scanner';
 import { SmartDateProcessor } from './services/smart-date-processor';
 import { TaskWriter } from './services/task-writer';
@@ -471,6 +473,31 @@ export class PluginLifecycleManager {
       },
     });
 
+    // Add command to open the archive preview dialog
+    this.plugin.addCommand({
+      id: 'archive-completed-tasks',
+      name: 'Archive completed tasks',
+      icon: 'archive',
+      callback: () => {
+        this.openArchiveDialog();
+      },
+    });
+
+    // Add command to undo the most recent archive run (session-scoped)
+    this.plugin.addCommand({
+      id: 'archive-undo-last-run',
+      name: 'Undo last archive run',
+      icon: 'undo-2',
+      checkCallback: (checking: boolean) => {
+        const service = this.plugin.archiveService;
+        if (!service?.hasUndoableRun()) return false;
+        if (!checking) {
+          void this.performArchiveUndo();
+        }
+        return true;
+      },
+    });
+
     // Listen to VaultScanner events for task updates
     // Note: TaskListView now subscribes directly to TaskStateManager,
     // but we still refresh UI components that need updates
@@ -654,5 +681,82 @@ export class PluginLifecycleManager {
    */
   private async saveSettings(): Promise<void> {
     await this.plugin.saveSettings();
+  }
+
+  /**
+   * Open the Auto-Archive preview dialog. Shared by the command and the
+   * settings entry point so both stay consistent.
+   */
+  private openArchiveDialog(): void {
+    const service = this.plugin.archiveService;
+    const scanner = this.plugin.vaultScanner;
+    const { taskStateManager, taskUpdateCoordinator, keywordManager } =
+      this.plugin;
+    if (
+      !service ||
+      !scanner ||
+      !taskStateManager ||
+      !taskUpdateCoordinator ||
+      !keywordManager
+    ) {
+      new Notice(
+        'Archive service is not ready yet. Try again after the vault scan completes.',
+      );
+      return;
+    }
+    const dialog = new ArchiveDialog(
+      {
+        settings: this.plugin.settings,
+        taskStateManager,
+        taskUpdateCoordinator,
+        archiveService: service,
+        keywordManager,
+        vaultScanner: scanner,
+        saveSettings: () => this.plugin.saveSettings(),
+        scanVault: () => this.plugin.scanVault(),
+        app: this.plugin.app,
+      },
+      scanner.getKeywordManager(),
+    );
+    dialog.open();
+  }
+
+  /**
+   * Revert the most recent archive run (session undo). Each journal record
+   * is verified against the current file line before reverting; changed or
+   * missing lines are skipped and reported. Shared by the undo command and
+   * the auto-run completion notice (plan 013) so the flows cannot drift.
+   */
+  private async performArchiveUndo(): Promise<void> {
+    const service = this.plugin.archiveService;
+    const coordinator = this.plugin.taskUpdateCoordinator;
+    if (!service || !coordinator) return;
+
+    try {
+      const outcome = await service.undoLastRun({
+        getRawLine: async (path, line) => {
+          const file = this.plugin.app.vault.getAbstractFileByPath(path);
+          if (!(file instanceof TFile)) return null;
+          const content = await this.plugin.app.vault.cachedRead(file);
+          return content.split('\n')[line] ?? null;
+        },
+        apply: async (task, originalState) => {
+          await coordinator.updateTaskState(task, originalState, 'task-list');
+        },
+      });
+
+      new Notice(
+        `Restored ${outcome.reverted.length} task${
+          outcome.reverted.length === 1 ? '' : 's'
+        }` +
+          (outcome.skipped.length > 0
+            ? `, skipped ${outcome.skipped.length} (changed since archive)`
+            : ''),
+      );
+      await this.plugin.scanVault();
+    } catch (error) {
+      console.debug('TODOseq: archive undo failed:', error);
+      new Notice('Undo failed. See console for details.');
+    }
   }
 }
