@@ -380,6 +380,19 @@ export class ArchiveDialog {
     if (!this.previewCountEl || !this.previewListEl) return;
 
     const matches = this.evaluateMatches();
+
+    // Default inclusion: every match is included. Newly-matching tasks (e.g.
+    // after a criteria change) are added; tasks that stopped matching are
+    // dropped so a stale exclusion can't silently include a no-longer-valid
+    // task. User exclusions persist across preview refreshes.
+    const matchKeys = new Set(matches.map((m) => `${m.path}:${m.line}`));
+    for (const key of matchKeys) {
+      this.includedPaths.add(key);
+    }
+    for (const key of Array.from(this.includedPaths)) {
+      if (!matchKeys.has(key)) this.includedPaths.delete(key);
+    }
+
     const included = matches.filter((m) =>
       this.includedPaths.has(`${m.path}:${m.line}`),
     );

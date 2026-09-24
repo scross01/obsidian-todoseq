@@ -741,8 +741,39 @@ export class PluginLifecycleManager {
           const content = await this.plugin.app.vault.cachedRead(file);
           return content.split('\n')[line] ?? null;
         },
-        apply: async (task, originalState) => {
-          await coordinator.updateTaskState(task, originalState, 'task-list');
+        apply: async (minimalTask, originalState) => {
+          // The service passes a minimal Task (path/line/rawText/state).
+          // TaskWriter.generateTaskLine needs the full shape (indent,
+          // listMarker, text, priority, …) or it corrupts the line — re-parse
+          // the archived line into a faithful Task via the file's parser.
+          const extension = minimalTask.path.includes('.')
+            ? `.${minimalTask.path.split('.').pop()?.toLowerCase()}`
+            : '.md';
+          const parser = this.plugin.vaultScanner
+            ?.getParserRegistry()
+            .getParserForExtension(extension);
+          const fullTask = parser
+            ? parser.parseLine(
+                minimalTask.rawText,
+                minimalTask.line,
+                minimalTask.path,
+              )
+            : null;
+          if (!fullTask) {
+            console.debug(
+              'TODOseq: archive undo could not re-parse line, skipping:',
+              minimalTask.path,
+              minimalTask.line,
+            );
+            throw new Error(
+              `Undo could not re-parse ${minimalTask.path}:${minimalTask.line}`,
+            );
+          }
+          await coordinator.updateTaskState(
+            fullTask,
+            originalState,
+            'task-list',
+          );
         },
       });
 
