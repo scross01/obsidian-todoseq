@@ -72,7 +72,10 @@ export interface UndoDeps {
   /** Current raw line content at path:line, or null when the line/file is gone. */
   getRawLine: (path: string, line: number) => Promise<string | null>;
   /** Perform the revert write with the original keyword. */
-  apply: (task: import('../types/task').Task, originalState: string) => Promise<void>;
+  apply: (
+    task: import('../types/task').Task,
+    originalState: string,
+  ) => Promise<void>;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -253,7 +256,10 @@ export class ArchiveService {
    * with rawTextBefore length sanity, this is the agreed verification
    * level — full line-shape comparison is deliberately not attempted.
    */
-  private lineStillArchived(rawLine: string, record: ArchivedTaskRecord): boolean {
+  private lineStillArchived(
+    rawLine: string,
+    record: ArchivedTaskRecord,
+  ): boolean {
     // The target keyword must appear as a standalone token on the line.
     const pattern = new RegExp(
       `(^|\\s|\\[|\\*)${this.escapeRegExp(record.target)}(\\s|\\]|$)`,
