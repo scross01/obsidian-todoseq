@@ -1,4 +1,5 @@
 import { KeywordManager } from '../utils/keyword-manager';
+import { RegexCache } from '../utils/regex-cache';
 import {
   ArchiveStateMapping,
   TaskArchiveSettings,
@@ -119,6 +120,8 @@ function parseIsoDateLocal(iso: string): Date | null {
 export class ArchiveService {
   private lastRun: ArchivedTaskRecord[] = [];
   private running = false;
+  /** Cached compiled patterns for lineStillArchived — targets repeat across journal records. */
+  private readonly linePatternCache = new RegexCache();
 
   constructor(
     private readonly keywordManager: KeywordManager,
@@ -261,7 +264,8 @@ export class ArchiveService {
     record: ArchivedTaskRecord,
   ): boolean {
     // The target keyword must appear as a standalone token on the line.
-    const pattern = new RegExp(
+    // Cached: the same target pattern repeats for every record of a run.
+    const pattern = this.linePatternCache.get(
       `(^|\\s|\\[|\\*)${this.escapeRegExp(record.target)}(\\s|\\]|$)`,
     );
     if (!pattern.test(rawLine)) return false;
