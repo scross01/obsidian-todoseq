@@ -17,6 +17,7 @@ import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
+import { ArchiveService } from './services/archive-service';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 import {
   smartDatePlugin,
@@ -116,6 +117,15 @@ export class PluginLifecycleManager {
       this.plugin.taskStateManager,
       this.plugin.keywordManager,
       this.plugin.changeTracker,
+    );
+
+    // Initialize archive service (Auto-Archive engine) — reads the shared
+    // KeywordManager for group validation; settings live under
+    // settings.taskArchive. Constructed after the coordinator because apply
+    // wiring delegates writes to it.
+    this.plugin.archiveService = new ArchiveService(
+      this.plugin.keywordManager,
+      this.plugin.settings.taskArchive,
     );
 
     // Initialize embedded task list processor
