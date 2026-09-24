@@ -706,3 +706,104 @@ describe('ArchiveService.undoLastRun', () => {
     expect(service.hasUndoableRun()).toBe(false);
   });
 });
+
+describe('ArchiveService batch performance (stress)', () => {
+  /**
+   * Vault-scale guard: 5000 matches must flow through evaluate → apply →
+   * undo in linear time. Bounds are deliberately generous (a linear
+   * implementation lands in the tens of milliseconds; these fail only on
+   * accidental O(n²) behavior, e.g. per-match journal array copies or
+   * unbounded regex recompilation).
+   *
+   * Uses performance.now() (not Date.now()) per the AGENTS.md test rule.
+   */
+  const STRESS_SIZE = 5000;
+  const APPLY_BUDGET_MS = 5000;
+  const UNDO_BUDGET_MS = 5000;
+
+  function buildStressTasks(): ArchiveCandidate[] {
+    const tasks: ArchiveCandidate[] = [];
+    for (let i = 0; i < STRESS_SIZE; i++) {
+      tasks.push({
+        path: `notes/stress-${i % 50}.md`, // spread across 50 files
+        line: 10 + i,
+        rawText: `- [x] DONE stress task ${i} lorem ipsum`,
+        state: 'DONE',
+        closedDate: daysBefore(REFERENCE, 100 + (i % 30)),
+      });
+    }
+    return tasks;
+  }
+
+  it(`applies ${STRESS_SIZE} matches within ${APPLY_BUDGET_MS}ms (linear, no O(n²))`, async () => {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const tasks = buildStressTasks();
+    const matches = service.evaluateArchiveCriteria(
+      tasks,
+      makeConfig(),
+      REFERENCE,
+    );
+    expect(matches).toHaveLength(STRESS_SIZE);
+
+    // Identity-store getTask: Map lookup per match, no per-call allocation.
+    const store = new Map<string, ArchiveCandidate>();
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    let applyCount = 0;
+
+    const start = performance.now();
+    const result = await service.applyArchives(matches, {
+      getTask: (path, line) => store.get(`${path}:${line}`) ?? null,
+      apply: async () => {
+        applyCount += 1;
+      },
+    });
+    const elapsed = performance.now() - start;
+
+    expect(applyCount).toBe(STRESS_SIZE);
+    expect(result.archived).toHaveLength(STRESS_SIZE);
+    expect(result.skipped).toHaveLength(0);
+    expect(elapsed).toBeLessThan(APPLY_BUDGET_MS);
+  });
+
+  it(`undoes a ${STRESS_SIZE}-record journal within ${UNDO_BUDGET_MS}ms with cached patterns`, async () => {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const tasks = buildStressTasks();
+    const matches = service.evaluateArchiveCriteria(
+      tasks,
+      makeConfig(),
+      REFERENCE,
+    );
+    const store = new Map<string, ArchiveCandidate>();
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    const applyResult = await service.applyArchives(matches, {
+      getTask: (path, line) => store.get(`${path}:${line}`) ?? null,
+      apply: async () => undefined,
+    });
+
+    // Simulate post-archive file content: one archived line per record,
+    // derived from the journal the run produced (path:line → archived line).
+    const archivedLines = new Map<string, string>();
+    applyResult.archived.forEach((record) => {
+      archivedLines.set(
+        `${record.path}:${record.line}`,
+        record.rawTextBefore.replace(' DONE ', ' ARCHIVED '),
+      );
+    });
+    let undoApplyCount = 0;
+
+    const start = performance.now();
+    const outcome = await service.undoLastRun({
+      getRawLine: async (path, line) =>
+        archivedLines.get(`${path}:${line}`) ?? null,
+      apply: async () => {
+        undoApplyCount += 1;
+      },
+    });
+    const elapsed = performance.now() - start;
+
+    expect(undoApplyCount).toBe(STRESS_SIZE);
+    expect(outcome.reverted).toHaveLength(STRESS_SIZE);
+    expect(outcome.skipped).toHaveLength(0);
+    expect(elapsed).toBeLessThan(UNDO_BUDGET_MS);
+  });
+});
