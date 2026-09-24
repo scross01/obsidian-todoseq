@@ -5,7 +5,12 @@ import {
   Notice,
   DropdownComponent,
   SettingDefinitionItem,
+  SettingDefinitionGroup,
 } from 'obsidian';
+import {
+  buildArchiveMappingRows,
+  toStateMappings,
+} from '../view/components/archive-dialog';
 import TodoTracker from '../main';
 import { TaskParser } from '../parser/task-parser';
 import {
@@ -670,6 +675,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           },
         ],
       },
+      this.buildAutoArchiveGroup(),
       {
         type: 'group',
         heading: 'Warning period',
@@ -747,6 +753,135 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         ],
       },
     ];
+  }
+
+  /**
+   * Build the Auto-archive settings group. All controls write into the
+   * nested settings.taskArchive block via custom render items — the
+   * declarative control keys resolve top-level settings properties only.
+   */
+  private buildAutoArchiveGroup(): SettingDefinitionGroup {
+    const archive = () => this.plugin.settings.taskArchive;
+
+    const persist = async (mutate: () => void) => {
+      mutate();
+      await this.plugin.saveSettings();
+    };
+
+    return {
+      type: 'group',
+      heading: 'Auto-archive completed tasks',
+      items: [
+        {
+          name: 'Enable automatic archiving',
+          desc: 'When enabled, tasks whose closed date is older than the threshold below are moved to their mapped archived state every time the vault is scanned (including at startup). Off by default.',
+          render: (setting) => {
+            setting.addToggle((toggle) => {
+              toggle.setValue(archive().autoArchiveEnabled).onChange(
+                (value) =>
+                  void persist(() => {
+                    archive().autoArchiveEnabled = value;
+                  }),
+              );
+            });
+          },
+        },
+        {
+          name: 'Archive threshold (days)',
+          desc: 'Tasks closed at least this many days ago match. Drives automatic runs and the dialog default.',
+          render: (setting) => {
+            setting.addText((text) => {
+              text.inputEl.type = 'number';
+              text.inputEl.min = '1';
+              text.inputEl.max = '3650';
+              text
+                .setValue(String(archive().criterionDays))
+                .onChange((value) => {
+                  const parsed = Number.parseInt(value, 10);
+                  if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 3650) {
+                    void persist(() => {
+                      archive().criterionDays = parsed;
+                    });
+                  }
+                });
+            });
+          },
+        },
+        {
+          name: 'Archive info',
+          desc: 'Tasks without a closed date are never archived. Enable "Track closed date" above so new completions get one. Map each completed state to an archived state below — targets come from the Archived keywords in the General section.',
+          render: (setting) => {
+            hideSettingNameAndControl(setting);
+          },
+        },
+        {
+          name: 'State mappings',
+          desc: 'Choose which completed states archive to which archived states.',
+          render: (setting, group) => {
+            const keywordManager = this.plugin.keywordManager;
+            const completed =
+              keywordManager.getKeywordsForGroup('completedKeywords');
+            const archived =
+              keywordManager.getKeywordsForGroup('archivedKeywords');
+            const rows = buildArchiveMappingRows(
+              completed,
+              archived,
+              archive().stateMappings,
+              archived[0] ?? 'ARCHIVED',
+            );
+
+            for (const row of rows) {
+              group.addSetting((rowSetting) => {
+                rowSetting.setName(`${row.source} \u2192`);
+                if (row.targetInvalid) {
+                  rowSetting.setDesc(
+                    `Target "${row.target}" is not a valid archived keyword. Add it under Archived keywords or pick another.`,
+                  );
+                }
+                rowSetting.addToggle((toggle) => {
+                  toggle.setValue(row.enabled).onChange(
+                    (value) =>
+                      void persist(() => {
+                        row.enabled = value;
+                        archive().stateMappings = toStateMappings(rows);
+                      }),
+                  );
+                });
+                rowSetting.addDropdown((dropdown) => {
+                  for (const target of row.validTargets) {
+                    dropdown.addOption(target, target);
+                  }
+                  if (row.targetInvalid) {
+                    dropdown.addOption(row.target, `${row.target} (invalid)`);
+                  }
+                  dropdown.setValue(row.target).onChange(
+                    (value) =>
+                      void persist(() => {
+                        row.target = value;
+                        archive().stateMappings = toStateMappings(rows);
+                      }),
+                  );
+                });
+              });
+            }
+          },
+        },
+        {
+          name: 'Preview and archive',
+          desc: 'Open the archive dialog to preview matching tasks, exclude specific ones, and run the archive now.',
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText('Preview and archive\u2026')
+                .setCta()
+                .onClick(() => {
+                  this.plugin.lifecycleManager.openArchiveDialog();
+                }),
+            );
+          },
+        },
+      ],
+    };
   }
 
   /**

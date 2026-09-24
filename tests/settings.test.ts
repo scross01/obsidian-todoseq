@@ -747,7 +747,7 @@ describe('TodoTrackerSettingTab', () => {
         ? (def as { control: Record<string, unknown> }).control
         : undefined;
 
-    it('returns formatTaskKeywords first and exactly 7 groups with expected headings', () => {
+    it('returns formatTaskKeywords first and exactly 8 groups with expected headings', () => {
       const defs = settingTab.getSettingDefinitions();
 
       expect(defs[0]).toMatchObject({
@@ -758,13 +758,14 @@ describe('TodoTrackerSettingTab', () => {
       const groups = defs.filter((d): d is GroupDef => {
         return 'type' in d && d.type === 'group';
       });
-      expect(groups).toHaveLength(7);
+      expect(groups).toHaveLength(8);
       expect(groups.map((g) => g.heading)).toEqual([
         'Task detection',
         'Smart date recognition',
         'Task list search and filter',
         'Task keywords',
         'Task state transitions',
+        'Auto-archive completed tasks',
         'Warning period',
         '⚠︎ Experimental features',
       ]);

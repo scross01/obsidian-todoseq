@@ -684,10 +684,11 @@ export class PluginLifecycleManager {
   }
 
   /**
-   * Open the Auto-Archive preview dialog. Shared by the command and the
-   * settings entry point so both stay consistent.
+   * Open the Auto-Archive preview dialog. Shared by the command, the
+   * settings entry point, and (in plan 013) nowhere else — the auto-run
+   * never opens a dialog.
    */
-  private openArchiveDialog(): void {
+  openArchiveDialog(): void {
     const service = this.plugin.archiveService;
     const scanner = this.plugin.vaultScanner;
     const { taskStateManager, taskUpdateCoordinator, keywordManager } =
@@ -727,7 +728,7 @@ export class PluginLifecycleManager {
    * missing lines are skipped and reported. Shared by the undo command and
    * the auto-run completion notice (plan 013) so the flows cannot drift.
    */
-  private async performArchiveUndo(): Promise<void> {
+  async performArchiveUndo(): Promise<void> {
     const service = this.plugin.archiveService;
     const coordinator = this.plugin.taskUpdateCoordinator;
     if (!service || !coordinator) return;
