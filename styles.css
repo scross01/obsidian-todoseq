@@ -2505,6 +2505,13 @@
  * higher specificity than a bare class, so both rules are scoped under
  * `.notice` to win the cascade. Message and action share ONE flex row with
  * a real gap; the button is compact and accent-filled, quiet until hovered.
+ *
+ * Mobile: Obsidian's base `button` rule sets `height: var(--input-height)`,
+ * and `.is-mobile` redefines that var to 44px — a padded-but-unheighted
+ * button renders as a tall slab next to the message. Declare the height
+ * explicitly (auto) so padding decides, match the phone notice's smaller
+ * type, and let long messages wrap the button onto its own row instead of
+ * squeezing the text.
  */
 
 .notice .todoseq-notice-actions {
@@ -2519,6 +2526,7 @@
 
 .notice .todoseq-notice-action-btn {
   flex-shrink: 0;
+  height: auto;
   padding: var(--size-2-1) var(--size-4-2);
   border: none;
   border-radius: var(--radius-s);
@@ -2531,6 +2539,20 @@
   transition:
     background 120ms ease-out,
     box-shadow 120ms ease-out;
+}
+
+.is-mobile .notice .todoseq-notice-action-btn {
+  font-size: var(--font-ui-smaller);
+  padding: var(--size-2-2) var(--size-4-3);
+}
+
+.is-phone .notice .todoseq-notice-actions {
+  flex-wrap: wrap;
+  row-gap: var(--size-2-2);
+}
+
+.is-phone .notice .todoseq-notice-message {
+  min-width: 0;
 }
 
 .notice .todoseq-notice-action-btn:hover {
@@ -2784,6 +2806,42 @@
 
 /* Mobile: full-width centered dialog with larger touch targets. The preview
    grows instead of nesting a second scroll container — only the modal scrolls. */
+/*
+ * Settings: auto-archive mapping rows on mobile.
+ * Each mapping row is a declarative setting item carrying a toggle AND a
+ * target dropdown. Obsidian's phone rules only stack rows whose class list
+ * is NOT .mod-toggle (stamped by addToggle), so these rows keep the two-
+ * column name|controls layout and the dropdown gets crushed to a stub that
+ * truncates ARCHIVED → "ARC…". Re-layout here: name and description take
+ * the full width; toggle + dropdown share a full-width controls row below
+ * with a generous touch target.
+ */
+
+.is-mobile .setting-item.todoseq-archive-mapping-item {
+  flex-wrap: wrap;
+}
+
+.is-mobile .setting-item.todoseq-archive-mapping-item .setting-item-info {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.is-mobile .setting-item.todoseq-archive-mapping-item .setting-item-control {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--size-4-3);
+}
+
+.is-mobile
+  .setting-item.todoseq-archive-mapping-item
+  .setting-item-control
+  select {
+  flex: 1 1 auto;
+  min-width: 14ch;
+}
+
 .is-mobile .todoseq-archive-modal {
   width: 92vw;
   min-width: 0;

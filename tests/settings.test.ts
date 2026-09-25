@@ -8,6 +8,7 @@ import { createBaseSettings } from './helpers/test-helper';
 import { DefaultSettings } from '../src/settings/settings-types';
 import { SUPPORTED_EXTENSIONS } from '../src/parser/code-comment-task-parser';
 import type { SettingDefinitionItem } from 'obsidian';
+import { Setting } from 'obsidian';
 
 // Mock obsidian
 jest.mock('obsidian', () => ({
@@ -95,13 +96,18 @@ jest.mock('obsidian', () => ({
       return this;
     }
 
+    private settingElCache: HTMLElement | null = null;
+
     get settingEl(): HTMLElement {
-      const el = activeDocument.createElement('div');
-      el.className = 'setting-item';
-      const info = activeDocument.createElement('div');
-      info.className = 'setting-item-info';
-      el.appendChild(info);
-      return el;
+      if (!this.settingElCache) {
+        const el = activeDocument.createElement('div');
+        el.className = 'setting-item';
+        const info = activeDocument.createElement('div');
+        info.className = 'setting-item-info';
+        el.appendChild(info);
+        this.settingElCache = el;
+      }
+      return this.settingElCache;
     }
   },
   App: jest.fn(),
@@ -1062,6 +1068,63 @@ describe('TodoTrackerSettingTab', () => {
       expect(dropdown.setValue).toHaveBeenCalledWith('DONE');
       expect(settings.stateTransitions.defaultCompleted).toBe('DONE');
       expect(pluginMock.saveSettings as jest.Mock).toHaveBeenCalledTimes(1);
+    });
+
+    describe('auto-archive mapping rows (mobile layout hook)', () => {
+      it('every mapping row carries the todoseq-archive-mapping-item class so mobile CSS can stack its controls', () => {
+        const defs = settingTab.getSettingDefinitions();
+        const group = defs.find(
+          (d): d is GroupDef =>
+            'type' in d &&
+            d.type === 'group' &&
+            d.heading === 'Auto-archive completed tasks',
+        );
+        expect(group).toBeDefined();
+
+        const sourceNames = ['DONE →', 'CANCELED →', 'CANCELLED →'];
+        const mappingDefs = group!.items.filter(
+          (item) => 'name' in item && sourceNames.includes(item.name),
+        );
+        expect(mappingDefs).toHaveLength(3);
+
+        for (const def of mappingDefs) {
+          const defWithRender = def as {
+            render?: (s: Setting) => void;
+            name: string;
+          };
+          const render = defWithRender.render;
+          expect(typeof render).toBe('function');
+
+          const setting = new Setting();
+          render!(setting);
+          expect(setting.settingEl.classList).toContain(
+            'todoseq-archive-mapping-item',
+          );
+        }
+      });
+
+      it('non-mapping items in the group do not carry the mapping-row class', () => {
+        const defs = settingTab.getSettingDefinitions();
+        const group = defs.find(
+          (d): d is GroupDef =>
+            'type' in d &&
+            d.type === 'group' &&
+            d.heading === 'Auto-archive completed tasks',
+        );
+        expect(group).toBeDefined();
+
+        const enableDef = group!.items.find(
+          (item) =>
+            'name' in item && item.name === 'Enable automatic archiving',
+        ) as { render?: (s: Setting) => void } | undefined;
+        expect(enableDef).toBeDefined();
+
+        const setting = new Setting();
+        enableDef!.render!(setting);
+        expect(setting.settingEl.classList).not.toContain(
+          'todoseq-archive-mapping-item',
+        );
+      });
     });
   });
 });

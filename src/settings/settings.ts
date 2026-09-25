@@ -785,6 +785,13 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             ? `Target "${target}" is not a valid archived keyword. Add it under Archived keywords (General) or pick another.`
             : `Archive ${source} tasks as ${target}.`,
           render: (setting: Setting) => {
+            // Mobile layout hook: Obsidian's phone rules only stack setting
+            // rows whose class list does NOT include mod-toggle, and
+            // addToggle() stamps exactly that class. This explicit hook lets
+            // styles.css re-layout the controls on narrow screens (the name
+            // column otherwise crushes the target dropdown to a stub that
+            // truncates ARCHIVED → "ARC…").
+            setting.settingEl.addClass('todoseq-archive-mapping-item');
             setting.addToggle((toggle) => {
               toggle.setValue(stored?.enabled ?? false).onChange(
                 (value) =>
