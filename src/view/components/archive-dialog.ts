@@ -121,6 +121,29 @@ export function toStateMappings(
   }));
 }
 
+/**
+ * Merge dialog rows into the stored mappings WITHOUT dropping concurrent
+ * writes for sources the dialog does not render (bugfix: the previous
+ * whole-array replacement wiped settings-tab toggle changes made while the
+ * dialog was open — the two surfaces are simultaneous writers because the
+ * dialog opens from the settings tab).
+ *
+ * - For every source present in `rows`, the dialog's value wins (the user
+ *   just changed it there).
+ * - Stored entries for unrendered sources pass through untouched (both
+ *   known-but-unrendered keywords and legacy entries for removed keywords).
+ *
+ * Pure: returns a new array; the caller assigns it.
+ */
+export function mergeMappingRowsIntoStored(
+  rows: ArchiveMappingRow[],
+  stored: ArchiveStateMapping[],
+): ArchiveStateMapping[] {
+  const rowSources = new Set(rows.map((row) => row.source));
+  const passthrough = stored.filter((m) => !rowSources.has(m.source));
+  return [...passthrough, ...toStateMappings(rows)];
+}
+
 /** Render cap for the preview list — beyond this, show a muted "N more" footer. */
 const PREVIEW_RENDER_LIMIT = 200;
 
@@ -506,7 +529,13 @@ export class ArchiveDialog {
   }
 
   private async persistMappings(): Promise<void> {
-    this.plugin.settings.taskArchive.stateMappings = toStateMappings(this.rows);
+    // Merge, don't replace: the settings tab is a simultaneous writer (the
+    // dialog opens from it), so a whole-array write would clobber toggle
+    // changes made there while this dialog is open.
+    this.plugin.settings.taskArchive.stateMappings = mergeMappingRowsIntoStored(
+      this.rows,
+      this.plugin.settings.taskArchive.stateMappings,
+    );
     await this.plugin.saveSettings();
     this.refreshPreview();
   }

@@ -1,5 +1,6 @@
 import {
   buildArchiveMappingRows,
+  mergeMappingRowsIntoStored,
   toStateMappings,
 } from '../src/view/components/archive-dialog';
 
@@ -140,5 +141,71 @@ describe('toStateMappings', () => {
     expect(toStateMappings(rows)).toEqual([
       { source: 'DONE', enabled: true, target: 'OBSOLETE' },
     ]);
+  });
+});
+
+describe('mergeMappingRowsIntoStored', () => {
+  it('applies dialog rows for sources the dialog shows', () => {
+    const stored = [
+      { source: 'DONE', enabled: true, target: 'ARCHIVED' },
+      { source: 'CANCELLED', enabled: false, target: 'ARCHIVED' },
+    ];
+    const rows = buildArchiveMappingRows(
+      ['DONE'],
+      ['ARCHIVED'],
+      [{ source: 'DONE', enabled: false, target: 'ARCHIVED' }],
+      'ARCHIVED',
+    );
+    const merged = mergeMappingRowsIntoStored(rows, stored);
+    expect(merged.find((m) => m.source === 'DONE')?.enabled).toBe(false);
+    // Sources the dialog does not render survive untouched.
+    expect(merged.find((m) => m.source === 'CANCELLED')).toEqual({
+      source: 'CANCELLED',
+      enabled: false,
+      target: 'ARCHIVED',
+    });
+  });
+
+  it('preserves stored entries for sources NOT in the dialog rows (the lost-update fix)', () => {
+    // Settings tab added CANCELLED while the dialog was open; the dialog's
+    // rows predate that and only know about DONE. The merge must NOT drop
+    // the concurrent write.
+    const stored = [
+      { source: 'DONE', enabled: true, target: 'ARCHIVED' },
+      { source: 'CANCELLED', enabled: true, target: 'ARCHIVED' },
+    ];
+    const rows = buildArchiveMappingRows(
+      ['DONE'],
+      ['ARCHIVED'],
+      [{ source: 'DONE', enabled: false, target: 'ARCHIVED' }],
+      'ARCHIVED',
+    );
+    const merged = mergeMappingRowsIntoStored(rows, stored);
+    expect(merged.map((m) => m.source).sort()).toEqual(['CANCELLED', 'DONE']);
+    expect(merged.find((m) => m.source === 'CANCELLED')?.enabled).toBe(true);
+  });
+
+  it('keeps unknown stored entries (e.g. rows for removed keywords) and appends genuinely new dialog rows', () => {
+    const stored = [{ source: 'REMOVED', enabled: false, target: 'ARCHIVED' }];
+    const rows = buildArchiveMappingRows(
+      ['DONE', 'SHIPPED'],
+      ['ARCHIVED'],
+      [],
+      'ARCHIVED',
+    );
+    const merged = mergeMappingRowsIntoStored(rows, stored);
+    const bySource = new Map(merged.map((m) => [m.source, m]));
+    // Removed keyword's entry persists (rows for removed keywords are kept).
+    expect(bySource.get('REMOVED')).toEqual({
+      source: 'REMOVED',
+      enabled: false,
+      target: 'ARCHIVED',
+    });
+    // Fresh dialog rows land.
+    expect(bySource.get('SHIPPED')).toEqual({
+      source: 'SHIPPED',
+      enabled: false,
+      target: 'ARCHIVED',
+    });
   });
 });
