@@ -43,6 +43,13 @@ export interface ArchivedTaskRecord {
   target: string;
   /** rawText before the run — undo verifies the line is unchanged before reverting. */
   rawTextBefore: string;
+  /**
+   * Full Task snapshot captured at apply time. Undo re-applies THIS object
+   * (with current line content + archived state) rather than reconstructing
+   * a Task — reconstruction cannot restore table-cell identity or parser-
+   * derived fields (`isTableTask`, `tableCell`, `indent`, `listMarker`, …).
+   */
+  taskSnapshot: import('../types/task').Task;
 }
 
 export interface ArchiveRunResult {
@@ -54,6 +61,10 @@ export interface UndoOutcome {
   reverted: ArchivedTaskRecord[];
   skipped: { record: ArchivedTaskRecord; reason: string }[];
 }
+
+/** Reasons a journal record could not be undone. */
+export type UndoSkipReason =
+  'line-missing' | 'line-changed' | 'unparseable' | 'apply-failed';
 
 /** Dependencies applyArchives/undoLastRun need, supplied by the wiring layer. */
 export interface ApplyArchiveDeps {
@@ -201,13 +212,18 @@ export class ArchiveService {
           skipped.push({ path: match.path, line: match.line, reason: 'stale' });
           continue;
         }
-        await deps.apply(current as import('../types/task').Task, match.target);
+        const fullTask = current as import('../types/task').Task;
+        await deps.apply(fullTask, match.target);
         archived.push({
           path: match.path,
           line: match.line,
           originalState: match.state,
           target: match.target,
           rawTextBefore: current.rawText,
+          // Snapshot BEFORE the write mutated anything that aliases the
+          // manager's task object (defensive copy — the coordinator may
+          // mutate or replace tasks in place).
+          taskSnapshot: { ...fullTask },
         });
       }
     } finally {
@@ -238,16 +254,33 @@ export class ArchiveService {
         skipped.push({ record, reason: 'line-changed' });
         continue;
       }
-      // Reconstruct a minimal Task: the wiring layer's apply performs the
-      // state rewrite through TaskWriter.generateTaskLine, which needs
-      // path/line/rawText/state to regenerate the line correctly.
-      const task = {
-        path: record.path,
-        line: record.line,
+      if (!record.taskSnapshot) {
+        // Legacy/foreign journal entry without a snapshot: reconstruction is
+        // not safe (loses table identity and parser-derived fields), so skip
+        // rather than corrupt the line.
+        skipped.push({ record, reason: 'unparseable' });
+        continue;
+      }
+      // Re-apply the journaled snapshot with the CURRENT line content and
+      // the archived state — TaskWriter regenerates the line from a shape it
+      // originally produced, including table-cell tasks.
+      const task: import('../types/task').Task = {
+        ...record.taskSnapshot,
         rawText: rawLine,
         state: record.target,
-      } as import('../types/task').Task;
-      await deps.apply(task, record.originalState);
+      };
+      try {
+        await deps.apply(task, record.originalState);
+      } catch (error) {
+        console.debug(
+          'TODOseq: archive undo apply failed for',
+          record.path,
+          record.line,
+          error,
+        );
+        skipped.push({ record, reason: 'apply-failed' });
+        continue;
+      }
       reverted.push(record);
     }
     return { reverted, skipped };

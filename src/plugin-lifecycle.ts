@@ -741,39 +741,12 @@ export class PluginLifecycleManager {
           const content = await this.plugin.app.vault.cachedRead(file);
           return content.split('\n')[line] ?? null;
         },
-        apply: async (minimalTask, originalState) => {
-          // The service passes a minimal Task (path/line/rawText/state).
-          // TaskWriter.generateTaskLine needs the full shape (indent,
-          // listMarker, text, priority, …) or it corrupts the line — re-parse
-          // the archived line into a faithful Task via the file's parser.
-          const extension = minimalTask.path.includes('.')
-            ? `.${minimalTask.path.split('.').pop()?.toLowerCase()}`
-            : '.md';
-          const parser = this.plugin.vaultScanner
-            ?.getParserRegistry()
-            .getParserForExtension(extension);
-          const fullTask = parser
-            ? parser.parseLine(
-                minimalTask.rawText,
-                minimalTask.line,
-                minimalTask.path,
-              )
-            : null;
-          if (!fullTask) {
-            console.debug(
-              'TODOseq: archive undo could not re-parse line, skipping:',
-              minimalTask.path,
-              minimalTask.line,
-            );
-            throw new Error(
-              `Undo could not re-parse ${minimalTask.path}:${minimalTask.line}`,
-            );
-          }
-          await coordinator.updateTaskState(
-            fullTask,
-            originalState,
-            'task-list',
-          );
+        apply: async (task, originalState) => {
+          // The service re-applies the journaled full-task snapshot (current
+          // rawText + archived state) — no reconstruction needed. Table-cell
+          // tasks carry their isTableTask/tableCell identity in the
+          // snapshot, so generateTaskLine regenerates the cell correctly.
+          await coordinator.updateTaskState(task, originalState, 'task-list');
         },
       });
 
@@ -782,7 +755,7 @@ export class PluginLifecycleManager {
           outcome.reverted.length === 1 ? '' : 's'
         }` +
           (outcome.skipped.length > 0
-            ? `, skipped ${outcome.skipped.length} (changed since archive)`
+            ? `, skipped ${outcome.skipped.length}`
             : ''),
       );
       await this.plugin.scanVault();

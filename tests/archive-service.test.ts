@@ -515,6 +515,33 @@ describe('ArchiveService.applyArchives', () => {
     expect(service.isRunning()).toBe(false);
   });
 
+  it('journals the full task snapshot, preserving table-cell identity', async () => {
+    const { service, store, deps } = setup();
+    const task = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      isTableTask: true,
+      tableCell: { cellIndex: 1 },
+    });
+    store.set(`${task.path}:${task.line}`, task);
+    const matches = service.evaluateArchiveCriteria(
+      [task],
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const result = await service.applyArchives(matches, deps);
+
+    expect(result.archived[0].taskSnapshot).toMatchObject({
+      path: task.path,
+      line: task.line,
+      state: 'DONE',
+      rawText: task.rawText,
+      isTableTask: true,
+      tableCell: { cellIndex: 1 },
+    });
+  });
+
   it('a new successful run overwrites the journal', async () => {
     const { service, store, deps } = setup();
     const first = makeTask({
@@ -593,6 +620,134 @@ describe('ArchiveService.undoLastRun', () => {
     ]);
     return { service, coordinator, task, archivedLine, store };
   }
+
+  it('applies the journaled snapshot (not a minimal reconstruction), preserving table identity', async () => {
+    const { service, task } = setupWithJournal();
+    const store = new Map<string, ArchiveCandidate>([
+      [
+        `${task.path}:${task.line}`,
+        { ...task, isTableTask: true, tableCell: { cellIndex: 2 } },
+      ],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    let appliedTask: unknown;
+    let appliedState: string | undefined;
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [x] ARCHIVED original text',
+      apply: async (t, originalState) => {
+        appliedTask = t;
+        appliedState = originalState;
+      },
+    });
+
+    expect(outcome.reverted).toHaveLength(1);
+    expect(appliedState).toBe('DONE');
+    expect(appliedTask).toMatchObject({
+      path: task.path,
+      line: task.line,
+      state: 'ARCHIVED',
+      isTableTask: true,
+      tableCell: { cellIndex: 2 },
+    });
+  });
+
+  it('skips records without a snapshot and still undoes the rest', async () => {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const t1 = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE one',
+    });
+    const t2 = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 110),
+      rawText: '- [x] DONE two',
+    });
+    const store = new Map<string, ArchiveCandidate>([
+      [`${t1.path}:${t1.line}`, t1],
+      [`${t2.path}:${t2.line}`, t2],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([t1, t2], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+    // Simulate a legacy journal record without a snapshot.
+    (
+      service as unknown as { lastRun: { taskSnapshot?: unknown }[] }
+    ).lastRun[0].taskSnapshot = undefined;
+
+    const applied: string[] = [];
+    const outcome = await service.undoLastRun({
+      getRawLine: async (p, l) =>
+        l === t1.line ? '- [x] ARCHIVED one' : '- [x] ARCHIVED two',
+      apply: async (t) => {
+        applied.push(t.rawText);
+      },
+    });
+
+    expect(outcome.reverted.map((r) => r.line)).toEqual([t2.line]);
+    expect(outcome.skipped).toEqual([
+      {
+        record: expect.objectContaining({ line: t1.line }),
+        reason: 'unparseable',
+      },
+    ]);
+    // The apply callback receives the CURRENT archived rawText (the wiring
+    // layer re-applies the snapshot; originalState arrives separately).
+    expect(applied).toEqual(['- [x] ARCHIVED two']);
+  });
+
+  it('a failing apply for one record does not abort the remaining undo', async () => {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const t1 = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE one',
+    });
+    const t2 = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 110),
+      rawText: '- [x] DONE two',
+    });
+    const store = new Map<string, ArchiveCandidate>([
+      [`${t1.path}:${t1.line}`, t1],
+      [`${t2.path}:${t2.line}`, t2],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([t1, t2], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    let calls = 0;
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [x] ARCHIVED text',
+      apply: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('coordinator exploded');
+      },
+    });
+
+    expect(outcome.reverted).toHaveLength(1);
+    expect(outcome.skipped).toEqual([
+      {
+        record: expect.objectContaining({ line: t1.line }),
+        reason: 'apply-failed',
+      },
+    ]);
+  });
 
   it('reverts each journaled record to its original state and clears the journal', async () => {
     const { service, coordinator, task, archivedLine, store } =
