@@ -2551,6 +2551,13 @@
   row-gap: var(--size-2-2);
 }
 
+/* Phone notices span the full screen width: right-justify the action
+   (Material-snackbar alignment). margin-left auto also right-aligns the
+   button when a long message wraps it onto its own row. */
+.is-phone .notice .todoseq-notice-action-btn {
+  margin-left: auto;
+}
+
 .is-phone .notice .todoseq-notice-message {
   min-width: 0;
 }
