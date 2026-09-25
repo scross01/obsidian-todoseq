@@ -178,11 +178,29 @@ export class ArchiveService {
   private running = false;
   /** Cached compiled patterns for lineStillArchived — targets repeat across journal records. */
   private readonly linePatternCache = new RegexCache();
+  /**
+   * The KeywordManager is replaceable: recreateParser() builds a NEW instance
+   * on every keyword edit (KeywordManager snapshots its resolution at
+   * construction), so holding the constructor reference would go stale and
+   * reject freshly added archived keywords as invalid targets.
+   */
+  private keywordManagerRef: KeywordManager;
 
   constructor(
-    private readonly keywordManager: KeywordManager,
+    keywordManager: KeywordManager,
     private readonly settings: TaskArchiveSettings,
-  ) {}
+  ) {
+    this.keywordManagerRef = keywordManager;
+  }
+
+  /** Swap in the current manager (called from recreateParser's refresh path). */
+  updateKeywordManager(keywordManager: KeywordManager): void {
+    this.keywordManagerRef = keywordManager;
+  }
+
+  private get keywordManager(): KeywordManager {
+    return this.keywordManagerRef;
+  }
 
   /** True while an applyArchives batch is in flight (used to gate auto-run against manual runs). */
   isRunning(): boolean {

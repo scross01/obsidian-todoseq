@@ -259,6 +259,11 @@ export default class TodoTracker extends Plugin {
       this.keywordManager = this.vaultScanner.getKeywordManager();
       // Also sync to TaskStateManager
       this.taskStateManager.setKeywordManager(this.keywordManager);
+      // Sync to TaskWriter and ArchiveService: both hold KeywordManager
+      // references for keyword validation, and KeywordManager snapshots its
+      // resolution at construction — a stale reference would reject newly
+      // added keywords (e.g. a fresh archived target) until restart.
+      this.updateTaskWriterKeywordManager();
 
       // Wait for the parser to be fully created
       this.vaultScanner.getParser();
@@ -407,6 +412,14 @@ export default class TodoTracker extends Plugin {
   public updateTaskWriterKeywordManager(): void {
     if (this.taskEditor && this.vaultScanner) {
       this.taskEditor.updateKeywordManager(
+        this.vaultScanner.getKeywordManager(),
+      );
+    }
+    // The archive service validates mapping targets against the archived
+    // keyword group — it must see the fresh manager too, or newly added
+    // archived keywords are rejected as invalid targets until restart.
+    if (this.archiveService && this.vaultScanner) {
+      this.archiveService.updateKeywordManager(
         this.vaultScanner.getKeywordManager(),
       );
     }

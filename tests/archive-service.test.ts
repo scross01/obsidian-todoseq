@@ -281,6 +281,44 @@ describe('ArchiveService.evaluateArchiveCriteria', () => {
       );
     });
 
+    it('accepts a swapped-in KeywordManager so keyword edits are not stale (updateKeywordManager)', () => {
+      // Service built when ABANDONED did not exist yet.
+      const initialManager = new KeywordManager({
+        ...DefaultSettings,
+      });
+      const swappingService = new ArchiveService(
+        initialManager,
+        DefaultTaskArchiveSettings,
+      );
+      const config = makeConfig({
+        stateMappings: [makeMapping('DONE', 'ABANDONED', true)],
+      });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      ];
+
+      // Before the swap: ABANDONED is not a known archived keyword → rejected.
+      expect(
+        swappingService.evaluateArchiveCriteria(tasks, config, REFERENCE),
+      ).toHaveLength(0);
+
+      // recreateParser() builds a NEW manager (user added ABANDONED), then
+      // main.ts syncs it into the service.
+      const freshManager = new KeywordManager({
+        ...DefaultSettings,
+        additionalArchivedKeywords: ['ABANDONED'],
+      });
+      swappingService.updateKeywordManager(freshManager);
+
+      const matches = swappingService.evaluateArchiveCriteria(
+        tasks,
+        config,
+        REFERENCE,
+      );
+      expect(matches).toHaveLength(1);
+      expect(matches[0].target).toBe('ABANDONED');
+    });
+
     it('uses the first enabled mapping when duplicates exist (deterministic)', () => {
       const config = makeConfig({
         stateMappings: [
