@@ -2739,6 +2739,28 @@
   font-weight: var(--font-medium);
 }
 
+/* Bulk include/exclude controls (plan 015): quiet secondary buttons under
+   the count line — the apply button stays the only accent-filled action. */
+.todoseq-archive-bulk {
+  display: flex;
+  gap: var(--size-2-2);
+}
+
+.todoseq-archive-bulk-btn {
+  padding: var(--size-2-1) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.todoseq-archive-bulk-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
 .todoseq-archive-preview {
   max-height: 40vh;
   overflow-y: auto;
@@ -2915,6 +2937,11 @@
 .is-mobile .todoseq-archive-preset {
   min-height: 44px;
   min-width: 44px;
+}
+
+.is-mobile .todoseq-archive-bulk-btn {
+  min-height: 44px;
+  padding: var(--size-2-2) var(--size-4-3);
 }
 
 .is-mobile .todoseq-archive-close {

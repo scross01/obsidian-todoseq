@@ -125,6 +125,31 @@ export function toStateMappings(
 const PREVIEW_RENDER_LIMIT = 200;
 
 /**
+ * Bulk include controls are scoped to the VISIBLE slice (the rendered rows
+ * up to PREVIEW_RENDER_LIMIT), never the whole match set — "select all N"
+ * for unrendered rows is a different product decision (plan 015).
+ */
+export const BULK_INCLUDES_VISIBLE_ONLY = true;
+
+/**
+ * Compute the key sets for a bulk include/exclude of the visible preview
+ * rows. Pure so the scope rule stays unit-testable: include mode returns the
+ * visible keys to add; exclude mode returns them for removal. Sets are
+ * deduplicated and disjoint by construction.
+ */
+export function computeBulkInclude(
+  allMatches: ArchiveMatch[],
+  visibleKeys: string[],
+  include: boolean,
+): { includeKeys: string[]; excludeKeys: string[] } {
+  const unique = Array.from(new Set(visibleKeys));
+  if (include) {
+    return { includeKeys: unique, excludeKeys: [] };
+  }
+  return { includeKeys: [], excludeKeys: unique };
+}
+
+/**
  * Archive-run completion notice: message and (optional) action button laid
  * out in one flex row with a real gap — the raw Notice message element
  * renders its children inline, which jammed the text against the button.
@@ -491,9 +516,63 @@ export class ArchiveDialog {
     this.previewCountEl = section.createDiv({
       cls: 'todoseq-archive-preview-count',
     });
+
+    // Bulk include controls (plan 015 deferred P2): scoped to the VISIBLE
+    // rows — the cap means "all" would silently differ from "rendered".
+    const bulkRow = section.createDiv({ cls: 'todoseq-archive-bulk' });
+    const includeVisibleBtn = bulkRow.createEl('button', {
+      cls: 'todoseq-archive-bulk-btn',
+      text: 'Include visible',
+      attr: { type: 'button' },
+    });
+    includeVisibleBtn.addEventListener('click', () =>
+      this.bulkSetVisible(true),
+    );
+    const excludeVisibleBtn = bulkRow.createEl('button', {
+      cls: 'todoseq-archive-bulk-btn',
+      text: 'Exclude visible',
+      attr: { type: 'button' },
+    });
+    excludeVisibleBtn.addEventListener('click', () =>
+      this.bulkSetVisible(false),
+    );
+
     this.previewListEl = section.createDiv({
       cls: 'todoseq-archive-preview',
     });
+  }
+
+  /** Bulk include/exclude the currently rendered rows (plan 015). */
+  private bulkSetVisible(include: boolean): void {
+    const visibleCount = Math.min(
+      this.currentMatches.length,
+      PREVIEW_RENDER_LIMIT,
+    );
+    const visibleKeys = this.currentMatches
+      .slice(0, visibleCount)
+      .map((m) => `${m.path}:${m.line}`);
+    const { includeKeys, excludeKeys } = computeBulkInclude(
+      this.currentMatches,
+      visibleKeys,
+      include,
+    );
+    for (const key of includeKeys) this.includedPaths.add(key);
+    for (const key of excludeKeys) this.includedPaths.delete(key);
+
+    // Sync the rendered checkboxes without rebuilding the list.
+    if (this.previewListEl) {
+      const boxes = this.previewListEl.querySelectorAll<HTMLInputElement>(
+        '.todoseq-archive-row input[type="checkbox"]',
+      );
+      boxes.forEach((box) => {
+        box.checked = include;
+      });
+    }
+
+    const included = this.currentMatches.filter((m) =>
+      this.includedPaths.has(`${m.path}:${m.line}`),
+    );
+    this.updateApplyButton(included.length, this.currentMatches);
   }
 
   private refreshPreview(): void {
@@ -570,6 +649,9 @@ export class ArchiveDialog {
     textWrap.createSpan({
       cls: 'todoseq-archive-task-text',
       text: taskText,
+      // Row text is ellipsized; the title lets desktop users hover to
+      // confirm the full text before archiving (plan 015 deferred P3).
+      attr: { title: taskText },
     });
     const meta = textWrap.createDiv({ cls: 'todoseq-archive-row-meta' });
     meta.createSpan({
