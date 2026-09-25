@@ -2690,23 +2690,39 @@
   color: var(--text-warning);
 }
 
+/*
+ * Mapping rows are a grid, not a sentence: [toggle][source][arrow][target]
+ * as shared tracks so arrows and target dropdowns align down the column
+ * regardless of source-keyword length. The source track flexes; the target
+ * track gets the larger share (it is the decision control).
+ */
 .todoseq-archive-mapping {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(8ch, 1fr) auto minmax(14ch, 1.4fr);
   align-items: center;
-  gap: var(--size-2-2);
+  gap: var(--size-2-2) var(--size-4-2);
+  padding: var(--size-2-1) 0;
+}
+
+.todoseq-archive-mapping + .todoseq-archive-mapping {
+  border-top: 1px solid var(--background-modifier-border);
 }
 
 .todoseq-archive-source {
   font-weight: var(--font-semibold);
   color: var(--interactive-accent);
-  min-width: 6ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .todoseq-archive-arrow {
   color: var(--text-muted);
+  justify-self: center;
 }
 
 .todoseq-archive-mapping select {
+  width: 100%;
   padding: var(--size-2-1) var(--size-4-2);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
@@ -2812,7 +2828,31 @@
 }
 
 /* Mobile: full-width centered dialog with larger touch targets. The preview
-   grows instead of nesting a second scroll container — only the modal scrolls. */
+   grows instead of nesting a second scroll container — only the modal scrolls.
+   Dialog mapping rows: on narrow screens the 4-column grid would crush the
+   target dropdown, so collapse to two aligned columns (source and target
+   share the second column, toggle leads). */
+.is-mobile .todoseq-archive-modal {
+  width: 92vw;
+  min-width: 0;
+}
+
+.is-mobile .todoseq-archive-mapping {
+  grid-template-columns: auto 1fr;
+}
+
+.is-mobile .todoseq-archive-mapping .todoseq-archive-arrow {
+  display: none;
+}
+
+.is-mobile .todoseq-archive-mapping .todoseq-archive-source {
+  grid-column: 2;
+}
+
+.is-mobile .todoseq-archive-mapping select {
+  grid-column: 2;
+}
+
 /*
  * Settings: auto-archive mapping rows on mobile.
  * Each mapping row is a declarative setting item carrying a toggle AND a
@@ -2849,11 +2889,6 @@
   min-width: 14ch;
 }
 
-.is-mobile .todoseq-archive-modal {
-  width: 92vw;
-  min-width: 0;
-}
-
 .is-mobile .todoseq-archive-preview {
   max-height: none;
   overflow-y: visible;
@@ -2870,6 +2905,11 @@
   height: 20px;
   padding: 12px; /* hit area extends to ~44px while the box stays compact */
   flex-shrink: 0;
+}
+
+.is-mobile .todoseq-archive-mapping input[type='checkbox'] {
+  grid-row: 1 / span 2;
+  align-self: center;
 }
 
 .is-mobile .todoseq-archive-preset {
