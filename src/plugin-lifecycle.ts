@@ -1,5 +1,8 @@
 import TodoTracker from './main';
-import { ArchiveDialog } from './view/components/archive-dialog';
+import {
+  ArchiveDialog,
+  showArchiveRunNotice,
+} from './view/components/archive-dialog';
 import { VaultScanner } from './services/vault-scanner';
 import { SmartDateProcessor } from './services/smart-date-processor';
 import { TaskWriter } from './services/task-writer';
@@ -717,6 +720,7 @@ export class PluginLifecycleManager {
         keywordManager,
         vaultScanner: scanner,
         saveSettings: () => this.plugin.saveSettings(),
+        performUndo: () => this.performArchiveUndo(),
         app: this.plugin.app,
       },
       scanner.getKeywordManager(),
@@ -768,16 +772,14 @@ export class PluginLifecycleManager {
       const archivedCount = result.archived.length;
       if (archivedCount === 0) return;
 
-      const notice = new Notice(
+      showArchiveRunNotice(
         `Archived ${archivedCount} task${archivedCount === 1 ? '' : 's'}`,
-        10_000,
+        {
+          actionLabel: service.hasUndoableRun() ? 'Undo' : undefined,
+          onAction: () => void this.performArchiveUndo(),
+          timeoutMs: 10_000,
+        },
       );
-      if (service.hasUndoableRun()) {
-        const undoBtn = notice.messageEl.createEl('button', { text: 'Undo' });
-        undoBtn.addEventListener('click', () => {
-          void this.performArchiveUndo();
-        });
-      }
     })().catch((error) => {
       console.debug('TODOseq: auto-archive skipped:', error);
     });

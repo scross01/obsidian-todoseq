@@ -2500,6 +2500,53 @@
 }
 
 /*
+ * Archive-run completion notice (auto-run + manual run).
+ * Obsidian renders notice content inline and styles `.notice button` with
+ * higher specificity than a bare class, so both rules are scoped under
+ * `.notice` to win the cascade. Message and action share ONE flex row with
+ * a real gap; the button is compact and accent-filled, quiet until hovered.
+ */
+
+.notice .todoseq-notice-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-3);
+}
+
+.notice .todoseq-notice-message {
+  color: var(--text-normal);
+}
+
+.notice .todoseq-notice-action-btn {
+  flex-shrink: 0;
+  padding: var(--size-2-1) var(--size-4-2);
+  border: none;
+  border-radius: var(--radius-s);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  line-height: var(--line-height-tight, 1.4);
+  cursor: pointer;
+  transition:
+    background 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.notice .todoseq-notice-action-btn:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 85%, white);
+}
+
+.notice .todoseq-notice-action-btn:focus-visible {
+  outline: 2px solid var(--text-on-accent);
+  outline-offset: 1px;
+}
+
+.notice .todoseq-notice-action-btn:active {
+  background: color-mix(in srgb, var(--interactive-accent) 75%, black);
+}
+
+/*
  * Auto-archive dialog
  */
 

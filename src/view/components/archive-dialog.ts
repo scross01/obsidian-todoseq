@@ -47,6 +47,8 @@ interface ArchiveDialogPlugin {
   keywordManager: KeywordManager;
   vaultScanner: { getKeywordManager(): KeywordManager } | null;
   saveSettings(): Promise<void>;
+  /** Revert the most recent archive run (same flow as the palette command). */
+  performUndo(): void | Promise<void>;
   app: App;
 }
 
@@ -121,6 +123,54 @@ export function toStateMappings(
 
 /** Render cap for the preview list — beyond this, show a muted "N more" footer. */
 const PREVIEW_RENDER_LIMIT = 200;
+
+/**
+ * Archive-run completion notice: message and (optional) action button laid
+ * out in one flex row with a real gap — the raw Notice message element
+ * renders its children inline, which jammed the text against the button.
+ * Styling lives in styles.css under `.todoseq-notice-*` (theme-native
+ * tokens only).
+ *
+ * Shared by the auto-run notice and the dialog's manual-run notice so the
+ * two surfaces cannot drift.
+ */
+export function showArchiveRunNotice(
+  message: string,
+  options: {
+    /** Label for the action button, e.g. 'Undo'. Omit for no action. */
+    actionLabel?: string;
+    /** Invoked when the action button is clicked; the notice dismisses itself. */
+    onAction?: () => void;
+    /** Notice timeout in ms. Default: Obsidian's standard notice duration. */
+    timeoutMs?: number;
+  } = {},
+): Notice {
+  // Build the content ourselves (empty constructor message) so message and
+  // action sit in ONE flex row with a real gap — the raw Notice message
+  // element renders its children inline, which jammed the text against the
+  // button. Styling lives in styles.css under `.todoseq-notice-*`
+  // (theme-native tokens only).
+  const notice = new Notice('', options.timeoutMs);
+  const row = notice.messageEl.createDiv({
+    cls: 'todoseq-notice-actions',
+  });
+  row.createSpan({
+    cls: 'todoseq-notice-message',
+    text: message,
+  });
+  if (options.actionLabel) {
+    const btn = row.createEl('button', {
+      cls: 'todoseq-notice-action-btn',
+      text: options.actionLabel,
+      attr: { type: 'button' },
+    });
+    btn.addEventListener('click', () => {
+      notice.hide();
+      options.onAction?.();
+    });
+  }
+  return notice;
+}
 
 const DAYS_PRESETS = [30, 90, 180, 365];
 
@@ -635,11 +685,15 @@ export class ArchiveDialog {
       const archivedCount = result.archived.length;
       const skippedCount = result.skipped.length;
       this.close();
-      new Notice(
-        `Archived ${archivedCount} tasks` +
+      showArchiveRunNotice(
+        `Archived ${archivedCount} task${archivedCount === 1 ? '' : 's'}` +
           (skippedCount > 0
             ? `, skipped ${skippedCount} (changed since preview)`
             : ''),
+        {
+          actionLabel: 'Undo',
+          onAction: () => void this.plugin.performUndo(),
+        },
       );
       // No vault rescan here. The update coordinator already refreshed the
       // state manager (archived tasks were removed). A full rescan would read
