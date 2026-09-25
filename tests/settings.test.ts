@@ -52,13 +52,23 @@ jest.mock('obsidian', () => ({
 
     addText(callback: (component: unknown) => void): this {
       this.controlCallback = callback;
+      const inputEl = activeDocument.createElement('input');
       const textComponent = {
-        setValue: jest.fn().mockReturnThis(),
+        // Mirror the real TextComponent: setValue writes to the input.
+        setValue: jest.fn(function (
+          this: { inputEl: HTMLInputElement },
+          value: string,
+        ) {
+          this.inputEl.value = value;
+          return this;
+        }),
         setPlaceholder: jest.fn().mockReturnThis(),
         onChange: jest.fn().mockReturnThis(),
-        inputEl: activeDocument.createElement('input'),
+        inputEl,
       };
       callback(textComponent);
+      // Mirror the real Setting: the control mounts into settingEl.
+      this.settingEl.appendChild(inputEl);
       return this;
     }
 
@@ -1102,7 +1112,6 @@ describe('TodoTrackerSettingTab', () => {
           );
         }
       });
-
       it('non-mapping items in the group do not carry the mapping-row class', () => {
         const defs = settingTab.getSettingDefinitions();
         const group = defs.find(
@@ -1124,6 +1133,30 @@ describe('TodoTrackerSettingTab', () => {
         expect(setting.settingEl.classList).not.toContain(
           'todoseq-archive-mapping-item',
         );
+      });
+
+      it('ships a 90-day default criterion (fresh installs show 90)', () => {
+        // Pinned per maintainer request: the default must be 90, not 30.
+        expect(DefaultSettings.taskArchive.criterionDays).toBe(90);
+
+        // The threshold control renders the stored value — with defaults
+        // (fresh install, no persisted drift) that is 90.
+        const defs = settingTab.getSettingDefinitions();
+        const group = defs.find(
+          (d): d is GroupDef =>
+            'type' in d &&
+            d.type === 'group' &&
+            d.heading === 'Auto-archive completed tasks',
+        );
+        const thresholdDef = group!.items.find(
+          (item) => 'name' in item && item.name === 'Archive threshold (days)',
+        ) as { render?: (s: Setting) => void } | undefined;
+        expect(thresholdDef).toBeDefined();
+
+        const setting = new Setting();
+        thresholdDef!.render!(setting);
+        const input = setting.settingEl.querySelector('input');
+        expect(input?.value).toBe('90');
       });
     });
   });
