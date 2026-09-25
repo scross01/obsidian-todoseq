@@ -1,10 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { getPage } from './helpers/session';
 import { resetVaultState } from './helpers/test-reset';
-import {
-  openTodoseqPanel,
-  waitForTaskListVisible,
-} from './helpers/assertions';
+import { openTodoseqPanel, waitForTaskListVisible } from './helpers/assertions';
 import { Page } from 'playwright';
 
 let page: Page;

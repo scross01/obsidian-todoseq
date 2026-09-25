@@ -96,6 +96,37 @@ export interface UndoDeps {
   ) => Promise<void>;
 }
 
+/** Why an automatic (scan-triggered) archive run will or will not run. */
+export type AutoArchiveDecisionReason =
+  'enabled-and-ready' | 'setting-off' | 'manual-run-in-progress' | 'no-service';
+
+export interface AutoArchiveDecision {
+  run: boolean;
+  reason: AutoArchiveDecisionReason;
+}
+
+/**
+ * Gate for the opt-in auto-archive on vault scan (plan 013). Pure and
+ * allocation-free on the no-op path: with default settings it reads one
+ * boolean and returns immediately.
+ */
+export function shouldAutoArchive(input: {
+  autoArchiveEnabled: boolean;
+  hasService: boolean;
+  isManualRunInProgress: boolean;
+}): AutoArchiveDecision {
+  if (!input.autoArchiveEnabled) {
+    return { run: false, reason: 'setting-off' };
+  }
+  if (!input.hasService) {
+    return { run: false, reason: 'no-service' };
+  }
+  if (input.isManualRunInProgress) {
+    return { run: false, reason: 'manual-run-in-progress' };
+  }
+  return { run: true, reason: 'enabled-and-ready' };
+}
+
 const MS_PER_DAY = 86_400_000;
 
 /** Narrow an ArchiveMatchInput to an ArchiveCandidate (path/line/rawText carrier). */

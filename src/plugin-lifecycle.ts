@@ -18,7 +18,7 @@ import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
-import { ArchiveService } from './services/archive-service';
+import { ArchiveService, shouldAutoArchive } from './services/archive-service';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 import {
   smartDatePlugin,
@@ -520,6 +520,10 @@ export class PluginLifecycleManager {
         });
         // Also refresh embedded lists
         this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists();
+        // Opt-in auto-archive after a full scan (plan 013). scan-completed
+        // only fires from scanVault() — incremental file updates emit
+        // tasks-changed without it — so no extra full-scan gating is needed.
+        this.runAutoArchiveIfEnabled();
       }, 0);
     });
 
@@ -718,6 +722,65 @@ export class PluginLifecycleManager {
       scanner.getKeywordManager(),
     );
     dialog.open();
+  }
+
+  /**
+   * Opt-in auto-archive (plan 013): after a full vault scan, archive tasks
+   * matching the days-mode criteria when the user enabled the setting.
+   * Silent-except-notice: no matches → no notice; the completion notice
+   * carries an Undo button that reuses the shared undo flow. Never throws
+   * into the scan listener.
+   */
+  private runAutoArchiveIfEnabled(): void {
+    const service = this.plugin.archiveService;
+    const coordinator = this.plugin.taskUpdateCoordinator;
+    const taskArchive = this.plugin.settings.taskArchive;
+    const decision = shouldAutoArchive({
+      autoArchiveEnabled: taskArchive?.autoArchiveEnabled === true,
+      hasService: !!service && !!coordinator,
+      isManualRunInProgress: service?.isRunning() === true,
+    });
+    if (!decision.run) {
+      console.debug(`TODOseq: auto-archive skipped (${decision.reason})`);
+      return;
+    }
+
+    // Fire-and-forget with full error containment — never break the scan listener.
+    void (async () => {
+      if (!service || !coordinator) return; // re-check inside the async closure
+      // Enforce days-mode for automatic runs regardless of the saved
+      // criterionMode: date mode is manual-run only by product decision.
+      const matches = service.evaluateArchiveCriteria(
+        this.plugin.taskStateManager.getTasks(),
+        { ...taskArchive, criterionMode: 'days' },
+        new Date(),
+      );
+      if (matches.length === 0) return; // no notice on no-ops
+
+      const taskStateManager = this.plugin.taskStateManager;
+      const result = await service.applyArchives(matches, {
+        getTask: (path, line, cellIndex) =>
+          taskStateManager.findTaskByPathAndLine(path, line, cellIndex),
+        apply: (task, target) =>
+          coordinator.updateTaskState(task, target, 'task-list'),
+      });
+
+      const archivedCount = result.archived.length;
+      if (archivedCount === 0) return;
+
+      const notice = new Notice(
+        `Archived ${archivedCount} task${archivedCount === 1 ? '' : 's'}`,
+        10_000,
+      );
+      if (service.hasUndoableRun()) {
+        const undoBtn = notice.messageEl.createEl('button', { text: 'Undo' });
+        undoBtn.addEventListener('click', () => {
+          void this.performArchiveUndo();
+        });
+      }
+    })().catch((error) => {
+      console.debug('TODOseq: auto-archive skipped:', error);
+    });
   }
 
   /**
