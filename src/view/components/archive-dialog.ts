@@ -141,7 +141,14 @@ export class ArchiveDialog {
     private keywordManager: KeywordManager,
   ) {}
 
+  private lastFocused: HTMLElement | null = null;
+
   open(): void {
+    this.lastFocused =
+      activeDocument.activeElement instanceof HTMLElement
+        ? activeDocument.activeElement
+        : null;
+
     const backdrop = activeDocument.body.createDiv({
       cls: 'todoseq-archive-backdrop',
     });
@@ -151,9 +158,16 @@ export class ArchiveDialog {
     const modal = activeDocument.body.createDiv({
       cls: 'todoseq-archive-modal',
     });
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Archive completed tasks');
     modal.addEventListener('click', (e) => e.stopPropagation());
     modal.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Escape') this.close();
+      if (e.key === 'Escape') {
+        this.close();
+        return;
+      }
+      if (e.key === 'Tab') this.trapFocus(e);
     });
     this.modalEl = modal;
 
@@ -164,6 +178,42 @@ export class ArchiveDialog {
     this.buildFooter();
 
     this.refreshPreview();
+
+    // Initial focus lands on the first control (the criterion select).
+    this.modalEl
+      ?.querySelector<HTMLSelectElement>('#todoseq-archive-criterion-select')
+      ?.focus();
+  }
+
+  /**
+   * Keep Tab cycling inside the dialog while it is open (WCAG 2.4.3):
+   * Shift+Tab from the first control wraps to the last, Tab from the last
+   * wraps to the first.
+   */
+  private trapFocus(e: KeyboardEvent): void {
+    const modal = this.modalEl;
+    if (!modal) return;
+    const focusables = Array.from(
+      modal.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => !el.hasAttribute('disabled'));
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active =
+      activeDocument.activeElement instanceof HTMLElement
+        ? activeDocument.activeElement
+        : null;
+    if (e.shiftKey) {
+      if (active === first || !modal.contains(active)) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (active === last || !modal.contains(active)) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 
   close(): void {
@@ -175,14 +225,17 @@ export class ArchiveDialog {
       this.backdropEl.remove();
       this.backdropEl = null;
     }
+    this.lastFocused?.focus();
+    this.lastFocused = null;
   }
 
   private buildHeader(): void {
     if (!this.modalEl) return;
     const titleEl = this.modalEl.createDiv({ cls: 'todoseq-archive-title' });
     titleEl.createSpan({ text: 'Archive completed tasks' });
-    const closeBtn = titleEl.createDiv({
+    const closeBtn = titleEl.createEl('button', {
       cls: 'todoseq-archive-close clickable-icon',
+      attr: { 'aria-label': 'Close', type: 'button' },
     });
     closeBtn.createSpan({ text: '\u00D7' });
     closeBtn.addEventListener('click', () => this.close());
@@ -197,11 +250,16 @@ export class ArchiveDialog {
     const section = this.modalEl.createDiv({
       cls: 'todoseq-archive-section',
     });
-    section.createEl('label', { text: 'Archive criterion' });
+    section.createEl('label', {
+      text: 'Archive criterion',
+      attr: { for: 'todoseq-archive-criterion-select' },
+    });
 
     const criteriaRow = section.createDiv({ cls: 'todoseq-archive-criteria' });
 
-    const modeSelect = criteriaRow.createEl('select');
+    const modeSelect = criteriaRow.createEl('select', {
+      attr: { id: 'todoseq-archive-criterion-select' },
+    });
     modeSelect.createEl('option', {
       attr: { value: 'days' },
       text: 'Closed more than',
@@ -234,7 +292,12 @@ export class ArchiveDialog {
     if (archive.criterionMode === 'days') {
       const daysInput = container.createEl('input', {
         cls: 'todoseq-archive-criteria-input',
-        attr: { type: 'number', min: '1', max: '3650' },
+        attr: {
+          type: 'number',
+          min: '1',
+          max: '3650',
+          'aria-label': 'Days threshold',
+        },
       });
       daysInput.value = String(archive.criterionDays);
       daysInput.addEventListener('change', async () => {
@@ -254,6 +317,10 @@ export class ArchiveDialog {
         const presetBtn = container.createEl('button', {
           cls: 'todoseq-archive-preset todoseq-archive-criteria-input',
           text: String(preset),
+          attr: {
+            type: 'button',
+            'aria-label': `Use ${preset} days threshold`,
+          },
         });
         presetBtn.addEventListener('click', async () => {
           archive.criterionDays = preset;
@@ -265,7 +332,7 @@ export class ArchiveDialog {
     } else {
       const dateInput = container.createEl('input', {
         cls: 'todoseq-archive-criteria-input',
-        attr: { type: 'date' },
+        attr: { type: 'date', 'aria-label': 'Closed before date' },
       });
       dateInput.value = archive.criterionDate;
       dateInput.addEventListener('change', async () => {
@@ -429,7 +496,10 @@ export class ArchiveDialog {
       cls: 'todoseq-archive-row',
     });
 
-    const checkbox = rowEl.createEl('input', { attr: { type: 'checkbox' } });
+    const taskText = match.rawText.replace(/^\s*-\s*\[.?\]\s*/, '').trim();
+    const checkbox = rowEl.createEl('input', {
+      attr: { type: 'checkbox', 'aria-label': `Include ${taskText}` },
+    });
     checkbox.checked = this.includedPaths.has(key);
     checkbox.addEventListener('change', () => {
       if (checkbox.checked) {
@@ -446,7 +516,7 @@ export class ArchiveDialog {
     const textWrap = rowEl.createDiv({ cls: 'todoseq-archive-row-text' });
     textWrap.createSpan({
       cls: 'todoseq-archive-task-text',
-      text: match.rawText.replace(/^\s*-\s*\[.?\]\s*/, '').trim(),
+      text: taskText,
     });
     const meta = textWrap.createDiv({ cls: 'todoseq-archive-row-meta' });
     meta.createSpan({

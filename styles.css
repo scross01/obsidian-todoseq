@@ -2589,6 +2589,18 @@
   font-size: var(--font-ui-small);
 }
 
+/* Keyboard focus parity with the saved-search dialog fields (polish pass). */
+.todoseq-archive-modal select:focus-visible,
+.todoseq-archive-modal input:focus-visible,
+.todoseq-archive-modal button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -1px;
+}
+
+.todoseq-archive-modal button:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .todoseq-archive-preset {
   cursor: pointer;
 }
@@ -2723,14 +2735,42 @@
   gap: var(--size-4-2);
 }
 
-/* Mobile: full-width centered dialog with larger touch targets */
+/* Mobile: full-width centered dialog with larger touch targets. The preview
+   grows instead of nesting a second scroll container — only the modal scrolls. */
 .is-mobile .todoseq-archive-modal {
   width: 92vw;
   min-width: 0;
 }
 
+.is-mobile .todoseq-archive-preview {
+  max-height: none;
+  overflow-y: visible;
+}
+
 .is-mobile .todoseq-archive-row {
   padding: var(--size-4-2);
+}
+
+/* 44px touch targets for the small interactive controls (adapt pass). */
+.is-mobile .todoseq-archive-row input[type='checkbox'],
+.is-mobile .todoseq-archive-mapping input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  padding: 12px; /* hit area extends to ~44px while the box stays compact */
+  flex-shrink: 0;
+}
+
+.is-mobile .todoseq-archive-preset {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.is-mobile .todoseq-archive-close {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .todoseq-saved-search-buttons {

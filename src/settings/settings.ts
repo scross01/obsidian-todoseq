@@ -820,6 +820,15 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
                     } else {
                       mappings.push({ source, enabled: false, target: value });
                     }
+                    // Keep the visible row description in sync with the
+                    // stored target instead of waiting for a tab re-render
+                    // (clarify pass: descriptions describe the live state).
+                    const nowInvalid = !archivedKeywords.includes(value);
+                    setting.setDesc(
+                      nowInvalid
+                        ? `Target "${value}" is not a valid archived keyword. Add it under Archived keywords (General) or pick another.`
+                        : `Archive ${source} tasks as ${value}.`,
+                    );
                   }),
               );
             });
