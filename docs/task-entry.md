@@ -264,6 +264,12 @@ TODOseq recognizes these task state keywords by default:
 - `CANCELED` - Task was cancelled
 - `CANCELLED` - Alternative spelling
 
+**Archived States:**
+
+- `ARCHIVED` - Task is archived and excluded from task collection
+
+Archived keywords are styled as archived and excluded from vault task collection and state search suggestions. Archived tasks can be produced by [Auto-Archive](auto-archive.md), which rewrites completed keywords to an archived keyword once a task's CLOSED date is older than a threshold.
+
 ### Task State Sequences
 
 Tasks progress through defined state sequences when you click the state keyword:

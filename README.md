@@ -29,6 +29,7 @@ Most task managers force you into a separate system. TODOseq meets you where you
 - Code-comment TODOs in 20+ languages
 - `todoseq` embedded lists in notes
 - Subtasks, repeating tasks, optional CLOSED dates
+- Auto-archive: promote aged DONE tasks to ARCHIVED, with preview and one-click undo
 - Logseq-compatible format for dual-use vaults
 
 More detail in the [documentation](https://scross01.github.io/obsidian-todoseq/).
@@ -56,6 +57,7 @@ Start here:
 - [Task List](https://scross01.github.io/obsidian-todoseq/task-list.html) — using the panel
 - [Task Entry](https://scross01.github.io/obsidian-todoseq/task-entry.html) — syntax and lifecycle
 - [Search](https://scross01.github.io/obsidian-todoseq/search.html) — filters and advanced queries
+- [Auto-Archive](https://scross01.github.io/obsidian-todoseq/auto-archive.html) — promote aged DONE tasks to ARCHIVED
 
 ## Development
 

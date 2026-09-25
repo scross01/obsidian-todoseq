@@ -7,6 +7,8 @@ TODOseq provides several commands that can be accessed through Obsidian's Comman
 - TODOseq: Show task list
 - TODOseq: Open task list in new tab
 - TODOseq: Rescan vault
+- TODOseq: Archive completed tasks
+- TODOseq: Undo last archive run
 - TODOseq: Toggle task state _(editor only)_
 - TODOseq: Cycle task state _(editor only)_
 - TODOseq: Copy task to today _(editor only)_
@@ -35,6 +37,16 @@ Opens the TODOseq Task List view in a new tab in the main workspace area. This i
 Manually triggers a full vault scan to update the task list with the latest changes.
 
 A full rescan is not typically required, unless the vault level setting for Excluded files has been updated. General file changes (create, modify, delete) trigger automatic incremental updates.
+
+### Archive completed tasks
+
+Opens the archive preview dialog. Choose a criterion ("Closed more than" N days ago with presets, or "Closed before" a date), adjust the state mappings, review the matching tasks, and confirm. Nothing is written until you apply. See [Auto-Archive](auto-archive.md).
+
+### Undo last archive run
+
+Reverts the most recent archive run. Each line is verified before restoring; lines that changed since the run are skipped and reported. Undo is session-scoped — it stays available until Obsidian restarts.
+
+**Availability**: Only when there is something to undo; the command is greyed out otherwise.
 
 ### Toggle task state
 

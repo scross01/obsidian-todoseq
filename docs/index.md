@@ -113,6 +113,7 @@ Once enabled, the Task List opens in the right sidebar. You can always reopen it
 <li><a href="sort-methods.html">Sort Methods</a><p>How tasks are ordered in the panel</p></li>
 <li><a href="urgency.html">Task Urgency</a><p>Urgency sorting and configuration</p></li>
 <li><a href="warning-periods.html">Warning Periods</a><p>Control when tasks appear before their dates</p></li>
+<li><a href="auto-archive.html">Auto-Archive</a><p>Promote aged DONE tasks to ARCHIVED — manually or automatically</p></li>
 <li><a href="import.html">Import</a><p>Bring tasks in from other formats</p></li>
 <li><a href="experimental-features.html">Experimental Features</a><p>Org-mode file support and more</p></li>
 </ul>

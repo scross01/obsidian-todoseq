@@ -1,5 +1,11 @@
 # Change Log
 
+## Unreleased
+
+- Added Auto-Archive: rewrite completed keywords (e.g. DONE) to archived keywords once a task's CLOSED date is older than a threshold. Preview and run Auto-archive manually from a dialog, or opt in to automatic runs after vault scans.
+- Added "Archive completed tasks" and "Undo last archive run" commands.
+- Added a session-scoped undo for archive runs with per-line verification; changed lines are skipped and reported.
+
 ## 0.20.1
 
 - Fixed CLOSED date being deleted when archiving or re-completing a completed task while "Track closed date" is disabled; existing timestamps are now preserved.

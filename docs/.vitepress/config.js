@@ -33,6 +33,7 @@ export default {
           { text: 'Task Urgency', link: '/urgency' },
           { text: 'Warning Periods', link: '/warning-periods' },
           { text: 'Moving Tasks', link: '/moving-tasks' },
+          { text: 'Auto-Archive', link: '/auto-archive' },
           { text: 'Import', link: '/import' },
         ],
       },
