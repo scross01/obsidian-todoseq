@@ -686,7 +686,9 @@ export class ArchiveDialog {
       const skippedCount = result.skipped.length;
       this.close();
       showArchiveRunNotice(
-        `Archived ${archivedCount} task${archivedCount === 1 ? '' : 's'}` +
+        `TODOseq archived ${archivedCount} task${
+          archivedCount === 1 ? '' : 's'
+        }` +
           (skippedCount > 0
             ? `, skipped ${skippedCount} (changed since preview)`
             : ''),

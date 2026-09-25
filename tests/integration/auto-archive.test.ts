@@ -204,7 +204,7 @@ test.describe('Auto-archive on vault scan', () => {
     // Notices are transient — query immediately. The auto-run notice is
     // 10s; the rescan just completed so it must still be visible.
     const noticeText = await readNoticeContainer(page);
-    expect(noticeText).toContain('Archived 1 task');
+    expect(noticeText).toContain('TODOseq auto-archived 1 task');
 
     // The Undo button reuses the shared undo flow.
     const undoBtn = await page.evaluate(() => {

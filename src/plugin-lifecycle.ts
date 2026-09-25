@@ -773,7 +773,9 @@ export class PluginLifecycleManager {
       if (archivedCount === 0) return;
 
       showArchiveRunNotice(
-        `Archived ${archivedCount} task${archivedCount === 1 ? '' : 's'}`,
+        `TODOseq auto-archived ${archivedCount} task${
+          archivedCount === 1 ? '' : 's'
+        }`,
         {
           actionLabel: service.hasUndoableRun() ? 'Undo' : undefined,
           onAction: () => void this.performArchiveUndo(),
