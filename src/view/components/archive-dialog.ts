@@ -332,7 +332,10 @@ export class ArchiveDialog {
     const criteriaRow = section.createDiv({ cls: 'todoseq-archive-criteria' });
 
     const modeSelect = criteriaRow.createEl('select', {
-      attr: { id: 'todoseq-archive-criterion-select' },
+      attr: {
+        id: 'todoseq-archive-criterion-select',
+        'aria-label': 'Archive criterion',
+      },
     });
     modeSelect.createEl('option', {
       attr: { value: 'days' },
@@ -470,7 +473,9 @@ export class ArchiveDialog {
       });
       rowEl.createSpan({ cls: 'todoseq-archive-arrow', text: '\u2192' });
 
-      const targetSelect = rowEl.createEl('select');
+      const targetSelect = rowEl.createEl('select', {
+        attr: { 'aria-label': `Target state for ${row.source}` },
+      });
       for (const target of row.validTargets) {
         targetSelect.createEl('option', {
           attr: { value: target },
@@ -707,10 +712,15 @@ export class ArchiveDialog {
   ): void {
     if (!this.applyBtn) return;
     const invalidEnabled = this.rows.some((r) => r.enabled && r.targetInvalid);
-    this.applyLabel =
-      includedCount === matches.length
-        ? `Archive ${includedCount} task${includedCount === 1 ? '' : 's'}`
-        : `Archive ${includedCount} of ${matches.length} tasks`;
+    if (matches.length === 0) {
+      // No matches at all: a count label would be a lie ("Archive 0 tasks").
+      this.applyLabel = 'Nothing to archive';
+    } else {
+      this.applyLabel =
+        includedCount === matches.length
+          ? `Archive ${includedCount} task${includedCount === 1 ? '' : 's'}`
+          : `Archive ${includedCount} of ${matches.length} tasks`;
+    }
     this.applyBtn.textContent = this.applyLabel;
     this.applyBtn.disabled = includedCount === 0 || invalidEnabled;
   }

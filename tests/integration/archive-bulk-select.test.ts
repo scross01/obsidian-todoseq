@@ -145,6 +145,25 @@ test.describe('Archive dialog bulk select (plan 015)', () => {
     await closeDialog();
   });
 
+  test('empty result state: apply button says Nothing to archive, not Archive 0 tasks', async () => {
+    // No matching tasks seeded: criterionDays far beyond any seeded CLOSED.
+    await page.evaluate(() => {
+      const app = (window as any).app;
+      const plugin = app.plugins.plugins.todoseq;
+      plugin.settings.taskArchive.criterionDays = 3650;
+      void plugin.saveSettings();
+    });
+    await openDialog();
+
+    await expect(page.locator('.todoseq-archive-empty')).toHaveText(
+      'No tasks match the current criteria.',
+    );
+    await expect(page.locator('.mod-cta')).toHaveText('Nothing to archive');
+    await expect(page.locator('.mod-cta')).toBeDisabled();
+
+    await closeDialog();
+  });
+
   test('task text carries a title attribute for hover reveal', async () => {
     await seedTasks(3);
     await openDialog();
