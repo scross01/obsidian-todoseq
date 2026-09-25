@@ -16,12 +16,16 @@ export type ArchiveCandidate = ArchiveMatchInput & {
   path: string;
   line: number;
   rawText: string;
+  /** Table-cell identity for cell tasks (same path:line as row siblings). */
+  tableCell?: { cellIndex: number };
 };
 
 /** An evaluated task that matches the archive criteria, with its resolved target keyword. */
 export interface ArchiveMatch extends ArchiveCandidate {
   /** Target archived keyword for this task's state. */
   target: string;
+  /** Table-cell identity for cell tasks (same path:line as row siblings). */
+  tableCell?: { cellIndex: number };
 }
 
 /** Runtime copy of the archive settings a run evaluates against. */
@@ -70,11 +74,13 @@ export type UndoSkipReason =
 export interface ApplyArchiveDeps {
   /**
    * Resolve the CURRENT task state for a match (or null if it no longer
-   * exists). Production wiring: TaskStateManager.findTaskByPathAndLine.
+   * exists). cellIndex disambiguates table cells that share path:line.
+   * Production wiring: TaskStateManager.findTaskByPathAndLine.
    */
   getTask: (
     path: string,
     line: number,
+    cellIndex?: number,
   ) => (ArchiveMatchInput & { rawText: string }) | null;
   /** Perform the write. Production wiring: TaskUpdateCoordinator.updateTaskState(task, target, 'task-list'). */
   apply: (task: import('../types/task').Task, target: string) => Promise<void>;
@@ -91,6 +97,14 @@ export interface UndoDeps {
 }
 
 const MS_PER_DAY = 86_400_000;
+
+/** Narrow an ArchiveMatchInput to an ArchiveCandidate (path/line/rawText carrier). */
+function isArchiveCandidate(task: ArchiveMatchInput): task is ArchiveCandidate {
+  return (
+    typeof (task as ArchiveCandidate).path === 'string' &&
+    typeof (task as ArchiveCandidate).rawText === 'string'
+  );
+}
 
 /** Local-midnight truncation — timezone-safe day comparisons (local components only). */
 function localMidnight(date: Date): Date {
@@ -183,6 +197,7 @@ export class ArchiveService {
         state: task.state,
         closedDate: task.closedDate,
         target: mapping.target,
+        tableCell: isArchiveCandidate(task) ? task.tableCell : undefined,
       });
     }
     return matches;
@@ -203,7 +218,11 @@ export class ArchiveService {
     const skipped: { path: string; line: number; reason: string }[] = [];
     try {
       for (const match of matches) {
-        const current = deps.getTask(match.path, match.line);
+        const current = deps.getTask(
+          match.path,
+          match.line,
+          match.tableCell?.cellIndex,
+        );
         if (!current) {
           skipped.push({ path: match.path, line: match.line, reason: 'stale' });
           continue;

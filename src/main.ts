@@ -1,4 +1,4 @@
-import { Plugin, MarkdownView, Platform, Notice } from 'obsidian';
+import { Plugin, MarkdownView, Platform, Notice, TFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from './types/task';
 import { TaskListView } from './view/task-list/task-list-view';
@@ -311,6 +311,33 @@ export default class TodoTracker extends Plugin {
     if (this.vaultScanner) {
       await this.vaultScanner.scanVault();
     }
+  }
+
+  /**
+   * Read the current content of a single line, preferring the live editor
+   * buffer for open files. vault.cachedRead can lag the buffer until
+   * Obsidian's autosave flushes source-mode edits to disk, so archive undo
+   * verification must not rely on it for the file being edited.
+   */
+  public async readLiveLine(
+    path: string,
+    line: number,
+  ): Promise<string | null> {
+    const md = this.app.workspace
+      .getLeavesOfType('markdown')
+      .find(
+        (leaf) =>
+          leaf.view instanceof MarkdownView && leaf.view.file?.path === path,
+      )?.view as MarkdownView | undefined;
+    const editorLine = md?.editor?.getLine(line);
+    if (typeof editorLine === 'string') {
+      return editorLine;
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return null;
+    const content = await this.app.vault.cachedRead(file);
+    return content.split('\n')[line] ?? null;
   }
 
   // Obsidian lifecycle method called to save settings

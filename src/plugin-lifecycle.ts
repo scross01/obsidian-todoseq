@@ -1,5 +1,4 @@
 import TodoTracker from './main';
-import { TFile } from 'obsidian';
 import { ArchiveDialog } from './view/components/archive-dialog';
 import { VaultScanner } from './services/vault-scanner';
 import { SmartDateProcessor } from './services/smart-date-processor';
@@ -714,7 +713,6 @@ export class PluginLifecycleManager {
         keywordManager,
         vaultScanner: scanner,
         saveSettings: () => this.plugin.saveSettings(),
-        scanVault: () => this.plugin.scanVault(),
         app: this.plugin.app,
       },
       scanner.getKeywordManager(),
@@ -735,12 +733,9 @@ export class PluginLifecycleManager {
 
     try {
       const outcome = await service.undoLastRun({
-        getRawLine: async (path, line) => {
-          const file = this.plugin.app.vault.getAbstractFileByPath(path);
-          if (!(file instanceof TFile)) return null;
-          const content = await this.plugin.app.vault.cachedRead(file);
-          return content.split('\n')[line] ?? null;
-        },
+        // Live line read: prefers the editor buffer for open files (cachedRead
+        // can lag until autosave, which would fail undo verification).
+        getRawLine: (path, line) => this.plugin.readLiveLine(path, line),
         apply: async (task, originalState) => {
           // The service re-applies the journaled full-task snapshot (current
           // rawText + archived state) — no reconstruction needed. Table-cell
@@ -758,7 +753,10 @@ export class PluginLifecycleManager {
             ? `, skipped ${outcome.skipped.length}`
             : ''),
       );
-      await this.plugin.scanVault();
+      // No full rescan: the coordinator re-added restored tasks to the state
+      // manager (archived→non-archived re-add path). A rescan would read
+      // stale pre-undo content via cachedRead for open files and undo the
+      // manager update.
     } catch (error) {
       console.debug('TODOseq: archive undo failed:', error);
       new Notice('Undo failed. See console for details.');

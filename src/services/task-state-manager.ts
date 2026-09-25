@@ -229,18 +229,36 @@ export class TaskStateManager {
       this.keywordManager,
     );
 
-    // Update using path+line lookup for safety
-    // Note: updateTaskByPathAndLine already handles parent subtask count updates
-    this.updateTaskByPathAndLine(
+    const updates = {
+      state: newState,
+      completed: isCompleted,
+      rawText: newLine,
+    };
+
+    // Update using path+line lookup for safety. When the task is not in the
+    // manager (e.g. it was removed on archive because archived tasks are not
+    // collected, and this call is the undo/re-add), re-add it so views and
+    // the archive dialog see it again.
+    const existing = this.findTaskByPathAndLine(
       task.path,
       task.line,
-      {
-        state: newState,
-        completed: isCompleted,
-        rawText: newLine,
-      },
       task.tableCell?.cellIndex,
     );
+    if (existing) {
+      // Note: updateTaskByPathAndLine already handles parent subtask count updates
+      this.updateTaskByPathAndLine(
+        task.path,
+        task.line,
+        updates,
+        task.tableCell?.cellIndex,
+      );
+    } else {
+      this._tasks.push({
+        ...task,
+        ...updates,
+        _lastUpdateTime: Date.now(),
+      });
+    }
 
     // Notify subscribers of the change
     this.notifySubscribers();

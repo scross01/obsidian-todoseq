@@ -511,6 +511,10 @@ export class TaskUpdateCoordinator {
       context.type === 'state' ||
       (context.type === 'recurrence' && context.newStateForRecurrence)
     ) {
+      // optimisticUpdate re-adds the task when it is absent from the manager
+      // (archived→non-archived undo: the task was removed on archive because
+      // archived tasks are not collected). For archived targets it is a plain
+      // update; removeTaskFromStateManager below then drops it again.
       this.taskStateManager.optimisticUpdate(context.task, newState);
 
       if (this.keywordManager.isArchived(newState)) {
@@ -568,10 +572,11 @@ export class TaskUpdateCoordinator {
    * Used for non-editor sources where the line number may have shifted.
    */
   private resolveStoredTask(context: ProcessingContext): Task {
+    const cellIndex = context.task.tableCell?.cellIndex;
     let storedTask = this.taskStateManager.findTaskByPathAndLine(
       context.filePath,
       context.fileLine,
-      context.task.tableCell?.cellIndex,
+      cellIndex,
     );
 
     if (!storedTask || storedTask.rawText !== context.task.rawText) {
@@ -791,93 +796,90 @@ export class TaskUpdateCoordinator {
     const urgency = this.calculateUrgencyForTask(updatedTask);
     const cellIndex = updatedTask.tableCell?.cellIndex;
 
-    switch (context.type) {
-      case 'state':
+    // updateTaskByPathAndLine is a lookup-and-patch: it silently does nothing
+    // when the task is absent. An undo from an archived state re-adds the task
+    // in the sync phase, but finalize must be able to re-add too (e.g. the
+    // async phase resolved a different line via rawText). Push when missing.
+    const finalizeUpdate = (updates: Partial<Task>): void => {
+      const existing = this.taskStateManager.findTaskByPathAndLine(
+        updatedTask.path,
+        updatedTask.line,
+        cellIndex,
+      );
+      if (existing) {
         this.taskStateManager.updateTaskByPathAndLine(
           updatedTask.path,
           updatedTask.line,
-          {
-            rawText: updatedTask.rawText,
-            state: updatedTask.state,
-            completed: updatedTask.completed,
-            scheduledDate: updatedTask.scheduledDate,
-            deadlineDate: updatedTask.deadlineDate,
-            scheduledDateRepeat: updatedTask.scheduledDateRepeat,
-            deadlineDateRepeat: updatedTask.deadlineDateRepeat,
-            scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
-            deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
-            closedDate: updatedTask.closedDate,
-            startedDate: updatedTask.startedDate,
-            urgency,
-          },
+          updates,
           cellIndex,
         );
+      } else {
+        this.taskStateManager.addTask({ ...updatedTask, ...updates, urgency });
+      }
+    };
+
+    switch (context.type) {
+      case 'state':
+        finalizeUpdate({
+          rawText: updatedTask.rawText,
+          state: updatedTask.state,
+          completed: updatedTask.completed,
+          scheduledDate: updatedTask.scheduledDate,
+          deadlineDate: updatedTask.deadlineDate,
+          scheduledDateRepeat: updatedTask.scheduledDateRepeat,
+          deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+          scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
+          deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
+          closedDate: updatedTask.closedDate,
+          startedDate: updatedTask.startedDate,
+          urgency,
+        });
         break;
 
       case 'scheduled-date':
-        this.taskStateManager.updateTaskByPathAndLine(
-          updatedTask.path,
-          updatedTask.line,
-          {
-            rawText: updatedTask.rawText,
-            scheduledDate: updatedTask.scheduledDate,
-            scheduledDateRepeat: updatedTask.scheduledDateRepeat,
-            scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
-            urgency,
-          },
-          cellIndex,
-        );
+        finalizeUpdate({
+          rawText: updatedTask.rawText,
+          scheduledDate: updatedTask.scheduledDate,
+          scheduledDateRepeat: updatedTask.scheduledDateRepeat,
+          scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
+          urgency,
+        });
         break;
 
       case 'deadline-date':
-        this.taskStateManager.updateTaskByPathAndLine(
-          updatedTask.path,
-          updatedTask.line,
-          {
-            rawText: updatedTask.rawText,
-            deadlineDate: updatedTask.deadlineDate,
-            deadlineDateRepeat: updatedTask.deadlineDateRepeat,
-            deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
-            urgency,
-          },
-          cellIndex,
-        );
+        finalizeUpdate({
+          rawText: updatedTask.rawText,
+          deadlineDate: updatedTask.deadlineDate,
+          deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+          deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
+          urgency,
+        });
         break;
 
       case 'priority':
-        this.taskStateManager.updateTaskByPathAndLine(
-          updatedTask.path,
-          updatedTask.line,
-          {
-            rawText: updatedTask.rawText,
-            text: updatedTask.text,
-            state: updatedTask.state,
-            completed: updatedTask.completed,
-            priority: updatedTask.priority,
-            urgency,
-          },
-          cellIndex,
-        );
+        finalizeUpdate({
+          rawText: updatedTask.rawText,
+          text: updatedTask.text,
+          state: updatedTask.state,
+          completed: updatedTask.completed,
+          priority: updatedTask.priority,
+          urgency,
+        });
         break;
 
       case 'recurrence':
-        this.taskStateManager.updateTaskByPathAndLine(
-          updatedTask.path,
-          updatedTask.line,
-          {
-            rawText: updatedTask.rawText,
-            state: updatedTask.state,
-            completed: updatedTask.completed,
-            scheduledDate: updatedTask.scheduledDate,
-            deadlineDate: updatedTask.deadlineDate,
-            scheduledDateRepeat: updatedTask.scheduledDateRepeat,
-            deadlineDateRepeat: updatedTask.deadlineDateRepeat,
-            scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
-            deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
-            urgency,
-          },
-          cellIndex,
-        );
+        finalizeUpdate({
+          rawText: updatedTask.rawText,
+          state: updatedTask.state,
+          completed: updatedTask.completed,
+          scheduledDate: updatedTask.scheduledDate,
+          deadlineDate: updatedTask.deadlineDate,
+          scheduledDateRepeat: updatedTask.scheduledDateRepeat,
+          deadlineDateRepeat: updatedTask.deadlineDateRepeat,
+          scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
+          deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
+          urgency,
+        });
         break;
     }
 

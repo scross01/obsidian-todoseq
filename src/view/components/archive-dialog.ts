@@ -47,7 +47,6 @@ interface ArchiveDialogPlugin {
   keywordManager: KeywordManager;
   vaultScanner: { getKeywordManager(): KeywordManager } | null;
   saveSettings(): Promise<void>;
-  scanVault(): Promise<void>;
   app: App;
 }
 
@@ -269,11 +268,12 @@ export class ArchiveDialog {
       text: 'Closed before',
     });
     modeSelect.value = archive.criterionMode;
-    modeSelect.addEventListener('change', async () => {
+    modeSelect.addEventListener('change', () => {
       archive.criterionMode = modeSelect.value as 'days' | 'date';
-      await this.plugin.saveSettings();
-      this.renderCriteriaInputs(criteriaRow);
-      this.refreshPreview();
+      void this.plugin.saveSettings().then(() => {
+        this.renderCriteriaInputs(criteriaRow);
+        this.refreshPreview();
+      });
     });
 
     this.renderCriteriaInputs(criteriaRow);
@@ -300,12 +300,13 @@ export class ArchiveDialog {
         },
       });
       daysInput.value = String(archive.criterionDays);
-      daysInput.addEventListener('change', async () => {
+      daysInput.addEventListener('change', () => {
         const parsed = Number.parseInt(daysInput.value, 10);
         if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 3650) {
           archive.criterionDays = parsed;
-          await this.plugin.saveSettings();
-          this.refreshPreview();
+          void this.plugin.saveSettings().then(() => {
+            this.refreshPreview();
+          });
         }
       });
       container.createSpan({
@@ -322,11 +323,12 @@ export class ArchiveDialog {
             'aria-label': `Use ${preset} days threshold`,
           },
         });
-        presetBtn.addEventListener('click', async () => {
+        presetBtn.addEventListener('click', () => {
           archive.criterionDays = preset;
-          await this.plugin.saveSettings();
-          daysInput.value = String(preset);
-          this.refreshPreview();
+          void this.plugin.saveSettings().then(() => {
+            daysInput.value = String(preset);
+            this.refreshPreview();
+          });
         });
       }
     } else {
@@ -335,10 +337,11 @@ export class ArchiveDialog {
         attr: { type: 'date', 'aria-label': 'Closed before date' },
       });
       dateInput.value = archive.criterionDate;
-      dateInput.addEventListener('change', async () => {
+      dateInput.addEventListener('change', () => {
         archive.criterionDate = dateInput.value;
-        await this.plugin.saveSettings();
-        this.refreshPreview();
+        void this.plugin.saveSettings().then(() => {
+          this.refreshPreview();
+        });
       });
     }
   }
@@ -381,9 +384,9 @@ export class ArchiveDialog {
         attr: { type: 'checkbox' },
       });
       toggle.checked = row.enabled;
-      toggle.addEventListener('change', async () => {
+      toggle.addEventListener('change', () => {
         row.enabled = toggle.checked;
-        await this.persistMappings();
+        void this.persistMappings();
       });
 
       rowEl.createSpan({
@@ -409,11 +412,11 @@ export class ArchiveDialog {
         targetSelect.addClass('todoseq-archive-target-invalid');
       }
       targetSelect.value = row.target;
-      targetSelect.addEventListener('change', async () => {
+      targetSelect.addEventListener('change', () => {
         row.target = targetSelect.value;
         targetSelect.removeClass('todoseq-archive-target-invalid');
         row.targetInvalid = !row.validTargets.includes(row.target);
-        await this.persistMappings();
+        void this.persistMappings();
       });
     }
 
@@ -598,7 +601,7 @@ export class ArchiveDialog {
 
     this.applyBtn = buttons.createEl('button', {
       cls: 'mod-cta',
-    }) as HTMLButtonElement;
+    });
     this.applyBtn.addEventListener('click', () => void this.apply());
   }
 
@@ -615,8 +618,12 @@ export class ArchiveDialog {
 
     try {
       const result = await this.plugin.archiveService.applyArchives(toApply, {
-        getTask: (path, line) =>
-          this.plugin.taskStateManager.findTaskByPathAndLine(path, line),
+        getTask: (path, line, cellIndex) =>
+          this.plugin.taskStateManager.findTaskByPathAndLine(
+            path,
+            line,
+            cellIndex,
+          ),
         apply: (task, target) =>
           this.plugin.taskUpdateCoordinator.updateTaskState(
             task,
@@ -634,7 +641,10 @@ export class ArchiveDialog {
             ? `, skipped ${skippedCount} (changed since preview)`
             : ''),
       );
-      await this.plugin.scanVault();
+      // No vault rescan here. The update coordinator already refreshed the
+      // state manager (archived tasks were removed). A full rescan would read
+      // the file via cachedRead, which lags the editor buffer for open files
+      // until autosave — resurrecting stale pre-archive states in the list.
     } catch (error) {
       console.debug('TODOseq: archive run failed:', error);
       this.applyBtn.disabled = false;

@@ -8,10 +8,6 @@ import {
   SettingDefinitionGroup,
   SettingGroupItem,
 } from 'obsidian';
-import {
-  buildArchiveMappingRows,
-  toStateMappings,
-} from '../view/components/archive-dialog';
 import TodoTracker from '../main';
 import { TaskParser } from '../parser/task-parser';
 import {
