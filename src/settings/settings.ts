@@ -768,11 +768,83 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       await this.plugin.saveSettings();
     };
 
+    return {
+      type: 'group',
+      heading: 'Auto-archive completed tasks',
+      items: [
+        {
+          name: 'Enable automatic archiving',
+          desc: 'When enabled, tasks whose closed date is older than the threshold below are moved to their mapped archived state every time the vault is scanned (including at startup). Off by default.',
+          render: (setting) => {
+            setting.addToggle((toggle) => {
+              toggle.setValue(archive().autoArchiveEnabled).onChange(
+                (value) =>
+                  void persist(() => {
+                    archive().autoArchiveEnabled = value;
+                  }),
+              );
+            });
+          },
+        },
+        {
+          name: 'Archive threshold (days)',
+          desc: 'Tasks closed at least this many days ago match. Drives automatic runs and the dialog default.',
+          render: (setting) => {
+            setting.addText((text) => {
+              text.inputEl.type = 'number';
+              text.inputEl.min = '1';
+              text.inputEl.max = '3650';
+              text
+                .setValue(String(archive().criterionDays))
+                .onChange((value) => {
+                  const parsed = Number.parseInt(value, 10);
+                  if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 3650) {
+                    void persist(() => {
+                      archive().criterionDays = parsed;
+                    });
+                  }
+                });
+            });
+          },
+        },
+        // Derived at call time from the current keyword sets (plan 014):
+        // every tab render rebuilds the mapping rows, so keyword edits made
+        // while the tab is open appear on the next refresh.
+        ...this.buildArchiveMappingItems(persist),
+        {
+          name: 'Preview and archive',
+          desc: 'Open the archive dialog to preview matching tasks, exclude specific ones, and run the archive now. Tasks without a closed date are never archived.',
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText('Preview and archive\u2026')
+                .setCta()
+                .onClick(() => {
+                  this.plugin.lifecycleManager.openArchiveDialog();
+                }),
+            );
+          },
+        },
+      ],
+    };
+  }
+
+  /**
+   * Build one mapping item per completed keyword (toggle + target dropdown),
+   * reading the keyword sets at CALL time — not captured at construction —
+   * so a tab re-render always reflects the live keyword vocabulary (plan
+   * 014). Persistence writes through to settings.taskArchive.stateMappings.
+   */
+  private buildArchiveMappingItems(
+    persist: (mutate: () => void) => Promise<void>,
+  ): SettingGroupItem[] {
+    const archive = () => this.plugin.settings.taskArchive;
+
     const archivedKeywords =
       this.plugin.keywordManager.getKeywordsForGroup('archivedKeywords');
     const defaultTarget = archivedKeywords[0] ?? 'ARCHIVED';
 
-    const mappingItems: SettingGroupItem[] = this.plugin.keywordManager
+    return this.plugin.keywordManager
       .getKeywordsForGroup('completedKeywords')
       .map((source) => {
         const stored = archive().stateMappings.find((m) => m.source === source);
@@ -838,63 +910,92 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           },
         };
       });
+  }
 
-    return {
-      type: 'group',
-      heading: 'Auto-archive completed tasks',
-      items: [
-        {
-          name: 'Enable automatic archiving',
-          desc: 'When enabled, tasks whose closed date is older than the threshold below are moved to their mapped archived state every time the vault is scanned (including at startup). Off by default.',
-          render: (setting) => {
-            setting.addToggle((toggle) => {
-              toggle.setValue(archive().autoArchiveEnabled).onChange(
-                (value) =>
-                  void persist(() => {
-                    archive().autoArchiveEnabled = value;
-                  }),
-              );
-            });
-          },
-        },
-        {
-          name: 'Archive threshold (days)',
-          desc: 'Tasks closed at least this many days ago match. Drives automatic runs and the dialog default.',
-          render: (setting) => {
-            setting.addText((text) => {
-              text.inputEl.type = 'number';
-              text.inputEl.min = '1';
-              text.inputEl.max = '3650';
-              text
-                .setValue(String(archive().criterionDays))
-                .onChange((value) => {
-                  const parsed = Number.parseInt(value, 10);
-                  if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 3650) {
-                    void persist(() => {
-                      archive().criterionDays = parsed;
-                    });
-                  }
-                });
-            });
-          },
-        },
-        ...mappingItems,
-        {
-          name: 'Preview and archive',
-          desc: 'Open the archive dialog to preview matching tasks, exclude specific ones, and run the archive now. Tasks without a closed date are never archived.',
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText('Preview and archive\u2026')
-                .setCta()
-                .onClick(() => {
-                  this.plugin.lifecycleManager.openArchiveDialog();
-                }),
-            );
-          },
-        },
-      ],
-    };
+  /**
+   * Re-render the whole tab while preserving the user's editing state
+   * (plan 014 Step 2). Triggered by the debounced keyword commit: keyword
+   * edits change the archive mapping rows, and the rows derive at render
+   * time, so only a tab update surfaces them.
+   *
+   * Guard: record the focused keyword input (via keywordFieldBindings) plus
+   * caret position and the settings scroll position, call update(), then
+   * restore focus/caret/scroll on the next frame against the REBUILT DOM.
+   * If the focused element is not a bound keyword input, skip focus
+   * restoration for that case (acceptable degradation per plan).
+   */
+  private async refreshPreservingEditingState(): Promise<void> {
+    const active =
+      typeof activeDocument !== 'undefined'
+        ? activeDocument.activeElement
+        : null;
+    // Identity match against the bindings map — NOT instanceof: the settings
+    // modal can live in a separate window (Obsidian 1.13+), whose elements
+    // belong to a different JS realm, so a main-realm `instanceof
+    // HTMLInputElement` would be false for the very input we need to match.
+    const focusedBinding = active
+      ? Array.from(this.keywordFieldBindings.values()).find(
+          (binding) => binding.inputEl === active,
+        )
+      : undefined;
+    const caret =
+      focusedBinding && active
+        ? {
+            start: (active as HTMLInputElement).selectionStart,
+            end: (active as HTMLInputElement).selectionEnd,
+          }
+        : null;
+
+    const scroller = this.getSettingsScrollContainer();
+    const scrollTop = scroller?.scrollTop ?? null;
+
+    this.update();
+
+    await new Promise<void>((resolve) => {
+      window.setTimeout(() => resolve(), 0);
+    });
+
+    if (focusedBinding && caret) {
+      const fresh = Array.from(this.keywordFieldBindings.values()).find(
+        (binding) => binding.settingKey === focusedBinding.settingKey,
+      );
+      const inputEl = fresh?.inputEl;
+      if (inputEl) {
+        inputEl.focus();
+        try {
+          inputEl.setSelectionRange(caret.start, caret.end);
+        } catch {
+          // setSelectionRange can throw on non-text inputs; focus is enough.
+        }
+      }
+    }
+    if (scroller && scrollTop !== null) {
+      scroller.scrollTop = scrollTop;
+    }
+  }
+
+  /**
+   * Find the settings tab's scrollable ancestor (the element the user is
+   * actually scrolling). Walks up from containerEl to the first ancestor
+   * that can scroll vertically.
+   */
+  private getSettingsScrollContainer(): HTMLElement | null {
+    let el: HTMLElement | null = this.containerEl;
+    while (el) {
+      const style =
+        typeof activeWindow !== 'undefined'
+          ? activeWindow.getComputedStyle(el)
+          : null;
+      if (
+        style &&
+        style.overflowY === 'auto' &&
+        el.scrollHeight > el.clientHeight
+      ) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return null;
   }
 
   /**
@@ -1030,6 +1131,19 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
                 console.error(
                   'Failed to recreate parser with keywords:',
                   parseError,
+                );
+              }
+
+              // Keyword sets changed → the archive mapping rows (derived at
+              // render time) are stale. Re-render the tab once, guarded to
+              // preserve focus/caret/scroll (plan 014 Step 2). Runs after
+              // recreateParser so plugin.keywordManager is already fresh.
+              try {
+                await this.refreshPreservingEditingState();
+              } catch (refreshError) {
+                console.debug(
+                  'TODOseq: archive mapping refresh skipped:',
+                  refreshError,
                 );
               }
             })();

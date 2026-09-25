@@ -1127,4 +1127,97 @@ describe('TodoTrackerSettingTab', () => {
       });
     });
   });
+
+  describe('archive mapping rows derive at render time (plan 014)', () => {
+    /**
+     * The mock plugin's getKeywordsForGroup is a jest.fn over fixed arrays;
+     * point it at a mutable source so a second getSettingDefinitions() call
+     * can simulate a keyword commit while the tab is open.
+     */
+    function setKeywordGroups(completed: string[], archived: string[]): void {
+      (
+        pluginMock.keywordManager as { getKeywordsForGroup: jest.Mock }
+      ).getKeywordsForGroup.mockImplementation((group: string) => {
+        if (group === 'completedKeywords') return [...completed];
+        if (group === 'archivedKeywords') return [...archived];
+        return [];
+      });
+    }
+
+    function mappingNames(): string[] {
+      const defs = settingTab.getSettingDefinitions();
+      const group = defs.find(
+        (d): d is GroupDef =>
+          'type' in d &&
+          d.type === 'group' &&
+          d.heading === 'Auto-archive completed tasks',
+      );
+      expect(group).toBeDefined();
+      const known = new Set([
+        'Enable automatic archiving',
+        'Archive threshold (days)',
+        'Preview and archive',
+      ]);
+      return group!.items
+        .filter((item) => 'name' in item && !known.has(item.name))
+        .map((item) => (item as { name: string }).name);
+    }
+
+    it('re-derives mapping rows on every getSettingDefinitions call', () => {
+      setKeywordGroups(['DONE'], ['ARCHIVED']);
+      expect(mappingNames()).toEqual(['DONE \u2192']);
+
+      // Keyword commit while the tab is open: next render must reflect it.
+      setKeywordGroups(['DONE', 'SHIPPED'], ['ARCHIVED']);
+      expect(mappingNames()).toEqual(['DONE \u2192', 'SHIPPED \u2192']);
+
+      // Renamed/removed keyword: row disappears without stale entries.
+      setKeywordGroups(['DONE', 'SHIPPED'], ['ARCHIVED', 'ABANDONED']);
+      expect(mappingNames()).toEqual(['DONE \u2192', 'SHIPPED \u2192']);
+    });
+
+    it('keyword commit triggers exactly one guarded tab refresh', async () => {
+      const updateSpy = jest
+        .spyOn(settingTab, 'update')
+        .mockImplementation(() => {});
+
+      await (settingTab as any).refreshPreservingEditingState();
+
+      expect(updateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('guarded refresh restores focus and caret to the same keyword input', async () => {
+      jest.spyOn(settingTab, 'update').mockImplementation(() => {});
+
+      const input = activeDocument.createElement('input');
+      input.value = 'SHIPPED';
+      activeDocument.body.appendChild(input);
+      input.focus();
+      input.setSelectionRange(4, 4);
+
+      (settingTab as any).keywordFieldBindings.set(
+        'additionalCompletedKeywords',
+        {
+          settingKey: 'additionalCompletedKeywords',
+          inputEl: input,
+          settingEl: activeDocument.createElement('div'),
+        },
+      );
+
+      await (settingTab as any).refreshPreservingEditingState();
+
+      expect(activeDocument.activeElement).toBe(input);
+      expect(input.selectionStart).toBe(4);
+
+      input.remove();
+    });
+
+    it('guarded refresh does not throw when nothing is focused', async () => {
+      jest.spyOn(settingTab, 'update').mockImplementation(() => {});
+
+      await expect(
+        (settingTab as any).refreshPreservingEditingState(),
+      ).resolves.toBeUndefined();
+    });
+  });
 });
