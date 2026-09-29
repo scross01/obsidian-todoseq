@@ -178,4 +178,42 @@ test.describe('Archive dialog bulk select (plan 015)', () => {
 
     await closeDialog();
   });
+
+  test('date mode note follows the live criterion mode', async () => {
+    // Scoped by text: .todoseq-archive-note is also the mapping warning's
+    // base class, which exists in every dialog state.
+    const note = page.locator('.todoseq-archive-note', {
+      hasText: 'Specific-date mode',
+    });
+
+    await openDialog();
+
+    // Dialog opened in days mode: no date-mode note.
+    await expect(note).toHaveCount(0);
+
+    // Switch to date mode: the informational note appears.
+    await page.evaluate(() => {
+      const select = document.querySelector(
+        '#todoseq-archive-criterion-select',
+      ) as HTMLSelectElement | null;
+      if (!select) throw new Error('criterion select not found');
+      select.value = 'date';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(note).toBeVisible();
+    await expect(note).toContainText('Specific-date mode');
+
+    // Switch back to days: the stale note is removed.
+    await page.evaluate(() => {
+      const select = document.querySelector(
+        '#todoseq-archive-criterion-select',
+      ) as HTMLSelectElement | null;
+      if (!select) throw new Error('criterion select not found');
+      select.value = 'days';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(note).toHaveCount(0);
+
+    await closeDialog();
+  });
 });

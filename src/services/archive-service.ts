@@ -281,7 +281,22 @@ export class ArchiveService {
           continue;
         }
         const fullTask = current as import('../types/task').Task;
-        await deps.apply(fullTask, match.target);
+        try {
+          await deps.apply(fullTask, match.target);
+        } catch (error) {
+          console.debug(
+            'TODOseq: archive apply failed for',
+            match.path,
+            match.line,
+            error,
+          );
+          skipped.push({
+            path: match.path,
+            line: match.line,
+            reason: 'apply-failed',
+          });
+          continue;
+        }
         archived.push({
           path: match.path,
           line: match.line,

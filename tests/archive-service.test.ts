@@ -694,6 +694,122 @@ describe('ArchiveService.applyArchives', () => {
     expect(result.archived).toHaveLength(0);
     expect(service.hasUndoableRun()).toBe(false);
   });
+
+  // Regression: a mid-batch throw used to strand the undo journal holding the
+  // PREVIOUS run while earlier matches of THIS run were already rewritten on
+  // disk — undo would then revert the wrong (older) run. Per-match containment
+  // (mirroring undoLastRun) keeps the loop alive and the journal accurate.
+  it('journals the successful prefix when a later apply throws', async () => {
+    const { service, coordinator, store, deps } = setup();
+    const tasks = [
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 110) }),
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 120) }),
+    ];
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    const matches = service.evaluateArchiveCriteria(
+      tasks,
+      makeConfig(),
+      REFERENCE,
+    );
+
+    let applyCalls = 0;
+    const result = await service.applyArchives(matches, {
+      ...deps,
+      apply: async (task, target) => {
+        applyCalls += 1;
+        if (applyCalls === 2) {
+          throw new Error('simulated sync-phase failure');
+        }
+        await deps.apply(task, target);
+      },
+    });
+
+    // Matches 1 and 3 archived (containment means continue, not abort);
+    // match 2 skipped with the typed reason.
+    expect(result.archived).toHaveLength(2);
+    expect(result.archived.map((r) => r.line)).toEqual([
+      tasks[0].line,
+      tasks[2].line,
+    ]);
+    expect(result.skipped).toEqual([
+      { path: tasks[1].path, line: tasks[1].line, reason: 'apply-failed' },
+    ]);
+    expect(coordinator.calls).toHaveLength(2);
+    expect(service.hasUndoableRun()).toBe(true);
+  });
+
+  it('undo after a partial apply reverts only the succeeded matches', async () => {
+    const { service, store, deps } = setup();
+    const tasks = [
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 110) }),
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 120) }),
+    ];
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    const matches = service.evaluateArchiveCriteria(
+      tasks,
+      makeConfig(),
+      REFERENCE,
+    );
+
+    let applyCalls = 0;
+    await service.applyArchives(matches, {
+      ...deps,
+      apply: async (task, target) => {
+        applyCalls += 1;
+        if (applyCalls === 2) {
+          throw new Error('simulated sync-phase failure');
+        }
+        await deps.apply(task, target);
+      },
+    });
+
+    const applied: { state: string; target: string }[] = [];
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [ ] ARCHIVED task text',
+      apply: async (task, target) => {
+        applied.push({ state: task.state, target });
+      },
+    });
+
+    expect(outcome.reverted).toHaveLength(2);
+    expect(outcome.reverted.map((r) => r.line)).toEqual([
+      tasks[0].line,
+      tasks[2].line,
+    ]);
+    expect(applied).toEqual([
+      { state: 'ARCHIVED', target: 'DONE' },
+      { state: 'ARCHIVED', target: 'DONE' },
+    ]);
+  });
+
+  it('running flag resets after an apply failure', async () => {
+    const { service, store, deps } = setup();
+    const task = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+    });
+    store.set(`${task.path}:${task.line}`, task);
+    const matches = service.evaluateArchiveCriteria(
+      [task],
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const result = await service.applyArchives(matches, {
+      ...deps,
+      apply: async () => {
+        throw new Error('simulated sync-phase failure');
+      },
+    });
+
+    expect(service.isRunning()).toBe(false);
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      { path: task.path, line: task.line, reason: 'apply-failed' },
+    ]);
+  });
 });
 
 describe('ArchiveService.undoLastRun', () => {

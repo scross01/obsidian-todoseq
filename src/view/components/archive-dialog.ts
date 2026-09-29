@@ -161,7 +161,6 @@ export const BULK_INCLUDES_VISIBLE_ONLY = true;
  * deduplicated and disjoint by construction.
  */
 export function computeBulkInclude(
-  allMatches: ArchiveMatch[],
   visibleKeys: string[],
   include: boolean,
 ): { includeKeys: string[]; excludeKeys: string[] } {
@@ -251,6 +250,7 @@ export class ArchiveDialog {
   private previewCountEl: HTMLElement | null = null;
   private previewListEl: HTMLElement | null = null;
   private mappingWarningEl: HTMLElement | null = null;
+  private dateModeNoteEl: HTMLElement | null = null;
 
   constructor(
     private plugin: ArchiveDialogPlugin,
@@ -390,17 +390,25 @@ export class ArchiveDialog {
     modeSelect.value = archive.criterionMode;
     modeSelect.addEventListener('change', () => {
       archive.criterionMode = modeSelect.value as 'days' | 'date';
-      void this.plugin.saveSettings().then(() => {
-        this.renderCriteriaInputs(criteriaRow);
-        this.refreshPreview();
-      });
+      this.plugin
+        .saveSettings()
+        .then(() => {
+          this.renderCriteriaInputs(criteriaRow);
+          this.updateDateModeNote(section);
+          this.refreshPreview();
+        })
+        .catch((error) =>
+          console.debug('TODOseq: archive dialog settings save failed:', error),
+        );
     });
 
     this.renderCriteriaInputs(criteriaRow);
 
-    if (archive.criterionMode === 'date') {
-      this.buildDateModeNote(section);
-    }
+    // The section is fresh DOM on every build — any note element from a
+    // previous dialog open is gone, so reset the tracked reference before
+    // syncing the note with the saved mode.
+    this.dateModeNoteEl = null;
+    this.updateDateModeNote(section);
   }
 
   private renderCriteriaInputs(container: HTMLElement): void {
@@ -424,9 +432,17 @@ export class ArchiveDialog {
         const parsed = Number.parseInt(daysInput.value, 10);
         if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 3650) {
           archive.criterionDays = parsed;
-          void this.plugin.saveSettings().then(() => {
-            this.refreshPreview();
-          });
+          this.plugin
+            .saveSettings()
+            .then(() => {
+              this.refreshPreview();
+            })
+            .catch((error) =>
+              console.debug(
+                'TODOseq: archive dialog settings save failed:',
+                error,
+              ),
+            );
         }
       });
       container.createSpan({
@@ -445,10 +461,18 @@ export class ArchiveDialog {
         });
         presetBtn.addEventListener('click', () => {
           archive.criterionDays = preset;
-          void this.plugin.saveSettings().then(() => {
-            daysInput.value = String(preset);
-            this.refreshPreview();
-          });
+          this.plugin
+            .saveSettings()
+            .then(() => {
+              daysInput.value = String(preset);
+              this.refreshPreview();
+            })
+            .catch((error) =>
+              console.debug(
+                'TODOseq: archive dialog settings save failed:',
+                error,
+              ),
+            );
         });
       }
     } else {
@@ -459,19 +483,39 @@ export class ArchiveDialog {
       dateInput.value = archive.criterionDate;
       dateInput.addEventListener('change', () => {
         archive.criterionDate = dateInput.value;
-        void this.plugin.saveSettings().then(() => {
-          this.refreshPreview();
-        });
+        this.plugin
+          .saveSettings()
+          .then(() => {
+            this.refreshPreview();
+          })
+          .catch((error) =>
+            console.debug(
+              'TODOseq: archive dialog settings save failed:',
+              error,
+            ),
+          );
       });
     }
   }
 
-  private buildDateModeNote(container: HTMLElement): void {
-    container
-      .createDiv({ cls: 'todoseq-archive-note' })
-      .setText(
-        'Specific-date mode is available for manual runs only. Automatic archiving (if enabled in settings) always uses the days threshold.',
-      );
+  /**
+   * Keep the informational note in sync with the LIVE criterion mode, not
+   * the mode saved when the dialog opened: present only while the dialog is
+   * in date mode, added and removed on every mode switch.
+   */
+  private updateDateModeNote(section: HTMLElement): void {
+    if (this.plugin.settings.taskArchive.criterionMode === 'date') {
+      if (!this.dateModeNoteEl) {
+        const note = section.createDiv({ cls: 'todoseq-archive-note' });
+        note.setText(
+          'Specific-date mode is available for manual runs only. Automatic archiving (if enabled in settings) always uses the days threshold.',
+        );
+        this.dateModeNoteEl = note;
+      }
+    } else if (this.dateModeNoteEl) {
+      this.dateModeNoteEl.remove();
+      this.dateModeNoteEl = null;
+    }
   }
 
   // ── Mapping rows ────────────────────────────────────────────────────────
@@ -605,7 +649,6 @@ export class ArchiveDialog {
       .slice(0, visibleCount)
       .map((m) => getMatchKey(m));
     const { includeKeys, excludeKeys } = computeBulkInclude(
-      this.currentMatches,
       visibleKeys,
       include,
     );

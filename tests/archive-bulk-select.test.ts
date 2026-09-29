@@ -35,22 +35,22 @@ describe('computeBulkInclude', () => {
       makeMatch('bulk.md', i + 1),
     );
     const visibleSlice = many.slice(0, 200).map((m) => `${m.path}:${m.line}`);
-    const result = computeBulkInclude(many, visibleSlice, true);
+    const result = computeBulkInclude(visibleSlice, true);
     expect(result.includeKeys).toHaveLength(200);
     expect(result.excludeKeys).toHaveLength(0);
   });
 
   it('computes exclusions from the visible slice only', () => {
     const visibleSlice = keys.slice(0, 2);
-    const result = computeBulkInclude(matches, visibleSlice, false);
+    const result = computeBulkInclude(visibleSlice, false);
     expect(result.excludeKeys).toEqual(visibleSlice);
     expect(result.includeKeys).toHaveLength(0);
   });
 
   it('returns only the side requested, with deduplicated keys', () => {
     const visibleSlice = [...keys, ...keys];
-    const include = computeBulkInclude(matches, visibleSlice, true);
-    const exclude = computeBulkInclude(matches, visibleSlice, false);
+    const include = computeBulkInclude(visibleSlice, true);
+    const exclude = computeBulkInclude(visibleSlice, false);
     // Each call returns only its own side (the caller applies exactly one).
     expect(include.excludeKeys).toHaveLength(0);
     expect(exclude.includeKeys).toHaveLength(0);
