@@ -7,13 +7,20 @@ import {
   DashboardRenderer,
   DashboardCallbacks,
 } from '../src/view/embedded-dashboard/dashboard-renderer';
+import { DashboardCodeBlockProcessor } from '../src/view/embedded-dashboard/dashboard-code-block-processor';
+import TodoTracker from '../src/main';
 import {
   DashboardResult,
   DashboardGroup,
 } from '../src/view/embedded-dashboard/aggregation';
 import { DashboardParameters } from '../src/view/embedded-dashboard/dashboard-parser';
+import { Task } from '../src/types/task';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
-import { createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseSettings,
+  createBaseTask,
+  createTestKeywordManager,
+} from './helpers/test-helper';
 
 installObsidianDomMocks();
 
@@ -668,5 +675,205 @@ describe('tooltip content', () => {
       'High: 4 tasks · 33% of matched — Click to open in Task List',
     );
     host.remove();
+  });
+});
+
+describe('DashboardCodeBlockProcessor', () => {
+  let unsubscribeMock: jest.Mock;
+  let subscribeMock: jest.Mock;
+  let registerProcessorMock: jest.Mock;
+  let onFileChangeMock: jest.Mock;
+  let getTasksMock: jest.Mock;
+  let host: HTMLElement;
+  let pluginMock: Record<string, unknown>;
+
+  const SOURCE = [
+    'search: tag:project',
+    'group-by: priority',
+    'title: Due & overdue',
+  ].join('\n');
+
+  const taskAt = (
+    path: string,
+    line: number,
+    priority: Task['priority'],
+  ): Task =>
+    createBaseTask({
+      path,
+      line,
+      rawText: `TODO task #project`,
+      tags: ['project'],
+      priority,
+    });
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    unsubscribeMock = jest.fn();
+    subscribeMock = jest.fn().mockReturnValue(unsubscribeMock);
+    registerProcessorMock = jest.fn();
+    onFileChangeMock = jest.fn();
+    getTasksMock = jest.fn(() => [
+      taskAt('a.md', 0, 'high'),
+      taskAt('a.md', 1, 'med'),
+    ]);
+    host = document.createElement('div');
+    document.body.appendChild(host);
+
+    pluginMock = {
+      settings: createBaseSettings(),
+      keywordManager: createTestKeywordManager(),
+      propertySearchEngine: null,
+      taskStateManager: { subscribe: subscribeMock },
+      eventCoordinator: { onFileChange: onFileChangeMock },
+      getTasks: getTasksMock,
+      registerMarkdownCodeBlockProcessor: registerProcessorMock,
+      vaultScanner: { getKeywordManager: () => createTestKeywordManager() },
+      uiManager: {
+        showTasks: jest.fn().mockResolvedValue(undefined),
+        showTasksInNewTab: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    host.remove();
+  });
+
+  const makeProcessor = (): DashboardCodeBlockProcessor => {
+    const processor = new DashboardCodeBlockProcessor(
+      pluginMock as unknown as TodoTracker,
+    );
+    processor.registerProcessor();
+    return processor;
+  };
+
+  const processSource = async (
+    processor: DashboardCodeBlockProcessor,
+  ): Promise<void> => {
+    const handler = registerProcessorMock.mock.calls.find(
+      (call) => call[0] === 'todoseq-dashboard',
+    )?.[1] as (source: string, el: HTMLElement, ctx: unknown) => Promise<void>;
+    expect(handler).toBeDefined();
+    await handler(SOURCE, host, { sourcePath: 'note.md' });
+  };
+
+  it('subscribes to the task state manager and registers the processor', () => {
+    makeProcessor();
+    expect(subscribeMock).toHaveBeenCalledTimes(1);
+    expect(registerProcessorMock).toHaveBeenCalledWith(
+      'todoseq-dashboard',
+      expect.any(Function),
+    );
+    expect(onFileChangeMock).toHaveBeenCalledTimes(1);
+  });
+  it('renders a card into the block element and tracks it', async () => {
+    const processor = makeProcessor();
+    await processSource(processor);
+
+    expect(host.querySelector('.todoseq-dashboard-container')).not.toBeNull();
+    expect(host.querySelector('.todoseq-dashboard-title')?.textContent).toBe(
+      'Due & overdue',
+    );
+    const rows = host.querySelectorAll('.todoseq-dashboard-bar-row');
+    expect(rows.length).toBe(2); // high 1, medium 1 — none dropped
+  });
+
+  it('renders the parser error instead of a card', async () => {
+    const processor = makeProcessor();
+    const handler = registerProcessorMock.mock.calls[0][1] as (
+      source: string,
+      el: HTMLElement,
+      ctx: unknown,
+    ) => Promise<void>;
+    await handler('group-by: bogus', host, { sourcePath: 'note.md' });
+    // The error line replaces the content; the header shell remains
+    expect(host.querySelector('.todoseq-dashboard-error')?.textContent).toBe(
+      'Unknown group-by: bogus',
+    );
+    expect(host.querySelector('.todoseq-dashboard-content')).toBeNull();
+    expect(host.querySelector('.todoseq-dashboard-bar-row')).toBeNull();
+  });
+
+  it('refreshes tracked dashboards when the state manager notifies', async () => {
+    const processor = makeProcessor();
+    await processSource(processor);
+
+    const row = host.querySelector('.todoseq-dashboard-bar-row');
+    const countEl = row?.querySelector('.todoseq-dashboard-bar-count');
+    expect(countEl?.textContent).toBe('1');
+
+    // Task state changed somewhere (e.g. archive run): new counts arrive
+    getTasksMock.mockReturnValue([
+      taskAt('a.md', 0, 'high'),
+      taskAt('a.md', 1, 'high'),
+      taskAt('a.md', 2, 'med'),
+    ]);
+    const notify = subscribeMock.mock.calls[0][0] as (tasks: Task[]) => void;
+    notify([]);
+
+    await jest.advanceTimersByTimeAsync(200);
+
+    // Patched in place: same row node, fresh count
+    expect(host.querySelector('.todoseq-dashboard-bar-row')).toBe(row);
+    expect(countEl?.textContent).toBe('2');
+  });
+
+  it('untracks blocks from deleted files and refreshes the rest', async () => {
+    const processor = makeProcessor();
+    await processSource(processor);
+    expect(host.querySelector('.todoseq-dashboard-container')).not.toBeNull();
+
+    const fileChangeHandler = onFileChangeMock.mock.calls[0][0] as (event: {
+      type: string;
+      file: { path: string };
+      oldPath?: string;
+    }) => void;
+
+    fileChangeHandler({ type: 'delete', file: { path: 'other.md' } });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(host.querySelector('.todoseq-dashboard-container')).not.toBeNull();
+
+    fileChangeHandler({ type: 'delete', file: { path: 'note.md' } });
+    await jest.advanceTimersByTimeAsync(0);
+    // Block untracked; the element is left as-is (Obsidian removes it with
+    // the deleted file's markdown view)
+    expect(host.querySelector('.todoseq-dashboard-container')).not.toBeNull();
+    // Further state-manager notifications no longer refresh anything
+    const notify = subscribeMock.mock.calls[0][0] as (tasks: Task[]) => void;
+    notify([]);
+    await jest.advanceTimersByTimeAsync(200);
+  });
+
+  it('renames tracked blocks to the new path', async () => {
+    const processor = makeProcessor();
+    await processSource(processor);
+    const fileChangeHandler = onFileChangeMock.mock.calls[0][0] as (event: {
+      type: string;
+      file: { path: string };
+      oldPath?: string;
+    }) => void;
+
+    fileChangeHandler({
+      type: 'rename',
+      file: { path: 'renamed.md' },
+      oldPath: 'note.md',
+    });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(host.querySelector('.todoseq-dashboard-container')).not.toBeNull();
+  });
+
+  it('cleanup unsubscribes and clears tracked blocks', async () => {
+    const processor = makeProcessor();
+    await processSource(processor);
+    processor.cleanup();
+    expect(unsubscribeMock).toHaveBeenCalledTimes(1);
+
+    const notify = subscribeMock.mock.calls[0][0] as (tasks: Task[]) => void;
+    notify([]);
+    await jest.advanceTimersByTimeAsync(200);
+    // No refresh happened after cleanup (count unchanged)
+    const countEl = host.querySelector('.todoseq-dashboard-bar-count');
+    expect(countEl?.textContent).toBe('1');
   });
 });

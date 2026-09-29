@@ -16,6 +16,7 @@ import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting
 import { PluginLifecycleManager } from './plugin-lifecycle';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
+import { DashboardCodeBlockProcessor } from './view/embedded-dashboard/dashboard-code-block-processor';
 import { TaskStateManager } from './services/task-state-manager';
 import { KeywordManager } from './utils/keyword-manager';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
@@ -58,6 +59,9 @@ export default class TodoTracker extends Plugin {
 
   // Embedded task list processor (created by PluginLifecycleManager)
   public embeddedTaskListProcessor: TodoseqCodeBlockProcessor | null = null;
+
+  // Embedded dashboard card processor (created by PluginLifecycleManager)
+  public dashboardProcessor: DashboardCodeBlockProcessor | null = null;
 
   // Property search engine
   public propertySearchEngine: PropertySearchEngine | null = null;
@@ -272,6 +276,11 @@ export default class TodoTracker extends Plugin {
     // Update embedded task list processor with new settings
     if (this.embeddedTaskListProcessor) {
       this.embeddedTaskListProcessor.updateSettings();
+    }
+
+    // Update embedded dashboard processor with new settings
+    if (this.dashboardProcessor) {
+      this.dashboardProcessor.updateSettings();
     }
 
     // Update task list views with new settings

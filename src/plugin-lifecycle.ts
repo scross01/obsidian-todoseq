@@ -23,6 +23,7 @@ import { EventCoordinator } from './services/event-coordinator';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import { ArchiveService, shouldAutoArchive } from './services/archive-service';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
+import { DashboardCodeBlockProcessor } from './view/embedded-dashboard/dashboard-code-block-processor';
 import {
   smartDatePlugin,
   smartDateHighlightPlugin,
@@ -137,6 +138,12 @@ export class PluginLifecycleManager {
       this.plugin,
     );
     this.plugin.embeddedTaskListProcessor.registerProcessor();
+
+    // Initialize the todoseq-dashboard code block processor (plan 020)
+    this.plugin.dashboardProcessor = new DashboardCodeBlockProcessor(
+      this.plugin,
+    );
+    this.plugin.dashboardProcessor.registerProcessor();
 
     this.plugin.taskEditor = new TaskWriter(
       this.plugin,
@@ -511,6 +518,7 @@ export class PluginLifecycleManager {
         console.error('Error refreshing task list:', error);
       });
       this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists();
+      this.plugin.dashboardProcessor?.refreshAllDashboards();
     });
 
     this.plugin.vaultScanner.on('scan-completed', () => {
@@ -523,6 +531,7 @@ export class PluginLifecycleManager {
         });
         // Also refresh embedded lists
         this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists();
+        this.plugin.dashboardProcessor?.refreshAllDashboards();
         // Opt-in auto-archive after a full scan (plan 013). scan-completed
         // only fires from scanVault() — incremental file updates emit
         // tasks-changed without it — so no extra full-scan gating is needed.
@@ -635,6 +644,11 @@ export class PluginLifecycleManager {
     // Clean up embedded task list processor
     if (this.plugin.embeddedTaskListProcessor) {
       this.plugin.embeddedTaskListProcessor.cleanup();
+    }
+
+    // Clean up embedded dashboard processor
+    if (this.plugin.dashboardProcessor) {
+      this.plugin.dashboardProcessor.cleanup();
     }
 
     // Clean up EventCoordinator (removes all vault event listeners)
