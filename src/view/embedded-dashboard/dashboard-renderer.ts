@@ -474,10 +474,13 @@ export class DashboardRenderer {
     ringWrap.appendChild(svg);
 
     const visible = result.groups.filter((g) => g.count > 0);
-    const denominator = visible.reduce((sum, g) => sum + g.count, 0) || 1;
+    // Slice geometry divides by the visible-count sum so the ring closes even
+    // for overlapping tag counts. Displayed percentages (legend + tooltip)
+    // both use result.total via sharePct — see the legend value below.
+    const arcDenominator = visible.reduce((sum, g) => sum + g.count, 0) || 1;
     let accumulated = 0;
     visible.forEach((group, index) => {
-      const share = group.count / denominator;
+      const share = group.count / arcDenominator;
       const arc = Math.max(0, share * DONUT_CIRCUMFERENCE - DONUT_GAP);
       const circle = document.createElementNS(SVG_NAMESPACE, 'circle');
       circle.setAttribute('cx', String(DONUT_SIZE / 2));
@@ -534,7 +537,10 @@ export class DashboardRenderer {
       });
       row.createSpan({
         cls: 'todoseq-dashboard-legend-value',
-        text: `${group.count} · ${this.sharePct(group.count, denominator)}%`,
+        // Same sharePct(count, result.total) call the tooltip uses, so the
+        // legend % and the tooltip's "% of matched" are always one number —
+        // even for group-by: tag where sum(counts) may exceed the total.
+        text: `${group.count} · ${this.sharePct(group.count, result.total)}%`,
       });
       setTooltip(row, this.groupTooltip(group, result));
       this.bindOpen(row, params, group.filter, callbacks);
@@ -708,7 +714,9 @@ export class DashboardRenderer {
   ): void {
     const total = nextResult.total;
     const maxCount = this.maxCount(nextResult.groups);
-    const denominator =
+    // Slice geometry divides by the visible-count sum so the ring closes even
+    // for overlapping tag counts. Displayed percentages use result.total.
+    const arcDenominator =
       nextResult.groups.reduce((sum, g) => sum + g.count, 0) || 1;
 
     nextResult.groups.forEach((group) => {
@@ -736,7 +744,7 @@ export class DashboardRenderer {
       // Donut slice geometry
       const slice = node.tagName.toLowerCase() === 'circle' ? node : null;
       if (slice) {
-        const share = group.count / denominator;
+        const share = group.count / arcDenominator;
         const arc = Math.max(0, share * DONUT_CIRCUMFERENCE - DONUT_GAP);
         slice.setAttribute(
           'stroke-dasharray',
@@ -744,19 +752,37 @@ export class DashboardRenderer {
         );
       }
 
-      // Legend share text
-      const value = node.querySelector('.todoseq-dashboard-legend-value');
+      // Legend share text — same sharePct(count, result.total) the tooltip
+      // uses, so legend % and tooltip "% of matched" stay one number. The
+      // legend row is matched by class: the donut's SVG circle carries the
+      // same data-key and precedes the row in document order, so a bare
+      // [data-key] lookup would return the circle and miss the row entirely.
+      const legendRow = contentRoot.querySelector<HTMLElement>(
+        `.todoseq-dashboard-legend-row[data-key="${group.key}"]`,
+      );
+      const value = legendRow?.querySelector('.todoseq-dashboard-legend-value');
       if (value) {
-        value.textContent = `${group.count} · ${this.sharePct(group.count, denominator)}%`;
+        value.textContent = `${group.count} · ${this.sharePct(group.count, total)}%`;
       }
 
       // Tile number
       const tileNumber = node.querySelector('.todoseq-dashboard-tile-number');
       if (tileNumber) tileNumber.textContent = String(group.count);
 
-      // Tooltips and aria-labels are stale after a patch — re-apply
-      node.setAttribute('aria-label', this.groupAriaLabel(group, nextResult));
-      setTooltip(node as HTMLElement, this.groupTooltip(group, nextResult));
+      // Tooltips and aria-labels are stale after a patch — re-apply. The
+      // donut's circle node carries no visible tooltip of its own; its
+      // legend row is refreshed below.
+      if (node.tagName.toLowerCase() !== 'circle') {
+        node.setAttribute('aria-label', this.groupAriaLabel(group, nextResult));
+        setTooltip(node as HTMLElement, this.groupTooltip(group, nextResult));
+      }
+      if (legendRow) {
+        legendRow.setAttribute(
+          'aria-label',
+          this.groupAriaLabel(group, nextResult),
+        );
+        setTooltip(legendRow, this.groupTooltip(group, nextResult));
+      }
     });
 
     // Donut center total

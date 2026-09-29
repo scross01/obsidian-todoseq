@@ -330,6 +330,81 @@ describe('DashboardRenderer', () => {
         expect.anything(),
       );
     });
+
+    it('computes legend shares from the card total when counts overlap (tag grouping)', () => {
+      // sum(counts) = 7 > total = 5 — shares must divide by the total so the
+      // legend % matches the tooltip's "% of matched" number.
+      const overlapResult = result({
+        total: 5,
+        overlapsTotal: true,
+        groups: [
+          group('tag:home', '#home', 3, 'tag:home'),
+          group('tag:project', '#project', 3, 'tag:project'),
+          group('tag:work', '#work', 1, 'tag:work'),
+        ],
+      });
+      renderer.renderCard(
+        host,
+        overlapResult,
+        params({ display: 'donut', groupBy: 'tag' }),
+        noopCallbacks(),
+      );
+
+      const values = Array.from(
+        host.querySelectorAll('.todoseq-dashboard-legend-value'),
+      ).map((el) => el.textContent);
+      // sharePct(count, total): 3/5 = 60%, 3/5 = 60%, 1/5 = 20%
+      // (dividing by the count sum 7 would give 43/43/14 instead)
+      expect(values).toEqual(['3 · 60%', '3 · 60%', '1 · 20%']);
+
+      // The tooltip's "% of matched" is the same number as the legend value
+      const firstRow = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-legend-row',
+      );
+      expect(firstRow?.getAttribute('title')).toBe(
+        '#home: 3 tasks · 60% of matched — Click to open in Task List',
+      );
+    });
+
+    it('recomputes legend shares from the total when patching overlapping counts', () => {
+      const callbacks = noopCallbacks();
+      const p = params({ display: 'donut', groupBy: 'tag' });
+      renderer.renderCard(
+        host,
+        result({
+          total: 5,
+          overlapsTotal: true,
+          groups: [
+            group('tag:home', '#home', 3, 'tag:home'),
+            group('tag:project', '#project', 3, 'tag:project'),
+            group('tag:work', '#work', 1, 'tag:work'),
+          ],
+        }),
+        p,
+        callbacks,
+      );
+
+      renderer.updateContent(
+        host.querySelector('.todoseq-dashboard-content') as HTMLElement,
+        result({
+          total: 5,
+          overlapsTotal: true,
+          groups: [
+            group('tag:home', '#home', 4, 'tag:home'),
+            group('tag:project', '#project', 2, 'tag:project'),
+            group('tag:work', '#work', 2, 'tag:work'),
+          ],
+        }),
+        p,
+        callbacks,
+      );
+
+      const values = Array.from(
+        host.querySelectorAll('.todoseq-dashboard-legend-value'),
+      ).map((el) => el.textContent);
+      // sharePct(count, total): 4/5 = 80%, 2/5 = 40%, 2/5 = 40%
+      expect(values).toEqual(['4 · 80%', '2 · 40%', '2 · 40%']);
+    });
   });
 
   describe('tiles display', () => {
