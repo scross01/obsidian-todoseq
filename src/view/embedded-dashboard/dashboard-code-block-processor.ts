@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext } from 'obsidian';
+import { MarkdownPostProcessorContext, Notice } from 'obsidian';
 import TodoTracker from '../../main';
 import { VaultScanner } from '../../services/vault-scanner';
 import { DashboardAggregator } from './aggregation';
@@ -161,11 +161,12 @@ export class DashboardCodeBlockProcessor {
   ): void {
     const newTab =
       event instanceof MouseEvent && (event.metaKey || event.ctrlKey);
-    if (newTab) {
-      void this.plugin.uiManager.showTasksInNewTab();
-    } else {
-      void this.plugin.uiManager.showTasks();
-    }
+    this.plugin.uiManager
+      .showTasksWithQuery(query, newTab)
+      .catch((error: unknown) => {
+        console.error('Error opening task list with dashboard query:', error);
+        new Notice('Failed to open task list');
+      });
   }
 
   /**

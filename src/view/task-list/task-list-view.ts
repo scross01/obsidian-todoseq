@@ -1202,6 +1202,21 @@ export class TaskListView extends ItemView {
   }
 
   /**
+   * Set the search query programmatically and refresh the list
+   * (dashboard drill-through). Matches applySavedSearch's refresh sequence
+   * without touching view mode, sort, or match-case (the dashboard does not
+   * carry those overrides).
+   */
+  async applyQueryAndRefresh(query: string): Promise<void> {
+    if (this.searchInputEl) {
+      this.searchInputEl.value = query;
+    }
+    this.setSearchQuery(query);
+    this.updateSaveSearchBtnVisibility(query);
+    await this.refreshVisibleList(true);
+  }
+
+  /**
    * Open save dialog for creating a new saved search
    */
   private openSaveSearchDialog(prefilledQuery?: string): void {
