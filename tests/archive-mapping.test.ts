@@ -1,7 +1,9 @@
 import {
   buildArchiveMappingRows,
+  getMatchKey,
   mergeMappingRowsIntoStored,
   toStateMappings,
+  type ArchiveMatchKeyInput,
 } from '../src/view/components/archive-dialog';
 
 describe('buildArchiveMappingRows', () => {
@@ -113,6 +115,36 @@ describe('buildArchiveMappingRows', () => {
     expect(buildArchiveMappingRows(completed, [], [], 'ARCHIVED')).toHaveLength(
       3,
     );
+  });
+});
+
+describe('getMatchKey', () => {
+  it('keys a non-table match by path:line only', () => {
+    const match: ArchiveMatchKeyInput = { path: 'p', line: 1 };
+    expect(getMatchKey(match)).toBe('p:1');
+  });
+
+  it('appends the cellIndex for a table-cell match', () => {
+    const match: ArchiveMatchKeyInput = {
+      path: 'p',
+      line: 1,
+      tableCell: { cellIndex: 2 },
+    };
+    expect(getMatchKey(match)).toBe('p:1:2');
+  });
+
+  it('gives table-cell siblings in the same row distinct keys', () => {
+    const first: ArchiveMatchKeyInput = {
+      path: 'p',
+      line: 1,
+      tableCell: { cellIndex: 2 },
+    };
+    const second: ArchiveMatchKeyInput = {
+      path: 'p',
+      line: 1,
+      tableCell: { cellIndex: 5 },
+    };
+    expect(getMatchKey(first)).not.toBe(getMatchKey(second));
   });
 });
 

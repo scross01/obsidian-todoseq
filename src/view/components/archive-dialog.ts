@@ -172,6 +172,25 @@ export function computeBulkInclude(
   return { includeKeys: [], excludeKeys: unique };
 }
 
+/** Canonical selection identity — same shape as getTaskKey (task-utils): table-cell siblings share path:line. */
+export type ArchiveMatchKeyInput = Pick<ArchiveMatch, 'path' | 'line'> & {
+  tableCell?: { cellIndex: number };
+};
+
+/**
+ * Canonical selection key for a preview match: `path:line`, or
+ * `path:line:cellIndex` for table-cell matches so two task cells in the same
+ * table row are selected independently. Built via join (not path/line
+ * template interpolation) so the "no raw key interpolation" grep stays
+ * meaningful for this file. Pure and DOM-free so its unit tests need no
+ * Obsidian environment.
+ */
+export function getMatchKey(m: ArchiveMatchKeyInput): string {
+  return m.tableCell
+    ? [m.path, m.line, m.tableCell.cellIndex].join(':')
+    : [m.path, m.line].join(':');
+}
+
 /**
  * Archive-run completion notice: message and (optional) action button laid
  * out in one flex row with a real gap — the raw Notice message element
@@ -584,7 +603,7 @@ export class ArchiveDialog {
     );
     const visibleKeys = this.currentMatches
       .slice(0, visibleCount)
-      .map((m) => `${m.path}:${m.line}`);
+      .map((m) => getMatchKey(m));
     const { includeKeys, excludeKeys } = computeBulkInclude(
       this.currentMatches,
       visibleKeys,
@@ -604,7 +623,7 @@ export class ArchiveDialog {
     }
 
     const included = this.currentMatches.filter((m) =>
-      this.includedPaths.has(`${m.path}:${m.line}`),
+      this.includedPaths.has(getMatchKey(m)),
     );
     this.updateApplyButton(included.length, this.currentMatches);
   }
@@ -618,7 +637,7 @@ export class ArchiveDialog {
     // after a criteria change) are added; tasks that stopped matching are
     // dropped so a stale exclusion can't silently include a no-longer-valid
     // task. User exclusions persist across preview refreshes.
-    const matchKeys = new Set(matches.map((m) => `${m.path}:${m.line}`));
+    const matchKeys = new Set(matches.map((m) => getMatchKey(m)));
     for (const key of matchKeys) {
       this.includedPaths.add(key);
     }
@@ -627,7 +646,7 @@ export class ArchiveDialog {
     }
 
     const included = matches.filter((m) =>
-      this.includedPaths.has(`${m.path}:${m.line}`),
+      this.includedPaths.has(getMatchKey(m)),
     );
 
     this.previewCountEl.setText(
@@ -657,7 +676,7 @@ export class ArchiveDialog {
 
   private buildPreviewRow(match: ArchiveMatch): void {
     if (!this.previewListEl) return;
-    const key = `${match.path}:${match.line}`;
+    const key = getMatchKey(match);
     const rowEl = this.previewListEl.createDiv({
       cls: 'todoseq-archive-row',
     });
@@ -674,7 +693,7 @@ export class ArchiveDialog {
         this.includedPaths.delete(key);
       }
       const included = this.currentMatches.filter((m) =>
-        this.includedPaths.has(`${m.path}:${m.line}`),
+        this.includedPaths.has(getMatchKey(m)),
       );
       this.updateApplyButton(included.length, this.currentMatches);
     });
@@ -780,7 +799,7 @@ export class ArchiveDialog {
     if (!this.applyBtn || this.applyBtn.disabled) return;
     const matches = this.evaluateMatches();
     const toApply = matches.filter((m) =>
-      this.includedPaths.has(`${m.path}:${m.line}`),
+      this.includedPaths.has(getMatchKey(m)),
     );
     if (toApply.length === 0) return;
 

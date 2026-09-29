@@ -216,4 +216,68 @@ test.describe('Archive state refresh (regression)', () => {
     const matches = await reopenDialogAndCountMatches(page);
     expect(matches).toBe(3); // two list tasks + one table task
   });
+
+  test('sibling table cells in one row are selected independently (cell-scoped keys)', async () => {
+    // One table row, TWO matching task cells: same path:line, distinguished
+    // only by cellIndex. The dialog must key selection by path:line:cellIndex
+    // so unchecking one sibling does not flip the other.
+    await page.evaluate(
+      ({ file, oldClosed }) => {
+        const app = (window as any).app;
+        const lines: string[] = [
+          '# Archive Sibling Cells',
+          '',
+          '| Task A | Task B |',
+          '|--------|--------|',
+          `| DONE Cell A<br>CLOSED: [${oldClosed}] | DONE Cell B<br>CLOSED: [${oldClosed}] |`,
+        ];
+        app.vault.create(file, lines.join('\n'));
+      },
+      { file: FILE, oldClosed: OLD_CLOSED },
+    );
+    await page.waitForTimeout(300);
+    await rescan(page);
+    await page.waitForTimeout(300);
+
+    // Open the dialog: both sibling cells must render as separate preview rows.
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      await app.commands.executeCommandById('todoseq:archive-completed-tasks');
+    });
+    await page.waitForSelector('.todoseq-archive-modal', { timeout: 5000 });
+    await page.waitForTimeout(300);
+    const previewRows = page.locator(
+      '.todoseq-archive-modal .todoseq-archive-row',
+    );
+    await expect(previewRows).toHaveCount(2);
+
+    // Uncheck the FIRST row's checkbox (cell 0 — parse order is cellIndex
+    // ascending, so row order is deterministic). The apply label must agree
+    // with the pixels: 1 of 2 included.
+    await previewRows.first().locator('input[type="checkbox"]').uncheck();
+    await expect(page.locator('.todoseq-archive-modal .mod-cta')).toHaveText(
+      'Archive 1 of 2 tasks',
+    );
+
+    await page.click('.todoseq-archive-modal .mod-cta');
+    await page.waitForSelector('.todoseq-archive-modal', {
+      state: 'detached',
+      timeout: 10000,
+    });
+    await page.waitForTimeout(400);
+
+    // Cell A (row 1, unchecked) keeps DONE; cell B (row 2) was archived.
+    const rowLine = await page.evaluate(async (file) => {
+      const app = (window as any).app;
+      const f = app.vault.getAbstractFileByPath(file);
+      const content = await app.vault.read(f);
+      return (
+        content.split('\n').find((l: string) => l.includes('Cell A')) ?? ''
+      );
+    }, FILE);
+    expect(rowLine).toContain('DONE Cell A');
+    expect(rowLine).toContain('ARCHIVED Cell B');
+    expect(rowLine).not.toContain('ARCHIVED Cell A');
+    expect(rowLine).not.toContain('DONE Cell B');
+  });
 });
