@@ -40,7 +40,7 @@ A full rescan is not typically required, unless the vault level setting for Excl
 
 ### Archive completed tasks
 
-Opens the archive preview dialog. Choose a criterion ("Closed more than" N days ago with presets, or "Closed before" a date), adjust the state mappings, review the matching tasks, and confirm. Nothing is written until you apply. See [Auto-Archive](auto-archive.md).
+Opens the archive preview dialog. Choose a criterion ("Closed at least" N days ago with presets, or "Closed before" a date), adjust the state mappings, review the matching tasks, and confirm. Nothing is written until you apply. See [Auto-Archive](auto-archive.md).
 
 ### Undo last archive run
 

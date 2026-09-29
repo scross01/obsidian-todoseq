@@ -158,6 +158,8 @@ test.describe('Archive dialog bulk select (plan 015)', () => {
     await expect(page.locator('.todoseq-archive-empty')).toHaveText(
       'No tasks match the current criteria.',
     );
+    // Dead controls in the empty state: bulk include/exclude hides with it.
+    await expect(page.locator('.todoseq-archive-bulk')).toBeHidden();
     await expect(page.locator('.mod-cta')).toHaveText('Nothing to archive');
     await expect(page.locator('.mod-cta')).toBeDisabled();
 

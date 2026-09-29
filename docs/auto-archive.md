@@ -34,7 +34,7 @@ Everything else on the line — text, priority, dates, indentation, table-cell p
 
 Open the dialog with **TODOseq: Archive completed tasks** in the Command Palette, or the **Preview and archive…** button in settings. Nothing is written until you confirm.
 
-**Criterion** — choose _Closed more than_ N days ago (with 30/90/180/365 presets) or _Closed before_ a specific date. Date mode is available for manual runs only; automatic runs always use the days threshold.
+**Criterion** — choose _Closed at least_ N days ago (with 30/90/180/365 presets) or _Closed before_ a specific date. Date mode is available for manual runs only; automatic runs always use the days threshold.
 
 **State mappings** — the same rows as the settings section, editable here. Changes apply immediately and persist.
 

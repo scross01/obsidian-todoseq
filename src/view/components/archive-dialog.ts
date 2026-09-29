@@ -249,6 +249,7 @@ export class ArchiveDialog {
   private applyLabel = '';
   private previewCountEl: HTMLElement | null = null;
   private previewListEl: HTMLElement | null = null;
+  private bulkRowEl: HTMLElement | null = null;
   private mappingWarningEl: HTMLElement | null = null;
   private dateModeNoteEl: HTMLElement | null = null;
 
@@ -381,7 +382,10 @@ export class ArchiveDialog {
     });
     modeSelect.createEl('option', {
       attr: { value: 'days' },
-      text: 'Closed more than',
+      // "At least" matches the evaluator's `ageDays >= criterionDays` and the
+      // settings tab / docs wording ("Tasks closed at least this many days
+      // ago").
+      text: 'Closed at least',
     });
     modeSelect.createEl('option', {
       attr: { value: 'date' },
@@ -545,7 +549,10 @@ export class ArchiveDialog {
       const rowEl = section.createDiv({ cls: 'todoseq-archive-mapping' });
 
       const toggle = rowEl.createEl('input', {
-        attr: { type: 'checkbox' },
+        // The visible source keyword is a sibling span, not a label, so the
+        // checkbox needs an explicit accessible name (WCAG 4.1.2) — matching
+        // the target select beside it.
+        attr: { type: 'checkbox', 'aria-label': `Archive ${row.source} tasks` },
       });
       toggle.checked = row.enabled;
       toggle.addEventListener('change', () => {
@@ -617,6 +624,7 @@ export class ArchiveDialog {
     // Bulk include controls (plan 015 deferred P2): scoped to the VISIBLE
     // rows — the cap means "all" would silently differ from "rendered".
     const bulkRow = section.createDiv({ cls: 'todoseq-archive-bulk' });
+    this.bulkRowEl = bulkRow;
     const includeVisibleBtn = bulkRow.createEl('button', {
       cls: 'todoseq-archive-bulk-btn',
       text: 'Include visible',
@@ -696,6 +704,9 @@ export class ArchiveDialog {
       matches.length === 1 ? '1 task matches' : `${matches.length} tasks match`,
     );
     this.previewListEl.empty();
+
+    // Dead controls in the empty state: hide the bulk row with it.
+    this.bulkRowEl?.toggleClass('todoseq-hidden', matches.length === 0);
 
     if (matches.length === 0) {
       this.previewListEl

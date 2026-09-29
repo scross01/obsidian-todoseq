@@ -2710,7 +2710,11 @@
 
 .todoseq-archive-source {
   font-weight: var(--font-semibold);
-  color: var(--interactive-accent);
+  /* Raw --interactive-accent measures below WCAG AA (4.5:1) for this 15px
+     text in both themes (dark 4.00:1, light 3.43:1). Mixing the accent into
+     --text-normal keeps the accent identity while lifting contrast; measured
+     >= 4.5:1 in dark and light. */
+  color: color-mix(in srgb, var(--interactive-accent) 55%, var(--text-normal));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2744,6 +2748,13 @@
 .todoseq-archive-bulk {
   display: flex;
   gap: var(--size-2-2);
+}
+
+/* The bulk row's own display: flex outranks the generic .todoseq-hidden rule
+   (same specificity, later in the file), so the empty-state hide needs a
+   scoped variant — same pattern as .todoseq-panel .todoseq-hidden above. */
+.todoseq-archive-bulk.todoseq-hidden {
+  display: none;
 }
 
 .todoseq-archive-bulk-btn {
@@ -2857,6 +2868,26 @@
 .is-mobile .todoseq-archive-modal {
   width: 92vw;
   min-width: 0;
+}
+
+/* Phone-class layouts: bottom sheet instead of the centered box. Centering
+   (top: 50% + translate) with `max-height: 85vh` pushes tall content past
+   the viewport instead of clipping it inside — on a 420x900 window the
+   footer could sit half off-screen. Anchoring to the bottom keeps the
+   footer reachable no matter how tall the content grows; the modal itself
+   scrolls internally (base rule's overflow-y: auto). Tablets keep the
+   centered .is-mobile rules above. */
+.is-phone .todoseq-archive-modal {
+  top: auto;
+  bottom: 0;
+  left: 0;
+  transform: none;
+  width: 100vw;
+  min-width: 0;
+  max-width: 100vw;
+  max-height: 92dvh;
+  border-radius: var(--radius-l) var(--radius-l) 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .is-mobile .todoseq-archive-mapping {
