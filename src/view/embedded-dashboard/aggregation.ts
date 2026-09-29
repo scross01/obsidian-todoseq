@@ -18,12 +18,7 @@ import { PropertySearchEngine } from '../../services/property-search-engine';
  */
 
 export type DashboardGroupBy =
-  | 'priority'
-  | 'state'
-  | 'keyword'
-  | 'tag'
-  | 'scheduled'
-  | 'deadline';
+  'priority' | 'state' | 'keyword' | 'tag' | 'scheduled' | 'deadline';
 
 export type DashboardDisplay = 'bar' | 'column' | 'donut' | 'tiles' | 'heatmap';
 
@@ -156,7 +151,12 @@ const PRIORITY_BUCKETS: Array<{
   filter: string;
   value: 'high' | 'med' | 'low' | null;
 }> = [
-  { key: 'priority:high', label: 'High', filter: 'priority:high', value: 'high' },
+  {
+    key: 'priority:high',
+    label: 'High',
+    filter: 'priority:high',
+    value: 'high',
+  },
   {
     key: 'priority:medium',
     label: 'Medium',
@@ -338,7 +338,9 @@ export class DashboardAggregator {
         return { task, matches };
       }),
     );
-    return results.filter((result) => result.matches).map((result) => result.task);
+    return results
+      .filter((result) => result.matches)
+      .map((result) => result.task);
   }
 
   /** Dispatch to the resolver for the group-by attribute. */
@@ -393,13 +395,10 @@ export class DashboardAggregator {
     // filters, so append an "Archived" group whose count is computed by
     // membership and whose filter OR-joins the individual keywords. This
     // keeps sum(counts) == total for state grouping.
-    const archivedKeywords = this.keywordManager.getKeywordsForGroup(
-      'archivedKeywords',
-    );
+    const archivedKeywords =
+      this.keywordManager.getKeywordsForGroup('archivedKeywords');
     if (archivedKeywords.length > 0) {
-      const archivedSet = new Set(
-        archivedKeywords.map((k) => k.toLowerCase()),
-      );
+      const archivedSet = new Set(archivedKeywords.map((k) => k.toLowerCase()));
       const uniqueKeywords = Array.from(new Set(archivedKeywords));
       groups.push({
         key: 'state:archived',
@@ -550,7 +549,8 @@ export class DashboardAggregator {
     const windowStartNumber = dayNumber(windowStart);
 
     for (const task of matched) {
-      const date = field === 'scheduled' ? task.scheduledDate : task.deadlineDate;
+      const date =
+        field === 'scheduled' ? task.scheduledDate : task.deadlineDate;
       if (!date) continue;
       const dayStart = startOfLocalDay(date);
       if (dayStart.getTime() < todayStart.getTime()) continue;

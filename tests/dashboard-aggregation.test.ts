@@ -167,13 +167,28 @@ describe('DashboardAggregator', () => {
       // The OR-joined filter must actually resolve through the evaluator —
       // individual keywords resolve where the group name does not.
       expect(
-        await Search.evaluate(archivedGroup?.filter ?? '', archived, false, settings),
+        await Search.evaluate(
+          archivedGroup?.filter ?? '',
+          archived,
+          false,
+          settings,
+        ),
       ).toBe(true);
       expect(
-        await Search.evaluate(archivedGroup?.filter ?? '', shipped, false, settings),
+        await Search.evaluate(
+          archivedGroup?.filter ?? '',
+          shipped,
+          false,
+          settings,
+        ),
       ).toBe(true);
       expect(
-        await Search.evaluate(archivedGroup?.filter ?? '', active, false, settings),
+        await Search.evaluate(
+          archivedGroup?.filter ?? '',
+          active,
+          false,
+          settings,
+        ),
       ).toBe(false);
     });
 
@@ -488,7 +503,12 @@ describe('DashboardAggregator', () => {
       expect(result.days?.some((d) => d.date === todayKey)).toBe(true);
       // The day filter resolves through the evaluator
       expect(
-        await Search.evaluate(`scheduled:${todayKey}`, todayTask, false, settings),
+        await Search.evaluate(
+          `scheduled:${todayKey}`,
+          todayTask,
+          false,
+          settings,
+        ),
       ).toBe(true);
     });
   });
@@ -738,12 +758,12 @@ describe('composeFilterQuery', () => {
       state: 'ARCHIVED',
     });
 
-    expect(await Search.evaluate(composed, projectArchived, false, settings)).toBe(
-      true,
-    );
-    expect(await Search.evaluate(composed, projectActive, false, settings)).toBe(
-      false,
-    );
+    expect(
+      await Search.evaluate(composed, projectArchived, false, settings),
+    ).toBe(true);
+    expect(
+      await Search.evaluate(composed, projectActive, false, settings),
+    ).toBe(false);
     expect(
       await Search.evaluate(composed, untaggedArchived, false, settings),
     ).toBe(false);

@@ -131,7 +131,10 @@ export class TodoseqDashboardParser {
           }
           display = value as DashboardDisplay;
         } else if (trimmed.startsWith('layout:')) {
-          const value = trimmed.substring('layout:'.length).trim().toLowerCase();
+          const value = trimmed
+            .substring('layout:'.length)
+            .trim()
+            .toLowerCase();
           if (!LAYOUT_VALUES.includes(value as 'card' | 'strip')) {
             throw new Error(
               `Invalid layout option: ${value}. Valid options: ${LAYOUT_VALUES.join(', ')}`,

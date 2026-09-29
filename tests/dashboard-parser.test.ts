@@ -84,21 +84,21 @@ describe('TodoseqDashboardParser', () => {
 
   describe('boolean alternates (true/show, false/hide)', () => {
     it('accepts show/hide for show-query', () => {
-      expect(
-        TodoseqDashboardParser.parse('show-query: show').showQuery,
-      ).toBe(true);
-      expect(
-        TodoseqDashboardParser.parse('show-query: hide').showQuery,
-      ).toBe(false);
+      expect(TodoseqDashboardParser.parse('show-query: show').showQuery).toBe(
+        true,
+      );
+      expect(TodoseqDashboardParser.parse('show-query: hide').showQuery).toBe(
+        false,
+      );
     });
 
     it('accepts show/hide for show-empty', () => {
-      expect(
-        TodoseqDashboardParser.parse('show-empty: show').showEmpty,
-      ).toBe(true);
-      expect(
-        TodoseqDashboardParser.parse('show-empty: hide').showEmpty,
-      ).toBe(false);
+      expect(TodoseqDashboardParser.parse('show-empty: show').showEmpty).toBe(
+        true,
+      );
+      expect(TodoseqDashboardParser.parse('show-empty: hide').showEmpty).toBe(
+        false,
+      );
     });
 
     it('rejects invalid boolean values', () => {
@@ -196,8 +196,12 @@ describe('TodoseqDashboardParser', () => {
 
     it('rejects non-positive or non-numeric max-groups', () => {
       expect(TodoseqDashboardParser.parse('max-groups: 0').error).toBeDefined();
-      expect(TodoseqDashboardParser.parse('max-groups: -2').error).toBeDefined();
-      expect(TodoseqDashboardParser.parse('max-groups: abc').error).toBeDefined();
+      expect(
+        TodoseqDashboardParser.parse('max-groups: -2').error,
+      ).toBeDefined();
+      expect(
+        TodoseqDashboardParser.parse('max-groups: abc').error,
+      ).toBeDefined();
       expect(TodoseqDashboardParser.parse('max-groups: 3').maxGroups).toBe(3);
     });
 
