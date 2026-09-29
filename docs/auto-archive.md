@@ -1,6 +1,6 @@
 # Auto-Archive
 
-Auto-Archive rewrites completed task keywords (e.g. `DONE`) to an archived keyword (e.g. `ARCHIVED`) once a task's CLOSED date is older than a threshold. The tasks stay in your notes with their history intact — they just stop appearing in the Task List. You can run it manually from a preview dialog, or opt in to automatic runs after vault scans.
+Auto-Archive rewrites completed task keywords (e.g. `DONE`) to an archived keyword (e.g. `ARCHIVED`) once a task's CLOSED date is at least the threshold days old. The tasks stay in your notes with their history intact — they just stop appearing in the Task List. You can run it manually from a preview dialog, or opt in to automatic runs after vault scans.
 
 ## Why Archive?
 
@@ -41,6 +41,7 @@ Open the dialog with **TODOseq: Archive completed tasks** in the Command Palette
 **Preview list** — every matching task with its text, file path, CLOSED date, and the rewrite that will happen (`DONE → ARCHIVED`). Each row has a checkbox:
 
 - Uncheck rows you want to leave alone
+- Tasks in table cells are previewed per cell, so two tasks sharing one table row are archived (or skipped) independently
 - **Include visible** / **Exclude visible** bulk-toggle the rows in the list
 - The list shows up to 200 rows ("+N more not shown"); bulk buttons apply to the visible rows only, so they never silently touch tasks you cannot see
 
@@ -56,6 +57,7 @@ Automatic runs always use the days threshold (never date mode), respect the same
 
 - Click **Undo** in the completion notice, or run **TODOseq: Undo last archive run** from the Command Palette
 - The most recent run is reverted; each line is verified before restoring, and lines that changed since the run are skipped and reported
+- A run that is interrupted partway is still undoable — Undo restores exactly the tasks that were archived
 - Undo is **session-scoped** — it stays available until Obsidian restarts
 
 ## Safety Rails

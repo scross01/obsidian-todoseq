@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added Auto-Archive: rewrite completed keywords (e.g. DONE) to archived keywords once a task's CLOSED date is older than a threshold. Preview and run Auto-archive manually from a dialog, or opt in to automatic runs after vault scans.
+- Added Auto-Archive: rewrite completed keywords (e.g. DONE) to archived keywords once a task's CLOSED date is at least the threshold days old. Preview and run Auto-archive manually from a dialog, or opt in to automatic runs after vault scans.
 - Added "Archive completed tasks" and "Undo last archive run" commands.
 - Added a session-scoped undo for archive runs with per-line verification; changed lines are skipped and reported.
 

@@ -649,7 +649,7 @@ With **Sunday start**:
 
 ## Auto-Archive Settings
 
-Auto-Archive rewrites completed keywords (e.g. `DONE`) to archived keywords (e.g. `ARCHIVED`) once a task's CLOSED date is older than a threshold. The task stays in your note with its history intact — it just stops appearing in the Task List. You can always run archiving manually from a preview dialog; automatic runs are opt-in. You will find these settings in the "Auto-archive completed tasks" group. See [Auto-Archive](auto-archive.md) for the full walkthrough.
+Auto-Archive rewrites completed keywords (e.g. `DONE`) to archived keywords (e.g. `ARCHIVED`) once a task's CLOSED date is at least the threshold days old. The task stays in your note with its history intact — it just stops appearing in the Task List. You can always run archiving manually from a preview dialog; automatic runs are opt-in. You will find these settings in the "Auto-archive completed tasks" group. See [Auto-Archive](auto-archive.md) for the full walkthrough.
 
 ### Enable automatic archiving
 

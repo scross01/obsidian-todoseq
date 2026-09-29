@@ -247,8 +247,8 @@ graph TB
 **TaskStateManager** (`src/services/task-state-manager.ts`)
 
 - **Responsibility**: Single source of truth for all task data
-- **Key Patterns**: Observer pattern for reactive updates, defensive copying
-- **Interface**: `getTasks()` (returns shallow copy), `setTasks()`, `subscribe(callback)`, `findTaskByPathAndLine()`
+- **Key Patterns**: Observer pattern for reactive updates, defensive copying, re-add on undo (`optimisticUpdate()` re-adds a task absent from the manager — the archived → non-archived undo path, since archived tasks are not collected on rescan)
+- **Interface**: `getTasks()` (returns shallow copy), `setTasks()`, `subscribe(callback)`, `findTaskByPathAndLine()`, `optimisticUpdate()`, `updateTaskByPathAndLine()`, `addTask()`, `removeTasks()`, `adjustLineIndices()`
 - **Mutation Policy**: External consumers receive shallow copies; internal methods may mutate task objects for performance
 
 **VaultScanner** (`src/services/vault-scanner.ts`)
@@ -272,6 +272,7 @@ graph TB
   - **Update Sources**: `editor`, `reader`, `task-list`, `embedded`
 - **Change Tracking**: Uses `ChangeTracker` to register expected file changes with content hashing
 - **Recurrence Handling**: Uses `originalNewState` to track user's requested completion state, schedules `RecurrenceCoordinator` for date advancement
+- **Undo re-add**: state finalization re-adds a task that is absent from the manager (`addTask`), completing the archived → non-archived undo path when the async phase resolved a different line via `rawText`
 - **Per-Task Locking**: Uses `pendingTaskUpdates` Map to serialize rapid updates to the same task (path + line)
 - **File Queue**: Uses `fileUpdateQueues` Map to serialize updates per file, preventing race conditions when multiple tasks in the same file are updated rapidly
 - **Editor Checkbox Updates**: `performDirectEditorCheckboxUpdate()` updates checkbox visual state after markdown has been updated
@@ -279,7 +280,7 @@ graph TB
 **ArchiveService** (`src/services/archive-service.ts`)
 
 - **Responsibility**: Auto-Archive engine — evaluates which completed tasks match archive criteria and applies/undoes bulk keyword rewrites
-- **Key Patterns**: Pure/injected design (file writes and state access via `ApplyArchiveDeps`/`UndoDeps`), immutable product invariants (no-CLOSED never matches; first enabled mapping wins; archived states terminal), per-match re-verification before write, session undo journal with per-line verification, `RegexCache` for undo line patterns
+- **Key Patterns**: Pure/injected design (file writes and state access via `ApplyArchiveDeps`/`UndoDeps`), immutable product invariants (no-CLOSED never matches; first enabled mapping wins; archived states terminal), per-match re-verification before write, per-match error containment in apply and undo (a partially failed run still journals the tasks it archived, so undo covers exactly what executed), session undo journal with per-line verification, `RegexCache` for undo line patterns
 - **Interface**: `evaluateArchiveCriteria()`, `applyArchives()`, `undoLastRun()`, `hasUndoableRun()`, `isRunning()`, `shouldAutoArchive()`, `updateKeywordManager()`
 - **KeywordManager Currency**: holds a replaceable reference — `recreateParser()` swaps in the fresh manager via `updateKeywordManager()` (KeywordManager snapshots its resolution at construction; a stale reference rejected newly added archived keywords as invalid targets)
 - **Used by**: `PluginLifecycleManager` (commands, auto-run, undo), `ArchiveDialog`
@@ -453,7 +454,7 @@ graph TB
 **ArchiveDialog** (`src/view/components/archive-dialog.ts`)
 
 - **Responsibility**: Preview-and-confirm modal for archive runs — criteria selection, mapping rows, capped preview with per-row and bulk include/exclude, apply
-- **Key Patterns**: Custom modal with focus trap and `activeDocument` popout support, 200-row render cap with "+N more" footer, merge-write persistence via `mergeMappingRowsIntoStored()` so settings-tab and dialog writes cannot clobber each other, shared `showArchiveRunNotice()` for both run paths
+- **Key Patterns**: Custom modal with focus trap and `activeDocument` popout support, 200-row render cap with "+N more" footer, cell-scoped selection keys via `getMatchKey()` (`path:line:cellIndex`) so sibling table-cell tasks are included/excluded independently, merge-write persistence via `mergeMappingRowsIntoStored()` so settings-tab and dialog writes cannot clobber each other, shared `showArchiveRunNotice()` for both run paths
 - **Used by**: `PluginLifecycleManager.openArchiveDialog()`
 - **Ownership**: Constructed on demand by `PluginLifecycleManager`
 

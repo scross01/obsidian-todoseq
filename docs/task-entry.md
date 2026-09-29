@@ -268,7 +268,7 @@ TODOseq recognizes these task state keywords by default:
 
 - `ARCHIVED` - Task is archived and excluded from task collection
 
-Archived keywords are styled as archived and excluded from vault task collection and state search suggestions. Archived tasks can be produced by [Auto-Archive](auto-archive.md), which rewrites completed keywords to an archived keyword once a task's CLOSED date is older than a threshold.
+Archived keywords are styled as archived and excluded from vault task collection and state search suggestions. Archived tasks can be produced by [Auto-Archive](auto-archive.md), which rewrites completed keywords to an archived keyword once a task's CLOSED date is at least the threshold days old.
 
 ### Task State Sequences
 
