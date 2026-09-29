@@ -3175,6 +3175,7 @@
 
 .todoseq-dashboard-bar-label {
   width: 92px;
+  font-size: 0.78rem;
   flex-shrink: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3352,6 +3353,7 @@
 
 .todoseq-dashboard-legend-label {
   flex: 1;
+  font-size: 0.78rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3609,6 +3611,7 @@
 }
 
 .todoseq-dashboard-pill-label {
+  font-size: 0.72rem;
   color: var(--text-normal);
 }
 
@@ -3641,6 +3644,7 @@
 }
 
 .todoseq-dashboard-empty-title {
+  font-size: 0.8125rem;
   color: var(--text-normal);
 }
 
