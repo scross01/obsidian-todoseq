@@ -1,0 +1,672 @@
+/**
+ * Unit tests for the dashboard renderer (plan 020 Step 3).
+ * jsdom + Obsidian DOM mocks (createEl/createDiv/empty/instanceOf).
+ * @jest-environment jsdom
+ */
+import {
+  DashboardRenderer,
+  DashboardCallbacks,
+} from '../src/view/embedded-dashboard/dashboard-renderer';
+import {
+  DashboardResult,
+  DashboardGroup,
+} from '../src/view/embedded-dashboard/aggregation';
+import { DashboardParameters } from '../src/view/embedded-dashboard/dashboard-parser';
+import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
+import { createBaseSettings } from './helpers/test-helper';
+
+installObsidianDomMocks();
+
+function group(
+  key: string,
+  label: string,
+  count: number,
+  filter: string,
+): DashboardGroup {
+  return { key, label, count, filter };
+}
+
+function result(overrides: Partial<DashboardResult> = {}): DashboardResult {
+  return {
+    total: 12,
+    groups: [
+      group('priority:high', 'High', 4, 'priority:high'),
+      group('priority:medium', 'Medium', 2, 'priority:medium'),
+      group('priority:none', 'None', 6, 'priority:none'),
+    ],
+    overlapsTotal: false,
+    ...overrides,
+  };
+}
+
+function params(
+  overrides: Partial<DashboardParameters> = {},
+): DashboardParameters {
+  return {
+    searchQuery: 'tag:project',
+    groupBy: 'priority',
+    display: 'bar',
+    layout: 'card',
+    title: 'Due & overdue',
+    showQuery: true,
+    sort: undefined,
+    showEmpty: false,
+    maxGroups: 8,
+    color: 'semantic',
+    collapsed: false,
+    heatmapWindow: 26,
+    ...overrides,
+  };
+}
+
+function noopCallbacks(): DashboardCallbacks {
+  return { onOpenQuery: jest.fn() };
+}
+
+describe('DashboardRenderer', () => {
+  let renderer: DashboardRenderer;
+  let host: HTMLElement;
+
+  beforeEach(() => {
+    renderer = new DashboardRenderer(createBaseSettings());
+    host = document.createElement('div');
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  describe('renderCard structure', () => {
+    it('builds container, header with title and total, chips, content root', () => {
+      const content = renderer.renderCard(
+        host,
+        result(),
+        params(),
+        noopCallbacks(),
+      );
+
+      const container = host.querySelector('.todoseq-dashboard-container');
+      expect(container).not.toBeNull();
+      expect(
+        container?.querySelector('.todoseq-dashboard-title')?.textContent,
+      ).toBe('Due & overdue');
+      expect(
+        container?.querySelector('.todoseq-dashboard-total')?.textContent,
+      ).toBe('12 tasks');
+      // Query chip + group-by meta chip
+      const chips = container?.querySelectorAll(
+        '.todoseq-dashboard-chip-query',
+      );
+      expect(chips?.length).toBe(1);
+      expect(chips?.[0].textContent).toBe('tag:project');
+      expect(
+        container?.querySelector('.todoseq-dashboard-chip-meta')?.textContent,
+      ).toBe('group-by: priority');
+      expect(content.classList.contains('todoseq-dashboard-content')).toBe(
+        true,
+      );
+    });
+
+    it('omits the title and query chip when not configured', () => {
+      renderer.renderCard(
+        host,
+        result(),
+        params({ title: undefined, searchQuery: '' }),
+        noopCallbacks(),
+      );
+      expect(host.querySelector('.todoseq-dashboard-title')).toBeNull();
+      expect(host.querySelector('.todoseq-dashboard-chip-query')).toBeNull();
+      // group-by chip still present
+      expect(host.querySelector('.todoseq-dashboard-chip-meta')).not.toBeNull();
+    });
+
+    it('adds the overlap tooltip to the header total for tag grouping', () => {
+      renderer.renderCard(
+        host,
+        result({
+          overlapsTotal: true,
+          groups: [group('tag:home', '#home', 20, 'tag:home')],
+        }),
+        params({ groupBy: 'tag' }),
+        noopCallbacks(),
+      );
+      const total = host.querySelector('.todoseq-dashboard-total');
+      // The obsidian mock's setTooltip writes the title attribute
+      expect(total?.getAttribute('title')).toContain('Tags can overlap');
+      expect(total?.getAttribute('title')).toContain('12');
+    });
+
+    it('renders a collapsed card with a toggle header', () => {
+      const content = renderer.renderCard(
+        host,
+        result(),
+        params({ collapsed: true }),
+        noopCallbacks(),
+      );
+      const container = host.querySelector('.todoseq-dashboard-container');
+      expect(container?.classList.contains('todoseq-dashboard-collapsed')).toBe(
+        true,
+      );
+      const toggle = container?.querySelector('[role="button"][aria-expanded]');
+      expect(toggle).not.toBeNull();
+      expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+
+      toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(container?.classList.contains('todoseq-dashboard-collapsed')).toBe(
+        false,
+      );
+      expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+      expect(content.classList.contains('todoseq-dashboard-content')).toBe(
+        true,
+      );
+    });
+  });
+
+  describe('bar display', () => {
+    it('renders one row per group with button semantics and aria labels', () => {
+      renderer.renderCard(host, result(), params(), noopCallbacks());
+      const rows = host.querySelectorAll('.todoseq-dashboard-bar-row');
+      expect(rows.length).toBe(3);
+      expect(rows[0].getAttribute('role')).toBe('button');
+      expect(rows[0].getAttribute('tabindex')).toBe('0');
+      expect(rows[0].getAttribute('aria-label')).toBe(
+        'High: 4 of 12 tasks. Open in task list',
+      );
+      expect(
+        rows[0].querySelector('.todoseq-dashboard-bar-label')?.textContent,
+      ).toBe('High');
+      expect(
+        rows[0].querySelector('.todoseq-dashboard-bar-count')?.textContent,
+      ).toBe('4');
+      // Group color exposed via the --todoseq-bar-color custom property
+      expect(
+        (rows[0] as HTMLElement).style.getPropertyValue('--todoseq-bar-color'),
+      ).toContain('--color-red');
+    });
+
+    it('sizes fills proportional to the max group count', () => {
+      renderer.renderCard(host, result(), params(), noopCallbacks());
+      const fills = host.querySelectorAll<HTMLElement>(
+        '.todoseq-dashboard-bar-fill',
+      );
+      expect(fills.length).toBe(3);
+      expect(fills[0].style.width).toBe('66.67%'); // 4 / 6
+      expect(fills[1].style.width).toBe('33.33%'); // 2 / 6
+      expect(fills[2].style.width).toBe('100%'); // 6 / 6
+    });
+
+    it('renders 100% width for a single-group card', () => {
+      renderer.renderCard(
+        host,
+        result({
+          groups: [group('priority:high', 'High', 3, 'priority:high')],
+        }),
+        params(),
+        noopCallbacks(),
+      );
+      const fill = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-bar-fill',
+      );
+      expect(fill?.style.width).toBe('100%');
+    });
+
+    it('click and Enter trigger onOpenQuery with the composed query', () => {
+      const callbacks = noopCallbacks();
+      renderer.renderCard(host, result(), params(), callbacks);
+
+      const row = host.querySelector<HTMLElement>('.todoseq-dashboard-bar-row');
+      row?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(callbacks.onOpenQuery).toHaveBeenCalledWith(
+        '(tag:project) priority:high',
+        expect.anything(),
+      );
+
+      (row as HTMLElement).dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
+      expect(callbacks.onOpenQuery).toHaveBeenCalledTimes(2);
+
+      (row as HTMLElement).dispatchEvent(
+        new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
+      );
+      expect(callbacks.onOpenQuery).toHaveBeenCalledTimes(3);
+
+      // Non-activation keys are ignored
+      (row as HTMLElement).dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }),
+      );
+      expect(callbacks.onOpenQuery).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('column display', () => {
+    it('renders count above bar with baseline and labels below', () => {
+      renderer.renderCard(
+        host,
+        result(),
+        params({ display: 'column' }),
+        noopCallbacks(),
+      );
+      const items = host.querySelectorAll('.todoseq-dashboard-column-item');
+      expect(items.length).toBe(3);
+      expect(
+        items[0].querySelector('.todoseq-dashboard-column-count')?.textContent,
+      ).toBe('4');
+      const fill = items[0].querySelector<HTMLElement>(
+        '.todoseq-dashboard-column-bar-fill',
+      );
+      expect(fill?.style.height).toBe('66.67%');
+      expect(
+        host.querySelector('.todoseq-dashboard-column-baseline'),
+      ).not.toBeNull();
+      const labels = host.querySelectorAll('.todoseq-dashboard-column-label');
+      expect(labels.length).toBe(3);
+      expect(labels[0].textContent).toBe('High');
+    });
+  });
+
+  describe('donut display', () => {
+    it('renders svg slices with dasharray offsets, center total, legend', () => {
+      renderer.renderCard(
+        host,
+        result({ total: 12 }),
+        params({ display: 'donut', groupBy: 'state' }),
+        noopCallbacks(),
+      );
+      const ring = host.querySelector('svg.todoseq-dashboard-donut-ring');
+      expect(ring).not.toBeNull();
+      expect(ring?.getAttribute('role')).toBe('img');
+      expect(ring?.getAttribute('aria-label')).toBe('12 tasks by state');
+
+      const circles = ring?.querySelectorAll('circle');
+      expect(circles?.length).toBe(3);
+
+      const C = 2 * Math.PI * 58;
+      const gap = 0.01 * C;
+      const share = 4 / 12;
+      const first = circles?.[0];
+      const [dash] = (first?.getAttribute('stroke-dasharray') ?? '').split(' ');
+      expect(parseFloat(dash)).toBeCloseTo(share * C - gap, 5);
+      const offset = parseFloat(first?.getAttribute('stroke-dashoffset') ?? '');
+      expect(offset).toBeCloseTo(-(gap / 2), 5);
+
+      expect(
+        host.querySelector('.todoseq-dashboard-donut-total')?.textContent,
+      ).toBe('12');
+      const legendRows = host.querySelectorAll('.todoseq-dashboard-legend-row');
+      expect(legendRows.length).toBe(3);
+      expect(legendRows[0].getAttribute('role')).toBe('button');
+      expect(
+        legendRows[0].querySelector('.todoseq-dashboard-legend-value')
+          ?.textContent,
+      ).toBe('4 · 33%');
+      expect(legendRows[0].getAttribute('aria-label')).toBe(
+        'High: 4 of 12 tasks. Open in task list',
+      );
+    });
+
+    it('legend rows are clickable and raise onOpenQuery', () => {
+      const callbacks = noopCallbacks();
+      renderer.renderCard(
+        host,
+        result(),
+        params({ display: 'donut' }),
+        callbacks,
+      );
+      const row = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-legend-row',
+      );
+      row?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(callbacks.onOpenQuery).toHaveBeenCalledWith(
+        '(tag:project) priority:high',
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('tiles display', () => {
+    it('renders grid tiles with colored numbers and labels', () => {
+      renderer.renderCard(
+        host,
+        result(),
+        params({ display: 'tiles' }),
+        noopCallbacks(),
+      );
+      const tiles = host.querySelectorAll('.todoseq-dashboard-tile');
+      expect(tiles.length).toBe(3);
+      expect(tiles[0].getAttribute('role')).toBe('button');
+      expect(
+        tiles[0].querySelector('.todoseq-dashboard-tile-number')?.textContent,
+      ).toBe('4');
+      // The group color custom property lives on the tile root; CSS cascades
+      // it to the numeral.
+      expect(
+        (tiles[0] as HTMLElement).style.getPropertyValue(
+          '--todoseq-tile-color',
+        ),
+      ).toContain('--color-red');
+      expect(
+        tiles[0].querySelector('.todoseq-dashboard-tile-label')?.textContent,
+      ).toBe('High');
+    });
+  });
+
+  describe('heatmap display', () => {
+    const heatmapResult = (over: Partial<DashboardResult> = {}) => {
+      const today = new Date();
+      const key = (d: Date): string =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+          d.getDate(),
+        ).padStart(2, '0')}`;
+      const windowStart = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate() - ((today.getDay() + 6) % 7),
+      );
+      const days = Array.from({ length: 26 * 7 }, (_, i) => {
+        const day = new Date(
+          windowStart.getFullYear(),
+          windowStart.getMonth(),
+          windowStart.getDate() + i,
+        );
+        return { date: key(day), count: 0 };
+      });
+      const todayIdx = (today.getDay() + 6) % 7;
+      days[todayIdx] = { date: key(today), count: 2 };
+      days[todayIdx + 1] = {
+        date: key(
+          new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+        ),
+        count: 4,
+      };
+      if (todayIdx >= 1) {
+        days[todayIdx - 1] = {
+          date: key(
+            new Date(
+              today.getFullYear(),
+              today.getMonth(),
+              today.getDate() - 1,
+            ),
+          ),
+          count: 9, // past day: aggregation keeps this at 0 in production
+        };
+      }
+      return result({
+        total: 160,
+        groups: [],
+        days,
+        today: key(today),
+        ...over,
+      });
+    };
+
+    it('renders 7-row grid cells with intensity, today and past classes', () => {
+      renderer.renderCard(
+        host,
+        heatmapResult(),
+        params({
+          display: 'heatmap',
+          groupBy: 'scheduled',
+          heatmapWindow: 26,
+        }),
+        noopCallbacks(),
+      );
+      const grid = host.querySelector('.todoseq-dashboard-heatmap-grid');
+      expect(grid).not.toBeNull();
+      const cells = grid?.querySelectorAll('.todoseq-dashboard-heatmap-cell');
+      expect(cells?.length).toBe(26 * 7);
+
+      // Intensity classes: count 2 -> l2, count 4 -> l4
+      expect(
+        grid?.querySelector('.todoseq-dashboard-heatmap-cell.l2'),
+      ).not.toBeNull();
+      expect(
+        grid?.querySelector('.todoseq-dashboard-heatmap-cell.l4'),
+      ).not.toBeNull();
+
+      // Today is outlined and interactive even though intensity applies
+      const todayCell = grid?.querySelector(
+        '.todoseq-dashboard-heatmap-cell.today',
+      );
+      expect(todayCell).not.toBeNull();
+      expect(todayCell?.getAttribute('role')).toBe('button');
+
+      // Past days are rendered but not interactive
+      const pastCells = grid?.querySelectorAll(
+        '.todoseq-dashboard-heatmap-cell.past',
+      );
+      expect(pastCells?.length).toBeGreaterThan(0);
+      pastCells?.forEach((cell) => {
+        expect(cell.getAttribute('role')).toBeNull();
+      });
+
+      // Gutter labels
+      const gutter = host.querySelectorAll(
+        '.todoseq-dashboard-heatmap-gutter span',
+      );
+      const gutterTexts = Array.from(gutter).map((g) => g.textContent);
+      expect(gutterTexts).toEqual(['Mon', '', 'Wed', '', 'Fri', '', '']);
+
+      // Footer: hint + LESS/MORE scale
+      expect(
+        host.querySelector('.todoseq-dashboard-heatmap-hint')?.textContent,
+      ).toContain('Click a day');
+      expect(
+        host.querySelector('.todoseq-dashboard-heatmap-scale'),
+      ).not.toBeNull();
+      expect(host.textContent).toContain('LESS');
+      expect(host.textContent).toContain('MORE');
+    });
+
+    it('clicking a day raises onOpenQuery with the day filter', () => {
+      const callbacks = noopCallbacks();
+      renderer.renderCard(
+        host,
+        heatmapResult(),
+        params({ display: 'heatmap', groupBy: 'scheduled' }),
+        callbacks,
+      );
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${String(
+        today.getMonth() + 1,
+      ).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const cell = host.querySelector<HTMLElement>(
+        `.todoseq-dashboard-heatmap-cell[data-date="${todayKey}"]`,
+      );
+      expect(cell).not.toBeNull();
+      cell?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(callbacks.onOpenQuery).toHaveBeenCalledWith(
+        `(tag:project) scheduled:${todayKey}`,
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('strip layout', () => {
+    it('renders query chip and pills without a header', () => {
+      renderer.renderCard(
+        host,
+        result(),
+        params({ layout: 'strip', title: undefined }),
+        noopCallbacks(),
+      );
+      expect(host.querySelector('.todoseq-dashboard-header')).toBeNull();
+      expect(
+        host.querySelector('.todoseq-dashboard-chip-query'),
+      ).not.toBeNull();
+      const pills = host.querySelectorAll('.todoseq-dashboard-pill');
+      expect(pills.length).toBe(3);
+      expect(pills[0].getAttribute('role')).toBe('button');
+      expect(
+        pills[0].querySelector('.todoseq-dashboard-pill-label')?.textContent,
+      ).toBe('High');
+      expect(
+        pills[0].querySelector('.todoseq-dashboard-pill-count')?.textContent,
+      ).toBe('4');
+    });
+  });
+
+  describe('empty and error states', () => {
+    it('renders the empty state when no tasks match', () => {
+      renderer.renderCard(
+        host,
+        result({ total: 0, groups: [] }),
+        params(),
+        noopCallbacks(),
+      );
+      const empty = host.querySelector('.todoseq-dashboard-empty');
+      expect(empty).not.toBeNull();
+      expect(empty?.textContent).toContain('No tasks match');
+      expect(empty?.textContent).toContain('Nothing in the vault matches');
+    });
+
+    it('renders a one-line error while keeping the header', () => {
+      renderer.renderError(
+        host,
+        params(),
+        'Invalid search query: unbalanced parenthesis',
+      );
+      const container = host.querySelector('.todoseq-dashboard-container');
+      expect(container).not.toBeNull();
+      expect(
+        container?.querySelector('.todoseq-dashboard-title')?.textContent,
+      ).toBe('Due & overdue');
+      const error = container?.querySelector('.todoseq-dashboard-error');
+      expect(error?.textContent).toBe(
+        'Invalid search query: unbalanced parenthesis',
+      );
+    });
+  });
+
+  describe('updateContent', () => {
+    it('patches counts in place when the group keys match', () => {
+      const callbacks = noopCallbacks();
+      const content = renderer.renderCard(host, result(), params(), callbacks);
+      const row = content.querySelector('.todoseq-dashboard-bar-row');
+      const countEl = row?.querySelector('.todoseq-dashboard-bar-count');
+      const fillEl = row?.querySelector<HTMLElement>(
+        '.todoseq-dashboard-bar-fill',
+      );
+      expect(countEl?.textContent).toBe('4');
+      expect(fillEl?.style.width).toBe('66.67%');
+
+      const next = result({
+        groups: [
+          group('priority:high', 'High', 5, 'priority:high'),
+          group('priority:medium', 'Medium', 1, 'priority:medium'),
+          group('priority:none', 'None', 6, 'priority:none'),
+        ],
+      });
+      renderer.updateContent(content, next, params(), callbacks);
+
+      // Same DOM node updated, not replaced
+      expect(content.querySelector('.todoseq-dashboard-bar-row')).toBe(row);
+      expect(countEl?.textContent).toBe('5');
+      expect(fillEl?.style.width).toBe('83.33%');
+      // Tooltip re-applied with the fresh count (mock writes title attr)
+      expect(row?.getAttribute('title')).toContain('High: 5 tasks');
+    });
+
+    it('rebuilds the content when the group keys differ', () => {
+      const callbacks = noopCallbacks();
+      const content = renderer.renderCard(host, result(), params(), callbacks);
+      const originalRow = content.querySelector('.todoseq-dashboard-bar-row');
+
+      const next = result({
+        groups: [
+          group('state:active', 'Active', 5, 'state:active'),
+          group('state:waiting', 'Waiting', 1, 'state:waiting'),
+        ],
+      });
+      renderer.updateContent(content, next, params(), callbacks);
+
+      const newRow = content.querySelector('.todoseq-dashboard-bar-row');
+      expect(newRow).not.toBeNull();
+      expect(newRow).not.toBe(originalRow);
+      expect(
+        newRow?.querySelector('.todoseq-dashboard-bar-label')?.textContent,
+      ).toBe('Active');
+    });
+
+    it('rebuilds when the new result is empty (empty state)', () => {
+      const callbacks = noopCallbacks();
+      const content = renderer.renderCard(host, result(), params(), callbacks);
+      renderer.updateContent(
+        content,
+        result({ total: 0, groups: [] }),
+        params(),
+        callbacks,
+      );
+      expect(content.querySelector('.todoseq-dashboard-empty')).not.toBeNull();
+    });
+
+    it('rebuilds from empty state when tasks return', () => {
+      const callbacks = noopCallbacks();
+      const content = renderer.renderCard(
+        host,
+        result({ total: 0, groups: [] }),
+        params(),
+        callbacks,
+      );
+      renderer.updateContent(content, result(), params(), callbacks);
+      expect(content.querySelector('.todoseq-dashboard-empty')).toBeNull();
+      expect(
+        content.querySelectorAll('.todoseq-dashboard-bar-row').length,
+      ).toBe(3);
+    });
+
+    it('always rebuilds the heatmap', () => {
+      const callbacks = noopCallbacks();
+      const p = params({ display: 'heatmap', groupBy: 'scheduled' });
+      const res = result({
+        total: 2,
+        groups: [],
+        days: [{ date: '2026-09-29', count: 2 }],
+        today: '2026-09-29',
+      });
+      const content = renderer.renderCard(host, res, p, callbacks);
+      const grid = content.querySelector('.todoseq-dashboard-heatmap-grid');
+      expect(grid).not.toBeNull();
+      renderer.updateContent(content, res, p, callbacks);
+      expect(content.querySelector('.todoseq-dashboard-heatmap-grid')).not.toBe(
+        grid,
+      );
+    });
+
+    it('patches strip pill counts in place', () => {
+      const callbacks = noopCallbacks();
+      const p = params({ layout: 'strip', title: undefined });
+      const content = renderer.renderCard(host, result(), p, callbacks);
+      const pill = content.querySelector('.todoseq-dashboard-pill');
+      const countEl = pill?.querySelector('.todoseq-dashboard-pill-count');
+      expect(countEl?.textContent).toBe('4');
+
+      const next = result({
+        groups: [
+          group('priority:high', 'High', 7, 'priority:high'),
+          group('priority:medium', 'Medium', 2, 'priority:medium'),
+          group('priority:none', 'None', 6, 'priority:none'),
+        ],
+      });
+      renderer.updateContent(content, next, p, callbacks);
+      expect(content.querySelector('.todoseq-dashboard-pill')).toBe(pill);
+      expect(countEl?.textContent).toBe('7');
+    });
+  });
+});
+
+describe('tooltip content', () => {
+  it('applies count, share, and the open hint via setTooltip', () => {
+    // The obsidian mock's setTooltip writes the title attribute
+    const renderer = new DashboardRenderer(createBaseSettings());
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    renderer.renderCard(host, result(), params(), noopCallbacks());
+    const row = host.querySelector('.todoseq-dashboard-bar-row');
+    expect(row?.getAttribute('title')).toBe(
+      'High: 4 tasks · 33% of matched — Click to open in Task List',
+    );
+    host.remove();
+  });
+});
