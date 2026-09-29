@@ -374,3 +374,10 @@ If no tasks are found or the search query is invalid:
 If there's an error with one of the sort or filter options, an error message will be displayed accordingly. The error message indicates what went wrong and suggests how to fix it.
 
 ![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error.png)
+
+## See Also
+
+If you want aggregated counts instead of the tasks themselves — workload by
+state, priority, tag, or date bucket — see [Dashboards](/dashboards), which
+uses the same search vocabulary with one-click drill-through into the Task
+List.

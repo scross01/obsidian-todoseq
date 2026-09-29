@@ -28,6 +28,7 @@ Most task managers force you into a separate system. TODOseq meets you where you
 - Works in Edit and Reading views; click a keyword or `Ctrl+Enter`
 - Code-comment TODOs in 20+ languages
 - `todoseq` embedded lists in notes
+- `todoseq-dashboard` aggregation cards in notes (counts by state, priority, tag, or date bucket with drill-through)
 - Subtasks, repeating tasks, optional CLOSED dates
 - Auto-archive: promote aged DONE tasks to ARCHIVED, with preview and one-click undo
 - Logseq-compatible format for dual-use vaults

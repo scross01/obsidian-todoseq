@@ -23,6 +23,7 @@ export default {
           { text: 'Reader Integration', link: '/reader' },
           { text: 'Command Palette', link: '/command-palette' },
           { text: 'Embedded Task Lists', link: '/embedded-task-lists' },
+          { text: 'Dashboards', link: '/dashboards' },
         ],
       },
       {

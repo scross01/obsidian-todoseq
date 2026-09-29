@@ -63,6 +63,9 @@ graph TB
             EmbeddedTaskItemRenderer["EmbeddedTaskItemRenderer<br/>Embedded Item Rendering"]
             EmbeddedTaskListManager["EmbeddedTaskListManager<br/>Embedded Filtering"]
             EmbeddedTaskListEventHandler["EmbeddedTaskListEventHandler<br/>Embedded Events"]
+            DashboardProcessor["DashboardCodeBlockProcessor<br/>Dashboard Cards"]
+            DashboardAggregator["DashboardAggregator<br/>Dashboard Aggregation"]
+            DashboardRenderer["DashboardRenderer<br/>Dashboard Rendering"]
             ArchiveDialog["ArchiveDialog<br/>Archive Preview & Confirm"]
         end
 
@@ -560,6 +563,27 @@ graph TB
 - **Interface**: `trackCodeBlock()`, `untrackCodeBlock()`, `toggleCollapse()`, `getCollapseState()`, `refreshAllCodeBlocks()`, `handleFileDeleted()`, `handleFileRenamed()`, `updateSettings()`
 - **Features**: Tracks active code blocks by ID; collapse/expand toggle; refreshes code blocks on file open, delete, and rename
 - **Used by**: TodoseqCodeBlockProcessor
+
+**DashboardCodeBlockProcessor** (`src/view/embedded-dashboard/dashboard-code-block-processor.ts`)
+
+- **Responsibility**: `todoseq-dashboard` code block processing — aggregated dashboard cards (counts grouped by state, priority, keyword, tag, or date bucket) embedded in any note
+- **Key Patterns**: Post-processor registration, 150ms-debounced `TaskStateManager` subscription (no skip-echo flag — dashboards never write tasks), code block tracking with file delete/rename untracking
+- **Interface**: `registerProcessor()`, `refreshAllDashboards()`, `updateSettings()`, `cleanup()`
+- **Used by**: `PluginLifecycleManager` (constructed + registered after the embedded list processor)
+
+**DashboardAggregator** (`src/view/embedded-dashboard/aggregation.ts`)
+
+- **Responsibility**: Pure aggregation engine — filters tasks through the shared `Search` evaluator, groups matched tasks, and produces click-through filter strings so card counts agree with the Task List by construction
+- **Key Patterns**: Evaluator-driven bucket assignment (first-true-wins date buckets), negation-composition "Later" filter from today's search vocabulary, version + params + tasks-reference memo invalidated via `invalidateCache()`
+- **Interface**: `aggregate(tasks, params)`, `invalidateCache()`, `composeFilterQuery()`, `WINDOW_BUCKET_FILTERS`, `LATER_FILTER`
+- **Used by**: DashboardCodeBlockProcessor
+
+**DashboardRenderer** (`src/view/embedded-dashboard/dashboard-renderer.ts`)
+
+- **Responsibility**: Renders dashboard cards (bar, column, donut, tiles, heatmap, strip) with theme-variable-only styling, and patches counts/shares/shapes in place when group keys are unchanged on task updates
+- **Key Patterns**: In-place patch vs. rebuild (`updateContent()`), button semantics with full-context aria-labels, `setTooltip` re-application after patches, container-query responsive layout
+- **Interface**: `renderCard()`, `renderContent()`, `updateContent()`, `renderError()`
+- **Used by**: DashboardCodeBlockProcessor
 
 ### 3. Parser Layer (Data Extraction)
 

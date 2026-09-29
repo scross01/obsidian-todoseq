@@ -24,11 +24,7 @@ const SEEDS_NOTE = 'dashboard-seeds.md';
 /** Local-date string `offset` days from today (no UTC). */
 function seedDate(offset: number): string {
   const now = new Date();
-  const d = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + offset,
-  );
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
     d.getDate(),
   ).padStart(2, '0')}`;
@@ -214,8 +210,7 @@ test.describe('Dashboard cards', () => {
     // The consistency guarantee, end to end: the Task List shows exactly the
     // card's High count (3 high-priority matched tasks).
     await page.waitForFunction(
-      () =>
-        document.querySelectorAll('.todoseq-task-item').length === 3,
+      () => document.querySelectorAll('.todoseq-task-item').length === 3,
       { timeout: 15_000 },
     );
   });
