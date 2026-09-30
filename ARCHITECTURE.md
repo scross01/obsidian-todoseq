@@ -653,18 +653,21 @@ graph TB
 - **Key Patterns**: Parser combinators, syntax tree construction, AST caching with FIFO eviction
 - **Interface**: Query parsing, AST generation, property filter parsing, `clearCache()` for AST cache invalidation
 - **AST Cache**: `astCache: Map<string, SearchNode>` capped at 50 entries (`AST_CACHE_MAX_SIZE`) with strict FIFO eviction on insertion (`astCache.keys().next().value → delete`) when the size cap is reached. Repeat calls for the same query string return the identical AST instance — the AST is immutable post-parse (SearchEvaluator never mutates it), so sharing is safe. Invalid queries are not cached: the parser throws `SearchError` before reaching the cache-write branch, so invalid-query evaluation still re-parses on each call.
+- **Validation contract**: closed-domain values are rejected at parse time — `priority:` accepts only high/med/medium/low/none (aliases a/b/c) and date prefixes reject date-shaped calendar-invalid values (`2026-02-30`), including range bounds and `<`/`<=`/`>`/`>=` forms; open-domain values (path, file, tag, content, state, non-date words) stay accepted. Operator tokens are uppercase-only (`OR`/`AND`); lowercase `or`/`and` are ordinary search words. Errors are `SearchError`s surfaced to users via `Search.getError()`.
 
 **SearchEvaluator** (`src/search/search-evaluator.ts`)
 
 - **Responsibility**: Task matching and filtering based on query AST
 - **Key Patterns**: Visitor pattern, filter chain execution, property search integration
 - **Interface**: Task evaluation, result filtering, `evaluatePropertyFilter()`
+- **Note**: evaluation assumes parse-time validation has run — `DateUtils.parseDateValue` fails closed on invalid dates so the evaluator's remaining `false` fallbacks are last-resort, not primary behavior
 
 **SearchTokenizer** (`src/search/search-tokenizer.ts`)
 
 - **Responsibility**: Lexical analysis of search queries
 - **Key Patterns**: Tokenization, pattern matching, property token detection
 - **Interface**: Token generation, lexical analysis, property token handling
+- **Case**: operator tokens (`OR`, `AND`) are matched case-sensitively by design; ordinary words like "or" remain searchable as text
 
 **SearchSuggestions** (`src/search/search-suggestions.ts`)
 

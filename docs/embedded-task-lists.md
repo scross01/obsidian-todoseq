@@ -81,6 +81,8 @@ The `sort:` parameter controls how tasks are ordered. Valid options are:
 - `filepath` - Sort by file path (default)
 - `scheduled` - Sort by scheduled date
 - `deadline` - Sort by deadline date
+- `closed` - Sort by closed date (when the task was completed)
+- `started` - Sort by started date (when work first began)
 - `priority` - Sort by priority (high → low)
 - `urgency` - Sort by urgency score (high → low)
 - `keyword` - Sort by keyword state groups
@@ -91,6 +93,16 @@ Example:
 ```todoseq
 search: scheduled:today
 sort: priority
+```
+````
+
+Another example: completed tasks sorted by their CLOSED date, so the most
+recently finished tasks come first.
+
+````txt
+```todoseq
+search: state:completed
+sort: closed
 ```
 ````
 

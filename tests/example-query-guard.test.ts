@@ -13,6 +13,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { Search } from '../src/search/search';
 import { TodoseqCodeBlockParser } from '../src/view/embedded-task-list/code-block-parser';
 import { TodoseqDashboardParser } from '../src/view/embedded-dashboard/dashboard-parser';
 
@@ -235,5 +236,27 @@ describe('Example and docs block guard', () => {
     expect(blockParseError('todoseq-dashboard', 'search: tag:(((')).toContain(
       'Invalid search query',
     );
+  });
+
+  it('every shipped default saved-search query parses cleanly', () => {
+    const dataPath = path.join(
+      REPO_ROOT,
+      'tests',
+      'integration',
+      'fixtures',
+      'baseline-plugin-data.json',
+    );
+    const data = JSON.parse(fs.readFileSync(dataPath, 'utf8')) as {
+      savedSearches: Array<{ name: string; query: string }>;
+    };
+    expect(data.savedSearches.length).toBeGreaterThan(0);
+    for (const saved of data.savedSearches) {
+      // Jest's expect() takes no message argument, so the name is folded
+      // into the failure text to keep per-search attribution.
+      const error = Search.getError(saved.query);
+      expect(`${saved.name}: ${error ?? 'parses cleanly'}`).toBe(
+        `${saved.name}: parses cleanly`,
+      );
+    }
   });
 });

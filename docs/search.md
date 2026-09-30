@@ -271,6 +271,8 @@ started:yesterday
 Find tasks started yesterday.
 
 > `started:` supports the same date expressions as `scheduled:` and `deadline:` (today, yesterday, this week, date literals, and ranges). Note that "overdue" is intentionally not supported for this prefix — the STARTED date records when work first began, so "overdue" has no meaning for it.
+>
+> Tasks can also be _sorted_ by their STARTED and CLOSED dates in the Task List and embedded lists (`sort: started` / `sort: closed`).
 
 ### Next N Days Expression
 
