@@ -42,10 +42,6 @@ opens it in a new tab.
 | `collapse:`       | `true` or `false`. Starts the card collapsed behind its header (same option and behavior as embedded task lists). Requires either `title:` to be set or `show-query: true`                                                                                                   | `false`    |
 | `heatmap-window:` | Number of weeks for the heatmap window, 4–52. The heatmap's first column follows the plugin's **Week starts on** setting (Monday or Sunday)                                                                                                                                  | `26`       |
 
-The expand/collapse chevron matches embedded task lists: directly after the
-title when the card has one, otherwise leading the chips row — click the
-header or chips (or press Enter/Space when focused) to toggle.
-
 Lines starting with `#` inside the block are treated as comments.
 
 ## Grouping
