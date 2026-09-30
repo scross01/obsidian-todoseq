@@ -90,65 +90,75 @@ async function writeAndOpen(): Promise<void> {
     },
   );
 
-  // Diagnostic: dump the rendered dashboard DOM state so a wait failure
-  // names its missing clause instead of guessing.
-  await page.waitForTimeout(3_000);
-  const dump = await page.evaluate(() => {
-    const scope = document.querySelector('.workspace-leaf.mod-active');
-    const containers = Array.from(
-      scope?.querySelectorAll<HTMLElement>('.todoseq-dashboard-container') ??
-        [],
-    );
-    return {
-      leafFound: !!scope,
-      containerCount: containers.length,
-      containers: containers.map((c) => ({
-        collapsed: c.classList.contains('todoseq-dashboard-collapsed'),
-        headerRole:
-          c.querySelector('.todoseq-dashboard-header')?.getAttribute('role') ??
-          null,
-        chevronCount: c.querySelectorAll('.todoseq-collapse-toggle-icon')
-          .length,
-        barRows: c.querySelectorAll('.todoseq-dashboard-bar-row').length,
-        headerChildren: Array.from(
-          c.querySelector('.todoseq-dashboard-header')?.children ?? [],
-        ).map((el) => el.className.split(' ').pop()),
-      })),
-    };
-  });
-  console.debug('dashboard-collapse dump:', JSON.stringify(dump, null, 1));
-
+  // Failure-time diagnostics only: dumpRenderState() runs when the wait
+  // below times out, so the dump names the missing clause (chevronCount 0,
+  // bar rows still visible, ...) instead of guessing. Playwright captures
+  // test console output in the error context on failure, so the dump reaches
+  // the failure report without polluting passing runs.
+  const dumpRenderState = () =>
+    page.evaluate(() => {
+      const scope = document.querySelector('.workspace-leaf.mod-active');
+      const containers = Array.from(
+        scope?.querySelectorAll<HTMLElement>('.todoseq-dashboard-container') ??
+          [],
+      );
+      return {
+        leafFound: !!scope,
+        containerCount: containers.length,
+        containers: containers.map((c) => ({
+          collapsed: c.classList.contains('todoseq-dashboard-collapsed'),
+          headerRole:
+            c
+              .querySelector('.todoseq-dashboard-header')
+              ?.getAttribute('role') ?? null,
+          chevronCount: c.querySelectorAll('.todoseq-collapse-toggle-icon')
+            .length,
+          barRows: c.querySelectorAll('.todoseq-dashboard-bar-row').length,
+          headerChildren: Array.from(
+            c.querySelector('.todoseq-dashboard-header')?.children ?? [],
+          ).map((el) => el.className.split(' ').pop()),
+        })),
+      };
+    });
   // Both cards render collapsed in the live-preview CM embed. Note: the
   // collapsed content stays in the DOM hidden by CSS, so the assertions are
   // visibility-based, not absence-based.
-  await page.waitForFunction(
-    () => {
-      const scope = document.querySelector('.workspace-leaf.mod-active');
-      if (!scope) return false;
-      const containers = Array.from(
-        scope.querySelectorAll<HTMLElement>('.todoseq-dashboard-container'),
-      );
-      const chevrons = Array.from(
-        scope.querySelectorAll<HTMLElement>(
-          '.todoseq-dashboard-header .todoseq-collapse-toggle-icon',
-        ),
-      );
-      const barRows = Array.from(
-        scope.querySelectorAll<HTMLElement>('.todoseq-dashboard-bar-row'),
-      );
-      return (
-        containers.length >= 2 &&
-        containers.every((c) =>
-          c.classList.contains('todoseq-dashboard-collapsed'),
-        ) &&
-        chevrons.length >= 2 &&
-        chevrons.every((el) => el.offsetParent !== null) &&
-        barRows.every((el) => el.offsetParent === null)
-      );
-    },
-    undefined,
-    { timeout: 15_000 },
-  );
+  try {
+    await page.waitForFunction(
+      () => {
+        const scope = document.querySelector('.workspace-leaf.mod-active');
+        if (!scope) return false;
+        const containers = Array.from(
+          scope.querySelectorAll<HTMLElement>('.todoseq-dashboard-container'),
+        );
+        const chevrons = Array.from(
+          scope.querySelectorAll<HTMLElement>(
+            '.todoseq-dashboard-header .todoseq-collapse-toggle-icon',
+          ),
+        );
+        const barRows = Array.from(
+          scope.querySelectorAll<HTMLElement>('.todoseq-dashboard-bar-row'),
+        );
+        return (
+          containers.length >= 2 &&
+          containers.every((c) =>
+            c.classList.contains('todoseq-dashboard-collapsed'),
+          ) &&
+          chevrons.length >= 2 &&
+          chevrons.every((el) => el.offsetParent !== null) &&
+          barRows.every((el) => el.offsetParent === null)
+        );
+      },
+      undefined,
+      { timeout: 15_000 },
+    );
+  } catch (error) {
+    console.debug(
+      'dashboard-collapse dump:',
+      JSON.stringify(await dumpRenderState(), null, 1),
+    );
+    throw error;
+  }
 }
 
 test.describe('Dashboard collapse chevron placement', () => {
