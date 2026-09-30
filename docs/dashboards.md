@@ -35,9 +35,7 @@ opens it in a new tab.
 - `display:` one of `bar`, `column`, `donut`, `tiles`, `heatmap`, or `strip`.
   Default is `bar`. `heatmap` requires `group-by: scheduled` or `deadline`.
   `strip` drops the header and renders the query chip and group pills inline
-  (it cannot be combined with `title:` or `heatmap-window:`). The 020
-  spelling `layout: strip` / `layout: card` still works as a deprecated
-  alias, but `display:` is the documented form
+  (it cannot be combined with `title:`, `heatmap-window:`, or `collapse:`)
 - `title:` (optional) adds a custom title displayed above the card
 - `show-query:` (optional) `show`, `hide`, `true`, or `false`. Controls the
   query chip under the title. Defaults to `show`
@@ -54,9 +52,8 @@ opens it in a new tab.
   `mono` collapses all fills to accent steps
 - `collapse:` (optional) `true` or `false`. Starts the card collapsed behind
   its header. Defaults to `false`. Requires either `title:` to be set OR
-  `show-query: true`. (The 020 spelling `collapsed:` still works as an
-  alias, but `collapse:` is the documented form, matching embedded task
-  lists.) The expand/collapse chevron matches embedded task lists: directly
+  `show-query: true` (the same option and behavior as embedded task lists).
+  The expand/collapse chevron matches embedded task lists: directly
   after the title when the card has one, otherwise leading the chips row —
   click the header or chips (or press Enter/Space when focused) to toggle
 - `heatmap-window:` (optional) number of weeks for the heatmap window, 4–52.

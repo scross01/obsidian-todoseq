@@ -16,7 +16,7 @@ import {
 export interface DashboardParameters {
   searchQuery: string;
   groupBy: DashboardGroupBy;
-  /** Visual form, including the headerless `strip` (the former layout). */
+  /** Visual form, including the headerless `strip`. */
   display: DashboardDisplay;
   title?: string;
   showQuery: boolean;
@@ -72,7 +72,7 @@ const MAX_HEATMAP_WINDOW = 52;
  * `error` field, `#` comment lines skipped, semantic values lowercased.
  * Boolean options follow the embedded list convention — true/show for on,
  * false/hide for off — except `collapse`, which accepts only true/false
- * (like the embedded `collapse:` option; `collapsed:` is a deprecated alias).
+ * (like the embedded `collapse:` option).
  *
  * Example code block:
  * ```
@@ -133,20 +133,6 @@ export class TodoseqDashboardParser {
             );
           }
           display = value as DashboardDisplay;
-        } else if (trimmed.startsWith('layout:')) {
-          // Deprecated 020 spelling: `layout: strip` == `display: strip` and
-          // `layout: card` is a no-op. `display:` is the documented form.
-          const value = trimmed
-            .substring('layout:'.length)
-            .trim()
-            .toLowerCase();
-          if (value === 'strip') {
-            display = 'strip';
-          } else if (value !== 'card') {
-            throw new Error(
-              `Invalid layout option: ${value}. Valid options: card, strip (prefer display: bar | column | donut | tiles | heatmap | strip)`,
-            );
-          }
         } else if (trimmed.startsWith('title:')) {
           title = trimmed.substring('title:'.length).trim();
         } else if (trimmed.startsWith('show-query:')) {
@@ -197,22 +183,6 @@ export class TodoseqDashboardParser {
           } else {
             throw new Error(
               `Invalid collapse option: ${value}. Valid options: true, false`,
-            );
-          }
-        } else if (trimmed.startsWith('collapsed:')) {
-          // Deprecated 020 spelling, kept as an alias so existing notes keep
-          // rendering; `collapse:` is the documented form.
-          const value = trimmed
-            .substring('collapsed:'.length)
-            .trim()
-            .toLowerCase();
-          if (value === 'true') {
-            collapse = true;
-          } else if (value === 'false') {
-            collapse = false;
-          } else {
-            throw new Error(
-              `Invalid collapsed option: ${value}. Valid options: true, false (prefer collapse:)`,
             );
           }
         } else if (trimmed.startsWith('heatmap-window:')) {

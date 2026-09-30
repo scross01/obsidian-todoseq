@@ -1,5 +1,5 @@
 /**
- * Unit tests for the todoseq-dashboard code block parser (plan 020 Step 2).
+ * Unit tests for the todoseq-dashboard code block parser.
  * Modeled after tests/code-block-parser.test.ts.
  */
 import { TodoseqDashboardParser } from '../src/view/embedded-dashboard/dashboard-parser';
@@ -56,26 +56,22 @@ describe('TodoseqDashboardParser', () => {
       expect(params.heatmapWindow).toBe(12);
     });
 
-    it('accepts display: strip (the former layout: strip)', () => {
+    it('accepts display: strip', () => {
       const params = TodoseqDashboardParser.parse('display: strip');
       expect(params.error).toBeUndefined();
       expect(params.display).toBe('strip');
     });
 
-    it('keeps layout: strip as a deprecated alias mapping to display: strip', () => {
-      const params = TodoseqDashboardParser.parse('layout: strip');
-      expect(params.error).toBeUndefined();
-      expect(params.display).toBe('strip');
-    });
-
-    it('keeps layout: card as a deprecated no-op alias', () => {
-      const params = TodoseqDashboardParser.parse('layout: card');
-      expect(params.error).toBeUndefined();
-      expect(params.display).toBe('bar');
-    });
-
-    it('rejects layout: bogus like any unknown value', () => {
-      expect(TodoseqDashboardParser.parse('layout: bogus').error).toBeDefined();
+    it('ignores the removed layout: option (never released)', () => {
+      const stripParams = TodoseqDashboardParser.parse('layout: strip');
+      expect(stripParams.error).toBeUndefined();
+      expect(stripParams.display).toBe('bar');
+      expect(
+        TodoseqDashboardParser.parse('layout: card').error,
+      ).toBeUndefined();
+      expect(
+        TodoseqDashboardParser.parse('layout: bogus').error,
+      ).toBeUndefined();
     });
 
     it('rejects display: bogus with the display error message', () => {
@@ -94,13 +90,6 @@ describe('TodoseqDashboardParser', () => {
     it('rejects strip combined with heatmap-window (meaningless for pills)', () => {
       const params = TodoseqDashboardParser.parse(
         'display: strip\nheatmap-window: 12',
-      );
-      expect(params.error).toBeDefined();
-    });
-
-    it('rejects layout: strip combined with a title (same rule, alias form)', () => {
-      const params = TodoseqDashboardParser.parse(
-        'layout: strip\ntitle: Pipeline',
       );
       expect(params.error).toBeDefined();
     });
@@ -177,6 +166,12 @@ describe('TodoseqDashboardParser', () => {
       expect(showParams.error).toBeDefined();
     });
 
+    it('ignores the removed collapsed: alias (never released)', () => {
+      const params = TodoseqDashboardParser.parse('collapsed: true');
+      expect(params.error).toBeUndefined();
+      expect(params.collapse).toBe(false);
+    });
+
     it('errors when collapse is set without title or query chip', () => {
       const guarded = TodoseqDashboardParser.parse(
         'collapse: true\nshow-query: false',
@@ -234,11 +229,6 @@ describe('TodoseqDashboardParser', () => {
 
     it('rejects an unknown sort option', () => {
       const params = TodoseqDashboardParser.parse('sort: bogus');
-      expect(params.error).toBeDefined();
-    });
-
-    it('rejects an unknown layout', () => {
-      const params = TodoseqDashboardParser.parse('layout: banner');
       expect(params.error).toBeDefined();
     });
 
