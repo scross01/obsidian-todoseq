@@ -20,7 +20,7 @@ describe('TodoseqDashboardParser', () => {
       expect(params.showEmpty).toBe(false);
       expect(params.maxGroups).toBe(8);
       expect(params.color).toBe('semantic');
-      expect(params.collapsed).toBe(false);
+      expect(params.collapse).toBe(false);
       expect(params.heatmapWindow).toBe(26);
     });
   });
@@ -38,7 +38,7 @@ describe('TodoseqDashboardParser', () => {
         'show-empty: true',
         'max-groups: 5',
         'color: mono',
-        'collapsed: false',
+        'collapse: false',
         'heatmap-window: 12',
       ].join('\n');
 
@@ -55,7 +55,7 @@ describe('TodoseqDashboardParser', () => {
       expect(params.showEmpty).toBe(true);
       expect(params.maxGroups).toBe(5);
       expect(params.color).toBe('mono');
-      expect(params.collapsed).toBe(false);
+      expect(params.collapse).toBe(false);
       expect(params.heatmapWindow).toBe(12);
     });
 
@@ -111,34 +111,34 @@ describe('TodoseqDashboardParser', () => {
     });
   });
 
-  describe('collapsed option', () => {
-    it('accepts only true/false (the collapse: precedent)', () => {
-      expect(TodoseqDashboardParser.parse('collapsed: true').collapsed).toBe(
+  describe('collapse option', () => {
+    it('accepts only true/false (the embedded collapse: precedent)', () => {
+      expect(TodoseqDashboardParser.parse('collapse: true').collapse).toBe(
         true,
       );
-      expect(TodoseqDashboardParser.parse('collapsed: false').collapsed).toBe(
+      expect(TodoseqDashboardParser.parse('collapse: false').collapse).toBe(
         false,
       );
-      // 'show' is NOT accepted for collapsed (stays invalid, default false)
-      const showParams = TodoseqDashboardParser.parse('collapsed: show');
+      // 'show' is NOT accepted for collapse (stays invalid, default false)
+      const showParams = TodoseqDashboardParser.parse('collapse: show');
       expect(showParams.error).toBeDefined();
     });
 
-    it('errors when collapsed is set without title or query chip', () => {
+    it('errors when collapse is set without title or query chip', () => {
       const guarded = TodoseqDashboardParser.parse(
-        'collapsed: true\nshow-query: false',
+        'collapse: true\nshow-query: false',
       );
       expect(guarded.error).toBeDefined();
 
       const withTitle = TodoseqDashboardParser.parse(
-        'collapsed: true\ntitle: Pipeline',
+        'collapse: true\ntitle: Pipeline',
       );
       expect(withTitle.error).toBeUndefined();
-      expect(withTitle.collapsed).toBe(true);
+      expect(withTitle.collapse).toBe(true);
 
-      const withQuery = TodoseqDashboardParser.parse('collapsed: true');
+      const withQuery = TodoseqDashboardParser.parse('collapse: true');
       expect(withQuery.error).toBeUndefined();
-      expect(withQuery.collapsed).toBe(true);
+      expect(withQuery.collapse).toBe(true);
     });
   });
 

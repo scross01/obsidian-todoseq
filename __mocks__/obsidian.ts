@@ -136,8 +136,9 @@ export class Notice {
   }
 }
 
-export function setIcon(_el: HTMLElement, _iconId: string): void {
-  // no-op in tests
+export function setIcon(el: HTMLElement, iconId: string): void {
+  // Tests assert on data-icon; real Obsidian sets it too (lucide container).
+  el.setAttribute('data-icon', iconId);
 }
 
 export function setTooltip(

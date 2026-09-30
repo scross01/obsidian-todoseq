@@ -24,7 +24,11 @@ export interface DashboardParameters {
   showEmpty: boolean;
   maxGroups: number;
   color: 'semantic' | 'mono';
-  collapsed: boolean;
+  /**
+   * Start the card collapsed behind its header. Named after the embedded
+   * task list's `collapse:` option (same true/false convention).
+   */
+  collapse: boolean;
   /** Weeks of future window for the heatmap (4-52). */
   heatmapWindow: number;
   error?: string;
@@ -67,8 +71,8 @@ const MAX_HEATMAP_WINDOW = 52;
  * Mirrors TodoseqCodeBlockParser: static parse with try/catch returning an
  * `error` field, `#` comment lines skipped, semantic values lowercased.
  * Boolean options follow the embedded list convention — true/show for on,
- * false/hide for off — except `collapsed`, which accepts only true/false
- * (like the embedded `collapse:` option).
+ * false/hide for off — except `collapse`, which accepts only true/false
+ * (like the embedded `collapse:` option; `collapsed:` is a deprecated alias).
  *
  * Example code block:
  * ```
@@ -98,7 +102,7 @@ export class TodoseqDashboardParser {
       let showEmpty = false;
       let maxGroups = 8;
       let color: 'semantic' | 'mono' = 'semantic';
-      let collapsed = false;
+      let collapse = false;
       let heatmapWindow = DEFAULT_HEATMAP_WINDOW;
 
       for (const line of lines) {
@@ -178,18 +182,35 @@ export class TodoseqDashboardParser {
             );
           }
           color = value as 'semantic' | 'mono';
+        } else if (trimmed.startsWith('collapse:')) {
+          // Same option name as the embedded task list's collapse control.
+          const value = trimmed
+            .substring('collapse:'.length)
+            .trim()
+            .toLowerCase();
+          if (value === 'true') {
+            collapse = true;
+          } else if (value === 'false') {
+            collapse = false;
+          } else {
+            throw new Error(
+              `Invalid collapse option: ${value}. Valid options: true, false`,
+            );
+          }
         } else if (trimmed.startsWith('collapsed:')) {
+          // Deprecated 020 spelling, kept as an alias so existing notes keep
+          // rendering; `collapse:` is the documented form.
           const value = trimmed
             .substring('collapsed:'.length)
             .trim()
             .toLowerCase();
           if (value === 'true') {
-            collapsed = true;
+            collapse = true;
           } else if (value === 'false') {
-            collapsed = false;
+            collapse = false;
           } else {
             throw new Error(
-              `Invalid collapsed option: ${value}. Valid options: true, false`,
+              `Invalid collapsed option: ${value}. Valid options: true, false (prefer collapse:)`,
             );
           }
         } else if (trimmed.startsWith('heatmap-window:')) {
@@ -229,10 +250,10 @@ export class TodoseqDashboardParser {
         throw new Error('heatmap requires group-by: scheduled or deadline');
       }
 
-      // collapsed needs a clickable header: either a title or the query chip
-      if (collapsed === true && !title && showQuery === false) {
+      // collapse needs a clickable header: either a title or the query chip
+      if (collapse === true && !title && showQuery === false) {
         throw new Error(
-          'collapsed option requires either title to be set or show-query to be enabled',
+          'collapse option requires either title to be set or show-query to be enabled',
         );
       }
 
@@ -247,7 +268,7 @@ export class TodoseqDashboardParser {
         showEmpty,
         maxGroups,
         color,
-        collapsed,
+        collapse,
         heatmapWindow,
       };
     } catch (error) {
@@ -264,7 +285,7 @@ export class TodoseqDashboardParser {
         showEmpty: false,
         maxGroups: 8,
         color: 'semantic',
-        collapsed: false,
+        collapse: false,
         heatmapWindow: DEFAULT_HEATMAP_WINDOW,
         error: errorMessage,
       };

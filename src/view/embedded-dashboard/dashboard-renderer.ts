@@ -75,6 +75,10 @@ const NEUTRAL_LADDER = [
 const MONO_STEPS = [100, 82, 64, 46, 30];
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** Gutter label rows for a Monday-start week (rows Mon..Sun). */
+const GUTTER_LABELS_MONDAY = ['Mon', '', 'Wed', '', 'Fri', '', ''];
+/** Gutter label rows for a Sunday-start week (rows Sun..Sat). */
+const GUTTER_LABELS_SUNDAY = ['Sun', '', 'Tue', '', 'Thu', '', 'Sat'];
 const MONTH_LABELS = [
   'Jan',
   'Feb',
@@ -103,11 +107,17 @@ const renderedKeys = new WeakMap<HTMLElement, string>();
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 
+/** Per-render options the host derives from plugin settings. */
+export interface DashboardRenderOptions {
+  /** First day of the week for the heatmap gutter (plugin setting). */
+  weekStartsOn?: 'Monday' | 'Sunday';
+}
+
 export class DashboardRenderer {
   /**
-   * Settings are accepted for parity with the embedded list renderer and for
-   * future per-display tuning; colors come from theme variables, so nothing
-   * is read from them today.
+   * Settings are accepted for parity with the embedded list renderer; colors
+   * come from theme variables, so nothing is read from them here. Per-render
+   * behavior (heatmap week start) arrives via DashboardRenderOptions.
    */
   constructor(_settings: TodoTrackerSettings) {}
 
@@ -120,6 +130,7 @@ export class DashboardRenderer {
     result: DashboardResult,
     params: DashboardParameters,
     callbacks: DashboardCallbacks,
+    options: DashboardRenderOptions = {},
   ): HTMLElement {
     el.empty();
     const container = el.createDiv({ cls: 'todoseq-dashboard-container' });
@@ -132,11 +143,11 @@ export class DashboardRenderer {
     this.renderChips(container, params);
 
     const content = container.createDiv({ cls: 'todoseq-dashboard-content' });
-    if (params.collapsed) {
+    if (params.collapse) {
       container.addClass('todoseq-dashboard-collapsed');
-      this.makeHeaderCollapsible(container);
+      this.makeHeaderCollapsible(container, params);
     }
-    this.renderContent(content, result, params, callbacks);
+    this.renderContent(content, result, params, callbacks, options);
     return content;
   }
 
@@ -151,6 +162,7 @@ export class DashboardRenderer {
     nextResult: DashboardResult,
     params: DashboardParameters,
     callbacks: DashboardCallbacks,
+    options: DashboardRenderOptions = {},
   ): void {
     const nextKeys = nextResult.groups.map((g) => g.key).join('|');
     const current = renderedKeys.get(contentRoot) ?? '';
@@ -173,7 +185,7 @@ export class DashboardRenderer {
       this.renderStripContentInto(contentRoot, nextResult, params, callbacks);
       return;
     }
-    this.renderContent(contentRoot, nextResult, params, callbacks);
+    this.renderContent(contentRoot, nextResult, params, callbacks, options);
   }
 
   /** One-line error message; header (title/chips) stays. */
@@ -224,9 +236,57 @@ export class DashboardRenderer {
     }
   }
 
-  private makeHeaderCollapsible(container: HTMLElement): void {
-    const header = container.querySelector('.todoseq-dashboard-header');
+  /**
+   * True when the header has no title — the count total is then the line's
+   * leading element and carries the collapse chevron before it.
+   */
+  private hasTitlelessHeader(params: DashboardParameters): boolean {
+    return !params.title;
+  }
+
+  /**
+   * Make the card collapsible and place the expand/collapse indicator on the
+   * header line — the one row that stays visible when collapsed.
+   *
+   * With a title the chevron sits directly after it. Without a title the
+   * chevron leads the line, before the task count. DOM adjacency alone is
+   * not enough: the header is `justify-content: space-between`, so the
+   * total's `margin-left: auto` does the pushing and the middle item would
+   * otherwise center — the chevron's margin rules in styles.css account for
+   * that (title case) or remove it entirely (count-leading case).
+   */
+  private makeHeaderCollapsible(
+    container: HTMLElement,
+    params: DashboardParameters,
+  ): void {
+    const header = container.querySelector<HTMLElement>(
+      '.todoseq-dashboard-header',
+    );
     if (!header) return;
+
+    const chevron = header.createSpan({
+      cls: 'todoseq-collapse-toggle-icon',
+    });
+    setIcon(chevron, 'chevron-right');
+
+    if (this.hasTitlelessHeader(params)) {
+      // No title: chevron leads the line, before the task count.
+      const total = header.querySelector<HTMLElement>(
+        '.todoseq-dashboard-total',
+      );
+      if (total) {
+        header.insertBefore(chevron, total);
+      }
+    } else {
+      // Title case: directly after the title, before the total.
+      const title = header.querySelector<HTMLElement>(
+        '.todoseq-dashboard-title',
+      );
+      if (title) {
+        title.insertAdjacentElement('afterend', chevron);
+      }
+    }
+
     header.addClass('todoseq-dashboard-header-toggle');
     header.setAttribute('role', 'button');
     header.setAttribute('tabindex', '0');
@@ -236,6 +296,12 @@ export class DashboardRenderer {
       const collapsed = container.hasClass('todoseq-dashboard-collapsed');
       container.toggleClass('todoseq-dashboard-collapsed', !collapsed);
       header.setAttribute('aria-expanded', String(collapsed));
+      // Same add/removeClass dance as the embedded task lists' chevron.
+      if (collapsed) {
+        chevron.addClass('is-expanded');
+      } else {
+        chevron.removeClass('is-expanded');
+      }
     };
     header.addEventListener('click', toggle);
     header.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -333,6 +399,7 @@ export class DashboardRenderer {
     result: DashboardResult,
     params: DashboardParameters,
     callbacks: DashboardCallbacks,
+    options: DashboardRenderOptions = {},
   ): void {
     if (result.total === 0 || (result.groups.length === 0 && !result.days)) {
       this.renderEmptyState(contentRoot);
@@ -341,7 +408,7 @@ export class DashboardRenderer {
     }
 
     if (params.display === 'heatmap' && result.days) {
-      this.renderHeatmap(contentRoot, result, params, callbacks);
+      this.renderHeatmap(contentRoot, result, params, callbacks, options);
       renderedKeys.set(contentRoot, '');
       return;
     }
@@ -392,7 +459,12 @@ export class DashboardRenderer {
         text: group.label,
       });
       const track = row.createDiv({ cls: 'todoseq-dashboard-bar-track' });
-      track.createDiv({ cls: 'todoseq-dashboard-bar-fill' });
+      const fill = track.createDiv({ cls: 'todoseq-dashboard-bar-fill' });
+      // The mockup dims faint-bucket fills (Low/None) while the swatch dot
+      // stays full strength.
+      if (this.isFaintBucket(params, group)) {
+        fill.addClass('is-muted');
+      }
       row.createDiv({
         cls: 'todoseq-dashboard-bar-count',
         text: String(group.count),
@@ -586,6 +658,7 @@ export class DashboardRenderer {
     result: DashboardResult,
     params: DashboardParameters,
     callbacks: DashboardCallbacks,
+    options: DashboardRenderOptions = {},
   ): void {
     const days = result.days ?? [];
     const weeks = days.length / 7;
@@ -600,11 +673,15 @@ export class DashboardRenderer {
     const scroll = root.createDiv({ cls: 'todoseq-dashboard-heatmap-scroll' });
     const body = scroll.createDiv({ cls: 'todoseq-dashboard-heatmap-body' });
 
-    // Weekday gutter (fixed outside the scroll area). Rows are Mon..Sun;
-    // only Monday, Wednesday and Friday carry a label.
+    // Weekday gutter (fixed outside the scroll area). Rows follow the
+    // week-start setting: Mon..Sun or Sun..Sat; only every other row up to
+    // the fifth carries a label.
     const gutter = body.createDiv({ cls: 'todoseq-dashboard-heatmap-gutter' });
-    const GUTTER_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
-    for (const label of GUTTER_LABELS) {
+    const gutterLabels =
+      options.weekStartsOn === 'Sunday'
+        ? GUTTER_LABELS_SUNDAY
+        : GUTTER_LABELS_MONDAY;
+    for (const label of gutterLabels) {
       gutter.createSpan({ text: label });
     }
 
@@ -694,11 +771,13 @@ export class DashboardRenderer {
     const empty = contentRoot.createDiv({ cls: 'todoseq-dashboard-empty' });
     const icon = empty.createDiv({ cls: 'todoseq-dashboard-empty-icon' });
     setIcon(icon, 'search');
-    empty.createDiv({
+    // Mockup layout: icon left, title + hint stacked to the right of it
+    const text = empty.createDiv({ cls: 'todoseq-dashboard-empty-text' });
+    text.createDiv({
       cls: 'todoseq-dashboard-empty-title',
       text: 'No tasks match',
     });
-    empty.createDiv({
+    text.createDiv({
       cls: 'todoseq-dashboard-empty-hint',
       text: "Nothing in the vault matches this dashboard's search. Adjust the query, or add matching tasks.",
     });
@@ -902,6 +981,18 @@ export class DashboardRenderer {
     if (count === 2) return 'l2';
     if (count === 3) return 'l3';
     return 'l4';
+  }
+
+  /**
+   * True when the group's semantic color is the faint bucket (Low / None /
+   * Archived / the 'more' tail). The mockup dims such bar fills while the
+   * swatch dot stays full strength.
+   */
+  private isFaintBucket(
+    params: DashboardParameters,
+    group: DashboardGroup,
+  ): boolean {
+    return this.colorForGroup(params, group, 0) === 'var(--text-faint)';
   }
 
   private colorForGroup(

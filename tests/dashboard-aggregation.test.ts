@@ -511,6 +511,58 @@ describe('DashboardAggregator', () => {
         ),
       ).toBe(true);
     });
+
+    function weekdayOf(dateKey: string): number {
+      // Local parse (never UTC) per the test timezone-independence rule.
+      const [y, m, d] = dateKey.split('-').map(Number);
+      return new Date(y, m - 1, d).getDay();
+    }
+
+    it('starts weeks on Monday by default (first column is a Monday)', async () => {
+      const aggregator = makeAggregator({ weekStartsOn: 'Monday' });
+      const task = makeTask({
+        path: 'a.md',
+        line: 0,
+        scheduledDate: dayOffset(0),
+      });
+      const result = await aggregator.aggregate([task], {
+        groupBy: 'scheduled',
+        display: 'heatmap',
+        heatmapWindow: 4,
+      });
+
+      const days = result.days ?? [];
+      expect(days).toHaveLength(28);
+      expect(weekdayOf(days[0].date)).toBe(1); // Monday
+      // Today stays inside the window regardless of the week start
+      expect(days.some((d) => d.date === result.today)).toBe(true);
+    });
+
+    it('starts weeks on Sunday when weekStartsOn is Sunday', async () => {
+      const aggregator = makeAggregator({ weekStartsOn: 'Sunday' });
+      const task = makeTask({
+        path: 'a.md',
+        line: 0,
+        scheduledDate: dayOffset(0),
+      });
+      const result = await aggregator.aggregate([task], {
+        groupBy: 'scheduled',
+        display: 'heatmap',
+        heatmapWindow: 4,
+      });
+
+      const days = result.days ?? [];
+      expect(days).toHaveLength(28);
+      expect(weekdayOf(days[0].date)).toBe(0); // Sunday
+      // Every 8th cell from the second column must be the next Sunday
+      // (7-row column flow: each column is one week)
+      expect(weekdayOf(days[7].date)).toBe(0);
+      // Today stays inside the window regardless of the week start
+      expect(days.some((d) => d.date === result.today)).toBe(true);
+      // Dated tasks still land in their own day cell
+      const todayCell = days.find((d) => d.date === result.today);
+      expect(todayCell?.count).toBe(1);
+    });
   });
 
   describe('base query filtering', () => {

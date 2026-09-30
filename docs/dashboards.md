@@ -50,11 +50,16 @@ opens it in a new tab.
 - `color:` (optional) `semantic` (default) or `mono`. Semantic maps each
   attribute to its theme color (High red, overdue red, completed green, …);
   `mono` collapses all fills to accent steps
-- `collapsed:` (optional) `true` or `false`. Starts the card collapsed behind
+- `collapse:` (optional) `true` or `false`. Starts the card collapsed behind
   its header. Defaults to `false`. Requires either `title:` to be set OR
-  `show-query: true`
+  `show-query: true`. (The 020 spelling `collapsed:` still works as an
+  alias, but `collapse:` is the documented form, matching embedded task
+  lists.) The expand/collapse chevron matches embedded task lists: directly
+  after the title when the card has one, otherwise leading the chips row —
+  click the header or chips (or press Enter/Space when focused) to toggle
 - `heatmap-window:` (optional) number of weeks for the heatmap window, 4–52.
-  Defaults to `26`
+  Defaults to `26`. The heatmap's first column follows the plugin's
+  **Week starts on** setting — Monday or Sunday
 
 Lines starting with `#` inside the block are treated as comments.
 
@@ -81,7 +86,8 @@ Lines starting with `#` inside the block are treated as comments.
 - **tiles** — a responsive grid of tiles with the count in the group color
 - **heatmap** — a GitHub-style calendar of upcoming due work (requires
   `group-by: scheduled` or `deadline`). Past days are dimmed, today is
-  outlined, and each day is clickable. Use `heatmap-window:` to control how
+  outlined, and each day is clickable. The first column follows the plugin's
+  **Week starts on** setting. Use `heatmap-window:` to control how
   many weeks ahead are shown
 
 Cards update automatically when tasks change anywhere in the vault — from the

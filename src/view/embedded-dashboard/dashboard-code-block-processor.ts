@@ -3,10 +3,14 @@ import TodoTracker from '../../main';
 import { VaultScanner } from '../../services/vault-scanner';
 import { DashboardAggregator } from './aggregation';
 import {
+  DashboardCallbacks,
+  DashboardRenderOptions,
+  DashboardRenderer,
+} from './dashboard-renderer';
+import {
   DashboardParameters,
   TodoseqDashboardParser,
 } from './dashboard-parser';
-import { DashboardCallbacks, DashboardRenderer } from './dashboard-renderer';
 
 /**
  * Processor for todoseq-dashboard code blocks.
@@ -130,6 +134,7 @@ export class DashboardCodeBlockProcessor {
         result,
         params,
         callbacks,
+        this.renderOptions(),
       );
 
       this.activeDashboards.set(containerId, {
@@ -200,6 +205,7 @@ export class DashboardCodeBlockProcessor {
           result,
           params,
           dashboard.callbacks,
+          this.renderOptions(),
         );
       } else {
         dashboard.contentRoot = this.renderer.renderCard(
@@ -207,6 +213,7 @@ export class DashboardCodeBlockProcessor {
           result,
           params,
           dashboard.callbacks,
+          this.renderOptions(),
         );
       }
     } catch (error: unknown) {
@@ -238,11 +245,17 @@ export class DashboardCodeBlockProcessor {
 
   /**
    * Update settings when plugin settings change: recreate the aggregator
-   * with fresh settings/keywordManager, then refresh.
+   * with fresh settings/keywordManager, then refresh. Heatmaps always take
+   * the rebuild path, so the new week start applies on the refresh.
    */
   updateSettings(): void {
     this.aggregator = this.createAggregator();
     this.refreshAllDashboards();
+  }
+
+  /** Per-render options derived from plugin settings. */
+  private renderOptions(): DashboardRenderOptions {
+    return { weekStartsOn: this.plugin.settings.weekStartsOn };
   }
 
   /** Clean up resources when plugin unloads. */

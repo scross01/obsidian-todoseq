@@ -529,9 +529,10 @@ export class DashboardAggregator {
 
   /**
    * Heatmap: bucket matched tasks by the calendar day of their date within
-   * `weeks` weeks starting Monday of the current week, extending forward.
-   * Days before today stay empty (the renderer dims them) — the heatmap is
-   * a forward-looking window; overdue work is what the bucket cards show.
+   * `weeks` weeks starting the first day of the current week (the plugin's
+   * weekStartsOn setting — Monday or Sunday), extending forward. Days before
+   * today stay empty (the renderer dims them) — the heatmap is a
+   * forward-looking window; overdue work is what the bucket cards show.
    */
   private resolveHeatmap(
     field: 'scheduled' | 'deadline',
@@ -542,7 +543,7 @@ export class DashboardAggregator {
     const now = new Date();
     const todayStart = startOfLocalDay(now);
     const windowStart = startOfLocalDay(now);
-    windowStart.setDate(windowStart.getDate() - this.daysSinceMonday(now));
+    windowStart.setDate(windowStart.getDate() - this.daysSinceWeekStart(now));
 
     const totalDays = weeks * 7;
     const counts = new Array<number>(totalDays).fill(0);
@@ -570,8 +571,15 @@ export class DashboardAggregator {
     return { days, today: toDateKey(todayStart) };
   }
 
-  /** Days since Monday (0 = Monday) for the heatmap week start. */
-  private daysSinceMonday(date: Date): number {
+  /**
+   * Days since the first day of the week (0 = week start). The plugin's
+   * weekStartsOn setting decides whether weeks start on Monday or Sunday —
+   * the heatmap's first column follows it.
+   */
+  private daysSinceWeekStart(date: Date): number {
+    if ((this.settings.weekStartsOn ?? 'Monday') === 'Sunday') {
+      return date.getDay();
+    }
     return (date.getDay() + 6) % 7;
   }
 

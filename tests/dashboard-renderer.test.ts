@@ -60,7 +60,7 @@ function params(
     showEmpty: false,
     maxGroups: 8,
     color: 'semantic',
-    collapsed: false,
+    collapsed: false as boolean | undefined,
     heatmapWindow: 26,
     ...overrides,
   };
@@ -148,7 +148,7 @@ describe('DashboardRenderer', () => {
       const content = renderer.renderCard(
         host,
         result(),
-        params({ collapsed: true }),
+        params({ collapse: true }),
         noopCallbacks(),
       );
       const container = host.querySelector('.todoseq-dashboard-container');
@@ -216,6 +216,27 @@ describe('DashboardRenderer', () => {
         '.todoseq-dashboard-bar-fill',
       );
       expect(fill?.style.width).toBe('100%');
+    });
+
+    it('dims faint-bucket fills (Low/None) with an is-muted class', () => {
+      renderer.renderCard(
+        host,
+        result({
+          groups: [
+            group('priority:high', 'High', 4, 'priority:high'),
+            group('priority:low', 'Low', 2, 'priority:low'),
+          ],
+        }),
+        params(),
+        noopCallbacks(),
+      );
+      const rows = host.querySelectorAll('.todoseq-dashboard-bar-row');
+      expect(rows.length).toBe(2);
+      // High keeps a full-strength fill; Low's fill is dimmed (dot stays full)
+      const highFill = rows[0].querySelector('.todoseq-dashboard-bar-fill');
+      const lowFill = rows[1].querySelector('.todoseq-dashboard-bar-fill');
+      expect(highFill?.classList.contains('is-muted')).toBe(false);
+      expect(lowFill?.classList.contains('is-muted')).toBe(true);
     });
 
     it('click and Enter trigger onOpenQuery with the composed query', () => {
@@ -529,7 +550,6 @@ describe('DashboardRenderer', () => {
       );
       const gutterTexts = Array.from(gutter).map((g) => g.textContent);
       expect(gutterTexts).toEqual(['Mon', '', 'Wed', '', 'Fri', '', '']);
-
       // Footer: hint + LESS/MORE scale
       expect(
         host.querySelector('.todoseq-dashboard-heatmap-hint')?.textContent,
@@ -539,6 +559,21 @@ describe('DashboardRenderer', () => {
       ).not.toBeNull();
       expect(host.textContent).toContain('LESS');
       expect(host.textContent).toContain('MORE');
+    });
+
+    it('rotates gutter labels when the week starts on Sunday', () => {
+      renderer.renderCard(
+        host,
+        heatmapResult(),
+        params({ display: 'heatmap', groupBy: 'scheduled' }),
+        noopCallbacks(),
+        { weekStartsOn: 'Sunday' },
+      );
+      const gutter = host.querySelectorAll(
+        '.todoseq-dashboard-heatmap-gutter span',
+      );
+      const texts = Array.from(gutter).map((g) => g.textContent);
+      expect(texts).toEqual(['Sun', '', 'Tue', '', 'Thu', '', 'Sat']);
     });
 
     it('clicking a day raises onOpenQuery with the day filter', () => {
@@ -562,6 +597,117 @@ describe('DashboardRenderer', () => {
         `(tag:project) scheduled:${todayKey}`,
         expect.anything(),
       );
+    });
+  });
+
+  describe('collapsed header', () => {
+    it('places the chevron directly after the title when a title is set', () => {
+      renderer.renderCard(
+        host,
+        result(),
+        params({ collapse: true, title: 'Dash' }),
+        noopCallbacks(),
+      );
+      const header = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-header',
+      );
+      expect(header?.getAttribute('aria-expanded')).toBe('false');
+      // Placement contract: chevron sits immediately after the title
+      // element; the total is pushed right by CSS, not by DOM order.
+      const children = header
+        ? Array.from(header.children).map((c) => c.className.split(' ').pop())
+        : [];
+      const titleIdx = children.indexOf('todoseq-dashboard-title');
+      const chevronIdx = children.indexOf('todoseq-collapse-toggle-icon');
+      expect(chevronIdx).toBe(titleIdx + 1);
+      expect(children[children.length - 1]).toBe('todoseq-dashboard-total');
+      const chevron = header?.querySelector('.todoseq-collapse-toggle-icon');
+      // Collapsed by default: chevron-right (points at the closed content);
+      // embedded task lists add .is-expanded to rotate it when open.
+      expect(chevron?.getAttribute('data-icon')).toBe('chevron-right');
+      expect(chevron?.classList.contains('is-expanded')).toBe(false);
+    });
+
+    it('leads the header line with the chevron before the task count when there is no title', () => {
+      renderer.renderCard(
+        host,
+        result(),
+        params({ collapse: true, title: undefined }),
+        noopCallbacks(),
+      );
+      // No title: the header row (chevron + count) is the toggle — it is the
+      // one row that stays visible when collapsed (the chips row hides).
+      const header = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-header',
+      );
+      expect(header?.getAttribute('role')).toBe('button');
+      expect(header?.getAttribute('aria-expanded')).toBe('false');
+      const children = header
+        ? Array.from(header.children).map((c) => c.className.split(' ').pop())
+        : [];
+      expect(children[0]).toBe('todoseq-collapse-toggle-icon');
+      expect(children[1]).toBe('todoseq-dashboard-total');
+      const chevron = header?.querySelector('.todoseq-collapse-toggle-icon');
+      expect(chevron?.getAttribute('data-icon')).toBe('chevron-right');
+
+      // The chips row is NOT the toggle.
+      const chips = host.querySelector<HTMLElement>('.todoseq-dashboard-chips');
+      expect(chips?.getAttribute('role')).toBeNull();
+
+      // Toggling expands the card and rotates the chevron.
+      header?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const container = host.querySelector('.todoseq-dashboard-container');
+      expect(container?.classList.contains('todoseq-dashboard-collapsed')).toBe(
+        false,
+      );
+      expect(chevron?.classList.contains('is-expanded')).toBe(true);
+    });
+
+    it('keeps the count-leading chevron when there is no title and no query chip', () => {
+      renderer.renderCard(
+        host,
+        result(),
+        params({
+          collapse: true,
+          title: undefined,
+          searchQuery: undefined,
+        }),
+        noopCallbacks(),
+      );
+      const header = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-header',
+      );
+      const children = header
+        ? Array.from(header.children).map((c) => c.className.split(' ').pop())
+        : [];
+      expect(children[0]).toBe('todoseq-collapse-toggle-icon');
+      expect(children[1]).toBe('todoseq-dashboard-total');
+      // The chips row still carries the group-by chip (visible when open).
+      expect(
+        host.querySelector('.todoseq-dashboard-chips')?.getAttribute('role'),
+      ).toBeNull();
+    });
+
+    it('expands the card and rotates the chevron on header click', () => {
+      renderer.renderCard(
+        host,
+        result(),
+        params({ collapse: true, title: 'Dash' }),
+        noopCallbacks(),
+      );
+      const container = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-container',
+      );
+      const header = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-header',
+      );
+      header?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(container?.classList.contains('todoseq-dashboard-collapsed')).toBe(
+        false,
+      );
+      expect(header?.getAttribute('aria-expanded')).toBe('true');
+      const chevron = header?.querySelector('.todoseq-collapse-toggle-icon');
+      expect(chevron?.classList.contains('is-expanded')).toBe(true);
     });
   });
 
@@ -601,6 +747,18 @@ describe('DashboardRenderer', () => {
       expect(empty).not.toBeNull();
       expect(empty?.textContent).toContain('No tasks match');
       expect(empty?.textContent).toContain('Nothing in the vault matches');
+      // Mockup layout: icon left, title + hint stacked to the right
+      expect(
+        empty?.querySelector('.todoseq-dashboard-empty-icon'),
+      ).not.toBeNull();
+      const text = empty?.querySelector('.todoseq-dashboard-empty-text');
+      expect(text).not.toBeNull();
+      expect(
+        text?.querySelector('.todoseq-dashboard-empty-title')?.textContent,
+      ).toBe('No tasks match');
+      expect(
+        text?.querySelector('.todoseq-dashboard-empty-hint'),
+      ).not.toBeNull();
     });
 
     it('renders a one-line error while keeping the header', () => {
