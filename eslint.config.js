@@ -93,6 +93,7 @@ export default [
       '@typescript-eslint/no-unused-vars': 'off',
       'no-empty': 'off',
       'import/no-nodejs-modules': 'off',
+      'obsidianmd/no-nodejs-modules': 'off',
       'obsidianmd/prefer-create-el': 'off',
       'obsidianmd/no-global-this': 'off',
       'obsidianmd/prefer-active-doc': 'off',
