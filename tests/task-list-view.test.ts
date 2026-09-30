@@ -228,6 +228,100 @@ describe('TaskListView', () => {
     });
   });
 
+  describe('resetUiStateToDefaults', () => {
+    function ensureContentEl(): HTMLElement {
+      if (!view['contentEl']) {
+        view['contentEl'] = activeDocument.createElement('div');
+      }
+      return view['contentEl'];
+    }
+
+    it('clears query, view-mode, sort, and match-case overrides and refreshes', async () => {
+      ensureContentEl();
+      view.setViewMode('hideCompleted');
+      view.setSortMethod('sortByPriority');
+      view['isCaseSensitive'] = true;
+      const refreshSpy = jest
+        .spyOn(
+          view as unknown as { refreshVisibleList: jest.Mock },
+          'refreshVisibleList',
+        )
+        .mockResolvedValue(undefined);
+
+      await view.resetUiStateToDefaults();
+
+      // Defaults come from plugin settings via the accessors' fallback chain.
+      expect(view['getViewMode']()).toBe(
+        (pluginMock.settings as { taskListViewMode: string }).taskListViewMode,
+      );
+      expect(view['getSortMethod']()).toBe(
+        (pluginMock.settings as { defaultSortMethod: string })
+          .defaultSortMethod,
+      );
+      expect(view['isCaseSensitive']).toBe(false);
+      expect(view['contentEl']?.getAttr('data-search')).toBe('');
+      expect(refreshSpy).toHaveBeenCalledWith(true);
+    });
+
+    it('syncs the toolbar dropdowns and match-case button when present', async () => {
+      const contentEl = ensureContentEl();
+      // Mock-DOM selects need options for value assignment to stick.
+      const makeOption = (value: string) => {
+        const option = activeDocument.createElement('option');
+        option.value = value;
+        return option;
+      };
+      const completedDropdown = activeDocument.createElement('select');
+      completedDropdown.id = 'completed-tasks-dropdown';
+      for (const v of ['showAll', 'sortCompletedLast', 'hideCompleted']) {
+        completedDropdown.appendChild(makeOption(v));
+      }
+      completedDropdown.value = 'hideCompleted';
+      contentEl.appendChild(completedDropdown);
+      const sortInfo = activeDocument.createElement('div');
+      sortInfo.className = 'search-results-info';
+      contentEl.appendChild(sortInfo);
+      const sortDropdown = activeDocument.createElement('select');
+      sortDropdown.setAttribute('aria-label', 'Sort tasks by');
+      for (const v of [
+        'default',
+        'sortByScheduled',
+        'sortByDeadline',
+        'sortByClosedDate',
+        'sortByStarted',
+        'sortByPriority',
+        'sortByUrgency',
+        'sortByKeyword',
+      ]) {
+        sortDropdown.appendChild(makeOption(v));
+      }
+      sortDropdown.value = 'sortByUrgency';
+      sortInfo.appendChild(sortDropdown);
+      const matchCaseBtn = activeDocument.createElement('div');
+      matchCaseBtn.className = 'input-right-decorator';
+      matchCaseBtn.setAttribute('aria-label', 'Match case');
+      matchCaseBtn.addClass('is-active');
+      contentEl.appendChild(matchCaseBtn);
+      jest
+        .spyOn(
+          view as unknown as { refreshVisibleList: jest.Mock },
+          'refreshVisibleList',
+        )
+        .mockResolvedValue(undefined);
+
+      await view.resetUiStateToDefaults();
+
+      expect(completedDropdown.value).toBe(
+        (pluginMock.settings as { taskListViewMode: string }).taskListViewMode,
+      );
+      expect(sortDropdown.value).toBe(
+        (pluginMock.settings as { defaultSortMethod: string })
+          .defaultSortMethod,
+      );
+      expect(matchCaseBtn.hasClass('is-active')).toBe(false);
+    });
+  });
+
   describe('getDisplayText', () => {
     it('should return Todoseq as display text', () => {
       expect(view.getDisplayText()).toBe('TODOseq');

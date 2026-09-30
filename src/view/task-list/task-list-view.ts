@@ -1217,6 +1217,50 @@ export class TaskListView extends ItemView {
   }
 
   /**
+   * Reset all shared-leaf UI state (query, view mode, sort, match case) back
+   * to the plugin's defaults and refresh. Exists for the integration test
+   * harness: tests share one Obsidian session, and a drill-through or saved
+   * search can leave UI overrides that would leak into later tests. The view
+   * owns its toolbar selectors, so the reset lives here rather than in
+   * test-side DOM scraping. Absent toolbar elements are skipped, matching
+   * applySavedSearch's defensive syncs.
+   */
+  async resetUiStateToDefaults(): Promise<void> {
+    if (this.searchInputEl) {
+      this.searchInputEl.value = '';
+    }
+    this.setSearchQuery('');
+    this.setViewMode(this.plugin.settings.taskListViewMode);
+    this.setSortMethod(this.plugin.settings.defaultSortMethod);
+    this.isCaseSensitive = false;
+
+    // Sync visible toolbar controls (same defensive lookups as applySavedSearch).
+    const completedDropdown = this.contentEl.querySelector(
+      '#completed-tasks-dropdown',
+    );
+    if (completedDropdown) {
+      (completedDropdown as HTMLSelectElement).value =
+        this.plugin.settings.taskListViewMode;
+    }
+    const sortDropdown = this.contentEl.querySelector(
+      '.search-results-info select[aria-label="Sort tasks by"]',
+    );
+    if (sortDropdown) {
+      (sortDropdown as HTMLSelectElement).value =
+        this.plugin.settings.defaultSortMethod;
+    }
+    const matchCaseBtn = this.contentEl.querySelector(
+      '.input-right-decorator[aria-label="Match case"]',
+    );
+    if (matchCaseBtn) {
+      matchCaseBtn.toggleClass('is-active', false);
+    }
+
+    this.updateSaveSearchBtnVisibility('');
+    await this.refreshVisibleList(true);
+  }
+
+  /**
    * Open save dialog for creating a new saved search
    */
   private openSaveSearchDialog(prefilledQuery?: string): void {

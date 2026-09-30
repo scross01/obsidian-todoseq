@@ -37,25 +37,32 @@ export async function resetVaultState(page: Page): Promise<void> {
   // Rescan vault so task state reflects the reset markdown content.
   await runRescan(page);
 
-  // Clear any search filter left in a live Task List leaf. Dashboard
-  // drill-through (and saved-search application) bakes a query into the
-  // shared leaf's search input; a later test expecting an unfiltered list
-  // would otherwise see only the stale filtered result set (order-dependent
+  // Clear any UI state left in live Task List leaves. Dashboard
+  // drill-through (and saved-search application) bakes a query, view mode,
+  // sort, and match-case into the shared leaf; a later test expecting the
+  // default view would otherwise inherit the stale state (order-dependent
   // failures: fine in isolation, wrong after the drill-through test ran).
-  await clearTaskListFilters(page);
+  await resetTaskListUiState(page);
 
   // Give the UI a moment to settle after the rescan.
   await page.waitForTimeout(500);
 }
 
-/** Reset the search query of every open Task List leaf to '' (all tasks). */
-async function clearTaskListFilters(page: Page): Promise<void> {
+/**
+ * Reset every open Task List leaf to the plugin's default UI state: empty
+ * query, default view mode / sort / match case, synced toolbar. Delegates to
+ * TaskListView.resetUiStateToDefaults() so the view owns its own DOM.
+ */
+async function resetTaskListUiState(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const app = (window as any).app;
     const leaves = app?.workspace?.getLeavesOfType?.('todoseq-view') ?? [];
     for (const leaf of leaves) {
       const view = leaf.view;
-      if (typeof view?.applyQueryAndRefresh === 'function') {
+      if (typeof view?.resetUiStateToDefaults === 'function') {
+        await view.resetUiStateToDefaults();
+      } else if (typeof view?.applyQueryAndRefresh === 'function') {
+        // Older builds without the full reset: still clear the query.
         await view.applyQueryAndRefresh('');
       }
     }
