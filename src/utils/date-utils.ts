@@ -1,9 +1,12 @@
 import { WarningPeriodInfo } from '../types/task';
+import { RegexCache } from './regex-cache';
 
 /**
  * Date utility class
  */
 export class DateUtils {
+  /** Cached regexes for date-value parsing (hot path: search evaluation). */
+  private static dateValueRegexCache = new RegexCache();
   /**
    * Format a date for display with relative time indicators
    * @param date The date to format
@@ -196,32 +199,80 @@ export class DateUtils {
     const nextNDaysMatch = trimmedValue.match(/^next\s+(\d+)\s+days$/);
     if (nextNDaysMatch) {
       return `next ${nextNDaysMatch[1]} days`;
+    } // Handle date ranges (e.g., 2024-01-01..2024-01-31, 2026-10..,
+    // ..2026-12-31, 2026-10..2026-11). Both sides optional, partial dates
+    // accepted; at least one side must be present.
+    const rangeRegex = this.dateValueRegexCache.get(
+      '^(\\d{4}(?:-\\d{2}(?:-\\d{2})?)?)?\\.\\.(\\d{4}(?:-\\d{2}(?:-\\d{2})?)?)?$',
+    );
+    const rangeMatch = trimmedValue.match(rangeRegex);
+    if (rangeMatch && (rangeMatch[1] || rangeMatch[2])) {
+      // A start bound begins at its interval's first day; an end bound runs
+      // through its interval's last day, expressed as last+1 (the existing
+      // inclusive-end convention). Full dates are the one-day interval case.
+      const startInterval = rangeMatch[1]
+        ? this.expandDatePartsToInterval(rangeMatch[1])
+        : null;
+      const endInterval = rangeMatch[2]
+        ? this.expandDatePartsToInterval(rangeMatch[2])
+        : null;
+
+      // Fail closed: a bound that looks like a date but is invalid
+      // (2026-13-01, 2026-02-30) makes the whole value invalid.
+      if (
+        (rangeMatch[1] && !startInterval) ||
+        (rangeMatch[2] && !endInterval)
+      ) {
+        return null;
+      }
+
+      const startDate = startInterval
+        ? startInterval.first
+        : new Date(-8640000000000000 / 2);
+      const endDate = endInterval
+        ? this.addDays(endInterval.last, 1)
+        : new Date(8640000000000000 / 2);
+
+      // Normalize dates to ensure timezone consistency with tasks
+      const normalizedStart = this.normalizeDateForTimezone(startDate);
+      const normalizedEnd = this.normalizeDateForTimezone(endDate);
+      return { start: normalizedStart, end: normalizedEnd };
     }
 
-    // Handle date ranges (e.g., 2024-01-01..2024-01-31)
-    const rangeMatch = trimmedValue.match(
-      /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/,
+    // Handle value-side comparison operators: <D, <=D, >D, >=D — full or
+    // partial dates. Desugars to the same {start, end} shape the equivalent
+    // one-sided range form produces so the two idioms cannot drift:
+    // <D == ..(day before D), <=D == ..D, >D == (day after D).., >=D == D..;
+    // a partial date expands to its interval and the operator selects one
+    // interval edge (see the equivalence tables in the search plan).
+    const operatorRegex = this.dateValueRegexCache.get(
+      '^([><]=?)(\\d{4}(?:-\\d{2}(?:-\\d{2})?)?)$',
     );
-    if (rangeMatch) {
-      // Parse dates using DateUtils.createDate to ensure timezone consistency
-      const [startYear, startMonth, startDay] = rangeMatch[1]
-        .split('-')
-        .map(Number);
-      const [endYear, endMonth, endDay] = rangeMatch[2].split('-').map(Number);
-
-      const startDate = this.createDate(startYear, startMonth - 1, startDay);
-      const endDate = this.createDate(endYear, endMonth - 1, endDay);
-
-      // Add one day to end date to make it inclusive
-      endDate.setDate(endDate.getDate() + 1);
-
-      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-        // Normalize dates to ensure timezone consistency with tasks
-        const normalizedStart = this.normalizeDateForTimezone(startDate);
-        const normalizedEnd = this.normalizeDateForTimezone(endDate);
-        return { start: normalizedStart, end: normalizedEnd };
+    const operatorMatch = trimmedValue.match(operatorRegex);
+    if (operatorMatch) {
+      const interval = this.expandDatePartsToInterval(operatorMatch[2]);
+      if (!interval) {
+        return null; // Invalid date: fail closed.
       }
-      return null;
+      const operator = operatorMatch[1];
+      if (operator[0] === '<') {
+        // '<': exclusive end at the interval's first day (strictly before).
+        // '<=': exclusive end at last day + 1 (inclusive through).
+        const end =
+          operator === '<' ? interval.first : this.addDays(interval.last, 1);
+        return {
+          start: new Date(-8640000000000000 / 2),
+          end: this.normalizeDateForTimezone(end),
+        };
+      }
+      // '>=': inclusive start at the interval's first day.
+      // '>': inclusive start at last day + 1 (strictly after).
+      const start =
+        operator === '>=' ? interval.first : this.addDays(interval.last, 1);
+      return {
+        start: this.normalizeDateForTimezone(start),
+        end: new Date(8640000000000000 / 2),
+      };
     }
 
     // Handle exact dates with various formats
@@ -859,6 +910,69 @@ export class DateUtils {
     }
 
     return date;
+  }
+
+  /**
+   * Resolve a range_filter bound (`YYYY`, `YYYY-MM`, or `YYYY-MM-DD`) to a
+   * single comparison Date: a start bound takes its interval's FIRST day,
+   * an end bound the day AFTER its interval's last day (exclusive — the
+   * existing inclusive-end convention). Full dates are the one-day
+   * interval case, reproducing the legacy two-sided semantics exactly.
+   * Returns null for calendar-invalid bounds (2026-13-01, 2026-02-30) and
+   * for non-numeric values (relative expressions have no absolute bound in
+   * a range composition — fail closed, matching legacy behavior).
+   */
+  static parseDateBound(bound: string, side: 'start' | 'end'): Date | null {
+    const interval = this.expandDatePartsToInterval(bound);
+    if (!interval) return null;
+    return side === 'start' ? interval.first : this.addDays(interval.last, 1);
+  }
+
+  /**
+   * Expand a date-value bound (`YYYY`, `YYYY-MM`, or `YYYY-MM-DD`) to the
+   * interval it denotes: {first, last} local-midnight dates. A full date is
+   * the one-day interval case. Returns null when the components are
+   * calendar-invalid (month 13, Feb 30) — createDate alone would silently
+   * roll them over. Single source of truth for partial-date bounds and
+   * comparison-operator desugaring in parseDateValue.
+   */
+  private static expandDatePartsToInterval(
+    bound: string,
+  ): { first: Date; last: Date } | null {
+    const parts = bound.split('-').map(Number);
+    const year = parts[0];
+    const month = parts.length >= 2 ? parts[1] : null;
+    const day = parts.length >= 3 ? parts[2] : null;
+
+    if (!Number.isInteger(year) || year < 1) return null;
+    if (month !== null && (month < 1 || month > 12)) return null;
+
+    if (month === null) {
+      // Whole year.
+      return {
+        first: this.createDate(year, 0, 1),
+        last: this.createDate(year, 11, 31),
+      };
+    }
+
+    if (day === null) {
+      // Whole month (createDate handles month length incl. leap years).
+      return {
+        first: this.createDate(year, month - 1, 1),
+        last: this.createDate(year, month, 0), // day 0 of next month = last day
+      };
+    }
+
+    // Full date: validate via round-trip (catches Feb 30, month 13, etc.).
+    const date = this.createDate(year, month - 1, day);
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return null;
+    }
+    return { first: date, last: date };
   }
 
   /**

@@ -276,6 +276,40 @@ class PrattParser {
 
     const valueToken = this.tokens[this.position];
 
+    // Left-open range form: `scheduled:..2026-12-31` tokenizes as
+    // prefix, range, word — the range operator IS the value position.
+    if (valueToken.type === 'range') {
+      const field = prefixToken.value as SearchPrefix;
+      if (
+        field !== 'scheduled' &&
+        field !== 'deadline' &&
+        field !== 'closed' &&
+        field !== 'started'
+      ) {
+        throw new SearchError(
+          'Range operator can only be used with scheduled:, deadline:, closed:, or started: prefixes',
+        );
+      }
+      this.position++; // consume range
+      const boundToken = this.tokens[this.position];
+      if (
+        !boundToken ||
+        (boundToken.type !== 'word' &&
+          boundToken.type !== 'prefix_value' &&
+          boundToken.type !== 'phrase')
+      ) {
+        throw new SearchError('Expected date value after range operator');
+      }
+      this.position++;
+      return {
+        type: 'range_filter',
+        field,
+        start: undefined,
+        end: boundToken.value,
+        position: prefixToken.position,
+      };
+    }
+
     // Handle both prefix_value and regular word/phrase tokens
     if (
       valueToken.type === 'prefix_value' ||
@@ -387,8 +421,11 @@ class PrattParser {
       }
 
       case 'range': {
-        // Handle range expressions like "2024-01-01..2024-01-31"
-        // The left node should be a prefix filter with a date value
+        // Handle range expressions like "2024-01-01..2024-01-31",
+        // "2026-10-07.." (right-open), and "..2026-12-31" (left-open,
+        // where the range token directly follows the prefix).
+        // The left node should be a prefix filter with a date value,
+        // or (left-open form) be absent entirely.
         if (
           left.type === 'prefix_filter' &&
           left.field &&
@@ -397,17 +434,23 @@ class PrattParser {
             left.field === 'closed' ||
             left.field === 'started')
         ) {
-          // Parse the right side of the range
-          // Note: position was already incremented in parseExpression before calling parseInfix
+          // Right-open form: no value token after the range operator.
+          // A new term (prefix/property/word/rparen/EOF) ends the range.
           const rightToken = this.tokens[this.position];
+          const rightIsValue =
+            rightToken &&
+            (rightToken.type === 'prefix_value' ||
+              rightToken.type === 'word' ||
+              rightToken.type === 'phrase');
 
-          if (
-            !rightToken ||
-            (rightToken.type !== 'prefix_value' &&
-              rightToken.type !== 'word' &&
-              rightToken.type !== 'phrase')
-          ) {
-            throw new SearchError('Expected date value after range operator');
+          if (!rightIsValue) {
+            return {
+              type: 'range_filter',
+              field: left.field,
+              start: left.value,
+              end: undefined,
+              position: operator.position,
+            };
           }
 
           this.position++;

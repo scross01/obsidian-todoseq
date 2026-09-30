@@ -85,12 +85,16 @@ export const WINDOW_BUCKET_FILTERS = (field: string): string[] => [
 
 /**
  * Filter string for the "Later" bucket: has a date, but outside the three
- * windows. Both NOT forms parse today with zero grammar change: `-x`
- * negates a single prefix filter and `-(A OR B)` negates a parenthesized
- * group; successive NOTs implicit-AND into one `and` node.
+ * windows. The open-ended range form (from 8 days after today onward)
+ * matches the bucket assignment exactly: the first-true-wins order puts
+ * anything before today+8 into Overdue/Today/Next-7, so Later = tasks
+ * dated strictly after today+7 — a single readable range.
  */
-export const LATER_FILTER = (field: string): string =>
-  `-${field}:none -(${WINDOW_BUCKET_FILTERS(field).join(' OR ')})`;
+export const LATER_FILTER = (field: string): string => {
+  const bound = startOfLocalDay(new Date());
+  bound.setDate(bound.getDate() + 8);
+  return `${field}:${toDateKey(bound)}..`;
+};
 
 /**
  * Filter string for the "Next 7 days" bucket. The evaluator's next-7-days

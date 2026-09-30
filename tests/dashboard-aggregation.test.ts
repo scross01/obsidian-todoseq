@@ -418,9 +418,12 @@ describe('DashboardAggregator', () => {
       expect(NEXT_7_DAYS_BUCKET_FILTER('scheduled')).toBe(
         'scheduled:"next 7 days" -scheduled:today',
       );
-      expect(LATER_FILTER('scheduled')).toBe(
-        '-scheduled:none -(scheduled:overdue OR scheduled:today OR scheduled:"next 7 days")',
-      );
+      // Later is the open-ended range from today+8 onward (local dates),
+      // matching the first-true-wins bucket assignment exactly.
+      const bound = new Date();
+      bound.setDate(bound.getDate() + 8);
+      const key = `${bound.getFullYear()}-${String(bound.getMonth() + 1).padStart(2, '0')}-${String(bound.getDate()).padStart(2, '0')}`;
+      expect(LATER_FILTER('scheduled')).toBe(`scheduled:${key}..`);
     });
 
     it('Later filter contract: only far-future dated tasks match', async () => {
