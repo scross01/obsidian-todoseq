@@ -23,7 +23,6 @@ title: bars by state
 search: -state:completed
 display: bar
 group-by: state
-layout: card
 ```
 
 `display:bar  color: mono`
