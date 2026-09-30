@@ -358,9 +358,6 @@ export class EmbeddedTaskListRenderer {
             tasks,
             params,
             totalTasksCount,
-            undefined,
-            undefined,
-            isCollapsed,
             true, // Render search options header when expanded with title
           );
         } else {
@@ -370,9 +367,6 @@ export class EmbeddedTaskListRenderer {
             tasks,
             params,
             totalTasksCount,
-            toggleCollapse,
-            containerId,
-            isCollapsed,
             false, // Don't render header - it already exists
           );
         }
@@ -469,9 +463,6 @@ export class EmbeddedTaskListRenderer {
           tasks,
           params,
           totalTasksCount,
-          undefined,
-          undefined,
-          isCollapsed,
           true, // Render search options header when expanded with title
         );
       } else {
@@ -481,9 +472,6 @@ export class EmbeddedTaskListRenderer {
           tasks,
           params,
           totalTasksCount,
-          toggleCollapse, // Pass toggle params to make header interactive
-          containerId,
-          isCollapsed,
           false, // Don't render header - it already exists
         );
       }
@@ -613,55 +601,17 @@ export class EmbeddedTaskListRenderer {
       });
     }
 
-    // Show search query using the same format for both states
-    if (params.showQuery !== false && params.searchQuery) {
-      header.createSpan({
-        cls: 'todoseq-embedded-task-list-search',
-        text: `Search: ${params.searchQuery}`,
-      });
-    }
-
-    // Show sort method if specified
-    if (params.sortMethod !== 'default') {
-      header.createSpan({
-        cls: 'todoseq-embedded-task-list-sort',
-        text: `Sort: ${params.sortMethod}`,
-      });
-    }
-
-    // Show completed filter if specified
-    if (params.completed !== undefined) {
-      header.createSpan({
-        cls: 'todoseq-embedded-task-list-completed',
-        text: `Completed: ${params.completed}`,
-      });
-    }
-
-    // Show future filter if specified
-    if (params.future !== undefined) {
-      header.createSpan({
-        cls: 'todoseq-embedded-task-list-future',
-        text: `Future: ${params.future}`,
-      });
-    }
-
-    // Show limit if specified
-    if (params.limit !== undefined) {
-      header.createSpan({
-        cls: 'todoseq-embedded-task-list-limit',
-        text: `Limit: ${params.limit}`,
-      });
-    }
-
-    // Create chevron icon container after the header content
+    // Chevron leads the header (before the content it opens), matching the
+    // dashboard card headers.
     const chevronSpan = header.createSpan({
       cls: 'todoseq-collapse-toggle-icon',
     });
     setIcon(chevronSpan, 'chevron-right');
-    // Add is-expanded class when expanded
     if (!isCollapsed) {
       chevronSpan.addClass('is-expanded');
     }
+
+    this.renderHeaderContentSpans(header, params);
 
     return header;
   }
@@ -744,8 +694,8 @@ export class EmbeddedTaskListRenderer {
   }
 
   /**
-   * Render the header content spans (search, sort, completed, future, limit) into a header element.
-   * This is shared between static and toggle headers.
+   * Render the header content spans (query, sort, completed, future, limit) into a header element.
+   * This is shared between the static header and the no-title collapsible header.
    */
   private renderHeaderContentSpans(
     header: HTMLElement,
@@ -754,11 +704,11 @@ export class EmbeddedTaskListRenderer {
     if (params.searchQuery) {
       header.createSpan({
         cls: 'todoseq-embedded-task-list-search',
-        text: `Search: ${params.searchQuery}`,
+        text: params.searchQuery,
       });
     }
 
-    if (params.sortMethod !== 'default') {
+    if (params.sortMethod && params.sortMethod !== 'default') {
       header.createSpan({
         cls: 'todoseq-embedded-task-list-sort',
         text: `Sort: ${params.sortMethod}`,
@@ -802,54 +752,7 @@ export class EmbeddedTaskListRenderer {
   }
 
   /**
-   * Render a toggle header that can collapse/expand the task list.
-   * Used for collapsible lists without a title.
-   */
-  private renderToggleHeader(
-    container: HTMLElement,
-    params: TodoseqParameters,
-    toggleCollapse: (containerId: string) => void,
-    containerId: string,
-    isCollapsed: boolean,
-  ): void {
-    const header = container.createDiv({
-      cls: 'todoseq-embedded-task-list-header',
-      attr: {
-        role: 'button',
-        tabindex: '0',
-        'aria-expanded': String(!isCollapsed),
-        'aria-label': 'Collapse task list',
-      },
-    });
-
-    header.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleCollapse(containerId);
-    });
-
-    header.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggleCollapse(containerId);
-      }
-    });
-
-    this.renderHeaderContentSpans(header, params);
-
-    // Add chevron icon for toggle functionality
-    const chevronSpan = header.createSpan({
-      cls: 'todoseq-collapse-toggle-icon',
-    });
-    setIcon(chevronSpan, 'chevron-right');
-    // Expanded state - add is-expanded class
-    chevronSpan.addClass('is-expanded');
-  }
-
-  /**
    * Render expanded content (standard task list content)
-   * @param toggleCollapse When provided, adds toggle functionality to the header (for no-title collapsible lists)
-   * @param containerId Container ID for toggle callback
-   * @param isCollapsed Current collapse state (used for chevron direction)
    * @param renderHeader When true, renders the header; when false, assumes header already exists
    */
   private renderExpandedContent(
@@ -857,29 +760,14 @@ export class EmbeddedTaskListRenderer {
     tasks: Task[],
     params: TodoseqParameters,
     totalTasksCount?: number,
-    toggleCollapse?: (containerId: string) => void,
-    containerId?: string,
-    isCollapsed?: boolean,
     renderHeader?: boolean,
   ): void {
-    // Render header only when explicitly requested and there's content or toggle capability
+    // Render header only when explicitly requested and there's content to display
     // When renderHeader=false, existing header is preserved to prevent flicker
     if (renderHeader) {
       const hasContent = this.hasHeaderContent(params);
-      const isToggleMode =
-        toggleCollapse && containerId && isCollapsed !== undefined;
 
-      if (isToggleMode) {
-        // Toggle header: always render when in toggle mode (even without content)
-        // This ensures the collapse/expand functionality is available
-        this.renderToggleHeader(
-          container,
-          params,
-          toggleCollapse,
-          containerId,
-          isCollapsed,
-        );
-      } else if (hasContent) {
+      if (hasContent) {
         // Static header: only render when there's actual content to display
         this.renderStaticHeader(container, params);
       }

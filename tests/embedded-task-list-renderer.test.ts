@@ -237,6 +237,23 @@ describe('EmbeddedTaskListRenderer', () => {
       expect(toggle).toHaveBeenCalledWith('id-1');
     });
 
+    it('places the chevron after the title text (matches dashboard headers)', () => {
+      const container = document.createElement('div');
+      const params: TodoseqParameters = { title: 'Tasks' };
+      const titleEl = renderer.renderCollapsibleTitle(
+        container,
+        params,
+        true,
+        3,
+      );
+
+      expect(
+        titleEl.lastElementChild?.classList.contains(
+          'todoseq-collapse-toggle-icon',
+        ),
+      ).toBe(true);
+    });
+
     it('does not add handlers when toggle callback missing', () => {
       const container = document.createElement('div');
       const params: TodoseqParameters = { title: 'Tasks' };
@@ -269,7 +286,43 @@ describe('EmbeddedTaskListRenderer', () => {
       const searchSpan = header.querySelector(
         '.todoseq-embedded-task-list-search',
       );
-      expect(searchSpan?.textContent).toBe('Search: test');
+      expect(searchSpan?.textContent).toBe('test');
+    });
+
+    it('places the chevron before the search chip (matches dashboard headers)', () => {
+      const container = document.createElement('div');
+      const params: TodoseqParameters = { searchQuery: 'tag:project' };
+      const header = renderer.renderCollapsibleHeaderNoTitle(
+        container,
+        params,
+        true,
+        5,
+      );
+
+      const children = Array.from(header.children);
+      expect(
+        children[0]?.classList.contains('todoseq-collapse-toggle-icon'),
+      ).toBe(true);
+      expect(
+        children[1]?.classList.contains('todoseq-embedded-task-list-search'),
+      ).toBe(true);
+    });
+
+    it('renders the chevron as the only child when no chips are present', () => {
+      const container = document.createElement('div');
+      const params: TodoseqParameters = {};
+      const header = renderer.renderCollapsibleHeaderNoTitle(
+        container,
+        params,
+        true,
+        5,
+      );
+
+      const children = Array.from(header.children);
+      expect(children).toHaveLength(1);
+      expect(
+        children[0].classList.contains('todoseq-collapse-toggle-icon'),
+      ).toBe(true);
     });
 
     it('renders sort method in header', () => {

@@ -838,8 +838,8 @@
 
 /* Title styling */
 .todoseq-embedded-task-list-title {
-  font-weight: var(--font-bold);
-  font-size: 1rem;
+  font-weight: var(--font-semibold);
+  font-size: 0.84375rem;
   color: var(--text-normal);
   padding: var(--size-2-1) var(--size-2-3) var(--size-2-3) var(--size-2-3);
   border-bottom: 1px solid var(--background-modifier-border);
@@ -878,6 +878,7 @@
   padding: var(--size-2-1) var(--size-2-3);
   border-radius: var(--radius-s);
   font-family: var(--font-monospace);
+  font-size: 0.68rem;
 }
 
 /* Truncated results indicator */
@@ -1684,10 +1685,11 @@
   margin-left: var(--size-2-3);
 }
 
-/* When icon is in todoseq-embedded-task-list-header (no title case), use same margin as title */
+/* When icon is in todoseq-embedded-task-list-header (no title case), it leads
+   the chips row — center it on the text's optical middle like the dashboard
+   headers do. */
 .todoseq-embedded-task-list-header .todoseq-collapse-toggle-icon {
-  margin-left: -10px;
-  margin-top: var(--size-2-1);
+  align-self: center;
 }
 
 /* Query summary in collapsed header */
