@@ -54,7 +54,7 @@ Palette character: **whatever the user's theme is.** TODOseq does not define a b
 
 ### TODOseq semantic mapping (theme-native)
 
-- **State keywords** (panel, editor, reader): bold, `--interactive-accent`; hover underline + `--background-modifier-hover`
+- **State keywords** (editor, reader): bold, `--interactive-accent`; hover underline + `--background-modifier-hover`. In the Task List panel the keyword is `--font-semibold` at `0.9em` so task titles lead (accent color unchanged).
 - **Priority A / B / C badges:** A `--color-red`, B `--interactive-accent`, C muted border + `--text-muted`
 - **Date rails:** 3px left border + low-alpha `color-mix` fill — overdue red, today orange, soon green, closed muted
 - **Completed tasks:** `--text-muted` + line-through; archived slightly dimmer
@@ -74,8 +74,9 @@ Palette character: **whatever the user's theme is.** TODOseq does not define a b
 
 ### Hierarchy
 
-- **Task title:** `--font-text` / `--font-text-size`; completed muted + strike
-- **Keyword:** bold, accent, ~0.85–0.9rem; heading keywords scale to 0.9em of heading size
+- **Task title:** `--font-text` / `--font-text-size`; completed muted + strike; completed rows' meta drops a further opacity step so completed clusters recede
+- **Date meta (panel):** label `--font-normal` at 0.75 opacity, muted; only the value carries status color (overdue/today), at `--font-medium`; the 3px status rail + low-alpha fill carry the state
+- **Keyword:** bold, accent, ~0.85–0.9rem (panel: `--font-semibold` at `0.9em`, theme-relative); heading keywords scale to 0.9em of heading size
 - **File info / date meta / subtask progress:** ~0.75–0.8rem, `--text-muted` or mono for counts
 - **Priority badge:** ~0.7em, `--font-medium`
 - **Empty state:** title `--font-bold` 1rem; subtitle 0.875rem muted

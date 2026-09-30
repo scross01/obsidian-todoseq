@@ -65,7 +65,9 @@
 /* List item */
 .todoseq-panel .todoseq-task-item {
   position: relative;
-  padding: var(--size-2-2) 0 var(--size-2-2) var(--size-2-2);
+  /* Vertical padding tightened one step (--size-2-1) to match the embedded
+     list's denser scan rhythm; horizontal padding unchanged. */
+  padding: var(--size-2-1) 0 var(--size-2-1) var(--size-2-2);
   content-visibility: auto;
   contain-intrinsic-size: 0 100px;
   transition: background-color 100ms ease;
@@ -142,12 +144,25 @@
   text-decoration: line-through;
 }
 
+/* Completed rows recede: their meta (file info, date rows) drops a further
+   step so completed clusters sit visually behind open work. */
+.todoseq-panel
+  .todoseq-task-item:has(.todoseq-task-text.completed)
+  .todoseq-task-file-info,
+.todoseq-panel
+  .todoseq-task-item:has(.todoseq-task-text.completed)
+  .todoseq-task-date-container {
+  opacity: 0.75;
+}
+
 /* Keyword toggle (TODO/DOING/DONE) */
 .todoseq-panel .todo-task-keyword {
   color: var(--interactive-accent);
   cursor: pointer;
-  font-weight: var(--font-bold);
-  font-size: 0.85rem;
+  font-weight: var(--font-semibold);
+  /* Theme-relative: keyword reads as a state token, not a heading; tracks
+     the user's font-size setting instead of a fixed rem value. */
+  font-size: 0.9em;
 }
 
 /* Hover hint */
@@ -330,7 +345,7 @@
 /* File info (path:line) */
 .todoseq-panel .todoseq-task-file-info {
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: var(--font-ui-smaller, var(--font-smallest));
   margin-top: var(--size-2-2);
 }
 
@@ -370,7 +385,8 @@
 /* Date display styling */
 .todoseq-panel .todoseq-task-date-container {
   margin-top: var(--size-2-2);
-  font-size: 0.8rem;
+  /* Theme-relative meta sizing: dates track the theme scale. */
+  font-size: var(--font-ui-small);
   color: var(--text-muted);
 }
 
@@ -431,8 +447,10 @@
 }
 
 .todoseq-panel .todoseq-task-date .todoseq-task-date-label {
-  font-weight: var(--font-medium);
-  opacity: 0.8;
+  /* Label stays quiet: the rail carries the state, the value carries the
+     date. Only the value earns status color (overdue/today). */
+  font-weight: var(--font-normal);
+  opacity: 0.75;
   margin-right: var(--size-2-2);
 }
 
@@ -458,7 +476,7 @@
 .todoseq-subtask-indicator {
   font-family: var(--font-mono, monospace);
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: var(--font-ui-smaller, var(--font-smallest));
   flex-shrink: 0;
   align-self: flex-start;
 }
@@ -476,7 +494,7 @@
 
 .todoseq-panel .todoseq-task-date-overdue .todoseq-task-date-value {
   color: var(--color-red);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
 }
 
 .todoseq-panel .todoseq-task-date-today {
@@ -486,7 +504,7 @@
 
 .todoseq-panel .todoseq-task-date-today .todoseq-task-date-value {
   color: var(--text-accent);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
 }
 
 .todoseq-panel .todoseq-task-date-soon {
