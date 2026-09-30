@@ -99,7 +99,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
       this.plugin.smartDateProcessor?.setEnabled(Boolean(value));
       this.refreshDomState();
     },
-    weekStartsOn: () => this.refreshViews(),
+    weekStartsOn: () => {
+      // Dashboards render the heatmap's first column from this setting via
+      // renderOptions; refreshAllTaskListViews does not reach them.
+      this.plugin.dashboardProcessor?.updateSettings();
+      return this.refreshViews();
+    },
     taskListViewMode: () => this.refreshViews(),
     futureTaskSorting: () => this.refreshViews(),
     taskDescriptionDisplay: () => this.refreshViews(),

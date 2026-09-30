@@ -252,8 +252,8 @@ export class TodoseqDashboardParser {
         throw new Error('heatmap requires group-by: scheduled or deadline');
       }
 
-      // The strip is a headerless inline row of pills: a title (and the
-      // collapse machinery built on the header) does not apply.
+      // The strip is a headerless inline row of pills: neither the title nor
+      // the collapse machinery (which is built on the header) applies.
       if (display === 'strip') {
         if (title) {
           throw new Error(
@@ -263,6 +263,11 @@ export class TodoseqDashboardParser {
         if (heatmapWindow !== DEFAULT_HEATMAP_WINDOW) {
           throw new Error(
             'strip display renders no heatmap, so heatmap-window does not apply',
+          );
+        }
+        if (collapse) {
+          throw new Error(
+            'strip display renders no header, so it cannot be collapsed',
           );
         }
       }

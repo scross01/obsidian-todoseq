@@ -105,6 +105,13 @@ describe('TodoseqDashboardParser', () => {
       expect(params.error).toBeDefined();
     });
 
+    it('rejects strip combined with collapse (the strip has no header to toggle)', () => {
+      const params = TodoseqDashboardParser.parse(
+        'display: strip\ncollapse: true',
+      );
+      expect(params.error).toBeDefined();
+    });
+
     it('accepts group: as an alias for group-by:', () => {
       expect(TodoseqDashboardParser.parse('group: tag').groupBy).toBe('tag');
     });
