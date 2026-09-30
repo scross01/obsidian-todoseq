@@ -881,6 +881,19 @@
   font-size: 0.68rem;
 }
 
+/* The query chip reads slightly more prominent than the parameter chips —
+   same query/meta split as the dashboard card headers. */
+.todoseq-embedded-task-list-search {
+  color: var(--text-normal);
+}
+
+.todoseq-embedded-task-list-sort,
+.todoseq-embedded-task-list-completed,
+.todoseq-embedded-task-list-future,
+.todoseq-embedded-task-list-limit {
+  color: var(--text-muted);
+}
+
 /* Truncated results indicator */
 .todoseq-embedded-task-list-truncated {
   text-align: center;

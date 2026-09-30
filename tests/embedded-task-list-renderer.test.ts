@@ -336,7 +336,7 @@ describe('EmbeddedTaskListRenderer', () => {
       );
 
       const sortSpan = header.querySelector('.todoseq-embedded-task-list-sort');
-      expect(sortSpan?.textContent).toBe('Sort: priority');
+      expect(sortSpan?.textContent).toBe('sort: priority');
     });
 
     it('renders completed filter in header', () => {
@@ -352,7 +352,7 @@ describe('EmbeddedTaskListRenderer', () => {
       const completedSpan = header.querySelector(
         '.todoseq-embedded-task-list-completed',
       );
-      expect(completedSpan?.textContent).toBe('Completed: hide');
+      expect(completedSpan?.textContent).toBe('completed: hide');
     });
 
     it('adds expanded class to chevron when not collapsed', () => {

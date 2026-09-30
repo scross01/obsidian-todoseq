@@ -711,28 +711,28 @@ export class EmbeddedTaskListRenderer {
     if (params.sortMethod && params.sortMethod !== 'default') {
       header.createSpan({
         cls: 'todoseq-embedded-task-list-sort',
-        text: `Sort: ${params.sortMethod}`,
+        text: `sort: ${params.sortMethod}`,
       });
     }
 
     if (params.completed !== undefined) {
       header.createSpan({
         cls: 'todoseq-embedded-task-list-completed',
-        text: `Completed: ${params.completed}`,
+        text: `completed: ${params.completed}`,
       });
     }
 
     if (params.future !== undefined) {
       header.createSpan({
         cls: 'todoseq-embedded-task-list-future',
-        text: `Future: ${params.future}`,
+        text: `future: ${params.future}`,
       });
     }
 
     if (params.limit !== undefined) {
       header.createSpan({
         cls: 'todoseq-embedded-task-list-limit',
-        text: `Limit: ${params.limit}`,
+        text: `limit: ${params.limit}`,
       });
     }
   }
