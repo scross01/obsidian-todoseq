@@ -3078,7 +3078,10 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: var(--size-4-2);
+  /* Matches the embedded task list's title-to-chevron breathing room (its
+     chevron carries a --size-2-3 margin); the right-aligned total is pushed
+     by margin-left: auto, so this gap only shapes the left group. */
+  gap: var(--size-2-3);
 }
 
 .todoseq-dashboard-title {
@@ -3129,6 +3132,10 @@
   transition: transform 0.15s ease-out;
   align-self: center;
   flex-shrink: 0;
+  /* The base rule's chevron margin is the embedded title's spacing
+     mechanism; here the header gap provides it, so cancel the margin to
+     keep the title-to-chevron distance identical on both surfaces. */
+  margin-left: 0;
 }
 
 .todoseq-dashboard-header .todoseq-collapse-toggle-icon.is-expanded {

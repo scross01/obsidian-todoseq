@@ -38,6 +38,12 @@ group-by: tag
 display: bar
 collapse: true
 \`\`\`
+
+\`\`\`todoseq
+search: tag:collapsetest
+collapse: true
+title: Task list
+\`\`\`
 `;
 }
 
@@ -235,6 +241,69 @@ test.describe('Dashboard collapse chevron placement', () => {
     expect(
       Math.abs(metrics!.chevronMid - metrics!.totalMid),
     ).toBeLessThanOrEqual(3);
+  });
+
+  test('title-to-chevron spacing matches the embedded task list title', async () => {
+    await writeAndOpen();
+
+    const metrics = await page.evaluate(() => {
+      const scope = document.querySelector('.workspace-leaf.mod-active');
+      if (!scope) return null;
+
+      // Visual gap between the title text's last glyph and the chevron box.
+      // Dashboard: the title element has no padding, so its rect is the text
+      // rect. Embedded: the chevron lives INSIDE the title element, so the
+      // text extent needs a Range that stops before the icon span.
+      let dashboardGap: number | null = null;
+      for (const header of Array.from(
+        scope.querySelectorAll<HTMLElement>('.todoseq-dashboard-header'),
+      )) {
+        const title = header.querySelector<HTMLElement>(
+          '.todoseq-dashboard-title',
+        );
+        const chevron = header.querySelector<HTMLElement>(
+          '.todoseq-collapse-toggle-icon',
+        );
+        if (title && chevron && chevron.offsetParent !== null) {
+          dashboardGap =
+            chevron.getBoundingClientRect().left -
+            title.getBoundingClientRect().right;
+          break;
+        }
+      }
+
+      let embeddedGap: number | null = null;
+      for (const titleEl of Array.from(
+        scope.querySelectorAll<HTMLElement>(
+          '.todoseq-embedded-task-list-title[role="button"]',
+        ),
+      )) {
+        const chevron = titleEl.querySelector<HTMLElement>(
+          '.todoseq-collapse-toggle-icon',
+        );
+        if (!chevron || (titleEl.textContent ?? '').trim().length === 0) {
+          continue;
+        }
+        const range = document.createRange();
+        range.selectNodeContents(titleEl);
+        range.setEndBefore(chevron);
+        embeddedGap =
+          chevron.getBoundingClientRect().left -
+          range.getBoundingClientRect().right;
+        break;
+      }
+
+      return { dashboardGap, embeddedGap };
+    });
+
+    expect(metrics).not.toBeNull();
+    expect(metrics!.dashboardGap).not.toBeNull();
+    expect(metrics!.embeddedGap).not.toBeNull();
+    // Same disclosure pattern, same breathing room (embedded uses a 6px
+    // chevron margin; the dashboard previously inherited its 8px flex gap).
+    expect(
+      Math.abs(metrics!.dashboardGap! - metrics!.embeddedGap!),
+    ).toBeLessThanOrEqual(1);
   });
 
   test('toggling the collapsed titleless header expands the card', async () => {
