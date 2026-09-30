@@ -222,7 +222,7 @@ testTimezones.forEach((timezone) => {
 
       test('should return null for invalid full date format', () => {
         const result = DateUtils.parseDateValue('2025-13-01'); // Invalid month
-        expect(result).not.toBeNull();
+        expect(result).toBeNull();
       });
 
       test('should parse year-month format (YYYY-MM)', () => {
@@ -243,7 +243,7 @@ testTimezones.forEach((timezone) => {
 
       test('should return null for invalid year-month format', () => {
         const result = DateUtils.parseDateValue('2025-13'); // Invalid month
-        expect(result).not.toBeNull();
+        expect(result).toBeNull();
       });
 
       test('should parse year-only format (YYYY)', () => {

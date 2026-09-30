@@ -171,6 +171,8 @@ Invalid search queries display user-friendly error messages:
 - Unmatched parentheses
 - Unexpected operators
 - Invalid syntax
+- Unknown closed-domain values (e.g. `priority:urgent`)
+- Calendar-invalid date values (e.g. `scheduled:2026-02-30`)
 
 Errors appear in a prominent red banner below the search input.
 
@@ -216,7 +218,7 @@ TODOseq now supports Obsidian-style prefix filters for targeted field-specific s
 - **File filter**: `file:meeting` - Filter tasks by filename
 - **Tag filter**: `tag:#urgent` - Filter tasks by tags
 - **State filter**: `state:DOING` - Filter tasks by state (individual keyword or group)
-- **Priority filter**: `priority:high` or `priority:A` - Filter tasks by priority
+- **Priority filter**: `priority:high` or `priority:A` - Filter tasks by priority (closed value domain: unknown values are rejected at parse time rather than silently matching nothing)
 - **Content filter**: `content:"project action"` - Filter tasks by content
 
 ### Token Types (Extended)

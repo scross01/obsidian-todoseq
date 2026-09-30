@@ -40,13 +40,13 @@ This will only match tasks containing the exact sequence "write documentation".
 
 ### OR Logic
 
-Use `OR` to match either term:
+Use `OR` (uppercase) to match either term:
 
 ```txt
 meeting OR call
 ```
 
-This will match tasks containing "meeting" OR "call".
+This will match tasks containing "meeting" OR "call". A lowercase `or`/`and` is an ordinary search word, not an operator — quoting it ("or") matches tasks containing the word itself.
 
 ### AND Logic (Implicit)
 
@@ -111,6 +111,10 @@ Find work tasks related to home or office, excluding phone related ones.
 ## Search Filters
 
 TODOseq supports filter keywords similar to Obsidian's general vault search for targeted searching.
+
+### Invalid Query Handling
+
+Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unknown `priority:` value, or a calendar-invalid date like `scheduled:2026-02-30`) show an error message instead of silently returning no results. Open-ended values — paths, filenames, tags, content, state keywords, quoted phrases — are not validated, because matching nothing is a legitimate outcome for them.
 
 ### Available Prefix Filters
 
@@ -446,6 +450,8 @@ TODOseq supports multiple ways to filter by priority.
 | `B`    | Short form for medium priority |
 | `C`    | Short form for low priority    |
 | `none` | Tasks without priority         |
+
+Other values (for example `priority:urgent` or `priority:p1`) are rejected with an error instead of silently matching nothing — `medium` is also accepted as a synonym of `med`.
 
 ### Priority Filter Examples
 

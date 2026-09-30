@@ -276,34 +276,32 @@ export class DateUtils {
     }
 
     // Handle exact dates with various formats
-    // Full date: YYYY-MM-DD
+    // Full date: YYYY-MM-DD. expandDatePartsToInterval validates the calendar
+    // components (createDate alone silently rolls 2026-02-30 to March 2, so
+    // the query would match the wrong day). Search values must fail closed on
+    // invalid dates; task-file dates keep createDate's normalization contract.
     if (trimmedValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      // Parse as local date to match task date creation
-      // Split the date and create a new Date object to ensure local timezone
-      const parts = trimmedValue.split('-').map(Number);
-      const date = this.createDate(parts[0], parts[1] - 1, parts[2]); // month is 0-indexed
-      if (!isNaN(date.getTime())) {
-        return { date, format: 'full' as const };
+      const interval = this.expandDatePartsToInterval(trimmedValue);
+      if (interval) {
+        return { date: interval.first, format: 'full' as const };
       }
       return null;
     }
 
     // Year-Month: YYYY-MM
     if (trimmedValue.match(/^\d{4}-\d{2}$/)) {
-      const parts = trimmedValue.split('-').map(Number);
-      const date = this.createDate(parts[0], parts[1] - 1, 1); // month is 0-indexed
-      if (!isNaN(date.getTime())) {
-        return { date, format: 'year-month' as const };
+      const interval = this.expandDatePartsToInterval(trimmedValue);
+      if (interval) {
+        return { date: interval.first, format: 'year-month' as const };
       }
       return null;
     }
 
     // Year only: YYYY
     if (trimmedValue.match(/^\d{4}$/)) {
-      const year = parseInt(trimmedValue, 10);
-      const date = this.createDate(year, 0, 1); // January 1st
-      if (!isNaN(date.getTime())) {
-        return { date, format: 'year' as const };
+      const interval = this.expandDatePartsToInterval(trimmedValue);
+      if (interval) {
+        return { date: interval.first, format: 'year' as const };
       }
       return null;
     }
