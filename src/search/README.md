@@ -75,8 +75,17 @@ scheduled:"next 7 days"    // Tasks scheduled in the next 7 days
 scheduled:"next Monday"     // Tasks scheduled next Monday
 deadline:"end of month"    // Tasks due at end of current month
 
-// Date ranges
+// Date ranges (both bounds optional; partial dates = whole month/year)
 scheduled:2024-01-01..2024-01-31  // Tasks scheduled in January 2024
+scheduled:2026-10-07..            // Scheduled from October 7 onward
+scheduled:..2026-12-31            // Scheduled up to and including Dec 31
+scheduled:2026-10..2026-12        // October 1 through December 31
+
+// Comparison operators (arithmetic boundary meaning; partial dates OK)
+scheduled:<2026-10-01             // Scheduled before October 1
+scheduled:>=2026-10               // Scheduled in October or later
+deadline:>2026-12-31              // Due after the end of the year
+closed:<=2026-06-30               // Closed up to and including June 30
 deadline:2024-06-01..2024-06-30   // Tasks due in June 2024
 
 // Special cases

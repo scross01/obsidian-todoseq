@@ -284,7 +284,34 @@ Find tasks with deadlines in the next 14 days.
 
 ## Date Range Syntax
 
-Use `..` to specify date ranges in `YYYY-MM-DD` format.
+Use `..` to specify date ranges. Both bounds are optional — omit one to
+search "from a date onward" or "up to a date". A written day is included
+in the range, and partial dates (`YYYY-MM` or `YYYY`) expand to the whole
+month or year:
+
+```txt
+scheduled:2026-10-07..        # from October 7 onward
+scheduled:..2026-12-31        # up to and including December 31
+scheduled:2026-10..2026-12    # October 1 through December 31
+```
+
+### Comparison Operators for Dates
+
+The four date prefixes (`scheduled:`, `deadline:`, `closed:`, `started:`)
+also accept value-side comparison operators — `<`, `<=`, `>`, `>=` — with
+their usual arithmetic boundary meaning (`<` excludes the day, `<=`
+includes it), including partial dates:
+
+```txt
+scheduled:<2026-10-01         # scheduled before October 1
+scheduled:>=2026-10           # scheduled in October or later
+deadline:>2026-12-31          # due after the end of the year
+closed:<=2026-06-30           # closed up to and including June 30
+```
+
+Operators and ranges express the same sets — pick whichever reads better:
+`scheduled:<2026-10-01` equals `scheduled:..2026-09-30`, and
+`scheduled:>=2026-10` equals `scheduled:2026-10..`.
 
 ### Date Range Examples
 
@@ -379,13 +406,18 @@ Find tasks that are not yet closed.
 
 ### Closed Date Range Syntax
 
-Use `..` to specify date ranges in `YYYY-MM-DD` format for closed dates.
+Use `..` to specify date ranges for closed dates — the same forms as
+[scheduled/deadline ranges](#date-range-syntax) apply to all four date
+prefixes, including one-sided ranges, comparison operators, and partial
+months/years.
 
 ```txt
 closed:2026-01-01..2026-01-31
+closed:..2026-12-31
+closed:>2026-06-30
 ```
 
-Find tasks closed in January 2026.
+Find tasks closed in January 2026, before 2027, or after June 30.
 
 ### Combining Closed Date with Other Filters
 
@@ -517,7 +549,7 @@ This type-aware comparison works with numeric values and allows for more precise
 
 ### Date Property Comparisons
 
-Comparison operators also work with date properties, enabling you to filter tasks based on page property date ranges. You can use `>`, `<`, `>=`, and `<=` with dates in `YYYY-MM-DD` format to find tasks with dates before or after a specific point in time.
+Comparison operators also work with date properties, enabling you to filter tasks based on page property date ranges. You can use `>`, `<`, `>=`, and `<=` with dates in `YYYY-MM-DD` format to find tasks with dates before or after a specific point in time. The same operators now also work directly on the task date fields — see [Comparison Operators for Dates](#comparison-operators-for-dates).
 
 ```txt
 [deadline:>2026-01-15]
