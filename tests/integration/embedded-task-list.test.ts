@@ -92,3 +92,95 @@ test.describe('Embedded task list', () => {
     expect(completedClass).toBe(true);
   });
 });
+
+test.describe('Embedded task list header hover parity', () => {
+  test.beforeEach(async () => {
+    await resetVaultState(page);
+  });
+
+  /**
+   * The dashboard card headers carry no hover highlight, so the embedded
+   * collapsible surfaces must not either (same toggle, same affordance).
+   * Writes a collapsible note through the vault API and opens it in source
+   * mode (live-preview embed renders the block), then hovers both the title
+   * row and the titleless header and asserts the background stays
+   * transparent.
+   */
+  async function writeAndOpenCollapsible(): Promise<void> {
+    await closeAllModals(page);
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const content = [
+        '# Hover parity',
+        '',
+        '```todoseq',
+        'search: tag:embeddedhover',
+        'collapse: true',
+        'title: Task list',
+        '```',
+        '',
+        '```todoseq',
+        'search: tag:embeddedhover',
+        'collapse: true',
+        'show-query: show',
+        '```',
+        '',
+      ].join('\n');
+      await app.vault.adapter.write('embedded-hover-parity.md', content);
+      for (let i = 0; i < 50; i++) {
+        if (app.vault.getAbstractFileByPath('embedded-hover-parity.md')) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      const file = app.vault.getAbstractFileByPath('embedded-hover-parity.md');
+      if (!file) throw new Error('embedded-hover-parity.md not indexed');
+      const leaf = app.workspace.getLeaf(false);
+      await leaf.setViewState({
+        type: 'markdown',
+        state: { file: file.path, mode: 'source' },
+        active: true,
+      });
+    });
+
+    await page.waitForFunction(
+      () => {
+        const scope = document.querySelector('.workspace-leaf.mod-active');
+        const toggles = Array.from(
+          scope?.querySelectorAll<HTMLElement>(
+            '.todoseq-embedded-task-list-title[role="button"], .todoseq-embedded-task-list-header[role="button"]',
+          ) ?? [],
+        );
+        return (
+          toggles.length >= 2 && toggles.every((el) => el.offsetParent !== null)
+        );
+      },
+      undefined,
+      { timeout: 15_000 },
+    );
+  }
+
+  async function hoveredBackground(selector: string): Promise<string | null> {
+    const scope = page.locator('.workspace-leaf.mod-active');
+    const target = scope.locator(selector).first();
+    await target.hover();
+    return target.evaluate((el) => getComputedStyle(el).backgroundColor);
+  }
+
+  test('collapsed title row shows no hover highlight (matches dashboard)', async () => {
+    await writeAndOpenCollapsible();
+
+    const background = await hoveredBackground(
+      '.todoseq-embedded-task-list-title[role="button"]',
+    );
+    // No highlight: the hover background must stay fully transparent.
+    expect(background).toBe('rgba(0, 0, 0, 0)');
+  });
+
+  test('collapsed titleless header shows no hover highlight (matches dashboard)', async () => {
+    await writeAndOpenCollapsible();
+
+    const background = await hoveredBackground(
+      '.todoseq-embedded-task-list-header[role="button"]',
+    );
+    expect(background).toBe('rgba(0, 0, 0, 0)');
+  });
+});

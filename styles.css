@@ -1644,10 +1644,6 @@
   padding: var(--size-2-1) var(--size-2-3) var(--size-2-3) var(--size-2-3);
 }
 
-.todoseq-embedded-task-list-title[role='button']:hover {
-  background-color: var(--background-modifier-hover);
-}
-
 .todoseq-embedded-task-list-title[role='button']:focus-visible {
   outline: 2px solid var(--interactive-accent, #7f6df2);
   outline-offset: 2px;
@@ -1665,10 +1661,6 @@
   cursor: pointer;
   user-select: none;
   border-radius: var(--radius-s);
-}
-
-.todoseq-embedded-task-list-header[role='button']:hover {
-  background-color: var(--background-modifier-hover);
 }
 
 .todoseq-embedded-task-list-header[role='button']:focus-visible {
