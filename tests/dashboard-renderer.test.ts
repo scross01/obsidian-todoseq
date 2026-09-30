@@ -383,7 +383,7 @@ describe('DashboardRenderer', () => {
         '.todoseq-dashboard-legend-row',
       );
       expect(firstRow?.getAttribute('title')).toBe(
-        '#home: 3 tasks · 60% of matched — Click to open in Task List',
+        '#home: 3 tasks · 60% of matched',
       );
     });
 
@@ -897,16 +897,14 @@ describe('DashboardRenderer', () => {
 });
 
 describe('tooltip content', () => {
-  it('applies count, share, and the open hint via setTooltip', () => {
+  it('applies count and share via setTooltip (no open hint)', () => {
     // The obsidian mock's setTooltip writes the title attribute
     const renderer = new DashboardRenderer(createBaseSettings());
     const host = document.createElement('div');
     document.body.appendChild(host);
     renderer.renderCard(host, result(), params(), noopCallbacks());
     const row = host.querySelector('.todoseq-dashboard-bar-row');
-    expect(row?.getAttribute('title')).toBe(
-      'High: 4 tasks · 33% of matched — Click to open in Task List',
-    );
+    expect(row?.getAttribute('title')).toBe('High: 4 tasks · 33% of matched');
     host.remove();
   });
 });

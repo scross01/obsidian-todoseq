@@ -938,11 +938,11 @@ export class DashboardRenderer {
   }
 
   private groupTooltip(group: DashboardGroup, result: DashboardResult): string {
-    if (result.total <= 0) return 'Click to open in Task List';
+    if (result.total <= 0) return group.label;
     return `${group.label}: ${group.count} tasks · ${this.sharePct(
       group.count,
       result.total,
-    )}% of matched — Click to open in Task List`;
+    )}% of matched`;
   }
 
   private groupAriaLabel(
