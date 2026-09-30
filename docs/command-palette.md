@@ -148,8 +148,6 @@ Opens the task context menu at the current cursor position in the Markdown edito
 - Move task to today's daily note
 - Migrate task to today's daily note
 
-**Implementation**: Uses CodeMirror editor API to get screen coordinates for positioning the menu at the cursor location.
-
 ### Open scheduled date picker
 
 Opens a date picker dialog for setting the scheduled date of the task at the current cursor position. The date picker provides a calendar interface for selecting dates.
@@ -161,7 +159,7 @@ Opens a date picker dialog for setting the scheduled date of the task at the cur
 - Calendar-based date selection
 - Quick date shortcuts (today, tomorrow, next week, etc.)
 - Support for recurring dates with repeat patterns
-- Integration with task update coordinator for immediate task updates
+- Changes take effect immediately, without needing to save the file
 
 **Example**:
 
@@ -181,7 +179,7 @@ Opens a date picker dialog for setting the deadline date of the task at the curr
 - Calendar-based date selection
 - Quick date shortcuts (today, tomorrow, next week, etc.)
 - Support for recurring dates with repeat patterns
-- Integration with task update coordinator for immediate task updates
+- Changes take effect immediately, without needing to save the file
 
 **Example**:
 
