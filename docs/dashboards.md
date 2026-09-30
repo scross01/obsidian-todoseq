@@ -91,6 +91,9 @@ Lines starting with `#` inside the block are treated as comments.
   outlined, and each day is clickable. The first column follows the plugin's
   **Week starts on** setting. Use `heatmap-window:` to control how
   many weeks ahead are shown
+- **strip** — a compact headerless row of pills (color dot, label, count),
+  with the query chip inline — fits a daily note or a narrow pane. Cannot be
+  combined with `title:` or `collapse:`
 
 Cards update automatically when tasks change anywhere in the vault — from the
 editor, the Task List, other pages, or
