@@ -28,37 +28,23 @@ opens it in a new tab.
 
 ## Code Block Parameters
 
-- `search:` any valid search string (see [search](/search)). Tasks that do not
-  match are excluded from the card before grouping. Defaults to all tasks
-- `group-by:` one of `priority`, `state`, `keyword`, `tag`, `scheduled`, or
-  `deadline`. Default is `state` (`group:` is an alias)
-- `display:` one of `bar`, `column`, `donut`, `tiles`, `heatmap`, or `strip`.
-  Default is `bar`. `heatmap` requires `group-by: scheduled` or `deadline`.
-  `strip` drops the header and renders the query chip and group pills inline
-  (it cannot be combined with `title:`, `heatmap-window:`, or `collapse:`)
-- `title:` (optional) adds a custom title displayed above the card
-- `show-query:` (optional) `show`, `hide`, `true`, or `false`. Controls the
-  query chip under the title. Defaults to `show`
-- `sort:` (optional) `fixed`, `count-desc`, `count-asc`, or `label`. Priority,
-  state, and date buckets default to `fixed` (urgency order); keyword and tag
-  default to `count-desc`
-- `show-empty:` (optional) `show`, `hide`, `true`, or `false`. When enabled,
-  groups with zero tasks are shown at 0 instead of being omitted. Defaults to
-  `hide`
-- `max-groups:` (optional) a positive integer. Truncates long tag/keyword
-  lists and appends an "N more" footer. Defaults to `8`
-- `color:` (optional) `semantic` (default) or `mono`. Semantic maps each
-  attribute to its theme color (High red, overdue red, completed green, …);
-  `mono` collapses all fills to accent steps
-- `collapse:` (optional) `true` or `false`. Starts the card collapsed behind
-  its header. Defaults to `false`. Requires either `title:` to be set OR
-  `show-query: true` (the same option and behavior as embedded task lists).
-  The expand/collapse chevron matches embedded task lists: directly
-  after the title when the card has one, otherwise leading the chips row —
-  click the header or chips (or press Enter/Space when focused) to toggle
-- `heatmap-window:` (optional) number of weeks for the heatmap window, 4–52.
-  Defaults to `26`. The heatmap's first column follows the plugin's
-  **Week starts on** setting — Monday or Sunday
+| Parameter         | Description                                                                                                                                                                                                                                                                  | Default    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `search:`         | Any valid search string (see [search](/search)). Tasks that do not match are excluded from the card before grouping                                                                                                                                                          | all tasks  |
+| `group-by:`       | One of `priority`, `state`, `keyword`, `tag`, `scheduled`, or `deadline` (`group:` is an alias)                                                                                                                                                                              | `state`    |
+| `display:`        | One of `bar`, `column`, `donut`, `tiles`, `heatmap`, or `strip`. `heatmap` requires `group-by: scheduled` or `deadline`. `strip` drops the header and renders the query chip and group pills inline — it cannot be combined with `title:`, `heatmap-window:`, or `collapse:` | `bar`      |
+| `title:`          | Adds a custom title displayed above the card                                                                                                                                                                                                                                 | —          |
+| `show-query:`     | `show`, `hide`, `true`, or `false`. Controls the query chip under the title                                                                                                                                                                                                  | `show`     |
+| `sort:`           | `fixed`, `count-desc`, `count-asc`, or `label`. Priority, state, and date buckets default to `fixed` (urgency order); keyword and tag default to `count-desc`                                                                                                                | —          |
+| `show-empty:`     | `show`, `hide`, `true`, or `false`. When enabled, groups with zero tasks are shown at `0` instead of being omitted                                                                                                                                                           | `hide`     |
+| `max-groups:`     | A positive integer. Truncates long tag/keyword lists and appends an "N more" footer                                                                                                                                                                                          | `8`        |
+| `color:`          | `semantic` or `mono`. Semantic maps each attribute to its theme color (High red, overdue red, completed green, …); `mono` collapses all fills to accent steps                                                                                                                | `semantic` |
+| `collapse:`       | `true` or `false`. Starts the card collapsed behind its header (same option and behavior as embedded task lists). Requires either `title:` to be set or `show-query: true`                                                                                                   | `false`    |
+| `heatmap-window:` | Number of weeks for the heatmap window, 4–52. The heatmap's first column follows the plugin's **Week starts on** setting (Monday or Sunday)                                                                                                                                  | `26`       |
+
+The expand/collapse chevron matches embedded task lists: directly after the
+title when the card has one, otherwise leading the chips row — click the
+header or chips (or press Enter/Space when focused) to toggle.
 
 Lines starting with `#` inside the block are treated as comments.
 
