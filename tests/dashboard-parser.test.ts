@@ -13,7 +13,6 @@ describe('TodoseqDashboardParser', () => {
       expect(params.searchQuery).toBe('');
       expect(params.groupBy).toBe('state');
       expect(params.display).toBe('bar');
-      expect(params.layout).toBe('card');
       expect(params.title).toBeUndefined();
       expect(params.showQuery).toBe(true);
       expect(params.sort).toBeUndefined();
@@ -31,7 +30,6 @@ describe('TodoseqDashboardParser', () => {
         'search: tag:project',
         'group-by: priority',
         'display: donut',
-        'layout: strip',
         'title: Work pipeline',
         'show-query: false',
         'sort: count-asc',
@@ -48,7 +46,6 @@ describe('TodoseqDashboardParser', () => {
       expect(params.searchQuery).toBe('tag:project');
       expect(params.groupBy).toBe('priority');
       expect(params.display).toBe('donut');
-      expect(params.layout).toBe('strip');
       expect(params.title).toBe('Work pipeline');
       expect(params.showQuery).toBe(false);
       expect(params.sort).toBe('count-asc');
@@ -57,6 +54,55 @@ describe('TodoseqDashboardParser', () => {
       expect(params.color).toBe('mono');
       expect(params.collapse).toBe(false);
       expect(params.heatmapWindow).toBe(12);
+    });
+
+    it('accepts display: strip (the former layout: strip)', () => {
+      const params = TodoseqDashboardParser.parse('display: strip');
+      expect(params.error).toBeUndefined();
+      expect(params.display).toBe('strip');
+    });
+
+    it('keeps layout: strip as a deprecated alias mapping to display: strip', () => {
+      const params = TodoseqDashboardParser.parse('layout: strip');
+      expect(params.error).toBeUndefined();
+      expect(params.display).toBe('strip');
+    });
+
+    it('keeps layout: card as a deprecated no-op alias', () => {
+      const params = TodoseqDashboardParser.parse('layout: card');
+      expect(params.error).toBeUndefined();
+      expect(params.display).toBe('bar');
+    });
+
+    it('rejects layout: bogus like any unknown value', () => {
+      expect(TodoseqDashboardParser.parse('layout: bogus').error).toBeDefined();
+    });
+
+    it('rejects display: bogus with the display error message', () => {
+      const params = TodoseqDashboardParser.parse('display: bogus');
+      expect(params.error).toBeDefined();
+      expect(params.error).toContain('display');
+    });
+
+    it('rejects strip combined with a title (the strip has no header)', () => {
+      const params = TodoseqDashboardParser.parse(
+        'display: strip\ntitle: Pipeline',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('rejects strip combined with heatmap-window (meaningless for pills)', () => {
+      const params = TodoseqDashboardParser.parse(
+        'display: strip\nheatmap-window: 12',
+      );
+      expect(params.error).toBeDefined();
+    });
+
+    it('rejects layout: strip combined with a title (same rule, alias form)', () => {
+      const params = TodoseqDashboardParser.parse(
+        'layout: strip\ntitle: Pipeline',
+      );
+      expect(params.error).toBeDefined();
     });
 
     it('accepts group: as an alias for group-by:', () => {

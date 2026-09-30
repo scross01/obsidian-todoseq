@@ -16,8 +16,8 @@ import {
 export interface DashboardParameters {
   searchQuery: string;
   groupBy: DashboardGroupBy;
+  /** Visual form, including the headerless `strip` (the former layout). */
   display: DashboardDisplay;
-  layout: 'card' | 'strip';
   title?: string;
   showQuery: boolean;
   sort?: DashboardSort;
@@ -49,6 +49,7 @@ const DISPLAY_VALUES: DashboardDisplay[] = [
   'donut',
   'tiles',
   'heatmap',
+  'strip',
 ];
 
 const SORT_VALUES: DashboardSort[] = [
@@ -58,7 +59,6 @@ const SORT_VALUES: DashboardSort[] = [
   'label',
 ];
 
-const LAYOUT_VALUES = ['card', 'strip'] as const;
 const COLOR_VALUES = ['semantic', 'mono'] as const;
 
 const DEFAULT_HEATMAP_WINDOW = 26;
@@ -95,7 +95,6 @@ export class TodoseqDashboardParser {
       let searchQuery = '';
       let groupBy: DashboardGroupBy = 'state';
       let display: DashboardDisplay = 'bar';
-      let layout: 'card' | 'strip' = 'card';
       let title: string | undefined;
       let showQuery = true;
       let sort: DashboardSort | undefined;
@@ -135,16 +134,19 @@ export class TodoseqDashboardParser {
           }
           display = value as DashboardDisplay;
         } else if (trimmed.startsWith('layout:')) {
+          // Deprecated 020 spelling: `layout: strip` == `display: strip` and
+          // `layout: card` is a no-op. `display:` is the documented form.
           const value = trimmed
             .substring('layout:'.length)
             .trim()
             .toLowerCase();
-          if (!LAYOUT_VALUES.includes(value as 'card' | 'strip')) {
+          if (value === 'strip') {
+            display = 'strip';
+          } else if (value !== 'card') {
             throw new Error(
-              `Invalid layout option: ${value}. Valid options: ${LAYOUT_VALUES.join(', ')}`,
+              `Invalid layout option: ${value}. Valid options: card, strip (prefer display: bar | column | donut | tiles | heatmap | strip)`,
             );
           }
-          layout = value as 'card' | 'strip';
         } else if (trimmed.startsWith('title:')) {
           title = trimmed.substring('title:'.length).trim();
         } else if (trimmed.startsWith('show-query:')) {
@@ -250,6 +252,21 @@ export class TodoseqDashboardParser {
         throw new Error('heatmap requires group-by: scheduled or deadline');
       }
 
+      // The strip is a headerless inline row of pills: a title (and the
+      // collapse machinery built on the header) does not apply.
+      if (display === 'strip') {
+        if (title) {
+          throw new Error(
+            'strip display renders no header, so it cannot be combined with a title',
+          );
+        }
+        if (heatmapWindow !== DEFAULT_HEATMAP_WINDOW) {
+          throw new Error(
+            'strip display renders no heatmap, so heatmap-window does not apply',
+          );
+        }
+      }
+
       // collapse needs a clickable header: either a title or the query chip
       if (collapse === true && !title && showQuery === false) {
         throw new Error(
@@ -261,7 +278,6 @@ export class TodoseqDashboardParser {
         searchQuery,
         groupBy,
         display,
-        layout,
         title,
         showQuery,
         sort,
@@ -278,7 +294,6 @@ export class TodoseqDashboardParser {
         searchQuery: '',
         groupBy: 'state',
         display: 'bar',
-        layout: 'card',
         title: undefined,
         showQuery: true,
         sort: undefined,

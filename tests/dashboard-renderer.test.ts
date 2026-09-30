@@ -711,12 +711,12 @@ describe('DashboardRenderer', () => {
     });
   });
 
-  describe('strip layout', () => {
+  describe('strip display', () => {
     it('renders query chip and pills without a header', () => {
       renderer.renderCard(
         host,
         result(),
-        params({ layout: 'strip', title: undefined }),
+        params({ display: 'strip', title: undefined }),
         noopCallbacks(),
       );
       expect(host.querySelector('.todoseq-dashboard-header')).toBeNull();
@@ -876,7 +876,7 @@ describe('DashboardRenderer', () => {
 
     it('patches strip pill counts in place', () => {
       const callbacks = noopCallbacks();
-      const p = params({ layout: 'strip', title: undefined });
+      const p = params({ display: 'strip', title: undefined });
       const content = renderer.renderCard(host, result(), p, callbacks);
       const pill = content.querySelector('.todoseq-dashboard-pill');
       const countEl = pill?.querySelector('.todoseq-dashboard-pill-count');

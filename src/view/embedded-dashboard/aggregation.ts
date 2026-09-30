@@ -20,7 +20,8 @@ import { PropertySearchEngine } from '../../services/property-search-engine';
 export type DashboardGroupBy =
   'priority' | 'state' | 'keyword' | 'tag' | 'scheduled' | 'deadline';
 
-export type DashboardDisplay = 'bar' | 'column' | 'donut' | 'tiles' | 'heatmap';
+export type DashboardDisplay =
+  'bar' | 'column' | 'donut' | 'tiles' | 'heatmap' | 'strip';
 
 export type DashboardSort = 'fixed' | 'count-desc' | 'count-asc' | 'label';
 

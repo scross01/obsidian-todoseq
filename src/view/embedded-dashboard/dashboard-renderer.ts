@@ -135,7 +135,7 @@ export class DashboardRenderer {
     el.empty();
     const container = el.createDiv({ cls: 'todoseq-dashboard-container' });
 
-    if (params.layout === 'strip') {
+    if (params.display === 'strip') {
       return this.renderStripContent(container, result, params, callbacks);
     }
 
@@ -179,7 +179,7 @@ export class DashboardRenderer {
     }
 
     contentRoot.empty();
-    if (params.layout === 'strip') {
+    if (params.display === 'strip') {
       // The strip renders directly into the container; its host passes the
       // container as contentRoot here. Rebuild the strip content in place.
       this.renderStripContentInto(contentRoot, nextResult, params, callbacks);
@@ -196,7 +196,7 @@ export class DashboardRenderer {
   ): void {
     el.empty();
     const container = el.createDiv({ cls: 'todoseq-dashboard-container' });
-    if (params.layout !== 'strip') {
+    if (params.display !== 'strip') {
       if (params.title) {
         const header = container.createDiv({
           cls: 'todoseq-dashboard-header',

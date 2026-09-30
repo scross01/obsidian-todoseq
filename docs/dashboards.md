@@ -32,10 +32,12 @@ opens it in a new tab.
   match are excluded from the card before grouping. Defaults to all tasks
 - `group-by:` one of `priority`, `state`, `keyword`, `tag`, `scheduled`, or
   `deadline`. Default is `state` (`group:` is an alias)
-- `display:` one of `bar`, `column`, `donut`, `tiles`, or `heatmap`. Default is
-  `bar`. `heatmap` requires `group-by: scheduled` or `deadline`
-- `layout:` `card` (default) or `strip`. The strip layout drops the header and
-  renders the query chip and group pills inline
+- `display:` one of `bar`, `column`, `donut`, `tiles`, `heatmap`, or `strip`.
+  Default is `bar`. `heatmap` requires `group-by: scheduled` or `deadline`.
+  `strip` drops the header and renders the query chip and group pills inline
+  (it cannot be combined with `title:` or `heatmap-window:`). The 020
+  spelling `layout: strip` / `layout: card` still works as a deprecated
+  alias, but `display:` is the documented form
 - `title:` (optional) adds a custom title displayed above the card
 - `show-query:` (optional) `show`, `hide`, `true`, or `false`. Controls the
   query chip under the title. Defaults to `show`
@@ -139,6 +141,6 @@ Compact strip inline in a project note:
 ```todoseq-dashboard
 search: tag:project
 group-by: priority
-layout: strip
+display: strip
 ```
 ````
