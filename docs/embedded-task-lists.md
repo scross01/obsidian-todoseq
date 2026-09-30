@@ -70,7 +70,7 @@ search: state:TODO OR state:DOING
 ```
 
 ```todoseq
-search: priority:high AND due:today
+search: priority:high AND scheduled:due
 ```
 ````
 
