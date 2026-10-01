@@ -2250,15 +2250,11 @@ export class TaskListView extends ItemView {
     };
     this.taskListContainer.addEventListener('scroll', this.scrollEventListener);
 
-    // Detect if this view is in the main tab area (not sidebar)
-    // and set up readable line length tracking
-    this.isInMainTab = this.isLeafInMainTab();
-    if (this.isInMainTab) {
-      container.addClass('todoseq-is-main-tab');
-      this.updateReadableLineLength();
-      this.setupLayoutAndConfigListeners();
-      this.setupBackgroundContextMenu();
-    }
+    // Detect if this view is in the main tab area (not sidebar) and apply
+    // the matching treatment (page margins, readable line length cap,
+    // background context menu). Re-run on layout changes below so a leaf
+    // moved between a sidebar and the main area updates too.
+    this.refreshMainTabState();
 
     // Create aria-live region for screen reader announcements
     this.ariaLiveRegion = container.createDiv({
@@ -2371,16 +2367,42 @@ export class TaskListView extends ItemView {
   }
 
   /**
+   * Re-evaluate whether this leaf sits in the main tab area and apply or
+   * remove the main-tab treatment accordingly. Runs on open and on every
+   * layout change, so a leaf dragged between a sidebar and the main area
+   * picks up (or drops) the page margins, line-length cap, and background
+   * context menu.
+   */
+  private refreshMainTabState(): void {
+    const wasMainTab = this.isInMainTab;
+    this.isInMainTab = this.isLeafInMainTab();
+    this.contentEl.toggleClass('todoseq-is-main-tab', this.isInMainTab);
+
+    if (this.isInMainTab) {
+      this.updateReadableLineLength();
+      this.setupLayoutAndConfigListeners();
+      this.setupBackgroundContextMenu();
+    } else if (wasMainTab) {
+      // Moved back into a sidebar: drop the readable-line class so the panel
+      // returns to full sidebar width. Listeners and the context-menu
+      // listener stay registered so the view keeps working if the leaf is
+      // moved to the main area again.
+      this.contentEl.removeClass('todoseq-readable-line-length');
+    }
+  }
+
+  /**
    * Track changes to Obsidian's readable line length setting by listening
    * for layout changes and re-checking when our tab gains focus.
    */
   private setupLayoutAndConfigListeners(): void {
+    // Re-registration happens whenever the leaf re-enters a main tab; guard
+    // against stacking duplicate subscriptions.
+    if (this.layoutChangeObserver || this.activeLeafObserver) {
+      return;
+    }
     const check = () => {
-      this.isInMainTab = this.isLeafInMainTab();
-      this.contentEl.toggleClass('todoseq-is-main-tab', this.isInMainTab);
-      if (this.isInMainTab) {
-        this.updateReadableLineLength();
-      }
+      this.refreshMainTabState();
     };
 
     this.layoutChangeObserver = this.app.workspace.on('layout-change', check);
@@ -2431,6 +2453,14 @@ export class TaskListView extends ItemView {
       });
       menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
     };
+    // Re-registration must not stack duplicate listeners (this method runs
+    // again whenever the leaf re-enters a main tab).
+    if (this.backgroundContextMenuHandler) {
+      this.contentEl.removeEventListener(
+        'contextmenu',
+        this.backgroundContextMenuHandler,
+      );
+    }
     this.contentEl.addEventListener(
       'contextmenu',
       this.backgroundContextMenuHandler,

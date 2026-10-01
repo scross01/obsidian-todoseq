@@ -5,13 +5,28 @@
 import { StatusBarManager } from '../src/view/editor-extensions/status-bar';
 import { createBaseTask } from './helpers/test-helper';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
-import { Notice } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 
 jest.mock('obsidian');
 
 describe('StatusBarManager', () => {
   let mockPlugin: any;
   let manager: StatusBarManager;
+
+  /** TFile-like mock: Obsidian patches String#contains, so emulate it. */
+  function makeFile(path: string, parentPath: string | null): TFile {
+    const pathObj = new String(path) as unknown as Record<string, unknown>;
+    pathObj.contains = (substr: string) =>
+      String.prototype.includes.call(pathObj, substr);
+    const segments = path.split('/');
+    const basename = segments[segments.length - 1].replace(/\.md$/, '');
+    return Object.assign(Object.create(TFile.prototype), {
+      path: pathObj,
+      basename,
+      extension: 'md',
+      parent: parentPath ? { path: parentPath } : null,
+    });
+  }
 
   beforeAll(() => {
     installObsidianDomMocks();
@@ -35,6 +50,7 @@ describe('StatusBarManager', () => {
       registerEvent: jest.fn(),
       uiManager: {
         showTasks: jest.fn().mockResolvedValue(undefined),
+        showTasksWithQuery: jest.fn().mockResolvedValue(undefined),
       },
       taskStateManager: {
         subscribe: jest.fn().mockReturnValue(jest.fn()),
@@ -157,23 +173,49 @@ describe('StatusBarManager', () => {
   });
 
   describe('handleStatusBarClick', () => {
-    it('opens task list via click event on status bar item', () => {
-      const pathObj = new String('notes/test.md') as any;
-      pathObj.contains = (substr: string) => pathObj.includes(substr);
-      const mockFile = {
-        path: pathObj,
-        basename: 'test',
-        extension: 'md',
-        parent: { path: 'notes' },
-      };
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
+    it('plain click applies the file filter via the sidebar-priority path', () => {
+      mockPlugin.app.workspace.getActiveFile.mockReturnValue(
+        makeFile('notes/test.md', 'notes'),
+      );
 
       manager.setupStatusBarItem();
-
       const item = mockPlugin.addStatusBarItem.mock.results[0].value;
       item.dispatchEvent(new MouseEvent('click'));
 
-      expect(mockPlugin.uiManager.showTasks).toHaveBeenCalled();
+      expect(mockPlugin.uiManager.showTasksWithQuery).toHaveBeenCalledWith(
+        expect.stringContaining('file:"test.md"'),
+        false,
+      );
+      // The untargeted showTasks path must not run: it could reveal a
+      // different leaf than the one the filter lands on (the bug where a
+      // background main-tab task list swallowed the query).
+      expect(mockPlugin.uiManager.showTasks).not.toHaveBeenCalled();
+    });
+
+    it('cmd-click opens the filtered list in a new main tab', () => {
+      mockPlugin.app.workspace.getActiveFile.mockReturnValue(
+        makeFile('notes/test.md', 'notes'),
+      );
+
+      manager.handleStatusBarClick(new MouseEvent('click', { metaKey: true }));
+
+      expect(mockPlugin.uiManager.showTasksWithQuery).toHaveBeenCalledWith(
+        expect.stringContaining('file:"test.md"'),
+        true,
+      );
+    });
+
+    it('ctrl-click opens the filtered list in a new main tab', () => {
+      mockPlugin.app.workspace.getActiveFile.mockReturnValue(
+        makeFile('notes/test.md', 'notes'),
+      );
+
+      manager.handleStatusBarClick(new MouseEvent('click', { ctrlKey: true }));
+
+      expect(mockPlugin.uiManager.showTasksWithQuery).toHaveBeenCalledWith(
+        expect.any(String),
+        true,
+      );
     });
 
     it('does nothing when no active file', () => {
@@ -181,41 +223,32 @@ describe('StatusBarManager', () => {
 
       manager.handleStatusBarClick();
 
-      expect(mockPlugin.uiManager.showTasks).not.toHaveBeenCalled();
+      expect(mockPlugin.uiManager.showTasksWithQuery).not.toHaveBeenCalled();
     });
 
-    it('constructs path filter for files with parent directory', () => {
-      const pathObj = new String('projects/notes.md') as any;
-      pathObj.contains = (substr: string) => pathObj.includes(substr);
-      const mockFile = {
-        path: pathObj,
-        basename: 'notes',
-        extension: 'md',
-        parent: { path: 'projects' },
-      };
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
+    it('includes the path filter for files with a parent directory', () => {
+      const file = makeFile('projects/notes.md', 'projects');
+      // instanceof TFile gates the path filter in production.
+      Object.setPrototypeOf(file, TFile.prototype);
+      mockPlugin.app.workspace.getActiveFile.mockReturnValue(file);
 
       manager.handleStatusBarClick();
 
-      // Should not throw; search query includes path and file filters
-      expect(mockPlugin.uiManager.showTasks).toHaveBeenCalled();
+      const [query] = mockPlugin.uiManager.showTasksWithQuery.mock.calls[0];
+      expect(query).toContain('path:"projects"');
+      expect(query).toContain('file:"notes.md"');
     });
 
-    it('omits path filter for files without parent directory', () => {
-      const pathObj = new String('notes.md') as any;
-      pathObj.contains = (substr: string) => pathObj.includes(substr);
-      const mockFile = {
-        path: pathObj,
-        basename: 'notes',
-        extension: 'md',
-        parent: null,
-      };
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
+    it('omits the path filter for files without a parent directory', () => {
+      const file = makeFile('notes.md', null);
+      Object.setPrototypeOf(file, TFile.prototype);
+      mockPlugin.app.workspace.getActiveFile.mockReturnValue(file);
 
       manager.handleStatusBarClick();
 
-      // Should not include path filter when no parent directory
-      expect(mockPlugin.uiManager.showTasks).toHaveBeenCalled();
+      const [query] = mockPlugin.uiManager.showTasksWithQuery.mock.calls[0];
+      expect(query).not.toContain('path:');
+      expect(query).toContain('file:"notes.md"');
     });
   });
 
@@ -307,7 +340,7 @@ describe('StatusBarManager', () => {
   });
 
   describe('handleStatusBarClick error handling', () => {
-    it('shows notice when showTasks fails', async () => {
+    it('shows notice when showTasksWithQuery fails', async () => {
       const consoleSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
@@ -320,7 +353,9 @@ describe('StatusBarManager', () => {
         parent: null,
       };
       mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
-      mockPlugin.uiManager.showTasks.mockRejectedValueOnce(new Error('Fail'));
+      mockPlugin.uiManager.showTasksWithQuery.mockRejectedValueOnce(
+        new Error('Fail'),
+      );
 
       manager.handleStatusBarClick();
 
@@ -336,108 +371,19 @@ describe('StatusBarManager', () => {
   });
 
   describe('handleStatusBarClick with search', () => {
-    it('sets search query on existing task list view', () => {
-      const pathObj = new String('notes/test.md') as any;
-      pathObj.contains = (substr: string) => pathObj.includes(substr);
-      const mockFile = {
-        path: pathObj,
-        basename: 'test',
-        extension: 'md',
-        parent: { path: 'notes' },
-      };
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
-
-      const mockView = {
-        contentEl: {
-          setAttr: jest.fn(),
-          querySelector: jest.fn().mockReturnValue(null),
-        },
-        refreshVisibleList: jest.fn().mockResolvedValue(undefined),
-      };
-
-      // Patch getLeavesOfType to return with mock view
-      mockPlugin.app.workspace.getLeavesOfType.mockReturnValue([
-        { view: mockView },
-      ]);
+    it('passes the full path + file filter query to the UI manager', () => {
+      const file = makeFile('notes/test.md', 'notes');
+      // instanceof TFile gates the path filter in production.
+      Object.setPrototypeOf(file, TFile.prototype);
+      mockPlugin.app.workspace.getActiveFile.mockReturnValue(file);
 
       manager.handleStatusBarClick();
 
-      // Should set search query on contentEl
-      expect(mockView.contentEl.setAttr).toHaveBeenCalledWith(
-        'data-search',
-        expect.stringContaining('file:"test.md"'),
-      );
-      expect(mockView.refreshVisibleList).toHaveBeenCalled();
-    });
-
-    it('sets search input element value when it exists', () => {
-      const pathObj = new String('test.md') as any;
-      pathObj.contains = (substr: string) => pathObj.includes(substr);
-      const mockFile = {
-        path: pathObj,
-        basename: 'test',
-        extension: 'md',
-        parent: null,
-      };
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
-
-      const searchInput = document.createElement('input');
-
-      const mockView = {
-        contentEl: {
-          setAttr: jest.fn(),
-          querySelector: jest.fn().mockReturnValue(searchInput),
-        },
-        refreshVisibleList: jest.fn().mockResolvedValue(undefined),
-      };
-      mockPlugin.app.workspace.getLeavesOfType.mockReturnValue([
-        { view: mockView },
-      ]);
-
-      manager.handleStatusBarClick();
-
-      expect(mockView.contentEl.setAttr).toHaveBeenCalledWith(
-        'data-search',
-        expect.any(String),
-      );
-    });
-
-    it('shows notice when refreshVisibleList fails', async () => {
-      const consoleSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      const pathObj = new String('test.md') as any;
-      pathObj.contains = (substr: string) => pathObj.includes(substr);
-      const mockFile = {
-        path: pathObj,
-        basename: 'test',
-        extension: 'md',
-        parent: null,
-      };
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockFile);
-
-      const mockView = {
-        contentEl: {
-          setAttr: jest.fn(),
-          querySelector: jest.fn().mockReturnValue(null),
-        },
-        refreshVisibleList: jest
-          .fn()
-          .mockRejectedValue(new Error('Refresh fail')),
-      };
-      mockPlugin.app.workspace.getLeavesOfType.mockReturnValue([
-        { view: mockView },
-      ]);
-
-      manager.handleStatusBarClick();
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error refreshing task list:',
-        expect.any(Error),
-      );
-      consoleSpy.mockRestore();
+      const [query, newTab] =
+        mockPlugin.uiManager.showTasksWithQuery.mock.calls[0];
+      expect(query).toContain('path:"notes"');
+      expect(query).toContain('file:"test.md"');
+      expect(newTab).toBe(false);
     });
   });
 

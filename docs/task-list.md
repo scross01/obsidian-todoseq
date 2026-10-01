@@ -22,6 +22,15 @@ The Task List automatically opens in the right sidebar when the TODOseq plugin i
 
 You can assign a custom keyboard shortcut to the "TODOseq: Show task list" command in Obsidian's Hotkeys settings.
 
+### Status Bar Task Count
+
+When a note is focused, Obsidian's status bar shows the number of open tasks in that note (for example, "3 tasks").
+
+- **Click** the count to open the Task List in the sidebar, filtered to the focused note
+- **Cmd/Ctrl-click** to open the filtered Task List in a new main tab — the same drill-through behavior as [dashboard cards](/dashboards)
+
+The filter targets the note itself, so the list shows only that note's tasks. Clear the search field in the Task List to see everything again.
+
 ## Task List Interface
 
 The Task List consists of several key components:

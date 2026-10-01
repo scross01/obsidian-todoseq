@@ -53,6 +53,33 @@
   align-self: center;
 }
 
+/* Main tab without readable line length: the search field grows with the
+   row and spans the full page width, matching the full-width task list
+   below it. */
+
+/* Same context: the guidance box stays a card-sized element centered on the
+   page rather than an edge-to-edge band. */
+.todoseq-panel.todoseq-is-main-tab:not(.todoseq-readable-line-length)
+  .todoseq-panel-empty {
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Main tab type scale: task text steps up to the editor's task entry size
+   (1em of --font-text-size) so page-tab reading mirrors the source notes,
+   while the keyword sits at 0.9em — the same size the editor renders task
+   keywords at — so both contexts echo their source. The side panel keeps
+   0.9em text for sidebar density; the keyword tracks the text there, and
+   meta rows (file info, dates) and icons are unchanged. */
+.todoseq-panel.todoseq-is-main-tab .todoseq-task-text {
+  font-size: 1em;
+}
+
+.todoseq-panel.todoseq-is-main-tab .todo-task-keyword {
+  font-size: 0.9em;
+}
+
 /* List layout */
 .todoseq-panel .todoseq-task-list {
   font-family: var(--font-text);
@@ -138,14 +165,23 @@
 /* Task text and completion state */
 .todoseq-panel .todoseq-task-text {
   line-height: var(--line-height-tight, 1.4);
+  /* Slightly below body size: the list reads denser than the editor and the
+     keyword lands at the same size as the text, mirroring source entries. */
+  font-size: 0.9em;
 }
 .todoseq-panel .todoseq-task-text.completed {
-  color: var(--text-muted);
+  color: var(--text-faint);
   text-decoration: line-through;
 }
 
-/* Completed rows recede: their meta (file info, date rows) drops a further
-   step so completed clusters sit visually behind open work. */
+/* Completed rows recede: keyword drops to faint and their meta (file info,
+   date rows) drops a further step so completed clusters sit visually behind
+   open work. */
+.todoseq-panel
+  .todoseq-task-item:has(.todoseq-task-text.completed)
+  .todo-task-keyword {
+  color: var(--text-faint);
+}
 .todoseq-panel
   .todoseq-task-item:has(.todoseq-task-text.completed)
   .todoseq-task-file-info,
@@ -159,10 +195,14 @@
 .todoseq-panel .todo-task-keyword {
   color: var(--interactive-accent);
   cursor: pointer;
-  font-weight: var(--font-semibold);
-  /* Theme-relative: keyword reads as a state token, not a heading; tracks
-     the user's font-size setting instead of a fixed rem value. */
-  font-size: 0.9em;
+  /* Bold, matching the weight the keyword carries in task capture (source
+     entries). A lighter weight read as a different typeface and broke the
+     visual continuity between capture and list. */
+  font-weight: var(--font-bold);
+  /* 1em of the surrounding task text: the keyword shares the text's size
+     exactly as in source entries (its span nests inside the text span, so
+     em compounds — 1em here means "same as the text"). */
+  font-size: 1em;
 }
 
 /* Hover hint */
@@ -201,6 +241,11 @@
 .todoseq-panel .todoseq-task-checkbox {
   margin-right: var(--size-2-2);
   vertical-align: middle;
+  /* vertical-align: middle centers on baseline + x-height/2, which sits just
+     below the text's optical midline (visible on struck-through rows).
+     Nudge up by a font-relative step so the checkbox centers on the text. */
+  position: relative;
+  top: -0.08em;
 }
 
 /* Editor checkbox styling for active tasks when NOT using themed styles */

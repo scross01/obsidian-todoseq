@@ -43,6 +43,10 @@ jest.mock('obsidian', () => ({
   MarkdownView: jest.fn(),
   setIcon: jest.fn(),
   Notice: jest.fn(),
+  Menu: jest.fn().mockImplementation(() => ({
+    addItem: jest.fn().mockReturnThis(),
+    showAtPosition: jest.fn(),
+  })),
   ConfirmationModal: jest.fn().mockImplementation(() => {
     const instance: any = {
       setTitle: jest.fn().mockReturnThis(),
@@ -1141,6 +1145,102 @@ describe('TaskListView', () => {
         pluginMock.settings.savedSearches.find((s) => s.id === search.id),
       ).toBeDefined();
       expect(pluginMock.saveSettings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('main-tab state refresh', () => {
+    /** Root fake whose containerEl carries `mod-root` only for main-area roots. */
+    const mainRoot = {
+      containerEl: {
+        classList: {
+          contains: (cls: string) => cls === 'mod-root',
+        },
+      },
+    };
+    const sidebarRoot = {
+      containerEl: {
+        classList: { contains: () => false },
+      },
+    };
+
+    function withWorkspace(root: unknown): { on: jest.Mock } {
+      const on = jest.fn();
+      (view as unknown as { app: unknown }).app = {
+        workspace: { on },
+        vault: {},
+      };
+      (view as unknown as { leaf: unknown }).leaf = { getRoot: () => root };
+      return { on };
+    }
+
+    it('adds main-tab treatment when a sidebar leaf is moved into the main area', () => {
+      withWorkspace(mainRoot);
+      view['isInMainTab'] = false;
+      view['contentEl']?.removeClass('todoseq-is-main-tab');
+
+      view['refreshMainTabState']();
+
+      expect(view['isInMainTab']).toBe(true);
+      expect(view['contentEl']?.hasClass('todoseq-is-main-tab')).toBe(true);
+    });
+
+    it('drops main-tab treatment when the leaf is moved back to a sidebar', () => {
+      withWorkspace(sidebarRoot);
+      view['isInMainTab'] = true;
+      view['contentEl']?.addClass('todoseq-is-main-tab');
+      view['backgroundContextMenuHandler'] = () => {};
+
+      view['refreshMainTabState']();
+
+      expect(view['isInMainTab']).toBe(false);
+      expect(view['contentEl']?.hasClass('todoseq-is-main-tab')).toBe(false);
+      // The context-menu listener stays registered so the view keeps working
+      // if the leaf is moved back to the main area again.
+      expect(view['backgroundContextMenuHandler']).not.toBeNull();
+    });
+
+    it('is a no-op for a view that never left the sidebar', () => {
+      const { on } = withWorkspace(sidebarRoot);
+      view['isInMainTab'] = false;
+      view['contentEl']?.removeClass('todoseq-is-main-tab');
+
+      view['refreshMainTabState']();
+
+      expect(view['isInMainTab']).toBe(false);
+      expect(view['contentEl']?.hasClass('todoseq-is-main-tab')).toBe(false);
+      expect(on).not.toHaveBeenCalled();
+    });
+
+    it('registers layout listeners the first time the view reaches a main tab', () => {
+      const { on } = withWorkspace(mainRoot);
+      view['isInMainTab'] = false;
+      view['layoutChangeObserver'] = null;
+      view['activeLeafObserver'] = null;
+
+      view['refreshMainTabState']();
+
+      // One layout-change subscription plus one active-leaf-change
+      // subscription carry the ongoing state sync.
+      expect(on).toHaveBeenCalledTimes(2);
+    });
+
+    it('treats a missing root as sidebar (fail-safe, no main-tab classes)', () => {
+      (view as unknown as { app: unknown }).app = {
+        workspace: { on: jest.fn() },
+        vault: {},
+      };
+      (view as unknown as { leaf: unknown }).leaf = {
+        getRoot: () => {
+          throw new Error('no root');
+        },
+      };
+      view['isInMainTab'] = true;
+      view['contentEl']?.addClass('todoseq-is-main-tab');
+
+      view['refreshMainTabState']();
+
+      expect(view['isInMainTab']).toBe(false);
+      expect(view['contentEl']?.hasClass('todoseq-is-main-tab')).toBe(false);
     });
   });
 });
