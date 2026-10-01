@@ -30,7 +30,7 @@ npx playwright test --config=tests/integration/playwright.config.ts -g "test nam
 Key details:
 
 - Obsidian is launched with `--user-data-dir` pointing at an ephemeral fixtures directory for full isolation.
-- A single Obsidian instance is shared across all test files via CDP on port 9333.
+- A single Obsidian instance is shared across all test files via CDP (port 9334 by default, overridable via `OBSIDIAN_CDP_PORT`; chosen to avoid collisions with other local apps).
 - The `obsidian-restart` project tests settings persistence across a real process restart.
 - **No keyboard shortcuts** — all Obsidian commands are invoked via `page.evaluate(() => app.commands.executeCommandById(...))` to avoid triggering unintended actions.
 - DOM selectors are version-specific (e.g. Obsidian 1.12+ uses `.vertical-tab-nav-item`, not `.vertical-tab-list-item`).

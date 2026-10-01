@@ -98,7 +98,7 @@ Playwright-based E2E tests that launch a real isolated Obsidian instance via Ele
 Connect Playwright to a running test Obsidian instance:
 
 ```typescript
-const browser = await chromium.connectOverCDP('http://127.0.0.1:9333');
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9334');
 const page = browser.contexts()[0].pages()[0];
 
 // Inspect DOM

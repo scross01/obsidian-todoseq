@@ -187,8 +187,14 @@ export function resetMutableState(): void {
   copyFile(BASELINE_SETTINGS_PATH, dataDest);
 }
 
-/** CDP port the launcher exposes for Playwright `connectOverCDP`. Overridable via env. */
-export const CDP_PORT = parseInt(process.env.OBSIDIAN_CDP_PORT || '9333', 10);
+/**
+ * CDP port the launcher exposes for Playwright `connectOverCDP`. Overridable
+ * via env. The default is deliberately uncommon: CDP tooling often assumes
+ * 9222, and 9333 has been observed colliding with other local apps — a
+ * collision is destructive here because the launcher kills whatever listens
+ * on this port before relaunching.
+ */
+export const CDP_PORT = parseInt(process.env.OBSIDIAN_CDP_PORT || '9334', 10);
 
 /** Path to the Obsidian executable. Overridable via env (defaults to macOS app). */
 export const OBSIDIAN_PATH =
