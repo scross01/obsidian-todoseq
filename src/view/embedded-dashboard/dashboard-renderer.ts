@@ -591,6 +591,11 @@ export class DashboardRenderer {
     center.createDiv({ cls: 'todoseq-dashboard-donut-unit', text: 'tasks' });
 
     const legend = wrap.createDiv({ cls: 'todoseq-dashboard-legend' });
+    // Index colours the same way the slices above do — over the *visible*
+    // groups. Keying off the position in the full group list made every dot
+    // after a zero-count group one step off from its own arc whenever the
+    // colour came from the positional ladder (mono, or an unmapped key).
+    const visibleIndex = new Map(visible.map((g, i) => [g.key, i]));
     result.groups.forEach((group, index) => {
       const row = legend.createDiv({
         cls: 'todoseq-dashboard-legend-row todoseq-dashboard-clickable',
@@ -603,7 +608,9 @@ export class DashboardRenderer {
       });
       row.style.setProperty(
         '--todoseq-bar-color',
-        this.colorForGroup(params, group, index),
+        // A zero-count group has no arc; its dot keeps a stable colour derived
+        // from its own position so it does not shift when siblings change.
+        this.colorForGroup(params, group, visibleIndex.get(group.key) ?? index),
       );
       row.createSpan({ cls: 'todoseq-dashboard-legend-dot' });
       row.createSpan({

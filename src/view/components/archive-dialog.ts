@@ -298,6 +298,13 @@ export class ArchiveDialog {
   private lastFocused: HTMLElement | null = null;
 
   open(): void {
+    // Guard at the DOM, not on `this.modalEl`: the plugin builds a fresh
+    // ArchiveDialog per command invocation, so an instance-level check would
+    // never see an already-open dialog. Two invocations stacked two backdrops,
+    // and close() only removes the newest — leaving one the user cannot
+    // dismiss. Querying the document also self-heals if a dialog was orphaned.
+    if (activeDocument.querySelector('.todoseq-archive-backdrop')) return;
+
     this.lastFocused =
       activeDocument.activeElement instanceof HTMLElement
         ? activeDocument.activeElement

@@ -234,6 +234,39 @@ describe('seed lint', () => {
       expect(problems).toEqual([]);
     });
 
+    it('accepts two paragraphs separated by a blank line', () => {
+      // The blank line skipped the state update entirely, so the second
+      // paragraph still saw the first one as prose and was reported as a
+      // mid-sentence wrap. AGENTS.md tells you to open a note with prose, so
+      // a two-paragraph intro is the shape this rule was most likely to meet.
+      const problems = lintSeedContent(
+        [
+          'Some intro prose about the release.',
+          '',
+          'A second paragraph, deliberately separate.',
+          '',
+        ].join('\n'),
+      );
+      expect(rules(problems, 'single-line-prose')).toEqual([]);
+    });
+
+    it('still flags a wrap that follows a blank line boundary correctly', () => {
+      // Guard against over-correcting: a genuine hard wrap inside the second
+      // paragraph must still be reported.
+      const problems = lintSeedContent(
+        [
+          'First paragraph.',
+          '',
+          'Second paragraph that keeps going',
+          'onto a third source line.',
+          '',
+        ].join('\n'),
+      );
+      expect(rules(problems, 'single-line-prose').map((p) => p.line)).toEqual([
+        4,
+      ]);
+    });
+
     it('does not mistake a task under prose for a wrapped line', () => {
       const problems = lintSeedContent(
         [

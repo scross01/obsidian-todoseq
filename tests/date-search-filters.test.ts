@@ -816,3 +816,29 @@ describe('Date Search Filters', () => {
     });
   });
 });
+
+describe('malformed date components', () => {
+  // A fourth component was dropped rather than rejected, so a typo'd bound
+  // produced a plausible wrong date instead of an error — the same silent-wrong
+  // answer as a comparison operator left on a range bound.
+  it('rejects a bound with a fourth component', () => {
+    expect(DateUtils.parseDateBound('2026-10-07-08', 'start')).toBeNull();
+    expect(DateUtils.parseDateBound('2026-10-07-08', 'end')).toBeNull();
+  });
+
+  it('does not silently truncate to the three-component date', () => {
+    const malformed = DateUtils.parseDateBound('2026-10-07-08', 'start');
+    const valid = DateUtils.parseDateBound('2026-10-07', 'start');
+    expect(malformed).not.toEqual(valid);
+  });
+
+  it('still accepts the documented shapes', () => {
+    expect(DateUtils.parseDateBound('2026', 'start')).not.toBeNull();
+    expect(DateUtils.parseDateBound('2026-10', 'start')).not.toBeNull();
+    expect(DateUtils.parseDateBound('2026-10-07', 'start')).not.toBeNull();
+  });
+
+  it('rejects a comparison-bound form carrying extra components', () => {
+    expect(DateUtils.parseDateBound('>=2026-10-07-08', 'start')).toBeNull();
+  });
+});

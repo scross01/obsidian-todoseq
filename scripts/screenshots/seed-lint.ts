@@ -111,7 +111,15 @@ export function lintSeedContent(content: string): SeedProblem[] {
       inFence = !inFence;
       continue;
     }
-    if (inFence || line === '') continue;
+    if (inFence) continue;
+    if (line === '') {
+      // A blank line ends a Markdown paragraph, so the next prose line starts
+      // a new one rather than continuing this one. Skipping the state update
+      // entirely carried `prevWasProse` across the gap, which reported every
+      // two-paragraph note as a hard wrap.
+      prevWasProse = false;
+      continue;
+    }
 
     const isTask = TASK_LINE.test(line);
     const isCheckbox = CHECKBOX_LINE.test(line);

@@ -35,7 +35,7 @@ group-by: state
 color: mono
 ```
 
-`display: bar  colapsed: true
+`display: bar  colapsed: true`
 
 ```todoseq-dashboard
 title: bar by priority (collapsible)

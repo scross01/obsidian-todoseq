@@ -1203,3 +1203,115 @@ describe('ArchiveService batch performance (stress)', () => {
     expect(elapsed).toBeLessThan(UNDO_BUDGET_MS);
   });
 });
+
+describe('ArchiveService.undoLastRun resilience', () => {
+  // The journal was cleared before the loop and getRawLine was unguarded, so a
+  // read that threw on record 3 abandoned records 4 and 5 *and* left nothing to
+  // retry with — the one operation whose entire promise is that it can be
+  // reversed had no way back. Read failures are now contained per record, and
+  // anything that could not be attempted stays in the journal.
+  function seedJournal() {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const tasks = [1, 2, 3].map((n) =>
+      makeTask({
+        path: `n${n}.md`,
+        line: n,
+        state: 'DONE',
+        closedDate: daysBefore(REFERENCE, 100),
+        rawText: `- [x] DONE task ${n}`,
+      }),
+    );
+    const store = new Map<string, ArchiveCandidate>(
+      tasks.map((t) => [`${t.path}:${t.line}`, t]),
+    );
+    return { service, tasks, store };
+  }
+
+  async function archiveAll(
+    service: ReturnType<typeof makeService>['service'],
+    store: Map<string, ArchiveCandidate>,
+    tasks: ReturnType<typeof makeTask>[],
+  ): Promise<void> {
+    await service.applyArchives(
+      service.evaluateArchiveCriteria(tasks, makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+  }
+
+  it('contains a getRawLine rejection and keeps going', async () => {
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    const applied: string[] = [];
+    const outcome = await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (path === 'n2.md') throw new Error('vault busy');
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async (t) => {
+        applied.push(t.path);
+      },
+    });
+
+    expect(applied).toEqual(['n1.md', 'n3.md']);
+    expect(outcome.reverted).toHaveLength(2);
+    expect(outcome.skipped.map((s) => s.reason)).toEqual(['read-failed']);
+  });
+
+  it('keeps un-attempted records in the journal for a retry', async () => {
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (path === 'n2.md') throw new Error('vault busy');
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+
+    expect(service.hasUndoableRun()).toBe(true);
+  });
+
+  it('retries the failed record on a second call', async () => {
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (path === 'n2.md') throw new Error('vault busy');
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+
+    const second: string[] = [];
+    await service.undoLastRun({
+      getRawLine: async (path) => `- [x] ARCHIVED ${path}`,
+      apply: async (t) => {
+        second.push(t.path);
+      },
+    });
+
+    expect(second).toEqual(['n2.md']);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
+  it('does not retain records that failed terminally', async () => {
+    // A missing line can never be undone, so keeping it would leave the undo
+    // command permanently available with nothing it could ever do.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    await service.undoLastRun({
+      getRawLine: async (path) =>
+        path === 'n2.md' ? null : `- [x] ARCHIVED ${path}`,
+      apply: async () => undefined,
+    });
+
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+});

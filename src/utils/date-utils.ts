@@ -942,6 +942,12 @@ export class DateUtils {
     const month = parts.length >= 2 ? parts[1] : null;
     const day = parts.length >= 3 ? parts[2] : null;
 
+    // Only YYYY, YYYY-MM and YYYY-MM-DD are dates. A fourth component used to
+    // be dropped, so `2026-10-07-08` resolved to Oct 7 and the filter quietly
+    // answered a different question than the one that was typed. Reject it, in
+    // line with how every other malformed bound is handled here.
+    if (parts.length > 3) return null;
+
     if (!Number.isInteger(year) || year < 1) return null;
     if (month !== null && (month < 1 || month > 12)) return null;
 

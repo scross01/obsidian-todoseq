@@ -323,12 +323,32 @@ export class ArchiveService {
    */
   async undoLastRun(deps: UndoDeps): Promise<UndoOutcome> {
     const journal = this.lastRun;
-    this.lastRun = [];
     const reverted: ArchivedTaskRecord[] = [];
     const skipped: { record: ArchivedTaskRecord; reason: string }[] = [];
+    // Records that could not be attempted or did not take, kept so a second
+    // call can retry them. Terminal outcomes (the line is gone, or no longer
+    // archived) are dropped instead: retrying them could never succeed, and
+    // leaving them behind would keep the undo command permanently available
+    // with nothing it could do.
+    const retryable: ArchivedTaskRecord[] = [];
 
     for (const record of journal) {
-      const rawLine = await deps.getRawLine(record.path, record.line);
+      let rawLine: string | null;
+      try {
+        rawLine = await deps.getRawLine(record.path, record.line);
+      } catch (error) {
+        // Contained per record: one unreadable line must not abandon the rest
+        // of the run.
+        console.debug(
+          'TODOseq: archive undo read failed for',
+          record.path,
+          record.line,
+          error,
+        );
+        skipped.push({ record, reason: 'read-failed' });
+        retryable.push(record);
+        continue;
+      }
       if (rawLine === null) {
         skipped.push({ record, reason: 'line-missing' });
         continue;
@@ -362,10 +382,16 @@ export class ArchiveService {
           error,
         );
         skipped.push({ record, reason: 'apply-failed' });
+        retryable.push(record);
         continue;
       }
       reverted.push(record);
     }
+
+    // Assigned only once the whole run is accounted for. Clearing it up front
+    // meant a throw part-way through left nothing to retry with — which is the
+    // one thing an undo must never do.
+    this.lastRun = retryable;
     return { reverted, skipped };
   }
 

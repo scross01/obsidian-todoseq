@@ -778,6 +778,50 @@ describe('DashboardRenderer', () => {
     });
   });
 
+  describe('donut legend colours', () => {
+    // Slices index the colour ladder over *visible* groups; the legend indexed
+    // over *all* groups. With show-empty on, a zero-count group in front of the
+    // real ones shifted every later legend dot by one step, so a dot no longer
+    // matched its own arc.
+    it('gives a legend dot the same colour as its slice', () => {
+      renderer.renderCard(
+        host,
+        result({
+          total: 6,
+          groups: [
+            group('priority:empty', 'Empty', 0, 'priority:empty'),
+            group('priority:high', 'High', 4, 'priority:high'),
+            group('priority:medium', 'Medium', 2, 'priority:medium'),
+          ],
+        }),
+        params({
+          display: 'donut',
+          color: 'mono',
+          showEmpty: true,
+        }),
+        noopCallbacks(),
+      );
+
+      const sliceColour = (key: string) =>
+        host
+          .querySelector<SVGCircleElement>(`circle[data-key="${key}"]`)
+          ?.getAttribute('stroke');
+      const legendColour = (key: string) =>
+        host
+          .querySelector<HTMLElement>(
+            `.todoseq-dashboard-legend-row[data-key="${key}"]`,
+          )
+          ?.style.getPropertyValue('--todoseq-bar-color');
+
+      // 'priority:high' is the second group overall but the first visible one.
+      expect(sliceColour('priority:high')).toBeTruthy();
+      expect(legendColour('priority:high')).toBe(sliceColour('priority:high'));
+      expect(legendColour('priority:medium')).toBe(
+        sliceColour('priority:medium'),
+      );
+    });
+  });
+
   describe('donut in-place patching', () => {
     const C = 2 * Math.PI * 58;
     const GAP = 0.01 * C;
