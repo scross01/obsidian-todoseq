@@ -504,6 +504,12 @@ export class TaskItemRenderer {
    */
   buildTaskListItem(task: Task): HTMLLIElement {
     const li = createEl('li', { cls: 'todoseq-task-item' });
+    // Set the state class here as well as in updateTaskElementContent. The
+    // "completed rows recede" rules in styles.css key off this class, and the
+    // initial render is the only path that reaches the stylesheet without
+    // going through the update path first — so without this the styling only
+    // appeared after a row was refreshed in place.
+    li.classList.toggle('completed', task.completed);
     const source = getTaskSource(task.path);
     li.setAttribute('data-source', source);
     li.setAttribute('data-path', task.path);

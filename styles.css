@@ -176,18 +176,20 @@
 
 /* Completed rows recede: keyword drops to faint and their meta (file info,
    date rows) drops a further step so completed clusters sit visually behind
-   open work. */
-.todoseq-panel
-  .todoseq-task-item:has(.todoseq-task-text.completed)
-  .todo-task-keyword {
+   open work.
+
+   Keyed off a class on the row itself, which the renderer sets from the same
+   `task.completed` that marks the text. It was previously
+   `.todoseq-task-item:has(.todoseq-task-text.completed)`, which the plugin
+   review flags for style invalidation: a relational selector re-evaluates
+   descendants on every change to the subtree, and this list re-renders
+   continuously as tasks stream in. A `:has()` ban, and the reason, is pinned
+   by tests/stylesheet-lint.test.ts. */
+.todoseq-panel .todoseq-task-item.completed .todo-task-keyword {
   color: var(--text-faint);
 }
-.todoseq-panel
-  .todoseq-task-item:has(.todoseq-task-text.completed)
-  .todoseq-task-file-info,
-.todoseq-panel
-  .todoseq-task-item:has(.todoseq-task-text.completed)
-  .todoseq-task-date-container {
+.todoseq-panel .todoseq-task-item.completed .todoseq-task-file-info,
+.todoseq-panel .todoseq-task-item.completed .todoseq-task-date-container {
   opacity: 0.75;
 }
 
