@@ -696,12 +696,19 @@ export class EmbeddedTaskListRenderer {
   /**
    * Render the header content spans (query, sort, completed, future, limit) into a header element.
    * This is shared between the static header and the no-title collapsible header.
+   *
+   * No show-query check here: both callers already gate on it. renderStaticHeader
+   * is only reached when hasHeaderContent is true, which is false for
+   * show-query: false, and the no-title collapsible header cannot be reached
+   * with show-query: false at all — the parser rejects
+   * `collapse: true` + no title + `show-query: false` because there would be no
+   * clickable header. A second reading of the flag here would contradict both.
    */
   private renderHeaderContentSpans(
     header: HTMLElement,
     params: TodoseqParameters,
   ): void {
-    if (params.searchQuery && params.showQuery !== false) {
+    if (params.searchQuery) {
       header.createSpan({
         cls: 'todoseq-embedded-task-list-search',
         text: params.searchQuery,

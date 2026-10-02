@@ -33,6 +33,9 @@ jest.mock('obsidian', () => ({
   },
 }));
 
+/** The state classes both the build and the update path stamp onto the li. */
+const STATE_CLASSES = ['completed', 'cancelled', 'in-progress', 'active'];
+
 // Minimal StateMenuBuilder mock: only needs buildStateMenu returning a menu object
 const createMockMenuBuilder = () =>
   ({
@@ -616,6 +619,27 @@ describe('TaskItemRenderer', () => {
         expect(li.classList.contains('completed')).toBe(completed);
       }
     });
+
+    it.each(['TODO', 'DOING', 'DONE', 'CANCELLED'])(
+      'mirrors every state class the update path sets on first paint (%s)',
+      (state) => {
+        // buildTaskListItem and updateTaskElementContent both stamp the task's
+        // state onto the li. When only `completed` was mirrored here, the other
+        // three appeared the first time a row was refreshed in place — so a
+        // row could look one way on arrival and another after an edit.
+        const task = createBaseTask({
+          completed: state === 'DONE',
+          state,
+        });
+        const li = renderer.buildTaskListItem(task);
+        const onArrival = STATE_CLASSES.map((c) => li.classList.contains(c));
+
+        renderer.updateTaskElementContent(task, li);
+        const afterUpdate = STATE_CLASSES.map((c) => li.classList.contains(c));
+
+        expect(onArrival).toEqual(afterUpdate);
+      },
+    );
 
     it('should create an li with correct data attributes', () => {
       const task = createBaseTask({

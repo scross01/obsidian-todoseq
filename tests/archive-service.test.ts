@@ -1314,4 +1314,65 @@ describe('ArchiveService.undoLastRun resilience', () => {
 
     expect(service.hasUndoableRun()).toBe(false);
   });
+
+  it('does not clobber a newer journal that landed mid-undo', async () => {
+    // An undo awaits once per record, so a concurrent applyArchives can finish
+    // in the gap and install a fresh journal. The undo must then leave it
+    // alone: the tasks it restores are exactly the ones the criteria match, so
+    // losing this journal both orphans the newer run's records and drops the
+    // Undo button from that run's notice.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    // A fresh, unrelated task archived by a run that lands during the undo.
+    const late = makeTask({
+      path: 'late.md',
+      line: 99,
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE late task',
+    });
+    store.set(`${late.path}:${late.line}`, late);
+    let interleaved: Promise<unknown> | null = null;
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (!interleaved) {
+          interleaved = service.applyArchives(
+            [{ ...late, target: 'ARCHIVED' }],
+            {
+              getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+              apply: async () => undefined,
+            },
+          );
+        }
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+    await interleaved;
+
+    expect(outcome.reverted).toHaveLength(3);
+    // The newer run's single record is still the undoable journal.
+    expect(service.hasUndoableRun()).toBe(true);
+  });
+
+  it('reports isRunning while an undo is in flight', async () => {
+    // isRunning gates the auto-archive path. An undo that leaves it false lets
+    // an auto-run start mid-undo, which is the interleaving above.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    const runningDuring: boolean[] = [];
+    await service.undoLastRun({
+      getRawLine: async (path) => {
+        runningDuring.push(service.isRunning());
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+
+    expect(runningDuring).toEqual([true, true, true]);
+    expect(service.isRunning()).toBe(false);
+  });
 });

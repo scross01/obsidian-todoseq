@@ -820,6 +820,94 @@ describe('DashboardRenderer', () => {
         sliceColour('priority:medium'),
       );
     });
+
+    it('gives an arc-less dot a colour no visible group is wearing', () => {
+      // The zero-count row has no arc, so it has no visible index to take.
+      // Falling back to its position in the FULL list let it collide with a
+      // visible group's visible index: with [empty, high, medium] the empty
+      // dot resolved to the same step as the high dot.
+      renderer.renderCard(
+        host,
+        result({
+          total: 6,
+          groups: [
+            group('priority:empty', 'Empty', 0, 'priority:empty'),
+            group('priority:high', 'High', 4, 'priority:high'),
+            group('priority:medium', 'Medium', 2, 'priority:medium'),
+          ],
+        }),
+        params({ display: 'donut', color: 'mono', showEmpty: true }),
+        noopCallbacks(),
+      );
+
+      const legendColour = (key: string) =>
+        host
+          .querySelector<HTMLElement>(
+            `.todoseq-dashboard-legend-row[data-key="${key}"]`,
+          )
+          ?.style.getPropertyValue('--todoseq-bar-color');
+      const visible = new Set(
+        ['priority:high', 'priority:medium'].map(legendColour),
+      );
+
+      expect(legendColour('priority:empty')).toBeTruthy();
+      expect(visible.has(legendColour('priority:empty')!)).toBe(false);
+    });
+
+    it('recolours the legend when a patch changes the visible index map', () => {
+      // patchDonutSlices re-derives every arc's stroke from the current
+      // visible-index map, but the legend dot's --todoseq-bar-color was only
+      // ever written at render time. Once counts move — which re-indexes the
+      // ladder — the arcs shifted colour and the dots did not.
+      const callbacks = noopCallbacks();
+      const mono = params({ display: 'donut', color: 'mono' });
+      const content = renderer.renderCard(
+        host,
+        result({
+          total: 9,
+          groups: [
+            group('a:x', 'X', 5, 'a:x'),
+            group('a:y', 'Y', 2, 'a:y'),
+            group('a:z', 'Z', 2, 'a:z'),
+          ],
+        }),
+        mono,
+        callbacks,
+      );
+
+      const legendColour = (key: string) =>
+        host
+          .querySelector<HTMLElement>(
+            `.todoseq-dashboard-legend-row[data-key="${key}"]`,
+          )
+          ?.style.getPropertyValue('--todoseq-bar-color');
+      const sliceColour = (key: string) =>
+        host
+          .querySelector<SVGCircleElement>(`circle[data-key="${key}"]`)
+          ?.getAttribute('stroke');
+
+      // 'a:y' drops to zero: it loses its arc and 'a:z' takes its index.
+      renderer.updateContent(
+        content,
+        result({
+          total: 7,
+          groups: [
+            group('a:x', 'X', 5, 'a:x'),
+            group('a:y', 'Y', 0, 'a:y'),
+            group('a:z', 'Z', 2, 'a:z'),
+          ],
+        }),
+        mono,
+        callbacks,
+      );
+
+      expect(sliceColour('a:z')).toBeTruthy();
+      expect(legendColour('a:z')).toBe(sliceColour('a:z'));
+      expect(legendColour('a:x')).toBe(sliceColour('a:x'));
+      // The arc-less row must not be wearing a live arc's colour either.
+      expect(legendColour('a:y')).not.toBe(sliceColour('a:x'));
+      expect(legendColour('a:y')).not.toBe(sliceColour('a:z'));
+    });
   });
 
   describe('donut in-place patching', () => {

@@ -176,7 +176,7 @@ export class DashboardRenderer {
       if (params.display === 'donut') {
         this.patchDonutSlices(contentRoot, nextResult, params);
       }
-      this.patchGroups(contentRoot, nextResult);
+      this.patchGroups(contentRoot, nextResult, params);
       renderedKeys.set(contentRoot, nextKeys);
       return;
     }
@@ -553,8 +553,11 @@ export class DashboardRenderer {
     // for overlapping tag counts. Displayed percentages (legend + tooltip)
     // both use result.total via sharePct — see the legend value below.
     const arcDenominator = visible.reduce((sum, g) => sum + g.count, 0) || 1;
+    // One map for the arcs and for the legend below: both must index the ladder
+    // over the same visible groups or a dot stops matching its own arc.
+    const colorIndex = this.legendColorIndex(result.groups);
     let accumulated = 0;
-    visible.forEach((group, index) => {
+    visible.forEach((group) => {
       const share = group.count / arcDenominator;
       const arc = Math.max(0, share * DONUT_CIRCUMFERENCE - DONUT_GAP);
       const circle = document.createElementNS(SVG_NAMESPACE, 'circle');
@@ -563,7 +566,10 @@ export class DashboardRenderer {
       circle.setAttribute('r', String(DONUT_RADIUS));
       circle.setAttribute('fill', 'none');
       circle.setAttribute('stroke-width', String(DONUT_STROKE));
-      circle.setAttribute('stroke', this.colorForGroup(params, group, index));
+      circle.setAttribute(
+        'stroke',
+        this.legendColor(params, group, colorIndex),
+      );
       circle.setAttribute(
         'stroke-dasharray',
         `${arc} ${DONUT_CIRCUMFERENCE - arc}`,
@@ -591,12 +597,7 @@ export class DashboardRenderer {
     center.createDiv({ cls: 'todoseq-dashboard-donut-unit', text: 'tasks' });
 
     const legend = wrap.createDiv({ cls: 'todoseq-dashboard-legend' });
-    // Index colours the same way the slices above do — over the *visible*
-    // groups. Keying off the position in the full group list made every dot
-    // after a zero-count group one step off from its own arc whenever the
-    // colour came from the positional ladder (mono, or an unmapped key).
-    const visibleIndex = new Map(visible.map((g, i) => [g.key, i]));
-    result.groups.forEach((group, index) => {
+    result.groups.forEach((group) => {
       const row = legend.createDiv({
         cls: 'todoseq-dashboard-legend-row todoseq-dashboard-clickable',
         attr: {
@@ -608,9 +609,7 @@ export class DashboardRenderer {
       });
       row.style.setProperty(
         '--todoseq-bar-color',
-        // A zero-count group has no arc; its dot keeps a stable colour derived
-        // from its own position so it does not shift when siblings change.
-        this.colorForGroup(params, group, visibleIndex.get(group.key) ?? index),
+        this.legendColor(params, group, colorIndex),
       );
       row.createSpan({ cls: 'todoseq-dashboard-legend-dot' });
       row.createSpan({
@@ -800,9 +799,15 @@ export class DashboardRenderer {
   private patchGroups(
     contentRoot: HTMLElement,
     nextResult: DashboardResult,
+    params: DashboardParameters,
   ): void {
     const total = nextResult.total;
     const maxCount = this.maxCount(nextResult.groups);
+    // patchDonutSlices re-derives every arc's stroke from this map on each
+    // patch, so the legend has to be re-coloured from the same one — otherwise
+    // the dots keep the index map from first paint while the ring re-indexes
+    // under them.
+    const colorIndex = this.legendColorIndex(nextResult.groups);
 
     nextResult.groups.forEach((group) => {
       const node = contentRoot.querySelector(`[data-key="${group.key}"]`);
@@ -851,6 +856,10 @@ export class DashboardRenderer {
         setTooltip(node as HTMLElement, this.groupTooltip(group, nextResult));
       }
       if (legendRow) {
+        legendRow.style.setProperty(
+          '--todoseq-bar-color',
+          this.legendColor(params, group, colorIndex),
+        );
         legendRow.setAttribute(
           'aria-label',
           this.groupAriaLabel(group, nextResult),
@@ -903,9 +912,10 @@ export class DashboardRenderer {
     // Same visible filter and denominator the initial render uses.
     const visible = nextResult.groups.filter((g) => g.count > 0);
     const arcDenominator = visible.reduce((sum, g) => sum + g.count, 0) || 1;
+    const colorIndex = this.legendColorIndex(nextResult.groups);
 
     let accumulated = 0;
-    visible.forEach((group, index) => {
+    visible.forEach((group) => {
       const share = group.count / arcDenominator;
       const arc = Math.max(0, share * DONUT_CIRCUMFERENCE - DONUT_GAP);
       let circle = svg.querySelector<SVGCircleElement>(
@@ -925,7 +935,10 @@ export class DashboardRenderer {
         circle.setAttribute('data-key', group.key);
         svg.appendChild(circle);
       }
-      circle.setAttribute('stroke', this.colorForGroup(params, group, index));
+      circle.setAttribute(
+        'stroke',
+        this.legendColor(params, group, colorIndex),
+      );
       circle.setAttribute(
         'stroke-dasharray',
         `${arc} ${DONUT_CIRCUMFERENCE - arc}`,
@@ -1074,6 +1087,41 @@ export class DashboardRenderer {
     group: DashboardGroup,
   ): boolean {
     return this.colorForGroup(params, group, 0) === 'var(--text-faint)';
+  }
+
+  /**
+   * Colour index per group key, shared by the ring, the arcs and the legend.
+   *
+   * Only a group with a count owns an arc, so the positional ladders must be
+   * indexed by VISIBLE position — indexing by position in the full group list
+   * puts every arc after a zero-count group one step off from its own dot.
+   * A group with no arc is absent from the map entirely; see legendColor.
+   */
+  private legendColorIndex(
+    groups: readonly DashboardGroup[],
+  ): Map<string, number> {
+    return new Map(groups.filter((g) => g.count > 0).map((g, i) => [g.key, i]));
+  }
+
+  /**
+   * A group's colour from the shared visible-index map.
+   *
+   * A group with no index has no arc, so it has no visible slot to take.
+   * Giving it its position in the full list instead can collide with a visible
+   * group's visible index (position 0 of [empty, high, medium] resolves to the
+   * same ladder step as the first visible group), which is the ambiguity this
+   * whole scheme exists to remove. Faint is never produced by the positional
+   * ladders, so an arc-less dot cannot land on a colour a live arc is wearing
+   * — and it reads correctly: no count, nothing to see.
+   */
+  private legendColor(
+    params: DashboardParameters,
+    group: DashboardGroup,
+    colorIndex: ReadonlyMap<string, number>,
+  ): string {
+    const index = colorIndex.get(group.key);
+    if (index === undefined) return 'var(--text-faint)';
+    return this.colorForGroup(params, group, index);
   }
 
   private colorForGroup(

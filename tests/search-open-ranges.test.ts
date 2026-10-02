@@ -271,6 +271,27 @@ describe('Open-ended date ranges and comparison operators', () => {
       );
     });
 
+    // The guard covers all four date prefixes, so the advice has to name the
+    // one the user actually typed. Hardcoding `scheduled:` told someone
+    // writing `deadline:>=2026-10..` to go and write a scheduled query instead.
+    it.each(['scheduled', 'deadline', 'closed', 'started'])(
+      'names the field the user typed in the start-bound advice (%s)',
+      (field) => {
+        expect(() => Search.parse(`${field}:>=2026-10..`)).toThrow(
+          `Use ${field}:2026-10.. for an open-ended range`,
+        );
+      },
+    );
+
+    it.each(['scheduled', 'deadline', 'closed', 'started'])(
+      'names the field the user typed in the end-bound advice (%s)',
+      (field) => {
+        expect(() => Search.parse(`${field}:2026-01-01..<=2026-10`)).toThrow(
+          `Use ${field}:..2026-10 for an open-ended range`,
+        );
+      },
+    );
+
     it('still accepts a bare range, so the rejection is specific', () => {
       expect(() => Search.parse('scheduled:2026-10..2026-12')).not.toThrow();
     });

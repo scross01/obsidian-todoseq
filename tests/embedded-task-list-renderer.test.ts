@@ -272,50 +272,56 @@ describe('EmbeddedTaskListRenderer', () => {
     });
   });
 
-  describe('renderCollapsibleHeaderNoTitle', () => {
-    it('omits the search chip when show-query is false', () => {
-      // show-query was parsed and surfaced through hasHeaderContent, but the
-      // chip itself was rendered from params.searchQuery alone, so `show-query:
-      // false` had no effect on this header — it printed the query anyway.
+  // show-query: false is a whole-header switch, not a query-chip switch
+  // (docs/embedded-task-lists.md). hasHeaderContent implements that reading and
+  // the parser refuses the one combination that could contradict it, so these
+  // go through renderTaskList rather than calling the private header builder —
+  // a private-only test can reach states no parsed input ever can.
+  describe('show-query: false', () => {
+    it('renders no header at all without a title', () => {
       const container = document.createElement('div');
-      const params: TodoseqParameters = {
-        searchQuery: 'test',
-        showQuery: false,
-      };
-      const header = renderer.renderCollapsibleHeaderNoTitle(
-        container,
-        params,
-        true,
-        5,
-      );
-
-      expect(
-        header.querySelector('.todoseq-embedded-task-list-search'),
-      ).toBeNull();
-    });
-
-    it('still renders other chips when only the query is hidden', () => {
-      const container = document.createElement('div');
-      const params: TodoseqParameters = {
-        searchQuery: 'test',
+      renderer.renderTaskList(container, [createBaseTask({ text: 'Task 1' })], {
+        searchQuery: 'tag:urgent',
         showQuery: false,
         limit: 5,
-      };
-      const header = renderer.renderCollapsibleHeaderNoTitle(
-        container,
-        params,
-        true,
-        5,
-      );
+      });
 
       expect(
-        header.querySelector('.todoseq-embedded-task-list-search'),
+        container.querySelector('.todoseq-embedded-task-list-header'),
       ).toBeNull();
       expect(
-        header.querySelector('.todoseq-embedded-task-list-limit')?.textContent,
-      ).toBe('limit: 5');
+        container.querySelector('.todoseq-embedded-task-list'),
+      ).toBeTruthy();
     });
 
+    it('renders the title but no query chip when a title is set', () => {
+      const container = document.createElement('div');
+      renderer.renderTaskList(container, [createBaseTask({ text: 'Task 1' })], {
+        searchQuery: 'tag:urgent',
+        showQuery: false,
+        title: 'Urgent',
+      });
+
+      expect(
+        container.querySelector('.todoseq-embedded-task-list-search'),
+      ).toBeNull();
+      expect(container.textContent).toContain('Urgent');
+    });
+
+    it('shows the query chip when show-query is left at its default', () => {
+      const container = document.createElement('div');
+      renderer.renderTaskList(container, [createBaseTask({ text: 'Task 1' })], {
+        searchQuery: 'tag:urgent',
+      });
+
+      expect(
+        container.querySelector('.todoseq-embedded-task-list-search')
+          ?.textContent,
+      ).toBe('tag:urgent');
+    });
+  });
+
+  describe('renderCollapsibleHeaderNoTitle', () => {
     it('renders search query in header', () => {
       const container = document.createElement('div');
       const params: TodoseqParameters = { searchQuery: 'test' };

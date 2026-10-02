@@ -520,9 +520,12 @@ class PrattParser {
           // filter matched nothing at all. Reject it instead of answering
           // with a silent empty result.
           if (/^[<>]=?/.test(left.value ?? '')) {
+            // Name the field the user typed: this branch covers four of them,
+            // and telling someone who wrote `deadline:` to try `scheduled:`
+            // sends them off fixing the wrong query.
             throw new SearchError(
               'Comparison operators cannot be used as range bounds. ' +
-                `Use scheduled:2026-10.. for an open-ended range, or a bare bound for a comparison.`,
+                `Use ${left.field}:2026-10.. for an open-ended range, or a bare bound for a comparison.`,
             );
           }
 
@@ -565,7 +568,7 @@ class PrattParser {
           if (/^[<>]=?/.test(rightToken.value)) {
             throw new SearchError(
               'Comparison operators cannot be used as range bounds. ' +
-                `Use scheduled:..2026-10 for an open-ended range, or a bare bound for a comparison.`,
+                `Use ${left.field}:..2026-10 for an open-ended range, or a bare bound for a comparison.`,
             );
           }
 

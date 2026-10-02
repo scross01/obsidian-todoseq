@@ -58,17 +58,31 @@ export interface ArchivedTaskRecord {
 
 export interface ArchiveRunResult {
   archived: ArchivedTaskRecord[];
-  skipped: { path: string; line: number; reason: string }[];
+  skipped: { path: string; line: number; reason: ApplySkipReason }[];
 }
 
 export interface UndoOutcome {
   reverted: ArchivedTaskRecord[];
-  skipped: { record: ArchivedTaskRecord; reason: string }[];
+  skipped: { record: ArchivedTaskRecord; reason: UndoSkipReason }[];
 }
 
-/** Reasons a journal record could not be undone. */
+/**
+ * Reasons a match could not be archived. Narrow rather than `string` so that
+ * adding a reason without adding it here is a type error, not a silent drift.
+ */
+export type ApplySkipReason = 'stale' | 'apply-failed';
+
+/**
+ * Reasons a journal record could not be undone. Every `skipped.push` in
+ * undoLastRun must appear here — the payload is typed, so a new reason will
+ * not compile until the union catches up.
+ */
 export type UndoSkipReason =
-  'line-missing' | 'line-changed' | 'unparseable' | 'apply-failed';
+  | 'line-missing'
+  | 'line-changed'
+  | 'unparseable'
+  | 'apply-failed'
+  | 'read-failed';
 
 /** Dependencies applyArchives/undoLastRun need, supplied by the wiring layer. */
 export interface ApplyArchiveDeps {
@@ -202,7 +216,11 @@ export class ArchiveService {
     return this.keywordManagerRef;
   }
 
-  /** True while an applyArchives batch is in flight (used to gate auto-run against manual runs). */
+  /**
+   * True while a batch is in flight — apply OR undo (used to gate auto-run
+   * against manual runs). An undo that reported false here let an auto-archive
+   * start mid-undo, and the two runs then raced over the journal.
+   */
   isRunning(): boolean {
     return this.running;
   }
@@ -264,7 +282,8 @@ export class ArchiveService {
   ): Promise<ArchiveRunResult> {
     this.running = true;
     const archived: ArchivedTaskRecord[] = [];
-    const skipped: { path: string; line: number; reason: string }[] = [];
+    const skipped: { path: string; line: number; reason: ApplySkipReason }[] =
+      [];
     try {
       for (const match of matches) {
         const current = deps.getTask(
@@ -324,7 +343,8 @@ export class ArchiveService {
   async undoLastRun(deps: UndoDeps): Promise<UndoOutcome> {
     const journal = this.lastRun;
     const reverted: ArchivedTaskRecord[] = [];
-    const skipped: { record: ArchivedTaskRecord; reason: string }[] = [];
+    const skipped: { record: ArchivedTaskRecord; reason: UndoSkipReason }[] =
+      [];
     // Records that could not be attempted or did not take, kept so a second
     // call can retry them. Terminal outcomes (the line is gone, or no longer
     // archived) are dropped instead: retrying them could never succeed, and
@@ -332,66 +352,78 @@ export class ArchiveService {
     // with nothing it could do.
     const retryable: ArchivedTaskRecord[] = [];
 
-    for (const record of journal) {
-      let rawLine: string | null;
-      try {
-        rawLine = await deps.getRawLine(record.path, record.line);
-      } catch (error) {
-        // Contained per record: one unreadable line must not abandon the rest
-        // of the run.
-        console.debug(
-          'TODOseq: archive undo read failed for',
-          record.path,
-          record.line,
-          error,
-        );
-        skipped.push({ record, reason: 'read-failed' });
-        retryable.push(record);
-        continue;
+    this.running = true;
+    try {
+      for (const record of journal) {
+        let rawLine: string | null;
+        try {
+          rawLine = await deps.getRawLine(record.path, record.line);
+        } catch (error) {
+          // Contained per record: one unreadable line must not abandon the rest
+          // of the run.
+          console.debug(
+            'TODOseq: archive undo read failed for',
+            record.path,
+            record.line,
+            error,
+          );
+          skipped.push({ record, reason: 'read-failed' });
+          retryable.push(record);
+          continue;
+        }
+        if (rawLine === null) {
+          skipped.push({ record, reason: 'line-missing' });
+          continue;
+        }
+        if (!this.lineStillArchived(rawLine, record)) {
+          skipped.push({ record, reason: 'line-changed' });
+          continue;
+        }
+        if (!record.taskSnapshot) {
+          // Legacy/foreign journal entry without a snapshot: reconstruction is
+          // not safe (loses table identity and parser-derived fields), so skip
+          // rather than corrupt the line.
+          skipped.push({ record, reason: 'unparseable' });
+          continue;
+        }
+        // Re-apply the journaled snapshot with the CURRENT line content and
+        // the archived state — TaskWriter regenerates the line from a shape it
+        // originally produced, including table-cell tasks.
+        const task: import('../types/task').Task = {
+          ...record.taskSnapshot,
+          rawText: rawLine,
+          state: record.target,
+        };
+        try {
+          await deps.apply(task, record.originalState);
+        } catch (error) {
+          console.debug(
+            'TODOseq: archive undo apply failed for',
+            record.path,
+            record.line,
+            error,
+          );
+          skipped.push({ record, reason: 'apply-failed' });
+          retryable.push(record);
+          continue;
+        }
+        reverted.push(record);
       }
-      if (rawLine === null) {
-        skipped.push({ record, reason: 'line-missing' });
-        continue;
-      }
-      if (!this.lineStillArchived(rawLine, record)) {
-        skipped.push({ record, reason: 'line-changed' });
-        continue;
-      }
-      if (!record.taskSnapshot) {
-        // Legacy/foreign journal entry without a snapshot: reconstruction is
-        // not safe (loses table identity and parser-derived fields), so skip
-        // rather than corrupt the line.
-        skipped.push({ record, reason: 'unparseable' });
-        continue;
-      }
-      // Re-apply the journaled snapshot with the CURRENT line content and
-      // the archived state — TaskWriter regenerates the line from a shape it
-      // originally produced, including table-cell tasks.
-      const task: import('../types/task').Task = {
-        ...record.taskSnapshot,
-        rawText: rawLine,
-        state: record.target,
-      };
-      try {
-        await deps.apply(task, record.originalState);
-      } catch (error) {
-        console.debug(
-          'TODOseq: archive undo apply failed for',
-          record.path,
-          record.line,
-          error,
-        );
-        skipped.push({ record, reason: 'apply-failed' });
-        retryable.push(record);
-        continue;
-      }
-      reverted.push(record);
+    } finally {
+      this.running = false;
     }
 
     // Assigned only once the whole run is accounted for. Clearing it up front
     // meant a throw part-way through left nothing to retry with — which is the
     // one thing an undo must never do.
-    this.lastRun = retryable;
+    //
+    // Claimed by identity, not unconditionally: this loop awaits once per
+    // record, so a concurrent applyArchives can install a NEWER journal in the
+    // gap (applyArchives is not gated by `running`, and a manual run can be
+    // launched directly). Writing our own list over that one would orphan the
+    // newer run's records and hide its Undo button. If the field is still the
+    // journal we started from, no one replaced it and ours is the truth.
+    if (this.lastRun === journal) this.lastRun = retryable;
     return { reverted, skipped };
   }
 

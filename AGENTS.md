@@ -24,13 +24,14 @@ Never stage or commit these local-only working files:
 - `plans/` — planning notes for work in progress
 - `.freebuff/` — agent workspace metadata
 - `.obsidian/plugins/todoseq/data.json` — local plugin state
-- Root-level scratch notes (`Test.md`, `Test Dashboard and Task List Styles.md`)
-- `examples/Task Entry Examples.md` — scratch rather than a tracked example
 
-**`Test*.md` is not a blanket exclusion.** The tracked example collection
-(`examples/Test Dashboards.md`, `examples/Test Checkboxes.md`, …) is real repo
-content and is committed normally; only root-level scratch notes match the rule.
-Check `git ls-files` before assuming a path is scratch.
+**Markdown is not excluded by name.** `git ls-files` is the authority: a tracked
+file is repo content and belongs in the commit even when its name looks like
+scratch. The whole `examples/` collection is tracked and committed normally —
+`examples/Test Dashboards.md`, `examples/Test Checkboxes.md` and
+`examples/Task Entry Examples.md` are all shipped example content. Write a
+never-commit rule about a _directory_ you can see is untracked, never about a
+filename that happens to sound provisional.
 
 Write the message to a temp file and delete it afterwards:
 
