@@ -4,12 +4,11 @@ import type { ChildProcess } from 'child_process';
 /**
  * Captures a launched Obsidian process's stdio and exit status to a log file.
  *
- * The integration harness launches Obsidian with `stdio: 'ignore'` so a chatty
- * Electron process cannot fill a pipe and block. That also discards everything
- * the process says about itself, so a launch that fails or exits unexpectedly
- * leaves only "Obsidian CDP not available after 60000ms". This helper writes
- * that output to a file instead — the pipes are still drained, so nothing
- * blocks.
+ * The launcher used to spawn Obsidian with `stdio: 'ignore'`, which kept a
+ * chatty Electron process from filling a pipe and blocking — and discarded
+ * everything the process said about itself, so a launch that failed or exited
+ * unexpectedly left only "Obsidian CDP not available after 60000ms". The pipes
+ * are now written here instead: still drained, so nothing blocks, but recorded.
  *
  * What it does NOT do: explain a renderer crash. A killed renderer writes
  * nothing to either stream (measured — killing one produced zero bytes), so
@@ -42,11 +41,13 @@ export interface ProcessLog {
   /** Record a harness-side event (a kill, a launch failure) in the log. */
   note(message: string): void;
   /**
-   * Truncate the log and forget the recorded exit state.
+   * Truncate the log and forget the recorded exit state, and stop the previous
+   * launch's handlers writing into it.
    *
    * Called at the start of each launch. Without it a previous run's failure
    * sits above the current run's header, and a reader chasing a crash reads
-   * last run's stderr instead of this one's.
+   * last run's stderr instead of this one's. Stream 'error' handlers are kept
+   * deliberately — see capture().
    */
   reset(): void;
   /** Last `maxChars` characters of the log; '' if nothing has been logged. */
@@ -151,46 +152,79 @@ export function createProcessLog(filePath: string): ProcessLog {
   ): void {
     if (!stream) return;
     stream.setEncoding('utf8');
-    stream.on('data', (chunk: string) => {
+    const onData = (chunk: string) => {
       // A child killed mid-write can emit EPIPE/EBADF here; losing a chunk of
       // crash output is acceptable, throwing out of the handler is not.
       writeChunk(label, chunk);
-    });
-    stream.on('error', () => {
+    };
+    // Deliberately never detached. A stream with no 'error' listener rethrows
+    // as an uncaught exception, and this stream outlives reset() — the child
+    // still owns it — so removing this handler would convert a lost chunk of
+    // log into a killed test worker.
+    const onError = () => {
       // Same rationale as above.
-    });
-    // `reset` detaches these: 'exit' fires before the pipes finish draining,
-    // so a superseded launch can still emit data afterwards. That data belongs
-    // to the launch the truncate just discarded, and it would land in the new
-    // launch's log carrying only a bare [stdout]/[stderr] — no pid to attribute
-    // it with, and no guarantee it lands above the new header rather than
-    // below it, where it would read as the current launch's own output.
-    detachers.push(() => {
-      stream.removeAllListeners('data');
-      stream.removeAllListeners('error');
-    });
+    };
+    stream.on('data', onData);
+    stream.on('error', onError);
+    // `reset` detaches only 'data': 'exit' fires before the pipes finish
+    // draining, so a superseded launch can still emit output afterwards. That
+    // output belongs to the launch the truncate just discarded, and would land
+    // in the new launch's log carrying only a bare [stdout]/[stderr] — no pid to
+    // attribute it with, and no guarantee it lands above the new header rather
+    // than below it, where it reads as the current launch's own output.
+    detachers.push(() => stream.off('data', onData));
+  }
+
+  /**
+   * Track a child's exit/error handlers so reset() can drop them too.
+   *
+   * `off` rather than removeAllListeners: these are the child's own emitter,
+   * and a future caller may legitimately have added listeners of its own.
+   */
+  function trackChild(
+    child: ChildProcess,
+    handlers: Array<[string, (...args: never[]) => void]>,
+  ): void {
+    for (const [event, handler] of handlers) {
+      detachers.push(() =>
+        child.off(event as 'exit' | 'error', handler as () => void),
+      );
+    }
   }
 
   return {
     filePath,
 
     attach(child: ChildProcess) {
-      capturedPid = child.pid;
-      write(
-        `--- launch header ${new Date().toISOString()} pid=${child.pid} ---\n`,
-      );
+      // Closed over rather than read from `capturedPid` at event time: after a
+      // reset the shared value is undefined, and after the next attach it is
+      // the *new* pid, so a stale handler would stamp its record with it.
+      const pid = child.pid;
+      capturedPid = pid;
+      write(`--- launch header ${new Date().toISOString()} pid=${pid} ---\n`);
       capture(child.stdout, 'stdout');
       capture(child.stderr, 'stderr');
 
-      child.on('exit', (code, signal) => {
+      const onExit = ((code: number | null, signal: NodeJS.Signals | null) => {
         record = { code, signal };
-        write(`--- ${formatExit(record)} pid=${capturedPid} ---\n`);
-      });
+        write(`--- ${formatExit(record)} pid=${pid} ---\n`);
+      }) as (...args: never[]) => void;
 
-      child.on('error', (err: Error) => {
+      const onError = ((err: Error) => {
         spawnError = err.message;
-        write(`--- ${formatExit(record, spawnError)} pid=${capturedPid} ---\n`);
-      });
+        write(`--- ${formatExit(record, spawnError)} pid=${pid} ---\n`);
+      }) as (...args: never[]) => void;
+
+      child.on('exit', onExit);
+      child.on('error', onError);
+      // A superseded child's exit belongs to the launch the truncate just
+      // discarded. Left attached it would write into the new launch's log and
+      // repopulate `record`/`spawnError` — and a stale `spawnError` makes
+      // waitForCDP fail the next launch on sight.
+      trackChild(child, [
+        ['exit', onExit],
+        ['error', onError],
+      ]);
     },
 
     describeExit() {

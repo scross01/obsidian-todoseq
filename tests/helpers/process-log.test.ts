@@ -31,12 +31,34 @@ async function waitForTail(log: ProcessLog, needle: string): Promise<void> {
 let tmpDir: string;
 let logPath: string;
 
+/**
+ * Every child this file spawns, so afterEach can reap them.
+ *
+ * A test that fails between spawning and killing leaks a live child, and jest
+ * then waits on it forever — a red assertion would read as a hang rather than a
+ * failure. Tracking them makes a failing test fail.
+ */
+const spawned: Array<ReturnType<typeof spawn>> = [];
+
+function spawnChild(command: string, args: string[]): ReturnType<typeof spawn> {
+  const child = spawn(command, args);
+  spawned.push(child);
+  return child;
+}
+
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'process-log-test-'));
   logPath = path.join(tmpDir, 'obsidian-stderr.log');
 });
 
 afterEach(() => {
+  for (const child of spawned.splice(0)) {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // already gone
+    }
+  }
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -69,7 +91,7 @@ describe('formatExit', () => {
 describe('createProcessLog', () => {
   it('writes stdout and stderr to the log file, labelled', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(process.execPath, [
+    const child = spawnChild(process.execPath, [
       '-e',
       'console.log("from stdout"); console.error("from stderr");',
     ]);
@@ -85,7 +107,7 @@ describe('createProcessLog', () => {
 
   it('records the exit code of the child', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(process.execPath, ['-e', 'process.exit(3);']);
+    const child = spawnChild(process.execPath, ['-e', 'process.exit(3);']);
     log.attach(child);
 
     await waitForExit(child);
@@ -96,7 +118,7 @@ describe('createProcessLog', () => {
 
   it('records the signal when the child is killed', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(process.execPath, ['-e', SPIN]);
+    const child = spawnChild(process.execPath, ['-e', SPIN]);
     log.attach(child);
 
     // Let node boot so the kill lands on a live process, not a spawn race.
@@ -111,7 +133,7 @@ describe('createProcessLog', () => {
 
   it('records a spawn failure, which emits no exit event at all', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(path.join(tmpDir, 'not-a-real-binary'), []);
+    const child = spawnChild(path.join(tmpDir, 'not-a-real-binary'), []);
     log.attach(child);
 
     await new Promise((resolve) => child.once('error', resolve));
@@ -125,14 +147,17 @@ describe('createProcessLog', () => {
 
   it('appends a launch header so two launches stay distinguishable', async () => {
     const first = createProcessLog(logPath);
-    const firstChild = spawn(process.execPath, ['-e', 'process.exit(0);']);
+    const firstChild = spawnChild(process.execPath, ['-e', 'process.exit(0);']);
     first.attach(firstChild);
     await waitForExit(firstChild);
     await settle();
 
     // The restart project launches a second instance against the same file.
     const second = createProcessLog(logPath);
-    const secondChild = spawn(process.execPath, ['-e', 'process.exit(0);']);
+    const secondChild = spawnChild(process.execPath, [
+      '-e',
+      'process.exit(0);',
+    ]);
     second.attach(secondChild);
     await waitForExit(secondChild);
     await settle();
@@ -168,7 +193,7 @@ describe('createProcessLog', () => {
 
   it('reports a failed spawn so the caller need not wait it out', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(path.join(tmpDir, 'not-a-real-binary'), []);
+    const child = spawnChild(path.join(tmpDir, 'not-a-real-binary'), []);
     log.attach(child);
 
     await new Promise((resolve) => child.once('error', resolve));
@@ -179,7 +204,7 @@ describe('createProcessLog', () => {
 
   it('does not report a failed spawn for a child that ran and exited', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(process.execPath, ['-e', 'process.exit(1);']);
+    const child = spawnChild(process.execPath, ['-e', 'process.exit(1);']);
     log.attach(child);
 
     await waitForExit(child);
@@ -202,7 +227,7 @@ describe('createProcessLog', () => {
 
   it('attributes exit and note lines to the launch they belong to', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(process.execPath, ['-e', 'process.exit(0);']);
+    const child = spawnChild(process.execPath, ['-e', 'process.exit(0);']);
     log.attach(child);
     await waitForExit(child);
     await settle();
@@ -259,7 +284,7 @@ describe('createProcessLog', () => {
 
   it('a late chunk from a superseded launch is not written', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(process.execPath, [
+    const child = spawnChild(process.execPath, [
       '-e',
       'console.log("early"); setTimeout(() => console.log("late"), 300);',
     ]);
@@ -282,9 +307,52 @@ describe('createProcessLog', () => {
     expect(fs.readFileSync(logPath, 'utf8')).not.toContain('late');
   });
 
+  it("a superseded child's exit does not reach the new launch's log", async () => {
+    const log = createProcessLog(logPath);
+    const child = spawnChild(process.execPath, [
+      '-e',
+      'console.log("early"); setTimeout(() => process.exit(0), 250);',
+    ]);
+    log.attach(child);
+
+    await waitForTail(log, 'early');
+    log.reset();
+
+    // The child exits at ~250ms, after the reset. Its 'exit' handler must be
+    // gone by then: otherwise the truncated log — which is meant to describe
+    // the launch that has not started yet — opens with an exit record for a
+    // pid it knows nothing about.
+    await settle(600);
+
+    const contents = fs.readFileSync(logPath, 'utf8');
+    expect(contents).not.toMatch(/--- exited/);
+    expect(contents).not.toContain('pid=undefined');
+    // And the new launch must not inherit its state: a stale 'error' would
+    // make waitForCDP fail the next launch on sight.
+    expect(log.describeExit()).toBe('still running');
+    expect(log.hasFailedToSpawn()).toBe(false);
+  });
+
+  it('keeps the stream error handler after reset', async () => {
+    const log = createProcessLog(logPath);
+    const child = spawnChild(process.execPath, ['-e', SPIN]);
+    log.attach(child);
+    await settle();
+
+    expect(child.stdout?.listenerCount('error')).toBeGreaterThan(0);
+
+    log.reset();
+
+    // Detaching 'data' is the point of reset. Detaching 'error' would leave a
+    // stream the dying child still owns with no error handler, so an EPIPE
+    // after the reset becomes an uncaught exception that kills the worker.
+    expect(child.stdout?.listenerCount('error')).toBeGreaterThan(0);
+    child.kill('SIGKILL');
+  });
+
   it('reset clears the recorded exit state too', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(process.execPath, ['-e', 'process.exit(7);']);
+    const child = spawnChild(process.execPath, ['-e', 'process.exit(7);']);
     log.attach(child);
     await waitForExit(child);
     await settle();
@@ -298,7 +366,7 @@ describe('createProcessLog', () => {
 
   it('ignores output arriving after the child is gone', async () => {
     const log = createProcessLog(logPath);
-    const child = spawn(process.execPath, ['-e', 'process.exit(0);']);
+    const child = spawnChild(process.execPath, ['-e', 'process.exit(0);']);
     log.attach(child);
     await waitForExit(child);
 
