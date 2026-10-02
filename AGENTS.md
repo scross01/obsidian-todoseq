@@ -96,9 +96,15 @@ These rules are enforced, not just documented: `tests/screenshot-seed-lint.test.
 Applies to `docs/assets/`, which is committed, and to anyone (human or agent) touching the capture pipeline.
 
 - **Never regenerate images as a side effect of another change.** A capture run takes minutes, rewrites 50+ committed binaries, and makes the real edit impossible to review in the diff. It is a deliberate act, never an automatic response to a stale row.
-- **The staleness check is informational.** `npm run docs:screenshots -- --check` reporting `STALE (plugin build changed)` means _these images may need updating_ — not _regenerate now_. CI runs it as a non-blocking job for exactly this reason. Leave the rows stale; say so in the summary.
+- **The staleness check is manual and informational.** `npm run docs:screenshots -- --check` reporting `STALE (plugin build changed)` means _these images may need updating_ — not _regenerate now_. Nothing runs it for you; run it yourself when you touch plugin sources, and leave the rows stale — say so in the summary rather than regenerating.
 - **Never commit regenerated images without manual review.** The pipeline cannot tell a correct screenshot of a broken state from a correct screenshot of a working one — a stale capture is exactly what a passing run produces. A human must look at each changed image against its docs section before it is committed. If you have regenerated but cannot review, revert `docs/assets/` and `scripts/screenshots/manifest.json` and leave the check reporting the drift.
 - **Screenshot changes are content changes.** Treat a commit that alters `docs/assets/*.png|gif` with the same care as one that alters a docs page, and say in the commit message which images changed and why.
+
+No CI job runs `--check`. That was tried and removed: staleness still fires on
+commits that change no rendered pixel, and a report on every PR trains people to
+scroll past the one signal the check exists to carry. Re-adding it should mean
+quieting it first — the bar is a check that stays silent unless an image is
+actually wrong.
 
 ## Mobile Compatibility
 

@@ -159,12 +159,14 @@ no edge to follow. To stop the declaration becoming a silent hole,
 `src/view` is claimed by no scenario**, so adding a view file always asks which
 screenshots it can change. Run `--explain` to see the current mapping.
 
-CI runs `--check` as a **non-blocking** `docs-screenshots` job: the step goes
-red and its report is written to the job summary, but the workflow still
-passes. It cannot be a hard gate, because a contributor who fixed a parser is
-not going to recapture 52 screenshots — and a permanently-red gate is worse
-than no gate at all. Read a stale row as "these images may need updating", not
-as work this change owes.
+`--check` is **manual only** — no CI job runs it, so nothing reports staleness
+unless you ask it to. That is deliberate, and it is the opposite of a hard gate
+for the same reason: a contributor who fixed a parser is not going to recapture
+52 screenshots. Per-scenario source hashing cut the noise considerably, but
+staleness still fires on plenty of commits that change no rendered pixel, and a
+report on every PR is noise rather than signal. Run it yourself when you touch
+plugin sources, and read a stale row as "these images may need updating", not as
+work this change owes.
 
 ### Workflow after a visual change
 
