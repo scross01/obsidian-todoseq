@@ -303,6 +303,16 @@ sort: priority
 ```
 ````
 
+Collapsed, the block is just its header and a count of what is hidden:
+
+![A collapsible list collapsed, showing only its header and a matching task count](./assets/todoseq-embedded-collapse-collapsed.png){.ts-img-wide .ts-img-dark}
+![A collapsible list collapsed, showing only its header and a matching task count](./assets/todoseq-embedded-collapse-collapsed-light.png){.ts-img-wide .ts-img-light}
+
+Clicking the header rotates the chevron and reveals the list:
+
+![The same collapsible list expanded, with the chevron rotated and the matching tasks shown](./assets/todoseq-embedded-collapse-expanded.png){.ts-img-wide .ts-img-dark}
+![The same collapsible list expanded, with the chevron rotated and the matching tasks shown](./assets/todoseq-embedded-collapse-expanded-light.png){.ts-img-wide .ts-img-light}
+
 ### Warning Period Overrides
 
 The warning period parameters override the global [warning period settings](settings.md#warning-period-settings) for a specific embedded task list. This is useful when different views need different visibility rules.

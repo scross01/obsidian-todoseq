@@ -512,6 +512,42 @@
       "outputSha256": "91de29d6e1da2155589cd927830caf5929dab509a85712575114696424c2b9f8",
       "capturedAt": "2026-10-02",
       "capturedAtCommit": "d236e06"
+    },
+    "todoseq-embedded-collapse-collapsed": {
+      "id": "todoseq-embedded-collapse-collapsed",
+      "scenarioId": "docs-embedded-collapse",
+      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
+      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
+      "outputSha256": "867a4b2add88e81ef7f98b58e6bc5e380162a143360fbdee48a17a22aa6bc4f1",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "e90739b"
+    },
+    "todoseq-embedded-collapse-expanded": {
+      "id": "todoseq-embedded-collapse-expanded",
+      "scenarioId": "docs-embedded-collapse",
+      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
+      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
+      "outputSha256": "3afca867c84ab89fb5a04b16b71c5a902a4485228837d2d557fc4731dfa8abf5",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "e90739b"
+    },
+    "todoseq-embedded-collapse-collapsed-light": {
+      "id": "todoseq-embedded-collapse-collapsed-light",
+      "scenarioId": "docs-embedded-collapse",
+      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
+      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
+      "outputSha256": "9ef585c46041fffbb59c31aff69cc4176064153b891daad80717f02d862c66ed",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "e90739b"
+    },
+    "todoseq-embedded-collapse-expanded-light": {
+      "id": "todoseq-embedded-collapse-expanded-light",
+      "scenarioId": "docs-embedded-collapse",
+      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
+      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
+      "outputSha256": "b7da3fa2246454a9aaf22332ad45644e81bf4ed952b4b7007718b93a8a11c501",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "e90739b"
     }
   }
 }
