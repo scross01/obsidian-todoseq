@@ -17,6 +17,32 @@ This file provides guidance to agents when working with code in this repository.
 - Think holistically about the problem, how do the changes fit with the rest of the plugin architecture.
 - Never use hard coded keyword checks, always use the KeywordManager.
 
+## Commit Hygiene
+
+Never stage or commit these local-only working files:
+
+- `plans/` — planning notes for work in progress
+- `.freebuff/` — agent workspace metadata
+- `.obsidian/plugins/todoseq/data.json` — local plugin state
+- Root-level scratch notes (`Test.md`, `Test Dashboard and Task List Styles.md`)
+- `examples/Task Entry Examples.md` — scratch rather than a tracked example
+
+**`Test*.md` is not a blanket exclusion.** The tracked example collection
+(`examples/Test Dashboards.md`, `examples/Test Checkboxes.md`, …) is real repo
+content and is committed normally; only root-level scratch notes match the rule.
+Check `git ls-files` before assuming a path is scratch.
+
+Write the message to a temp file and delete it afterwards:
+
+```bash
+git add <paths>
+git commit -F .git-commit-msg-tmp.txt
+rm .git-commit-msg-tmp.txt
+```
+
+Trailers: `🤖 Generated with Codebuff` and `Co-Authored-By: Codebuff <noreply@codebuff.com>`.
+Do not `git push` unless the user asks.
+
 ## Build & Test
 
 - **Build**: `npm run build`

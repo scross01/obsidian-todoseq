@@ -16,7 +16,7 @@ group-by: priority
 display: tiles
 ```
 
-`display:bar`
+`display: bar`
 
 ```todoseq-dashboard
 title: bars by state
@@ -25,7 +25,7 @@ display: bar
 group-by: state
 ```
 
-`display:bar  color: mono`
+`display: bar  color: mono`
 
 ```todoseq-dashboard
 title: bars by state
@@ -35,7 +35,7 @@ group-by: state
 color: mono
 ```
 
-`display: bar  colapsed: true`
+`display: bar  collapse: true`
 
 ```todoseq-dashboard
 title: bar by priority (collapsible)
