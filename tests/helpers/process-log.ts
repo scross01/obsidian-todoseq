@@ -5,11 +5,16 @@ import type { ChildProcess } from 'child_process';
  * Captures a launched Obsidian process's stdio and exit status to a log file.
  *
  * The integration harness launches Obsidian with `stdio: 'ignore'` so a chatty
- * Electron process cannot fill a pipe and block. That also means a renderer
- * crash is completely silent: the test fails with "Target page, context or
- * browser has been closed" and the report contains an empty snapshot with no
- * indication of why. This helper trades that silence for a durable log —
- * stdio is read from the pipes (so nothing blocks) and written to a file.
+ * Electron process cannot fill a pipe and block. That also discards everything
+ * the process says about itself, so a launch that fails or exits unexpectedly
+ * leaves only "Obsidian CDP not available after 60000ms". This helper writes
+ * that output to a file instead — the pipes are still drained, so nothing
+ * blocks.
+ *
+ * What it does NOT do: explain a renderer crash. A killed renderer writes
+ * nothing to either stream (measured — killing one produced zero bytes), so
+ * "Target page, context or browser has been closed" still arrives with no
+ * explanation. The value here is the main process's own output and exit status.
  *
  * Node-only, with no Obsidian or Playwright imports, so it can be unit tested
  * without a running app.

@@ -57,9 +57,10 @@ function httpGet(url: string): Promise<number> {
  * Wait for Obsidian's CDP endpoint, or throw with everything known about how
  * the launch went.
  *
- * The exit status and the tail of the captured stdio are what turn "Obsidian
- * never came up" from a 60-second wait into a diagnosable failure — a renderer
- * crash prints a stack to stderr that is otherwise discarded entirely.
+ * The exit status is the part that earns its keep: a launch that fails outright
+ * reports why in the error rather than as a bare 60-second timeout. Note the
+ * captured stdio is *not* a renderer-crash stack — killing the renderer
+ * produces no stderr at all (verified), so do not expect one here.
  */
 async function waitForCDP(timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -87,8 +88,9 @@ async function waitForCDP(timeoutMs = 60_000): Promise<void> {
 
 /**
  * Build a launch failure that carries the evidence: where the captured output
- * lives, and its tail. Electron prints renderer crash stacks to stderr, so this
- * is the difference between a diagnosable crash and a bare timeout.
+ * lives, and its tail. Mainly valuable when the process wrote something useful
+ * before failing (a bad flag, a rejected config); a renderer crash itself is
+ * silent on both streams.
  */
 function launchFailure(message: string): Error {
   const tail = processLog.tail();
