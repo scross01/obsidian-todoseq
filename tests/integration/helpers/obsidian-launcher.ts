@@ -6,11 +6,39 @@ import {
   TEST_VAULT_DIR,
   CDP_PORT,
   OBSIDIAN_PATH,
+  REPO_ROOT,
 } from './harness';
 import { connectOverCDP, startCoverageOnPage } from './session';
 import { closeAllModals } from './assertions';
+import { createProcessLog, ProcessLog } from '../../helpers/process-log';
+import path from 'path';
 
 let obsidianProcess: ChildProcess | null = null;
+
+/**
+ * Where Obsidian's stdio is captured: alongside Playwright's own artifacts.
+ *
+ * Not in the ephemeral fixture dirs, because the interesting case is a run that
+ * has already failed — globalTeardown wipes the fixtures on the way out, taking
+ * the evidence with it.
+ */
+const PROCESS_LOG_PATH = path.join(
+  REPO_ROOT,
+  'test-results',
+  'obsidian-process.log',
+);
+
+const processLog: ProcessLog = createProcessLog(PROCESS_LOG_PATH);
+
+/**
+ * Truncate the log and clear any recorded exit state, so the capture describes
+ * the launch that follows and nothing older. The file is append-mode within a
+ * launch, so a relaunch (the restart project) supersedes the previous instance's
+ * output rather than interleaving two apps' stdio into one unreadable log.
+ */
+function beginCapture(): void {
+  processLog.reset();
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -27,9 +55,25 @@ function httpGet(url: string): Promise<number> {
   });
 }
 
+/**
+ * Wait for Obsidian's CDP endpoint, or throw with everything known about how
+ * the launch went.
+ *
+ * The exit status and the tail of the captured stdio are what turn "Obsidian
+ * never came up" from a 60-second wait into a diagnosable failure — a renderer
+ * crash prints a stack to stderr that is otherwise discarded entirely.
+ */
 async function waitForCDP(timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    // A bad OBSIDIAN_PATH (or a missing wrapper command) means there is no
+    // process coming — fail now rather than sit out the whole timeout on a port
+    // nothing will ever listen on.
+    if (processLog.hasFailedToSpawn()) {
+      throw launchFailure(
+        `Obsidian failed to launch (${processLog.describeExit()})`,
+      );
+    }
     try {
       const status = await httpGet(`http://127.0.0.1:${CDP_PORT}/json/version`);
       if (status === 200) return;
@@ -38,7 +82,25 @@ async function waitForCDP(timeoutMs = 60_000): Promise<void> {
     }
     await sleep(500);
   }
-  throw new Error(`Obsidian CDP not available after ${timeoutMs}ms`);
+  throw launchFailure(
+    `Obsidian CDP not available after ${timeoutMs}ms (${processLog.describeExit()})`,
+  );
+}
+
+/**
+ * Build a launch failure that carries the evidence: where the captured output
+ * lives, and its tail. Electron prints renderer crash stacks to stderr, so this
+ * is the difference between a diagnosable crash and a bare timeout.
+ */
+function launchFailure(message: string): Error {
+  const tail = processLog.tail();
+  return new Error(
+    [
+      message,
+      `Captured output: ${processLog.filePath}`,
+      tail ? `\n--- last ${tail.length} chars ---\n${tail}` : '',
+    ].join('\n'),
+  );
 }
 
 async function isCDPUp(): Promise<boolean> {
@@ -57,6 +119,11 @@ async function killSpawned(): Promise<void> {
   const proc = obsidianProcess;
   obsidianProcess = null;
   if (!proc || proc.exitCode !== null) return;
+
+  // Distinguish a harness-initiated shutdown in the log from a process that
+  // died on its own: the exit record reads "exited on signal SIGTERM" either
+  // way, and that ambiguity is exactly what makes a crash hard to spot.
+  processLog.note('stopping Obsidian (SIGTERM)');
 
   await new Promise<void>((resolve) => {
     const onGone = () => resolve();
@@ -122,6 +189,10 @@ export async function launchObsidian(): Promise<{
   browser: Browser;
   page: Page;
 }> {
+  // Start each launch with a clean log: a stale failure from a previous run
+  // sitting above the current header is worse than no log at all.
+  beginCapture();
+
   // Kill our tracked process, and any instance on our CDP port that we didn't
   // spawn (e.g. one launched by globalSetup in another Node process). Scoped to
   // the port — never kills the user's real Obsidian.
@@ -147,8 +218,12 @@ export async function launchObsidian(): Promise<{
       `--remote-debugging-port=${CDP_PORT}`,
       TEST_VAULT_DIR,
     ],
-    { detached: false, stdio: 'ignore' },
+    // Piped, not ignored: the pipes are drained into the log by the attached
+    // ProcessLog, so a chatty Electron process still cannot block on a full
+    // buffer — we just no longer throw its output away.
+    { detached: false, stdio: ['ignore', 'pipe', 'pipe'] },
   );
+  processLog.attach(obsidianProcess);
 
   await waitForCDP();
 
