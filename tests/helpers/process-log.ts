@@ -175,56 +175,49 @@ export function createProcessLog(filePath: string): ProcessLog {
     detachers.push(() => stream.off('data', onData));
   }
 
-  /**
-   * Track a child's exit/error handlers so reset() can drop them too.
-   *
-   * `off` rather than removeAllListeners: these are the child's own emitter,
-   * and a future caller may legitimately have added listeners of its own.
-   */
-  function trackChild(
-    child: ChildProcess,
-    handlers: Array<[string, (...args: never[]) => void]>,
-  ): void {
-    for (const [event, handler] of handlers) {
-      detachers.push(() =>
-        child.off(event as 'exit' | 'error', handler as () => void),
-      );
-    }
-  }
-
   return {
     filePath,
 
     attach(child: ChildProcess) {
-      // Closed over rather than read from `capturedPid` at event time: after a
-      // reset the shared value is undefined, and after the next attach it is
-      // the *new* pid, so a stale handler would stamp its record with it.
+      // Per-child rather than shared: reset() silences the superseded child
+      // while the next attach() activates its own. A flag held on the
+      // ProcessLog would be set true again by that attach, reviving handlers
+      // belonging to a process the truncate just discarded.
+      let live = true;
+      // Closed over rather than read from `capturedPid` at event time, so a
+      // record can never be stamped with another launch's pid.
       const pid = child.pid;
       capturedPid = pid;
       write(`--- launch header ${new Date().toISOString()} pid=${pid} ---\n`);
       capture(child.stdout, 'stdout');
       capture(child.stderr, 'stderr');
 
-      const onExit = ((code: number | null, signal: NodeJS.Signals | null) => {
+      const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+        if (!live) return;
         record = { code, signal };
         write(`--- ${formatExit(record)} pid=${pid} ---\n`);
-      }) as (...args: never[]) => void;
+      };
 
-      const onError = ((err: Error) => {
+      const onError = (err: Error) => {
+        if (!live) return;
         spawnError = err.message;
         write(`--- ${formatExit(record, spawnError)} pid=${pid} ---\n`);
-      }) as (...args: never[]) => void;
+      };
 
+      // Never detached — a ChildProcess is an EventEmitter with the same rule
+      // as its streams, and an 'error' with no listener rethrows as an
+      // uncaught exception. Node emits 'error' for "the process could not be
+      // killed", and killSpawned() resolves on its SIGKILL timeout without
+      // waiting for the exit, so a superseded child can still emit one — and a
+      // bare emitter would take the Playwright worker down with it.
       child.on('exit', onExit);
       child.on('error', onError);
-      // A superseded child's exit belongs to the launch the truncate just
-      // discarded. Left attached it would write into the new launch's log and
-      // repopulate `record`/`spawnError` — and a stale `spawnError` makes
-      // waitForCDP fail the next launch on sight.
-      trackChild(child, [
-        ['exit', onExit],
-        ['error', onError],
-      ]);
+      // reset() silences these rather than unsubscribing them: the stale-exit
+      // and stale-spawnError problems are solved by the `live` guard above,
+      // and by this nothing is ever removed from an emitter we do not own.
+      detachers.push(() => {
+        live = false;
+      });
     },
 
     describeExit() {

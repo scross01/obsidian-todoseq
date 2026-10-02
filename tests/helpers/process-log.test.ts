@@ -350,6 +350,63 @@ describe('createProcessLog', () => {
     child.kill('SIGKILL');
   });
 
+  it('keeps the child error handler after reset', async () => {
+    const log = createProcessLog(logPath);
+    const child = spawnChild(process.execPath, ['-e', SPIN]);
+    log.attach(child);
+    await settle();
+
+    log.reset();
+
+    // Same rule as the stream case: an EventEmitter with no 'error' listener
+    // rethrows. The child outlives the reset, so it must keep a listener even
+    // though the listener is inert — Node emits 'error' for "the process could
+    // not be killed", and killSpawned() resolves on its SIGKILL timeout without
+    // waiting for the exit.
+    expect(child.listenerCount('error')).toBeGreaterThan(0);
+  });
+
+  it('a superseded child that fires an error does not mark a spawn failure', async () => {
+    const log = createProcessLog(logPath);
+    const child = spawnChild(process.execPath, ['-e', SPIN]);
+    log.attach(child);
+    await settle();
+
+    log.reset();
+
+    // The child is now inert but still listened to. An error from it must not
+    // set spawnError, or waitForCDP fails the next launch on sight.
+    child.emit('error', new Error('kill ESRCH') as Error & { code: string });
+    await settle();
+
+    expect(log.hasFailedToSpawn()).toBe(false);
+    expect(log.describeExit()).toBe('still running');
+  });
+
+  it('a superseded child stays silent after the next launch attaches', async () => {
+    const log = createProcessLog(logPath);
+    const stale = spawnChild(process.execPath, [
+      '-e',
+      'console.log("a"); setTimeout(() => process.exit(0), 350);',
+    ]);
+    log.attach(stale);
+    await waitForTail(log, 'a');
+    log.reset();
+
+    // The next launch attaches while the superseded child is still alive. If
+    // "superseded" were tracked as one flag on the ProcessLog, this attach
+    // would flip it back on and the old child's exit would be recorded against
+    // the new launch's log.
+    const current = spawnChild(process.execPath, ['-e', SPIN]);
+    log.attach(current);
+
+    await settle(700);
+
+    const contents = fs.readFileSync(logPath, 'utf8');
+    expect(contents).toContain('launch header');
+    expect(contents).not.toContain(`pid=${stale.pid}`);
+  });
+
   it('reset clears the recorded exit state too', async () => {
     const log = createProcessLog(logPath);
     const child = spawnChild(process.execPath, ['-e', 'process.exit(7);']);
