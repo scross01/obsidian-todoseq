@@ -494,6 +494,24 @@
       "outputSha256": "25dacdc8ff0034a8d1d2fafe9f5d9f5cdce0899799b65ce768c442f3288e507e",
       "capturedAt": "2026-10-02",
       "capturedAtCommit": "c52994c"
+    },
+    "todoseq-warning-period-arrows": {
+      "id": "todoseq-warning-period-arrows",
+      "scenarioId": "docs-warning-periods",
+      "scenarioHash": "7bd6150092fbf5659dcaccba00d877169f49c519348b9bedef1dcbe410ebd401",
+      "pluginBuildHash": "dbe1098c5db7e27716c53a505c92a9136f862b6397bab9ec98db3ce9a5fdb5fc",
+      "outputSha256": "9e40ada42eb1c5fd10501ddecd780d8b8ce1c63b4e64fa567647bdaa46ac8b71",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "d236e06"
+    },
+    "todoseq-warning-period-arrows-light": {
+      "id": "todoseq-warning-period-arrows-light",
+      "scenarioId": "docs-warning-periods",
+      "scenarioHash": "7bd6150092fbf5659dcaccba00d877169f49c519348b9bedef1dcbe410ebd401",
+      "pluginBuildHash": "dbe1098c5db7e27716c53a505c92a9136f862b6397bab9ec98db3ce9a5fdb5fc",
+      "outputSha256": "91de29d6e1da2155589cd927830caf5929dab509a85712575114696424c2b9f8",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "d236e06"
     }
   }
 }

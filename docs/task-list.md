@@ -226,12 +226,8 @@ When a task has a warning period set, a small arrow indicator appears after the 
 
 These arrows are only shown when a warning period is active (either per-task via `-Nd` syntax or via global default settings).
 
-**Example displays:**
-
-```
-Scheduled: Yesterday →
-Deadline: Jun 22, 2026 ←
-```
+![A task scheduled for yesterday with a delay, and a task with a deadline one week out](./assets/todoseq-warning-period-arrows.png){.ts-img-detail .ts-img-dark}
+![A task scheduled for yesterday with a delay, and a task with a deadline one week out](./assets/todoseq-warning-period-arrows-light.png){.ts-img-detail .ts-img-light}
 
 #### Hover Tooltips
 
