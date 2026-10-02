@@ -163,7 +163,14 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
       if (this.processingPromise) {
         await this.processingPromise;
       }
-      return;
+      // Re-check rather than returning on faith. The drain loop picks up
+      // anything queued before it exits, so today this cannot find work — but
+      // that is a property of where the loop's exit check sits, not of this
+      // function, and moving the emit or the callbacks outside the loop would
+      // strand the event silently.
+      if (this.pendingEvents.size === 0) {
+        return;
+      }
     }
 
     if (this.pendingEvents.size === 0) {

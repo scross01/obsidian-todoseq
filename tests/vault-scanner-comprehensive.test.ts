@@ -722,6 +722,41 @@ TODO task outside blocks
       expect(vaultScanner.isScanning()).toBe(true);
     });
 
+    it('runs a rescan that was requested while a scan was in flight', async () => {
+      // A "Rescan vault" during a scan used to return silently: nothing ran and
+      // nothing said so. The request is now held and run once the scan in
+      // progress finishes.
+      const file = new TFile('note.md', 'note.md', 'md');
+      mockApp.vault.getFiles.mockReturnValue([file]);
+
+      // Gate only the first read; the deferred pass must be able to finish.
+      let firstRead: Promise<string> | null = null;
+      let releaseRead: (() => void) | null = null;
+      mockApp.vault.cachedRead.mockImplementation(() => {
+        if (firstRead) return Promise.resolve('- TODO test task');
+        firstRead = new Promise<string>((resolve) => {
+          releaseRead = () => resolve('- TODO test task');
+        });
+        return firstRead;
+      });
+
+      const scanStarted = jest.fn();
+      vaultScanner.on('scan-started', scanStarted);
+
+      const first = vaultScanner.scanVault();
+      // Let the first scan reach its file read before asking again.
+      for (let i = 0; i < 50 && releaseRead === null; i++) {
+        await Promise.resolve();
+      }
+      await vaultScanner.scanVault();
+
+      releaseRead?.();
+      await first;
+
+      expect(scanStarted).toHaveBeenCalledTimes(2);
+      expect(mockApp.vault.getFiles).toHaveBeenCalledTimes(2);
+    });
+
     it('should filter archived tasks', async () => {
       const file = new TFile('test.md', 'test.md', 'md');
 

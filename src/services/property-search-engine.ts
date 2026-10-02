@@ -22,7 +22,23 @@ export class PropertySearchEngine {
   private isInitialized = false;
   private startupScanEnabled = true;
   private pendingUpdates = new Set<string>();
-  private isUpdating = false;
+  /**
+   * A full pass (initialisation or rebuild) owns the property cache.
+   *
+   * This replaces one `isUpdating` boolean that three entry points set and five
+   * places cleared. Carrying "a pass is running", "an incremental batch is
+   * pending" and "a rebuild may be dropped" in a single flag meant whichever
+   * path finished first decided for the others: the debounced incremental pass
+   * cleared the claim of a rebuild still filling the cache, and rebuildAll saw
+   * the same flag set and returned on the promise that pending updates would
+   * cover it — which they never do, because they only touch changed files.
+   *
+   * Incremental passes defer to a full pass instead of racing it; a rebuild that
+   * arrives mid-pass is kept in `rebuildPending` and run by that pass's tail.
+   */
+  private fullPassActive = false;
+  /** A rebuild was asked for during a pass; run it when that pass ends. */
+  private rebuildPending = false;
   private initializationPromise: Promise<void> | null = null; // Track if initialization is already queued
 
   // Track pending update timeout for cleanup
@@ -66,7 +82,7 @@ export class PropertySearchEngine {
     // Wait for vault scan to complete if it's in progress
     await this.waitForVaultScan();
 
-    this.isUpdating = true;
+    this.fullPassActive = true;
 
     try {
       // Event listeners are now handled by EventCoordinator
@@ -88,8 +104,26 @@ export class PropertySearchEngine {
         error,
       );
     } finally {
-      this.isUpdating = false;
+      this.fullPassActive = false;
       this.initializationPromise = null;
+      await this.settleAfterPass();
+    }
+  }
+
+  /**
+   * The tail every full pass shares.
+   *
+   * Incremental passes that arrived mid-pass are waiting on us, and a rebuild
+   * asked for during the pass has not been run — the incremental path can only
+   * touch changed files, so honouring it here is the only way it gets done.
+   */
+  private async settleAfterPass(): Promise<void> {
+    if (this.pendingUpdates.size > 0) {
+      this.processPendingUpdates();
+    }
+    if (this.rebuildPending) {
+      this.rebuildPending = false;
+      await this.rebuildAll();
     }
   }
 
@@ -502,13 +536,13 @@ export class PropertySearchEngine {
 
     this.pendingUpdates.add(file.path);
 
-    // Debounce updates
-    if (!this.isUpdating) {
-      this.isUpdating = true;
-      this.pendingUpdateTimeout = window.setTimeout(
-        () => this.processPendingUpdates(),
-        this.PENDING_UPDATE_DEBOUNCE_MS,
-      );
+    // Debounce updates: one armed timer covers every change that lands while it
+    // is pending, which is what the timer handle now records on its own.
+    if (this.pendingUpdateTimeout === null) {
+      this.pendingUpdateTimeout = window.setTimeout(() => {
+        this.pendingUpdateTimeout = null;
+        this.processPendingUpdates();
+      }, this.PENDING_UPDATE_DEBOUNCE_MS);
     }
   }
 
@@ -562,12 +596,11 @@ export class PropertySearchEngine {
     }
 
     // Debounce updates only if we actually added a new pending update
-    if (added && !this.isUpdating) {
-      this.isUpdating = true;
-      this.pendingUpdateTimeout = window.setTimeout(
-        () => this.processPendingUpdates(),
-        1000,
-      );
+    if (added && this.pendingUpdateTimeout === null) {
+      this.pendingUpdateTimeout = window.setTimeout(() => {
+        this.pendingUpdateTimeout = null;
+        this.processPendingUpdates();
+      }, 1000);
     }
   }
 
@@ -588,8 +621,13 @@ export class PropertySearchEngine {
   }
 
   private processPendingUpdates(): void {
+    // A full pass owns the cache until it finishes; it drains this queue in its
+    // own tail. Running here would mutate entries the rebuild is still writing.
+    if (this.fullPassActive) {
+      return;
+    }
+
     if (this.pendingUpdates.size === 0) {
-      this.isUpdating = false;
       return;
     }
 
@@ -654,7 +692,6 @@ export class PropertySearchEngine {
     }
 
     this.pendingUpdates.clear();
-    this.isUpdating = false;
   }
 
   // Remove all references to a file from property cache
@@ -682,12 +719,15 @@ export class PropertySearchEngine {
 
   // Force rebuild of all caches
   async rebuildAll(): Promise<void> {
-    // If already updating, do nothing - pending updates will be processed after current update
-    if (this.isUpdating) {
+    // Deferred, never dropped. The caller is the settings-change path, which
+    // goes on as soon as this resolves; returning here without arranging the
+    // work would leave property filters reading a cache that was never rebuilt.
+    if (this.fullPassActive) {
+      this.rebuildPending = true;
       return;
     }
 
-    this.isUpdating = true;
+    this.fullPassActive = true;
 
     // If already initialized, clear caches but don't reset isInitialized flag
     // This prevents repeated initialization calls
@@ -695,23 +735,18 @@ export class PropertySearchEngine {
     this.propertyKeys.clear();
 
     // Re-build cache directly using single-pass initialization
-    if (this.startupScanEnabled) {
-      try {
-        await this.initializePropertyCacheSinglePass();
-        this.isInitialized = true;
-      } catch (error) {
-        console.error('TODOseq: PropertySearchEngine rebuild failed:', error);
-      } finally {
-        // After rebuild completes, check if there are pending updates
-        if (this.pendingUpdates.size > 0) {
-          this.pendingUpdates.clear();
-          await this.rebuildAll(); // Recursively call to process pending updates
-        } else {
-          this.isUpdating = false;
+    try {
+      if (this.startupScanEnabled) {
+        try {
+          await this.initializePropertyCacheSinglePass();
+          this.isInitialized = true;
+        } catch (error) {
+          console.error('TODOseq: PropertySearchEngine rebuild failed:', error);
         }
       }
-    } else {
-      this.isUpdating = false;
+    } finally {
+      this.fullPassActive = false;
+      await this.settleAfterPass();
     }
   }
 
@@ -752,7 +787,16 @@ export class PropertySearchEngine {
     this.propertyKeys.clear();
     this.isInitialized = false;
     this.pendingUpdates.clear();
-    this.isUpdating = false;
+    // Cancel the armed timer too. Clearing the queue while leaving the timer
+    // running means the pass still fires, against a cache and a queue that have
+    // both just been wiped.
+    if (this.pendingUpdateTimeout !== null) {
+      window.clearTimeout(this.pendingUpdateTimeout);
+      this.pendingUpdateTimeout = null;
+    }
+    // `fullPassActive` is deliberately left alone: it belongs to a pass that is
+    // still running and will clear it, and clearing it here would let the next
+    // pass start alongside that one.
   }
 
   /**
