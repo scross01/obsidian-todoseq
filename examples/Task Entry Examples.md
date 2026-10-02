@@ -8,7 +8,7 @@ This approach is faster to type and more natural when taking notes or journaling
 
 Tasks can be captured with priority and dates for scheduling. Use the Obsidian commands like "Add scheduled date" while on the task line to speed up entry.
 
-DOING [#A] Task with high priority 
+- [ ] DOING [#A] Task with high priority 
 TODO [#B] Task with medium and scheduled date
 SCHEDULED: <2026-01-15>
 
