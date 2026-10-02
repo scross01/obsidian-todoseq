@@ -105,6 +105,8 @@ export const SCENARIO_PLUGIN_SOURCES: Record<string, readonly string[]> = {
     'src/view/components/base-dialog.ts',
     'src/services/archive-service.ts',
   ],
+  // The warning arrows: the task list rows and the date badges they hang off.
+  'docs-warning-periods': ['src/view/task-list/**'],
   // The hero GIF: typing in the editor, so the editor extensions again, plus
   // the natural-language date rewriting that the demo visibly depends on.
   'docs-task-entry': [
