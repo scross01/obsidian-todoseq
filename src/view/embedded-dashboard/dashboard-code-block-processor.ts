@@ -189,6 +189,11 @@ export class DashboardCodeBlockProcessor {
     try {
       const params = TodoseqDashboardParser.parse(dashboard.source);
       if (params.error) {
+        // renderError empties the host, so the cached contentRoot is now
+        // detached. Drop it, or the next refresh takes the "patch in place"
+        // branch and updates a node that is no longer in the document —
+        // leaving the card stuck on the error for the rest of the session.
+        dashboard.contentRoot = null;
         this.renderer.renderError(dashboard.el, params, params.error);
         return;
       }
@@ -219,6 +224,10 @@ export class DashboardCodeBlockProcessor {
     } catch (error: unknown) {
       console.error('Error refreshing TODOseq dashboard block:', error);
       const message = error instanceof Error ? error.message : String(error);
+      // Same detachment as the parse-error path: the error UI replaced the
+      // card, so the cached contentRoot must not be reused by a later
+      // refresh. One transient aggregation failure was otherwise permanent.
+      dashboard.contentRoot = null;
       this.renderer.renderError(
         dashboard.el,
         dashboard.params ?? TodoseqDashboardParser.parse(''),

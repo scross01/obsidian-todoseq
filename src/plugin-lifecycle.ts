@@ -822,7 +822,16 @@ export class PluginLifecycleManager {
           // rawText + archived state) — no reconstruction needed. Table-cell
           // tasks carry their isTableTask/tableCell identity in the
           // snapshot, so generateTaskLine regenerates the cell correctly.
-          await coordinator.updateTaskState(task, originalState, 'task-list');
+          //
+          // 'archive-undo', not 'task-list': the journaled state is a completed
+          // keyword, and writing a completed keyword through the ordinary path
+          // rolls a recurring task forward to its next occurrence instead of
+          // restoring what was archived.
+          await coordinator.updateTaskState(
+            task,
+            originalState,
+            'archive-undo',
+          );
         },
       });
 

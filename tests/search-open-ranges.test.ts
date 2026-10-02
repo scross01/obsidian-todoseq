@@ -253,6 +253,28 @@ describe('Open-ended date ranges and comparison operators', () => {
       );
     });
 
+    // A comparison operator on a single bound is a different query from a
+    // range bound: `scheduled:>=2026-10` means "on or after October", while
+    // `scheduled:>=2026-10..` is not that. The range branch validated the
+    // value with the operator stripped but stored it with the operator still
+    // attached, so the evaluator's date parse failed and the filter silently
+    // matched nothing — no error, just an empty result.
+    it('rejects a comparison operator on a range start bound', () => {
+      expect(() => Search.parse('scheduled:>=2026-10..')).toThrow(
+        'Comparison operators cannot be used as range bounds',
+      );
+    });
+
+    it('rejects a comparison operator on a range end bound', () => {
+      expect(() => Search.parse('scheduled:2026-01-01..<=2026-10')).toThrow(
+        'Comparison operators cannot be used as range bounds',
+      );
+    });
+
+    it('still accepts a bare range, so the rejection is specific', () => {
+      expect(() => Search.parse('scheduled:2026-10..2026-12')).not.toThrow();
+    });
+
     it('composes a right-open range with a following term by implicit AND', () => {
       const node = Search.parse('scheduled:2026-10-07.. priority:high');
       expect(node.type).toBe('and');

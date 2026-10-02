@@ -2424,6 +2424,15 @@ export class TaskListView extends ItemView {
    * Only active when view is in a main tab
    */
   private setupBackgroundContextMenu(): void {
+    // Detach the previously registered handler *before* overwriting the field.
+    // Reading the field after the assignment gives the new handler, which was
+    // never added — so the old one survived and every re-registration stacked
+    // another listener.
+    const previous = this.backgroundContextMenuHandler;
+    if (previous) {
+      this.contentEl.removeEventListener('contextmenu', previous);
+    }
+
     this.backgroundContextMenuHandler = (evt: MouseEvent) => {
       const target = evt.target as HTMLElement;
 
@@ -2453,14 +2462,9 @@ export class TaskListView extends ItemView {
       });
       menu.showAtPosition({ x: evt.clientX, y: evt.clientY });
     };
+
     // Re-registration must not stack duplicate listeners (this method runs
     // again whenever the leaf re-enters a main tab).
-    if (this.backgroundContextMenuHandler) {
-      this.contentEl.removeEventListener(
-        'contextmenu',
-        this.backgroundContextMenuHandler,
-      );
-    }
     this.contentEl.addEventListener(
       'contextmenu',
       this.backgroundContextMenuHandler,

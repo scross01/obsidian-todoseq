@@ -273,6 +273,49 @@ describe('EmbeddedTaskListRenderer', () => {
   });
 
   describe('renderCollapsibleHeaderNoTitle', () => {
+    it('omits the search chip when show-query is false', () => {
+      // show-query was parsed and surfaced through hasHeaderContent, but the
+      // chip itself was rendered from params.searchQuery alone, so `show-query:
+      // false` had no effect on this header — it printed the query anyway.
+      const container = document.createElement('div');
+      const params: TodoseqParameters = {
+        searchQuery: 'test',
+        showQuery: false,
+      };
+      const header = renderer.renderCollapsibleHeaderNoTitle(
+        container,
+        params,
+        true,
+        5,
+      );
+
+      expect(
+        header.querySelector('.todoseq-embedded-task-list-search'),
+      ).toBeNull();
+    });
+
+    it('still renders other chips when only the query is hidden', () => {
+      const container = document.createElement('div');
+      const params: TodoseqParameters = {
+        searchQuery: 'test',
+        showQuery: false,
+        limit: 5,
+      };
+      const header = renderer.renderCollapsibleHeaderNoTitle(
+        container,
+        params,
+        true,
+        5,
+      );
+
+      expect(
+        header.querySelector('.todoseq-embedded-task-list-search'),
+      ).toBeNull();
+      expect(
+        header.querySelector('.todoseq-embedded-task-list-limit')?.textContent,
+      ).toBe('limit: 5');
+    });
+
     it('renders search query in header', () => {
       const container = document.createElement('div');
       const params: TodoseqParameters = { searchQuery: 'test' };

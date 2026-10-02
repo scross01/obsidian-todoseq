@@ -701,7 +701,7 @@ export class EmbeddedTaskListRenderer {
     header: HTMLElement,
     params: TodoseqParameters,
   ): void {
-    if (params.searchQuery) {
+    if (params.searchQuery && params.showQuery !== false) {
       header.createSpan({
         cls: 'todoseq-embedded-task-list-search',
         text: params.searchQuery,

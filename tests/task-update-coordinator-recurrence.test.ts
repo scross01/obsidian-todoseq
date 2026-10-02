@@ -17,6 +17,15 @@ global.document = {
   querySelectorAll: jest.fn(() => []),
 } as any;
 
+// The embed-refresh path reads window.activeDocument; these tests drive real
+// updateTaskState calls, so it needs to exist in the node environment.
+(global as any).window = {
+  ...((global as any).window ?? {}),
+  activeDocument: {
+    querySelectorAll: jest.fn(() => []),
+  },
+};
+
 // Mock Obsidian App
 const mockApp = {
   vault: {
@@ -186,6 +195,68 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
   });
 
   describe('updateTaskRecurrence', () => {
+    // An archive undo restores a task that was *already* complete, writing its
+    // journaled completed keyword back onto a possibly-recurring task. That
+    // is indistinguishable from the user re-completing it, so the ordinary
+    // path rolled the task forward to its next occurrence instead of putting
+    // back the archived line.
+    describe('archive undo does not roll a recurring task forward', () => {
+      const recurringDone = (): Task =>
+        ({
+          ...createBaseTask({ state: 'TODO' }),
+          path: 'test.md',
+          line: 0,
+          state: 'TODO',
+          scheduledDate: new Date('2026-03-10'),
+          scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        }) as Task;
+
+      it('writes the requested keyword verbatim for archive-undo', async () => {
+        await taskUpdateCoordinator.updateTaskState(
+          recurringDone(),
+          'DONE',
+          'archive-undo',
+        );
+
+        const [writtenTask, writtenState] =
+          mockPlugin.taskEditor.updateTaskState.mock.calls[0];
+        expect(writtenState).toBe('DONE');
+        expect(writtenTask.state).toBe('TODO');
+      });
+
+      it('does not schedule a recurrence for archive-undo', async () => {
+        const schedule = jest
+          .spyOn(
+            (taskUpdateCoordinator as any).recurrenceCoordinator,
+            'scheduleRecurrence',
+          )
+          .mockImplementation(() => {});
+
+        await taskUpdateCoordinator.updateTaskState(
+          recurringDone(),
+          'DONE',
+          'archive-undo',
+        );
+        jest.advanceTimersByTime(200);
+
+        expect(schedule).not.toHaveBeenCalled();
+      });
+
+      it('still rolls forward for a normal completion', async () => {
+        // The guard must be specific to the undo, not a blanket disable.
+        await taskUpdateCoordinator.updateTaskState(
+          recurringDone(),
+          'DONE',
+          'task-list',
+        );
+        jest.advanceTimersByTime(200);
+
+        const [, writtenState] =
+          mockPlugin.taskEditor.updateTaskState.mock.calls[0];
+        expect(writtenState).not.toBe('DONE');
+      });
+    });
+
     it('should call updateTaskScheduledDate when newScheduledDate is provided', async () => {
       const task: Task = {
         ...createBaseTask(),

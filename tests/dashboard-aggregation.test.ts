@@ -731,6 +731,23 @@ describe('composeFilterQuery', () => {
     ).toBe('(tag:project OR tag:home) priority:high');
   });
 
+  it('wraps a base that only looks wrapped', () => {
+    // "starts with ( and ends with )" is not the same as "is one group". The
+    // leading paren closes mid-string here, so a top-level OR survives and the
+    // appended filter binds to the last arm alone — exactly the divergence
+    // this wrap exists to prevent, and invisible until a click count and a
+    // Task List count disagree.
+    expect(
+      composeFilterQuery('(tag:project OR tag:home) OR (tag:work)', 'p:high'),
+    ).toBe('((tag:project OR tag:home) OR (tag:work)) p:high');
+  });
+
+  it('wraps a base made of two sibling groups', () => {
+    expect(
+      composeFilterQuery('(tag:project OR tag:home) (tag:a OR tag:b)', 'p'),
+    ).toBe('((tag:project OR tag:home) (tag:a OR tag:b)) p');
+  });
+
   it('appends to a plain base query with the wrapped form', () => {
     expect(composeFilterQuery('tag:project', 'priority:high')).toBe(
       '(tag:project) priority:high',

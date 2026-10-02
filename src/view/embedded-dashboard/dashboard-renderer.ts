@@ -173,6 +173,9 @@ export class DashboardRenderer {
       params.display !== 'heatmap';
 
     if (canPatch) {
+      if (params.display === 'donut') {
+        this.patchDonutSlices(contentRoot, nextResult, params);
+      }
       this.patchGroups(contentRoot, nextResult);
       renderedKeys.set(contentRoot, nextKeys);
       return;
@@ -793,10 +796,6 @@ export class DashboardRenderer {
   ): void {
     const total = nextResult.total;
     const maxCount = this.maxCount(nextResult.groups);
-    // Slice geometry divides by the visible-count sum so the ring closes even
-    // for overlapping tag counts. Displayed percentages use result.total.
-    const arcDenominator =
-      nextResult.groups.reduce((sum, g) => sum + g.count, 0) || 1;
 
     nextResult.groups.forEach((group) => {
       const node = contentRoot.querySelector(`[data-key="${group.key}"]`);
@@ -818,17 +817,6 @@ export class DashboardRenderer {
       );
       if (columnFill) {
         columnFill.style.height = this.fillPct(group.count, maxCount);
-      }
-
-      // Donut slice geometry
-      const slice = node.tagName.toLowerCase() === 'circle' ? node : null;
-      if (slice) {
-        const share = group.count / arcDenominator;
-        const arc = Math.max(0, share * DONUT_CIRCUMFERENCE - DONUT_GAP);
-        slice.setAttribute(
-          'stroke-dasharray',
-          `${arc} ${DONUT_CIRCUMFERENCE - arc}`,
-        );
       }
 
       // Legend share text — same sharePct(count, result.total) the tooltip
@@ -883,12 +871,98 @@ export class DashboardRenderer {
   // Shared helpers
   // ------------------------------------------------------------------
 
+  /**
+   * Re-slice the donut ring in place.
+   *
+   * Geometry is rebuilt as a whole rather than per existing slice, because two
+   * things about the ring are derived from the set of groups rather than from
+   * any one slice. `stroke-dashoffset` positions each arc along the
+   * circumference, so it moves whenever an earlier arc's length changes — the
+   * per-slice patch only ever rewrote the dasharray, leaving every arc at the
+   * position it had on first paint. And a group with no tasks gets no circle at
+   * all, so a group gaining its first task had nothing to patch and stayed
+   * invisible until the card was rebuilt from scratch.
+   */
+  private patchDonutSlices(
+    contentRoot: HTMLElement,
+    nextResult: DashboardResult,
+    params: DashboardParameters,
+  ): void {
+    const svg = contentRoot.querySelector<SVGSVGElement>(
+      'svg.todoseq-dashboard-donut-ring',
+    );
+    if (!svg) return;
+
+    // Same visible filter and denominator the initial render uses.
+    const visible = nextResult.groups.filter((g) => g.count > 0);
+    const arcDenominator = visible.reduce((sum, g) => sum + g.count, 0) || 1;
+
+    let accumulated = 0;
+    visible.forEach((group, index) => {
+      const share = group.count / arcDenominator;
+      const arc = Math.max(0, share * DONUT_CIRCUMFERENCE - DONUT_GAP);
+      let circle = svg.querySelector<SVGCircleElement>(
+        `circle[data-key="${group.key}"]`,
+      );
+      if (!circle) {
+        circle = document.createElementNS(SVG_NAMESPACE, 'circle');
+        circle.setAttribute('cx', String(DONUT_SIZE / 2));
+        circle.setAttribute('cy', String(DONUT_SIZE / 2));
+        circle.setAttribute('r', String(DONUT_RADIUS));
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke-width', String(DONUT_STROKE));
+        circle.setAttribute(
+          'transform',
+          `rotate(-90 ${DONUT_SIZE / 2} ${DONUT_SIZE / 2})`,
+        );
+        circle.setAttribute('data-key', group.key);
+        svg.appendChild(circle);
+      }
+      circle.setAttribute('stroke', this.colorForGroup(params, group, index));
+      circle.setAttribute(
+        'stroke-dasharray',
+        `${arc} ${DONUT_CIRCUMFERENCE - arc}`,
+      );
+      circle.setAttribute(
+        'stroke-dashoffset',
+        String(-(accumulated * DONUT_CIRCUMFERENCE + DONUT_GAP / 2)),
+      );
+      accumulated += share;
+    });
+
+    // Groups that fell to zero keep no arc, matching the initial render.
+    const live = new Set(visible.map((g) => g.key));
+    svg
+      .querySelectorAll<SVGCircleElement>('circle[data-key]')
+      .forEach((circle) => {
+        const key = circle.getAttribute('data-key');
+        if (key && !live.has(key)) circle.remove();
+      });
+
+    // Ring-level readouts that also go stale on a patch: the accessible name
+    // and the centre total are set once at render and were never revisited.
+    svg.setAttribute(
+      'aria-label',
+      `${nextResult.total} tasks by ${params.groupBy}`,
+    );
+    const centre = contentRoot.querySelector<HTMLElement>(
+      '.todoseq-dashboard-donut-total',
+    );
+    if (centre) centre.textContent = String(nextResult.total);
+  }
+
   private bindOpen(
     el: HTMLElement,
     params: DashboardParameters,
     filter: string,
     callbacks: DashboardCallbacks,
   ): void {
+    // An empty filter marks a non-navigable row — the "N more" truncation tail
+    // carries one so it can render as a muted footer. Binding a handler
+    // anyway composed it to the bare base query, which made the footer look
+    // clickable and then filtered nothing.
+    if (!filter) return;
+
     const open = (event: MouseEvent | KeyboardEvent): void => {
       callbacks.onOpenQuery(
         composeFilterQuery(params.searchQuery, filter),

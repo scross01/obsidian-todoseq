@@ -46,7 +46,18 @@ export type UpdateType =
 /**
  * Source of the update (for debugging/tracking)
  */
-export type UpdateSource = 'editor' | 'reader' | 'task-list' | 'embedded';
+/**
+ * Where an update originated.
+ *
+ * `archive-undo` is deliberately distinct from `task-list`: an archive undo
+ * writes a *completed* keyword back onto a task that may well be recurring,
+ * which is indistinguishable from the user re-completing it. Both the
+ * rollover state substitution and recurrence scheduling are driven by "was a
+ * completed keyword requested", so reusing `task-list` made undo roll the task
+ * forward to its next occurrence instead of restoring the journaled line.
+ */
+export type UpdateSource =
+  'editor' | 'reader' | 'task-list' | 'embedded' | 'archive-undo';
 
 /**
  * Context object for a task update operation.
@@ -448,7 +459,14 @@ export class TaskUpdateCoordinator {
     // Preserve the original requested state for recurrence checking
     const originalNewState = context.newState ?? '';
 
-    if (context.type === 'state' && context.newState) {
+    if (
+      context.type === 'state' &&
+      context.newState &&
+      // Restoring an archived line is not a completion. Skipping the rollover
+      // is what makes the undo reproduce the journaled state verbatim rather
+      // than the task's successor.
+      context.source !== 'archive-undo'
+    ) {
       const isOriginalStateCompleted = this.keywordManager.isCompleted(
         context.newState,
       );
@@ -924,6 +942,10 @@ export class TaskUpdateCoordinator {
         updatedTask.deadlineDate != null);
 
     if (isOriginalCompleted && taskHasRepeatingDates) {
+      // Undoing an archive must not mint a new occurrence: the task was
+      // already complete when it was archived, so there is no new completion
+      // to roll forward.
+      if (context.source === 'archive-undo') return;
       this.recurrenceCoordinator.scheduleRecurrence(updatedTask, 50);
     }
   }

@@ -129,6 +129,30 @@ function hasTopLevelOr(filter: string): boolean {
 }
 
 /**
+ * Whether a query string is exactly one parenthesised group.
+ *
+ * The earlier check was `startsWith('(') && endsWith(')')`, which is not the
+ * same thing: `(a OR b) OR (c)` starts and ends with a parenthesis but its
+ * leading group closes mid-string, leaving a top-level OR. Treating that as
+ * already-wrapped skipped the wrap and let the appended filter bind to the
+ * last OR arm, so a dashboard group click showed fewer tasks than the Task List
+ * did for the same query.
+ */
+function isSingleParenthesisedGroup(query: string): boolean {
+  if (!query.startsWith('(') || !query.endsWith(')')) return false;
+  let depth = 0;
+  for (let i = 0; i < query.length; i++) {
+    if (query[i] === '(') depth++;
+    else if (query[i] === ')') {
+      depth--;
+      // Closed before the final character, so there is more than one group.
+      if (depth === 0 && i < query.length - 1) return false;
+    }
+  }
+  return depth === 0;
+}
+
+/**
  * Compose a group's click filter with the card's base query.
  *
  * Both sides are guarded against the grammar's operator precedence
@@ -143,8 +167,9 @@ function hasTopLevelOr(filter: string): boolean {
 export function composeFilterQuery(baseQuery: string, filter: string): string {
   if (!baseQuery.trim()) return filter;
   const trimmed = baseQuery.trim();
-  const wrapped =
-    trimmed.startsWith('(') && trimmed.endsWith(')') ? trimmed : `(${trimmed})`;
+  const wrapped = isSingleParenthesisedGroup(trimmed)
+    ? trimmed
+    : `(${trimmed})`;
   const filterText = hasTopLevelOr(filter) ? `(${filter})` : filter;
   return `${wrapped} ${filterText}`;
 }

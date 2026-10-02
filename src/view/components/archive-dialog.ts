@@ -240,11 +240,48 @@ export function showArchiveRunNotice(
 
 const DAYS_PRESETS = [30, 90, 180, 365];
 
+/**
+ * Fold a refreshed match set into the dialog's inclusion state.
+ *
+ * A task the preview has never shown before defaults to included. A task the
+ * user has already excluded stays excluded, which is the whole reason `seen`
+ * is separate from `included`: with one set, every refresh re-added every
+ * match and quietly undid the exclusions as soon as any criteria field
+ * changed. Keys that no longer match are dropped from `included` so a stale
+ * entry can never inflate the apply count, but they stay in `seen`, so a task
+ * that stops matching and later comes back does not silently regain inclusion.
+ */
+export function reconcileInclusions(
+  included: Set<string>,
+  seen: Set<string>,
+  matchKeys: Iterable<string>,
+): void {
+  const matches = new Set(matchKeys);
+  for (const key of matches) {
+    if (!seen.has(key)) {
+      seen.add(key);
+      included.add(key);
+    }
+  }
+  for (const key of Array.from(included)) {
+    if (!matches.has(key)) included.delete(key);
+  }
+}
+
 export class ArchiveDialog {
   private modalEl: HTMLElement | null = null;
   private backdropEl: HTMLElement | null = null;
   private rows: ArchiveMappingRow[] = [];
   private includedPaths = new Set<string>();
+  /**
+   * Every task key this dialog has ever offered, whether included or not.
+   *
+   * Needed because absence from `includedPaths` means two different things —
+   * "not seen yet" and "the user unchecked it" — and the preview refresh has
+   * to tell them apart to default new tasks to included without resurrecting
+   * the ones a user deliberately excluded.
+   */
+  private seenMatchKeys = new Set<string>();
   private applyBtn: HTMLButtonElement | null = null;
   private applyLabel = '';
   private previewCountEl: HTMLElement | null = null;
@@ -684,17 +721,15 @@ export class ArchiveDialog {
 
     const matches = this.evaluateMatches();
 
-    // Default inclusion: every match is included. Newly-matching tasks (e.g.
-    // after a criteria change) are added; tasks that stopped matching are
-    // dropped so a stale exclusion can't silently include a no-longer-valid
-    // task. User exclusions persist across preview refreshes.
-    const matchKeys = new Set(matches.map((m) => getMatchKey(m)));
-    for (const key of matchKeys) {
-      this.includedPaths.add(key);
-    }
-    for (const key of Array.from(this.includedPaths)) {
-      if (!matchKeys.has(key)) this.includedPaths.delete(key);
-    }
+    // Newly-seen tasks default to included; exclusions the user already made
+    // survive the refresh. Doing this with `includedPaths` alone re-added every
+    // match, so changing any criteria field silently re-checked every box the
+    // user had unticked.
+    reconcileInclusions(
+      this.includedPaths,
+      this.seenMatchKeys,
+      matches.map((m) => getMatchKey(m)),
+    );
 
     const included = matches.filter((m) =>
       this.includedPaths.has(getMatchKey(m)),

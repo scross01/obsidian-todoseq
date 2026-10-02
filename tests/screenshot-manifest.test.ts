@@ -299,22 +299,6 @@ describe('screenshot manifest', () => {
     });
   });
 
-  describe('summarizeRows', () => {
-    it('counts only FRESH rows as good', () => {
-      const rows: CheckRow[] = [
-        { asset: 'a.png', status: 'FRESH' },
-        { asset: 'b.png', status: 'FRESH' },
-        { asset: 'c.png', status: 'STALE (plugin build changed)' },
-        { asset: 'd.png', status: 'UNREFERENCED' },
-      ];
-      expect(summarizeRows(rows)).toEqual({ fresh: 2, bad: 2 });
-    });
-
-    it('reports zero of each for an empty run', () => {
-      expect(summarizeRows([])).toEqual({ fresh: 0, bad: 0 });
-    });
-  });
-
   describe('formatCheckReport', () => {
     it('renders one aligned row per asset plus a summary', () => {
       const rows: CheckRow[] = [

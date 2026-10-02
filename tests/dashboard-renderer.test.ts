@@ -778,6 +778,185 @@ describe('DashboardRenderer', () => {
     });
   });
 
+  describe('donut in-place patching', () => {
+    const C = 2 * Math.PI * 58;
+    const GAP = 0.01 * C;
+
+    function donutRing(): SVGSVGElement | null {
+      return host.querySelector<SVGSVGElement>(
+        'svg.todoseq-dashboard-donut-ring',
+      );
+    }
+
+    function slice(key: string): SVGCircleElement | null {
+      return (
+        donutRing()?.querySelector<SVGCircleElement>(
+          `circle[data-key="${key}"]`,
+        ) ?? null
+      );
+    }
+
+    it('recomputes stroke-dashoffset when counts change', () => {
+      // The offset is what positions each arc along the ring. The initial
+      // render sets it from a running total; patching only the dasharray left
+      // every arc at its original position, so a count change repainted the
+      // ring into overlapping arcs.
+      const callbacks = noopCallbacks();
+      const content = renderer.renderCard(
+        host,
+        result(),
+        params({ display: 'donut' }),
+        callbacks,
+      );
+      expect(slice('priority:high')).not.toBeNull();
+      const beforeOffset =
+        slice('priority:high')!.getAttribute('stroke-dashoffset');
+
+      renderer.updateContent(
+        content,
+        result({
+          total: 12,
+          groups: [
+            group('priority:high', 'High', 1, 'priority:high'),
+            group('priority:medium', 'Medium', 5, 'priority:medium'),
+            group('priority:none', 'None', 6, 'priority:none'),
+          ],
+        }),
+        params({ display: 'donut' }),
+        callbacks,
+      );
+
+      const afterOffset =
+        slice('priority:high')!.getAttribute('stroke-dashoffset');
+      // High was first before and after, so its own offset is unchanged —
+      // but Medium's share grew, so Medium's arc must move.
+      expect(afterOffset).toBe(beforeOffset);
+      const mediumDash = parseFloat(
+        (
+          slice('priority:medium')!.getAttribute('stroke-dasharray') ?? ''
+        ).split(' ')[0],
+      );
+      expect(mediumDash).toBeCloseTo((5 / 12) * C - GAP, 5);
+      const mediumOffset = parseFloat(
+        slice('priority:medium')!.getAttribute('stroke-dashoffset') ?? '',
+      );
+      expect(mediumOffset).toBeCloseTo(-((1 / 12) * C + GAP / 2), 5);
+    });
+
+    it('materialises a slice for a group that goes from 0 to non-zero', () => {
+      // Zero-count groups get no circle at render time, so patching could only
+      // ever update slices that already existed — a group gaining its first
+      // task stayed invisible until a full re-render.
+      const callbacks = noopCallbacks();
+      const content = renderer.renderCard(
+        host,
+        result({
+          total: 4,
+          groups: [
+            group('priority:high', 'High', 4, 'priority:high'),
+            group('priority:low', 'Low', 0, 'priority:low'),
+          ],
+        }),
+        params({ display: 'donut' }),
+        callbacks,
+      );
+      expect(slice('priority:low')).toBeNull();
+
+      renderer.updateContent(
+        content,
+        result({
+          total: 6,
+          groups: [
+            group('priority:high', 'High', 4, 'priority:high'),
+            group('priority:low', 'Low', 2, 'priority:low'),
+          ],
+        }),
+        params({ display: 'donut' }),
+        callbacks,
+      );
+
+      expect(slice('priority:low')).not.toBeNull();
+      expect(donutRing()?.querySelectorAll('circle').length).toBe(2);
+    });
+
+    it('drops the slice for a group that falls back to zero', () => {
+      const callbacks = noopCallbacks();
+      const content = renderer.renderCard(
+        host,
+        result({
+          total: 6,
+          groups: [
+            group('priority:high', 'High', 4, 'priority:high'),
+            group('priority:low', 'Low', 2, 'priority:low'),
+          ],
+        }),
+        params({ display: 'donut' }),
+        callbacks,
+      );
+      expect(slice('priority:low')).not.toBeNull();
+
+      renderer.updateContent(
+        content,
+        result({
+          total: 4,
+          groups: [
+            group('priority:high', 'High', 4, 'priority:high'),
+            group('priority:low', 'Low', 0, 'priority:low'),
+          ],
+        }),
+        params({ display: 'donut' }),
+        callbacks,
+      );
+
+      expect(slice('priority:low')).toBeNull();
+      expect(donutRing()?.querySelectorAll('circle').length).toBe(1);
+    });
+  });
+
+  describe('non-clickable groups', () => {
+    it('does not bind open handlers for a group with an empty filter', () => {
+      // The "N more" truncation tail carries filter: '' so the renderer shows
+      // it as a muted footer. It was still getting click and keydown handlers,
+      // which composed to the unfiltered base query — so the footer behaved
+      // like a button that filtered nothing.
+      const callbacks = noopCallbacks();
+      renderer.renderCard(
+        host,
+        result({
+          total: 12,
+          groups: [
+            group('priority:high', 'High', 4, 'priority:high'),
+            group('more', '2 more', 6, ''),
+          ],
+        }),
+        params({ display: 'bar', maxGroups: 1 }),
+        callbacks,
+      );
+
+      const tail = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-bar-row[data-key="more"]',
+      );
+      expect(tail).not.toBeNull();
+      tail?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(callbacks.onOpenQuery).not.toHaveBeenCalled();
+    });
+
+    it('still binds open handlers for a group with a real filter', () => {
+      const callbacks = noopCallbacks();
+      renderer.renderCard(
+        host,
+        result(),
+        params({ display: 'bar' }),
+        callbacks,
+      );
+      const row = host.querySelector<HTMLElement>(
+        '.todoseq-dashboard-bar-row[data-key="priority:high"]',
+      );
+      row?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(callbacks.onOpenQuery).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('updateContent', () => {
     it('patches counts in place when the group keys match', () => {
       const callbacks = noopCallbacks();
@@ -977,6 +1156,29 @@ describe('DashboardCodeBlockProcessor', () => {
     processor.registerProcessor();
     return processor;
   };
+
+  // renderError empties the host element, detaching the cached contentRoot.
+  // While the processor kept that stale reference, the next refresh took the
+  // patch-in-place branch and updated a node that was no longer in the
+  // document, so one transient failure left the card stuck on the error.
+  it('re-renders the card after a transient refresh error', async () => {
+    const processor = makeProcessor();
+    await processSource(processor);
+    const dashboard = processor['activeDashboards'].values().next().value;
+    expect(dashboard.contentRoot).not.toBeNull();
+    const el = dashboard.el;
+
+    getTasksMock.mockImplementationOnce(() => {
+      throw new Error('transient');
+    });
+    await processor['refreshDashboard'](dashboard);
+    expect(el.querySelector('.todoseq-dashboard-error')).not.toBeNull();
+    expect(dashboard.contentRoot).toBeNull();
+
+    await processor['refreshDashboard'](dashboard);
+    expect(el.querySelector('.todoseq-dashboard-error')).toBeNull();
+    expect(el.querySelector('.todoseq-dashboard-container')).not.toBeNull();
+  });
 
   const processSource = async (
     processor: DashboardCodeBlockProcessor,

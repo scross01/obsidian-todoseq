@@ -1243,4 +1243,54 @@ describe('TaskListView', () => {
       expect(view['contentEl']?.hasClass('todoseq-is-main-tab')).toBe(false);
     });
   });
+
+  describe('background context menu listener registration', () => {
+    // The dedup guard ran after the field had already been reassigned to the
+    // new handler, so it removed the handler it was about to add and left the
+    // previous one attached. Every re-registration therefore stacked another
+    // listener, and a right-click on the background opened one context menu per
+    // past visit to the tab.
+    it('does not stack handlers across repeated registration', () => {
+      const contentEl = activeDocument.createElement('div');
+      view['contentEl'] = contentEl;
+      const remove = jest.spyOn(contentEl, 'removeEventListener');
+
+      view['setupBackgroundContextMenu']();
+      const first = view['backgroundContextMenuHandler'];
+
+      view['setupBackgroundContextMenu']();
+      const second = view['backgroundContextMenuHandler'];
+
+      expect(second).not.toBe(first);
+      // The handler from the first registration must be the one removed.
+      expect(remove).toHaveBeenCalledWith('contextmenu', first);
+    });
+
+    it('leaves exactly one handler attached after three registrations', () => {
+      const contentEl = activeDocument.createElement('div');
+      view['contentEl'] = contentEl;
+      const registered: EventListener[] = [];
+      const realAdd = contentEl.addEventListener.bind(contentEl);
+      const realRemove = contentEl.removeEventListener.bind(contentEl);
+      jest
+        .spyOn(contentEl, 'addEventListener')
+        .mockImplementation((type: string, fn: EventListener) => {
+          registered.push(fn);
+          realAdd(type, fn);
+        });
+      jest
+        .spyOn(contentEl, 'removeEventListener')
+        .mockImplementation((type: string, fn: EventListener) => {
+          const i = registered.indexOf(fn);
+          if (i >= 0) registered.splice(i, 1);
+          realRemove(type, fn);
+        });
+
+      view['setupBackgroundContextMenu']();
+      view['setupBackgroundContextMenu']();
+      view['setupBackgroundContextMenu']();
+
+      expect(registered).toEqual([view['backgroundContextMenuHandler']]);
+    });
+  });
 });

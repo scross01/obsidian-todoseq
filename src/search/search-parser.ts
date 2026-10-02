@@ -512,6 +512,20 @@ class PrattParser {
             left.field === 'closed' ||
             left.field === 'started')
         ) {
+          // A comparison operator is meaningful on a single bound
+          // (`scheduled:>=2026-10`) but not on a range bound, where it has no
+          // coherent reading. It used to pass validation here because the
+          // operator was stripped for the date check and then kept on the
+          // stored value, so the evaluator's date parse returned null and the
+          // filter matched nothing at all. Reject it instead of answering
+          // with a silent empty result.
+          if (/^[<>]=?/.test(left.value ?? '')) {
+            throw new SearchError(
+              'Comparison operators cannot be used as range bounds. ' +
+                `Use scheduled:2026-10.. for an open-ended range, or a bare bound for a comparison.`,
+            );
+          }
+
           // Fail loud on date-shaped but calendar-invalid start bounds —
           // the prefix value already passed single-value validation, but
           // only when it is date-shaped (2026-02-30 as a range start).
@@ -547,6 +561,13 @@ class PrattParser {
           }
 
           this.position++;
+
+          if (/^[<>]=?/.test(rightToken.value)) {
+            throw new SearchError(
+              'Comparison operators cannot be used as range bounds. ' +
+                `Use scheduled:..2026-10 for an open-ended range, or a bare bound for a comparison.`,
+            );
+          }
 
           // Fail loud on date-shaped but calendar-invalid end bounds.
           if (
