@@ -193,10 +193,17 @@ export async function launchObsidian(): Promise<{
   await killSpawned();
   await killObsidianOnCDP();
 
-  // Truncate only once the outgoing instance is gone, so its shutdown note and
-  // exit record stay with the launch they describe. Truncating first would put
-  // them above the new launch header — a reader chasing a crash would read the
-  // previous instance's stderr and conclude this launch died.
+  // Truncate only once the outgoing instance has exited, so its shutdown note
+  // and exit record are written before the file is emptied rather than landing
+  // above the new launch header. That is the whole benefit: it keeps the
+  // outgoing instance's records out of the new launch's log. They are still
+  // truncated away — the log describes the launch in flight — so "recorded
+  // somewhere" is not claimed here.
+  //
+  // One race remains and is not fixed by this placement: `exit` fires before
+  // the stdio pipes finish draining, so trailing output from the dying instance
+  // can still be appended after the truncate. Every record carries its pid, so
+  // such lines stay attributable instead of silently reading as this launch's.
   beginCapture();
 
   // Build the launch command. OBSIDIAN_COMMAND (a full command string like
