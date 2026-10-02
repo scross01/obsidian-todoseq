@@ -105,6 +105,9 @@ export const SCENARIO_PLUGIN_SOURCES: Record<string, readonly string[]> = {
     'src/view/components/base-dialog.ts',
     'src/services/archive-service.ts',
   ],
+  // The collapse toggle: the embedded list renderer that draws the header,
+  // the chevron and the collapsed footer.
+  'docs-embedded-collapse': ['src/view/embedded-task-list/**'],
   // The warning arrows: the task list rows and the date badges they hang off.
   'docs-warning-periods': ['src/view/task-list/**'],
   // The hero GIF: typing in the editor, so the editor extensions again, plus

@@ -52,6 +52,7 @@ export const SCENARIOS: Record<string, ScenarioDef> = {
   'docs-dashboards': { script: 'dashboards.ts', kind: 'stills' },
   'docs-auto-archive': { script: 'auto-archive.ts', kind: 'stills' },
   'docs-warning-periods': { script: 'warning-periods.ts', kind: 'stills' },
+  'docs-embedded-collapse': { script: 'embedded-collapse.ts', kind: 'stills' },
   'docs-task-entry': {
     script: 'task-entry.ts',
     kind: 'gif',

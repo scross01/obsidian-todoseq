@@ -5,6 +5,7 @@ import {
 } from '../scripts/screenshots/seed-lint';
 import {
   ARCHIVE_SEEDS,
+  COLLAPSE_SEEDS,
   DASHBOARD_SEEDS,
   DEMO_SEEDS,
   EDITOR_SEEDS,
@@ -32,6 +33,7 @@ const ALL_SEEDS: Record<string, Record<string, string>> = {
   TASK_ENTRY_SEEDS,
   DASHBOARD_SEEDS,
   ARCHIVE_SEEDS,
+  COLLAPSE_SEEDS,
   WARNING_PERIOD_SEEDS,
 };
 
