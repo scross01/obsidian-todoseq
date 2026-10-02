@@ -35,7 +35,8 @@ export interface ProcessLog {
    */
   hasFailedToSpawn(): boolean;
   /** Record a harness-side event (a kill, a launch failure) in the log. */
-  note(message: string): void; /**
+  note(message: string): void;
+  /**
    * Truncate the log and forget the recorded exit state.
    *
    * Called at the start of each launch. Without it a previous run's failure
@@ -45,6 +46,13 @@ export interface ProcessLog {
   reset(): void;
   /** Last `maxChars` characters of the log; '' if nothing has been logged. */
   tail(maxChars?: number): string;
+  /**
+   * Append a block of child output, prefixing each line with its stream label
+   * and writing the whole block in one append. The launcher reaches this
+   * through `attach`; it is exposed so tests can assert on the line splitting
+   * and the write count without standing up a child process.
+   */
+  writeChunk(label: 'stdout' | 'stderr', text: string): void;
 }
 
 /** Default cap on the log excerpt embedded in an error message. */
@@ -85,10 +93,49 @@ export function createProcessLog(filePath: string): ProcessLog {
   // Chunks do not align to line boundaries, so a half-written line would get
   // mislabelled if we prefixed every chunk. Track whether a newline is owed.
   const atLineStart = { stdout: true, stderr: true };
+  // The output dir is created once per ProcessLog, not per chunk. Piping the
+  // child's stdio makes this handler hot, and a recursive mkdir on every line
+  // is thousands of syscalls per run for a directory that already exists.
+  let dirEnsured = false;
+
+  function ensureDir(): void {
+    if (dirEnsured) return;
+    fs.mkdirSync(pathDir(filePath), { recursive: true });
+    dirEnsured = true;
+  }
 
   function write(text: string): void {
-    fs.mkdirSync(pathDir(filePath), { recursive: true });
-    fs.appendFileSync(filePath, text);
+    try {
+      ensureDir();
+      fs.appendFileSync(filePath, text);
+    } catch {
+      // The log is diagnostics, never the reason a test fails. Losing output
+      // is acceptable; throwing out of a stdio handler is not.
+    }
+  }
+
+  /**
+   * Append a chunk of child output, labelling each line and buffering it into
+   * a single append. One file write per chunk, not per line — the difference
+   * between one open/write/close and five for a chatty Electron process.
+   */
+  function writeChunk(label: 'stdout' | 'stderr', chunk: string): void {
+    const lines = chunk.split('\n');
+    const out: string[] = [];
+    for (const [index, line] of lines.entries()) {
+      const isLast = index === lines.length - 1;
+      if (atLineStart[label] && line !== '') {
+        out.push(`[${label}] `);
+      }
+      out.push(line);
+      if (!isLast) {
+        out.push('\n');
+        atLineStart[label] = true;
+      } else {
+        atLineStart[label] = line === '';
+      }
+    }
+    write(out.join(''));
   }
 
   function capture(
@@ -100,24 +147,7 @@ export function createProcessLog(filePath: string): ProcessLog {
     stream.on('data', (chunk: string) => {
       // A child killed mid-write can emit EPIPE/EBADF here; losing a chunk of
       // crash output is acceptable, throwing out of the handler is not.
-      try {
-        const lines = chunk.split('\n');
-        for (const [index, line] of lines.entries()) {
-          const isLast = index === lines.length - 1;
-          if (atLineStart[label] && line !== '') {
-            write(`[${label}] `);
-          }
-          write(line);
-          if (!isLast) {
-            write('\n');
-            atLineStart[label] = true;
-          } else {
-            atLineStart[label] = line === '';
-          }
-        }
-      } catch {
-        // Ignore: the log is diagnostics, never the reason a test fails.
-      }
+      writeChunk(label, chunk);
     });
     stream.on('error', () => {
       // Same rationale as above.
@@ -162,6 +192,8 @@ export function createProcessLog(filePath: string): ProcessLog {
       );
     },
 
+    writeChunk,
+
     reset() {
       record = null;
       spawnError = undefined;
@@ -169,7 +201,7 @@ export function createProcessLog(filePath: string): ProcessLog {
       atLineStart.stdout = true;
       atLineStart.stderr = true;
       try {
-        fs.mkdirSync(pathDir(filePath), { recursive: true });
+        ensureDir();
         fs.writeFileSync(filePath, '');
       } catch {
         // A log we cannot truncate still appends; nothing downstream depends

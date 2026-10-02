@@ -212,6 +212,42 @@ describe('createProcessLog', () => {
     ).toContain(`pid=${child.pid}`);
   });
 
+  it('creates the log directory once, not on every chunk', () => {
+    const log = createProcessLog(
+      path.join(tmpDir, 'nested', 'deep', 'log.txt'),
+    );
+    const mkdir = jest.spyOn(fs, 'mkdirSync');
+
+    try {
+      for (let i = 0; i < 50; i++) {
+        log.note(`line ${i}`);
+      }
+      // Piping the child's stdio makes this handler hot — thousands of chunks
+      // per run. A recursive mkdir per chunk is pure syscalls for nothing.
+      expect(mkdir).toHaveBeenCalledTimes(1);
+      expect(fs.readFileSync(log.filePath, 'utf8')).toContain('line 49');
+    } finally {
+      mkdir.mockRestore();
+    }
+  });
+
+  it('writes one append per chunk, not one per line', () => {
+    const log = createProcessLog(logPath);
+    const append = jest.spyOn(fs, 'appendFileSync');
+
+    try {
+      // A single 5-line chunk must not become 10 file opens.
+      log.writeChunk('stdout', 'one\ntwo\nthree\nfour\nfive');
+      expect(append).toHaveBeenCalledTimes(1);
+      const contents = fs.readFileSync(logPath, 'utf8');
+      expect(contents).toBe(
+        '[stdout] one\n[stdout] two\n[stdout] three\n[stdout] four\n[stdout] five',
+      );
+    } finally {
+      append.mockRestore();
+    }
+  });
+
   it('reset clears the recorded exit state too', async () => {
     const log = createProcessLog(logPath);
     const child = spawn(process.execPath, ['-e', 'process.exit(7);']);

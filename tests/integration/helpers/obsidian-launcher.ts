@@ -32,9 +32,7 @@ const processLog: ProcessLog = createProcessLog(PROCESS_LOG_PATH);
 
 /**
  * Truncate the log and clear any recorded exit state, so the capture describes
- * the launch that follows and nothing older. The file is append-mode within a
- * launch, so a relaunch (the restart project) supersedes the previous instance's
- * output rather than interleaving two apps' stdio into one unreadable log.
+ * the launch that follows and nothing older.
  */
 function beginCapture(): void {
   processLog.reset();
@@ -189,15 +187,17 @@ export async function launchObsidian(): Promise<{
   browser: Browser;
   page: Page;
 }> {
-  // Start each launch with a clean log: a stale failure from a previous run
-  // sitting above the current header is worse than no log at all.
-  beginCapture();
-
   // Kill our tracked process, and any instance on our CDP port that we didn't
   // spawn (e.g. one launched by globalSetup in another Node process). Scoped to
   // the port — never kills the user's real Obsidian.
   await killSpawned();
   await killObsidianOnCDP();
+
+  // Truncate only once the outgoing instance is gone, so its shutdown note and
+  // exit record stay with the launch they describe. Truncating first would put
+  // them above the new launch header — a reader chasing a crash would read the
+  // previous instance's stderr and conclude this launch died.
+  beginCapture();
 
   // Build the launch command. OBSIDIAN_COMMAND (a full command string like
   // `flatpak run md.obsidian.Obsidian` or `snap run obsidian`) is split into
