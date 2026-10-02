@@ -1375,4 +1375,83 @@ describe('ArchiveService.undoLastRun resilience', () => {
     expect(runningDuring).toEqual([true, true, true]);
     expect(service.isRunning()).toBe(false);
   });
+
+  it('keeps isRunning true for the undo when a concurrent apply finishes first', async () => {
+    // The flag is shared by both batch kinds, so whichever finishes first used
+    // to clear it for the other. Here the apply completes while the undo is
+    // still reverting: isRunning() must keep reporting true, or the
+    // auto-archive gate in runAutoArchiveIfEnabled opens a third batch over the
+    // same tasks.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    const late = makeTask({
+      path: 'late.md',
+      line: 99,
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE late task',
+    });
+    store.set(`${late.path}:${late.line}`, late);
+
+    let interleaved: Promise<unknown> | null = null;
+    let runningAfterApply: boolean | null = null;
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (!interleaved) {
+          interleaved = service.applyArchives(
+            [{ ...late, target: 'ARCHIVED' }],
+            {
+              getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+              apply: async () => undefined,
+            },
+          );
+          await interleaved;
+          // The apply has finished; this undo has not.
+          runningAfterApply = service.isRunning();
+        }
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+
+    expect(runningAfterApply).toBe(true);
+    expect(outcome.reverted).toHaveLength(3);
+    expect(service.isRunning()).toBe(false);
+  });
+
+  it('keeps isRunning true for the apply when a concurrent undo finishes first', async () => {
+    // The mirror image: the undo is the batch that completes first this time,
+    // and the apply is the one still writing.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    const late = makeTask({
+      path: 'late.md',
+      line: 99,
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE late task',
+    });
+    store.set(`${late.path}:${late.line}`, late);
+
+    let interleaved: Promise<unknown> | null = null;
+    let runningAfterUndo: boolean | null = null;
+
+    await service.applyArchives([{ ...late, target: 'ARCHIVED' }], {
+      getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+      apply: async () => {
+        interleaved = service.undoLastRun({
+          getRawLine: async (path) => `- [x] ARCHIVED ${path}`,
+          apply: async () => undefined,
+        });
+        await interleaved;
+        runningAfterUndo = service.isRunning();
+      },
+    });
+
+    expect(runningAfterUndo).toBe(true);
+    expect(service.isRunning()).toBe(false);
+  });
 });

@@ -189,7 +189,19 @@ function parseIsoDateLocal(iso: string): Date | null {
  */
 export class ArchiveService {
   private lastRun: ArchivedTaskRecord[] = [];
-  private running = false;
+  /**
+   * Batches in flight, counted rather than flagged.
+   *
+   * Both batch kinds set this and both clear it on the way out, and they can
+   * overlap: applyArchives is not gated by isRunning(), so a manual run can be
+   * launched (or an undo triggered from the notice) while another batch is
+   * still writing. A shared boolean made whichever finished first responsible
+   * for clearing a flag the other still needed, so isRunning() reported idle
+   * while records were in flight — and isRunning() is the gate
+   * runAutoArchiveIfEnabled consults before starting an auto run. A depth count
+   * has no such owner: it stays positive until the last batch leaves.
+   */
+  private activeRuns = 0;
   /** Cached compiled patterns for lineStillArchived — targets repeat across journal records. */
   private readonly linePatternCache = new RegexCache();
   /**
@@ -217,12 +229,13 @@ export class ArchiveService {
   }
 
   /**
-   * True while a batch is in flight — apply OR undo (used to gate auto-run
-   * against manual runs). An undo that reported false here let an auto-archive
-   * start mid-undo, and the two runs then raced over the journal.
+   * True while any batch is in flight — apply OR undo, overlapping or not
+   * (used to gate auto-run against manual runs). An undo that reported false
+   * here let an auto-archive start mid-undo, and the two runs then raced over
+   * the journal.
    */
   isRunning(): boolean {
-    return this.running;
+    return this.activeRuns > 0;
   }
 
   /** True when a previous run left undoable journal entries. */
@@ -280,7 +293,7 @@ export class ArchiveService {
     matches: readonly ArchiveMatch[],
     deps: ApplyArchiveDeps,
   ): Promise<ArchiveRunResult> {
-    this.running = true;
+    this.activeRuns += 1;
     const archived: ArchivedTaskRecord[] = [];
     const skipped: { path: string; line: number; reason: ApplySkipReason }[] =
       [];
@@ -329,7 +342,7 @@ export class ArchiveService {
         });
       }
     } finally {
-      this.running = false;
+      this.activeRuns -= 1;
     }
     this.lastRun = archived;
     return { archived, skipped };
@@ -352,7 +365,7 @@ export class ArchiveService {
     // with nothing it could do.
     const retryable: ArchivedTaskRecord[] = [];
 
-    this.running = true;
+    this.activeRuns += 1;
     try {
       for (const record of journal) {
         let rawLine: string | null;
@@ -410,7 +423,7 @@ export class ArchiveService {
         reverted.push(record);
       }
     } finally {
-      this.running = false;
+      this.activeRuns -= 1;
     }
 
     // Assigned only once the whole run is accounted for. Clearing it up front
@@ -419,7 +432,7 @@ export class ArchiveService {
     //
     // Claimed by identity, not unconditionally: this loop awaits once per
     // record, so a concurrent applyArchives can install a NEWER journal in the
-    // gap (applyArchives is not gated by `running`, and a manual run can be
+    // gap (applyArchives is not gated by isRunning(), and a manual run can be
     // launched directly). Writing our own list over that one would orphan the
     // newer run's records and hide its Undo button. If the field is still the
     // journal we started from, no one replaced it and ours is the truth.
