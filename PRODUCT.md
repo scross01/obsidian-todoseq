@@ -64,7 +64,7 @@ Open / undecided product facts: none required for docs landing work.
 
 - Live plugin behavior and screenshots under `docs/assets/` and root `screenshot.png`
 - Animated demo: `docs/assets/todoseq-task-entry.gif`
-- Light/dark product stills: `docs/assets/todoseq-screenshot-light.png`, `docs/assets/todoseq-screenshot-dark.png`
+- Light/dark product stills: `docs/assets/todoseq-screenshot-dark.png`, `docs/assets/todoseq-screenshot-dark-light.png`
 - Docs home and guides under `docs/`
 - Manifest description: “Lightweight keyword-based task tracker using Logseq style keywords.”
 - Absence to respect: no official customer logos, testimonials, or published usage metrics — do not fabricate them

@@ -26,6 +26,9 @@ The card lists one row per group with a proportional bar and count. Click a
 row to open the Task List with that group's filter applied; Cmd/Ctrl-click
 opens it in a new tab.
 
+![TODOseq dashboard card showing due and overdue work by priority](./assets/todoseq-dashboard-basic-usage.png){.ts-img-wide .ts-img-dark}
+![TODOseq dashboard card showing due and overdue work by priority](./assets/todoseq-dashboard-basic-usage-light.png){.ts-img-wide .ts-img-light}
+
 ## Code Block Parameters
 
 | Parameter         | Description                                                                                                                                                                                                                                                                  | Default    |
@@ -58,6 +61,9 @@ Lines starting with `#` inside the block are treated as comments.
   List with the matching date filter
 
 ## Display Forms
+
+Every form below has a worked example with a screenshot further down this
+page.
 
 - **bar** — the default: one row per group with a color swatch, label, and a
   track filled proportionally to the largest group
@@ -95,6 +101,9 @@ title: Work pipeline
 ```
 ````
 
+![TODOseq work pipeline donut](./assets/todoseq-dashboard-example-donut.png){.ts-img-wide .ts-img-dark}
+![TODOseq work pipeline donut](./assets/todoseq-dashboard-example-donut-light.png){.ts-img-wide .ts-img-light}
+
 Scheduled workload as tiles:
 
 ````txt
@@ -105,6 +114,9 @@ title: Scheduled workload
 show-empty: show
 ```
 ````
+
+![TODOseq scheduled workload tiles](./assets/todoseq-dashboard-example-tiles.png){.ts-img-wide .ts-img-dark}
+![TODOseq scheduled workload tiles](./assets/todoseq-dashboard-example-tiles-light.png){.ts-img-wide .ts-img-light}
 
 Upcoming deadlines heatmap:
 
@@ -117,6 +129,9 @@ title: Due dates — next 3 months
 ```
 ````
 
+![TODOseq deadlines heatmap](./assets/todoseq-dashboard-example-heatmap.png){.ts-img-wide .ts-img-dark}
+![TODOseq deadlines heatmap](./assets/todoseq-dashboard-example-heatmap-light.png){.ts-img-wide .ts-img-light}
+
 Compact strip inline in a project note:
 
 ````txt
@@ -126,3 +141,6 @@ group-by: priority
 display: strip
 ```
 ````
+
+![TODOseq compact priority strip](./assets/todoseq-dashboard-example-strip.png){.ts-img-wide .ts-img-dark}
+![TODOseq compact priority strip](./assets/todoseq-dashboard-example-strip-light.png){.ts-img-wide .ts-img-light}

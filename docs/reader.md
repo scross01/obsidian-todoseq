@@ -2,7 +2,8 @@
 
 TODOseq brings the same interactive task experience from the editor into Obsidian's Reader view (also called Reading mode or Preview mode). When you're reading your notes rather than editing them, your tasks remain fully functional—you can click keywords to change states, use context menus, and see the same visual styling that helps you quickly identify task status.
 
-![TODOseq in reader View](./assets/todoseq-reader-view.png){.ts-img-full}
+![TODOseq in reader View](./assets/todoseq-reader-view.png){.ts-img-full .ts-img-dark}
+![TODOseq in reader View](./assets/todoseq-reader-view-light.png){.ts-img-full .ts-img-light}
 
 ## What You Get in Reader View
 

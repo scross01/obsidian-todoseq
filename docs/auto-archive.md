@@ -34,6 +34,9 @@ Everything else on the line — text, priority, dates, indentation, table-cell p
 
 Open the dialog with **TODOseq: Archive completed tasks** in the Command Palette, or the **Preview and archive…** button in settings. Nothing is written until you confirm.
 
+![TODOseq archive preview dialog](./assets/todoseq-archive-dialog.png){.ts-img-wide .ts-img-dark}
+![TODOseq archive preview dialog](./assets/todoseq-archive-dialog-light.png){.ts-img-wide .ts-img-light}
+
 **Criterion** — choose _Closed at least_ N days ago (with 30/90/180/365 presets) or _Closed before_ a specific date. Date mode is available for manual runs only; automatic runs always use the days threshold.
 
 **State mappings** — the same rows as the settings section, editable here. Changes apply immediately and persist.

@@ -2,7 +2,8 @@
 
 The TODOseq plugin supports rendering filtered task lists directly within your notes using special code blocks. This feature allows you to create dynamic, interactive task lists that are filtered and sorted according to your specifications.
 
-![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist.png){.ts-img-full}
+![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist.png){.ts-img-full .ts-img-dark}
+![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist-light.png){.ts-img-full .ts-img-light}
 
 ## Basic Usage
 
@@ -10,12 +11,16 @@ To create an embedded task list, use a code block with the `todoseq` language:
 
 ````txt
 ```todoseq
-search: file:"Test Priorities"
-sort: priority
+search: tag:phoenix
+sort: urgency
+title: Phoenix Tasks
 ```
 ````
 
-![TODOseq embedded task list example](assets/todoseq-embedded-list-example.png){.ts-img-wide}
+The block above matches every task tagged `#phoenix`, orders them by urgency, and renders under the heading "Phoenix Tasks". Only `search` is required — `sort` and `title` are optional, and every option is covered below.
+
+![TODOseq embedded task list example](assets/todoseq-embedded-list-example.png){.ts-img-wide .ts-img-dark}
+![TODOseq embedded task list example](assets/todoseq-embedded-list-example-light.png){.ts-img-wide .ts-img-light}
 
 ## Code Block Parameters
 
@@ -383,11 +388,13 @@ In all cases, TODOseq navigates to the exact line containing the task and focuse
 
 If no tasks are found or the search query is invalid:
 
-![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty.png){.ts-img-wide}
+![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty.png){.ts-img-wide .ts-img-dark}
+![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty-light.png){.ts-img-wide .ts-img-light}
 
 If there's an error with one of the sort or filter options, an error message will be displayed accordingly. The error message indicates what went wrong and suggests how to fix it.
 
-![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error.png)
+![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error.png){.ts-img-dark}
+![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error-light.png){.ts-img-light}
 
 ## See Also
 

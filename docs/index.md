@@ -20,7 +20,12 @@ outline: false
     </p>
   </div>
   <div class="ts-hero-media ts-media">
-    <img class="ts-hero-gif" src="./assets/todoseq-task-entry.gif" alt="Click a TODO keyword in Obsidian to cycle its task state" />
+    <!-- Dark/light pair, same as every screenshot on the docs pages: the
+         capture pipeline records the demo once per Obsidian base theme and the
+         `ts-img-dark` / `ts-img-light` CSS rules show one. The README keeps the
+         dark recording, because GitHub has no `html.dark` for these to key off. -->
+    <img class="ts-hero-gif ts-img-dark" src="./assets/todoseq-task-entry.gif" alt="Click a TODO keyword in Obsidian to cycle its task state" />
+    <img class="ts-hero-gif ts-img-light" src="./assets/todoseq-task-entry-light.gif" alt="Click a TODO keyword in Obsidian to cycle its task state" />
   </div>
 </div>
 

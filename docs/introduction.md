@@ -1,6 +1,7 @@
 # Introduction to TODOseq
 
-![TODOseq Task List beside plain-text notes in Obsidian](./assets/todoseq-screenshot-dark.png){.ts-img-full}
+![TODOseq Task List beside plain-text notes in Obsidian](./assets/todoseq-screenshot-dark.png){.ts-img-full .ts-img-dark}
+![TODOseq Task List beside plain-text notes in Obsidian](./assets/todoseq-screenshot-dark-light.png){.ts-img-full .ts-img-light}
 
 ## What is TODOseq?
 

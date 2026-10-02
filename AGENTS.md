@@ -54,6 +54,17 @@ This file provides guidance to agents when working with code in this repository.
 - **Reader view refresh**: `refreshReaderViewFormatter()` iterates leaves and calls `previewMode.rerender(true)`
 - **Regex caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches
 
+## Demo Content Guidelines
+
+Applies to every demo, screenshot, GIF, and doc example — anything staged into a throwaway vault to illustrate the plugin.
+
+These rules are enforced, not just documented: `tests/screenshot-seed-lint.test.ts` runs the linter in `scripts/screenshots/seed-lint.ts` over every seed the screenshot pipeline stages, and fails with the note name, line and fix.
+
+- **TODOseq syntax only.** Dates belong on their own `SCHEDULED:` / `DEADLINE:` / `CLOSED:` / `STARTED:` line immediately below the task. An inline `<2026-10-01>` in the task text is _Tasks_ plugin syntax that TODOseq never parses: it renders as dead literal text that looks like a working date, so the demo appears to prove something it does not. No completion emoji either — state is carried by the keyword and the checkbox. Priorities are `[#A]`/`[#B]`/`[#C]`; checkboxes are `- [ ]` / `- [x]`.
+- **Keep demos focused.** A demo should make its point in one glance, so seed only the tasks the scene is actually about. Filler rows shrink every row until the feature is unreadable and bury what the shot is for. Long lists are the exception, not the default: use volume only in search and filter demos, where having something to narrow is the whole point.
+- **No H1 in example vault content.** Obsidian already renders the file name at H1 size, so an `# Title` at the top of the note just repeats it — two titles, one of them redundant, and it reads as a mistake. Start with a line or two of intro content, then use `##` sub-headings for structure.
+- **Dates in seeds are relative to today** so buckets stay meaningful over time. Never hardcode a capture-day date.
+
 ## Mobile Compatibility
 
 - **Support desktop and mobile**: Obsidian mobile has some differnences that need to be handled correctly, and misses some node.js apis.

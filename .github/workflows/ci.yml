@@ -35,3 +35,42 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+  docs-screenshots:
+    # Advisory, and deliberately so. This reports docs screenshots that were
+    # not recaptured after the UI they show changed — the failure mode where a
+    # screenshot quietly documents a plugin that no longer exists. A
+    # contributor fixing a parser cannot be expected to recapture 52 assets, so
+    # failing the build on every such PR would only teach people to dismiss the
+    # one job whose whole value is being believed. The report is written to the
+    # step summary so it is readable without opening the log.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Report screenshot freshness
+        # No `npm run build`: the check hashes plugin *sources* and the
+        # captured bytes, neither of which needs the bundle.
+        run: |
+          # pipefail so the check's non-zero exit survives the tee and the step
+          # still goes red — the job is continue-on-error, the signal is not
+          # silenced.
+          set -o pipefail
+          {
+            echo '## Docs screenshot freshness'
+            echo
+            echo 'Stale rows mean a docs image no longer matches the plugin. Recapture with `npm run docs:screenshots`; see CONTRIBUTING.md.'
+            echo
+            echo '```'
+            npm run docs:screenshots -- --check
+            echo '```'
+          } 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
