@@ -44,6 +44,10 @@ jobs:
     # failing the build on every such PR would only teach people to dismiss the
     # one job whose whole value is being believed. The report is written to the
     # step summary so it is readable without opening the log.
+    #
+    # A stale row is a heads-up, not an instruction. Regenerating is a
+    # deliberate act, and regenerated images are never committed unreviewed —
+    # see the docs screenshot guidelines in AGENTS.md.
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -68,7 +72,7 @@ jobs:
           {
             echo '## Docs screenshot freshness'
             echo
-            echo 'Stale rows mean a docs image no longer matches the plugin. Recapture with `npm run docs:screenshots`; see CONTRIBUTING.md.'
+            echo 'Informational only. A stale row means a docs image may no longer match the plugin — it does not need regenerating for this change to be correct, and regenerated images are never committed without human review. See CONTRIBUTING.md.'
             echo
             echo '```'
             npm run docs:screenshots -- --check

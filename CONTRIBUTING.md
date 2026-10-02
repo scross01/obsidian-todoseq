@@ -163,7 +163,8 @@ CI runs `--check` as a **non-blocking** `docs-screenshots` job: the step goes
 red and its report is written to the job summary, but the workflow still
 passes. It cannot be a hard gate, because a contributor who fixed a parser is
 not going to recapture 52 screenshots — and a permanently-red gate is worse
-than no gate at all.
+than no gate at all. Read a stale row as "these images may need updating", not
+as work this change owes.
 
 ### Workflow after a visual change
 
@@ -171,11 +172,24 @@ than no gate at all.
 2. `npm run docs:screenshots` — or `--only=<scenario>` for the one you touched,
    if you are confident nothing else renders that change.
 3. `npm run docs:screenshots -- --check` — expect `all N fresh` and exit 0.
-4. **Eyeball the changed images against their docs section.** The driver cannot
+4. **Eyeball every changed image against its docs section.** The driver cannot
    tell a correct screenshot of a broken state from a correct screenshot of a
    working one; a stale capture is exactly what a passing run produces.
 5. `npm run docs:build` and click through the affected pages in both light and
    dark appearance.
+
+Do not skip to step 2 on every change. A capture run takes minutes and rewrites
+50+ committed binaries, which buries the actual edit in a diff of images, so
+regenerating is a deliberate act rather than the automatic response to a stale
+row.
+
+A `STALE` row is a heads-up, not an instruction. It means _this image may no
+longer match the plugin_ — which is frequently fine, because many changes change
+no pixel, and because the image is still an honest record of a build that
+existed. The correct response is often to leave it stale and say so. When you do
+regenerate, a human has to look at the result before it is committed; if you
+have regenerated but cannot review, revert `docs/assets/` and
+`scripts/screenshots/manifest.json` and let the check keep reporting the drift.
 
 ### Things that will waste your time otherwise
 

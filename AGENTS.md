@@ -65,6 +65,15 @@ These rules are enforced, not just documented: `tests/screenshot-seed-lint.test.
 - **No H1 in example vault content.** Obsidian already renders the file name at H1 size, so an `# Title` at the top of the note just repeats it — two titles, one of them redundant, and it reads as a mistake. Start with a line or two of intro content, then use `##` sub-headings for structure.
 - **Dates in seeds are relative to today** so buckets stay meaningful over time. Never hardcode a capture-day date.
 
+## Docs Screenshot Guidelines
+
+Applies to `docs/assets/`, which is committed, and to anyone (human or agent) touching the capture pipeline.
+
+- **Never regenerate images as a side effect of another change.** A capture run takes minutes, rewrites 50+ committed binaries, and makes the real edit impossible to review in the diff. It is a deliberate act, never an automatic response to a stale row.
+- **The staleness check is informational.** `npm run docs:screenshots -- --check` reporting `STALE (plugin build changed)` means _these images may need updating_ — not _regenerate now_. CI runs it as a non-blocking job for exactly this reason. Leave the rows stale; say so in the summary.
+- **Never commit regenerated images without manual review.** The pipeline cannot tell a correct screenshot of a broken state from a correct screenshot of a working one — a stale capture is exactly what a passing run produces. A human must look at each changed image against its docs section before it is committed. If you have regenerated but cannot review, revert `docs/assets/` and `scripts/screenshots/manifest.json` and leave the check reporting the drift.
+- **Screenshot changes are content changes.** Treat a commit that alters `docs/assets/*.png|gif` with the same care as one that alters a docs page, and say in the commit message which images changed and why.
+
 ## Mobile Compatibility
 
 - **Support desktop and mobile**: Obsidian mobile has some differnences that need to be handled correctly, and misses some node.js apis.
