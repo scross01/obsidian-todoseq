@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
-import { formatExit, createProcessLog } from './process-log';
+import { formatExit, createProcessLog, ProcessLog } from './process-log';
 
 /** A script that keeps running until killed, so a signal exit can be tested. */
 const SPIN = 'setInterval(() => {}, 1000)';
@@ -15,8 +15,17 @@ function waitForExit(child: ReturnType<typeof spawn>): Promise<unknown> {
 }
 
 /** Give stream events a chance to land in the log before asserting on it. */
-async function settle(): Promise<void> {
-  await new Promise((r) => setTimeout(r, 100));
+async function settle(ms = 100): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+/** Poll the log until `needle` appears, or give up after ~2s. */
+async function waitForTail(log: ProcessLog, needle: string): Promise<void> {
+  for (let i = 0; i < 40; i++) {
+    if (log.tail().includes(needle)) return;
+    await settle(50);
+  }
+  throw new Error(`timed out waiting for ${needle} in the log`);
 }
 
 let tmpDir: string;
@@ -246,6 +255,31 @@ describe('createProcessLog', () => {
     } finally {
       append.mockRestore();
     }
+  });
+
+  it('a late chunk from a superseded launch is not written', async () => {
+    const log = createProcessLog(logPath);
+    const child = spawn(process.execPath, [
+      '-e',
+      'console.log("early"); setTimeout(() => console.log("late"), 300);',
+    ]);
+    log.attach(child);
+
+    await waitForTail(log, 'early');
+
+    // The next launch starts here.
+    log.reset();
+
+    // Long enough for the child's 300ms trailing write to have landed.
+    await settle(600);
+
+    // The straggler belongs to the launch the truncate just discarded. Writing
+    // it here would put an unattributed "[stdout] late" in the new launch's
+    // log, above or below its header depending on timing.
+    //
+    // Deliberately not awaiting the child's exit: it has already emitted 'exit'
+    // by now, and a once('exit') listener attached after the fact never fires.
+    expect(fs.readFileSync(logPath, 'utf8')).not.toContain('late');
   });
 
   it('reset clears the recorded exit state too', async () => {

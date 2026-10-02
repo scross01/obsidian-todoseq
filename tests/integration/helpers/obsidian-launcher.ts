@@ -197,13 +197,13 @@ export async function launchObsidian(): Promise<{
   // and exit record are written before the file is emptied rather than landing
   // above the new launch header. That is the whole benefit: it keeps the
   // outgoing instance's records out of the new launch's log. They are still
-  // truncated away — the log describes the launch in flight — so "recorded
-  // somewhere" is not claimed here.
+  // truncated away — the log describes the launch in flight.
   //
-  // One race remains and is not fixed by this placement: `exit` fires before
-  // the stdio pipes finish draining, so trailing output from the dying instance
-  // can still be appended after the truncate. Every record carries its pid, so
-  // such lines stay attributable instead of silently reading as this launch's.
+  // `exit` fires before the stdio pipes finish draining, so the dying instance
+  // can still emit data after this point. reset() detaches its listeners, so
+  // that straggler is discarded rather than written here — it would carry no
+  // pid (only [stdout]/[stderr]) and could land below the new header, where it
+  // would read as the current launch's own output.
   beginCapture();
 
   // Build the launch command. OBSIDIAN_COMMAND (a full command string like

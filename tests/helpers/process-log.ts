@@ -97,6 +97,8 @@ export function createProcessLog(filePath: string): ProcessLog {
   // child's stdio makes this handler hot, and a recursive mkdir on every line
   // is thousands of syscalls per run for a directory that already exists.
   let dirEnsured = false;
+  // Unsubscribes the current launch's stream listeners. See capture().
+  let detachers: Array<() => void> = [];
 
   function ensureDir(): void {
     if (dirEnsured) return;
@@ -152,6 +154,16 @@ export function createProcessLog(filePath: string): ProcessLog {
     stream.on('error', () => {
       // Same rationale as above.
     });
+    // `reset` detaches these: 'exit' fires before the pipes finish draining,
+    // so a superseded launch can still emit data afterwards. That data belongs
+    // to the launch the truncate just discarded, and it would land in the new
+    // launch's log carrying only a bare [stdout]/[stderr] — no pid to attribute
+    // it with, and no guarantee it lands above the new header rather than
+    // below it, where it would read as the current launch's own output.
+    detachers.push(() => {
+      stream.removeAllListeners('data');
+      stream.removeAllListeners('error');
+    });
   }
 
   return {
@@ -195,6 +207,17 @@ export function createProcessLog(filePath: string): ProcessLog {
     writeChunk,
 
     reset() {
+      // Stop writing the previous launch's output before emptying the file, so
+      // a straggler cannot land in the next launch's log. The listeners are
+      // removed rather than the streams destroyed: the child still owns them.
+      for (const detach of detachers) {
+        try {
+          detach();
+        } catch {
+          // A stream already torn down with its child: nothing to detach.
+        }
+      }
+      detachers = [];
       record = null;
       spawnError = undefined;
       capturedPid = undefined;
