@@ -26,6 +26,52 @@ export interface StateTransitionSettings {
   transitionStatements: string[];
 }
 
+/**
+ * One source-state → target-state rule for the Auto-Archive feature.
+ * A completed task whose state has an enabled mapping gets its keyword
+ * rewritten to the mapping's target (an archived-group keyword).
+ */
+export interface ArchiveStateMapping {
+  /** Completed-state keyword this rule matches (e.g. DONE, CANCELLED). */
+  source: string;
+  /** Whether this mapping participates in archive runs. */
+  enabled: boolean;
+  /** Target archived-group keyword (e.g. ARCHIVED, ABANDONED). */
+  target: string;
+}
+
+/**
+ * Settings for the Auto-Archive feature (rewrite completed keywords to
+ * archived keywords based on CLOSED date age).
+ */
+export interface TaskArchiveSettings {
+  /** Master opt-in for automatic archiving at vault scan. Manual runs do not require this. */
+  autoArchiveEnabled: boolean;
+  /** Which criterion the run uses. 'date' mode is manual-run only (enforced by callers). */
+  criterionMode: 'days' | 'date';
+  /** Days threshold for 'days' mode. A task matches when closed ≥ this many days ago. */
+  criterionDays: number;
+  /** ISO date string (YYYY-MM-DD) for 'date' mode; '' = unset. */
+  criterionDate: string;
+  /** One entry per completed keyword the user wants to map; unmapped keywords never match. */
+  stateMappings: ArchiveStateMapping[];
+  /**
+   * Reserved for a future opt-in sweep of completed tasks without a CLOSED date.
+   * MUST stay false in this feature version: the evaluator rejects no-closed-date
+   * tasks regardless of this flag (see ArchiveService.evaluateArchiveCriteria).
+   */
+  includeNoClosedDate: false;
+}
+
+export const DefaultTaskArchiveSettings: TaskArchiveSettings = {
+  autoArchiveEnabled: false,
+  criterionMode: 'days',
+  criterionDays: 90,
+  criterionDate: '',
+  stateMappings: [],
+  includeNoClosedDate: false,
+};
+
 export interface TodoTrackerSettings {
   additionalInactiveKeywords: string[]; // Custom inactive keywords (TODO, LATER, FIXME, etc.)
   additionalActiveKeywords: string[]; // Custom active keywords (DOING, NOW, etc.)
@@ -64,6 +110,8 @@ export interface TodoTrackerSettings {
   // Task completion settings
   trackClosedDate: boolean; // when true, adds CLOSED: timestamp when tasks are marked as completed
   trackStartedDate: boolean; // when true, adds STARTED: timestamp when tasks first enter active state
+  // Auto-archive settings
+  taskArchive: TaskArchiveSettings; // completed → archived keyword rewrite rules (see TaskArchiveSettings)
   // Experimental features
   useExtendedCheckboxStyles: boolean; // when true, uses themed markdown checkbox styles ([/], [-]) for active and cancelled tasks
   // Smart date recognition settings
@@ -135,6 +183,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   stateTransitions: DefaultStateTransitionSettings,
   trackClosedDate: false, // Disabled by default
   trackStartedDate: false, // Disabled by default
+  taskArchive: DefaultTaskArchiveSettings, // Auto-archive defaults (opt-in, 90 days)
   useExtendedCheckboxStyles: false, // Experimental feature - disabled by default
   // Smart date recognition settings
   enableSmartDateRecognition: true, // Enabled by default

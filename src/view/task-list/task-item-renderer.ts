@@ -504,6 +504,11 @@ export class TaskItemRenderer {
    */
   buildTaskListItem(task: Task): HTMLLIElement {
     const li = createEl('li', { cls: 'todoseq-task-item' });
+    // The initial render is the only path that reaches the stylesheet without
+    // going through the update path first, so the state classes have to be set
+    // here too — otherwise styling only appeared after a row was refreshed in
+    // place. One helper for both paths, so they cannot drift apart again.
+    this.applyStateClasses(li, task);
     const source = getTaskSource(task.path);
     li.setAttribute('data-source', source);
     li.setAttribute('data-path', task.path);
@@ -840,6 +845,17 @@ export class TaskItemRenderer {
     }
 
     // 6. Update LI classes for task state
+    this.applyStateClasses(element, task);
+  }
+
+  /**
+   * Stamp a task's state onto its `li`. Shared by the build and update paths:
+   * they must produce the same classes for the same task, or a row changes
+   * appearance the first time it is refreshed in place. Nothing in styles.css
+   * reads `cancelled` / `in-progress` / `active` yet, but the invariant is the
+   * point — a fourth class should not need a second edit to reach first paint.
+   */
+  private applyStateClasses(element: HTMLElement, task: Task): void {
     element.classList.toggle('completed', task.completed);
     element.classList.toggle(
       'cancelled',

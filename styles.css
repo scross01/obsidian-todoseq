@@ -53,6 +53,33 @@
   align-self: center;
 }
 
+/* Main tab without readable line length: the search field grows with the
+   row and spans the full page width, matching the full-width task list
+   below it. */
+
+/* Same context: the guidance box stays a card-sized element centered on the
+   page rather than an edge-to-edge band. */
+.todoseq-panel.todoseq-is-main-tab:not(.todoseq-readable-line-length)
+  .todoseq-panel-empty {
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Main tab type scale: task text steps up to the editor's task entry size
+   (1em of --font-text-size) so page-tab reading mirrors the source notes,
+   while the keyword sits at 0.9em — the same size the editor renders task
+   keywords at — so both contexts echo their source. The side panel keeps
+   0.9em text for sidebar density; the keyword tracks the text there, and
+   meta rows (file info, dates) and icons are unchanged. */
+.todoseq-panel.todoseq-is-main-tab .todoseq-task-text {
+  font-size: 1em;
+}
+
+.todoseq-panel.todoseq-is-main-tab .todo-task-keyword {
+  font-size: 0.9em;
+}
+
 /* List layout */
 .todoseq-panel .todoseq-task-list {
   font-family: var(--font-text);
@@ -65,7 +92,9 @@
 /* List item */
 .todoseq-panel .todoseq-task-item {
   position: relative;
-  padding: var(--size-2-2) 0 var(--size-2-2) var(--size-2-2);
+  /* Vertical padding tightened one step (--size-2-1) to match the embedded
+     list's denser scan rhythm; horizontal padding unchanged. */
+  padding: var(--size-2-1) 0 var(--size-2-1) var(--size-2-2);
   content-visibility: auto;
   contain-intrinsic-size: 0 100px;
   transition: background-color 100ms ease;
@@ -136,18 +165,46 @@
 /* Task text and completion state */
 .todoseq-panel .todoseq-task-text {
   line-height: var(--line-height-tight, 1.4);
+  /* Slightly below body size: the list reads denser than the editor and the
+     keyword lands at the same size as the text, mirroring source entries. */
+  font-size: 0.9em;
 }
 .todoseq-panel .todoseq-task-text.completed {
-  color: var(--text-muted);
+  color: var(--text-faint);
   text-decoration: line-through;
+}
+
+/* Completed rows recede: keyword drops to faint and their meta (file info,
+   date rows) drops a further step so completed clusters sit visually behind
+   open work.
+
+   Keyed off a class on the row itself, which the renderer sets from the same
+   `task.completed` that marks the text. It was previously
+   `.todoseq-task-item:has(.todoseq-task-text.completed)`, which the plugin
+   review flags for style invalidation: a relational selector re-evaluates
+   descendants on every change to the subtree, and this list re-renders
+   continuously as tasks stream in. A `:has()` ban, and the reason, is pinned
+   by tests/stylesheet-lint.test.ts. */
+.todoseq-panel .todoseq-task-item.completed .todo-task-keyword {
+  color: var(--text-faint);
+}
+.todoseq-panel .todoseq-task-item.completed .todoseq-task-file-info,
+.todoseq-panel .todoseq-task-item.completed .todoseq-task-date-container {
+  opacity: 0.75;
 }
 
 /* Keyword toggle (TODO/DOING/DONE) */
 .todoseq-panel .todo-task-keyword {
   color: var(--interactive-accent);
   cursor: pointer;
+  /* Bold, matching the weight the keyword carries in task capture (source
+     entries). A lighter weight read as a different typeface and broke the
+     visual continuity between capture and list. */
   font-weight: var(--font-bold);
-  font-size: 0.85rem;
+  /* 1em of the surrounding task text: the keyword shares the text's size
+     exactly as in source entries (its span nests inside the text span, so
+     em compounds — 1em here means "same as the text"). */
+  font-size: 1em;
 }
 
 /* Hover hint */
@@ -186,6 +243,11 @@
 .todoseq-panel .todoseq-task-checkbox {
   margin-right: var(--size-2-2);
   vertical-align: middle;
+  /* vertical-align: middle centers on baseline + x-height/2, which sits just
+     below the text's optical midline (visible on struck-through rows).
+     Nudge up by a font-relative step so the checkbox centers on the text. */
+  position: relative;
+  top: -0.08em;
 }
 
 /* Editor checkbox styling for active tasks when NOT using themed styles */
@@ -330,7 +392,7 @@
 /* File info (path:line) */
 .todoseq-panel .todoseq-task-file-info {
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: var(--font-ui-smaller, var(--font-smallest));
   margin-top: var(--size-2-2);
 }
 
@@ -370,7 +432,8 @@
 /* Date display styling */
 .todoseq-panel .todoseq-task-date-container {
   margin-top: var(--size-2-2);
-  font-size: 0.8rem;
+  /* Theme-relative meta sizing: dates track the theme scale. */
+  font-size: var(--font-ui-small);
   color: var(--text-muted);
 }
 
@@ -431,8 +494,10 @@
 }
 
 .todoseq-panel .todoseq-task-date .todoseq-task-date-label {
-  font-weight: var(--font-medium);
-  opacity: 0.8;
+  /* Label stays quiet: the rail carries the state, the value carries the
+     date. Only the value earns status color (overdue/today). */
+  font-weight: var(--font-normal);
+  opacity: 0.75;
   margin-right: var(--size-2-2);
 }
 
@@ -458,7 +523,7 @@
 .todoseq-subtask-indicator {
   font-family: var(--font-mono, monospace);
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: var(--font-ui-smaller, var(--font-smallest));
   flex-shrink: 0;
   align-self: flex-start;
 }
@@ -476,7 +541,7 @@
 
 .todoseq-panel .todoseq-task-date-overdue .todoseq-task-date-value {
   color: var(--color-red);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
 }
 
 .todoseq-panel .todoseq-task-date-today {
@@ -486,7 +551,7 @@
 
 .todoseq-panel .todoseq-task-date-today .todoseq-task-date-value {
   color: var(--text-accent);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
 }
 
 .todoseq-panel .todoseq-task-date-soon {
@@ -838,8 +903,8 @@
 
 /* Title styling */
 .todoseq-embedded-task-list-title {
-  font-weight: var(--font-bold);
-  font-size: 1rem;
+  font-weight: var(--font-semibold);
+  font-size: 0.84375rem;
   color: var(--text-normal);
   padding: var(--size-2-1) var(--size-2-3) var(--size-2-3) var(--size-2-3);
   border-bottom: 1px solid var(--background-modifier-border);
@@ -878,6 +943,20 @@
   padding: var(--size-2-1) var(--size-2-3);
   border-radius: var(--radius-s);
   font-family: var(--font-monospace);
+  font-size: 0.68rem;
+}
+
+/* The query chip reads slightly more prominent than the parameter chips —
+   same query/meta split as the dashboard card headers. */
+.todoseq-embedded-task-list-search {
+  color: var(--text-normal);
+}
+
+.todoseq-embedded-task-list-sort,
+.todoseq-embedded-task-list-completed,
+.todoseq-embedded-task-list-future,
+.todoseq-embedded-task-list-limit {
+  color: var(--text-muted);
 }
 
 /* Truncated results indicator */
@@ -1630,10 +1709,6 @@
   padding: var(--size-2-1) var(--size-2-3) var(--size-2-3) var(--size-2-3);
 }
 
-.todoseq-embedded-task-list-title[role='button']:hover {
-  background-color: var(--background-modifier-hover);
-}
-
 .todoseq-embedded-task-list-title[role='button']:focus-visible {
   outline: 2px solid var(--interactive-accent, #7f6df2);
   outline-offset: 2px;
@@ -1651,10 +1726,6 @@
   cursor: pointer;
   user-select: none;
   border-radius: var(--radius-s);
-}
-
-.todoseq-embedded-task-list-header[role='button']:hover {
-  background-color: var(--background-modifier-hover);
 }
 
 .todoseq-embedded-task-list-header[role='button']:focus-visible {
@@ -1684,10 +1755,11 @@
   margin-left: var(--size-2-3);
 }
 
-/* When icon is in todoseq-embedded-task-list-header (no title case), use same margin as title */
+/* When icon is in todoseq-embedded-task-list-header (no title case), it leads
+   the chips row — center it on the text's optical middle like the dashboard
+   headers do. */
 .todoseq-embedded-task-list-header .todoseq-collapse-toggle-icon {
-  margin-left: -10px;
-  margin-top: var(--size-2-1);
+  align-self: center;
 }
 
 /* Query summary in collapsed header */
@@ -2499,6 +2571,490 @@
   border-width: 2px;
 }
 
+/*
+ * Archive-run completion notice (auto-run + manual run).
+ * Obsidian renders notice content inline and styles `.notice button` with
+ * higher specificity than a bare class, so both rules are scoped under
+ * `.notice` to win the cascade. Message and action share ONE flex row with
+ * a real gap; the button is compact and accent-filled, quiet until hovered.
+ *
+ * Mobile: Obsidian's base `button` rule sets `height: var(--input-height)`,
+ * and `.is-mobile` redefines that var to 44px — a padded-but-unheighted
+ * button renders as a tall slab next to the message. Declare the height
+ * explicitly (auto) so padding decides, match the phone notice's smaller
+ * type, and let long messages wrap the button onto its own row instead of
+ * squeezing the text.
+ */
+
+.notice .todoseq-notice-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-3);
+}
+
+.notice .todoseq-notice-message {
+  color: var(--text-normal);
+}
+
+.notice .todoseq-notice-action-btn {
+  flex-shrink: 0;
+  height: auto;
+  padding: var(--size-2-1) var(--size-4-2);
+  border: none;
+  border-radius: var(--radius-s);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  line-height: var(--line-height-tight, 1.4);
+  cursor: pointer;
+  transition:
+    background 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.is-mobile .notice .todoseq-notice-action-btn {
+  font-size: var(--font-ui-smaller);
+  padding: var(--size-2-2) var(--size-4-3);
+}
+
+.is-phone .notice .todoseq-notice-actions {
+  flex-wrap: wrap;
+  row-gap: var(--size-2-2);
+}
+
+/* Phone notices span the full screen width: right-justify the action
+   (Material-snackbar alignment). margin-left auto also right-aligns the
+   button when a long message wraps it onto its own row. */
+.is-phone .notice .todoseq-notice-action-btn {
+  margin-left: auto;
+}
+
+.is-phone .notice .todoseq-notice-message {
+  min-width: 0;
+}
+
+.notice .todoseq-notice-action-btn:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 85%, white);
+}
+
+.notice .todoseq-notice-action-btn:focus-visible {
+  outline: 2px solid var(--text-on-accent);
+  outline-offset: 1px;
+}
+
+.notice .todoseq-notice-action-btn:active {
+  background: color-mix(in srgb, var(--interactive-accent) 75%, black);
+}
+
+/*
+ * Auto-archive dialog
+ */
+
+.todoseq-archive-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: var(--layer-modal, 100);
+}
+
+.todoseq-archive-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: calc(var(--layer-modal, 100) + 1);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l);
+  min-width: min(560px, 90vw);
+  max-width: 560px;
+  width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.todoseq-archive-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--size-4-3) var(--size-4-4);
+  font-weight: var(--font-semibold);
+  font-size: 1rem;
+  border-bottom: 1px solid var(--background-modifier-border);
+  position: sticky;
+  top: 0;
+  background: var(--background-primary);
+  z-index: 1;
+}
+
+.todoseq-archive-close {
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  line-height: 1;
+  padding: var(--size-2-1);
+  border-radius: var(--radius-s);
+}
+
+.todoseq-archive-close:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.todoseq-archive-section {
+  padding: var(--size-4-2) var(--size-4-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+}
+
+.todoseq-archive-section > label {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  color: var(--text-muted);
+}
+
+.todoseq-archive-criteria {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  flex-wrap: wrap;
+}
+
+.todoseq-archive-criteria select,
+.todoseq-archive-criteria input {
+  padding: var(--size-4-1) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+/* Keyboard focus parity with the saved-search dialog fields (polish pass). */
+.todoseq-archive-modal select:focus-visible,
+.todoseq-archive-modal input:focus-visible,
+.todoseq-archive-modal button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -1px;
+}
+
+.todoseq-archive-modal button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.todoseq-archive-preset {
+  cursor: pointer;
+}
+
+.todoseq-archive-preset:hover {
+  background: var(--background-modifier-hover);
+}
+
+.todoseq-archive-note {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-warning);
+}
+
+/*
+ * Mapping rows are a grid, not a sentence: [toggle][source][arrow][target]
+ * as shared tracks so arrows and target dropdowns align down the column
+ * regardless of source-keyword length. The source track flexes; the target
+ * track gets the larger share (it is the decision control).
+ */
+.todoseq-archive-mapping {
+  display: grid;
+  grid-template-columns: auto minmax(8ch, 1fr) auto minmax(14ch, 1.4fr);
+  align-items: center;
+  gap: var(--size-2-2) var(--size-4-2);
+  padding: var(--size-2-1) 0;
+}
+
+.todoseq-archive-mapping + .todoseq-archive-mapping {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.todoseq-archive-source {
+  font-weight: var(--font-semibold);
+  /* Raw --interactive-accent measures below WCAG AA (4.5:1) for this 15px
+     text in both themes (dark 4.00:1, light 3.43:1). Mixing the accent into
+     --text-normal keeps the accent identity while lifting contrast; measured
+     >= 4.5:1 in dark and light. */
+  color: color-mix(in srgb, var(--interactive-accent) 55%, var(--text-normal));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todoseq-archive-arrow {
+  color: var(--text-muted);
+  justify-self: center;
+}
+
+.todoseq-archive-mapping select {
+  width: 100%;
+  padding: var(--size-2-1) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+.todoseq-archive-target-invalid {
+  box-shadow: 0 0 0 1px var(--error-color);
+}
+
+.todoseq-archive-preview-count {
+  font-weight: var(--font-medium);
+}
+
+/* Bulk include/exclude controls (plan 015): quiet secondary buttons under
+   the count line — the apply button stays the only accent-filled action. */
+.todoseq-archive-bulk {
+  display: flex;
+  gap: var(--size-2-2);
+}
+
+/* The bulk row's own display: flex outranks the generic .todoseq-hidden rule
+   (same specificity, later in the file), so the empty-state hide needs a
+   scoped variant — same pattern as .todoseq-panel .todoseq-hidden above. */
+.todoseq-archive-bulk.todoseq-hidden {
+  display: none;
+}
+
+.todoseq-archive-bulk-btn {
+  padding: var(--size-2-1) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.todoseq-archive-bulk-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.todoseq-archive-preview {
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+}
+
+.todoseq-archive-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  padding: var(--size-2-1) var(--size-4-2);
+}
+
+.todoseq-archive-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.todoseq-archive-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.todoseq-archive-task-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-normal);
+}
+
+.todoseq-archive-row-meta {
+  display: flex;
+  gap: var(--size-4-2);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.todoseq-archive-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todoseq-archive-chip {
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--tag-radius, var(--radius-s));
+  padding: 0 var(--size-2-1);
+  white-space: nowrap;
+}
+
+.todoseq-archive-empty {
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: var(--size-4-4);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.todoseq-archive-more {
+  padding: var(--size-2-1) var(--size-4-2);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.todoseq-archive-footer {
+  padding: var(--size-4-2) var(--size-4-4) var(--size-4-3);
+  border-top: 1px solid var(--background-modifier-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+}
+
+.todoseq-archive-undo-note {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.todoseq-archive-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-4-2);
+}
+
+/* Mobile: full-width centered dialog with larger touch targets. The preview
+   grows instead of nesting a second scroll container — only the modal scrolls.
+   Dialog mapping rows: on narrow screens the 4-column grid would crush the
+   target dropdown, so collapse to two aligned columns (source and target
+   share the second column, toggle leads). */
+.is-mobile .todoseq-archive-modal {
+  width: 92vw;
+  min-width: 0;
+}
+
+/* Phone-class layouts: bottom sheet instead of the centered box. Centering
+   (top: 50% + translate) with `max-height: 85vh` pushes tall content past
+   the viewport instead of clipping it inside — on a 420x900 window the
+   footer could sit half off-screen. Anchoring to the bottom keeps the
+   footer reachable no matter how tall the content grows; the modal itself
+   scrolls internally (base rule's overflow-y: auto). Tablets keep the
+   centered .is-mobile rules above. */
+.is-phone .todoseq-archive-modal {
+  top: auto;
+  bottom: 0;
+  left: 0;
+  transform: none;
+  width: 100vw;
+  min-width: 0;
+  max-width: 100vw;
+  max-height: 92dvh;
+  border-radius: var(--radius-l) var(--radius-l) 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.is-mobile .todoseq-archive-mapping {
+  grid-template-columns: auto 1fr;
+}
+
+.is-mobile .todoseq-archive-mapping .todoseq-archive-arrow {
+  display: none;
+}
+
+.is-mobile .todoseq-archive-mapping .todoseq-archive-source {
+  grid-column: 2;
+}
+
+.is-mobile .todoseq-archive-mapping select {
+  grid-column: 2;
+}
+
+/*
+ * Settings: auto-archive mapping rows on mobile.
+ * Each mapping row is a declarative setting item carrying a toggle AND a
+ * target dropdown. Obsidian's phone rules only stack rows whose class list
+ * is NOT .mod-toggle (stamped by addToggle), so these rows keep the two-
+ * column name|controls layout and the dropdown gets crushed to a stub that
+ * truncates ARCHIVED → "ARC…". Re-layout here: name and description take
+ * the full width; toggle + dropdown share a full-width controls row below
+ * with a generous touch target.
+ */
+
+.is-mobile .setting-item.todoseq-archive-mapping-item {
+  flex-wrap: wrap;
+}
+
+.is-mobile .setting-item.todoseq-archive-mapping-item .setting-item-info {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.is-mobile .setting-item.todoseq-archive-mapping-item .setting-item-control {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--size-4-3);
+}
+
+.is-mobile
+  .setting-item.todoseq-archive-mapping-item
+  .setting-item-control
+  select {
+  flex: 1 1 auto;
+  min-width: 14ch;
+}
+
+.is-mobile .todoseq-archive-preview {
+  max-height: none;
+  overflow-y: visible;
+}
+
+.is-mobile .todoseq-archive-row {
+  padding: var(--size-4-2);
+}
+
+/* 44px touch targets for the small interactive controls (adapt pass). */
+.is-mobile .todoseq-archive-row input[type='checkbox'],
+.is-mobile .todoseq-archive-mapping input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  padding: 12px; /* hit area extends to ~44px while the box stays compact */
+  flex-shrink: 0;
+}
+
+.is-mobile .todoseq-archive-mapping input[type='checkbox'] {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.is-mobile .todoseq-archive-preset {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.is-mobile .todoseq-archive-bulk-btn {
+  min-height: 44px;
+  padding: var(--size-2-2) var(--size-4-3);
+}
+
+.is-mobile .todoseq-archive-close {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .todoseq-saved-search-buttons {
   display: flex;
   justify-content: flex-end;
@@ -2560,4 +3116,725 @@
 
 .todoseq-dropdown .search-suggest-history-item:hover .suggestion-aux {
   opacity: 1;
+}
+
+/* ============================================================================
+   Embedded dashboard cards (todoseq-dashboard)
+   Sibling of the embedded task list well. Theme variables only — no hex
+   literals, no docs-site tokens. Responsive via container queries driven by
+   the card's own width (container-type: inline-size), plus .is-mobile /
+   .is-phone body classes for hit-target sizing.
+   ============================================================================ */
+
+.todoseq-dashboard-container {
+  container-type: inline-size;
+  padding: var(--size-4-2) var(--size-4-3);
+  border-radius: var(--code-radius);
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.markdown-reading-view .todoseq-dashboard-container {
+  margin: var(--size-4-4) 0;
+}
+
+/* Header: optional title + right-aligned total */
+.todoseq-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  /* Matches the embedded task list's title-to-chevron breathing room (its
+     chevron carries a --size-2-3 margin); the right-aligned total is pushed
+     by margin-left: auto, so this gap only shapes the left group. */
+  gap: var(--size-2-3);
+}
+
+.todoseq-dashboard-title {
+  font-size: 0.84375rem;
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todoseq-dashboard-total {
+  font-family: var(--font-monospace);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  /* Absorbs all free space (before justify-content applies), so the title
+     + collapse chevron group stays left and the count right-aligns in every
+     header composition: [title, total], [title, chevron, total], and
+     [chevron, total]. */
+  margin-left: auto;
+}
+
+/* Collapsed cards: the header is the toggle */
+.todoseq-dashboard-header-toggle {
+  cursor: pointer;
+  border-radius: var(--radius-s);
+}
+
+/* Expand/collapse chevron — same pattern as the embedded task lists
+   (.todoseq-collapse-toggle-icon, rotates 90° when expanded). Sits directly
+   after the title, or leads the header line before the task count when the
+   card has no title.
+
+   Geometry: the total carries margin-left: auto, so all free space is
+   consumed before justify-content applies — title + chevron group on the
+   left (titleless: chevron alone), total right-aligned in both cases. The
+   header baseline-aligns its items and an SVG-only box's synthesized
+   baseline is its bottom edge, which rides the icon high — align-self:
+   center drops it onto the text's optical middle. */
+.todoseq-dashboard-header .todoseq-collapse-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-s);
+  height: var(--icon-s);
+  color: var(--text-muted);
+  transition: transform 0.15s ease-out;
+  align-self: center;
+  flex-shrink: 0;
+  /* The base rule's chevron margin is the embedded title's spacing
+     mechanism; here the header gap provides it, so cancel the margin to
+     keep the title-to-chevron distance identical on both surfaces. */
+  margin-left: 0;
+}
+
+.todoseq-dashboard-header .todoseq-collapse-toggle-icon.is-expanded {
+  transform: rotate(90deg);
+}
+
+.todoseq-dashboard-collapsed .todoseq-dashboard-chips,
+.todoseq-dashboard-collapsed .todoseq-dashboard-content {
+  display: none;
+}
+
+/* Chip row under the header: query chip (mono) + meta chips (muted) */
+.todoseq-dashboard-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2);
+  padding-top: var(--size-4-1);
+}
+
+.todoseq-dashboard-chip-query,
+.todoseq-dashboard-chip-meta {
+  /* Mockup: query + meta chips sit in a pill background */
+  padding: var(--size-2-1) var(--size-2-3);
+  border-radius: var(--radius-s);
+  background-color: var(--background-modifier-selection);
+  font-family: var(--font-monospace);
+  font-size: 0.68rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todoseq-dashboard-chip-query {
+  color: var(--text-normal);
+}
+
+.todoseq-dashboard-chip-meta {
+  color: var(--text-muted);
+}
+
+.todoseq-dashboard-content {
+  padding-top: var(--size-4-2);
+}
+
+/* Shared interactive semantics for rows / legend / tiles / pills / cells */
+.todoseq-dashboard-clickable {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.todoseq-dashboard-clickable:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: 1px;
+}
+
+/* -- bar ------------------------------------------------------------------ */
+
+.todoseq-dashboard-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-1);
+}
+
+.todoseq-dashboard-bar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-2-1) var(--size-2-2);
+  border-radius: var(--radius-s);
+}
+
+.todoseq-dashboard-bar-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todoseq-dashboard-bar-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background-color: var(--todoseq-bar-color);
+  flex-shrink: 0;
+}
+
+.todoseq-dashboard-bar-label {
+  width: 92px;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-normal);
+}
+
+.todoseq-dashboard-bar-track {
+  flex: 1;
+  height: 10px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.todoseq-dashboard-bar-fill {
+  height: 100%;
+  background-color: var(--todoseq-bar-color);
+  border-radius: 2px;
+}
+
+/* The mockup dims faint-bucket fills (Low/None) while the swatch dot stays
+   full strength; the renderer adds .is-muted for those groups. */
+.todoseq-dashboard-bar-fill.is-muted {
+  opacity: 0.55;
+}
+
+.todoseq-dashboard-bar-count {
+  font-family: var(--font-monospace);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  min-width: 2ch;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* -- column ---------------------------------------------------------------- */
+
+.todoseq-dashboard-column-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.todoseq-dashboard-column {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: var(--size-4-4);
+}
+
+.todoseq-dashboard-column-item {
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--size-2-1);
+  border-radius: var(--radius-s);
+  padding: var(--size-2-1) 0;
+}
+
+.todoseq-dashboard-column-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todoseq-dashboard-column-count {
+  font-family: var(--font-monospace);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.todoseq-dashboard-column-bar {
+  width: 30px;
+  height: 96px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.todoseq-dashboard-column-bar-fill {
+  width: 100%;
+  background-color: var(--todoseq-bar-color);
+  border-radius: 3px 3px 0 0;
+  min-height: 1px;
+}
+
+.todoseq-dashboard-column-baseline {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.todoseq-dashboard-column-labels {
+  display: flex;
+  justify-content: center;
+  gap: var(--size-4-4);
+  padding-top: var(--size-2-1);
+}
+
+.todoseq-dashboard-column-label {
+  width: 72px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  /* Mockup tint: dimmer than Obsidian's default --text-muted. */
+  color: var(--text-faint);
+}
+
+/* -- donut + legend --------------------------------------------------------- */
+
+.todoseq-dashboard-donut {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-4);
+}
+
+.todoseq-dashboard-donut-ring-wrap {
+  position: relative;
+  width: 136px;
+  height: 136px;
+  flex-shrink: 0;
+}
+
+.todoseq-dashboard-donut-ring {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.todoseq-dashboard-donut-center {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.todoseq-dashboard-donut-total {
+  font-family: var(--font-monospace);
+  font-size: 1.3125rem;
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+  line-height: 1.1;
+}
+
+.todoseq-dashboard-donut-unit {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.todoseq-dashboard-legend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-1);
+  min-width: 0;
+}
+
+.todoseq-dashboard-legend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-4-1) var(--size-4-2);
+  border-radius: var(--radius-s);
+}
+
+.todoseq-dashboard-legend-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todoseq-dashboard-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background-color: var(--todoseq-bar-color);
+  flex-shrink: 0;
+}
+
+.todoseq-dashboard-legend-label {
+  flex: 1;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-normal);
+}
+
+.todoseq-dashboard-legend-value {
+  font-family: var(--font-monospace);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* -- tiles ------------------------------------------------------------------ */
+
+.todoseq-dashboard-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--size-4-2);
+}
+
+.todoseq-dashboard-tile {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: var(--size-4-2);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--size-2-1);
+}
+
+.todoseq-dashboard-tile:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todoseq-dashboard-tile-number {
+  font-family: var(--font-monospace);
+  font-size: 1.375rem;
+  font-weight: var(--font-semibold);
+  color: var(--todoseq-tile-color);
+  line-height: 1;
+}
+
+.todoseq-dashboard-tile-label {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+/* -- heatmap ---------------------------------------------------------------- */
+
+.todoseq-dashboard-heatmap {
+  --todoseq-heatmap-cell: 14px;
+  --todoseq-heatmap-gap: 3px;
+}
+
+.todoseq-dashboard-heatmap-scroll {
+  overflow-x: auto;
+  /* Mockup: the grid centers in the card, scrolling left-anchored when it
+     overflows (justify-content center collapses under overflow). */
+  display: flex;
+  justify-content: safe center;
+}
+
+.todoseq-dashboard-heatmap-body {
+  display: flex;
+  align-items: flex-start;
+}
+
+.todoseq-dashboard-heatmap-gutter {
+  display: grid;
+  grid-template-rows: repeat(7, var(--todoseq-heatmap-cell));
+  gap: var(--todoseq-heatmap-gap);
+  width: 28px;
+  flex-shrink: 0;
+  /* Offset = the months strip height (1.1em) + its margin-bottom, so the
+     Monday label lines up with the first grid row (the original
+     cell + gap + 1.1em formula drifted 15px below the grid). */
+  margin-top: calc(1.1em + var(--size-4-1));
+}
+
+.todoseq-dashboard-heatmap-gutter span {
+  font-size: 0.53125rem;
+  color: var(--text-faint);
+  line-height: var(--todoseq-heatmap-cell);
+}
+
+.todoseq-dashboard-heatmap-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.todoseq-dashboard-heatmap-months {
+  display: grid;
+  grid-template-columns: repeat(
+    var(--todoseq-heatmap-weeks),
+    var(--todoseq-heatmap-cell)
+  );
+  gap: var(--todoseq-heatmap-gap);
+  margin-bottom: var(--size-4-1);
+  height: 1.1em;
+}
+
+.todoseq-dashboard-heatmap-month {
+  grid-row: 1;
+  font-size: 0.5625rem;
+  /* Mockup tint: dimmer than Obsidian's default --text-muted. */
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.todoseq-dashboard-heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, var(--todoseq-heatmap-cell));
+  grid-auto-flow: column;
+  grid-auto-columns: var(--todoseq-heatmap-cell);
+  gap: var(--todoseq-heatmap-gap);
+  width: fit-content;
+}
+
+.todoseq-dashboard-heatmap-cell {
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  padding: 0;
+}
+
+.todoseq-dashboard-heatmap-cell.l1 {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 28%,
+    var(--background-secondary)
+  );
+  border-color: transparent;
+}
+
+.todoseq-dashboard-heatmap-cell.l2 {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 52%,
+    var(--background-secondary)
+  );
+  border-color: transparent;
+}
+
+.todoseq-dashboard-heatmap-cell.l3 {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 76%,
+    var(--background-secondary)
+  );
+  border-color: transparent;
+}
+
+.todoseq-dashboard-heatmap-cell.l4 {
+  background-color: var(--interactive-accent);
+  border-color: transparent;
+}
+
+.todoseq-dashboard-heatmap-cell.today {
+  border-color: var(--interactive-accent);
+}
+
+.todoseq-dashboard-heatmap-cell.past {
+  opacity: 0.38;
+}
+
+/* Mockup: hovering a cell outlines it with the accent (after .today so a
+   hovered today cell keeps the same accent border). */
+.todoseq-dashboard-heatmap-cell.todoseq-dashboard-clickable:hover {
+  border-color: var(--interactive-accent);
+}
+
+.todoseq-dashboard-heatmap-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-2);
+  font-size: 0.625rem;
+  color: var(--text-faint);
+}
+
+.todoseq-dashboard-hint-narrow {
+  display: none;
+}
+
+.todoseq-dashboard-heatmap-scale {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  font-size: 0.59375rem;
+}
+
+.todoseq-dashboard-heatmap-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.todoseq-dashboard-heatmap-swatch.l1 {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 28%,
+    var(--background-secondary)
+  );
+  border-color: transparent;
+}
+
+.todoseq-dashboard-heatmap-swatch.l2 {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 52%,
+    var(--background-secondary)
+  );
+  border-color: transparent;
+}
+
+.todoseq-dashboard-heatmap-swatch.l3 {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 76%,
+    var(--background-secondary)
+  );
+  border-color: transparent;
+}
+
+.todoseq-dashboard-heatmap-swatch.l4 {
+  background-color: var(--interactive-accent);
+  border-color: transparent;
+}
+
+/* -- strip layout ------------------------------------------------------------ */
+
+.todoseq-dashboard-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-2);
+}
+
+.todoseq-dashboard-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  padding: var(--size-2-1) var(--size-4-2);
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+}
+
+.todoseq-dashboard-pill:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todoseq-dashboard-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--todoseq-bar-color);
+  flex-shrink: 0;
+}
+
+.todoseq-dashboard-pill-label {
+  font-size: 0.72rem;
+  color: var(--text-normal);
+}
+
+.todoseq-dashboard-pill-count {
+  font-family: var(--font-monospace);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* -- empty + error ------------------------------------------------------------ */
+
+.todoseq-dashboard-empty {
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: var(--size-4-6) var(--size-4-3);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--size-4-3);
+  text-align: left;
+}
+
+.todoseq-dashboard-empty-icon {
+  color: var(--text-faint);
+  margin-top: 1px;
+}
+
+.todoseq-dashboard-empty-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.todoseq-dashboard-empty-title {
+  font-size: 0.8125rem;
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+}
+
+.todoseq-dashboard-empty-hint {
+  color: var(--text-muted);
+  font-size: 0.71875rem;
+  margin-top: var(--size-2-1);
+  line-height: 1.45;
+}
+
+.todoseq-dashboard-error {
+  color: var(--error-color);
+  font-size: 0.8rem;
+  padding: var(--size-2-1) 0;
+}
+
+/* -- narrow containers (mobile portrait / narrow panes) ----------------------- */
+
+@container (max-width: 480px) {
+  .todoseq-dashboard-bar-label {
+    width: 84px;
+  }
+
+  .todoseq-dashboard-donut {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .todoseq-dashboard-donut-ring-wrap {
+    width: 112px;
+    height: 112px;
+    align-self: center;
+  }
+
+  .todoseq-dashboard-tiles {
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  }
+
+  .todoseq-dashboard-heatmap {
+    --todoseq-heatmap-cell: 12px;
+    --todoseq-heatmap-gap: 2px;
+  }
+
+  .todoseq-dashboard-hint-full {
+    display: none;
+  }
+
+  .todoseq-dashboard-hint-narrow {
+    display: inline;
+  }
+}
+
+/* Mobile hit-target sizing (body classes set by Obsidian) */
+.is-mobile .todoseq-dashboard-clickable {
+  min-height: 24px;
+}
+
+.is-phone .todoseq-dashboard-clickable {
+  min-height: 24px;
 }

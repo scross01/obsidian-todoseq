@@ -1,0 +1,1457 @@
+import {
+  DefaultSettings,
+  DefaultTaskArchiveSettings,
+  TaskArchiveSettings,
+} from '../src/settings/settings-types';
+import {
+  ArchiveCandidate,
+  ArchiveRunConfig,
+  ArchiveService,
+} from '../src/services/archive-service';
+import { KeywordManager } from '../src/utils/keyword-manager';
+
+// Timezone-safe local date helper (AGENTS.md rule: never Date.now()/UTC in tests).
+function localDate(year: number, month: number, day: number, hour = 12): Date {
+  return new Date(year, month - 1, day, hour, 0, 0, 0);
+}
+
+/** Days before the reference date, as a local date at noon (avoids DST edges). */
+function daysBefore(reference: Date, days: number): Date {
+  return new Date(
+    reference.getFullYear(),
+    reference.getMonth(),
+    reference.getDate() - days,
+    12,
+    0,
+    0,
+    0,
+  );
+}
+
+const REFERENCE = localDate(2026, 9, 24); // fixed reference 'now' for all evaluator tests
+
+function makeMapping(
+  source: string,
+  target = 'ARCHIVED',
+  enabled = true,
+): ArchiveRunConfig['stateMappings'][number] {
+  return { source, enabled, target };
+}
+
+function makeConfig(
+  overrides: Partial<ArchiveRunConfig> = {},
+): ArchiveRunConfig {
+  return {
+    criterionMode: 'days',
+    criterionDays: 90,
+    criterionDate: '',
+    stateMappings: [makeMapping('DONE'), makeMapping('CANCELLED')],
+    includeNoClosedDate: false,
+    ...overrides,
+  };
+}
+
+let nextLine = 0;
+
+function makeTask(
+  overrides: Partial<ArchiveCandidate> & {
+    state?: string;
+    closedDate?: Date | null;
+  },
+): ArchiveCandidate {
+  nextLine += 1;
+  return {
+    path: `notes/test.md`,
+    line: nextLine,
+    rawText: `- [x] ${overrides.state ?? 'DONE'} task text`,
+    state: 'DONE',
+    closedDate: null,
+    ...overrides,
+  };
+}
+
+function makeService(archiveSettings: Partial<TaskArchiveSettings> = {}): {
+  service: ArchiveService;
+  keywordManager: KeywordManager;
+} {
+  const keywordManager = new KeywordManager(DefaultSettings);
+  const settings: TaskArchiveSettings = {
+    ...DefaultTaskArchiveSettings,
+    ...archiveSettings,
+  };
+  return {
+    service: new ArchiveService(keywordManager, settings),
+    keywordManager,
+  };
+}
+
+describe('TaskArchiveSettings defaults', () => {
+  it('ships with sane defaults', () => {
+    expect(DefaultTaskArchiveSettings).toEqual({
+      autoArchiveEnabled: false, // opt-in only
+      criterionDays: 90, // days-mode threshold
+      criterionMode: 'days', // 'days' | 'date' (date = manual runs only)
+      criterionDate: '', // ISO YYYY-MM-DD string, used when mode='date'
+      stateMappings: [], // ArchiveStateMapping[]
+      includeNoClosedDate: false, // reserved: always false in this feature version
+    });
+    expect(DefaultSettings).toMatchObject({
+      taskArchive: DefaultTaskArchiveSettings,
+    });
+  });
+});
+
+describe('ArchiveService.evaluateArchiveCriteria', () => {
+  const { service } = makeService();
+
+  describe('days mode', () => {
+    it('matches tasks closed more than criterionDays ago', () => {
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      ];
+      const matches = service.evaluateArchiveCriteria(
+        tasks,
+        makeConfig(),
+        REFERENCE,
+      );
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toMatchObject({ state: 'DONE', target: 'ARCHIVED' });
+    });
+
+    it('does not match recently closed tasks', () => {
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 10) }),
+      ];
+      expect(
+        service.evaluateArchiveCriteria(tasks, makeConfig(), REFERENCE),
+      ).toHaveLength(0);
+    });
+
+    it('matches at the exact boundary (age >= criterionDays, inclusive)', () => {
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 90) }),
+      ];
+      expect(
+        service.evaluateArchiveCriteria(tasks, makeConfig(), REFERENCE),
+      ).toHaveLength(1);
+    });
+
+    it('matches a task closed 91 days ago at 23:59 (time-of-day does not skip the boundary)', () => {
+      // 91 days ago late evening: day-difference is 91, must match even though
+      // the reference noon-time gives >90 full 24h periods.
+      const closed = new Date(
+        REFERENCE.getFullYear(),
+        REFERENCE.getMonth(),
+        REFERENCE.getDate() - 91,
+        23,
+        59,
+      );
+      const tasks = [makeTask({ state: 'DONE', closedDate: closed })];
+      expect(
+        service.evaluateArchiveCriteria(tasks, makeConfig(), REFERENCE),
+      ).toHaveLength(1);
+    });
+  });
+
+  describe('date mode', () => {
+    it('matches tasks closed strictly before criterionDate', () => {
+      const config = makeConfig({
+        criterionMode: 'date',
+        criterionDate: '2026-02-01',
+      });
+      const before = [
+        makeTask({ state: 'DONE', closedDate: localDate(2026, 1, 15) }),
+      ];
+      const after = [
+        makeTask({ state: 'DONE', closedDate: localDate(2026, 2, 15) }),
+      ];
+      expect(
+        service.evaluateArchiveCriteria(before, config, REFERENCE),
+      ).toHaveLength(1);
+      expect(
+        service.evaluateArchiveCriteria(after, config, REFERENCE),
+      ).toHaveLength(0);
+    });
+
+    it('does not match a task closed exactly on criterionDate (strict "before")', () => {
+      const config = makeConfig({
+        criterionMode: 'date',
+        criterionDate: '2026-02-01',
+      });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: localDate(2026, 2, 1) }),
+      ];
+      expect(
+        service.evaluateArchiveCriteria(tasks, config, REFERENCE),
+      ).toHaveLength(0);
+    });
+
+    it('matches nothing when criterionDate is unset', () => {
+      const config = makeConfig({ criterionMode: 'date', criterionDate: '' });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: localDate(2020, 1, 1) }),
+      ];
+      expect(
+        service.evaluateArchiveCriteria(tasks, config, REFERENCE),
+      ).toHaveLength(0);
+    });
+  });
+
+  describe('closed-date requirement', () => {
+    it('never matches tasks without a CLOSED date', () => {
+      const tasks = [makeTask({ state: 'DONE', closedDate: null })];
+      expect(
+        service.evaluateArchiveCriteria(tasks, makeConfig(), REFERENCE),
+      ).toHaveLength(0);
+    });
+
+    it('rejects no-closed-date tasks even if includeNoClosedDate is somehow true (regression guard)', () => {
+      const config = makeConfig({ includeNoClosedDate: true as const });
+      const tasks = [makeTask({ state: 'DONE', closedDate: null })];
+      expect(
+        service.evaluateArchiveCriteria(tasks, config, REFERENCE),
+      ).toHaveLength(0);
+    });
+  });
+
+  describe('state mapping', () => {
+    it('only matches states with an enabled mapping', () => {
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+        makeTask({
+          state: 'CANCELLED',
+          closedDate: daysBefore(REFERENCE, 100),
+        }),
+        makeTask({
+          state: 'WAIT-DONE',
+          closedDate: daysBefore(REFERENCE, 100),
+        }),
+      ];
+      const matches = service.evaluateArchiveCriteria(
+        tasks,
+        makeConfig(),
+        REFERENCE,
+      );
+      expect(matches.map((m) => m.state)).toEqual(['DONE', 'CANCELLED']);
+    });
+
+    it('ignores disabled mappings', () => {
+      const config = makeConfig({
+        stateMappings: [makeMapping('DONE', 'ARCHIVED', false)],
+      });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      ];
+      expect(
+        service.evaluateArchiveCriteria(tasks, config, REFERENCE),
+      ).toHaveLength(0);
+    });
+
+    it('routes each state to its own mapped target (DONE→ARCHIVED, CANCELLED→ABANDONED)', () => {
+      const config = makeConfig({
+        stateMappings: [
+          makeMapping('DONE', 'ARCHIVED'),
+          makeMapping('CANCELLED', 'ABANDONED'),
+        ],
+      });
+      const keywordManager = new KeywordManager({
+        ...DefaultSettings,
+        additionalArchivedKeywords: ['ABANDONED'],
+      });
+      const customService = new ArchiveService(
+        keywordManager,
+        DefaultTaskArchiveSettings,
+      );
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+        makeTask({
+          state: 'CANCELLED',
+          closedDate: daysBefore(REFERENCE, 100),
+        }),
+      ];
+      const matches = customService.evaluateArchiveCriteria(
+        tasks,
+        config,
+        REFERENCE,
+      );
+      expect(matches).toHaveLength(2);
+      expect(matches.find((m) => m.state === 'DONE')?.target).toBe('ARCHIVED');
+      expect(matches.find((m) => m.state === 'CANCELLED')?.target).toBe(
+        'ABANDONED',
+      );
+    });
+
+    it('accepts a swapped-in KeywordManager so keyword edits are not stale (updateKeywordManager)', () => {
+      // Service built when ABANDONED did not exist yet.
+      const initialManager = new KeywordManager({
+        ...DefaultSettings,
+      });
+      const swappingService = new ArchiveService(
+        initialManager,
+        DefaultTaskArchiveSettings,
+      );
+      const config = makeConfig({
+        stateMappings: [makeMapping('DONE', 'ABANDONED', true)],
+      });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      ];
+
+      // Before the swap: ABANDONED is not a known archived keyword → rejected.
+      expect(
+        swappingService.evaluateArchiveCriteria(tasks, config, REFERENCE),
+      ).toHaveLength(0);
+
+      // recreateParser() builds a NEW manager (user added ABANDONED), then
+      // main.ts syncs it into the service.
+      const freshManager = new KeywordManager({
+        ...DefaultSettings,
+        additionalArchivedKeywords: ['ABANDONED'],
+      });
+      swappingService.updateKeywordManager(freshManager);
+
+      const matches = swappingService.evaluateArchiveCriteria(
+        tasks,
+        config,
+        REFERENCE,
+      );
+      expect(matches).toHaveLength(1);
+      expect(matches[0].target).toBe('ABANDONED');
+    });
+
+    it('uses the first enabled mapping when duplicates exist (deterministic)', () => {
+      const config = makeConfig({
+        stateMappings: [
+          makeMapping('DONE', 'ARCHIVED', true),
+          makeMapping('DONE', 'ARCHIVED', true),
+        ],
+      });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      ];
+      const matches = service.evaluateArchiveCriteria(tasks, config, REFERENCE);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].target).toBe('ARCHIVED');
+    });
+
+    it('never matches states that are themselves archived keywords', () => {
+      const config = makeConfig({
+        stateMappings: [makeMapping('ARCHIVED', 'ARCHIVED', true)],
+      });
+      const tasks = [
+        makeTask({ state: 'ARCHIVED', closedDate: daysBefore(REFERENCE, 100) }),
+      ];
+      expect(
+        service.evaluateArchiveCriteria(tasks, config, REFERENCE),
+      ).toHaveLength(0);
+    });
+  });
+
+  describe('target validation', () => {
+    it('rejects mappings whose target is not an archived-group keyword', () => {
+      const config = makeConfig({
+        stateMappings: [makeMapping('DONE', 'DONE')],
+      });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      ];
+      expect(
+        service.evaluateArchiveCriteria(tasks, config, REFERENCE),
+      ).toHaveLength(0);
+    });
+
+    it('rejects custom targets unknown to the KeywordManager', () => {
+      // ABANDONED is not in DefaultSettings archived keywords — mapping is invalid there.
+      const config = makeConfig({
+        stateMappings: [makeMapping('DONE', 'ABANDONED')],
+      });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      ];
+      expect(
+        service.evaluateArchiveCriteria(tasks, config, REFERENCE),
+      ).toHaveLength(0);
+    });
+
+    it('accepts custom targets present in the user archived-keyword settings', () => {
+      const keywordManager = new KeywordManager({
+        ...DefaultSettings,
+        additionalArchivedKeywords: ['ABANDONED'],
+      });
+      const customService = new ArchiveService(
+        keywordManager,
+        DefaultTaskArchiveSettings,
+      );
+      const config = makeConfig({
+        stateMappings: [makeMapping('DONE', 'ABANDONED')],
+      });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      ];
+      const matches = customService.evaluateArchiveCriteria(
+        tasks,
+        config,
+        REFERENCE,
+      );
+      expect(matches).toHaveLength(1);
+      expect(matches[0].target).toBe('ABANDONED');
+    });
+  });
+
+  describe('config source', () => {
+    it('falls back to the constructor settings when config is omitted', () => {
+      const { service: configured } = makeService({
+        criterionDays: 30,
+        stateMappings: [makeMapping('DONE')],
+      });
+      const tasks = [
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 45) }),
+        makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 10) }),
+      ];
+      const matches = configured.evaluateArchiveCriteria(
+        tasks,
+        undefined,
+        REFERENCE,
+      );
+      expect(matches).toHaveLength(1);
+    });
+  });
+});
+
+describe('ArchiveService.applyArchives', () => {
+  class FakeCoordinator {
+    calls: { state: string; target: string; rawText: string }[] = [];
+    async updateTaskState(
+      task: { state: string; rawText: string },
+      newState: string,
+    ): Promise<void> {
+      this.calls.push({
+        state: task.state,
+        target: newState,
+        rawText: task.rawText,
+      });
+    }
+  }
+
+  function setup() {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const coordinator = new FakeCoordinator();
+    const store = new Map<string, ArchiveCandidate>();
+    const deps = {
+      getTask: (path: string, line: number) =>
+        store.get(`${path}:${line}`) ?? null,
+      apply: async (task: { state: string }, target: string) => {
+        await coordinator.updateTaskState(task, target);
+      },
+    };
+    return { service, coordinator, store, deps };
+  }
+
+  it('applies to all matches and journals one record per apply', async () => {
+    const { service, coordinator, store, deps } = setup();
+    const tasks = [
+      makeTask({
+        state: 'DONE',
+        closedDate: daysBefore(REFERENCE, 100),
+        rawText: '- [x] DONE first',
+      }),
+      makeTask({
+        state: 'DONE',
+        closedDate: daysBefore(REFERENCE, 120),
+        rawText: '- [x] DONE second',
+      }),
+    ];
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    const matches = service.evaluateArchiveCriteria(
+      tasks,
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const result = await service.applyArchives(matches, deps);
+
+    expect(result.archived).toHaveLength(2);
+    expect(result.skipped).toHaveLength(0);
+    expect(coordinator.calls).toHaveLength(2);
+    expect(coordinator.calls.every((c) => c.target === 'ARCHIVED')).toBe(true);
+    expect(service.hasUndoableRun()).toBe(true);
+    expect(result.archived[0]).toMatchObject({
+      path: tasks[0].path,
+      line: tasks[0].line,
+      originalState: 'DONE',
+      target: 'ARCHIVED',
+      rawTextBefore: '- [x] DONE first',
+    });
+  });
+
+  it('skips stale tasks (no longer present) without applying or journaling', async () => {
+    const { service, coordinator, deps } = setup();
+    const task = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+    });
+    const matches = service.evaluateArchiveCriteria(
+      [task],
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const result = await service.applyArchives(matches, deps); // store empty → getTask returns null
+
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      { path: task.path, line: task.line, reason: 'stale' },
+    ]);
+    expect(coordinator.calls).toHaveLength(0);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
+  it('skips tasks whose state changed since evaluation', async () => {
+    const { service, coordinator, store, deps } = setup();
+    const task = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+    });
+    store.set(`${task.path}:${task.line}`, { ...task, state: 'DOING' }); // changed underneath us
+    const matches = service.evaluateArchiveCriteria(
+      [task],
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const result = await service.applyArchives(matches, deps);
+
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toBe('stale');
+    expect(coordinator.calls).toHaveLength(0);
+  });
+
+  it('reports isRunning during the batch and false after', async () => {
+    const { service, store, deps } = setup();
+    const task = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+    });
+    store.set(`${task.path}:${task.line}`, task);
+    const matches = service.evaluateArchiveCriteria(
+      [task],
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const runningDuring: boolean[] = [];
+    await service.applyArchives(matches, {
+      ...deps,
+      apply: async (t, target) => {
+        runningDuring.push(service.isRunning());
+        await Promise.resolve();
+      },
+    });
+
+    expect(runningDuring).toEqual([true]);
+    expect(service.isRunning()).toBe(false);
+  });
+
+  it('journals the full task snapshot, preserving table-cell identity', async () => {
+    const { service, store, deps } = setup();
+    const task = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      isTableTask: true,
+      tableCell: { cellIndex: 1 },
+    });
+    store.set(`${task.path}:${task.line}`, task);
+    const matches = service.evaluateArchiveCriteria(
+      [task],
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const result = await service.applyArchives(matches, deps);
+
+    expect(result.archived[0].taskSnapshot).toMatchObject({
+      path: task.path,
+      line: task.line,
+      state: 'DONE',
+      rawText: task.rawText,
+      isTableTask: true,
+      tableCell: { cellIndex: 1 },
+    });
+  });
+
+  it('a new successful run overwrites the journal', async () => {
+    const { service, store, deps } = setup();
+    const first = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE first run',
+    });
+    const second = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 200),
+      rawText: '- [x] DONE second run',
+    });
+
+    store.set(`${first.path}:${first.line}`, first);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([first], makeConfig(), REFERENCE),
+      deps,
+    );
+
+    store.delete(`${first.path}:${first.line}`);
+    store.set(`${second.path}:${second.line}`, second);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([second], makeConfig(), REFERENCE),
+      deps,
+    );
+
+    expect(service.hasUndoableRun()).toBe(true);
+    // Journal must contain ONLY the second run's record.
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => `- [ ] ARCHIVED second run`,
+      apply: async () => undefined,
+    });
+    expect(outcome.reverted).toHaveLength(1);
+    expect(outcome.reverted[0].rawTextBefore).toBe('- [x] DONE second run');
+  });
+
+  // Regression: table cells in the same row share path+line, so getTask must
+  // receive the match's cell identity — otherwise verify can hit the wrong
+  // cell's task (or skip the match entirely).
+  it('resolves table-cell tasks by cellIndex during apply-verify', async () => {
+    const { service } = makeService({ stateMappings: [makeMapping('DOING')] });
+    const cell0 = makeTask({
+      path: 'table.md',
+      line: 7,
+      state: 'DONE',
+      rawText: 'DONE Cell zero',
+      isTableTask: true,
+      tableCell: { cellIndex: 0 },
+    });
+    const cell1 = makeTask({
+      path: 'table.md',
+      line: 7,
+      state: 'DOING',
+      rawText: 'DOING Cell one',
+      isTableTask: true,
+      tableCell: { cellIndex: 1 },
+    });
+    const store = new Map<string, ArchiveCandidate>([
+      [`${cell0.path}:${cell0.line}`, cell0],
+      [`${cell1.path}:${cell1.line}`, cell1],
+    ]);
+    const seenCellIndexes: (number | undefined)[] = [];
+
+    const result = await service.applyArchives(
+      [
+        {
+          path: cell1.path,
+          line: cell1.line,
+          rawText: cell1.rawText,
+          state: 'DOING',
+          closedDate: daysBefore(REFERENCE, 100),
+          target: 'ARCHIVED',
+          tableCell: { cellIndex: 1 },
+        },
+      ],
+      {
+        getTask: (path, line, cellIndex) => {
+          seenCellIndexes.push(cellIndex);
+          return store.get(`${path}:${line}`) &&
+            (store.get(`${path}:${line}`)?.tableCell?.cellIndex === cellIndex ||
+              cellIndex === undefined)
+            ? (store.get(`${path}:${line}`) ?? null)
+            : null;
+        },
+        apply: async () => undefined,
+      },
+    );
+
+    expect(seenCellIndexes).toEqual([1]);
+    expect(result.archived).toHaveLength(1);
+    expect(result.skipped).toHaveLength(0);
+  });
+
+  it('an empty apply clears any previous journal (no-op run is not undoable)', async () => {
+    const { service, store, deps } = setup();
+    const first = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+    });
+    store.set(`${first.path}:${first.line}`, first);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([first], makeConfig(), REFERENCE),
+      deps,
+    );
+    expect(service.hasUndoableRun()).toBe(true);
+
+    // Second run with all matches stale → empty archived list overwrites journal.
+    store.delete(`${first.path}:${first.line}`);
+    const staleMatch = { ...first, target: 'ARCHIVED' };
+    const result = await service.applyArchives([staleMatch], deps);
+
+    expect(result.archived).toHaveLength(0);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
+  // Regression: a mid-batch throw used to strand the undo journal holding the
+  // PREVIOUS run while earlier matches of THIS run were already rewritten on
+  // disk — undo would then revert the wrong (older) run. Per-match containment
+  // (mirroring undoLastRun) keeps the loop alive and the journal accurate.
+  it('journals the successful prefix when a later apply throws', async () => {
+    const { service, coordinator, store, deps } = setup();
+    const tasks = [
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 110) }),
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 120) }),
+    ];
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    const matches = service.evaluateArchiveCriteria(
+      tasks,
+      makeConfig(),
+      REFERENCE,
+    );
+
+    let applyCalls = 0;
+    const result = await service.applyArchives(matches, {
+      ...deps,
+      apply: async (task, target) => {
+        applyCalls += 1;
+        if (applyCalls === 2) {
+          throw new Error('simulated sync-phase failure');
+        }
+        await deps.apply(task, target);
+      },
+    });
+
+    // Matches 1 and 3 archived (containment means continue, not abort);
+    // match 2 skipped with the typed reason.
+    expect(result.archived).toHaveLength(2);
+    expect(result.archived.map((r) => r.line)).toEqual([
+      tasks[0].line,
+      tasks[2].line,
+    ]);
+    expect(result.skipped).toEqual([
+      { path: tasks[1].path, line: tasks[1].line, reason: 'apply-failed' },
+    ]);
+    expect(coordinator.calls).toHaveLength(2);
+    expect(service.hasUndoableRun()).toBe(true);
+  });
+
+  it('undo after a partial apply reverts only the succeeded matches', async () => {
+    const { service, store, deps } = setup();
+    const tasks = [
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 100) }),
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 110) }),
+      makeTask({ state: 'DONE', closedDate: daysBefore(REFERENCE, 120) }),
+    ];
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    const matches = service.evaluateArchiveCriteria(
+      tasks,
+      makeConfig(),
+      REFERENCE,
+    );
+
+    let applyCalls = 0;
+    await service.applyArchives(matches, {
+      ...deps,
+      apply: async (task, target) => {
+        applyCalls += 1;
+        if (applyCalls === 2) {
+          throw new Error('simulated sync-phase failure');
+        }
+        await deps.apply(task, target);
+      },
+    });
+
+    const applied: { state: string; target: string }[] = [];
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [ ] ARCHIVED task text',
+      apply: async (task, target) => {
+        applied.push({ state: task.state, target });
+      },
+    });
+
+    expect(outcome.reverted).toHaveLength(2);
+    expect(outcome.reverted.map((r) => r.line)).toEqual([
+      tasks[0].line,
+      tasks[2].line,
+    ]);
+    expect(applied).toEqual([
+      { state: 'ARCHIVED', target: 'DONE' },
+      { state: 'ARCHIVED', target: 'DONE' },
+    ]);
+  });
+
+  it('running flag resets after an apply failure', async () => {
+    const { service, store, deps } = setup();
+    const task = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+    });
+    store.set(`${task.path}:${task.line}`, task);
+    const matches = service.evaluateArchiveCriteria(
+      [task],
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const result = await service.applyArchives(matches, {
+      ...deps,
+      apply: async () => {
+        throw new Error('simulated sync-phase failure');
+      },
+    });
+
+    expect(service.isRunning()).toBe(false);
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      { path: task.path, line: task.line, reason: 'apply-failed' },
+    ]);
+  });
+});
+
+describe('ArchiveService.undoLastRun', () => {
+  function setupWithJournal() {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const coordinator = {
+      calls: [] as { state: string; originalState: string }[],
+    };
+    const task = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE original text',
+    });
+    const archivedLine = '- [x] ARCHIVED original text';
+
+    // Seed the journal directly through a successful apply.
+    const store = new Map<string, ArchiveCandidate>([
+      [`${task.path}:${task.line}`, task],
+    ]);
+    return { service, coordinator, task, archivedLine, store };
+  }
+
+  it('applies the journaled snapshot (not a minimal reconstruction), preserving table identity', async () => {
+    const { service, task } = setupWithJournal();
+    const store = new Map<string, ArchiveCandidate>([
+      [
+        `${task.path}:${task.line}`,
+        { ...task, isTableTask: true, tableCell: { cellIndex: 2 } },
+      ],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    let appliedTask: unknown;
+    let appliedState: string | undefined;
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [x] ARCHIVED original text',
+      apply: async (t, originalState) => {
+        appliedTask = t;
+        appliedState = originalState;
+      },
+    });
+
+    expect(outcome.reverted).toHaveLength(1);
+    expect(appliedState).toBe('DONE');
+    expect(appliedTask).toMatchObject({
+      path: task.path,
+      line: task.line,
+      state: 'ARCHIVED',
+      isTableTask: true,
+      tableCell: { cellIndex: 2 },
+    });
+  });
+
+  it('skips records without a snapshot and still undoes the rest', async () => {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const t1 = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE one',
+    });
+    const t2 = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 110),
+      rawText: '- [x] DONE two',
+    });
+    const store = new Map<string, ArchiveCandidate>([
+      [`${t1.path}:${t1.line}`, t1],
+      [`${t2.path}:${t2.line}`, t2],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([t1, t2], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+    // Simulate a legacy journal record without a snapshot.
+    (
+      service as unknown as { lastRun: { taskSnapshot?: unknown }[] }
+    ).lastRun[0].taskSnapshot = undefined;
+
+    const applied: string[] = [];
+    const outcome = await service.undoLastRun({
+      getRawLine: async (p, l) =>
+        l === t1.line ? '- [x] ARCHIVED one' : '- [x] ARCHIVED two',
+      apply: async (t) => {
+        applied.push(t.rawText);
+      },
+    });
+
+    expect(outcome.reverted.map((r) => r.line)).toEqual([t2.line]);
+    expect(outcome.skipped).toEqual([
+      {
+        record: expect.objectContaining({ line: t1.line }),
+        reason: 'unparseable',
+      },
+    ]);
+    // The apply callback receives the CURRENT archived rawText (the wiring
+    // layer re-applies the snapshot; originalState arrives separately).
+    expect(applied).toEqual(['- [x] ARCHIVED two']);
+  });
+
+  // Regression: the wiring applies the undo via coordinator.updateTaskState,
+  // which re-derives `completed` from the ORIGINAL state keyword. The snapshot
+  // applied here carries the archived state, so it must not leak through —
+  // otherwise a restored DONE task stays flagged non-completed in the manager.
+  it('applies the snapshot with the archived state, not the undo target', async () => {
+    const { service, task } = setupWithJournal();
+    const store = new Map<string, ArchiveCandidate>([
+      [`${task.path}:${task.line}`, task],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    let appliedTask: unknown;
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [x] ARCHIVED original text',
+      apply: async (t, originalState) => {
+        appliedTask = t;
+        void originalState;
+      },
+    });
+
+    expect(outcome.reverted).toHaveLength(1);
+    expect(appliedTask).toMatchObject({ state: 'ARCHIVED' });
+  });
+
+  it('a failing apply for one record does not abort the remaining undo', async () => {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const t1 = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE one',
+    });
+    const t2 = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 110),
+      rawText: '- [x] DONE two',
+    });
+    const store = new Map<string, ArchiveCandidate>([
+      [`${t1.path}:${t1.line}`, t1],
+      [`${t2.path}:${t2.line}`, t2],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([t1, t2], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    let calls = 0;
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [x] ARCHIVED text',
+      apply: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('coordinator exploded');
+      },
+    });
+
+    expect(outcome.reverted).toHaveLength(1);
+    expect(outcome.skipped).toEqual([
+      {
+        record: expect.objectContaining({ line: t1.line }),
+        reason: 'apply-failed',
+      },
+    ]);
+  });
+
+  it('reverts each journaled record to its original state and clears the journal', async () => {
+    const { service, coordinator, task, archivedLine, store } =
+      setupWithJournal();
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    const applied: string[] = [];
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => archivedLine,
+      apply: async (t, originalState) => {
+        applied.push(originalState);
+        await coordinator.calls.push({ state: t.state, originalState });
+      },
+    });
+
+    expect(outcome.reverted).toHaveLength(1);
+    expect(outcome.skipped).toHaveLength(0);
+    expect(applied).toEqual(['DONE']);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
+  it('skips records whose line is missing', async () => {
+    const { service, task } = setupWithJournal();
+    const store = new Map<string, ArchiveCandidate>([
+      [`${task.path}:${task.line}`, task],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => null,
+      apply: async () => undefined,
+    });
+
+    expect(outcome.reverted).toHaveLength(0);
+    expect(outcome.skipped).toEqual([
+      {
+        record: expect.objectContaining({ path: task.path }),
+        reason: 'line-missing',
+      },
+    ]);
+  });
+
+  it('skips records whose line content changed since the archive', async () => {
+    const { service, task } = setupWithJournal();
+    const store = new Map<string, ArchiveCandidate>([
+      [`${task.path}:${task.line}`, task],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [x] DONE user edited this line completely',
+      apply: async () => undefined,
+    });
+
+    expect(outcome.reverted).toHaveLength(0);
+    expect(outcome.skipped).toHaveLength(1);
+    expect(outcome.skipped[0].reason).toBe('line-changed');
+  });
+
+  it('treats a line still matching the pre-archive shape as changed (never archived or reverted out-of-band)', async () => {
+    const { service, task } = setupWithJournal();
+    const store = new Map<string, ArchiveCandidate>([
+      [`${task.path}:${task.line}`, task],
+    ]);
+    await service.applyArchives(
+      service.evaluateArchiveCriteria([task], makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => task.rawText, // identical to rawTextBefore
+      apply: async () => undefined,
+    });
+
+    expect(outcome.reverted).toHaveLength(0);
+    expect(outcome.skipped[0].reason).toBe('line-changed');
+  });
+
+  it('is a no-op when there is no journal', async () => {
+    const { service } = makeService();
+    let applyCalls = 0;
+    const outcome = await service.undoLastRun({
+      getRawLine: async () => '- [x] ARCHIVED whatever',
+      apply: async () => {
+        applyCalls += 1;
+      },
+    });
+    expect(outcome.reverted).toHaveLength(0);
+    expect(applyCalls).toBe(0);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+});
+
+describe('ArchiveService batch performance (stress)', () => {
+  /**
+   * Vault-scale guard: 5000 matches must flow through evaluate → apply →
+   * undo in linear time. Bounds are deliberately generous (a linear
+   * implementation lands in the tens of milliseconds; these fail only on
+   * accidental O(n²) behavior, e.g. per-match journal array copies or
+   * unbounded regex recompilation).
+   *
+   * Uses performance.now() (not Date.now()) per the AGENTS.md test rule.
+   */
+  const STRESS_SIZE = 5000;
+  const APPLY_BUDGET_MS = 5000;
+  const UNDO_BUDGET_MS = 5000;
+
+  function buildStressTasks(): ArchiveCandidate[] {
+    const tasks: ArchiveCandidate[] = [];
+    for (let i = 0; i < STRESS_SIZE; i++) {
+      tasks.push({
+        path: `notes/stress-${i % 50}.md`, // spread across 50 files
+        line: 10 + i,
+        rawText: `- [x] DONE stress task ${i} lorem ipsum`,
+        state: 'DONE',
+        closedDate: daysBefore(REFERENCE, 100 + (i % 30)),
+      });
+    }
+    return tasks;
+  }
+
+  it(`applies ${STRESS_SIZE} matches within ${APPLY_BUDGET_MS}ms (linear, no O(n²))`, async () => {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const tasks = buildStressTasks();
+    const matches = service.evaluateArchiveCriteria(
+      tasks,
+      makeConfig(),
+      REFERENCE,
+    );
+    expect(matches).toHaveLength(STRESS_SIZE);
+
+    // Identity-store getTask: Map lookup per match, no per-call allocation.
+    const store = new Map<string, ArchiveCandidate>();
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    let applyCount = 0;
+
+    const start = performance.now();
+    const result = await service.applyArchives(matches, {
+      getTask: (path, line) => store.get(`${path}:${line}`) ?? null,
+      apply: async () => {
+        applyCount += 1;
+      },
+    });
+    const elapsed = performance.now() - start;
+
+    expect(applyCount).toBe(STRESS_SIZE);
+    expect(result.archived).toHaveLength(STRESS_SIZE);
+    expect(result.skipped).toHaveLength(0);
+    expect(elapsed).toBeLessThan(APPLY_BUDGET_MS);
+  });
+
+  it(`undoes a ${STRESS_SIZE}-record journal within ${UNDO_BUDGET_MS}ms with cached patterns`, async () => {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const tasks = buildStressTasks();
+    const matches = service.evaluateArchiveCriteria(
+      tasks,
+      makeConfig(),
+      REFERENCE,
+    );
+    const store = new Map<string, ArchiveCandidate>();
+    tasks.forEach((t) => store.set(`${t.path}:${t.line}`, t));
+    const applyResult = await service.applyArchives(matches, {
+      getTask: (path, line) => store.get(`${path}:${line}`) ?? null,
+      apply: async () => undefined,
+    });
+
+    // Simulate post-archive file content: one archived line per record,
+    // derived from the journal the run produced (path:line → archived line).
+    const archivedLines = new Map<string, string>();
+    applyResult.archived.forEach((record) => {
+      archivedLines.set(
+        `${record.path}:${record.line}`,
+        record.rawTextBefore.replace(' DONE ', ' ARCHIVED '),
+      );
+    });
+    let undoApplyCount = 0;
+
+    const start = performance.now();
+    const outcome = await service.undoLastRun({
+      getRawLine: async (path, line) =>
+        archivedLines.get(`${path}:${line}`) ?? null,
+      apply: async () => {
+        undoApplyCount += 1;
+      },
+    });
+    const elapsed = performance.now() - start;
+
+    expect(undoApplyCount).toBe(STRESS_SIZE);
+    expect(outcome.reverted).toHaveLength(STRESS_SIZE);
+    expect(outcome.skipped).toHaveLength(0);
+    expect(elapsed).toBeLessThan(UNDO_BUDGET_MS);
+  });
+});
+
+describe('ArchiveService.undoLastRun resilience', () => {
+  // The journal was cleared before the loop and getRawLine was unguarded, so a
+  // read that threw on record 3 abandoned records 4 and 5 *and* left nothing to
+  // retry with — the one operation whose entire promise is that it can be
+  // reversed had no way back. Read failures are now contained per record, and
+  // anything that could not be attempted stays in the journal.
+  function seedJournal() {
+    const { service } = makeService({ stateMappings: [makeMapping('DONE')] });
+    const tasks = [1, 2, 3].map((n) =>
+      makeTask({
+        path: `n${n}.md`,
+        line: n,
+        state: 'DONE',
+        closedDate: daysBefore(REFERENCE, 100),
+        rawText: `- [x] DONE task ${n}`,
+      }),
+    );
+    const store = new Map<string, ArchiveCandidate>(
+      tasks.map((t) => [`${t.path}:${t.line}`, t]),
+    );
+    return { service, tasks, store };
+  }
+
+  async function archiveAll(
+    service: ReturnType<typeof makeService>['service'],
+    store: Map<string, ArchiveCandidate>,
+    tasks: ReturnType<typeof makeTask>[],
+  ): Promise<void> {
+    await service.applyArchives(
+      service.evaluateArchiveCriteria(tasks, makeConfig(), REFERENCE),
+      {
+        getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+        apply: async () => undefined,
+      },
+    );
+  }
+
+  it('contains a getRawLine rejection and keeps going', async () => {
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    const applied: string[] = [];
+    const outcome = await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (path === 'n2.md') throw new Error('vault busy');
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async (t) => {
+        applied.push(t.path);
+      },
+    });
+
+    expect(applied).toEqual(['n1.md', 'n3.md']);
+    expect(outcome.reverted).toHaveLength(2);
+    expect(outcome.skipped.map((s) => s.reason)).toEqual(['read-failed']);
+  });
+
+  it('keeps un-attempted records in the journal for a retry', async () => {
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (path === 'n2.md') throw new Error('vault busy');
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+
+    expect(service.hasUndoableRun()).toBe(true);
+  });
+
+  it('retries the failed record on a second call', async () => {
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (path === 'n2.md') throw new Error('vault busy');
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+
+    const second: string[] = [];
+    await service.undoLastRun({
+      getRawLine: async (path) => `- [x] ARCHIVED ${path}`,
+      apply: async (t) => {
+        second.push(t.path);
+      },
+    });
+
+    expect(second).toEqual(['n2.md']);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
+  it('does not retain records that failed terminally', async () => {
+    // A missing line can never be undone, so keeping it would leave the undo
+    // command permanently available with nothing it could ever do.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    await service.undoLastRun({
+      getRawLine: async (path) =>
+        path === 'n2.md' ? null : `- [x] ARCHIVED ${path}`,
+      apply: async () => undefined,
+    });
+
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
+  it('does not clobber a newer journal that landed mid-undo', async () => {
+    // An undo awaits once per record, so a concurrent applyArchives can finish
+    // in the gap and install a fresh journal. The undo must then leave it
+    // alone: the tasks it restores are exactly the ones the criteria match, so
+    // losing this journal both orphans the newer run's records and drops the
+    // Undo button from that run's notice.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    // A fresh, unrelated task archived by a run that lands during the undo.
+    const late = makeTask({
+      path: 'late.md',
+      line: 99,
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE late task',
+    });
+    store.set(`${late.path}:${late.line}`, late);
+    let interleaved: Promise<unknown> | null = null;
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (!interleaved) {
+          interleaved = service.applyArchives(
+            [{ ...late, target: 'ARCHIVED' }],
+            {
+              getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+              apply: async () => undefined,
+            },
+          );
+        }
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+    await interleaved;
+
+    expect(outcome.reverted).toHaveLength(3);
+    // The newer run's single record is still the undoable journal.
+    expect(service.hasUndoableRun()).toBe(true);
+  });
+
+  it('reports isRunning while an undo is in flight', async () => {
+    // isRunning gates the auto-archive path. An undo that leaves it false lets
+    // an auto-run start mid-undo, which is the interleaving above.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    const runningDuring: boolean[] = [];
+    await service.undoLastRun({
+      getRawLine: async (path) => {
+        runningDuring.push(service.isRunning());
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+
+    expect(runningDuring).toEqual([true, true, true]);
+    expect(service.isRunning()).toBe(false);
+  });
+
+  it('keeps isRunning true for the undo when a concurrent apply finishes first', async () => {
+    // The flag is shared by both batch kinds, so whichever finishes first used
+    // to clear it for the other. Here the apply completes while the undo is
+    // still reverting: isRunning() must keep reporting true, or the
+    // auto-archive gate in runAutoArchiveIfEnabled opens a third batch over the
+    // same tasks.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    const late = makeTask({
+      path: 'late.md',
+      line: 99,
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE late task',
+    });
+    store.set(`${late.path}:${late.line}`, late);
+
+    let interleaved: Promise<unknown> | null = null;
+    let runningAfterApply: boolean | null = null;
+
+    const outcome = await service.undoLastRun({
+      getRawLine: async (path) => {
+        if (!interleaved) {
+          interleaved = service.applyArchives(
+            [{ ...late, target: 'ARCHIVED' }],
+            {
+              getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+              apply: async () => undefined,
+            },
+          );
+          await interleaved;
+          // The apply has finished; this undo has not.
+          runningAfterApply = service.isRunning();
+        }
+        return `- [x] ARCHIVED ${path}`;
+      },
+      apply: async () => undefined,
+    });
+
+    expect(runningAfterApply).toBe(true);
+    expect(outcome.reverted).toHaveLength(3);
+    expect(service.isRunning()).toBe(false);
+  });
+
+  it('keeps isRunning true for the apply when a concurrent undo finishes first', async () => {
+    // The mirror image: the undo is the batch that completes first this time,
+    // and the apply is the one still writing.
+    const { service, tasks, store } = seedJournal();
+    await archiveAll(service, store, tasks);
+
+    const late = makeTask({
+      path: 'late.md',
+      line: 99,
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE late task',
+    });
+    store.set(`${late.path}:${late.line}`, late);
+
+    let interleaved: Promise<unknown> | null = null;
+    let runningAfterUndo: boolean | null = null;
+
+    await service.applyArchives([{ ...late, target: 'ARCHIVED' }], {
+      getTask: (p, l) => store.get(`${p}:${l}`) ?? null,
+      apply: async () => {
+        interleaved = service.undoLastRun({
+          getRawLine: async (path) => `- [x] ARCHIVED ${path}`,
+          apply: async () => undefined,
+        });
+        await interleaved;
+        runningAfterUndo = service.isRunning();
+      },
+    });
+
+    expect(runningAfterUndo).toBe(true);
+    expect(service.isRunning()).toBe(false);
+  });
+});

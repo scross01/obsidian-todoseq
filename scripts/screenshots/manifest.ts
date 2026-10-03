@@ -1,0 +1,157 @@
+import { createHash } from 'node:crypto';
+
+/** One committed manifest entry in scripts/screenshots/manifest.json. */
+export interface ManifestEntry {
+  /** Asset id (the captured file basename without extension). */
+  id: string;
+  /**
+   * Registry id of the scenario that produced this asset. Check needs it to
+   * recompute the scenario hash; `id` alone cannot map an asset back to a
+   * scenario (one scenario emits several assets).
+   */
+  scenarioId: string;
+  /** Sha256 of the scenario definition (id + source files + seed content). */
+  scenarioHash: string;
+  /**
+   * Sha256 over the plugin sources this scenario's screenshots depend on —
+   * `styles.css` plus the modules listed for the scenario in
+   * plugin-surfaces.ts, not the whole build output.
+   */
+  pluginBuildHash: string;
+  /** Sha256 of the captured asset file bytes. */
+  outputSha256: string;
+  /** Capture date (local, YYYY-MM-DD). */
+  capturedAt: string;
+  /** Short commit sha the capture was produced against. */
+  capturedAtCommit: string;
+}
+
+/** Shape of scripts/screenshots/manifest.json. */
+export interface Manifest {
+  assets: Record<string, ManifestEntry>;
+}
+
+/** Inputs the check compares against a manifest entry. */
+export interface CheckInputs {
+  scenarioHash: string;
+  pluginBuildHash: string;
+  outputSha256: string;
+}
+
+/** One row of the --check report. */
+export interface CheckRow {
+  asset: string;
+  status: string;
+}
+
+/** NUL separator so concatenated fields can never collide. */
+const SEP = '\u0000';
+
+/**
+ * Length-prefixed sha256 over a scenario's plugin sources.
+ *
+ * Keyed by repo-relative path and sorted, so the hash depends on the *set* of
+ * sources rather than the order they were collected in. Deliberately not a
+ * hash of `main.js`: the bundle is one minified file, so hashing it marks all
+ * assets stale after any source change at all, including ones that change no
+ * pixel. The narrowed source set is declared in plugin-surfaces.ts.
+ */
+export function computePluginBuildHash(
+  sources: Record<string, string>,
+): string {
+  const h = createHash('sha256');
+  for (const p of Object.keys(sources).sort()) {
+    const content = sources[p];
+    h.update(`${p}${SEP}${content.length}:${content}${SEP}`);
+  }
+  return h.digest('hex');
+}
+
+/** Scenario definition inputs that participate in the scenario hash. */
+export interface ScenarioHashInput {
+  id: string;
+  /**
+   * Every file whose content defines this scenario, keyed by its path inside
+   * scripts/screenshots/scenarios/ — the scenario script *and* the shared
+   * module it imports (helpers.ts holds the vault seeds and wait predicates).
+   * Hashing only the scenario file would report a helpers edit as FRESH.
+   */
+  sources: Record<string, string>;
+  /** Seed content by vault path — dates must be resolved before hashing. */
+  seed: Record<string, string>;
+}
+
+/**
+ * Replace ISO dates in seed content with a normalized placeholder so the
+ * scenario hash is stable across days: seeds stage content relative to
+ * "today" (local date methods), so raw dates would change every run and make
+ * every asset STALE the day after a capture. Offsets are not inferred — any
+ * same-shape date normalizes identically, and non-date edits still change the
+ * hash.
+ */
+function normalizeDates(content: string): string {
+  return content.replace(/\d{4}-\d{2}-\d{2}/g, 'YYYY-MM-DD');
+}
+
+/**
+ * Sha256 over the scenario definition. Source and seed entries are sorted by
+ * key and date-normalized so the hash is stable regardless of object key order
+ * or the day the capture ran.
+ */
+export function computeScenarioHash(scenario: ScenarioHashInput): string {
+  const h = createHash('sha256');
+  h.update(`${scenario.id}${SEP}`);
+  for (const p of Object.keys(scenario.sources).sort()) {
+    h.update(`${p}${SEP}${normalizeDates(scenario.sources[p])}${SEP}`);
+  }
+  for (const p of Object.keys(scenario.seed).sort()) {
+    h.update(`${p}${SEP}${normalizeDates(scenario.seed[p])}${SEP}`);
+  }
+  return h.digest('hex');
+}
+
+/**
+ * Classify one asset for the --check report. Precedence: missing entry, then
+ * scenario drift (definition changed), then plugin build drift, then output
+ * bytes (someone edited the PNG or the doc embed changed nothing but the file
+ * was regenerated off-manifest).
+ */
+export function classifyAsset(
+  manifest: Manifest,
+  asset: string,
+  inputs: CheckInputs,
+): 'FRESH' | 'MISSING' | string {
+  const entry = manifest.assets[asset];
+  if (!entry) return 'MISSING';
+  if (entry.scenarioHash !== inputs.scenarioHash)
+    return 'STALE (scenario changed)';
+  if (entry.pluginBuildHash !== inputs.pluginBuildHash)
+    return 'STALE (plugin build changed)';
+  if (entry.outputSha256 !== inputs.outputSha256)
+    return 'STALE (output changed)';
+  return 'FRESH';
+}
+
+/** Tally of a check run: how many rows are fresh, and how many are not. */
+export function summarizeRows(rows: CheckRow[]): {
+  fresh: number;
+  bad: number;
+} {
+  const fresh = rows.filter((r) => r.status === 'FRESH').length;
+  return { fresh, bad: rows.length - fresh };
+}
+
+/** Render the --check table: aligned columns plus a summary line. */
+export function formatCheckReport(rows: CheckRow[]): string {
+  if (rows.length === 0) return 'No assets found in docs/assets/.';
+  const width = Math.max(...rows.map((r) => r.asset.length));
+  const lines = rows.map((r) => `${r.asset.padEnd(width)}  ${r.status}`);
+  const { fresh, bad } = summarizeRows(rows);
+  lines.push('');
+  lines.push(
+    bad === 0
+      ? `all ${fresh} fresh`
+      : `${bad} stale/missing/unreferenced, ${fresh} fresh`,
+  );
+  return lines.join('\n');
+}

@@ -277,6 +277,26 @@ a.ts-btn-ghost:hover {
   max-width: min(100%, 480px);
 }
 
+/* Light/dark screenshot pairs.
+ *
+ * Every docs image is captured twice by the screenshot pipeline — once in
+ * Obsidian's dark base theme, once in light — because a dark app screenshot
+ * on the docs' light background reads as a hole in the page. Both files are
+ * embedded and one is hidden, so the page ships both and the appearance
+ * toggle picks. `html.dark` is the class VitePress sets for dark mode.
+ *
+ * Progressive enhancement: if a light twin is ever missing, the dark image is
+ * still the one shown in dark mode, and in light mode the broken light file is
+ * hidden — the same as before this existed, minus the hole.
+ */
+html.dark .vp-doc img.ts-img-light {
+  display: none;
+}
+
+html:not(.dark) .vp-doc img.ts-img-dark {
+  display: none;
+}
+
 .vp-doc table {
   width: 100%;
 }

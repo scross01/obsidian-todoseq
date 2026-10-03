@@ -43,6 +43,10 @@ jest.mock('obsidian', () => ({
   MarkdownView: jest.fn(),
   setIcon: jest.fn(),
   Notice: jest.fn(),
+  Menu: jest.fn().mockImplementation(() => ({
+    addItem: jest.fn().mockReturnThis(),
+    showAtPosition: jest.fn(),
+  })),
   ConfirmationModal: jest.fn().mockImplementation(() => {
     const instance: any = {
       setTitle: jest.fn().mockReturnThis(),
@@ -225,6 +229,100 @@ describe('TaskListView', () => {
   describe('getViewType', () => {
     it('should return the correct view type', () => {
       expect(view.getViewType()).toBe('todoseq-view');
+    });
+  });
+
+  describe('resetUiStateToDefaults', () => {
+    function ensureContentEl(): HTMLElement {
+      if (!view['contentEl']) {
+        view['contentEl'] = activeDocument.createElement('div');
+      }
+      return view['contentEl'];
+    }
+
+    it('clears query, view-mode, sort, and match-case overrides and refreshes', async () => {
+      ensureContentEl();
+      view.setViewMode('hideCompleted');
+      view.setSortMethod('sortByPriority');
+      view['isCaseSensitive'] = true;
+      const refreshSpy = jest
+        .spyOn(
+          view as unknown as { refreshVisibleList: jest.Mock },
+          'refreshVisibleList',
+        )
+        .mockResolvedValue(undefined);
+
+      await view.resetUiStateToDefaults();
+
+      // Defaults come from plugin settings via the accessors' fallback chain.
+      expect(view['getViewMode']()).toBe(
+        (pluginMock.settings as { taskListViewMode: string }).taskListViewMode,
+      );
+      expect(view['getSortMethod']()).toBe(
+        (pluginMock.settings as { defaultSortMethod: string })
+          .defaultSortMethod,
+      );
+      expect(view['isCaseSensitive']).toBe(false);
+      expect(view['contentEl']?.getAttr('data-search')).toBe('');
+      expect(refreshSpy).toHaveBeenCalledWith(true);
+    });
+
+    it('syncs the toolbar dropdowns and match-case button when present', async () => {
+      const contentEl = ensureContentEl();
+      // Mock-DOM selects need options for value assignment to stick.
+      const makeOption = (value: string) => {
+        const option = activeDocument.createElement('option');
+        option.value = value;
+        return option;
+      };
+      const completedDropdown = activeDocument.createElement('select');
+      completedDropdown.id = 'completed-tasks-dropdown';
+      for (const v of ['showAll', 'sortCompletedLast', 'hideCompleted']) {
+        completedDropdown.appendChild(makeOption(v));
+      }
+      completedDropdown.value = 'hideCompleted';
+      contentEl.appendChild(completedDropdown);
+      const sortInfo = activeDocument.createElement('div');
+      sortInfo.className = 'search-results-info';
+      contentEl.appendChild(sortInfo);
+      const sortDropdown = activeDocument.createElement('select');
+      sortDropdown.setAttribute('aria-label', 'Sort tasks by');
+      for (const v of [
+        'default',
+        'sortByScheduled',
+        'sortByDeadline',
+        'sortByClosedDate',
+        'sortByStarted',
+        'sortByPriority',
+        'sortByUrgency',
+        'sortByKeyword',
+      ]) {
+        sortDropdown.appendChild(makeOption(v));
+      }
+      sortDropdown.value = 'sortByUrgency';
+      sortInfo.appendChild(sortDropdown);
+      const matchCaseBtn = activeDocument.createElement('div');
+      matchCaseBtn.className = 'input-right-decorator';
+      matchCaseBtn.setAttribute('aria-label', 'Match case');
+      matchCaseBtn.addClass('is-active');
+      contentEl.appendChild(matchCaseBtn);
+      jest
+        .spyOn(
+          view as unknown as { refreshVisibleList: jest.Mock },
+          'refreshVisibleList',
+        )
+        .mockResolvedValue(undefined);
+
+      await view.resetUiStateToDefaults();
+
+      expect(completedDropdown.value).toBe(
+        (pluginMock.settings as { taskListViewMode: string }).taskListViewMode,
+      );
+      expect(sortDropdown.value).toBe(
+        (pluginMock.settings as { defaultSortMethod: string })
+          .defaultSortMethod,
+      );
+      expect(matchCaseBtn.hasClass('is-active')).toBe(false);
     });
   });
 
@@ -1047,6 +1145,152 @@ describe('TaskListView', () => {
         pluginMock.settings.savedSearches.find((s) => s.id === search.id),
       ).toBeDefined();
       expect(pluginMock.saveSettings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('main-tab state refresh', () => {
+    /** Root fake whose containerEl carries `mod-root` only for main-area roots. */
+    const mainRoot = {
+      containerEl: {
+        classList: {
+          contains: (cls: string) => cls === 'mod-root',
+        },
+      },
+    };
+    const sidebarRoot = {
+      containerEl: {
+        classList: { contains: () => false },
+      },
+    };
+
+    function withWorkspace(root: unknown): { on: jest.Mock } {
+      const on = jest.fn();
+      (view as unknown as { app: unknown }).app = {
+        workspace: { on },
+        vault: {},
+      };
+      (view as unknown as { leaf: unknown }).leaf = { getRoot: () => root };
+      return { on };
+    }
+
+    it('adds main-tab treatment when a sidebar leaf is moved into the main area', () => {
+      withWorkspace(mainRoot);
+      view['isInMainTab'] = false;
+      view['contentEl']?.removeClass('todoseq-is-main-tab');
+
+      view['refreshMainTabState']();
+
+      expect(view['isInMainTab']).toBe(true);
+      expect(view['contentEl']?.hasClass('todoseq-is-main-tab')).toBe(true);
+    });
+
+    it('drops main-tab treatment when the leaf is moved back to a sidebar', () => {
+      withWorkspace(sidebarRoot);
+      view['isInMainTab'] = true;
+      view['contentEl']?.addClass('todoseq-is-main-tab');
+      view['backgroundContextMenuHandler'] = () => {};
+
+      view['refreshMainTabState']();
+
+      expect(view['isInMainTab']).toBe(false);
+      expect(view['contentEl']?.hasClass('todoseq-is-main-tab')).toBe(false);
+      // The context-menu listener stays registered so the view keeps working
+      // if the leaf is moved back to the main area again.
+      expect(view['backgroundContextMenuHandler']).not.toBeNull();
+    });
+
+    it('is a no-op for a view that never left the sidebar', () => {
+      const { on } = withWorkspace(sidebarRoot);
+      view['isInMainTab'] = false;
+      view['contentEl']?.removeClass('todoseq-is-main-tab');
+
+      view['refreshMainTabState']();
+
+      expect(view['isInMainTab']).toBe(false);
+      expect(view['contentEl']?.hasClass('todoseq-is-main-tab')).toBe(false);
+      expect(on).not.toHaveBeenCalled();
+    });
+
+    it('registers layout listeners the first time the view reaches a main tab', () => {
+      const { on } = withWorkspace(mainRoot);
+      view['isInMainTab'] = false;
+      view['layoutChangeObserver'] = null;
+      view['activeLeafObserver'] = null;
+
+      view['refreshMainTabState']();
+
+      // One layout-change subscription plus one active-leaf-change
+      // subscription carry the ongoing state sync.
+      expect(on).toHaveBeenCalledTimes(2);
+    });
+
+    it('treats a missing root as sidebar (fail-safe, no main-tab classes)', () => {
+      (view as unknown as { app: unknown }).app = {
+        workspace: { on: jest.fn() },
+        vault: {},
+      };
+      (view as unknown as { leaf: unknown }).leaf = {
+        getRoot: () => {
+          throw new Error('no root');
+        },
+      };
+      view['isInMainTab'] = true;
+      view['contentEl']?.addClass('todoseq-is-main-tab');
+
+      view['refreshMainTabState']();
+
+      expect(view['isInMainTab']).toBe(false);
+      expect(view['contentEl']?.hasClass('todoseq-is-main-tab')).toBe(false);
+    });
+  });
+
+  describe('background context menu listener registration', () => {
+    // The dedup guard ran after the field had already been reassigned to the
+    // new handler, so it removed the handler it was about to add and left the
+    // previous one attached. Every re-registration therefore stacked another
+    // listener, and a right-click on the background opened one context menu per
+    // past visit to the tab.
+    it('does not stack handlers across repeated registration', () => {
+      const contentEl = activeDocument.createElement('div');
+      view['contentEl'] = contentEl;
+      const remove = jest.spyOn(contentEl, 'removeEventListener');
+
+      view['setupBackgroundContextMenu']();
+      const first = view['backgroundContextMenuHandler'];
+
+      view['setupBackgroundContextMenu']();
+      const second = view['backgroundContextMenuHandler'];
+
+      expect(second).not.toBe(first);
+      // The handler from the first registration must be the one removed.
+      expect(remove).toHaveBeenCalledWith('contextmenu', first);
+    });
+
+    it('leaves exactly one handler attached after three registrations', () => {
+      const contentEl = activeDocument.createElement('div');
+      view['contentEl'] = contentEl;
+      const registered: EventListener[] = [];
+      const realAdd = contentEl.addEventListener.bind(contentEl);
+      const realRemove = contentEl.removeEventListener.bind(contentEl);
+      jest
+        .spyOn(contentEl, 'addEventListener')
+        .mockImplementation((type: string, fn: EventListener) => {
+          registered.push(fn);
+          realAdd(type, fn);
+        });
+      jest
+        .spyOn(contentEl, 'removeEventListener')
+        .mockImplementation((type: string, fn: EventListener) => {
+          const i = registered.indexOf(fn);
+          if (i >= 0) registered.splice(i, 1);
+          realRemove(type, fn);
+        });
+
+      view['setupBackgroundContextMenu']();
+      view['setupBackgroundContextMenu']();
+      view['setupBackgroundContextMenu']();
+
+      expect(registered).toEqual([view['backgroundContextMenuHandler']]);
     });
   });
 });

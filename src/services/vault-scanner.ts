@@ -32,6 +32,14 @@ export class VaultScanner
   implements IVaultScannerStatusProvider
 {
   private _isScanning = false;
+  /**
+   * A scan was asked for while one was running.
+   *
+   * Returning early dropped the request outright, so a "Rescan vault" during the
+   * initial scan did nothing at all and said nothing either. Held instead, and
+   * run once the scan in progress finishes.
+   */
+  private _rescanRequested = false;
   private _isInitializing = true; // Track Obsidian initialization state
   private _hasCompletedInitialScan = false; // Track if the first scan has completed
   private urgencyCoefficients!: UrgencyCoefficients;
@@ -106,7 +114,10 @@ export class VaultScanner
 
   // Core scanning methods
   async scanVault(): Promise<void> {
-    if (this._isScanning) return;
+    if (this._isScanning) {
+      this._rescanRequested = true;
+      return;
+    }
     this._isScanning = true;
 
     const startTime = performance.now();
@@ -197,6 +208,14 @@ export class VaultScanner
     } finally {
       this._hasCompletedInitialScan = true;
       this._isScanning = false;
+    }
+
+    // Outside the try, so the deferred pass runs even if this one threw.
+    // Cleared first: a request that arrives during the deferred pass queues
+    // another one rather than making this recurse forever.
+    if (this._rescanRequested) {
+      this._rescanRequested = false;
+      await this.scanVault();
     }
   }
 

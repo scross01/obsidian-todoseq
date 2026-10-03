@@ -7,6 +7,8 @@ TODOseq provides several commands that can be accessed through Obsidian's Comman
 - TODOseq: Show task list
 - TODOseq: Open task list in new tab
 - TODOseq: Rescan vault
+- TODOseq: Archive completed tasks
+- TODOseq: Undo last archive run
 - TODOseq: Toggle task state _(editor only)_
 - TODOseq: Cycle task state _(editor only)_
 - TODOseq: Copy task to today _(editor only)_
@@ -35,6 +37,16 @@ Opens the TODOseq Task List view in a new tab in the main workspace area. This i
 Manually triggers a full vault scan to update the task list with the latest changes.
 
 A full rescan is not typically required, unless the vault level setting for Excluded files has been updated. General file changes (create, modify, delete) trigger automatic incremental updates.
+
+### Archive completed tasks
+
+Opens the archive preview dialog. Choose a criterion ("Closed at least" N days ago with presets, or "Closed before" a date), adjust the state mappings, review the matching tasks, and confirm. Nothing is written until you apply. See [Auto-Archive](auto-archive.md).
+
+### Undo last archive run
+
+Reverts the most recent archive run. Each line is verified before restoring; lines that changed since the run are skipped and reported. Undo is session-scoped — it stays available until Obsidian restarts.
+
+**Availability**: Only when there is something to undo; the command is greyed out otherwise.
 
 ### Toggle task state
 
@@ -136,8 +148,6 @@ Opens the task context menu at the current cursor position in the Markdown edito
 - Move task to today's daily note
 - Migrate task to today's daily note
 
-**Implementation**: Uses CodeMirror editor API to get screen coordinates for positioning the menu at the cursor location.
-
 ### Open scheduled date picker
 
 Opens a date picker dialog for setting the scheduled date of the task at the current cursor position. The date picker provides a calendar interface for selecting dates.
@@ -149,7 +159,7 @@ Opens a date picker dialog for setting the scheduled date of the task at the cur
 - Calendar-based date selection
 - Quick date shortcuts (today, tomorrow, next week, etc.)
 - Support for recurring dates with repeat patterns
-- Integration with task update coordinator for immediate task updates
+- Changes take effect immediately, without needing to save the file
 
 **Example**:
 
@@ -169,7 +179,7 @@ Opens a date picker dialog for setting the deadline date of the task at the curr
 - Calendar-based date selection
 - Quick date shortcuts (today, tomorrow, next week, etc.)
 - Support for recurring dates with repeat patterns
-- Integration with task update coordinator for immediate task updates
+- Changes take effect immediately, without needing to save the file
 
 **Example**:
 

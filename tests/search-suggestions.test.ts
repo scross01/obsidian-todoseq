@@ -660,8 +660,14 @@ describe('Search Suggestions', () => {
       expect(dates).toContain('2023-01-15');
       expect(dates).toContain('2023-02-20');
 
-      // Should be sorted chronologically
-      expect(dates).toEqual(['2023-01-15', '2023-02-20']);
+      // Should be sorted chronologically, each date followed by its
+      // open-ended range completion.
+      expect(dates).toEqual([
+        '2023-01-15',
+        '2023-01-15..',
+        '2023-02-20',
+        '2023-02-20..',
+      ]);
     });
 
     it('should handle empty task array for scheduled dates', () => {
@@ -727,8 +733,8 @@ describe('Search Suggestions', () => {
 
       const dates = SearchSuggestions.getScheduledDateSuggestions(tasks);
 
-      // Should deduplicate same dates
-      expect(dates).toEqual(['2023-01-15']);
+      // Should deduplicate same dates (range completion dedupes too)
+      expect(dates).toEqual(['2023-01-15', '2023-01-15..']);
     });
 
     it('should handle tasks with no deadline dates', () => {
@@ -941,7 +947,7 @@ describe('Search Suggestions', () => {
 
       expect(dates).toContain('2023-02-20');
       expect(dates).not.toContain('2023-01-15');
-      expect(dates).toEqual(['2023-02-20']);
+      expect(dates).toEqual(['2023-02-20', '2023-02-20..']);
     });
 
     it('should return all scheduled dates when mode is sortCompletedLast', () => {

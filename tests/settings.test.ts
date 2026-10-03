@@ -8,6 +8,7 @@ import { createBaseSettings } from './helpers/test-helper';
 import { DefaultSettings } from '../src/settings/settings-types';
 import { SUPPORTED_EXTENSIONS } from '../src/parser/code-comment-task-parser';
 import type { SettingDefinitionItem } from 'obsidian';
+import { Setting } from 'obsidian';
 
 // Mock obsidian
 jest.mock('obsidian', () => ({
@@ -51,13 +52,23 @@ jest.mock('obsidian', () => ({
 
     addText(callback: (component: unknown) => void): this {
       this.controlCallback = callback;
+      const inputEl = activeDocument.createElement('input');
       const textComponent = {
-        setValue: jest.fn().mockReturnThis(),
+        // Mirror the real TextComponent: setValue writes to the input.
+        setValue: jest.fn(function (
+          this: { inputEl: HTMLInputElement },
+          value: string,
+        ) {
+          this.inputEl.value = value;
+          return this;
+        }),
         setPlaceholder: jest.fn().mockReturnThis(),
         onChange: jest.fn().mockReturnThis(),
-        inputEl: activeDocument.createElement('input'),
+        inputEl,
       };
       callback(textComponent);
+      // Mirror the real Setting: the control mounts into settingEl.
+      this.settingEl.appendChild(inputEl);
       return this;
     }
 
@@ -95,13 +106,18 @@ jest.mock('obsidian', () => ({
       return this;
     }
 
+    private settingElCache: HTMLElement | null = null;
+
     get settingEl(): HTMLElement {
-      const el = activeDocument.createElement('div');
-      el.className = 'setting-item';
-      const info = activeDocument.createElement('div');
-      info.className = 'setting-item-info';
-      el.appendChild(info);
-      return el;
+      if (!this.settingElCache) {
+        const el = activeDocument.createElement('div');
+        el.className = 'setting-item';
+        const info = activeDocument.createElement('div');
+        info.className = 'setting-item-info';
+        el.appendChild(info);
+        this.settingElCache = el;
+      }
+      return this.settingElCache;
     }
   },
   App: jest.fn(),
@@ -199,7 +215,15 @@ describe('TodoTrackerSettingTab', () => {
       embeddedTaskListProcessor: {
         updateSettings: jest.fn(),
       },
-      keywordManager: {},
+      keywordManager: {
+        getKeywordsForGroup: jest.fn((group: string) =>
+          group === 'completedKeywords'
+            ? ['DONE', 'CANCELED', 'CANCELLED']
+            : group === 'archivedKeywords'
+              ? ['ARCHIVED']
+              : [],
+        ),
+      },
     };
 
     settingTab = new TodoTrackerSettingTab(appMock as any, pluginMock as any);
@@ -747,7 +771,7 @@ describe('TodoTrackerSettingTab', () => {
         ? (def as { control: Record<string, unknown> }).control
         : undefined;
 
-    it('returns formatTaskKeywords first and exactly 7 groups with expected headings', () => {
+    it('returns formatTaskKeywords first and exactly 8 groups with expected headings', () => {
       const defs = settingTab.getSettingDefinitions();
 
       expect(defs[0]).toMatchObject({
@@ -758,13 +782,14 @@ describe('TodoTrackerSettingTab', () => {
       const groups = defs.filter((d): d is GroupDef => {
         return 'type' in d && d.type === 'group';
       });
-      expect(groups).toHaveLength(7);
+      expect(groups).toHaveLength(8);
       expect(groups.map((g) => g.heading)).toEqual([
         'Task detection',
         'Smart date recognition',
         'Task list search and filter',
         'Task keywords',
         'Task state transitions',
+        'Auto-archive completed tasks',
         'Warning period',
         '⚠︎ Experimental features',
       ]);
@@ -1053,6 +1078,179 @@ describe('TodoTrackerSettingTab', () => {
       expect(dropdown.setValue).toHaveBeenCalledWith('DONE');
       expect(settings.stateTransitions.defaultCompleted).toBe('DONE');
       expect(pluginMock.saveSettings as jest.Mock).toHaveBeenCalledTimes(1);
+    });
+
+    describe('auto-archive mapping rows (mobile layout hook)', () => {
+      it('every mapping row carries the todoseq-archive-mapping-item class so mobile CSS can stack its controls', () => {
+        const defs = settingTab.getSettingDefinitions();
+        const group = defs.find(
+          (d): d is GroupDef =>
+            'type' in d &&
+            d.type === 'group' &&
+            d.heading === 'Auto-archive completed tasks',
+        );
+        expect(group).toBeDefined();
+
+        const sourceNames = ['DONE →', 'CANCELED →', 'CANCELLED →'];
+        const mappingDefs = group!.items.filter(
+          (item) => 'name' in item && sourceNames.includes(item.name),
+        );
+        expect(mappingDefs).toHaveLength(3);
+
+        for (const def of mappingDefs) {
+          const defWithRender = def as {
+            render?: (s: Setting) => void;
+            name: string;
+          };
+          const render = defWithRender.render;
+          expect(typeof render).toBe('function');
+
+          const setting = new Setting();
+          render!(setting);
+          expect(setting.settingEl.classList).toContain(
+            'todoseq-archive-mapping-item',
+          );
+        }
+      });
+      it('non-mapping items in the group do not carry the mapping-row class', () => {
+        const defs = settingTab.getSettingDefinitions();
+        const group = defs.find(
+          (d): d is GroupDef =>
+            'type' in d &&
+            d.type === 'group' &&
+            d.heading === 'Auto-archive completed tasks',
+        );
+        expect(group).toBeDefined();
+
+        const enableDef = group!.items.find(
+          (item) =>
+            'name' in item && item.name === 'Enable automatic archiving',
+        ) as { render?: (s: Setting) => void } | undefined;
+        expect(enableDef).toBeDefined();
+
+        const setting = new Setting();
+        enableDef!.render!(setting);
+        expect(setting.settingEl.classList).not.toContain(
+          'todoseq-archive-mapping-item',
+        );
+      });
+
+      it('ships a 90-day default criterion (fresh installs show 90)', () => {
+        // Pinned per maintainer request: the default must be 90, not 30.
+        expect(DefaultSettings.taskArchive.criterionDays).toBe(90);
+
+        // The threshold control renders the stored value — with defaults
+        // (fresh install, no persisted drift) that is 90.
+        const defs = settingTab.getSettingDefinitions();
+        const group = defs.find(
+          (d): d is GroupDef =>
+            'type' in d &&
+            d.type === 'group' &&
+            d.heading === 'Auto-archive completed tasks',
+        );
+        const thresholdDef = group!.items.find(
+          (item) => 'name' in item && item.name === 'Archive threshold (days)',
+        ) as { render?: (s: Setting) => void } | undefined;
+        expect(thresholdDef).toBeDefined();
+
+        const setting = new Setting();
+        thresholdDef!.render!(setting);
+        const input = setting.settingEl.querySelector('input');
+        expect(input?.value).toBe('90');
+      });
+    });
+  });
+
+  describe('archive mapping rows derive at render time (plan 014)', () => {
+    /**
+     * The mock plugin's getKeywordsForGroup is a jest.fn over fixed arrays;
+     * point it at a mutable source so a second getSettingDefinitions() call
+     * can simulate a keyword commit while the tab is open.
+     */
+    function setKeywordGroups(completed: string[], archived: string[]): void {
+      (
+        pluginMock.keywordManager as { getKeywordsForGroup: jest.Mock }
+      ).getKeywordsForGroup.mockImplementation((group: string) => {
+        if (group === 'completedKeywords') return [...completed];
+        if (group === 'archivedKeywords') return [...archived];
+        return [];
+      });
+    }
+
+    function mappingNames(): string[] {
+      const defs = settingTab.getSettingDefinitions();
+      const group = defs.find(
+        (d): d is GroupDef =>
+          'type' in d &&
+          d.type === 'group' &&
+          d.heading === 'Auto-archive completed tasks',
+      );
+      expect(group).toBeDefined();
+      const known = new Set([
+        'Enable automatic archiving',
+        'Archive threshold (days)',
+        'Preview and archive',
+      ]);
+      return group!.items
+        .filter((item) => 'name' in item && !known.has(item.name))
+        .map((item) => (item as { name: string }).name);
+    }
+
+    it('re-derives mapping rows on every getSettingDefinitions call', () => {
+      setKeywordGroups(['DONE'], ['ARCHIVED']);
+      expect(mappingNames()).toEqual(['DONE \u2192']);
+
+      // Keyword commit while the tab is open: next render must reflect it.
+      setKeywordGroups(['DONE', 'SHIPPED'], ['ARCHIVED']);
+      expect(mappingNames()).toEqual(['DONE \u2192', 'SHIPPED \u2192']);
+
+      // Renamed/removed keyword: row disappears without stale entries.
+      setKeywordGroups(['DONE', 'SHIPPED'], ['ARCHIVED', 'ABANDONED']);
+      expect(mappingNames()).toEqual(['DONE \u2192', 'SHIPPED \u2192']);
+    });
+
+    it('keyword commit triggers exactly one guarded tab refresh', async () => {
+      const updateSpy = jest
+        .spyOn(settingTab, 'update')
+        .mockImplementation(() => {});
+
+      await (settingTab as any).refreshPreservingEditingState();
+
+      expect(updateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('guarded refresh restores focus and caret to the same keyword input', async () => {
+      jest.spyOn(settingTab, 'update').mockImplementation(() => {});
+
+      const input = activeDocument.createElement('input');
+      input.value = 'SHIPPED';
+      activeDocument.body.appendChild(input);
+      input.focus();
+      input.setSelectionRange(4, 4);
+
+      (settingTab as any).keywordFieldBindings.set(
+        'additionalCompletedKeywords',
+        {
+          settingKey: 'additionalCompletedKeywords',
+          inputEl: input,
+          settingEl: activeDocument.createElement('div'),
+        },
+      );
+
+      await (settingTab as any).refreshPreservingEditingState();
+
+      expect(activeDocument.activeElement).toBe(input);
+      expect(input.selectionStart).toBe(4);
+
+      input.remove();
+    });
+
+    it('guarded refresh does not throw when nothing is focused', async () => {
+      jest.spyOn(settingTab, 'update').mockImplementation(() => {});
+
+      await expect(
+        (settingTab as any).refreshPreservingEditingState(),
+      ).resolves.toBeUndefined();
     });
   });
 });

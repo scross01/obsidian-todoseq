@@ -56,6 +56,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "generate-content": "ts-node scripts/content-generator.ts",
+    "docs:screenshots": "ts-node scripts/screenshots/capture.ts",
     "test:integration": "npm run build && NODE_OPTIONS='--disable-warning=DEP0205' npx playwright test --config=tests/integration/playwright.config.ts",
     "test:integration:fast": "NODE_OPTIONS='--disable-warning=DEP0205' npx playwright test --config=tests/integration/playwright.config.ts",
     "test:integration:coverage": "NODE_OPTIONS='--disable-warning=DEP0205' COLLECT_COVERAGE=1 npx playwright test --config=tests/integration/playwright.config.ts --project=obsidian",
@@ -72,7 +73,8 @@
       "esbuild": "^0.25.8"
     },
     "esbuild": "^0.28.1",
-    "js-yaml": "^4.2.0"
+    "js-yaml": "^4.2.0",
+    "moment": "^2.31.0"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,

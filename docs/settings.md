@@ -2,7 +2,8 @@
 
 TODOseq provides configuration options to customize the plugin to your workflow. This guide covers all available settings and their impact on functionality.
 
-![TODOseq Settings](./assets/todoseq-settings.png){.ts-img-full}
+![TODOseq Settings](./assets/todoseq-settings.png){.ts-img-full .ts-img-dark}
+![TODOseq Settings](./assets/todoseq-settings-light.png){.ts-img-full .ts-img-light}
 
 ## Accessing Settings
 
@@ -646,6 +647,70 @@ With **Sunday start**:
 - **Urgency**: Sort by urgency score (high → low)
 
 **Default**: Default (file path)
+
+## Auto-Archive Settings
+
+Auto-Archive rewrites completed keywords (e.g. `DONE`) to archived keywords (e.g. `ARCHIVED`) once a task's CLOSED date is at least the threshold days old. The task stays in your note with its history intact — it just stops appearing in the Task List. You can always run archiving manually from a preview dialog; automatic runs are opt-in. You will find these settings in the "Auto-archive completed tasks" group. See [Auto-Archive](auto-archive.md) for the full walkthrough.
+
+### Enable automatic archiving
+
+**Setting**: "Enable automatic archiving" (toggle)
+
+**Description**: Enable or disable automatic archive runs after vault scans.
+
+**Default**: Disabled
+
+**When Enabled:**
+
+- Runs after every full vault scan, including the scan at startup
+- Uses the days threshold only — the "Closed before" date criterion is available for manual runs only
+- Shows a notice with an Undo button when tasks are archived; stays silent when nothing matches
+
+**When Disabled:**
+
+- Nothing is archived automatically
+- Manual runs via "Preview and archive…" are still available
+
+### Archive threshold (days)
+
+**Setting**: "Archive threshold (days)" numeric input (1–3650)
+
+**Description**: Tasks closed at least this many days ago match. Drives automatic runs and the dialog default.
+
+**Default**: 90
+
+**Example**: A threshold of 90 means a task closed on 2026-01-01 starts matching on 2026-04-01.
+
+### State mappings
+
+**Setting**: One mapping row per completed keyword (`<KEYWORD> →`), each with a toggle and a target dropdown
+
+**Description**: Choose which completed states are archived and which archived keyword they become. The toggle controls whether the row participates in archive runs; the dropdown selects the target archived keyword from your keyword configuration.
+
+**Rules:**
+
+- The first enabled mapping wins when several rows map the same source keyword
+- Rows update live when your task or archived keywords change
+- A mapping with an invalid target is flagged and is unusable at run time until fixed
+
+**Example**:
+
+```txt
+DONE → ARCHIVED        (enabled)
+CANCELED → ARCHIVED    (disabled)
+```
+
+### Preview and archive
+
+**Setting**: "Preview and archive…" button
+
+**Description**: Opens the archive dialog, where you choose a criterion, adjust the state mappings, review the matching tasks, and confirm. Nothing is written until you apply. Manual runs do not require "Enable automatic archiving". Tasks without a CLOSED date are never archived. See [Auto-Archive](auto-archive.md).
+
+### Safety rails
+
+- Undo the most recent run with the "Undo last archive run" command (available until Obsidian restarts)
+- Every task is re-checked against the file immediately before writing; lines that changed are skipped, not overwritten
+- Archived states are terminal — archived tasks are never archived again
 
 ## Other Settings
 

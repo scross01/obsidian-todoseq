@@ -237,6 +237,23 @@ describe('EmbeddedTaskListRenderer', () => {
       expect(toggle).toHaveBeenCalledWith('id-1');
     });
 
+    it('places the chevron after the title text (matches dashboard headers)', () => {
+      const container = document.createElement('div');
+      const params: TodoseqParameters = { title: 'Tasks' };
+      const titleEl = renderer.renderCollapsibleTitle(
+        container,
+        params,
+        true,
+        3,
+      );
+
+      expect(
+        titleEl.lastElementChild?.classList.contains(
+          'todoseq-collapse-toggle-icon',
+        ),
+      ).toBe(true);
+    });
+
     it('does not add handlers when toggle callback missing', () => {
       const container = document.createElement('div');
       const params: TodoseqParameters = { title: 'Tasks' };
@@ -255,6 +272,55 @@ describe('EmbeddedTaskListRenderer', () => {
     });
   });
 
+  // show-query: false is a whole-header switch, not a query-chip switch
+  // (docs/embedded-task-lists.md). hasHeaderContent implements that reading and
+  // the parser refuses the one combination that could contradict it, so these
+  // go through renderTaskList rather than calling the private header builder —
+  // a private-only test can reach states no parsed input ever can.
+  describe('show-query: false', () => {
+    it('renders no header at all without a title', () => {
+      const container = document.createElement('div');
+      renderer.renderTaskList(container, [createBaseTask({ text: 'Task 1' })], {
+        searchQuery: 'tag:urgent',
+        showQuery: false,
+        limit: 5,
+      });
+
+      expect(
+        container.querySelector('.todoseq-embedded-task-list-header'),
+      ).toBeNull();
+      expect(
+        container.querySelector('.todoseq-embedded-task-list'),
+      ).toBeTruthy();
+    });
+
+    it('renders the title but no query chip when a title is set', () => {
+      const container = document.createElement('div');
+      renderer.renderTaskList(container, [createBaseTask({ text: 'Task 1' })], {
+        searchQuery: 'tag:urgent',
+        showQuery: false,
+        title: 'Urgent',
+      });
+
+      expect(
+        container.querySelector('.todoseq-embedded-task-list-search'),
+      ).toBeNull();
+      expect(container.textContent).toContain('Urgent');
+    });
+
+    it('shows the query chip when show-query is left at its default', () => {
+      const container = document.createElement('div');
+      renderer.renderTaskList(container, [createBaseTask({ text: 'Task 1' })], {
+        searchQuery: 'tag:urgent',
+      });
+
+      expect(
+        container.querySelector('.todoseq-embedded-task-list-search')
+          ?.textContent,
+      ).toBe('tag:urgent');
+    });
+  });
+
   describe('renderCollapsibleHeaderNoTitle', () => {
     it('renders search query in header', () => {
       const container = document.createElement('div');
@@ -269,7 +335,43 @@ describe('EmbeddedTaskListRenderer', () => {
       const searchSpan = header.querySelector(
         '.todoseq-embedded-task-list-search',
       );
-      expect(searchSpan?.textContent).toBe('Search: test');
+      expect(searchSpan?.textContent).toBe('test');
+    });
+
+    it('places the chevron before the search chip (matches dashboard headers)', () => {
+      const container = document.createElement('div');
+      const params: TodoseqParameters = { searchQuery: 'tag:project' };
+      const header = renderer.renderCollapsibleHeaderNoTitle(
+        container,
+        params,
+        true,
+        5,
+      );
+
+      const children = Array.from(header.children);
+      expect(
+        children[0]?.classList.contains('todoseq-collapse-toggle-icon'),
+      ).toBe(true);
+      expect(
+        children[1]?.classList.contains('todoseq-embedded-task-list-search'),
+      ).toBe(true);
+    });
+
+    it('renders the chevron as the only child when no chips are present', () => {
+      const container = document.createElement('div');
+      const params: TodoseqParameters = {};
+      const header = renderer.renderCollapsibleHeaderNoTitle(
+        container,
+        params,
+        true,
+        5,
+      );
+
+      const children = Array.from(header.children);
+      expect(children).toHaveLength(1);
+      expect(
+        children[0].classList.contains('todoseq-collapse-toggle-icon'),
+      ).toBe(true);
     });
 
     it('renders sort method in header', () => {
@@ -283,7 +385,7 @@ describe('EmbeddedTaskListRenderer', () => {
       );
 
       const sortSpan = header.querySelector('.todoseq-embedded-task-list-sort');
-      expect(sortSpan?.textContent).toBe('Sort: priority');
+      expect(sortSpan?.textContent).toBe('sort: priority');
     });
 
     it('renders completed filter in header', () => {
@@ -299,7 +401,7 @@ describe('EmbeddedTaskListRenderer', () => {
       const completedSpan = header.querySelector(
         '.todoseq-embedded-task-list-completed',
       );
-      expect(completedSpan?.textContent).toBe('Completed: hide');
+      expect(completedSpan?.textContent).toBe('completed: hide');
     });
 
     it('adds expanded class to chevron when not collapsed', () => {

@@ -88,9 +88,12 @@ describe('TaskUpdateCoordinator - Archived State Removal', () => {
     );
 
     mockPlugin.taskEditor.updateTaskState.mockImplementation(
+      // Faithful to TaskWriter.applyLineUpdate's contract: completed is
+      // derived from the NEW state, not carried over from the source task.
       async (task, newState) => ({
         ...task,
         state: newState,
+        completed: keywordManager.isCompleted(newState),
         rawText: task.rawText.replace(/TODO/, newState),
       }),
     );
@@ -374,6 +377,64 @@ describe('TaskUpdateCoordinator - Re-adding Tasks from Archived', () => {
 
     expect(taskStateManager.getTaskCount()).toBe(0);
     expect(mockParser.parseLine).not.toHaveBeenCalled();
+  });
+
+  // Regression: undo after an archive run routes through updateTaskState
+  // (not updateTaskByPath). The task was REMOVED from the manager when it was
+  // archived, so the coordinator must re-add it from the journaled snapshot —
+  // otherwise the undo'd task never reappears in views or the archive dialog.
+  it('re-adds task via updateTaskState when undoing from archived to DONE (task absent from manager)', async () => {
+    expect(taskStateManager.getTaskCount()).toBe(0);
+
+    // The journaled-snapshot-shaped task the archive service passes on undo:
+    // the task with the archived keyword it currently carries in the file.
+    const undoTask = createBaseTask({
+      path: 'test.md',
+      line: 0,
+      state: 'ARCHIVED',
+      rawText: '- [x] ARCHIVED Reactivated task',
+      completed: false,
+      closedDate: new Date(2026, 0, 15),
+    });
+
+    await taskUpdateCoordinator.updateTaskState(undoTask, 'DONE', 'task-list');
+
+    expect(taskStateManager.getTaskCount()).toBe(1);
+    const restored = taskStateManager.findTaskByPathAndLine('test.md', 0);
+    expect(restored).not.toBeNull();
+    expect(restored?.state).toBe('DONE');
+    expect(restored?.completed).toBe(true);
+    expect(restored?.closedDate?.getTime()).toBe(
+      undoTask.closedDate?.getTime(),
+    );
+  });
+
+  it('re-adds table-cell task with cell identity when undoing from archived state', async () => {
+    const cellTask = createBaseTask({
+      path: 'table.md',
+      line: 3,
+      state: 'ARCHIVED',
+      rawText: 'ARCHIVED Cell task',
+      completed: false,
+      isTableTask: true,
+      tableCell: { cellIndex: 1 },
+    });
+
+    // parseLine returns null for table rows (known parser behavior) — the
+    // coordinator must fall back to the task it was given, not drop it.
+    const mockParser = {
+      parseLine: jest.fn().mockReturnValue(null),
+    };
+    mockPlugin.vaultScanner.getParser.mockReturnValue(mockParser);
+
+    await taskUpdateCoordinator.updateTaskState(cellTask, 'DONE', 'task-list');
+
+    expect(taskStateManager.getTaskCount()).toBe(1);
+    const restored = taskStateManager.findTaskByPathAndLine('table.md', 3, 1);
+    expect(restored).not.toBeNull();
+    expect(restored?.isTableTask).toBe(true);
+    expect(restored?.tableCell?.cellIndex).toBe(1);
+    expect(restored?.state).toBe('DONE');
   });
 
   it('should use existing task if already in state manager when reactivating', async () => {

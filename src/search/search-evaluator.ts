@@ -679,17 +679,23 @@ export class SearchEvaluator {
     const start = node.start;
     const end = node.end;
 
-    if (!field || !start || !end) {
+    // One-sided ranges are allowed: at least one bound must be present.
+    // A bound that is present but invalid fails closed below (parseDateValue
+    // returns null for 2026-13-01, 2026-02-30, etc.).
+    if (!field || (!start && !end)) {
       return false;
     }
 
-    // Parse the start and end dates
-    // Ensure we parse dates in local timezone to match task date format
-    const startDate = DateUtils.parseDateValue(start);
-    const endDate = DateUtils.parseDateValue(end);
+    // Resolve bounds through parseDateBound (interval edges): a start bound
+    // is its interval's first day, an end bound the day after its interval's
+    // last day — identical semantics for full dates (legacy behavior) and
+    // correct month/year expansion for partial dates (2026-10 as an end
+    // bound = through Oct 31, not through Oct 1).
+    const startDate = start ? DateUtils.parseDateBound(start, 'start') : null;
+    const endDate = end ? DateUtils.parseDateBound(end, 'end') : null;
 
-    // Both start and end must be valid date ranges or dates
-    if (startDate === null || endDate === null) {
+    // Present bounds must resolve; absent bounds are fine (one-sided range).
+    if ((start && startDate === null) || (end && endDate === null)) {
       return false;
     }
 
@@ -710,72 +716,11 @@ export class SearchEvaluator {
       return false;
     }
 
-    // Convert to date range format for comparison
-    let rangeStart: Date;
-    let rangeEnd: Date;
-
-    // Handle start date
-    if (
-      typeof startDate === 'object' &&
-      startDate !== null &&
-      'start' in startDate &&
-      'end' in startDate
-    ) {
-      rangeStart = DateUtils.getStartOfDay(startDate.start);
-      rangeEnd = DateUtils.getStartOfDay(startDate.end);
-    } else if (
-      typeof startDate === 'object' &&
-      startDate !== null &&
-      'date' in startDate
-    ) {
-      rangeStart = DateUtils.getStartOfDay(startDate.date);
-      // Handle end date
-      if (
-        typeof endDate === 'object' &&
-        endDate !== null &&
-        'start' in endDate &&
-        'end' in endDate
-      ) {
-        rangeEnd = DateUtils.getStartOfDay(endDate.end);
-      } else if (
-        typeof endDate === 'object' &&
-        endDate !== null &&
-        'date' in endDate
-      ) {
-        rangeEnd = DateUtils.getStartOfDay(endDate.date);
-        rangeEnd.setDate(rangeEnd.getDate() + 1); // Make end date exclusive
-      } else if (endDate instanceof Date) {
-        rangeEnd = DateUtils.getStartOfDay(endDate);
-        rangeEnd.setDate(rangeEnd.getDate() + 1); // Make end date exclusive
-      } else {
-        return false;
-      }
-    } else if (startDate instanceof Date) {
-      rangeStart = DateUtils.getStartOfDay(startDate);
-      // Handle end date
-      if (
-        typeof endDate === 'object' &&
-        endDate !== null &&
-        'start' in endDate &&
-        'end' in endDate
-      ) {
-        rangeEnd = DateUtils.getStartOfDay(endDate.end);
-      } else if (
-        typeof endDate === 'object' &&
-        endDate !== null &&
-        'date' in endDate
-      ) {
-        rangeEnd = DateUtils.getStartOfDay(endDate.date);
-        rangeEnd.setDate(rangeEnd.getDate() + 1); // Make end date exclusive
-      } else if (endDate instanceof Date) {
-        rangeEnd = DateUtils.getStartOfDay(endDate);
-        rangeEnd.setDate(rangeEnd.getDate() + 1); // Make end date exclusive
-      } else {
-        return false;
-      }
-    } else {
-      return false;
-    }
+    // Bounds are already resolved to local-midnight Dates by parseDateBound
+    // (start = interval first day, end = exclusive day after interval last).
+    // Absent sides use the min/max sentinel so isDateInRange stays open.
+    const rangeStart = startDate ?? new Date(-8640000000000000 / 2);
+    const rangeEnd = endDate ?? new Date(8640000000000000 / 2);
 
     return DateUtils.isDateInRange(taskDate, rangeStart, rangeEnd);
   }

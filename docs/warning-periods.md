@@ -104,6 +104,9 @@ When a task has a warning period set, the task list displays small arrow indicat
 
 These arrows provide an immediate visual cue that a warning period is active, without needing to hover over the date. The arrows also appear in embedded task lists when date badges are enabled.
 
+![A task scheduled for yesterday with a delay, and a task with a deadline one week out](./assets/todoseq-warning-period-arrows.png){.ts-img-detail .ts-img-dark}
+![A task scheduled for yesterday with a delay, and a task with a deadline one week out](./assets/todoseq-warning-period-arrows-light.png){.ts-img-detail .ts-img-light}
+
 ## Examples
 
 ### Basic Deadline Advance Notice

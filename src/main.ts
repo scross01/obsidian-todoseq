@@ -1,4 +1,4 @@
-import { Plugin, MarkdownView, Platform, Notice } from 'obsidian';
+import { Plugin, MarkdownView, Platform, Notice, TFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { Task } from './types/task';
 import { TaskListView } from './view/task-list/task-list-view';
@@ -16,6 +16,7 @@ import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting
 import { PluginLifecycleManager } from './plugin-lifecycle';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
+import { DashboardCodeBlockProcessor } from './view/embedded-dashboard/dashboard-code-block-processor';
 import { TaskStateManager } from './services/task-state-manager';
 import { KeywordManager } from './utils/keyword-manager';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
@@ -23,6 +24,7 @@ import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { ChangeTracker } from './services/change-tracker';
 import { SmartDateProcessor } from './services/smart-date-processor';
+import { ArchiveService } from './services/archive-service';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -40,6 +42,7 @@ export default class TodoTracker extends Plugin {
 
   // Centralized task update coordinator (created by PluginLifecycleManager)
   public taskUpdateCoordinator: TaskUpdateCoordinator | null = null;
+  public archiveService: ArchiveService | null = null;
 
   // Managers for different functional areas
   public editorController: EditorController;
@@ -56,6 +59,9 @@ export default class TodoTracker extends Plugin {
 
   // Embedded task list processor (created by PluginLifecycleManager)
   public embeddedTaskListProcessor: TodoseqCodeBlockProcessor | null = null;
+
+  // Embedded dashboard card processor (created by PluginLifecycleManager)
+  public dashboardProcessor: DashboardCodeBlockProcessor | null = null;
 
   // Property search engine
   public propertySearchEngine: PropertySearchEngine | null = null;
@@ -257,6 +263,11 @@ export default class TodoTracker extends Plugin {
       this.keywordManager = this.vaultScanner.getKeywordManager();
       // Also sync to TaskStateManager
       this.taskStateManager.setKeywordManager(this.keywordManager);
+      // Sync to TaskWriter and ArchiveService: both hold KeywordManager
+      // references for keyword validation, and KeywordManager snapshots its
+      // resolution at construction — a stale reference would reject newly
+      // added keywords (e.g. a fresh archived target) until restart.
+      this.updateTaskWriterKeywordManager();
 
       // Wait for the parser to be fully created
       this.vaultScanner.getParser();
@@ -265,6 +276,11 @@ export default class TodoTracker extends Plugin {
     // Update embedded task list processor with new settings
     if (this.embeddedTaskListProcessor) {
       this.embeddedTaskListProcessor.updateSettings();
+    }
+
+    // Update embedded dashboard processor with new settings
+    if (this.dashboardProcessor) {
+      this.dashboardProcessor.updateSettings();
     }
 
     // Update task list views with new settings
@@ -309,6 +325,33 @@ export default class TodoTracker extends Plugin {
     if (this.vaultScanner) {
       await this.vaultScanner.scanVault();
     }
+  }
+
+  /**
+   * Read the current content of a single line, preferring the live editor
+   * buffer for open files. vault.cachedRead can lag the buffer until
+   * Obsidian's autosave flushes source-mode edits to disk, so archive undo
+   * verification must not rely on it for the file being edited.
+   */
+  public async readLiveLine(
+    path: string,
+    line: number,
+  ): Promise<string | null> {
+    const md = this.app.workspace
+      .getLeavesOfType('markdown')
+      .find(
+        (leaf) =>
+          leaf.view instanceof MarkdownView && leaf.view.file?.path === path,
+      )?.view as MarkdownView | undefined;
+    const editorLine = md?.editor?.getLine(line);
+    if (typeof editorLine === 'string') {
+      return editorLine;
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return null;
+    const content = await this.app.vault.cachedRead(file);
+    return content.split('\n')[line] ?? null;
   }
 
   // Obsidian lifecycle method called to save settings
@@ -378,6 +421,14 @@ export default class TodoTracker extends Plugin {
   public updateTaskWriterKeywordManager(): void {
     if (this.taskEditor && this.vaultScanner) {
       this.taskEditor.updateKeywordManager(
+        this.vaultScanner.getKeywordManager(),
+      );
+    }
+    // The archive service validates mapping targets against the archived
+    // keyword group — it must see the fresh manager too, or newly added
+    // archived keywords are rejected as invalid targets until restart.
+    if (this.archiveService && this.vaultScanner) {
+      this.archiveService.updateKeywordManager(
         this.vaultScanner.getKeywordManager(),
       );
     }

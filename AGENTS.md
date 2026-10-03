@@ -17,6 +17,33 @@ This file provides guidance to agents when working with code in this repository.
 - Think holistically about the problem, how do the changes fit with the rest of the plugin architecture.
 - Never use hard coded keyword checks, always use the KeywordManager.
 
+## Commit Hygiene
+
+Never stage or commit these local-only working files:
+
+- `plans/` — planning notes for work in progress
+- `.freebuff/` — agent workspace metadata
+- `.obsidian/plugins/todoseq/data.json` — local plugin state
+
+**Markdown is not excluded by name.** `git ls-files` is the authority: a tracked
+file is repo content and belongs in the commit even when its name looks like
+scratch. The whole `examples/` collection is tracked and committed normally —
+`examples/Test Dashboards.md`, `examples/Test Checkboxes.md` and
+`examples/Task Entry Examples.md` are all shipped example content. Write a
+never-commit rule about a _directory_ you can see is untracked, never about a
+filename that happens to sound provisional.
+
+Write the message to a temp file and delete it afterwards:
+
+```bash
+git add <paths>
+git commit -F .git-commit-msg-tmp.txt
+rm .git-commit-msg-tmp.txt
+```
+
+Trailers: `🤖 Generated with Codebuff` and `Co-Authored-By: Codebuff <noreply@codebuff.com>`.
+Do not `git push` unless the user asks.
+
 ## Build & Test
 
 - **Build**: `npm run build`
@@ -54,6 +81,32 @@ This file provides guidance to agents when working with code in this repository.
 - **Reader view refresh**: `refreshReaderViewFormatter()` iterates leaves and calls `previewMode.rerender(true)`
 - **Regex caching**: `RegexCache` utility caches compiled regex patterns to avoid repeated compilation during vault scans and searches
 
+## Demo Content Guidelines
+
+Applies to every demo, screenshot, GIF, and doc example — anything staged into a throwaway vault to illustrate the plugin.
+
+These rules are enforced, not just documented: `tests/screenshot-seed-lint.test.ts` runs the linter in `scripts/screenshots/seed-lint.ts` over every seed the screenshot pipeline stages, and fails with the note name, line and fix.
+
+- **TODOseq syntax only.** Dates belong on their own `SCHEDULED:` / `DEADLINE:` / `CLOSED:` / `STARTED:` line immediately below the task. An inline `<2026-10-01>` in the task text is _Tasks_ plugin syntax that TODOseq never parses: it renders as dead literal text that looks like a working date, so the demo appears to prove something it does not. No completion emoji either — state is carried by the keyword and the checkbox. Priorities are `[#A]`/`[#B]`/`[#C]`; checkboxes are `- [ ]` / `- [x]`.
+- **Keep demos focused.** A demo should make its point in one glance, so seed only the tasks the scene is actually about. Filler rows shrink every row until the feature is unreadable and bury what the shot is for. Long lists are the exception, not the default: use volume only in search and filter demos, where having something to narrow is the whole point.
+- **No H1 in example vault content.** Obsidian already renders the file name at H1 size, so an `# Title` at the top of the note just repeats it — two titles, one of them redundant, and it reads as a mistake. Start with a line or two of intro content, then use `##` sub-headings for structure.
+- **Dates in seeds are relative to today** so buckets stay meaningful over time. Never hardcode a capture-day date.
+
+## Docs Screenshot Guidelines
+
+Applies to `docs/assets/`, which is committed, and to anyone (human or agent) touching the capture pipeline.
+
+- **Never regenerate images as a side effect of another change.** A capture run takes minutes, rewrites 50+ committed binaries, and makes the real edit impossible to review in the diff. It is a deliberate act, never an automatic response to a stale row.
+- **The staleness check is manual and informational.** `npm run docs:screenshots -- --check` reporting `STALE (plugin build changed)` means _these images may need updating_ — not _regenerate now_. Nothing runs it for you; run it yourself when you touch plugin sources, and leave the rows stale — say so in the summary rather than regenerating.
+- **Never commit regenerated images without manual review.** The pipeline cannot tell a correct screenshot of a broken state from a correct screenshot of a working one — a stale capture is exactly what a passing run produces. A human must look at each changed image against its docs section before it is committed. If you have regenerated but cannot review, revert `docs/assets/` and `scripts/screenshots/manifest.json` and leave the check reporting the drift.
+- **Screenshot changes are content changes.** Treat a commit that alters `docs/assets/*.png|gif` with the same care as one that alters a docs page, and say in the commit message which images changed and why.
+
+No CI job runs `--check`. That was tried and removed: staleness still fires on
+commits that change no rendered pixel, and a report on every PR trains people to
+scroll past the one signal the check exists to carry. Re-adding it should mean
+quieting it first — the bar is a check that stays silent unless an image is
+actually wrong.
+
 ## Mobile Compatibility
 
 - **Support desktop and mobile**: Obsidian mobile has some differnences that need to be handled correctly, and misses some node.js apis.
@@ -80,6 +133,7 @@ Playwright-based E2E tests that launch a real isolated Obsidian instance via Ele
 - **Plugin loading**: Plugin is pre-enabled via `community-plugins.json` in the test vault. After trust is accepted, the plugin loads automatically.
 - **Shared instance**: `globalSetup` launches one Obsidian instance; all test files reconnect via CDP (`session.ts`). `obsidian-restart` project manages its own lifecycle.
 - **Between-test reset**: `test-reset.ts` closes lingering modals, restores baseline `data.json`, and triggers a vault rescan.
+- **Process stdio capture**: the launcher pipes Obsidian's stdout/stderr into `test-results/obsidian-process.log` (labelled `[stdout]`/`[stderr]`) and records how the process ended — exit code, signal, or spawn failure — as a `--- ... ---` line. Consult it when Obsidian itself misbehaves: a launch that fails, a process that exits unexpectedly, or a bad `OBSIDIAN_PATH` (now ~1s with the spawn error, instead of waiting out the 60s CDP timeout). The log is truncated per launch, and lives outside the fixture dirs so `globalTeardown`'s cleanup does not delete the evidence. **It will not explain a renderer crash.** "Target page, context or browser has been closed" means the renderer died, but a killed renderer writes nothing to either stream (verified by killing one), so the log is empty for that case — the `--- ... ---` records cover the main process only.
 
 ### Critical Gotchas
 
@@ -98,7 +152,7 @@ Playwright-based E2E tests that launch a real isolated Obsidian instance via Ele
 Connect Playwright to a running test Obsidian instance:
 
 ```typescript
-const browser = await chromium.connectOverCDP('http://127.0.0.1:9333');
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9334');
 const page = browser.contexts()[0].pages()[0];
 
 // Inspect DOM

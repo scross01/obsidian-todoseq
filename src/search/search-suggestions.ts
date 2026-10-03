@@ -323,6 +323,8 @@ export class SearchSuggestions {
       if (task.scheduledDate) {
         const dateStr = task.scheduledDate.toISOString().split('T')[0];
         datesSet.add(dateStr);
+        // Offer the open-ended range form next to the bare date.
+        datesSet.add(`${dateStr}..`);
       }
     });
 

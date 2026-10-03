@@ -7,6 +7,112 @@ import {
   createBaseSettings,
 } from './helpers/test-helper';
 
+describe('TaskStateManager.optimisticUpdate - re-add for removed tasks', () => {
+  let stateManager: TaskStateManager;
+
+  beforeEach(() => {
+    const keywordManager = createTestKeywordManager(createBaseSettings());
+    stateManager = new TaskStateManager(keywordManager);
+  });
+
+  // Regression: archive runs remove tasks from the manager (archived tasks
+  // are not collected), so undo must be able to re-add them — otherwise the
+  // task never returns to views or the archive dialog's candidate list.
+  it('re-adds a task that is no longer in the manager (archive → undo)', () => {
+    const task = createBaseTask({
+      rawText: '- [x] DONE Old task',
+      state: 'DONE',
+      completed: true,
+      closedDate: new Date(2026, 0, 15),
+    });
+
+    const updatedLine = stateManager.optimisticUpdate(task, 'DONE');
+
+    expect(updatedLine).toContain('DONE');
+    const stored = stateManager.findTaskByPathAndLine(task.path, task.line);
+    expect(stored).not.toBeNull();
+    expect(stored?.state).toBe('DONE');
+    expect(stored?.completed).toBe(true);
+    expect(stored?.closedDate?.getTime()).toBe(task.closedDate?.getTime());
+  });
+
+  it('re-adds a table-cell task with its cell identity preserved', () => {
+    const task = createBaseTask({
+      path: 'table.md',
+      line: 3,
+      rawText: 'DONE Cell task',
+      state: 'DONE',
+      completed: true,
+      isTableTask: true,
+      tableCell: { cellIndex: 1 },
+    });
+
+    stateManager.optimisticUpdate(task, 'DONE');
+
+    const stored = stateManager.findTaskByPathAndLine(
+      task.path,
+      task.line,
+      task.tableCell.cellIndex,
+    );
+    expect(stored).not.toBeNull();
+    expect(stored?.isTableTask).toBe(true);
+    expect(stored?.tableCell?.cellIndex).toBe(1);
+  });
+
+  it('re-adds a task that was removed by an earlier archive run (undo scenario)', () => {
+    const task = createBaseTask({
+      rawText: '- [x] DONE Previously archived',
+      state: 'DONE',
+      completed: true,
+    });
+    stateManager.addTask(task);
+    // Simulate the archive run removing the task (archived tasks are not
+    // collected) — the manager no longer knows this task.
+    stateManager.removeTasks((t) => t === task);
+    expect(stateManager.findTaskByPathAndLine(task.path, task.line)).toBeNull();
+
+    // Undo calls optimisticUpdate with the journaled state.
+    stateManager.optimisticUpdate(task, 'DONE');
+
+    const stored = stateManager.findTaskByPathAndLine(task.path, task.line);
+    expect(stored).not.toBeNull();
+    expect(stored?.state).toBe('DONE');
+    expect(stateManager.getTaskCount()).toBe(1);
+  });
+
+  it('re-add notifies subscribers', () => {
+    const subscriber = jest.fn();
+    stateManager.subscribe(subscriber);
+    subscriber.mockClear();
+
+    const task = createBaseTask({ state: 'DONE', completed: true });
+    stateManager.optimisticUpdate(task, 'DONE');
+
+    expect(subscriber).toHaveBeenCalledTimes(1);
+    const tasks = subscriber.mock.calls[0][0] as Task[];
+    expect(
+      tasks.some((t) => t.path === task.path && t.line === task.line),
+    ).toBe(true);
+  });
+
+  it('re-add of an existing task still replaces the stored entry (no duplicates)', () => {
+    const task = createBaseTask({
+      rawText: '- [x] DONE First',
+      text: 'First',
+      state: 'DONE',
+      completed: true,
+    });
+    stateManager.addTask(task);
+
+    const updated = { ...task, text: 'First (changed)' };
+    stateManager.optimisticUpdate(updated, 'DONE');
+
+    expect(stateManager.getTaskCount()).toBe(1);
+    const stored = stateManager.findTaskByPathAndLine(task.path, task.line);
+    expect(stored?.rawText).toBe('- [x] DONE First (changed)');
+  });
+});
+
 describe('TaskStateManager.optimisticUpdate', () => {
   let stateManager: TaskStateManager;
 

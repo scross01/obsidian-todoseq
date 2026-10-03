@@ -2,7 +2,8 @@
 
 The search field in the TODOseq Task List provides a powerful search system that allows you to quickly find and filter tasks across your entire vault. This guide covers all aspects of the search functionality, from basic filtering to advanced query syntax.
 
-![Search Options](./assets/todoseq-search-options-menu.png){.ts-img-detail}
+![Search Options](./assets/todoseq-search-options-menu.png){.ts-img-detail .ts-img-dark}
+![Search Options](./assets/todoseq-search-options-menu-light.png){.ts-img-detail .ts-img-light}
 
 ## Basic Search
 
@@ -40,13 +41,13 @@ This will only match tasks containing the exact sequence "write documentation".
 
 ### OR Logic
 
-Use `OR` to match either term:
+Use `OR` (uppercase) to match either term:
 
 ```txt
 meeting OR call
 ```
 
-This will match tasks containing "meeting" OR "call".
+This will match tasks containing "meeting" OR "call". A lowercase `or`/`and` is an ordinary search word, not an operator — quoting it ("or") matches tasks containing the word itself.
 
 ### AND Logic (Implicit)
 
@@ -111,6 +112,10 @@ Find work tasks related to home or office, excluding phone related ones.
 ## Search Filters
 
 TODOseq supports filter keywords similar to Obsidian's general vault search for targeted searching.
+
+### Invalid Query Handling
+
+Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unknown `priority:` value, or a calendar-invalid date like `scheduled:2026-02-30`) show an error message instead of silently returning no results. Open-ended values — paths, filenames, tags, content, state keywords, quoted phrases — are not validated, because matching nothing is a legitimate outcome for them.
 
 ### Available Prefix Filters
 
@@ -267,6 +272,8 @@ started:yesterday
 Find tasks started yesterday.
 
 > `started:` supports the same date expressions as `scheduled:` and `deadline:` (today, yesterday, this week, date literals, and ranges). Note that "overdue" is intentionally not supported for this prefix — the STARTED date records when work first began, so "overdue" has no meaning for it.
+>
+> Tasks can also be _sorted_ by their STARTED and CLOSED dates in the Task List and embedded lists (`sort: started` / `sort: closed`).
 
 ### Next N Days Expression
 
@@ -284,7 +291,34 @@ Find tasks with deadlines in the next 14 days.
 
 ## Date Range Syntax
 
-Use `..` to specify date ranges in `YYYY-MM-DD` format.
+Use `..` to specify date ranges. Both bounds are optional — omit one to
+search "from a date onward" or "up to a date". A written day is included
+in the range, and partial dates (`YYYY-MM` or `YYYY`) expand to the whole
+month or year:
+
+```txt
+scheduled:2026-10-07..        # from October 7 onward
+scheduled:..2026-12-31        # up to and including December 31
+scheduled:2026-10..2026-12    # October 1 through December 31
+```
+
+### Comparison Operators for Dates
+
+The four date prefixes (`scheduled:`, `deadline:`, `closed:`, `started:`)
+also accept value-side comparison operators — `<`, `<=`, `>`, `>=` — with
+their usual arithmetic boundary meaning (`<` excludes the day, `<=`
+includes it), including partial dates:
+
+```txt
+scheduled:<2026-10-01         # scheduled before October 1
+scheduled:>=2026-10           # scheduled in October or later
+deadline:>2026-12-31          # due after the end of the year
+closed:<=2026-06-30           # closed up to and including June 30
+```
+
+Operators and ranges express the same sets — pick whichever reads better:
+`scheduled:<2026-10-01` equals `scheduled:..2026-09-30`, and
+`scheduled:>=2026-10` equals `scheduled:2026-10..`.
 
 ### Date Range Examples
 
@@ -379,13 +413,18 @@ Find tasks that are not yet closed.
 
 ### Closed Date Range Syntax
 
-Use `..` to specify date ranges in `YYYY-MM-DD` format for closed dates.
+Use `..` to specify date ranges for closed dates — the same forms as
+[scheduled/deadline ranges](#date-range-syntax) apply to all four date
+prefixes, including one-sided ranges, comparison operators, and partial
+months/years.
 
 ```txt
 closed:2026-01-01..2026-01-31
+closed:..2026-12-31
+closed:>2026-06-30
 ```
 
-Find tasks closed in January 2026.
+Find tasks closed in January 2026, before 2027, or after June 30.
 
 ### Combining Closed Date with Other Filters
 
@@ -414,6 +453,8 @@ TODOseq supports multiple ways to filter by priority.
 | `B`    | Short form for medium priority |
 | `C`    | Short form for low priority    |
 | `none` | Tasks without priority         |
+
+Other values (for example `priority:urgent` or `priority:p1`) are rejected with an error instead of silently matching nothing — `medium` is also accepted as a synonym of `med`.
 
 ### Priority Filter Examples
 
@@ -517,7 +558,7 @@ This type-aware comparison works with numeric values and allows for more precise
 
 ### Date Property Comparisons
 
-Comparison operators also work with date properties, enabling you to filter tasks based on page property date ranges. You can use `>`, `<`, `>=`, and `<=` with dates in `YYYY-MM-DD` format to find tasks with dates before or after a specific point in time.
+Comparison operators also work with date properties, enabling you to filter tasks based on page property date ranges. You can use `>`, `<`, `>=`, and `<=` with dates in `YYYY-MM-DD` format to find tasks with dates before or after a specific point in time. The same operators now also work directly on the task date fields — see [Comparison Operators for Dates](#comparison-operators-for-dates).
 
 ```txt
 [deadline:>2026-01-15]

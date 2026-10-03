@@ -873,6 +873,86 @@ export class UIManager {
   }
 
   /**
+   * Show the tasks view and apply a search query programmatically
+   * (dashboard drill-through).
+   *
+   * newTab === false reuses the existing task list leaf with the same
+   * priority order as showTasks() (right sidebar → left sidebar → tab),
+   * creating one in the right sidebar when none exists. newTab === true
+   * opens the task list in a new main-area tab. The query is then applied
+   * to the view's search state and the list refreshes.
+   *
+   * @param query - The search query to apply
+   * @param newTab - Whether to open a new tab instead of reusing the leaf
+   */
+  async showTasksWithQuery(query: string, newTab = false): Promise<void> {
+    const { workspace } = this.plugin.app;
+
+    if (newTab) {
+      const leaf = workspace.getLeaf('tab');
+      await leaf.setViewState({ type: TaskListView.viewType, active: true });
+      if (leaf.view instanceof TaskListView) {
+        await leaf.view.applyQueryAndRefresh(query);
+      }
+      return;
+    }
+
+    // Get all task list leaves
+    const leaves = workspace.getLeavesOfType(TaskListView.viewType);
+
+    if (leaves.length > 0) {
+      // Find existing task list in priority order: right sidebar, left sidebar, tab
+      const leaf = this.findTaskLeafInPriorityOrder(leaves);
+
+      if (leaf) {
+        // Only reveal if the leaf is not already active to avoid focus stealing
+        const activeLeaf = workspace.getLeaf(false);
+        if (activeLeaf !== leaf) {
+          await workspace.revealLeaf(leaf);
+        }
+        if (leaf.view instanceof TaskListView) {
+          await leaf.view.applyQueryAndRefresh(query);
+        }
+        return;
+      }
+    }
+
+    // No existing task list found — create a new one in the right sidebar
+    // (same fallback as showTasks), then apply the query.
+    let leaf: WorkspaceLeaf | null = null;
+    try {
+      leaf = workspace.getRightLeaf(false);
+      if (!leaf) {
+        // If no right leaf exists, create one by splitting the active leaf
+        const activeLeaf = workspace.getLeaf(false);
+        if (activeLeaf) {
+          leaf = workspace.createLeafBySplit(activeLeaf, 'vertical');
+        } else {
+          // Fallback to main area if no active leaf is available
+          leaf = workspace.getLeaf(true);
+        }
+      }
+      await leaf.setViewState({ type: TaskListView.viewType, active: false });
+      // Only reveal if the leaf is not already active to avoid focus stealing
+      const activeLeaf = workspace.getLeaf(false);
+      if (activeLeaf !== leaf) {
+        await workspace.revealLeaf(leaf);
+      }
+    } catch (error) {
+      console.warn(
+        'Failed to open task view in right sidebar, falling back to main area:',
+        error,
+      );
+      // Fallback to main area if right sidebar access fails
+      leaf = workspace.getLeaf(true);
+      await leaf.setViewState({ type: TaskListView.viewType, active: false });
+    }
+    if (leaf.view instanceof TaskListView) {
+      await leaf.view.applyQueryAndRefresh(query);
+    }
+  }
+
+  /**
    * Find a task list leaf in priority order: right sidebar, left sidebar, tab
    * @param leaves - Array of task list leaves to search through
    * @returns The first leaf found in priority order, or null if none found

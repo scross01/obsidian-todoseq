@@ -2,7 +2,8 @@
 
 The Task List is the central interface for managing all your tasks across your Obsidian vault. It provides a comprehensive overview of your tasks and powerful tools for task management.
 
-![TODOseq with task list side panel](./assets/todoseq-editor-sidepanel-with-context-menu.png){.ts-img-full}
+![TODOseq with task list side panel](./assets/todoseq-editor-sidepanel-with-context-menu.png){.ts-img-full .ts-img-dark}
+![TODOseq with task list side panel](./assets/todoseq-editor-sidepanel-with-context-menu-light.png){.ts-img-full .ts-img-light}
 
 ## Opening the Task List
 
@@ -16,11 +17,21 @@ The Task List automatically opens in the right sidebar when the TODOseq plugin i
 2. Search for "TODOseq: Show task list"
 3. Select the command to open/show the Task List in the right sidebar
 
-![Command Palette Example](./assets/todoseq-command-palette.png){.ts-img-wide}
+![Command Palette Example](./assets/todoseq-command-palette.png){.ts-img-wide .ts-img-dark}
+![Command Palette Example](./assets/todoseq-command-palette-light.png){.ts-img-wide .ts-img-light}
 
 ### Keyboard Shortcut
 
 You can assign a custom keyboard shortcut to the "TODOseq: Show task list" command in Obsidian's Hotkeys settings.
+
+### Status Bar Task Count
+
+When a note is focused, Obsidian's status bar shows the number of open tasks in that note (for example, "3 tasks").
+
+- **Click** the count to open the Task List in the sidebar, filtered to the focused note
+- **Cmd/Ctrl-click** to open the filtered Task List in a new main tab — the same drill-through behavior as [dashboard cards](/dashboards)
+
+The filter targets the note itself, so the list shows only that note's tasks. Clear the search field in the Task List to see everything again.
 
 ## Task List Interface
 
@@ -30,7 +41,8 @@ The Task List consists of several key components:
 
 Located at the top of the Task List, the toolbar contains:
 
-![Search and Settings Toolbar](./assets/todoseq-search-and-settings-toolbar.png){.ts-img-wide}
+![Search and Settings Toolbar](./assets/todoseq-search-and-settings-toolbar.png){.ts-img-wide .ts-img-dark}
+![Search and Settings Toolbar](./assets/todoseq-search-and-settings-toolbar-light.png){.ts-img-wide .ts-img-light}
 
 - **Search field**: Live filtering of tasks as you type
 - **Case sensitivity toggle**: Button to toggle case-sensitive search
@@ -42,7 +54,8 @@ Located at the top of the Task List, the toolbar contains:
 
 The main area displays all detected tasks with the following information:
 
-![Task List Example](./assets/todoseq-task-list-example.png){.ts-img-wide}
+![Task List Example](./assets/todoseq-task-list-example.png){.ts-img-wide .ts-img-dark}
+![Task List Example](./assets/todoseq-task-list-example-light.png){.ts-img-wide .ts-img-light}
 
 - **Checkbox**: Visual indicator of completion status
 - **State keyword**: Colored badge showing task state (TODO, DOING, DONE, etc.). Right-click the badge to see all next state options
@@ -74,11 +87,15 @@ The checkbox provides a simple toggle between completed and incomplete states:
 
 Right-click any **task keyword** to see all available state options in a popup menu. This shows all possible states for the current task type, allows direct selection of any state, and provides quick access to less commonly used states.
 
-![TODOseq task context menu](./assets/todoseq-context-menu.png){.ts-img-detail}
+![TODOseq task context menu](./assets/todoseq-context-menu.png){.ts-img-detail .ts-img-dark}
+![TODOseq task context menu](./assets/todoseq-context-menu-light.png){.ts-img-detail .ts-img-light}
 
 ### Task Context Menu
 
 Right-click anywhere on a task row in the Task List to open a comprehensive context menu with quick actions for task management. This menu provides fast access to common operations without needing to navigate to the source file.
+
+![TODOseq task row context menu](./assets/todoseq-task-context-menu.png){.ts-img-detail .ts-img-dark}
+![TODOseq task row context menu](./assets/todoseq-task-context-menu-light.png){.ts-img-detail .ts-img-light}
 
 The context menu includes several sections:
 
@@ -111,7 +128,8 @@ The context menu supports keyboard navigation with arrow keys and Enter to selec
 
 ### Date Picker
 
-![TODOseq date picker](./assets/todoseq-date-picker.png){.ts-img-detail}
+![TODOseq date picker](./assets/todoseq-date-picker.png){.ts-img-detail .ts-img-dark}
+![TODOseq date picker](./assets/todoseq-date-picker-light.png){.ts-img-detail .ts-img-light}
 
 Use the Date Picker for selecting and managing task dates. The Date Picker provides:
 
@@ -208,12 +226,8 @@ When a task has a warning period set, a small arrow indicator appears after the 
 
 These arrows are only shown when a warning period is active (either per-task via `-Nd` syntax or via global default settings).
 
-**Example displays:**
-
-```
-Scheduled: Yesterday →
-Deadline: Jun 22, 2026 ←
-```
+![A task scheduled for yesterday with a delay, and a task with a deadline one week out](./assets/todoseq-warning-period-arrows.png){.ts-img-detail .ts-img-dark}
+![A task scheduled for yesterday with a delay, and a task with a deadline one week out](./assets/todoseq-warning-period-arrows-light.png){.ts-img-detail .ts-img-light}
 
 #### Hover Tooltips
 

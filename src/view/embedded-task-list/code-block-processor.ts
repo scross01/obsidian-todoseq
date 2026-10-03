@@ -182,7 +182,10 @@ export class TodoseqCodeBlockProcessor {
     this.manager.invalidateCache();
     // Refresh all active code blocks
     this.eventHandler.refreshAllCodeBlocks();
-    // Reset the flag after refresh is complete, allowing the next update to proceed
+    // Cleared here rather than left for the subscriber to consume: this method
+    // does not always cause a notification, so a flag that only the subscriber
+    // cleared would stay set and swallow the next genuine task change. The
+    // subscriber also clears it (above) for the echo this refresh does cause.
     this.skipNextRefresh = false;
   }
 

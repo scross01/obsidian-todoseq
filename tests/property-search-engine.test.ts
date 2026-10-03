@@ -579,14 +579,17 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
     });
 
     test('should handle processPendingUpdates with empty pending set', async () => {
+      // Was asserting a private flag went true then false, which is the state
+      // model this change replaces. The behaviour worth pinning is that an
+      // empty queue is a no-op that leaves nothing scheduled behind.
       await propertySearchEngine.initialize();
 
-      (propertySearchEngine as any).isUpdating = true;
       (propertySearchEngine as any).pendingUpdates.clear();
 
       (propertySearchEngine as any).processPendingUpdates();
 
-      expect((propertySearchEngine as any).isUpdating).toBe(false);
+      expect((propertySearchEngine as any).pendingUpdates.size).toBe(0);
+      expect((propertySearchEngine as any).pendingUpdateTimeout).toBeNull();
     });
 
     test('should rebuild cache correctly after removing old file references', async () => {
@@ -807,7 +810,6 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
 
       propertySearchEngine.invalidateFile(testFile);
 
-      expect((propertySearchEngine as any).isUpdating).toBe(true);
       expect((propertySearchEngine as any).pendingUpdateTimeout).not.toBeNull();
     });
 
@@ -832,17 +834,138 @@ describe('PropertySearchEngine - Comprehensive Tests', () => {
     });
   });
 
-  describe('rebuildAll', () => {
-    test('should skip rebuild if already updating', async () => {
-      await propertySearchEngine.initialize();
+  describe('pass scheduling', () => {
+    /**
+     * Hold the single-pass cache build open so a second pass can be observed
+     * starting (or not) during the first — the window every bug here lives in.
+     * Returns a spy, a release and the peak number of builds ever in flight.
+     */
+    function gateSinglePassBuild() {
+      const original = (
+        propertySearchEngine as any
+      ).initializePropertyCacheSinglePass.bind(propertySearchEngine);
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let active = 0;
+      let peakConcurrency = 0;
+      const spy = jest.fn(async () => {
+        active++;
+        peakConcurrency = Math.max(peakConcurrency, active);
+        try {
+          await gate;
+          return await original();
+        } finally {
+          active--;
+        }
+      });
+      (propertySearchEngine as any).initializePropertyCacheSinglePass = spy;
+      return { spy, release: () => release(), peak: () => peakConcurrency };
+    }
 
-      (propertySearchEngine as any).isUpdating = true;
+    test('runs a rebuild that was requested while a pass was already running', async () => {
+      // The one flag used to be both "a pass is running" and "the request can
+      // be dropped", and the incremental path it belonged to can only ever touch
+      // changed files. So a rebuild arriving during another pass has to be kept
+      // and run by that pass's tail, or it is lost — and its caller is the
+      // settings path, which carries on as though the cache was rebuilt.
+      const gate = gateSinglePassBuild();
+
+      const first = propertySearchEngine.rebuildAll();
+      // Let the first rebuild reach its gated build before asking again.
+      for (let i = 0; i < 50 && gate.spy.mock.calls.length === 0; i++) {
+        await Promise.resolve();
+      }
 
       await propertySearchEngine.rebuildAll();
 
-      expect(
-        (propertySearchEngine as any).propertyKeys.size,
-      ).toBeGreaterThanOrEqual(0);
+      gate.release();
+      await first;
+
+      // Once for the rebuild that was running, once for the one it had to keep.
+      expect(gate.spy).toHaveBeenCalledTimes(2);
+      expect(gate.peak()).toBe(1);
+    });
+
+    test('an incremental pass does not run while a full pass owns the cache', async () => {
+      // The debounce firing inside another pass used to clear the shared flag
+      // on its way out, which released a claim the other pass still needed and
+      // let a second pass start against the cache it was still filling.
+      const gate = gateSinglePassBuild();
+      const testFile = createMockFile('note.md');
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'note.md' },
+      ]);
+
+      const rebuild = propertySearchEngine.rebuildAll();
+      for (let i = 0; i < 50 && gate.spy.mock.calls.length === 0; i++) {
+        await Promise.resolve();
+      }
+
+      jest.useFakeTimers();
+      try {
+        propertySearchEngine.onFileChanged(testFile);
+        jest.advanceTimersByTime(500);
+      } finally {
+        jest.useRealTimers();
+      }
+
+      // Still queued: the pass that owns the cache will drain it.
+      expect((propertySearchEngine as any).pendingUpdates.size).toBe(1);
+
+      gate.release();
+      await rebuild;
+
+      // And the queue is not simply abandoned — it ran once the cache was free.
+      expect((propertySearchEngine as any).pendingUpdates.size).toBe(0);
+    });
+
+    test('runs a rebuild that was requested while a debounced pass was pending', async () => {
+      // The same drop with nothing in flight yet, only a scheduled incremental
+      // pass: the rebuild must be honoured rather than folded into "pending
+      // updates will handle it".
+      await propertySearchEngine.initialize();
+      const keys = (propertySearchEngine as any).propertyKeys as Set<string>;
+      const cache = (propertySearchEngine as any).propertyCache as Map<
+        string,
+        Map<unknown, Set<string>>
+      >;
+      // An entry only a full rebuild would drop: the incremental pass only ever
+      // touches the changed file.
+      keys.add('stale');
+      cache.set('stale', new Map([['ghost', new Set(['ghost.md'])]]));
+
+      const testFile = createMockFile('note.md');
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'note.md' },
+      ]);
+
+      propertySearchEngine.onFileChanged(testFile);
+      await propertySearchEngine.rebuildAll();
+      // Real timers throughout: the single-pass build yields to the event loop
+      // between batches, so awaiting a pass under fake timers would deadlock.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      expect(keys.has('stale')).toBe(false);
+    });
+
+    test('reset cancels a scheduled incremental pass', async () => {
+      // reset() cleared the flag but left the timer armed, so the pass ran
+      // anyway afterwards — against a cache and queue it had just wiped.
+      await propertySearchEngine.initialize();
+      const testFile = createMockFile('note.md');
+      (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+        { path: 'note.md' },
+      ]);
+      const spy = jest.fn();
+      (propertySearchEngine as any).processPendingUpdates = spy;
+
+      propertySearchEngine.onFileChanged(testFile);
+      propertySearchEngine.reset();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 

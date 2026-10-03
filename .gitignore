@@ -38,6 +38,10 @@ test-results/.last-run.json
 docs/.vitepress/dist
 docs/.vitepress/cache
 
+# Docs screenshot pipeline scratch (staged plugin build + raw recorder output)
+.tmp-screenshots/
+.tmp-probe-inspect/
+
 # TypeScript build info
 tsconfig.tsbuildinfo
 

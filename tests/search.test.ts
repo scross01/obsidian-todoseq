@@ -602,10 +602,15 @@ describe('Search functionality', () => {
       expect(() => Search.parse('path: OR')).toThrow('Expected prefix value');
     });
 
-    it('should handle missing date after range operator', () => {
-      expect(() => Search.parse('scheduled:2024-01-01..')).toThrow(
-        'Expected date value after range operator',
-      );
+    it('should treat a missing date after range operator as right-open', () => {
+      // Right-open ranges are valid now: no end bound means "from date onward".
+      const node = Search.parse('scheduled:2024-01-01..');
+      expect(node).toMatchObject({
+        type: 'range_filter',
+        field: 'scheduled',
+        start: '2024-01-01',
+      });
+      expect(node.end).toBeUndefined();
     });
 
     it('should handle range with non-date prefix', () => {

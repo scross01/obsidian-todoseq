@@ -187,27 +187,38 @@ describe('TodoseqCodeBlockProcessor', () => {
   });
 
   describe('skipNextRefresh behavior', () => {
-    it('should skip refresh when skipNextRefresh is set', () => {
-      const eventHandlerInstance = (EmbeddedTaskListEventHandler as jest.Mock)
-        .mock.results[0]?.value;
+    /** The callback this processor handed to TaskStateManager.subscribe. */
+    function subscriber(): (tasks: unknown[]) => void {
+      const subscribeMock = (pluginMock.taskStateManager as any).subscribe;
+      return subscribeMock.mock.calls[0][0];
+    }
+
+    it('swallows the notification its own refresh causes', () => {
+      // The suppression exists so a refresh does not immediately re-enter
+      // through the subscription that triggered it.
+      const onTasksChanged = jest.fn();
+      (processor as any).onTasksChanged = onTasksChanged;
 
       processor.refreshAllEmbeddedTaskLists();
-      // After calling refreshAllEmbeddedTaskLists, skipNextRefresh is reset
-      // Next subscriber callback should trigger refresh
-      const taskStateManagerMock = pluginMock.taskStateManager as any;
-      const subscriberCallback =
-        taskStateManagerMock.subscribe.mock.calls[0][0];
+      subscriber()([]);
 
-      // First call after refresh sets skip flag
+      expect(onTasksChanged).not.toHaveBeenCalled();
+    });
+
+    it('does not swallow a later, unrelated notification', async () => {
+      // The flag must not outlive the refresh that set it. Left set, it would
+      // eat the next genuine task change and the embed would silently stop
+      // updating until some other refresh happened to clear it.
+      const onTasksChanged = jest.fn();
+      (processor as any).onTasksChanged = onTasksChanged;
+
       processor.refreshAllEmbeddedTaskLists();
-      subscriberCallback([]);
+      // Past the debounce the refresh schedules, so this is a later change.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      subscriber()([]);
+      await new Promise((resolve) => setTimeout(resolve, 250));
 
-      // refreshAllCodeBlocks should not be called because skipNextRefresh was true
-      const refreshCalls =
-        eventHandlerInstance?.refreshAllCodeBlocks.mock.calls.length ?? 0;
-      // First refreshAllEmbeddedTaskLists calls it, subscriber callback should skip
-      // The exact count depends on prior calls, so we check it doesn't throw
-      expect(() => processor.refreshAllEmbeddedTaskLists()).not.toThrow();
+      expect(onTasksChanged).toHaveBeenCalled();
     });
   });
 

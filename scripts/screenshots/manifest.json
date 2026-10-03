@@ -1,0 +1,553 @@
+{
+  "assets": {
+    "todoseq-editor-checkbox-interaction": {
+      "id": "todoseq-editor-checkbox-interaction",
+      "scenarioId": "docs-editor",
+      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
+      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
+      "outputSha256": "fba3afc5f19fc898a119ca0ca7e965053571e52b1593696f9b89389114ac3fea",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-date-autocomplete": {
+      "id": "todoseq-editor-date-autocomplete",
+      "scenarioId": "docs-editor",
+      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
+      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
+      "outputSha256": "d30a5b7acdbdd41cc6fe3020e42270a61e7e2b30fcd82950c7c610f670074607",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-task-styling": {
+      "id": "todoseq-editor-task-styling",
+      "scenarioId": "docs-editor",
+      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
+      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
+      "outputSha256": "4f94dc9eb7b80d666c9636b2f2768c2e195e796f680fdb50aa18952874315b93",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-view": {
+      "id": "todoseq-editor-view",
+      "scenarioId": "docs-editor",
+      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
+      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
+      "outputSha256": "77085d83994e8f01fbb8ad2b29e0851eb4f368ea3e00dfe69609d1d1bd1c0a48",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-command-palette": {
+      "id": "todoseq-command-palette",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "5a0211d030f22db3914fbc61c521a1ab0d8fcf02eeb167b525c16c8113613e46",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-context-menu": {
+      "id": "todoseq-context-menu",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "44a9d94499efe3d89d22e0305c25744e9878c31eb902846ba77124e19919ead7",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-date-picker": {
+      "id": "todoseq-date-picker",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "88e91fa56fac37f6c2a77ac519713c9c36cfa4df1b5e0e14efafa2f649437b57",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-sidepanel-with-context-menu": {
+      "id": "todoseq-editor-sidepanel-with-context-menu",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "35caa051a19cfb6569565b93471d5c9160bbb2b5c346a5d878bb3ed3586a3b48",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-search-and-settings-toolbar": {
+      "id": "todoseq-search-and-settings-toolbar",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "50c578463bf115c561ddb78ff79b83ce4e2d5d6f0fec2db2b46fec0ea70eebab",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-task-list-example": {
+      "id": "todoseq-task-list-example",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "90135145170a3952763a3f05dd76aae020367ea115ce3e2a41b9834ec7e17139",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-embedded-tasklist": {
+      "id": "todoseq-editor-embedded-tasklist",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "60f3daae944a1661bd83cf6ecfa53aebaf1ac88b1b286d24e40ad1595ead64de",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-embedded-list-empty": {
+      "id": "todoseq-embedded-list-empty",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "5c786b37072157f8d54cde02cef18cd150859719f415ef3ad32b7be66da9f66f",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-embedded-list-error": {
+      "id": "todoseq-embedded-list-error",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "be046434795601ffe1b599bc87191604b152da6f588a460ee508c582141a6991",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-embedded-list-example": {
+      "id": "todoseq-embedded-list-example",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "49f8a8236791663c5bb9f156f9d0073ce525f83dab02ff9c37c624c20db25467",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-reader-view": {
+      "id": "todoseq-reader-view",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "4ca549d23dcd6f093433befbf3c2fa39f74f40cab0e1cf51e26bf233ea887426",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-screenshot-dark": {
+      "id": "todoseq-screenshot-dark",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "2f79b00898e8216e016485d78eaf65444a682eab3b56890917faf09c69758790",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-search-options-menu": {
+      "id": "todoseq-search-options-menu",
+      "scenarioId": "docs-search",
+      "scenarioHash": "f214c5545eb1c2acc3d920726cfae7fd17b2716e4cc24e81f7fb4df2d44b41aa",
+      "pluginBuildHash": "bc4a4c462ca66fb52e5f61fc10aa7e1b883dde4e08ef7b82f8f074d25726bfed",
+      "outputSha256": "95b2b5d2ef48bc0c9d3bb6c35970cdc4cc41853cc39fb7b5c27061b744c3a359",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-settings": {
+      "id": "todoseq-settings",
+      "scenarioId": "docs-settings",
+      "scenarioHash": "b67ad6d1e64b90c27c690295c2d389ce245758a7956b3bff70a528a7fde6b9f8",
+      "pluginBuildHash": "35ec86132f93a0e1e8488ef93113333384ba023b7fb5020fc7d38f8b15f4aa5c",
+      "outputSha256": "c9aef7b96a40ec5ca3448e73f9da13a475119f1ab7511fe05a4990c9cd48cbe7",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-task-entry": {
+      "id": "todoseq-task-entry",
+      "scenarioId": "docs-task-entry",
+      "scenarioHash": "d8d01d1007bfc18834c9fb2ff43a19f882c30ee17c9a47d3c0bff3d256fc4ca8",
+      "pluginBuildHash": "fa95bd5cd79f8644162f691f394c4f8b982221e8dd21fcef5127a694a80c2acf",
+      "outputSha256": "1f86b35c52787144e7a6c8abbbec8b72b055251f9a7d6e92bc62bfbe5082b9e0",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-display-forms": {
+      "id": "todoseq-dashboard-display-forms",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "209e096bf69cfb72c9a1db7d6652b4dd1eeaa6c873fc4b8b863e018f8caccdb3",
+      "pluginBuildHash": "728ecccfb9b85b3ceb8df1b826b90fdec3c368f6ee6303b866ecd15142cad02d",
+      "outputSha256": "93f048b45af79c8a2d8d8af3e708100e857b661e200afec6c884a5aa975182fb",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "6af41db"
+    },
+    "todoseq-dashboard-heatmap": {
+      "id": "todoseq-dashboard-heatmap",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "209e096bf69cfb72c9a1db7d6652b4dd1eeaa6c873fc4b8b863e018f8caccdb3",
+      "pluginBuildHash": "728ecccfb9b85b3ceb8df1b826b90fdec3c368f6ee6303b866ecd15142cad02d",
+      "outputSha256": "c4b1ad3ac7567b76fe93ee7ad0e3bb6877e03e1e87727cf873e7a015fd9974a4",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "6af41db"
+    },
+    "todoseq-dashboard-strip": {
+      "id": "todoseq-dashboard-strip",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "209e096bf69cfb72c9a1db7d6652b4dd1eeaa6c873fc4b8b863e018f8caccdb3",
+      "pluginBuildHash": "728ecccfb9b85b3ceb8df1b826b90fdec3c368f6ee6303b866ecd15142cad02d",
+      "outputSha256": "076e6fa01413f007d4cfb4ee34e7f1ad1a8bc53e2a55456689c95dfecdae515a",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "6af41db"
+    },
+    "todoseq-archive-dialog": {
+      "id": "todoseq-archive-dialog",
+      "scenarioId": "docs-auto-archive",
+      "scenarioHash": "e6b7734b3f2be7646967726892cca3cc6639be45667cd2a04a8f81709eee5065",
+      "pluginBuildHash": "7ecc67f7554e6374632a4e944cf26411a2fb9ef87df48f0b79b0a43e35685563",
+      "outputSha256": "841e436ba739203261fe48e5bf6044a966c6f6e7d59b3e8db2a2da30679f3e07",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-task-context-menu": {
+      "id": "todoseq-task-context-menu",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "350f90700b1813a33c5edafab95191518addf47abf81621f7ba9037e6e8108ba",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-basic-usage": {
+      "id": "todoseq-dashboard-basic-usage",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "8a330dba5f948438a2bb50f9ea1fef041fb973c47a4107c94f5f7b516b80f3d0",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-example-donut": {
+      "id": "todoseq-dashboard-example-donut",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "018b77b5a6ccd04753b8d1513b06f6a4255fd4ff2a1251ec5f89d7e0e646b577",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-example-heatmap": {
+      "id": "todoseq-dashboard-example-heatmap",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "01636c8a950891200dea982d57ce0a30dc576f841fc107033e231f19cccf0787",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-example-strip": {
+      "id": "todoseq-dashboard-example-strip",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "f865c798a3d5b1eaaa29f19c550dda8a70d4e0d2325d6fb73dd076343fc1e8b2",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-example-tiles": {
+      "id": "todoseq-dashboard-example-tiles",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "d83aee74107bd0bd6b05d91c80e3821cf08c7ebd73d2b9c515da7f15561de9ba",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-search-options-menu-light": {
+      "id": "todoseq-search-options-menu-light",
+      "scenarioId": "docs-search",
+      "scenarioHash": "f214c5545eb1c2acc3d920726cfae7fd17b2716e4cc24e81f7fb4df2d44b41aa",
+      "pluginBuildHash": "bc4a4c462ca66fb52e5f61fc10aa7e1b883dde4e08ef7b82f8f074d25726bfed",
+      "outputSha256": "9af435f57e1e5f1bf15c4de424ac6d738b3977938f499f755f8dade86229601e",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-checkbox-interaction-light": {
+      "id": "todoseq-editor-checkbox-interaction-light",
+      "scenarioId": "docs-editor",
+      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
+      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
+      "outputSha256": "74444857eff4b51e36204d44e5f7642dbd2fcb90fd49035c01657b5c79784675",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-date-autocomplete-light": {
+      "id": "todoseq-editor-date-autocomplete-light",
+      "scenarioId": "docs-editor",
+      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
+      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
+      "outputSha256": "a3fdfed72f9c0cfa0a811b8dfcb75a409068770f5c9a2cf433161321845f3367",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-task-styling-light": {
+      "id": "todoseq-editor-task-styling-light",
+      "scenarioId": "docs-editor",
+      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
+      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
+      "outputSha256": "87707c8aaf7341cc33eb7cd1b156c0d4d14207727cf9795bba21d711384adf2c",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-view-light": {
+      "id": "todoseq-editor-view-light",
+      "scenarioId": "docs-editor",
+      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
+      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
+      "outputSha256": "b0da99c9d7c916a1d5c0627723967fac5440af2599882dc21a7b0e1ccf3a57ed",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-command-palette-light": {
+      "id": "todoseq-command-palette-light",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "a7d83db662db0399d12ada2bccef180800e8bb4e59a9cb036a520709330f071a",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-context-menu-light": {
+      "id": "todoseq-context-menu-light",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "d3f922047432c91f7c008b175d379f9647ef5ac102a9d50aae8b3d6f11787145",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-date-picker-light": {
+      "id": "todoseq-date-picker-light",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "402eb5a0d6fdd2dd51535efcf19fce53284985247be4b046b0e48fa52b50721a",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-sidepanel-with-context-menu-light": {
+      "id": "todoseq-editor-sidepanel-with-context-menu-light",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "d89ed137058649aa0045aa56b6699b2dfb63517aee343f6a70e77dab933b8e5c",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-search-and-settings-toolbar-light": {
+      "id": "todoseq-search-and-settings-toolbar-light",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "0c3d909ef9d490af3b32dd935cdb629f5a122895ecbb2ff870af1dd78e81e475",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-task-context-menu-light": {
+      "id": "todoseq-task-context-menu-light",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "0da3007db70a4effbf4a55ec14f4a7bbf0d7086485e6df4345f2f592cc374f69",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-task-list-example-light": {
+      "id": "todoseq-task-list-example-light",
+      "scenarioId": "docs-task-list",
+      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
+      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
+      "outputSha256": "e7b5da2a13b919b41e125426143420267aa8d6efc363efbd2e8c67aab5987156",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-editor-embedded-tasklist-light": {
+      "id": "todoseq-editor-embedded-tasklist-light",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "f4b4f6abaabcc6eacf4213451c7e01448b7467733bb8b0ad5d94d85baf055246",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-embedded-list-empty-light": {
+      "id": "todoseq-embedded-list-empty-light",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "2fd3223395870aaae271d9502cfc35bc527bc0b1a1e82118e0ff20de8c3dc81b",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-embedded-list-error-light": {
+      "id": "todoseq-embedded-list-error-light",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "c1a19f81ef9232b29d82a53790191f55fb1396a4b633f978f731bdf73da90ee9",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-embedded-list-example-light": {
+      "id": "todoseq-embedded-list-example-light",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "d1f77a3a36b5f0a95d15e63f17f131386f7ddac18da91c2f1e58a6052b54ee93",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-reader-view-light": {
+      "id": "todoseq-reader-view-light",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "f9fdeacf2c5e49b2e3404a4746813c15cdd7b3d5ae751e77baa819b50beeb32f",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-screenshot-dark-light": {
+      "id": "todoseq-screenshot-dark-light",
+      "scenarioId": "docs-embedded-reader",
+      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
+      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "outputSha256": "90664425e7211c4a268df51be32905ef674b1dbc2a5982ab5567ddd219785aae",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-settings-light": {
+      "id": "todoseq-settings-light",
+      "scenarioId": "docs-settings",
+      "scenarioHash": "b67ad6d1e64b90c27c690295c2d389ce245758a7956b3bff70a528a7fde6b9f8",
+      "pluginBuildHash": "35ec86132f93a0e1e8488ef93113333384ba023b7fb5020fc7d38f8b15f4aa5c",
+      "outputSha256": "622221d01698af4b3553fc4ff3563a346635bdd6ba5c34b567685d576cccce29",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-basic-usage-light": {
+      "id": "todoseq-dashboard-basic-usage-light",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "9965b50323e7a85d8468801e75961df91355f5673d91d83a0657dcee37002e76",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-example-donut-light": {
+      "id": "todoseq-dashboard-example-donut-light",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "b539444993a3ba0517a7197709b9968c8f80bd45ba77761212e9c42d3f552970",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-example-heatmap-light": {
+      "id": "todoseq-dashboard-example-heatmap-light",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "1755b7341db4cc6ec27b181536bd9fc2bb3c7091a7ab995673c262f1ef860e21",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-example-strip-light": {
+      "id": "todoseq-dashboard-example-strip-light",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "beb77e54b1da0bb5131c0ae9f26a75091eacb6adba8df8d7f553d7b140271e50",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-dashboard-example-tiles-light": {
+      "id": "todoseq-dashboard-example-tiles-light",
+      "scenarioId": "docs-dashboards",
+      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
+      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
+      "outputSha256": "621e1dc72dfd7d3f6c0920aa2f16426a6d49f604ab4c20dd669a2d71c39ce27a",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-archive-dialog-light": {
+      "id": "todoseq-archive-dialog-light",
+      "scenarioId": "docs-auto-archive",
+      "scenarioHash": "e6b7734b3f2be7646967726892cca3cc6639be45667cd2a04a8f81709eee5065",
+      "pluginBuildHash": "7ecc67f7554e6374632a4e944cf26411a2fb9ef87df48f0b79b0a43e35685563",
+      "outputSha256": "0ca66d12abea766263a7a1ac625509043d553556bd85133112337148c7a193e8",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-task-entry-light": {
+      "id": "todoseq-task-entry-light",
+      "scenarioId": "docs-task-entry",
+      "scenarioHash": "d8d01d1007bfc18834c9fb2ff43a19f882c30ee17c9a47d3c0bff3d256fc4ca8",
+      "pluginBuildHash": "fa95bd5cd79f8644162f691f394c4f8b982221e8dd21fcef5127a694a80c2acf",
+      "outputSha256": "25dacdc8ff0034a8d1d2fafe9f5d9f5cdce0899799b65ce768c442f3288e507e",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "c52994c"
+    },
+    "todoseq-warning-period-arrows": {
+      "id": "todoseq-warning-period-arrows",
+      "scenarioId": "docs-warning-periods",
+      "scenarioHash": "7bd6150092fbf5659dcaccba00d877169f49c519348b9bedef1dcbe410ebd401",
+      "pluginBuildHash": "dbe1098c5db7e27716c53a505c92a9136f862b6397bab9ec98db3ce9a5fdb5fc",
+      "outputSha256": "9e40ada42eb1c5fd10501ddecd780d8b8ce1c63b4e64fa567647bdaa46ac8b71",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "d236e06"
+    },
+    "todoseq-warning-period-arrows-light": {
+      "id": "todoseq-warning-period-arrows-light",
+      "scenarioId": "docs-warning-periods",
+      "scenarioHash": "7bd6150092fbf5659dcaccba00d877169f49c519348b9bedef1dcbe410ebd401",
+      "pluginBuildHash": "dbe1098c5db7e27716c53a505c92a9136f862b6397bab9ec98db3ce9a5fdb5fc",
+      "outputSha256": "91de29d6e1da2155589cd927830caf5929dab509a85712575114696424c2b9f8",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "d236e06"
+    },
+    "todoseq-embedded-collapse-collapsed": {
+      "id": "todoseq-embedded-collapse-collapsed",
+      "scenarioId": "docs-embedded-collapse",
+      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
+      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
+      "outputSha256": "867a4b2add88e81ef7f98b58e6bc5e380162a143360fbdee48a17a22aa6bc4f1",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "e90739b"
+    },
+    "todoseq-embedded-collapse-expanded": {
+      "id": "todoseq-embedded-collapse-expanded",
+      "scenarioId": "docs-embedded-collapse",
+      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
+      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
+      "outputSha256": "3afca867c84ab89fb5a04b16b71c5a902a4485228837d2d557fc4731dfa8abf5",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "e90739b"
+    },
+    "todoseq-embedded-collapse-collapsed-light": {
+      "id": "todoseq-embedded-collapse-collapsed-light",
+      "scenarioId": "docs-embedded-collapse",
+      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
+      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
+      "outputSha256": "9ef585c46041fffbb59c31aff69cc4176064153b891daad80717f02d862c66ed",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "e90739b"
+    },
+    "todoseq-embedded-collapse-expanded-light": {
+      "id": "todoseq-embedded-collapse-expanded-light",
+      "scenarioId": "docs-embedded-collapse",
+      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
+      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
+      "outputSha256": "b7da3fa2246454a9aaf22332ad45644e81bf4ed952b4b7007718b93a8a11c501",
+      "capturedAt": "2026-10-02",
+      "capturedAtCommit": "e90739b"
+    }
+  }
+}

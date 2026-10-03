@@ -6,11 +6,37 @@ import {
   TEST_VAULT_DIR,
   CDP_PORT,
   OBSIDIAN_PATH,
+  REPO_ROOT,
 } from './harness';
 import { connectOverCDP, startCoverageOnPage } from './session';
 import { closeAllModals } from './assertions';
+import { createProcessLog, ProcessLog } from '../../helpers/process-log';
+import path from 'path';
 
 let obsidianProcess: ChildProcess | null = null;
+
+/**
+ * Where Obsidian's stdio is captured: alongside Playwright's own artifacts.
+ *
+ * Not in the ephemeral fixture dirs, because the interesting case is a run that
+ * has already failed — globalTeardown wipes the fixtures on the way out, taking
+ * the evidence with it.
+ */
+const PROCESS_LOG_PATH = path.join(
+  REPO_ROOT,
+  'test-results',
+  'obsidian-process.log',
+);
+
+const processLog: ProcessLog = createProcessLog(PROCESS_LOG_PATH);
+
+/**
+ * Truncate the log and clear any recorded exit state, so the capture describes
+ * the launch that follows and nothing older.
+ */
+function beginCapture(): void {
+  processLog.reset();
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -27,9 +53,26 @@ function httpGet(url: string): Promise<number> {
   });
 }
 
+/**
+ * Wait for Obsidian's CDP endpoint, or throw with everything known about how
+ * the launch went.
+ *
+ * The exit status is the part that earns its keep: a launch that fails outright
+ * reports why in the error rather than as a bare 60-second timeout. Note the
+ * captured stdio is *not* a renderer-crash stack — killing the renderer
+ * produces no stderr at all (verified), so do not expect one here.
+ */
 async function waitForCDP(timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    // A bad OBSIDIAN_PATH (or a missing wrapper command) means there is no
+    // process coming — fail now rather than sit out the whole timeout on a port
+    // nothing will ever listen on.
+    if (processLog.hasFailedToSpawn()) {
+      throw launchFailure(
+        `Obsidian failed to launch (${processLog.describeExit()})`,
+      );
+    }
     try {
       const status = await httpGet(`http://127.0.0.1:${CDP_PORT}/json/version`);
       if (status === 200) return;
@@ -38,7 +81,26 @@ async function waitForCDP(timeoutMs = 60_000): Promise<void> {
     }
     await sleep(500);
   }
-  throw new Error(`Obsidian CDP not available after ${timeoutMs}ms`);
+  throw launchFailure(
+    `Obsidian CDP not available after ${timeoutMs}ms (${processLog.describeExit()})`,
+  );
+}
+
+/**
+ * Build a launch failure that carries the evidence: where the captured output
+ * lives, and its tail. Mainly valuable when the process wrote something useful
+ * before failing (a bad flag, a rejected config); a renderer crash itself is
+ * silent on both streams.
+ */
+function launchFailure(message: string): Error {
+  const tail = processLog.tail();
+  return new Error(
+    [
+      message,
+      `Captured output: ${processLog.filePath}`,
+      tail ? `\n--- last ${tail.length} chars ---\n${tail}` : '',
+    ].join('\n'),
+  );
 }
 
 async function isCDPUp(): Promise<boolean> {
@@ -57,6 +119,11 @@ async function killSpawned(): Promise<void> {
   const proc = obsidianProcess;
   obsidianProcess = null;
   if (!proc || proc.exitCode !== null) return;
+
+  // Distinguish a harness-initiated shutdown in the log from a process that
+  // died on its own: the exit record reads "exited on signal SIGTERM" either
+  // way, and that ambiguity is exactly what makes a crash hard to spot.
+  processLog.note('stopping Obsidian (SIGTERM)');
 
   await new Promise<void>((resolve) => {
     const onGone = () => resolve();
@@ -128,6 +195,19 @@ export async function launchObsidian(): Promise<{
   await killSpawned();
   await killObsidianOnCDP();
 
+  // Truncate only once the outgoing instance has exited, so its shutdown note
+  // and exit record are written before the file is emptied rather than landing
+  // above the new launch header. That is the whole benefit: it keeps the
+  // outgoing instance's records out of the new launch's log. They are still
+  // truncated away — the log describes the launch in flight.
+  //
+  // `exit` fires before the stdio pipes finish draining, so the dying instance
+  // can still emit data after this point. reset() detaches its listeners, so
+  // that straggler is discarded rather than written here — it would carry no
+  // pid (only [stdout]/[stderr]) and could land below the new header, where it
+  // would read as the current launch's own output.
+  beginCapture();
+
   // Build the launch command. OBSIDIAN_COMMAND (a full command string like
   // `flatpak run md.obsidian.Obsidian` or `snap run obsidian`) is split into
   // program + prefix args; otherwise fall back to OBSIDIAN_PATH (the default is
@@ -147,8 +227,12 @@ export async function launchObsidian(): Promise<{
       `--remote-debugging-port=${CDP_PORT}`,
       TEST_VAULT_DIR,
     ],
-    { detached: false, stdio: 'ignore' },
+    // Piped, not ignored: the pipes are drained into the log by the attached
+    // ProcessLog, so a chatty Electron process still cannot block on a full
+    // buffer — we just no longer throw its output away.
+    { detached: false, stdio: ['ignore', 'pipe', 'pipe'] },
   );
+  processLog.attach(obsidianProcess);
 
   await waitForCDP();
 

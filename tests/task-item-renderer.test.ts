@@ -33,6 +33,9 @@ jest.mock('obsidian', () => ({
   },
 }));
 
+/** The state classes both the build and the update path stamp onto the li. */
+const STATE_CLASSES = ['completed', 'cancelled', 'in-progress', 'active'];
+
 // Minimal StateMenuBuilder mock: only needs buildStateMenu returning a menu object
 const createMockMenuBuilder = () =>
   ({
@@ -584,6 +587,60 @@ describe('TaskItemRenderer', () => {
   // buildTaskListItem
   // ============================================================================
   describe('buildTaskListItem', () => {
+    it('marks the li completed so state styling needs no :has()', () => {
+      // styles.css keys the "completed rows recede" rules off this class
+      // rather than `:has(.todoseq-task-text.completed)`. The update path has
+      // always set it, but the initial render did not — so the styling would
+      // have applied only after an in-place update, which is the opposite of
+      // when it matters: the first paint of the list.
+      const li = renderer.buildTaskListItem(
+        createBaseTask({ completed: true, state: 'DONE' }),
+      );
+      expect(li.classList.contains('completed')).toBe(true);
+    });
+
+    it('leaves the li unmarked when the task is not completed', () => {
+      const li = renderer.buildTaskListItem(
+        createBaseTask({ completed: false, state: 'TODO' }),
+      );
+      expect(li.classList.contains('completed')).toBe(false);
+    });
+
+    it('agrees with the class on the task text element', () => {
+      // The two used to be independent: the stylesheet read the text element
+      // while the li carried its own copy. They must not drift, or the
+      // keyword fades while the date row does not.
+      for (const completed of [true, false]) {
+        const li = renderer.buildTaskListItem(
+          createBaseTask({ completed, state: completed ? 'DONE' : 'TODO' }),
+        );
+        const text = li.querySelector('.todoseq-task-text');
+        expect(text?.classList.contains('completed')).toBe(completed);
+        expect(li.classList.contains('completed')).toBe(completed);
+      }
+    });
+
+    it.each(['TODO', 'DOING', 'DONE', 'CANCELLED'])(
+      'mirrors every state class the update path sets on first paint (%s)',
+      (state) => {
+        // buildTaskListItem and updateTaskElementContent both stamp the task's
+        // state onto the li. When only `completed` was mirrored here, the other
+        // three appeared the first time a row was refreshed in place — so a
+        // row could look one way on arrival and another after an edit.
+        const task = createBaseTask({
+          completed: state === 'DONE',
+          state,
+        });
+        const li = renderer.buildTaskListItem(task);
+        const onArrival = STATE_CLASSES.map((c) => li.classList.contains(c));
+
+        renderer.updateTaskElementContent(task, li);
+        const afterUpdate = STATE_CLASSES.map((c) => li.classList.contains(c));
+
+        expect(onArrival).toEqual(afterUpdate);
+      },
+    );
+
     it('should create an li with correct data attributes', () => {
       const task = createBaseTask({
         path: 'notes/test.md',

@@ -412,15 +412,15 @@ export class TodoseqCodeBlockParser {
         }
       }
 
-      // Validate search query syntax
-      if (searchQuery) {
-        try {
-          Search.validate(searchQuery);
-        } catch (error: unknown) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          throw new Error(`Invalid search query: ${message}`);
-        }
+      // Validate search query syntax. Search.validate() reports invalid
+      // queries by returning false — it does not throw — so the message comes
+      // from Search.getError(). Without this, an invalid query silently
+      // matched nothing and rendered as an unexplained "0 tasks".
+      if (searchQuery && !Search.validate(searchQuery)) {
+        const message = Search.getError(searchQuery);
+        throw new Error(
+          message ? `Invalid search query: ${message}` : 'Invalid search query',
+        );
       }
 
       // Validate collapse option compatibility

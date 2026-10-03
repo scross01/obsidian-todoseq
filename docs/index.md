@@ -20,7 +20,12 @@ outline: false
     </p>
   </div>
   <div class="ts-hero-media ts-media">
-    <img class="ts-hero-gif" src="./assets/todoseq-task-entry.gif" alt="Click a TODO keyword in Obsidian to cycle its task state" />
+    <!-- Dark/light pair, same as every screenshot on the docs pages: the
+         capture pipeline records the demo once per Obsidian base theme and the
+         `ts-img-dark` / `ts-img-light` CSS rules show one. The README keeps the
+         dark recording, because GitHub has no `html.dark` for these to key off. -->
+    <img class="ts-hero-gif ts-img-dark" src="./assets/todoseq-task-entry.gif" alt="Click a TODO keyword in Obsidian to cycle its task state" />
+    <img class="ts-hero-gif ts-img-light" src="./assets/todoseq-task-entry-light.gif" alt="Click a TODO keyword in Obsidian to cycle its task state" />
   </div>
 </div>
 
@@ -113,6 +118,7 @@ Once enabled, the Task List opens in the right sidebar. You can always reopen it
 <li><a href="sort-methods.html">Sort Methods</a><p>How tasks are ordered in the panel</p></li>
 <li><a href="urgency.html">Task Urgency</a><p>Urgency sorting and configuration</p></li>
 <li><a href="warning-periods.html">Warning Periods</a><p>Control when tasks appear before their dates</p></li>
+<li><a href="auto-archive.html">Auto-Archive</a><p>Promote aged DONE tasks to ARCHIVED — manually or automatically</p></li>
 <li><a href="import.html">Import</a><p>Bring tasks in from other formats</p></li>
 <li><a href="experimental-features.html">Experimental Features</a><p>Org-mode file support and more</p></li>
 </ul>

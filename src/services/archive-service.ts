@@ -1,0 +1,501 @@
+import { KeywordManager } from '../utils/keyword-manager';
+import { RegexCache } from '../utils/regex-cache';
+import {
+  ArchiveStateMapping,
+  TaskArchiveSettings,
+} from '../settings/settings-types';
+
+/** The subset of Task the evaluator needs (keeps the service unit-testable without DOM/TFile). */
+export interface ArchiveMatchInput {
+  state: string;
+  closedDate: Date | null;
+}
+
+/** An evaluator input that also carries task identity — production always passes full Tasks. */
+export type ArchiveCandidate = ArchiveMatchInput & {
+  path: string;
+  line: number;
+  rawText: string;
+  /** Table-cell identity for cell tasks (same path:line as row siblings). */
+  tableCell?: { cellIndex: number };
+};
+
+/** An evaluated task that matches the archive criteria, with its resolved target keyword. */
+export interface ArchiveMatch extends ArchiveCandidate {
+  /** Target archived keyword for this task's state. */
+  target: string;
+  /** Table-cell identity for cell tasks (same path:line as row siblings). */
+  tableCell?: { cellIndex: number };
+}
+
+/** Runtime copy of the archive settings a run evaluates against. */
+export interface ArchiveRunConfig {
+  criterionMode: 'days' | 'date';
+  criterionDays: number;
+  criterionDate: string; // ISO YYYY-MM-DD or ''
+  stateMappings: ArchiveStateMapping[];
+  includeNoClosedDate: false;
+}
+
+/** A task successfully archived by applyArchives, journaled for session undo. */
+export interface ArchivedTaskRecord {
+  path: string;
+  line: number;
+  /** State keyword before the run (the undo target). */
+  originalState: string;
+  /** Archived keyword written by the run. */
+  target: string;
+  /** rawText before the run — undo verifies the line is unchanged before reverting. */
+  rawTextBefore: string;
+  /**
+   * Full Task snapshot captured at apply time. Undo re-applies THIS object
+   * (with current line content + archived state) rather than reconstructing
+   * a Task — reconstruction cannot restore table-cell identity or parser-
+   * derived fields (`isTableTask`, `tableCell`, `indent`, `listMarker`, …).
+   */
+  taskSnapshot: import('../types/task').Task;
+}
+
+export interface ArchiveRunResult {
+  archived: ArchivedTaskRecord[];
+  skipped: { path: string; line: number; reason: ApplySkipReason }[];
+}
+
+export interface UndoOutcome {
+  reverted: ArchivedTaskRecord[];
+  skipped: { record: ArchivedTaskRecord; reason: UndoSkipReason }[];
+}
+
+/**
+ * Reasons a match could not be archived. Narrow rather than `string` so that
+ * adding a reason without adding it here is a type error, not a silent drift.
+ */
+export type ApplySkipReason = 'stale' | 'apply-failed';
+
+/**
+ * Reasons a journal record could not be undone. Every `skipped.push` in
+ * undoLastRun must appear here — the payload is typed, so a new reason will
+ * not compile until the union catches up.
+ */
+export type UndoSkipReason =
+  | 'line-missing'
+  | 'line-changed'
+  | 'unparseable'
+  | 'apply-failed'
+  | 'read-failed';
+
+/** Dependencies applyArchives/undoLastRun need, supplied by the wiring layer. */
+export interface ApplyArchiveDeps {
+  /**
+   * Resolve the CURRENT task state for a match (or null if it no longer
+   * exists). cellIndex disambiguates table cells that share path:line.
+   * Production wiring: TaskStateManager.findTaskByPathAndLine.
+   */
+  getTask: (
+    path: string,
+    line: number,
+    cellIndex?: number,
+  ) => (ArchiveMatchInput & { rawText: string }) | null;
+  /** Perform the write. Production wiring: TaskUpdateCoordinator.updateTaskState(task, target, 'task-list'). */
+  apply: (task: import('../types/task').Task, target: string) => Promise<void>;
+}
+
+export interface UndoDeps {
+  /** Current raw line content at path:line, or null when the line/file is gone. */
+  getRawLine: (path: string, line: number) => Promise<string | null>;
+  /** Perform the revert write with the original keyword. */
+  apply: (
+    task: import('../types/task').Task,
+    originalState: string,
+  ) => Promise<void>;
+}
+
+/** Why an automatic (scan-triggered) archive run will or will not run. */
+export type AutoArchiveDecisionReason =
+  'enabled-and-ready' | 'setting-off' | 'manual-run-in-progress' | 'no-service';
+
+export interface AutoArchiveDecision {
+  run: boolean;
+  reason: AutoArchiveDecisionReason;
+}
+
+/**
+ * Gate for the opt-in auto-archive on vault scan (plan 013). Pure and
+ * allocation-free on the no-op path: with default settings it reads one
+ * boolean and returns immediately.
+ */
+export function shouldAutoArchive(input: {
+  autoArchiveEnabled: boolean;
+  hasService: boolean;
+  isManualRunInProgress: boolean;
+}): AutoArchiveDecision {
+  if (!input.autoArchiveEnabled) {
+    return { run: false, reason: 'setting-off' };
+  }
+  if (!input.hasService) {
+    return { run: false, reason: 'no-service' };
+  }
+  if (input.isManualRunInProgress) {
+    return { run: false, reason: 'manual-run-in-progress' };
+  }
+  return { run: true, reason: 'enabled-and-ready' };
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/** Narrow an ArchiveMatchInput to an ArchiveCandidate (path/line/rawText carrier). */
+function isArchiveCandidate(task: ArchiveMatchInput): task is ArchiveCandidate {
+  return (
+    typeof (task as ArchiveCandidate).path === 'string' &&
+    typeof (task as ArchiveCandidate).rawText === 'string'
+  );
+}
+
+/** Local-midnight truncation — timezone-safe day comparisons (local components only). */
+function localMidnight(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/** Parse YYYY-MM-DD as a LOCAL date (avoids UTC shift from `new Date(string)`). */
+function parseIsoDateLocal(iso: string): Date | null {
+  const parts = iso.split('-').map((p) => Number.parseInt(p, 10));
+  if (parts.length !== 3 || parts.some((p) => Number.isNaN(p))) return null;
+  const [year, month, day] = parts;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const date = new Date(year, month - 1, day);
+  // Reject rollovers like 2026-02-31 (February 31 becomes March 3).
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+/**
+ * Auto-Archive engine: evaluates which completed tasks match the archive
+ * criteria and applies/undoes bulk keyword rewrites. Pure logic — file
+ * writes and state-manager access are injected via deps, keeping this
+ * class unit-testable without mocks of Obsidian services.
+ *
+ * Product invariants (plans/011-archive-service-core.md):
+ * - Tasks without a CLOSED date NEVER match (includeNoClosedDate is
+ *   reserved; this version always treats it as false).
+ * - Only states with an enabled mapping to a VALID archived-group keyword
+ *   match; the first enabled mapping wins for duplicate sources.
+ * - Archived states are never re-archived.
+ */
+export class ArchiveService {
+  private lastRun: ArchivedTaskRecord[] = [];
+  /**
+   * Batches in flight, counted rather than flagged.
+   *
+   * Both batch kinds set this and both clear it on the way out, and they can
+   * overlap: applyArchives is not gated by isRunning(), so a manual run can be
+   * launched (or an undo triggered from the notice) while another batch is
+   * still writing. A shared boolean made whichever finished first responsible
+   * for clearing a flag the other still needed, so isRunning() reported idle
+   * while records were in flight — and isRunning() is the gate
+   * runAutoArchiveIfEnabled consults before starting an auto run. A depth count
+   * has no such owner: it stays positive until the last batch leaves.
+   */
+  private activeRuns = 0;
+  /** Cached compiled patterns for lineStillArchived — targets repeat across journal records. */
+  private readonly linePatternCache = new RegexCache();
+  /**
+   * The KeywordManager is replaceable: recreateParser() builds a NEW instance
+   * on every keyword edit (KeywordManager snapshots its resolution at
+   * construction), so holding the constructor reference would go stale and
+   * reject freshly added archived keywords as invalid targets.
+   */
+  private keywordManagerRef: KeywordManager;
+
+  constructor(
+    keywordManager: KeywordManager,
+    private readonly settings: TaskArchiveSettings,
+  ) {
+    this.keywordManagerRef = keywordManager;
+  }
+
+  /** Swap in the current manager (called from recreateParser's refresh path). */
+  updateKeywordManager(keywordManager: KeywordManager): void {
+    this.keywordManagerRef = keywordManager;
+  }
+
+  private get keywordManager(): KeywordManager {
+    return this.keywordManagerRef;
+  }
+
+  /**
+   * True while any batch is in flight — apply OR undo, overlapping or not
+   * (used to gate auto-run against manual runs). An undo that reported false
+   * here let an auto-archive start mid-undo, and the two runs then raced over
+   * the journal.
+   */
+  isRunning(): boolean {
+    return this.activeRuns > 0;
+  }
+
+  /** True when a previous run left undoable journal entries. */
+  hasUndoableRun(): boolean {
+    return this.lastRun.length > 0;
+  }
+
+  /**
+   * Pure evaluation: which completed tasks match, and their targets.
+   * @param tasks candidate tasks (archived tasks are ignored internally)
+   * @param config run configuration; defaults to the constructor settings
+   * @param referenceDate 'now' — injected for testability
+   */
+  evaluateArchiveCriteria(
+    tasks: readonly ArchiveCandidate[],
+    config: ArchiveRunConfig = this.settings,
+    referenceDate: Date = new Date(),
+  ): ArchiveMatch[] {
+    const targetBySource = this.buildMappingLookup(config.stateMappings);
+    const matches: ArchiveMatch[] = [];
+
+    for (const task of tasks) {
+      // Archived states are terminal — never re-archive them.
+      if (this.keywordManager.isArchived(task.state)) continue;
+
+      const mapping = targetBySource.get(task.state);
+      if (!mapping) continue; // no enabled mapping for this state
+
+      // Product invariant: no CLOSED date → never matches. includeNoClosedDate
+      // is typed `false` this version; even a `true` value is ignored here.
+      if (task.closedDate === null) continue;
+
+      if (!this.isOldEnough(task.closedDate, config, referenceDate)) continue;
+
+      matches.push({
+        path: task.path,
+        line: task.line,
+        rawText: task.rawText,
+        state: task.state,
+        closedDate: task.closedDate,
+        target: mapping.target,
+        tableCell: isArchiveCandidate(task) ? task.tableCell : undefined,
+      });
+    }
+    return matches;
+  }
+
+  /**
+   * Batch-apply matches. Each match is re-verified against a fresh task
+   * snapshot immediately before write; stale entries are skipped, not
+   * applied. A successful run REPLACES the undo journal (undo reverts the
+   * most recent run only).
+   */
+  async applyArchives(
+    matches: readonly ArchiveMatch[],
+    deps: ApplyArchiveDeps,
+  ): Promise<ArchiveRunResult> {
+    this.activeRuns += 1;
+    const archived: ArchivedTaskRecord[] = [];
+    const skipped: { path: string; line: number; reason: ApplySkipReason }[] =
+      [];
+    try {
+      for (const match of matches) {
+        const current = deps.getTask(
+          match.path,
+          match.line,
+          match.tableCell?.cellIndex,
+        );
+        if (!current) {
+          skipped.push({ path: match.path, line: match.line, reason: 'stale' });
+          continue;
+        }
+        if (current.state !== match.state) {
+          skipped.push({ path: match.path, line: match.line, reason: 'stale' });
+          continue;
+        }
+        const fullTask = current as import('../types/task').Task;
+        try {
+          await deps.apply(fullTask, match.target);
+        } catch (error) {
+          console.debug(
+            'TODOseq: archive apply failed for',
+            match.path,
+            match.line,
+            error,
+          );
+          skipped.push({
+            path: match.path,
+            line: match.line,
+            reason: 'apply-failed',
+          });
+          continue;
+        }
+        archived.push({
+          path: match.path,
+          line: match.line,
+          originalState: match.state,
+          target: match.target,
+          rawTextBefore: current.rawText,
+          // Snapshot BEFORE the write mutated anything that aliases the
+          // manager's task object (defensive copy — the coordinator may
+          // mutate or replace tasks in place).
+          taskSnapshot: { ...fullTask },
+        });
+      }
+    } finally {
+      this.activeRuns -= 1;
+    }
+    this.lastRun = archived;
+    return { archived, skipped };
+  }
+
+  /**
+   * Revert the most recent run. Each journal entry is re-verified: the line
+   * must still exist and still contain the archived target keyword; anything
+   * else is skipped with a reason. The journal is cleared afterwards.
+   */
+  async undoLastRun(deps: UndoDeps): Promise<UndoOutcome> {
+    const journal = this.lastRun;
+    const reverted: ArchivedTaskRecord[] = [];
+    const skipped: { record: ArchivedTaskRecord; reason: UndoSkipReason }[] =
+      [];
+    // Records that could not be attempted or did not take, kept so a second
+    // call can retry them. Terminal outcomes (the line is gone, or no longer
+    // archived) are dropped instead: retrying them could never succeed, and
+    // leaving them behind would keep the undo command permanently available
+    // with nothing it could do.
+    const retryable: ArchivedTaskRecord[] = [];
+
+    this.activeRuns += 1;
+    try {
+      for (const record of journal) {
+        let rawLine: string | null;
+        try {
+          rawLine = await deps.getRawLine(record.path, record.line);
+        } catch (error) {
+          // Contained per record: one unreadable line must not abandon the rest
+          // of the run.
+          console.debug(
+            'TODOseq: archive undo read failed for',
+            record.path,
+            record.line,
+            error,
+          );
+          skipped.push({ record, reason: 'read-failed' });
+          retryable.push(record);
+          continue;
+        }
+        if (rawLine === null) {
+          skipped.push({ record, reason: 'line-missing' });
+          continue;
+        }
+        if (!this.lineStillArchived(rawLine, record)) {
+          skipped.push({ record, reason: 'line-changed' });
+          continue;
+        }
+        if (!record.taskSnapshot) {
+          // Legacy/foreign journal entry without a snapshot: reconstruction is
+          // not safe (loses table identity and parser-derived fields), so skip
+          // rather than corrupt the line.
+          skipped.push({ record, reason: 'unparseable' });
+          continue;
+        }
+        // Re-apply the journaled snapshot with the CURRENT line content and
+        // the archived state — TaskWriter regenerates the line from a shape it
+        // originally produced, including table-cell tasks.
+        const task: import('../types/task').Task = {
+          ...record.taskSnapshot,
+          rawText: rawLine,
+          state: record.target,
+        };
+        try {
+          await deps.apply(task, record.originalState);
+        } catch (error) {
+          console.debug(
+            'TODOseq: archive undo apply failed for',
+            record.path,
+            record.line,
+            error,
+          );
+          skipped.push({ record, reason: 'apply-failed' });
+          retryable.push(record);
+          continue;
+        }
+        reverted.push(record);
+      }
+    } finally {
+      this.activeRuns -= 1;
+    }
+
+    // Assigned only once the whole run is accounted for. Clearing it up front
+    // meant a throw part-way through left nothing to retry with — which is the
+    // one thing an undo must never do.
+    //
+    // Claimed by identity, not unconditionally: this loop awaits once per
+    // record, so a concurrent applyArchives can install a NEWER journal in the
+    // gap (applyArchives is not gated by isRunning(), and a manual run can be
+    // launched directly). Writing our own list over that one would orphan the
+    // newer run's records and hide its Undo button. If the field is still the
+    // journal we started from, no one replaced it and ours is the truth.
+    if (this.lastRun === journal) this.lastRun = retryable;
+    return { reverted, skipped };
+  }
+
+  /**
+   * Cheap line verification: the line must still contain the archived
+   * target keyword as the state token (after the list marker). Combined
+   * with rawTextBefore length sanity, this is the agreed verification
+   * level — full line-shape comparison is deliberately not attempted.
+   */
+  private lineStillArchived(
+    rawLine: string,
+    record: ArchivedTaskRecord,
+  ): boolean {
+    // The target keyword must appear as a standalone token on the line.
+    // Cached: the same target pattern repeats for every record of a run.
+    const pattern = this.linePatternCache.get(
+      `(^|\\s|\\[|\\*)${this.escapeRegExp(record.target)}(\\s|\\]|$)`,
+    );
+    if (!pattern.test(rawLine)) return false;
+    // If the line still matches the ORIGINAL pre-archive shape, it was never
+    // actually archived (or was reverted out-of-band) — treat as changed.
+    if (rawLine === record.rawTextBefore) return false;
+    return true;
+  }
+
+  private escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /** source → first enabled mapping; targets invalid for this vault's keywords are dropped. */
+  private buildMappingLookup(
+    mappings: readonly ArchiveStateMapping[],
+  ): Map<string, ArchiveStateMapping> {
+    const lookup = new Map<string, ArchiveStateMapping>();
+    for (const mapping of mappings) {
+      if (!mapping.enabled) continue;
+      if (lookup.has(mapping.source)) continue; // first enabled mapping wins
+      if (!this.keywordManager.isArchived(mapping.target)) continue; // invalid target → rule unusable
+      lookup.set(mapping.source, mapping);
+    }
+    return lookup;
+  }
+
+  /** Days-mode: closed ≥ criterionDays local midnights ago. Date-mode: closed strictly before criterionDate. */
+  private isOldEnough(
+    closedDate: Date,
+    config: ArchiveRunConfig,
+    referenceDate: Date,
+  ): boolean {
+    const closedMidnight = localMidnight(closedDate);
+    if (config.criterionMode === 'date') {
+      const criterion = parseIsoDateLocal(config.criterionDate);
+      if (!criterion) return false; // unset/invalid date matches nothing
+      return closedMidnight.getTime() < criterion.getTime();
+    }
+    const referenceMidnight = localMidnight(referenceDate);
+    const ageDays = Math.round(
+      (referenceMidnight.getTime() - closedMidnight.getTime()) / MS_PER_DAY,
+    );
+    return ageDays >= config.criterionDays;
+  }
+}

@@ -1,6 +1,5 @@
 import TodoTracker from '../../main';
 import { Task } from '../../types/task';
-import { TaskListView } from '../task-list/task-list-view';
 import { TFile, Notice } from 'obsidian';
 
 export class StatusBarManager {
@@ -21,8 +20,8 @@ export class StatusBarManager {
 
     // Add click event listener
     if (this.statusBarItem) {
-      this.statusBarItem.addEventListener('click', () => {
-        this.handleStatusBarClick();
+      this.statusBarItem.addEventListener('click', (evt) => {
+        this.handleStatusBarClick(evt);
       });
     }
 
@@ -82,15 +81,12 @@ export class StatusBarManager {
   }
 
   // Handle click on status bar item
-  handleStatusBarClick(): void {
+  // Plain click: open/focus the task list in the sidebar and filter to the
+  // active file. Cmd (mac) / Ctrl (win/linux) click: open a new main tab,
+  // matching the dashboard drill-through behavior.
+  handleStatusBarClick(evt?: MouseEvent): void {
     const activeFile = this.plugin.app.workspace.getActiveFile();
     if (!activeFile) return;
-
-    // Open/focus TODOseq Task List
-    this.plugin.uiManager.showTasks().catch((error) => {
-      new Notice('Failed to open task list');
-      console.error('Error opening task list:', error);
-    });
 
     // Populate the search filter with file name only
     // Omit path filter for files without parent directory
@@ -102,34 +98,18 @@ export class StatusBarManager {
     const fileFilter = `file:"${activeFile.basename}.${activeFile.extension}"`;
     const searchQuery = pathFilter + fileFilter;
 
-    const leaves = this.plugin.app.workspace.getLeavesOfType(
-      TaskListView.viewType,
-    );
-    if (leaves.length > 0) {
-      const view = leaves[0].view as TaskListView;
-      if (view) {
-        // Use the public method to set search query
-        this.setTaskListViewSearchQuery(view, searchQuery);
-      }
-    }
-  }
-
-  // Public method to set search query on a TodoView
-  private setTaskListViewSearchQuery(view: TaskListView, query: string): void {
-    // Access the private method through the content element attribute
-    view.contentEl.setAttr('data-search', query);
-    // Also update the search input element if it exists
-    const searchInput = view.contentEl.querySelector(
-      '.search-input-container input',
-    );
-    if (searchInput instanceof HTMLInputElement) {
-      searchInput.value = query;
-    }
-    // Trigger a refresh to apply the new search query
-    view.refreshVisibleList().catch((error) => {
-      new Notice('Failed to refresh task list');
-      console.error('Error refreshing task list:', error);
-    });
+    // Route through the dashboard drill-through entry point so the reveal
+    // target and the query target are the same leaf. Applying the query via
+    // leaves[0] while revealing by sidebar priority could land the filter on
+    // an unfocused main-tab task list that the user never sees.
+    const openInNewTab =
+      evt instanceof MouseEvent && (evt.metaKey || evt.ctrlKey);
+    this.plugin.uiManager
+      .showTasksWithQuery(searchQuery, openInNewTab)
+      .catch((error) => {
+        new Notice('Failed to open task list');
+        console.error('Error opening task list:', error);
+      });
   }
 
   // Clean up status bar item

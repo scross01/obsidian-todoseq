@@ -2,7 +2,8 @@
 
 The TODOseq plugin supports rendering filtered task lists directly within your notes using special code blocks. This feature allows you to create dynamic, interactive task lists that are filtered and sorted according to your specifications.
 
-![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist.png){.ts-img-full}
+![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist.png){.ts-img-full .ts-img-dark}
+![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist-light.png){.ts-img-full .ts-img-light}
 
 ## Basic Usage
 
@@ -10,35 +11,41 @@ To create an embedded task list, use a code block with the `todoseq` language:
 
 ````txt
 ```todoseq
-search: file:"Test Priorities"
-sort: priority
+search: tag:phoenix
+sort: urgency
+title: Phoenix Tasks
 ```
 ````
 
-![TODOseq embedded task list example](assets/todoseq-embedded-list-example.png){.ts-img-wide}
+The block above matches every task tagged `#phoenix`, orders them by urgency, and renders under the heading "Phoenix Tasks". Only `search` is required — `sort` and `title` are optional, and every option is covered below.
+
+![TODOseq embedded task list example](assets/todoseq-embedded-list-example.png){.ts-img-wide .ts-img-dark}
+![TODOseq embedded task list example](assets/todoseq-embedded-list-example-light.png){.ts-img-wide .ts-img-light}
 
 ## Code Block Parameters
 
 Using the following parameters within the `todoseq` code block you define which tasks are displayed.
 
-- `search:` any valid search string (see [search](/search.html))
-- `title:` (optional) adds a custom title displayed above the task list
-- `sort:` (optional) one of `filepath`, `scheduled`, `deadline`, `closed`, `priority`, `urgency`, or `keyword`. Default is `filepath`
-- `limit:` (optional) set the display limit to restrict the number of results shown
-- `show-completed:` (optional) one of `show`, `hide`, `sort-to-end`. Controls how completed tasks are displayed. Defaults to `show`. (`completed:` is an alternative alias)
-- `show-file:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show the source file info column. Defaults to `show` (responsive layout)
-- `show-future:` (optional) one of `show-all`, `show-upcoming`, `hide`, `sort-to-end`. Controls how future-dated tasks are displayed. Defaults to `show-all`. (`future:` is an alternative alias)
-- `show-query:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show the search query and filter parameters in the header. Defaults to `show`
-- `wrap-content:` (optional) `true`, `false`, `wrap`, `truncate`, or `dynamic`. Controls whether task text wraps to multiple lines or truncates with ellipsis. Defaults to `dynamic` (responsive - truncates on wide screens, wraps on mobile). When wrap is enabled, file info moves to a new row with full filename
-- `show-scheduled-date:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show inline scheduled date badges on incomplete tasks. Defaults to `hide`
-- `show-deadline-date:` (optional) `show`, `hide`, `true`, or `false`. Controls whether to show inline deadline date badges on incomplete tasks. Defaults to `hide`
-- `collapse:` (optional) `true` or `false`. When enabled, the task list is collapsible with a chevron toggle. Defaults to `false`. Requires either `title:` to be set OR `show-query: true`
-- `upcoming-period:` (optional) a positive number. Overrides the global "Upcoming period" setting for this code block, controlling how many days ahead tasks are considered "upcoming" when using `show-future: show-upcoming`
-- `scheduled-warning-period:` (optional) a non-negative number. Overrides the global "Scheduled delay" setting for this code block. Tasks appear this many days after their scheduled date
-- `deadline-warning-period:` (optional) a non-negative number. Overrides the global "Deadline advance notice" setting for this code block. Tasks appear this many days before their deadline
-- `skip-scheduled-warning-if-deadline:` (optional) `true` or `false`. Overrides the global "Ignore Scheduled Delay When Deadline Is Set" setting for this code block
-- `skip-deadline-warning-if-scheduled:` (optional) `true` or `false`. Overrides the global "Ignore Deadline Advance Notice When Scheduled Is Set" setting for this code block
-- `show-description:` (optional) `show`, `hide`, `true`, or `false`. Controls how task descriptions are displayed. `show` displays the icon and description text, `hide` displays only the icon. `true` maps to `show`, `false` maps to `hide`. Defaults to `hide`
+| Parameter                             | Description                                                                                                                                                                                                    | Default                                                             |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `search:`                             | Any valid search string (see [search](/search.html))                                                                                                                                                           | all tasks                                                           |
+| `title:`                              | Adds a custom title displayed above the task list                                                                                                                                                              | —                                                                   |
+| `sort:`                               | One of `filepath`, `scheduled`, `deadline`, `closed`, `priority`, `urgency`, or `keyword`                                                                                                                      | `filepath`                                                          |
+| `limit:`                              | Set the display limit to restrict the number of results shown                                                                                                                                                  | —                                                                   |
+| `show-completed:`                     | One of `show`, `hide`, or `sort-to-end`. Controls how completed tasks are displayed (`completed:` is an alternative alias)                                                                                     | `show`                                                              |
+| `show-file:`                          | `show`, `hide`, `true`, or `false`. Controls whether to show the source file info column (responsive layout)                                                                                                   | `show`                                                              |
+| `show-future:`                        | One of `show-all`, `show-upcoming`, `hide`, or `sort-to-end`. Controls how future-dated tasks are displayed (`future:` is an alternative alias)                                                                | `show-all`                                                          |
+| `show-query:`                         | `show`, `hide`, `true`, or `false`. Controls whether to show the search query and filter parameters in the header                                                                                              | `show`                                                              |
+| `wrap-content:`                       | `true`, `false`, `wrap`, `truncate`, or `dynamic`. Controls whether task text wraps to multiple lines or truncates with ellipsis. When wrap is enabled, file info moves to a new row with full filename        | `dynamic` (responsive — truncates on wide screens, wraps on mobile) |
+| `show-scheduled-date:`                | `show`, `hide`, `true`, or `false`. Controls whether to show inline scheduled date badges on incomplete tasks                                                                                                  | `hide`                                                              |
+| `show-deadline-date:`                 | `show`, `hide`, `true`, or `false`. Controls whether to show inline deadline date badges on incomplete tasks                                                                                                   | `hide`                                                              |
+| `collapse:`                           | `true` or `false`. When enabled, the task list is collapsible with a chevron toggle. Requires either `title:` to be set or `show-query: true`                                                                  | `false`                                                             |
+| `upcoming-period:`                    | A positive number. Controls how many days ahead tasks are considered "upcoming" when using `show-future: show-upcoming`                                                                                        | global **Upcoming period** setting                                  |
+| `scheduled-warning-period:`           | A non-negative number. Tasks appear this many days after their scheduled date                                                                                                                                  | global **Scheduled delay** setting                                  |
+| `deadline-warning-period:`            | A non-negative number. Tasks appear this many days before their deadline                                                                                                                                       | global **Deadline advance notice** setting                          |
+| `skip-scheduled-warning-if-deadline:` | `true` or `false`. Overrides the global **Ignore Scheduled Delay When Deadline Is Set** setting for this code block                                                                                            | global setting                                                      |
+| `skip-deadline-warning-if-scheduled:` | `true` or `false`. Overrides the global **Ignore Deadline Advance Notice When Scheduled Is Set** setting for this code block                                                                                   | global setting                                                      |
+| `show-description:`                   | `show`, `hide`, `true`, or `false`. Controls how task descriptions are displayed: `show` displays the icon and description text, `hide` displays only the icon (`true` maps to `show`, `false` maps to `hide`) | `hide`                                                              |
 
 Example:
 
@@ -68,7 +75,7 @@ search: state:TODO OR state:DOING
 ```
 
 ```todoseq
-search: priority:high AND due:today
+search: priority:high AND scheduled:due
 ```
 ````
 
@@ -79,6 +86,8 @@ The `sort:` parameter controls how tasks are ordered. Valid options are:
 - `filepath` - Sort by file path (default)
 - `scheduled` - Sort by scheduled date
 - `deadline` - Sort by deadline date
+- `closed` - Sort by closed date (when the task was completed)
+- `started` - Sort by started date (when work first began)
 - `priority` - Sort by priority (high → low)
 - `urgency` - Sort by urgency score (high → low)
 - `keyword` - Sort by keyword state groups
@@ -89,6 +98,16 @@ Example:
 ```todoseq
 search: scheduled:today
 sort: priority
+```
+````
+
+Another example: completed tasks sorted by their CLOSED date, so the most
+recently finished tasks come first.
+
+````txt
+```todoseq
+search: state:completed
+sort: closed
 ```
 ````
 
@@ -284,6 +303,16 @@ sort: priority
 ```
 ````
 
+Collapsed, the block is just its header and a count of what is hidden:
+
+![A collapsible list collapsed, showing only its header and a matching task count](./assets/todoseq-embedded-collapse-collapsed.png){.ts-img-wide .ts-img-dark}
+![A collapsible list collapsed, showing only its header and a matching task count](./assets/todoseq-embedded-collapse-collapsed-light.png){.ts-img-wide .ts-img-light}
+
+Clicking the header rotates the chevron and reveals the list:
+
+![The same collapsible list expanded, with the chevron rotated and the matching tasks shown](./assets/todoseq-embedded-collapse-expanded.png){.ts-img-wide .ts-img-dark}
+![The same collapsible list expanded, with the chevron rotated and the matching tasks shown](./assets/todoseq-embedded-collapse-expanded-light.png){.ts-img-wide .ts-img-light}
+
 ### Warning Period Overrides
 
 The warning period parameters override the global [warning period settings](settings.md#warning-period-settings) for a specific embedded task list. This is useful when different views need different visibility rules.
@@ -369,8 +398,17 @@ In all cases, TODOseq navigates to the exact line containing the task and focuse
 
 If no tasks are found or the search query is invalid:
 
-![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty.png){.ts-img-wide}
+![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty.png){.ts-img-wide .ts-img-dark}
+![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty-light.png){.ts-img-wide .ts-img-light}
 
 If there's an error with one of the sort or filter options, an error message will be displayed accordingly. The error message indicates what went wrong and suggests how to fix it.
 
-![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error.png)
+![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error.png){.ts-img-dark}
+![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error-light.png){.ts-img-light}
+
+## See Also
+
+If you want aggregated counts instead of the tasks themselves — workload by
+state, priority, tag, or date bucket — see [Dashboards](/dashboards), which
+uses the same search vocabulary with one-click drill-through into the Task
+List.

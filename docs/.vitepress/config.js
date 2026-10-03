@@ -23,6 +23,7 @@ export default {
           { text: 'Reader Integration', link: '/reader' },
           { text: 'Command Palette', link: '/command-palette' },
           { text: 'Embedded Task Lists', link: '/embedded-task-lists' },
+          { text: 'Dashboards', link: '/dashboards' },
         ],
       },
       {
@@ -33,6 +34,7 @@ export default {
           { text: 'Task Urgency', link: '/urgency' },
           { text: 'Warning Periods', link: '/warning-periods' },
           { text: 'Moving Tasks', link: '/moving-tasks' },
+          { text: 'Auto-Archive', link: '/auto-archive' },
           { text: 'Import', link: '/import' },
         ],
       },

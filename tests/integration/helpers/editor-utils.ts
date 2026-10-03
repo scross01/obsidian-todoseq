@@ -2,6 +2,13 @@ import { Page } from 'playwright';
 
 /**
  * Open a file in the editor (source mode).
+ *
+ * Uses setViewState with an explicit source mode rather than leaf.openFile:
+ * openFile inherits the leaf's current mode, so a leaf left in reading mode
+ * by an earlier test (e.g. a dashboard opened via the mode toggle) opens the
+ * file with the source view hidden and the visibility wait below times out.
+ * setViewState with active:true also avoids the New-tab-leaf-active hazard
+ * of openFile after detaching leaves (see dashboard-card-styles.test.ts).
  */
 export async function openFileInEditor(
   page: Page,
@@ -12,7 +19,11 @@ export async function openFileInEditor(
     const file = app.vault.getFiles().find((f: any) => f.basename === name);
     if (!file) throw new Error(`File not found: ${name}`);
     const leaf = app.workspace.getLeaf(false);
-    await leaf.openFile(file);
+    await leaf.setViewState({
+      type: 'markdown',
+      state: { file: file.path, mode: 'source' },
+      active: true,
+    });
   }, filename);
   await page.waitForSelector(
     '.workspace-leaf.mod-active .cm-editor, .workspace-leaf.mod-active .markdown-source-view',

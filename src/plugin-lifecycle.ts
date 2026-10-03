@@ -1,4 +1,8 @@
 import TodoTracker from './main';
+import {
+  ArchiveDialog,
+  showArchiveRunNotice,
+} from './view/components/archive-dialog';
 import { VaultScanner } from './services/vault-scanner';
 import { SmartDateProcessor } from './services/smart-date-processor';
 import { TaskWriter } from './services/task-writer';
@@ -17,7 +21,9 @@ import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
+import { ArchiveService, shouldAutoArchive } from './services/archive-service';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
+import { DashboardCodeBlockProcessor } from './view/embedded-dashboard/dashboard-code-block-processor';
 import {
   smartDatePlugin,
   smartDateHighlightPlugin,
@@ -118,11 +124,26 @@ export class PluginLifecycleManager {
       this.plugin.changeTracker,
     );
 
+    // Initialize archive service (Auto-Archive engine) — reads the shared
+    // KeywordManager for group validation; settings live under
+    // settings.taskArchive. Constructed after the coordinator because apply
+    // wiring delegates writes to it.
+    this.plugin.archiveService = new ArchiveService(
+      this.plugin.keywordManager,
+      this.plugin.settings.taskArchive,
+    );
+
     // Initialize embedded task list processor
     this.plugin.embeddedTaskListProcessor = new TodoseqCodeBlockProcessor(
       this.plugin,
     );
     this.plugin.embeddedTaskListProcessor.registerProcessor();
+
+    // Initialize the todoseq-dashboard code block processor (plan 020)
+    this.plugin.dashboardProcessor = new DashboardCodeBlockProcessor(
+      this.plugin,
+    );
+    this.plugin.dashboardProcessor.registerProcessor();
 
     this.plugin.taskEditor = new TaskWriter(
       this.plugin,
@@ -461,6 +482,31 @@ export class PluginLifecycleManager {
       },
     });
 
+    // Add command to open the archive preview dialog
+    this.plugin.addCommand({
+      id: 'archive-completed-tasks',
+      name: 'Archive completed tasks',
+      icon: 'archive',
+      callback: () => {
+        this.openArchiveDialog();
+      },
+    });
+
+    // Add command to undo the most recent archive run (session-scoped)
+    this.plugin.addCommand({
+      id: 'archive-undo-last-run',
+      name: 'Undo last archive run',
+      icon: 'undo-2',
+      checkCallback: (checking: boolean) => {
+        const service = this.plugin.archiveService;
+        if (!service?.hasUndoableRun()) return false;
+        if (!checking) {
+          void this.performArchiveUndo();
+        }
+        return true;
+      },
+    });
+
     // Listen to VaultScanner events for task updates
     // Note: TaskListView now subscribes directly to TaskStateManager,
     // but we still refresh UI components that need updates
@@ -472,6 +518,7 @@ export class PluginLifecycleManager {
         console.error('Error refreshing task list:', error);
       });
       this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists();
+      this.plugin.dashboardProcessor?.refreshAllDashboards();
     });
 
     this.plugin.vaultScanner.on('scan-completed', () => {
@@ -484,6 +531,11 @@ export class PluginLifecycleManager {
         });
         // Also refresh embedded lists
         this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists();
+        this.plugin.dashboardProcessor?.refreshAllDashboards();
+        // Opt-in auto-archive after a full scan (plan 013). scan-completed
+        // only fires from scanVault() — incremental file updates emit
+        // tasks-changed without it — so no extra full-scan gating is needed.
+        this.runAutoArchiveIfEnabled();
       }, 0);
     });
 
@@ -594,6 +646,11 @@ export class PluginLifecycleManager {
       this.plugin.embeddedTaskListProcessor.cleanup();
     }
 
+    // Clean up embedded dashboard processor
+    if (this.plugin.dashboardProcessor) {
+      this.plugin.dashboardProcessor.cleanup();
+    }
+
     // Clean up EventCoordinator (removes all vault event listeners)
     await this.eventCoordinator?.destroy();
 
@@ -644,5 +701,155 @@ export class PluginLifecycleManager {
    */
   private async saveSettings(): Promise<void> {
     await this.plugin.saveSettings();
+  }
+
+  /**
+   * Open the Auto-Archive preview dialog. Shared by the command, the
+   * settings entry point, and (in plan 013) nowhere else — the auto-run
+   * never opens a dialog.
+   */
+  openArchiveDialog(): void {
+    const service = this.plugin.archiveService;
+    const scanner = this.plugin.vaultScanner;
+    const { taskStateManager, taskUpdateCoordinator, keywordManager } =
+      this.plugin;
+    if (
+      !service ||
+      !scanner ||
+      !taskStateManager ||
+      !taskUpdateCoordinator ||
+      !keywordManager
+    ) {
+      new Notice(
+        'Archive service is not ready yet. Try again after the vault scan completes.',
+      );
+      return;
+    }
+    const dialog = new ArchiveDialog(
+      {
+        settings: this.plugin.settings,
+        taskStateManager,
+        taskUpdateCoordinator,
+        archiveService: service,
+        keywordManager,
+        vaultScanner: scanner,
+        saveSettings: () => this.plugin.saveSettings(),
+        performUndo: () => this.performArchiveUndo(),
+        app: this.plugin.app,
+      },
+      scanner.getKeywordManager(),
+    );
+    dialog.open();
+  }
+
+  /**
+   * Opt-in auto-archive (plan 013): after a full vault scan, archive tasks
+   * matching the days-mode criteria when the user enabled the setting.
+   * Silent-except-notice: no matches → no notice; the completion notice
+   * carries an Undo button that reuses the shared undo flow. Never throws
+   * into the scan listener.
+   */
+  private runAutoArchiveIfEnabled(): void {
+    const service = this.plugin.archiveService;
+    const coordinator = this.plugin.taskUpdateCoordinator;
+    const taskArchive = this.plugin.settings.taskArchive;
+    const decision = shouldAutoArchive({
+      autoArchiveEnabled: taskArchive?.autoArchiveEnabled === true,
+      hasService: !!service && !!coordinator,
+      isManualRunInProgress: service?.isRunning() === true,
+    });
+    if (!decision.run) {
+      console.debug(`TODOseq: auto-archive skipped (${decision.reason})`);
+      return;
+    }
+
+    // Fire-and-forget with full error containment — never break the scan listener.
+    void (async () => {
+      if (!service || !coordinator) return; // re-check inside the async closure
+      // Enforce days-mode for automatic runs regardless of the saved
+      // criterionMode: date mode is manual-run only by product decision.
+      const matches = service.evaluateArchiveCriteria(
+        this.plugin.taskStateManager.getTasks(),
+        { ...taskArchive, criterionMode: 'days' },
+        new Date(),
+      );
+      if (matches.length === 0) return; // no notice on no-ops
+
+      const taskStateManager = this.plugin.taskStateManager;
+      const result = await service.applyArchives(matches, {
+        getTask: (path, line, cellIndex) =>
+          taskStateManager.findTaskByPathAndLine(path, line, cellIndex),
+        apply: (task, target) =>
+          coordinator.updateTaskState(task, target, 'task-list'),
+      });
+
+      const archivedCount = result.archived.length;
+      if (archivedCount === 0) return;
+
+      showArchiveRunNotice(
+        `TODOseq auto-archived ${archivedCount} task${
+          archivedCount === 1 ? '' : 's'
+        }`,
+        {
+          actionLabel: service.hasUndoableRun() ? 'Undo' : undefined,
+          onAction: () => void this.performArchiveUndo(),
+          timeoutMs: 10_000,
+        },
+      );
+    })().catch((error) => {
+      console.debug('TODOseq: auto-archive skipped:', error);
+    });
+  }
+
+  /**
+   * Revert the most recent archive run (session undo). Each journal record
+   * is verified against the current file line before reverting; changed or
+   * missing lines are skipped and reported. Shared by the undo command and
+   * the auto-run completion notice (plan 013) so the flows cannot drift.
+   */
+  async performArchiveUndo(): Promise<void> {
+    const service = this.plugin.archiveService;
+    const coordinator = this.plugin.taskUpdateCoordinator;
+    if (!service || !coordinator) return;
+
+    try {
+      const outcome = await service.undoLastRun({
+        // Live line read: prefers the editor buffer for open files (cachedRead
+        // can lag until autosave, which would fail undo verification).
+        getRawLine: (path, line) => this.plugin.readLiveLine(path, line),
+        apply: async (task, originalState) => {
+          // The service re-applies the journaled full-task snapshot (current
+          // rawText + archived state) — no reconstruction needed. Table-cell
+          // tasks carry their isTableTask/tableCell identity in the
+          // snapshot, so generateTaskLine regenerates the cell correctly.
+          //
+          // 'archive-undo', not 'task-list': the journaled state is a completed
+          // keyword, and writing a completed keyword through the ordinary path
+          // rolls a recurring task forward to its next occurrence instead of
+          // restoring what was archived.
+          await coordinator.updateTaskState(
+            task,
+            originalState,
+            'archive-undo',
+          );
+        },
+      });
+
+      new Notice(
+        `Restored ${outcome.reverted.length} task${
+          outcome.reverted.length === 1 ? '' : 's'
+        }` +
+          (outcome.skipped.length > 0
+            ? `, skipped ${outcome.skipped.length}`
+            : ''),
+      );
+      // No full rescan: the coordinator re-added restored tasks to the state
+      // manager (archived→non-archived re-add path). A rescan would read
+      // stale pre-undo content via cachedRead for open files and undo the
+      // manager update.
+    } catch (error) {
+      console.debug('TODOseq: archive undo failed:', error);
+      new Notice('Undo failed. See console for details.');
+    }
   }
 }

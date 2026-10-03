@@ -39,6 +39,7 @@ graph TB
              TransitionParser["TransitionParser<br/>State Transition Syntax"]
              SmartDateProcessor["SmartDateProcessor<br/>Date Conversion"]
              SavedSearchManager["SavedSearchManager<br/>Saved Searches"]
+             ArchiveService["ArchiveService<br/>Auto-Archive Engine"]
          end
 
         subgraph "UI Layer"
@@ -62,6 +63,10 @@ graph TB
             EmbeddedTaskItemRenderer["EmbeddedTaskItemRenderer<br/>Embedded Item Rendering"]
             EmbeddedTaskListManager["EmbeddedTaskListManager<br/>Embedded Filtering"]
             EmbeddedTaskListEventHandler["EmbeddedTaskListEventHandler<br/>Embedded Events"]
+            DashboardProcessor["DashboardCodeBlockProcessor<br/>Dashboard Cards"]
+            DashboardAggregator["DashboardAggregator<br/>Dashboard Aggregation"]
+            DashboardRenderer["DashboardRenderer<br/>Dashboard Rendering"]
+            ArchiveDialog["ArchiveDialog<br/>Archive Preview & Confirm"]
         end
 
         subgraph "Parser Layer"
@@ -146,6 +151,12 @@ graph TB
     UpdateCoordinator --> ChangeTracker
     UpdateCoordinator --> RecurrenceCoordinator
 
+    Main --> ArchiveService
+    ArchiveService --> UpdateCoordinator
+    ArchiveService --> KeywordManager
+    ArchiveDialog --> ArchiveService
+    ArchiveDialog --> KeywordManager
+
     EventCoordinator --> VaultScanner
     EventCoordinator --> PropertySearchEngine
     EventCoordinator --> FileSystem
@@ -195,8 +206,8 @@ graph TB
     classDef external fill:#f5f5f5
 
     class Main pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchManager serviceLayer
-    class UIManager,TaskListView,TaskWriter,ReaderFormatter,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown,DatePicker,SavedSearchDialog,TaskContextMenu,TaskDragDropHandler,TaskItemRenderer,TaskListFilter,ChunkedRenderQueue,TaskElementCache,EmbeddedTaskItemRenderer,EmbeddedTaskListManager,EmbeddedTaskListEventHandler uiLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchManager,ArchiveService serviceLayer
+    class UIManager,TaskListView,TaskWriter,ReaderFormatter,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown,DatePicker,SavedSearchDialog,TaskContextMenu,TaskDragDropHandler,TaskItemRenderer,TaskListFilter,ChunkedRenderQueue,TaskElementCache,EmbeddedTaskItemRenderer,EmbeddedTaskListManager,EmbeddedTaskListEventHandler,ArchiveDialog uiLayer
     class TaskParser,OrgModeParser,CodeCommentParser,ParserRegistry,LanguageRegistry,DateParser,NaturalDateParser parserLayer
     class Search,SearchParser,SearchEvaluator searchLayer
     class TaskUtils,KeywordManager,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils,TaskSubBullets,PropertyEvaluator,MobileUtils,OrgPatterns,DateRepeater,TaskFormat utilityLayer
@@ -217,6 +228,7 @@ graph TB
 - These are services that depend on core services and are managed together as a lifecycle group
 - `VaultScanner` - File monitoring (receives `TaskStateManager`, `KeywordManager`, `ChangeTracker`)
 - `TaskUpdateCoordinator` - Update pipeline (receives `TaskStateManager`, `KeywordManager`, `ChangeTracker`)
+- `ArchiveService` - Auto-Archive engine (receives `KeywordManager`, `taskArchive` settings); constructed after `TaskUpdateCoordinator` because apply wiring delegates writes to it
 - `EmbeddedTaskListProcessor` - Embedded lists (receives `TaskUpdateCoordinator`)
 - `EventCoordinator` - Event handling (receives `VaultScanner`, `PropertySearchEngine`)
 - `SmartDateProcessor` - Automatic date conversion (created with main plugin instance; `setEnabled()` controlled by setting)
@@ -238,8 +250,8 @@ graph TB
 **TaskStateManager** (`src/services/task-state-manager.ts`)
 
 - **Responsibility**: Single source of truth for all task data
-- **Key Patterns**: Observer pattern for reactive updates, defensive copying
-- **Interface**: `getTasks()` (returns shallow copy), `setTasks()`, `subscribe(callback)`, `findTaskByPathAndLine()`
+- **Key Patterns**: Observer pattern for reactive updates, defensive copying, re-add on undo (`optimisticUpdate()` re-adds a task absent from the manager — the archived → non-archived undo path, since archived tasks are not collected on rescan)
+- **Interface**: `getTasks()` (returns shallow copy), `setTasks()`, `subscribe(callback)`, `findTaskByPathAndLine()`, `optimisticUpdate()`, `updateTaskByPathAndLine()`, `addTask()`, `removeTasks()`, `adjustLineIndices()`
 - **Mutation Policy**: External consumers receive shallow copies; internal methods may mutate task objects for performance
 
 **VaultScanner** (`src/services/vault-scanner.ts`)
@@ -263,9 +275,19 @@ graph TB
   - **Update Sources**: `editor`, `reader`, `task-list`, `embedded`
 - **Change Tracking**: Uses `ChangeTracker` to register expected file changes with content hashing
 - **Recurrence Handling**: Uses `originalNewState` to track user's requested completion state, schedules `RecurrenceCoordinator` for date advancement
+- **Undo re-add**: state finalization re-adds a task that is absent from the manager (`addTask`), completing the archived → non-archived undo path when the async phase resolved a different line via `rawText`
 - **Per-Task Locking**: Uses `pendingTaskUpdates` Map to serialize rapid updates to the same task (path + line)
 - **File Queue**: Uses `fileUpdateQueues` Map to serialize updates per file, preventing race conditions when multiple tasks in the same file are updated rapidly
 - **Editor Checkbox Updates**: `performDirectEditorCheckboxUpdate()` updates checkbox visual state after markdown has been updated
+
+**ArchiveService** (`src/services/archive-service.ts`)
+
+- **Responsibility**: Auto-Archive engine — evaluates which completed tasks match archive criteria and applies/undoes bulk keyword rewrites
+- **Key Patterns**: Pure/injected design (file writes and state access via `ApplyArchiveDeps`/`UndoDeps`), immutable product invariants (no-CLOSED never matches; first enabled mapping wins; archived states terminal), per-match re-verification before write, per-match error containment in apply and undo (a partially failed run still journals the tasks it archived, so undo covers exactly what executed), session undo journal with per-line verification, `RegexCache` for undo line patterns
+- **Interface**: `evaluateArchiveCriteria()`, `applyArchives()`, `undoLastRun()`, `hasUndoableRun()`, `isRunning()`, `shouldAutoArchive()`, `updateKeywordManager()`
+- **KeywordManager Currency**: holds a replaceable reference — `recreateParser()` swaps in the fresh manager via `updateKeywordManager()` (KeywordManager snapshots its resolution at construction; a stale reference rejected newly added archived keywords as invalid targets)
+- **Used by**: `PluginLifecycleManager` (commands, auto-run, undo), `ArchiveDialog`
+- **Ownership**: Created and owned by `PluginLifecycleManager`; stored on main plugin as `archiveService`
 
 **EditorController** (`src/services/editor-controller.ts`)
 
@@ -432,6 +454,13 @@ graph TB
 - **Features**: Go to task, priority selection, scheduled date shortcuts, deadline date picker, copy/move to today
 - **Used by**: TaskListView, EmbeddedTaskItemRenderer
 
+**ArchiveDialog** (`src/view/components/archive-dialog.ts`)
+
+- **Responsibility**: Preview-and-confirm modal for archive runs — criteria selection, mapping rows, capped preview with per-row and bulk include/exclude, apply
+- **Key Patterns**: Custom modal with focus trap and `activeDocument` popout support, 200-row render cap with "+N more" footer, cell-scoped selection keys via `getMatchKey()` (`path:line:cellIndex`) so sibling table-cell tasks are included/excluded independently, merge-write persistence via `mergeMappingRowsIntoStored()` so settings-tab and dialog writes cannot clobber each other, shared `showArchiveRunNotice()` for both run paths
+- **Used by**: `PluginLifecycleManager.openArchiveDialog()`
+- **Ownership**: Constructed on demand by `PluginLifecycleManager`
+
 **DatePicker** (`src/view/components/date-picker-menu.ts`)
 
 - **Responsibility**: Comprehensive date and time picker with repeat options, calendar grid, and warning period support
@@ -535,6 +564,27 @@ graph TB
 - **Features**: Tracks active code blocks by ID; collapse/expand toggle; refreshes code blocks on file open, delete, and rename
 - **Used by**: TodoseqCodeBlockProcessor
 
+**DashboardCodeBlockProcessor** (`src/view/embedded-dashboard/dashboard-code-block-processor.ts`)
+
+- **Responsibility**: `todoseq-dashboard` code block processing — aggregated dashboard cards (counts grouped by state, priority, keyword, tag, or date bucket) embedded in any note
+- **Key Patterns**: Post-processor registration, 150ms-debounced `TaskStateManager` subscription (no skip-echo flag — dashboards never write tasks), code block tracking with file delete/rename untracking
+- **Interface**: `registerProcessor()`, `refreshAllDashboards()`, `updateSettings()`, `cleanup()`
+- **Used by**: `PluginLifecycleManager` (constructed + registered after the embedded list processor)
+
+**DashboardAggregator** (`src/view/embedded-dashboard/aggregation.ts`)
+
+- **Responsibility**: Pure aggregation engine — filters tasks through the shared `Search` evaluator, groups matched tasks, and produces click-through filter strings so card counts agree with the Task List by construction
+- **Key Patterns**: Evaluator-driven bucket assignment (first-true-wins date buckets), negation-composition "Later" filter from today's search vocabulary, version + params + tasks-reference memo invalidated via `invalidateCache()`
+- **Interface**: `aggregate(tasks, params)`, `invalidateCache()`, `composeFilterQuery()`, `WINDOW_BUCKET_FILTERS`, `LATER_FILTER`
+- **Used by**: DashboardCodeBlockProcessor
+
+**DashboardRenderer** (`src/view/embedded-dashboard/dashboard-renderer.ts`)
+
+- **Responsibility**: Renders dashboard cards (bar, column, donut, tiles, heatmap, strip) with theme-variable-only styling, and patches counts/shares/shapes in place when group keys are unchanged on task updates
+- **Key Patterns**: In-place patch vs. rebuild (`updateContent()`), button semantics with full-context aria-labels, `setTooltip` re-application after patches, container-query responsive layout
+- **Interface**: `renderCard()`, `renderContent()`, `updateContent()`, `renderError()`
+- **Used by**: DashboardCodeBlockProcessor
+
 ### 3. Parser Layer (Data Extraction)
 
 **ITaskParser Interface** (`src/parser/types.ts`)
@@ -603,18 +653,21 @@ graph TB
 - **Key Patterns**: Parser combinators, syntax tree construction, AST caching with FIFO eviction
 - **Interface**: Query parsing, AST generation, property filter parsing, `clearCache()` for AST cache invalidation
 - **AST Cache**: `astCache: Map<string, SearchNode>` capped at 50 entries (`AST_CACHE_MAX_SIZE`) with strict FIFO eviction on insertion (`astCache.keys().next().value → delete`) when the size cap is reached. Repeat calls for the same query string return the identical AST instance — the AST is immutable post-parse (SearchEvaluator never mutates it), so sharing is safe. Invalid queries are not cached: the parser throws `SearchError` before reaching the cache-write branch, so invalid-query evaluation still re-parses on each call.
+- **Validation contract**: closed-domain values are rejected at parse time — `priority:` accepts only high/med/medium/low/none (aliases a/b/c) and date prefixes reject date-shaped calendar-invalid values (`2026-02-30`), including range bounds and `<`/`<=`/`>`/`>=` forms; open-domain values (path, file, tag, content, state, non-date words) stay accepted. Operator tokens are uppercase-only (`OR`/`AND`); lowercase `or`/`and` are ordinary search words. Errors are `SearchError`s surfaced to users via `Search.getError()`.
 
 **SearchEvaluator** (`src/search/search-evaluator.ts`)
 
 - **Responsibility**: Task matching and filtering based on query AST
 - **Key Patterns**: Visitor pattern, filter chain execution, property search integration
 - **Interface**: Task evaluation, result filtering, `evaluatePropertyFilter()`
+- **Note**: evaluation assumes parse-time validation has run — `DateUtils.parseDateValue` fails closed on invalid dates so the evaluator's remaining `false` fallbacks are last-resort, not primary behavior
 
 **SearchTokenizer** (`src/search/search-tokenizer.ts`)
 
 - **Responsibility**: Lexical analysis of search queries
 - **Key Patterns**: Tokenization, pattern matching, property token detection
 - **Interface**: Token generation, lexical analysis, property token handling
+- **Case**: operator tokens (`OR`, `AND`) are matched case-sensitively by design; ordinary words like "or" remain searchable as text
 
 **SearchSuggestions** (`src/search/search-suggestions.ts`)
 
@@ -689,6 +742,7 @@ end
          DatePickerComp[DatePicker]
          SavedSearchDialogComp[SavedSearchDialog]
          TaskContextMenuComp[TaskContextMenu]
+         ArchiveDialogComp[ArchiveDialog]
          TaskDragDrop[TaskDragDropHandler]
          TaskItemRendererComp[TaskItemRenderer]
          TaskListFilterComp[TaskListFilter]
@@ -739,6 +793,7 @@ end
         EditorController[EditorController]
         TaskWriter[TaskWriter]
         SavedSearchMgr[SavedSearchManager]
+        ArchiveService[ArchiveService]
     end
 
     subgraph "Lifecycle Dependencies"
@@ -845,6 +900,14 @@ end
     LifecycleManager --> StatusBar
     LifecycleManager --> TaskListView
 
+    %% Archive dependencies
+    LifecycleManager --> ArchiveService
+    ArchiveService --> KeywordManager
+    ArchiveService --> UpdateCoordinator
+    ArchiveDialogComp --> ArchiveService
+    ArchiveDialogComp --> KeywordManager
+    ArchiveDialogComp --> StateManager
+
     %% Styling for dependency direction
     linkStyle 0,1,2,3,4,5,6 stroke:#2196f3,stroke-width:2px
     linkStyle 7,8,9,10,11,12 stroke:#4caf50,stroke-width:2px
@@ -855,8 +918,8 @@ end
 
     %% Class styling for component types
     class Main,LifecycleManager pluginLayer
-    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchMgr serviceLayer
-     class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown,DatePickerComp,SavedSearchDialogComp,TaskContextMenuComp,TaskDragDrop,TaskItemRendererComp,TaskListFilterComp,ChunkedRender,ElementCache,EmbeddedItemRenderer,EmbeddedListManager,EmbeddedEventHandler uiLayer
+    class StateManager,VaultScanner,UpdateCoordinator,EditorController,TaskWriter,EventCoordinator,PropertySearchEngine,TaskStateTransitionManager,ChangeTracker,RecurrenceCoordinator,SmartDateProcessor,SavedSearchMgr,ArchiveService serviceLayer
+     class UIManager,TaskListView,ReaderFormatter,StatusBar,EditorKeywordMenu,StateMenuBuilder,EmbeddedProcessor,SearchOptionsDropdown,SearchSuggestionDropdown,DatePickerComp,SavedSearchDialogComp,TaskContextMenuComp,TaskDragDrop,TaskItemRendererComp,TaskListFilterComp,ChunkedRender,ElementCache,EmbeddedItemRenderer,EmbeddedListManager,EmbeddedEventHandler,ArchiveDialogComp uiLayer
     class TaskParser,OrgModeParser,CodeCommentParser,ParserRegistry,LanguageRegistry,DateParser,NaturalDateParser parserLayer
     class Search,SearchParser,SearchEvaluator,SearchTokenizer,SearchSuggestions searchLayer
     class TaskUtils,KeywordManager,DateUtils,SettingsUtils,Patterns,RegexCache,TaskSort,TaskUrgency,DailyNoteUtils,TaskSubBulletsComp,PropertyEvaluatorComp,MobileUtilsComp,OrgPatternsComp,DateRepeaterComp,TaskFormatComp utilityLayer
@@ -1445,6 +1508,9 @@ The indicator uses monospace font and appears in both the main task list and emb
 29. **Urgency Calculation**: task-urgency functions require keyword sets to be passed via UrgencyContext - no fallback defaults
 30. **Subtask Detection**: Subtasks are only detected when indented one level deeper than the parent task; deeper nesting is not supported
 31. **Mobile Async Context**: On mobile (Android/iPad), async contexts may be destroyed after UI elements close (command palette, menus). Avoid awaits before critical operations like optimistic updates. Use `taskStateManager.optimisticUpdate()` synchronously first, then `taskEditor.updateTaskState()` for async file writes.
+32. **Archive Target Validation**: ArchiveService validates mapping targets against the live archived keyword group — its KeywordManager reference is swapped by `recreateParser()`; do not cache managers across keyword edits
+33. **Simultaneous Mapping Writers**: settings tab and archive dialog both write `taskArchive.stateMappings` — dialog writes must use `mergeMappingRowsIntoStored()`; never replace the array wholesale
+34. **Archive Run Gating**: automatic runs fire only from `scanVault()`'s `scan-completed` event and are gated by `shouldAutoArchive()` (opt-in + days mode forced + not while a manual run is in flight)
 
 ### Testing Architecture
 
