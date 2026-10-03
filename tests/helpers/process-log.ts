@@ -41,13 +41,14 @@ export interface ProcessLog {
   /** Record a harness-side event (a kill, a launch failure) in the log. */
   note(message: string): void;
   /**
-   * Truncate the log and forget the recorded exit state, and stop the previous
+   * Truncate the log, forget the recorded exit state, and stop the previous
    * launch's handlers writing into it.
    *
    * Called at the start of each launch. Without it a previous run's failure
    * sits above the current run's header, and a reader chasing a crash reads
-   * last run's stderr instead of this one's. Stream 'error' handlers are kept
-   * deliberately — see capture().
+   * last run's stderr instead of this one's. 'error' handlers — on the streams
+   * and on the child — are kept deliberately, never removed; see capture()
+   * and attach().
    */
   reset(): void;
   /** Last `maxChars` characters of the log; '' if nothing has been logged. */
@@ -103,7 +104,10 @@ export function createProcessLog(filePath: string): ProcessLog {
   // child's stdio makes this handler hot, and a recursive mkdir on every line
   // is thousands of syscalls per run for a directory that already exists.
   let dirEnsured = false;
-  // Unsubscribes the current launch's stream listeners. See capture().
+  // Per-launch teardown, run by reset(). Two different jobs: stream 'data'
+  // listeners are unsubscribed, while child exit/error handlers are only
+  // silenced — never removed, because they live on an emitter the child owns.
+  // See capture() and attach().
   let detachers: Array<() => void> = [];
 
   function ensureDir(): void {
@@ -239,14 +243,17 @@ export function createProcessLog(filePath: string): ProcessLog {
     writeChunk,
 
     reset() {
-      // Stop writing the previous launch's output before emptying the file, so
-      // a straggler cannot land in the next launch's log. The listeners are
-      // removed rather than the streams destroyed: the child still owns them.
-      for (const detach of detachers) {
+      // Stop the previous launch writing into the file before emptying it, so
+      // a straggler cannot land in the next launch's log. Stream 'data'
+      // listeners are unsubscribed; child exit/error handlers are silenced via
+      // their `live` flag and stay attached, since the child still owns the
+      // emitter and a bare one would rethrow.
+      for (const teardown of detachers) {
         try {
-          detach();
+          teardown();
         } catch {
-          // A stream already torn down with its child: nothing to detach.
+          // The child is already gone and its streams torn down with it, so
+          // there is nothing left to unsubscribe or silence.
         }
       }
       detachers = [];

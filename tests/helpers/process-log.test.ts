@@ -318,10 +318,11 @@ describe('createProcessLog', () => {
     await waitForTail(log, 'early');
     log.reset();
 
-    // The child exits at ~250ms, after the reset. Its 'exit' handler must be
-    // gone by then: otherwise the truncated log — which is meant to describe
-    // the launch that has not started yet — opens with an exit record for a
-    // pid it knows nothing about.
+    // The child exits at ~250ms, after the reset. Its 'exit' handler stays on
+    // the emitter but must be inert by then — it is silenced by the per-attach
+    // `live` flag, never unsubscribed. Otherwise the truncated log, which is
+    // meant to describe the launch that has not started yet, opens with an
+    // exit record for a pid it knows nothing about.
     await settle(600);
 
     const contents = fs.readFileSync(logPath, 'utf8');
