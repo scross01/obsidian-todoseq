@@ -1,16 +1,15 @@
 # Change Log
 
-## Unreleased
+## 0.21.0
 
+- Added `todoseq-dashboard` embedded dashboard cards: aggregated task counts grouped by state, priority, keyword, tag, or scheduled/deadline bucket, rendered as bar, column, donut, tiles, heatmap, or compact strip. Cards aggregate with the same search engine as the Task List (counts agree by construction), support one-click drill-through into the Task List (Cmd/Ctrl-click opens a new tab), update in place when tasks change anywhere in the vault — including auto-archive — and adapt to narrow panes and mobile.
+- Added Auto-Archive: rewrite completed keywords (e.g. DONE) to archived keywords once a task's CLOSED date is at least the threshold days old. Preview and run Auto-archive manually from a dialog, or opt in to automatic runs after vault scans.
+- Added "Archive completed tasks" and "Undo last archive run" commands.
+- Added open-ended date ranges and comparison operators for task date searches: `scheduled:2026-10-07..`, `closed:..2026-12-31`, `scheduled:<2026-10-01`, `deadline:>=2026-11`, including partial months and years (`2026-10` = the whole month). Ranges include the days they name; `<`/`>` exclude them.
 - Adjusted main task list styling: tighter alignment between checkbox, keyword, and task text; completed items recede further; and denser type in the side panel. When the task list is open in a main tab, task text and keywords now match the editor's task entry sizing, and the search field spans the full page width when readable line length is disabled.
 - Fixed the task list not applying main-tab layout treatment when its leaf was moved between the sidebar and a main tab while open.
 - Fixed clicking the status bar task count doing nothing when a task list was already open in a main tab. Plain click now reliably opens/focuses the filtered task list in the sidebar, and Cmd/Ctrl-click opens it in a new main tab — matching the dashboard drill-through behavior.
-- Added open-ended date ranges and comparison operators for task date searches: `scheduled:2026-10-07..`, `closed:..2026-12-31`, `scheduled:<2026-10-01`, `deadline:>=2026-11`, including partial months and years (`2026-10` = the whole month). Ranges include the days they name; `<`/`>` exclude them.
-- Added `todoseq-dashboard` embedded dashboard cards: aggregated task counts grouped by state, priority, keyword, tag, or scheduled/deadline bucket, rendered as bar, column, donut, tiles, heatmap, or compact strip. Cards aggregate with the same search engine as the Task List (counts agree by construction), support one-click drill-through into the Task List (Cmd/Ctrl-click opens a new tab), update in place when tasks change anywhere in the vault — including auto-archive — and adapt to narrow panes and mobile.
-- Added Auto-Archive: rewrite completed keywords (e.g. DONE) to archived keywords once a task's CLOSED date is at least the threshold days old. Preview and run Auto-archive manually from a dialog, or opt in to automatic runs after vault scans.
 - Search queries now fail loud on values the evaluator could never match: unknown `priority:` values and calendar-invalid date values (e.g. `scheduled:2026-02-30`, which previously matched tasks on March 2) are rejected with a visible error instead of silently returning zero results. Embedded task lists now surface invalid search queries as an error message instead of showing an unexplained "0 tasks".
-- Added "Archive completed tasks" and "Undo last archive run" commands.
-- Added a session-scoped undo for archive runs with per-line verification; changed lines are skipped and reported.
 
 ## 0.20.1
 

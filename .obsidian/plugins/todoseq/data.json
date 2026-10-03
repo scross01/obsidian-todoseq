@@ -38,6 +38,14 @@
   },
   "trackClosedDate": false,
   "trackStartedDate": false,
+  "taskArchive": {
+    "autoArchiveEnabled": false,
+    "criterionMode": "days",
+    "criterionDays": 90,
+    "criterionDate": "",
+    "stateMappings": [],
+    "includeNoClosedDate": false
+  },
   "useExtendedCheckboxStyles": false,
   "enableSmartDateRecognition": true,
   "smartDateRemoveKeywords": true,
