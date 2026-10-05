@@ -63,6 +63,7 @@ The main area displays all detected tasks with the following information:
 - **Task text**: The full text of the task
 - **Date displays**: Shows scheduled dates, deadline dates (for incomplete tasks), or closed dates (for completed tasks) below the task text
 - **File path**: Shows the file name and line number location of the task in your vault. Hover the mouse over it to see the full path
+- **Empty state**: When no tasks match, the message names the filter responsible — "Future dated tasks" or "Completed tasks" — and how many tasks it is hiding, rather than telling you to clear an empty search
 
 ## Task Interactions
 

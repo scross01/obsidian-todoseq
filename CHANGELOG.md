@@ -1,5 +1,9 @@
 # Change Log
 
+## Unreleased
+
+- Task List empty state now says which filter hid your tasks: when the list is empty it names the "Future dated tasks" or "Completed tasks" setting responsible and how many tasks it is hiding, instead of suggesting you clear an empty search. The "X of Y tasks" count now excludes future-dated tasks that the current setting hides.
+
 ## 0.21.0
 
 - Added `todoseq-dashboard` embedded dashboard cards: aggregated task counts grouped by state, priority, keyword, tag, or scheduled/deadline bucket, rendered as bar, column, donut, tiles, heatmap, or compact strip. Cards aggregate with the same search engine as the Task List (counts agree by construction), support one-click drill-through into the Task List (Cmd/Ctrl-click opens a new tab), update in place when tasks change anywhere in the vault — including auto-archive — and adapt to narrow panes and mobile.
