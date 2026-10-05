@@ -331,7 +331,7 @@ export function getEffectiveVisibilityDate(
  * @param settings Warning period settings (optional, uses defaults if not provided)
  * @returns Task classification
  */
-function classifyTask(
+export function classifyTask(
   task: Task,
   now: Date,
   settings?: WarningPeriodSettings,
