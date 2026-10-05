@@ -8,7 +8,11 @@ import {
   SortMethod,
 } from '../src/view/task-list/task-list-view';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
-import { createBaseTask, createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseTask,
+  createBaseSettings,
+  createDate,
+} from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { createSavedSearch } from '../src/services/saved-search-manager';
 
@@ -116,6 +120,9 @@ jest.mock('../src/view/task-list/task-list-filter', () => ({
     filterTasksByViewMode: jest
       .fn()
       .mockImplementation((tasks: Task[]) => tasks.slice()),
+    countHiddenByFilters: jest
+      .fn()
+      .mockReturnValue({ future: 0, completed: 0 }),
   })),
 }));
 
@@ -408,24 +415,76 @@ describe('TaskListView', () => {
     });
   });
 
-  describe('filterTasksByViewMode', () => {
-    it('should hide completed tasks', () => {
-      const tasks = [
-        createBaseTask({ completed: false }),
-        createBaseTask({ completed: true }),
-      ];
-      const result = view['filterTasksByViewMode'](tasks, 'hideCompleted');
-      expect(result).toHaveLength(1);
-      expect(result[0].completed).toBe(false);
+  describe('empty state', () => {
+    beforeEach(() => {
+      // Without this the refresh takes the isInitialLoad path and renders
+      // "Loading tasks..." instead of the empty-state copy.
+      (pluginMock as Record<string, unknown>).vaultScanner = {
+        shouldShowScanningMessage: jest.fn().mockReturnValue(false),
+        hasCompletedInitialScan: jest.fn().mockReturnValue(true),
+      };
+      (pluginMock as Record<string, unknown>).settings = createBaseSettings({
+        futureTaskSorting: 'hideFuture',
+      });
     });
 
-    it('should return all tasks for showAll', () => {
-      const tasks = [
-        createBaseTask({ completed: false }),
-        createBaseTask({ completed: true }),
+    afterEach(() => {
+      delete (pluginMock as Record<string, unknown>).vaultScanner;
+    });
+
+    it('blames the future-dating filter when it is hiding the tasks', async () => {
+      const threeMonthsOut = createDate(
+        new Date().getFullYear(),
+        new Date().getMonth() + 3,
+        new Date().getDate(),
+      );
+      const futureTasks = [
+        createBaseTask({
+          path: 'a.md',
+          line: 0,
+          scheduledDate: threeMonthsOut,
+        }),
+        createBaseTask({
+          path: 'b.md',
+          line: 0,
+          scheduledDate: threeMonthsOut,
+        }),
       ];
-      const result = view['filterTasksByViewMode'](tasks, 'showAll');
-      expect(result).toHaveLength(2);
+      view.updateTasks(futureTasks);
+
+      const filter = view['taskListFilter'];
+      jest.spyOn(filter, 'transformForView').mockReturnValue([]);
+      jest
+        .spyOn(filter, 'countHiddenByFilters')
+        .mockReturnValue({ future: 2, completed: 0 });
+
+      await view.refreshVisibleList();
+
+      const title = view.contentEl.querySelector('.todoseq-panel-empty-title');
+      const subtitle = view.contentEl.querySelector(
+        '.todoseq-panel-empty-subtitle',
+      );
+      expect(title?.textContent).toBe('All tasks are future-dated');
+      expect(subtitle?.textContent).toBe(
+        '2 future-dated tasks. Set "Future dated tasks" to Show to see them.',
+      );
+    });
+
+    it('counts the tasks the view mode and future filter are hiding', async () => {
+      const futureTasks = [
+        createBaseTask({ path: 'a.md', line: 0, scheduledDate: new Date() }),
+      ];
+      view.updateTasks(futureTasks);
+
+      const filter = view['taskListFilter'];
+      jest.spyOn(filter, 'transformForView').mockReturnValue([]);
+      const countSpy = jest
+        .spyOn(filter, 'countHiddenByFilters')
+        .mockReturnValue({ future: 1, completed: 0 });
+
+      await view.refreshVisibleList();
+
+      expect(countSpy).toHaveBeenCalledWith(futureTasks, 'showAll');
     });
   });
 

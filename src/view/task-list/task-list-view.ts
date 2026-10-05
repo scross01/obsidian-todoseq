@@ -49,6 +49,7 @@ import {
   TaskListViewMode,
   SortMethod,
 } from './task-list-filter';
+import { buildEmptyStateCopy } from './empty-state-copy';
 import {
   getTodayDailyNote,
   isTaskOnTodayDailyNote,
@@ -395,20 +396,6 @@ export class TaskListView extends ItemView {
   }
   setSortMethod(method: SortMethod) {
     this.contentEl.setAttr('data-sort-method', method);
-  }
-
-  /**
-   * Filter tasks based on view mode
-   * Only filters when mode is 'hideCompleted'; returns a copy for all other modes
-   * @param tasks Array of all tasks
-   * @param mode Current view mode
-   * @returns Filtered tasks array
-   */
-  private filterTasksByViewMode(tasks: Task[], mode: TaskListViewMode): Task[] {
-    if (mode === 'hideCompleted') {
-      return tasks.filter((t) => !t.completed);
-    }
-    return tasks.slice(); // Return copy for other modes
   }
 
   /** Non-mutating transform for rendering */
@@ -1935,6 +1922,7 @@ export class TaskListView extends ItemView {
     const mode = this.getViewMode();
     const allTasks = this.tasks ?? [];
     let visible = this.transformForView(allTasks, mode);
+    const preSearchCount = visible.length;
 
     // Apply search filtering
     const q = this.getSearchQuery().trim();
@@ -1988,10 +1976,9 @@ export class TaskListView extends ItemView {
       '.search-results-result-count',
     );
     if (searchResultsCount) {
-      const filteredAllTasks = this.filterTasksByViewMode(allTasks, mode);
       searchResultsCount.setText(
-        `${visible.length} of ${filteredAllTasks.length} task` +
-          (filteredAllTasks.length === 1 ? '' : 's'),
+        `${visible.length} of ${preSearchCount} task` +
+          (preSearchCount === 1 ? '' : 's'),
       );
     }
 
@@ -2083,31 +2070,15 @@ export class TaskListView extends ItemView {
         cls: 'todoseq-panel-empty-subtitle',
       });
 
-      // Determine scenario
-      const hasAnyTasks = allTasks.length > 0;
-      const hasAnyIncomplete = allTasks.some((t) => !t.completed);
-      const isHideCompleted = mode === 'hideCompleted';
+      const { title: emptyTitle, subtitle: emptySubtitle } =
+        buildEmptyStateCopy({
+          hasAnyTasks: allTasks.length > 0,
+          hasSearchQuery: q.length > 0,
+          hidden: this.taskListFilter.countHiddenByFilters(allTasks, mode),
+        });
 
-      if (!hasAnyTasks) {
-        // No tasks in vault at all
-        title.setText('No tasks found');
-        subtitle.setText(
-          // workaround aggressive obsidianmd/ui/sentence-case -- correct case for test.
-          'Create tasks in your notes using "' +
-            'TODO' +
-            ' your task". They will appear here automatically.',
-        );
-      } else if (isHideCompleted && !hasAnyIncomplete) {
-        // b) Hide-completed enabled, but only completed tasks exist
-        title.setText('All tasks are completed');
-        subtitle.setText(
-          'You are hiding completed tasks. Switch view mode or add new tasks to see more.',
-        );
-      } else {
-        // General empty from search filter or other modes
-        title.setText('No matching tasks');
-        subtitle.setText('Try clearing the search or switching view modes.');
-      }
+      title.setText(emptyTitle);
+      subtitle.setText(emptySubtitle);
 
       // Keep toolbar enabled: do not disable or overlay; list remains empty
       return;
