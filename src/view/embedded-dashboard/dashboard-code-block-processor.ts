@@ -2,6 +2,7 @@ import { MarkdownPostProcessorContext, Notice } from 'obsidian';
 import TodoTracker from '../../main';
 import { VaultScanner } from '../../services/vault-scanner';
 import { DashboardAggregator } from './aggregation';
+import type { Task } from '../../types/task';
 import {
   DashboardCallbacks,
   DashboardRenderOptions,
@@ -104,6 +105,18 @@ export class DashboardCodeBlockProcessor {
    * @param el The container element
    * @param ctx The markdown post processor context
    */
+  /**
+   * Filter out archived tasks from a task array.
+   * Dashboards are a collection view and must respect the same archived-task
+   * exclusion as the vault scanner and the Task List: archived tasks are
+   * styled but NOT collected.
+   */
+  private filterArchivedTasks(tasks: Task[]): Task[] {
+    return tasks.filter(
+      (task) => !this.plugin.keywordManager.isArchived(task.state),
+    );
+  }
+
   private async processCodeBlock(
     source: string,
     el: HTMLElement,
@@ -118,7 +131,7 @@ export class DashboardCodeBlockProcessor {
         return;
       }
 
-      const allTasks = this.plugin.getTasks();
+      const allTasks = this.filterArchivedTasks(this.plugin.getTasks());
       const result = await this.aggregator.aggregate(allTasks, params);
 
       const containerId = `todoseq-dashboard-${Math.random()
@@ -200,7 +213,7 @@ export class DashboardCodeBlockProcessor {
       dashboard.params = params;
 
       const result = await this.aggregator.aggregate(
-        this.plugin.getTasks(),
+        this.filterArchivedTasks(this.plugin.getTasks()),
         params,
       );
 

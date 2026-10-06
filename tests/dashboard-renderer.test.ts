@@ -1425,9 +1425,7 @@ describe('DashboardCodeBlockProcessor', () => {
     });
     await jest.advanceTimersByTimeAsync(0);
     expect(host.querySelector('.todoseq-dashboard-container')).not.toBeNull();
-  });
-
-  it('cleanup unsubscribes and clears tracked blocks', async () => {
+  });  it('cleanup unsubscribes and clears tracked blocks', async () => {
     const processor = makeProcessor();
     await processSource(processor);
     processor.cleanup();
@@ -1440,4 +1438,194 @@ describe('DashboardCodeBlockProcessor', () => {
     const countEl = host.querySelector('.todoseq-dashboard-bar-count');
     expect(countEl?.textContent).toBe('1');
   });
+
+  describe('archived task exclusion', () => {
+    const archivedSource = [
+      'search: tag:project',
+      'group-by: state',
+      'title: My dashboard',
+    ].join('\n');
+
+    const activeTask = createBaseTask({
+      path: 'a.md',
+      line: 0,
+      rawText: 'DOING task #project',
+      tags: ['project'],
+      state: 'DOING',
+    });
+
+    const archivedTask = createBaseTask({
+      path: 'b.md',
+      line: 0,
+      rawText: 'ARCHIVED task #project',
+      tags: ['project'],
+      state: 'ARCHIVED',
+    });
+
+    it('excludes archived tasks from the dashboard card counts and groups', async () => {
+      // Both active and archived tasks match the base query (tag:project)
+      getTasksMock.mockReturnValue([activeTask, archivedTask]);
+
+      const processor = makeProcessor();
+      // Invoke handler directly with archivedSource (state grouping)
+      const handler = registerProcessorMock.mock.calls.find(
+        (call) => call[0] === 'todoseq-dashboard',
+      )?.[1] as (source: string, el: HTMLElement, ctx: unknown) => Promise<void>;
+      await handler(archivedSource, host, { sourcePath: 'note.md' });
+
+      // The card's total should only count the active task
+      const total = host.querySelector(
+        '.todoseq-dashboard-total',
+      )?.textContent;
+      expect(total).toBe('1 task');
+
+      // State groups should only include non-archived states
+      const rows = host.querySelectorAll('.todoseq-dashboard-bar-row');
+      expect(rows.length).toBe(1); // only TODO/active
+      expect(rows[0].querySelector('.todoseq-dashboard-bar-label')?.textContent).toBe(
+        'Active',
+      );
+      expect(rows[0].querySelector('.todoseq-dashboard-bar-count')?.textContent).toBe(
+        '1',
+      );
+
+      // The archived group must not appear (archived tasks filtered before aggregation)
+      const archivedRow = host.querySelector(
+        '.todoseq-dashboard-bar-row[data-group="state:archived"]',
+      );
+      expect(archivedRow).toBeNull();
+    });
+
+    it('filters archived tasks with custom archived keywords', async () => {
+      // Custom archived keyword via settings
+      const customSettings = createBaseSettings({
+        additionalArchivedKeywords: ['SHIPPED'],
+      });
+      pluginMock.settings = customSettings;
+      pluginMock.keywordManager = createTestKeywordManager({
+        additionalArchivedKeywords: ['SHIPPED'],
+      });
+
+      const shippedTask = createBaseTask({
+        path: 'c.md',
+        line: 0,
+        rawText: 'SHIPPED task #project',
+        tags: ['project'],
+        state: 'SHIPPED',
+      });
+
+      getTasksMock.mockReturnValue([activeTask, shippedTask]);
+
+      const processor = makeProcessor();
+      const handler = registerProcessorMock.mock.calls.find(
+        (call) => call[0] === 'todoseq-dashboard',
+      )?.[1] as (source: string, el: HTMLElement, ctx: unknown) => Promise<void>;
+      await handler(archivedSource, host, { sourcePath: 'note.md' });
+
+      // SHIPPED is an archived keyword — excluded from the card
+      const total = host.querySelector(
+        '.todoseq-dashboard-total',
+      )?.textContent;
+      expect(total).toBe('1 task');
+    });
+
+    it('keeps non-archived tasks when mixed with archived', async () => {
+      getTasksMock.mockReturnValue([
+        activeTask,
+        archivedTask,
+        createBaseTask({
+          path: 'c.md',
+          line: 0,
+          rawText: 'DOING task #project',
+          tags: ['project'],
+          state: 'DOING',
+        }),
+      ]);
+
+      const processor = makeProcessor();
+      const handler = registerProcessorMock.mock.calls.find(
+        (call) => call[0] === 'todoseq-dashboard',
+      )?.[1] as (source: string, el: HTMLElement, ctx: unknown) => Promise<void>;
+      await handler(archivedSource, host, { sourcePath: 'note.md' });
+
+      // Total: 2 non-archived tasks, not 3
+      const total = host.querySelector(
+        '.todoseq-dashboard-total',
+      )?.textContent;
+      expect(total).toBe('2 tasks');
+
+      // Both non-archived tasks are DOING → 'Active' group
+      const rows = host.querySelectorAll('.todoseq-dashboard-bar-row');
+      expect(rows.length).toBe(1);
+      expect(rows[0].querySelector('.todoseq-dashboard-bar-label')?.textContent).toBe(
+        'Active',
+      );
+      expect(rows[0].querySelector('.todoseq-dashboard-bar-count')?.textContent).toBe(
+        '2',
+      );
+    });
+
+    it('does not render an archived state group when all tasks are archived', async () => {
+      // All tasks archived: no groups, empty state
+      getTasksMock.mockReturnValue([archivedTask]);
+
+      const processor = makeProcessor();
+      const handler = registerProcessorMock.mock.calls.find(
+        (call) => call[0] === 'todoseq-dashboard',
+      )?.[1] as (source: string, el: HTMLElement, ctx: unknown) => Promise<void>;
+      await handler(archivedSource, host, { sourcePath: 'note.md' });
+
+      // Empty state: no tasks match
+      expect(host.querySelector('.todoseq-dashboard-empty')?.textContent).toContain(
+        'No tasks match',
+      );
+      // No bar rows (no non-archived tasks to group)
+      expect(host.querySelectorAll('.todoseq-dashboard-bar-row').length).toBe(0);
+    });
+
+    it('excludes archived tasks from refreshDashboard path too', async () => {
+      // Simulate a refresh after an archive run: archived task enters memory
+      // but must be filtered out by refreshDashboard
+      getTasksMock.mockReturnValue([activeTask, archivedTask]);
+
+      const processor = makeProcessor();
+      const handler = registerProcessorMock.mock.calls.find(
+        (call) => call[0] === 'todoseq-dashboard',
+      )?.[1] as (source: string, el: HTMLElement, ctx: unknown) => Promise<void>;
+      await handler(archivedSource, host, { sourcePath: 'note.md' });
+
+      // Get the tracked dashboard and trigger a refresh
+      const dashboard = processor['activeDashboards'].values().next().value;
+      expect(dashboard).toBeDefined();
+
+      // Change getTasks to return an archived task that was just archived
+      getTasksMock.mockReturnValue([
+        createBaseTask({
+          path: 'a.md',
+          line: 0,
+          rawText: 'DOING task #project',
+          tags: ['project'],
+          state: 'DOING',
+        }),
+        createBaseTask({
+          path: 'b.md',
+          line: 0,
+          rawText: 'ARCHIVED task #project',
+          tags: ['project'],
+          state: 'ARCHIVED',
+        }),
+      ]);
+
+      await processor['refreshDashboard'](dashboard);
+
+      // After refresh: only the DOING task counted
+      const total = host.querySelector(
+        '.todoseq-dashboard-total',
+      )?.textContent;
+      expect(total).toBe('1 task');
+    });
+
+  });
 });
+
+

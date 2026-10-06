@@ -1,7 +1,8 @@
 # Change Log
 
-## Unreleased
+## 0.21.1
 
+- Dashboard cards now exclude archived tasks from their counts and groups, matching the Task List and vault scan behavior. Archived tasks are styled in notes but no longer appear in dashboard aggregation.
 - Task List empty state now says which filter hid your tasks: when the list is empty it names the "Future dated tasks" or "Completed tasks" setting responsible and how many tasks it is hiding, instead of suggesting you clear an empty search. The "X of Y tasks" count now excludes future-dated tasks that the current setting hides.
 
 ## 0.21.0
