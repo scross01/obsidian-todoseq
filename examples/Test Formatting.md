@@ -7,6 +7,8 @@ TODO task with emoji characters 🫣
 
 TODO task with **Bold** *Italic* ~~strikethrough~~ and ==highlighted== text
 
+TODO task with coloured ==🔴highlight red== and ==🟢highligh green== text
+
 TODO test with `code` content
 
 TODO task with image ![](image.jpg) in the text

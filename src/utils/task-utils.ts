@@ -144,6 +144,15 @@ export function stripMarkdownForDisplay(input: string): string {
 
   // Strike/highlight/math
   out = out.replace(/~~(.*?)~~/g, '$1');
+  // Obsidian 1.14 color highlights: ==🔴Highlight== etc.
+  // Only strip the six highlight-color emoji (changelog: 🔴🟠🟢🔵🟣 + 🟡 for explicit yellow).
+  // Keep other emoji like ==🎉Party== intact.
+  // \uFE0F handles platforms that emit emoji + variation selector.
+  const COLOR_EMOJI = '(?:🔴|🟠|🟡|🟢|🔵|🟣)';
+  out = out.replace(
+    new RegExp(`==\\s*${COLOR_EMOJI}\\uFE0F?\\s*(.*?)==`, 'g'),
+    '$1',
+  );
   out = out.replace(/==(.*?)==/g, '$1');
   out = out.replace(/\$\$(.*?)\$\$/g, '$1');
 
