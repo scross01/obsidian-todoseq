@@ -505,6 +505,46 @@ describe('task-utils', () => {
       );
     });
 
+    test('strips color highlight (red)', () => {
+      expect(
+        stripMarkdownForDisplay('this is ==\uD83D\uDD34highlighted== text'),
+      ).toBe('this is highlighted text');
+    });
+
+    test('strips color highlights for all Obsidian 1.14 colors', () => {
+      expect(stripMarkdownForDisplay('==\uD83D\uDD34red==')).toBe('red');
+      expect(stripMarkdownForDisplay('==\uD83D\uDFE0orange==')).toBe('orange');
+      expect(stripMarkdownForDisplay('==\uD83D\uDFE1yellow==')).toBe('yellow');
+      expect(stripMarkdownForDisplay('==\uD83D\uDFE2green==')).toBe('green');
+      expect(stripMarkdownForDisplay('==\uD83D\uDD35blue==')).toBe('blue');
+      expect(stripMarkdownForDisplay('==\uD83D\uDFE3purple==')).toBe('purple');
+    });
+
+    test('strips color highlight with spaces and multiple highlights', () => {
+      expect(stripMarkdownForDisplay('==\uD83D\uDD34 red ==')).toBe('red');
+      expect(
+        stripMarkdownForDisplay(
+          'a ==\uD83D\uDD34one== b ==\uD83D\uDFE2two== c',
+        ),
+      ).toBe('a one b two c');
+      expect(
+        stripMarkdownForDisplay('mixed ==plain== and ==\uD83D\uDD35colored=='),
+      ).toBe('mixed plain and colored');
+    });
+
+    test('does not strip non-color emoji inside highlight', () => {
+      expect(stripMarkdownForDisplay('==\uD83C\uDF89Party==')).toBe(
+        '\uD83C\uDF89Party',
+      );
+    });
+
+    test('strips color highlight with variation selector', () => {
+      // Some platforms emit 🔴 + VS16 (U+FE0F); ensure it is also stripped.
+      expect(stripMarkdownForDisplay('==\uD83D\uDD34\uFE0Fhighlighted==')).toBe(
+        'highlighted',
+      );
+    });
+
     test('strips math blocks', () => {
       expect(stripMarkdownForDisplay('formula $$E=mc^2$$ here')).toBe(
         'formula E=mc^2 here',
@@ -650,6 +690,12 @@ describe('task-utils', () => {
 
     test('handles text with no markdown', () => {
       expect(stripDescriptionMarkdown('Plain text')).toBe('Plain text');
+    });
+
+    test('strips color highlight in description', () => {
+      expect(
+        stripDescriptionMarkdown('note ==\uD83D\uDD34important== idea'),
+      ).toBe('note important idea');
     });
   });
 });
