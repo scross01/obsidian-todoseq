@@ -53,7 +53,8 @@ Lines starting with `#` inside the block are treated as comments.
 - **state** — Active / Inactive / Waiting / Completed, using your
   [keyword settings](/settings) (never hardcoded). Archived tasks are excluded
   from dashboards (same as the Task List and vault scan) — they are styled in
-  notes but do not appear in card counts or groups.
+  notes but do not appear in card counts or groups, and no "Archived" group is
+  emitted, even with `show-empty: show`.
 - **keyword** — one column per task state actually present in the matched tasks
 - **tag** — one group per tag. Tags can overlap, so column sums may exceed the
   card total; the header total explains this in its tooltip. The `#A`/`#B`/`#C`

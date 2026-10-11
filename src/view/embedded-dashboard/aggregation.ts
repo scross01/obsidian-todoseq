@@ -419,27 +419,12 @@ export class DashboardAggregator {
       };
     });
 
-    // Archived wrinkle: `state:archived` does not resolve through the
-    // evaluator's STATE_GROUP_MAP, but individual keywords do. A task whose
-    // keyword is in the archived group matches none of the four state:*
-    // filters, so append an "Archived" group whose count is computed by
-    // membership and whose filter OR-joins the individual keywords. This
-    // keeps sum(counts) == total for state grouping.
-    const archivedKeywords =
-      this.keywordManager.getKeywordsForGroup('archivedKeywords');
-    if (archivedKeywords.length > 0) {
-      const archivedSet = new Set(archivedKeywords.map((k) => k.toLowerCase()));
-      const uniqueKeywords = Array.from(new Set(archivedKeywords));
-      groups.push({
-        key: 'state:archived',
-        label: 'Archived',
-        filter: uniqueKeywords.map((k) => `state:${k}`).join(' OR '),
-        count: matched.filter((task) =>
-          archivedSet.has(task.state.toLowerCase()),
-        ).length,
-      });
-    }
-
+    // No "Archived" group: the host filters archived tasks out before
+    // aggregation (same exclusion as the vault scan and the Task List), so
+    // an archived group could never carry a count — it would only ever show
+    // as a zero slot under show-empty. sum(counts) == total holds because
+    // every task that survives the host filter falls in one of the four
+    // state groups.
     return groups;
   }
 

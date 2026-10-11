@@ -1,5 +1,9 @@
 # Change Log
 
+## Unreleased
+
+- Fixed the dashboard state grouping emitting an "Archived" group: it never carries a count because archived tasks are not collected, so with `show-empty` enabled it showed as a permanent zero slot. The state groups are now exactly Active / Inactive / Waiting / Completed.
+
 ## 0.21.1
 
 - Dashboard cards now exclude archived tasks from their counts and groups, matching the Task List and vault scan behavior. Archived tasks are styled in notes but no longer appear in dashboard aggregation.
