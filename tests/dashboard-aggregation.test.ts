@@ -117,7 +117,7 @@ describe('DashboardAggregator', () => {
   });
 
   describe('state grouping', () => {
-    it('counts the four settings groups plus archived, exhaustive over total', async () => {
+    it('counts the four settings groups, never an Archived group (issue 85)', async () => {
       const aggregator = makeAggregator();
       const tasks = [
         makeTask({ path: 'a.md', line: 0, state: 'TODO' }),
@@ -126,70 +126,46 @@ describe('DashboardAggregator', () => {
         makeTask({ path: 'a.md', line: 3, state: 'WAIT' }),
         makeTask({ path: 'a.md', line: 4, state: 'DONE' }),
         makeTask({ path: 'a.md', line: 5, state: 'DONE' }),
-        makeTask({ path: 'a.md', line: 6, state: 'ARCHIVED' }),
       ];
 
       const result = await aggregator.aggregate(tasks, { groupBy: 'state' });
 
-      expect(result.total).toBe(7);
+      expect(result.total).toBe(6);
       expect(result.groups.map((g) => g.key)).toEqual([
         'state:active',
         'state:inactive',
         'state:waiting',
         'state:completed',
-        'state:archived',
       ]);
-      expect(result.groups.map((g) => g.count)).toEqual([1, 2, 1, 2, 1]);
-      // sum(counts) == total — the archived wrinkle keeps grouping exhaustive
+      expect(result.groups.map((g) => g.count)).toEqual([1, 2, 1, 2]);
+      // sum(counts) == total — the four groups are exhaustive over the
+      // non-archived tasks the host passes in.
       const sum = result.groups.reduce((acc, g) => acc + g.count, 0);
       expect(sum).toBe(result.total);
     });
 
-    it('builds the archived filter from OR-joined individual keywords', async () => {
+    it('never emits the Archived group, even with show-empty (issue 85)', async () => {
       const aggregator = makeAggregator({
         additionalArchivedKeywords: ['SHIPPED'],
       });
-      const archived = makeTask({ path: 'a.md', line: 0, state: 'ARCHIVED' });
-      const shipped = makeTask({ path: 'a.md', line: 1, state: 'SHIPPED' });
-      const active = makeTask({ path: 'a.md', line: 2, state: 'DOING' });
+      // Only non-archived tasks: the archived keyword is configured, but the
+      // host-filtered input carries no archived tasks.
+      const active = makeTask({ path: 'a.md', line: 0, state: 'DOING' });
 
-      const result = await aggregator.aggregate([archived, shipped, active], {
+      const result = await aggregator.aggregate([active], {
         groupBy: 'state',
+        showEmpty: true,
       });
 
-      const archivedGroup = result.groups.find(
-        (g) => g.key === 'state:archived',
-      );
-      expect(archivedGroup).toBeDefined();
-      expect(archivedGroup?.filter).toBe('state:ARCHIVED OR state:SHIPPED');
-      expect(archivedGroup?.count).toBe(2);
-
-      // The OR-joined filter must actually resolve through the evaluator —
-      // individual keywords resolve where the group name does not.
+      expect(result.groups.map((g) => g.key)).toEqual([
+        'state:active',
+        'state:inactive',
+        'state:waiting',
+        'state:completed',
+      ]);
       expect(
-        await Search.evaluate(
-          archivedGroup?.filter ?? '',
-          archived,
-          false,
-          settings,
-        ),
-      ).toBe(true);
-      expect(
-        await Search.evaluate(
-          archivedGroup?.filter ?? '',
-          shipped,
-          false,
-          settings,
-        ),
-      ).toBe(true);
-      expect(
-        await Search.evaluate(
-          archivedGroup?.filter ?? '',
-          active,
-          false,
-          settings,
-        ),
-      ).toBe(false);
+        result.groups.find((g) => g.key === 'state:archived'),
+      ).toBeUndefined();
     });
 
     it('uses KeywordManager so custom keywords land in the right group', async () => {

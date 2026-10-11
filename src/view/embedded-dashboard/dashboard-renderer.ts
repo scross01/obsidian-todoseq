@@ -56,7 +56,6 @@ const STATE_COLORS: Record<string, string> = {
   'state:inactive': 'var(--color-blue)',
   'state:waiting': 'var(--color-orange)',
   'state:completed': 'var(--color-green)',
-  'state:archived': 'var(--text-faint)',
 };
 
 /** Neutral ladder for attributes without a semantic mapping. */
