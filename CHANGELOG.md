@@ -1,6 +1,6 @@
 # Change Log
 
-## Unreleased
+## 0.21.2
 
 - Fixed the dashboard state grouping emitting an "Archived" group: it never carries a count because archived tasks are not collected, so with `show-empty` enabled it showed as a permanent zero slot. The state groups are now exactly Active / Inactive / Waiting / Completed.
 
