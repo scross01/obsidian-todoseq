@@ -1312,9 +1312,12 @@ export class TaskWriter {
             taskIndent,
           );
           const indent = this.getEffectiveDateLineIndent(lines, -1, task);
-          const from: EditorPosition = { line: insertIndex, ch: 0 };
-          const to: EditorPosition = { line: insertIndex, ch: 0 };
-          editor.replaceRange(`${indent}STARTED: ${dateStr}\n`, from, to);
+          this.insertDateLineInEditor(
+            editor,
+            insertIndex,
+            `${indent}STARTED: ${dateStr}`,
+            lines,
+          );
           lineDelta = 1;
         }
       } else {
@@ -1506,9 +1509,12 @@ export class TaskWriter {
           lineDelta = 0; // Updated in place, no line count change
         } else {
           // Insert new CLOSED line at calculated position
-          const from: EditorPosition = { line: insertIndex, ch: 0 };
-          const to: EditorPosition = { line: insertIndex, ch: 0 };
-          editor.replaceRange(`${closedIndent}CLOSED: ${dateStr}\n`, from, to);
+          this.insertDateLineInEditor(
+            editor,
+            insertIndex,
+            `${closedIndent}CLOSED: ${dateStr}`,
+            lines,
+          );
           lineDelta = 1; // New line inserted
         }
       } else {
@@ -2036,12 +2042,44 @@ export class TaskWriter {
       taskIndent,
     );
     const indent = this.getEffectiveDateLineIndent(lines, -1, task);
-    editor.replaceRange(
-      `${indent}${dateType}: ${dateStr}\n`,
-      { line: insertIdx, ch: 0 },
-      { line: insertIdx, ch: 0 },
+    this.insertDateLineInEditor(
+      editor,
+      insertIdx,
+      `${indent}${dateType}: ${dateStr}`,
+      lines,
     );
     return 1;
+  }
+
+  /**
+   * Insert a complete date line at `insertIdx` through the Editor API.
+   *
+   * CodeMirror clamps out-of-range positions to the end of the document, so
+   * `replaceRange(text + '\n', {line: lineCount, ch: 0}, …)` splices the
+   * text onto the END of the last line ("SCHEDULED: …CLOSED: …") instead of
+   * starting its own line. Anchor to the end of the final line with a
+   * LEADING newline instead; when the document ends with an empty line the
+   * classic line-boundary insert is already safe.
+   */
+  private insertDateLineInEditor(
+    editor: Editor,
+    insertIdx: number,
+    lineText: string,
+    sourceLines: string[],
+  ): void {
+    const lastLine = sourceLines[sourceLines.length - 1] ?? '';
+    if (insertIdx >= sourceLines.length && lastLine !== '') {
+      const last = Math.max(sourceLines.length - 1, 0);
+      const pos: EditorPosition = { line: last, ch: lastLine.length };
+      editor.replaceRange(`\n${lineText}`, pos, { ...pos });
+    } else {
+      const at = Math.min(insertIdx, Math.max(sourceLines.length - 1, 0));
+      editor.replaceRange(
+        `${lineText}\n`,
+        { line: at, ch: 0 },
+        { line: at, ch: 0 },
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────

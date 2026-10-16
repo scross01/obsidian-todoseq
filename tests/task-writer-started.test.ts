@@ -4,6 +4,7 @@ import {
   createCheckboxTask,
   createTestKeywordManager,
   createBaseSettings,
+  emulateEditorReplaceRange,
 } from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { TFile } from 'obsidian';
@@ -38,24 +39,8 @@ describe('TaskWriter - STARTED date handling', () => {
       lineCount: jest.fn(() => lines.length),
       getLine: jest.fn((i: number) => lines[i]),
       replaceRange: jest.fn((text: string, from: any, to: any) => {
-        // Minimal line-array emulation for replaceRange on full lines.
-        const startLine = from.line;
-        const endLine = to.line;
-        const inserted = text.split('\n');
-        // Full-line replacement or pure insertion at line boundary
-        if (startLine === endLine) {
-          if (text.endsWith('\n')) {
-            // Insert new line(s) at startLine
-            inserted.pop(); // drop trailing empty from trailing \n
-            lines.splice(startLine, 0, ...inserted);
-          } else {
-            // Replace whole line content
-            lines[startLine] = text;
-          }
-        } else {
-          // Removing lines (from.line..to.line)
-          lines.splice(startLine, endLine - startLine, ...inserted);
-        }
+        // CodeMirror-faithful line emulation (clipPos clamping at EOF).
+        emulateEditorReplaceRange(lines, text, from, to);
       }),
       getCursor: jest.fn(() => ({ line: 0, ch: 0 })),
       setCursor: jest.fn(),

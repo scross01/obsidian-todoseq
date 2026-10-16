@@ -24,6 +24,7 @@ import {
   createBaseTask,
   createTestKeywordManager,
   createBaseSettings,
+  emulateEditorReplaceRange,
 } from './helpers/test-helper';
 import { TFile } from 'obsidian';
 
@@ -53,19 +54,8 @@ function makeHarness(
     lineCount: jest.fn(() => lines.length),
     getLine: jest.fn((i: number) => lines[i]),
     replaceRange: jest.fn((text: string, from: any, to: any) => {
-      const startLine = from.line;
-      const endLine = to.line;
-      const inserted = text.split('\n');
-      if (startLine === endLine) {
-        if (text.endsWith('\n')) {
-          inserted.pop();
-          lines.splice(startLine, 0, ...inserted);
-        } else {
-          lines[startLine] = text;
-        }
-      } else {
-        lines.splice(startLine, endLine - startLine, ...inserted);
-      }
+      // CodeMirror-faithful line emulation (clipPos clamping at EOF).
+      emulateEditorReplaceRange(lines, text, from, to);
     }),
     getCursor: jest.fn(() => ({ line: 0, ch: 0 })),
     setCursor: jest.fn(),
