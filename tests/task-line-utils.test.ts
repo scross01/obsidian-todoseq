@@ -459,6 +459,42 @@ describe('task-line-utils', () => {
     });
   });
 
+  describe('findDateLine — configured-keyword collisions with date lines', () => {
+    // The documented keyword-groups example configures STARTED as an
+    // ACTIVE keyword (docs/settings.md). A STARTED *date* line must never
+    // be treated as a task boundary, or every date line behind it becomes
+    // unfindable: un-completion can't remove CLOSED, completion inserts a
+    // duplicate, and recurrence rollovers stack SCHEDULED lines.
+    const collisionManager = new KeywordManager({
+      additionalActiveKeywords: ['STARTED'],
+    } as never);
+
+    const content = [
+      'TODO test me',
+      'STARTED: [2026-10-14 Wed 09:00]',
+      'CLOSED: [2026-10-14 Wed 10:00]',
+      'SCHEDULED: <2026-10-15 Thu .+1d>',
+    ];
+
+    it('a STARTED date line configured as an active keyword does not break the scan', () => {
+      expect(findDateLine(content, 1, 'CLOSED', '', collisionManager)).toBe(2);
+      expect(findDateLine(content, 1, 'SCHEDULED', '', collisionManager)).toBe(
+        3,
+      );
+      expect(findDateLine(content, 1, 'STARTED', '', collisionManager)).toBe(1);
+    });
+
+    it('a real STARTED task line (no colon) still breaks the scan', () => {
+      const lines = ['TODO outer', 'STARTED deep work', 'CLOSED: <2026-01-01>'];
+      expect(findDateLine(lines, 1, 'CLOSED', '', collisionManager)).toBe(-1);
+    });
+
+    it('without the colliding keyword the scan already worked (regression)', () => {
+      expect(findDateLine(content, 1, 'CLOSED', '', keywordManager)).toBe(2);
+      expect(findDateLine(content, 1, 'SCHEDULED', '', keywordManager)).toBe(3);
+    });
+  });
+
   describe('findDateLineWithParser', () => {
     it('should use parser when provided', () => {
       const mockParser = {
