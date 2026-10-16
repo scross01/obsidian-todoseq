@@ -10,6 +10,7 @@ import {
   getTaskIndent,
   getDateLineIndent,
 } from '../utils/task-line-utils';
+import { DateParser } from '../parser/date-parser';
 import TodoTracker from '../main';
 import { getStateTransitionManager } from './task-update-coordinator';
 
@@ -264,6 +265,7 @@ export class TaskWriter {
     let updatedClosedDate = task.closedDate;
     let updatedStartedDate = task.startedDate;
     let startedInserted = false;
+    let retainedStartedDate: Date | null = null;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
@@ -340,6 +342,32 @@ export class TaskWriter {
               task,
             );
             startedInserted = startedResult.lineDelta > 0;
+            retainedStartedDate = startedResult.retainedStartedDate;
+          }
+
+          // Stale-snapshot retention for NON-active transitions (e.g. a
+          // DOING→DONE issued from a task object that predates the STARTED
+          // insert): the insert above is skipped, but the file may already
+          // carry a STARTED line. Derive its date so the returned snapshot
+          // (and the state manager) never lose the start.
+          if (
+            settings?.trackStartedDate &&
+            !task.startedDate &&
+            !startedInserted &&
+            retainedStartedDate === null
+          ) {
+            const existingIdx = findDateLine(
+              lines,
+              task.line + 1,
+              'STARTED',
+              getTaskIndent(task),
+              this.keywordManager,
+            );
+            if (existingIdx >= 0) {
+              retainedStartedDate = TaskWriter.parseStartedDateFromLine(
+                lines[existingIdx],
+              );
+            }
           }
 
           return lines.join('\n');
@@ -368,17 +396,39 @@ export class TaskWriter {
       // 'keep': leave the CLOSED line alone; updatedClosedDate keeps
       // task.closedDate — an existing timestamp is never rewritten.
 
-      // STARTED: insert via Editor API on first entry into an active state.
-      // updateTaskStartedDate is idempotent (retains existing STARTED line)
-      // and there is NO removal branch — insertion is one-way.
-      if (isActiveState && settings?.trackStartedDate && !task.startedDate) {
-        const startedResult = await this.updateTaskStartedDate(
-          task,
-          new Date(),
-          false,
-        );
-        lineDelta += startedResult.lineDelta;
-        updatedStartedDate = startedResult.task.startedDate;
+      if (settings?.trackStartedDate && !task.startedDate) {
+        if (isActiveState) {
+          // STARTED: insert via Editor API on first entry into an active state.
+          // updateTaskStartedDate is idempotent (retains existing STARTED
+          // line) and there is NO removal branch — insertion is one-way.
+          const startedResult = await this.updateTaskStartedDate(
+            task,
+            new Date(),
+            false,
+          );
+          lineDelta += startedResult.lineDelta;
+          updatedStartedDate = startedResult.task.startedDate;
+        } else if (editor) {
+          // Stale-snapshot retention: a NON-active transition skips the
+          // insert, but the editor may already carry a STARTED line the task
+          // object predates. Derive its date so the snapshot never loses it.
+          const editorLines = Array.from(
+            { length: editor.lineCount() },
+            (_, i) => editor.getLine(i),
+          );
+          const startedLineIndex = findDateLine(
+            editorLines,
+            task.line + 1,
+            'STARTED',
+            getTaskIndent(task),
+            this.keywordManager,
+          );
+          if (startedLineIndex >= 0) {
+            updatedStartedDate = TaskWriter.parseStartedDateFromLine(
+              editorLines[startedLineIndex],
+            );
+          }
+        }
       }
     } else if (!isSourceMode || forceVaultApi) {
       // For non-source mode, CLOSED date was handled atomically above
@@ -390,12 +440,16 @@ export class TaskWriter {
         updatedClosedDate = null;
       }
 
-      // STARTED was handled atomically above; account for the inserted line
-      if (isActiveState && settings?.trackStartedDate && !task.startedDate) {
+      // STARTED was handled atomically above; account for the inserted line.
+      // Keyed on the setting and the snapshot's knowledge — not on the
+      // target state's activity: a stale snapshot racing into a completed
+      // state must still report the retained start.
+      if (settings?.trackStartedDate && !task.startedDate) {
         lineDelta += startedInserted ? 1 : 0;
+        // Derive from the ACTUAL file result, not the guard's prediction.
         updatedStartedDate = startedInserted
           ? new Date()
-          : (task.startedDate ?? null);
+          : (retainedStartedDate ?? null);
       }
     }
 
@@ -1156,6 +1210,7 @@ export class TaskWriter {
       : null;
 
     let lineDelta = 0;
+    let retainedStartedDate: Date | null = null;
 
     if (!dateStr) {
       return {
@@ -1193,6 +1248,9 @@ export class TaskWriter {
         if (startedLineIndex >= 0) {
           // Existing STARTED line found: retain original, do nothing.
           lineDelta = 0;
+          retainedStartedDate = TaskWriter.parseStartedDateFromLine(
+            lines[startedLineIndex],
+          );
         } else {
           // Insert new STARTED line first in the date-line sequence
           const insertIndex = this.calcDateLineInsertIndex(
@@ -1218,6 +1276,7 @@ export class TaskWriter {
             task,
           );
           lineDelta = result.lineDelta;
+          retainedStartedDate = result.retainedStartedDate;
           return lines.join('\n');
         });
       }
@@ -1227,10 +1286,29 @@ export class TaskWriter {
       task: {
         ...task,
         startedDate:
-          lineDelta > 0 ? startedDate : (task.startedDate ?? startedDate),
+          lineDelta > 0
+            ? startedDate
+            : (task.startedDate ?? retainedStartedDate ?? startedDate),
       },
       lineDelta,
     };
+  }
+
+  /**
+   * Parse a retained STARTED line's date, mirroring the scanner's
+   * parseDateFromLine so a snapshot derived from the file round-trips to
+   * the same instant the parser produces.
+   */
+  private static parseStartedDateFromLine(line: string): Date | null {
+    const match = line.match(/^\s*(?:>\s*)?STARTED:\s*(.+)$/);
+    if (!match) {
+      return null;
+    }
+    let content = match[1].trim();
+    if (content.startsWith('[') && content.endsWith(']')) {
+      content = `<${content.slice(1, -1)}>`;
+    }
+    return DateParser.parseDate(content);
   }
 
   /**
@@ -1243,7 +1321,11 @@ export class TaskWriter {
     taskLineIndex: number,
     dateStr: string,
     task: Task,
-  ): { lines: string[]; lineDelta: number } {
+  ): {
+    lines: string[];
+    lineDelta: number;
+    retainedStartedDate: Date | null;
+  } {
     const kwManager = this.keywordManager;
     const taskIndent = getTaskIndent(task);
     const existingIdx = findDateLine(
@@ -1255,8 +1337,15 @@ export class TaskWriter {
     );
 
     if (existingIdx >= 0) {
-      // Idempotent: retain the original STARTED line untouched.
-      return { lines, lineDelta: 0 };
+      // Idempotent: retain the original STARTED line untouched, but report
+      // its date so callers on a stale task snapshot can restore it.
+      return {
+        lines,
+        lineDelta: 0,
+        retainedStartedDate: TaskWriter.parseStartedDateFromLine(
+          lines[existingIdx],
+        ),
+      };
     }
 
     const insertIdx = this.calcDateLineInsertIndex(
@@ -1267,7 +1356,7 @@ export class TaskWriter {
     );
     const indent = this.getEffectiveDateLineIndent(lines, -1, task);
     lines.splice(insertIdx, 0, `${indent}STARTED: ${dateStr}`);
-    return { lines, lineDelta: 1 };
+    return { lines, lineDelta: 1, retainedStartedDate: null };
   }
 
   /**
