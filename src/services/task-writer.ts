@@ -148,7 +148,15 @@ export class TaskWriter {
       const textPart = task.text ? ` ${task.text}` : ' ';
       // Check if this is a footnote task and include the footnote marker
       const footnoteMarker = task.footnoteMarker || '';
-      newLine = `${task.indent}${footnoteMarker}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
+      // Tasks without a list marker (org-mode heading stars, code comments)
+      // compose the keyword straight onto the prefix. Keep them separated so
+      // native syntax highlighting keeps working (`* TODO x`, not `*TODO x`).
+      // No separator when the prefix is empty (column-0 tasks) or already
+      // whitespace-terminated — existing output stays byte-identical.
+      const prefix = `${task.indent}${footnoteMarker}`;
+      const separator =
+        !task.listMarker && prefix !== '' && !/\s$/.test(prefix) ? ' ' : '';
+      newLine = `${prefix}${separator}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
 
       // Add trailing comment end characters if they were present in the original task
       if (task.tail) {
