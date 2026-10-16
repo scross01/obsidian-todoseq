@@ -480,3 +480,96 @@ describe('TaskKeywordDecorator block state tracking', () => {
     });
   });
 });
+describe('TaskKeywordDecorator date-line decorations (E4 audit)', () => {
+  const collectBuilder = () => {
+    const added: Array<{ from: number; to: number; deco: any }> = [];
+    const builder = {
+      add: (from: number, to: number, deco: any) => {
+        added.push({ from, to, deco });
+      },
+    };
+    return { added, builder };
+  };
+
+  const makeDecorator = () => {
+    const mockEditorView = {
+      state: {
+        doc: {
+          lines: 2,
+          line: jest
+            .fn()
+            .mockReturnValue({ text: '', from: 0, to: 0, number: 1 }),
+          lineAt: jest.fn().mockReturnValue({ number: 1 }),
+        },
+        selection: { main: { head: 0, from: 0, to: 0 } },
+      },
+      dom: {
+        parentElement: {
+          classList: { contains: jest.fn().mockReturnValue(true) },
+        },
+      },
+    };
+    const decorator = new (TaskKeywordDecorator as any)(
+      mockEditorView,
+      createBaseSettings(),
+      { testRegex: /TODO/ },
+    );
+    // Simulate a task line immediately before the date line.
+    decorator['previousTaskLine'] = 0;
+    decorator['previousTaskIndent'] = '';
+    return decorator;
+  };
+
+  it('decorates a CLOSED line with the closed date-line class (mirror)', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      'CLOSED: [2026-01-16 Fri 09:30]',
+      { from: 0, to: 28 },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[0].deco.spec.class).toBe('todoseq-closed-line');
+    expect(added[0].deco.spec.attributes['data-date-line-type']).toBe('closed');
+    expect(added[1].deco.spec.class).toBe('todoseq-closed-keyword');
+    expect(added[1].deco.spec.attributes['data-date-keyword']).toBe('CLOSED:');
+  });
+
+  it('decorates a STARTED line with the started date-line class', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      'STARTED: [2026-01-16 Fri 09:30]',
+      { from: 0, to: 30 },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[0].deco.spec.class).toBe('todoseq-started-line');
+    expect(added[0].deco.spec.attributes['data-date-line-type']).toBe(
+      'started',
+    );
+    expect(added[1].deco.spec.class).toBe('todoseq-started-keyword');
+    expect(added[1].deco.spec.attributes['data-date-keyword']).toBe('STARTED:');
+  });
+
+  it('decorates a STARTED line inside a callout with the started class', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      '> STARTED: [2026-01-16 Fri 09:30]',
+      { from: 0, to: 33 },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[0].deco.spec.class).toBe('todoseq-started-line');
+  });
+});
