@@ -16,6 +16,7 @@ This file provides guidance to agents when working with code in this repository.
 
 - Think holistically about the problem, how do the changes fit with the rest of the plugin architecture.
 - Never use hard coded keyword checks, always use the KeywordManager.
+- **CHANGELOG entries are user-facing**: concise (one or two sentences) and written from the user's perspective — describe the fixed behaviour or the new capability, never the implementation (no internals like timers, frames, parsers, or refactors).
 
 ## Commit Hygiene
 
