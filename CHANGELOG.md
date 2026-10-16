@@ -1,5 +1,9 @@
 # Change Log
 
+## Unreleased
+
+- Fixed vault scans hanging when Obsidian is minimised or in the background: scans now finish while the window is hidden instead of stalling until it is visible again.
+
 ## 0.21.2
 
 - Fixed the dashboard state grouping emitting an "Archived" group: it never carries a count because archived tasks are not collected, so with `show-empty` enabled it showed as a permanent zero slot. The state groups are now exactly Active / Inactive / Waiting / Completed.

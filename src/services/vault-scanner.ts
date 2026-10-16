@@ -16,6 +16,7 @@ import { IVaultScannerStatusProvider } from './property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
 import { ChangeTracker } from './change-tracker';
 import { EventEmitter } from '../utils/event-emitter';
+import { yieldToEventLoop } from '../utils/event-loop';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -165,7 +166,7 @@ export class VaultScanner
         }
 
         // Yield to the event loop between batches to keep Obsidian UI responsive
-        await this.yieldToEventLoop();
+        await yieldToEventLoop();
       }
 
       // Default sort
@@ -627,13 +628,6 @@ export class VaultScanner
         err instanceof Error ? err : new Error(String(err)),
       );
     }
-  }
-
-  // Utility method to yield to event loop
-  private async yieldToEventLoop(): Promise<void> {
-    await new Promise<void>((resolve) =>
-      window.requestAnimationFrame(() => resolve()),
-    );
   }
 
   // Clean up resources
