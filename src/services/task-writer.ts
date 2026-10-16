@@ -1544,37 +1544,7 @@ export class TaskWriter {
 
       if (isActive && editor) {
         // Use Editor API when file is open in editor to avoid triggering file watcher
-        const taskIndent = getTaskIndent(task);
-
-        // Look for existing CLOSED line after the task
-        const closedLineIndex = findDateLine(
-          Array.from({ length: editor.lineCount() }, (_, i) =>
-            editor.getLine(i),
-          ),
-          task.line + 1,
-          'CLOSED',
-          taskIndent,
-          this.keywordManager,
-        );
-
-        if (closedLineIndex >= 0) {
-          // Remove the CLOSED line using Editor API
-          const from: EditorPosition = { line: closedLineIndex, ch: 0 };
-          const to: EditorPosition = {
-            line: closedLineIndex,
-            ch: editor.getLine(closedLineIndex).length,
-          };
-          // Replace with empty string to remove the line
-          editor.replaceRange('', from, to);
-          // Remove the newline as well by extending to the next line
-          const nextLineFrom: EditorPosition = { line: closedLineIndex, ch: 0 };
-          const nextLineTo: EditorPosition = {
-            line: closedLineIndex + 1,
-            ch: 0,
-          };
-          editor.replaceRange('', nextLineFrom, nextLineTo);
-          lineDelta = -1; // Line was removed
-        }
+        lineDelta += this.removeDateLineInEditor(editor, task, 'CLOSED');
       } else {
         // Use Vault API for background edits
         await this.app.vault.process(file, (data) => {
@@ -1593,6 +1563,42 @@ export class TaskWriter {
       },
       lineDelta,
     };
+  }
+
+  /**
+   * Remove an existing date line (CLOSED/STARTED/…) after the task via the
+   * Editor API. Two-step removal (clear the line, then swallow its newline)
+   * mirrors removeTaskClosedDate's historical editor branch. Returns -1 when
+   * a line was removed, 0 when absent (idempotent).
+   */
+  private removeDateLineInEditor(
+    editor: Editor,
+    task: Task,
+    dateType: DateLineType,
+  ): number {
+    const taskIndent = getTaskIndent(task);
+    const lineIndex = findDateLine(
+      Array.from({ length: editor.lineCount() }, (_, i) => editor.getLine(i)),
+      task.line + 1,
+      dateType,
+      taskIndent,
+      this.keywordManager,
+    );
+    if (lineIndex < 0) {
+      return 0;
+    }
+    const from: EditorPosition = { line: lineIndex, ch: 0 };
+    const to: EditorPosition = {
+      line: lineIndex,
+      ch: editor.getLine(lineIndex).length,
+    };
+    // Replace with empty string to remove the line
+    editor.replaceRange('', from, to);
+    // Remove the newline as well by extending to the next line
+    const nextLineFrom: EditorPosition = { line: lineIndex, ch: 0 };
+    const nextLineTo: EditorPosition = { line: lineIndex + 1, ch: 0 };
+    editor.replaceRange('', nextLineFrom, nextLineTo);
+    return -1;
   }
 
   /**
@@ -1633,6 +1639,24 @@ export class TaskWriter {
       md?.getViewType() === 'markdown' &&
       md?.getMode &&
       md.getMode() === 'source';
+
+    // Per-occurrence STARTED reset. The rollover is the one operation that
+    // advances the occurrence's dates, so it is the one operation that
+    // resets the STARTED record: remove the completed occurrence's stamp
+    // (idempotent) and, only when the rolled state is active, stamp the new
+    // occurrence fresh. Gated on the setting AND a date advance — manual
+    // transitions (including DONE→TODO and DOING→TODO) never reach here.
+    const settings = this.settings;
+    const shouldResetStarted =
+      Boolean(settings?.trackStartedDate) &&
+      (options.newScheduledDate !== undefined ||
+        options.newDeadlineDate !== undefined);
+    const freshStartedDate =
+      shouldResetStarted &&
+      options.newState !== undefined &&
+      this.keywordManager.isActive(options.newState)
+        ? new Date()
+        : null;
 
     if (file && file instanceof TFile) {
       if (isSourceMode && editor) {
@@ -1700,6 +1724,20 @@ export class TaskWriter {
             taskIndent,
           );
           totalDelta += delta;
+        }
+
+        // Per-occurrence STARTED reset (editor path: sequential editor ops,
+        // mirroring removeTaskClosedDate — no second write mechanism).
+        if (shouldResetStarted) {
+          totalDelta += this.removeDateLineInEditor(editor, task, 'STARTED');
+          if (freshStartedDate) {
+            const startedResult = await this.updateTaskStartedDate(
+              task,
+              freshStartedDate,
+              false,
+            );
+            totalDelta += startedResult.lineDelta;
+          }
         }
 
         lineDelta = totalDelta;
@@ -1778,6 +1816,27 @@ export class TaskWriter {
             newRawText = generated.newLine;
           }
 
+          // Per-occurrence STARTED reset — inside the SAME vault.process so
+          // the rollover stays one atomic write / one undo entry.
+          if (shouldResetStarted) {
+            const removal = this.removeDateLine(
+              lines,
+              task.line,
+              'STARTED',
+              task,
+            );
+            totalDelta += removal.lineDelta;
+            if (freshStartedDate) {
+              const insert = this.updateOrInsertStartedDateLine(
+                lines,
+                task.line,
+                DateUtils.formatStartedDate(freshStartedDate),
+                task,
+              );
+              totalDelta += insert.lineDelta;
+            }
+          }
+
           lineDelta = totalDelta;
           return lines.join('\n');
         });
@@ -1795,6 +1854,9 @@ export class TaskWriter {
       rawText: newRawText ?? task.rawText,
       state: options.newState ?? task.state,
       completed,
+      // Reset only when this write is the date-advancing rollover; the
+      // file is the truth: rolled inactive → null, rolled active → fresh.
+      startedDate: shouldResetStarted ? freshStartedDate : task.startedDate,
       scheduledDate:
         options.newScheduledDate !== undefined
           ? options.newScheduledDate

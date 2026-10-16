@@ -423,7 +423,7 @@ FIXME Handle edge cases
 - Adds a STARTED date when a task first enters an active state (e.g., TODO → DOING)
 - STARTED date uses the same square-bracket syntax as CLOSED: `STARTED: [2025-01-18 Fri 09:00]`
 - Records when the task _first_ became active — written once, idempotently
-- Does NOT remove the STARTED date when tasks are reactivated (unlike CLOSED); only manual editing removes it
+- Does NOT remove the STARTED date when tasks are reactivated (unlike CLOSED); the only automatic removal is a recurring task rolling over to its next occurrence (manual editing can always remove it)
 
 **When Disabled:**
 

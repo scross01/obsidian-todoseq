@@ -491,8 +491,9 @@ The STARTED date uses square brackets `[]` (the same inactive-timestamp conventi
 #### STARTED Date Behavior
 
 - **Automatic Addition**: When a task transitions into an active state (e.g., TODO → DOING), a STARTED date is automatically added if the "Track started date" setting is enabled.
-- **Idempotent**: The STARTED date is written once. It is never updated, duplicated, or removed by later state changes.
-- **First-ever semantics**: STARTED records when a task first became active. If you pause (DOING → WAIT), reactivate, or resume a task, the original STARTED date is retained — it spans the task's whole life, across multiple work sessions.
+- **Idempotent within an occurrence**: The STARTED date is written once. Manual state changes never update, duplicate, or remove it.
+- **First-ever semantics within an occurrence**: STARTED records when the occurrence first became active. If you pause (DOING → WAIT), reactivate, or resume, the original STARTED date is retained — it spans that occurrence's whole life, across multiple work sessions.
+- **Recurring tasks reset per occurrence**: A recurring task is a series of occurrences, and the STARTED date belongs to the current one. When a recurring task completes and rolls over to its next occurrence (its scheduled/deadline dates advance), the STARTED date is cleared with the finished occurrence — starting the new occurrence then writes a fresh one. Manual state changes on recurring tasks still never remove it.
 - **Duration**: Together with the CLOSED date, STARTED enables duration calculation (STARTED to CLOSED) and "what did I start today?" queries via the `started:` search filter.
 - **Manual Editing**: You can manually add or remove STARTED dates directly in your notes.
 
