@@ -256,3 +256,75 @@ describe('E3 — mixed-case custom active keywords follow KeywordManager', () =>
     expect(h.startedLines()).toEqual([]);
   });
 });
+
+describe('M4 — last mode: completions and manual pauses keep the stamp', () => {
+  const oldStarted = new Date(2026, 0, 10, 8, 0, 0);
+  const oldStartedLine = 'STARTED: [2026-01-10 Sat 08:00]';
+
+  it('DOING→DONE retains the STARTED line and snapshot (mode-invariant)', async () => {
+    const h = makeHarness({ startedDateMode: 'last' });
+    h.setLines(['DOING Task text', oldStartedLine]);
+    const task = h.makeTask({
+      rawText: 'DOING Task text',
+      state: 'DOING',
+      startedDate: oldStarted,
+    });
+
+    const result = await h.taskWriter.applyLineUpdate(task, 'DONE');
+
+    expect(h.startedLines()).toEqual([oldStartedLine]);
+    expect(result.startedDate).toEqual(oldStarted);
+  });
+
+  it('manual DOING→TODO pause retains the STARTED line and snapshot', async () => {
+    const h = makeHarness({ startedDateMode: 'last' });
+    h.setLines(['DOING Task text', oldStartedLine]);
+    const task = h.makeTask({
+      rawText: 'DOING Task text',
+      state: 'DOING',
+      startedDate: oldStarted,
+    });
+
+    const result = await h.taskWriter.applyLineUpdate(task, 'TODO');
+
+    expect(h.startedLines()).toEqual([oldStartedLine]);
+    expect(result.startedDate).toEqual(oldStarted);
+  });
+});
+
+describe('M8 — last mode: re-stamped date reaches the state manager', () => {
+  it('TaskStateManager carries the fresh date after a re-entry', async () => {
+    const h = makeHarness({ startedDateMode: 'last' });
+    h.setLines(['TODO Task text', 'STARTED: [2026-01-10 Sat 08:00]']);
+    const task = h.makeTask({
+      startedDate: new Date(2026, 0, 10, 8, 0, 0),
+    });
+    h.taskStateManager.addTask(task);
+
+    await h.coordinator.updateTaskState(task, 'DOING');
+
+    expect(h.startedLines()).toEqual([fixedStartedLine]);
+    const stored = h.taskStateManager.findTaskByPathAndLine('test.md', 0);
+    expect(stored?.startedDate).toEqual(fixedNow);
+  });
+});
+
+describe('M9 — last mode: rapid stale double-entry keeps one line', () => {
+  it('two DOING entries from one stale TODO snapshot collapse to one fresh stamp', async () => {
+    const h = makeHarness({ startedDateMode: 'last' });
+    const stale = h.makeTask(); // captured BEFORE the first DOING insert
+
+    const first = await h.taskWriter.applyLineUpdate(stale, 'DOING');
+    expect(first.startedDate).toEqual(fixedNow);
+    expect(h.startedLines()).toEqual([fixedStartedLine]);
+
+    jest.setSystemTime(new Date(2026, 0, 16, 9, 35, 0));
+    const second = await h.taskWriter.applyLineUpdate(stale, 'DOING');
+
+    // File safety: exactly one STARTED line; last-writer-wins within the
+    // staleness window (both entries are "now").
+    expect(h.startedLines()).toEqual(['STARTED: [2026-01-16 Fri 09:35]']);
+    expect(second.startedDate).toEqual(new Date(2026, 0, 16, 9, 35, 0));
+    expect((second as Task & { lineDelta?: number }).lineDelta ?? 0).toBe(0);
+  });
+});

@@ -672,8 +672,22 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           },
           {
             name: 'Track started date',
-            desc: 'Add started: timestamp when tasks first enter an active state. Written once and never removed automatically.',
+            desc: 'Add started: timestamp when tasks enter an active state. Manual state changes never remove it.',
             control: { type: 'toggle', key: 'trackStartedDate' },
+          },
+          {
+            name: 'STARTED date records',
+            desc: 'Choose whether the started timestamp records the first time a task entered an active state, or the most recent time it did. Only applies while "Track started date" is enabled.',
+            control: {
+              type: 'dropdown',
+              key: 'startedDateMode',
+              options: {
+                first: 'First activation',
+                last: 'Most recent activation',
+              },
+              defaultValue: 'first',
+              disabled: () => !this.plugin.settings.trackStartedDate,
+            },
           },
         ],
       },

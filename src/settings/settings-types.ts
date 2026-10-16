@@ -110,6 +110,7 @@ export interface TodoTrackerSettings {
   // Task completion settings
   trackClosedDate: boolean; // when true, adds CLOSED: timestamp when tasks are marked as completed
   trackStartedDate: boolean; // when true, adds STARTED: timestamp when tasks first enter active state
+  startedDateMode: 'first' | 'last'; // 'first' = first-ever-start (written once); 'last' = re-stamp on each fresh entry into an active state
   // Auto-archive settings
   taskArchive: TaskArchiveSettings; // completed → archived keyword rewrite rules (see TaskArchiveSettings)
   // Experimental features
@@ -183,6 +184,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   stateTransitions: DefaultStateTransitionSettings,
   trackClosedDate: false, // Disabled by default
   trackStartedDate: false, // Disabled by default
+  startedDateMode: 'first', // Preserve first-ever-start semantics by default
   taskArchive: DefaultTaskArchiveSettings, // Auto-archive defaults (opt-in, 90 days)
   useExtendedCheckboxStyles: false, // Experimental feature - disabled by default
   // Smart date recognition settings

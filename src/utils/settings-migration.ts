@@ -82,6 +82,21 @@ const MIGRATIONS: SettingsMigrations[] = [
       return { ...settings };
     },
   },
+  {
+    version: 7,
+    migrate: (settings: Record<string, unknown>) => {
+      // v7: added startedDateMode setting. Default 'first' preserves the
+      // existing first-ever-start semantics; 'last' opts into restart
+      // semantics (re-stamp on each fresh entry into an active state).
+      if (!('startedDateMode' in settings)) {
+        return {
+          ...settings,
+          startedDateMode: 'first',
+        };
+      }
+      return { ...settings };
+    },
+  },
 ];
 
 export function migrateSettings(
