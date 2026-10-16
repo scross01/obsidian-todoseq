@@ -143,6 +143,97 @@ describe('TaskWriter.generateTaskLine — keyword separator (org-mode)', () => {
     });
   });
 
+  describe('keyword removal (empty state)', () => {
+    test('org heading keeps its text off the stars when the keyword is removed', () => {
+      const task = createBaseTask({
+        rawText: '* DONE Task text',
+        indent: '*',
+        state: 'DONE',
+      });
+      const result = TaskWriter.generateTaskLine(
+        task,
+        '',
+        true,
+        createTestKeywordManager(),
+      );
+      expect(result.newLine).toBe('* Task text');
+      expect(result.completed).toBe(false);
+    });
+
+    test('column-0 keyword removal gains no leading space', () => {
+      const result = TaskWriter.generateTaskLine(
+        createBaseTask(),
+        '',
+        true,
+        createTestKeywordManager(),
+      );
+      expect(result.newLine).toBe('Task text');
+    });
+
+    test('indent already ending in whitespace gains no extra space', () => {
+      const result = TaskWriter.generateTaskLine(
+        createBaseTask({ rawText: '    TODO Task text', indent: '    ' }),
+        '',
+        true,
+        createTestKeywordManager(),
+      );
+      expect(result.newLine).toBe('    Task text');
+    });
+
+    test('markdown list marker keeps its own single space', () => {
+      const result = TaskWriter.generateTaskLine(
+        createBaseTask({ rawText: '- TODO Task text', listMarker: '- ' }),
+        '',
+        true,
+        createTestKeywordManager(),
+      );
+      expect(result.newLine).toBe('- Task text');
+    });
+
+    test('org heading with no text stays bare after removal', () => {
+      const result = TaskWriter.generateTaskLine(
+        createBaseTask({
+          rawText: '* DONE',
+          indent: '*',
+          state: 'DONE',
+          text: '',
+        }),
+        '',
+        true,
+        createTestKeywordManager(),
+      );
+      expect(result.newLine).toBe('*');
+    });
+
+    test('round-trip: removal then re-adding a keyword keeps one space', () => {
+      const keywordManager = createTestKeywordManager();
+      const removed = TaskWriter.generateTaskLine(
+        createBaseTask({
+          rawText: '* DONE Task text',
+          indent: '*',
+          state: 'DONE',
+        }),
+        '',
+        true,
+        keywordManager,
+      );
+      expect(removed.newLine).toBe('* Task text');
+
+      const readded = TaskWriter.generateTaskLine(
+        createBaseTask({
+          rawText: removed.newLine,
+          indent: '*',
+          state: '',
+        }),
+        'TODO',
+        true,
+        keywordManager,
+      );
+      expect(readded.newLine).toBe('* TODO Task text');
+      expect(readded.newLine).not.toContain('  ');
+    });
+  });
+
   describe('round-trip: repeated state cycles never accumulate spaces', () => {
     test('TODO → DOING → DONE on an org task stays single-spaced', () => {
       const keywordManager = createTestKeywordManager();

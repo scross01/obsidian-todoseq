@@ -117,7 +117,17 @@ export class TaskWriter {
         // Handle spacing properly based on whether there's a list marker
         // Note: task.listMarker already includes trailing space if present
         const textPart = task.text ? task.text : '';
-        newLine = `${task.indent}${task.listMarker || ''}${textPart}`;
+        // Same separator rule as the state-compose branch below: keep the
+        // keyword-less text off an unwhitespace-terminated prefix (org-mode
+        // heading stars) so the line stays a valid headline.
+        const separator =
+          !task.listMarker &&
+          task.indent !== '' &&
+          textPart !== '' &&
+          !/\s$/.test(task.indent)
+            ? ' '
+            : '';
+        newLine = `${task.indent}${separator}${task.listMarker || ''}${textPart}`;
       }
 
       // Add trailing comment end characters if they were present in the original task

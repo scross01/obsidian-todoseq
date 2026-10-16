@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fixed org-mode tasks being rewritten with the keyword glued to the heading stars (e.g. `*DONE task`), which broke Obsidian's syntax highlighting on every state change. The keyword now stays separated: `* DONE task`.
+- Fixed org-mode tasks being rewritten with the keyword glued to the heading stars (e.g. `*DONE task`), which broke Obsidian's syntax highlighting on every state change — including when cycling a completed task past DONE removes the keyword. The keyword now stays separated: `* DONE task`, `* task`.
 - Fixed vault scans hanging when Obsidian is minimised or in the background: scans now finish while the window is hidden instead of stalling until it is visible again.
 
 ## 0.21.2
