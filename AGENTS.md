@@ -17,6 +17,7 @@ This file provides guidance to agents when working with code in this repository.
 - Think holistically about the problem, how do the changes fit with the rest of the plugin architecture.
 - Never use hard coded keyword checks, always use the KeywordManager.
 - **CHANGELOG entries are user-facing**: concise (one or two sentences) and written from the user's perspective — describe the fixed behaviour or the new capability, never the implementation (no internals like timers, frames, parsers, or refactors).
+- **Detailed behaviour descriptions belong in `docs/`, not `CHANGELOG.md`**: the CHANGELOG is a summary; the full, precise description of how something behaves (edge cases, modes, settings interactions, examples) goes in the relevant `docs/` page. Every change to user-visible behaviour must update `docs/` in the same PR — and implementation plans (improve skill) must include that docs update as an explicit step.
 
 ## Commit Hygiene
 

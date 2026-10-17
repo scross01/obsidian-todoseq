@@ -24,6 +24,7 @@ When enabled, TODOseq will:
 - Scan all `.org` files in your vault for tasks
 - Extract tasks from Org-mode headlines with state keywords
 - Display Org-mode tasks alongside Markdown tasks in the Task List
+- Change an org task's state from the Task List — the headline keyword is rewritten in place, keeping the space between the heading stars and the keyword (`* TODO task` becomes `* DONE task`, and cycling a completed task past its completed state clears the keyword: `* task`)
 - Support Org-mode priorities, scheduled dates, and deadline dates
 
 ### How to Enable
@@ -94,7 +95,7 @@ The following limitations apply to Org-mode support:
 
 - **Editor styling not supported**: Tasks in `.org` files will not have keyword formatting, priority badges, or date decorations in the editor view
 - **Reader view styling not supported**: Org-mode tasks are not visually enhanced in the reader/preview view
-- **Vault scanning only**: Tasks are detected during vault scans and appear in the Task List, but in-editor interactions are limited
+- **Task List for interactions**: state changes happen from the Task List, not the editor — org files get no in-editor affordances for tasks
 - **Checkbox synchronization not available**: Org-mode uses headlines, not checkboxes, so checkbox state synchronization does not apply
 - **File must have `.org` extension**: Files must use the `.org` extension to be parsed as Org-mode
 

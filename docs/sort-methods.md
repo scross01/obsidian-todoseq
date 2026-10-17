@@ -20,7 +20,7 @@ Tasks sorted by their CLOSED date (the date when the task was marked as complete
 
 ### 5. Started Date
 
-Tasks sorted by their STARTED date (when the task first entered an active state). Tasks without a started date appear at the end, with earlier started dates appearing first. When two tasks have the same started date, they are sorted by keyword group and position, then by file path and line number.
+Tasks sorted by their STARTED date (when the task entered an active state). Tasks without a started date appear at the end, with earlier started dates appearing first. When two tasks have the same started date, they are sorted by keyword group and position, then by file path and line number.
 
 ### 6. Priority
 
