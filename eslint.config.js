@@ -12,6 +12,7 @@ export default [
       'manifest.json',
       'versions.json',
       'scripts/**',
+      'demos/**',
       '.*/**',
       'examples/**',
       'docs/**',
