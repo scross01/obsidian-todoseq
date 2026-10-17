@@ -180,7 +180,7 @@ function parseIsoDateLocal(iso: string): Date | null {
  * writes and state-manager access are injected via deps, keeping this
  * class unit-testable without mocks of Obsidian services.
  *
- * Product invariants (plans/011-archive-service-core.md):
+ * Product invariants:
  * - Tasks without a CLOSED date NEVER match (includeNoClosedDate is
  *   reserved; this version always treats it as false).
  * - Only states with an enabled mapping to a VALID archived-group keyword

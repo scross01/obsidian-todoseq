@@ -2,7 +2,7 @@ import { TaskParser } from '../src/parser/task-parser';
 import { createTestKeywordManager } from './helpers/test-helper';
 
 /**
- * Tests for STARTED line parsing (plans/003-started-timestamps.md, Step 12).
+ * Tests for STARTED line parsing.
  * Pattern: tests/task-parser-description.test.ts (parseFile-based).
  */
 describe('TaskParser - STARTED date parsing', () => {

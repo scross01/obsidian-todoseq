@@ -10,7 +10,7 @@ import { Task } from '../src/types/task';
 import { TFile } from 'obsidian';
 
 /**
- * Tests for STARTED timestamp tracking (plans/003-started-timestamps.md).
+ * Tests for STARTED timestamp tracking.
  *
  * Semantics under test:
  * - STARTED line inserted on first entry into an active state when

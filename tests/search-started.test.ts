@@ -7,8 +7,7 @@ import { sortTasksWithThreeBlockSystem } from '../src/utils/task-sort';
 import { createBaseTask, createCheckboxTask } from './helpers/test-helper';
 
 /**
- * Tests for the started: search property and sortByStarted sort method
- * (plans/003-started-timestamps.md, Step 13).
+ * Tests for the started: search property and sortByStarted sort method.
  *
  * 'overdue' semantics: intentionally NOT supported for started dates —
  * under first-ever-start semantics it has no meaningful definition. The
