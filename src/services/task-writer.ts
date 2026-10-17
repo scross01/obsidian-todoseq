@@ -729,6 +729,149 @@ export class TaskWriter {
     return result;
   }
 
+  /**
+   * Atomically apply a recurrence rollover to a table cell task: rewrite
+   * the cell's keyword with the rolled state and advance/remove the inline
+   * <br>SCHEDULED / <br>DEADLINE segments in place. One modifyTableCell
+   * write keeps the row intact — the line-based updateOrInsertDateLine /
+   * removeDateLine machinery must never touch a table row (it would rewrite
+   * the whole row as a plain task line).
+   */
+  private async applyTableCellRecurrenceUpdate(
+    task: Task,
+    options: {
+      newScheduledDate?: Date | null;
+      newDeadlineDate?: Date | null;
+      newScheduledRepeat?: DateRepeatInfo | null;
+      newDeadlineRepeat?: DateRepeatInfo | null;
+      newScheduledWarningPeriod?: WarningPeriodInfo | null;
+      newDeadlineWarningPeriod?: WarningPeriodInfo | null;
+      newState?: string;
+    },
+    startedReset: { shouldResetStarted: boolean },
+  ): Promise<Task & { lineDelta?: number }> {
+    let newCellContent = task.rawText;
+
+    await this.modifyTableCell(task, (origCell) => {
+      const brIdx = origCell.indexOf('<br');
+      let textPart = (
+        brIdx >= 0 ? origCell.substring(0, brIdx) : origCell
+      ).trim();
+      let dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
+
+      // Swap the keyword (mirrors applyTableCellUpdate: strip indent +
+      // list marker so only keyword + priority + text land in the cell)
+      if (options.newState !== undefined) {
+        const generated = TaskWriter.generateTaskLine(
+          task,
+          options.newState,
+          true,
+          this.keywordManager,
+        );
+        let cellLine = generated.newLine;
+        if (cellLine.startsWith(task.indent)) {
+          cellLine = cellLine.slice(task.indent.length);
+        }
+        if (cellLine.startsWith(task.listMarker)) {
+          cellLine = cellLine.slice(task.listMarker.length);
+        }
+        textPart = cellLine.trim();
+      }
+
+      // Advance or remove an inline date segment in place; append only
+      // when the rollover adds a date the cell doesn't carry yet.
+      const replaceInlineDate = (
+        dateType: 'SCHEDULED' | 'DEADLINE',
+        dateStr: string | null,
+      ): void => {
+        const existing = new RegExp(
+          `\\s*<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`,
+          'i',
+        );
+        if (dateStr === null) {
+          dateSuffix = dateSuffix.replace(existing, '');
+          return;
+        }
+        const tag = `<br>${dateType}: ${dateStr}`;
+        dateSuffix = existing.test(dateSuffix)
+          ? dateSuffix.replace(existing, tag)
+          : `${dateSuffix}${tag}`;
+      };
+
+      if (options.newScheduledDate !== undefined) {
+        replaceInlineDate(
+          'SCHEDULED',
+          options.newScheduledDate === null
+            ? null
+            : TaskWriter.buildDateLineContent(
+                options.newScheduledDate,
+                options.newScheduledRepeat ?? task.scheduledDateRepeat,
+                options.newScheduledWarningPeriod ??
+                  task.scheduledWarningPeriod,
+              ),
+        );
+      }
+
+      if (options.newDeadlineDate !== undefined) {
+        replaceInlineDate(
+          'DEADLINE',
+          options.newDeadlineDate === null
+            ? null
+            : TaskWriter.buildDateLineContent(
+                options.newDeadlineDate,
+                options.newDeadlineRepeat ?? task.deadlineDateRepeat,
+                options.newDeadlineWarningPeriod ?? task.deadlineWarningPeriod,
+              ),
+        );
+      }
+
+      newCellContent = `${textPart}${dateSuffix}`;
+      return newCellContent;
+    });
+
+    const completed =
+      options.newState !== undefined
+        ? this.keywordManager.isCompleted(options.newState)
+        : task.completed;
+
+    return {
+      ...task,
+      rawText: newCellContent,
+      state: options.newState ?? task.state,
+      completed,
+      // Cells never stamp STARTED at rollover (documented limitation): with
+      // tracking on, the rolled occurrence starts unstamped; with tracking
+      // off the parsed value is kept (any hand-written segment also stays
+      // untouched in the file by the mutation above).
+      startedDate: startedReset.shouldResetStarted ? null : task.startedDate,
+      scheduledDate:
+        options.newScheduledDate !== undefined
+          ? options.newScheduledDate
+          : task.scheduledDate,
+      scheduledDateRepeat:
+        options.newScheduledRepeat !== undefined
+          ? options.newScheduledRepeat
+          : task.scheduledDateRepeat,
+      scheduledWarningPeriod:
+        options.newScheduledWarningPeriod !== undefined
+          ? options.newScheduledWarningPeriod
+          : task.scheduledWarningPeriod,
+      deadlineDate:
+        options.newDeadlineDate !== undefined
+          ? options.newDeadlineDate
+          : task.deadlineDate,
+      deadlineDateRepeat:
+        options.newDeadlineRepeat !== undefined
+          ? options.newDeadlineRepeat
+          : task.deadlineDateRepeat,
+      deadlineWarningPeriod:
+        options.newDeadlineWarningPeriod !== undefined
+          ? options.newDeadlineWarningPeriod
+          : task.deadlineWarningPeriod,
+      lineDelta: 0,
+    };
+  }
+
   // Cycles a task to its next state using TaskStateTransitionManager and persists change
   async updateTaskState(
     task: Task,
@@ -1743,6 +1886,20 @@ export class TaskWriter {
       this.keywordManager.isActive(options.newState)
         ? new Date()
         : null;
+
+    // Table-cell tasks store dates INLINE — the rollover is one
+    // modifyTableCell write that swaps the keyword and advances/removes
+    // the <br>SCHEDULED / <br>DEADLINE segments in place. The row is never
+    // rewritten as a plain task line and no date lines are inserted below
+    // the table. Cells never write STARTED (documented limitation, same as
+    // applyTableCellUpdate), so the rolled snapshot carries startedDate
+    // null when the rollover ran with tracking on — the file holds no
+    // stamp.
+    if (this.isTableCellDateUpdate(task)) {
+      return this.applyTableCellRecurrenceUpdate(task, options, {
+        shouldResetStarted,
+      });
+    }
 
     if (file && file instanceof TFile) {
       if (isSourceMode && editor) {

@@ -27,7 +27,25 @@ const FILE = `${BASENAME}.md`;
  * find CLOSED, re-completion duplicates it, and rollovers stack dates.
  */
 test.describe('CLOSED/STARTED scenarios', () => {
+  /** Close editor leaves showing the scenarios note before each test.
+   *  seedNote's vault.modify updates an open buffer asynchronously, so a
+   *  buffer left behind by an earlier test races the reload — cell writes
+   *  (editor.replaceRange on the row) then land on stale content and
+   *  corrupt it. Same rationale as table-tasks.test.ts's leaf cleanup. */
+  async function closeScenariosLeaves(): Promise<void> {
+    await page.evaluate(() => {
+      const app = (window as any).app;
+      app.workspace
+        .getLeavesOfType('markdown')
+        .filter(
+          (l: any) => l.view?.file?.path === 'Closed Started Scenarios.md',
+        )
+        .forEach((l: any) => l.detach());
+    });
+  }
+
   test.beforeEach(async () => {
+    await closeScenariosLeaves();
     await resetVaultState(page);
   });
 
@@ -115,7 +133,10 @@ test.describe('CLOSED/STARTED scenarios', () => {
       .length;
   }
 
-  /** Wait for the 50 ms recurrence rollover to change a date line. */
+  /** Wait for the 50 ms recurrence rollover to change a date line.
+   *  A no-match (null) keeps polling instead of passing the not.toBe
+   *  comparison — a transient buffer without the segment would otherwise
+   *  satisfy `null not.toBe previousDate` and crash the unwrap below. */
   async function pollRollover(
     prefix: string,
     previousDate: string,
@@ -127,7 +148,7 @@ test.describe('CLOSED/STARTED scenarios', () => {
           const match = content?.match(
             new RegExp(`${prefix}: <(\\d{4}-\\d{2}-\\d{2})`),
           );
-          return match ? match[1] : null;
+          return match ? match[1] : previousDate;
         },
         {
           timeout: 10_000,
@@ -330,5 +351,82 @@ test.describe('CLOSED/STARTED scenarios', () => {
     expect(countLines(content, 'DEADLINE:')).toBe(1);
     expect(countLines(content, 'SCHEDULED:')).toBe(0);
     expect(countLines(content, 'STARTED:')).toBe(0);
+  });
+
+  // ---- Table cell tasks: the same matrix via inline <br> dates ----
+  // Cells store dates INLINE in the row; there are no date lines below the
+  // task. CLOSED shares the list matrix; STARTED has no cell writer
+  // (documented limitation — hand-written segments must survive); the
+  // recurring rollover must advance the inline segment in place.
+
+  const occurrences = (haystack: string, needle: string): number =>
+    haystack.split(needle).length - 1;
+
+  test('table cell: un-completion strips inline CLOSED; re-completion stamps exactly one fresh CLOSED; STARTED segment untouched', async () => {
+    await setSettings({
+      trackClosedDate: true,
+      trackStartedDate: true,
+      startedDateMode: 'last',
+      additionalActiveKeywords: ['STARTED'],
+    });
+    await seedNote(
+      [
+        '| DONE cell task<br>STARTED: [2026-10-14 Wed 09:00]<br>CLOSED: [2026-10-14 Wed 10:00]<br>SCHEDULED: <2026-10-20 Tue> |',
+      ].join('\n'),
+    );
+
+    await setTaskState('TODO');
+    let content = await waitForNote(
+      (c) => !c.includes('CLOSED:'),
+      'un-completion should strip the inline CLOSED segment from the cell',
+    );
+    // The other inline segments and the row itself survive the write.
+    expect(content).toContain('TODO cell task');
+    expect(content).toContain('STARTED: [2026-10-14 Wed 09:00]');
+    expect(content).toContain('SCHEDULED: <2026-10-20 Tue>');
+    expect(content).toContain('| ');
+
+    await setTaskState('DONE');
+    content = await waitForNote(
+      (c) =>
+        occurrences(c, 'CLOSED:') === 1 &&
+        !c.includes('CLOSED: [2026-10-14 Wed 10:00]'),
+      're-completion should stamp exactly one fresh inline CLOSED',
+    );
+    expect(occurrences(content, 'STARTED:')).toBe(1);
+    expect(occurrences(content, 'SCHEDULED:')).toBe(1);
+    expect(content).toContain('| DONE cell task');
+  });
+
+  test('table cell, repeating SCHEDULED: three completions advance the inline segment in place; the row is never rewritten', async () => {
+    await setSettings({
+      trackClosedDate: true,
+      trackStartedDate: true,
+      startedDateMode: 'last',
+      additionalActiveKeywords: ['STARTED'],
+    });
+    await seedNote(
+      ['| TODO cell task<br>SCHEDULED: <2026-10-15 Thu .+1d> |'].join('\n'),
+    );
+
+    let previous = '2026-10-15';
+    for (let i = 0; i < 3; i++) {
+      await setTaskState('DONE');
+      previous = await pollRollover('SCHEDULED', previous);
+
+      const content = await readNote();
+      // One inline segment, rolled back to the inactive state, row intact.
+      expect(occurrences(content, 'SCHEDULED:')).toBe(1);
+      expect(content).toContain('TODO cell task');
+      expect(content).toContain('<br>SCHEDULED: <');
+      expect(content.trim()).toMatch(
+        /^\| TODO cell task<br>SCHEDULED: <\d{4}-\d{2}-\d{2}/,
+      );
+      // Recurring completions write the rolled state directly
+      // (buildProcessingContext maps DONE → the successor state for
+      // repeating tasks), so no CLOSED is ever stamped — same semantics
+      // as list tasks.
+      expect(occurrences(content, 'CLOSED:')).toBe(0);
+    }
   });
 });

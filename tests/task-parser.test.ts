@@ -1575,4 +1575,41 @@ describe('table task parsing', () => {
       expect(task?.closedDate!.getDate()).toBe(14);
     });
   });
+
+  describe('configured active keyword segments (keyword-groups example)', () => {
+    // STARTED configured as an ACTIVE keyword (the documented keyword-
+    // groups example) must never make a <br>STARTED: date segment parse
+    // as a phantom task. Cells are segment-based — one task per cell — so
+    // the configured keyword cannot create task boundaries inside a row.
+    const parseWithStartedActive = (content: string): Task[] => {
+      const km = createTestKeywordManager({
+        additionalActiveKeywords: ['STARTED'],
+      });
+      return TaskParser.create(km, null, undefined).parseFile(
+        content,
+        'test.md',
+      );
+    };
+
+    it('parses a STARTED-segment cell as ONE task, never a phantom', () => {
+      const tasks = parseWithStartedActive(
+        '| TODO cell task<br>STARTED: [2026-10-14 Wed 09:00]<br>CLOSED: [2026-10-14 Wed 10:00]<br>SCHEDULED: <2026-10-20 Tue> |',
+      );
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].state).toBe('TODO');
+      expect(tasks[0].isTableTask).toBe(true);
+      expect(tasks[0].tableCell?.cellIndex).toBe(0);
+      expect(tasks[0].closedDate).not.toBeNull();
+      expect(tasks[0].scheduledDate).not.toBeNull();
+    });
+
+    it('a second cell after a STARTED segment still parses independently', () => {
+      const tasks = parseWithStartedActive(
+        '| TODO a<br>STARTED: [2026-10-14 Wed 09:00] | TODO b |',
+      );
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].text).toBe('a');
+      expect(tasks[1].text).toBe('b');
+    });
+  });
 });

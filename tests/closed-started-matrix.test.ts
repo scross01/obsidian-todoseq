@@ -342,3 +342,172 @@ describe('recurring rollovers never stack date lines', () => {
     expect(h.countLines('STARTED:')).toBe(0);
   });
 });
+
+describe('table cells — the same matrix via inline <br> dates', () => {
+  // Cells store dates INLINE (<br>SCHEDULED: <…> inside the row); there
+  // are no date lines below the task. CLOSED shares the list matrix via
+  // resolveClosedDateAction (plan 009); STARTED has no cell writer
+  // (documented limitation — segments must pass through untouched); the
+  // recurring rollover must advance the inline segment in place.
+
+  const occurrences = (haystack: string, needle: string) =>
+    haystack.split(needle).length - 1;
+
+  const cellRow = (cell: string) => `| ${cell} |`;
+
+  const scheduledDateIn = (row: string): string | null =>
+    row.match(/SCHEDULED: <(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
+
+  it('CLOSED tracking on: un-complete strips inline CLOSED (STARTED/SCHEDULED preserved); re-complete stamps exactly one fresh CLOSED', async () => {
+    const h = makeHarness();
+    h.setLines([
+      cellRow(
+        'DONE cell task<br>STARTED: [2026-10-14 Wed 09:00]<br>CLOSED: [2026-10-14 Wed 10:00]<br>SCHEDULED: <2026-10-14 Wed>',
+      ),
+    ]);
+    h.taskStateManager.addTask(
+      h.makeTask({
+        isTableTask: true,
+        tableCell: { cellIndex: 0 },
+        rawText: 'DONE cell task',
+        text: 'cell task',
+        state: 'DONE',
+        completed: true,
+        startedDate: new Date(2026, 9, 14, 9, 0, 0),
+        closedDate: new Date(2026, 9, 14, 10, 0, 0),
+        scheduledDate: new Date(2026, 9, 14),
+      }),
+    );
+
+    await h.coordinator.updateTaskState(h.storedTask(), 'TODO');
+
+    let row = h.getLines()[0];
+    expect(row).not.toContain('CLOSED');
+    expect(row).toContain('TODO cell task');
+    expect(row).toContain('STARTED: [2026-10-14 Wed 09:00]');
+    expect(row).toContain('SCHEDULED: <2026-10-14 Wed>');
+    expect(h.storedTask().closedDate).toBeNull();
+
+    await h.coordinator.updateTaskState(h.storedTask(), 'DONE');
+
+    row = h.getLines()[0];
+    expect(occurrences(row, 'CLOSED:')).toBe(1);
+    expect(row).toContain('CLOSED: [2026-10-16 Fri 12:00]');
+    expect(occurrences(row, 'STARTED:')).toBe(1);
+    expect(h.storedTask().closedDate).toEqual(now);
+  });
+
+  it('CLOSED tracking off: un-complete still strips inline CLOSED (39a829d — removal is never gated); re-complete adds none', async () => {
+    const h = makeHarness({ trackClosedDate: false });
+    h.setLines([
+      cellRow(
+        'DONE cell task<br>CLOSED: [2026-10-14 Wed 10:00]<br>SCHEDULED: <2026-10-14 Wed>',
+      ),
+    ]);
+    h.taskStateManager.addTask(
+      h.makeTask({
+        isTableTask: true,
+        tableCell: { cellIndex: 0 },
+        rawText: 'DONE cell task',
+        text: 'cell task',
+        state: 'DONE',
+        completed: true,
+        closedDate: new Date(2026, 9, 14, 10, 0, 0),
+        scheduledDate: new Date(2026, 9, 14),
+      }),
+    );
+
+    await h.coordinator.updateTaskState(h.storedTask(), 'TODO');
+    expect(h.getLines()[0]).not.toContain('CLOSED');
+
+    await h.coordinator.updateTaskState(h.storedTask(), 'DONE');
+    expect(occurrences(h.getLines()[0], 'CLOSED:')).toBe(0);
+    expect(h.storedTask().closedDate ?? null).toBeNull();
+  });
+
+  it('STARTED tracking off: completion cycle never writes STARTED into the cell', async () => {
+    const h = makeHarness({ trackStartedDate: false });
+    h.setLines([cellRow('TODO cell task<br>SCHEDULED: <2026-10-20 Tue>')]);
+    h.taskStateManager.addTask(
+      h.makeTask({
+        isTableTask: true,
+        tableCell: { cellIndex: 0 },
+        text: 'cell task',
+        scheduledDate: new Date(2026, 9, 20),
+      }),
+    );
+
+    await h.coordinator.updateTaskState(h.storedTask(), 'DONE');
+    expect(h.getLines()[0]).not.toContain('STARTED');
+
+    await h.coordinator.updateTaskState(h.storedTask(), 'TODO');
+    expect(h.getLines()[0]).not.toContain('STARTED');
+  });
+
+  it('hand-written inline STARTED segment survives un-complete/re-complete untouched (cells never write STARTED)', async () => {
+    const h = makeHarness();
+    h.setLines([
+      cellRow(
+        'DONE cell task<br>STARTED: [2026-10-14 Wed 09:00]<br>CLOSED: [2026-10-14 Wed 10:00]',
+      ),
+    ]);
+    h.taskStateManager.addTask(
+      h.makeTask({
+        isTableTask: true,
+        tableCell: { cellIndex: 0 },
+        rawText: 'DONE cell task',
+        text: 'cell task',
+        state: 'DONE',
+        completed: true,
+        startedDate: new Date(2026, 9, 14, 9, 0, 0),
+        closedDate: new Date(2026, 9, 14, 10, 0, 0),
+      }),
+    );
+
+    await h.coordinator.updateTaskState(h.storedTask(), 'TODO');
+    await h.coordinator.updateTaskState(h.storedTask(), 'DONE');
+
+    const row = h.getLines()[0];
+    expect(occurrences(row, 'STARTED:')).toBe(1);
+    expect(row).toContain('STARTED: [2026-10-14 Wed 09:00]');
+  });
+
+  it('repeating cell: rollover advances the inline SCHEDULED segment in place; never stacks, never rewrites the row', async () => {
+    const h = makeHarness();
+    h.setLines([cellRow('TODO cell task<br>SCHEDULED: <2026-10-15 Thu .+1d>')]);
+    h.taskStateManager.addTask(
+      h.makeTask({
+        isTableTask: true,
+        tableCell: { cellIndex: 0 },
+        text: 'cell task',
+        scheduledDate: new Date(2026, 9, 15),
+        scheduledDateRepeat: {
+          type: '+' as const,
+          unit: 'd' as const,
+          value: 1,
+          raw: '+1d',
+        },
+      }),
+    );
+
+    // Plain +1d from 2026-10-15: each roll adds one day.
+    const expectedDates = ['2026-10-16', '2026-10-17', '2026-10-18'];
+    for (let i = 0; i < 3; i++) {
+      await h.coordinator.updateTaskState(h.storedTask(), 'DONE');
+      await jest.advanceTimersByTimeAsync(50);
+
+      const row = h.getLines()[0];
+      expect(occurrences(row, 'SCHEDULED:')).toBe(1);
+      expect(scheduledDateIn(row)).toBe(expectedDates[i]);
+      // The rollover must never rewrite the table row as a plain task line.
+      expect(row.startsWith('| ')).toBe(true);
+      expect(row.endsWith(' |')).toBe(true);
+      expect(row).toContain('TODO cell task');
+      expect(h.storedTask().state).toBe('TODO');
+      // Recurring completions write the rolled state directly
+      // (buildProcessingContext maps DONE → successor for repeating
+      // tasks), so no CLOSED is ever stamped — list-task semantics.
+      expect(row).not.toContain('CLOSED');
+    }
+  });
+});
