@@ -50,6 +50,8 @@ Do not `git push` unless the user asks.
 
 - **Build**: `npm run build`
 - **Test**: `npm test`
+- **Perf (node benches)**: `npm run perf:node` — report-only; artifacts in `output/perf/`
+- **Perf (real Obsidian)**: `npm run perf:obsidian` — report-only, needs an Obsidian binary; `scripts/perf/README.md`
 - **Format**: `npm run format` - runs prettier on all files.
 - **Lint**: `npm run lint` - run format first to reduce lint errors.
 - **Single test**: `npm test -- --testNamePattern="pattern"` (Jest with regex match)
