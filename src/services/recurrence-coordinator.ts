@@ -18,6 +18,7 @@ import { calculateNextRepeatDate } from '../utils/date-repeater';
 import {
   findDateLineWithParser,
   getTaskIndent,
+  parseTableCells,
 } from '../utils/task-line-utils';
 
 /**
@@ -206,7 +207,14 @@ export class RecurrenceCoordinator {
     // scanning below the row would risk matching the NEXT task's date
     // lines. The row itself is the only source of truth for cells.
     const isCellTask = task.isTableTask && task.tableCell != null;
-    const rowLine = lines[task.line] ?? '';
+    // Anchor inline-segment parsing to THIS task's cell: a row can carry
+    // several task cells, each with its own <br>SCHEDULED / <br>DEADLINE
+    // segments, so the first match in the row may be a sibling's.
+    const inlineCellSource = isCellTask
+      ? (parseTableCells(lines[task.line] ?? '')[
+          task.tableCell?.cellIndex ?? -1
+        ]?.content ?? '')
+      : '';
 
     // Find SCHEDULED and DEADLINE line indices using the shared utility
     // (line tasks only — cells resolve their dates from the row above)
@@ -240,7 +248,7 @@ export class RecurrenceCoordinator {
         scheduledLineIndex >= 0
           ? this.parseDateFromLine(lines[scheduledLineIndex])
           : isCellTask
-            ? this.parseInlineCellDate(rowLine, 'SCHEDULED')
+            ? this.parseInlineCellDate(inlineCellSource, 'SCHEDULED')
             : null;
       if (date) {
         newScheduledDate = calculateNextRepeatDate(
@@ -258,7 +266,7 @@ export class RecurrenceCoordinator {
         deadlineLineIndex >= 0
           ? this.parseDateFromLine(lines[deadlineLineIndex])
           : isCellTask
-            ? this.parseInlineCellDate(rowLine, 'DEADLINE')
+            ? this.parseInlineCellDate(inlineCellSource, 'DEADLINE')
             : null;
       if (date) {
         newDeadlineDate = calculateNextRepeatDate(
@@ -416,10 +424,10 @@ export class RecurrenceCoordinator {
 
   /**
    * Parse a date from an inline table-cell date segment, e.g.
-   * "…<br>SCHEDULED: <2026-10-15 Thu .+1d>…". Returns null when the row
-   * carries no such segment.
+   * "…<br>SCHEDULED: <2026-10-15 Thu .+1d>…". Returns null when the
+   * content carries no such segment.
    *
-   * @param line - The full table row line
+   * @param line - The cell content (or line text) to search
    * @param dateType - Which inline segment to extract
    * @returns The parsed date or null if the segment is absent
    */

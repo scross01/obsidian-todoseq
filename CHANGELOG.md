@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed recurring table tasks rolling to another cell's date: when several cells in the same row carry repeating dates, completing one advanced from the first matching date in the row instead of its own. Each cell now rolls from its own SCHEDULED/DEADLINE date.
 - Added a choice for what the STARTED timestamp records: the first time a task enters an active state (default) or the most recent time it did. With "most recent activation", resuming a paused task rewrites the date.
 - Fixed STARTED date for a recurring task to now track the current occurrence. Completing a recurring task clears its STARTED date when it rolls to the next occurrence, and starting the new occurrence writes a fresh one.
 - Fixed org-mode tasks being rewritten with the keyword glued to the heading stars (e.g. `*DONE task`). The keyword now stays separated: `* DONE task`.

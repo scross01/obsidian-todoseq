@@ -472,6 +472,39 @@ describe('table cells — the same matrix via inline <br> dates', () => {
     expect(row).toContain('STARTED: [2026-10-14 Wed 09:00]');
   });
 
+  it("repeating cell in a multi-cell row: rolls from ITS OWN inline segment, never a sibling cell's", async () => {
+    const h = makeHarness();
+    h.setLines([
+      '| sibling task<br>SCHEDULED: <2026-10-02 Fri .+1d> | target cell<br>SCHEDULED: <2026-10-15 Thu .+1d> |',
+    ]);
+    h.taskStateManager.addTask(
+      h.makeTask({
+        isTableTask: true,
+        tableCell: { cellIndex: 1 },
+        rawText: 'target cell',
+        text: 'target cell',
+        scheduledDate: new Date(2026, 9, 15),
+        scheduledDateRepeat: {
+          type: '+' as const,
+          unit: 'd' as const,
+          value: 1,
+          raw: '+1d',
+        },
+      }),
+    );
+
+    await h.coordinator.updateTaskState(h.storedTask(), 'DONE');
+    await jest.advanceTimersByTimeAsync(50);
+
+    const row = h.getLines()[0];
+    // The sibling's segment must be untouched — the rollover belongs to
+    // cell 1 only, and must advance cell 1's own 2026-10-15, not the
+    // first SCHEDULED segment in the row.
+    expect(row).toContain('sibling task<br>SCHEDULED: <2026-10-02 Fri .+1d>');
+    expect(row).toContain('target cell<br>SCHEDULED: <2026-10-16 Fri +1d>');
+    expect(h.storedTask().state).toBe('TODO');
+  });
+
   it('repeating cell: rollover advances the inline SCHEDULED segment in place; never stacks, never rewrites the row', async () => {
     const h = makeHarness();
     h.setLines([cellRow('TODO cell task<br>SCHEDULED: <2026-10-15 Thu .+1d>')]);
