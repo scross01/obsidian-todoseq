@@ -70,6 +70,9 @@ async function maybeStopProfile(label: string): Promise<void> {
 
 function report(label: string, result: ScenarioResult): void {
   results.push(result);
+  const longTasks = result.longTasks
+    ? ` longTasks {count:${result.longTasks.count} max:${result.longTasks.maxMs.toFixed(1)}ms total:${result.longTasks.totalMs.toFixed(1)}ms}`
+    : '';
   process.stdout.write(
     `\n[perf] ${label}: median ${result.medianMs.toFixed(1)}ms ` +
       `p95 ${result.p95Ms.toFixed(1)}ms min ${result.minMs.toFixed(1)}ms ` +
@@ -79,7 +82,8 @@ function report(label: string, result: ScenarioResult): void {
         1024
       ).toFixed(
         1,
-      )}MB -> ${(result.heapAfterBytes / 1024 / 1024).toFixed(1)}MB\n`,
+      )}MB -> ${(result.heapAfterBytes / 1024 / 1024).toFixed(1)}MB` +
+      `${longTasks}\n`,
   );
 }
 
@@ -120,6 +124,8 @@ test.describe('performance profiling (report-only)', () => {
           await app.plugins.plugins.todoseq.vaultScanner.scanVault();
         });
       },
+      undefined,
+      true, // long-task observation (yield/chunk design check)
     );
     report('full rescan', rescan);
     await maybeStopProfile('obsidian-rescan');
@@ -158,6 +164,8 @@ test.describe('performance profiling (report-only)', () => {
           }
         }, modes);
       },
+      undefined,
+      true, // long-task observation (full-list refresh design check)
     );
     await maybeStopProfile('obsidian-view-mode-switches');
     report('12 view-mode switches (per iteration)', viewModes);
@@ -181,6 +189,8 @@ test.describe('performance profiling (report-only)', () => {
         await input.fill('');
         await waitForListMutation(page);
       },
+      undefined,
+      true, // long-task observation (per-keystroke refresh stall check)
     );
     await maybeStopProfile('obsidian-search-input-latency');
     report('search input latency (4 queries, per iteration)', search);

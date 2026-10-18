@@ -101,6 +101,26 @@ Artifacts: `output/perf/obsidian-metrics.json`, plus optional
 comparable either. Historical JSONs keep their original labels — use this
 mapping before comparing across runs.
 
+### Long-task observation (`longTasks`, additive schema)
+
+Three sections — `obsidian-rescan`, `obsidian-view-mode-switches`,
+`obsidian-search-input-latency` — wrap their whole window (warmup +
+timed loop) in an in-page `PerformanceObserver({type: 'longtask'})`, so
+those entries in `obsidian-metrics.json` gain
+`longTasks: {count, maxMs, totalMs}` (Chromium counts tasks >50ms by
+spec; the collector returns raw entries, the summary is computed
+Node-side and unit-tested in `tests/perf-longtask-observer.test.ts`).
+Report-only — **no thresholds anywhere**: zero long tasks at size `m`
+is the design expectation (scan yields + chunked render); anything at
+size `l` is a recorded _input_ to a future evidence-led plan, not a
+failure. Dashboard/editor/archive sections are deliberately not attached
+(short sections — the observation would dominate their signal).
+
+Related quiet guard: `tests/bundle-size.test.ts` asserts
+`gzip(main.js) < 175KB` (~+24% headroom over the recorded baseline) so
+bundle growth surfaces in review instead of silently; it skips when no
+build artifact exists and CI builds before tests.
+
 - **Stdout table first**: median is the headline; a p95 far above the
   median means GC or event-loop noise — rerun before trusting it.
 - **Scale curve**: run size `m` and `l`. Near-linear growth is healthy;

@@ -10,10 +10,24 @@
  * local-only output/perf/ directory. There are no thresholds.
  */
 
-import { Page, CDPSession } from 'playwright';
+import type { Page, CDPSession } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
-import { REPO_ROOT } from './harness';
+
+// tests/integration/helpers/ -> repo root. Deliberately local (not imported
+// from ./harness): harness.ts uses `import.meta`, which the unit-jest CJS
+// runtime cannot load, and these helpers are unit-tested (051).
+// Dual-runtime derivation: `__dirname` exists in jest's CJS transform; the
+// Playwright loader has no `__dirname`, so fall back to the npm-script cwd
+// (playwright test always runs from the repo root via package.json scripts).
+const REPO_ROOT = path.resolve(
+  typeof __dirname === 'string'
+    ? __dirname
+    : path.join(process.cwd(), 'tests', 'integration', 'helpers'),
+  '..',
+  '..',
+  '..',
+);
 
 let metricsSession: CDPSession | null = null;
 let profileSession: CDPSession | null = null;
@@ -44,6 +58,86 @@ export interface ScenarioResult {
   minMs: number;
   heapBeforeBytes: number;
   heapAfterBytes: number;
+  /** Present only on sections observed via `observeLongTasks` (additive). */
+  longTasks?: LongTaskStats;
+}
+
+/** One buffered in-page `longtask` entry (Chromium: >50ms by spec). */
+export interface LongTaskEntry {
+  startTime: number;
+  duration: number;
+}
+
+/** Aggregated long-task observation for a measured window (report-only). */
+export interface LongTaskStats {
+  count: number;
+  maxMs: number;
+  totalMs: number;
+}
+
+/**
+ * Node-side summary of buffered long-task entries (single implementation,
+ * unit-tested; the in-page collector returns raw entries only).
+ */
+export function summarizeLongTaskEntries(
+  entries: LongTaskEntry[],
+): LongTaskStats {
+  let maxMs = 0;
+  let totalMs = 0;
+  for (const entry of entries) {
+    if (entry.duration > maxMs) maxMs = entry.duration;
+    totalMs += entry.duration;
+  }
+  return { count: entries.length, maxMs, totalMs };
+}
+
+/**
+ * Install an in-page `PerformanceObserver` for `longtask` entries, buffering
+ * `{startTime, duration}` until `stopAndCollectLongTasks` collects them.
+ * Report-only: the plugin never learns about any of this.
+ */
+export async function startLongTaskObserver(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    type Buffer = {
+      entries: { startTime: number; duration: number }[];
+      obs: PerformanceObserver | null;
+    };
+    const w = window as unknown as { __todoseqLT?: Buffer };
+    const buffer: Buffer = { entries: [], obs: null };
+    w.__todoseqLT = buffer;
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        buffer.entries.push({
+          startTime: entry.startTime,
+          duration: entry.duration,
+        });
+      }
+    });
+    observer.observe({ type: 'longtask', buffered: false });
+    buffer.obs = observer;
+  });
+}
+
+/**
+ * Disconnect the observer, take the buffered entries, and clear the page
+ * state. Returns `[]` when no observer was installed (idempotent stop).
+ */
+export async function stopAndCollectLongTasks(
+  page: Page,
+): Promise<LongTaskEntry[]> {
+  return page.evaluate(() => {
+    const w = window as unknown as {
+      __todoseqLT?: {
+        entries: { startTime: number; duration: number }[];
+        obs: PerformanceObserver | null;
+      };
+    };
+    const buffer = w.__todoseqLT;
+    if (!buffer) return [];
+    buffer.obs?.disconnect();
+    w.__todoseqLT = undefined;
+    return buffer.entries;
+  });
 }
 
 /**
@@ -55,6 +149,9 @@ export interface ScenarioResult {
  * alike — OUTSIDE the timer. Timer contract (plan 046 D1): a fixed sleep
  * must never sit inside `action`; cool-downs and cleanup belong here so
  * they are never billed as plugin work.
+ *
+ * `observeLongTasks` (051) wraps the whole window (warmup + timed loop)
+ * in an in-page long-task observer and reports `longTasks` on the result.
  */
 export async function measureScenario(
   page: Page,
@@ -62,7 +159,9 @@ export async function measureScenario(
   iterations: number,
   action: () => Promise<void>,
   afterEach?: () => Promise<void>,
+  observeLongTasks = false,
 ): Promise<ScenarioResult> {
+  if (observeLongTasks) await startLongTaskObserver(page);
   const heapBeforeBytes = await jsHeapUsed(page);
 
   await action();
@@ -77,6 +176,9 @@ export async function measureScenario(
   }
 
   const heapAfterBytes = await jsHeapUsed(page);
+  const longTasks = observeLongTasks
+    ? summarizeLongTaskEntries(await stopAndCollectLongTasks(page))
+    : undefined;
   const sorted = [...samples].sort((a, b) => a - b);
   const p95 =
     sorted[Math.min(sorted.length - 1, Math.ceil(0.95 * sorted.length) - 1)];
@@ -88,6 +190,7 @@ export async function measureScenario(
     minMs: sorted[0],
     heapBeforeBytes,
     heapAfterBytes,
+    ...(longTasks ? { longTasks } : {}),
   };
 }
 
