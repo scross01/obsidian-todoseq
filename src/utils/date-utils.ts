@@ -823,8 +823,10 @@ export class DateUtils {
   static addDays(date: Date, days: number): Date {
     const result = new Date(date);
     result.setDate(result.getDate() + days);
-    // Normalize to ensure timezone independence
-    return this.normalizeDateForTimezone(result);
+    // Normalize in place: `result` is a private, never-aliased Date, so the
+    // extra copy normalizeDateForTimezone would make is pure overhead in the
+    // classification hot path (one fresh Date per addDays call instead of two).
+    return this.normalizeDateInPlace(result);
   }
 
   /**
@@ -938,9 +940,7 @@ export class DateUtils {
    * @param date The date to normalize
    * @returns A new Date object with proper timezone handling
    */
-  static normalizeDateForTimezone(date: Date): Date {
-    const result = new Date(date);
-
+  private static normalizeDateInPlace(result: Date): Date {
     // Check if time is zero (indicating date-only)
     const hasTime =
       result.getHours() !== 0 ||
@@ -968,6 +968,17 @@ export class DateUtils {
     }
 
     return result;
+  }
+
+  /**
+   * Normalize a date to ensure timezone independence
+   * - If time is zero (00:00:00), treat as date-only and zero timezone
+   * - If time is non-zero, ensure no timezone association and use local time
+   * @param date The date to normalize
+   * @returns A new Date object with proper timezone handling
+   */
+  static normalizeDateForTimezone(date: Date): Date {
+    return this.normalizeDateInPlace(new Date(date));
   }
 
   /**

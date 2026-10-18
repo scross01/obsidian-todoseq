@@ -4,6 +4,9 @@ import {
   sortTasksInBlocks,
   sortTasksWithThreeBlockSystem,
   taskComparator,
+  classifyAll,
+  classifyTask,
+  TaskClassification,
   // Keyword sort types and functions
   getKeywordGroup,
   keywordSortComparator,
@@ -32,6 +35,160 @@ describe('Task Sorting System', () => {
       tail: '',
       ...overrides,
     });
+
+  describe('classifyTask day-boundary matrix (local dates)', () => {
+    const warningSettings = {
+      upcomingPeriod: 7,
+      defaultDeadlineWarningPeriod: 0,
+      defaultScheduledWarningPeriod: 0,
+      skipScheduledWarningPeriodIfDeadline: false,
+      skipDeadlinePrewarningIfScheduled: false,
+    };
+
+    /**
+     * Local-time builders per AGENTS.md (never UTC-fixed offsets): the
+     * classification compares calendar days, so each case pins the exact
+     * local-local day relation it cares about.
+     */
+    const ymd = (year: number, month: number, day: number): Date =>
+      new Date(year, month - 1, day);
+    const nowRef = ymd(2024, 1, 15); // local 2024-01-15
+
+    it('yesterday, today, and later-today all classify as current', () => {
+      for (const date of [
+        ymd(2024, 1, 14), // yesterday
+        ymd(2024, 1, 15), // today at midnight
+        new Date(2024, 0, 15, 23, 59), // later today
+      ]) {
+        const task = createTask({ scheduledDate: date });
+        expect(classifyTask(task, nowRef, warningSettings).category).toBe(
+          'current',
+        );
+      }
+    });
+
+    it('exactly upcomingPeriod days ahead is upcoming; one more is future', () => {
+      const plus7 = ymd(2024, 1, 22);
+      const plus8 = ymd(2024, 1, 23);
+      expect(
+        classifyTask(
+          createTask({ scheduledDate: plus7 }),
+          nowRef,
+          warningSettings,
+        ).category,
+      ).toBe('upcoming');
+      expect(
+        classifyTask(
+          createTask({ scheduledDate: plus8 }),
+          nowRef,
+          warningSettings,
+        ).category,
+      ).toBe('future');
+    });
+
+    it('honors a non-default upcomingPeriod', () => {
+      const settings3 = { ...warningSettings, upcomingPeriod: 3 };
+      expect(
+        classifyTask(
+          createTask({ scheduledDate: ymd(2024, 1, 18) }),
+          nowRef,
+          settings3,
+        ).category,
+      ).toBe('upcoming');
+      expect(
+        classifyTask(
+          createTask({ scheduledDate: ymd(2024, 1, 19) }),
+          nowRef,
+          settings3,
+        ).category,
+      ).toBe('future');
+    });
+
+    it('completed tasks stay completed and carry the earliest date', () => {
+      const task = createTask({
+        completed: true,
+        scheduledDate: ymd(2024, 3, 5),
+        deadlineDate: ymd(2024, 2, 2),
+      });
+      const result = classifyTask(task, nowRef, warningSettings);
+      expect(result.category).toBe('completed');
+      expect(result.earliestDate?.getTime()).toBe(ymd(2024, 2, 2).getTime());
+    });
+
+    it('deadline-only tasks use the deadline path symmetrically', () => {
+      const task = createTask({ deadlineDate: ymd(2024, 1, 22) });
+      expect(classifyTask(task, nowRef, warningSettings).category).toBe(
+        'upcoming',
+      );
+      const taskFuture = createTask({ deadlineDate: ymd(2024, 1, 23) });
+      expect(classifyTask(taskFuture, nowRef, warningSettings).category).toBe(
+        'future',
+      );
+    });
+  });
+
+  describe('classifyAll shared-pass contract', () => {
+    const warningSettings = {
+      upcomingPeriod: 7,
+      defaultDeadlineWarningPeriod: 0,
+      defaultScheduledWarningPeriod: 0,
+      skipScheduledWarningPeriodIfDeadline: false,
+      skipDeadlinePrewarningIfScheduled: false,
+    };
+
+    it('matches per-task classifyTask for every task (with warning settings)', () => {
+      const tasks = [
+        createTask({ scheduledDate: new Date(2024, 0, 10) }),
+        createTask({ scheduledDate: new Date(2024, 0, 15) }),
+        createTask({ scheduledDate: new Date(2024, 0, 20, 9, 30) }),
+        createTask({ deadlineDate: new Date(2024, 1, 2) }),
+        createTask({ completed: true, closedDate: new Date(2024, 0, 3) }),
+        createTask({}),
+      ];
+      const now = new Date(2024, 0, 15, 11, 22);
+      const map = classifyAll(tasks, now, warningSettings);
+      expect(map.size).toBe(tasks.length);
+      for (const task of tasks) {
+        const fromMap = map.get(task);
+        const perTask = classifyTask(task, now, warningSettings);
+        expect(fromMap?.category).toBe(perTask.category);
+        expect(fromMap?.earliestDate?.getTime()).toBe(
+          perTask.earliestDate?.getTime(),
+        );
+      }
+    });
+
+    it('fills a caller-provided target map in place and returns it', () => {
+      const tasks = [createTask({ scheduledDate: new Date(2024, 0, 16) })];
+      const target = new Map<Task, TaskClassification>();
+      const result = classifyAll(
+        tasks,
+        new Date(2024, 0, 15),
+        warningSettings,
+        target,
+      );
+      expect(result).toBe(target);
+      expect(result.size).toBe(1);
+      expect(result.has(tasks[0])).toBe(true);
+    });
+
+    it('pins the single `now` semantics: the day boundary is taken per pass', () => {
+      const task = createTask({ scheduledDate: new Date(2024, 0, 16) });
+      // Late on Jan 15 the effective date is upcoming; on Jan 16 it is current.
+      const mapLateDay = classifyAll(
+        [task],
+        new Date(2024, 0, 15, 23, 59),
+        warningSettings,
+      );
+      const mapNextDay = classifyAll(
+        [task],
+        new Date(2024, 0, 16, 0, 0),
+        warningSettings,
+      );
+      expect(mapLateDay.get(task)?.category).toBe('upcoming');
+      expect(mapNextDay.get(task)?.category).toBe('current');
+    });
+  });
 
   describe('Task Classification', () => {
     it('should classify completed tasks as completed regardless of dates', () => {

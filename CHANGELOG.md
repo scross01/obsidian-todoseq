@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Speeded up live search filtering: matching now runs in one pass over the task list instead of starting a separate evaluation for every task, which cuts the wait after each keystroke noticeably on large vaults and slower machines.
+- Speeded up Task List refreshes: task classification no longer recomputes the same today/upcoming boundary for every task and avoids extra date-object churn, so view-mode switches and search re-renders finish sooner on large vaults.
 - Fixed recurring table tasks rolling to another cell's date: when several cells in the same row carry repeating dates, completing one advanced from the first matching date in the row instead of its own. Each cell now rolls from its own SCHEDULED/DEADLINE date.
 - Added a choice for what the STARTED timestamp records: the first time a task enters an active state (default) or the most recent time it did. With "most recent activation", resuming a paused task rewrites the date.
 - Fixed STARTED date for a recurring task to now track the current occurrence. Completing a recurring task clears its STARTED date when it rolls to the next occurrence, and starting the new occurrence writes a fresh one.
