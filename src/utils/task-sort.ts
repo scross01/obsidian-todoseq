@@ -64,7 +64,7 @@ export type CompletedTaskSetting = 'showAll' | 'sortToEnd' | 'hide';
 /**
  * Task classification result
  */
-interface TaskClassification {
+export interface TaskClassification {
   category: TaskCategory;
   earliestDate: Date | null;
 }
@@ -372,6 +372,33 @@ export function classifyTask(
 }
 
 /**
+ * Classify every task once, keyed by task identity, so a refresh's sort and
+ * hidden-count passes can share a single classification pass.
+ *
+ * The map is an explicit, caller-owned parameter (no module-level cache):
+ * its lifetime is the caller's natural scope — one refresh — so `now`
+ * correctness (midnight rollover) is automatic and no staleness mode exists.
+ * Callers that pass `target` get it filled in place.
+ *
+ * @param tasks Tasks to classify
+ * @param now Current date/time (the single `now` shared by all uses)
+ * @param settings Warning-period inputs that decide visibility dates
+ * @param target Optional map to fill instead of allocating a new one
+ */
+export function classifyAll(
+  tasks: Task[],
+  now: Date,
+  settings?: WarningPeriodSettings,
+  target?: Map<Task, TaskClassification>,
+): Map<Task, TaskClassification> {
+  const classifications = target ?? new Map<Task, TaskClassification>();
+  for (const task of tasks) {
+    classifications.set(task, classifyTask(task, now, settings));
+  }
+  return classifications;
+}
+
+/**
  * Get sort function based on sort method
  * @param sortMethod The sort method to use
  * @param keywordConfig Optional keyword sort configuration for sortByKeyword
@@ -552,6 +579,7 @@ export function sortTasksInBlocks(
   sortMethod: SortMethod = 'default',
   keywordConfig?: KeywordSortConfig,
   warningPeriodSettings?: WarningPeriodSettings,
+  classifications?: Map<Task, TaskClassification>,
 ): TaskBlock[] {
   // Classify all tasks - don't sort yet
   const classified: Record<TaskCategory, Task[]> = {
@@ -562,7 +590,11 @@ export function sortTasksInBlocks(
   };
 
   for (const task of tasks) {
-    const { category } = classifyTask(task, now, warningPeriodSettings);
+    // Shared classifications when provided (one pass per refresh);
+    // otherwise classify inline exactly as before.
+    const classification = classifications?.get(task);
+    const { category } =
+      classification ?? classifyTask(task, now, warningPeriodSettings);
     classified[category].push(task);
   }
 
@@ -670,6 +702,7 @@ export function sortTasksWithThreeBlockSystem(
   sortMethod: SortMethod = 'default',
   keywordConfig?: KeywordSortConfig,
   warningPeriodSettings?: WarningPeriodSettings,
+  classifications?: Map<Task, TaskClassification>,
 ): Task[] {
   const blocks = sortTasksInBlocks(
     tasks,
@@ -679,6 +712,7 @@ export function sortTasksWithThreeBlockSystem(
     sortMethod,
     keywordConfig,
     warningPeriodSettings,
+    classifications,
   );
   return flattenBlocks(blocks);
 }

@@ -13,6 +13,7 @@ import {
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
+import { TaskClassification } from '../../utils/task-sort';
 import { Search } from '../../search/search';
 import {
   SearchOptionsDropdown,
@@ -399,9 +400,18 @@ export class TaskListView extends ItemView {
   }
 
   /** Non-mutating transform for rendering */
-  private transformForView(tasks: Task[], mode: TaskListViewMode): Task[] {
+  private transformForView(
+    tasks: Task[],
+    mode: TaskListViewMode,
+    outClassifications?: Map<Task, TaskClassification>,
+  ): Task[] {
     const sortMethod = this.getSortMethod();
-    return this.taskListFilter.transformForView(tasks, mode, sortMethod);
+    return this.taskListFilter.transformForView(
+      tasks,
+      mode,
+      sortMethod,
+      outClassifications,
+    );
   }
 
   /** Search query (persisted on root contentEl attribute to survive re-renders) */
@@ -1921,7 +1931,10 @@ export class TaskListView extends ItemView {
 
     const mode = this.getViewMode();
     const allTasks = this.tasks ?? [];
-    let visible = this.transformForView(allTasks, mode);
+    // One classification pass shared by the sort and (when the empty state
+    // needs it) the hidden-count pass below — same map, same `now`.
+    const classifications = new Map<Task, TaskClassification>();
+    let visible = this.transformForView(allTasks, mode, classifications);
     const preSearchCount = visible.length;
 
     // Apply search filtering
@@ -2074,7 +2087,11 @@ export class TaskListView extends ItemView {
         buildEmptyStateCopy({
           hasAnyTasks: allTasks.length > 0,
           hasSearchQuery: q.length > 0,
-          hidden: this.taskListFilter.countHiddenByFilters(allTasks, mode),
+          hidden: this.taskListFilter.countHiddenByFilters(
+            allTasks,
+            mode,
+            classifications,
+          ),
         });
 
       title.setText(emptyTitle);

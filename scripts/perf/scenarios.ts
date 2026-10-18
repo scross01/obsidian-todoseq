@@ -13,6 +13,8 @@ import { BenchScenario, BenchContext } from './harness';
 import {
   sortTasksWithThreeBlockSystem,
   buildKeywordSortConfig,
+  classifyAll,
+  classifyTask,
   FutureTaskSetting,
   CompletedTaskSetting,
 } from '../../src/utils/task-sort';
@@ -85,7 +87,108 @@ const classifySort: BenchScenario = {
   },
 };
 
-/** Queries a user would plausibly type; every one must parse (fail loud). */
+/**
+ * Same 12-combo workload with ONE shared classification pass — the
+ * production shape when the refresh threads its `classifyAll` map into the
+ * sort (the unchanged `classify-sort` above stays as the control).
+ */
+const classifySortShared: BenchScenario = {
+  name: 'classify-sort-shared (12 combos, one classify pass)',
+  runOnce(ctx: BenchContext): void {
+    const keywordConfig = buildKeywordSortConfig(ctx.keywordManager);
+    const warningPeriodSettings = {
+      upcomingPeriod: ctx.settings.upcomingPeriod,
+      defaultDeadlineWarningPeriod: ctx.settings.defaultDeadlineWarningPeriod,
+      defaultScheduledWarningPeriod: ctx.settings.defaultScheduledWarningPeriod,
+      skipScheduledWarningPeriodIfDeadline:
+        ctx.settings.skipScheduledWarningPeriodIfDeadline,
+      skipDeadlinePrewarningIfScheduled:
+        ctx.settings.skipDeadlinePrewarningIfScheduled,
+    };
+    const classifications = classifyAll(
+      ctx.tasks,
+      ctx.today,
+      warningPeriodSettings,
+    );
+    for (const future of FUTURE_SETTINGS) {
+      for (const completed of COMPLETED_SETTINGS) {
+        sortTasksWithThreeBlockSystem(
+          ctx.tasks,
+          ctx.today,
+          future,
+          completed,
+          'default',
+          keywordConfig,
+          warningPeriodSettings,
+          classifications,
+        );
+      }
+    }
+  },
+};
+
+/**
+ * Production-shaped refresh pair: the list transform and the hidden-count
+ * pass — the sequence `TaskListFilter.transformForView` +
+ * `countHiddenByFilters` runs in a refresh's empty-state branch. Mirrors
+ * the production call shape on each side of the change: before, two
+ * classification passes; after, one shared `classifyAll` map.
+ */
+const classifyRefreshPair: BenchScenario = {
+  name: 'classify-refresh-pair (sort + hidden count)',
+  runOnce(ctx: BenchContext): void {
+    const keywordConfig = buildKeywordSortConfig(ctx.keywordManager);
+    const warningPeriodSettings = {
+      upcomingPeriod: ctx.settings.upcomingPeriod,
+      defaultDeadlineWarningPeriod: ctx.settings.defaultDeadlineWarningPeriod,
+      defaultScheduledWarningPeriod: ctx.settings.defaultScheduledWarningPeriod,
+      skipScheduledWarningPeriodIfDeadline:
+        ctx.settings.skipScheduledWarningPeriodIfDeadline,
+      skipDeadlinePrewarningIfScheduled:
+        ctx.settings.skipDeadlinePrewarningIfScheduled,
+    };
+    // Pass 1 — the transform with a shared classification map.
+    const classifications = classifyAll(
+      ctx.tasks,
+      ctx.today,
+      warningPeriodSettings,
+    );
+    sortTasksWithThreeBlockSystem(
+      ctx.tasks,
+      ctx.today,
+      ctx.settings.futureTaskSorting,
+      'showAll',
+      'default',
+      keywordConfig,
+      warningPeriodSettings,
+      classifications,
+    );
+    // Pass 2 — the hidden-count loop reading the shared map (with the
+    // production fallback for a task the map does not cover).
+    let future = 0;
+    let completed = 0;
+    for (const task of ctx.tasks) {
+      const { category } =
+        classifications.get(task) ??
+        classifyTask(task, ctx.today, warningPeriodSettings);
+      if (category === 'completed') {
+        completed++;
+      } else if (ctx.settings.futureTaskSorting === 'hideFuture') {
+        if (category === 'upcoming' || category === 'future') future++;
+      } else if (
+        ctx.settings.futureTaskSorting === 'showUpcoming' &&
+        category === 'future'
+      ) {
+        future++;
+      }
+    }
+    // Real invariant (counts can never exceed the total) — keeps the loop
+    // results observable to the optimizer.
+    if (future + completed > ctx.tasks.length) {
+      throw new Error('hidden counts exceed task total');
+    }
+  },
+};
 const SEARCH_QUERIES = [
   'refactor',
   'the scanner',
@@ -239,6 +342,8 @@ const regexCold: BenchScenario = {
 export const SCENARIOS: BenchScenario[] = [
   parseFile,
   classifySort,
+  classifySortShared,
+  classifyRefreshPair,
   search,
   dashboardAggregate,
   naturalDate,

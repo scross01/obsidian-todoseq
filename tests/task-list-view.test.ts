@@ -477,14 +477,25 @@ describe('TaskListView', () => {
       view.updateTasks(futureTasks);
 
       const filter = view['taskListFilter'];
-      jest.spyOn(filter, 'transformForView').mockReturnValue([]);
+      const transformSpy = jest
+        .spyOn(filter, 'transformForView')
+        .mockReturnValue([]);
       const countSpy = jest
         .spyOn(filter, 'countHiddenByFilters')
         .mockReturnValue({ future: 1, completed: 0 });
 
       await view.refreshVisibleList();
 
-      expect(countSpy).toHaveBeenCalledWith(futureTasks, 'showAll');
+      // The refresh threads ONE classifications map through the transform
+      // and the hidden-count pass (single classification pass per refresh).
+      const sharedClassifications = transformSpy.mock.calls[0][3];
+      expect(sharedClassifications).toBeInstanceOf(Map);
+      expect(countSpy).toHaveBeenCalledTimes(1);
+      expect(countSpy).toHaveBeenCalledWith(
+        futureTasks,
+        'showAll',
+        sharedClassifications,
+      );
     });
   });
 
