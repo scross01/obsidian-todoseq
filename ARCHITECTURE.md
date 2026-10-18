@@ -663,6 +663,7 @@ graph TB
 - **Responsibility**: Task matching and filtering based on query AST
 - **Key Patterns**: Visitor pattern, filter chain execution, property search integration
 - **Interface**: Task evaluation, result filtering, `evaluatePropertyFilter()`
+- **Default search domain**: an unprefixed term or phrase (`evaluateTerm`/`evaluatePhrase`, via `getSearchableFields`) matches the task line (`text`/`rawText`), the task's `DESCRIPTION:` line, the file path, or the filename. Use `content:` for the task line alone, `description:` for the description alone, and `heading:` for the enclosing heading.
 - **Note**: evaluation assumes parse-time validation has run — `DateUtils.parseDateValue` fails closed on invalid dates so the evaluator's remaining `false` fallbacks are last-resort, not primary behavior
 
 **SearchTokenizer** (`src/search/search-tokenizer.ts`)

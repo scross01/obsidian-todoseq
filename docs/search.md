@@ -9,7 +9,22 @@ The search field in the TODOseq Task List provides a powerful search system that
 
 ### Search Field Overview
 
-The search field is located in the Task List toolbar and provides live filtering as you type. Basic search matches the entered text against task text, file path, and filename.
+The search field is located in the Task List toolbar and provides live filtering as you type. Basic search matches the entered text against the task text, the task's `DESCRIPTION:` line, the file path, and the filename.
+
+Searching without a prefix looks in the task line _and_ its description, so a task can match on either:
+
+```txt
+format
+```
+
+```markdown
+TODO check the document format
+
+TODO release the presentation
+DESCRIPTION: updated document format presentation
+```
+
+Both tasks match, because `format` appears in the first task's line and in the second task's description. To search the task line only, or the description only, use the `content:` and `description:` prefixes respectively.
 
 ### Search Shortcuts
 
@@ -127,6 +142,7 @@ Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unkn
 | `state:`       | Find tasks with specific states or groups | `state:active`              |
 | `priority:`    | Find tasks with specific priorities       | `priority:high`             |
 | `content:`     | Find tasks with specific content          | `content:project`           |
+|                | _(the task line only)_                    |                             |
 | `description:` | Find tasks by their DESCRIPTION: line     | `description:meeting notes` |
 | `heading:`     | Find tasks under a matching heading       | `heading:Setup`             |
 | `scheduled:`   | Find tasks with scheduled dates           | `scheduled:due`             |
@@ -166,6 +182,12 @@ heading containing "finance". `description:` never matches tasks without a
 `DESCRIPTION:` line. `heading:` matches the nearest heading above the task
 (text after the `#`s), so `heading:Setup` finds everything under any
 `## Setup`-style section; tasks before the first heading never match.
+
+These prefixes narrow a search to one field. A term with no prefix is broader
+by design: it matches the task line _or_ the description, so `bank` in the
+query above would also find a task whose `DESCRIPTION:` mentions "bank" while
+its line says something else. Use `content:bank` when you want the task line
+alone, and `description:bank` when you want the description alone.
 
 The `state:` filter and state autocomplete suggestions follow the effective keyword configuration from settings. This includes custom keywords and advanced built-in overrides. Archived keywords are excluded from state search suggestions because archived tasks are not collected into the task index.
 

@@ -57,6 +57,70 @@ describe('description: and heading: search prefixes', () => {
     });
   });
 
+  describe('default (no-prefix) search', () => {
+    // Expanding plan 034: an unprefixed term/phrase matches the task line OR
+    // its DESCRIPTION text. The user's acceptance example, verbatim.
+    const lineOnly = task({
+      rawText: 'TODO check the document format',
+      text: 'check the document format',
+    });
+    const descriptionOnly = task({
+      rawText: 'TODO release the presentation',
+      text: 'release the presentation',
+      description: 'updated document format presentation',
+    });
+
+    it('matches a term in the description when the task line lacks it', async () => {
+      expect(await matches('format', descriptionOnly)).toBe(true);
+      expect(await matches('format', lineOnly)).toBe(true);
+    });
+
+    it('still matches a term in the task line when there is no description', async () => {
+      expect(await matches('document', lineOnly)).toBe(true);
+    });
+
+    it('does not match a term absent from both line and description', async () => {
+      expect(await matches('spreadsheet', descriptionOnly)).toBe(false);
+      expect(await matches('spreadsheet', lineOnly)).toBe(false);
+    });
+
+    it('matches a quoted phrase across description word boundaries', async () => {
+      expect(await matches('"document format"', descriptionOnly)).toBe(true);
+      expect(await matches('"format document"', descriptionOnly)).toBe(false);
+    });
+
+    it('honours case sensitivity for description matches', async () => {
+      const candidate = task({
+        rawText: 'TODO release',
+        text: 'release',
+        description: 'Updated DOCUMENT format',
+      });
+      expect(await matches('document', candidate, false)).toBe(true);
+      expect(await matches('document', candidate, true)).toBe(false);
+    });
+
+    it('reaches the same result through the bulk filter facade', async () => {
+      const filtered = await Search.filterTasks(
+        [lineOnly, descriptionOnly],
+        'format',
+      );
+      expect(filtered).toEqual([lineOnly, descriptionOnly]);
+    });
+
+    it('excludes the description from heading: matches (field stays scoped)', async () => {
+      // Guard against a blanket searchable-fields change: heading: must not
+      // start matching description text, and description: must not match
+      // heading-only text.
+      const candidate = task({
+        parentHeading: 'Meeting Notes',
+        description: 'agenda for the call',
+      });
+      expect(await matches('heading:agenda', candidate)).toBe(false);
+      expect(await matches('description:notes', candidate)).toBe(false);
+      expect(await matches('heading:notes', candidate)).toBe(true);
+    });
+  });
+
   describe('heading:', () => {
     it('matches a substring of the parent heading', async () => {
       const candidate = task({ parentHeading: 'Meeting Notes' });

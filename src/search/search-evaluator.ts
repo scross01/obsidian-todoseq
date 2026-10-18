@@ -630,6 +630,10 @@ export class SearchEvaluator {
 
     if (task.rawText) fields.push(task.rawText);
     if (task.text) fields.push(task.text);
+    // DESCRIPTION text joins the default (no-prefix) search: an unprefixed
+    // term matches the task line OR its description. Kept out of
+    // `parentHeading`-based matching, which stays scoped via heading:.
+    if (task.description) fields.push(task.description);
     if (task.path) {
       fields.push(task.path);
       // Also add just the filename using shared utility
