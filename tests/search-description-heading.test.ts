@@ -7,6 +7,8 @@ import {
   createTestKeywordManager,
 } from './helpers/test-helper';
 
+import { createBaseSettings } from './helpers/test-helper';
+
 describe('description: and heading: search prefixes', () => {
   const task = (overrides: Partial<Task>): Task =>
     createBaseTask({
@@ -119,6 +121,27 @@ describe('description: and heading: search prefixes', () => {
       expect(await matches('description:notes', candidate)).toBe(false);
       expect(await matches('heading:notes', candidate)).toBe(true);
     });
+  });
+
+  it('matches an unprefixed term via the real parser (acceptance example)', async () => {
+    // End to end: raw markdown -> TaskParser -> Search.filterTasks, so a
+    // parser/evaluator mismatch on where DESCRIPTION text lives cannot slip
+    // through the hand-built fixtures above.
+    const parser = TaskParser.create(createTestKeywordManager());
+    const content =
+      '- TODO check the document format\n\n' +
+      '- TODO release the presentation\n' +
+      'DESCRIPTION: updated document format presentation\n';
+    const tasks = parser.parseFile(content, 'acceptance.md');
+    expect(tasks).toHaveLength(2);
+
+    const filtered = await Search.filterTasks(tasks, 'format');
+    expect(filtered).toHaveLength(2);
+    expect(filtered).toEqual(tasks);
+
+    // The task line alone still matches, and an absent term matches nothing.
+    expect(await Search.filterTasks(tasks, 'presentation')).toHaveLength(1);
+    expect(await Search.filterTasks(tasks, 'spreadsheet')).toHaveLength(0);
   });
 
   describe('heading:', () => {
