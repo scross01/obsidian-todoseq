@@ -43,6 +43,12 @@ import {
 
 type RegexPair = { test: RegExp; capture: RegExp };
 
+// Section-heading capture for Task.parentHeading: an anchored ATX heading
+// with its text (group 1, hashes stripped, trailing whitespace trimmed).
+// Only lines already gated by a leading '#' reach this regex (see parseFile),
+// so ordinary lines pay a single character test.
+const SECTION_HEADING_TEXT_REGEX = /^#{1,6}\s+(.+?)\s*$/;
+
 /**
  * Markdown task parser for TODOseq.
  * Parses tasks from markdown files using markdown syntax.
@@ -1151,6 +1157,9 @@ export class TaskParser implements ITaskParser {
 
     const tasks: Task[] = [];
     const processedLines = new Set<number>();
+    // Nearest enclosing markdown heading, tracked for Task.parentHeading
+    // (search `heading:` prefix; heading-grouping plans consume it too).
+    let currentHeading: string | undefined;
 
     for (let index = 0; index < lines.length; index++) {
       const line = lines[index];
@@ -1170,6 +1179,7 @@ export class TaskParser implements ITaskParser {
           processedLines,
         );
         if (footnoteTask) {
+          footnoteTask.parentHeading = currentHeading;
           tasks.push(footnoteTask);
         }
         continue;
@@ -1200,6 +1210,18 @@ export class TaskParser implements ITaskParser {
         continue;
       }
 
+      // Section-heading tracking for Task.parentHeading. Cheap leading-'#'
+      // gate first; block-transition handling above guarantees in-block
+      // lines (e.g. `# comment` inside a code fence) never reach the regex.
+      // Heading-task lines (`# TODO x`) are captured here too — their own
+      // text becomes their parentHeading (they *are* that section).
+      if (!inBlock && line.charCodeAt(0) === 35 /* '#' */) {
+        const headingText = SECTION_HEADING_TEXT_REGEX.exec(line);
+        if (headingText) {
+          currentHeading = headingText[1];
+        }
+      }
+
       // Check for single-line comment blocks (%% ... %%)
       const isSingleLineComment = SINGLE_LINE_COMMENT_REGEX.test(line);
       if (isSingleLineComment) {
@@ -1212,6 +1234,7 @@ export class TaskParser implements ITaskParser {
             processedLines,
           );
           if (commentTask) {
+            commentTask.parentHeading = currentHeading;
             tasks.push(commentTask);
           }
         }
@@ -1225,7 +1248,11 @@ export class TaskParser implements ITaskParser {
 
       // Table cell task detection
       if (/^\s*\|/.test(line) && !this.testRegex.test(line)) {
-        tasks.push(...this.parseTasksFromTableCells(line, index, path));
+        const cellTasks = this.parseTasksFromTableCells(line, index, path);
+        for (const cellTask of cellTasks) {
+          cellTask.parentHeading = currentHeading;
+        }
+        tasks.push(...cellTasks);
         continue;
       }
 
@@ -1240,6 +1267,7 @@ export class TaskParser implements ITaskParser {
           file,
         );
         if (headingTask) {
+          headingTask.parentHeading = currentHeading;
           tasks.push(headingTask);
         }
         continue;
@@ -1277,6 +1305,7 @@ export class TaskParser implements ITaskParser {
       );
 
       if (task) {
+        task.parentHeading = currentHeading;
         tasks.push(task);
       }
     }

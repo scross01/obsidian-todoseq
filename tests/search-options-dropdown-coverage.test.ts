@@ -102,7 +102,7 @@ describe('SearchOptionsDropdown - Coverage Gap Tests', () => {
     it('returns all options when search term is empty', async () => {
       const dropdown = createDropdown();
       await dropdown.showOptionsDropdown('');
-      expect(dropdown['currentSuggestions'].length).toBe(10);
+      expect(dropdown['currentSuggestions'].length).toBe(13);
     });
 
     it('returns empty array for non-matching search term', async () => {
@@ -407,7 +407,10 @@ describe('SearchOptionsDropdown - Coverage Gap Tests', () => {
       );
 
       historyItems[0].dispatchEvent(new MouseEvent('mouseover'));
-      expect(dropdown['selectedIndex']).toBe(10);
+      // History rows start right after the prefix options.
+      expect(dropdown['selectedIndex']).toBe(
+        dropdown['currentSuggestions'].length,
+      );
 
       const selectedAfter = dropdown['containerEl'].querySelectorAll(
         '.search-suggest-item:not(.mod-group).is-selected',
@@ -444,12 +447,13 @@ describe('SearchOptionsDropdown - Coverage Gap Tests', () => {
       dropdown.addToHistory('history query');
       await dropdown.showOptionsDropdown();
 
-      for (let i = 0; i <= 10; i++) {
+      const optionCount = dropdown['currentSuggestions'].length;
+      for (let i = 0; i <= optionCount; i++) {
         dropdown.handleKeyDown(
           new KeyboardEvent('keydown', { key: 'ArrowDown' }),
         );
       }
-      expect(dropdown['selectedIndex']).toBe(10);
+      expect(dropdown['selectedIndex']).toBe(optionCount);
 
       const enterEvent = new KeyboardEvent('keydown', {
         key: 'Enter',
@@ -505,7 +509,8 @@ describe('SearchOptionsDropdown - Coverage Gap Tests', () => {
       dropdown.addToHistory('tab history');
       await dropdown.showOptionsDropdown();
 
-      for (let i = 0; i <= 10; i++) {
+      const optionCount = dropdown['currentSuggestions'].length;
+      for (let i = 0; i <= optionCount; i++) {
         dropdown.handleKeyDown(
           new KeyboardEvent('keydown', { key: 'ArrowDown' }),
         );
@@ -772,7 +777,9 @@ describe('SearchOptionsDropdown - Coverage Gap Tests', () => {
       dropdown.addToHistory('query2');
       await dropdown.showOptionsDropdown();
 
-      expect(dropdown['getTotalItems']()).toBe(12);
+      expect(dropdown['getTotalItems']()).toBe(
+        dropdown['currentSuggestions'].length + 2,
+      );
     });
   });
 

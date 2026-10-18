@@ -47,7 +47,13 @@ export class SearchSuggestionDropdown extends BaseDropdown {
 
     const prefixKey = prefix.endsWith(':') ? prefix.slice(0, -1) : prefix;
 
-    if (prefixKey === 'content') {
+    // Open-domain prefixes with no value universe to suggest: hide rather
+    // than show an empty dropdown (mirrors how content: has always behaved).
+    if (
+      prefixKey === 'content' ||
+      prefixKey === 'description' ||
+      prefixKey === 'heading'
+    ) {
       this.hide();
       return;
     }

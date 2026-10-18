@@ -606,6 +606,7 @@ graph TB
 - **Responsibility**: Complex regex-based task extraction for Markdown files
 - **Key Patterns**: State machine, builder pattern, security-first design
 - **Interface**: Implements `ITaskParser`, `parseFile()`, `parseLine()`, language-aware parsing
+- **Section headings**: `parseFile`'s line loop tracks the nearest enclosing markdown heading into `Task.parentHeading` (hashes stripped; heading-task lines carry their own text; skipped inside code fences) — the data behind the search `heading:` prefix
 - **Creation**: TaskParser.create(keywordManager, app, urgencyCoefficients, parserSettings) - first parameter must be KeywordManager
 - **Subtasks**: Supports subtask detection via indented checkbox lines (see [Subtasks](#subtasks) section)
 
@@ -655,7 +656,7 @@ graph TB
 - **Key Patterns**: Parser combinators, syntax tree construction, AST caching with FIFO eviction
 - **Interface**: Query parsing, AST generation, property filter parsing, `clearCache()` for AST cache invalidation
 - **AST Cache**: `astCache: Map<string, SearchNode>` capped at 50 entries (`AST_CACHE_MAX_SIZE`) with strict FIFO eviction on insertion (`astCache.keys().next().value → delete`) when the size cap is reached. Repeat calls for the same query string return the identical AST instance — the AST is immutable post-parse (SearchEvaluator never mutates it), so sharing is safe. Invalid queries are not cached: the parser throws `SearchError` before reaching the cache-write branch, so invalid-query evaluation still re-parses on each call.
-- **Validation contract**: closed-domain values are rejected at parse time — `priority:` accepts only high/med/medium/low/none (aliases a/b/c) and date prefixes reject date-shaped calendar-invalid values (`2026-02-30`), including range bounds and `<`/`<=`/`>`/`>=` forms; open-domain values (path, file, tag, content, state, non-date words) stay accepted. Operator tokens are uppercase-only (`OR`/`AND`); lowercase `or`/`and` are ordinary search words. Errors are `SearchError`s surfaced to users via `Search.getError()`.
+- **Validation contract**: closed-domain values are rejected at parse time — `priority:` accepts only high/med/medium/low/none (aliases a/b/c) and date prefixes reject date-shaped calendar-invalid values (`2026-02-30`), including range bounds and `<`/`<=`/`>`/`>=` forms; open-domain values (path, file, tag, content, description, heading, state, non-date words) stay accepted. Operator tokens are uppercase-only (`OR`/`AND`); lowercase `or`/`and` are ordinary search words. Errors are `SearchError`s surfaced to users via `Search.getError()`.
 
 **SearchEvaluator** (`src/search/search-evaluator.ts`)
 

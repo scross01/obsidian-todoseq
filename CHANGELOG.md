@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added `description:` and `heading:` search prefixes: `description:call` finds tasks whose DESCRIPTION: line mentions "call", and `heading:Setup` finds tasks under a note heading containing "Setup". Both combine with the existing filters (e.g. `heading:Setup state:active`) and work in embedded task lists too.
 - Speeded up live search filtering: matching now runs in one pass over the task list instead of starting a separate evaluation for every task, which cuts the wait after each keystroke noticeably on large vaults and slower machines.
 - Speeded up Task List refreshes: task classification no longer recomputes the same today/upcoming boundary for every task and avoids extra date-object churn, so view-mode switches and search re-renders finish sooner on large vaults.
 - Made task list updates smoother when changing view modes: rows that are unchanged now stay exactly where they are in the DOM instead of the whole list being rebuilt behind the scenes, so the panel re-layouts only what actually moved.

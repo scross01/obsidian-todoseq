@@ -402,6 +402,10 @@ export class SearchEvaluator {
         return this.evaluatePriorityFilter(value, task, caseSensitive);
       case 'content':
         return this.evaluateContentFilter(value, task, caseSensitive);
+      case 'description':
+        return this.evaluateDescriptionFilter(value, task, caseSensitive);
+      case 'heading':
+        return this.evaluateHeadingFilter(value, task, caseSensitive);
       case 'scheduled':
         return this.evaluateScheduledFilter(
           value,
@@ -587,6 +591,38 @@ export class SearchEvaluator {
     const targetText = caseSensitive ? task.text : task.text.toLowerCase();
 
     return targetText.includes(searchText);
+  }
+
+  /** `description:` — substring of the task's DESCRIPTION: line; tasks without one never match. */
+  private static evaluateDescriptionFilter(
+    value: string,
+    task: Task,
+    caseSensitive: boolean,
+  ): boolean {
+    if (!task.description) return false;
+
+    const searchText = caseSensitive ? value : value.toLowerCase();
+    const target = caseSensitive
+      ? task.description
+      : task.description.toLowerCase();
+
+    return target.includes(searchText);
+  }
+
+  /** `heading:` — substring of the nearest enclosing markdown heading; absent → no match. */
+  private static evaluateHeadingFilter(
+    value: string,
+    task: Task,
+    caseSensitive: boolean,
+  ): boolean {
+    if (!task.parentHeading) return false;
+
+    const searchText = caseSensitive ? value : value.toLowerCase();
+    const target = caseSensitive
+      ? task.parentHeading
+      : task.parentHeading.toLowerCase();
+
+    return target.includes(searchText);
   }
 
   private static getSearchableFields(task: Task): string[] {

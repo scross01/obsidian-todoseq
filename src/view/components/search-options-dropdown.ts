@@ -102,9 +102,12 @@ export class SearchOptionsDropdown extends BaseDropdown {
       'state:',
       'priority:',
       'content:',
+      'description:',
+      'heading:',
       'scheduled:',
       'deadline:',
       'closed:',
+      'started:',
       '[]',
     ];
 

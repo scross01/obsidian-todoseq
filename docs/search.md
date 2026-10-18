@@ -119,19 +119,21 @@ Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unkn
 
 ### Available Prefix Filters
 
-| Prefix       | Description                               | Example                   |
-| ------------ | ----------------------------------------- | ------------------------- |
-| `path:`      | Find tasks in specific file paths         | `path:Journal`            |
-| `file:`      | Find tasks in files with matching names   | `file:meeting.md`         |
-| `tag:`       | Find tasks containing specific tags       | `tag:urgent`              |
-| `state:`     | Find tasks with specific states or groups | `state:active`            |
-| `priority:`  | Find tasks with specific priorities       | `priority:high`           |
-| `content:`   | Find tasks with specific content          | `content:project`         |
-| `scheduled:` | Find tasks with scheduled dates           | `scheduled:due`           |
-| `deadline:`  | Find tasks with deadline dates            | `deadline:"this week"`    |
-| `closed:`    | Find tasks by closed date                 | `closed:yesterday`        |
-| `started:`   | Find tasks by start date                  | `started:today`           |
-| `property:`  | Find tasks based on page properties       | `property:[type:Project]` |
+| Prefix         | Description                               | Example                     |
+| -------------- | ----------------------------------------- | --------------------------- |
+| `path:`        | Find tasks in specific file paths         | `path:Journal`              |
+| `file:`        | Find tasks in files with matching names   | `file:meeting.md`           |
+| `tag:`         | Find tasks containing specific tags       | `tag:urgent`                |
+| `state:`       | Find tasks with specific states or groups | `state:active`              |
+| `priority:`    | Find tasks with specific priorities       | `priority:high`             |
+| `content:`     | Find tasks with specific content          | `content:project`           |
+| `description:` | Find tasks by their DESCRIPTION: line     | `description:meeting notes` |
+| `heading:`     | Find tasks under a matching heading       | `heading:Setup`             |
+| `scheduled:`   | Find tasks with scheduled dates           | `scheduled:due`             |
+| `deadline:`    | Find tasks with deadline dates            | `deadline:"this week"`      |
+| `closed:`      | Find tasks by closed date                 | `closed:yesterday`          |
+| `started:`     | Find tasks by start date                  | `started:today`             |
+| `property:`    | Find tasks based on page properties       | `property:[type:Project]`   |
 
 ### Using Search Filters
 
@@ -154,6 +156,16 @@ state:TODO priority:high
 ```
 
 Find high priority tasks that are in TODO state.
+
+```txt
+description:bank heading:finance
+```
+
+Find tasks whose `DESCRIPTION:` line mentions "bank" that live under a
+heading containing "finance". `description:` never matches tasks without a
+`DESCRIPTION:` line. `heading:` matches the nearest heading above the task
+(text after the `#`s), so `heading:Setup` finds everything under any
+`## Setup`-style section; tasks before the first heading never match.
 
 The `state:` filter and state autocomplete suggestions follow the effective keyword configuration from settings. This includes custom keywords and advanced built-in overrides. Archived keywords are excluded from state search suggestions because archived tasks are not collected into the task index.
 
