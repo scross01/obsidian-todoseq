@@ -82,22 +82,26 @@ export class ChunkedRenderQueue {
     return this.pending.length === 0 && !this.isProcessing;
   }
 
-  async renderToFragment(
+  /**
+   * Render tasks to an ordered element array — production callers reconcile
+   * rows in place (dom-reconcile.ts) instead of appending a fragment, which
+   * forces every row to re-parent and re-layout.
+   */
+  async renderToElements(
     tasks: Task[],
     renderFn: (task: Task) => HTMLLIElement,
     yieldDuringRender = true,
-  ): Promise<DocumentFragment> {
-    const fragment = createFragment();
+  ): Promise<HTMLLIElement[]> {
+    const elements: HTMLLIElement[] = [];
 
     for (let i = 0; i < tasks.length; i++) {
-      const element = renderFn(tasks[i]);
-      fragment.appendChild(element);
+      elements.push(renderFn(tasks[i]));
 
       if (yieldDuringRender && i > 0 && i % YIELD_EVERY_N_TASKS === 0) {
         await new Promise((resolve) => window.setTimeout(resolve, 0));
       }
     }
 
-    return fragment;
+    return elements;
   }
 }
