@@ -7,6 +7,84 @@ import { RegexCache } from './regex-cache';
 export class DateUtils {
   /** Cached regexes for date-value parsing (hot path: search evaluation). */
   private static dateValueRegexCache = new RegexCache();
+
+  /**
+   * Whole-string memos for the render hot path (formatDateForDisplay /
+   * formatDateTooltip run per date field per task row on every refresh).
+   * Keys are derived entirely from the inputs — the date's epoch and the
+   * local calendar day (the only ways `now` affects the output; epochs
+   * determine their normalized form, see normalizeDateForTimezone) — and
+   * are checked **before** any normalization, so a hit costs one Date
+   * construction + a Map get instead of the full timezone-normalization
+   * pass. Midnight rollover changes the day stamp, producing fresh labels;
+   * entries for a previous day are dropped rather than accumulated.
+   * Bounded by the distinct timestamps the vault actually contains.
+   * `d|` / `t|` prefixes keep the two functions' key spaces separate.
+   */
+  private static dateLabelMemo = new Map<string, string>();
+
+  /** The local calendar day (as YYYYMMDD) a memo entry was built for. */
+  private static memoDayStamp = 0;
+
+  /** Local YYYYMMDD stamp for "today" — one Date + three getters. */
+  private static todayStamp(): number {
+    const now = new Date();
+    return (
+      now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate()
+    );
+  }
+
+  /**
+   * Memo lookup: returns a hit, or null on miss. On a day change (midnight
+   * rollover or the test clock jumping days) the previous day's entries
+   * are dropped so stale relative labels can never be served and the memo
+   * never grows beyond one day's distinct timestamps.
+   */
+  private static getMemo(keyDayStamp: number, key: string): string | null {
+    if (keyDayStamp !== this.memoDayStamp) {
+      this.dateLabelMemo.clear();
+      this.memoDayStamp = keyDayStamp;
+    }
+    return this.dateLabelMemo.get(key) ?? null;
+  }
+
+  /**
+   * Absolute label memo (e.g. "Oct 15, 2025") keyed by calendar date —
+   * the toLocaleDateString options are fixed literals, so a label for a
+   * given date never changes within a session (locale changes restart the
+   * process; see clearFormatMemos for tests/hooks).
+   */
+  private static absoluteDateMemo = new Map<string, string>();
+
+  /** Clear the format memos (tests; language-change hooks if ever needed). */
+  static clearFormatMemos(): void {
+    this.dateLabelMemo.clear();
+    this.absoluteDateMemo.clear();
+    this.memoDayStamp = 0;
+  }
+
+  /** Shared absolute-label formatting (fixed options, memoized). */
+  private static absoluteLabel(d: Date): string {
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const hit = this.absoluteDateMemo.get(key);
+    if (hit !== undefined) return hit;
+    const label = d.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    this.absoluteDateMemo.set(key, label);
+    return label;
+  }
+
+  /** diffDays between a normalized date's calendar day and today's. */
+  private static diffDaysFor(normalizedDate: Date): number {
+    const today = this.getDateOnly(new Date());
+    const taskDate = this.getDateOnly(normalizedDate);
+    return Math.ceil(
+      (taskDate.getTime() - today.getTime()) / DateUtils.MILLISECONDS_PER_DAY,
+    );
+  }
   /**
    * Format a date for display with relative time indicators
    * @param date The date to format
@@ -16,16 +94,29 @@ export class DateUtils {
   static formatDateForDisplay(date: Date | null, includeTime = false): string {
     if (!date) return '';
 
+    // Cheap input-derived key, checked before any normalization work.
+    const dayStamp = this.todayStamp();
+    const memoKey = `d|${date.getTime()}|${dayStamp}|${includeTime ? 1 : 0}`;
+    const memoized = this.getMemo(dayStamp, memoKey);
+    if (memoized !== null) return memoized;
+
     // Ensure date is timezone independent - zero out time if no time component
     const normalizedDate = this.normalizeDateForTimezone(date);
+    const diffDays = this.diffDaysFor(normalizedDate);
+    const result = this.computeDateForDisplay(date, diffDays, includeTime);
+    this.dateLabelMemo.set(memoKey, result);
+    return result;
+  }
 
-    const now = new Date();
-    const today = this.getDateOnly(now);
-    const taskDate = this.getDateOnly(normalizedDate);
-
-    const diffTime = taskDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
-
+  /**
+   * Formatting body moved verbatim from formatDateForDisplay — byte
+   * identity is pinned by the golden matrix in tests/date-utils.test.ts.
+   */
+  private static computeDateForDisplay(
+    date: Date,
+    diffDays: number,
+    includeTime: boolean,
+  ): string {
     const formatTime = (d: Date) => {
       // Format time showing hours and minutes (no leading zero for hour).
       // Keep locale behavior (12/24h) but normalize AM/PM to lowercase when present.
@@ -36,14 +127,7 @@ export class DateUtils {
       return time.replace(/AM|PM/i, (m) => m.toLowerCase());
     };
 
-    const formatFullDate = (d: Date) => {
-      // Use locale-aware formatting so month/day/year order and separators follow the user's locale
-      return d.toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
-    };
+    const formatFullDate = (d: Date) => this.absoluteLabel(d);
 
     if (diffDays === 0) {
       return includeTime && (date.getHours() !== 0 || date.getMinutes() !== 0)
@@ -77,8 +161,33 @@ export class DateUtils {
    */
   static formatDateTooltip(date: Date | null, includeTime = false): string {
     if (!date) return '';
-    const normalizedDate = this.normalizeDateForTimezone(date);
+    // Cheap input-derived key, checked before any normalization work.
+    const dayStamp = this.todayStamp();
+    const memoKey = `t|${date.getTime()}|${dayStamp}|${includeTime ? 1 : 0}`;
+    const memoized = this.getMemo(dayStamp, memoKey);
+    if (memoized !== null) return memoized;
 
+    const normalizedDate = this.normalizeDateForTimezone(date);
+    const diffDays = this.diffDaysFor(normalizedDate);
+    const result = this.computeDateTooltip(
+      normalizedDate,
+      diffDays,
+      includeTime,
+    );
+    this.dateLabelMemo.set(memoKey, result);
+    return result;
+  }
+
+  /**
+   * Tooltip body moved verbatim from formatDateTooltip — byte identity is
+   * pinned by the golden matrix in tests/date-utils.test.ts. The
+   * absoluteDate line now goes through the shared absolute-label memo.
+   */
+  private static computeDateTooltip(
+    normalizedDate: Date,
+    diffDays: number,
+    includeTime: boolean,
+  ): string {
     const formatTime = (d: Date) => {
       const time = d.toLocaleTimeString(undefined, {
         hour: 'numeric',
@@ -90,20 +199,10 @@ export class DateUtils {
     const hasTime =
       includeTime &&
       (normalizedDate.getHours() !== 0 || normalizedDate.getMinutes() !== 0);
-    const absoluteDate = normalizedDate.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    const absoluteDate = this.absoluteLabel(normalizedDate);
     const absoluteWithTime = hasTime
       ? `${absoluteDate} ${formatTime(normalizedDate)}`
       : absoluteDate;
-
-    const now = new Date();
-    const today = this.getDateOnly(now);
-    const taskDate = this.getDateOnly(normalizedDate);
-    const diffTime = taskDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
 
     if (diffDays === 0) {
       return hasTime

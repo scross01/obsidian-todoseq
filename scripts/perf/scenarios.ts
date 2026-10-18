@@ -22,6 +22,7 @@ import { SearchEvaluator } from '../../src/search/search-evaluator';
 import { DashboardAggregator } from '../../src/view/embedded-dashboard/aggregation';
 import { NaturalDateParser } from '../../src/parser/natural-date-parser';
 import { RegexCache } from '../../src/utils/regex-cache';
+import { DateUtils } from '../../src/utils/date-utils';
 
 /** Parse every fixture file through the parser that owns its format. */
 const parseFile: BenchScenario = {
@@ -158,6 +159,33 @@ const NATURAL_DATE_CORPUS = [
   'december 25',
 ];
 
+/**
+ * Date label formatting over mixed spans — the render hot path the CPU
+ * profile showed dominated by Intl (toLocale* per row per refresh).
+ * Repeats mirror real renders: the same task dates are formatted again
+ * on every refresh, which is exactly what a warm memo absorbs.
+ */
+const dateFormat: BenchScenario = {
+  name: 'date-format (6k formats, mixed spans)',
+  runOnce(ctx: BenchContext): void {
+    const offsets = [0, 1, 2, 3, 7, 9, 30, -1, -5, -40];
+    const dates: Date[] = [];
+    for (const offset of offsets) {
+      const d = new Date(ctx.today);
+      d.setDate(d.getDate() + offset);
+      dates.push(d);
+      dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 30));
+    }
+    for (let i = 0; i < 100; i++) {
+      for (const d of dates) {
+        DateUtils.formatDateForDisplay(d, true);
+        DateUtils.formatDateTooltip(d, true);
+        DateUtils.formatDateForDisplay(d, false);
+      }
+    }
+  },
+};
+
 const naturalDate: BenchScenario = {
   name: 'natural-date (per-keystroke corpus ×25)',
   runOnce(ctx: BenchContext): void {
@@ -214,6 +242,7 @@ export const SCENARIOS: BenchScenario[] = [
   search,
   dashboardAggregate,
   naturalDate,
+  dateFormat,
   regexCached,
   regexCold,
 ];

@@ -28,14 +28,15 @@ PERF_ITERATIONS=30 npm run perf:node   # more samples
 
 Scenarios (`scripts/perf/scenarios.ts`):
 
-| scenario                     | what it drives                                                                                     |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `parse-file`                 | full-vault parse through TaskParser / OrgModeTaskParser / CodeCommentTaskParser                    |
-| `classify-sort`              | `sortTasksWithThreeBlockSystem` for all 3 view modes × 4 future settings (every Task List refresh) |
-| `search`                     | tokenize + parse + evaluate 6 realistic queries over the full task set (per-keystroke path)        |
-| `dashboard-aggregate`        | `DashboardAggregator.aggregate` for all 6 group-by dimensions                                      |
-| `natural-date`               | `NaturalDateParser.parse` over a keystroke-sized corpus (smart-date path)                          |
-| `regex-cache` / `regex-cold` | warm cache gets vs fresh compiles — the value RegexCache provides                                  |
+| scenario                     | what it drives                                                                                           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `parse-file`                 | full-vault parse through TaskParser / OrgModeTaskParser / CodeCommentTaskParser                          |
+| `classify-sort`              | `sortTasksWithThreeBlockSystem` for all 3 view modes × 4 future settings (every Task List refresh)       |
+| `search`                     | tokenize + parse + evaluate 6 realistic queries over the full task set (per-keystroke path)              |
+| `dashboard-aggregate`        | `DashboardAggregator.aggregate` for all 6 group-by dimensions                                            |
+| `natural-date`               | `NaturalDateParser.parse` over a keystroke-sized corpus (smart-date path)                                |
+| `date-format`                | 6k `formatDateForDisplay`/`formatDateTooltip` calls over mixed relative/absolute spans (render hot path) |
+| `regex-cache` / `regex-cold` | warm cache gets vs fresh compiles — the value RegexCache provides                                        |
 
 Artifact: `output/perf/node-<size>.json` (local-only, untracked) with the
 git SHA, node version, platform, and every scenario's numbers.

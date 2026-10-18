@@ -750,3 +750,202 @@ describe('warningPeriodToDays', () => {
     );
   });
 });
+
+// Format memoization contract: byte-identity vs the pre-change recording,
+// Intl-sparing warm path, and midnight rollover (render hot path).
+describe('DateUtils format memoization contract', () => {
+  const originalToLocaleDateString = Date.prototype.toLocaleDateString;
+  const originalToLocaleTimeString = Date.prototype.toLocaleTimeString;
+
+  beforeAll(() => {
+    Date.prototype.toLocaleDateString = function (
+      this: Date,
+      locales?: string | string[],
+      options?: Intl.DateTimeFormatOptions,
+    ): string {
+      return originalToLocaleDateString.call(this, 'en-US', options);
+    };
+    Date.prototype.toLocaleTimeString = function (
+      this: Date,
+      locales?: string | string[],
+      options?: Intl.DateTimeFormatOptions,
+    ): string {
+      return originalToLocaleTimeString.call(this, 'en-US', options);
+    };
+  });
+  afterAll(() => {
+    Date.prototype.toLocaleDateString = originalToLocaleDateString;
+    Date.prototype.toLocaleTimeString = originalToLocaleTimeString;
+  });
+
+  /**
+   * Recorded from the UNMODIFIED implementation (frozen clock 2025-10-15
+   * 12:00 local, pinned en-US locale, local-calendar inputs only): the
+   * memoized build must reproduce every string byte-for-byte, cold and
+   * warm. Any expected-value edit after the optimization lands is a STOP.
+   */
+  const GOLDEN: Record<string, string> = {
+    'display|today|false': 'Today',
+    'tooltip|today|false': 'Today (Oct 15, 2025)',
+    'display|today|true': 'Today',
+    'tooltip|today|true': 'Today (Oct 15, 2025)',
+    'display|today-930|false': 'Today',
+    'tooltip|today-930|false': 'Today (Oct 15, 2025)',
+    'display|today-930|true': 'Today 9:30 am',
+    'tooltip|today-930|true': 'Today 9:30 am (Oct 15, 2025)',
+    'display|today-1405|false': 'Today',
+    'tooltip|today-1405|false': 'Today (Oct 15, 2025)',
+    'display|today-1405|true': 'Today 2:05 pm',
+    'tooltip|today-1405|true': 'Today 2:05 pm (Oct 15, 2025)',
+    'display|today-0000|false': 'Today',
+    'tooltip|today-0000|false': 'Today (Oct 15, 2025)',
+    'display|today-0000|true': 'Today',
+    'tooltip|today-0000|true': 'Today (Oct 15, 2025)',
+    'display|tomorrow|false': 'Tomorrow',
+    'tooltip|tomorrow|false': 'Tomorrow (Oct 16, 2025)',
+    'display|tomorrow|true': 'Tomorrow',
+    'tooltip|tomorrow|true': 'Tomorrow (Oct 16, 2025)',
+    'display|tomorrow-930|false': 'Tomorrow',
+    'tooltip|tomorrow-930|false': 'Tomorrow (Oct 16, 2025)',
+    'display|tomorrow-930|true': 'Tomorrow 9:30 am',
+    'tooltip|tomorrow-930|true': 'Tomorrow 9:30 am (Oct 16, 2025)',
+    'display|yesterday|false': 'Yesterday',
+    'tooltip|yesterday|false': 'Yesterday (Oct 14, 2025)',
+    'display|yesterday|true': 'Yesterday',
+    'tooltip|yesterday|true': 'Yesterday (Oct 14, 2025)',
+    'display|plus3|false': '3 days from now',
+    'tooltip|plus3|false': '3 days from now (Oct 18, 2025)',
+    'display|plus3|true': '3 days from now',
+    'tooltip|plus3|true': '3 days from now (Oct 18, 2025)',
+    'display|plus7-2359|false': '7 days from now',
+    'tooltip|plus7-2359|false': '7 days from now (Oct 22, 2025)',
+    'display|plus7-2359|true': '7 days from now',
+    'tooltip|plus7-2359|true': '7 days from now 11:59 pm (Oct 22, 2025)',
+    'display|plus9|false': 'Oct 24, 2025',
+    'tooltip|plus9|false': 'Oct 24, 2025',
+    'display|plus9|true': 'Oct 24, 2025',
+    'tooltip|plus9|true': 'Oct 24, 2025',
+    'display|minus2|false': '2 days ago',
+    'tooltip|minus2|false': '2 days ago (Oct 13, 2025)',
+    'display|minus2|true': '2 days ago',
+    'tooltip|minus2|true': '2 days ago (Oct 13, 2025)',
+    'display|minus9|false': '9 days ago',
+    'tooltip|minus9|false': '9 days ago (Oct 6, 2025)',
+    'display|minus9|true': '9 days ago',
+    'tooltip|minus9|true': '9 days ago (Oct 6, 2025)',
+    'display|plus30-930|false': 'Nov 14, 2025',
+    'tooltip|plus30-930|false': 'Nov 14, 2025',
+    'display|plus30-930|true': 'Nov 14, 2025 9:30 am',
+    'tooltip|plus30-930|true': 'Nov 14, 2025 9:30 am',
+    'display|minus30|false': '30 days ago',
+    'tooltip|minus30|false': '30 days ago (Sep 15, 2025)',
+    'display|minus30|true': '30 days ago',
+    'tooltip|minus30|true': '30 days ago (Sep 15, 2025)',
+    'display|nye-2025-2359|false': 'Dec 31, 2025',
+    'tooltip|nye-2025-2359|false': 'Dec 31, 2025',
+    'display|nye-2025-2359|true': 'Dec 31, 2025 11:59 pm',
+    'tooltip|nye-2025-2359|true': 'Dec 31, 2025 11:59 pm',
+    'display|nyd-2026|false': 'Jan 1, 2026',
+    'tooltip|nyd-2026|false': 'Jan 1, 2026',
+    'display|nyd-2026|true': 'Jan 1, 2026',
+    'tooltip|nyd-2026|true': 'Jan 1, 2026',
+  };
+
+  const inputs: Array<[string, Date]> = [
+    ['today', DateUtils.createDate(2025, 9, 15)],
+    ['today-930', DateUtils.createDate(2025, 9, 15, 9, 30)],
+    ['today-1405', DateUtils.createDate(2025, 9, 15, 14, 5)],
+    ['today-0000', DateUtils.createDate(2025, 9, 15, 0, 0)],
+    ['tomorrow', DateUtils.createDate(2025, 9, 16)],
+    ['tomorrow-930', DateUtils.createDate(2025, 9, 16, 9, 30)],
+    ['yesterday', DateUtils.createDate(2025, 9, 14)],
+    ['plus3', DateUtils.createDate(2025, 9, 18)],
+    ['plus7-2359', DateUtils.createDate(2025, 9, 22, 23, 59)],
+    ['plus9', DateUtils.createDate(2025, 9, 24)],
+    ['minus2', DateUtils.createDate(2025, 9, 13)],
+    ['minus9', DateUtils.createDate(2025, 9, 6)],
+    ['plus30-930', DateUtils.createDate(2025, 10, 14, 9, 30)],
+    ['minus30', DateUtils.createDate(2025, 8, 15)],
+    ['nye-2025-2359', DateUtils.createDate(2025, 11, 31, 23, 59)],
+    ['nyd-2026', DateUtils.createDate(2026, 0, 1)],
+  ];
+
+  const clearMemos = (): void => {
+    const clear = (DateUtils as unknown as { clearFormatMemos?: () => void })
+      .clearFormatMemos;
+    if (clear) clear.call(DateUtils);
+  };
+
+  beforeEach(() => {
+    jest
+      .useFakeTimers()
+      .setSystemTime(DateUtils.createDate(2025, 9, 15, 12, 0, 0));
+    clearMemos();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('matches the pre-change recording byte-for-byte, cold and warm', () => {
+    for (const [label, date] of inputs) {
+      for (const includeTime of [false, true]) {
+        const displayKey = `display|${label}|${includeTime}`;
+        const tooltipKey = `tooltip|${label}|${includeTime}`;
+        expect(DateUtils.formatDateForDisplay(date, includeTime)).toBe(
+          GOLDEN[displayKey],
+        );
+        expect(DateUtils.formatDateForDisplay(date, includeTime)).toBe(
+          GOLDEN[displayKey],
+        );
+        expect(DateUtils.formatDateTooltip(date, includeTime)).toBe(
+          GOLDEN[tooltipKey],
+        );
+        expect(DateUtils.formatDateTooltip(date, includeTime)).toBe(
+          GOLDEN[tooltipKey],
+        );
+      }
+    }
+  });
+
+  it('second identical call performs zero toLocale* hits (warm memo)', () => {
+    const dateSpy = jest.spyOn(Date.prototype, 'toLocaleDateString');
+    const timeSpy = jest.spyOn(Date.prototype, 'toLocaleTimeString');
+    const date = DateUtils.createDate(2025, 9, 15, 9, 30);
+
+    DateUtils.formatDateForDisplay(date, true);
+    DateUtils.formatDateTooltip(date, true);
+    expect(
+      dateSpy.mock.calls.length + timeSpy.mock.calls.length,
+    ).toBeGreaterThan(0);
+
+    dateSpy.mockClear();
+    timeSpy.mockClear();
+    DateUtils.formatDateForDisplay(date, true);
+    DateUtils.formatDateTooltip(date, true);
+    expect(dateSpy).not.toHaveBeenCalled();
+    expect(timeSpy).not.toHaveBeenCalled();
+
+    // A different key still computes — the memo is per-input, not sticky.
+    const other = DateUtils.createDate(2025, 9, 16, 9, 30);
+    DateUtils.formatDateForDisplay(other, true);
+    expect(
+      dateSpy.mock.calls.length + timeSpy.mock.calls.length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('midnight rollover serves fresh labels (no stale Today)', () => {
+    const yesterday = DateUtils.createDate(2025, 9, 15);
+    const today = DateUtils.createDate(2025, 9, 16);
+    expect(DateUtils.formatDateForDisplay(yesterday, false)).toBe('Today');
+    expect(DateUtils.formatDateForDisplay(today, false)).toBe('Tomorrow');
+
+    jest.setSystemTime(DateUtils.createDate(2025, 9, 16, 0, 1, 0));
+
+    expect(DateUtils.formatDateForDisplay(yesterday, false)).toBe('Yesterday');
+    expect(DateUtils.formatDateForDisplay(today, false)).toBe('Today');
+    expect(DateUtils.formatDateTooltip(yesterday, false)).toBe(
+      'Yesterday (Oct 15, 2025)',
+    );
+  });
+});
