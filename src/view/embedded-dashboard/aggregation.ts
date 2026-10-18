@@ -356,21 +356,15 @@ export class DashboardAggregator {
     if (!searchQuery.trim()) {
       return tasks;
     }
-    const results = await Promise.all(
-      tasks.map(async (task) => {
-        const matches = await Search.evaluate(
-          searchQuery,
-          task,
-          false,
-          this.settings,
-          this.propertySearchEngine ?? undefined,
-        );
-        return { task, matches };
-      }),
+    // Bulk single-pass filter (parity with the per-row Search.evaluate
+    // deployment it replaces — see tests/search-bulk.test.ts).
+    return Search.filterTasks(
+      tasks,
+      searchQuery,
+      false,
+      this.settings,
+      this.propertySearchEngine ?? undefined,
     );
-    return results
-      .filter((result) => result.matches)
-      .map((result) => result.task);
   }
 
   /** Dispatch to the resolver for the group-by attribute. */

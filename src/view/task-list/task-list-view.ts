@@ -1941,24 +1941,16 @@ export class TaskListView extends ItemView {
     const q = this.getSearchQuery().trim();
     if (q.length > 0) {
       try {
-        // Use new advanced search functionality
-        const searchResults = await Promise.all(
-          visible.map(async (t) => {
-            const matches = await Search.evaluate(
-              q,
-              t,
-              this.isCaseSensitive,
-              this.plugin.settings,
-              this.plugin.propertySearchEngine ?? undefined,
-            );
-            return { task: t, matches };
-          }),
+        // Replace the per-row Promise.all fan-out with the single-pass bulk
+        // filter: property engines re-solve once per unique filter, then the
+        // whole tree evaluates synchronously over the task set.
+        visible = await Search.filterTasks(
+          visible,
+          q,
+          this.isCaseSensitive,
+          this.plugin.settings,
+          this.plugin.propertySearchEngine ?? undefined,
         );
-
-        // Filter based on the results
-        visible = searchResults
-          .filter((result) => result.matches)
-          .map((result) => result.task);
         this.searchError = null;
       } catch {
         // If there's an error in parsing, fall back to simple search

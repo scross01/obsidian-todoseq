@@ -33,6 +33,7 @@ Scenarios (`scripts/perf/scenarios.ts`):
 | `parse-file`                 | full-vault parse through TaskParser / OrgModeTaskParser / CodeCommentTaskParser                          |
 | `classify-sort`              | `sortTasksWithThreeBlockSystem` for all 3 view modes × 4 future settings (every Task List refresh)       |
 | `search`                     | tokenize + parse + evaluate 6 realistic queries over the full task set (per-keystroke path)              |
+| `search-bulk`                | same 6 queries through the bulk `Search.filterTasks` facade — the Task List/embedded per-keystroke call  |
 | `dashboard-aggregate`        | `DashboardAggregator.aggregate` for all 6 group-by dimensions                                            |
 | `natural-date`               | `NaturalDateParser.parse` over a keystroke-sized corpus (smart-date path)                                |
 | `date-format`                | 6k `formatDateForDisplay`/`formatDateTooltip` calls over mixed relative/absolute spans (render hot path) |

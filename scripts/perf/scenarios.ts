@@ -21,6 +21,7 @@ import {
 import { SearchTokenizer } from '../../src/search/search-tokenizer';
 import { SearchParser } from '../../src/search/search-parser';
 import { SearchEvaluator } from '../../src/search/search-evaluator';
+import { Search } from '../../src/search/search';
 import { DashboardAggregator } from '../../src/view/embedded-dashboard/aggregation';
 import { NaturalDateParser } from '../../src/parser/natural-date-parser';
 import { RegexCache } from '../../src/utils/regex-cache';
@@ -223,6 +224,31 @@ const search: BenchScenario = {
 };
 
 /**
+ * Same query set through the Search facade's bulk filter — the exact call
+ * the Task List, embedded dashboards, and embedded task lists make per
+ * keystroke. Compare against `search` above: the facade replaces the
+ * per-row Promise fan-out with one synchronous pass. Property-engine
+ * resolutions (n/a in the bench's query set) are hoisted to the batch.
+ */
+const searchBulk: BenchScenario = {
+  name: 'search-bulk (6 queries × full task set, bulk facade)',
+  async runOnce(ctx: BenchContext): Promise<void> {
+    for (const query of SEARCH_QUERIES) {
+      const kept = await Search.filterTasks(
+        ctx.tasks,
+        query,
+        false,
+        ctx.settings,
+      );
+      // Keep the result alive so the filter cost stays in the measurement.
+      if (kept.length < 0) {
+        throw new Error(`unreachable for query: ${query}`);
+      }
+    }
+  },
+};
+
+/**
  * Dashboard aggregation across every group-by dimension over the full
  * task set.
  */
@@ -345,6 +371,7 @@ export const SCENARIOS: BenchScenario[] = [
   classifySortShared,
   classifyRefreshPair,
   search,
+  searchBulk,
   dashboardAggregate,
   naturalDate,
   dateFormat,
