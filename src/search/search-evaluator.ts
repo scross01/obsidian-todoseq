@@ -628,8 +628,13 @@ export class SearchEvaluator {
   private static getSearchableFields(task: Task): string[] {
     const fields: string[] = [];
 
+    // `rawText` is the full original line. `text` is that same line with the
+    // keyword, priority token and footnote/embed references stripped, so it is
+    // always a contiguous substring of `rawText` and can never match a term or
+    // phrase that `rawText` does not already match. Indexing both would only
+    // add a redundant scan for no extra matches, so just `rawText` is indexed
+    // (the no-lost-match invariant is pinned by tests/search-evaluator.test.ts).
     if (task.rawText) fields.push(task.rawText);
-    if (task.text) fields.push(task.text);
     // DESCRIPTION text joins the default (no-prefix) search: an unprefixed
     // term matches the task line OR its description. Kept out of
     // `parentHeading`-based matching, which stays scoped via heading:.

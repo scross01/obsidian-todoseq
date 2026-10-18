@@ -1296,6 +1296,44 @@ describe('SearchEvaluator - Comprehensive', () => {
       expect(result).toBe(true);
     });
 
+    it('should lose no matches when task text is folded into rawText', async () => {
+      // `text` is `rawText` with the keyword/priority/references stripped, so
+      // it is a contiguous substring of `rawText`: anything `text` matches,
+      // `rawText` already matches. Only `rawText` is indexed, so this pins that
+      // folding `text` away loses no match — it goes red if stripping ever made
+      // `text` hold something `rawText` does not.
+      const task = createBaseTask({
+        rawText: '- [#A] TODO ship the release now ^abc123',
+        text: 'ship the release now',
+        path: 'notes/test.md',
+      });
+      // Matches because it lives in the task text, which is inside rawText.
+      expect(
+        await SearchEvaluator.evaluate(
+          { type: 'term', value: 'ship the release' },
+          task,
+          false,
+        ),
+      ).toBe(true);
+      // A phrase straddling the stripped priority token: rawText-only content.
+      expect(
+        await SearchEvaluator.evaluate(
+          { type: 'phrase', value: 'ship the' },
+          task,
+          false,
+        ),
+      ).toBe(true);
+      // The stripped marker chars stay searchable via rawText, so nothing that
+      // was findable before has become unfindable.
+      expect(
+        await SearchEvaluator.evaluate(
+          { type: 'term', value: '#A' },
+          task,
+          false,
+        ),
+      ).toBe(true);
+    });
+
     it('should include filename from path', async () => {
       const task = createBaseTask({ path: 'notes/folder/test.md' });
       const node = { type: 'term', value: 'test' };
@@ -3173,6 +3211,35 @@ describe('SearchEvaluator - Comprehensive', () => {
       const node = { type: 'term' as const, value: 'full' };
       const result = await SearchEvaluator.evaluate(node, task, false);
       expect(result).toBe(true);
+    });
+
+    it('should lose no matches when task text is folded into rawText', async () => {
+      const task = createBaseTask({
+        rawText: '- [#A] TODO ship the release now ^abc123',
+        text: 'ship the release now',
+        path: 'notes/test.md',
+      });
+      expect(
+        await SearchEvaluator.evaluate(
+          { type: 'term' as const, value: 'ship the release' },
+          task,
+          false,
+        ),
+      ).toBe(true);
+      expect(
+        await SearchEvaluator.evaluate(
+          { type: 'phrase' as const, value: 'ship the' },
+          task,
+          false,
+        ),
+      ).toBe(true);
+      expect(
+        await SearchEvaluator.evaluate(
+          { type: 'term' as const, value: '#A' },
+          task,
+          false,
+        ),
+      ).toBe(true);
     });
 
     it('should include filename from path', async () => {
