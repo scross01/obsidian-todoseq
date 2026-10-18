@@ -121,6 +121,31 @@ Related quiet guard: `tests/bundle-size.test.ts` asserts
 bundle growth surfaces in review instead of silently; it skips when no
 build artifact exists and CI builds before tests.
 
+### Settling before measurement (no fixed sleeps)
+
+The Obsidian scenarios settle on the plugin's real state instead of a
+fixed sleep, in three logged phases: after seeding the fixture vault and
+dispatching the rescan, the harness waits for the vault scanner to report
+its initial scan complete and idle (`[perf] settle: scan idle after
+…ms`), then for the **task-state count to stop changing** (`[perf]
+settle: state stable at N tasks after …ms` — Obsidian keeps registering
+freshly-seeded files after the scanner reports idle, so scanner-idle
+alone settles nothing), then for the task list to record no DOM
+mutations for 300ms (`[perf] settle: list quiet after …ms`). A fixed
+sleep cannot be right at every size: at size `l` the seed scan outlasts
+any reasonable sleep, and a partially-settled app produces impossible
+numbers (a no-op rescan hitting the scanner's in-progress guard, section
+medians measured over a half-populated vault). The settle is fail-loud —
+a scanner that never goes idle, a count that never stabilises, or a list
+that never quiets throws instead of yielding invalid measurements. The
+in-page primitives are unit-tested in `tests/perf-harness-settle.test.ts`.
+
+Related: the search-latency timer resolves on the first list mutation
+**at or after the plugin's 250ms search debounce** — a first-mutation
+wait without that floor resolves on pre-debounce DOM churn (focus-driven
+`draggable` flips on task items land ~9ms after each fill) instead of
+the debounced refresh the metric is defined as.
+
 - **Stdout table first**: median is the headline; a p95 far above the
   median means GC or event-loop noise — rerun before trusting it.
 - **Scale curve**: run size `m` and `l`. Near-linear growth is healthy;

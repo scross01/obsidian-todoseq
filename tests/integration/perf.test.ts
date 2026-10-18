@@ -29,6 +29,9 @@ import {
   writeMetrics,
   profileTargetFromEnv,
   waitForListMutation,
+  waitForScanIdle,
+  waitForListSettled,
+  waitForStateStable,
   ScenarioResult,
 } from './helpers/profile';
 import {
@@ -46,6 +49,11 @@ const SIZE = (
     : 'm'
 ) as PerfSize;
 const ITER = Number(process.env.PERF_ITERATIONS ?? 5);
+// Mirrors SEARCH_REFRESH_DEBOUNCE_MS in src/view/task-list/task-list-view.ts
+// — the search wait resolves on the DEBOUNCED refresh reaching the DOM,
+// never on pre-debounce DOM churn (focus-driven `draggable` flips on task
+// items land ~9ms after each fill and would otherwise win the wait).
+const SEARCH_DEBOUNCE_MS = 250;
 const PROFILE_TARGET = profileTargetFromEnv();
 
 const FIXTURE_DIR = path.join(TEST_VAULT_DIR, 'perf-fixture');
@@ -105,10 +113,33 @@ test.describe('performance profiling (report-only)', () => {
       const app = (window as unknown as { app: any }).app;
       await app.commands.executeCommandById('todoseq:rescan-vault');
     });
-    await page.waitForTimeout(2000); // let the scan + chunked render settle
+    // Settle on the plugin's real state, never a fixed sleep: at size `l`
+    // a 2000ms sleep races the seed scan + chunked render, so sections
+    // measured a partially-settled app (the scanner's in-progress guard
+    // makes rescan no-op; chunk mutations resolve the search wait early).
+    const scanSettle = await waitForScanIdle(page);
+    process.stdout.write(
+      `[perf] settle: scan idle after ${scanSettle.scanIdleMs.toFixed(0)}ms ` +
+        `(saw busy: ${scanSettle.sawBusy})\n`,
+    );
+    // Scanner-idle is not enough: Obsidian keeps registering freshly-seeded
+    // files after it, so the task-state count climbs across later rescans
+    // (sections would otherwise measure a half-populated vault).
+    const stateSettle = await waitForStateStable(page);
+    process.stdout.write(
+      `[perf] settle: state stable at ${stateSettle.finalCount} tasks ` +
+        `after ${stateSettle.stableMs.toFixed(0)}ms ` +
+        `(${stateSettle.changes} changes)\n`,
+    );
 
     await openTodoseqPanel(page);
     await waitForTaskListVisible(page);
+
+    const listSettle = await waitForListSettled(page);
+    process.stdout.write(
+      `[perf] settle: list quiet after ${listSettle.settledMs.toFixed(0)}ms ` +
+        `(mutations: ${listSettle.mutationsObserved})\n`,
+    );
 
     // ---- 1. Full vault rescan -------------------------------------------
     await maybeStartProfile('obsidian-rescan');
@@ -184,10 +215,10 @@ test.describe('performance profiling (report-only)', () => {
         const input = page.locator('input[aria-label="Search tasks"]');
         for (const query of ['refactor', 'archive', 'the scanner', 'TODO']) {
           await input.fill(query);
-          await waitForListMutation(page);
+          await waitForListMutation(page, SEARCH_DEBOUNCE_MS);
         }
         await input.fill('');
-        await waitForListMutation(page);
+        await waitForListMutation(page, SEARCH_DEBOUNCE_MS);
       },
       undefined,
       true, // long-task observation (per-keystroke refresh stall check)

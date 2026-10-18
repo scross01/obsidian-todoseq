@@ -194,6 +194,348 @@ export async function measureScenario(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Vault settle: wait on the plugin's real state instead of a fixed sleep.
+// At size `l` (10k tasks) a fixed 2000ms settle races the seed scan +
+// chunked render, so sections measure a partially-settled app (the scanner's
+// in-progress guard makes rescan no-op; chunk mutations resolve the search
+// wait early). The in-page primitives below are self-contained so
+// Playwright can serialize them into the page; jsdom unit-tests the real
+// logic (tests/perf-harness-settle.test.ts).
+
+export interface ScanIdleOptions {
+  /** Poll interval while waiting. */
+  pollMs: number;
+  /** Bound for "initial scan has completed at least once". */
+  startTimeoutMs: number;
+  /** Bound for "no scan currently running / initializing". */
+  idleTimeoutMs: number;
+}
+
+export interface ScanIdleResult {
+  /** Whether `isScanning()` was observed true at least once while polling. */
+  sawBusy: boolean;
+  scanIdleMs: number;
+}
+
+/**
+ * In-page: wait until the vault scanner has completed its initial scan and
+ * no scan is currently running (or Obsidian initializing). The
+ * `hasCompletedInitialScan` flag closes the "polled before the scan
+ * started" race without a start-poll. Throws on timeout or scanner-API
+ * drift — a silent resolve would re-introduce exactly the invalid numbers
+ * this exists to kill (fail loud).
+ */
+export async function scanIdlePage(
+  opts: ScanIdleOptions,
+): Promise<ScanIdleResult> {
+  const started = performance.now();
+  const w = window as unknown as {
+    app?: {
+      plugins?: {
+        plugins?: {
+          todoseq?: {
+            vaultScanner?: {
+              isScanning?: () => boolean;
+              isObsidianInitializing?: () => boolean;
+              hasCompletedInitialScan?: () => boolean;
+            };
+          };
+        };
+      };
+    };
+  };
+  const scanner = w.app?.plugins?.plugins?.todoseq?.vaultScanner;
+  if (
+    !scanner ||
+    typeof scanner.isScanning !== 'function' ||
+    typeof scanner.isObsidianInitializing !== 'function' ||
+    typeof scanner.hasCompletedInitialScan !== 'function'
+  ) {
+    throw new Error(
+      'todoseq vaultScanner settle API missing ' +
+        '(isScanning/isObsidianInitializing/hasCompletedInitialScan) — ' +
+        'reconcile the perf harness with the live scanner API',
+    );
+  }
+
+  let sawBusy = false;
+  const startDeadline = performance.now() + opts.startTimeoutMs;
+  while (!scanner.hasCompletedInitialScan()) {
+    if (scanner.isScanning()) sawBusy = true;
+    if (performance.now() > startDeadline) {
+      throw new Error(
+        `initial scan never completed within ${opts.startTimeoutMs}ms — ` +
+          'the rescan dispatch did not produce a completed scan; ' +
+          'refusing to measure a partially-settled app',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, opts.pollMs));
+  }
+
+  const idleDeadline = performance.now() + opts.idleTimeoutMs;
+  while (scanner.isScanning() || scanner.isObsidianInitializing()) {
+    if (scanner.isScanning()) sawBusy = true;
+    if (performance.now() > idleDeadline) {
+      throw new Error(
+        `vault scanner did not go idle within ${opts.idleTimeoutMs}ms ` +
+          `(scanning=${scanner.isScanning()} ` +
+          `initializing=${scanner.isObsidianInitializing()}) — ` +
+          'settle would hang the perf run',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, opts.pollMs));
+  }
+
+  return { sawBusy, scanIdleMs: performance.now() - started };
+}
+
+export interface ListQuiescentOptions {
+  /** Required quiet window with no mutations on the list subtree. */
+  quietMs: number;
+  /** Bound for the list container to exist (panel render). */
+  appearTimeoutMs: number;
+  /** Overall bound; on expiry the settle is refused, never silently passed. */
+  timeoutMs: number;
+}
+
+export interface ListQuiescentResult {
+  settledMs: number;
+  mutationsObserved: boolean;
+}
+
+/**
+ * In-page: wait for `.todoseq-task-list` to exist, then for its subtree to
+ * record no mutations for `quietMs` (chunked render / recurrence-delay
+ * updates settle in this window). Throws when the list never appears or
+ * never quiets — a background pipeline still mutating means measurements
+ * would be invalid, and a hanging harness beats a wrong number.
+ */
+export async function listQuiescentPage(
+  opts: ListQuiescentOptions,
+): Promise<ListQuiescentResult> {
+  const started = performance.now();
+  const appearDeadline = performance.now() + opts.appearTimeoutMs;
+  let target: Element | null = null;
+  while (!(target = document.querySelector('.todoseq-task-list'))) {
+    if (performance.now() > appearDeadline) {
+      throw new Error(
+        `.todoseq-task-list did not appear within ${opts.appearTimeoutMs}ms — ` +
+          'panel not open or render not started',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  return new Promise<ListQuiescentResult>((resolve, reject) => {
+    let mutationsObserved = false;
+    let quietTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function finish(): void {
+      observer.disconnect();
+      clearTimeout(overallTimer);
+      if (quietTimer) clearTimeout(quietTimer);
+      resolve({ settledMs: performance.now() - started, mutationsObserved });
+    }
+
+    const overallTimer = setTimeout(() => {
+      observer.disconnect();
+      if (quietTimer) clearTimeout(quietTimer);
+      reject(
+        new Error(
+          `task list did not go quiet for ${opts.quietMs}ms within ` +
+            `${opts.timeoutMs}ms — a background pipeline (scan/chunked ` +
+            'render) is still mutating; refusing to measure a ' +
+            'partially-settled app',
+        ),
+      );
+    }, opts.timeoutMs);
+
+    const observer = new MutationObserver(() => {
+      mutationsObserved = true;
+      if (quietTimer) clearTimeout(quietTimer);
+      quietTimer = setTimeout(finish, opts.quietMs);
+    });
+    observer.observe(target, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true,
+    });
+    quietTimer = setTimeout(finish, opts.quietMs);
+  });
+}
+
+/**
+ * Node-side: settle the page on the scanner's real state (see
+ * `scanIdlePage`). Defaults sized for the largest fixture tier.
+ */
+export async function waitForScanIdle(page: Page): Promise<ScanIdleResult> {
+  return page.evaluate(scanIdlePage, {
+    pollMs: 50,
+    startTimeoutMs: 30_000,
+    idleTimeoutMs: 120_000,
+  });
+}
+
+/** Node-side: wait for the visible task list to stop mutating. */
+export async function waitForListSettled(
+  page: Page,
+): Promise<ListQuiescentResult> {
+  return page.evaluate(listQuiescentPage, {
+    quietMs: 300,
+    appearTimeoutMs: 30_000,
+    timeoutMs: 60_000,
+  });
+}
+
+export interface StateStableOptions {
+  pollMs: number;
+  /** The count must hold still this long before the settle counts as done. */
+  stableForMs: number;
+  timeoutMs: number;
+}
+
+export interface StateStableResult {
+  finalCount: number;
+  stableMs: number;
+  /** Distinct count changes observed while waiting. */
+  changes: number;
+}
+
+/**
+ * In-page: wait until the task-state count stops changing. The scanner can
+ * report idle while Obsidian is still registering freshly-seeded files
+ * (the plugin's state then climbs across later rescans), so scanner-idle
+ * alone settles nothing — sections would measure a half-populated vault.
+ * Throws on timeout or API drift (fail loud, same contract as
+ * `scanIdlePage`).
+ */
+export async function stateStablePage(
+  opts: StateStableOptions,
+): Promise<StateStableResult> {
+  const started = performance.now();
+  const w = window as unknown as {
+    app?: {
+      plugins?: {
+        plugins?: {
+          todoseq?: {
+            vaultScanner?: {
+              getTasks?: () => unknown[];
+            };
+          };
+        };
+      };
+    };
+  };
+  const scanner = w.app?.plugins?.plugins?.todoseq?.vaultScanner;
+  if (!scanner || typeof scanner.getTasks !== 'function') {
+    throw new Error(
+      'todoseq vaultScanner.getTasks missing — reconcile the perf ' +
+        'harness with the live scanner API',
+    );
+  }
+
+  let lastCount = -1;
+  let lastChangeAt = performance.now();
+  let changes = 0;
+  for (;;) {
+    const count = scanner.getTasks().length;
+    if (count !== lastCount) {
+      if (lastCount !== -1) changes += 1;
+      lastCount = count;
+      lastChangeAt = performance.now();
+    }
+    const now = performance.now();
+    if (now - lastChangeAt >= opts.stableForMs) {
+      return { finalCount: lastCount, stableMs: now - started, changes };
+    }
+    if (now - started > opts.timeoutMs) {
+      throw new Error(
+        `task state never stabilised for ${opts.stableForMs}ms within ` +
+          `${opts.timeoutMs}ms (last count ${lastCount}) — the fixture ` +
+          'is still being registered; refusing to measure a ' +
+          'partially-settled app',
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, opts.pollMs));
+  }
+}
+
+export interface ListMutationOptions {
+  /**
+   * Ignore mutations younger than this (the search debounce floor): a
+   * first-mutation wait without a floor resolves on pre-debounce DOM
+   * churn (focus-driven `draggable` flips on task items, ~9ms after each
+   * fill) instead of the debounced refresh the metric is defined as.
+   */
+  minAgeMs: number;
+  /** Safety cap; on expiry resolve with timedOut=true (never hang a run). */
+  timeoutMs: number;
+}
+
+export interface ListMutationResult {
+  /** Mutation age in ms, or -1 for the absent-list/timeout paths. */
+  atMs: number;
+  timedOut: boolean;
+}
+
+/**
+ * In-page: resolve on the first mutation of `.todoseq-task-list` at least
+ * `minAgeMs` old (or on the safety cap). Absent list resolves timedOut
+ * immediately — same legacy shape the Node wrapper always had.
+ */
+export async function listMutationPage(
+  opts: ListMutationOptions,
+): Promise<ListMutationResult> {
+  const started = performance.now();
+  return new Promise<ListMutationResult>((resolve) => {
+    const list = document.querySelector('.todoseq-task-list');
+    if (!list) {
+      resolve({ atMs: -1, timedOut: true });
+      return;
+    }
+    let done = false;
+    const finish = (result: ListMutationResult): void => {
+      if (done) return;
+      done = true;
+      observer.disconnect();
+      clearTimeout(cap);
+      resolve(result);
+    };
+    const cap = setTimeout(
+      () => finish({ atMs: -1, timedOut: true }),
+      opts.timeoutMs,
+    );
+    const observer = new MutationObserver(() => {
+      const age = performance.now() - started;
+      if (age < opts.minAgeMs) return; // pre-floor churn — not the refresh
+      finish({ atMs: age, timedOut: false });
+    });
+    observer.observe(list, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true,
+    });
+  });
+}
+
+/**
+ * Node-side: wait for the task-state count to stop changing (Obsidian's
+ * file registration + progressive state emission both continue after the
+ * scanner reports idle).
+ */
+export async function waitForStateStable(
+  page: Page,
+): Promise<StateStableResult> {
+  return page.evaluate(stateStablePage, {
+    pollMs: 100,
+    stableForMs: 750,
+    timeoutMs: 60_000,
+  });
+}
+
 /** Start a V8 sampling CPU profile; pair with stopCpuProfile(). */
 export async function startCpuProfile(page: Page): Promise<void> {
   profileSession = await page.context().newCDPSession(page);
@@ -265,29 +607,9 @@ export function profileTargetFromEnv(): string | null {
  * A 2s safety cap makes a hung refresh show up as a bad number rather
  * than hanging the suite.
  */
-export async function waitForListMutation(page: Page): Promise<void> {
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        const list = document.querySelector('.todoseq-task-list');
-        if (!list) {
-          resolve();
-          return;
-        }
-        const observer = new MutationObserver(() => {
-          observer.disconnect();
-          resolve();
-        });
-        observer.observe(list, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          characterData: true,
-        });
-        setTimeout(() => {
-          observer.disconnect();
-          resolve();
-        }, 2000);
-      }),
-  );
+export async function waitForListMutation(
+  page: Page,
+  minAgeMs = 0,
+): Promise<void> {
+  await page.evaluate(listMutationPage, { minAgeMs, timeoutMs: 2000 });
 }
