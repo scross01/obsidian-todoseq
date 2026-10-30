@@ -234,6 +234,17 @@ describe('SmartDateProcessor', () => {
       );
       expect(result).toBe('TODO test');
     });
+
+    it('should preserve leading indentation of a nested task', () => {
+      const dates: InlineDateInfo[] = [
+        { type: 'SCHEDULED', dateStr: '<2026-08-11 Tue>' },
+      ];
+      const result = processor.removeInlineDatesFromText(
+        '    - TODO child SCHEDULED: <2026-08-11 Tue>',
+        dates,
+      );
+      expect(result).toBe('    - TODO child');
+    });
   });
 
   describe('Inline date detection', () => {
@@ -743,6 +754,74 @@ describe('SmartDateProcessor', () => {
       expect(insertLines[1]).toMatch(
         /^SCHEDULED: <\d{4}-\d{2}-\d{2} \w{3}(?: \d{2}:\d{2})?>$/,
       );
+    });
+  });
+
+  describe('Nested task indentation', () => {
+    // Regression: converting a date on an indented (nested) task used to
+    // trim the task line, moving the task to the top level of the list.
+    function runConversion(taskLineText: string): string[] {
+      const filePath = 'test.md';
+      const indent = taskLineText.match(/^\s*/)?.[0] ?? '';
+      mockPlugin.getVaultScanner.mockReturnValue({
+        getParser: jest.fn().mockReturnValue({
+          isTaskLine: jest.fn().mockReturnValue(true),
+          getDateLineType: jest.fn().mockReturnValue(null),
+          parseLineAsTask: jest.fn().mockReturnValue(
+            createBaseTask({
+              path: filePath,
+              line: 1,
+              rawText: taskLineText,
+              indent,
+              listMarker: '- ',
+              state: 'TODO',
+            }),
+          ),
+        }),
+      });
+
+      const lines = ['- TODO parent', taskLineText];
+      const dispatchFn = jest.fn();
+      const mockView = {
+        state: {
+          selection: { main: { head: 0 } },
+          doc: {
+            lines: lines.length,
+            lineAt: jest.fn().mockReturnValue({ number: 1 }),
+            line: jest.fn((n: number) => {
+              const from = n === 1 ? 0 : lines[0].length + 1;
+              const text = lines[n - 1];
+              return { number: n, from, to: from + text.length, text };
+            }),
+          },
+        },
+        dispatch: dispatchFn,
+      } as any;
+
+      mockPlugin.app.workspace.getActiveViewOfType.mockReturnValue({
+        file: { path: filePath },
+        editor: { cm: mockView },
+      } as any);
+
+      void processor.processLine(filePath, 2, taskLineText, mockView, true);
+
+      expect(dispatchFn).toHaveBeenCalledTimes(1);
+      return dispatchFn.mock.calls[0][0].changes.insert.split('\n');
+    }
+
+    it('keeps the indentation of a nested task with a natural language date', async () => {
+      const insertLines = runConversion('    - TODO child task tomorrow');
+      await Promise.resolve();
+      expect(insertLines[0]).toBe('    - TODO child task');
+    });
+
+    it('keeps the indentation of a nested task with an inline structured date', async () => {
+      const insertLines = runConversion(
+        '    - TODO child task SCHEDULED: <2026-08-11 Tue>',
+      );
+      await Promise.resolve();
+      expect(insertLines[0]).toBe('    - TODO child task');
+      expect(insertLines[1]).toBe('      SCHEDULED: <2026-08-11 Tue>');
     });
   });
 

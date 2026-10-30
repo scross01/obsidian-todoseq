@@ -486,6 +486,8 @@ export class SmartDateProcessor {
    * Handles extra whitespace left behind.
    */
   removeInlineDatesFromText(lineText: string, dates: InlineDateInfo[]): string {
+    // Keep the line's leading indentation so nested tasks stay nested.
+    const indent = lineText.match(/^\s*/)?.[0] ?? '';
     let result = lineText;
 
     for (const date of dates) {
@@ -494,7 +496,7 @@ export class SmartDateProcessor {
       result = result.replace(new RegExp(pattern), '');
     }
 
-    return result.replace(/\s{2,}/g, ' ').trim();
+    return indent + result.replace(/\s{2,}/g, ' ').trim();
   }
 
   /**
