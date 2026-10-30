@@ -608,6 +608,20 @@ describe('NaturalDateParser', () => {
       );
       expect(result).toBe('TODO meeting at the office');
     });
+
+    it('should preserve leading indentation of a nested task', () => {
+      const result = NaturalDateParser.removeDateFromText(
+        '    - TODO child task tomorrow',
+      );
+      expect(result).toBe('    - TODO child task');
+    });
+
+    it('should preserve leading tab indentation of a nested task', () => {
+      const result = NaturalDateParser.removeDateFromText(
+        '\t\t- TODO child task today',
+      );
+      expect(result).toBe('\t\t- TODO child task');
+    });
   });
 
   describe('Detection', () => {

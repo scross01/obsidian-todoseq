@@ -409,6 +409,8 @@ export class NaturalDateParser {
     const result = NaturalDateParser.parse(text);
     if (!result) return text;
 
+    // Keep the line's leading indentation so nested tasks stay nested.
+    const indent = text.match(/^\s*/)?.[0] ?? '';
     const trimmed = text.trim();
     const beforeRaw = trimmed.substring(0, result.matchIndex);
     const afterRaw = trimmed.substring(
@@ -418,6 +420,6 @@ export class NaturalDateParser {
     // Strip preceding connector words that chrono didn't include in the match.
     const before = beforeRaw.replace(PRECEDING_CONNECTORS, '').trimEnd();
 
-    return (before + ' ' + afterRaw).trim();
+    return indent + (before + ' ' + afterRaw).trim();
   }
 }
