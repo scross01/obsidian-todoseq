@@ -1,6 +1,6 @@
 {
   "name": "todoseq",
-  "version": "0.21.2",
+  "version": "0.22.0",
   "description": "TODOseq lightweight, keyword-based task tracker for Obsidian",
   "license": "MIT",
   "author": "Stephen Cross",
@@ -10,8 +10,8 @@
     "node": ">=20.14.0"
   },
   "devDependencies": {
-    "@codemirror/state": "6.5.0",
-    "@codemirror/view": "6.38.6",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.13",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@types/jest": "^30.0.0",

@@ -67,6 +67,8 @@ Click any task keyword (or press `Ctrl+Enter`) to cycle its state in both Edit a
 
 ## Installation
 
+TODOseq requires Obsidian 1.14 or later.
+
 ### From Obsidian Community Plugins
 
 1. Open **Settings → Community plugins** and make sure community plugins are enabled
