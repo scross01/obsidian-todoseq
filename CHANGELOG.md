@@ -13,6 +13,8 @@
 - Fixed STARTED date for a recurring task to now track the current occurrence. Completing a recurring task clears its STARTED date when it rolls to the next occurrence, and starting the new occurrence writes a fresh one.
 - Fixed org-mode tasks being rewritten with the keyword glued to the heading stars (e.g. `*DONE task`). The keyword now stays separated: `* DONE task`.
 - Fixed vault scans hanging when Obsidian is minimised or in the background: scans now finish while the window is hidden instead of stalling until it is visible again.
+- Fixed a completed task at the very end of a file getting its date appended to the previous date line instead of starting its own, so the two dates ran together on one line. Date lines now always start on their own line, including at the end of a file.
+- Fixed `CLOSED:` and `SCHEDULED:` lines being lost, duplicated, or stacked when a configured keyword also matches date lines: un-completing left the `CLOSED:` line on the task, completing again duplicated it, and repeating tasks added extra `SCHEDULED:` lines instead of updating the existing one. Date lines are now skipped when scanning for the next task.
 - Raised the minimum supported Obsidian version to 1.14: TODOseq 0.22.0 no longer installs or updates on Obsidian 1.13 or earlier.
 
 ## 0.21.2
