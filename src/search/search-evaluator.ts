@@ -18,6 +18,19 @@ const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
   completed: 'completedKeywords',
 };
 
+/**
+ * A property filter node's engine query plus its resolution identity.
+ * Engine results depend only on the query (never the task), so the bulk
+ * path resolves each unique query once per batch.
+ */
+interface PropertyEngineResolution {
+  /** Dedupe key: case-sensitivity class + engine query. */
+  key: string;
+  /** The engine query (e.g. `[type:Project]`). */
+  query: string;
+  effectiveCaseSensitive: boolean;
+}
+
 export class SearchEvaluator {
   private static regexCache = new RegexCache();
 
@@ -112,6 +125,154 @@ export class SearchEvaluator {
       default:
         return false;
     }
+  }
+
+  /**
+   * Synchronous evaluation for bulk (list-wide) filtering.
+   *
+   * The per-row `evaluate` above allocates a Promise per node per task; over
+   * a vault-sized task set that is thousands of suspensions and wrapper
+   * allocations per keystroke refresh. Bulk filtering is only worthwhile
+   * when the tree is synchronously evaluable after the task-independent
+   * engine resolutions have been pre-computed (see
+   * `collectEngineResolutions` → `resolveEngineFiles`), so callers must
+   * keep this contract:
+   *
+   *   - Every `async`/`await` boundary lives at the batch level, never per
+   *     row: the facade awaits the *engine* (whose matching-file set does
+   *     not depend on the task being evaluated), then runs one plain loop.
+   *   - `engineFiles` maps the dedupe key of every `property_filter` node
+   *     in the tree (`S|query` / `I|query`, built by buildPropertyQuery) to
+   *     its engine result — `null` when the engine failed, exactly like
+   *     the per-row catch. Absent key or absent map falls back to the
+   *     task's file metadata path.
+   *   - Behavior parity with `evaluate` is pinned by tests/search-bulk.test.ts.
+   */
+  static evaluateSync(
+    node: SearchNode,
+    task: Task,
+    caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
+    engineFiles?: Map<string, Set<string> | null>,
+  ): boolean {
+    switch (node.type) {
+      case 'term':
+        return node.value
+          ? this.evaluateTerm(node.value, task, caseSensitive)
+          : false;
+      case 'phrase':
+        return node.value
+          ? this.evaluatePhrase(node.value, task, caseSensitive)
+          : false;
+      case 'prefix_filter':
+        return this.evaluatePrefixFilter(node, task, caseSensitive, settings);
+      case 'range_filter':
+        return this.evaluateRangeFilter(node, task, caseSensitive);
+      case 'property_filter': {
+        const built = this.buildPropertyQuery(node);
+        if (!built) return false;
+        const effectiveCaseSensitive = node.exact ? true : caseSensitive;
+        const resolved = engineFiles?.get(
+          `${effectiveCaseSensitive ? 'S' : 'I'}|${built.query}`,
+        );
+        return this.evaluatePropertyFilterSync(
+          node,
+          task,
+          caseSensitive,
+          settings,
+          resolved,
+        );
+      }
+      case 'and':
+        return (node.children ?? []).every((child) =>
+          this.evaluateSync(child, task, caseSensitive, settings, engineFiles),
+        );
+      case 'or':
+        return (node.children ?? []).some((child) =>
+          this.evaluateSync(child, task, caseSensitive, settings, engineFiles),
+        );
+      case 'not': {
+        const first = node.children?.[0];
+        return first
+          ? !this.evaluateSync(
+              first,
+              task,
+              caseSensitive,
+              settings,
+              engineFiles,
+            )
+          : false;
+      }
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Walk the AST and collect every `property_filter` node's engine query,
+   * deduplicated by (effective case sensitivity | query). Engine results
+   * depend only on the query, never on the task, so one resolution per
+   * unique filter serves the whole batch — instead of one engine call per
+   * row per keystroke.
+   */
+  static collectEngineResolutions(
+    node: SearchNode,
+    caseSensitive: boolean,
+  ): PropertyEngineResolution[] {
+    const resolutions = new Map<string, PropertyEngineResolution>();
+    const walk = (n: SearchNode): void => {
+      if (n.type === 'property_filter') {
+        const built = this.buildPropertyQuery(n);
+        if (built) {
+          const effectiveCaseSensitive = n.exact ? true : caseSensitive;
+          const key = `${effectiveCaseSensitive ? 'S' : 'I'}|${built.query}`;
+          if (!resolutions.has(key)) {
+            resolutions.set(key, {
+              key,
+              query: built.query,
+              effectiveCaseSensitive,
+            });
+          }
+        }
+      }
+      for (const child of n.children ?? []) walk(child);
+    };
+    walk(node);
+    return Array.from(resolutions.values());
+  }
+
+  /** One engine query → matching-file set (null on engine failure, per-row catch semantics). */
+  static async resolveEngineFiles(
+    query: string,
+    effectiveCaseSensitive: boolean,
+    propertySearchEngine: PropertySearchEngine,
+  ): Promise<Set<string> | null> {
+    try {
+      return await propertySearchEngine.searchProperties(
+        query,
+        effectiveCaseSensitive,
+      );
+    } catch {
+      // Fall back to direct metadata access, mirroring the per-row catch.
+      return null;
+    }
+  }
+
+  /** Single-pass bulk filter — the production per-keystroke list shape. */
+  static filterTasksByNode(
+    node: SearchNode,
+    tasks: Task[],
+    caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
+    engineFiles?: Map<string, Set<string> | null>,
+  ): Task[] {
+    const matched: Task[] = [];
+    for (const task of tasks) {
+      if (this.evaluateSync(node, task, caseSensitive, settings, engineFiles)) {
+        matched.push(task);
+      }
+    }
+    return matched;
   }
 
   private static evaluateTerm(
@@ -241,6 +402,10 @@ export class SearchEvaluator {
         return this.evaluatePriorityFilter(value, task, caseSensitive);
       case 'content':
         return this.evaluateContentFilter(value, task, caseSensitive);
+      case 'description':
+        return this.evaluateDescriptionFilter(value, task, caseSensitive);
+      case 'heading':
+        return this.evaluateHeadingFilter(value, task, caseSensitive);
       case 'scheduled':
         return this.evaluateScheduledFilter(
           value,
@@ -428,11 +593,52 @@ export class SearchEvaluator {
     return targetText.includes(searchText);
   }
 
+  /** `description:` — substring of the task's DESCRIPTION: line; tasks without one never match. */
+  private static evaluateDescriptionFilter(
+    value: string,
+    task: Task,
+    caseSensitive: boolean,
+  ): boolean {
+    if (!task.description) return false;
+
+    const searchText = caseSensitive ? value : value.toLowerCase();
+    const target = caseSensitive
+      ? task.description
+      : task.description.toLowerCase();
+
+    return target.includes(searchText);
+  }
+
+  /** `heading:` — substring of the nearest enclosing markdown heading; absent → no match. */
+  private static evaluateHeadingFilter(
+    value: string,
+    task: Task,
+    caseSensitive: boolean,
+  ): boolean {
+    if (!task.parentHeading) return false;
+
+    const searchText = caseSensitive ? value : value.toLowerCase();
+    const target = caseSensitive
+      ? task.parentHeading
+      : task.parentHeading.toLowerCase();
+
+    return target.includes(searchText);
+  }
+
   private static getSearchableFields(task: Task): string[] {
     const fields: string[] = [];
 
+    // `rawText` is the full original line. `text` is that same line with the
+    // keyword, priority token and footnote/embed references stripped, so it is
+    // always a contiguous substring of `rawText` and can never match a term or
+    // phrase that `rawText` does not already match. Indexing both would only
+    // add a redundant scan for no extra matches, so just `rawText` is indexed
+    // (the no-lost-match invariant is pinned by tests/search-evaluator.test.ts).
     if (task.rawText) fields.push(task.rawText);
-    if (task.text) fields.push(task.text);
+    // DESCRIPTION text joins the default (no-prefix) search: an unprefixed
+    // term matches the task line OR its description. Kept out of
+    // `parentHeading`-based matching, which stays scoped via heading:.
+    if (task.description) fields.push(task.description);
     if (task.path) {
       fields.push(task.path);
       // Also add just the filename using shared utility
@@ -734,18 +940,48 @@ export class SearchEvaluator {
    * @param propertySearchEngine Property search engine instance
    * @returns True if task matches the property filter
    */
-  private static async evaluatePropertyFilter(
+  static async evaluatePropertyFilter(
     node: SearchNode,
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
     propertySearchEngine?: PropertySearchEngine,
   ): Promise<boolean> {
+    const built = this.buildPropertyQuery(node);
+    if (!built) return false;
+    const effectiveCaseSensitive = node.exact ? true : caseSensitive;
+    const matchingFiles = propertySearchEngine
+      ? await this.resolveEngineFiles(
+          built.query,
+          effectiveCaseSensitive,
+          propertySearchEngine,
+        )
+      : undefined;
+    return this.evaluatePropertyFilterSync(
+      node,
+      task,
+      caseSensitive,
+      settings,
+      matchingFiles,
+    );
+  }
+
+  /**
+   * Validate a property filter node and build its engine query.
+   * Returns null when the node is missing field or value — no match, per
+   * the original inline guard. Shared by the per-row and bulk property
+   * paths, and by the resolution collector, so the two cannot drift.
+   */
+  private static buildPropertyQuery(node: SearchNode): {
+    query: string;
+    propertyKey: string;
+    propertyValue: string | null;
+  } | null {
     const field = node.field;
     const value = node.value;
 
     if (!field || !value) {
-      return false;
+      return null;
     }
 
     // Parse the field and property value from the stored value
@@ -768,31 +1004,40 @@ export class SearchEvaluator {
       propertyValue = null;
     }
 
+    // Build the engine query string. The engine receives the same shape the
+    // inline path always used: [key:value] or [key].
+    const query =
+      propertyValue !== null
+        ? `[${propertyKey}:${propertyValue}]`
+        : `[${propertyKey}]`;
+    return { query, propertyKey, propertyValue };
+  }
+
+  /**
+   * The metadata-cache property path shared by per-row and bulk evaluation.
+   * `matchingFiles` short-circuits when the engine resolved a set to test
+   * against; undefined (no engine) or null (engine failed) falls through to
+   * the task's file frontmatter, exactly as the inline path always did.
+   */
+  private static evaluatePropertyFilterSync(
+    node: SearchNode,
+    task: Task,
+    caseSensitive: boolean,
+    settings?: TodoTrackerSettings,
+    matchingFiles?: Set<string> | null,
+  ): boolean {
+    const built = this.buildPropertyQuery(node);
+    if (!built) return false;
+    const { propertyKey, propertyValue } = built;
+
+    // Engine pre-resolution (bulk) or per-row engine hit: the matching-file
+    // set is task-independent, so membership is the whole answer.
+    if (matchingFiles) {
+      return matchingFiles.has(task.path);
+    }
+
     // When exact flag is true (quoted values), force case sensitivity
     const effectiveCaseSensitive = node.exact ? true : caseSensitive;
-
-    // Use PropertySearchEngine for efficient property search
-    if (propertySearchEngine) {
-      try {
-        // Build the query string
-        const query =
-          propertyValue !== null
-            ? `[${propertyKey}:${propertyValue}]`
-            : `[${propertyKey}]`;
-
-        // Search for files matching the property query
-        // Pass case sensitivity flag (inverted: caseSensitive=false means insensitive matching)
-        const matchingFiles = await propertySearchEngine.searchProperties(
-          query,
-          effectiveCaseSensitive,
-        );
-
-        // Check if the task's file is in the matching files
-        return matchingFiles.has(task.path);
-      } catch {
-        // Fall back to direct metadata access if PropertySearchEngine fails
-      }
-    }
 
     // Fall back to direct metadata access
     // Get file cache and frontmatter

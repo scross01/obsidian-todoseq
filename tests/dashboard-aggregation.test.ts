@@ -15,6 +15,7 @@ import {
   DashboardResult,
 } from '../src/view/embedded-dashboard/aggregation';
 import { Search } from '../src/search/search';
+import { SearchEvaluator } from '../src/search/search-evaluator';
 import { Task } from '../src/types/task';
 import {
   createBaseTask,
@@ -342,6 +343,30 @@ describe('DashboardAggregator', () => {
       // Property: exactly one bucket claims every matched task
       const sum = result.groups.reduce((acc, g) => acc + g.count, 0);
       expect(sum).toBe(result.total);
+    });
+
+    it('buckets through the sync facade, not per-row async evaluate', async () => {
+      // Same bulk-shape pin as search-bulk: the window filters are pure date
+      // vocabulary whose evaluation cannot await anything, so per-task
+      // Search.evaluate promise plumbing is dead weight. The bucket counts
+      // must be identical to the evaluator-driven assignment above.
+      const aggregator = makeAggregator();
+      const perRow = jest.spyOn(Search, 'evaluate');
+      const syncEval = jest.spyOn(SearchEvaluator, 'evaluateSync');
+      try {
+        const result = await aggregator.aggregate(bucketTasks(), {
+          groupBy: 'scheduled',
+        });
+
+        expect(result.groups.map((g) => g.count)).toEqual([2, 1, 2, 1, 1]);
+        expect(perRow).not.toHaveBeenCalled();
+        // First-true-wins means the later windows never run for tasks an
+        // earlier window already claimed — counts only, no exact call pin.
+        expect(syncEval.mock.calls.length).toBeGreaterThan(0);
+      } finally {
+        perRow.mockRestore();
+        syncEval.mockRestore();
+      }
     });
 
     it('keeps every bucket filter consistent with its count via the evaluator', async () => {

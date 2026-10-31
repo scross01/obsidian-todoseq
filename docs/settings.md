@@ -420,15 +420,26 @@ FIXME Handle edge cases
 
 **When Enabled:**
 
-- Adds a STARTED date when a task first enters an active state (e.g., TODO → DOING)
+- Adds a STARTED date when a task enters an active state (e.g., TODO → DOING)
 - STARTED date uses the same square-bracket syntax as CLOSED: `STARTED: [2025-01-18 Fri 09:00]`
-- Records when the task _first_ became active — written once, idempotently
-- Does NOT remove the STARTED date when tasks are reactivated (unlike CLOSED); only manual editing removes it
+- Does NOT remove the STARTED date when tasks are reactivated (unlike CLOSED); the only automatic removal is a recurring task rolling over to its next occurrence (manual editing can always remove it)
+- What the date _records_ is controlled by the "STARTED date records" dropdown below
 
 **When Disabled:**
 
 - No STARTED date is added automatically
 - Manual STARTED dates in notes are still recognized and parsed
+
+#### STARTED Date Records
+
+**Setting**: "STARTED date records" (dropdown, only applies while "Track started date" is enabled)
+
+**Options:**
+
+- **First activation** (default) — records when the task _first_ became active. Written once, idempotently; pausing, resuming, and reactivating all retain the original date. Best when you want to see how long tasks have been open.
+- **Most recent activation** — records the most recent time the task entered an active state. Resuming a paused task (e.g., WAIT → DOING, or TODO → DOING after a manual pause) rewrites the date; switching between active states (e.g., DOING → IN-PROGRESS) does not, because the work period never ended. Completions and manual pauses never remove it.
+
+Both modes are per-occurrence for recurring tasks: the rollover clears the finished occurrence's date, and starting the new occurrence writes a fresh one (see [Task Entry](task-entry.md#started-date-behavior)).
 
 ### Smart Date Recognition
 

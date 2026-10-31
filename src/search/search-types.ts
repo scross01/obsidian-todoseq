@@ -5,6 +5,8 @@ export type SearchPrefix =
   | 'state'
   | 'priority'
   | 'content'
+  | 'description'
+  | 'heading'
   | 'scheduled'
   | 'deadline'
   | 'closed'

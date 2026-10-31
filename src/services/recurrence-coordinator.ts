@@ -18,6 +18,7 @@ import { calculateNextRepeatDate } from '../utils/date-repeater';
 import {
   findDateLineWithParser,
   getTaskIndent,
+  parseTableCells,
 } from '../utils/task-line-utils';
 
 /**
@@ -201,9 +202,24 @@ export class RecurrenceCoordinator {
     let newScheduledDate: Date | null = null;
     let newDeadlineDate: Date | null = null;
 
+    // Table-cell tasks keep their dates INLINE (<br>SCHEDULED: <date>
+    // inside the row) — there are no date lines below the task, and
+    // scanning below the row would risk matching the NEXT task's date
+    // lines. The row itself is the only source of truth for cells.
+    const isCellTask = task.isTableTask && task.tableCell != null;
+    // Anchor inline-segment parsing to THIS task's cell: a row can carry
+    // several task cells, each with its own <br>SCHEDULED / <br>DEADLINE
+    // segments, so the first match in the row may be a sibling's.
+    const inlineCellSource = isCellTask
+      ? (parseTableCells(lines[task.line] ?? '')[
+          task.tableCell?.cellIndex ?? -1
+        ]?.content ?? '')
+      : '';
+
     // Find SCHEDULED and DEADLINE line indices using the shared utility
+    // (line tasks only — cells resolve their dates from the row above)
     const scheduledLineIndex =
-      task.scheduledDateRepeat != null
+      !isCellTask && task.scheduledDateRepeat != null
         ? findDateLineWithParser(
             lines,
             task.line + 1,
@@ -214,7 +230,7 @@ export class RecurrenceCoordinator {
           )
         : -1;
     const deadlineLineIndex =
-      task.deadlineDateRepeat != null
+      !isCellTask && task.deadlineDateRepeat != null
         ? findDateLineWithParser(
             lines,
             task.line + 1,
@@ -225,10 +241,15 @@ export class RecurrenceCoordinator {
           )
         : -1;
 
-    // Parse and calculate next dates for SCHEDULED line
-    if (scheduledLineIndex >= 0 && task.scheduledDateRepeat != null) {
-      const line = lines[scheduledLineIndex];
-      const date = this.parseDateFromLine(line);
+    // Parse and calculate next dates for SCHEDULED (date line, or inline
+    // cell segment)
+    if (task.scheduledDateRepeat != null) {
+      const date =
+        scheduledLineIndex >= 0
+          ? this.parseDateFromLine(lines[scheduledLineIndex])
+          : isCellTask
+            ? this.parseInlineCellDate(inlineCellSource, 'SCHEDULED')
+            : null;
       if (date) {
         newScheduledDate = calculateNextRepeatDate(
           date,
@@ -238,10 +259,15 @@ export class RecurrenceCoordinator {
       }
     }
 
-    // Parse and calculate next dates for DEADLINE line
-    if (deadlineLineIndex >= 0 && task.deadlineDateRepeat != null) {
-      const line = lines[deadlineLineIndex];
-      const date = this.parseDateFromLine(line);
+    // Parse and calculate next dates for DEADLINE (date line, or inline
+    // cell segment)
+    if (task.deadlineDateRepeat != null) {
+      const date =
+        deadlineLineIndex >= 0
+          ? this.parseDateFromLine(lines[deadlineLineIndex])
+          : isCellTask
+            ? this.parseInlineCellDate(inlineCellSource, 'DEADLINE')
+            : null;
       if (date) {
         newDeadlineDate = calculateNextRepeatDate(
           date,
@@ -394,6 +420,26 @@ export class RecurrenceCoordinator {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /**
+   * Parse a date from an inline table-cell date segment, e.g.
+   * "…<br>SCHEDULED: <2026-10-15 Thu .+1d>…". Returns null when the
+   * content carries no such segment.
+   *
+   * @param line - The cell content (or line text) to search
+   * @param dateType - Which inline segment to extract
+   * @returns The parsed date or null if the segment is absent
+   */
+  private parseInlineCellDate(
+    line: string,
+    dateType: 'SCHEDULED' | 'DEADLINE',
+  ): Date | null {
+    const match = line.match(
+      new RegExp(`<br\\s*/?>\\s*${dateType}:\\s*<([^>]+)>`, 'i'),
+    );
+    if (!match) return null;
+    return this.parseDateFromLine(`<${match[1]}>`);
   }
 
   /**

@@ -64,7 +64,7 @@ export type CompletedTaskSetting = 'showAll' | 'sortToEnd' | 'hide';
 /**
  * Task classification result
  */
-interface TaskClassification {
+export interface TaskClassification {
   category: TaskCategory;
   earliestDate: Date | null;
 }
@@ -244,19 +244,59 @@ export function buildKeywordSortConfig(
 }
 
 /**
+ * Calendar-day stamp for day-level comparisons without allocating Dates.
+ * Local components are fixed-width (Y×10⁴ + M×10² + D), so integer
+ * ordering reproduces calendar-day ordering exactly — the equivalent of
+ * comparing `getStartOfDay(a) <= getStartOfDay(b)` with zero allocations.
+ * (setHours never changes the calendar day, so DST-shifted midnights keep
+ * their original day components.)
+ */
+function ymdStamp(date: Date): number {
+  return (
+    date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate()
+  );
+}
+
+/**
+ * `now`-derived invariants shared across one classification pass. A pass
+ * computes these ONCE per refresh instead of once per task.
+ */
+export interface ClassificationContext {
+  /** ymdStamp of `now`'s local calendar day. */
+  todayStamp: number;
+  /** ymdStamp of today + settings.upcomingPeriod (the upcoming boundary). */
+  upcomingStamp: number;
+}
+
+/**
+ * Build the pass-wide invariants for a classification pass.
+ * Kept exported so callers that classify several batches against the same
+ * `now` (tests, future coordinators) can share one context object.
+ */
+export function classifyContext(
+  now: Date,
+  settings?: WarningPeriodSettings,
+): ClassificationContext {
+  const today = DateUtils.getStartOfDay(now);
+  const upcomingDays = settings?.upcomingPeriod ?? 7;
+  return {
+    todayStamp: ymdStamp(today),
+    upcomingStamp: ymdStamp(DateUtils.addDays(today, upcomingDays)),
+  };
+}
+
+/**
  * Get the earliest date from a task (scheduled or deadline)
  * @param task The task to analyze
  * @returns The earliest date or null if no dates
  */
 function getEarliestDate(task: Task): Date | null {
-  const dates: Date[] = [];
-  if (task.scheduledDate) dates.push(task.scheduledDate);
-  if (task.deadlineDate) dates.push(task.deadlineDate);
-
-  if (dates.length === 0) return null;
-  return dates.reduce((earliest, current) =>
-    current < earliest ? current : earliest,
-  );
+  const scheduled = task.scheduledDate;
+  const deadline = task.deadlineDate;
+  if (scheduled && deadline) {
+    return scheduled < deadline ? scheduled : deadline;
+  }
+  return scheduled ?? deadline ?? null;
 }
 
 /**
@@ -329,12 +369,17 @@ export function getEffectiveVisibilityDate(
  * @param task The task to classify
  * @param now Current date/time
  * @param settings Warning period settings (optional, uses defaults if not provided)
+ * @param context Optional pass-wide `now`-derived invariants (today and the
+ * upcoming boundary as day stamps). Passing one computed by classifyContext()
+ * removes the per-task invariant recomputation — the classification result is
+ * identical either way (pinned by the golden matrix and the parity tests).
  * @returns Task classification
  */
 export function classifyTask(
   task: Task,
   now: Date,
   settings?: WarningPeriodSettings,
+  context?: ClassificationContext,
 ): TaskClassification {
   // Completed tasks are always in completed category
   if (task.completed) {
@@ -350,25 +395,66 @@ export function classifyTask(
     return { category: 'current', earliestDate: null };
   }
 
-  // Normalize to day-level comparison to avoid time-of-day misclassification
-  const today = DateUtils.getStartOfDay(now);
-  const effectiveDay = DateUtils.getStartOfDay(effectiveDate);
+  // Normalize to day-level comparison to avoid time-of-day misclassification.
+  // Integer day stamps: identical ordering to the startOfDay Date comparison,
+  // without the per-task Date allocations.
+  const todayStamp =
+    context?.todayStamp ?? ymdStamp(DateUtils.getStartOfDay(now));
+  const effectiveStamp = ymdStamp(effectiveDate);
 
   // Tasks with effective date on or before today are current
-  if (effectiveDay <= today) {
+  if (effectiveStamp <= todayStamp) {
     return { category: 'current', earliestDate: effectiveDate };
   }
 
   // Tasks with effective date within upcoming period are upcoming
-  const upcomingDays = settings?.upcomingPeriod ?? 7;
-  const upcomingBoundary = DateUtils.addDays(today, upcomingDays);
+  const upcomingStamp =
+    context?.upcomingStamp ??
+    ymdStamp(
+      DateUtils.addDays(
+        DateUtils.getStartOfDay(now),
+        settings?.upcomingPeriod ?? 7,
+      ),
+    );
 
-  if (effectiveDay <= upcomingBoundary) {
+  if (effectiveStamp <= upcomingStamp) {
     return { category: 'upcoming', earliestDate: effectiveDate };
   }
 
   // Tasks with dates beyond upcoming period are future
   return { category: 'future', earliestDate: effectiveDate };
+}
+
+/**
+ * Classify every task once, keyed by task identity, so a refresh's sort and
+ * hidden-count passes can share a single classification pass.
+ *
+ * The map is an explicit, caller-owned parameter (no module-level cache):
+ * its lifetime is the caller's natural scope — one refresh — so `now`
+ * correctness (midnight rollover) is automatic and no staleness mode exists.
+ * Callers that pass `target` get it filled in place.
+ *
+ * The `now`-derived invariants (today's day stamp and the upcoming boundary)
+ * are computed once for the whole pass and threaded into every classifyTask
+ * call — they only depend on `now` and `settings`, never on the task.
+ *
+ * @param tasks Tasks to classify
+ * @param now Current date/time (the single `now` shared by all uses)
+ * @param settings Warning-period inputs that decide visibility dates
+ * @param target Optional map to fill instead of allocating a new one
+ */
+export function classifyAll(
+  tasks: Task[],
+  now: Date,
+  settings?: WarningPeriodSettings,
+  target?: Map<Task, TaskClassification>,
+): Map<Task, TaskClassification> {
+  const classifications = target ?? new Map<Task, TaskClassification>();
+  const context = classifyContext(now, settings);
+  for (const task of tasks) {
+    classifications.set(task, classifyTask(task, now, settings, context));
+  }
+  return classifications;
 }
 
 /**
@@ -552,6 +638,7 @@ export function sortTasksInBlocks(
   sortMethod: SortMethod = 'default',
   keywordConfig?: KeywordSortConfig,
   warningPeriodSettings?: WarningPeriodSettings,
+  classifications?: Map<Task, TaskClassification>,
 ): TaskBlock[] {
   // Classify all tasks - don't sort yet
   const classified: Record<TaskCategory, Task[]> = {
@@ -562,7 +649,11 @@ export function sortTasksInBlocks(
   };
 
   for (const task of tasks) {
-    const { category } = classifyTask(task, now, warningPeriodSettings);
+    // Shared classifications when provided (one pass per refresh);
+    // otherwise classify inline exactly as before.
+    const classification = classifications?.get(task);
+    const { category } =
+      classification ?? classifyTask(task, now, warningPeriodSettings);
     classified[category].push(task);
   }
 
@@ -670,6 +761,7 @@ export function sortTasksWithThreeBlockSystem(
   sortMethod: SortMethod = 'default',
   keywordConfig?: KeywordSortConfig,
   warningPeriodSettings?: WarningPeriodSettings,
+  classifications?: Map<Task, TaskClassification>,
 ): Task[] {
   const blocks = sortTasksInBlocks(
     tasks,
@@ -679,6 +771,7 @@ export function sortTasksWithThreeBlockSystem(
     sortMethod,
     keywordConfig,
     warningPeriodSettings,
+    classifications,
   );
   return flattenBlocks(blocks);
 }

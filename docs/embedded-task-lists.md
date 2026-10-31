@@ -87,7 +87,7 @@ The `sort:` parameter controls how tasks are ordered. Valid options are:
 - `scheduled` - Sort by scheduled date
 - `deadline` - Sort by deadline date
 - `closed` - Sort by closed date (when the task was completed)
-- `started` - Sort by started date (when work first began)
+- `started` - Sort by started date (when work began)
 - `priority` - Sort by priority (high → low)
 - `urgency` - Sort by urgency score (high → low)
 - `keyword` - Sort by keyword state groups

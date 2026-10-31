@@ -890,6 +890,10 @@ export class TaskUpdateCoordinator {
           rawText: updatedTask.rawText,
           state: updatedTask.state,
           completed: updatedTask.completed,
+          // The rollover ends the occurrence: follow the writer's file truth
+          // (null when inactive-rolled, fresh date when active-rolled) so the
+          // next start's insert guard re-arms.
+          startedDate: updatedTask.startedDate,
           scheduledDate: updatedTask.scheduledDate,
           deadlineDate: updatedTask.deadlineDate,
           scheduledDateRepeat: updatedTask.scheduledDateRepeat,

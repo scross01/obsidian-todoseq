@@ -133,8 +133,8 @@ describe('ChunkedRenderQueue', () => {
     });
   });
 
-  describe('renderToFragment', () => {
-    it('renders tasks to a document fragment', async () => {
+  describe('renderToElements', () => {
+    it('renders tasks to an ordered element array', async () => {
       const tasks = [
         createBaseTask({ path: 'a.md', line: 0, state: 'TODO' }),
         createBaseTask({ path: 'b.md', line: 1, state: 'DONE' }),
@@ -146,11 +146,9 @@ describe('ChunkedRenderQueue', () => {
         return li;
       };
 
-      const fragment = await queue.renderToFragment(tasks, renderFn, false);
+      const elements = await queue.renderToElements(tasks, renderFn, false);
 
-      expect(fragment.children.length).toBe(2);
-      expect(fragment.children[0].textContent).toBe('TODO');
-      expect(fragment.children[1].textContent).toBe('DONE');
+      expect(elements.map((el) => el.textContent)).toEqual(['TODO', 'DONE']);
     });
 
     it('yields during render when yieldDuringRender is true', async () => {
@@ -164,9 +162,9 @@ describe('ChunkedRenderQueue', () => {
         return li;
       };
 
-      const fragment = await queue.renderToFragment(tasks, renderFn, true);
+      const elements = await queue.renderToElements(tasks, renderFn, true);
 
-      expect(fragment.children.length).toBe(15);
+      expect(elements).toHaveLength(15);
     });
   });
 });

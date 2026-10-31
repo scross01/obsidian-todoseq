@@ -57,7 +57,16 @@ export function findDateLine(
       return i;
     }
 
-    if (isTaskLine(trimmedLine, keywordManager)) {
+    // A date line is never a task boundary — even when a configured
+    // keyword collides with a date keyword (e.g. STARTED set as an active
+    // keyword, the documented keyword-groups example). Without this, a
+    // STARTED date line above a SCHEDULED/CLOSED line would break the
+    // scan: un-completion could not remove CLOSED, completion inserted a
+    // duplicate, and recurrence rollovers stacked date lines.
+    if (
+      isTaskLine(trimmedLine, keywordManager) &&
+      !isDateKeywordLine(trimmedLine)
+    ) {
       break;
     }
 

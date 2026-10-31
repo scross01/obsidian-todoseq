@@ -135,6 +135,40 @@ function pickVisibleHandle(sel: string) {
   }, sel);
 }
 
+/**
+ * Pick the gutter and cell and measure both in a single synchronous JS task.
+ * Two separate pickVisibleHandle roundtrips are racy: a dashboard re-render
+ * landing between the two captures detaches the first handle, and a detached
+ * element's getBoundingClientRect() reports 0,0 — which surfaced as the cell's
+ * own viewport position (308px) masquerading as a misalignment.
+ * Both selections come off one DOM state inside one evaluate, so there is no
+ * window for a re-render to replace the render under measurement.
+ */
+function measureGutterAlignment(): Promise<{
+  gutterTop: number;
+  cellTop: number;
+} | null> {
+  return page.evaluate<{
+    gutterTop: number;
+    cellTop: number;
+  } | null>(() => {
+    const scope = document.querySelector('.workspace-leaf.mod-active');
+    const visible = (sel: string): HTMLElement | null =>
+      Array.from(scope?.querySelectorAll<HTMLElement>(sel) ?? []).find(
+        (el) => el.isConnected && el.offsetParent !== null,
+      ) ?? null;
+    const gutter = visible('.todoseq-dashboard-heatmap-gutter span');
+    const cell = visible(
+      '.todoseq-dashboard-heatmap-grid .todoseq-dashboard-heatmap-cell',
+    );
+    if (!gutter || !cell) return null;
+    return {
+      gutterTop: gutter.getBoundingClientRect().top,
+      cellTop: cell.getBoundingClientRect().top,
+    };
+  });
+}
+
 test.describe('Dashboard card styles (mockup conformance)', () => {
   test.beforeEach(async () => {
     await resetVaultState(page);
@@ -143,26 +177,7 @@ test.describe('Dashboard card styles (mockup conformance)', () => {
   test('weekday gutter labels align with the first grid row (±2px)', async () => {
     await writeAndOpenHeatmap();
 
-    const gutterHandle = await pickVisibleHandle(
-      '.todoseq-dashboard-heatmap-gutter span',
-    );
-    const cellHandle = await pickVisibleHandle(
-      '.todoseq-dashboard-heatmap-grid .todoseq-dashboard-heatmap-cell',
-    );
-    const result = await page.evaluate(
-      ([gutter, cell]) => {
-        const g = gutter as HTMLElement | null;
-        const c = cell as HTMLElement | null;
-        if (!g || !c) return null;
-        return {
-          gutterTop: g.getBoundingClientRect().top,
-          cellTop: c.getBoundingClientRect().top,
-        };
-      },
-      [gutterHandle, cellHandle],
-    );
-    await gutterHandle.dispose();
-    await cellHandle.dispose();
+    const result = await measureGutterAlignment();
 
     expect(result).not.toBeNull();
     // Degenerate hidden-render guard: a display:none element rect sits at 0.

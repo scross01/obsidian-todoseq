@@ -1,0 +1,15 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "roots": ["<rootDir>/scripts/perf"],
+  "testMatch": ["**/*.bench.ts"],
+  "moduleFileExtensions": ["ts", "js", "json"],
+  "setupFiles": ["<rootDir>/tests/test-setup.ts"],
+  "moduleNameMapper": {
+    "^obsidian$": "<rootDir>/__mocks__/obsidian.ts"
+  },
+  "testEnvironmentOptions": {
+    "timezone": "UTC"
+  },
+  "collectCoverage": false
+}

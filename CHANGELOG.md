@@ -1,5 +1,22 @@
 # Change Log
 
+## Unreleased
+
+- Plain search terms now also match a task's description: searching `format` finds both a task whose line says "check the document format" and one whose DESCRIPTION: line mentions "format". Use `content:` to search the task line alone.
+- Added `description:` and `heading:` search prefixes: `description:call` finds tasks whose DESCRIPTION: line mentions "call", and `heading:Setup` finds tasks under a note heading containing "Setup".
+- Speeded up live search filtering: matching now runs in one pass over the task list instead of starting a separate evaluation for every task, which cuts the wait after each keystroke noticeably on large vaults and slower machines.
+- Speeded up Task List refreshes: task classification no longer recomputes the same today/upcoming boundary for every task and avoids extra date-object churn, so view-mode switches and search re-renders finish sooner on large vaults.
+- Made task list updates smoother when changing view modes: rows that are unchanged now stay exactly where they are in the DOM instead of the whole list being rebuilt behind the scenes, so the panel re-layouts only what actually moved.
+- Speeded up dashboard date buckets (Overdue / Due today / Next 7 days): each task is now checked against the windows in a single pass, so cards grouped by scheduled or deadline date render sooner on large vaults.
+- Fixed recurring table tasks rolling to another cell's date: when several cells in the same row carry repeating dates, completing one advanced from the first matching date in the row instead of its own. Each cell now rolls from its own SCHEDULED/DEADLINE date.
+- Added a choice for what the STARTED timestamp records: the first time a task enters an active state (default) or the most recent time it did. With "most recent activation", resuming a paused task rewrites the date.
+- Fixed STARTED date for a recurring task to now track the current occurrence. Completing a recurring task clears its STARTED date when it rolls to the next occurrence, and starting the new occurrence writes a fresh one.
+- Fixed org-mode tasks being rewritten with the keyword glued to the heading stars (e.g. `*DONE task`). The keyword now stays separated: `* DONE task`.
+- Fixed vault scans hanging when Obsidian is minimised or in the background: scans now finish while the window is hidden instead of stalling until it is visible again.
+- Fixed a completed task at the very end of a file getting its date appended to the previous date line instead of starting its own, so the two dates ran together on one line. Date lines now always start on their own line, including at the end of a file.
+- Fixed `CLOSED:` and `SCHEDULED:` lines being lost, duplicated, or stacked when a configured keyword also matches date lines: un-completing left the `CLOSED:` line on the task, completing again duplicated it, and repeating tasks added extra `SCHEDULED:` lines instead of updating the existing one. Date lines are now skipped when scanning for the next task.
+- Raised the minimum supported Obsidian version to 1.14: TODOseq 0.22.0 no longer installs or updates on Obsidian 1.13 or earlier.
+
 ## 0.21.2
 
 - Fixed the dashboard state grouping emitting an "Archived" group: it never carries a count because archived tasks are not collected, so with `show-empty` enabled it showed as a permanent zero slot. The state groups are now exactly Active / Inactive / Waiting / Completed.

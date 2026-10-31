@@ -477,14 +477,125 @@ describe('TaskListView', () => {
       view.updateTasks(futureTasks);
 
       const filter = view['taskListFilter'];
-      jest.spyOn(filter, 'transformForView').mockReturnValue([]);
+      const transformSpy = jest
+        .spyOn(filter, 'transformForView')
+        .mockReturnValue([]);
       const countSpy = jest
         .spyOn(filter, 'countHiddenByFilters')
         .mockReturnValue({ future: 1, completed: 0 });
 
       await view.refreshVisibleList();
 
-      expect(countSpy).toHaveBeenCalledWith(futureTasks, 'showAll');
+      // The refresh threads ONE classifications map through the transform
+      // and the hidden-count pass (single classification pass per refresh).
+      const sharedClassifications = transformSpy.mock.calls[0][3];
+      expect(sharedClassifications).toBeInstanceOf(Map);
+      expect(countSpy).toHaveBeenCalledTimes(1);
+      expect(countSpy).toHaveBeenCalledWith(
+        futureTasks,
+        'showAll',
+        sharedClassifications,
+      );
+    });
+  });
+
+  describe('refreshVisibleList in-place DOM reconcile', () => {
+    /**
+     * setUpListContainer mirrors onOpen's structure (toolbar-less): the
+     * refresh looks for the task list inside `taskListContainer`.
+     */
+    function setUpListContainer(): HTMLElement {
+      if (!view['contentEl']) {
+        view['contentEl'] = activeDocument.createElement('div');
+      }
+      const container = view['contentEl'];
+      // isConnected assertions need the tree rooted in the document.
+      if (!container.isConnected) {
+        activeDocument.body.appendChild(container);
+      }
+      if (!view['taskListContainer']) {
+        const listContainer = activeDocument.createElement('div');
+        listContainer.className = 'todoseq-task-list-container';
+        container.appendChild(listContainer);
+        view['taskListContainer'] = listContainer;
+      }
+      return view['taskListContainer'];
+    }
+
+    function taskRows(list: Element): HTMLElement[] {
+      return Array.from(
+        list.querySelectorAll('li.todoseq-task-item'),
+      ) as HTMLElement[];
+    }
+
+    it('preserves the list element identity across refreshes', async () => {
+      const listContainer = setUpListContainer();
+      view.updateTasks(taskStateManagerMock.getTasks() as Task[]);
+      await view.refreshVisibleList();
+      const listBefore = listContainer.querySelector('ul.todoseq-task-list');
+      expect(listBefore).not.toBeNull();
+
+      await view.refreshVisibleList();
+
+      const listAfter = listContainer.querySelector('ul.todoseq-task-list');
+      // The cloneNode/replaceChild double-buffer swap created a NEW list
+      // element on every refresh, forcing a full relayout; the in-place
+      // reconcile keeps the same list element in the DOM.
+      expect(listAfter).toBe(listBefore);
+    });
+
+    it('keeps the same row nodes for unchanged tasks', async () => {
+      setUpListContainer();
+      view.updateTasks(taskStateManagerMock.getTasks() as Task[]);
+      await view.refreshVisibleList();
+      const list = view['taskListContainer'].querySelector(
+        'ul.todoseq-task-list',
+      );
+      const rowsBefore = taskRows(list);
+      expect(rowsBefore).toHaveLength(2);
+
+      await view.refreshVisibleList();
+
+      const rowsAfter = taskRows(list);
+      expect(rowsAfter[0]).toBe(rowsBefore[0]);
+      expect(rowsAfter[1]).toBe(rowsBefore[1]);
+    });
+
+    it('detaches rows of tasks that left the view', async () => {
+      const listContainer = setUpListContainer();
+      const original = (taskStateManagerMock.getTasks as jest.Mock)() as Task[];
+      view.updateTasks(original);
+      await view.refreshVisibleList();
+      const list = listContainer.querySelector('ul.todoseq-task-list');
+      expect(list).not.toBeNull();
+      const rowsBefore = taskRows(list);
+      expect(rowsBefore).toHaveLength(2);
+
+      // Task 2 disappears from the state manager.
+      view.updateTasks(original.slice(0, 1));
+      await view.refreshVisibleList();
+
+      expect(taskRows(list)).toHaveLength(1);
+      expect(rowsBefore[0].isConnected).toBe(true);
+      expect(rowsBefore[1].isConnected).toBe(false);
+    });
+
+    it('reflects reordered tasks while keeping both nodes', async () => {
+      const listContainer = setUpListContainer();
+      const original = (taskStateManagerMock.getTasks as jest.Mock)() as Task[];
+      view.updateTasks(original);
+      await view.refreshVisibleList();
+      const list = listContainer.querySelector('ul.todoseq-task-list');
+      const rowsBefore = taskRows(list);
+
+      view.updateTasks([...original].reverse());
+      await view.refreshVisibleList();
+
+      const rowsAfter = taskRows(list);
+      expect(rowsAfter[0]).toBe(rowsBefore[1]);
+      expect(rowsAfter[1]).toBe(rowsBefore[0]);
+      expect(rowsAfter[0].getAttribute('data-path')).toBe('test2.md');
+      expect(rowsAfter[1].getAttribute('data-path')).toBe('test1.md');
     });
   });
 

@@ -4,7 +4,9 @@ import {
   KeywordSortConfig,
   CompletedTaskSetting,
   WarningPeriodSettings,
+  classifyAll,
   classifyTask,
+  TaskClassification,
 } from '../../utils/task-sort';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
@@ -137,6 +139,7 @@ export class TaskListFilter {
     tasks: Task[],
     mode: TaskListViewMode,
     sortMethod: SortMethod,
+    outClassifications?: Map<Task, TaskClassification>,
   ): Task[] {
     const now = new Date();
 
@@ -156,6 +159,14 @@ export class TaskListFilter {
       keywordConfig = this.getKeywordSortConfig();
     }
 
+    const warningSettings = this.getWarningPeriodSettings();
+    // Optional shared classifications: when the caller will also run the
+    // hidden-count pass (empty-state branch of a refresh), it passes a map
+    // so both passes classify the task set exactly once.
+    if (outClassifications) {
+      classifyAll(tasks, now, warningSettings, outClassifications);
+    }
+
     const sortedTasks = sortTasksWithThreeBlockSystem(
       tasks,
       now,
@@ -163,7 +174,8 @@ export class TaskListFilter {
       completedSetting,
       sortMethod,
       keywordConfig,
-      this.getWarningPeriodSettings(),
+      warningSettings,
+      outClassifications,
     );
 
     return sortedTasks;
@@ -175,10 +187,15 @@ export class TaskListFilter {
    * invariant holds: transformForView(...).length + future + completed === tasks.length
    *
    * Only call this when the list is empty — it is a full extra pass.
+   *
+   * When `classifications` (the map filled by `transformForView` for the
+   * same task set) is provided, no classification work happens here — the
+   * shared map already covers every task, so the pair runs one pass total.
    */
   countHiddenByFilters(
     tasks: Task[],
     mode: TaskListViewMode,
+    classifications?: Map<Task, TaskClassification>,
   ): HiddenTaskCounts {
     const now = new Date();
     const completedSetting = this.getCompletedSetting(mode);
@@ -189,7 +206,9 @@ export class TaskListFilter {
     let completed = 0;
 
     for (const task of tasks) {
-      const { category } = classifyTask(task, now, warningSettings);
+      const classification = classifications?.get(task);
+      const { category } =
+        classification ?? classifyTask(task, now, warningSettings);
       if (category === 'completed') {
         if (completedSetting === 'hide') completed++;
       } else if (futureSetting === 'hideFuture') {

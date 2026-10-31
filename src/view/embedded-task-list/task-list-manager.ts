@@ -162,24 +162,15 @@ export class EmbeddedTaskListManager {
     searchQuery: string,
   ): Promise<Task[]> {
     try {
-      // Use the existing Search class for consistent filtering
-      const results = await Promise.all(
-        tasks.map(async (task) => {
-          const matches = await Search.evaluate(
-            searchQuery,
-            task,
-            false,
-            this.settings,
-            this.propertySearchEngine ?? undefined,
-          );
-          return { task, matches };
-        }),
+      // Bulk single-pass filter through the Search facade for consistent
+      // filtering (same deployment the Task List uses per keystroke).
+      return await Search.filterTasks(
+        tasks,
+        searchQuery,
+        false,
+        this.settings,
+        this.propertySearchEngine ?? undefined,
       );
-
-      // Filter based on results
-      return results
-        .filter((result) => result.matches)
-        .map((result) => result.task);
     } catch (error) {
       console.error('Error evaluating search query:', error);
       // Return all tasks if search fails

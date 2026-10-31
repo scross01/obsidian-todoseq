@@ -164,3 +164,62 @@ export function createTestPropertySearchEngine(
     createTestPropertySearchEngineDependencies(overrides),
   );
 }
+
+/**
+ * CodeMirror-faithful line-array emulation of Editor.replaceRange for
+ * full-line edits.
+ *
+ * Positions at/after lineCount clamp to the end of the last line (clipPos
+ * semantics) — exactly how an insert at `{ line: lineCount, ch: 0 }` glues
+ * onto the final line in real Obsidian. Pure line-range deletions
+ * (`replaceRange('', {i,0}, {i+1,0})`) remove the covered lines entirely,
+ * matching CM's newline-inclusive ranges.
+ *
+ * Use this in editor mocks instead of a naive splice emulation: the naive
+ * version hides end-of-document bugs that only reproduce against real
+ * CodeMirror.
+ */
+export function emulateEditorReplaceRange(
+  lines: string[],
+  text: string,
+  from: { line: number; ch: number },
+  to: { line: number; ch: number },
+): void {
+  const clamp = (pos: {
+    line: number;
+    ch: number;
+  }): { line: number; ch: number } => {
+    if (lines.length === 0) return { line: 0, ch: 0 };
+    if (pos.line >= lines.length) {
+      return { line: lines.length - 1, ch: lines[lines.length - 1].length };
+    }
+    return pos;
+  };
+  const start = clamp(from);
+  const end = clamp(to);
+
+  // Whole-line removal: CM's {i,0}→{i+1,0} range covers the line and its
+  // trailing newline.
+  if (text === '' && start.ch === 0 && end.ch === 0 && end.line > start.line) {
+    lines.splice(start.line, end.line - start.line);
+    return;
+  }
+
+  const segs = text.split('\n');
+  const startText = lines[start.line] ?? '';
+  if (start.line === end.line && segs.length === 1) {
+    lines[start.line] =
+      startText.slice(0, start.ch) + text + startText.slice(end.ch);
+    return;
+  }
+  const endText = lines[end.line] ?? '';
+  const tail =
+    start.line === end.line ? startText.slice(end.ch) : endText.slice(end.ch);
+  lines[start.line] = startText.slice(0, start.ch) + segs[0];
+  lines.splice(
+    start.line + 1,
+    end.line - start.line,
+    ...segs.slice(1, -1),
+    segs[segs.length - 1] + tail,
+  );
+}

@@ -229,9 +229,9 @@ graph TB
 - `VaultScanner` - File monitoring (receives `TaskStateManager`, `KeywordManager`, `ChangeTracker`)
 - `TaskUpdateCoordinator` - Update pipeline (receives `TaskStateManager`, `KeywordManager`, `ChangeTracker`)
 - `ArchiveService` - Auto-Archive engine (receives `KeywordManager`, `taskArchive` settings); constructed after `TaskUpdateCoordinator` because apply wiring delegates writes to it
-- `EmbeddedTaskListProcessor` - Embedded lists (receives `TaskUpdateCoordinator`)
+- `TodoseqCodeBlockProcessor` - Embedded lists (receives `TaskUpdateCoordinator`)
 - `EventCoordinator` - Event handling (receives `VaultScanner`, `PropertySearchEngine`)
-- `SmartDateProcessor` - Automatic date conversion (created with main plugin instance; `setEnabled()` controlled by setting)
+- `SmartDateProcessor` - Automatic date conversion (constructed by the lifecycle manager with the main plugin instance; `setEnabled()` controlled by setting)
 - `CodeCommentTaskParser` - Code file scanning (conditionally registered with `ParserRegistry` when `scanCodeFiles` setting enabled)
 - Other UI and lifecycle components
 
@@ -251,7 +251,7 @@ graph TB
 
 - **Responsibility**: Single source of truth for all task data
 - **Key Patterns**: Observer pattern for reactive updates, defensive copying, re-add on undo (`optimisticUpdate()` re-adds a task absent from the manager — the archived → non-archived undo path, since archived tasks are not collected on rescan)
-- **Interface**: `getTasks()` (returns shallow copy), `setTasks()`, `subscribe(callback)`, `findTaskByPathAndLine()`, `optimisticUpdate()`, `updateTaskByPathAndLine()`, `addTask()`, `removeTasks()`, `adjustLineIndices()`
+- **Interface**: `findTaskByPathAndLine(path, line, cellIndex?)` (cellIndex disambiguates table-cell siblings), `getTasks()` (returns shallow copy), `setTasks()`, `subscribe(callback)`, `optimisticUpdate()`, `updateTaskByPathAndLine()`, `addTask()`, `removeTasks()`, `adjustLineIndices()`
 - **Mutation Policy**: External consumers receive shallow copies; internal methods may mutate task objects for performance
 
 **VaultScanner** (`src/services/vault-scanner.ts`)
@@ -272,7 +272,7 @@ graph TB
   - **Sync Phase**: Always completes immediately - optimistic update, DOM manipulation, UI refresh
   - **Async Phase**: Background execution - file write, recurrence scheduling, state finalization
   - **Update Types**: `state`, `scheduled-date`, `deadline-date`, `priority`, `closed-date`, `recurrence`
-  - **Update Sources**: `editor`, `reader`, `task-list`, `embedded`
+  - **Update Sources**: `editor`, `reader`, `task-list`, `embedded`, `archive-undo` (archive undo restores journaled state verbatim — deliberately skips the recurrence rollover)
 - **Change Tracking**: Uses `ChangeTracker` to register expected file changes with content hashing
 - **Recurrence Handling**: Uses `originalNewState` to track user's requested completion state, schedules `RecurrenceCoordinator` for date advancement
 - **Undo re-add**: state finalization re-adds a task that is absent from the manager (`addTask`), completing the archived → non-archived undo path when the async phase resolved a different line via `rawText`
@@ -284,7 +284,7 @@ graph TB
 
 - **Responsibility**: Auto-Archive engine — evaluates which completed tasks match archive criteria and applies/undoes bulk keyword rewrites
 - **Key Patterns**: Pure/injected design (file writes and state access via `ApplyArchiveDeps`/`UndoDeps`), immutable product invariants (no-CLOSED never matches; first enabled mapping wins; archived states terminal), per-match re-verification before write, per-match error containment in apply and undo (a partially failed run still journals the tasks it archived, so undo covers exactly what executed), session undo journal with per-line verification, `RegexCache` for undo line patterns
-- **Interface**: `evaluateArchiveCriteria()`, `applyArchives()`, `undoLastRun()`, `hasUndoableRun()`, `isRunning()`, `shouldAutoArchive()`, `updateKeywordManager()`
+- **Interface**: `evaluateArchiveCriteria()`, `applyArchives()`, `undoLastRun()`, `hasUndoableRun()`, `isRunning()`, `updateKeywordManager()`; auto-run eligibility is the module-level `shouldAutoArchive()` helper
 - **KeywordManager Currency**: holds a replaceable reference — `recreateParser()` swaps in the fresh manager via `updateKeywordManager()` (KeywordManager snapshots its resolution at construction; a stale reference rejected newly added archived keywords as invalid targets)
 - **Used by**: `PluginLifecycleManager` (commands, auto-run, undo), `ArchiveDialog`
 - **Ownership**: Created and owned by `PluginLifecycleManager`; stored on main plugin as `archiveService`
@@ -295,7 +295,7 @@ graph TB
 - **Key Patterns**: Bridge pattern, command delegation
 - **Interface**: Task cycling, priority changes, keyword toggling
 - **Command Palette Actions**: Provides three editor-specific commands that use `editorCheckCallback`:
-  - **Open context menu** (`open-context-menu`, icon: `more-horizontal`): Opens the task context menu at cursor position, providing access to priority, scheduled date, deadline date, and copy/move to today options. Uses CodeMirror editor API (`cmEditor.coordsAtPos()`) to get screen coordinates for positioning the menu. Only appears when cursor is on a valid task line.
+  - **Open context menu** (`open-context-menu`, icon: `square-menu`): Opens the task context menu at cursor position, providing access to priority, scheduled date, deadline date, and copy/move to today options. Uses CodeMirror editor API (`cmEditor.coordsAtPos()`) to get screen coordinates for positioning the menu. Only appears when cursor is on a valid task line.
   - **Open scheduled date picker** (`open-scheduled-date-picker`, icon: `calendar-clock`): Opens the date picker dialog for setting the scheduled date at cursor position. Uses CodeMirror editor API for positioning. Only appears when cursor is on a valid task line.
   - **Open deadline date picker** (`open-deadline-date-picker`, icon: `calendar-range`): Opens the date picker dialog for setting the deadline date at cursor position. Uses CodeMirror editor API for positioning. Only appears when cursor is on a valid task line.
 - **Implementation Details**: All three commands delegate to methods in EditorController: `handleOpenContextMenuAtCursor()`, `handleOpenScheduledDatePickerAtCursor()`, and `handleOpenDeadlineDatePickerAtCursor()`. These methods use the standard Obsidian `editorCheckCallback` signature `(checking: boolean, editor: Editor, view: MarkdownView)` and integrate with `TaskUpdateCoordinator` for task updates.
@@ -304,19 +304,20 @@ graph TB
 
 - **Responsibility**: Atomic file operations, state preservation, formatting, editor-aware writes
 - **Key Patterns**: Strategy pattern, atomic operations, editor/vault API handling
-- **Interface**: `updateTaskState()`, `applyLineUpdate()`, `writeLines()`, `generateTaskLine()`, file persistence, date update methods
-- **Inline Date-Line Helpers**: SCHEDULED/DEADLINE/CLOSED line insertion/removal is inlined as private methods on `TaskWriter` (`updateOrInsertDateLine`, `removeDateLine`, `calcDateLineInsertIndex`, `getEffectiveDateLineIndent`, `getExistingDateLineIndent` — formerly a separate `DateLineOperator` module). Insertion rules: SCHEDULED before DEADLINE; DEADLINE after SCHEDULED; CLOSED after both. Both Editor-API and Vault-API paths route through these shared helpers for consistent indent preservation.
-- **Editor Awareness**: Uses Editor API (`editor.replaceRange()`) for active files in source mode to preserve cursor/selection/folds; falls back to Vault API for inactive files or preview mode
-- **Multiple Line Writes**: `writeLines()` method for writing multiple lines while maintaining editor awareness
+- **Interface**: `updateTaskState()`, `updateTaskCycleState()`, `applyLineUpdate()`, `applyRecurrenceUpdate()`, static `generateTaskLine()`, date update methods (`updateTaskScheduledDate()`, `removeTaskScheduledDate()`, `updateTaskDeadlineDate()`, `removeTaskDeadlineDate()`, `updateTaskStartedDate()`, `updateTaskClosedDate()`, `removeTaskClosedDate()`), file persistence
+- **Inline Date-Line Helpers**: SCHEDULED/DEADLINE/CLOSED/STARTED line insertion/removal is inlined as private methods on `TaskWriter` (`updateOrInsertDateLine`, `updateOrInsertStartedDateLine`, `removeDateLine`, `removeDateLineInEditor`, `calcDateLineInsertIndex`, `getEffectiveDateLineIndent`, `getExistingDateLineIndent` — formerly a separate `DateLineOperator` module). Insertion order: STARTED first (immediately under the task), then SCHEDULED before DEADLINE, CLOSED after both. Both Editor-API and Vault-API paths route through these shared helpers for consistent indent preservation.
+- **Editor Awareness**: Uses Editor API (`editor.replaceRange()`) for active files in source mode to preserve cursor/selection/folds; falls back to Vault API (`vault.process()`) for inactive files or preview mode
+- **Table-Cell Writes**: tasks in markdown table cells are written via `applyTableCellUpdate()`, a cell-level `vault.process()` path that rewrites only the cell content, never the surrounding table row structure
 - **Atomic CLOSED Date Handling**: For non-source mode, CLOSED date is handled atomically with task line update in a single `vault.process()` operation
-- **Line Delta Returns**: Date update methods (`updateTaskScheduledDate()`, `removeTaskScheduledDate()`, `updateTaskDeadlineDate()`, `removeTaskDeadlineDate()`) return `Task & { lineDelta?: number }` for line index adjustments
+- **STARTED Date Handling**: `updateTaskStartedDate()` is mode-gated by the `startedDateMode` setting (`'first'` writes the stamp once; `'last'` re-stamps on each fresh entry into an active state); recurring-task rollover clears the finished occurrence's STARTED line inside the same atomic write. `parseStartedDateFromLine()` (static) re-reads a retained STARTED line on both write paths so rapid stale-snapshot state updates keep the correct date
+- **Line Delta Returns**: Date update methods return `Task & { lineDelta?: number }` for line index adjustments
 - **Checkbox Preservation**: Preserves list marker character (`-`, `*`, `+`) and checkbox state when changing to archived states
 
 **EventCoordinator** (`src/services/event-coordinator.ts`)
 
 - **Responsibility**: Unified vault event handling with debouncing and batching
 - **Key Patterns**: Event aggregation, debouncing, batch processing
-- **Interface**: `onFileChange()`, `initialize()`, `setVaultScanner()`, `setPropertySearchEngine()`, plus inherited `on/off/removeAllListeners` from `EventEmitter<EventCoordinatorEvents>` (typed event subscription; emit is protected). See [EventEmitter](#eventemittert-src-utilsevent-emitterts).
+- **Interface**: `onFileChange()`, `initialize()`, plus inherited `on/off/removeAllListeners` from `EventEmitter<EventCoordinatorEvents>` (typed event subscription; emit is protected). `VaultScanner` and `PropertySearchEngine` are injected as optional constructor parameters. See [EventEmitter](#eventemittert-src-utilsevent-emitterts).
 
 **PropertySearchEngine** (`src/services/property-search-engine.ts`)
 
@@ -339,7 +340,7 @@ graph TB
 - **Interface**: `isCompleted()`, `isActive()`, `isWaiting()`, `isInactive()`, `isArchived()`, `getGroup()`, `getAllKeywords()`, `getKeywordsForGroup()`, `getBuiltinActiveKeywords()`, `getBuiltinInactiveKeywords()`, `getBuiltinWaitingKeywords()`, `getBuiltinCompletedKeywords()`, `getBuiltinArchivedKeywords()`, `getDefaultInactive()`, `getDefaultActive()`, `getDefaultCompleted()`
 - **Default Keywords**: Provides methods to get default keywords for each group (`getDefaultInactive()`, `getDefaultActive()`, `getDefaultCompleted()`) which prefer standard keywords (TODO, DOING, DONE) when available
 - **Used by**: TaskParser, OrgModeTaskParser, VaultScanner (owns instance), TaskWriter, EditorController, RecurrenceCoordinator, UI components (task-list-view, task-renderer), task-sort, task-urgency
-- **Ownership**: VaultScanner creates and owns the KeywordManager instance; components get it via `vaultScanner.getKeywordManager()`
+- **Ownership**: the initial instance is created in `main.ts`; `VaultScanner` recreates it on settings updates and exposes the current instance via `vaultScanner.getKeywordManager()`
 
 **TaskStateTransitionManager** (`src/services/task-state-transition-manager.ts`)
 
@@ -362,7 +363,7 @@ graph TB
 - **Key Patterns**: Per-task tracking, delayed updates, vault-based file operations, pure-math date calculation
 - **Interface**: `scheduleRecurrence()`, `cancelRecurrence()`, `performRecurrenceUpdate()`, `calculateNextDates()`, `destroy()`, `setTaskUpdateCoordinator()`, `setKeywordManager()`
 - **Inline Date Math**: `calculateNextDates()` is an inlined public method on `RecurrenceCoordinator` (the previous delegation to a separate `RecurrenceManager` service has been removed). It accepts the structural `RecurrenceDateLineParser` interface — which replaces the deleted `DateLineParser` interface — and any object satisfying its `getDateLineType(line, indent)` shape is accepted. The pure-math result is typed as `RecurrenceDateCalculationResult`, while the orchestration result (`performRecurrenceUpdate`) is typed as `RecurrenceUpdateResult`. The two result types are intentionally separate shapes (no field overlap — cross-assignment is a compile error) to prevent accidental confusion between math output and orchestration outcome. Warning-period semantics: `-Nd` (non-firstOnly) is preserved across repeats; `--Nd` (isFirstOnly) is stripped after first occurrence (returned as `null` to signal stripping downstream).
-- **Vault-Based Reads**: `getFileContent()` always reads from vault (not editor buffer) to ensure latest content
+- **Editor-Aware Reads**: `getFileContent()` prefers the live editor buffer (source-mode view of the file) and falls back to a vault read, so a recurrence update never overwrites unsaved edits
 - **TaskUpdateCoordinator Integration**: Uses `setTaskUpdateCoordinator()` to avoid circular dependency, delegates all updates to `TaskUpdateCoordinator`
 - **State Independence**: For recurring tasks (those with repeat dates), advances dates regardless of current task state (since DONE state is intentionally skipped during completion)
 - **Used by**: TaskUpdateCoordinator, VaultScanner
@@ -485,7 +486,7 @@ graph TB
 - **Key Patterns**: Single-instance active dialog management, backdrop handling, keyboard navigation, positioning logic
 - **Interface**: `hide()`, `isVisible()`, `cleanup()`, `positionDialog()`, `attachGlobalListeners()`, `detachGlobalListeners()`, `moveFocus()`
 - **Features**: Global menu management (only one menu open at a time); phone-specific backdrop and centered positioning; desktop cursor-based positioning with viewport bounds checking; arrow key navigation; scroll-to-hide behavior; mobile touch suppression delay
-- **Subclasses**: DatePicker, StateMenuBuilder, TaskContextMenu
+- **Subclasses**: DatePicker, TaskContextMenu (`StateMenuBuilder` is a standalone class, not a `BaseDialog` subclass)
 
 **BaseDropdown** (`src/view/components/base-dropdown.ts`)
 
@@ -518,8 +519,9 @@ graph TB
 - **Responsibility**: View mode and sort method management for the task list, including three-block sorting (active, future, completed)
 - **Key Patterns**: Cached keyword sort config, three-block sorting system
 - **Interface**: `getViewMode()`, `setViewMode()`, `getSortMethod()`, `setSortMethod()`, `filterTasksByViewMode()`, `transformForView()`, `getKeywordSortConfig()`
-- **Sort Methods**: default, sortByScheduled, sortByDeadline, sortByClosedDate, sortByPriority, sortByUrgency, sortByKeyword
+- **Sort Methods**: default, sortByScheduled, sortByDeadline, sortByClosedDate, sortByStarted, sortByPriority, sortByUrgency, sortByKeyword
 - **View Modes**: showAll, sortCompletedLast, hideCompleted
+- **Hidden-count invariant**: `countHiddenByFilters()` shares `classifyTask` + warning-period settings with `transformForView()`, so shown + hidden-future + hidden-completed always equals the input count
 - **Used by**: TaskListView
 
 **ChunkedRenderQueue** (`src/view/task-list/chunked-render-queue.ts`)
@@ -536,7 +538,7 @@ graph TB
 - **Responsibility**: DOM element caching for task items to avoid redundant re-rendering
 - **Key Patterns**: Path:line key-based cache, Map storage
 - **Interface**: `get(task)`, `set(task, element)`, `invalidate(task)`, `invalidateByKey(key)`, `clear()`, `has(task)`
-- **Cache Key**: `${task.path}:${task.line}`
+- **Cache Key**: `getTaskKey(task)` — `${task.path}:${task.line}`, plus `:${cellIndex}` for table-cell tasks
 - **Used by**: TaskListView
 
 **EmbeddedTaskItemRenderer** (`src/view/embedded-task-list/embedded-task-item-renderer.ts`)
@@ -567,7 +569,7 @@ graph TB
 **DashboardCodeBlockProcessor** (`src/view/embedded-dashboard/dashboard-code-block-processor.ts`)
 
 - **Responsibility**: `todoseq-dashboard` code block processing — aggregated dashboard cards (counts grouped by state, priority, keyword, tag, or date bucket) embedded in any note
-- **Key Patterns**: Post-processor registration, 150ms-debounced `TaskStateManager` subscription (no skip-echo flag — dashboards never write tasks), code block tracking with file delete/rename untracking
+- **Key Patterns**: Post-processor registration, archived-task exclusion at the processor input gate (`filterArchivedTasks()`, matching the vault-scanner and Task List rules), 150ms-debounced `TaskStateManager` subscription (no skip-echo flag — dashboards never write tasks), code block tracking with file delete/rename untracking
 - **Interface**: `registerProcessor()`, `refreshAllDashboards()`, `updateSettings()`, `cleanup()`
 - **Used by**: `PluginLifecycleManager` (constructed + registered after the embedded list processor)
 
@@ -604,6 +606,7 @@ graph TB
 - **Responsibility**: Complex regex-based task extraction for Markdown files
 - **Key Patterns**: State machine, builder pattern, security-first design
 - **Interface**: Implements `ITaskParser`, `parseFile()`, `parseLine()`, language-aware parsing
+- **Section headings**: `parseFile`'s line loop tracks the nearest enclosing markdown heading into `Task.parentHeading` (hashes stripped; heading-task lines carry their own text; skipped inside code fences) — the data behind the search `heading:` prefix
 - **Creation**: TaskParser.create(keywordManager, app, urgencyCoefficients, parserSettings) - first parameter must be KeywordManager
 - **Subtasks**: Supports subtask detection via indented checkbox lines (see [Subtasks](#subtasks) section)
 
@@ -653,13 +656,14 @@ graph TB
 - **Key Patterns**: Parser combinators, syntax tree construction, AST caching with FIFO eviction
 - **Interface**: Query parsing, AST generation, property filter parsing, `clearCache()` for AST cache invalidation
 - **AST Cache**: `astCache: Map<string, SearchNode>` capped at 50 entries (`AST_CACHE_MAX_SIZE`) with strict FIFO eviction on insertion (`astCache.keys().next().value → delete`) when the size cap is reached. Repeat calls for the same query string return the identical AST instance — the AST is immutable post-parse (SearchEvaluator never mutates it), so sharing is safe. Invalid queries are not cached: the parser throws `SearchError` before reaching the cache-write branch, so invalid-query evaluation still re-parses on each call.
-- **Validation contract**: closed-domain values are rejected at parse time — `priority:` accepts only high/med/medium/low/none (aliases a/b/c) and date prefixes reject date-shaped calendar-invalid values (`2026-02-30`), including range bounds and `<`/`<=`/`>`/`>=` forms; open-domain values (path, file, tag, content, state, non-date words) stay accepted. Operator tokens are uppercase-only (`OR`/`AND`); lowercase `or`/`and` are ordinary search words. Errors are `SearchError`s surfaced to users via `Search.getError()`.
+- **Validation contract**: closed-domain values are rejected at parse time — `priority:` accepts only high/med/medium/low/none (aliases a/b/c) and date prefixes reject date-shaped calendar-invalid values (`2026-02-30`), including range bounds and `<`/`<=`/`>`/`>=` forms; open-domain values (path, file, tag, content, description, heading, state, non-date words) stay accepted. Operator tokens are uppercase-only (`OR`/`AND`); lowercase `or`/`and` are ordinary search words. Errors are `SearchError`s surfaced to users via `Search.getError()`.
 
 **SearchEvaluator** (`src/search/search-evaluator.ts`)
 
 - **Responsibility**: Task matching and filtering based on query AST
 - **Key Patterns**: Visitor pattern, filter chain execution, property search integration
 - **Interface**: Task evaluation, result filtering, `evaluatePropertyFilter()`
+- **Default search domain**: an unprefixed term or phrase (`evaluateTerm`/`evaluatePhrase`, via `getSearchableFields`) matches the full original task line (`rawText`), the task's `DESCRIPTION:` line, the file path, or the filename. Use `content:` for the task line alone, `description:` for the description alone, and `heading:` for the enclosing heading. `text` is deliberately _not_ indexed: it is `rawText` with the keyword/priority/reference markers stripped, hence a contiguous substring that can never match something `rawText` does not.
 - **Note**: evaluation assumes parse-time validation has run — `DateUtils.parseDateValue` fails closed on invalid dates so the evaluator's remaining `false` fallbacks are last-resort, not primary behavior
 
 **SearchTokenizer** (`src/search/search-tokenizer.ts`)
@@ -964,7 +968,7 @@ Coordinator->>TaskWriter: performFileWrite()
 TaskWriter->>Editor: editor.replaceRange() (if source mode)
 Editor-->>TaskWriter: Success
 TaskWriter-->>Coordinator: Success (with lineDelta)
-Coordinator->>StateMgr: finalizeTaskState()
+Coordinator->>Coordinator: finalizeTaskState()
 StateMgr->>Views: notifySubscribers()
 Note over Coordinator: For state updates only
 Coordinator->>Coordinator: performDirectEditorCheckboxUpdate()
@@ -976,14 +980,14 @@ alt Recurring task completed (originalNewState is completed)
 end
 
 Note over RecurCoord: Recurrence Update (after delay)
-RecurCoord->>RecurCoord: getFileContent() (from vault)
+RecurCoord->>RecurCoord: getFileContent() (editor buffer first)
 RecurCoord->>Coordinator: updateTaskRecurrence()
 Note over Coordinator: Updates dates and state atomically
 Coordinator->>TaskWriter: performFileWrite()
 TaskWriter->>Editor: editor.replaceRange() / vault.process()
 Editor-->>TaskWriter: Success
 TaskWriter-->>Coordinator: Success
-Coordinator->>StateMgr: finalizeTaskState()
+Coordinator->>Coordinator: finalizeTaskState()
 Coordinator->>VaultScan: addSkipIncrementalChange()
 Coordinator->>StateMgr: notifySubscribers()
 
@@ -1065,27 +1069,21 @@ graph LR
         AND[AND Operation]
         OR[OR Operation]
         NOT[NOT Operation]
-        TEXT[Text Match]
-        TAG[Tag Match]
-        DATE[Date Range]
-        PRIORITY[Priority Filter]
-        STATE[State Filter]
-        PROPERTY[Property Filter]
-        PROPERTY_OR[Property OR Operation]
-        PROPERTY_COMP[Property Comparison]
+        TERM[Term Match]
+        PHRASE[Phrase Match]
+        PREFIX[prefix_filter]
+        RANGE[range_filter]
+        PROPERTY[property_filter]
     end
 
     Parser -.-> AND
     Parser -.-> OR
     Parser -.-> NOT
-    Parser -.-> TEXT
-    Parser -.-> TAG
-    Parser -.-> DATE
-    Parser -.-> PRIORITY
-    Parser -.-> STATE
+    Parser -.-> TERM
+    Parser -.-> PHRASE
+    Parser -.-> PREFIX
+    Parser -.-> RANGE
     Parser -.-> PROPERTY
-    Parser -.-> PROPERTY_OR
-    Parser -.-> PROPERTY_COMP
 
     classDef input fill:#e3f2fd
     classDef parser fill:#f3e5f5
@@ -1098,7 +1096,7 @@ graph LR
     class Tokenizer,Parser,Validator parser
     class Evaluator,FilterChain,SortEngine,PropertySearch evaluator
     class TaskSource,ViewUpdater,EmbeddedUpdater integration
-    class AND,OR,NOT,TEXT,TAG,DATE,PRIORITY,STATE,PROPERTY,PROPERTY_OR,PROPERTY_COMP ast
+    class AND,OR,NOT,TERM,PHRASE,PREFIX,RANGE,PROPERTY ast
     class SearchDropdown,SearchSuggestions ui
 ```
 
@@ -1122,8 +1120,8 @@ graph LR
 
 - **Inline State Skipping**: When completing a recurring task, TODOseq writes the final inactive state (e.g., TODO) directly instead of DONE. The `TaskUpdateCoordinator` tracks `originalNewState` to detect user's completion intent and schedules `RecurrenceCoordinator` for date advancement.
 - **Delayed Updates**: Recurring tasks use 50ms delay via `RecurrenceCoordinator` before advancing dates (scheduled by `TaskUpdateCoordinator`)
-- **Vault-Based Reads**: `RecurrenceCoordinator.getFileContent()` always reads from vault (not editor buffer) to ensure latest content
-- **File Write Consistency**: `TaskWriter.writeLines()` ensures all file writes are editor-aware
+- **Editor-Aware Reads**: `RecurrenceCoordinator.getFileContent()` prefers the live editor buffer and falls back to the vault — never read from disk over a user's unsaved edits
+- **File Write Consistency**: `TaskWriter` routes every write through the Editor API (active source-mode files) or a single `vault.process()` (everything else), so cursor, selection, and folds are preserved
 - **Atomic CLOSED Date**: For non-source mode, CLOSED date is handled atomically with task line update in a single `vault.process()` operation
 - **Line Delta Tracking**: Date update methods return `Task & { lineDelta?: number }` to allow `TaskUpdateCoordinator` to adjust subsequent task indices
 - **Recovery Processing**: `VaultScanner` identifies completed recurring tasks on vault reload and coordinates with `RecurrenceCoordinator` to prevent duplicate updates
@@ -1251,16 +1249,15 @@ interface ITaskParser {
 The [`ParserRegistry`](src/parser/parser-registry.ts) manages multiple parsers and routes files to the appropriate parser based on file extension:
 
 - **Registration**: Parsers are registered with `registerParser(parser: ITaskParser)`
-- **Routing**: `getParserForFile(filePath)` returns the appropriate parser
+- **Routing**: `getParserForExtension(extension)` returns the appropriate parser
 - **Delegation**: `parseFile()` and `parseLine()` delegate to the correct parser
 
 ### Parser Lifecycle
 
-1. **Initialization**: VaultScanner creates KeywordManager and TaskParser internally during construction. TaskParser.create() receives KeywordManager as the first argument.
-2. **Settings Updates**: When settings change, VaultScanner creates a new KeywordManager and updates parsers via `updateConfig()`
+1. **Initialization**: `PluginLifecycleManager` creates the `ParserRegistry`, then registers `TaskParser` (and conditionally `OrgModeTaskParser` / `CodeCommentTaskParser` when their settings are enabled) via `registry.register(parser)`. `TaskParser.create()` receives KeywordManager as the first argument. `VaultScanner` is constructed with the fully configured registry.
+2. **Settings Updates**: When settings change, `VaultScanner.updateSettings()` creates a new KeywordManager and updates parsers via `updateConfig()`; `TodoTracker.recreateParser()` dynamically registers/unregisters the org-mode and code-comment parsers when their feature toggles change.
 3. **File Scanning**: `VaultScanner` uses `ParserRegistry` to parse files based on extension
-4. **Parser Registration**: Additional parsers (e.g., OrgModeTaskParser) are created with KeywordManager via `OrgModeTaskParser.create(keywordManager, app, coefficients)` and registered via `vaultScanner.registerParser()`
-5. **Parser Access**: Use `vaultScanner.getParser()` to access the shared parser instance
+4. **Parser Access**: Use `vaultScanner.getParser()` (markdown parser) or `vaultScanner.getParserRegistry()` to access registered parsers
 
 ### Supported Parsers
 
@@ -1291,9 +1288,10 @@ interface Task {
   line: number; // Line number in file
   rawText: string; // Original full line
   indent: string; // Leading whitespace
-  listMarker: string; // List marker (+ space)
+  listMarker: string; // List marker plus trailing space (e.g. "- ")
   footnoteMarker?: string; // Footnote marker
   text: string; // Task content (without keywords/priority)
+  description?: string; // DESCRIPTION: line text
   textDisplay?: string; // Lazy-computed markdown-stripped text for display
   state: string; // Current state (TODO, DOING, etc.)
   completed: boolean; // Completion status
@@ -1303,16 +1301,11 @@ interface Task {
   deadlineDate: Date | null;
   deadlineDateRepeat: DateRepeatInfo | null; // Repeat info for deadline date
   closedDate: Date | null; // Closed date (for completed tasks)
-
-  // Date repeat info (org-mode compatible repeating dates)
-  scheduledDateRepeat: DateRepeatInfo | null; // Repeat info for scheduled date
-  deadlineDateRepeat: DateRepeatInfo | null; // Repeat info for deadline date
+  startedDate: Date | null; // STARTED date (entry into an active state)
 
   // Warning periods
-  scheduledWarningPeriod: number | null; // Warning period for scheduled date
-  deadlineWarningPeriod: number | null; // Warning period for deadline date
-  scheduledFirstOnlyWarningPeriod: number | null; // First-only warning period for scheduled
-  deadlineFirstOnlyWarningPeriod: number | null; // First-only warning period for deadline
+  scheduledWarningPeriod: WarningPeriodInfo | null; // isFirstOnly marks --Nd syntax
+  deadlineWarningPeriod: WarningPeriodInfo | null;
   tail?: string; // Trailing characters
   urgency: number | null; // Calculated urgency score
   file?: TFile; // Obsidian file reference
@@ -1322,36 +1315,36 @@ interface Task {
   embedReference?: string;
   footnoteReference?: string;
   quoteNestingLevel?: number; // Number of nested quote levels (e.g., 1 for "> ", 2 for "> > ")
+  headingLevel?: number; // Heading level (1-6) for heading tasks
   subtaskCount: number; // Total number of subtasks (checkbox lines indented under this task)
   subtaskCompletedCount: number; // Number of completed subtasks
+  _lastUpdateTime?: number; // Timestamp of last TODOseq write (race prevention)
+  isTableTask?: boolean; // Parsed from a markdown table cell
+  tableCell?: { cellIndex: number }; // Position info for table cell tasks
 }
 ```
 
 ### Search Types and Interfaces
 
 ```typescript
-// Search query AST node types
-interface SearchNode {
+// Search query AST node types (src/search/search-types.ts)
+export interface SearchNode {
   type:
-    | 'AND'
-    | 'OR'
-    | 'NOT'
-    | 'TEXT'
-    | 'TAG'
-    | 'DATE'
-    | 'PRIORITY'
-    | 'STATE'
-    | 'PROPERTY';
+    | 'and'
+    | 'or'
+    | 'not'
+    | 'term'
+    | 'phrase'
+    | 'prefix_filter'
+    | 'range_filter'
+    | 'property_filter';
+  children?: SearchNode[]; // and/or/not operands
   value?: string;
-  left?: SearchNode;
-  right?: SearchNode;
-}
-
-// Property search configuration
-interface PropertySearchQuery {
-  key: string;
-  value: string;
-  caseSensitive: boolean;
+  field?: SearchPrefix | 'property'; // prefix_filter field (path, tag, state, scheduled, ...)
+  start?: string; // range_filter bounds
+  end?: string;
+  position?: number;
+  exact?: boolean; // value was originally quoted (exact match)
 }
 
 // Search sort methods
@@ -1360,6 +1353,7 @@ type SortMethod =
   | 'sortByScheduled'
   | 'sortByDeadline'
   | 'sortByClosedDate'
+  | 'sortByStarted'
   | 'sortByPriority'
   | 'sortByUrgency'
   | 'sortByKeyword';
@@ -1409,7 +1403,7 @@ The indicator uses monospace font and appears in both the main task list and emb
 - **Task interface** ([`src/types/task.ts`](src/types/task.ts)): Added `subtaskCount` and `subtaskCompletedCount` fields
 - **TaskParser** ([`src/parser/task-parser.ts`](src/parser/task-parser.ts)): Added `isSubtaskLine()` and `extractSubtasks()` methods
 - **TaskUtils** ([`src/utils/task-utils.ts`](src/utils/task-utils.ts)): Added `hasSubtasks()` and `getSubtaskDisplayText()` functions
-- **TaskRenderer** ([`src/view/task-list/task-renderer.ts`](src/view/task-list/task-renderer.ts)): Added `buildSubtaskIndicator()` method
+- **TaskItemRenderer** ([`src/view/task-list/task-item-renderer.ts`](src/view/task-list/task-item-renderer.ts)): `buildSubtaskIndicator()` method
 - **Embedded lists** ([`src/view/embedded-task-list/task-list-renderer.ts`](src/view/embedded-task-list/task-list-renderer.ts)): Added subtask indicator rendering
 
 ### 1. Language Support Extensions
@@ -1483,13 +1477,13 @@ The indicator uses monospace font and appears in both the main task list and emb
 4. **Editor Operations**: Use `EditorController` for intent detection and `TaskWriter` for file operations
 5. **File Race Conditions**: Use `ChangeTracker` to track expected file changes with content hashing; use `RecurrenceCoordinator` for centralized recurrence management; use per-task locking in `TaskUpdateCoordinator` for rapid update handling
 6. **Rapid Update Handling**: `TaskUpdateCoordinator` uses per-task locking (`pendingTaskUpdates` Map) to serialize rapid updates to the same task. Per-file queueing (`fileUpdateQueues` Map) ensures serialized writes to same file.
-7. **Editor/File Sync**: When reading file content for recurrence updates, use `RecurrenceCoordinator.getFileContent()` which always reads from vault to ensure latest content
+7. **Editor/File Sync**: `RecurrenceCoordinator.getFileContent()` prefers the live editor buffer and falls back to the vault — never read from disk over a user's unsaved edits
 8. **Skip Set Expiration**: The vault scanner's `skipIncrementalChanges` uses timestamp-based expiration (5 seconds) instead of setTimeout to handle chained rapid updates
 9. **Cross-Platform Hashing**: `ChangeTracker` uses a consistent hash function (not Node.js crypto) for cross-platform compatibility
 10. **Performance Testing**: Test with large vaults (1000+ files, 10000+ tasks)
 11. **Embedded Lists**: Use `TodoseqCodeBlockProcessor` with separate lifecycle from main plugin
 12. **Parser Registry**: All parsers are created and registered in `PluginLifecycleManager` before `VaultScanner` creation; `VaultScanner` receives fully configured `ParserRegistry` via constructor
-13. **Org-Mode Limitations**: Org-mode files support vault scanning only; editor styling is not supported
+13. **Org-Mode Limitations**: Org-mode tasks are detected by vault scanning only and get no editor styling; state changes happen from the Task List (the headline keyword is rewritten in place)
 14. **Property Search Initialization**: `PropertySearchEngine` initializes lazily - ensure to await `initialize()` before using
 15. **Event Debouncing**: `EventCoordinator` handles debouncing of file change events automatically
 16. **Property Cache Invalidation**: File changes automatically invalidate the property cache via EventCoordinator

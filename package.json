@@ -1,6 +1,6 @@
 {
   "name": "todoseq",
-  "version": "0.21.2",
+  "version": "0.22.0",
   "description": "TODOseq lightweight, keyword-based task tracker for Obsidian",
   "license": "MIT",
   "author": "Stephen Cross",
@@ -10,8 +10,8 @@
     "node": ">=20.14.0"
   },
   "devDependencies": {
-    "@codemirror/state": "6.5.0",
-    "@codemirror/view": "6.38.6",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.13",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@types/jest": "^30.0.0",
@@ -61,6 +61,9 @@
     "test:integration:fast": "NODE_OPTIONS='--disable-warning=DEP0205' npx playwright test --config=tests/integration/playwright.config.ts",
     "test:integration:coverage": "NODE_OPTIONS='--disable-warning=DEP0205' COLLECT_COVERAGE=1 npx playwright test --config=tests/integration/playwright.config.ts --project=obsidian",
     "test:coverage": "npm test && npm run build:debug && npm run test:integration:coverage && node scripts/convert-v8-to-istanbul.mjs && node scripts/merge-coverage.mjs && node scripts/coverage-gap.mjs",
+    "perf:node": "node --no-warnings node_modules/.bin/jest --config jest.perf.config.json --runInBand --silent",
+    "perf:fixture": "ts-node scripts/perf/generate-fixture-cli.ts",
+    "perf:obsidian": "npm run build && PERF=1 NODE_OPTIONS='--disable-warning=DEP0205' npx playwright test --config=tests/integration/playwright.config.ts perf.test.ts",
     "coverage:merge": "node scripts/merge-coverage.mjs",
     "coverage:gap": "node scripts/coverage-gap.mjs"
   },

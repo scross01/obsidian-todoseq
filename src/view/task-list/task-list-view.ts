@@ -13,6 +13,7 @@ import {
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
+import { TaskClassification } from '../../utils/task-sort';
 import { Search } from '../../search/search';
 import {
   SearchOptionsDropdown,
@@ -42,6 +43,7 @@ import {
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TaskElementCache } from './task-element-cache';
 import { ChunkedRenderQueue } from './chunked-render-queue';
+import { reconcileRowsInPlace } from './dom-reconcile';
 import { TaskItemRenderer } from './task-item-renderer';
 import { TaskDragDropHandler } from './task-drag-drop';
 import {
@@ -399,9 +401,18 @@ export class TaskListView extends ItemView {
   }
 
   /** Non-mutating transform for rendering */
-  private transformForView(tasks: Task[], mode: TaskListViewMode): Task[] {
+  private transformForView(
+    tasks: Task[],
+    mode: TaskListViewMode,
+    outClassifications?: Map<Task, TaskClassification>,
+  ): Task[] {
     const sortMethod = this.getSortMethod();
-    return this.taskListFilter.transformForView(tasks, mode, sortMethod);
+    return this.taskListFilter.transformForView(
+      tasks,
+      mode,
+      sortMethod,
+      outClassifications,
+    );
   }
 
   /** Search query (persisted on root contentEl attribute to survive re-renders) */
@@ -992,9 +1003,12 @@ export class TaskListView extends ItemView {
         'state',
         'priority',
         'content',
+        'description',
+        'heading',
         'scheduled',
         'deadline',
         'closed',
+        'started',
       ];
       if (
         validPrefixes.includes(prefixBase) ||
@@ -1753,6 +1767,21 @@ export class TaskListView extends ItemView {
     this.taskItemRenderer.updateTaskElementContent(task, element);
   }
 
+  /**
+   * The stable key an existing list row can be re-identified by — the DOM
+   * counterpart of getTaskKey(). The format must match getTaskKey() in
+   * task-utils.ts (`path:line[:cellIndex]`).
+   */
+  private getRowKeyFromElement(el: Element): string | null {
+    const path = el.getAttribute('data-path');
+    const line = el.getAttribute('data-line');
+    if (!path || !line) return null;
+    const cellIndex = el.getAttribute('data-cell-index');
+    return cellIndex !== null
+      ? `${path}:${line}:${cellIndex}`
+      : `${path}:${line}`;
+  }
+
   // Set up scroll listener for lazy loading
   private setupSentinelObserver(): void {
     this.cleanupSentinelObserver();
@@ -1921,31 +1950,26 @@ export class TaskListView extends ItemView {
 
     const mode = this.getViewMode();
     const allTasks = this.tasks ?? [];
-    let visible = this.transformForView(allTasks, mode);
+    // One classification pass shared by the sort and (when the empty state
+    // needs it) the hidden-count pass below — same map, same `now`.
+    const classifications = new Map<Task, TaskClassification>();
+    let visible = this.transformForView(allTasks, mode, classifications);
     const preSearchCount = visible.length;
 
     // Apply search filtering
     const q = this.getSearchQuery().trim();
     if (q.length > 0) {
       try {
-        // Use new advanced search functionality
-        const searchResults = await Promise.all(
-          visible.map(async (t) => {
-            const matches = await Search.evaluate(
-              q,
-              t,
-              this.isCaseSensitive,
-              this.plugin.settings,
-              this.plugin.propertySearchEngine ?? undefined,
-            );
-            return { task: t, matches };
-          }),
+        // Replace the per-row Promise.all fan-out with the single-pass bulk
+        // filter: property engines re-solve once per unique filter, then the
+        // whole tree evaluates synchronously over the task set.
+        visible = await Search.filterTasks(
+          visible,
+          q,
+          this.isCaseSensitive,
+          this.plugin.settings,
+          this.plugin.propertySearchEngine ?? undefined,
         );
-
-        // Filter based on the results
-        visible = searchResults
-          .filter((result) => result.matches)
-          .map((result) => result.task);
         this.searchError = null;
       } catch {
         // If there's an error in parsing, fall back to simple search
@@ -2074,7 +2098,11 @@ export class TaskListView extends ItemView {
         buildEmptyStateCopy({
           hasAnyTasks: allTasks.length > 0,
           hasSearchQuery: q.length > 0,
-          hidden: this.taskListFilter.countHiddenByFilters(allTasks, mode),
+          hidden: this.taskListFilter.countHiddenByFilters(
+            allTasks,
+            mode,
+            classifications,
+          ),
         });
 
       title.setText(emptyTitle);
@@ -2103,19 +2131,10 @@ export class TaskListView extends ItemView {
 
       // Get all existing elements by their stable ID (path:line[:cellIndex])
       const existingElements = new Map<string, HTMLElement>();
-      const existingKeys = new Set<string>();
       list.querySelectorAll('li.todoseq-task-item').forEach((el) => {
-        const path = el.getAttribute('data-path');
-        const line = el.getAttribute('data-line');
-        const cellIndex = el.getAttribute('data-cell-index');
-        if (path && line) {
-          // Key format must match getTaskKey() in task-utils.ts
-          const key =
-            cellIndex !== null
-              ? `${path}:${line}:${cellIndex}`
-              : `${path}:${line}`;
+        const key = this.getRowKeyFromElement(el);
+        if (key) {
           existingElements.set(key, el as HTMLElement);
-          existingKeys.add(key);
         }
       });
 
@@ -2132,9 +2151,9 @@ export class TaskListView extends ItemView {
       // Track which elements we've already used this render cycle
       const usedKeys = new Set<string>();
 
-      // Double-buffer: build all elements in a DocumentFragment first (no yields for refresh),
-      // then swap into DOM in a single operation to prevent flicker
-      const fragment = await this.renderQueue.renderToFragment(
+      // Build all elements first (no yields during incremental refresh to
+      // prevent flicker), preserving reuse for keys present in the DOM.
+      const rows = await this.renderQueue.renderToElements(
         toRender,
         (task) => {
           const key = getTaskKey(task);
@@ -2168,13 +2187,19 @@ export class TaskListView extends ItemView {
         return;
       }
 
-      // No-clear swap: create new list element, populate it, then replace old with new
-      // This prevents the brief empty flash from innerHTML = ''
-      const newList = list.cloneNode(false) as HTMLElement;
-      newList.appendChild(fragment);
-      list.parentNode?.replaceChild(newList, list);
-
-      // Note: We don't need to manually remove old elements - they're gone with the detached old list
+      // In-place keyed reconcile (see dom-reconcile.ts): the list element is
+      // never replaced, unchanged rows keep their DOM node (no re-layout),
+      // stale rows are detached, and changed/new rows are placed with
+      // minimal insertBefore calls. The previous double-buffer swap
+      // (cloneNode + replaceChild) re-parented every row on every refresh,
+      // forcing a whole-list relayout per keystroke.
+      reconcileRowsInPlace(list as HTMLElement, rows, (child) => {
+        // Only task rows participate — anything else in the list (e.g.
+        // the lazy-load sentinel, removed later by resetLazyLoading)
+        // never counts as stale.
+        const key = this.getRowKeyFromElement(child);
+        return key !== null && !keepKeys.has(key);
+      });
 
       // Update lazy loading state
       this.renderQueue.clear();

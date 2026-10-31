@@ -31,6 +31,7 @@ export interface Task {
   footnoteReference?: string; // footnote reference like [^2]
   quoteNestingLevel?: number; // number of nested quote levels (e.g., 1 for "> ", 2 for "> > ")
   headingLevel?: number; // heading level (1-6) for heading tasks (1 for "# ", 2 for "## ", etc.)
+  parentHeading?: string; // nearest enclosing markdown heading text (hashes stripped) at parse time; undefined for org/code-comment tasks
   subtaskCount: number; // total number of subtasks (checkbox lines indented under this task)
   subtaskCompletedCount: number; // number of completed subtasks
   _lastUpdateTime?: number; // timestamp of last task update by TODOseq (used for race condition prevention)

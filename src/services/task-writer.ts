@@ -10,6 +10,7 @@ import {
   getTaskIndent,
   getDateLineIndent,
 } from '../utils/task-line-utils';
+import { DateParser } from '../parser/date-parser';
 import TodoTracker from '../main';
 import { getStateTransitionManager } from './task-update-coordinator';
 
@@ -117,7 +118,17 @@ export class TaskWriter {
         // Handle spacing properly based on whether there's a list marker
         // Note: task.listMarker already includes trailing space if present
         const textPart = task.text ? task.text : '';
-        newLine = `${task.indent}${task.listMarker || ''}${textPart}`;
+        // Same separator rule as the state-compose branch below: keep the
+        // keyword-less text off an unwhitespace-terminated prefix (org-mode
+        // heading stars) so the line stays a valid headline.
+        const separator =
+          !task.listMarker &&
+          task.indent !== '' &&
+          textPart !== '' &&
+          !/\s$/.test(task.indent)
+            ? ' '
+            : '';
+        newLine = `${task.indent}${separator}${task.listMarker || ''}${textPart}`;
       }
 
       // Add trailing comment end characters if they were present in the original task
@@ -148,7 +159,15 @@ export class TaskWriter {
       const textPart = task.text ? ` ${task.text}` : ' ';
       // Check if this is a footnote task and include the footnote marker
       const footnoteMarker = task.footnoteMarker || '';
-      newLine = `${task.indent}${footnoteMarker}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
+      // Tasks without a list marker (org-mode heading stars, code comments)
+      // compose the keyword straight onto the prefix. Keep them separated so
+      // native syntax highlighting keeps working (`* TODO x`, not `*TODO x`).
+      // No separator when the prefix is empty (column-0 tasks) or already
+      // whitespace-terminated — existing output stays byte-identical.
+      const prefix = `${task.indent}${footnoteMarker}`;
+      const separator =
+        !task.listMarker && prefix !== '' && !/\s$/.test(prefix) ? ' ' : '';
+      newLine = `${prefix}${separator}${task.listMarker || ''}${newState}${priorityPart}${textPart}`;
 
       // Add trailing comment end characters if they were present in the original task
       if (task.tail) {
@@ -219,9 +238,23 @@ export class TaskWriter {
     // inputs, and is consumed by the vault, editor, and accumulator branches.
     const closedAction = this.resolveClosedDateAction(task, newState);
 
-    // STARTED tracking: trigger on first entry into an active state.
-    // Idempotent and one-way — never removed on reactivation (first-ever-start).
+    // STARTED tracking: trigger on entry into an active state.
+    // 'first' (default): first-ever start — insert once, never rewrite.
+    // 'last': the stamp records the most recent entry into an active state
+    // — rewritten in place on fresh (non-active→active) transitions only;
+    // active→active switches keep the stamp (the work period never ended).
     const isActiveState = this.keywordManager.isActive(newState);
+    const startedMode = settings?.startedDateMode ?? 'first';
+    const freshActiveEntry =
+      isActiveState && !this.keywordManager.isActive(task.state);
+    const shouldStampStarted =
+      Boolean(settings?.trackStartedDate) &&
+      isActiveState &&
+      (startedMode === 'last'
+        ? freshActiveEntry || !task.startedDate
+        : !task.startedDate);
+    const allowStartedOverwrite = startedMode === 'last' && freshActiveEntry;
+    const startedStampDate = shouldStampStarted ? new Date() : null;
 
     // Check if target is the active file in a MarkdownView
     // Using getActiveViewOfType() is safer than accessing workspace.activeLeaf directly
@@ -246,6 +279,8 @@ export class TaskWriter {
     let updatedClosedDate = task.closedDate;
     let updatedStartedDate = task.startedDate;
     let startedInserted = false;
+    let startedOverwrote = false;
+    let retainedStartedDate: Date | null = null;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (file && file instanceof TFile) {
@@ -306,22 +341,48 @@ export class TaskWriter {
             this.removeDateLine(lines, task.line, 'CLOSED', task);
           }
 
-          // Handle STARTED date atomically (first entry into active state).
-          // updateOrInsertStartedDateLine is idempotent: an existing STARTED
-          // line is retained untouched (no duplicate, no overwrite).
-          if (
-            isActiveState &&
-            settings?.trackStartedDate &&
-            !task.startedDate
-          ) {
-            const startedDateStr = DateUtils.formatStartedDate(new Date());
+          // Handle STARTED date atomically (entry into an active state,
+          // per the startedDateMode rule). updateOrInsertStartedDateLine
+          // never duplicates; it rewrites in place only when the 'last'
+          // mode grants the overwrite (fresh re-entry).
+          if (shouldStampStarted && startedStampDate) {
+            const startedDateStr =
+              DateUtils.formatStartedDate(startedStampDate);
             const startedResult = this.updateOrInsertStartedDateLine(
               lines,
               task.line,
               startedDateStr,
               task,
+              allowStartedOverwrite,
             );
             startedInserted = startedResult.lineDelta > 0;
+            startedOverwrote = startedResult.overwrote;
+            retainedStartedDate = startedResult.retainedStartedDate;
+          }
+
+          // Stale-snapshot retention for NON-active transitions (e.g. a
+          // DOING→DONE issued from a task object that predates the STARTED
+          // insert): the insert above is skipped, but the file may already
+          // carry a STARTED line. Derive its date so the returned snapshot
+          // (and the state manager) never lose the start.
+          if (
+            settings?.trackStartedDate &&
+            !task.startedDate &&
+            !startedInserted &&
+            retainedStartedDate === null
+          ) {
+            const existingIdx = findDateLine(
+              lines,
+              task.line + 1,
+              'STARTED',
+              getTaskIndent(task),
+              this.keywordManager,
+            );
+            if (existingIdx >= 0) {
+              retainedStartedDate = TaskWriter.parseStartedDateFromLine(
+                lines[existingIdx],
+              );
+            }
           }
 
           return lines.join('\n');
@@ -350,17 +411,45 @@ export class TaskWriter {
       // 'keep': leave the CLOSED line alone; updatedClosedDate keeps
       // task.closedDate — an existing timestamp is never rewritten.
 
-      // STARTED: insert via Editor API on first entry into an active state.
-      // updateTaskStartedDate is idempotent (retains existing STARTED line)
-      // and there is NO removal branch — insertion is one-way.
-      if (isActiveState && settings?.trackStartedDate && !task.startedDate) {
-        const startedResult = await this.updateTaskStartedDate(
-          task,
-          new Date(),
-          false,
-        );
-        lineDelta += startedResult.lineDelta;
-        updatedStartedDate = startedResult.task.startedDate;
+      if (
+        settings?.trackStartedDate &&
+        (shouldStampStarted || !task.startedDate)
+      ) {
+        if (shouldStampStarted && startedStampDate) {
+          // STARTED: insert via Editor API on entry into an active state
+          // (per startedDateMode). updateTaskStartedDate never duplicates;
+          // it rewrites in place only when the 'last' mode grants the
+          // overwrite (fresh re-entry). Removal is not a concern here —
+          // STARTED is removed only by the recurrence rollover.
+          const startedResult = await this.updateTaskStartedDate(
+            task,
+            startedStampDate,
+            false,
+            allowStartedOverwrite,
+          );
+          lineDelta += startedResult.lineDelta;
+          updatedStartedDate = startedResult.task.startedDate;
+        } else if (editor) {
+          // Stale-snapshot retention: a NON-active transition skips the
+          // insert, but the editor may already carry a STARTED line the task
+          // object predates. Derive its date so the snapshot never loses it.
+          const editorLines = Array.from(
+            { length: editor.lineCount() },
+            (_, i) => editor.getLine(i),
+          );
+          const startedLineIndex = findDateLine(
+            editorLines,
+            task.line + 1,
+            'STARTED',
+            getTaskIndent(task),
+            this.keywordManager,
+          );
+          if (startedLineIndex >= 0) {
+            updatedStartedDate = TaskWriter.parseStartedDateFromLine(
+              editorLines[startedLineIndex],
+            );
+          }
+        }
       }
     } else if (!isSourceMode || forceVaultApi) {
       // For non-source mode, CLOSED date was handled atomically above
@@ -372,12 +461,18 @@ export class TaskWriter {
         updatedClosedDate = null;
       }
 
-      // STARTED was handled atomically above; account for the inserted line
-      if (isActiveState && settings?.trackStartedDate && !task.startedDate) {
-        lineDelta += startedInserted ? 1 : 0;
-        updatedStartedDate = startedInserted
-          ? new Date()
-          : (task.startedDate ?? null);
+      // STARTED was handled atomically above; account for the written line.
+      // Keyed on the actual file result — a write (insert or 'last'-mode
+      // re-stamp) reports the exact date written; otherwise a stale snapshot
+      // racing into a completed state still reports the retained start.
+      if (settings?.trackStartedDate) {
+        if (startedInserted || startedOverwrote) {
+          lineDelta += startedInserted ? 1 : 0;
+          // Single clock: the same Date instance written to the file.
+          updatedStartedDate = startedStampDate;
+        } else if (!task.startedDate) {
+          updatedStartedDate = retainedStartedDate ?? null;
+        }
       }
     }
 
@@ -632,6 +727,149 @@ export class TaskWriter {
           : { closedDate: null }),
     };
     return result;
+  }
+
+  /**
+   * Atomically apply a recurrence rollover to a table cell task: rewrite
+   * the cell's keyword with the rolled state and advance/remove the inline
+   * <br>SCHEDULED / <br>DEADLINE segments in place. One modifyTableCell
+   * write keeps the row intact — the line-based updateOrInsertDateLine /
+   * removeDateLine machinery must never touch a table row (it would rewrite
+   * the whole row as a plain task line).
+   */
+  private async applyTableCellRecurrenceUpdate(
+    task: Task,
+    options: {
+      newScheduledDate?: Date | null;
+      newDeadlineDate?: Date | null;
+      newScheduledRepeat?: DateRepeatInfo | null;
+      newDeadlineRepeat?: DateRepeatInfo | null;
+      newScheduledWarningPeriod?: WarningPeriodInfo | null;
+      newDeadlineWarningPeriod?: WarningPeriodInfo | null;
+      newState?: string;
+    },
+    startedReset: { shouldResetStarted: boolean },
+  ): Promise<Task & { lineDelta?: number }> {
+    let newCellContent = task.rawText;
+
+    await this.modifyTableCell(task, (origCell) => {
+      const brIdx = origCell.indexOf('<br');
+      let textPart = (
+        brIdx >= 0 ? origCell.substring(0, brIdx) : origCell
+      ).trim();
+      let dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
+
+      // Swap the keyword (mirrors applyTableCellUpdate: strip indent +
+      // list marker so only keyword + priority + text land in the cell)
+      if (options.newState !== undefined) {
+        const generated = TaskWriter.generateTaskLine(
+          task,
+          options.newState,
+          true,
+          this.keywordManager,
+        );
+        let cellLine = generated.newLine;
+        if (cellLine.startsWith(task.indent)) {
+          cellLine = cellLine.slice(task.indent.length);
+        }
+        if (cellLine.startsWith(task.listMarker)) {
+          cellLine = cellLine.slice(task.listMarker.length);
+        }
+        textPart = cellLine.trim();
+      }
+
+      // Advance or remove an inline date segment in place; append only
+      // when the rollover adds a date the cell doesn't carry yet.
+      const replaceInlineDate = (
+        dateType: 'SCHEDULED' | 'DEADLINE',
+        dateStr: string | null,
+      ): void => {
+        const existing = new RegExp(
+          `\\s*<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`,
+          'i',
+        );
+        if (dateStr === null) {
+          dateSuffix = dateSuffix.replace(existing, '');
+          return;
+        }
+        const tag = `<br>${dateType}: ${dateStr}`;
+        dateSuffix = existing.test(dateSuffix)
+          ? dateSuffix.replace(existing, tag)
+          : `${dateSuffix}${tag}`;
+      };
+
+      if (options.newScheduledDate !== undefined) {
+        replaceInlineDate(
+          'SCHEDULED',
+          options.newScheduledDate === null
+            ? null
+            : TaskWriter.buildDateLineContent(
+                options.newScheduledDate,
+                options.newScheduledRepeat ?? task.scheduledDateRepeat,
+                options.newScheduledWarningPeriod ??
+                  task.scheduledWarningPeriod,
+              ),
+        );
+      }
+
+      if (options.newDeadlineDate !== undefined) {
+        replaceInlineDate(
+          'DEADLINE',
+          options.newDeadlineDate === null
+            ? null
+            : TaskWriter.buildDateLineContent(
+                options.newDeadlineDate,
+                options.newDeadlineRepeat ?? task.deadlineDateRepeat,
+                options.newDeadlineWarningPeriod ?? task.deadlineWarningPeriod,
+              ),
+        );
+      }
+
+      newCellContent = `${textPart}${dateSuffix}`;
+      return newCellContent;
+    });
+
+    const completed =
+      options.newState !== undefined
+        ? this.keywordManager.isCompleted(options.newState)
+        : task.completed;
+
+    return {
+      ...task,
+      rawText: newCellContent,
+      state: options.newState ?? task.state,
+      completed,
+      // Cells never stamp STARTED at rollover (documented limitation): with
+      // tracking on, the rolled occurrence starts unstamped; with tracking
+      // off the parsed value is kept (any hand-written segment also stays
+      // untouched in the file by the mutation above).
+      startedDate: startedReset.shouldResetStarted ? null : task.startedDate,
+      scheduledDate:
+        options.newScheduledDate !== undefined
+          ? options.newScheduledDate
+          : task.scheduledDate,
+      scheduledDateRepeat:
+        options.newScheduledRepeat !== undefined
+          ? options.newScheduledRepeat
+          : task.scheduledDateRepeat,
+      scheduledWarningPeriod:
+        options.newScheduledWarningPeriod !== undefined
+          ? options.newScheduledWarningPeriod
+          : task.scheduledWarningPeriod,
+      deadlineDate:
+        options.newDeadlineDate !== undefined
+          ? options.newDeadlineDate
+          : task.deadlineDate,
+      deadlineDateRepeat:
+        options.newDeadlineRepeat !== undefined
+          ? options.newDeadlineRepeat
+          : task.deadlineDateRepeat,
+      deadlineWarningPeriod:
+        options.newDeadlineWarningPeriod !== undefined
+          ? options.newDeadlineWarningPeriod
+          : task.deadlineWarningPeriod,
+      lineDelta: 0,
+    };
   }
 
   // Cycles a task to its next state using TaskStateTransitionManager and persists change
@@ -1126,18 +1364,29 @@ export class TaskWriter {
    * Returns both the updated task and the line delta (+1 if inserted, 0 if
    * a STARTED line already existed).
    */
+  /**
+   * Insert (or, with allowOverwrite, rewrite) the task's STARTED line.
+   *
+   * Returns both the updated task and the line delta (+1 if inserted,
+   * 0 if a STARTED line already existed). A STARTED line is never removed
+   * here — removal belongs to the recurrence rollover only.
+   */
   async updateTaskStartedDate(
     task: Task,
     startedDate: Date | null,
     forceVaultApi = false,
+    allowOverwrite = false,
   ): Promise<DateLineUpdateResult> {
-    // Idempotent: if a STARTED line already exists, do nothing.
-    // STARTED is never removed once set (first-ever-start semantics).
+    // Idempotent: if a STARTED line already exists, do nothing — unless
+    // allowOverwrite ('last' mode fresh re-entry) rewrites the date in
+    // place. STARTED is never removed once set.
     const dateStr = startedDate
       ? DateUtils.formatStartedDate(startedDate)
       : null;
 
     let lineDelta = 0;
+    let retainedStartedDate: Date | null = null;
+    let overwrote = false;
 
     if (!dateStr) {
       return {
@@ -1173,8 +1422,30 @@ export class TaskWriter {
         );
 
         if (startedLineIndex >= 0) {
-          // Existing STARTED line found: retain original, do nothing.
-          lineDelta = 0;
+          if (allowOverwrite) {
+            // 'last' mode fresh re-entry: the new work period replaces the
+            // record — rewrite the date in place, preserving the line's
+            // indentation/quote prefix. lineDelta stays 0 (in-place update).
+            const existingLine = editor.getLine(startedLineIndex);
+            const prefixMatch = existingLine.match(
+              /^(\s*(?:>\s*)?)STARTED:.*$/,
+            );
+            const prefix = prefixMatch ? prefixMatch[1] : taskIndent;
+            const from: EditorPosition = { line: startedLineIndex, ch: 0 };
+            const to: EditorPosition = {
+              line: startedLineIndex,
+              ch: existingLine.length,
+            };
+            editor.replaceRange(`${prefix}STARTED: ${dateStr}`, from, to);
+            lineDelta = 0;
+            overwrote = true;
+          } else {
+            // Existing STARTED line found: retain original, do nothing.
+            lineDelta = 0;
+            retainedStartedDate = TaskWriter.parseStartedDateFromLine(
+              lines[startedLineIndex],
+            );
+          }
         } else {
           // Insert new STARTED line first in the date-line sequence
           const insertIndex = this.calcDateLineInsertIndex(
@@ -1184,9 +1455,12 @@ export class TaskWriter {
             taskIndent,
           );
           const indent = this.getEffectiveDateLineIndent(lines, -1, task);
-          const from: EditorPosition = { line: insertIndex, ch: 0 };
-          const to: EditorPosition = { line: insertIndex, ch: 0 };
-          editor.replaceRange(`${indent}STARTED: ${dateStr}\n`, from, to);
+          this.insertDateLineInEditor(
+            editor,
+            insertIndex,
+            `${indent}STARTED: ${dateStr}`,
+            lines,
+          );
           lineDelta = 1;
         }
       } else {
@@ -1198,8 +1472,11 @@ export class TaskWriter {
             task.line,
             dateStr,
             task,
+            allowOverwrite,
           );
           lineDelta = result.lineDelta;
+          retainedStartedDate = result.retainedStartedDate;
+          overwrote = result.overwrote;
           return lines.join('\n');
         });
       }
@@ -1209,23 +1486,49 @@ export class TaskWriter {
       task: {
         ...task,
         startedDate:
-          lineDelta > 0 ? startedDate : (task.startedDate ?? startedDate),
+          overwrote || lineDelta > 0
+            ? startedDate
+            : (task.startedDate ?? retainedStartedDate ?? startedDate),
       },
       lineDelta,
     };
   }
 
   /**
-   * Vault-API variant of idempotent STARTED insertion.
-   * Unlike updateOrInsertDateLine, this NEVER updates an existing STARTED line —
-   * the first-ever-start timestamp is preserved.
+   * Parse a retained STARTED line's date, mirroring the scanner's
+   * parseDateFromLine so a snapshot derived from the file round-trips to
+   * the same instant the parser produces.
+   */
+  private static parseStartedDateFromLine(line: string): Date | null {
+    const match = line.match(/^\s*(?:>\s*)?STARTED:\s*(.+)$/);
+    if (!match) {
+      return null;
+    }
+    let content = match[1].trim();
+    if (content.startsWith('[') && content.endsWith(']')) {
+      content = `<${content.slice(1, -1)}>`;
+    }
+    return DateParser.parseDate(content);
+  }
+
+  /**
+   * Vault-API variant of idempotent STARTED insertion. An existing line is
+   * retained untouched — the first-ever-start timestamp is preserved —
+   * unless allowOverwrite ('last' mode fresh re-entry) rewrites its date
+   * in place (lineDelta 0, overwrote true).
    */
   private updateOrInsertStartedDateLine(
     lines: string[],
     taskLineIndex: number,
     dateStr: string,
     task: Task,
-  ): { lines: string[]; lineDelta: number } {
+    allowOverwrite = false,
+  ): {
+    lines: string[];
+    lineDelta: number;
+    retainedStartedDate: Date | null;
+    overwrote: boolean;
+  } {
     const kwManager = this.keywordManager;
     const taskIndent = getTaskIndent(task);
     const existingIdx = findDateLine(
@@ -1237,8 +1540,33 @@ export class TaskWriter {
     );
 
     if (existingIdx >= 0) {
-      // Idempotent: retain the original STARTED line untouched.
-      return { lines, lineDelta: 0 };
+      if (allowOverwrite) {
+        // 'last' mode fresh re-entry: the new work period replaces the
+        // record — rewrite the date in place, preserving the line's
+        // indentation/quote prefix.
+        const existingLine = lines[existingIdx];
+        const prefixMatch = existingLine.match(/^(\s*(?:>\s*)?)STARTED:.*$/);
+        const prefix = prefixMatch ? prefixMatch[1] : taskIndent;
+        lines[existingIdx] = `${prefix}STARTED: ${dateStr}`;
+        return {
+          lines,
+          lineDelta: 0,
+          retainedStartedDate: TaskWriter.parseStartedDateFromLine(
+            lines[existingIdx],
+          ),
+          overwrote: true,
+        };
+      }
+      // Idempotent: retain the original STARTED line untouched, but report
+      // its date so callers on a stale task snapshot can restore it.
+      return {
+        lines,
+        lineDelta: 0,
+        retainedStartedDate: TaskWriter.parseStartedDateFromLine(
+          lines[existingIdx],
+        ),
+        overwrote: false,
+      };
     }
 
     const insertIdx = this.calcDateLineInsertIndex(
@@ -1249,7 +1577,12 @@ export class TaskWriter {
     );
     const indent = this.getEffectiveDateLineIndent(lines, -1, task);
     lines.splice(insertIdx, 0, `${indent}STARTED: ${dateStr}`);
-    return { lines, lineDelta: 1 };
+    return {
+      lines,
+      lineDelta: 1,
+      retainedStartedDate: null,
+      overwrote: false,
+    };
   }
 
   /**
@@ -1319,9 +1652,12 @@ export class TaskWriter {
           lineDelta = 0; // Updated in place, no line count change
         } else {
           // Insert new CLOSED line at calculated position
-          const from: EditorPosition = { line: insertIndex, ch: 0 };
-          const to: EditorPosition = { line: insertIndex, ch: 0 };
-          editor.replaceRange(`${closedIndent}CLOSED: ${dateStr}\n`, from, to);
+          this.insertDateLineInEditor(
+            editor,
+            insertIndex,
+            `${closedIndent}CLOSED: ${dateStr}`,
+            lines,
+          );
           lineDelta = 1; // New line inserted
         }
       } else {
@@ -1437,37 +1773,7 @@ export class TaskWriter {
 
       if (isActive && editor) {
         // Use Editor API when file is open in editor to avoid triggering file watcher
-        const taskIndent = getTaskIndent(task);
-
-        // Look for existing CLOSED line after the task
-        const closedLineIndex = findDateLine(
-          Array.from({ length: editor.lineCount() }, (_, i) =>
-            editor.getLine(i),
-          ),
-          task.line + 1,
-          'CLOSED',
-          taskIndent,
-          this.keywordManager,
-        );
-
-        if (closedLineIndex >= 0) {
-          // Remove the CLOSED line using Editor API
-          const from: EditorPosition = { line: closedLineIndex, ch: 0 };
-          const to: EditorPosition = {
-            line: closedLineIndex,
-            ch: editor.getLine(closedLineIndex).length,
-          };
-          // Replace with empty string to remove the line
-          editor.replaceRange('', from, to);
-          // Remove the newline as well by extending to the next line
-          const nextLineFrom: EditorPosition = { line: closedLineIndex, ch: 0 };
-          const nextLineTo: EditorPosition = {
-            line: closedLineIndex + 1,
-            ch: 0,
-          };
-          editor.replaceRange('', nextLineFrom, nextLineTo);
-          lineDelta = -1; // Line was removed
-        }
+        lineDelta += this.removeDateLineInEditor(editor, task, 'CLOSED');
       } else {
         // Use Vault API for background edits
         await this.app.vault.process(file, (data) => {
@@ -1486,6 +1792,42 @@ export class TaskWriter {
       },
       lineDelta,
     };
+  }
+
+  /**
+   * Remove an existing date line (CLOSED/STARTED/…) after the task via the
+   * Editor API. Two-step removal (clear the line, then swallow its newline)
+   * mirrors removeTaskClosedDate's historical editor branch. Returns -1 when
+   * a line was removed, 0 when absent (idempotent).
+   */
+  private removeDateLineInEditor(
+    editor: Editor,
+    task: Task,
+    dateType: DateLineType,
+  ): number {
+    const taskIndent = getTaskIndent(task);
+    const lineIndex = findDateLine(
+      Array.from({ length: editor.lineCount() }, (_, i) => editor.getLine(i)),
+      task.line + 1,
+      dateType,
+      taskIndent,
+      this.keywordManager,
+    );
+    if (lineIndex < 0) {
+      return 0;
+    }
+    const from: EditorPosition = { line: lineIndex, ch: 0 };
+    const to: EditorPosition = {
+      line: lineIndex,
+      ch: editor.getLine(lineIndex).length,
+    };
+    // Replace with empty string to remove the line
+    editor.replaceRange('', from, to);
+    // Remove the newline as well by extending to the next line
+    const nextLineFrom: EditorPosition = { line: lineIndex, ch: 0 };
+    const nextLineTo: EditorPosition = { line: lineIndex + 1, ch: 0 };
+    editor.replaceRange('', nextLineFrom, nextLineTo);
+    return -1;
   }
 
   /**
@@ -1526,6 +1868,38 @@ export class TaskWriter {
       md?.getViewType() === 'markdown' &&
       md?.getMode &&
       md.getMode() === 'source';
+
+    // Per-occurrence STARTED reset. The rollover is the one operation that
+    // advances the occurrence's dates, so it is the one operation that
+    // resets the STARTED record: remove the completed occurrence's stamp
+    // (idempotent) and, only when the rolled state is active, stamp the new
+    // occurrence fresh. Gated on the setting AND a date advance — manual
+    // transitions (including DONE→TODO and DOING→TODO) never reach here.
+    const settings = this.settings;
+    const shouldResetStarted =
+      Boolean(settings?.trackStartedDate) &&
+      (options.newScheduledDate !== undefined ||
+        options.newDeadlineDate !== undefined);
+    const freshStartedDate =
+      shouldResetStarted &&
+      options.newState !== undefined &&
+      this.keywordManager.isActive(options.newState)
+        ? new Date()
+        : null;
+
+    // Table-cell tasks store dates INLINE — the rollover is one
+    // modifyTableCell write that swaps the keyword and advances/removes
+    // the <br>SCHEDULED / <br>DEADLINE segments in place. The row is never
+    // rewritten as a plain task line and no date lines are inserted below
+    // the table. Cells never write STARTED (documented limitation, same as
+    // applyTableCellUpdate), so the rolled snapshot carries startedDate
+    // null when the rollover ran with tracking on — the file holds no
+    // stamp.
+    if (this.isTableCellDateUpdate(task)) {
+      return this.applyTableCellRecurrenceUpdate(task, options, {
+        shouldResetStarted,
+      });
+    }
 
     if (file && file instanceof TFile) {
       if (isSourceMode && editor) {
@@ -1593,6 +1967,20 @@ export class TaskWriter {
             taskIndent,
           );
           totalDelta += delta;
+        }
+
+        // Per-occurrence STARTED reset (editor path: sequential editor ops,
+        // mirroring removeTaskClosedDate — no second write mechanism).
+        if (shouldResetStarted) {
+          totalDelta += this.removeDateLineInEditor(editor, task, 'STARTED');
+          if (freshStartedDate) {
+            const startedResult = await this.updateTaskStartedDate(
+              task,
+              freshStartedDate,
+              false,
+            );
+            totalDelta += startedResult.lineDelta;
+          }
         }
 
         lineDelta = totalDelta;
@@ -1671,6 +2059,27 @@ export class TaskWriter {
             newRawText = generated.newLine;
           }
 
+          // Per-occurrence STARTED reset — inside the SAME vault.process so
+          // the rollover stays one atomic write / one undo entry.
+          if (shouldResetStarted) {
+            const removal = this.removeDateLine(
+              lines,
+              task.line,
+              'STARTED',
+              task,
+            );
+            totalDelta += removal.lineDelta;
+            if (freshStartedDate) {
+              const insert = this.updateOrInsertStartedDateLine(
+                lines,
+                task.line,
+                DateUtils.formatStartedDate(freshStartedDate),
+                task,
+              );
+              totalDelta += insert.lineDelta;
+            }
+          }
+
           lineDelta = totalDelta;
           return lines.join('\n');
         });
@@ -1688,6 +2097,9 @@ export class TaskWriter {
       rawText: newRawText ?? task.rawText,
       state: options.newState ?? task.state,
       completed,
+      // Reset only when this write is the date-advancing rollover; the
+      // file is the truth: rolled inactive → null, rolled active → fresh.
+      startedDate: shouldResetStarted ? freshStartedDate : task.startedDate,
       scheduledDate:
         options.newScheduledDate !== undefined
           ? options.newScheduledDate
@@ -1787,12 +2199,44 @@ export class TaskWriter {
       taskIndent,
     );
     const indent = this.getEffectiveDateLineIndent(lines, -1, task);
-    editor.replaceRange(
-      `${indent}${dateType}: ${dateStr}\n`,
-      { line: insertIdx, ch: 0 },
-      { line: insertIdx, ch: 0 },
+    this.insertDateLineInEditor(
+      editor,
+      insertIdx,
+      `${indent}${dateType}: ${dateStr}`,
+      lines,
     );
     return 1;
+  }
+
+  /**
+   * Insert a complete date line at `insertIdx` through the Editor API.
+   *
+   * CodeMirror clamps out-of-range positions to the end of the document, so
+   * `replaceRange(text + '\n', {line: lineCount, ch: 0}, …)` splices the
+   * text onto the END of the last line ("SCHEDULED: …CLOSED: …") instead of
+   * starting its own line. Anchor to the end of the final line with a
+   * LEADING newline instead; when the document ends with an empty line the
+   * classic line-boundary insert is already safe.
+   */
+  private insertDateLineInEditor(
+    editor: Editor,
+    insertIdx: number,
+    lineText: string,
+    sourceLines: string[],
+  ): void {
+    const lastLine = sourceLines[sourceLines.length - 1] ?? '';
+    if (insertIdx >= sourceLines.length && lastLine !== '') {
+      const last = Math.max(sourceLines.length - 1, 0);
+      const pos: EditorPosition = { line: last, ch: lastLine.length };
+      editor.replaceRange(`\n${lineText}`, pos, { ...pos });
+    } else {
+      const at = Math.min(insertIdx, Math.max(sourceLines.length - 1, 0));
+      editor.replaceRange(
+        `${lineText}\n`,
+        { line: at, ch: 0 },
+        { line: at, ch: 0 },
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────

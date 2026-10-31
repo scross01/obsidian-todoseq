@@ -4,12 +4,13 @@ import {
   createCheckboxTask,
   createTestKeywordManager,
   createBaseSettings,
+  emulateEditorReplaceRange,
 } from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { TFile } from 'obsidian';
 
 /**
- * Tests for STARTED timestamp tracking (plans/003-started-timestamps.md).
+ * Tests for STARTED timestamp tracking.
  *
  * Semantics under test:
  * - STARTED line inserted on first entry into an active state when
@@ -38,24 +39,8 @@ describe('TaskWriter - STARTED date handling', () => {
       lineCount: jest.fn(() => lines.length),
       getLine: jest.fn((i: number) => lines[i]),
       replaceRange: jest.fn((text: string, from: any, to: any) => {
-        // Minimal line-array emulation for replaceRange on full lines.
-        const startLine = from.line;
-        const endLine = to.line;
-        const inserted = text.split('\n');
-        // Full-line replacement or pure insertion at line boundary
-        if (startLine === endLine) {
-          if (text.endsWith('\n')) {
-            // Insert new line(s) at startLine
-            inserted.pop(); // drop trailing empty from trailing \n
-            lines.splice(startLine, 0, ...inserted);
-          } else {
-            // Replace whole line content
-            lines[startLine] = text;
-          }
-        } else {
-          // Removing lines (from.line..to.line)
-          lines.splice(startLine, endLine - startLine, ...inserted);
-        }
+        // CodeMirror-faithful line emulation (clipPos clamping at EOF).
+        emulateEditorReplaceRange(lines, text, from, to);
       }),
       getCursor: jest.fn(() => ({ line: 0, ch: 0 })),
       setCursor: jest.fn(),
@@ -455,6 +440,108 @@ describe('TaskWriter - STARTED date handling', () => {
       expect(vaultLines[0]).toBe('- [x] DONE Task text');
       expect(vaultLines.filter((l) => l.includes('STARTED:'))).toHaveLength(0);
       expect(result.startedDate ?? null).toBeNull();
+    });
+  });
+
+  describe('startedDateMode — last activation (restart) semantics', () => {
+    const oldStarted = new Date(2026, 0, 10, 8, 0, 0);
+    const oldStartedLine = '  STARTED: [2026-01-10 Sat 08:00]';
+    const freshStartedLine = '  STARTED: [2026-01-16 Fri 09:30]';
+
+    const useLastMode = () => {
+      mockPlugin.settings = createBaseSettings({
+        trackStartedDate: true,
+        startedDateMode: 'last',
+      });
+    };
+    const useVaultPath = () => {
+      mockApp.workspace.getActiveViewOfType.mockReturnValue(null);
+    };
+    const startedLines = () => lines.filter((l) => l.includes('STARTED:'));
+
+    it('M1 (vault): fresh entry with no existing stamp inserts', async () => {
+      useVaultPath();
+      useLastMode();
+      const task = makeTask();
+      const result = await taskWriter.applyLineUpdate(task, 'DOING');
+      expect(startedLines()).toEqual([freshStartedLine]);
+      expect((result as Task & { lineDelta?: number }).lineDelta).toBe(1);
+      expect(result.startedDate).toEqual(fixedNow);
+    });
+
+    it('M1 (source): fresh entry with no existing stamp inserts', async () => {
+      useLastMode();
+      const task = makeTask();
+      const result = await taskWriter.applyLineUpdate(task, 'DOING');
+      expect(startedLines()).toEqual([freshStartedLine]);
+      expect((result as Task & { lineDelta?: number }).lineDelta).toBe(1);
+      expect(result.startedDate).toEqual(fixedNow);
+    });
+
+    it('M2 (vault): fresh re-entry rewrites the stamp in place', async () => {
+      useVaultPath();
+      useLastMode();
+      lines = ['- [ ] TODO Task text', oldStartedLine];
+      const task = makeTask({ startedDate: oldStarted });
+      const result = await taskWriter.applyLineUpdate(task, 'DOING');
+      expect(startedLines()).toEqual([freshStartedLine]);
+      expect((result as Task & { lineDelta?: number }).lineDelta ?? 0).toBe(0);
+      expect(result.startedDate).toEqual(fixedNow);
+    });
+
+    it('M2 (source): fresh re-entry rewrites the stamp in place', async () => {
+      useLastMode();
+      lines = ['- [ ] TODO Task text', oldStartedLine];
+      const task = makeTask({ startedDate: oldStarted });
+      const result = await taskWriter.applyLineUpdate(task, 'DOING');
+      expect(startedLines()).toEqual([freshStartedLine]);
+      expect((result as Task & { lineDelta?: number }).lineDelta ?? 0).toBe(0);
+      expect(result.startedDate).toEqual(fixedNow);
+    });
+
+    it('M3 (vault): active→active switch keeps the stamp (mid-work protection)', async () => {
+      useVaultPath();
+      useLastMode();
+      lines = ['- [ ] DOING Task text', oldStartedLine];
+      const task = makeTask({
+        rawText: '- [ ] DOING Task text',
+        state: 'DOING',
+        startedDate: oldStarted,
+      });
+      const result = await taskWriter.applyLineUpdate(task, 'IN-PROGRESS');
+      expect(startedLines()).toEqual([oldStartedLine]);
+      expect(result.startedDate).toEqual(oldStarted);
+    });
+
+    it('M5 (vault): first mode (default) re-entry retains the original stamp', async () => {
+      useVaultPath();
+      lines = ['- [ ] TODO Task text', oldStartedLine];
+      const task = makeTask({ startedDate: oldStarted });
+      const result = await taskWriter.applyLineUpdate(task, 'DOING');
+      expect(startedLines()).toEqual([oldStartedLine]);
+      expect(result.startedDate).toEqual(oldStarted);
+    });
+
+    it('M5 (source): first mode (default) re-entry retains the original stamp', async () => {
+      lines = ['- [ ] TODO Task text', oldStartedLine];
+      const task = makeTask({ startedDate: oldStarted });
+      const result = await taskWriter.applyLineUpdate(task, 'DOING');
+      expect(startedLines()).toEqual([oldStartedLine]);
+      expect(result.startedDate).toEqual(oldStarted);
+    });
+
+    it('M6: trackStartedDate off — no write in either mode', async () => {
+      for (const mode of ['first', 'last'] as const) {
+        lines = ['- [ ] TODO Task text', oldStartedLine];
+        mockPlugin.settings = createBaseSettings({
+          trackStartedDate: false,
+          startedDateMode: mode,
+        });
+        const task = makeTask({ startedDate: oldStarted });
+        const result = await taskWriter.applyLineUpdate(task, 'DOING');
+        expect(startedLines()).toEqual([oldStartedLine]);
+        expect(result.startedDate).toEqual(oldStarted);
+      }
     });
   });
 });

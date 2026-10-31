@@ -1,5 +1,7 @@
 import { Task, KeywordGroup } from '../../types/task';
 import { Search } from '../../search/search';
+import { SearchEvaluator } from '../../search/search-evaluator';
+import { SearchError } from '../../search/search-types';
 import { TodoTrackerSettings } from '../../settings/settings-types';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { PropertySearchEngine } from '../../services/property-search-engine';
@@ -356,21 +358,15 @@ export class DashboardAggregator {
     if (!searchQuery.trim()) {
       return tasks;
     }
-    const results = await Promise.all(
-      tasks.map(async (task) => {
-        const matches = await Search.evaluate(
-          searchQuery,
-          task,
-          false,
-          this.settings,
-          this.propertySearchEngine ?? undefined,
-        );
-        return { task, matches };
-      }),
+    // Bulk single-pass filter (parity with the per-row Search.evaluate
+    // deployment it replaces — see tests/search-bulk.test.ts).
+    return Search.filterTasks(
+      tasks,
+      searchQuery,
+      false,
+      this.settings,
+      this.propertySearchEngine ?? undefined,
     );
-    return results
-      .filter((result) => result.matches)
-      .map((result) => result.task);
   }
 
   /** Dispatch to the resolver for the group-by attribute. */
@@ -483,6 +479,13 @@ export class DashboardAggregator {
    * filters in order — first true wins. Later = has a date and none of the
    * three matched; its click filter is exactly LATER_FILTER(field). No date
    * = date is null with filter `<field>:none`.
+   *
+   * The window filters parse once per aggregation and every row evaluates
+   * synchronously (SearchEvaluator.evaluateSync), mirroring the bulk facade
+   * of Search.filterTasks: the date vocabulary can never await, and
+   * per-row Search.evaluate promise plumbing was a measurable share of the
+   * dashboard-aggregate node benchmark. Bucket counts are pinned by the
+   * scheduled/deadline tests above.
    */
   private async resolveDateBucketGroups(
     field: 'scheduled' | 'deadline',
@@ -491,33 +494,76 @@ export class DashboardAggregator {
     const windowFilters = WINDOW_BUCKET_FILTERS(field);
     const counts = [0, 0, 0, 0, 0];
 
-    await Promise.all(
-      matched.map(async (task) => {
-        const date =
-          field === 'scheduled' ? task.scheduledDate : task.deadlineDate;
-        if (!date) {
-          counts[4]++;
-          return;
+    // Batch-level await boundary, exactly like Search.filterTasks: engine
+    // results depend on the query, never the row, so they resolve once per
+    // window here. The window vocabulary holds no property nodes today, so
+    // this is preparation for vocabulary growth, not current IO.
+    const windowEvaluators: Array<(task: Task) => boolean> = [];
+    for (const filter of windowFilters) {
+      let evaluate: (task: Task) => boolean;
+      try {
+        const ast = Search.parse(filter);
+        const resolutions = SearchEvaluator.collectEngineResolutions(
+          ast,
+          false,
+        );
+        let engineFiles: Map<string, Set<string> | null> | undefined;
+        if (resolutions.length > 0 && this.propertySearchEngine) {
+          engineFiles = new Map();
+          for (const resolution of resolutions) {
+            engineFiles.set(
+              resolution.key,
+              await SearchEvaluator.resolveEngineFiles(
+                resolution.query,
+                resolution.effectiveCaseSensitive,
+                this.propertySearchEngine,
+              ),
+            );
+          }
         }
-        const windowResults = await Promise.all(
-          windowFilters.map((filter) =>
-            Search.evaluate(
-              filter,
+        evaluate = (task: Task) => {
+          try {
+            return SearchEvaluator.evaluateSync(
+              ast,
               task,
               false,
               this.settings,
-              this.propertySearchEngine ?? undefined,
-            ),
-          ),
-        );
-        const idx = windowResults.findIndex(Boolean);
-        if (idx >= 0) {
-          counts[idx]++;
+              engineFiles,
+            );
+          } catch (error) {
+            // Per-row contract of Search.evaluate: a SearchError during
+            // evaluation reads as row false; other errors propagate.
+            if (error instanceof SearchError) return false;
+            throw error;
+          }
+        };
+      } catch (error) {
+        // Same legacy contract for a failing window parse: every row of a
+        // failed window counted as false (unreachable with the frozen
+        // constants; guarded so injection or vocabulary drift stays exact).
+        if (error instanceof SearchError) {
+          evaluate = () => false;
         } else {
-          counts[3]++; // Later: dated but outside all three windows
+          throw error;
         }
-      }),
-    );
+      }
+      windowEvaluators.push(evaluate);
+    }
+
+    for (const task of matched) {
+      const date =
+        field === 'scheduled' ? task.scheduledDate : task.deadlineDate;
+      if (!date) {
+        counts[4]++;
+        continue;
+      }
+      const idx = windowEvaluators.findIndex((evaluate) => evaluate(task));
+      if (idx >= 0) {
+        counts[idx]++;
+      } else {
+        counts[3]++; // Later: dated but outside all three windows
+      }
+    }
 
     const filters = [
       windowFilters[0],
