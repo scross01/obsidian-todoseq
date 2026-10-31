@@ -1,6 +1,6 @@
 # Change Log
 
-## Unreleased
+## 0.22.0
 
 - Plain search terms now also match a task's description: searching `format` finds both a task whose line says "check the document format" and one whose DESCRIPTION: line mentions "format". Use `content:` to search the task line alone.
 - Added `description:` and `heading:` search prefixes: `description:call` finds tasks whose DESCRIPTION: line mentions "call", and `heading:Setup` finds tasks under a note heading containing "Setup".
