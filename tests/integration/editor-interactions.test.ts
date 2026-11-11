@@ -7,6 +7,29 @@ import { Page } from 'playwright';
 
 let page: Page;
 
+async function parentProgress(
+  targetPage: Page,
+): Promise<{ count: number; completed: number } | null> {
+  return targetPage.evaluate(() => {
+    const app = (window as any).app;
+    const tasks =
+      app.plugins.plugins.todoseq.taskStateManager.getTasks() as Array<{
+        path: string;
+        text: string;
+        subtaskCount: number;
+        subtaskCompletedCount: number;
+      }>;
+    const parent = tasks.find(
+      (task) =>
+        task.path.endsWith('subtask-progress.md') &&
+        task.text === 'Parent task',
+    );
+    return parent
+      ? { count: parent.subtaskCount, completed: parent.subtaskCompletedCount }
+      : null;
+  });
+}
+
 test.beforeAll(async () => {
   page = await getPage();
 });
@@ -172,5 +195,59 @@ test.describe('Editor interactions', () => {
     expect(taskLine).toBeDefined();
     // With defaultInactive="" in baseline settings, DONE cycles to empty keyword.
     expect(taskLine).not.toMatch(/DONE|TODO|DOING/);
+  });
+
+  test('optimistic subtask progress follows parsed span and survives rescan', async () => {
+    await openFileInEditor(page, 'subtask-progress');
+
+    await expect
+      .poll(() => parentProgress(page))
+      .toEqual({
+        count: 2,
+        completed: 0,
+      });
+
+    const activeLeaf = page.locator('.workspace-leaf.mod-active');
+    const childLine = activeLeaf
+      .locator('.cm-line')
+      .filter({ hasText: 'Child one' });
+    await expect(childLine).toBeVisible({ timeout: 10_000 });
+    await childLine.click();
+    await runCommandById(page, 'todoseq:cycle-task-state');
+    await page.waitForTimeout(500);
+    await childLine.click();
+    await runCommandById(page, 'todoseq:cycle-task-state');
+    await page.waitForTimeout(700);
+
+    await expect
+      .poll(() => parentProgress(page))
+      .toEqual({
+        count: 2,
+        completed: 1,
+      });
+
+    const siblingLine = activeLeaf
+      .locator('.cm-line')
+      .filter({ hasText: 'Plain sibling' });
+    await expect(siblingLine).toBeVisible({ timeout: 10_000 });
+    await siblingLine.click();
+    await runCommandById(page, 'todoseq:cycle-task-state');
+    await page.waitForTimeout(500);
+    await siblingLine.click();
+    await runCommandById(page, 'todoseq:cycle-task-state');
+    await page.waitForTimeout(700);
+
+    // The sibling sits outside the parent's parsed span: no progress change.
+    expect(await parentProgress(page)).toEqual({ count: 2, completed: 1 });
+
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const view = app.workspace.activeLeaf?.view;
+      if (typeof view?.save === 'function') await view.save();
+      await app.plugins.plugins.todoseq?.vaultScanner?.scanVault?.();
+    });
+    await page.waitForTimeout(700);
+
+    expect(await parentProgress(page)).toEqual({ count: 2, completed: 1 });
   });
 });

@@ -98,6 +98,20 @@ Some text after the code block.
 `,
   );
 
+  // Parent/child and plain-sibling fixture for optimistic subtask progress.
+  // The blank line keeps the sibling outside the parent's parsed span.
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'subtask-progress.md'),
+    `# Subtask Progress
+
+- [ ] TODO Parent task
+  - [ ] TODO Child one
+  - [ ] TODO Child two
+
+- [ ] TODO Plain sibling
+`,
+  );
+
   // File for smart date processing test
   fs.writeFileSync(
     path.join(TEST_VAULT_DIR, 'smart-date.md'),
