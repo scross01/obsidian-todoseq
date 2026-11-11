@@ -363,6 +363,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — default search indexes the normalized task text alongside the raw line, so phrases spanning a priority or footnote marker match again while raw words stay searchable. Unit 173 suites / 5,537 tests, build and lint green.
 - **File**: [067-normalized-task-search.md](067-normalized-task-search.md)
 
+### Plan 068
+
+- **Title**: Release plugin-owned update timers and editor handlers on unload
+- **Meta**: priority P2 · effort S–M · depends on —
+- **Record**: DONE (2026-11-11) — unload now destroys the update coordinator before async teardown and removes capture-phase editor handlers; unit tests red 4 failed → green 53 passed; host Playwright reload scenario not run
+- **File**: [068-plugin-owned-teardown.md](068-plugin-owned-teardown.md)
+
 ### Plan 072
 
 - **Title**: Preserve archive dialog keyboard traversal and focus in pop-out windows

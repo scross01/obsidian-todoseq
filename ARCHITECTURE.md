@@ -1570,3 +1570,7 @@ processor and are cleared by `cleanup()`. `refreshAllEmbeddedTaskLists` and
 ## Failed write recovery
 
 `TaskUpdateCoordinator` records a per-file write generation when a request is made and keeps the per-file queues serialized. When a write fails it asks `VaultScanner.reconcileFileAfterFailedWrite` for the file's persisted tasks; that path deliberately bypasses the failed write's skip marker and expected-change suppression, because the note is authoritative after a failure. The parsed snapshot is retained as the baseline for the next queued edit, while publication is skipped when a newer request for that file is already pending, so an older failure cannot overwrite newer optimistic intent.
+
+## Plugin teardown ownership
+
+`PluginLifecycleManager.onunload` owns the update coordinator and destroys and clears it synchronously, before awaiting `EventCoordinator.destroy`, so its repeating cleanup timer and pending recurrence timeouts stop with the plugin. `UIManager` records the exact capture-phase options it installs, clears their removal options with the same object shape, and tracks delayed editor setup in owned timer handles guarded by a disposal flag, so cleanup cancels setup instead of letting it reattach handlers.

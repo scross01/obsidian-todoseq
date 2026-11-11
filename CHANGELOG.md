@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed disabling or reloading the plugin leaving its task update timers and right-click task handlers behind; editor interactions and pending delayed setup now stop with the plugin.
 - Fixed failed task changes staying on screen as though they had been saved; the Task List now returns to the note's actual state and later edits build on that saved content.
 - Fixed code-comment tasks gaining executable metadata lines when their state changed; their date actions now leave the source untouched, and Org tasks keep their CLOSED/STARTED history.
 - Fixed updating a task's date replacing its other metadata, such as an existing scheduled date or started timestamp, instead of changing only the targeted line.

@@ -290,3 +290,7 @@ See [Command Palette](command-palette.md) for more details.
 When a smart date conversion updates a task that already has date lines, only the targeted line changes. A task with a scheduled date, a started timestamp and a deadline keeps the scheduled date and started timestamp when the deadline is updated, and date recognition continues past those lines instead of adding a duplicate.
 
 If the recognized date has no line of its own yet, the first existing date line is retagged in place, preserving that line's position among the other metadata.
+
+## Disabling or reloading the plugin
+
+Turning the plugin off or reloading it releases the editor interactions it added, including the right-click task keyword menu. Delayed editor setup and pending delayed task updates are cancelled with it, so they cannot reattach handlers or run after the plugin is gone. A file write that is already in progress is not rolled back by disabling the plugin.
