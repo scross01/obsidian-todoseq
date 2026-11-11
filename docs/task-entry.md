@@ -892,3 +892,7 @@ When a task state is updated, TODOseq preserves:
 ```markdown
 - DOING [#A] Write documentation for new feature
 ```
+
+## Footnote definitions and excluded blocks
+
+Numeric footnote definitions follow the same inclusion settings as other tasks: a definition inside an excluded code, comment or math block is not collected, while an included one is parsed exactly like a task line.

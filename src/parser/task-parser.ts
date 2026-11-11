@@ -1169,22 +1169,6 @@ export class TaskParser implements ITaskParser {
         continue;
       }
 
-      // Check for footnote definitions
-      if (FOOTNOTE_DEFINITION_REGEX.test(line)) {
-        const footnoteTask = this.tryParseFootnoteTask(
-          line,
-          path,
-          index,
-          lines,
-          processedLines,
-        );
-        if (footnoteTask) {
-          footnoteTask.parentHeading = currentHeading;
-          tasks.push(footnoteTask);
-        }
-        continue;
-      }
-
       // Check for block transitions
       const blockTransition = this.detectBlockTransition(
         line,
@@ -1243,6 +1227,23 @@ export class TaskParser implements ITaskParser {
 
       // Check if line should be skipped
       if (this.shouldSkipLine(line, inBlock, blockMarker)) {
+        continue;
+      }
+
+      // Numeric footnote definitions obey the same block-inclusion rules as
+      // other tasks; the block transition above has already run.
+      if (FOOTNOTE_DEFINITION_REGEX.test(line)) {
+        const footnoteTask = this.tryParseFootnoteTask(
+          line,
+          path,
+          index,
+          lines,
+          processedLines,
+        );
+        if (footnoteTask) {
+          footnoteTask.parentHeading = currentHeading;
+          tasks.push(footnoteTask);
+        }
         continue;
       }
 
