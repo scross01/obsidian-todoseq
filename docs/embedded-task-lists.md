@@ -412,3 +412,7 @@ If you want aggregated counts instead of the tasks themselves — workload by
 state, priority, tag, or date bucket — see [Dashboards](/dashboards), which
 uses the same search vocabulary with one-click drill-through into the Task
 List.
+
+## Render lifetime
+
+An embedded list belongs to the Markdown render that produced it. When the note closes, switches reading modes, or is re-rendered, the list is released and stops receiving updates; a later task change updates only the lists currently on screen. If two refreshes overlap, only the newest result is shown.

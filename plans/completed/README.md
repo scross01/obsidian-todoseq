@@ -370,6 +370,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — copy, move and migrate go through one TaskWriter seam with atomic destination appends, source revalidation and cell-local table moves; panel, embedded list and drag-and-drop report typed outcomes. 177 suites / 5,550 tests, build and lint green; no Playwright host spec.
 - **File**: [055-safe-task-transfers.md](055-safe-task-transfers.md)
 
+### Plan 058
+
+- **Title**: Release embedded task lists and dashboards when their Markdown renders unload
+- **Meta**: priority P2 · effort M · depends on —
+- **Record**: DONE (2026-11-11) — each embedded list and dashboard is owned by its Markdown render, refreshes carry a per-instance generation, and debounce timers are cleaned up, so unloaded blocks never repaint. 178 suites / 5,558 tests, build and lint green; no Playwright mode-switch spec.
+- **File**: [058-embedded-render-lifecycle.md](058-embedded-render-lifecycle.md)
+
 ## Execution notes
 
 These notes previously sat directly under the status table in `plans/README.md`.

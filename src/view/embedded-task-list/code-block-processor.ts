@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext } from 'obsidian';
+import { MarkdownPostProcessorContext, MarkdownRenderChild } from 'obsidian';
 import TodoTracker from '../../main';
 import { VaultScanner } from '../../services/vault-scanner';
 import { EmbeddedTaskListRenderer } from './task-list-renderer';
@@ -17,6 +17,7 @@ export class TodoseqCodeBlockProcessor {
   private eventHandler: EmbeddedTaskListEventHandler;
   private unsubscribeFromStateManager: (() => void) | null = null;
   private skipNextRefresh = false;
+  private embedRefreshTimeout: number | null = null;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
@@ -35,7 +36,6 @@ export class TodoseqCodeBlockProcessor {
     // Subscribe to task state changes from the centralized state manager
     // This ensures embedded lists refresh when tasks are updated, added, or removed
     // Use debouncing to prevent excessive re-renders during rapid changes
-    let embedRefreshTimeout: number | null = null;
     const EMBED_REFRESH_DEBOUNCE_MS = 150;
 
     this.unsubscribeFromStateManager = plugin.taskStateManager.subscribe(
@@ -45,11 +45,11 @@ export class TodoseqCodeBlockProcessor {
           this.skipNextRefresh = false;
           return;
         }
-        if (embedRefreshTimeout) {
-          window.clearTimeout(embedRefreshTimeout);
+        if (this.embedRefreshTimeout !== null) {
+          window.clearTimeout(this.embedRefreshTimeout);
         }
-        embedRefreshTimeout = window.setTimeout(() => {
-          embedRefreshTimeout = null;
+        this.embedRefreshTimeout = window.setTimeout(() => {
+          this.embedRefreshTimeout = null;
           this.onTasksChanged();
         }, EMBED_REFRESH_DEBOUNCE_MS);
       },
@@ -93,15 +93,46 @@ export class TodoseqCodeBlockProcessor {
    * @param el The container element
    * @param ctx The markdown post processor context
    */
+  /** Register this render with Obsidian's Markdown render lifetime. */
+  private registerRenderChild(
+    ctx: MarkdownPostProcessorContext,
+    el: HTMLElement,
+    onDispose: () => void,
+  ): { disposed: boolean } {
+    const lifetime = { disposed: false };
+    const RenderChild = MarkdownRenderChild as unknown;
+    if (
+      typeof RenderChild !== 'function' ||
+      typeof ctx.addChild !== 'function'
+    ) {
+      return lifetime;
+    }
+    const child = new (
+      RenderChild as new (containerEl: HTMLElement) => MarkdownRenderChild
+    )(el);
+    child.onunload = () => {
+      lifetime.disposed = true;
+      onDispose();
+    };
+    ctx.addChild(child);
+    return lifetime;
+  }
+
   private async processCodeBlock(
     source: string,
     el: HTMLElement,
     ctx: MarkdownPostProcessorContext,
   ): Promise<void> {
+    const containerId = `todoseq-${Math.random().toString(36).slice(2, 8)}`;
+    const lifetime = this.registerRenderChild(ctx, el, () =>
+      this.eventHandler.untrackCodeBlock(containerId),
+    );
+
     try {
       // Parse parameters from code block
       const params = TodoseqCodeBlockParser.parse(source);
 
+      if (lifetime.disposed) return;
       if (params.error) {
         this.renderer.renderError(el, params.error);
         return;
@@ -114,8 +145,8 @@ export class TodoseqCodeBlockProcessor {
       const { tasks: filteredTasks, totalCount } =
         await this.manager.filterAndSortTasksWithCount(allTasks, params);
 
-      // Generate unique container ID for this code block
-      const containerId = `todoseq-${Math.random().toString(36).slice(2, 8)}`;
+      if (lifetime.disposed) return;
+
       el.id = containerId;
 
       // Determine initial collapse state (collapsed if collapse: true)
@@ -141,6 +172,7 @@ export class TodoseqCodeBlockProcessor {
         containerId,
       );
     } catch (error: unknown) {
+      if (lifetime.disposed) return;
       console.error('Error processing TODOseq code block:', error);
       const message = error instanceof Error ? error.message : String(error);
       this.renderer.renderError(el, `Processing error: ${message}`);
@@ -200,6 +232,10 @@ export class TodoseqCodeBlockProcessor {
    * Clean up resources when plugin unloads
    */
   cleanup(): void {
+    if (this.embedRefreshTimeout !== null) {
+      window.clearTimeout(this.embedRefreshTimeout);
+      this.embedRefreshTimeout = null;
+    }
     // Unsubscribe from state manager
     if (this.unsubscribeFromStateManager) {
       this.unsubscribeFromStateManager();

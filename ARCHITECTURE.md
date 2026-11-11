@@ -1547,3 +1547,14 @@ This architecture provides a robust, maintainable, and extensible foundation for
 ## Task transfers
 
 Copy, move and migrate are owned by `TaskWriter.transferTask`. It reads the live editor buffer when a file is open, appends to the destination with an atomic vault write, and revalidates the source task identity immediately before changing it. A table cell task transfers as a plain task line; moving one clears only its cell. The panel, embedded list and drag-and-drop handler only resolve the destination and report the typed outcome — they never write task bytes.
+
+## Embedded render ownership
+
+Embedded task lists and dashboards register each render as a
+`MarkdownRenderChild` of the post-processor context, keyed by container id.
+Unloading the child removes the tracked instance and advances a per-instance
+generation, so a pending initial render or in-flight refresh becomes a no-op
+instead of painting a detached block. Refreshes carry the generation they
+started with and only the newest commits; debounce timers belong to the
+processor and are cleared by `cleanup()`. `refreshAllEmbeddedTaskLists` and
+`refreshAllDashboards` therefore touch only blocks that are still mounted.

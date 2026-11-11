@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed embedded task lists and dashboard cards staying active after their note closed or re-rendered, so hidden blocks no longer refresh and overlapping refreshes show the newest result.
 - Fixed copy, move and migrate overwriting each other when two transfers target the same note, and made table tasks transfer only their own cell with the rest of the row untouched.
 - Fixed table rows containing an escaped pipe so the correct cell is edited and the rest of the row is left byte-for-byte intact.
 - Fixed the archive dialog losing Tab trapping and focus restoration in pop-out windows.
