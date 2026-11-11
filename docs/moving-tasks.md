@@ -6,6 +6,12 @@ You can perform these actions through the [task context menu](task-list.md#task-
 
 Some copy/move actions require the Daily Notes core plugin to be enabled in Obsidian.
 
+## What travels with a task
+
+Copy, move and drag-and-drop take the whole task block: the task line, its consecutive metadata lines and its indented child tasks. Metadata means `SCHEDULED:`, `DEADLINE:`, `CLOSED:`, `STARTED:` and `DESCRIPTION:` lines directly below the task — no blank line or prose in between. A line that is not one of those ends the block, so a sibling task or paragraph is never dragged along.
+
+Migrate to Today is the exception: the copy keeps the full block, while the source line keeps `STARTED:`, `CLOSED:` and `DESCRIPTION:` and loses only the `SCHEDULED:` and `DEADLINE:` dates it is moving to the new copy.
+
 ## Copy
 
 Copy the task content to the clipboard. This is useful when you want to duplicate a task without changing its original location.

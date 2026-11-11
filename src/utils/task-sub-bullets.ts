@@ -1,6 +1,65 @@
 import { App, TFile } from 'obsidian';
 import { Task } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX, BULLET_LIST_PATTERN } from './patterns';
+import { getIndentLength } from './task-line-utils';
+
+/**
+ * Metadata lines that belong to the task above them when a task block is
+ * copied, moved or migrated. The set matches what TaskParser recognises for
+ * a plain note task: the four date/history lines plus a single DESCRIPTION.
+ */
+export type TaskMetadataLineType =
+  'scheduled' | 'deadline' | 'closed' | 'started' | 'description';
+
+const METADATA_PREFIXES: ReadonlyArray<
+  readonly [string, TaskMetadataLineType]
+> = [
+  ['SCHEDULED:', 'scheduled'],
+  ['DEADLINE:', 'deadline'],
+  ['CLOSED:', 'closed'],
+  ['STARTED:', 'started'],
+  ['DESCRIPTION:', 'description'],
+];
+
+/**
+ * Classify a line as task metadata for the task at `taskIndent`.
+ *
+ * Mirrors TaskParser.getDateLineType/getDescriptionText: quoted metadata is
+ * accepted at any indent, plain metadata must be at the task's indent or
+ * deeper (heading tasks treat their `# ` indent as zero). Returns null for
+ * anything that is not metadata, so the caller can stop its contiguous span.
+ */
+export function classifyTaskMetadataLine(
+  line: string,
+  taskIndent: string,
+): TaskMetadataLineType | null {
+  const trimmed = line.trim();
+  if (trimmed === '') return null;
+
+  if (trimmed.startsWith('>')) {
+    const contentAfterArrow = trimmed.replace(/^>\s*/, '');
+    for (const [prefix, type] of METADATA_PREFIXES) {
+      if (contentAfterArrow.startsWith(prefix)) return type;
+    }
+    return null;
+  }
+
+  const isHeadingIndent = /^#{1,6}\s+$/.test(taskIndent);
+  const taskIndentLength = isHeadingIndent ? 0 : getIndentLength(taskIndent);
+  const lineIndent = line.substring(0, line.length - line.trimStart().length);
+  if (getIndentLength(lineIndent) < taskIndentLength) return null;
+
+  for (const [prefix, type] of METADATA_PREFIXES) {
+    if (trimmed.startsWith(prefix)) return type;
+  }
+  return null;
+}
+
+/** Leading whitespace of a line, used when no task indent is supplied. */
+function leadingIndent(line: string | undefined): string {
+  if (!line) return '';
+  return line.substring(0, line.length - line.trimStart().length);
+}
 
 export function taskHasCheckbox(task: Task): boolean {
   return CHECKBOX_DETECTION_REGEX.test(task.rawText);
@@ -9,11 +68,12 @@ export function taskHasCheckbox(task: Task): boolean {
 export function buildRemovalRange(
   lines: string[],
   taskLine: number,
+  taskIndent?: string,
 ): { start: number; end: number } {
+  const indent = taskIndent ?? leadingIndent(lines[taskLine]);
   let end = taskLine;
   for (let i = taskLine + 1; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (trimmed.startsWith('SCHEDULED:') || trimmed.startsWith('DEADLINE:')) {
+    if (classifyTaskMetadataLine(lines[i], indent)) {
       end = i;
     } else {
       break;
@@ -79,7 +139,7 @@ export function getSubtaskLinesFromLines(
   lines: string[],
   task: Task,
 ): string[] {
-  const { end: dateEnd } = buildRemovalRange(lines, task.line);
+  const { end: dateEnd } = buildRemovalRange(lines, task.line, task.indent);
   return extractSubtaskLines(
     lines,
     dateEnd,
@@ -92,7 +152,11 @@ export function getTaskRemovalRange(
   lines: string[],
   task: Task,
 ): { start: number; end: number } {
-  const { start, end: dateEnd } = buildRemovalRange(lines, task.line);
+  const { start, end: dateEnd } = buildRemovalRange(
+    lines,
+    task.line,
+    task.indent,
+  );
   const subtaskEnd = findSubtaskEnd(
     lines,
     dateEnd,
@@ -125,16 +189,27 @@ export function modifyLinesForMigration(
     );
   }
 
-  const { end } = buildRemovalRange(result, taskLine);
+  // Migration has its own cleanup policy: it removes only the source
+  // SCHEDULED/DEADLINE dates. STARTED, CLOSED and DESCRIPTION are history or
+  // task content and stay on the original line in their original order —
+  // never splice the whole metadata span, which would delete them.
+  const taskIndent = leadingIndent(result[taskLine]);
+  const { end } = buildRemovalRange(result, taskLine, taskIndent);
   if (end > taskLine) {
-    result.splice(taskLine + 1, end - taskLine);
+    const retained: string[] = [];
+    for (let i = taskLine + 1; i <= end; i++) {
+      const type = classifyTaskMetadataLine(result[i], taskIndent);
+      if (type === 'scheduled' || type === 'deadline') continue;
+      retained.push(result[i]);
+    }
+    result.splice(taskLine + 1, end - taskLine, ...retained);
   }
 
   return result;
 }
 
 export function readTaskBlockFromLines(lines: string[], task: Task): string[] {
-  const { start } = buildRemovalRange(lines, task.line);
+  const { start } = buildRemovalRange(lines, task.line, task.indent);
   const { end } = getTaskRemovalRange(lines, task);
 
   const parentIndentLen = task.indent.length;

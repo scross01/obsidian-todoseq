@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed copying and moving a task dropping its `STARTED:`, `CLOSED:` or `DESCRIPTION:` lines: the whole metadata block now travels with the task, while Migrate to Today still removes only the dates it moves.
 - Fixed recurring tasks deleting the wrong date: completing a task whose SCHEDULED repeats but whose DEADLINE is one-off no longer removes the deadline, and a first-only (`--Nd`) warning period is now actually removed from the written date line.
 - Fixed reading mode forcing every paragraph to the default text colour and size, which overrode colours set by themes and other plugins — for example trait and action names rendered by Fantasy Statblocks.
 

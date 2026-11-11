@@ -110,14 +110,14 @@ describe('buildRemovalRange', () => {
     expect(buildRemovalRange(lines, 0)).toEqual({ start: 0, end: 2 });
   });
 
-  it('stops at CLOSED line (not a date line to remove)', () => {
+  it('includes CLOSED and the metadata that follows it', () => {
     const lines = [
       'TODO some task',
       'SCHEDULED: <2026-04-02 Thu>',
       'CLOSED: [2026-04-01 Wed]',
       'DEADLINE: <2026-04-03 Fri>',
     ];
-    expect(buildRemovalRange(lines, 0)).toEqual({ start: 0, end: 1 });
+    expect(buildRemovalRange(lines, 0)).toEqual({ start: 0, end: 3 });
   });
 });
 
