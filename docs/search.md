@@ -11,6 +11,8 @@ The search field in the TODOseq Task List provides a powerful search system that
 
 The search field is located in the Task List toolbar and provides live filtering as you type. Basic search matches the entered text against the task text, the task's `DESCRIPTION:` line, the file path, and the filename.
 
+Results follow live edits. Moving a task under a different heading or renaming its note updates `heading:` matches without a manual rescan.
+
 Searching without a prefix looks in the task line _and_ its description, so a task can match on either:
 
 ```txt

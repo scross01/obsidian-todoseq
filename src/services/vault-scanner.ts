@@ -48,6 +48,12 @@ export class VaultScanner
   private parserRegistry: ParserRegistry;
   private keywordManager: KeywordManager;
   private skipIncrementalChanges = new Map<string, number>();
+  /**
+   * Paths whose scanner-visible state changed while a full scan was running.
+   * Null outside an active scan. Bounded to the pass and used only to stop a
+   * scan's older snapshots overwriting newer per-file publications.
+   */
+  private activeScanDirtyPaths: Set<string> | null = null;
 
   constructor(
     private plugin: TodoTracker,
@@ -120,6 +126,7 @@ export class VaultScanner
       return;
     }
     this._isScanning = true;
+    this.activeScanDirtyPaths = new Set<string>();
 
     const startTime = performance.now();
 
@@ -157,7 +164,7 @@ export class VaultScanner
 
         // Emit an initial chunk of tasks to the UI to unblock Largest Contentful Paint (LCP)
         if (newTasks.length > 0 && !hasEmittedInitialBatch) {
-          const initialTasks = [...newTasks];
+          const initialTasks = this.reconcileWithCurrentState(newTasks);
           initialTasks.sort(taskComparator);
           this.taskStateManager.setTasks(initialTasks);
           // UI elements will now mount instantly while the rest of the vault continues
@@ -188,17 +195,20 @@ export class VaultScanner
         );
       }
 
-      // Update the centralized state manager
-      this.taskStateManager.setTasks(newTasks);
+      // Update the centralized state manager. Reconcile synchronously just
+      // before publication: a path whose newer state was published while
+      // this pass was reading must win over the scan's older snapshot.
+      const reconciledTasks = this.reconcileWithCurrentState(newTasks);
+      this.taskStateManager.setTasks(reconciledTasks);
 
       // Emit events for backward compatibility
-      this.emit('tasks-changed', newTasks);
+      this.emit('tasks-changed', reconciledTasks);
       this.emit('scan-completed');
 
       const endTime = performance.now();
       const scanDuration = endTime - startTime;
       console.debug(
-        `TODOseq: scan vault completed in ${scanDuration.toFixed(2)}ms (${newTasks.length} tasks found)`,
+        `TODOseq: scan vault completed in ${scanDuration.toFixed(2)}ms (${reconciledTasks.length} tasks found)`,
       );
     } catch (error) {
       console.error('VaultScanner scanVault error', error);
@@ -209,6 +219,7 @@ export class VaultScanner
     } finally {
       this._hasCompletedInitialScan = true;
       this._isScanning = false;
+      this.activeScanDirtyPaths = null;
     }
 
     // Outside the try, so the deferred pass runs even if this one threw.
@@ -471,10 +482,9 @@ export class VaultScanner
     }
 
     try {
-      const currentTasks = this.taskStateManager.getTasks();
-      const fileTasksBefore = currentTasks.filter(
-        (task) => task.path === file.path,
-      );
+      // Journal BEFORE the awaited reads: anything this event publishes must
+      // win over a full scan's older snapshot for the same path.
+      this.activeScanDirtyPaths?.add(file.path);
 
       const fileTasks = await this.scanFile(file);
 
@@ -496,6 +506,14 @@ export class VaultScanner
       if (checkResult.isExpected) {
         return;
       }
+
+      // Capture current state AFTER the awaited reads. A scan or another
+      // event may have published newer state for unrelated paths (or this
+      // one) while we were reading; merging a pre-read snapshot would undo it.
+      const currentTasks = this.taskStateManager.getTasks();
+      const fileTasksBefore = currentTasks.filter(
+        (task) => task.path === file.path,
+      );
 
       // Skip update if tasks haven't actually changed (identity comparison by path, line, rawText)
       if (this.tasksIdentical(fileTasksBefore, nonArchivedTasks)) {
@@ -530,6 +548,61 @@ export class VaultScanner
    */
   addSkipIncrementalChange(filePath: string): void {
     this.skipIncrementalChanges.set(filePath, Date.now());
+    // A plugin write during a full scan is invisible to that scan's reads,
+    // so the scan must publish the current central state for this path.
+    this.activeScanDirtyPaths?.add(filePath);
+  }
+
+  /**
+   * Replace the accumulated scan's entries for paths that changed during the
+   * pass with the latest central-state entries. Clean paths keep their scan
+   * result; deleted paths and old renamed paths drop out; paths created after
+   * file enumeration are added; archived tasks stay excluded.
+   *
+   * Runs synchronously on already-collected arrays: no reads, no reparse and
+   * no per-task cloning.
+   */
+  private reconcileWithCurrentState(scanTasks: Task[]): Task[] {
+    const dirtyPaths = this.activeScanDirtyPaths;
+    if (!dirtyPaths || dirtyPaths.size === 0) return scanTasks;
+
+    const latestByPath = new Map<string, Task[]>();
+    for (const task of this.taskStateManager.getTasks()) {
+      const existing = latestByPath.get(task.path);
+      if (existing) existing.push(task);
+      else latestByPath.set(task.path, [task]);
+    }
+
+    const reconciled: Task[] = [];
+    const handledPaths = new Set<string>();
+    for (const task of scanTasks) {
+      if (!dirtyPaths.has(task.path)) {
+        reconciled.push(task);
+        continue;
+      }
+      if (handledPaths.has(task.path)) continue;
+      handledPaths.add(task.path);
+      const latest = latestByPath.get(task.path);
+      if (!latest) continue;
+      reconciled.push(
+        ...latest.filter(
+          (current) => !this.keywordManager.isArchived(current.state),
+        ),
+      );
+    }
+
+    for (const path of dirtyPaths) {
+      if (handledPaths.has(path)) continue;
+      const latest = latestByPath.get(path);
+      if (!latest) continue;
+      reconciled.push(
+        ...latest.filter(
+          (current) => !this.keywordManager.isArchived(current.state),
+        ),
+      );
+    }
+
+    return reconciled;
   }
 
   // Compare two WarningPeriodInfo objects by value (not reference)
@@ -559,6 +632,7 @@ export class VaultScanner
         b.line !== a.line ||
         b.rawText !== a.rawText ||
         b.description !== a.description ||
+        b.parentHeading !== a.parentHeading ||
         (b.scheduledDate?.getTime() ?? null) !==
           (a.scheduledDate?.getTime() ?? null) ||
         (b.deadlineDate?.getTime() ?? null) !==
@@ -589,6 +663,7 @@ export class VaultScanner
   // Process file deletion (called by EventCoordinator)
   async processFileDelete(file: TFile): Promise<void> {
     try {
+      this.activeScanDirtyPaths?.add(file.path);
       const currentTasks = this.taskStateManager.getTasks();
       const updatedTasks = currentTasks.filter(
         (task) => task.path !== file.path,
@@ -609,14 +684,25 @@ export class VaultScanner
   // Process file rename (called by EventCoordinator)
   async processFileRename(file: TFile, oldPath: string): Promise<void> {
     try {
-      const currentTasks = this.taskStateManager.getTasks();
+      // Capture the new path as a string before awaiting: a later TFile
+      // mutation must not change what the scan journal recorded.
+      const newPath = file.path;
+      this.activeScanDirtyPaths?.add(oldPath);
+      this.activeScanDirtyPaths?.add(newPath);
 
-      const updatedTasks = currentTasks.filter((t) => t.path !== oldPath);
-
-      if (!this.isExcluded(file.path)) {
+      let renamedTasks: Task[] = [];
+      if (!this.isExcluded(newPath)) {
         const fileTasks = await this.scanFile(file);
-        updatedTasks.push(...fileTasks);
+        // Archived tasks are styled but never collected, including on rename.
+        renamedTasks = fileTasks.filter(
+          (task) => !this.keywordManager.isArchived(task.state),
+        );
       }
+
+      // Read current state after the awaited scan, then merge.
+      const currentTasks = this.taskStateManager.getTasks();
+      const updatedTasks = currentTasks.filter((t) => t.path !== oldPath);
+      updatedTasks.push(...renamedTasks);
 
       updatedTasks.sort(taskComparator);
       this.taskStateManager.setTasks(updatedTasks);

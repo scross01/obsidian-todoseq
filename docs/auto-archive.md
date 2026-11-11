@@ -4,6 +4,8 @@ Auto-Archive rewrites completed task keywords (e.g. `DONE`) to an archived keywo
 
 ## Why Archive?
 
+Renaming a note does not bring its archived tasks back into the Task List: archived keywords stay excluded when a file is renamed, just as they are during a scan.
+
 Completed tasks accumulate forever. `DONE` lines are useful history, but after a while they bury the work that still matters. Archiving keeps the record in the note — the line and its CLOSED date are unchanged apart from the keyword — while removing the task from the Task List, because archived tasks are not collected during vault scans (see [Task Entry](task-entry.md)).
 
 ## How It Works

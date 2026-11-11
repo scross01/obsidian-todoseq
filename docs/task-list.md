@@ -11,6 +11,8 @@ The Task List is the central interface for managing all your tasks across your O
 
 The Task List automatically opens in the right sidebar when the TODOseq plugin is first enabled. You can drag and drop the panel to reposition it within the Obsidian interface, such as moving to different panel locations or making it a floating window.
 
+The list follows the vault. Edits, renames and deletions made in Obsidian — or outside it — update the list, and a task's current state is kept even when a background vault scan and a live edit land at the same time.
+
 ### Command Palette
 
 1. Open the command palette with `Ctrl/Cmd + P`

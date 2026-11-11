@@ -256,7 +256,7 @@ graph TB
 
 **VaultScanner** (`src/services/vault-scanner.ts`)
 
-- **Responsibility**: File system monitoring, incremental scanning, owns KeywordManager
+- **Responsibility**: File system monitoring, incremental scanning, owns KeywordManager. Publication is generation-aware: an active full scan journals paths whose state changed while it ran (incremental update, delete, rename, plugin write) and, in one synchronous tail before each partial/final `setTasks`, replaces its older snapshot for those paths with the current central state. Clean paths keep their scan result; no extra parse or clone happens in the tail.
 - **Key Patterns**: Event-driven architecture, performance optimization, yielding to event loop
 - **Interface**: `scanVault()`, `updateSettings()`, `getKeywordManager()`, `getParserRegistry()`, `getParser()`, plus inherited `on/off/emit/removeAllListeners` from `EventEmitter<VaultScannerEvents>` for typed event subscription (see [EventEmitter](#eventemittert-src-utilsevent-emitterts))
 - **Ownership**: Receives and uses KeywordManager instance; receives fully configured ParserRegistry via constructor
