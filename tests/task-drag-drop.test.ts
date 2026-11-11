@@ -110,14 +110,14 @@ describe('buildRemovalRange', () => {
     expect(buildRemovalRange(lines, 0)).toEqual({ start: 0, end: 2 });
   });
 
-  it('stops at CLOSED line (not a date line to remove)', () => {
+  it('includes CLOSED and the metadata that follows it', () => {
     const lines = [
       'TODO some task',
       'SCHEDULED: <2026-04-02 Thu>',
       'CLOSED: [2026-04-01 Wed]',
       'DEADLINE: <2026-04-03 Fri>',
     ];
-    expect(buildRemovalRange(lines, 0)).toEqual({ start: 0, end: 1 });
+    expect(buildRemovalRange(lines, 0)).toEqual({ start: 0, end: 3 });
   });
 });
 
@@ -1042,16 +1042,14 @@ describe('TaskDragDropHandler', () => {
       ).toBe(true);
     });
 
-    it('should call executeDrop and show notice for copy action', async () => {
+    it('delegates the drop to the task writer and shows a notice', async () => {
       const task = createBaseTask({ path: 'source.md', line: 0 });
       (handler as any).draggedTask = task;
 
-      const readSpy = jest
-        .spyOn(mockApp.vault, 'read')
-        .mockResolvedValue('TODO Test task');
-      const modifySpy = jest
-        .spyOn(mockApp.vault, 'modify')
-        .mockResolvedValue(undefined);
+      const transferTask = jest.fn().mockResolvedValue({ status: 'success' });
+      (mockPlugin as unknown as { taskEditor: unknown }).taskEditor = {
+        transferTask,
+      };
 
       const dropCallback = (mockApp as any).workspace.on.mock.calls[0][1];
       const mockEvt = createDragEvent('drop', {
@@ -1060,22 +1058,23 @@ describe('TaskDragDropHandler', () => {
         altKey: false,
       });
       const preventDefaultSpy = jest.spyOn(mockEvt, 'preventDefault');
-      const view = { file: new TFile('target.md', 'target.md') };
-      dropCallback(mockEvt, mockEditor, view);
+      const target = new TFile('target.md', 'target.md');
+      dropCallback(mockEvt, mockEditor, { file: target });
 
       // Wait for async executeDrop
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(preventDefaultSpy).toHaveBeenCalled();
-      expect(readSpy).toHaveBeenCalled();
-      expect(modifySpy).toHaveBeenCalled();
-
+      expect(transferTask).toHaveBeenCalledWith(
+        task,
+        target,
+        'copy',
+        undefined,
+      );
       expect(noticeInstances.some((n) => n.message.includes('copied'))).toBe(
         true,
       );
 
-      readSpy.mockRestore();
-      modifySpy.mockRestore();
       preventDefaultSpy.mockRestore();
     });
   });
@@ -1121,290 +1120,55 @@ describe('TaskDragDropHandler', () => {
     });
   });
 
-  describe('insertAtPosition', () => {
-    it('should insert lines at given position', () => {
-      const editor = createMockEditor();
-      editor.getLine.mockReturnValue('existing line');
-
-      (handler as any).insertAtPosition(
-        editor as any,
-        ['TODO New task', 'SCHEDULED: <2026-04-02 Thu>'],
-        { line: 0, ch: 13 },
-      );
-
-      expect(editor.replaceRange).toHaveBeenCalledWith(
-        '\nTODO New task\nSCHEDULED: <2026-04-02 Thu>',
-        { line: 0, ch: 13 },
-      );
-    });
-
-    it('should insert without newline when current line is empty', () => {
-      const editor = createMockEditor();
-      editor.getLine.mockReturnValue('');
-
-      (handler as any).insertAtPosition(editor as any, ['TODO New task'], {
-        line: 0,
-        ch: 0,
-      });
-
-      expect(editor.replaceRange).toHaveBeenCalledWith('TODO New task', {
-        line: 0,
-        ch: 0,
-      });
-    });
-
-    it('should use editor cursor when pos is null', () => {
-      const editor = createMockEditor();
-      editor.getLine.mockReturnValue('existing');
-
-      (handler as any).insertAtPosition(editor as any, ['TODO Task'], null);
-
-      expect(editor.replaceRange).toHaveBeenCalledWith('\nTODO Task', {
-        line: 0,
-        ch: 8,
-      });
-    });
-  });
-
-  describe('insertAtEnd', () => {
-    it('should append lines to file content', async () => {
-      const file = new TFile('target.md', 'target.md');
-      const readSpy = jest
-        .spyOn(mockApp.vault, 'read')
-        .mockResolvedValue('# Notes\n\nExisting');
-      const modifySpy = jest
-        .spyOn(mockApp.vault, 'modify')
-        .mockResolvedValue(undefined);
-
-      await (handler as any).insertAtEnd(file, ['TODO New task']);
-
-      expect(readSpy).toHaveBeenCalledWith(file);
-      expect(modifySpy).toHaveBeenCalledWith(
-        file,
-        '# Notes\n\nExisting\n\nTODO New task\n',
-      );
-
-      readSpy.mockRestore();
-      modifySpy.mockRestore();
-    });
-  });
-
-  describe('handleSourceModification', () => {
-    it('should do nothing for copy action', async () => {
-      const task = createBaseTask({ path: 'source.md', line: 1 });
-      const modifySpy = jest.spyOn(mockApp.vault, 'modify');
-
-      await (handler as any).handleSourceModification(task, 'copy');
-      expect(modifySpy).not.toHaveBeenCalled();
-
-      modifySpy.mockRestore();
-    });
-
-    it('should remove task lines for move action', async () => {
-      const task = createBaseTask({
-        path: 'source.md',
-        line: 1,
-        indent: '',
-        rawText: '- [ ] TODO Task',
-      });
-
-      const sourceFile = new TFile('source.md', 'source.md');
-      jest
-        .spyOn(mockApp.vault, 'getAbstractFileByPath')
-        .mockReturnValue(sourceFile);
-      jest
-        .spyOn(mockApp.vault, 'read')
-        .mockResolvedValue(
-          ['# Header', '- [ ] TODO Task', '  - [ ] sub', 'Next line'].join(
-            '\n',
-          ),
-        );
-      const modifySpy = jest
-        .spyOn(mockApp.vault, 'modify')
-        .mockResolvedValue(undefined);
-
-      await (handler as any).handleSourceModification(task, 'move');
-
-      expect(modifySpy).toHaveBeenCalled();
-      const modifiedContent = modifySpy.mock.calls[0][1];
-      expect(modifiedContent).not.toContain('TODO Task');
-
-      modifySpy.mockRestore();
-    });
-
-    it('should migrate keyword for migrate action', async () => {
-      const task = createBaseTask({
-        path: 'source.md',
-        line: 1,
-        indent: '',
-        state: 'TODO',
-        rawText: 'TODO Task',
-      });
-
-      const sourceFile = new TFile('source.md', 'source.md');
-      jest
-        .spyOn(mockApp.vault, 'getAbstractFileByPath')
-        .mockReturnValue(sourceFile);
-      jest
-        .spyOn(mockApp.vault, 'read')
-        .mockResolvedValue(
-          ['# Header', 'TODO Task', 'SCHEDULED: <2026-04-02 Thu>', 'Next'].join(
-            '\n',
-          ),
-        );
-      const modifySpy = jest
-        .spyOn(mockApp.vault, 'modify')
-        .mockResolvedValue(undefined);
-
-      await (handler as any).handleSourceModification(task, 'migrate');
-
-      expect(modifySpy).toHaveBeenCalled();
-      const modifiedContent = modifySpy.mock.calls[0][1];
-      expect(modifiedContent).toContain('MIGRATED Task');
-      expect(modifiedContent).not.toContain('SCHEDULED');
-
-      modifySpy.mockRestore();
-    });
-
-    it('should handle error during source modification', async () => {
-      const task = createBaseTask({ path: 'source.md', line: 1 });
-
-      jest
-        .spyOn(mockApp.vault, 'getAbstractFileByPath')
-        .mockImplementation(() => {
-          throw new Error('disk error');
-        });
-
-      const consoleSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      await (handler as any).handleSourceModification(task, 'move');
-
-      expect(consoleSpy).toHaveBeenCalled();
-      expect(
-        noticeInstances.some((n) =>
-          n.message.includes('Failed to update source task'),
-        ),
-      ).toBe(true);
-
-      consoleSpy.mockRestore();
-    });
-
-    it('should return early when source file is not a TFile', async () => {
-      const task = createBaseTask({ path: 'source.md', line: 1 });
-      jest.spyOn(mockApp.vault, 'getAbstractFileByPath').mockReturnValue(null);
-      const modifySpy = jest.spyOn(mockApp.vault, 'modify');
-
-      await (handler as any).handleSourceModification(task, 'move');
-      expect(modifySpy).not.toHaveBeenCalled();
-
-      modifySpy.mockRestore();
-    });
-  });
-
-  describe('showActionNotice', () => {
-    it('should show copy notice', () => {
-      (handler as any).showActionNotice('copy');
-      expect(noticeInstances[noticeInstances.length - 1].message).toBe(
-        'Task copied',
-      );
-    });
-
-    it('should show move notice', () => {
-      (handler as any).showActionNotice('move');
-      expect(noticeInstances[noticeInstances.length - 1].message).toBe(
-        'Task moved',
-      );
-    });
-
-    it('should show migrate notice', () => {
-      (handler as any).showActionNotice('migrate');
-      expect(noticeInstances[noticeInstances.length - 1].message).toBe(
-        'Task migrated',
-      );
-    });
-  });
-
-  describe('isOverValidDropTarget', () => {
-    it('should return false when target is not HTMLElement', () => {
-      const evt = createDragEvent('dragover');
-      Object.defineProperty(evt, 'target', { value: null });
-      expect((handler as any).isOverValidDropTarget(evt)).toBe(false);
-    });
-
-    it('should return true when over markdown source view', () => {
-      const sourceView = activeDocument.createElement('div');
-      sourceView.className = 'markdown-source-view';
-      activeDocument.body.appendChild(sourceView);
-
-      const evt = createDragEvent('dragover');
-      Object.defineProperty(evt, 'target', { value: sourceView });
-      expect((handler as any).isOverValidDropTarget(evt)).toBe(true);
-
-      activeDocument.body.removeChild(sourceView);
-    });
-
-    it('should return false when not over markdown source view', () => {
-      const div = activeDocument.createElement('div');
-      const evt = createDragEvent('dragover');
-      Object.defineProperty(evt, 'target', { value: div });
-      expect((handler as any).isOverValidDropTarget(evt)).toBe(false);
-    });
-  });
-
   describe('executeDrop', () => {
-    it('should insert at position in source mode', async () => {
+    function withWriter(result: { status: string }) {
+      const transferTask = jest.fn().mockResolvedValue(result);
+      (mockPlugin as unknown as { taskEditor: unknown }).taskEditor = {
+        transferTask,
+      };
+      return transferTask;
+    }
+
+    it('passes the drop position to the writer in source mode', async () => {
       const task = createBaseTask({ path: 'source.md', line: 0 });
-      const insertAtPositionSpy = jest
-        .spyOn(handler as any, 'insertAtPosition')
-        .mockReturnValue(undefined);
-      const handleSourceModificationSpy = jest
-        .spyOn(handler as any, 'handleSourceModification')
-        .mockResolvedValue(undefined);
+      const transferTask = withWriter({ status: 'success' });
+      const target = new TFile('target.md', 'target.md');
 
-      jest.spyOn(mockApp.vault, 'read').mockResolvedValue('TODO Task');
+      await (handler as any).executeDrop(task, target, 'copy', {
+        line: 2,
+        ch: 0,
+      });
 
-      await (handler as any).executeDrop(
-        task,
-        mockEditor as any,
-        new TFile('target.md', 'target.md'),
-        true,
-        'copy',
-        { line: 2, ch: 0 },
-      );
-
-      expect(insertAtPositionSpy).toHaveBeenCalled();
-      expect(handleSourceModificationSpy).toHaveBeenCalledWith(task, 'copy');
-
-      insertAtPositionSpy.mockRestore();
-      handleSourceModificationSpy.mockRestore();
+      expect(transferTask).toHaveBeenCalledWith(task, target, 'copy', {
+        insertAt: { line: 2, ch: 0 },
+      });
     });
 
-    it('should insert at end when not in source mode', async () => {
+    it('appends at the end when there is no drop position', async () => {
       const task = createBaseTask({ path: 'source.md', line: 0 });
-      const insertAtEndSpy = jest
-        .spyOn(handler as any, 'insertAtEnd')
-        .mockResolvedValue(undefined);
-      const handleSourceModificationSpy = jest
-        .spyOn(handler as any, 'handleSourceModification')
-        .mockResolvedValue(undefined);
+      const transferTask = withWriter({ status: 'success' });
+      const target = new TFile('target.md', 'target.md');
 
-      jest.spyOn(mockApp.vault, 'read').mockResolvedValue('TODO Task');
+      await (handler as any).executeDrop(task, target, 'move', undefined);
 
-      await (handler as any).executeDrop(
+      expect(transferTask).toHaveBeenCalledWith(
         task,
-        mockEditor as any,
-        new TFile('target.md', 'target.md'),
-        false,
-        'copy',
+        target,
+        'move',
+        undefined,
       );
+    });
 
-      expect(insertAtEndSpy).toHaveBeenCalled();
-      expect(handleSourceModificationSpy).toHaveBeenCalledWith(task, 'copy');
+    it('shows an accurate notice when the writer refuses', async () => {
+      const task = createBaseTask({ path: 'source.md', line: 0 });
+      withWriter({ status: 'stale-source' });
+      const target = new TFile('target.md', 'target.md');
 
-      insertAtEndSpy.mockRestore();
-      handleSourceModificationSpy.mockRestore();
+      await (handler as any).executeDrop(task, target, 'move', undefined);
+
+      expect(noticeInstances[noticeInstances.length - 1].message).toBe(
+        'Task has changed since it was dragged',
+      );
     });
   });
 

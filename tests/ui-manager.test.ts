@@ -292,6 +292,67 @@ describe('UIManager', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Owned setup teardown
+  // ---------------------------------------------------------------------------
+  describe('owned setup teardown', () => {
+    it('removes a capture-phase listener recorded by setup', () => {
+      const target = activeDocument.createElement('div');
+      const handler = jest.fn();
+      (
+        uiManager as unknown as {
+          registerCapturedListener: (
+            target: EventTarget,
+            type: string,
+            handler: EventListener,
+          ) => void;
+        }
+      ).registerCapturedListener(target, 'contextmenu', handler);
+
+      target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      uiManager.cleanup();
+      target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops delayed setup after cleanup', () => {
+      jest.useFakeTimers();
+      const workspace = (
+        pluginMock as unknown as {
+          app: {
+            workspace: {
+              getLeavesOfType: jest.Mock;
+              on: jest.Mock;
+            };
+          };
+        }
+      ).app.workspace;
+      workspace.getLeavesOfType.mockReturnValue([]);
+
+      uiManager.setupTaskKeywordContextMenu();
+      expect(workspace.getLeavesOfType).toHaveBeenCalledTimes(1);
+
+      const fileOpen = workspace.on.mock.calls.find(
+        (call: unknown[]) => call[0] === 'file-open',
+      )?.[1] as ((file: unknown) => void) | undefined;
+      expect(fileOpen).toBeDefined();
+      const { TFile: MockTFile } = jest.requireMock('obsidian') as {
+        TFile: new (path: string) => { path: string; extension: string };
+      };
+      const file = new MockTFile('note.md');
+      file.extension = 'md';
+      fileOpen?.(file);
+
+      uiManager.cleanup();
+      jest.runOnlyPendingTimers();
+
+      expect(workspace.getLeavesOfType).toHaveBeenCalledTimes(1);
+      jest.useRealTimers();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Cleanup (lifecycle)
   // ---------------------------------------------------------------------------
   describe('cleanup', () => {

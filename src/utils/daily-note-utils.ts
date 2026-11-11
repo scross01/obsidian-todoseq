@@ -9,9 +9,6 @@ import {
 import { moment } from 'obsidian';
 import { Task } from '../types/task';
 
-// Cache for daily notes plugin status to avoid repeated file reads
-let dailyNotesPluginEnabledCache: boolean | null = null;
-
 /**
  * Determines if a file is a daily note and extracts its date
  * @param app The Obsidian app instance
@@ -60,20 +57,13 @@ export function getDailyNoteInfo(
  * @param app The Obsidian app instance
  * @returns true if Daily Notes plugin is enabled
  */
-export function isDailyNotesPluginEnabledSync(app: App): boolean {
-  // Return cached value if available
-  if (dailyNotesPluginEnabledCache !== null) {
-    return dailyNotesPluginEnabledCache;
-  }
-
-  // Check via obsidian-daily-notes-interface (synchronous, no file reading)
+export function isDailyNotesPluginEnabledSync(_app: App): boolean {
+  // The interface returns the real boolean: true when the core Daily Notes
+  // plugin is enabled, otherwise the Periodic Notes daily.enabled flag. It
+  // reads live in-memory plugin state, so no cache or file read is needed.
   try {
-    const settings = appHasDailyNotesPluginLoaded();
-    const isEnabled = settings !== undefined;
-    dailyNotesPluginEnabledCache = isEnabled;
-    return isEnabled;
+    return appHasDailyNotesPluginLoaded() === true;
   } catch {
-    // Fallback: if there's any error, assume plugin is not available
     return false;
   }
 }
@@ -86,56 +76,12 @@ export function isDailyNotesPluginEnabledSync(app: App): boolean {
  */
 export function isDailyNotesPluginEnabled(
   app: App,
-  forceRefresh = false,
+  _forceRefresh = false,
 ): Promise<boolean> {
-  // If we have a cached value and not forcing refresh, return it
-  if (dailyNotesPluginEnabledCache !== null && !forceRefresh) {
-    return Promise.resolve(dailyNotesPluginEnabledCache);
-  }
-
-  try {
-    // Check .obsidian/core-plugins.json file to determine plugin status
-    const adapter = app.vault.adapter;
-    const corePluginsPath = `${app.vault.configDir}/core-plugins.json`;
-
-    // Read core plugins file
-    return adapter
-      .read(corePluginsPath)
-      .then((data) => {
-        try {
-          const plugins = JSON.parse(data) as Record<string, boolean>;
-          const isEnabled = plugins['daily-notes'] === true;
-
-          // Cache the result
-          dailyNotesPluginEnabledCache = isEnabled;
-          return isEnabled;
-        } catch (error) {
-          console.warn('Failed to parse core-plugins.json:', error);
-          dailyNotesPluginEnabledCache = false;
-          return false;
-        }
-      })
-      .catch((error) => {
-        console.warn('Failed to read core-plugins.json:', error);
-        dailyNotesPluginEnabledCache = false;
-        return false;
-      });
-  } catch (error) {
-    // Fallback to checking via obsidian-daily-notes-interface
-    console.warn(
-      'Error checking daily notes plugin status, using fallback:',
-      error,
-    );
-    try {
-      const settings = appHasDailyNotesPluginLoaded();
-      const isEnabled = settings !== undefined;
-      dailyNotesPluginEnabledCache = isEnabled;
-      return Promise.resolve(isEnabled);
-    } catch {
-      dailyNotesPluginEnabledCache = false;
-      return Promise.resolve(false);
-    }
-  }
+  // Same boolean contract as the sync wrapper, so command availability and
+  // actual note resolution cannot disagree. No disk read and no cache: the
+  // interface reflects current in-memory provider state.
+  return Promise.resolve(isDailyNotesPluginEnabledSync(app));
 }
 
 /**
@@ -143,7 +89,7 @@ export function isDailyNotesPluginEnabled(
  * Call this when plugin settings change to ensure cache is updated
  */
 export function refreshDailyNotesPluginStatus(): void {
-  dailyNotesPluginEnabledCache = null;
+  // Kept for callers: availability is read live, so there is nothing to reset.
 }
 
 /**

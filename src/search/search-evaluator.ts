@@ -10,6 +10,7 @@ import { PropertySearchEngine } from '../services/property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
 import { KeywordGroup } from '../types/task';
 import { App, TFile } from 'obsidian';
+import type { PropertyQueryDescriptor } from './search-types';
 
 const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
   active: 'activeKeywords',
@@ -17,6 +18,12 @@ const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
   waiting: 'waitingKeywords',
   completed: 'completedKeywords',
 };
+
+/** Batch-local keyword resolution shared by every row in one search pass. */
+export interface SearchBatchContext {
+  /** Raw group alias -> normalized keyword sets (exact and lowercase). */
+  stateGroupKeywords: Map<string, { exact: Set<string>; lower: Set<string> }>;
+}
 
 /**
  * A property filter node's engine query plus its resolution identity.
@@ -154,6 +161,7 @@ export class SearchEvaluator {
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
     engineFiles?: Map<string, Set<string> | null>,
+    batchContext?: SearchBatchContext,
   ): boolean {
     switch (node.type) {
       case 'term':
@@ -165,7 +173,13 @@ export class SearchEvaluator {
           ? this.evaluatePhrase(node.value, task, caseSensitive)
           : false;
       case 'prefix_filter':
-        return this.evaluatePrefixFilter(node, task, caseSensitive, settings);
+        return this.evaluatePrefixFilter(
+          node,
+          task,
+          caseSensitive,
+          settings,
+          batchContext,
+        );
       case 'range_filter':
         return this.evaluateRangeFilter(node, task, caseSensitive);
       case 'property_filter': {
@@ -185,11 +199,25 @@ export class SearchEvaluator {
       }
       case 'and':
         return (node.children ?? []).every((child) =>
-          this.evaluateSync(child, task, caseSensitive, settings, engineFiles),
+          this.evaluateSync(
+            child,
+            task,
+            caseSensitive,
+            settings,
+            engineFiles,
+            batchContext,
+          ),
         );
       case 'or':
         return (node.children ?? []).some((child) =>
-          this.evaluateSync(child, task, caseSensitive, settings, engineFiles),
+          this.evaluateSync(
+            child,
+            task,
+            caseSensitive,
+            settings,
+            engineFiles,
+            batchContext,
+          ),
         );
       case 'not': {
         const first = node.children?.[0];
@@ -200,12 +228,53 @@ export class SearchEvaluator {
               caseSensitive,
               settings,
               engineFiles,
+              batchContext,
             )
           : false;
       }
       default:
         return false;
     }
+  }
+
+  /**
+   * Resolve the keyword groups a query actually uses once per batch, using
+   * the same KeywordManager instance accessor as per-row evaluation so
+   * custom keywords and settings edits stay authoritative.
+   */
+  static buildBatchContext(
+    node: SearchNode,
+    settings?: TodoTrackerSettings,
+  ): SearchBatchContext | undefined {
+    if (!settings) return undefined;
+    const stateGroupKeywords = new Map<
+      string,
+      { exact: Set<string>; lower: Set<string> }
+    >();
+
+    const walk = (n: SearchNode): void => {
+      if (
+        n.type === 'prefix_filter' &&
+        n.field === 'state' &&
+        n.value &&
+        STATE_GROUP_MAP[n.value]
+      ) {
+        const group = STATE_GROUP_MAP[n.value];
+        if (!stateGroupKeywords.has(n.value)) {
+          const keywords = new KeywordManager(settings).getKeywordsForGroup(
+            group,
+          );
+          stateGroupKeywords.set(n.value, {
+            exact: new Set(keywords),
+            lower: new Set(keywords.map((keyword) => keyword.toLowerCase())),
+          });
+        }
+      }
+      for (const child of n.children ?? []) walk(child);
+    };
+
+    walk(node);
+    return stateGroupKeywords.size > 0 ? { stateGroupKeywords } : undefined;
   }
 
   /**
@@ -243,13 +312,30 @@ export class SearchEvaluator {
 
   /** One engine query → matching-file set (null on engine failure, per-row catch semantics). */
   static async resolveEngineFiles(
-    query: string,
+    descriptorOrQuery: PropertyQueryDescriptor | string,
     effectiveCaseSensitive: boolean,
     propertySearchEngine: PropertySearchEngine,
   ): Promise<Set<string> | null> {
+    const descriptor =
+      typeof descriptorOrQuery === 'string'
+        ? this.descriptorFromQuery(descriptorOrQuery)
+        : descriptorOrQuery;
     try {
+      if (typeof propertySearchEngine.searchProperty === 'function') {
+        return await propertySearchEngine.searchProperty(
+          descriptor,
+          effectiveCaseSensitive,
+        );
+      }
+      // Compatibility for partially stubbed engines in existing callers.
+      const legacyQuery =
+        typeof descriptorOrQuery === 'string'
+          ? descriptorOrQuery
+          : descriptor.kind === 'existence'
+            ? `[${descriptor.key}]`
+            : `[${descriptor.key}:${descriptor.value}]`;
       return await propertySearchEngine.searchProperties(
-        query,
+        legacyQuery,
         effectiveCaseSensitive,
       );
     } catch {
@@ -265,10 +351,20 @@ export class SearchEvaluator {
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
     engineFiles?: Map<string, Set<string> | null>,
+    batchContext?: SearchBatchContext,
   ): Task[] {
     const matched: Task[] = [];
     for (const task of tasks) {
-      if (this.evaluateSync(node, task, caseSensitive, settings, engineFiles)) {
+      if (
+        this.evaluateSync(
+          node,
+          task,
+          caseSensitive,
+          settings,
+          engineFiles,
+          batchContext,
+        )
+      ) {
         matched.push(task);
       }
     }
@@ -381,6 +477,7 @@ export class SearchEvaluator {
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
+    batchContext?: SearchBatchContext,
   ): boolean {
     const field = node.field;
     const value = node.value;
@@ -397,7 +494,13 @@ export class SearchEvaluator {
       case 'tag':
         return this.evaluateTagFilter(value, task, caseSensitive, node.exact);
       case 'state':
-        return this.evaluateStateFilter(value, task, caseSensitive, settings);
+        return this.evaluateStateFilter(
+          value,
+          task,
+          caseSensitive,
+          settings,
+          batchContext,
+        );
       case 'priority':
         return this.evaluatePriorityFilter(value, task, caseSensitive);
       case 'content':
@@ -540,11 +643,18 @@ export class SearchEvaluator {
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
+    batchContext?: SearchBatchContext,
   ): boolean {
     const group = STATE_GROUP_MAP[value];
     if (group && settings) {
-      const groupKeywords = KeywordManager.getKeywordsForGroup(group, settings);
+      const resolved = batchContext?.stateGroupKeywords.get(value);
       const taskState = caseSensitive ? task.state : task.state.toLowerCase();
+      if (resolved) {
+        return caseSensitive
+          ? resolved.exact.has(task.state)
+          : resolved.lower.has(taskState);
+      }
+      const groupKeywords = KeywordManager.getKeywordsForGroup(group, settings);
       return groupKeywords.some((k) =>
         caseSensitive ? k === task.state : k.toLowerCase() === taskState,
       );
@@ -628,13 +738,13 @@ export class SearchEvaluator {
   private static getSearchableFields(task: Task): string[] {
     const fields: string[] = [];
 
-    // `rawText` is the full original line. `text` is that same line with the
-    // keyword, priority token and footnote/embed references stripped, so it is
-    // always a contiguous substring of `rawText` and can never match a term or
-    // phrase that `rawText` does not already match. Indexing both would only
-    // add a redundant scan for no extra matches, so just `rawText` is indexed
-    // (the no-lost-match invariant is pinned by tests/search-evaluator.test.ts).
+    // `rawText` is the full original line. `text` is the normalized line with
+    // the keyword, priority token and footnote/embed references stripped. That
+    // stripping removes tokens from the middle, so a displayed phrase such as
+    // `Review report` (from `Review[^1] report`) is NOT a contiguous substring
+    // of `rawText`; index the normalized text too, but only when it differs.
     if (task.rawText) fields.push(task.rawText);
+    if (task.text && task.text !== task.rawText) fields.push(task.text);
     // DESCRIPTION text joins the default (no-prefix) search: an unprefixed
     // term matches the task line OR its description. Kept out of
     // `parentHeading`-based matching, which stays scoped via heading:.
@@ -952,7 +1062,7 @@ export class SearchEvaluator {
     const effectiveCaseSensitive = node.exact ? true : caseSensitive;
     const matchingFiles = propertySearchEngine
       ? await this.resolveEngineFiles(
-          built.query,
+          built.descriptor,
           effectiveCaseSensitive,
           propertySearchEngine,
         )
@@ -973,44 +1083,95 @@ export class SearchEvaluator {
    * paths, and by the resolution collector, so the two cannot drift.
    */
   private static buildPropertyQuery(node: SearchNode): {
+    descriptor: PropertyQueryDescriptor;
     query: string;
     propertyKey: string;
     propertyValue: string | null;
   } | null {
-    const field = node.field;
-    const value = node.value;
+    let descriptor = node.property;
 
-    if (!field || !value) {
-      return null;
-    }
+    if (!descriptor) {
+      const value = node.value;
+      if (!value) return null;
 
-    // Parse the field and property value from the stored value
-    // The parser stores it as "key:propertyValue" format
-    let propertyKey: string;
-    let propertyValue: string | null;
-
-    if (value.includes(':')) {
-      const colonIndex = value.indexOf(':');
-      propertyKey = value.slice(0, colonIndex);
-      propertyValue = value.slice(colonIndex + 1);
-
-      // Handle empty value case [type:]
-      if (propertyValue === '') {
-        propertyValue = null;
+      if (value.includes(':')) {
+        const colonIndex = value.indexOf(':');
+        const key = value.slice(0, colonIndex);
+        const rawValue = value.slice(colonIndex + 1);
+        descriptor =
+          rawValue === ''
+            ? {
+                key,
+                kind: 'existence',
+                value: '',
+                exact: false,
+                keyExact: false,
+              }
+            : {
+                key,
+                kind: rawValue === 'null' ? 'null' : 'string',
+                value: rawValue,
+                exact: node.exact === true,
+                keyExact: false,
+              };
+      } else {
+        descriptor = {
+          key: value,
+          kind: 'existence',
+          value: '',
+          exact: false,
+          keyExact: false,
+        };
       }
-    } else {
-      // Key-only case like [type]
-      propertyKey = value;
-      propertyValue = null;
     }
 
-    // Build the engine query string. The engine receives the same shape the
-    // inline path always used: [key:value] or [key].
+    if (!descriptor.key) return null;
+
     const query =
-      propertyValue !== null
-        ? `[${propertyKey}:${propertyValue}]`
-        : `[${propertyKey}]`;
-    return { query, propertyKey, propertyValue };
+      descriptor.kind === 'existence'
+        ? `[${descriptor.key}]`
+        : `[${descriptor.key}:${descriptor.value}]`;
+
+    return {
+      descriptor,
+      query,
+      propertyKey: descriptor.key,
+      propertyValue: descriptor.kind === 'existence' ? null : descriptor.value,
+    };
+  }
+
+  /** Adapter for older string-query callers; keeps their shape unchanged. */
+  private static descriptorFromQuery(query: string): PropertyQueryDescriptor {
+    const inner =
+      query.startsWith('[') && query.endsWith(']') ? query.slice(1, -1) : query;
+    const colonIndex = inner.indexOf(':');
+    if (colonIndex === -1) {
+      return {
+        key: inner.trim(),
+        kind: 'existence',
+        value: '',
+        exact: false,
+        keyExact: false,
+      };
+    }
+    const key = inner.slice(0, colonIndex).trim();
+    const value = inner.slice(colonIndex + 1).trim();
+    if (value === 'null') {
+      return {
+        key,
+        kind: 'null',
+        value: 'null',
+        exact: false,
+        keyExact: false,
+      };
+    }
+    return {
+      key,
+      kind: 'string',
+      value,
+      exact: false,
+      keyExact: false,
+    };
   }
 
   /**
@@ -1028,7 +1189,7 @@ export class SearchEvaluator {
   ): boolean {
     const built = this.buildPropertyQuery(node);
     if (!built) return false;
-    const { propertyKey, propertyValue } = built;
+    const { descriptor } = built;
 
     // Engine pre-resolution (bulk) or per-row engine hit: the matching-file
     // set is task-independent, so membership is the whole answer.
@@ -1036,11 +1197,6 @@ export class SearchEvaluator {
       return matchingFiles.has(task.path);
     }
 
-    // When exact flag is true (quoted values), force case sensitivity
-    const effectiveCaseSensitive = node.exact ? true : caseSensitive;
-
-    // Fall back to direct metadata access
-    // Get file cache and frontmatter
     let file;
     try {
       file = this.getFileForTask(task, settings);
@@ -1058,102 +1214,102 @@ export class SearchEvaluator {
       return false;
     }
 
-    const frontmatter = fileCache.frontmatter;
+    const frontmatter = fileCache.frontmatter as Record<string, unknown>;
+    const effectiveCaseSensitive = node.exact ? true : caseSensitive;
 
-    // Handle key-only searches (e.g., [type] or [type:])
-    // But NOT [type:""] which is a search for empty string value
-    if (propertyValue === null || (propertyValue === '' && !node.exact)) {
-      // Check if property exists (regardless of value)
-      if (effectiveCaseSensitive) {
-        return Boolean(
-          Object.prototype.hasOwnProperty.call(frontmatter, propertyKey),
-        );
-      } else {
-        // Case insensitive key search
-        const lowerField = propertyKey.toLowerCase();
-        return Object.keys(frontmatter).some(
-          (key) => key.toLowerCase() === lowerField,
-        );
+    if (descriptor.kind === 'string') {
+      let text = descriptor.value.trim();
+      if (text.startsWith('(') && text.endsWith(')')) {
+        text = text.slice(1, -1).trim();
       }
-    }
 
-    // Handle null value search (e.g., [type:null])
-    if (propertyValue === 'null') {
-      if (effectiveCaseSensitive) {
-        const hasKey = Boolean(
-          Object.prototype.hasOwnProperty.call(frontmatter, propertyKey),
-        );
-        return hasKey && frontmatter[propertyKey] === null;
-      } else {
-        // Case insensitive key search for null value
-        const lowerField = propertyKey.toLowerCase();
-        return Object.keys(frontmatter).some((key) => {
-          if (key.toLowerCase() === lowerField) {
-            return frontmatter[key] === null;
-          }
-          return false;
-        });
+      if (text.includes(' OR ')) {
+        return text
+          .split(' OR ')
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .some((part) =>
+            PropertyEvaluator.matchesPropertyFilter(
+              frontmatter,
+              { ...descriptor, value: part },
+              effectiveCaseSensitive,
+            ),
+          );
       }
-    }
 
-    // Get the property value (case sensitive or insensitive key search)
-    let actualPropertyValue: unknown;
-    if (effectiveCaseSensitive) {
-      actualPropertyValue = frontmatter[propertyKey];
-    } else {
-      // Case insensitive key search
-      const lowerField = propertyKey.toLowerCase();
-      const foundKey = Object.keys(frontmatter).find(
-        (key) => key.toLowerCase() === lowerField,
-      );
-      actualPropertyValue = foundKey ? frontmatter[foundKey] : undefined;
-    }
-
-    if (actualPropertyValue === undefined) {
-      return false;
-    }
-
-    // Special case: searching for empty string should NOT match null values
-    if (propertyValue === '' && actualPropertyValue === null) {
-      return false;
-    }
-
-    // Handle parentheses in OR expressions first (e.g., [status:(Draft OR Published)])
-    if (propertyValue.startsWith('(') && propertyValue.endsWith(')')) {
-      const innerValue = propertyValue.slice(1, -1);
-      if (innerValue.includes(' OR ')) {
-        const orValues = innerValue.split(' OR ').map((v) => v.trim());
-        return orValues.some((orValue) => {
-          // Create a temporary node for each OR value with just the value part
-          const tempNode = { ...node, value: orValue };
-          return this.evaluateSinglePropertyValue(
-            tempNode,
-            actualPropertyValue,
+      if (!descriptor.exact) {
+        const parsedDate = DateUtils.parseDateValue(text);
+        if (parsedDate) {
+          const keys = PropertyEvaluator.matchingKeys(
+            frontmatter,
+            descriptor,
             effectiveCaseSensitive,
           );
-        });
+          const matched = keys.some((key) => {
+            const raw = frontmatter[key];
+            const values = Array.isArray(raw) ? raw : [raw];
+            return values.some((value) => {
+              const taskDate =
+                PropertyEvaluator.parsePropertyValueAsDate(value);
+              return taskDate
+                ? PropertyEvaluator.compareDate(taskDate, parsedDate)
+                : false;
+            });
+          });
+          if (matched) return true;
+        }
+
+        const comparison = text.match(/^([><]=?)(.+)$/);
+        if (comparison) {
+          const operator = comparison[1];
+          const compareText = comparison[2];
+          const compareDate =
+            PropertyEvaluator.parseDateForComparison(compareText);
+          const compareNumber = Number(compareText);
+          const keys = PropertyEvaluator.matchingKeys(
+            frontmatter,
+            descriptor,
+            effectiveCaseSensitive,
+          );
+          return keys.some((key) => {
+            const raw = frontmatter[key];
+            const values = Array.isArray(raw) ? raw : [raw];
+            return values.some((value) => {
+              if (compareDate) {
+                const taskDate =
+                  PropertyEvaluator.parsePropertyValueAsDate(value);
+                return taskDate
+                  ? PropertyEvaluator.evaluateDateComparison(
+                      taskDate,
+                      operator,
+                      compareDate,
+                    )
+                  : false;
+              }
+              if (typeof value !== 'number' || isNaN(compareNumber)) {
+                return false;
+              }
+              switch (operator) {
+                case '>':
+                  return value > compareNumber;
+                case '>=':
+                  return value >= compareNumber;
+                case '<':
+                  return value < compareNumber;
+                case '<=':
+                  return value <= compareNumber;
+                default:
+                  return false;
+              }
+            });
+          });
+        }
       }
     }
 
-    // Handle OR expressions in the value (e.g., [status:Draft OR Published])
-    if (propertyValue.includes(' OR ')) {
-      const orValues = propertyValue.split(' OR ').map((v) => v.trim());
-      return orValues.some((orValue) => {
-        // Create a temporary node for each OR value with just the value part
-        const tempNode = { ...node, value: orValue };
-        return this.evaluateSinglePropertyValue(
-          tempNode,
-          actualPropertyValue,
-          effectiveCaseSensitive,
-        );
-      });
-    }
-
-    // Handle single value comparison - create a node with just the property value
-    const valueOnlyNode = { ...node, value: propertyValue };
-    return this.evaluateSinglePropertyValue(
-      valueOnlyNode,
-      actualPropertyValue,
+    return PropertyEvaluator.matchesPropertyFilter(
+      frontmatter,
+      descriptor,
       effectiveCaseSensitive,
     );
   }

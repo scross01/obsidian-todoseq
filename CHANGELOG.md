@@ -1,8 +1,30 @@
 # Change Log
 
-## Unreleased
+## 0.22.1
 
-- Fixed reading mode forcing every paragraph to the default text colour and size, which overrode colours set by themes and other plugins — for example trait and action names rendered by Fantasy Statblocks.
+- Fixed completing an unrelated plain task incrementing a preceding task's subtask count; optimistic progress now follows the checkbox children the parser actually counted and stays in agreement with a rescan.
+- Fixed combined searches mixing states and date ranges, implicit `AND` grouping around `OR`, and invalid queries such as a stray `)` or unclosed quote being silently accepted; the Task List now shows the validation error and clears it when corrected.
+- Fixed property searches missing partial and differently-cased values, treating empty arrays or null as a missing key, and confusing an exact empty string with a key-only filter.
+- Fixed disabling or reloading the plugin leaving its task update timers and right-click task handlers behind; editor interactions and pending delayed setup now stop with the plugin.
+- Fixed failed task changes staying on screen as though they had been saved; the Task List now returns to the note's actual state and later edits build on that saved content.
+- Fixed code-comment tasks gaining executable metadata lines when their state changed; their date actions now leave the source untouched, and Org tasks keep their CLOSED/STARTED history.
+- Fixed updating a task's date replacing its other metadata, such as an existing scheduled date or started timestamp, instead of changing only the targeted line.
+- Fixed the task list showing stale text on rows revealed by scrolling and letting a slow earlier search replace the newest results, count or error.
+- Fixed property-filtered task lists, embedded lists and dashboards staying stale after a note's properties changed.
+- Fixed embedded task lists and dashboard cards staying active after their note closed or re-rendered, so hidden blocks no longer refresh and overlapping refreshes show the newest result.
+- Fixed copy, move and migrate overwriting each other when two transfers target the same note, and made table tasks transfer only their own cell with the rest of the row untouched.
+- Fixed table rows containing an escaped pipe so the correct cell is edited and the rest of the row is left byte-for-byte intact.
+- Fixed the archive dialog losing Tab trapping and focus restoration in pop-out windows.
+- Fixed relative date labels and the seven-day date highlight being a day off around daylight-saving transitions.
+- Fixed footnote tasks inside excluded code, comment or math blocks being collected as tasks.
+- Fixed search missing tasks when the phrase you typed spans a priority marker or footnote reference, for example `Review[^1] report` for the phrase "Review report".
+- Fixed date autocomplete only recognising a few hardcoded task states: configured and built-in states now get the date shortcut, while ordinary prose that merely contains a keyword does not.
+- Fixed "copy/move to today" being offered when the Daily Notes plugin was disabled but then failing: command availability and the actual transfer now agree, and Periodic Notes can provide the daily note.
+- Fixed tasks in enabled Org notes and code files staying stale after the file was edited, created, deleted or renamed. Renaming a tracked file to an unsupported extension now also clears its old tasks, while attachments stay ignored.
+- Fixed the Task List briefly showing stale tasks when a vault scan overlapped a live edit, and stopped renamed archived notes from bringing their archived tasks back into the list. Moving a task under a new heading now also updates `heading:` search results immediately.
+- Fixed copying and moving a task dropping its `STARTED:`, `CLOSED:` or `DESCRIPTION:` lines: the whole metadata block now travels with the task, while Migrate to Today still removes only the dates it moves.
+- Fixed recurring tasks deleting the wrong date: completing a task whose SCHEDULED repeats but whose DEADLINE is one-off no longer removes the deadline, and a first-only (`--Nd`) warning period is now actually removed from the written date line.
+- Fixed reading mode forcing every paragraph to the default text colour and size, which overrode colours set by themes and other plugins — for example trait and action names rendered by Fantasy Statblocks. #90
 
 ## 0.22.0
 

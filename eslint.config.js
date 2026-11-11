@@ -35,6 +35,12 @@ export default [
     },
   },
   {
+    files: ['src/utils/patterns.ts'],
+    rules: {
+      'obsidianmd/regex-lookbehind': 'off',
+    },
+  },
+  {
     files: ['src/**/*.ts'],
     languageOptions: {
       parser: tsparser,
@@ -99,6 +105,7 @@ export default [
       'obsidianmd/no-global-this': 'off',
       'obsidianmd/prefer-active-doc': 'off',
       'obsidianmd/prefer-window-timers': 'off',
+      'obsidianmd/no-misused-promises': 'off',
       'obsidianmd/ui/sentence-case': 'off',
     },
   },

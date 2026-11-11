@@ -398,12 +398,15 @@ export class RecurrenceCoordinator {
       // This ensures all updates go through the unified flow
       // Warning periods are determined here (preserves -Nd, strips --Nd)
       await this.taskUpdateCoordinator.updateTaskRecurrence(taskForUpdate, {
-        newScheduledDate: dateResult.newScheduledDate ?? null,
-        newDeadlineDate: dateResult.newDeadlineDate ?? null,
+        // undefined means "this date is unchanged" and null means "delete";
+        // the writer relies on that distinction, so never coerce one to the
+        // other when forwarding the calculation result.
+        newScheduledDate: dateResult.newScheduledDate,
+        newDeadlineDate: dateResult.newDeadlineDate,
         newScheduledRepeat: taskForUpdate.scheduledDateRepeat,
         newDeadlineRepeat: taskForUpdate.deadlineDateRepeat,
-        newScheduledWarningPeriod: dateResult.newScheduledWarningPeriod ?? null,
-        newDeadlineWarningPeriod: dateResult.newDeadlineWarningPeriod ?? null,
+        newScheduledWarningPeriod: dateResult.newScheduledWarningPeriod,
+        newDeadlineWarningPeriod: dateResult.newDeadlineWarningPeriod,
         newStateForRecurrence: defaultInactive,
       });
 

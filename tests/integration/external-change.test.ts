@@ -56,6 +56,26 @@ test.describe('External file change', () => {
     expect(updatedText).toContain('Another external task');
   });
 
+  test('renaming an archived note keeps its tasks out of the list', async () => {
+    const archivedPath = path.join(TEST_VAULT_DIR, 'archived-rename.md');
+    fs.writeFileSync(archivedPath, '# Archived\n\nARCHIVED parked task\n');
+    await page.waitForTimeout(3000);
+
+    await openTodoseqPanel(page);
+    await waitForTaskListVisible(page);
+    const before = await page.locator('.todoseq-task-list').textContent();
+    expect(before).not.toContain('parked task');
+
+    fs.renameSync(archivedPath, path.join(TEST_VAULT_DIR, 'renamed.md'));
+    await page.waitForTimeout(3000);
+
+    await openTodoseqPanel(page);
+    await waitForTaskListVisible(page);
+    await page.waitForTimeout(500);
+    const after = await page.locator('.todoseq-task-list').textContent();
+    expect(after).not.toContain('parked task');
+  });
+
   test('external file deletion removes tasks from list', async () => {
     // Open task list and verify inbox tasks are visible.
     await openTodoseqPanel(page);

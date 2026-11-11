@@ -322,14 +322,14 @@ describe('daily-note-utils', () => {
   });
 
   describe('isDailyNotesPluginEnabledSync', () => {
-    test('returns true when appHasDailyNotesPluginLoaded returns a value', () => {
-      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue({});
+    test('returns true when the interface reports an enabled provider', () => {
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(true);
       const app = new App();
       expect(isDailyNotesPluginEnabledSync(app)).toBe(true);
     });
 
-    test('returns false when appHasDailyNotesPluginLoaded returns undefined', () => {
-      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(undefined);
+    test('returns false when the interface reports disabled', () => {
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(false);
       const app = new App();
       expect(isDailyNotesPluginEnabledSync(app)).toBe(false);
     });
@@ -342,105 +342,72 @@ describe('daily-note-utils', () => {
       expect(isDailyNotesPluginEnabledSync(app)).toBe(false);
     });
 
-    test('caches result and does not recheck on subsequent calls', () => {
-      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue({});
+    test('reads live provider state on every call (no stale cache)', () => {
       const app = new App();
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(true);
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(true);
 
-      isDailyNotesPluginEnabledSync(app);
-      isDailyNotesPluginEnabledSync(app);
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(false);
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(false);
 
-      expect(appHasDailyNotesPluginLoaded).toHaveBeenCalledTimes(1);
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(true);
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(true);
+      expect(appHasDailyNotesPluginLoaded).toHaveBeenCalledTimes(3);
     });
 
-    test('rechecks after refreshDailyNotesPluginStatus resets cache', () => {
-      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue({});
+    test('enable -> disable -> enable works without a cache reset call', () => {
       const app = new App();
-
-      isDailyNotesPluginEnabledSync(app);
-      expect(appHasDailyNotesPluginLoaded).toHaveBeenCalledTimes(1);
-
-      refreshDailyNotesPluginStatus();
-
-      isDailyNotesPluginEnabledSync(app);
-      expect(appHasDailyNotesPluginLoaded).toHaveBeenCalledTimes(2);
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(true);
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(true);
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(false);
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(false);
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(true);
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(true);
     });
   });
 
   describe('isDailyNotesPluginEnabled', () => {
-    function createAppWithAdapter(readResult?: string | Error): App {
-      const adapter = { read: jest.fn() };
-      if (readResult instanceof Error) {
-        adapter.read.mockRejectedValue(readResult);
-      } else if (readResult !== undefined) {
-        adapter.read.mockResolvedValue(readResult);
-      }
-      return {
-        vault: { adapter, configDir: '.obsidian' },
-      } as unknown as App;
-    }
-
-    test('returns true when daily-notes is enabled in core-plugins.json', async () => {
-      const app = createAppWithAdapter(JSON.stringify({ 'daily-notes': true }));
-      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(true);
-    });
-
-    test('returns false when daily-notes is disabled in core-plugins.json', async () => {
-      const app = createAppWithAdapter(
-        JSON.stringify({ 'daily-notes': false }),
-      );
-      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
-    });
-
-    test('returns false when daily-notes key is absent from core-plugins.json', async () => {
-      const app = createAppWithAdapter(
-        JSON.stringify({ 'other-plugin': true }),
-      );
-      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
-    });
-
-    test('returns false when adapter.read rejects', async () => {
-      const app = createAppWithAdapter(new Error('file not found'));
-      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
-    });
-
-    test('returns false when core-plugins.json contains invalid JSON', async () => {
-      const app = createAppWithAdapter('not valid json');
-      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
-    });
-
-    test('caches result across calls without re-reading file', async () => {
-      const app = createAppWithAdapter(JSON.stringify({ 'daily-notes': true }));
-      await isDailyNotesPluginEnabled(app);
-      await isDailyNotesPluginEnabled(app);
-      const adapter = (
-        app as unknown as { vault: { adapter: { read: jest.Mock } } }
-      ).vault.adapter;
-      expect(adapter.read).toHaveBeenCalledTimes(1);
-    });
-
-    test('forceRefresh re-reads the file', async () => {
-      const app = createAppWithAdapter(JSON.stringify({ 'daily-notes': true }));
-      await isDailyNotesPluginEnabled(app);
-      await isDailyNotesPluginEnabled(app, true);
-      const adapter = (
-        app as unknown as { vault: { adapter: { read: jest.Mock } } }
-      ).vault.adapter;
-      expect(adapter.read).toHaveBeenCalledTimes(2);
-    });
-
-    test('falls back to appHasDailyNotesPluginLoaded when vault is unavailable', async () => {
+    test('resolves the boolean predicate: true', async () => {
       const app = {} as App;
-      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue({});
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(true);
       await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(true);
-      expect(appHasDailyNotesPluginLoaded).toHaveBeenCalled();
     });
 
-    test('returns false when vault unavailable and fallback also fails', async () => {
+    test('resolves the boolean predicate: false (not "defined")', async () => {
+      const app = {} as App;
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(false);
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
+    });
+
+    test('resolves false when the predicate throws', async () => {
       const app = {} as App;
       (appHasDailyNotesPluginLoaded as jest.Mock).mockImplementation(() => {
         throw new Error('fallback fail');
       });
       await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
+    });
+
+    test('sync and async wrappers agree in any invocation order', async () => {
+      const app = {} as App;
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(true);
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(true);
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(true);
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(true);
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(true);
+
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(false);
+      expect(isDailyNotesPluginEnabledSync(app)).toBe(false);
+      await expect(isDailyNotesPluginEnabled(app)).resolves.toBe(false);
+    });
+
+    test('does not read core-plugins.json', async () => {
+      const read = jest.fn();
+      const app = { vault: { adapter: { read }, configDir: '.obsidian' } };
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(true);
+      await expect(
+        isDailyNotesPluginEnabled(app as unknown as App),
+      ).resolves.toBe(true);
+      expect(read).not.toHaveBeenCalled();
     });
   });
 
@@ -448,17 +415,8 @@ describe('daily-note-utils', () => {
     let originalMoment: unknown;
 
     function createAppWithPluginEnabled(): App {
-      return {
-        vault: {
-          adapter: {
-            read: jest
-              .fn()
-              .mockResolvedValue(JSON.stringify({ 'daily-notes': true })),
-          },
-
-          configDir: '.obsidian',
-        },
-      } as unknown as App;
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(true);
+      return {} as App;
     }
 
     beforeEach(() => {
@@ -479,21 +437,13 @@ describe('daily-note-utils', () => {
     });
 
     test('throws when daily notes plugin is not enabled', async () => {
-      const app = {
-        vault: {
-          adapter: {
-            read: jest
-              .fn()
-              .mockResolvedValue(JSON.stringify({ 'daily-notes': false })),
-          },
-
-          configDir: '.obsidian',
-        },
-      } as unknown as App;
+      (appHasDailyNotesPluginLoaded as jest.Mock).mockReturnValue(false);
+      const app = {} as App;
 
       await expect(getTodayDailyNote(app)).rejects.toThrow(
         'Daily notes plugin is not enabled',
       );
+      expect(createDailyNote).not.toHaveBeenCalled();
     });
 
     test('returns existing daily note without creating a new one', async () => {

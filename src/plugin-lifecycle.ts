@@ -651,6 +651,13 @@ export class PluginLifecycleManager {
       this.plugin.dashboardProcessor.cleanup();
     }
 
+    // Stop plugin-owned update timers and pending delayed recurrence work
+    // synchronously, before the first await in teardown.
+    if (this.plugin.taskUpdateCoordinator) {
+      this.plugin.taskUpdateCoordinator.destroy();
+      this.plugin.taskUpdateCoordinator = null;
+    }
+
     // Clean up EventCoordinator (removes all vault event listeners)
     await this.eventCoordinator?.destroy();
 

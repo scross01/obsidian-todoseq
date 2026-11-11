@@ -7,19 +7,61 @@ import { buildWarningPeriodString } from '../utils/date-repeater';
 import {
   findDateLine,
   findDescriptionLine,
+  parseTableCells,
   getTaskIndent,
   getDateLineIndent,
+  supportsTaskMetadata,
+  replaceTableCellContent,
 } from '../utils/task-line-utils';
 import { DateParser } from '../parser/date-parser';
+import type { EditorView } from '@codemirror/view';
 import TodoTracker from '../main';
 import { getStateTransitionManager } from './task-update-coordinator';
+import {
+  getTaskRemovalRange,
+  modifyLinesForMigration,
+  readTaskBlockFromLines,
+} from '../utils/task-sub-bullets';
 
 /** A SCHEDULED/DEADLINE/CLOSED/STARTED date line kind. */
 type DateLineType = 'SCHEDULED' | 'DEADLINE' | 'CLOSED' | 'STARTED';
 
+export type TaskTransferStatus =
+  | 'success'
+  | 'already-there'
+  | 'stale-source'
+  | 'destination-failed'
+  | 'partial';
+
+export interface TaskTransferResult {
+  status: TaskTransferStatus;
+  reason?: string;
+}
+
 export interface DateLineUpdateResult {
   task: Task;
   lineDelta: number;
+}
+
+/** A fully formatted metadata line produced by smart-date recognition. */
+export interface SmartDateLine {
+  type: DateLineType;
+  dateText: string;
+}
+
+/**
+ * One synchronous smart-date edit, computed against the current editor
+ * document. `replaceLineNumber` is 1-based; null inserts new date lines
+ * directly below the task line.
+ */
+export interface SmartDateEditRequest {
+  filePath: string;
+  lineNumber: number;
+  expectedTaskText: string;
+  updatedTaskText: string;
+  dateLines: SmartDateLine[];
+  replaceLineNumber: number | null;
+  triggerSource: 'debounce' | 'cursorLeave';
 }
 
 /**
@@ -36,6 +78,71 @@ export class TaskWriter {
   ) {}
 
   /**
+   * Apply a smart-date conversion as one editor transaction.
+   *
+   * The task-line replacement and the date-line write are disjoint changes
+   * against the same original document, so every other metadata line between
+   * them (SCHEDULED, DEADLINE, STARTED, CLOSED, DESCRIPTION) is preserved
+   * byte-for-byte. Synchronous by design: smart-date recognition runs inside a
+   * requestAnimationFrame callback and must not await the file queue.
+   */
+  applySmartDateEdit(
+    request: SmartDateEditRequest,
+    task: Task,
+    view: EditorView,
+  ): boolean {
+    const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (mdView?.file?.path !== request.filePath) return false;
+
+    const state = view.state;
+    if (request.lineNumber < 1 || request.lineNumber > state.doc.lines) {
+      return false;
+    }
+    const taskLine = state.doc.line(request.lineNumber);
+    if (taskLine.text !== request.expectedTaskText) return false;
+    if (request.dateLines.length === 0) return false;
+
+    const indent = getDateLineIndent(task);
+    const block = request.dateLines
+      .map((line) => `${indent}${line.type}: ${line.dateText}`)
+      .join('\n');
+
+    const changes: { from: number; to: number; insert: string }[] = [
+      { from: taskLine.from, to: taskLine.to, insert: request.updatedTaskText },
+    ];
+
+    if (request.replaceLineNumber !== null) {
+      const lineNumber = request.replaceLineNumber;
+      if (lineNumber < 1 || lineNumber > state.doc.lines) return false;
+      const existing = state.doc.line(lineNumber);
+      if (existing.number === taskLine.number) return false;
+      changes.push({ from: existing.from, to: existing.to, insert: block });
+    } else {
+      changes.push({
+        from: taskLine.to,
+        to: taskLine.to,
+        insert: `\n${block}`,
+      });
+    }
+
+    if (request.triggerSource === 'debounce') {
+      // Cursor to the end of the last written date line. Resolve it against
+      // the post-change document so the earlier task-line edit is accounted
+      // for.
+      const mapped = state.update({ changes });
+      const dateLineNumber =
+        request.replaceLineNumber ??
+        request.lineNumber + request.dateLines.length;
+      const anchor = mapped.state.doc.line(dateLineNumber).to;
+      view.dispatch({ changes, selection: { anchor, head: anchor } });
+    } else {
+      view.dispatch({ changes });
+    }
+
+    return true;
+  }
+
+  /**
    * Update the KeywordManager instance when settings change.
    */
   public updateKeywordManager(keywordManager: KeywordManager): void {
@@ -48,6 +155,240 @@ export class TaskWriter {
 
   private get settings() {
     return this.plugin.settings;
+  }
+
+  /**
+   * Read a file through the live editor buffer when it is open, so unsaved
+   * edits are part of the transfer and never overwritten by a stale read.
+   */
+  private getTransferEditor(file: TFile): Editor | null {
+    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (md?.file?.path !== file.path) return null;
+    return md.editor ?? null;
+  }
+
+  private async readFileText(file: TFile): Promise<string> {
+    const editor = this.getTransferEditor(file);
+    if (!editor) return this.app.vault.read(file);
+    const lines: string[] = [];
+    for (let i = 0; i < editor.lineCount(); i++) lines.push(editor.getLine(i));
+    return lines.join('\n');
+  }
+
+  /** True when the line still holds the task's state keyword and text. */
+  private lineMatchesTask(line: string | undefined, task: Task): boolean {
+    if (typeof line !== 'string') return false;
+    if (task.isTableTask && task.tableCell) {
+      const cell = parseTableCells(line)[task.tableCell.cellIndex];
+      if (!cell) return false;
+      return (
+        cell.content.includes(task.state) && cell.content.includes(task.text)
+      );
+    }
+    return line.includes(task.state) && line.includes(task.text);
+  }
+
+  private async readSourceBlock(
+    task: Task,
+  ): Promise<{ lines: string[]; text: string } | null> {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) return null;
+    const text = await this.readFileText(file);
+    const lines = text.split('\n');
+    if (!this.lineMatchesTask(lines[task.line], task)) return null;
+    return { lines, text };
+  }
+
+  /** The task as standalone lines: a table cell becomes a plain task line. */
+  private buildTransferBlock(lines: string[], task: Task): string[] {
+    if (task.isTableTask && task.tableCell) {
+      const cell = parseTableCells(lines[task.line] ?? '')[
+        task.tableCell.cellIndex
+      ];
+      if (!cell) return [];
+      const taskLine = cell.content.split(/<br\s*\/?>/i)[0]?.trim();
+      return taskLine ? [taskLine] : [];
+    }
+    return readTaskBlockFromLines(lines, task);
+  }
+
+  private async appendToFile(
+    file: TFile,
+    lines: string[],
+    insertAt?: { line: number; ch: number },
+  ): Promise<boolean> {
+    const editor = this.getTransferEditor(file);
+    if (editor && insertAt) {
+      const currentLine = editor.getLine(insertAt.line) ?? '';
+      const prefix = currentLine === '' ? '' : '\n';
+      editor.replaceRange(prefix + lines.join('\n'), {
+        line: insertAt.line,
+        ch: Math.min(insertAt.ch, currentLine.length),
+      });
+      return true;
+    }
+    if (editor) {
+      const last = editor.lineCount() - 1;
+      const lastLine = editor.getLine(last) ?? '';
+      const separator = editor.getValue().trim() === '' ? '' : '\n\n';
+      editor.replaceRange(separator + lines.join('\n') + '\n', {
+        line: last,
+        ch: lastLine.length,
+      });
+      return true;
+    }
+    // vault.process is an atomic read-modify-write, so concurrent appends to
+    // the same destination cannot overwrite each other.
+    await this.app.vault.process(file, (data) => {
+      const base = data.trimEnd();
+      return (base ? base + '\n\n' : '') + lines.join('\n') + '\n';
+    });
+    return true;
+  }
+
+  private removeFromLines(lines: string[], task: Task): string[] {
+    if (task.isTableTask && task.tableCell) {
+      const updated = replaceTableCellContent(
+        lines[task.line] ?? '',
+        task.tableCell.cellIndex,
+        '',
+      );
+      if (updated === null) return lines;
+      const out = [...lines];
+      if (parseTableCells(updated).every((cell) => cell.content === '')) {
+        out.splice(task.line, 1);
+      } else {
+        out[task.line] = updated;
+      }
+      return out;
+    }
+    const { start, end } = getTaskRemovalRange(lines, task);
+    return [...lines.slice(0, start), ...lines.slice(end + 1)];
+  }
+
+  private migrateInLines(
+    lines: string[],
+    task: Task,
+    migrateState: string,
+  ): string[] {
+    const keyword = task.state || 'TODO';
+    if (task.isTableTask && task.tableCell) {
+      const cell = parseTableCells(lines[task.line] ?? '')[
+        task.tableCell.cellIndex
+      ];
+      if (!cell) return lines;
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const migrated =
+        migrateState === ''
+          ? cell.content.replace(new RegExp(`^\\s*${escaped}\\s*`, 'i'), '')
+          : cell.content.replace(
+              new RegExp(`\\b${escaped}\\b`, 'i'),
+              migrateState,
+            );
+      const updated = replaceTableCellContent(
+        lines[task.line],
+        task.tableCell.cellIndex,
+        migrated,
+      );
+      if (updated === null) return lines;
+      const out = [...lines];
+      out[task.line] = updated;
+      return out;
+    }
+    return modifyLinesForMigration(lines, task.line, keyword, migrateState);
+  }
+
+  /** Revalidate the source and rewrite it, or report that nothing changed. */
+  private async rewriteSource(
+    task: Task,
+    mutate: (lines: string[]) => string[],
+  ): Promise<boolean> {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) return false;
+
+    const editor = this.getTransferEditor(file);
+    if (editor) {
+      const lines: string[] = [];
+      for (let i = 0; i < editor.lineCount(); i++)
+        lines.push(editor.getLine(i));
+      if (!this.lineMatchesTask(lines[task.line], task)) return false;
+      const next = mutate(lines).join('\n');
+      const last = editor.lineCount() - 1;
+      editor.replaceRange(
+        next,
+        { line: 0, ch: 0 },
+        {
+          line: last,
+          ch: (editor.getLine(last) ?? '').length,
+        },
+      );
+      return true;
+    }
+
+    let changed = false;
+    await this.app.vault.process(file, (data) => {
+      const lines = data.split('\n');
+      if (!this.lineMatchesTask(lines[task.line], task)) return data;
+      changed = true;
+      return mutate(lines).join('\n');
+    });
+    return changed;
+  }
+
+  /**
+   * Copy, move or migrate a task into `destination`, writing through the
+   * source-aware seam: the live buffer is the source of truth, destination
+   * appends are atomic, and the source is revalidated before it is changed.
+   */
+  async transferTask(
+    task: Task,
+    destination: TFile,
+    action: 'copy' | 'move' | 'migrate',
+    options?: { insertAt?: { line: number; ch: number } },
+  ): Promise<TaskTransferResult> {
+    if (task.path === destination.path) {
+      return { status: 'already-there' };
+    }
+
+    const source = await this.readSourceBlock(task);
+    if (!source) {
+      return {
+        status: 'stale-source',
+        reason: 'The task is no longer at its recorded location.',
+      };
+    }
+    const block = this.buildTransferBlock(source.lines, task);
+    if (block.length === 0) {
+      return { status: 'stale-source', reason: 'The task could not be read.' };
+    }
+
+    let appended = false;
+    try {
+      appended = await this.appendToFile(destination, block, options?.insertAt);
+    } catch {
+      appended = false;
+    }
+    if (!appended) {
+      return {
+        status: 'destination-failed',
+        reason: 'The destination file could not be written.',
+      };
+    }
+    if (action === 'copy') return { status: 'success' };
+
+    const migrateState = this.settings.migrateToTodayState || '';
+    const changed = await this.rewriteSource(task, (lines) =>
+      action === 'move'
+        ? this.removeFromLines(lines, task)
+        : this.migrateInLines(lines, task, migrateState),
+    );
+    if (!changed) {
+      return {
+        status: 'partial',
+        reason: 'The destination was updated but the source could not be.',
+      };
+    }
+    return { status: 'success' };
   }
 
   private static buildDateLineContent(
@@ -236,7 +577,10 @@ export class TaskWriter {
     // CLOSED date action for this transition (see resolveClosedDateAction).
     // Computed once here: it reads only `task` and `newState`, both immutable
     // inputs, and is consumed by the vault, editor, and accumulator branches.
-    const closedAction = this.resolveClosedDateAction(task, newState);
+    const canWriteMetadata = supportsTaskMetadata(task);
+    const closedAction = canWriteMetadata
+      ? this.resolveClosedDateAction(task, newState)
+      : 'keep';
 
     // STARTED tracking: trigger on entry into an active state.
     // 'first' (default): first-ever start — insert once, never rewrite.
@@ -248,6 +592,7 @@ export class TaskWriter {
     const freshActiveEntry =
       isActiveState && !this.keywordManager.isActive(task.state);
     const shouldStampStarted =
+      canWriteMetadata &&
       Boolean(settings?.trackStartedDate) &&
       isActiveState &&
       (startedMode === 'last'
@@ -509,15 +854,13 @@ export class TaskWriter {
     if (!(file instanceof TFile)) return;
 
     const mutateLine = (line: string): string | null => {
-      const cells = line.split('|');
-      let start = 0;
-      if (cells.length > 0 && cells[0].trim() === '') start = 1;
-      const idx = start + task.tableCell!.cellIndex;
-      if (idx >= cells.length) return null;
-      const origCell = cells[idx].trim();
-      const newCell = mutate(origCell);
-      cells[idx] = ` ${newCell} `;
-      return cells.join('|');
+      const cell = parseTableCells(line)[task.tableCell!.cellIndex];
+      if (!cell) return null;
+      return replaceTableCellContent(
+        line,
+        task.tableCell!.cellIndex,
+        mutate(cell.content),
+      );
     };
 
     // If the file is open in the active source-mode editor, update the buffer
@@ -806,8 +1149,9 @@ export class TaskWriter {
             : TaskWriter.buildDateLineContent(
                 options.newScheduledDate,
                 options.newScheduledRepeat ?? task.scheduledDateRepeat,
-                options.newScheduledWarningPeriod ??
-                  task.scheduledWarningPeriod,
+                options.newScheduledWarningPeriod !== undefined
+                  ? options.newScheduledWarningPeriod
+                  : task.scheduledWarningPeriod,
               ),
         );
       }
@@ -820,7 +1164,9 @@ export class TaskWriter {
             : TaskWriter.buildDateLineContent(
                 options.newDeadlineDate,
                 options.newDeadlineRepeat ?? task.deadlineDateRepeat,
-                options.newDeadlineWarningPeriod ?? task.deadlineWarningPeriod,
+                options.newDeadlineWarningPeriod !== undefined
+                  ? options.newDeadlineWarningPeriod
+                  : task.deadlineWarningPeriod,
               ),
         );
       }
@@ -1068,6 +1414,10 @@ export class TaskWriter {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ): Promise<Task & { lineDelta?: number }> {
+    if (!supportsTaskMetadata(task)) {
+      return { ...task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline with <br> separators
     if (this.isTableCellDateUpdate(task)) {
       return this.applyTableCellDateUpdate(
@@ -1139,6 +1489,10 @@ export class TaskWriter {
   async removeTaskScheduledDate(
     task: Task,
   ): Promise<Task & { lineDelta?: number }> {
+    if (!supportsTaskMetadata(task)) {
+      return { ...task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline — strip from cell
     if (this.isTableCellDateUpdate(task)) {
       return this.removeTableCellDate(task, 'SCHEDULED');
@@ -1198,6 +1552,10 @@ export class TaskWriter {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ): Promise<Task & { lineDelta?: number }> {
+    if (!supportsTaskMetadata(task)) {
+      return { ...task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline with <br> separators
     if (this.isTableCellDateUpdate(task)) {
       return this.applyTableCellDateUpdate(
@@ -1269,6 +1627,10 @@ export class TaskWriter {
   async removeTaskDeadlineDate(
     task: Task,
   ): Promise<Task & { lineDelta?: number }> {
+    if (!supportsTaskMetadata(task)) {
+      return { ...task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline — strip from cell
     if (this.isTableCellDateUpdate(task)) {
       return this.removeTableCellDate(task, 'DEADLINE');
@@ -1377,6 +1739,10 @@ export class TaskWriter {
     forceVaultApi = false,
     allowOverwrite = false,
   ): Promise<DateLineUpdateResult> {
+    if (!supportsTaskMetadata(task)) {
+      return { task, lineDelta: 0 };
+    }
+
     // Idempotent: if a STARTED line already exists, do nothing — unless
     // allowOverwrite ('last' mode fresh re-entry) rewrites the date in
     // place. STARTED is never removed once set.
@@ -1596,6 +1962,10 @@ export class TaskWriter {
     closedDate: Date,
     forceVaultApi = false,
   ): Promise<DateLineUpdateResult> {
+    if (!supportsTaskMetadata(task)) {
+      return { task, lineDelta: 0 };
+    }
+
     const dateStr = DateUtils.formatClosedDate(closedDate);
     let lineDelta = 0;
 
@@ -1753,6 +2123,10 @@ export class TaskWriter {
     task: Task,
     forceVaultApi = false,
   ): Promise<DateLineUpdateResult> {
+    if (!supportsTaskMetadata(task)) {
+      return { task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline — strip from cell
     if (this.isTableCellDateUpdate(task)) {
       await this.removeTableCellDate(task, 'CLOSED');
@@ -1935,8 +2309,9 @@ export class TaskWriter {
               : TaskWriter.buildDateLineContent(
                   options.newScheduledDate,
                   options.newScheduledRepeat ?? task.scheduledDateRepeat,
-                  options.newScheduledWarningPeriod ??
-                    task.scheduledWarningPeriod,
+                  options.newScheduledWarningPeriod !== undefined
+                    ? options.newScheduledWarningPeriod
+                    : task.scheduledWarningPeriod,
                 );
           const delta = this.updateDateLineInEditor(
             editor,
@@ -1956,8 +2331,9 @@ export class TaskWriter {
               : TaskWriter.buildDateLineContent(
                   options.newDeadlineDate,
                   options.newDeadlineRepeat ?? task.deadlineDateRepeat,
-                  options.newDeadlineWarningPeriod ??
-                    task.deadlineWarningPeriod,
+                  options.newDeadlineWarningPeriod !== undefined
+                    ? options.newDeadlineWarningPeriod
+                    : task.deadlineWarningPeriod,
                 );
           const delta = this.updateDateLineInEditor(
             editor,
@@ -2004,8 +2380,9 @@ export class TaskWriter {
               const dateStr = TaskWriter.buildDateLineContent(
                 options.newScheduledDate,
                 options.newScheduledRepeat ?? task.scheduledDateRepeat,
-                options.newScheduledWarningPeriod ??
-                  task.scheduledWarningPeriod,
+                options.newScheduledWarningPeriod !== undefined
+                  ? options.newScheduledWarningPeriod
+                  : task.scheduledWarningPeriod,
               );
               const result = this.updateOrInsertDateLine(
                 lines,
@@ -2032,7 +2409,9 @@ export class TaskWriter {
               const dateStr = TaskWriter.buildDateLineContent(
                 options.newDeadlineDate,
                 options.newDeadlineRepeat ?? task.deadlineDateRepeat,
-                options.newDeadlineWarningPeriod ?? task.deadlineWarningPeriod,
+                options.newDeadlineWarningPeriod !== undefined
+                  ? options.newDeadlineWarningPeriod
+                  : task.deadlineWarningPeriod,
               );
               const result = this.updateOrInsertDateLine(
                 lines,

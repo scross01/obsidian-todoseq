@@ -22,6 +22,7 @@ export class EmbeddedTaskListEventHandler {
       source: string;
       filePath: string;
       isCollapsed?: boolean;
+      refreshGeneration: number;
     }
   > = new Map();
 
@@ -72,6 +73,7 @@ export class EmbeddedTaskListEventHandler {
       source,
       filePath,
       isCollapsed: initialCollapsed,
+      refreshGeneration: 0,
     });
   }
 
@@ -181,13 +183,35 @@ export class EmbeddedTaskListEventHandler {
    * Refresh a specific code block
    * @param containerId ID of the code block to refresh
    */
+  /**
+   * A completion may commit only while its block is still tracked and its
+   * refresh is the newest one for that block.
+   */
+  private isCurrent(
+    containerId: string,
+    codeBlock: { refreshGeneration: number },
+    generation: number,
+  ): boolean {
+    return (
+      this.activeCodeBlocks.get(containerId) === codeBlock &&
+      codeBlock.refreshGeneration === generation
+    );
+  }
+
+  /**
+   * Refresh a specific code block
+   * @param containerId ID of the code block to refresh
+   */
   private async refreshCodeBlock(containerId: string): Promise<void> {
     const codeBlock = this.activeCodeBlocks.get(containerId);
     if (!codeBlock) return;
+    const generation = ++codeBlock.refreshGeneration;
 
     try {
       // Parse parameters
       const params = TodoseqCodeBlockParser.parse(codeBlock.source);
+
+      if (!this.isCurrent(containerId, codeBlock, generation)) return;
 
       if (params.error) {
         this.renderer.renderError(codeBlock.element, params.error);
@@ -201,6 +225,9 @@ export class EmbeddedTaskListEventHandler {
       const { tasks: filteredTasks, totalCount } =
         await this.manager.filterAndSortTasksWithCount(allTasks, params);
 
+      // A newer refresh, or the render teardown, may have won while awaiting.
+      if (!this.isCurrent(containerId, codeBlock, generation)) return;
+
       // Re-render the task list with collapse state and toggle callback
       this.renderer.renderTaskList(
         codeBlock.element,
@@ -212,6 +239,7 @@ export class EmbeddedTaskListEventHandler {
         containerId,
       );
     } catch (error: unknown) {
+      if (!this.isCurrent(containerId, codeBlock, generation)) return;
       console.error('Error refreshing code block:', error);
       const message = error instanceof Error ? error.message : String(error);
       this.renderer.renderError(codeBlock.element, `Refresh error: ${message}`);

@@ -795,3 +795,11 @@ See [Experimental Features](experimental-features.md) for detailed documentation
 - No subtask tracking: Code comments don't support subtask counting
 
 See [Experimental Features](experimental-features.md) for detailed documentation on code file scanning.
+
+## Block inclusion and footnote definitions
+
+The code block and comment block inclusion settings also apply to numeric footnote definitions, and math blocks are always excluded.
+
+## Date tracking scope
+
+The closed-date, started-date and scheduled/deadline date actions apply to Markdown and Org tasks. Code-comment tasks keep their source intact: their state changes rewrite only the keyword, and date actions are no-ops.

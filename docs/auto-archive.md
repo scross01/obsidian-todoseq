@@ -4,6 +4,8 @@ Auto-Archive rewrites completed task keywords (e.g. `DONE`) to an archived keywo
 
 ## Why Archive?
 
+Renaming a note does not bring its archived tasks back into the Task List: archived keywords stay excluded when a file is renamed, just as they are during a scan.
+
 Completed tasks accumulate forever. `DONE` lines are useful history, but after a while they bury the work that still matters. Archiving keeps the record in the note — the line and its CLOSED date are unchanged apart from the keyword — while removing the task from the Task List, because archived tasks are not collected during vault scans (see [Task Entry](task-entry.md)).
 
 ## How It Works
@@ -81,3 +83,11 @@ Automatic runs always use the days threshold (never date mode), respect the same
 ## Settings Reference
 
 See [Settings](settings.md) for every option: [Auto-Archive Settings](settings.md#auto-archive-settings).
+
+## Keyboard and pop-out windows
+
+The archive dialog keeps Tab and Shift+Tab inside it, Escape closes it, and closing returns focus to the control that opened it. This also works when the dialog is opened in a pop-out window.
+
+## Failed archive writes
+
+If archiving cannot be written to the note, the task returns to its completed state rather than staying hidden as though the archive had succeeded. A later edit to that task is based on the keyword that is actually in the note.

@@ -147,3 +147,7 @@ display: strip
 
 ![TODOseq compact priority strip](./assets/todoseq-dashboard-example-strip.png){.ts-img-wide .ts-img-dark}
 ![TODOseq compact priority strip](./assets/todoseq-dashboard-example-strip-light.png){.ts-img-wide .ts-img-light}
+
+## Render lifetime
+
+A dashboard belongs to the Markdown render that produced it. Closing the note or switching modes releases it, so later task changes no longer update a hidden card, and overlapping refreshes commit only the newest result.

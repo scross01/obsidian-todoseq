@@ -32,6 +32,17 @@ export interface SearchToken {
   position: number;
 }
 
+export type PropertyValueKind = 'existence' | 'null' | 'string';
+
+/** Lossless property filter intent: presence, null, or a string value. */
+export interface PropertyQueryDescriptor {
+  key: string;
+  kind: PropertyValueKind;
+  value: string;
+  exact: boolean;
+  keyExact: boolean;
+}
+
 export interface SearchNode {
   type:
     | 'and'
@@ -49,6 +60,8 @@ export interface SearchNode {
   end?: string;
   position?: number;
   exact?: boolean; // Track if value was originally quoted for exact matching
+  /** Structural property intent; authoritative when present. */
+  property?: PropertyQueryDescriptor;
 }
 
 export class SearchError extends Error {

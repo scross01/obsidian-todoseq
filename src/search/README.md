@@ -291,3 +291,7 @@ Potential features for future versions:
 - Search highlighting in results
 - Search history and suggestions
 - Autocomplete dropdown for prefix values
+
+## Grammar guarantees
+
+Adjacency is conjunction at the same binding power as `AND`, which is tighter than `OR`; parentheses override it. A range operator binds to the date prefix immediately before it, including inside an implicit conjunction. Top-level parsing must consume every token, so stray closing parentheses, dangling operators and unmatched quotes raise `SearchError`. `Search.filterTasks` still translates `SearchError` to an empty result for existing callers; the Task List validates first so it can show the message.

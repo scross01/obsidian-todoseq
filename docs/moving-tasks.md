@@ -4,7 +4,13 @@ TODOseq provides several ways to move tasks between locations in your vault. Whe
 
 You can perform these actions through the [task context menu](task-list.md#task-context-menu) or by [drag and drop](task-list.md#drag-and-drop) directly from the Task List into an open file in your vault.
 
-Some copy/move actions require the Daily Notes core plugin to be enabled in Obsidian.
+Some copy/move actions require a daily-note provider: the Daily Notes core plugin, or Periodic Notes with its daily note enabled. When neither provides a daily note, those commands are unavailable in the command palette and nothing is created.
+
+## What travels with a task
+
+Copy, move and drag-and-drop take the whole task block: the task line, its consecutive metadata lines and its indented child tasks. Metadata means `SCHEDULED:`, `DEADLINE:`, `CLOSED:`, `STARTED:` and `DESCRIPTION:` lines directly below the task — no blank line or prose in between. A line that is not one of those ends the block, so a sibling task or paragraph is never dragged along.
+
+Migrate to Today is the exception: the copy keeps the full block, while the source line keeps `STARTED:`, `CLOSED:` and `DESCRIPTION:` and loses only the `SCHEDULED:` and `DEADLINE:` dates it is moving to the new copy.
 
 ## Copy
 
@@ -63,3 +69,7 @@ Combining a keyword with custom text e.g. `ARCHIVED (moved)` helps to provide ad
 
 ARCHIVED (moved) Review project timeline
 ```
+
+## What copy, move and migrate guarantee
+
+Transfers are written by the task writer, not by the view. The destination append is atomic, so two transfers into the same note can never overwrite one another, and an open unsaved editor buffer is the source of truth for both files. The source is revalidated immediately before it changes: if the task moved or changed since the list was rendered, the transfer stops with a notice instead of copying the wrong line. A table cell task transfers as a normal task line; moving one clears only that cell, leaving the rest of the row byte-for-byte intact, and removes the row only when nothing else is in it. A failed destination write never removes the source; if the destination succeeds and the source cannot be updated, the notice says the task was copied but not updated.

@@ -244,11 +244,10 @@ describe('SearchTokenizer', () => {
       expect(tokens[1].value).toBe('my-folder');
     });
 
-    it('skips lone double-quote character that does not match any pattern', () => {
-      const tokens = tokenize('hello"world');
-      expect(tokens).toHaveLength(2);
-      expect(tokens[0].value).toBe('hello');
-      expect(tokens[1].value).toBe('world');
+    it('rejects an unterminated double quote instead of skipping it', () => {
+      expect(() => tokenize('hello"world')).toThrow(
+        'Unterminated quoted string',
+      );
     });
 
     it('tokenizes property with quoted key and unquoted value', () => {
@@ -402,7 +401,7 @@ describe('SearchTokenizer', () => {
       expect(SearchTokenizer.getBindingPower('or')).toBe(60);
     });
 
-    it('returns default binding power 50 for all other types', () => {
+    it('returns conjunction binding power 80 for adjacency and other types', () => {
       const defaultTypes: SearchToken['type'][] = [
         'word',
         'phrase',
@@ -415,7 +414,7 @@ describe('SearchTokenizer', () => {
         'rparen',
       ];
       for (const type of defaultTypes) {
-        expect(SearchTokenizer.getBindingPower(type)).toBe(50);
+        expect(SearchTokenizer.getBindingPower(type)).toBe(80);
       }
     });
   });

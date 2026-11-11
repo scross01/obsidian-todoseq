@@ -11,6 +11,8 @@ The Task List is the central interface for managing all your tasks across your O
 
 The Task List automatically opens in the right sidebar when the TODOseq plugin is first enabled. You can drag and drop the panel to reposition it within the Obsidian interface, such as moving to different panel locations or making it a floating window.
 
+The list follows the vault. Edits, renames and deletions made in Obsidian — or outside it — update the list, and a task's current state is kept even when a background vault scan and a live edit land at the same time. Configured non-Markdown formats (Org notes, code comments) refresh live too; renaming one to an unsupported extension removes its tasks from the list.
+
 ### Command Palette
 
 1. Open the command palette with `Ctrl/Cmd + P`
@@ -245,3 +247,21 @@ The tooltip includes:
 - The date label and formatted date
 - The repeat pattern in descriptive format (if set)
 - The warning period with the effective appearance date
+
+## Relative date labels
+
+Today, Tomorrow, Yesterday and the signed day counts are counted in local calendar days, and the seven-day highlight uses the same count, so labels stay correct across daylight-saving transitions.
+
+## Search results and scrolled rows
+
+The list always shows the result of the query currently in the search box. If an earlier, slower search finishes after a newer one, its result is discarded instead of replacing the current rows, result count or error.
+
+Rows revealed by scrolling are refreshed with the task's current text, state, priority and actions, so a task edited since it was last on screen appears with its new content. A query that returns no tasks also resets the scroll bookkeeping, so continued scrolling cannot bring back rows from the previous query.
+
+## Failed writes
+
+If saving a task change fails, the list returns to the task's actual content in the note instead of keeping a state or archive that was only displayed. Edits made while that recovery is in progress are applied to the saved content, so they cannot persist the change that failed.
+
+## Subtask counts
+
+A parent's subtask total and completed count reflect the checkbox children the parser counted, not every later task that happens to be indented. Completing a plain sibling or a task outside the parent's parsed span leaves that parent's progress unchanged; after a reparse, the same counts are produced from the source.

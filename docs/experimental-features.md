@@ -21,7 +21,7 @@ Org-mode support allows TODOseq to parse tasks from Org-mode files (`.org` exten
 
 When enabled, TODOseq will:
 
-- Scan all `.org` files in your vault for tasks
+- Scan all `.org` files in your vault for tasks, and refresh them live when the file is edited, created, deleted or renamed (attachments and unsupported formats stay ignored)
 - Extract tasks from Org-mode headlines with state keywords
 - Display Org-mode tasks alongside Markdown tasks in the Task List
 - Change an org task's state from the Task List — the headline keyword is rewritten in place, keeping the space between the heading stars and the keyword (`* TODO task` becomes `* DONE task`, and cycling a completed task past its completed state clears the keyword: `* task`)
@@ -309,3 +309,7 @@ If you encounter issues with code file scanning, please report them on the [GitH
 - Expected behavior
 - Actual behavior
 - Whether the issue persists after disabling and re-enabling the feature
+
+## Dates and code-comment tasks
+
+Code-comment tasks do not receive automatic date lines. Completing a task in a code comment changes only the keyword, because a bare `CLOSED:` or `STARTED:` line inside source code would become executable text; the same applies to direct date actions on those tasks, which leave the file unchanged.

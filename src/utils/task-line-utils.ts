@@ -97,7 +97,10 @@ export function findDateLine(
  * @param keywordManager - KeywordManager for dynamic keyword detection
  * @returns true if the line appears to be a task
  */
-function isTaskLine(line: string, keywordManager: KeywordManager): boolean {
+export function isTaskLine(
+  line: string,
+  keywordManager: KeywordManager,
+): boolean {
   // Check for checkbox pattern: - [ ] or - [x]
   if (/^[\s]*- \[[ x]\]/i.test(line)) {
     return true;
@@ -107,8 +110,10 @@ function isTaskLine(line: string, keywordManager: KeywordManager): boolean {
   for (let i = 0; i < allKeywords.length; i++) {
     const keyword = allKeywords[i];
     const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Accept the same prefixes the parser allows: indentation, blockquote
+    // markers and an optional bullet marker before the keyword.
     const taskPattern = new RegExp(
-      `^[\\s]*${escaped}\\b|^>+\\s+${escaped}\\b`,
+      `^(?:\\s*>\\s*)*\\s*(?:[-*+]\\s+)?${escaped}\\b`,
       'i',
     );
     if (taskPattern.test(line)) {
@@ -280,6 +285,12 @@ function lineStartsWithKeyword(
  * @returns The proper indent string for date lines
  */
 export function getTaskIndent(task: Task): string {
+  if (task.sourceFormat === 'org') {
+    // Org tasks store the heading stars in `indent`; metadata belongs on a
+    // whitespace-indented line below the headline, never on a new headline.
+    return ' '.repeat((task.indent?.length ?? 0) + 1);
+  }
+
   // Return the task's leading whitespace indent.
   // Previously computed indent from rawText.indexOf(state) which included
   // list marker characters (e.g. "- [ ] " → 6 spaces), causing date-line
@@ -298,6 +309,15 @@ export function getTaskIndent(task: Task): string {
  * @returns The proper indent string for date lines
  */
 export function getDateLineIndent(task: Task): string {
+  if (task.sourceFormat === 'org') {
+    return getTaskIndent(task);
+  }
+  if (task.sourceFormat === 'code-comment') {
+    // Metadata is not supported in code comments; callers that still ask get
+    // the comment prefix rather than inventing executable syntax.
+    return task.indent ?? '';
+  }
+
   // Extract quote prefix (e.g., "> ", "> > ") if present
   const quotePrefix = task.rawText.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
 
@@ -321,6 +341,15 @@ export function getDateLineIndent(task: Task): string {
   return hasListMarker ? task.indent + '  ' : task.indent;
 }
 
+/**
+ * Whether a task's source format can carry TODOseq metadata lines
+ * (SCHEDULED/DEADLINE/CLOSED/STARTED/DESCRIPTION). Code comments cannot:
+ * inserting bare metadata there changes executable source.
+ */
+export function supportsTaskMetadata(task: Task): boolean {
+  return task.sourceFormat !== 'code-comment';
+}
+
 // ─── Table cell utilities ─────────────────────────────────────────────────────
 
 export interface TableCellInfo {
@@ -339,28 +368,50 @@ export interface TableCellInfo {
  * Returns cell info with character offsets for precise DOM/edit operations.
  */
 export function parseTableCells(line: string): TableCellInfo[] {
-  const cells: TableCellInfo[] = [];
-  const parts = line.split('|');
-  let start = 0;
-  if (parts.length > 0 && parts[0].trim() === '') start = 1;
-  let end = parts.length;
-  if (end > start && parts[end - 1].trim() === '') end--;
-
-  // Account for leading whitespace before the first |
-  let pos = parts[0].length;
-  for (let i = start; i < end; i++) {
-    const raw = parts[i];
-    const contentStart = pos + 1; // after the |
-    const contentEnd = contentStart + raw.length;
-    cells.push({
-      raw,
-      content: raw.trim(),
-      start: contentStart,
-      end: contentEnd,
-    });
-    pos = contentEnd; // past this cell's content, before next |
+  // Scan for delimiters instead of splitting: a backslash escapes the next
+  // character, so `a\|b` is one displayed cell even though it contains a pipe.
+  const delimiters: number[] = [];
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '\\') {
+      i++;
+      continue;
+    }
+    if (line[i] === '|') delimiters.push(i);
   }
-  return cells;
+  if (delimiters.length === 0) return [];
+
+  const cells: TableCellInfo[] = [];
+  const push = (cellStart: number, cellEnd: number): void => {
+    const raw = line.slice(cellStart, cellEnd);
+    cells.push({ raw, content: raw.trim(), start: cellStart, end: cellEnd });
+  };
+  push(0, delimiters[0]);
+  for (let i = 0; i < delimiters.length - 1; i++) {
+    push(delimiters[i] + 1, delimiters[i + 1]);
+  }
+  push(delimiters[delimiters.length - 1] + 1, line.length);
+
+  // The empty text outside the outer pipes is not a cell (leading indentation
+  // and trailing whitespace keep their existing meaning).
+  let first = 0;
+  let last = cells.length;
+  if (cells[first].content === '') first++;
+  if (last > first && cells[last - 1].content === '') last--;
+  return cells.slice(first, last);
+}
+
+/**
+ * Replace one cell's content, preserving every byte outside that cell.
+ * Returns null when the row has no cell at that index.
+ */
+export function replaceTableCellContent(
+  line: string,
+  cellIndex: number,
+  newContent: string,
+): string | null {
+  const cell = parseTableCells(line)[cellIndex];
+  if (!cell) return null;
+  return line.slice(0, cell.start) + ` ${newContent} ` + line.slice(cell.end);
 }
 
 /**

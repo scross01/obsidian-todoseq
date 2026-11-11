@@ -13,6 +13,7 @@ import {
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
+import { TaskTransferResult } from '../../services/task-writer';
 import { TaskClassification } from '../../utils/task-sort';
 import { Search } from '../../search/search';
 import {
@@ -56,11 +57,7 @@ import {
   getTodayDailyNote,
   isTaskOnTodayDailyNote,
 } from '../../utils/daily-note-utils';
-import {
-  getTaskRemovalRange,
-  modifyLinesForMigration,
-  readTaskBlockFromVault,
-} from '../../utils/task-sub-bullets';
+import { readTaskBlockFromVault } from '../../utils/task-sub-bullets';
 
 const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
@@ -136,6 +133,9 @@ export class TaskListView extends ItemView {
 
   // Add generation counter for refreshVisibleList
   private refreshGeneration = 0;
+
+  /** True from onClose until a later onOpen; blocks all late async commits. */
+  private isDisposed = false;
 
   // Reference to the plugin for checking user-initiated updates
   private plugin: TodoTracker;
@@ -1629,116 +1629,70 @@ export class TaskListView extends ItemView {
   }
 
   /**
-   * Copy task to today's daily note
-   * @param task The task to copy
+   * Copy, move or migrate a task into today's daily note through TaskWriter.
    */
-  private async copyTaskToToday(task: Task): Promise<void> {
+  private async transferTaskToToday(
+    task: Task,
+    action: 'copy' | 'move' | 'migrate',
+  ): Promise<void> {
     const todayNote = await getTodayDailyNote(this.plugin.app);
     if (!todayNote) {
       new Notice('Failed to get or create today daily note');
       return;
     }
-
     if (isTaskOnTodayDailyNote(task, todayNote)) {
       new Notice('Task is already on today daily note');
       return;
     }
-
-    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
-    const currentContent = await this.plugin.app.vault.read(todayNote);
-    const newContent =
-      currentContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
-    await this.plugin.app.vault.modify(todayNote, newContent);
-
-    new Notice('Task copied to today daily note');
-  }
-
-  /**
-   * Move task to today's daily note
-   * @param task The task to move
-   */
-  private async moveTaskToToday(task: Task): Promise<void> {
-    const todayNote = await getTodayDailyNote(this.plugin.app);
-    if (!todayNote) {
-      new Notice('Failed to get or create today daily note');
+    const writer = this.plugin.taskEditor;
+    if (!writer) {
+      new Notice('Failed to write task');
       return;
     }
-
-    if (isTaskOnTodayDailyNote(task, todayNote)) {
-      new Notice('Task is already on today daily note');
-      return;
-    }
-
-    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
-
-    const todayContent = await this.plugin.app.vault.read(todayNote);
-    const newTodayContent =
-      todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
-    await this.plugin.app.vault.modify(todayNote, newTodayContent);
-
-    const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
-    if (!(sourceFile instanceof TFile)) {
-      new Notice('Failed to find source file');
-      return;
-    }
-
-    const sourceContent = await this.plugin.app.vault.read(sourceFile);
-    const sourceLines = sourceContent.split('\n');
-    const { start, end } = getTaskRemovalRange(sourceLines, task);
-
-    const newSourceLines = [
-      ...sourceLines.slice(0, start),
-      ...sourceLines.slice(end + 1),
-    ];
-    await this.plugin.app.vault.modify(sourceFile, newSourceLines.join('\n'));
-
-    new Notice('Task moved to today daily note');
-  }
-
-  /**
-   * Migrate task to today's daily note
-   * Copies the task to today's daily note and updates the source task
-   * to the migrated state keyword.
-   * @param task The task to migrate
-   */
-  private async migrateTaskToToday(task: Task): Promise<void> {
-    const todayNote = await getTodayDailyNote(this.plugin.app);
-    if (!todayNote) {
-      new Notice('Failed to get or create today daily note');
-      return;
-    }
-
-    if (isTaskOnTodayDailyNote(task, todayNote)) {
-      new Notice('Task is already on today daily note');
-      return;
-    }
-
-    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
-
-    const todayContent = await this.plugin.app.vault.read(todayNote);
-    const newTodayContent =
-      todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
-    await this.plugin.app.vault.modify(todayNote, newTodayContent);
-
-    const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
-    if (!(sourceFile instanceof TFile)) {
-      new Notice('Failed to find source file');
-      return;
-    }
-
-    const sourceContent = await this.plugin.app.vault.read(sourceFile);
-    const sourceLines = sourceContent.split('\n');
-    const migrateState = this.plugin.settings.migrateToTodayState;
-    const taskKeyword = task.state || 'TODO';
-    const modified = modifyLinesForMigration(
-      sourceLines,
-      task.line,
-      taskKeyword,
-      migrateState,
+    const result = await writer.transferTask(task, todayNote, action);
+    this.notifyTransfer(
+      result,
+      action === 'copy'
+        ? 'Task copied to today daily note'
+        : action === 'move'
+          ? 'Task moved to today daily note'
+          : 'Task migrated to today daily note',
     );
-    await this.plugin.app.vault.modify(sourceFile, modified.join('\n'));
+  }
 
-    new Notice('Task migrated to today daily note');
+  private notifyTransfer(
+    result: TaskTransferResult,
+    successMessage: string,
+  ): void {
+    switch (result.status) {
+      case 'success':
+        new Notice(successMessage);
+        break;
+      case 'already-there':
+        new Notice('Task is already on today daily note');
+        break;
+      case 'stale-source':
+        new Notice('Task has changed since the panel was refreshed');
+        break;
+      case 'destination-failed':
+        new Notice('Failed to write to today daily note');
+        break;
+      case 'partial':
+        new Notice('Task copied, but the original could not be updated');
+        break;
+    }
+  }
+
+  private async copyTaskToToday(task: Task): Promise<void> {
+    await this.transferTaskToToday(task, 'copy');
+  }
+
+  private async moveTaskToToday(task: Task): Promise<void> {
+    await this.transferTaskToToday(task, 'move');
+  }
+
+  private async migrateTaskToToday(task: Task): Promise<void> {
+    await this.transferTaskToToday(task, 'migrate');
   }
 
   /**
@@ -1845,7 +1799,7 @@ export class TaskListView extends ItemView {
   }
 
   private async loadMoreTasks(): Promise<void> {
-    if (this.isLoadingMore || this.isAllTasksLoaded) return;
+    if (this.isDisposed || this.isLoadingMore || this.isAllTasksLoaded) return;
 
     this.isLoadingMore = true;
     const currentGeneration = this.refreshGeneration;
@@ -1873,18 +1827,23 @@ export class TaskListView extends ItemView {
     await this.renderQueue.enqueue(
       tasksToLoad,
       (task) => {
-        let element = this.taskElementCache.get(task);
-        if (!element) {
-          element = this.buildTaskListItem(task);
-          this.taskElementCache.set(task, element);
+        // Cache keys identify a location, not immutable content: a row that
+        // was detached by an earlier refresh still holds the old text, state
+        // and handlers. Patch it before it is shown again.
+        const cachedElement = this.taskElementCache.get(task);
+        if (cachedElement) {
+          this.updateTaskElementContent(task, cachedElement);
+          return cachedElement;
         }
+        const element = this.buildTaskListItem(task);
+        this.taskElementCache.set(task, element);
         return element;
       },
       list,
     );
 
-    // Abort if another refresh was triggered while chunking lazy load
-    if (this.refreshGeneration !== currentGeneration) {
+    // Abort if another refresh or teardown happened while chunking lazy load
+    if (!this.isCurrentRefresh(currentGeneration)) {
       this.isLoadingMore = false;
       return;
     }
@@ -1904,6 +1863,24 @@ export class TaskListView extends ItemView {
     }
   }
 
+  /** Whether work started for `generation` may still commit its results. */
+  private isCurrentRefresh(generation: number): boolean {
+    return !this.isDisposed && this.refreshGeneration === generation;
+  }
+
+  /**
+   * Reset pagination to a known result set. Every path that replaces the
+   * visible rows calls this, so a scroll callback captured for an earlier
+   * query cannot append its old tasks under the new state.
+   */
+  private resetPagination(total: number, loaded: number): void {
+    this.renderQueue.clear();
+    this.resetLazyLoading();
+    this.totalTaskCount = total;
+    this.loadedTaskCount = loaded;
+    this.isAllTasksLoaded = loaded >= total;
+  }
+
   private resetLazyLoading(): void {
     this.loadedTaskCount = 0;
     this.isAllTasksLoaded = false;
@@ -1916,6 +1893,8 @@ export class TaskListView extends ItemView {
    * @param resetScroll If true, reset to top of list. If false, preserve scroll position.
    */
   async refreshVisibleList(resetScroll = false): Promise<void> {
+    if (this.isDisposed) return;
+
     const currentGeneration = ++this.refreshGeneration;
 
     // Cancel any pending debounced refresh - this call takes precedence
@@ -1934,8 +1913,8 @@ export class TaskListView extends ItemView {
     // Yield to main thread to prevent blocking user typing
     await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-    // Abort if another refresh was triggered while we yielded
-    if (this.refreshGeneration !== currentGeneration) {
+    // Abort if another refresh or teardown happened while we yielded
+    if (!this.isCurrentRefresh(currentGeneration)) {
       return;
     }
 
@@ -1956,43 +1935,61 @@ export class TaskListView extends ItemView {
     let visible = this.transformForView(allTasks, mode, classifications);
     const preSearchCount = visible.length;
 
-    // Apply search filtering
+    // Apply search filtering. Results are computed locally and only committed
+    // once this refresh is confirmed current: a property query can settle
+    // after a newer plain or empty query, and must not overwrite its rows,
+    // count or error.
     const q = this.getSearchQuery().trim();
     if (q.length > 0) {
-      try {
-        // Replace the per-row Promise.all fan-out with the single-pass bulk
-        // filter: property engines re-solve once per unique filter, then the
-        // whole tree evaluates synchronously over the task set.
-        visible = await Search.filterTasks(
-          visible,
-          q,
-          this.isCaseSensitive,
-          this.plugin.settings,
-          this.plugin.propertySearchEngine ?? undefined,
-        );
-        this.searchError = null;
-      } catch {
-        // If there's an error in parsing, fall back to simple search
-        const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
-        const searchText = this.isCaseSensitive
-          ? (text: string) => text
-          : (text: string) => text.toLowerCase();
-
-        visible = visible.filter((t) => {
-          const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
-          return (
-            (t.rawText && searchText(t.rawText).includes(searchQuery)) ||
-            (t.text && searchText(t.text).includes(searchQuery)) ||
-            (t.path && searchText(t.path).includes(searchQuery)) ||
-            (baseName && searchText(baseName).includes(searchQuery))
+      const validationError = Search.getError(q);
+      let filtered: Task[];
+      let nextSearchError: string | null = validationError;
+      if (validationError) {
+        filtered = [];
+      } else
+        try {
+          // Replace the per-row Promise.all fan-out with the single-pass bulk
+          // filter: property engines re-solve once per unique filter, then the
+          // whole tree evaluates synchronously over the task set.
+          filtered = await Search.filterTasks(
+            visible,
+            q,
+            this.isCaseSensitive,
+            this.plugin.settings,
+            this.plugin.propertySearchEngine ?? undefined,
           );
-        });
+        } catch {
+          // If there's an error in parsing, fall back to simple search
+          const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
+          const searchText = this.isCaseSensitive
+            ? (text: string) => text
+            : (text: string) => text.toLowerCase();
 
-        // Store the error for display
-        this.searchError = Search.getError(q) || 'Invalid search query';
+          filtered = visible.filter((t) => {
+            const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
+            return (
+              (t.rawText && searchText(t.rawText).includes(searchQuery)) ||
+              (t.text && searchText(t.text).includes(searchQuery)) ||
+              (t.path && searchText(t.path).includes(searchQuery)) ||
+              (baseName && searchText(baseName).includes(searchQuery))
+            );
+          });
+
+          // Store the error for display
+          nextSearchError = Search.getError(q) || 'Invalid search query';
+        }
+
+      if (!this.isCurrentRefresh(currentGeneration)) {
+        return;
       }
+      visible = filtered;
+      this.searchError = nextSearchError;
     } else {
       this.searchError = null;
+    }
+
+    if (!this.isCurrentRefresh(currentGeneration)) {
+      return;
     }
 
     // Update search results info
@@ -2069,6 +2066,10 @@ export class TaskListView extends ItemView {
       }
 
       // Keep toolbar enabled: do not disable or overlay; list remains empty
+      if (visible.length === 0) {
+        this.cachedVisibleTasks = [];
+        this.resetPagination(0, 0);
+      }
       return;
     } else if (visible.length === 0) {
       // Clear all existing tasks from the list first
@@ -2107,6 +2108,9 @@ export class TaskListView extends ItemView {
 
       title.setText(emptyTitle);
       subtitle.setText(emptySubtitle);
+
+      this.cachedVisibleTasks = [];
+      this.resetPagination(0, 0);
 
       // Keep toolbar enabled: do not disable or overlay; list remains empty
       return;
@@ -2183,7 +2187,7 @@ export class TaskListView extends ItemView {
       );
 
       // Abort if another refresh superseded us while building!
-      if (this.refreshGeneration !== currentGeneration) {
+      if (!this.isCurrentRefresh(currentGeneration)) {
         return;
       }
 
@@ -2202,11 +2206,7 @@ export class TaskListView extends ItemView {
       });
 
       // Update lazy loading state
-      this.renderQueue.clear();
-      this.resetLazyLoading();
-      this.totalTaskCount = visible.length;
-      this.isAllTasksLoaded = renderCount >= visible.length;
-      this.loadedTaskCount = renderCount;
+      this.resetPagination(visible.length, renderCount);
 
       // Set up sentinel observer for lazy loading if there are more tasks
       if (!this.isAllTasksLoaded) {
@@ -2225,6 +2225,10 @@ export class TaskListView extends ItemView {
 
   // Obsidian lifecycle methods for view open: keyed, minimal render
   async onOpen() {
+    // The host may reuse this view instance; start a fresh lifetime.
+    this.isDisposed = false;
+    this.refreshGeneration++;
+
     const container = this.contentEl;
     container.empty();
     container.addClass('todoseq-panel');
@@ -2758,6 +2762,11 @@ export class TaskListView extends ItemView {
 
   // Cleanup listeners
   async onClose() {
+    // Invalidate every pending refresh before teardown: late search results
+    // must not touch a closed view's DOM, cache or pagination.
+    this.isDisposed = true;
+    this.refreshGeneration++;
+
     const handler = this._searchKeyHandler;
     if (handler) {
       window.removeEventListener('keydown', handler);

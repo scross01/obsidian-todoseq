@@ -1,8 +1,10 @@
 import {
+  classifyTaskMetadataLine,
   getSubtaskLinesFromLines,
   getTaskRemovalRange,
   taskHasCheckbox,
   readTaskBlockFromLines,
+  modifyLinesForMigration,
 } from '../src/utils/task-sub-bullets';
 import { Task } from '../src/types/task';
 
@@ -225,6 +227,154 @@ describe('getTaskRemovalRange', () => {
     ];
     const task = createTask({ line: 0 });
     expect(getTaskRemovalRange(lines, task)).toEqual({ start: 0, end: 4 });
+  });
+});
+
+describe('task metadata block boundaries', () => {
+  it('classifies every supported metadata line', () => {
+    expect(classifyTaskMetadataLine('SCHEDULED: <2026-05-09 Sat>', '')).toBe(
+      'scheduled',
+    );
+    expect(classifyTaskMetadataLine('DEADLINE: <2026-05-10 Sun>', '')).toBe(
+      'deadline',
+    );
+    expect(classifyTaskMetadataLine('CLOSED: [2026-05-09 Sat]', '')).toBe(
+      'closed',
+    );
+    expect(
+      classifyTaskMetadataLine('STARTED: <2026-05-09 Sat 10:00>', ''),
+    ).toBe('started');
+    expect(classifyTaskMetadataLine('DESCRIPTION: some text', '')).toBe(
+      'description',
+    );
+    expect(classifyTaskMetadataLine('just prose', '')).toBeNull();
+  });
+
+  it('honours indent and quote context like the parser', () => {
+    expect(classifyTaskMetadataLine('  STARTED: <2026-05-09 Sat>', '')).toBe(
+      'started',
+    );
+    expect(
+      classifyTaskMetadataLine('STARTED: <2026-05-09 Sat>', '  '),
+    ).toBeNull();
+    expect(classifyTaskMetadataLine('> CLOSED: [2026-05-09 Sat]', '  ')).toBe(
+      'closed',
+    );
+  });
+
+  it('keeps every metadata type in a copied block, in order', () => {
+    const lines = [
+      'TODO task',
+      'STARTED: <2026-05-01 Fri 09:00>',
+      'SCHEDULED: <2026-05-09 Sat>',
+      'CLOSED: [2026-05-09 Sat]',
+      'DEADLINE: <2026-05-10 Sun>',
+      'DESCRIPTION: keep this',
+      '- [ ] child task',
+      'NEXT',
+    ];
+    const task = createTask({ line: 0 });
+    expect(readTaskBlockFromLines(lines, task)).toEqual([
+      'TODO task',
+      'STARTED: <2026-05-01 Fri 09:00>',
+      'SCHEDULED: <2026-05-09 Sat>',
+      'CLOSED: [2026-05-09 Sat]',
+      'DEADLINE: <2026-05-10 Sun>',
+      'DESCRIPTION: keep this',
+      '- [ ] child task',
+    ]);
+    expect(getTaskRemovalRange(lines, task)).toEqual({ start: 0, end: 6 });
+  });
+
+  it('preserves indented metadata under a bullet task', () => {
+    const lines = [
+      '- TODO task',
+      '  STARTED: <2026-05-01 Fri 09:00>',
+      '  DESCRIPTION: detail',
+      '  SCHEDULED: <2026-05-09 Sat>',
+      '  - [ ] child task',
+      'NEXT',
+    ];
+    const task = createTask({
+      rawText: '- TODO task',
+      listMarker: '- ',
+      line: 0,
+    });
+    expect(readTaskBlockFromLines(lines, task)).toEqual([
+      '- TODO task',
+      '  STARTED: <2026-05-01 Fri 09:00>',
+      '  DESCRIPTION: detail',
+      '  SCHEDULED: <2026-05-09 Sat>',
+      '  - [ ] child task',
+    ]);
+  });
+
+  it('stops at a sibling task, prose or blank line', () => {
+    const task = createTask({ line: 0 });
+    expect(
+      readTaskBlockFromLines(
+        ['TODO a', 'STARTED: <2026-05-01 Fri 09:00>', 'TODO b'],
+        task,
+      ),
+    ).toEqual(['TODO a', 'STARTED: <2026-05-01 Fri 09:00>']);
+    expect(
+      readTaskBlockFromLines(
+        ['TODO a', 'DESCRIPTION: d', 'Unrelated prose'],
+        task,
+      ),
+    ).toEqual(['TODO a', 'DESCRIPTION: d']);
+    expect(
+      readTaskBlockFromLines(['TODO a', 'CLOSED: [2026-05-09 Sat]', ''], task),
+    ).toEqual(['TODO a', 'CLOSED: [2026-05-09 Sat]']);
+  });
+
+  it('keeps quoted metadata with the task', () => {
+    const lines = [
+      '> TODO quoted',
+      '> SCHEDULED: <2026-05-09 Sat>',
+      '> STARTED: <2026-05-09 Sat 09:00>',
+      'NEXT',
+    ];
+    const task = createTask({ rawText: '> TODO quoted', line: 0 });
+    expect(readTaskBlockFromLines(lines, task)).toEqual([
+      '> TODO quoted',
+      '> SCHEDULED: <2026-05-09 Sat>',
+      '> STARTED: <2026-05-09 Sat 09:00>',
+    ]);
+  });
+
+  it('migration removes only SCHEDULED/DEADLINE and keeps other metadata', () => {
+    const lines = [
+      'TODO task',
+      'STARTED: <2026-05-01 Fri 09:00>',
+      'SCHEDULED: <2026-05-09 Sat>',
+      'DESCRIPTION: keep this',
+      'DEADLINE: <2026-05-10 Sun>',
+      'CLOSED: [2026-05-09 Sat]',
+      'NEXT',
+    ];
+
+    expect(modifyLinesForMigration(lines, 0, 'TODO', 'MIGRATED')).toEqual([
+      'MIGRATED task',
+      'STARTED: <2026-05-01 Fri 09:00>',
+      'DESCRIPTION: keep this',
+      'CLOSED: [2026-05-09 Sat]',
+      'NEXT',
+    ]);
+  });
+
+  it('migration keeps an empty DESCRIPTION line and sibling lines', () => {
+    const lines = [
+      'TODO task',
+      'DESCRIPTION:',
+      'SCHEDULED: <2026-05-09 Sat>',
+      'TODO sibling',
+    ];
+    expect(modifyLinesForMigration(lines, 0, 'TODO', '')).toEqual([
+      'task',
+      'DESCRIPTION:',
+      'TODO sibling',
+    ]);
   });
 });
 

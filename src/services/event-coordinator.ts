@@ -97,30 +97,75 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
     });
   }
 
+  /**
+   * Whether a live file event may produce tasks. Uses the scanner's live
+   * settings so configured Org/code formats behave like a scan; attachments
+   * and unsupported formats stay cheap. Falls back to Markdown without a
+   * scanner (tests and early startup).
+   */
+  private isEligibleFile(file: TFile): boolean {
+    if (!this.vaultScanner) return file.extension === 'md';
+    const scanner = this.vaultScanner as VaultScanner & {
+      isScannableFile?: (file: TFile) => boolean;
+    };
+    return typeof scanner.isScannableFile === 'function'
+      ? scanner.isScannableFile(file)
+      : file.extension === 'md';
+  }
+
+  /** Whether any collected task currently lives at this path. */
+  private hasCollectedTasks(path: string): boolean {
+    return this.taskStateManager.getTasks().some((task) => task.path === path);
+  }
+
+  /**
+   * Drop pending debounce/queued work for a path. Captured as a string: a
+   * TFile.path mutates on rename, so a timer that fires later must not look up
+   * (or queue) the new path under the old key.
+   */
+  private cancelPendingFileWork(path: string): void {
+    const timeout = this.fileChangeTimeouts.get(path);
+    if (timeout !== undefined) {
+      window.clearTimeout(timeout);
+      this.fileChangeTimeouts.delete(path);
+    }
+    this.pendingEvents.delete(path);
+  }
+
   private handleVaultEvent(type: FileChangeType, file: TAbstractFile): void {
-    if (!(file instanceof TFile) || file.extension !== 'md') {
+    if (!(file instanceof TFile)) {
       return;
     }
 
     const tFile = file;
+    const filePath = tFile.path;
 
-    // Don't debounce delete events - file won't receive further changes
+    // Don't debounce delete events - file won't receive further changes.
+    // Forward when the path is eligible now, or still holds collected tasks
+    // (a format disabled since it was scanned).
     if (type === 'delete') {
-      this.queueFileEvent({
-        type,
-        file: tFile,
-        timestamp: Date.now(),
-      });
+      this.cancelPendingFileWork(filePath);
+      if (this.isEligibleFile(tFile) || this.hasCollectedTasks(filePath)) {
+        this.queueFileEvent({
+          type,
+          file: tFile,
+          timestamp: Date.now(),
+        });
+      }
       return;
     }
 
-    const existingTimeout = this.fileChangeTimeouts.get(tFile.path);
+    if (!this.isEligibleFile(tFile)) {
+      return;
+    }
+
+    const existingTimeout = this.fileChangeTimeouts.get(filePath);
     if (existingTimeout) {
       window.clearTimeout(existingTimeout);
     }
 
     const timeout = window.setTimeout(() => {
-      this.fileChangeTimeouts.delete(tFile.path);
+      this.fileChangeTimeouts.delete(filePath);
       this.queueFileEvent({
         type,
         file: tFile,
@@ -128,11 +173,24 @@ export class EventCoordinator extends EventEmitter<EventCoordinatorEvents> {
       });
     }, this.FILE_DEBOUNCE_MS);
 
-    this.fileChangeTimeouts.set(tFile.path, timeout);
+    this.fileChangeTimeouts.set(filePath, timeout);
   }
 
   private handleVaultRename(file: TAbstractFile, oldPath: string): void {
-    if (!(file instanceof TFile) || file.extension !== 'md') {
+    if (!(file instanceof TFile)) {
+      return;
+    }
+
+    // A rename must clean up the OLD path even when the destination is no
+    // longer a supported format, and even when the old file had no tasks.
+    this.cancelPendingFileWork(oldPath);
+
+    const newPath = file.path;
+    if (
+      !this.isEligibleFile(file) &&
+      !this.hasCollectedTasks(oldPath) &&
+      !this.hasCollectedTasks(newPath)
+    ) {
       return;
     }
 

@@ -38,7 +38,10 @@ export class UIManager {
         this.plugin.settings,
         () => this.plugin.vaultScanner?.getParser() ?? null,
       ),
-      dateAutocompleteExtension(this.plugin.settings),
+      dateAutocompleteExtension(
+        this.plugin.settings,
+        () => this.plugin.keywordManager,
+      ),
     ]);
     this.plugin.taskFormatters.set('editor-extension', extension);
   }
@@ -54,16 +57,48 @@ export class UIManager {
     options?: AddEventListenerOptions;
   }[] = [];
 
+  /** Plugin-owned delayed setup timers, cleared on cleanup. */
+  private delayedSetupTimers = new Set<number>();
+
+  /** Layout-change debounce timer for context menu re-attachment. */
+  private layoutChangeDebounceTimer: number | null = null;
+
+  /** True once cleanup ran; delayed setup must not reattach afterwards. */
+  private isDisposed = false;
+
+  /** Record and attach a capture-phase listener with matching removal options. */
+  private registerCapturedListener(
+    target: EventTarget,
+    type: string,
+    handler: EventListener,
+  ): void {
+    const options: AddEventListenerOptions = { capture: true };
+    this.registeredEventListeners.push({ target, type, handler, options });
+    target.addEventListener(type, handler, options);
+  }
+
+  /** Run delayed setup only while this manager is alive, and own the handle. */
+  private scheduleSetup(callback: () => void, delay: number): void {
+    const timer = window.setTimeout(() => {
+      this.delayedSetupTimers.delete(timer);
+      if (this.isDisposed) return;
+      callback();
+    }, delay);
+    this.delayedSetupTimers.add(timer);
+  }
+
   setupCheckboxEventListeners(): void {
     if (!this.plugin.settings.formatTaskKeywords) {
       return;
     }
+    this.isDisposed = false;
 
     // Track which editors have had listeners attached to avoid duplicates
     const attachedEditors = new Set<HTMLElement>();
 
     // Set up event listeners on all active markdown editors immediately
     const setupEditorListeners = () => {
+      if (this.isDisposed) return;
       const leaves = this.plugin.app.workspace.getLeavesOfType('markdown');
       leaves.forEach((leaf) => {
         const view = leaf.view;
@@ -195,9 +230,7 @@ export class UIManager {
     this.plugin.registerEvent(
       this.plugin.app.workspace.on('file-open', () => {
         // Small delay to allow the editor to fully initialize
-        window.setTimeout(() => {
-          setupEditorListeners();
-        }, 100);
+        this.scheduleSetup(setupEditorListeners, 100);
       }),
     );
   }
@@ -699,6 +732,7 @@ export class UIManager {
    * Setup task keyword context menu
    */
   setupTaskKeywordContextMenu(): void {
+    this.isDisposed = false;
     // Track which editors have had the context menu handler attached to
     // avoid stacking duplicate handlers when setup re-runs (layout-change,
     // file-open, editor rebuilds).
@@ -706,6 +740,7 @@ export class UIManager {
 
     // Set up context menu listeners on all markdown editors
     const setupContextMenuListeners = () => {
+      if (this.isDisposed) return;
       const leaves = this.plugin.app.workspace.getLeavesOfType('markdown');
       leaves.forEach((leaf) => {
         const view = leaf.view;
@@ -747,27 +782,21 @@ export class UIManager {
               }
             };
 
-            // Store cleanup information for manual cleanup
-            this.registeredEventListeners.push({
-              target: editorContent,
-              type: 'contextmenu',
-              handler: contextMenuHandler,
-            });
-
             // Capture phase so we run before CodeMirror's own contextmenu
             // handler on .cm-content (which stops propagation, letting the
             // native menu through) while still defaulting to preventDefault.
-            editorContent.addEventListener('contextmenu', contextMenuHandler, {
-              capture: true,
-            });
+            // Recording the same options is required for removal to work.
+            this.registerCapturedListener(
+              editorContent,
+              'contextmenu',
+              contextMenuHandler,
+            );
           }
         }
       });
     };
 
     setupContextMenuListeners();
-
-    let layoutChangeDebounceTimer: number | null = null;
 
     // Re-attach when the layout changes: toggling source/live-preview mode
     // rebuilds the .cm-editor DOM node and drops the previously attached
@@ -776,11 +805,11 @@ export class UIManager {
     this.plugin.registerEvent(
       this.plugin.app.workspace.on('layout-change', () => {
         // Debounce to avoid running on every layout event (pane moves, mode toggles, etc.)
-        if (layoutChangeDebounceTimer !== null) {
-          window.clearTimeout(layoutChangeDebounceTimer);
+        if (this.layoutChangeDebounceTimer !== null) {
+          window.clearTimeout(this.layoutChangeDebounceTimer);
         }
-        layoutChangeDebounceTimer = window.setTimeout(() => {
-          layoutChangeDebounceTimer = null;
+        this.layoutChangeDebounceTimer = window.setTimeout(() => {
+          this.layoutChangeDebounceTimer = null;
           setupContextMenuListeners();
         }, 50);
       }),
@@ -791,9 +820,7 @@ export class UIManager {
       this.plugin.app.workspace.on('file-open', (file) => {
         if (file instanceof TFile && file.extension === 'md') {
           // Small delay to allow the editor to fully load
-          window.setTimeout(() => {
-            setupContextMenuListeners();
-          }, 100);
+          this.scheduleSetup(setupContextMenuListeners, 100);
         }
       }),
     );
@@ -1035,6 +1062,18 @@ export class UIManager {
    * Clean up all registered event listeners
    */
   cleanup(): void {
+    this.isDisposed = true;
+
+    // Cancel plugin-owned delayed setup before it can reattach handlers.
+    for (const timer of this.delayedSetupTimers) {
+      window.clearTimeout(timer);
+    }
+    this.delayedSetupTimers.clear();
+    if (this.layoutChangeDebounceTimer !== null) {
+      window.clearTimeout(this.layoutChangeDebounceTimer);
+      this.layoutChangeDebounceTimer = null;
+    }
+
     // Remove all registered event listeners
     this.registeredEventListeners.forEach(
       ({ target, type, handler, options }) => {

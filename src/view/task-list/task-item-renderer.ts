@@ -897,11 +897,9 @@ export class TaskItemRenderer {
   getDateStatusClasses(date: Date | null, _isDeadline = false): string[] {
     if (!date) return [];
 
-    const today = DateUtils.getDateOnly(new Date());
-    const taskDate = DateUtils.getDateOnly(date);
-
-    const diffTime = taskDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / DateUtils.MILLISECONDS_PER_DAY);
+    // Calendar-day distance, matching the relative date labels: elapsed-hour
+    // arithmetic mislabels the day after a DST transition.
+    const diffDays = DateUtils.calendarDayDifference(date);
 
     const classes = ['todoseq-task-date'];
 

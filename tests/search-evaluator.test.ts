@@ -1296,18 +1296,16 @@ describe('SearchEvaluator - Comprehensive', () => {
       expect(result).toBe(true);
     });
 
-    it('should lose no matches when task text is folded into rawText', async () => {
-      // `text` is `rawText` with the keyword/priority/references stripped, so
-      // it is a contiguous substring of `rawText`: anything `text` matches,
-      // `rawText` already matches. Only `rawText` is indexed, so this pins that
-      // folding `text` away loses no match — it goes red if stripping ever made
-      // `text` hold something `rawText` does not.
+    it('matches a normalized phrase that straddles a stripped marker', async () => {
+      // Stripping removes tokens from the MIDDLE of the line, so `text` is not
+      // always a contiguous substring of `rawText`. The normalized text is
+      // indexed alongside the raw line, which is what makes this phrase match.
       const task = createBaseTask({
-        rawText: '- [#A] TODO ship the release now ^abc123',
-        text: 'ship the release now',
+        rawText: '- TODO ship [#A] the release',
+        text: 'ship the release',
         path: 'notes/test.md',
       });
-      // Matches because it lives in the task text, which is inside rawText.
+      // Matches because it lives in the task text.
       expect(
         await SearchEvaluator.evaluate(
           { type: 'term', value: 'ship the release' },
@@ -1315,10 +1313,10 @@ describe('SearchEvaluator - Comprehensive', () => {
           false,
         ),
       ).toBe(true);
-      // A phrase straddling the stripped priority token: rawText-only content.
+      // A phrase straddling the stripped priority token: only `text` holds it.
       expect(
         await SearchEvaluator.evaluate(
-          { type: 'phrase', value: 'ship the' },
+          { type: 'phrase', value: 'ship the release' },
           task,
           false,
         ),

@@ -98,6 +98,20 @@ Some text after the code block.
 `,
   );
 
+  // Parent/child and plain-sibling fixture for optimistic subtask progress.
+  // The blank line keeps the sibling outside the parent's parsed span.
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'subtask-progress.md'),
+    `# Subtask Progress
+
+- [ ] TODO Parent task
+  - [ ] TODO Child one
+  - [ ] TODO Child two
+
+- [ ] TODO Plain sibling
+`,
+  );
+
   // File for smart date processing test
   fs.writeFileSync(
     path.join(TEST_VAULT_DIR, 'smart-date.md'),
@@ -144,6 +158,21 @@ due: ${dateStr}
 
 - [ ] DOING Recurring DOING task
   SCHEDULED: <${todayStr} +1m>
+`,
+  );
+
+  // Mixed repeating/one-off dates and a first-only warning period. Rolling
+  // the task must keep the non-repeating date and drop --Nd from the file.
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'recurrence-mixed.md'),
+    `# Recurrence Mixed Date Test
+
+- [ ] TODO Mixed date task
+  SCHEDULED: <${todayStr} +1w>
+  DEADLINE: <${todayStr}>
+
+- [ ] DOING First-only warning task
+  DEADLINE: <${todayStr} +1d --2d>
 `,
   );
 

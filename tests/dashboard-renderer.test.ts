@@ -1303,11 +1303,17 @@ describe('DashboardCodeBlockProcessor', () => {
     getTasksMock.mockImplementationOnce(() => {
       throw new Error('transient');
     });
-    await processor['refreshDashboard'](dashboard);
+    await processor['refreshDashboard'](
+      Array.from(processor['activeDashboards'].keys())[0],
+      dashboard,
+    );
     expect(el.querySelector('.todoseq-dashboard-error')).not.toBeNull();
     expect(dashboard.contentRoot).toBeNull();
 
-    await processor['refreshDashboard'](dashboard);
+    await processor['refreshDashboard'](
+      Array.from(processor['activeDashboards'].keys())[0],
+      dashboard,
+    );
     expect(el.querySelector('.todoseq-dashboard-error')).toBeNull();
     expect(el.querySelector('.todoseq-dashboard-container')).not.toBeNull();
   });
@@ -1633,7 +1639,10 @@ describe('DashboardCodeBlockProcessor', () => {
         }),
       ]);
 
-      await processor['refreshDashboard'](dashboard);
+      await processor['refreshDashboard'](
+        Array.from(processor['activeDashboards'].keys())[0],
+        dashboard,
+      );
 
       // After refresh: only the DOING task counted
       const total = host.querySelector('.todoseq-dashboard-total')?.textContent;

@@ -77,13 +77,32 @@ export class DateUtils {
     return label;
   }
 
+  /**
+   * Local calendar-day distance between two dates (positive = in the future).
+   * Counts dates, not elapsed hours: a 23- or 25-hour local day around a
+   * daylight-saving transition still counts as one day.
+   */
+  static calendarDayDifference(
+    date: Date,
+    reference: Date = new Date(),
+  ): number {
+    const from = this.localDayNumber(reference);
+    const to = this.localDayNumber(date);
+    return to - from;
+  }
+
+  /** Days since the UTC epoch for a date's local year/month/day. */
+  private static localDayNumber(date: Date): number {
+    const utc = new Date(0);
+    // setUTCFullYear avoids Date.UTC's 1900 remapping for years 0-99.
+    utc.setUTCFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+    utc.setUTCHours(0, 0, 0, 0);
+    return Math.round(utc.getTime() / DateUtils.MILLISECONDS_PER_DAY);
+  }
+
   /** diffDays between a normalized date's calendar day and today's. */
   private static diffDaysFor(normalizedDate: Date): number {
-    const today = this.getDateOnly(new Date());
-    const taskDate = this.getDateOnly(normalizedDate);
-    return Math.ceil(
-      (taskDate.getTime() - today.getTime()) / DateUtils.MILLISECONDS_PER_DAY,
-    );
+    return this.calendarDayDifference(normalizedDate);
   }
   /**
    * Format a date for display with relative time indicators

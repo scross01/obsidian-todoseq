@@ -101,9 +101,26 @@ export class TaskStateManager {
 
     let adjusted = false;
     for (const task of this._tasks) {
-      if (task.path === path && task.line >= fromLine) {
+      if (task.path !== path) continue;
+
+      if (task.line >= fromLine) {
         task.line += delta;
         adjusted = true;
+      }
+
+      if (task.subtaskSpan) {
+        if (fromLine <= task.subtaskSpan.start) {
+          task.subtaskSpan.start += delta;
+          task.subtaskSpan.end += delta;
+          adjusted = true;
+        } else if (fromLine <= task.subtaskSpan.end) {
+          task.subtaskSpan.end += delta;
+          adjusted = true;
+        }
+
+        if (task.subtaskSpan.end < task.subtaskSpan.start) {
+          task.subtaskSpan = undefined;
+        }
       }
     }
 
@@ -315,20 +332,35 @@ export class TaskStateManager {
    * @param parentTask The potential parent task
    * @returns true if task is a subtask of parentTask
    */
+  /** Count quote nesting markers at the start of an indent string. */
+  private getQuoteLevel(indent: string): number {
+    return (indent.match(/>/g) ?? []).length;
+  }
+
   private isSubtaskOf(task: Task, parentTask: Task): boolean {
-    const parentIndent = parentTask.indent;
-    const taskIndent = task.indent;
-
-    // Handle quoted lines - extract quote prefix separately
-    const parentQuotePrefix = parentIndent.match(/^(>\s*)+/)?.[0] ?? '';
-    const taskQuotePrefix = taskIndent.match(/^(>\s*)+/)?.[0] ?? '';
-
-    // Check if both are in the same quote nesting level
-    if (parentQuotePrefix !== taskQuotePrefix) {
+    // Source bounds are the authority. Without a parsed span there is no
+    // trustworthy evidence that this task is a child of the candidate.
+    if (!parentTask.subtaskSpan) return false;
+    if (!CHECKBOX_DETECTION_REGEX.test(task.rawText.trimStart())) return false;
+    if (
+      task.line < parentTask.subtaskSpan.start ||
+      task.line > parentTask.subtaskSpan.end
+    ) {
       return false;
     }
 
-    // Get the actual whitespace indent (without quote prefix)
+    const parentIndent = parentTask.indent;
+    const taskIndent = task.indent;
+
+    // Compare nesting depth, not the exact prefix: a checkbox-only line and
+    // its quoted parent can carry different trailing spaces after '>'.
+    if (this.getQuoteLevel(parentIndent) !== this.getQuoteLevel(taskIndent)) {
+      return false;
+    }
+
+    const parentQuotePrefix = parentIndent.match(/^(>\s*)+/)?.[0] ?? '';
+    const taskQuotePrefix = taskIndent.match(/^(>\s*)+/)?.[0] ?? '';
+
     const parentWhitespaceIndent = parentIndent.substring(
       parentQuotePrefix.length,
     );
@@ -336,17 +368,14 @@ export class TaskStateManager {
 
     const parentIndentLength = this.getIndentLength(parentWhitespaceIndent);
     const taskIndentLength = this.getIndentLength(taskWhitespaceIndent);
+    const parentHasCheckbox = CHECKBOX_DETECTION_REGEX.test(
+      parentTask.rawText.trimStart(),
+    );
 
-    // Check if parent has a checkbox
-    const parentHasCheckbox = CHECKBOX_DETECTION_REGEX.test(parentTask.rawText);
-
-    // If parent has a checkbox, subtask must be more indented
-    // If parent doesn't have a checkbox, subtask can be at same or greater indentation
     if (parentHasCheckbox) {
       return taskIndentLength > parentIndentLength;
-    } else {
-      return taskIndentLength >= parentIndentLength;
     }
+    return taskIndentLength >= parentIndentLength;
   }
 
   /**
@@ -361,32 +390,16 @@ export class TaskStateManager {
    * @returns Array of parent tasks (ordered from immediate to root)
    */
   private findParentTasks(task: Task): Task[] {
-    // Get all tasks in the same file, sorted by line number
-    const tasksInFile = this._tasks
-      .filter((t) => t.path === task.path && t.line < task.line)
-      .sort((a, b) => a.line - b.line);
+    if (!CHECKBOX_DETECTION_REGEX.test(task.rawText.trimStart())) return [];
 
-    const parents: Task[] = [];
-    let currentTask = task;
-
-    // Walk backwards through tasks to find the parent chain
-    for (let i = tasksInFile.length - 1; i >= 0; i--) {
-      const potentialParent = tasksInFile[i];
-
-      // Check if this task is a parent of the current task
-      if (this.isSubtaskOf(currentTask, potentialParent)) {
-        parents.push(potentialParent);
-        currentTask = potentialParent;
-
-        // If we've found a task with no indent (root level), stop searching
-        if (this.getIndentLength(currentTask.indent) === 0) {
-          break;
-        }
-      }
-    }
-
-    // Return parents ordered from immediate to root (reverse of insertion order)
-    return parents;
+    return this._tasks
+      .filter(
+        (candidate) =>
+          candidate.path === task.path &&
+          candidate.line < task.line &&
+          this.isSubtaskOf(task, candidate),
+      )
+      .sort((a, b) => b.line - a.line);
   }
 
   /**
@@ -453,54 +466,39 @@ export class TaskStateManager {
     line: number,
     indent: string,
   ): Task[] {
-    const tasksInFile = this._tasks
-      .filter((t) => t.path === filePath && t.line < line)
-      .sort((a, b) => a.line - b.line);
+    const taskQuoteLevel = this.getQuoteLevel(indent);
+    const taskQuotePrefix = indent.match(/^(>\s*)+/)?.[0] ?? '';
+    const taskWhitespaceIndent = indent.substring(taskQuotePrefix.length);
+    const taskIndentLength = this.getIndentLength(taskWhitespaceIndent);
 
-    const parents: Task[] = [];
-    let currentIndent = indent;
-    let currentIndentLength = this.getIndentLength(indent);
-
-    for (let i = tasksInFile.length - 1; i >= 0; i--) {
-      const potentialParent = tasksInFile[i];
-
-      const parentIndent = potentialParent.indent;
-      const parentQuotePrefix = parentIndent.match(/^(>\s*)+/)?.[0] ?? '';
-      const taskQuotePrefix = currentIndent.match(/^(>\s*)+/)?.[0] ?? '';
-
-      if (parentQuotePrefix !== taskQuotePrefix) {
-        continue;
-      }
-
-      const parentWhitespaceIndent = parentIndent.substring(
-        parentQuotePrefix.length,
-      );
-      const parentIndentLength = this.getIndentLength(parentWhitespaceIndent);
-
-      const parentHasCheckbox = CHECKBOX_DETECTION_REGEX.test(
-        potentialParent.rawText,
-      );
-
-      let isParent = false;
-      if (parentHasCheckbox) {
-        isParent = currentIndentLength > parentIndentLength;
-      } else {
-        isParent = currentIndentLength >= parentIndentLength;
-      }
-
-      if (isParent) {
-        parents.push(potentialParent);
-
-        if (this.getIndentLength(parentWhitespaceIndent) === 0) {
-          break;
+    return this._tasks
+      .filter((candidate) => {
+        if (candidate.path !== filePath || candidate.line >= line) return false;
+        if (!candidate.subtaskSpan) return false;
+        if (
+          line < candidate.subtaskSpan.start ||
+          line > candidate.subtaskSpan.end
+        ) {
+          return false;
         }
 
-        currentIndent = parentIndent;
-        currentIndentLength = parentIndentLength;
-      }
-    }
+        const parentQuotePrefix = candidate.indent.match(/^(>\s*)+/)?.[0] ?? '';
+        if (this.getQuoteLevel(candidate.indent) !== taskQuoteLevel) {
+          return false;
+        }
 
-    return parents;
+        const parentIndentLength = this.getIndentLength(
+          candidate.indent.substring(parentQuotePrefix.length),
+        );
+        const parentHasCheckbox = CHECKBOX_DETECTION_REGEX.test(
+          candidate.rawText,
+        );
+
+        return parentHasCheckbox
+          ? taskIndentLength > parentIndentLength
+          : taskIndentLength >= parentIndentLength;
+      })
+      .sort((a, b) => b.line - a.line);
   }
 
   /**

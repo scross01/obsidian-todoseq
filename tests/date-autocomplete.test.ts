@@ -6,7 +6,11 @@ import {
   DateAutocompleteExtension,
   dateAutocompleteExtension,
 } from '../src/view/editor-extensions/date-autocomplete';
-import { createBaseSettings } from './helpers/test-helper';
+import {
+  createBaseSettings,
+  createTestKeywordManager,
+} from './helpers/test-helper';
+import { KeywordManager } from '../src/utils/keyword-manager';
 
 function createMockView(
   docLines: string[],
@@ -346,5 +350,59 @@ describe('DateAutocompleteExtension', () => {
       const result = dateAutocompleteExtension(settings);
       expect(result).toBeDefined();
     });
+  });
+});
+
+describe('DateAutocompleteExtension task context', () => {
+  const settings = createBaseSettings();
+
+  function contextExtension(manager: () => KeywordManager) {
+    return new DateAutocompleteExtension(settings, manager) as any;
+  }
+
+  function viewFor(line: string) {
+    return createMockView([line, ''], 1, 0);
+  }
+
+  it('accepts every state the current KeywordManager knows', () => {
+    const manager = createTestKeywordManager(settings);
+    const ext = contextExtension(() => manager);
+    for (const state of manager.getAllKeywords()) {
+      expect(ext.checkLineContext(viewFor(`- [ ] ${state} task`), 2)).toBe(
+        true,
+      );
+    }
+  });
+
+  it('recognises previously omitted built-in states explicitly', () => {
+    const manager = createTestKeywordManager(settings);
+    const ext = contextExtension(() => manager);
+    const keywords = manager.getAllKeywords();
+    const omitted = ['NOW', 'WAITING', 'WAIT', 'LATER'].filter((state) =>
+      keywords.includes(state),
+    );
+    expect(omitted.length).toBeGreaterThan(0);
+    for (const state of omitted) {
+      expect(ext.checkLineContext(viewFor(`${state} task`), 2)).toBe(true);
+    }
+  });
+
+  it('rejects prose that merely contains a keyword', () => {
+    const ext = contextExtension(() => createTestKeywordManager(settings));
+    expect(ext.checkLineContext(viewFor('I will TODO this later'), 2)).toBe(
+      false,
+    );
+    expect(ext.checkLineContext(viewFor('TODOish prose'), 2)).toBe(false);
+  });
+
+  it('uses the live keyword manager after settings change', () => {
+    let manager = createTestKeywordManager(settings);
+    const ext = contextExtension(() => manager);
+    expect(ext.checkLineContext(viewFor('ZZZ custom task'), 2)).toBe(false);
+
+    manager = new KeywordManager(
+      createBaseSettings({ additionalInactiveKeywords: ['ZZZ'] }),
+    );
+    expect(ext.checkLineContext(viewFor('ZZZ custom task'), 2)).toBe(true);
   });
 });

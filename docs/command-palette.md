@@ -82,15 +82,15 @@ After using the command:
 
 ### Copy task to today
 
-Copy the task at the current cursor position to today's daily note while keeping the original task in place. This command requires the Daily Notes core plugin to be enabled.
+Copy the task at the current cursor position to today's daily note while keeping the original task in place. This command requires an enabled daily-note provider (the Daily Notes core plugin, or Periodic Notes' daily note). When no provider is enabled the command is unavailable and no note is created.
 
 ### Move task to today
 
-Move the task at the current cursor position to today's daily note, removing it from its original location. This command requires the Daily Notes core plugin to be enabled.
+Move the task at the current cursor position to today's daily note, removing it from its original location. This command requires an enabled daily-note provider (the Daily Notes core plugin, or Periodic Notes' daily note). When no provider is enabled the command is unavailable and no note is created.
 
 ### Migrate task to today
 
-Copy the task at the current cursor position to today's daily note and update the original task with a custom state keyword. The keyword used is configured in settings (see [Migrated state keyword](settings.md#migrated-state-keyword)). This command requires both the Daily Notes core plugin to be enabled and a migrated state keyword to be configured.
+Copy the task at the current cursor position to today's daily note and update the original task with a custom state keyword. The keyword used is configured in settings (see [Migrated state keyword](settings.md#migrated-state-keyword)). This command requires an enabled daily-note provider (Daily Notes or Periodic Notes' daily note) and a configured migrated state keyword.
 
 ### Add scheduled date
 

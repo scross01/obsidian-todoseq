@@ -15,6 +15,7 @@ import {
 } from './helpers/test-helper';
 import { Task } from '../src/types/task';
 import { createSavedSearch } from '../src/services/saved-search-manager';
+import { Search } from '../src/search/search';
 
 // Mock obsidian
 jest.mock('obsidian', () => ({
@@ -98,9 +99,15 @@ jest.mock('../src/view/task-list/task-item-renderer', () => ({
       li.setAttribute('data-path', task.path);
       li.setAttribute('data-line', String(task.line));
       li.classList.add('todoseq-task-item');
+      li.textContent = task.text;
       return li;
     }),
-    updateTaskElementContent: jest.fn(),
+    updateTaskElementContent: jest
+      .fn()
+      .mockImplementation((task: Task, element: HTMLElement) => {
+        element.textContent = task.text;
+        element.setAttribute('data-raw-text', task.rawText);
+      }),
     renderTaskTextWithLinks: jest.fn(),
   })),
 }));
@@ -1462,5 +1469,265 @@ describe('TaskListView', () => {
 
       expect(registered).toEqual([view['backgroundContextMenuHandler']]);
     });
+  });
+});
+
+describe('task list lazy rows and search completion', () => {
+  interface SearchModuleMock {
+    filterTasks?: jest.Mock;
+    evaluate: jest.Mock;
+    getError: jest.Mock;
+  }
+
+  interface Deferred<T> {
+    promise: Promise<T>;
+    resolve: (value: T) => void;
+    reject: (reason: unknown) => void;
+  }
+
+  const searchMock = Search as unknown as SearchModuleMock;
+
+  function tick(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  function deferred<T>(): Deferred<T> {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  function makeTasks(count: number): Task[] {
+    return Array.from({ length: count }, (_, index) =>
+      createBaseTask({
+        path: `note${index}.md`,
+        line: 0,
+        text: `Task ${index}`,
+        rawText: `TODO Task ${index}`,
+      }),
+    );
+  }
+
+  function createViewInstance(tasks: Task[]): TaskListView {
+    const taskStateManager = {
+      getTasks: () => tasks,
+      subscribe: jest.fn().mockReturnValue(jest.fn()),
+      findTaskByPathAndLine: jest.fn(),
+      getKeywordManager: jest.fn().mockReturnValue({}),
+    };
+    const plugin = {
+      settings: createBaseSettings(),
+      saveSettings: jest.fn().mockResolvedValue(undefined),
+      app: {
+        workspace: { getLeavesOfType: jest.fn().mockReturnValue([]) },
+        vault: { getAbstractFileByPath: jest.fn().mockReturnValue(null) },
+      },
+      taskUpdateCoordinator: {
+        updateTaskState: jest.fn().mockResolvedValue(undefined),
+      },
+      keywordManager: {},
+      taskStateManager,
+      propertySearchEngine: null,
+    };
+    const view = new TaskListView(
+      {} as never,
+      taskStateManager as never,
+      'showAll' as TaskListViewMode,
+      plugin as never,
+      {} as never,
+    );
+    view.updateTasks(tasks);
+    return view;
+  }
+
+  function mount(view: TaskListView): {
+    listContainer: HTMLElement;
+    countEl: HTMLElement;
+  } {
+    const container = view['contentEl'];
+    activeDocument.body.appendChild(container);
+    const listContainer = activeDocument.createElement('div');
+    listContainer.className = 'todoseq-task-list-container';
+    container.appendChild(listContainer);
+    view['taskListContainer'] = listContainer;
+    const countEl = activeDocument.createElement('div');
+    countEl.className = 'search-results-result-count';
+    container.appendChild(countEl);
+    return { listContainer, countEl };
+  }
+
+  function taskRows(listContainer: HTMLElement): HTMLElement[] {
+    return Array.from(
+      listContainer.querySelectorAll('li.todoseq-task-item'),
+    ) as HTMLElement[];
+  }
+
+  afterEach(() => {
+    delete searchMock.filterTasks;
+    jest.clearAllMocks();
+  });
+
+  it('patches a cached row beyond the first batch before showing it again', async () => {
+    const tasks = makeTasks(60);
+    const view = createViewInstance(tasks);
+    const { listContainer } = mount(view);
+
+    await view.refreshVisibleList();
+    await view['loadMoreTasks']();
+    expect(taskRows(listContainer)).toHaveLength(60);
+
+    // The edited task is beyond the first batch: its cached element was
+    // detached by this refresh but is reused when the user scrolls again.
+    const edited = tasks.map((task, index) =>
+      index === 55
+        ? createBaseTask({
+            path: task.path,
+            line: 0,
+            text: 'Edited task 55',
+            rawText: 'TODO Edited task 55',
+          })
+        : task,
+    );
+    view.updateTasks(edited);
+    await view.refreshVisibleList();
+    await view['loadMoreTasks']();
+
+    const row = listContainer.querySelector('li[data-path="note55.md"]');
+    expect(row?.textContent).toBe('Edited task 55');
+    expect(row?.getAttribute('data-raw-text')).toBe('TODO Edited task 55');
+  });
+
+  it('resets pagination on a zero-result query so an old scroll load appends nothing', async () => {
+    const tasks = makeTasks(60);
+    const view = createViewInstance(tasks);
+    const { listContainer } = mount(view);
+    await view.refreshVisibleList();
+
+    searchMock.filterTasks = jest.fn().mockResolvedValue([]);
+    view['setSearchQuery']('nothing-matches');
+    await view.refreshVisibleList();
+    expect(taskRows(listContainer)).toHaveLength(0);
+
+    // A scroll callback captured before the empty query must not append the
+    // previous query's second batch under the empty-state message.
+    await view['loadMoreTasks']();
+
+    expect(taskRows(listContainer)).toHaveLength(0);
+    expect(
+      listContainer.querySelectorAll('ul.todoseq-task-list li'),
+    ).toHaveLength(0);
+  });
+
+  it('keeps the newest rows, count and error when an older search settles late', async () => {
+    const tasks = makeTasks(60);
+    const view = createViewInstance(tasks);
+    const { listContainer, countEl } = mount(view);
+    await view.refreshVisibleList();
+
+    const older = deferred<Task[]>();
+    const newer = deferred<Task[]>();
+    searchMock.filterTasks = jest
+      .fn()
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(newer.promise);
+
+    view['setSearchQuery']('older');
+    const olderRefresh = view.refreshVisibleList();
+    await tick();
+    view['setSearchQuery']('newer');
+    const newerRefresh = view.refreshVisibleList();
+    await tick();
+
+    newer.resolve(tasks.slice(0, 2));
+    await newerRefresh;
+    older.resolve([]);
+    await olderRefresh;
+
+    expect(taskRows(listContainer)).toHaveLength(2);
+    expect(taskRows(listContainer)[0].textContent).toBe('Task 0');
+    expect(countEl.textContent).toBe('2 of 60 tasks');
+    expect(
+      view['contentEl'].querySelector('.search-error-container'),
+    ).toBeNull();
+  });
+
+  it('does not let an older rejected search replace a newer result', async () => {
+    const tasks = makeTasks(60);
+    const view = createViewInstance(tasks);
+    const { listContainer, countEl } = mount(view);
+    await view.refreshVisibleList();
+
+    const older = deferred<Task[]>();
+    const newer = deferred<Task[]>();
+    searchMock.filterTasks = jest
+      .fn()
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(newer.promise);
+
+    view['setSearchQuery']('older');
+    const olderRefresh = view.refreshVisibleList();
+    await tick();
+    view['setSearchQuery']('newer');
+    const newerRefresh = view.refreshVisibleList();
+    await tick();
+
+    newer.resolve(tasks.slice(0, 3));
+    await newerRefresh;
+    older.reject(new Error('bad query'));
+    await olderRefresh;
+
+    expect(taskRows(listContainer)).toHaveLength(3);
+    expect(countEl.textContent).toBe('3 of 60 tasks');
+    expect(
+      view['contentEl'].querySelector('.search-error-container'),
+    ).toBeNull();
+  });
+
+  it('mutates nothing when a search settles after the view closed', async () => {
+    const tasks = makeTasks(2);
+    const view = createViewInstance(tasks);
+    const { listContainer, countEl } = mount(view);
+    await view.refreshVisibleList();
+    expect(taskRows(listContainer)).toHaveLength(2);
+
+    const pending = deferred<Task[]>();
+    searchMock.filterTasks = jest.fn().mockReturnValue(pending.promise);
+    view['setSearchQuery']('slow query');
+    const refresh = view.refreshVisibleList();
+    await tick();
+
+    await view.onClose();
+    pending.resolve([]);
+    await refresh;
+
+    expect(taskRows(listContainer)).toHaveLength(2);
+    expect(countEl.textContent).toBe('2 of 2 tasks');
+    expect(view['contentEl'].querySelector('.todoseq-panel-empty')).toBeNull();
+  });
+
+  it('does not show a closed view a late search failure', async () => {
+    const tasks = makeTasks(2);
+    const view = createViewInstance(tasks);
+    const { countEl } = mount(view);
+    await view.refreshVisibleList();
+
+    const pending = deferred<Task[]>();
+    searchMock.filterTasks = jest.fn().mockReturnValue(pending.promise);
+    view['setSearchQuery']('slow query');
+    const refresh = view.refreshVisibleList();
+    await tick();
+
+    await view.onClose();
+    pending.reject(new Error('bad query'));
+    await refresh;
+
+    expect(
+      view['contentEl'].querySelector('.search-error-container'),
+    ).toBeNull();
+    expect(countEl.textContent).toBe('2 of 2 tasks');
   });
 });

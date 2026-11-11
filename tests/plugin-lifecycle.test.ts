@@ -174,6 +174,7 @@ jest.mock('../src/services/event-coordinator', () => ({
 jest.mock('../src/services/task-update-coordinator', () => ({
   TaskUpdateCoordinator: jest.fn().mockImplementation(function () {
     this.updateTaskByPath = jest.fn().mockResolvedValue(undefined);
+    this.destroy = jest.fn();
   }),
 }));
 
@@ -373,6 +374,39 @@ describe('PluginLifecycleManager', () => {
       await lifecycleManager.onunload();
 
       expect(eventCoordinatorMock.destroy).toHaveBeenCalled();
+    });
+
+    it('destroys and clears the task update coordinator before async teardown', async () => {
+      const coordinatorMock = { destroy: jest.fn() };
+      (pluginMock as any).taskUpdateCoordinator = coordinatorMock;
+      let resolveDestroy: () => void = () => undefined;
+      const eventCoordinatorMock = {
+        destroy: jest.fn(
+          () =>
+            new Promise<void>((resolve) => {
+              resolveDestroy = resolve;
+            }),
+        ),
+      };
+      (lifecycleManager as any).eventCoordinator = eventCoordinatorMock;
+
+      const unload = lifecycleManager.onunload();
+
+      expect(coordinatorMock.destroy).toHaveBeenCalledTimes(1);
+      expect((pluginMock as any).taskUpdateCoordinator).toBeNull();
+
+      resolveDestroy();
+      await unload;
+    });
+
+    it('destroys the coordinator only once across repeated unloads', async () => {
+      const coordinatorMock = { destroy: jest.fn() };
+      (pluginMock as any).taskUpdateCoordinator = coordinatorMock;
+
+      await lifecycleManager.onunload();
+      await lifecycleManager.onunload();
+
+      expect(coordinatorMock.destroy).toHaveBeenCalledTimes(1);
     });
 
     it('should destroy vault scanner', async () => {

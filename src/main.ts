@@ -387,6 +387,12 @@ export default class TodoTracker extends Plugin {
     if (this.embeddedTaskListProcessor) {
       this.embeddedTaskListProcessor.refreshAllEmbeddedTaskLists();
     }
+
+    // Dashboard cards answer property queries too, so a property-index
+    // notification must reach them as well.
+    if (this.dashboardProcessor) {
+      this.dashboardProcessor.refreshAllDashboards();
+    }
   }
 
   /**

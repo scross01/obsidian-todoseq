@@ -196,6 +196,8 @@ const SEARCH_QUERIES = [
   '"search tokenizer"',
   'TODO OR DOING',
   'state:completed',
+  'state:active OR state:completed',
+  'state:waiting -DONE',
   '-DONE',
 ];
 

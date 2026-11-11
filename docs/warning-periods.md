@@ -44,7 +44,9 @@ SCHEDULED: <2026-06-10 Wed +1w --2d> # First occurrence delayed 2 days; later we
 DEADLINE: <2026-03-01 Sun +1m --1w> # First month: 1-week advance notice; later months: none
 ```
 
-The `-Nunit` form (single dash) persists across all occurrences. The `--Nunit` form is stripped after the first recurrence.
+The `-Nunit` form (single dash) persists across all occurrences. The `--Nunit` form is removed from the written date line when the task rolls to its next occurrence, so the file and the task list agree.
+
+Advancing a recurring task only rewrites the date that repeats. A one-off SCHEDULED or DEADLINE on the same task is preserved untouched.
 
 ## How It Works
 

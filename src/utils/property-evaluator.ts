@@ -1,4 +1,5 @@
 import { DateUtils } from './date-utils';
+import type { PropertyQueryDescriptor } from '../search/search-types';
 
 /**
  * Utility class for evaluating property values in search queries.
@@ -6,6 +7,98 @@ import { DateUtils } from './date-utils';
  * previously duplicated between PropertySearchEngine and SearchEvaluator.
  */
 export class PropertyEvaluator {
+  /** Frontmatter keys selected by a filter key, honouring quoted-key exactness. */
+  static matchingKeys(
+    frontmatter: Record<string, unknown>,
+    descriptor: PropertyQueryDescriptor,
+    caseSensitive: boolean,
+  ): string[] {
+    if (descriptor.keyExact || caseSensitive) {
+      return Object.prototype.hasOwnProperty.call(frontmatter, descriptor.key)
+        ? [descriptor.key]
+        : [];
+    }
+    const lowerKey = descriptor.key.toLowerCase();
+    return Object.keys(frontmatter).filter(
+      (key) => key.toLowerCase() === lowerKey,
+    );
+  }
+
+  /** True when a scalar or array element satisfies the filter value. */
+  static matchesPropertyValue(
+    value: unknown,
+    descriptor: PropertyQueryDescriptor,
+    caseSensitive: boolean,
+  ): boolean {
+    if (descriptor.kind === 'existence') return true;
+    if (descriptor.kind === 'null') return value === null;
+    // A literal null is presence-only; it must not match text through the
+    // "[object Null]" coercion used for plain objects below.
+    if (value === null) return false;
+
+    const search = descriptor.value;
+    if (descriptor.exact) {
+      if (typeof value === 'string') return value === search;
+      if (
+        typeof value === 'number' ||
+        typeof value === 'boolean' ||
+        (typeof value === 'object' && value !== null)
+      ) {
+        const text =
+          value instanceof Date
+            ? value.toISOString()
+            : String(Object.prototype.toString.call(value));
+        return text === search;
+      }
+      return false;
+    }
+
+    if (typeof value === 'string') {
+      return caseSensitive
+        ? value.includes(search)
+        : value.toLowerCase().includes(search.toLowerCase());
+    }
+    if (typeof value === 'number') {
+      const numeric = Number(search);
+      return !isNaN(numeric) && value === numeric;
+    }
+    if (typeof value === 'boolean') {
+      return String(value) === search.toLowerCase();
+    }
+
+    // Objects keep the established "[object Object]" contract.
+    const text =
+      value instanceof Date
+        ? value.toISOString()
+        : String(Object.prototype.toString.call(value));
+    return caseSensitive
+      ? text.includes(search)
+      : text.toLowerCase().includes(search.toLowerCase());
+  }
+
+  /**
+   * Evaluate a structured property filter against one frontmatter object.
+   * Shared by the indexed engine and the metadata-cache fallback so both
+   * paths keep presence, null, empty string and quoted exactness distinct.
+   */
+  static matchesPropertyFilter(
+    frontmatter: Record<string, unknown>,
+    descriptor: PropertyQueryDescriptor,
+    caseSensitive: boolean,
+  ): boolean {
+    const keys = this.matchingKeys(frontmatter, descriptor, caseSensitive);
+    if (keys.length === 0) return false;
+    if (descriptor.kind === 'existence') return true;
+
+    return keys.some((key) => {
+      const value = frontmatter[key];
+      const values = Array.isArray(value) ? value : [value];
+      return values.some((item) =>
+        this.matchesPropertyValue(item, descriptor, caseSensitive),
+      );
+    });
+  }
+
   /**
    * Parse a property value as a date
    * Handles Date instances, strings, and objects with date property

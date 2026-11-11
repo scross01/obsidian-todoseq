@@ -1,4 +1,8 @@
-import { MarkdownPostProcessorContext, Notice } from 'obsidian';
+import {
+  MarkdownPostProcessorContext,
+  MarkdownRenderChild,
+  Notice,
+} from 'obsidian';
 import TodoTracker from '../../main';
 import { VaultScanner } from '../../services/vault-scanner';
 import { DashboardAggregator } from './aggregation';
@@ -36,6 +40,7 @@ interface TrackedDashboard {
   params: DashboardParameters | null;
   contentRoot: HTMLElement | null;
   callbacks: DashboardCallbacks;
+  refreshGeneration: number;
 }
 
 const DASHBOARD_REFRESH_DEBOUNCE_MS = 150;
@@ -46,6 +51,7 @@ export class DashboardCodeBlockProcessor {
   private aggregator: DashboardAggregator;
   private unsubscribeFromStateManager: (() => void) | null = null;
   private activeDashboards: Map<string, TrackedDashboard> = new Map();
+  private refreshTimeout: number | null = null;
 
   constructor(plugin: TodoTracker) {
     this.plugin = plugin;
@@ -54,13 +60,12 @@ export class DashboardCodeBlockProcessor {
 
     // Subscribe to task state changes (single source of truth). Debounced to
     // prevent excessive re-aggregation during rapid changes.
-    let refreshTimeout: number | null = null;
     this.unsubscribeFromStateManager = plugin.taskStateManager.subscribe(() => {
-      if (refreshTimeout !== null) {
-        window.clearTimeout(refreshTimeout);
+      if (this.refreshTimeout !== null) {
+        window.clearTimeout(this.refreshTimeout);
       }
-      refreshTimeout = window.setTimeout(() => {
-        refreshTimeout = null;
+      this.refreshTimeout = window.setTimeout(() => {
+        this.refreshTimeout = null;
         this.refreshAllDashboards();
       }, DASHBOARD_REFRESH_DEBOUNCE_MS);
     });
@@ -117,15 +122,47 @@ export class DashboardCodeBlockProcessor {
     );
   }
 
+  /** Register this render with Obsidian's Markdown render lifetime. */
+  private registerRenderChild(
+    ctx: MarkdownPostProcessorContext,
+    el: HTMLElement,
+    onDispose: () => void,
+  ): { disposed: boolean } {
+    const lifetime = { disposed: false };
+    const RenderChild = MarkdownRenderChild as unknown;
+    if (
+      typeof RenderChild !== 'function' ||
+      typeof ctx.addChild !== 'function'
+    ) {
+      return lifetime;
+    }
+    const child = new (
+      RenderChild as new (containerEl: HTMLElement) => MarkdownRenderChild
+    )(el);
+    child.onunload = () => {
+      lifetime.disposed = true;
+      onDispose();
+    };
+    ctx.addChild(child);
+    return lifetime;
+  }
+
   private async processCodeBlock(
     source: string,
     el: HTMLElement,
     ctx: MarkdownPostProcessorContext,
   ): Promise<void> {
+    const containerId = `todoseq-dashboard-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    const lifetime = this.registerRenderChild(ctx, el, () => {
+      this.activeDashboards.delete(containerId);
+    });
     let params: DashboardParameters | null = null;
     try {
       params = TodoseqDashboardParser.parse(source);
 
+      if (lifetime.disposed) return;
       if (params.error) {
         this.renderer.renderError(el, params, params.error);
         return;
@@ -134,9 +171,8 @@ export class DashboardCodeBlockProcessor {
       const allTasks = this.filterArchivedTasks(this.plugin.getTasks());
       const result = await this.aggregator.aggregate(allTasks, params);
 
-      const containerId = `todoseq-dashboard-${Math.random()
-        .toString(36)
-        .slice(2, 8)}`;
+      if (lifetime.disposed) return;
+
       el.id = containerId;
 
       const callbacks: DashboardCallbacks = {
@@ -157,8 +193,10 @@ export class DashboardCodeBlockProcessor {
         params,
         contentRoot,
         callbacks,
+        refreshGeneration: 0,
       });
     } catch (error: unknown) {
+      if (lifetime.disposed) return;
       console.error('Error processing TODOseq dashboard block:', error);
       const message = error instanceof Error ? error.message : String(error);
       this.renderer.renderError(
@@ -193,14 +231,31 @@ export class DashboardCodeBlockProcessor {
    */
   refreshAllDashboards(): void {
     this.aggregator.invalidateCache();
-    this.activeDashboards.forEach((dashboard) => {
-      void this.refreshDashboard(dashboard);
+    this.activeDashboards.forEach((dashboard, containerId) => {
+      void this.refreshDashboard(containerId, dashboard);
     });
   }
 
-  private async refreshDashboard(dashboard: TrackedDashboard): Promise<void> {
+  /** Only the newest refresh of a still-tracked dashboard may render. */
+  private isCurrent(
+    containerId: string,
+    dashboard: TrackedDashboard,
+    generation: number,
+  ): boolean {
+    return (
+      this.activeDashboards.get(containerId) === dashboard &&
+      dashboard.refreshGeneration === generation
+    );
+  }
+
+  private async refreshDashboard(
+    containerId: string,
+    dashboard: TrackedDashboard,
+  ): Promise<void> {
+    const generation = ++dashboard.refreshGeneration;
     try {
       const params = TodoseqDashboardParser.parse(dashboard.source);
+      if (!this.isCurrent(containerId, dashboard, generation)) return;
       if (params.error) {
         // renderError empties the host, so the cached contentRoot is now
         // detached. Drop it, or the next refresh takes the "patch in place"
@@ -216,6 +271,8 @@ export class DashboardCodeBlockProcessor {
         this.filterArchivedTasks(this.plugin.getTasks()),
         params,
       );
+
+      if (!this.isCurrent(containerId, dashboard, generation)) return;
 
       if (dashboard.contentRoot) {
         this.renderer.updateContent(
@@ -235,6 +292,7 @@ export class DashboardCodeBlockProcessor {
         );
       }
     } catch (error: unknown) {
+      if (!this.isCurrent(containerId, dashboard, generation)) return;
       console.error('Error refreshing TODOseq dashboard block:', error);
       const message = error instanceof Error ? error.message : String(error);
       // Same detachment as the parse-error path: the error UI replaced the
@@ -282,6 +340,10 @@ export class DashboardCodeBlockProcessor {
 
   /** Clean up resources when plugin unloads. */
   cleanup(): void {
+    if (this.refreshTimeout !== null) {
+      window.clearTimeout(this.refreshTimeout);
+      this.refreshTimeout = null;
+    }
     if (this.unsubscribeFromStateManager) {
       this.unsubscribeFromStateManager();
       this.unsubscribeFromStateManager = null;

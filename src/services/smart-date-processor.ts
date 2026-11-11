@@ -17,7 +17,6 @@ import {
 import { Task } from '../types/task';
 import { formatOrgDate } from '../utils/task-format';
 import {
-  getDateLineIndent,
   parseTableCells,
   isSeparatorCell,
   getCellTaskLine,
@@ -364,6 +363,7 @@ export class SmartDateProcessor {
       return [];
     }
 
+    const parser = this.plugin.getVaultScanner()?.getParser();
     const result: { lineNumber: number; type: InlineDateType }[] = [];
 
     for (let i = 1; ; i++) {
@@ -382,6 +382,16 @@ export class SmartDateProcessor {
 
       if (nextLineTrimmed.startsWith('DEADLINE:')) {
         result.push({ lineNumber: nextLineNum, type: 'DEADLINE' });
+        continue;
+      }
+
+      // Supported metadata between date lines is traversed, not a boundary:
+      // STARTED/CLOSED/DESCRIPTION may sit above an existing SCHEDULED or
+      // DEADLINE. Anything else (including the next task) ends the scan.
+      if (
+        /^(STARTED|CLOSED|DESCRIPTION):/.test(nextLineTrimmed) &&
+        !parser?.isTaskLine(nextLineTrimmed)
+      ) {
         continue;
       }
 
@@ -515,62 +525,25 @@ export class SmartDateProcessor {
     replaceLineNumber: number | null = null,
     triggerSource: ConversionTrigger = 'debounce',
   ): boolean {
-    const { state: docState } = editorView;
-
-    if (lineNumber < 1 || lineNumber > docState.doc.lines) return false;
-    const taskLine = docState.doc.line(lineNumber);
+    const writer = this.plugin.taskEditor;
+    if (!writer) return false;
 
     const mdView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    const effectiveIndent =
-      (mdView?.editor as { cm?: EditorView })?.cm === editorView
-        ? getDateLineIndent(task)
-        : '';
-    const dateLine = `${effectiveIndent}${dateType}: ${dateStr}`;
-    const newContent = [updatedTaskLine, dateLine].join('\n');
+    if (!mdView?.file?.path) return false;
 
-    if (replaceLineNumber !== null) {
-      if (replaceLineNumber < 1 || replaceLineNumber > docState.doc.lines)
-        return false;
-      const existingDateLine = docState.doc.line(replaceLineNumber);
-      if (triggerSource === 'cursorLeave') {
-        // Cursor has already moved naturally (Up/Left/click). Just insert
-        // the date line and leave the cursor where the user moved it.
-        editorView.dispatch({
-          changes: {
-            from: taskLine.from,
-            to: existingDateLine.to,
-            insert: newContent,
-          },
-        });
-      } else {
-        // Debounce trigger (Enter/Down/Right): move cursor to end of date line.
-        const cursorInNewDoc =
-          taskLine.from + updatedTaskLine.length + 1 + dateLine.length;
-        editorView.dispatch({
-          changes: {
-            from: taskLine.from,
-            to: existingDateLine.to,
-            insert: newContent,
-          },
-          selection: { anchor: cursorInNewDoc, head: cursorInNewDoc },
-        });
-      }
-    } else {
-      if (triggerSource === 'cursorLeave') {
-        editorView.dispatch({
-          changes: { from: taskLine.from, to: taskLine.to, insert: newContent },
-        });
-      } else {
-        const cursorInNewDoc =
-          taskLine.from + updatedTaskLine.length + 1 + dateLine.length;
-        editorView.dispatch({
-          changes: { from: taskLine.from, to: taskLine.to, insert: newContent },
-          selection: { anchor: cursorInNewDoc, head: cursorInNewDoc },
-        });
-      }
-    }
-
-    return true;
+    return writer.applySmartDateEdit(
+      {
+        filePath: mdView.file.path,
+        lineNumber,
+        expectedTaskText: editorView.state.doc.line(lineNumber).text,
+        updatedTaskText: updatedTaskLine,
+        dateLines: [{ type: dateType, dateText: dateStr }],
+        replaceLineNumber,
+        triggerSource,
+      },
+      task,
+      editorView,
+    );
   }
 
   /**
@@ -596,21 +569,25 @@ export class SmartDateProcessor {
 
     const updatedTaskLine = this.removeInlineDatesFromText(lineText, dates);
 
-    const insertLines = [updatedTaskLine];
-    for (const dateInfo of dates) {
-      const indent = getDateLineIndent(task);
-      insertLines.push(`${indent}${dateInfo.type}: ${dateInfo.dateStr}`);
-    }
+    const writer = this.plugin.taskEditor;
+    if (!writer || !mdView?.file?.path) return false;
 
-    editorView.dispatch({
-      changes: {
-        from: line.from,
-        to: line.to,
-        insert: insertLines.join('\n'),
+    return writer.applySmartDateEdit(
+      {
+        filePath: mdView.file.path,
+        lineNumber,
+        expectedTaskText: line.text,
+        updatedTaskText: updatedTaskLine,
+        dateLines: dates.map((dateInfo) => ({
+          type: dateInfo.type,
+          dateText: dateInfo.dateStr,
+        })),
+        replaceLineNumber: null,
+        triggerSource: 'debounce',
       },
-    });
-
-    return true;
+      task,
+      editorView,
+    );
   }
 
   /**

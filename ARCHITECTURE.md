@@ -256,7 +256,7 @@ graph TB
 
 **VaultScanner** (`src/services/vault-scanner.ts`)
 
-- **Responsibility**: File system monitoring, incremental scanning, owns KeywordManager
+- **Responsibility**: File system monitoring, incremental scanning, owns KeywordManager. Publication is generation-aware: an active full scan journals paths whose state changed while it ran (incremental update, delete, rename, plugin write) and, in one synchronous tail before each partial/final `setTasks`, replaces its older snapshot for those paths with the current central state. Clean paths keep their scan result; no extra parse or clone happens in the tail.
 - **Key Patterns**: Event-driven architecture, performance optimization, yielding to event loop
 - **Interface**: `scanVault()`, `updateSettings()`, `getKeywordManager()`, `getParserRegistry()`, `getParser()`, plus inherited `on/off/emit/removeAllListeners` from `EventEmitter<VaultScannerEvents>` for typed event subscription (see [EventEmitter](#eventemittert-src-utilsevent-emitterts))
 - **Ownership**: Receives and uses KeywordManager instance; receives fully configured ParserRegistry via constructor
@@ -1543,3 +1543,46 @@ The indicator uses monospace font and appears in both the main task list and emb
 6. **Editor Refresh**: Complex `requestMeasure()` + `dispatch()` + `setTimeout` sequence for decoration updates
 
 This architecture provides a robust, maintainable, and extensible foundation for task management while ensuring optimal performance and user experience through careful design patterns, performance optimizations, and a well-structured component hierarchy.
+
+## Task transfers
+
+Copy, move and migrate are owned by `TaskWriter.transferTask`. It reads the live editor buffer when a file is open, appends to the destination with an atomic vault write, and revalidates the source task identity immediately before changing it. A table cell task transfers as a plain task line; moving one clears only its cell. The panel, embedded list and drag-and-drop handler only resolve the destination and report the typed outcome — they never write task bytes.
+
+## Embedded render ownership
+
+Embedded task lists and dashboards register each render as a
+`MarkdownRenderChild` of the post-processor context, keyed by container id.
+Unloading the child removes the tracked instance and advances a per-instance
+generation, so a pending initial render or in-flight refresh becomes a no-op
+instead of painting a detached block. Refreshes carry the generation they
+started with and only the newest commits; debounce timers belong to the
+processor and are cleared by `cleanup()`. `refreshAllEmbeddedTaskLists` and
+`refreshAllDashboards` therefore touch only blocks that are still mounted.
+
+## Property index invalidation
+
+`PropertySearchEngine.processPendingUpdates` publishes one view notification after a drained, nonempty batch commits. The injected callback runs `refreshAllTaskListViews`, which refreshes the main list, embedded lists and dashboards. A disposed engine (after `destroy`) publishes nothing, and a throwing recipient is logged without stopping the batch.
+
+## Task source provenance
+
+`Task.sourceFormat` records which parser produced a task (`markdown`, `org`, `code-comment`; an absent value is treated as Markdown for older snapshots). `supportsTaskMetadata` is the single authority for whether TODOseq may write metadata lines: code comments cannot, so writers suppress automatic dates and make direct date actions no-ops while still returning the unchanged task. Org tasks emit new metadata as whitespace-indented lines below the headline, and the Org parser reads CLOSED/STARTED history back into the task.
+
+## Failed write recovery
+
+`TaskUpdateCoordinator` records a per-file write generation when a request is made and keeps the per-file queues serialized. When a write fails it asks `VaultScanner.reconcileFileAfterFailedWrite` for the file's persisted tasks; that path deliberately bypasses the failed write's skip marker and expected-change suppression, because the note is authoritative after a failure. The parsed snapshot is retained as the baseline for the next queued edit, while publication is skipped when a newer request for that file is already pending, so an older failure cannot overwrite newer optimistic intent.
+
+## Plugin teardown ownership
+
+`PluginLifecycleManager.onunload` owns the update coordinator and destroys and clears it synchronously, before awaiting `EventCoordinator.destroy`, so its repeating cleanup timer and pending recurrence timeouts stop with the plugin. `UIManager` records the exact capture-phase options it installs, clears their removal options with the same object shape, and tracks delayed editor setup in owned timer handles guarded by a disposal flag, so cleanup cancels setup instead of letting it reattach handlers.
+
+## Search grammar and validation
+
+The tokenizer treats adjacency as conjunction at `AND` binding power (80), above `OR` (60). Range lookahead is bounded to the current value token, so a later date range cannot consume an earlier prefix value; when an implicit conjunction has already grouped a date prefix, the range attaches to that last prefix filter. Top-level parsing requires every token to be consumed, and an unterminated quote raises `SearchError` instead of being skipped. `TaskListView` validates a nonblank query with `Search.getError` before filtering, so structural and closed-domain errors are displayed with no rows and are cleared on correction, while `Search.filterTasks` keeps its `SearchError` → `[]` facade for other callers.
+
+## Parsed subtask ancestry
+
+`TaskParser.extractSubtasks` records an inclusive `subtaskSpan` on a task when it counts checkbox children, in addition to the counts. `TaskStateManager` uses that parser-owned span plus checkbox and indentation qualification for both keyword-task and checkbox-only optimistic updates; it does not infer ancestry from indentation alone or invent it for snapshots without a span. `adjustLineIndices` shifts or removes span endpoints when metadata lines are inserted or deleted. Reparsing replaces the span along with the counts, so a later scan restores source truth.
+
+## Batch state-group search
+
+`Search.filterTasks` builds a per-pass batch context for the state-group aliases the query uses (`state:active`, `state:waiting`, and so on). It resolves each group once through `KeywordManager` and passes exact/lowercase keyword sets down through `filterTasksByNode`, `evaluateSync`, and `evaluateStateFilter`; rows only do set membership. Per-row `Search.evaluate` keeps the existing per-call resolution, and the context is rebuilt on every batch so settings edits and custom keywords are picked up immediately. `collectEngineResolutions` remains the separate batch seam for property-engine filters.

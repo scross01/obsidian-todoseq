@@ -1,11 +1,11 @@
-import { SearchToken } from './search-types';
+import { SearchError, SearchToken } from './search-types';
 
 // Binding power constants for Pratt parser
 const enum BP {
   NOT = 100,
   AND = 80,
   OR = 60,
-  DEFAULT = 50,
+  // Adjacency uses AND's binding power; there is no separate default.
 }
 
 export class SearchTokenizer {
@@ -68,25 +68,25 @@ export class SearchTokenizer {
           if (
             pattern.type === 'word' &&
             tokens.length > 0 &&
-            tokens[tokens.length - 1].type === 'prefix' &&
-            query.slice(pos).includes('..')
+            tokens[tokens.length - 1].type === 'prefix'
           ) {
-            // Find the position of the first ..
-            const rangePos = query.indexOf('..', pos);
-            if (rangePos !== -1) {
-              // Extract the part before .. as prefix_value
-              const prefixValue = query.slice(pos, rangePos);
-              if (prefixValue.length > 0) {
-                tokens.push({
-                  type: 'prefix_value',
-                  value: prefixValue,
-                  original: prefixValue,
-                  position: pos,
-                });
-                pos = rangePos;
-                matched = true;
-                // Now we should match the range in the next iteration
-              }
+            // Bound the lookahead to this value token. Searching the whole
+            // remainder let a later date range swallow an earlier prefix
+            // value (`state:TODO scheduled:2026-01-01..2026-12-31`).
+            const valuePattern = /[^\s"()]+/y;
+            valuePattern.lastIndex = pos;
+            const valueMatch = valuePattern.exec(query);
+            const rangePos = valueMatch ? valueMatch[0].indexOf('..') : -1;
+            if (valueMatch && rangePos > 0) {
+              const prefixValue = valueMatch[0].slice(0, rangePos);
+              tokens.push({
+                type: 'prefix_value',
+                value: prefixValue,
+                original: prefixValue,
+                position: pos,
+              });
+              pos += rangePos;
+              matched = true;
               break;
             }
           }
@@ -169,8 +169,12 @@ export class SearchTokenizer {
         }
       }
 
-      // If no pattern matched, skip character (error handling)
+      // If no pattern matched, reject an unterminated quote rather than
+      // silently dropping it and searching for the remaining text.
       if (!matched) {
+        if (query[pos] === '"') {
+          throw new SearchError('Unterminated quoted string');
+        }
         pos++;
       }
     }
@@ -283,21 +287,21 @@ export class SearchTokenizer {
       case 'or':
         return BP.OR;
       case 'range':
-        return BP.DEFAULT;
+        return BP.AND;
       case 'prefix':
-        return BP.DEFAULT;
+        return BP.AND;
       case 'prefix_value':
-        return BP.DEFAULT;
+        return BP.AND;
       case 'prefix_value_quoted':
-        return BP.DEFAULT;
+        return BP.AND;
       case 'property':
-        return BP.DEFAULT;
+        return BP.AND;
       case 'word':
-        return BP.DEFAULT;
+        return BP.AND;
       case 'phrase':
-        return BP.DEFAULT;
+        return BP.AND;
       default:
-        return BP.DEFAULT;
+        return BP.AND;
     }
   }
 }
