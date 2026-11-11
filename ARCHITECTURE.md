@@ -1578,3 +1578,7 @@ processor and are cleared by `cleanup()`. `refreshAllEmbeddedTaskLists` and
 ## Search grammar and validation
 
 The tokenizer treats adjacency as conjunction at `AND` binding power (80), above `OR` (60). Range lookahead is bounded to the current value token, so a later date range cannot consume an earlier prefix value; when an implicit conjunction has already grouped a date prefix, the range attaches to that last prefix filter. Top-level parsing requires every token to be consumed, and an unterminated quote raises `SearchError` instead of being skipped. `TaskListView` validates a nonblank query with `Search.getError` before filtering, so structural and closed-domain errors are displayed with no rows and are cleared on correction, while `Search.filterTasks` keeps its `SearchError` → `[]` facade for other callers.
+
+## Parsed subtask ancestry
+
+`TaskParser.extractSubtasks` records an inclusive `subtaskSpan` on a task when it counts checkbox children, in addition to the counts. `TaskStateManager` uses that parser-owned span plus checkbox and indentation qualification for both keyword-task and checkbox-only optimistic updates; it does not infer ancestry from indentation alone or invent it for snapshots without a span. `adjustLineIndices` shifts or removes span endpoints when metadata lines are inserted or deleted. Reparsing replaces the span along with the counts, so a later scan restores source truth.

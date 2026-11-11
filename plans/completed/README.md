@@ -398,6 +398,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — one shared local calendar-day distance drives relative labels and row status classes, so 23/25-hour days no longer shift labels. Toronto, UTC and Tokyo runs green; 175 suites / 5,549 tests, build and lint green.
 - **File**: [073-calendar-day-labels.md](073-calendar-day-labels.md)
 
+### Plan 074
+
+- **Title**: Make optimistic subtask counts follow parsed task boundaries
+- **Meta**: priority P2 · effort M · depends on —
+- **Record**: DONE (2026-11-11) — optimistic progress now uses parser-owned spans and never treats plain siblings or legacy snapshots as children; unit tests red 6 failed → green 75 passed across the affected suites; host Playwright case not run
+- **File**: [074-parser-consistent-ancestry.md](074-parser-consistent-ancestry.md)
+
 ### Plan 076
 
 - **Title**: Apply block inclusion settings before collecting numeric footnote tasks

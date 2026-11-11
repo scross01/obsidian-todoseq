@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed completing an unrelated plain task incrementing a preceding task's subtask count; optimistic progress now follows the checkbox children the parser actually counted and stays in agreement with a rescan.
 - Fixed combined searches mixing states and date ranges, implicit `AND` grouping around `OR`, and invalid queries such as a stray `)` or unclosed quote being silently accepted; the Task List now shows the validation error and clears it when corrected.
 - Fixed property searches missing partial and differently-cased values, treating empty arrays or null as a missing key, and confusing an exact empty string with a key-only filter.
 - Fixed disabling or reloading the plugin leaving its task update timers and right-click task handlers behind; editor interactions and pending delayed setup now stop with the plugin.

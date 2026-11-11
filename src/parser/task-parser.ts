@@ -1031,9 +1031,15 @@ export class TaskParser implements ITaskParser {
     indent: string,
     parentHasCheckbox: boolean,
     processedLines: Set<number>,
-  ): { subtaskCount: number; subtaskCompletedCount: number } {
+  ): {
+    subtaskCount: number;
+    subtaskCompletedCount: number;
+    subtaskSpan?: { start: number; end: number };
+  } {
     let subtaskCount = 0;
     let subtaskCompletedCount = 0;
+    let spanStart: number | undefined;
+    let spanEnd: number | undefined;
 
     for (let i = startIndex; i < lines.length; i++) {
       const nextLine = lines[i];
@@ -1073,6 +1079,8 @@ export class TaskParser implements ITaskParser {
         } else {
           // If it is a valid subtask, count it as a subtask even though it also matches the task regex
           subtaskCount++;
+          spanStart ??= i;
+          spanEnd = i;
           if (isSubtaskResult.completed) {
             subtaskCompletedCount++;
           }
@@ -1136,13 +1144,22 @@ export class TaskParser implements ITaskParser {
       );
       if (isSubtask) {
         subtaskCount++;
+        spanStart ??= i;
+        spanEnd = i;
         if (completed) {
           subtaskCompletedCount++;
         }
       }
     }
 
-    return { subtaskCount, subtaskCompletedCount };
+    return {
+      subtaskCount,
+      subtaskCompletedCount,
+      subtaskSpan:
+        subtaskCount > 0 && spanStart !== undefined && spanEnd !== undefined
+          ? { start: spanStart, end: spanEnd }
+          : undefined,
+    };
   }
 
   // Parse a single file content into Task[], pure and stateless w.r.t. external app
@@ -1721,15 +1738,17 @@ export class TaskParser implements ITaskParser {
 
     // Extract subtasks from lines following date lines
     // Footnote tasks don't have checkboxes
-    const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
-      lines,
-      index + 1,
-      taskDetails.indent,
-      false,
-      processedLines,
-    );
+    const { subtaskCount, subtaskCompletedCount, subtaskSpan } =
+      this.extractSubtasks(
+        lines,
+        index + 1,
+        taskDetails.indent,
+        false,
+        processedLines,
+      );
     task.subtaskCount = subtaskCount;
     task.subtaskCompletedCount = subtaskCompletedCount;
+    task.subtaskSpan = subtaskSpan;
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
@@ -1858,15 +1877,17 @@ export class TaskParser implements ITaskParser {
     // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
     // all checkbox states including [/], [-], etc., not just [ ] and [x])
     const parentHasCheckbox = CHECKBOX_DETECTION_REGEX.test(content);
-    const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
-      lines,
-      index + 1,
-      taskDetails.indent,
-      parentHasCheckbox,
-      processedLines,
-    );
+    const { subtaskCount, subtaskCompletedCount, subtaskSpan } =
+      this.extractSubtasks(
+        lines,
+        index + 1,
+        taskDetails.indent,
+        parentHasCheckbox,
+        processedLines,
+      );
     task.subtaskCount = subtaskCount;
     task.subtaskCompletedCount = subtaskCompletedCount;
+    task.subtaskSpan = subtaskSpan;
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
       const urgencyContext: UrgencyContext = {
@@ -2136,15 +2157,17 @@ export class TaskParser implements ITaskParser {
     // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
     // all checkbox states including [/], [-], etc., not just [ ] and [x])
     const parentHasCheckbox = CHECKBOX_DETECTION_REGEX.test(line);
-    const { subtaskCount, subtaskCompletedCount } = this.extractSubtasks(
-      lines,
-      index + 1,
-      taskDetails.indent,
-      parentHasCheckbox,
-      processedLines,
-    );
+    const { subtaskCount, subtaskCompletedCount, subtaskSpan } =
+      this.extractSubtasks(
+        lines,
+        index + 1,
+        taskDetails.indent,
+        parentHasCheckbox,
+        processedLines,
+      );
     task.subtaskCount = subtaskCount;
     task.subtaskCompletedCount = subtaskCompletedCount;
+    task.subtaskSpan = subtaskSpan;
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
       const urgencyContext: UrgencyContext = {

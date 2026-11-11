@@ -24,6 +24,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Parent task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -59,6 +60,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Root task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -69,6 +71,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Middle task',
         indent: '  ',
         subtaskCount: 1,
+        subtaskSpan: { start: 2, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -149,7 +152,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
       expect(parents).toHaveLength(0);
     });
 
-    test('should handle tasks without checkboxes', () => {
+    test('should not infer a parent from indentation alone', () => {
       // Parent without checkbox
       const parentTask = createBaseTask({
         line: 0,
@@ -178,7 +181,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
       );
       const parents = findParentTasks(subtask);
 
-      expect(parents).toHaveLength(1);
+      expect(parents).toHaveLength(0);
     });
   });
 
@@ -189,6 +192,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         rawText: '- [ ] TODO Parent task',
         text: 'Parent task',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -209,6 +213,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         rawText: '- [ ] TODO Parent task',
         text: 'Parent task',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 1,
       });
 
@@ -229,6 +234,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         rawText: '- [ ] TODO Parent task',
         text: 'Parent task',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -249,6 +255,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         rawText: '- [ ] TODO Parent task',
         text: 'Parent task',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -272,6 +279,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Parent task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -301,6 +309,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Parent task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 1,
       });
 
@@ -332,6 +341,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Root task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -341,6 +351,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Middle task',
         indent: '  ',
         subtaskCount: 1,
+        subtaskSpan: { start: 2, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -374,6 +385,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Parent task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -405,6 +417,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Parent task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -438,6 +451,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Parent task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 1,
       });
 
@@ -473,6 +487,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Parent task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -526,6 +541,8 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         rawText: '- [ ] TODO Parent',
         text: 'Parent',
         indent: '',
+        subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
       });
 
       const subtask = createCheckboxTask({
@@ -545,6 +562,8 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         rawText: '- [ ] TODO Parent',
         text: 'Parent',
         indent: '',
+        subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
       });
 
       const sameLevelTask = createCheckboxTask({
@@ -564,11 +583,13 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         rawText: 'TODO Parent',
         text: 'Parent',
         indent: '',
+        subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
       });
 
-      const sameLevelTask = createBaseTask({
+      const sameLevelTask = createCheckboxTask({
         line: 1,
-        rawText: 'TODO Same level',
+        rawText: '- [ ] TODO Same level',
         text: 'Same level',
         indent: '',
       });
@@ -586,6 +607,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Parent task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -608,6 +630,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Root task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -617,6 +640,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Middle task',
         indent: '  ',
         subtaskCount: 1,
+        subtaskSpan: { start: 2, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -673,6 +697,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Parent task',
         indent: '',
         subtaskCount: 2,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -759,6 +784,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Root task',
         indent: '',
         subtaskCount: 1,
+        subtaskSpan: { start: 1, end: 99 },
         subtaskCompletedCount: 0,
       });
 
@@ -768,6 +794,7 @@ describe('TaskStateManager - Subtask Parent Updates', () => {
         text: 'Middle task',
         indent: '  ',
         subtaskCount: 1,
+        subtaskSpan: { start: 2, end: 99 },
         subtaskCompletedCount: 0,
       });
 

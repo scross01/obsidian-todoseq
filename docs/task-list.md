@@ -261,3 +261,7 @@ Rows revealed by scrolling are refreshed with the task's current text, state, pr
 ## Failed writes
 
 If saving a task change fails, the list returns to the task's actual content in the note instead of keeping a state or archive that was only displayed. Edits made while that recovery is in progress are applied to the saved content, so they cannot persist the change that failed.
+
+## Subtask counts
+
+A parent's subtask total and completed count reflect the checkbox children the parser counted, not every later task that happens to be indented. Completing a plain sibling or a task outside the parent's parsed span leaves that parent's progress unchanged; after a reparse, the same counts are produced from the source.

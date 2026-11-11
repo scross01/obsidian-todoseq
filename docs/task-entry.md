@@ -900,3 +900,7 @@ Numeric footnote definitions follow the same inclusion settings as other tasks: 
 ## Escaped pipes in tables
 
 A backslash-escaped pipe (`\|`) inside a table cell is not a cell delimiter. Tasks in a row that contains one keep their displayed cell index, and state or date changes rewrite only that cell — every other byte of the row is left as it was.
+
+## Optimistic subtask progress
+
+Completing a task from a view updates its parents' progress immediately. Parents are the tasks the parser actually grouped it under: a checkbox child inside the parent's parsed line span, with the same quote nesting and valid indentation. Plain siblings, tasks separated by a blank line, prose or a heading, and legacy snapshots without parsed bounds are not treated as parent/child, so their progress counts never change. When metadata lines are inserted or removed, the stored span shifts with the file's line numbers.

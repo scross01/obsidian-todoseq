@@ -34,6 +34,12 @@ export interface Task {
   parentHeading?: string; // nearest enclosing markdown heading text (hashes stripped) at parse time; undefined for org/code-comment tasks
   subtaskCount: number; // total number of subtasks (checkbox lines indented under this task)
   subtaskCompletedCount: number; // number of completed subtasks
+  /**
+   * Inclusive 0-based line span covering the checkbox children the parser
+   * counted. Undefined when the task has no counted children; optimistic
+   * ancestry must not invent a relationship without it.
+   */
+  subtaskSpan?: { start: number; end: number };
   _lastUpdateTime?: number; // timestamp of last task update by TODOseq (used for race condition prevention)
   isTableTask?: boolean; // true if task was parsed from a markdown table cell
   sourceFormat?: 'markdown' | 'org' | 'code-comment'; // parser provenance; undefined means markdown for legacy snapshots
