@@ -412,6 +412,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — footnote extraction now runs after block transitions and the shared skip rule, so excluded code/comment/math content no longer yields tasks. 175 suites / 5,549 tests, build and lint green.
 - **File**: [076-footnote-block-context.md](076-footnote-block-context.md)
 
+### Plan 079
+
+- **Title**: Resolve keyword groups once per search batch
+- **Meta**: priority P3 · effort S–M · depends on 067, 069, 071
+- **Record**: DONE (2026-11-11) — group aliases are resolved once per `Search.filterTasks` pass; new suite red on old code, 255 search tests green; no latency measurement recorded
+- **File**: [079-batch-state-group-search.md](079-batch-state-group-search.md)
+
 ### Plan 080
 
 - **Title**: Characterize escaped table delimiters in Obsidian before a bounded cell-identity fix

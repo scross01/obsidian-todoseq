@@ -1582,3 +1582,7 @@ The tokenizer treats adjacency as conjunction at `AND` binding power (80), above
 ## Parsed subtask ancestry
 
 `TaskParser.extractSubtasks` records an inclusive `subtaskSpan` on a task when it counts checkbox children, in addition to the counts. `TaskStateManager` uses that parser-owned span plus checkbox and indentation qualification for both keyword-task and checkbox-only optimistic updates; it does not infer ancestry from indentation alone or invent it for snapshots without a span. `adjustLineIndices` shifts or removes span endpoints when metadata lines are inserted or deleted. Reparsing replaces the span along with the counts, so a later scan restores source truth.
+
+## Batch state-group search
+
+`Search.filterTasks` builds a per-pass batch context for the state-group aliases the query uses (`state:active`, `state:waiting`, and so on). It resolves each group once through `KeywordManager` and passes exact/lowercase keyword sets down through `filterTasksByNode`, `evaluateSync`, and `evaluateStateFilter`; rows only do set membership. Per-row `Search.evaluate` keeps the existing per-call resolution, and the context is rebuilt on every batch so settings edits and custom keywords are picked up immediately. `collectEngineResolutions` remains the separate batch seam for property-engine filters.

@@ -19,6 +19,12 @@ const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
   completed: 'completedKeywords',
 };
 
+/** Batch-local keyword resolution shared by every row in one search pass. */
+export interface SearchBatchContext {
+  /** Raw group alias -> normalized keyword sets (exact and lowercase). */
+  stateGroupKeywords: Map<string, { exact: Set<string>; lower: Set<string> }>;
+}
+
 /**
  * A property filter node's engine query plus its resolution identity.
  * Engine results depend only on the query (never the task), so the bulk
@@ -155,6 +161,7 @@ export class SearchEvaluator {
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
     engineFiles?: Map<string, Set<string> | null>,
+    batchContext?: SearchBatchContext,
   ): boolean {
     switch (node.type) {
       case 'term':
@@ -166,7 +173,13 @@ export class SearchEvaluator {
           ? this.evaluatePhrase(node.value, task, caseSensitive)
           : false;
       case 'prefix_filter':
-        return this.evaluatePrefixFilter(node, task, caseSensitive, settings);
+        return this.evaluatePrefixFilter(
+          node,
+          task,
+          caseSensitive,
+          settings,
+          batchContext,
+        );
       case 'range_filter':
         return this.evaluateRangeFilter(node, task, caseSensitive);
       case 'property_filter': {
@@ -186,11 +199,25 @@ export class SearchEvaluator {
       }
       case 'and':
         return (node.children ?? []).every((child) =>
-          this.evaluateSync(child, task, caseSensitive, settings, engineFiles),
+          this.evaluateSync(
+            child,
+            task,
+            caseSensitive,
+            settings,
+            engineFiles,
+            batchContext,
+          ),
         );
       case 'or':
         return (node.children ?? []).some((child) =>
-          this.evaluateSync(child, task, caseSensitive, settings, engineFiles),
+          this.evaluateSync(
+            child,
+            task,
+            caseSensitive,
+            settings,
+            engineFiles,
+            batchContext,
+          ),
         );
       case 'not': {
         const first = node.children?.[0];
@@ -201,12 +228,53 @@ export class SearchEvaluator {
               caseSensitive,
               settings,
               engineFiles,
+              batchContext,
             )
           : false;
       }
       default:
         return false;
     }
+  }
+
+  /**
+   * Resolve the keyword groups a query actually uses once per batch, using
+   * the same KeywordManager instance accessor as per-row evaluation so
+   * custom keywords and settings edits stay authoritative.
+   */
+  static buildBatchContext(
+    node: SearchNode,
+    settings?: TodoTrackerSettings,
+  ): SearchBatchContext | undefined {
+    if (!settings) return undefined;
+    const stateGroupKeywords = new Map<
+      string,
+      { exact: Set<string>; lower: Set<string> }
+    >();
+
+    const walk = (n: SearchNode): void => {
+      if (
+        n.type === 'prefix_filter' &&
+        n.field === 'state' &&
+        n.value &&
+        STATE_GROUP_MAP[n.value]
+      ) {
+        const group = STATE_GROUP_MAP[n.value];
+        if (!stateGroupKeywords.has(n.value)) {
+          const keywords = new KeywordManager(settings).getKeywordsForGroup(
+            group,
+          );
+          stateGroupKeywords.set(n.value, {
+            exact: new Set(keywords),
+            lower: new Set(keywords.map((keyword) => keyword.toLowerCase())),
+          });
+        }
+      }
+      for (const child of n.children ?? []) walk(child);
+    };
+
+    walk(node);
+    return stateGroupKeywords.size > 0 ? { stateGroupKeywords } : undefined;
   }
 
   /**
@@ -283,10 +351,20 @@ export class SearchEvaluator {
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
     engineFiles?: Map<string, Set<string> | null>,
+    batchContext?: SearchBatchContext,
   ): Task[] {
     const matched: Task[] = [];
     for (const task of tasks) {
-      if (this.evaluateSync(node, task, caseSensitive, settings, engineFiles)) {
+      if (
+        this.evaluateSync(
+          node,
+          task,
+          caseSensitive,
+          settings,
+          engineFiles,
+          batchContext,
+        )
+      ) {
         matched.push(task);
       }
     }
@@ -399,6 +477,7 @@ export class SearchEvaluator {
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
+    batchContext?: SearchBatchContext,
   ): boolean {
     const field = node.field;
     const value = node.value;
@@ -415,7 +494,13 @@ export class SearchEvaluator {
       case 'tag':
         return this.evaluateTagFilter(value, task, caseSensitive, node.exact);
       case 'state':
-        return this.evaluateStateFilter(value, task, caseSensitive, settings);
+        return this.evaluateStateFilter(
+          value,
+          task,
+          caseSensitive,
+          settings,
+          batchContext,
+        );
       case 'priority':
         return this.evaluatePriorityFilter(value, task, caseSensitive);
       case 'content':
@@ -558,11 +643,18 @@ export class SearchEvaluator {
     task: Task,
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
+    batchContext?: SearchBatchContext,
   ): boolean {
     const group = STATE_GROUP_MAP[value];
     if (group && settings) {
-      const groupKeywords = KeywordManager.getKeywordsForGroup(group, settings);
+      const resolved = batchContext?.stateGroupKeywords.get(value);
       const taskState = caseSensitive ? task.state : task.state.toLowerCase();
+      if (resolved) {
+        return caseSensitive
+          ? resolved.exact.has(task.state)
+          : resolved.lower.has(taskState);
+      }
+      const groupKeywords = KeywordManager.getKeywordsForGroup(group, settings);
       return groupKeywords.some((k) =>
         caseSensitive ? k === task.state : k.toLowerCase() === taskState,
       );

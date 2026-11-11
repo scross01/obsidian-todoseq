@@ -170,3 +170,11 @@ Add a scenario to `scripts/perf/scenarios.ts` (node tier) or a section in
 `tests/integration/perf.test.ts` (Obsidian tier). The fixture generator
 grows in `generate-fixture.ts`; its contract (determinism + parse-back
 count) is pinned by `tests/perf-fixture.test.ts` — keep that green.
+
+### Search state-group batching
+
+The search scenario includes `state:active OR state:completed` and
+`state:waiting -DONE`. These exercise the batch-local group resolution added by
+plan 079: each group alias in a query is resolved once per `Search.filterTasks`
+pass, then shared by every row, while standalone `Search.evaluate` still
+resolves per call.

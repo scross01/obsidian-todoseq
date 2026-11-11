@@ -107,6 +107,7 @@ export class Search {
         caseSensitive,
         settings,
         engineFiles,
+        SearchEvaluator.buildBatchContext(ast, settings),
       );
     } catch (error) {
       if (error instanceof SearchError) {
