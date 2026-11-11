@@ -232,6 +232,15 @@ export class VaultScanner
   }
 
   /**
+   * Public eligibility seam for live file events: the same rules a scan uses,
+   * read from the current settings (so enabling a format needs no restart) and
+   * including compound configured suffixes such as `.txt.bak`.
+   */
+  isScannableFile(file: TFile): boolean {
+    return this.shouldScanFile(file);
+  }
+
+  /**
    * Check if a file should be scanned based on extension and exclusion rules
    * @param file The file to check
    * @returns true if the file should be scanned

@@ -241,9 +241,10 @@ describe('EventCoordinator', () => {
 
       await coordinator.flush();
 
-      expect(receivedEvents.length).toBe(2);
-      expect(receivedEvents.some((e) => e.type === 'modify')).toBe(true);
-      expect(receivedEvents.some((e) => e.type === 'delete')).toBe(true);
+      // The delete supersedes the still-debounced modify for the same path:
+      // publishing the modify afterwards would resurrect a deleted file.
+      expect(receivedEvents.length).toBe(1);
+      expect(receivedEvents[0].type).toBe('delete');
     });
   });
 
@@ -380,6 +381,127 @@ describe('EventCoordinator', () => {
       await coordinator.flush();
 
       expect(listener).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('configured format events', () => {
+    let env: TestEnv;
+
+    beforeEach(() => {
+      env = createTestEnv();
+    });
+
+    function createOrgScanner() {
+      return {
+        isScannableFile: jest.fn((file: TFile) => file.extension === 'org'),
+        processIncrementalChange: jest.fn().mockResolvedValue(undefined),
+        processFileDelete: jest.fn().mockResolvedValue(undefined),
+        processFileRename: jest.fn().mockResolvedValue(undefined),
+      };
+    }
+
+    it('forwards an enabled Org modify and ignores an attachment', async () => {
+      const mockScanner = createOrgScanner();
+      const coordinator = buildCoordinator(env, mockScanner);
+      const changed = jest.fn();
+      coordinator.on('file-changed', changed);
+      coordinator.initialize();
+
+      (env.mockVault as any).triggerEvent(
+        'modify',
+        new TFile('notes.org', 'notes.org', 'org'),
+      );
+      (env.mockVault as any).triggerEvent(
+        'modify',
+        new TFile('photo.png', 'photo.png', 'png'),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await coordinator.flush();
+
+      expect(mockScanner.processIncrementalChange).toHaveBeenCalledTimes(1);
+      expect(mockScanner.processIncrementalChange).toHaveBeenCalledWith(
+        expect.objectContaining({ path: 'notes.org' }),
+      );
+      expect(changed).toHaveBeenCalledTimes(1);
+      await coordinator.destroy();
+    });
+
+    it('cleans the old path when a tracked file becomes unsupported', async () => {
+      env.taskStateManager.setTasks([
+        {
+          path: 'notes.org',
+          line: 0,
+          rawText: 'TODO org task',
+          indent: '',
+          listMarker: '',
+          text: 'org task',
+          state: 'TODO',
+          completed: false,
+          priority: null,
+          scheduledDate: null,
+          scheduledDateRepeat: null,
+          deadlineDate: null,
+          deadlineDateRepeat: null,
+          closedDate: null,
+          subtaskCount: 0,
+          subtaskCompletedCount: 0,
+          isDailyNote: false,
+          dailyNoteDate: null,
+          tags: [],
+        },
+      ]);
+      const mockScanner = createOrgScanner();
+      const coordinator = buildCoordinator(env, mockScanner);
+      coordinator.initialize();
+
+      const renamed = new TFile('notes.txt', 'notes.txt', 'txt');
+      (env.mockVault as any).triggerEvent('rename', renamed, 'notes.org');
+      await coordinator.flush();
+
+      // The destination is no longer supported, but the old tasks must go.
+      expect(mockScanner.processFileRename).toHaveBeenCalledWith(
+        renamed,
+        'notes.org',
+      );
+      await coordinator.destroy();
+    });
+
+    it('cancels a pending debounce when the file is renamed', async () => {
+      const mockScanner = createOrgScanner();
+      const coordinator = buildCoordinator(env, mockScanner);
+      coordinator.initialize();
+
+      (env.mockVault as any).triggerEvent(
+        'modify',
+        new TFile('notes.org', 'notes.org', 'org'),
+      );
+      (env.mockVault as any).triggerEvent(
+        'rename',
+        new TFile('renamed.org', 'renamed.org', 'org'),
+        'notes.org',
+      );
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await coordinator.flush();
+
+      expect(mockScanner.processIncrementalChange).not.toHaveBeenCalled();
+      expect(mockScanner.processFileRename).toHaveBeenCalledTimes(1);
+      await coordinator.destroy();
+    });
+
+    it('drops queued modify work for a deleted path', async () => {
+      const mockScanner = createOrgScanner();
+      const coordinator = buildCoordinator(env, mockScanner);
+      coordinator.initialize();
+
+      const file = new TFile('notes.org', 'notes.org', 'org');
+      (env.mockVault as any).triggerEvent('modify', file);
+      (env.mockVault as any).triggerEvent('delete', file);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await coordinator.flush();
+
+      expect(mockScanner.processIncrementalChange).not.toHaveBeenCalled();
+      expect(mockScanner.processFileDelete).toHaveBeenCalledTimes(1);
+      await coordinator.destroy();
     });
   });
 
