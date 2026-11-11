@@ -1,6 +1,6 @@
 # Change Log
 
-## Unreleased
+## 0.22.1
 
 - Fixed completing an unrelated plain task incrementing a preceding task's subtask count; optimistic progress now follows the checkbox children the parser actually counted and stays in agreement with a rescan.
 - Fixed combined searches mixing states and date ranges, implicit `AND` grouping around `OR`, and invalid queries such as a stray `)` or unclosed quote being silently accepted; the Task List now shows the validation error and clears it when corrected.
@@ -24,7 +24,7 @@
 - Fixed the Task List briefly showing stale tasks when a vault scan overlapped a live edit, and stopped renamed archived notes from bringing their archived tasks back into the list. Moving a task under a new heading now also updates `heading:` search results immediately.
 - Fixed copying and moving a task dropping its `STARTED:`, `CLOSED:` or `DESCRIPTION:` lines: the whole metadata block now travels with the task, while Migrate to Today still removes only the dates it moves.
 - Fixed recurring tasks deleting the wrong date: completing a task whose SCHEDULED repeats but whose DEADLINE is one-off no longer removes the deadline, and a first-only (`--Nd`) warning period is now actually removed from the written date line.
-- Fixed reading mode forcing every paragraph to the default text colour and size, which overrode colours set by themes and other plugins — for example trait and action names rendered by Fantasy Statblocks.
+- Fixed reading mode forcing every paragraph to the default text colour and size, which overrode colours set by themes and other plugins — for example trait and action names rendered by Fantasy Statblocks. #90
 
 ## 0.22.0
 
