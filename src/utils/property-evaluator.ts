@@ -44,10 +44,10 @@ export class PropertyEvaluator {
         typeof value === 'boolean' ||
         (typeof value === 'object' && value !== null)
       ) {
-        const text: string =
+        const text =
           value instanceof Date
             ? value.toISOString()
-            : Object.prototype.toString.call(value);
+            : String(Object.prototype.toString.call(value));
         return text === search;
       }
       return false;
@@ -67,10 +67,10 @@ export class PropertyEvaluator {
     }
 
     // Objects keep the established "[object Object]" contract.
-    const text: string =
+    const text =
       value instanceof Date
         ? value.toISOString()
-        : Object.prototype.toString.call(value);
+        : String(Object.prototype.toString.call(value));
     return caseSensitive
       ? text.includes(search)
       : text.toLowerCase().includes(search.toLowerCase());
