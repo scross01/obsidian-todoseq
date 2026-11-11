@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed property searches missing partial and differently-cased values, treating empty arrays or null as a missing key, and confusing an exact empty string with a key-only filter.
 - Fixed disabling or reloading the plugin leaving its task update timers and right-click task handlers behind; editor interactions and pending delayed setup now stop with the plugin.
 - Fixed failed task changes staying on screen as though they had been saved; the Task List now returns to the note's actual state and later edits build on that saved content.
 - Fixed code-comment tasks gaining executable metadata lines when their state changed; their date actions now leave the source untouched, and Org tasks keep their CLOSED/STARTED history.

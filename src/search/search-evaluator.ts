@@ -10,6 +10,7 @@ import { PropertySearchEngine } from '../services/property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
 import { KeywordGroup } from '../types/task';
 import { App, TFile } from 'obsidian';
+import type { PropertyQueryDescriptor } from './search-types';
 
 const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
   active: 'activeKeywords',
@@ -243,13 +244,30 @@ export class SearchEvaluator {
 
   /** One engine query → matching-file set (null on engine failure, per-row catch semantics). */
   static async resolveEngineFiles(
-    query: string,
+    descriptorOrQuery: PropertyQueryDescriptor | string,
     effectiveCaseSensitive: boolean,
     propertySearchEngine: PropertySearchEngine,
   ): Promise<Set<string> | null> {
+    const descriptor =
+      typeof descriptorOrQuery === 'string'
+        ? this.descriptorFromQuery(descriptorOrQuery)
+        : descriptorOrQuery;
     try {
+      if (typeof propertySearchEngine.searchProperty === 'function') {
+        return await propertySearchEngine.searchProperty(
+          descriptor,
+          effectiveCaseSensitive,
+        );
+      }
+      // Compatibility for partially stubbed engines in existing callers.
+      const legacyQuery =
+        typeof descriptorOrQuery === 'string'
+          ? descriptorOrQuery
+          : descriptor.kind === 'existence'
+            ? `[${descriptor.key}]`
+            : `[${descriptor.key}:${descriptor.value}]`;
       return await propertySearchEngine.searchProperties(
-        query,
+        legacyQuery,
         effectiveCaseSensitive,
       );
     } catch {
@@ -952,7 +970,7 @@ export class SearchEvaluator {
     const effectiveCaseSensitive = node.exact ? true : caseSensitive;
     const matchingFiles = propertySearchEngine
       ? await this.resolveEngineFiles(
-          built.query,
+          built.descriptor,
           effectiveCaseSensitive,
           propertySearchEngine,
         )
@@ -973,44 +991,95 @@ export class SearchEvaluator {
    * paths, and by the resolution collector, so the two cannot drift.
    */
   private static buildPropertyQuery(node: SearchNode): {
+    descriptor: PropertyQueryDescriptor;
     query: string;
     propertyKey: string;
     propertyValue: string | null;
   } | null {
-    const field = node.field;
-    const value = node.value;
+    let descriptor = node.property;
 
-    if (!field || !value) {
-      return null;
-    }
+    if (!descriptor) {
+      const value = node.value;
+      if (!value) return null;
 
-    // Parse the field and property value from the stored value
-    // The parser stores it as "key:propertyValue" format
-    let propertyKey: string;
-    let propertyValue: string | null;
-
-    if (value.includes(':')) {
-      const colonIndex = value.indexOf(':');
-      propertyKey = value.slice(0, colonIndex);
-      propertyValue = value.slice(colonIndex + 1);
-
-      // Handle empty value case [type:]
-      if (propertyValue === '') {
-        propertyValue = null;
+      if (value.includes(':')) {
+        const colonIndex = value.indexOf(':');
+        const key = value.slice(0, colonIndex);
+        const rawValue = value.slice(colonIndex + 1);
+        descriptor =
+          rawValue === ''
+            ? {
+                key,
+                kind: 'existence',
+                value: '',
+                exact: false,
+                keyExact: false,
+              }
+            : {
+                key,
+                kind: rawValue === 'null' ? 'null' : 'string',
+                value: rawValue,
+                exact: node.exact === true,
+                keyExact: false,
+              };
+      } else {
+        descriptor = {
+          key: value,
+          kind: 'existence',
+          value: '',
+          exact: false,
+          keyExact: false,
+        };
       }
-    } else {
-      // Key-only case like [type]
-      propertyKey = value;
-      propertyValue = null;
     }
 
-    // Build the engine query string. The engine receives the same shape the
-    // inline path always used: [key:value] or [key].
+    if (!descriptor.key) return null;
+
     const query =
-      propertyValue !== null
-        ? `[${propertyKey}:${propertyValue}]`
-        : `[${propertyKey}]`;
-    return { query, propertyKey, propertyValue };
+      descriptor.kind === 'existence'
+        ? `[${descriptor.key}]`
+        : `[${descriptor.key}:${descriptor.value}]`;
+
+    return {
+      descriptor,
+      query,
+      propertyKey: descriptor.key,
+      propertyValue: descriptor.kind === 'existence' ? null : descriptor.value,
+    };
+  }
+
+  /** Adapter for older string-query callers; keeps their shape unchanged. */
+  private static descriptorFromQuery(query: string): PropertyQueryDescriptor {
+    const inner =
+      query.startsWith('[') && query.endsWith(']') ? query.slice(1, -1) : query;
+    const colonIndex = inner.indexOf(':');
+    if (colonIndex === -1) {
+      return {
+        key: inner.trim(),
+        kind: 'existence',
+        value: '',
+        exact: false,
+        keyExact: false,
+      };
+    }
+    const key = inner.slice(0, colonIndex).trim();
+    const value = inner.slice(colonIndex + 1).trim();
+    if (value === 'null') {
+      return {
+        key,
+        kind: 'null',
+        value: 'null',
+        exact: false,
+        keyExact: false,
+      };
+    }
+    return {
+      key,
+      kind: 'string',
+      value,
+      exact: false,
+      keyExact: false,
+    };
   }
 
   /**
@@ -1028,7 +1097,7 @@ export class SearchEvaluator {
   ): boolean {
     const built = this.buildPropertyQuery(node);
     if (!built) return false;
-    const { propertyKey, propertyValue } = built;
+    const { descriptor } = built;
 
     // Engine pre-resolution (bulk) or per-row engine hit: the matching-file
     // set is task-independent, so membership is the whole answer.
@@ -1036,11 +1105,6 @@ export class SearchEvaluator {
       return matchingFiles.has(task.path);
     }
 
-    // When exact flag is true (quoted values), force case sensitivity
-    const effectiveCaseSensitive = node.exact ? true : caseSensitive;
-
-    // Fall back to direct metadata access
-    // Get file cache and frontmatter
     let file;
     try {
       file = this.getFileForTask(task, settings);
@@ -1058,103 +1122,10 @@ export class SearchEvaluator {
       return false;
     }
 
-    const frontmatter = fileCache.frontmatter;
-
-    // Handle key-only searches (e.g., [type] or [type:])
-    // But NOT [type:""] which is a search for empty string value
-    if (propertyValue === null || (propertyValue === '' && !node.exact)) {
-      // Check if property exists (regardless of value)
-      if (effectiveCaseSensitive) {
-        return Boolean(
-          Object.prototype.hasOwnProperty.call(frontmatter, propertyKey),
-        );
-      } else {
-        // Case insensitive key search
-        const lowerField = propertyKey.toLowerCase();
-        return Object.keys(frontmatter).some(
-          (key) => key.toLowerCase() === lowerField,
-        );
-      }
-    }
-
-    // Handle null value search (e.g., [type:null])
-    if (propertyValue === 'null') {
-      if (effectiveCaseSensitive) {
-        const hasKey = Boolean(
-          Object.prototype.hasOwnProperty.call(frontmatter, propertyKey),
-        );
-        return hasKey && frontmatter[propertyKey] === null;
-      } else {
-        // Case insensitive key search for null value
-        const lowerField = propertyKey.toLowerCase();
-        return Object.keys(frontmatter).some((key) => {
-          if (key.toLowerCase() === lowerField) {
-            return frontmatter[key] === null;
-          }
-          return false;
-        });
-      }
-    }
-
-    // Get the property value (case sensitive or insensitive key search)
-    let actualPropertyValue: unknown;
-    if (effectiveCaseSensitive) {
-      actualPropertyValue = frontmatter[propertyKey];
-    } else {
-      // Case insensitive key search
-      const lowerField = propertyKey.toLowerCase();
-      const foundKey = Object.keys(frontmatter).find(
-        (key) => key.toLowerCase() === lowerField,
-      );
-      actualPropertyValue = foundKey ? frontmatter[foundKey] : undefined;
-    }
-
-    if (actualPropertyValue === undefined) {
-      return false;
-    }
-
-    // Special case: searching for empty string should NOT match null values
-    if (propertyValue === '' && actualPropertyValue === null) {
-      return false;
-    }
-
-    // Handle parentheses in OR expressions first (e.g., [status:(Draft OR Published)])
-    if (propertyValue.startsWith('(') && propertyValue.endsWith(')')) {
-      const innerValue = propertyValue.slice(1, -1);
-      if (innerValue.includes(' OR ')) {
-        const orValues = innerValue.split(' OR ').map((v) => v.trim());
-        return orValues.some((orValue) => {
-          // Create a temporary node for each OR value with just the value part
-          const tempNode = { ...node, value: orValue };
-          return this.evaluateSinglePropertyValue(
-            tempNode,
-            actualPropertyValue,
-            effectiveCaseSensitive,
-          );
-        });
-      }
-    }
-
-    // Handle OR expressions in the value (e.g., [status:Draft OR Published])
-    if (propertyValue.includes(' OR ')) {
-      const orValues = propertyValue.split(' OR ').map((v) => v.trim());
-      return orValues.some((orValue) => {
-        // Create a temporary node for each OR value with just the value part
-        const tempNode = { ...node, value: orValue };
-        return this.evaluateSinglePropertyValue(
-          tempNode,
-          actualPropertyValue,
-          effectiveCaseSensitive,
-        );
-      });
-    }
-
-    // Handle single value comparison - create a node with just the property value
-    const valueOnlyNode = { ...node, value: propertyValue };
-    return this.evaluateSinglePropertyValue(
-      valueOnlyNode,
-      actualPropertyValue,
-      effectiveCaseSensitive,
+    return PropertyEvaluator.matchesPropertyFilter(
+      fileCache.frontmatter,
+      descriptor,
+      node.exact ? true : caseSensitive,
     );
   }
 

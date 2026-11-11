@@ -778,3 +778,9 @@ Pressing Escape or clicking the clear button exits the saved search view, just l
 ## Property changes and collection views
 
 Editing only a note's properties changes what property filters match without changing any task. Once the property index has processed a batch of such edits, the Task List, embedded task lists and dashboard cards re-run their property queries, so filtered results update without an edit to the task itself.
+
+## Property matching details
+
+Property filters use one matching contract for the fast index and the metadata fallback. An unquoted value matches partially and ignores case, across every spelling of the key, so `[type:ject]` finds `Project` and `[type:Project]` also finds `project` and `Project backlog`. Quoting a value makes it exact and case-sensitive, and ignores whitespace before the quote: `[type: "Project"]` matches only the exact value `Project`.
+
+`[type]` and `[type:]` ask whether the key exists. They include keys whose value is empty, an empty array or null, and exclude notes without the key. `[type:null]` matches an actual null value, while `[type:""]` matches an exact empty string; the two are no longer conflated. Numeric and boolean values stay typed, so `[size:1]` does not match `12`.

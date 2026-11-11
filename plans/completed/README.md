@@ -370,6 +370,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — unload now destroys the update coordinator before async teardown and removes capture-phase editor handlers; unit tests red 4 failed → green 53 passed; host Playwright reload scenario not run
 - **File**: [068-plugin-owned-teardown.md](068-plugin-owned-teardown.md)
 
+### Plan 069
+
+- **Title**: Unify indexed and fallback property matching
+- **Meta**: priority P2 · effort M–L · depends on —
+- **Record**: DONE (2026-11-11) — partial, mixed-case, existence, null and exact-empty property matching now share one contract across the index and fallback; unit tests red 6 failed → green 6 passed; host Playwright scenario not run
+- **File**: [069-indexed-property-contract.md](069-indexed-property-contract.md)
+
 ### Plan 072
 
 - **Title**: Preserve archive dialog keyboard traversal and focus in pop-out windows

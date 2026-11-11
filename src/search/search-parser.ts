@@ -3,6 +3,7 @@ import {
   SearchNode,
   SearchError,
   SearchPrefix,
+  PropertyQueryDescriptor,
 } from './search-types';
 import { SearchTokenizer } from './search-tokenizer';
 import { DateUtils } from '../utils/date-utils';
@@ -415,7 +416,6 @@ class PrattParser {
   }
 
   private parsePropertyFilter(): SearchNode {
-    // Expecting a property token with value in "key:value" format
     if (this.position >= this.tokens.length) {
       throw new SearchError('Unexpected end of expression after property');
     }
@@ -426,61 +426,61 @@ class PrattParser {
         `Expected property token, got ${propertyToken.type}`,
       );
     }
-
     this.position++;
 
-    // Parse the property value which is in "key:value" format
-    const propertyValue = propertyToken.value;
+    const inner = propertyToken.original.slice(1, -1);
+    const parsed = inner.match(
+      /^\s*(?:"((?:\\.|[^"\\])*)"|([^\s:]+))\s*(?::\s*(?:"((?:\\.|[^"\\])*)"|([^]*)))?\s*$/,
+    );
+    if (!parsed) {
+      throw new SearchError(
+        `Invalid property filter: ${propertyToken.original}`,
+      );
+    }
 
-    // Find the colon to split key and value
-    const colonIndex = propertyValue.indexOf(':');
+    const quotedKey = parsed[1];
+    const bareKey = parsed[2];
+    const quotedValue = parsed[3];
+    const unquotedValue = parsed[4];
+    const key = (quotedKey ?? bareKey ?? '').replace(/\\"/g, '"');
+    const keyExact = quotedKey !== undefined;
 
-    let key: string;
-    let value: string | null = null;
+    let kind: 'existence' | 'null' | 'string' = 'existence';
+    let value = '';
     let exact = false;
 
-    if (colonIndex === -1) {
-      // Key-only case like [type]
-      key = propertyValue;
-      value = null;
-    } else {
-      // Key-value case like [type:Project]
-      key = propertyValue.slice(0, colonIndex);
-      value = propertyValue.slice(colonIndex + 1);
-
-      // Check if the original property token had quoted values
-      // We need to check the original token to determine if it was quoted
-      const original = propertyToken.original;
-
-      // Extract the original value part (after colon)
-      const originalColonIndex = original.indexOf(':');
-      if (originalColonIndex !== -1) {
-        const originalValue = original.slice(originalColonIndex + 1, -1); // -1 to exclude closing bracket
-
-        // Check if the original value was quoted
-        if (originalValue.startsWith('"') && originalValue.endsWith('"')) {
-          exact = true;
+    if (quotedValue !== undefined) {
+      kind = 'string';
+      value = quotedValue.replace(/\\"/g, '"');
+      exact = true;
+    } else if (unquotedValue !== undefined) {
+      const trimmed = unquotedValue.trim();
+      if (trimmed !== '') {
+        if (trimmed.toLowerCase() === 'null') {
+          kind = 'null';
+          value = 'null';
+        } else {
+          kind = 'string';
+          value = trimmed;
         }
-
-        // Check if the original key was quoted
-        const originalKeyPart = original.slice(1, originalColonIndex); // 1 to exclude opening bracket
-        if (originalKeyPart.startsWith('"') && originalKeyPart.endsWith('"')) {
-          exact = true;
-        }
-      }
-
-      // Handle empty value case [type:]
-      if (value === '') {
-        value = null;
       }
     }
+
+    const property: PropertyQueryDescriptor = {
+      key,
+      kind,
+      value,
+      exact,
+      keyExact,
+    };
 
     return {
       type: 'property_filter',
       field: 'property',
-      value: value === null ? key : `${key}:${value}`, // Store as key:value format for evaluator
+      value: kind === 'existence' ? key : `${key}:${value}`,
       position: propertyToken.position,
-      exact: exact,
+      exact,
+      property,
     };
   }
 

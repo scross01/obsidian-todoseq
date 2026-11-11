@@ -2,6 +2,7 @@ import { App, TFile } from 'obsidian';
 import { DateUtils } from '../utils/date-utils';
 import { PropertyEvaluator } from '../utils/property-evaluator';
 import { TaskStateManager } from './task-state-manager';
+import type { PropertyQueryDescriptor } from '../search/search-types';
 
 // Minimal interface for the vault scanner status this engine polls during init
 export interface IVaultScannerStatusProvider {
@@ -18,6 +19,8 @@ export interface PropertySearchEngineDependencies {
 
 export class PropertySearchEngine {
   private propertyCache = new Map<string, Map<unknown, Set<string>>>();
+  /** Key presence, kept separately so null, empty arrays and empty strings exist. */
+  private propertyExistence = new Map<string, Set<string>>();
   private propertyKeys = new Set<string>();
   private isInitialized = false;
   private startupScanEnabled = true;
@@ -188,37 +191,7 @@ export class PropertySearchEngine {
             if (isMarkdownFile && tfile) {
               const cache = this.app.metadataCache.getFileCache(tfile);
               if (cache?.frontmatter) {
-                // Single pass: collect keys AND build cache
-                Object.entries(cache.frontmatter).forEach(([key, value]) => {
-                  this.propertyKeys.add(key);
-
-                  // Get or create cache for this property
-                  let valueMap = this.propertyCache.get(key);
-                  if (!valueMap) {
-                    valueMap = new Map<unknown, Set<string>>();
-                    this.propertyCache.set(key, valueMap);
-                  }
-
-                  // Add value to cache
-                  if (Array.isArray(value)) {
-                    for (const item of value) {
-                      if (item === undefined) continue;
-                      const existingSet = valueMap.get(item);
-                      const filePathSet = existingSet ?? new Set<string>();
-                      if (!existingSet) {
-                        valueMap.set(item, filePathSet);
-                      }
-                      filePathSet.add(filePath);
-                    }
-                  } else {
-                    const existingSet = valueMap.get(value);
-                    const filePathSet = existingSet ?? new Set<string>();
-                    if (!existingSet) {
-                      valueMap.set(value, filePathSet);
-                    }
-                    filePathSet.add(filePath);
-                  }
-                });
+                this.registerFileProperties(filePath, cache.frontmatter);
               }
             }
           }
@@ -236,265 +209,313 @@ export class PropertySearchEngine {
     }
   }
 
-  // Search for files matching property query
+  /**
+   * Match a structured property filter. Shared by the indexed and fallback
+   * paths so partial values, case-insensitive keys, presence, null and an
+   * exact empty string cannot diverge.
+   */
+  async searchProperty(
+    filter: PropertyQueryDescriptor,
+    caseSensitive = false,
+  ): Promise<Set<string>> {
+    await this.initialize();
+    if (!filter.key) return new Set();
+
+    // A quoted key is exact regardless of the global match-case setting.
+    const keyCaseSensitive =
+      filter.keyExact || filter.exact ? true : caseSensitive;
+    const { maps, existence } = this.getEntriesForKey(
+      filter.key,
+      keyCaseSensitive,
+    );
+
+    if (filter.kind === 'existence') {
+      return new Set(existence);
+    }
+
+    if (filter.kind === 'null') {
+      const files = new Set<string>();
+      for (const map of maps) {
+        map.get(null)?.forEach((filePath) => files.add(filePath));
+      }
+      return files;
+    }
+
+    let text = filter.value.trim();
+    if (text.startsWith('(') && text.endsWith(')')) {
+      text = text.slice(1, -1).trim();
+    }
+
+    if (text.includes(' OR ')) {
+      const files = new Set<string>();
+      for (const part of text.split(' OR ')) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        const result = await this.searchProperty(
+          { ...filter, value: trimmed },
+          caseSensitive,
+        );
+        result.forEach((filePath) => files.add(filePath));
+      }
+      return files;
+    }
+
+    const special = this.searchSingleValue(
+      maps,
+      text,
+      caseSensitive,
+      filter.exact,
+    );
+    if (special.size > 0 || filter.exact) {
+      return special;
+    }
+    return this.findValueInCache(maps, text, caseSensitive, false);
+  }
+
+  /** Union value maps and presence sets for every matching key spelling. */
+  private getEntriesForKey(
+    key: string,
+    caseSensitive: boolean,
+  ): {
+    maps: Map<unknown, Set<string>>[];
+    existence: Set<string>;
+  } {
+    const maps: Map<unknown, Set<string>>[] = [];
+    const existence = new Set<string>();
+    const lowerKey = key.toLowerCase();
+
+    this.propertyCache.forEach((valueMap, cacheKey) => {
+      if (
+        caseSensitive ? cacheKey === key : cacheKey.toLowerCase() === lowerKey
+      ) {
+        maps.push(valueMap);
+        this.propertyExistence
+          .get(cacheKey)
+          ?.forEach((filePath) => existence.add(filePath));
+      }
+    });
+
+    return { maps, existence };
+  }
+
+  // Search for files matching a legacy string property query
   async searchProperties(
     query: string,
     caseSensitive = false,
   ): Promise<Set<string>> {
     await this.initialize();
-
-    // Parse query: [key:value] or [key]
-    let key: string;
-    let value: string | null;
-
-    if (query.startsWith('[') && query.endsWith(']')) {
-      const content = query.slice(1, -1);
-      const colonIndex = content.indexOf(':');
-
-      if (colonIndex !== -1) {
-        key = content.slice(0, colonIndex);
-        value = content.slice(colonIndex + 1);
-      } else {
-        key = content;
-        value = null;
-      }
-    } else {
+    if (!query.startsWith('[') || !query.endsWith(']')) {
       return new Set();
     }
 
-    // Find the cache with case-insensitive key matching if needed
-    const cache = this.getPropertyCacheForKey(key, caseSensitive);
-    if (!cache) return new Set();
-
-    if (value === null) {
-      // Key-only search: return all files with this property
-      const files = new Set<string>();
-      Array.from(cache.values()).forEach((fileSet) => {
-        Array.from(fileSet).forEach((filePath) => {
-          files.add(filePath);
-        });
-      });
-      return files;
+    const content = query.slice(1, -1);
+    const colonIndex = content.indexOf(':');
+    if (colonIndex === -1) {
+      return this.searchProperty(
+        {
+          key: content.trim(),
+          kind: 'existence',
+          value: '',
+          exact: false,
+          keyExact: false,
+        },
+        caseSensitive,
+      );
     }
 
-    // Handle OR expressions in the value (e.g., [status:Draft OR Active])
-    // Also handle parentheses (e.g., [status:(Draft OR Active)])
-    let processedValue = value;
-    if (value.startsWith('(') && value.endsWith(')')) {
-      processedValue = value.slice(1, -1);
+    const key = content.slice(0, colonIndex).trim();
+    let value = content.slice(colonIndex + 1).trim();
+    if (value === 'null') {
+      return this.searchProperty(
+        { key, kind: 'null', value: 'null', exact: false, keyExact: false },
+        caseSensitive,
+      );
     }
 
-    if (processedValue.includes(' OR ')) {
-      const orValues = processedValue.split(' OR ').map((v) => v.trim());
-      const matchingFiles = new Set<string>();
-
-      // Search for each OR value and union the results
-      for (const orValue of orValues) {
-        const results = await this.searchSingleValue(
-          key,
-          orValue,
-          cache,
-          caseSensitive,
-        );
-        results.forEach((filePath) => {
-          matchingFiles.add(filePath);
-        });
-      }
-
-      return matchingFiles;
+    let exact = false;
+    if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1);
+      exact = true;
     }
 
-    // Single value search
-    return this.searchSingleValue(key, processedValue, cache, caseSensitive);
+    return this.searchProperty(
+      { key, kind: 'string', value, exact, keyExact: false },
+      caseSensitive,
+    );
   }
 
-  // Get property cache for a key, with case-insensitive lookup if needed
-  private getPropertyCacheForKey(
-    key: string,
-    caseSensitive: boolean,
-  ): Map<unknown, Set<string>> | null {
-    if (caseSensitive) {
-      // Case sensitive: exact key match
-      return this.propertyCache.get(key) || null;
-    }
-
-    // Case insensitive: find key matching lowercase
-    const lowerKey = key.toLowerCase();
-    const cacheKeys = Array.from(this.propertyCache.keys());
-    for (const cacheKey of cacheKeys) {
-      if (typeof cacheKey === 'string' && cacheKey.toLowerCase() === lowerKey) {
-        return this.propertyCache.get(cacheKey) || null;
-      }
-    }
-    return null;
-  }
-
-  // Search for a single property value (no OR processing)
-  private async searchSingleValue(
-    key: string,
+  // Search for a single property value (comparison/date/boolean aware)
+  private searchSingleValue(
+    maps: Map<unknown, Set<string>>[],
     value: string,
-    cache: Map<unknown, Set<string>>,
-    caseSensitive = false,
-  ): Promise<Set<string>> {
-    // Check if it's a comparison operator query (numeric or date)
-    const comparisonMatch = value.match(/^([><]=?)(.+)$/);
-    if (comparisonMatch) {
-      const operator = comparisonMatch[1];
-      const compareValueStr = comparisonMatch[2];
+    caseSensitive: boolean,
+    exact: boolean,
+  ): Set<string> {
+    if (!exact) {
+      const comparisonMatch = value.match(/^([><]=?)(.+)$/);
+      if (comparisonMatch) {
+        const operator = comparisonMatch[1];
+        const compareValueStr = comparisonMatch[2];
+        const compareDate =
+          PropertyEvaluator.parseDateForComparison(compareValueStr);
 
-      // First, try to parse as date comparison
-      const compareDate =
-        PropertyEvaluator.parseDateForComparison(compareValueStr);
-      if (compareDate) {
-        const matchingFiles = new Set<string>();
-
-        // Iterate through all property values in cache
-        cache.forEach((fileSet, propValue) => {
-          const taskDate =
-            PropertyEvaluator.parsePropertyValueAsDate(propValue);
-          if (taskDate) {
-            const matches = PropertyEvaluator.evaluateDateComparison(
-              taskDate,
-              operator,
-              compareDate,
-            );
-
-            if (matches) {
-              fileSet.forEach((filePath) => {
-                matchingFiles.add(filePath);
-              });
-            }
+        if (compareDate) {
+          const matchingFiles = new Set<string>();
+          for (const cache of maps) {
+            cache.forEach((fileSet, propValue) => {
+              const taskDate =
+                PropertyEvaluator.parsePropertyValueAsDate(propValue);
+              if (
+                taskDate &&
+                PropertyEvaluator.evaluateDateComparison(
+                  taskDate,
+                  operator,
+                  compareDate,
+                )
+              ) {
+                fileSet.forEach((filePath) => matchingFiles.add(filePath));
+              }
+            });
           }
-        });
-
-        return matchingFiles;
-      }
-
-      // Fall back to numeric comparison
-      const compareValue = Number(compareValueStr);
-      if (!isNaN(compareValue)) {
-        const matchingFiles = new Set<string>();
-
-        // Iterate through all property values in cache
-        cache.forEach((fileSet, propValue) => {
-          // Only perform comparison if property value is numeric
-          if (typeof propValue === 'number') {
-            let matches = false;
-
-            switch (operator) {
-              case '>':
-                matches = propValue > compareValue;
-                break;
-              case '>=':
-                matches = propValue >= compareValue;
-                break;
-              case '<':
-                matches = propValue < compareValue;
-                break;
-              case '<=':
-                matches = propValue <= compareValue;
-                break;
-            }
-
-            if (matches) {
-              fileSet.forEach((filePath) => {
-                matchingFiles.add(filePath);
-              });
-            }
-          }
-        });
-
-        return matchingFiles;
-      }
-    }
-
-    // Try to parse as date and handle date comparisons
-    const parsedDate = DateUtils.parseDateValue(value);
-
-    if (parsedDate) {
-      const matchingFiles = new Set<string>();
-
-      // Iterate through all property values in cache
-      cache.forEach((fileSet, propValue) => {
-        // Try to parse property value as date
-        const taskDate = PropertyEvaluator.parsePropertyValueAsDate(propValue);
-
-        if (taskDate) {
-          // Use PropertyEvaluator for date comparison
-          if (PropertyEvaluator.compareDate(taskDate, parsedDate)) {
-            fileSet.forEach((filePath) => matchingFiles.add(filePath));
-          }
+          return matchingFiles;
         }
-      });
 
-      if (matchingFiles.size > 0) {
-        return matchingFiles;
+        const compareValue = Number(compareValueStr);
+        if (!isNaN(compareValue)) {
+          const matchingFiles = new Set<string>();
+          for (const cache of maps) {
+            cache.forEach((fileSet, propValue) => {
+              if (typeof propValue !== 'number') return;
+              let matches = false;
+              switch (operator) {
+                case '>':
+                  matches = propValue > compareValue;
+                  break;
+                case '>=':
+                  matches = propValue >= compareValue;
+                  break;
+                case '<':
+                  matches = propValue < compareValue;
+                  break;
+                case '<=':
+                  matches = propValue <= compareValue;
+                  break;
+              }
+              if (matches) {
+                fileSet.forEach((filePath) => matchingFiles.add(filePath));
+              }
+            });
+          }
+          return matchingFiles;
+        }
+      }
+
+      const parsedDate = DateUtils.parseDateValue(value);
+      if (parsedDate) {
+        const matchingFiles = new Set<string>();
+        for (const cache of maps) {
+          cache.forEach((fileSet, propValue) => {
+            const taskDate =
+              PropertyEvaluator.parsePropertyValueAsDate(propValue);
+            if (
+              taskDate &&
+              PropertyEvaluator.compareDate(taskDate, parsedDate)
+            ) {
+              fileSet.forEach((filePath) => matchingFiles.add(filePath));
+            }
+          });
+        }
+        if (matchingFiles.size > 0) return matchingFiles;
       }
     }
 
-    // Handle boolean value search
-    const lowerValue = value.toLowerCase();
-    if (lowerValue === 'true' || lowerValue === 'false') {
-      const boolValue = lowerValue === 'true';
-      const boolResult = cache.get(boolValue);
-      if (boolResult) {
-        return boolResult;
-      }
-    }
-
-    // Value search: return files with this value
-    // Try to match with the same type, or convert to number if possible
-    let result = this.findValueInCache(cache, value, caseSensitive);
-    if (!result) {
-      // Try to parse as number
-      const numValue = Number(value);
-      if (!isNaN(numValue)) {
-        result = cache.get(numValue);
-      }
-    }
-    return result || new Set();
+    return this.findValueInCache(maps, value, caseSensitive, exact);
   }
 
-  // Find a value in the cache with optional case-insensitive matching
+  /**
+   * Match a distinct cached value as a partial string, or exactly when the
+   * query was quoted. Non-string scalars stay typed (1 does not match 12).
+   */
   private findValueInCache(
-    cache: Map<unknown, Set<string>>,
+    maps: Map<unknown, Set<string>>[],
     searchValue: string,
     caseSensitive: boolean,
-  ): Set<string> | undefined {
-    // First try exact match
-    const exactResult = cache.get(searchValue);
-    if (exactResult) {
-      return exactResult;
-    }
+    exact: boolean,
+  ): Set<string> {
+    const results = new Set<string>();
+    const search = caseSensitive ? searchValue : searchValue.toLowerCase();
+    const numeric = Number(searchValue);
+    const lowerSearch = searchValue.toLowerCase();
 
-    // If case-insensitive, search for matching string keys
-    if (!caseSensitive) {
-      const lowerSearch = searchValue.toLowerCase();
-      const cacheEntries = Array.from(cache.entries());
-      for (const [cacheKey, fileSet] of cacheEntries) {
-        if (
-          typeof cacheKey === 'string' &&
-          cacheKey.toLowerCase() === lowerSearch
-        ) {
-          return fileSet;
+    for (const cache of maps) {
+      cache.forEach((fileSet, cacheKey) => {
+        let matches = false;
+
+        if (typeof cacheKey === 'string') {
+          if (exact) {
+            matches = cacheKey === searchValue;
+          } else {
+            const candidate = caseSensitive ? cacheKey : cacheKey.toLowerCase();
+            matches = candidate.includes(search);
+          }
+        } else if (typeof cacheKey === 'number') {
+          matches = !isNaN(numeric) && cacheKey === numeric;
+        } else if (typeof cacheKey === 'boolean') {
+          matches = String(cacheKey) === lowerSearch;
+        } else if (cacheKey instanceof Date) {
+          matches = exact && cacheKey.toISOString() === searchValue;
         }
-      }
+
+        if (matches) {
+          fileSet.forEach((filePath) => results.add(filePath));
+        }
+      });
     }
 
-    return undefined;
+    return results;
+  }
+
+  /** Register one file's frontmatter values and key presence. */
+  private registerFileProperties(
+    filePath: string,
+    frontmatter: Record<string, unknown>,
+  ): void {
+    Object.entries(frontmatter).forEach(([key, value]) => {
+      this.propertyKeys.add(key);
+
+      let valueMap = this.propertyCache.get(key);
+      if (!valueMap) {
+        valueMap = new Map<unknown, Set<string>>();
+        this.propertyCache.set(key, valueMap);
+      }
+
+      let existence = this.propertyExistence.get(key);
+      if (!existence) {
+        existence = new Set<string>();
+        this.propertyExistence.set(key, existence);
+      }
+      existence.add(filePath);
+
+      const values = Array.isArray(value) ? value : [value];
+      for (const item of values) {
+        if (item === undefined) continue;
+        const existingSet = valueMap.get(item);
+        const filePathSet = existingSet ?? new Set<string>();
+        if (!existingSet) {
+          valueMap.set(item, filePathSet);
+        }
+        filePathSet.add(filePath);
+      }
+    });
   }
 
   // Get all files with a specific property key (any value)
   getFilesWithPropertyKey(key: string): Set<string> {
-    const valueMap = this.propertyCache.get(key);
     const files = new Set<string>();
-    if (valueMap) {
-      Array.from(valueMap.values()).forEach((fileSet) => {
-        Array.from(fileSet).forEach((filePath) => {
-          files.add(filePath);
-        });
-      });
-    }
+    this.propertyExistence.get(key)?.forEach((filePath) => files.add(filePath));
+    this.propertyCache.get(key)?.forEach((fileSet) => {
+      fileSet.forEach((filePath) => files.add(filePath));
+    });
     return files;
   }
 
@@ -662,37 +683,7 @@ export class PropertySearchEngine {
       if (file && file instanceof TFile && file.extension === 'md') {
         const cache = this.app.metadataCache.getFileCache(file);
         if (cache?.frontmatter) {
-          // Add new properties to cache
-          Object.entries(cache.frontmatter).forEach(([key, value]) => {
-            this.propertyKeys.add(key);
-
-            // Get or create cache for this property
-            let valueMap = this.propertyCache.get(key);
-            if (!valueMap) {
-              valueMap = new Map<unknown, Set<string>>();
-              this.propertyCache.set(key, valueMap);
-            }
-
-            // Add value to cache
-            if (Array.isArray(value)) {
-              for (const item of value) {
-                if (item === undefined) continue;
-                const existingSet = valueMap.get(item);
-                const filePathSet = existingSet ?? new Set<string>();
-                if (!existingSet) {
-                  valueMap.set(item, filePathSet);
-                }
-                filePathSet.add(filePath);
-              }
-            } else {
-              const existingSet = valueMap.get(value);
-              const filePathSet = existingSet ?? new Set<string>();
-              if (!existingSet) {
-                valueMap.set(value, filePathSet);
-              }
-              filePathSet.add(filePath);
-            }
-          });
+          this.registerFileProperties(filePath, cache.frontmatter);
         }
       }
     }
@@ -738,10 +729,18 @@ export class PropertySearchEngine {
         }
       });
 
-      // If property has no more values, remove the property from cache and property keys
+      const existence = this.propertyExistence.get(key);
+      existence?.delete(filePath);
+      if (existence && existence.size === 0) {
+        this.propertyExistence.delete(key);
+      }
+
+      // Remove the key only when neither values nor presence remain.
       if (valueMap.size === 0) {
         this.propertyCache.delete(key);
-        this.propertyKeys.delete(key);
+        if (!this.propertyExistence.has(key)) {
+          this.propertyKeys.delete(key);
+        }
       }
     });
   }
