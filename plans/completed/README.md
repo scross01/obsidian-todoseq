@@ -377,6 +377,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — each embedded list and dashboard is owned by its Markdown render, refreshes carry a per-instance generation, and debounce timers are cleaned up, so unloaded blocks never repaint. 178 suites / 5,558 tests, build and lint green; no Playwright mode-switch spec.
 - **File**: [058-embedded-render-lifecycle.md](058-embedded-render-lifecycle.md)
 
+### Plan 059
+
+- **Title**: Refresh property-filtered task views after each completed property index batch
+- **Meta**: priority P2 · effort M · depends on 058, 061, 069
+- **Record**: DONE (2026-11-11) — a drained nonempty property batch publishes exactly one refresh to the panel, embedded lists and dashboards; empty and destroyed batches publish nothing and a throwing recipient cannot stop later batches. 179 suites / 5,564 tests, build and lint green; 069 and the host spec remain open.
+- **File**: [059-property-view-invalidation.md](059-property-view-invalidation.md)
+
 ## Execution notes
 
 These notes previously sat directly under the status table in `plans/README.md`.

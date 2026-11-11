@@ -1558,3 +1558,7 @@ instead of painting a detached block. Refreshes carry the generation they
 started with and only the newest commits; debounce timers belong to the
 processor and are cleared by `cleanup()`. `refreshAllEmbeddedTaskLists` and
 `refreshAllDashboards` therefore touch only blocks that are still mounted.
+
+## Property index invalidation
+
+`PropertySearchEngine.processPendingUpdates` publishes one view notification after a drained, nonempty batch commits. The injected callback runs `refreshAllTaskListViews`, which refreshes the main list, embedded lists and dashboards. A disposed engine (after `destroy`) publishes nothing, and a throwing recipient is logged without stopping the batch.

@@ -774,3 +774,7 @@ Pressing Escape or clicking the clear button exits the saved search view, just l
 3. **Punctuation**: Most punctuation is treated as literal characters
 4. **Order**: Search terms can appear in any order in results
 5. **Proximity**: Terms don't need to be adjacent unless using quotes
+
+## Property changes and collection views
+
+Editing only a note's properties changes what property filters match without changing any task. Once the property index has processed a batch of such edits, the Task List, embedded task lists and dashboard cards re-run their property queries, so filtered results update without an edit to the task itself.

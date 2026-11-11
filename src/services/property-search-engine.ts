@@ -43,6 +43,8 @@ export class PropertySearchEngine {
 
   // Track pending update timeout for cleanup
   private pendingUpdateTimeout: number | null = null;
+  /** Set by destroy(); a disposed engine publishes no view notifications. */
+  private isDestroyed = false;
   private readonly PENDING_UPDATE_DEBOUNCE_MS = 100;
 
   // Dependencies
@@ -621,6 +623,10 @@ export class PropertySearchEngine {
   }
 
   private processPendingUpdates(): void {
+    if (this.isDestroyed) {
+      return;
+    }
+
     // A full pass owns the cache until it finishes; it drains this queue in its
     // own tail. Running here would mutate entries the rebuild is still writing.
     if (this.fullPassActive) {
@@ -692,6 +698,29 @@ export class PropertySearchEngine {
     }
 
     this.pendingUpdates.clear();
+
+    // A completed, nonempty batch is the first point where every affected
+    // file's properties are consistent again. Property-filtered views cannot
+    // be refreshed from task equality, so publish exactly one notification.
+    this.notifyIndexCommitted();
+  }
+
+  /**
+   * Tell collection views that the property index has caught up.
+   *
+   * Called once per drained batch. A throwing recipient must not stop the
+   * batch from completing or prevent the next notification.
+   */
+  private notifyIndexCommitted(): void {
+    if (this.isDestroyed) return;
+    try {
+      this.refreshAllTaskListViews();
+    } catch (error) {
+      console.error(
+        'TODOseq: Failed to refresh property-filtered views:',
+        error,
+      );
+    }
   }
 
   // Remove all references to a file from property cache
@@ -803,6 +832,7 @@ export class PropertySearchEngine {
    * Destroy the property search engine and clean up resources
    */
   destroy(): void {
+    this.isDestroyed = true;
     this.reset();
     // Clear any pending update timeout
     if (this.pendingUpdateTimeout) {
