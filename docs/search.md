@@ -58,13 +58,13 @@ This will only match tasks containing the exact sequence "write documentation".
 
 ### OR Logic
 
-Use `OR` or `or` to match either term (case doesn't matter):
+Use `OR` (uppercase) to match either term:
 
 ```txt
 meeting OR call
 ```
 
-This will match tasks containing "meeting" OR "call". To search for the literal word `or` or `and` in task text, quote it (`"or"`) — unquoted it is treated as an operator.
+This will match tasks containing "meeting" OR "call". A lowercase `or`/`and` is an ordinary search word, not an operator — quoting it ("or") matches tasks containing the word itself.
 
 ### AND Logic (Implicit)
 
@@ -74,7 +74,7 @@ Multiple terms without operators use implicit AND:
 meeting work
 ```
 
-This will match tasks containing BOTH "meeting" AND "work". An explicit `AND` or `and` works identically: `meeting AND work`.
+This will match tasks containing BOTH "meeting" AND "work".
 
 ### Exclusion (NOT Logic)
 

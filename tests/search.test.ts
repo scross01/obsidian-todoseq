@@ -74,51 +74,6 @@ describe('Search functionality', () => {
       expect(result.map((t) => t.path)).toContain('notes/meeting.md');
       expect(result.map((t) => t.path)).toContain('notes/personal.md');
     });
-
-    it('treats lowercase or as the OR operator', async () => {
-      const a = createBaseTask({
-        path: 'a.md',
-        rawText: 'TODO alpha task',
-        text: 'alpha task',
-      });
-      const b = createBaseTask({
-        path: 'b.md',
-        rawText: 'TODO beta task',
-        text: 'beta task',
-      });
-
-      expect(await Search.evaluate('alpha or beta', a, false)).toBe(true);
-      expect(await Search.evaluate('alpha or beta', b, false)).toBe(true);
-    });
-
-    it('treats lowercase and as the AND operator', async () => {
-      const both = createBaseTask({
-        path: 'a.md',
-        rawText: 'TODO alpha beta task',
-        text: 'alpha beta task',
-      });
-      const onlyAlpha = createBaseTask({
-        path: 'b.md',
-        rawText: 'TODO alpha task',
-        text: 'alpha task',
-      });
-
-      expect(await Search.evaluate('alpha and beta', both, false)).toBe(true);
-      expect(await Search.evaluate('alpha and beta', onlyAlpha, false)).toBe(
-        false,
-      );
-    });
-
-    it('finds the literal word or through the quoted escape hatch', async () => {
-      const task = createBaseTask({
-        path: 'c.md',
-        rawText: 'TODO this or that',
-        text: 'this or that',
-      });
-
-      expect(await Search.evaluate('"or"', task, false)).toBe(true);
-      expect(await Search.evaluate('this "or" that', task, false)).toBe(true);
-    });
   });
 
   describe('Exact phrase search', () => {

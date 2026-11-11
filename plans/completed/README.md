@@ -202,13 +202,6 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (branch `advisor/031-background-safe-yield`, 2026-10-16; helper extracted to `src/utils/event-loop.ts` — MessageChannel message task with `window.setTimeout(resolve, 0)` fallback, no rAF; scanner keeps its single call site; 3 behavioural tests incl. a never-firing rAF race-guard; CHANGELOG `Unreleased` entry added per convention (later tightened to user-focused wording per new AGENTS.md changelog guideline, commit `34f16a7`; amended into fix commit `d7b4724`), ARCHITECTURE.md needed no edit (it names only `yieldToEventLoop()`); suite 5310/5310 green, project tsc `--skipLibCheck` + lint + build green. Deviations/findings: (1) unclosed MessageChannel ports kept Jest's event loop alive after the suite — applied the plan's cleanup note, both ports closed inside `onmessage`; (2) repo lint rule `obsidianmd/prefer-window-timers` → fallback uses `window.setTimeout`; (3) `npx tsc --noEmit` without `--skipLibCheck` reports 3 pre-existing errors in `node_modules/obsidian.d.ts` (HistoryHandler) — zero project-file errors; (4) `eslint .` chokes on local-only untracked dirs (`demos/`, `output/`, not in eslint ignores) — linted with those two ignored; (5) `npm run format` also reformatted pre-existing drift in `tests/dashboard-renderer.test.ts` — reverted, out of scope, left at HEAD; new test file + helper would fail against the old rAF implementation (verified by re-reading, per plan) — not re-run against the hang)
 - **File**: [031-background-safe-event-loop-yield.md](031-background-safe-event-loop-yield.md)
 
-### Plan 027
-
-- **Title**: Accept lowercase `or`/`and` as search operators
-- **Meta**: priority P3 · effort S–M · depends on 071
-- **Record**: DONE (2026-11-11) — operators match case-insensitively with word-boundary anchors; quoted forms remain literal; red 3 failed → targeted 189, host 7/7, full 188 suites / 5,633 tests
-- **File**: [027-lowercase-operators.md](027-lowercase-operators.md)
-
 ### Plan 032
 
 - **Title**: Org-mode keyword separator — one compose-site rule in `TaskWriter` (`prefix` non-empty and not whitespace-terminated ⇒ single space before `newState`) so `* TODO` survives state cycles; byte-preservation matrix keeps markdown/checkbox/footnote output identical
