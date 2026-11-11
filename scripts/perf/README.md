@@ -13,6 +13,29 @@ fixtures use `.ts` like real plugin content — but the harness must never
 associations would hand an opened `.ts` to a media player (e.g. IINA,
 "Cannot open file or stream") and other extensions to other apps.
 
+## Generating a fixture vault
+
+Write the same deterministic corpus the benchmarks and Obsidian profiling runs
+use:
+
+```bash
+npm run perf:fixture -- --size s --seed 4242 --today 2026-11-10 --out /tmp/todoseq-vault
+```
+
+- `--size` is one of the fixed presets `s` (250 tasks / 50 files), `m`
+  (2,500 / 500) or `l` (10,000 / 2,000); it defaults to `m`.
+- `--seed` defaults to `1337`; `--today` accepts a whole local `YYYY-MM-DD`
+  date and defaults to the local date. Supplying both makes byte-identical
+  output reproducible across machines.
+- `--out` is required; `--output` and `-o` are accepted equivalents.
+- `npm run generate-content` remains as a deprecated alias and prints a
+  migration warning. Its old `--files`/`--length`/`--tasks` counts are rejected
+  before anything is written: they have no exact mapping to the fixed presets.
+- Regeneration overwrites the generated paths but does not remove unrelated
+  files already in the target directory. It is not a cleanup command.
+
+`--help` on either entry point prints the supported options and writes nothing.
+
 ## Tier 1 — node benchmarks (`npm run perf:node`)
 
 Times the pure-logic hot paths over the generated vault, in-process, with

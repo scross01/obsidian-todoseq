@@ -18,6 +18,20 @@
 - `npm run docs:preview` — Preview static production docs
 - `npm run docs:screenshots` — Recapture the docs screenshots (see below)
 
+## Fixture Generation
+
+Manual fixture vaults use the same deterministic corpus as the performance
+harness:
+
+```bash
+npm run perf:fixture -- --size s --seed 4242 --today 2026-11-10 --out /tmp/todoseq-vault
+```
+
+`--size` must be `s`, `m` or `l`; `--out` (also `--output`/`-o`) is required.
+See `scripts/perf/README.md` for presets, determinism and output behavior.
+`npm run generate-content` is a deprecated alias; its arbitrary file/line/task
+count flags are rejected because they cannot be mapped exactly to the presets.
+
 ## Integration Tests
 
 Integration tests launch a real isolated Obsidian instance via Electron, connect over CDP (Chrome DevTools Protocol), and run Playwright tests against the actual plugin.
