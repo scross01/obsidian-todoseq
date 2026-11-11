@@ -335,6 +335,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — smart-date writes go through one synchronous writer transaction with disjoint task/date changes, so other dates and metadata survive; discovery walks past STARTED/CLOSED/DESCRIPTION. 181 suites / 5,578 tests, build and lint green; no host spec.
 - **File**: [064-smart-date-metadata.md](064-smart-date-metadata.md)
 
+### Plan 065
+
+- **Title**: Keep metadata writes safe for code comments and native Org tasks
+- **Meta**: priority P1 · effort M–L · depends on 053
+- **Record**: DONE (2026-11-11) — parser provenance drives a single metadata capability; code-comment state and date writes never add source lines, and Org CLOSED/STARTED survive parse/write/reparse with whitespace-only metadata. 182 suites / 5,583 tests, build and lint green; no host spec.
+- **File**: [065-source-format-metadata.md](065-source-format-metadata.md)
+
 ### Plan 062
 
 - **Title**: Recognize configured task keywords when inserting dates in the editor

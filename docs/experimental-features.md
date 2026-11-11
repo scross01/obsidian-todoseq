@@ -309,3 +309,7 @@ If you encounter issues with code file scanning, please report them on the [GitH
 - Expected behavior
 - Actual behavior
 - Whether the issue persists after disabling and re-enabling the feature
+
+## Dates and code-comment tasks
+
+Code-comment tasks do not receive automatic date lines. Completing a task in a code comment changes only the keyword, because a bare `CLOSED:` or `STARTED:` line inside source code would become executable text; the same applies to direct date actions on those tasks, which leave the file unchanged.

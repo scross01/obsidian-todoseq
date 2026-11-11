@@ -10,6 +10,7 @@ import {
   parseTableCells,
   getTaskIndent,
   getDateLineIndent,
+  supportsTaskMetadata,
   replaceTableCellContent,
 } from '../utils/task-line-utils';
 import { DateParser } from '../parser/date-parser';
@@ -576,7 +577,10 @@ export class TaskWriter {
     // CLOSED date action for this transition (see resolveClosedDateAction).
     // Computed once here: it reads only `task` and `newState`, both immutable
     // inputs, and is consumed by the vault, editor, and accumulator branches.
-    const closedAction = this.resolveClosedDateAction(task, newState);
+    const canWriteMetadata = supportsTaskMetadata(task);
+    const closedAction = canWriteMetadata
+      ? this.resolveClosedDateAction(task, newState)
+      : 'keep';
 
     // STARTED tracking: trigger on entry into an active state.
     // 'first' (default): first-ever start — insert once, never rewrite.
@@ -588,6 +592,7 @@ export class TaskWriter {
     const freshActiveEntry =
       isActiveState && !this.keywordManager.isActive(task.state);
     const shouldStampStarted =
+      canWriteMetadata &&
       Boolean(settings?.trackStartedDate) &&
       isActiveState &&
       (startedMode === 'last'
@@ -1409,6 +1414,10 @@ export class TaskWriter {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ): Promise<Task & { lineDelta?: number }> {
+    if (!supportsTaskMetadata(task)) {
+      return { ...task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline with <br> separators
     if (this.isTableCellDateUpdate(task)) {
       return this.applyTableCellDateUpdate(
@@ -1480,6 +1489,10 @@ export class TaskWriter {
   async removeTaskScheduledDate(
     task: Task,
   ): Promise<Task & { lineDelta?: number }> {
+    if (!supportsTaskMetadata(task)) {
+      return { ...task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline — strip from cell
     if (this.isTableCellDateUpdate(task)) {
       return this.removeTableCellDate(task, 'SCHEDULED');
@@ -1539,6 +1552,10 @@ export class TaskWriter {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ): Promise<Task & { lineDelta?: number }> {
+    if (!supportsTaskMetadata(task)) {
+      return { ...task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline with <br> separators
     if (this.isTableCellDateUpdate(task)) {
       return this.applyTableCellDateUpdate(
@@ -1610,6 +1627,10 @@ export class TaskWriter {
   async removeTaskDeadlineDate(
     task: Task,
   ): Promise<Task & { lineDelta?: number }> {
+    if (!supportsTaskMetadata(task)) {
+      return { ...task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline — strip from cell
     if (this.isTableCellDateUpdate(task)) {
       return this.removeTableCellDate(task, 'DEADLINE');
@@ -1718,6 +1739,10 @@ export class TaskWriter {
     forceVaultApi = false,
     allowOverwrite = false,
   ): Promise<DateLineUpdateResult> {
+    if (!supportsTaskMetadata(task)) {
+      return { task, lineDelta: 0 };
+    }
+
     // Idempotent: if a STARTED line already exists, do nothing — unless
     // allowOverwrite ('last' mode fresh re-entry) rewrites the date in
     // place. STARTED is never removed once set.
@@ -1937,6 +1962,10 @@ export class TaskWriter {
     closedDate: Date,
     forceVaultApi = false,
   ): Promise<DateLineUpdateResult> {
+    if (!supportsTaskMetadata(task)) {
+      return { task, lineDelta: 0 };
+    }
+
     const dateStr = DateUtils.formatClosedDate(closedDate);
     let lineDelta = 0;
 
@@ -2094,6 +2123,10 @@ export class TaskWriter {
     task: Task,
     forceVaultApi = false,
   ): Promise<DateLineUpdateResult> {
+    if (!supportsTaskMetadata(task)) {
+      return { task, lineDelta: 0 };
+    }
+
     // Table tasks store dates inline — strip from cell
     if (this.isTableCellDateUpdate(task)) {
       await this.removeTableCellDate(task, 'CLOSED');

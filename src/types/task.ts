@@ -36,6 +36,7 @@ export interface Task {
   subtaskCompletedCount: number; // number of completed subtasks
   _lastUpdateTime?: number; // timestamp of last task update by TODOseq (used for race condition prevention)
   isTableTask?: boolean; // true if task was parsed from a markdown table cell
+  sourceFormat?: 'markdown' | 'org' | 'code-comment'; // parser provenance; undefined means markdown for legacy snapshots
   tableCell?: { cellIndex: number }; // position info for table cell tasks
 }
 

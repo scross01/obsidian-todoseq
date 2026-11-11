@@ -370,6 +370,7 @@ export class CodeCommentTaskParser implements ITaskParser {
       dailyNoteDate: null,
       subtaskCount: 0,
       subtaskCompletedCount: 0,
+      sourceFormat: 'code-comment',
     };
   }
 

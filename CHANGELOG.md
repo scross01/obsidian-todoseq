@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed code-comment tasks gaining executable metadata lines when their state changed; their date actions now leave the source untouched, and Org tasks keep their CLOSED/STARTED history.
 - Fixed updating a task's date replacing its other metadata, such as an existing scheduled date or started timestamp, instead of changing only the targeted line.
 - Fixed the task list showing stale text on rows revealed by scrolling and letting a slow earlier search replace the newest results, count or error.
 - Fixed property-filtered task lists, embedded lists and dashboards staying stale after a note's properties changed.

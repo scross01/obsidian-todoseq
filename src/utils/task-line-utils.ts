@@ -285,6 +285,12 @@ function lineStartsWithKeyword(
  * @returns The proper indent string for date lines
  */
 export function getTaskIndent(task: Task): string {
+  if (task.sourceFormat === 'org') {
+    // Org tasks store the heading stars in `indent`; metadata belongs on a
+    // whitespace-indented line below the headline, never on a new headline.
+    return ' '.repeat((task.indent?.length ?? 0) + 1);
+  }
+
   // Return the task's leading whitespace indent.
   // Previously computed indent from rawText.indexOf(state) which included
   // list marker characters (e.g. "- [ ] " → 6 spaces), causing date-line
@@ -303,6 +309,15 @@ export function getTaskIndent(task: Task): string {
  * @returns The proper indent string for date lines
  */
 export function getDateLineIndent(task: Task): string {
+  if (task.sourceFormat === 'org') {
+    return getTaskIndent(task);
+  }
+  if (task.sourceFormat === 'code-comment') {
+    // Metadata is not supported in code comments; callers that still ask get
+    // the comment prefix rather than inventing executable syntax.
+    return task.indent ?? '';
+  }
+
   // Extract quote prefix (e.g., "> ", "> > ") if present
   const quotePrefix = task.rawText.match(/^(\s*(>\s*)+)/)?.[1] ?? '';
 
@@ -324,6 +339,15 @@ export function getDateLineIndent(task: Task): string {
   // For tasks with list markers, add 2 spaces to the leading whitespace
   // For keyword-only tasks, use the same indent as the task
   return hasListMarker ? task.indent + '  ' : task.indent;
+}
+
+/**
+ * Whether a task's source format can carry TODOseq metadata lines
+ * (SCHEDULED/DEADLINE/CLOSED/STARTED/DESCRIPTION). Code comments cannot:
+ * inserting bare metadata there changes executable source.
+ */
+export function supportsTaskMetadata(task: Task): boolean {
+  return task.sourceFormat !== 'code-comment';
 }
 
 // ─── Table cell utilities ─────────────────────────────────────────────────────

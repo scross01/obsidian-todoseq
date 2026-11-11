@@ -234,6 +234,7 @@ export class OrgModeTaskParser implements ITaskParser {
       isDailyNote,
       dailyNoteDate,
       quoteNestingLevel: nestingLevel, // Store nesting level here
+      sourceFormat: 'org',
       subtaskCount: 0,
       subtaskCompletedCount: 0,
     };
@@ -247,6 +248,8 @@ export class OrgModeTaskParser implements ITaskParser {
         deadlineDateRepeat,
         scheduledWarningPeriod,
         deadlineWarningPeriod,
+        closedDate,
+        startedDate,
       } = this.extractTaskDates(lines, index + 1);
       task.scheduledDate = scheduledDate;
       task.scheduledDateRepeat = scheduledDateRepeat;
@@ -254,6 +257,8 @@ export class OrgModeTaskParser implements ITaskParser {
       task.deadlineDateRepeat = deadlineDateRepeat;
       task.scheduledWarningPeriod = scheduledWarningPeriod;
       task.deadlineWarningPeriod = deadlineWarningPeriod;
+      task.closedDate = closedDate;
+      task.startedDate = startedDate;
     }
 
     // Calculate urgency for non-completed tasks
@@ -285,6 +290,8 @@ export class OrgModeTaskParser implements ITaskParser {
     deadlineDateRepeat: DateRepeatInfo | null;
     scheduledWarningPeriod: WarningPeriodInfo | null;
     deadlineWarningPeriod: WarningPeriodInfo | null;
+    closedDate: Date | null;
+    startedDate: Date | null;
   } {
     let scheduledDate: Date | null = null;
     let scheduledDateRepeat: DateRepeatInfo | null = null;
@@ -292,6 +299,8 @@ export class OrgModeTaskParser implements ITaskParser {
     let deadlineDateRepeat: DateRepeatInfo | null = null;
     let scheduledWarningPeriod: WarningPeriodInfo | null = null;
     let deadlineWarningPeriod: WarningPeriodInfo | null = null;
+    let closedDate: Date | null = null;
+    let startedDate: Date | null = null;
 
     let inPropertiesDrawer = false;
 
@@ -352,11 +361,19 @@ export class OrgModeTaskParser implements ITaskParser {
         continue;
       }
 
-      // Break if we've found both scheduled and deadline dates
-      // (org-mode dates are on separate lines immediately after the headline)
-      // Otherwise continue to allow finding body text or other date lines
-      if (scheduledDate && deadlineDate) {
-        break;
+      // History lines use inactive brackets and may sit below the planning
+      // dates, so keep scanning until the next headline rather than stopping
+      // once scheduled and deadline are known.
+      const closedMatch = /^\s*CLOSED:\s*(.+)$/.exec(line);
+      if (closedMatch && !closedDate) {
+        closedDate = this.parseOrgDateWithRepeater(closedMatch[1]).date;
+        continue;
+      }
+
+      const startedMatch = /^\s*STARTED:\s*(.+)$/.exec(line);
+      if (startedMatch && !startedDate) {
+        startedDate = this.parseOrgDateWithRepeater(startedMatch[1]).date;
+        continue;
       }
     }
 
@@ -367,6 +384,8 @@ export class OrgModeTaskParser implements ITaskParser {
       deadlineDateRepeat,
       scheduledWarningPeriod,
       deadlineWarningPeriod,
+      closedDate,
+      startedDate,
     };
   }
 

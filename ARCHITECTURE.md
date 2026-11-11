@@ -1562,3 +1562,7 @@ processor and are cleared by `cleanup()`. `refreshAllEmbeddedTaskLists` and
 ## Property index invalidation
 
 `PropertySearchEngine.processPendingUpdates` publishes one view notification after a drained, nonempty batch commits. The injected callback runs `refreshAllTaskListViews`, which refreshes the main list, embedded lists and dashboards. A disposed engine (after `destroy`) publishes nothing, and a throwing recipient is logged without stopping the batch.
+
+## Task source provenance
+
+`Task.sourceFormat` records which parser produced a task (`markdown`, `org`, `code-comment`; an absent value is treated as Markdown for older snapshots). `supportsTaskMetadata` is the single authority for whether TODOseq may write metadata lines: code comments cannot, so writers suppress automatic dates and make direct date actions no-ops while still returning the unchanged task. Org tasks emit new metadata as whitespace-indented lines below the headline, and the Org parser reads CLOSED/STARTED history back into the task.
