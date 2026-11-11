@@ -4,7 +4,7 @@ TODOseq provides several ways to move tasks between locations in your vault. Whe
 
 You can perform these actions through the [task context menu](task-list.md#task-context-menu) or by [drag and drop](task-list.md#drag-and-drop) directly from the Task List into an open file in your vault.
 
-Some copy/move actions require the Daily Notes core plugin to be enabled in Obsidian.
+Some copy/move actions require a daily-note provider: the Daily Notes core plugin, or Periodic Notes with its daily note enabled. When neither provides a daily note, those commands are unavailable in the command palette and nothing is created.
 
 ## What travels with a task
 

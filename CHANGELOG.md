@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed "copy/move to today" being offered when the Daily Notes plugin was disabled but then failing: command availability and the actual transfer now agree, and Periodic Notes can provide the daily note.
 - Fixed tasks in enabled Org notes and code files staying stale after the file was edited, created, deleted or renamed. Renaming a tracked file to an unsupported extension now also clears its old tasks, while attachments stay ignored.
 - Fixed the Task List briefly showing stale tasks when a vault scan overlapped a live edit, and stopped renamed archived notes from bringing their archived tasks back into the list. Moving a task under a new heading now also updates `heading:` search results immediately.
 - Fixed copying and moving a task dropping its `STARTED:`, `CLOSED:` or `DESCRIPTION:` lines: the whole metadata block now travels with the task, while Migrate to Today still removes only the dates it moves.
