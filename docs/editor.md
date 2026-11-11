@@ -284,3 +284,9 @@ Editor interactions respect your cursor position. The Ctrl+Enter keyboard shortc
 TODOseq provides several editor-specific commands to modify task that can be accessed through Obsidian's Command Palette (Ctrl/Cmd+P) and keyboard shortcuts. Task specific commands only appear when your cursor is on a valid task line
 
 See [Command Palette](command-palette.md) for more details.
+
+## Smart dates and existing metadata
+
+When a smart date conversion updates a task that already has date lines, only the targeted line changes. A task with a scheduled date, a started timestamp and a deadline keeps the scheduled date and started timestamp when the deadline is updated, and date recognition continues past those lines instead of adding a duplicate.
+
+If the recognized date has no line of its own yet, the first existing date line is retagged in place, preserving that line's position among the other metadata.

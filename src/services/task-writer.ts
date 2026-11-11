@@ -13,6 +13,7 @@ import {
   replaceTableCellContent,
 } from '../utils/task-line-utils';
 import { DateParser } from '../parser/date-parser';
+import type { EditorView } from '@codemirror/view';
 import TodoTracker from '../main';
 import { getStateTransitionManager } from './task-update-coordinator';
 import {
@@ -41,6 +42,27 @@ export interface DateLineUpdateResult {
   lineDelta: number;
 }
 
+/** A fully formatted metadata line produced by smart-date recognition. */
+export interface SmartDateLine {
+  type: DateLineType;
+  dateText: string;
+}
+
+/**
+ * One synchronous smart-date edit, computed against the current editor
+ * document. `replaceLineNumber` is 1-based; null inserts new date lines
+ * directly below the task line.
+ */
+export interface SmartDateEditRequest {
+  filePath: string;
+  lineNumber: number;
+  expectedTaskText: string;
+  updatedTaskText: string;
+  dateLines: SmartDateLine[];
+  replaceLineNumber: number | null;
+  triggerSource: 'debounce' | 'cursorLeave';
+}
+
 /**
  * Handles writing task state changes to files.
  */
@@ -53,6 +75,71 @@ export class TaskWriter {
     private readonly plugin: TodoTracker,
     private keywordManager: KeywordManager,
   ) {}
+
+  /**
+   * Apply a smart-date conversion as one editor transaction.
+   *
+   * The task-line replacement and the date-line write are disjoint changes
+   * against the same original document, so every other metadata line between
+   * them (SCHEDULED, DEADLINE, STARTED, CLOSED, DESCRIPTION) is preserved
+   * byte-for-byte. Synchronous by design: smart-date recognition runs inside a
+   * requestAnimationFrame callback and must not await the file queue.
+   */
+  applySmartDateEdit(
+    request: SmartDateEditRequest,
+    task: Task,
+    view: EditorView,
+  ): boolean {
+    const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (mdView?.file?.path !== request.filePath) return false;
+
+    const state = view.state;
+    if (request.lineNumber < 1 || request.lineNumber > state.doc.lines) {
+      return false;
+    }
+    const taskLine = state.doc.line(request.lineNumber);
+    if (taskLine.text !== request.expectedTaskText) return false;
+    if (request.dateLines.length === 0) return false;
+
+    const indent = getDateLineIndent(task);
+    const block = request.dateLines
+      .map((line) => `${indent}${line.type}: ${line.dateText}`)
+      .join('\n');
+
+    const changes: { from: number; to: number; insert: string }[] = [
+      { from: taskLine.from, to: taskLine.to, insert: request.updatedTaskText },
+    ];
+
+    if (request.replaceLineNumber !== null) {
+      const lineNumber = request.replaceLineNumber;
+      if (lineNumber < 1 || lineNumber > state.doc.lines) return false;
+      const existing = state.doc.line(lineNumber);
+      if (existing.number === taskLine.number) return false;
+      changes.push({ from: existing.from, to: existing.to, insert: block });
+    } else {
+      changes.push({
+        from: taskLine.to,
+        to: taskLine.to,
+        insert: `\n${block}`,
+      });
+    }
+
+    if (request.triggerSource === 'debounce') {
+      // Cursor to the end of the last written date line. Resolve it against
+      // the post-change document so the earlier task-line edit is accounted
+      // for.
+      const mapped = state.update({ changes });
+      const dateLineNumber =
+        request.replaceLineNumber ??
+        request.lineNumber + request.dateLines.length;
+      const anchor = mapped.state.doc.line(dateLineNumber).to;
+      view.dispatch({ changes, selection: { anchor, head: anchor } });
+    } else {
+      view.dispatch({ changes });
+    }
+
+    return true;
+  }
 
   /**
    * Update the KeywordManager instance when settings change.

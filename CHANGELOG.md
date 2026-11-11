@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed updating a task's date replacing its other metadata, such as an existing scheduled date or started timestamp, instead of changing only the targeted line.
 - Fixed the task list showing stale text on rows revealed by scrolling and letting a slow earlier search replace the newest results, count or error.
 - Fixed property-filtered task lists, embedded lists and dashboards staying stale after a note's properties changed.
 - Fixed embedded task lists and dashboard cards staying active after their note closed or re-rendered, so hidden blocks no longer refresh and overlapping refreshes show the newest result.

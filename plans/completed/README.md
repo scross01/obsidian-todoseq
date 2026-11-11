@@ -328,6 +328,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — the newest query alone commits rows, count and error; cached rows beyond the first batch are patched before reuse; empty results reset pagination; closing the view invalidates every pending refresh. 179 suites / 5,570 tests, build and lint green; no host spec.
 - **File**: [061-task-list-lazy-state.md](061-task-list-lazy-state.md)
 
+### Plan 064
+
+- **Title**: Preserve every other metadata line when smart dates update a task
+- **Meta**: priority P1 · effort M · depends on —
+- **Record**: DONE (2026-11-11) — smart-date writes go through one synchronous writer transaction with disjoint task/date changes, so other dates and metadata survive; discovery walks past STARTED/CLOSED/DESCRIPTION. 181 suites / 5,578 tests, build and lint green; no host spec.
+- **File**: [064-smart-date-metadata.md](064-smart-date-metadata.md)
+
 ### Plan 062
 
 - **Title**: Recognize configured task keywords when inserting dates in the editor

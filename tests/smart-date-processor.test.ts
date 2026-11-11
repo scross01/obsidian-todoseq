@@ -36,10 +36,15 @@ function createMockPlugin(): jest.Mocked<TodoTracker> {
     },
   } as unknown as MockApp;
 
+  const taskEditor = {
+    applySmartDateEdit: jest.fn().mockReturnValue(true),
+  };
+
   return {
     app,
     settings,
     keywordManager,
+    taskEditor,
     getVaultScanner: jest.fn().mockReturnValue(null),
   } as unknown as jest.Mocked<TodoTracker>;
 }
@@ -463,18 +468,18 @@ describe('SmartDateProcessor', () => {
         true,
       );
 
-      // dispatch must be called with a single editor change replacing
-      // the original line with "TODO test\nSCHEDULED: <YYYY-MM-DD Mon>"
-      // Two dispatches: first for content change, second for cursor position
-      expect(dispatchFn).toHaveBeenCalledTimes(1);
-
-      const arg = dispatchFn.mock.calls[0][0];
-      expect(arg.changes.from).toBe(0);
-      expect(arg.changes.to).toBe(lineText.length);
-      const lines = arg.changes.insert.split('\n');
-      expect(lines).toHaveLength(2);
-      expect(lines[0]).toBe('TODO test');
-      expect(lines[1]).toMatch(/^SCHEDULED: <\d{4}-\d{2}-\d{2} Mon>$/);
+      const writer = mockPlugin.taskEditor as unknown as {
+        applySmartDateEdit: jest.Mock;
+      };
+      expect(dispatchFn).not.toHaveBeenCalled();
+      expect(writer.applySmartDateEdit).toHaveBeenCalledTimes(1);
+      const request = writer.applySmartDateEdit.mock.calls[0][0];
+      expect(request.updatedTaskText).toBe('TODO test');
+      expect(request.replaceLineNumber).toBeNull();
+      expect(request.dateLines[0].type).toBe('SCHEDULED');
+      expect(request.dateLines[0].dateText).toMatch(
+        /^<\d{4}-\d{2}-\d{2} Mon>$/,
+      );
     });
 
     it('should not call debounced parser when cursor stays on the same line', async () => {
@@ -660,23 +665,15 @@ describe('SmartDateProcessor', () => {
       // RAF mock fires synchronously — no extra await needed.
       await processor.processLine(filePath, 1, taskLineText, mockView, true);
 
-      // Two dispatches: first for content change, second for cursor position
-      expect(dispatchFn).toHaveBeenCalledTimes(1);
-
-      const arg = dispatchFn.mock.calls[0][0];
-      // The replace path: changes.to reaches the END of the existing SCHEDULED
-      // line (dateLineTo=49), not just the task line boundary.
-      expect(arg.changes.from).toBe(0);
-      expect(arg.changes.to).toBe(dateLineTo);
-
-      const insertLines = arg.changes.insert.split('\n');
-      expect(insertLines).toHaveLength(2);
-      // removeDateFromText strips "at 4:00pm" since it's a time expression,
-      // so the task line in the insert is "TODO test 2".
-      expect(insertLines[0]).toBe('TODO test 2');
-      expect(insertLines[1]).toMatch(
-        /^SCHEDULED: <\d{4}-\d{2}-\d{2} \w{3}(?: \d{2}:\d{2})?>$/,
-      );
+      const writer = mockPlugin.taskEditor as unknown as {
+        applySmartDateEdit: jest.Mock;
+      };
+      expect(dispatchFn).not.toHaveBeenCalled();
+      const request = writer.applySmartDateEdit.mock.calls[0][0];
+      expect(request.replaceLineNumber).toBe(2);
+      // removeDateFromText strips "at 4:00pm" since it's a time expression.
+      expect(request.updatedTaskText).toBe('TODO test 2');
+      expect(request.dateLines[0].type).toBe('SCHEDULED');
     });
 
     it('appends a new date line when no existing date line is present', async () => {
@@ -738,29 +735,25 @@ describe('SmartDateProcessor', () => {
 
       await processor.processLine(filePath, 1, taskLineText, mockView, true);
 
-      // Two dispatches: first for content change, second for cursor position
-      expect(dispatchFn).toHaveBeenCalledTimes(1);
-
-      const arg = dispatchFn.mock.calls[0][0];
-      // No existing date line to replace — range ends at task line boundary
-      expect(arg.changes.from).toBe(0);
-      expect(arg.changes.to).toBe(taskLineLen);
-
-      const insertLines = arg.changes.insert.split('\n');
-      expect(insertLines).toHaveLength(2);
-      // removeDateFromText strips "tomorrow" since it's a date expression,
-      // so the task line in the insert is "TODO test new date".
-      expect(insertLines[0]).toBe('TODO test new date');
-      expect(insertLines[1]).toMatch(
-        /^SCHEDULED: <\d{4}-\d{2}-\d{2} \w{3}(?: \d{2}:\d{2})?>$/,
-      );
+      const writer = mockPlugin.taskEditor as unknown as {
+        applySmartDateEdit: jest.Mock;
+      };
+      expect(dispatchFn).not.toHaveBeenCalled();
+      const request = writer.applySmartDateEdit.mock.calls[0][0];
+      expect(request.replaceLineNumber).toBeNull();
+      // removeDateFromText strips "tomorrow" since it's a date expression.
+      expect(request.updatedTaskText).toBe('TODO test new date');
+      expect(request.dateLines[0].type).toBe('SCHEDULED');
     });
   });
 
   describe('Nested task indentation', () => {
     // Regression: converting a date on an indented (nested) task used to
     // trim the task line, moving the task to the top level of the list.
-    function runConversion(taskLineText: string): string[] {
+    function runConversion(taskLineText: string): {
+      updatedTaskText: string;
+      dateLines: { type: string; dateText: string }[];
+    } {
       const filePath = 'test.md';
       const indent = taskLineText.match(/^\s*/)?.[0] ?? '';
       mockPlugin.getVaultScanner.mockReturnValue({
@@ -805,23 +798,28 @@ describe('SmartDateProcessor', () => {
 
       void processor.processLine(filePath, 2, taskLineText, mockView, true);
 
-      expect(dispatchFn).toHaveBeenCalledTimes(1);
-      return dispatchFn.mock.calls[0][0].changes.insert.split('\n');
+      const writer = mockPlugin.taskEditor as unknown as {
+        applySmartDateEdit: jest.Mock;
+      };
+      expect(dispatchFn).not.toHaveBeenCalled();
+      return writer.applySmartDateEdit.mock.calls[0][0];
     }
 
     it('keeps the indentation of a nested task with a natural language date', async () => {
-      const insertLines = runConversion('    - TODO child task tomorrow');
+      const request = runConversion('    - TODO child task tomorrow');
       await Promise.resolve();
-      expect(insertLines[0]).toBe('    - TODO child task');
+      expect(request.updatedTaskText).toBe('    - TODO child task');
     });
 
     it('keeps the indentation of a nested task with an inline structured date', async () => {
-      const insertLines = runConversion(
+      const request = runConversion(
         '    - TODO child task SCHEDULED: <2026-08-11 Tue>',
       );
       await Promise.resolve();
-      expect(insertLines[0]).toBe('    - TODO child task');
-      expect(insertLines[1]).toBe('      SCHEDULED: <2026-08-11 Tue>');
+      expect(request.updatedTaskText).toBe('    - TODO child task');
+      expect(request.dateLines).toEqual([
+        { type: 'SCHEDULED', dateText: '<2026-08-11 Tue>' },
+      ]);
     });
   });
 
