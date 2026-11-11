@@ -349,6 +349,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — date insertion uses the live KeywordManager and the shared task-line grammar; all configured states are recognised, prose is not, and manager replacement applies immediately. Unit 172 suites / 5,531 tests, build and lint green.
 - **File**: [062-date-autocomplete-keywords.md](062-date-autocomplete-keywords.md)
 
+### Plan 066
+
+- **Title**: Reconcile failed task writes without suppressing recovery or erasing newer updates
+- **Meta**: priority P1 · effort M · depends on —
+- **Record**: DONE (2026-11-11) — failed writes now recover persisted file truth without overwriting newer queued intent; unit tests red 4 failed → green 4 passed; host Playwright scenario not run
+- **File**: [066-failed-write-recovery.md](066-failed-write-recovery.md)
+
 ### Plan 067
 
 - **Title**: Preserve default search over normalized task text

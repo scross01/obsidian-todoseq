@@ -464,6 +464,63 @@ export class VaultScanner
     }
   }
 
+  /**
+   * Reconcile one file from persisted truth after a failed plugin write.
+   *
+   * Deliberately bypasses the skip marker this plugin wrote before the failed
+   * write and the ChangeTracker's expected-content suppression: the file is
+   * the authority after a failure. Publication is guarded by the caller so an
+   * older failure cannot overwrite a newer optimistic request.
+   *
+   * Returns the parsed, non-archived tasks for the file, or null when the
+   * path is excluded. A missing file removes only that file's tasks.
+   */
+  async reconcileFileAfterFailedWrite(
+    filePath: string,
+    file: TFile | null,
+    publish: boolean,
+  ): Promise<Task[] | null> {
+    if (this.isExcluded(filePath)) {
+      return null;
+    }
+    if (file === null) {
+      if (!publish) return null;
+      const updatedTasks = this.taskStateManager
+        .getTasks()
+        .filter((task) => task.path !== filePath);
+      this.taskStateManager.setTasks(updatedTasks);
+      this.emit('tasks-changed', updatedTasks);
+      return [];
+    }
+
+    try {
+      const fileTasks = await this.scanFile(file);
+      const nonArchivedTasks = fileTasks.filter(
+        (task) => !this.keywordManager.isArchived(task.state),
+      );
+
+      if (publish) {
+        const currentTasks = this.taskStateManager.getTasks();
+        const updatedTasks = currentTasks.filter(
+          (task) => task.path !== file.path,
+        );
+        updatedTasks.push(...nonArchivedTasks);
+        updatedTasks.sort(taskComparator);
+        this.taskStateManager.setTasks(updatedTasks);
+        this.emit('tasks-changed', updatedTasks);
+      }
+
+      return nonArchivedTasks;
+    } catch (err) {
+      console.error('VaultScanner reconcileFileAfterFailedWrite error', err);
+      this.emit(
+        'scan-error',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+      return null;
+    }
+  }
+
   // Process incremental file change (called by EventCoordinator)
   async processIncrementalChange(file: TFile): Promise<void> {
     if (this.isExcluded(file.path)) {

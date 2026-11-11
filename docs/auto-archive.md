@@ -87,3 +87,7 @@ See [Settings](settings.md) for every option: [Auto-Archive Settings](settings.m
 ## Keyboard and pop-out windows
 
 The archive dialog keeps Tab and Shift+Tab inside it, Escape closes it, and closing returns focus to the control that opened it. This also works when the dialog is opened in a pop-out window.
+
+## Failed archive writes
+
+If archiving cannot be written to the note, the task returns to its completed state rather than staying hidden as though the archive had succeeded. A later edit to that task is based on the keyword that is actually in the note.

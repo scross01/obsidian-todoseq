@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed failed task changes staying on screen as though they had been saved; the Task List now returns to the note's actual state and later edits build on that saved content.
 - Fixed code-comment tasks gaining executable metadata lines when their state changed; their date actions now leave the source untouched, and Org tasks keep their CLOSED/STARTED history.
 - Fixed updating a task's date replacing its other metadata, such as an existing scheduled date or started timestamp, instead of changing only the targeted line.
 - Fixed the task list showing stale text on rows revealed by scrolling and letting a slow earlier search replace the newest results, count or error.

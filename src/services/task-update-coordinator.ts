@@ -140,6 +140,8 @@ interface ProcessingContext {
     completed: boolean;
     closedDate: Date | null;
   };
+  /** Generation captured when this request was made, before it queues. */
+  fileRequestGeneration?: number;
 }
 
 /**
@@ -173,6 +175,12 @@ export class TaskUpdateCoordinator {
 
   /** Per-file queueing: ensures serialized writes to same file */
   private fileUpdateQueues = new Map<string, PendingFileQueue>();
+
+  /** Latest requested write per file, used to gate recovery publication. */
+  private fileWriteGenerations = new Map<string, number>();
+
+  /** Persisted per-file tasks after a failed write, used to rebase later edits. */
+  private recoveredFileTasks = new Map<string, Task[]>();
 
   /** Cleanup interval for removing stale map entries */
   private cleanupInterval: number | null = null;
@@ -258,6 +266,13 @@ export class TaskUpdateCoordinator {
     return new TaskStateTransitionManager(keywordManager, transitionSettings);
   }
 
+  /** Reserve the next write generation for a file at request time. */
+  private nextFileGeneration(filePath: string): number {
+    const generation = (this.fileWriteGenerations.get(filePath) ?? 0) + 1;
+    this.fileWriteGenerations.set(filePath, generation);
+    return generation;
+  }
+
   /**
    * UNIFIED ENTRY POINT: Update a task with any combination of changes.
    *
@@ -268,6 +283,9 @@ export class TaskUpdateCoordinator {
    */
   async updateTask(context: UpdateContext): Promise<void> {
     const procContext = this.buildProcessingContext(context);
+    procContext.fileRequestGeneration = this.nextFileGeneration(
+      procContext.filePath,
+    );
     this.performSyncPhase(procContext);
     return this.queueAsyncPhase(procContext);
   }
@@ -590,6 +608,17 @@ export class TaskUpdateCoordinator {
    * Used for non-editor sources where the line number may have shifted.
    */
   private resolveStoredTask(context: ProcessingContext): Task {
+    const recovered = this.recoveredFileTasks.get(context.filePath);
+    if (recovered) {
+      const match = recovered.find(
+        (task) =>
+          task.line === context.task.line &&
+          (task.tableCell?.cellIndex ?? null) ===
+            (context.task.tableCell?.cellIndex ?? null),
+      );
+      if (match) return match;
+    }
+
     const cellIndex = context.task.tableCell?.cellIndex;
     let storedTask = this.taskStateManager.findTaskByPathAndLine(
       context.filePath,
@@ -615,6 +644,9 @@ export class TaskUpdateCoordinator {
    */
   private async performAsyncPhase(context: ProcessingContext): Promise<void> {
     const existingQueue = this.fileUpdateQueues.get(context.filePath);
+    const generation =
+      context.fileRequestGeneration ??
+      this.nextFileGeneration(context.filePath);
 
     const doAsyncWork = async (): Promise<void> => {
       const taskEditor = this.plugin.taskEditor;
@@ -661,8 +693,22 @@ export class TaskUpdateCoordinator {
         const file = this.plugin.app.vault.getAbstractFileByPath(
           context.filePath,
         );
-        if (file instanceof TFile) {
-          await this.plugin.vaultScanner?.processIncrementalChange(file);
+        const scanner = this.plugin.vaultScanner;
+        const isLatest =
+          this.fileWriteGenerations.get(context.filePath) === generation;
+        if (scanner?.reconcileFileAfterFailedWrite) {
+          // Recover persisted truth even though the failed write's skip marker
+          // is still live. Publish only when no newer request owns the file.
+          const recovered = await scanner.reconcileFileAfterFailedWrite(
+            context.filePath,
+            file instanceof TFile ? file : null,
+            isLatest,
+          );
+          if (recovered) {
+            this.recoveredFileTasks.set(context.filePath, recovered);
+          }
+        } else if (file instanceof TFile) {
+          await scanner?.processIncrementalChange(file);
         }
         return;
       }
@@ -677,6 +723,7 @@ export class TaskUpdateCoordinator {
         );
       }
 
+      this.recoveredFileTasks.delete(context.filePath);
       this.finalizeTaskState(updatedTask, context);
 
       if (context.type === 'state') {
@@ -718,6 +765,9 @@ export class TaskUpdateCoordinator {
         this.fileUpdateQueues.get(context.filePath)?.promise === queuePromise
       ) {
         this.fileUpdateQueues.delete(context.filePath);
+      }
+      if (this.fileWriteGenerations.get(context.filePath) === generation) {
+        this.fileWriteGenerations.delete(context.filePath);
       }
     }
   }
@@ -1184,6 +1234,8 @@ export class TaskUpdateCoordinator {
     // Clear maps to prevent memory leaks
     this.pendingTaskUpdates.clear();
     this.fileUpdateQueues.clear();
+    this.fileWriteGenerations.clear();
+    this.recoveredFileTasks.clear();
 
     // Clean up recurrence coordinator to clear pending timeouts
     this.recurrenceCoordinator.destroy();
