@@ -83,11 +83,31 @@ describe('SearchTokenizer', () => {
       });
     });
 
-    it('does not match lowercase or/and as operators', () => {
-      const tokens = tokenize('hello or world');
-      expect(tokens).toHaveLength(3);
-      expect(tokens[1].type).toBe('word');
-      expect(tokens[1].value).toBe('or');
+    it('matches lowercase and uppercase or/and as operators', () => {
+      const lower = tokenize('hello or world');
+      expect(lower[1].type).toBe('or');
+      expect(lower[1].value).toBe('or');
+
+      const upper = tokenize('hello OR world');
+      expect(upper[1].type).toBe('or');
+      expect(upper[1].value).toBe('or');
+
+      const mixed = tokenize('todo and done AND cancelled');
+      expect(mixed[1].type).toBe('and');
+      expect(mixed[3].type).toBe('and');
+    });
+
+    it('word boundaries prevent matching inside words', () => {
+      const tokens = tokenize('panda orbit');
+      expect(tokens).toHaveLength(2);
+      expect(tokens.every((t) => t.type === 'word')).toBe(true);
+    });
+
+    it('a quoted "or" is a phrase, never an operator', () => {
+      const tokens = tokenize('"or"');
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0].type).toBe('phrase');
+      expect(tokens[0].value).toBe('or');
     });
 
     it('tokenizes parentheses', () => {

@@ -671,7 +671,7 @@ graph TB
 - **Responsibility**: Lexical analysis of search queries
 - **Key Patterns**: Tokenization, pattern matching, property token detection
 - **Interface**: Token generation, lexical analysis, property token handling
-- **Case**: operator tokens (`OR`, `AND`) are matched case-sensitively by design; ordinary words like "or" remain searchable as text
+- **Case**: operator tokens (`OR`/`AND`) match case-insensitively (Obsidian-parity grammar, word-boundary anchored); the quoted forms "or"/"and" are the escape hatch for searching the literal words.
 
 **SearchSuggestions** (`src/search/search-suggestions.ts`)
 

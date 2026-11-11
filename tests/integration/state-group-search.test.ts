@@ -40,6 +40,13 @@ test.describe('State-group search', () => {
     expect(body).toContain('Completed task');
     expect(body).not.toContain('State cycling task');
 
+    await searchInput.fill('state:active or state:completed');
+    await page.waitForTimeout(800);
+    body = await page.locator('.todoseq-task-list').textContent();
+    expect(body).toContain('In-progress task');
+    expect(body).toContain('Completed task');
+    expect(body).not.toContain('State cycling task');
+
     await searchInput.fill('');
     await page.waitForTimeout(500);
   });
