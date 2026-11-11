@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed table rows containing an escaped pipe so the correct cell is edited and the rest of the row is left byte-for-byte intact.
 - Fixed the archive dialog losing Tab trapping and focus restoration in pop-out windows.
 - Fixed relative date labels and the seven-day date highlight being a day off around daylight-saving transitions.
 - Fixed footnote tasks inside excluded code, comment or math blocks being collected as tasks.

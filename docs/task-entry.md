@@ -896,3 +896,7 @@ When a task state is updated, TODOseq preserves:
 ## Footnote definitions and excluded blocks
 
 Numeric footnote definitions follow the same inclusion settings as other tasks: a definition inside an excluded code, comment or math block is not collected, while an included one is parsed exactly like a task line.
+
+## Escaped pipes in tables
+
+A backslash-escaped pipe (`\|`) inside a table cell is not a cell delimiter. Tasks in a row that contains one keep their displayed cell index, and state or date changes rewrite only that cell — every other byte of the row is left as it was.

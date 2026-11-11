@@ -7,8 +7,10 @@ import { buildWarningPeriodString } from '../utils/date-repeater';
 import {
   findDateLine,
   findDescriptionLine,
+  parseTableCells,
   getTaskIndent,
   getDateLineIndent,
+  replaceTableCellContent,
 } from '../utils/task-line-utils';
 import { DateParser } from '../parser/date-parser';
 import TodoTracker from '../main';
@@ -509,15 +511,13 @@ export class TaskWriter {
     if (!(file instanceof TFile)) return;
 
     const mutateLine = (line: string): string | null => {
-      const cells = line.split('|');
-      let start = 0;
-      if (cells.length > 0 && cells[0].trim() === '') start = 1;
-      const idx = start + task.tableCell!.cellIndex;
-      if (idx >= cells.length) return null;
-      const origCell = cells[idx].trim();
-      const newCell = mutate(origCell);
-      cells[idx] = ` ${newCell} `;
-      return cells.join('|');
+      const cell = parseTableCells(line)[task.tableCell!.cellIndex];
+      if (!cell) return null;
+      return replaceTableCellContent(
+        line,
+        task.tableCell!.cellIndex,
+        mutate(cell.content),
+      );
     };
 
     // If the file is open in the active source-mode editor, update the buffer
