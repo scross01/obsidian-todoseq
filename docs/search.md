@@ -784,3 +784,9 @@ Editing only a note's properties changes what property filters match without cha
 Property filters use one matching contract for the fast index and the metadata fallback. An unquoted value matches partially and ignores case, across every spelling of the key, so `[type:ject]` finds `Project` and `[type:Project]` also finds `project` and `Project backlog`. Quoting a value makes it exact and case-sensitive, and ignores whitespace before the quote: `[type: "Project"]` matches only the exact value `Project`.
 
 `[type]` and `[type:]` ask whether the key exists. They include keys whose value is empty, an empty array or null, and exclude notes without the key. `[type:null]` matches an actual null value, while `[type:""]` matches an exact empty string; the two are no longer conflated. Numeric and boolean values stay typed, so `[size:1]` does not match `12`.
+
+## Combining filters and errors
+
+Adjacent terms and explicit `AND` bind more tightly than `OR`, so `alpha OR beta gamma` means `alpha OR (beta gamma)`. Use parentheses to change that grouping. A date range stays attached to the field it follows, so `state:TODO scheduled:2026-01-01..2026-12-31` filters on both `state` and the scheduled range.
+
+Queries must be structurally complete. A stray closing parenthesis, an unclosed parenthesis or quote, or a dangling operator is reported as an invalid query instead of being silently ignored or reduced to the text before it. A complete query that simply matches nothing is still a valid empty result. The Task List shows the validation message and clears it when the query is corrected.

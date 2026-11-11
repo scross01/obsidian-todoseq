@@ -377,6 +377,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — partial, mixed-case, existence, null and exact-empty property matching now share one contract across the index and fallback; unit tests red 6 failed → green 6 passed; host Playwright scenario not run
 - **File**: [069-indexed-property-contract.md](069-indexed-property-contract.md)
 
+### Plan 071
+
+- **Title**: Apply complete search grammar with consistent precedence and visible errors
+- **Meta**: priority P2 · effort M–L · depends on 061; sequence 069 first
+- **Record**: DONE (2026-11-11) — ranges no longer swallow earlier filters, adjacency binds above OR, incomplete queries fail loudly and the Task List shows the error; unit tests red 4 failed → green 5 passed; host panel/recovery test not run
+- **File**: [071-search-grammar-and-errors.md](071-search-grammar-and-errors.md)
+
 ### Plan 072
 
 - **Title**: Preserve archive dialog keyboard traversal and focus in pop-out windows

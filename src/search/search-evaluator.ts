@@ -1122,10 +1122,103 @@ export class SearchEvaluator {
       return false;
     }
 
+    const frontmatter = fileCache.frontmatter as Record<string, unknown>;
+    const effectiveCaseSensitive = node.exact ? true : caseSensitive;
+
+    if (descriptor.kind === 'string') {
+      let text = descriptor.value.trim();
+      if (text.startsWith('(') && text.endsWith(')')) {
+        text = text.slice(1, -1).trim();
+      }
+
+      if (text.includes(' OR ')) {
+        return text
+          .split(' OR ')
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .some((part) =>
+            PropertyEvaluator.matchesPropertyFilter(
+              frontmatter,
+              { ...descriptor, value: part },
+              effectiveCaseSensitive,
+            ),
+          );
+      }
+
+      if (!descriptor.exact) {
+        const parsedDate = DateUtils.parseDateValue(text);
+        if (parsedDate) {
+          const keys = PropertyEvaluator.matchingKeys(
+            frontmatter,
+            descriptor,
+            effectiveCaseSensitive,
+          );
+          const matched = keys.some((key) => {
+            const raw = frontmatter[key];
+            const values = Array.isArray(raw) ? raw : [raw];
+            return values.some((value) => {
+              const taskDate =
+                PropertyEvaluator.parsePropertyValueAsDate(value);
+              return taskDate
+                ? PropertyEvaluator.compareDate(taskDate, parsedDate)
+                : false;
+            });
+          });
+          if (matched) return true;
+        }
+
+        const comparison = text.match(/^([><]=?)(.+)$/);
+        if (comparison) {
+          const operator = comparison[1];
+          const compareText = comparison[2];
+          const compareDate =
+            PropertyEvaluator.parseDateForComparison(compareText);
+          const compareNumber = Number(compareText);
+          const keys = PropertyEvaluator.matchingKeys(
+            frontmatter,
+            descriptor,
+            effectiveCaseSensitive,
+          );
+          return keys.some((key) => {
+            const raw = frontmatter[key];
+            const values = Array.isArray(raw) ? raw : [raw];
+            return values.some((value) => {
+              if (compareDate) {
+                const taskDate =
+                  PropertyEvaluator.parsePropertyValueAsDate(value);
+                return taskDate
+                  ? PropertyEvaluator.evaluateDateComparison(
+                      taskDate,
+                      operator,
+                      compareDate,
+                    )
+                  : false;
+              }
+              if (typeof value !== 'number' || isNaN(compareNumber)) {
+                return false;
+              }
+              switch (operator) {
+                case '>':
+                  return value > compareNumber;
+                case '>=':
+                  return value >= compareNumber;
+                case '<':
+                  return value < compareNumber;
+                case '<=':
+                  return value <= compareNumber;
+                default:
+                  return false;
+              }
+            });
+          });
+        }
+      }
+    }
+
     return PropertyEvaluator.matchesPropertyFilter(
-      fileCache.frontmatter,
+      frontmatter,
       descriptor,
-      node.exact ? true : caseSensitive,
+      effectiveCaseSensitive,
     );
   }
 

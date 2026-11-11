@@ -1574,3 +1574,7 @@ processor and are cleared by `cleanup()`. `refreshAllEmbeddedTaskLists` and
 ## Plugin teardown ownership
 
 `PluginLifecycleManager.onunload` owns the update coordinator and destroys and clears it synchronously, before awaiting `EventCoordinator.destroy`, so its repeating cleanup timer and pending recurrence timeouts stop with the plugin. `UIManager` records the exact capture-phase options it installs, clears their removal options with the same object shape, and tracks delayed editor setup in owned timer handles guarded by a disposal flag, so cleanup cancels setup instead of letting it reattach handlers.
+
+## Search grammar and validation
+
+The tokenizer treats adjacency as conjunction at `AND` binding power (80), above `OR` (60). Range lookahead is bounded to the current value token, so a later date range cannot consume an earlier prefix value; when an implicit conjunction has already grouped a date prefix, the range attaches to that last prefix filter. Top-level parsing requires every token to be consumed, and an unterminated quote raises `SearchError` instead of being skipped. `TaskListView` validates a nonblank query with `Search.getError` before filtering, so structural and closed-domain errors are displayed with no rows and are cleared on correction, while `Search.filterTasks` keeps its `SearchError` → `[]` facade for other callers.

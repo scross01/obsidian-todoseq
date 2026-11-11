@@ -1941,39 +1941,43 @@ export class TaskListView extends ItemView {
     // count or error.
     const q = this.getSearchQuery().trim();
     if (q.length > 0) {
+      const validationError = Search.getError(q);
       let filtered: Task[];
-      let nextSearchError: string | null = null;
-      try {
-        // Replace the per-row Promise.all fan-out with the single-pass bulk
-        // filter: property engines re-solve once per unique filter, then the
-        // whole tree evaluates synchronously over the task set.
-        filtered = await Search.filterTasks(
-          visible,
-          q,
-          this.isCaseSensitive,
-          this.plugin.settings,
-          this.plugin.propertySearchEngine ?? undefined,
-        );
-      } catch {
-        // If there's an error in parsing, fall back to simple search
-        const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
-        const searchText = this.isCaseSensitive
-          ? (text: string) => text
-          : (text: string) => text.toLowerCase();
-
-        filtered = visible.filter((t) => {
-          const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
-          return (
-            (t.rawText && searchText(t.rawText).includes(searchQuery)) ||
-            (t.text && searchText(t.text).includes(searchQuery)) ||
-            (t.path && searchText(t.path).includes(searchQuery)) ||
-            (baseName && searchText(baseName).includes(searchQuery))
+      let nextSearchError: string | null = validationError;
+      if (validationError) {
+        filtered = [];
+      } else
+        try {
+          // Replace the per-row Promise.all fan-out with the single-pass bulk
+          // filter: property engines re-solve once per unique filter, then the
+          // whole tree evaluates synchronously over the task set.
+          filtered = await Search.filterTasks(
+            visible,
+            q,
+            this.isCaseSensitive,
+            this.plugin.settings,
+            this.plugin.propertySearchEngine ?? undefined,
           );
-        });
+        } catch {
+          // If there's an error in parsing, fall back to simple search
+          const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
+          const searchText = this.isCaseSensitive
+            ? (text: string) => text
+            : (text: string) => text.toLowerCase();
 
-        // Store the error for display
-        nextSearchError = Search.getError(q) || 'Invalid search query';
-      }
+          filtered = visible.filter((t) => {
+            const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
+            return (
+              (t.rawText && searchText(t.rawText).includes(searchQuery)) ||
+              (t.text && searchText(t.text).includes(searchQuery)) ||
+              (t.path && searchText(t.path).includes(searchQuery)) ||
+              (baseName && searchText(baseName).includes(searchQuery))
+            );
+          });
+
+          // Store the error for display
+          nextSearchError = Search.getError(q) || 'Invalid search query';
+        }
 
       if (!this.isCurrentRefresh(currentGeneration)) {
         return;

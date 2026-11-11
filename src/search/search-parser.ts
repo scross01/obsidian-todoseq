@@ -104,7 +104,20 @@ export class SearchParser {
 
   static parseTokens(tokens: SearchToken[]): SearchNode {
     const parser = new PrattParser(tokens);
-    return parser.parseExpression(0);
+    const ast = parser.parseExpression(0);
+
+    // A complete top-level query consumes every token. Previously a trailing
+    // `)` was silently ignored, so `alpha) deadline:today` searched only alpha.
+    const remaining = parser.getRemainingToken();
+    if (remaining) {
+      throw new SearchError(
+        remaining.type === 'rparen'
+          ? 'Unexpected closing parenthesis'
+          : `Unexpected token: ${remaining.original}`,
+      );
+    }
+
+    return ast;
   }
 
   static validate(query: string): boolean {
@@ -128,6 +141,12 @@ class PrattParser {
 
   constructor(tokens: SearchToken[]) {
     this.tokens = tokens;
+  }
+
+  getRemainingToken(): SearchToken | null {
+    return this.position < this.tokens.length
+      ? this.tokens[this.position]
+      : null;
   }
 
   parseExpression(bp: number): SearchNode {
@@ -499,53 +518,45 @@ class PrattParser {
       }
 
       case 'range': {
-        // Handle range expressions like "2024-01-01..2024-01-31",
-        // "2026-10-07.." (right-open), and "..2026-12-31" (left-open,
-        // where the range token directly follows the prefix).
-        // The left node should be a prefix filter with a date value,
-        // or (left-open form) be absent entirely.
+        // An implicit conjunction may already have grouped the date prefix
+        // with an earlier filter (`state:TODO scheduled:...`). Apply the range
+        // to that last prefix filter instead of rejecting the whole group.
+        const parentAnd = left.type === 'and' ? left : null;
+        const lastChild = parentAnd?.children?.[parentAnd.children.length - 1];
+        const target =
+          left.type === 'prefix_filter'
+            ? left
+            : lastChild?.type === 'prefix_filter'
+              ? lastChild
+              : null;
+
         if (
-          left.type === 'prefix_filter' &&
-          left.field &&
-          (left.field === 'scheduled' ||
-            left.field === 'deadline' ||
-            left.field === 'closed' ||
-            left.field === 'started')
+          target &&
+          target.field &&
+          (target.field === 'scheduled' ||
+            target.field === 'deadline' ||
+            target.field === 'closed' ||
+            target.field === 'started')
         ) {
-          // A comparison operator is meaningful on a single bound
-          // (`scheduled:>=2026-10`) but not on a range bound, where it has no
-          // coherent reading. It used to pass validation here because the
-          // operator was stripped for the date check and then kept on the
-          // stored value, so the evaluator's date parse returned null and the
-          // filter matched nothing at all. Reject it instead of answering
-          // with a silent empty result.
-          if (/^[<>]=?/.test(left.value ?? '')) {
-            // Name the field the user typed: this branch covers four of them,
-            // and telling someone who wrote `deadline:` to try `scheduled:`
-            // sends them off fixing the wrong query.
+          if (/^[<>]=?/.test(target.value ?? '')) {
             throw new SearchError(
               'Comparison operators cannot be used as range bounds. ' +
-                `Use ${left.field}:2026-10.. for an open-ended range, or a bare bound for a comparison.`,
+                `Use ${target.field}:2026-10.. for an open-ended range, or a bare bound for a comparison.`,
             );
           }
 
-          // Fail loud on date-shaped but calendar-invalid start bounds —
-          // the prefix value already passed single-value validation, but
-          // only when it is date-shaped (2026-02-30 as a range start).
           if (
-            looksLikeDateBound(left.value ?? '') &&
+            looksLikeDateBound(target.value ?? '') &&
             !DateUtils.parseDateBound(
-              (left.value ?? '').replace(/^[<>]=?/, ''),
+              (target.value ?? '').replace(/^[<>]=?/, ''),
               'start',
             )
           ) {
             throw new SearchError(
-              `Invalid date value: ${left.value}. Use YYYY-MM-DD, YYYY-MM, or YYYY`,
+              `Invalid date value: ${target.value}. Use YYYY-MM-DD, YYYY-MM, or YYYY`,
             );
           }
 
-          // Right-open form: no value token after the range operator.
-          // A new term (prefix/property/word/rparen/EOF) ends the range.
           const rightToken = this.tokens[this.position];
           const rightIsValue =
             rightToken &&
@@ -553,47 +564,53 @@ class PrattParser {
               rightToken.type === 'word' ||
               rightToken.type === 'phrase');
 
+          let range: SearchNode;
           if (!rightIsValue) {
-            return {
+            range = {
               type: 'range_filter',
-              field: left.field,
-              start: left.value,
+              field: target.field,
+              start: target.value,
               end: undefined,
+              position: operator.position,
+            };
+          } else {
+            this.position++;
+
+            if (/^[<>]=?/.test(rightToken.value)) {
+              throw new SearchError(
+                'Comparison operators cannot be used as range bounds. ' +
+                  `Use ${target.field}:..2026-10 for an open-ended range, or a bare bound for a comparison.`,
+              );
+            }
+
+            if (
+              looksLikeDateBound(rightToken.value) &&
+              !DateUtils.parseDateBound(rightToken.value, 'end')
+            ) {
+              throw new SearchError(
+                `Invalid date value: ${rightToken.value}. Use YYYY-MM-DD, YYYY-MM, or YYYY`,
+              );
+            }
+
+            range = {
+              type: 'range_filter',
+              field: target.field,
+              start: target.value,
+              end: rightToken.value,
               position: operator.position,
             };
           }
 
-          this.position++;
-
-          if (/^[<>]=?/.test(rightToken.value)) {
-            throw new SearchError(
-              'Comparison operators cannot be used as range bounds. ' +
-                `Use ${left.field}:..2026-10 for an open-ended range, or a bare bound for a comparison.`,
-            );
+          if (parentAnd && parentAnd.children) {
+            parentAnd.children[parentAnd.children.length - 1] = range;
+            return parentAnd;
           }
-
-          // Fail loud on date-shaped but calendar-invalid end bounds.
-          if (
-            looksLikeDateBound(rightToken.value) &&
-            !DateUtils.parseDateBound(rightToken.value, 'end')
-          ) {
-            throw new SearchError(
-              `Invalid date value: ${rightToken.value}. Use YYYY-MM-DD, YYYY-MM, or YYYY`,
-            );
-          }
-
-          return {
-            type: 'range_filter',
-            field: left.field,
-            start: left.value,
-            end: rightToken.value,
-            position: operator.position,
-          };
-        } else {
-          throw new SearchError(
-            'Range operator can only be used with scheduled:, deadline:, closed:, or started: prefixes',
-          );
+          return range;
         }
+
+        throw new SearchError(
+          'Range operator can only be used with scheduled:, deadline:, closed:, or started: prefixes',
+        );
       }
 
       default:

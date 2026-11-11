@@ -32,12 +32,23 @@ export class PropertyEvaluator {
   ): boolean {
     if (descriptor.kind === 'existence') return true;
     if (descriptor.kind === 'null') return value === null;
+    // A literal null is presence-only; it must not match text through the
+    // "[object Null]" coercion used for plain objects below.
+    if (value === null) return false;
 
     const search = descriptor.value;
     if (descriptor.exact) {
       if (typeof value === 'string') return value === search;
-      if (typeof value === 'number' || typeof value === 'boolean') {
-        return String(value) === search;
+      if (
+        typeof value === 'number' ||
+        typeof value === 'boolean' ||
+        (typeof value === 'object' && value !== null)
+      ) {
+        const text =
+          value instanceof Date
+            ? value.toISOString()
+            : (Object.prototype.toString.call(value) as string);
+        return text === search;
       }
       return false;
     }
@@ -54,7 +65,15 @@ export class PropertyEvaluator {
     if (typeof value === 'boolean') {
       return String(value) === search.toLowerCase();
     }
-    return false;
+
+    // Objects keep the established "[object Object]" contract.
+    const text =
+      value instanceof Date
+        ? value.toISOString()
+        : (Object.prototype.toString.call(value) as string);
+    return caseSensitive
+      ? text.includes(search)
+      : text.toLowerCase().includes(search.toLowerCase());
   }
 
   /**
