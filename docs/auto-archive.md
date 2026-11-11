@@ -83,3 +83,7 @@ Automatic runs always use the days threshold (never date mode), respect the same
 ## Settings Reference
 
 See [Settings](settings.md) for every option: [Auto-Archive Settings](settings.md#auto-archive-settings).
+
+## Keyboard and pop-out windows
+
+The archive dialog keeps Tab and Shift+Tab inside it, Escape closes it, and closing returns focus to the control that opened it. This also works when the dialog is opened in a pop-out window.

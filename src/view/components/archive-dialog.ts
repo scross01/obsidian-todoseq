@@ -305,10 +305,13 @@ export class ArchiveDialog {
     // dismiss. Querying the document also self-heals if a dialog was orphaned.
     if (activeDocument.querySelector('.todoseq-archive-backdrop')) return;
 
+    // Capture by capability, not by the main realm's HTMLElement constructor:
+    // in a pop-out window every element fails `instanceof HTMLElement`, which
+    // used to leave `lastFocused` null and lose focus restoration.
+    const openingDocument = activeDocument;
+    const active = openingDocument.activeElement as HTMLElement | null;
     this.lastFocused =
-      activeDocument.activeElement instanceof HTMLElement
-        ? activeDocument.activeElement
-        : null;
+      active && typeof active.focus === 'function' ? active : null;
 
     const backdrop = activeDocument.body.createDiv({
       cls: 'todoseq-archive-backdrop',
@@ -362,10 +365,11 @@ export class ArchiveDialog {
     if (focusables.length === 0) return;
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
-    const active =
-      activeDocument.activeElement instanceof HTMLElement
-        ? activeDocument.activeElement
-        : null;
+    // The dialog may live in a pop-out window: read its own document and
+    // compare actual element identity rather than the main realm's
+    // HTMLElement constructor.
+    const doc = modal.ownerDocument;
+    const active = doc.activeElement as HTMLElement | null;
     if (e.shiftKey) {
       if (active === first || !modal.contains(active)) {
         e.preventDefault();
@@ -386,8 +390,11 @@ export class ArchiveDialog {
       this.backdropEl.remove();
       this.backdropEl = null;
     }
-    this.lastFocused?.focus();
+    const target = this.lastFocused;
     this.lastFocused = null;
+    if (target && typeof target.focus === 'function' && target.isConnected) {
+      target.focus();
+    }
   }
 
   private buildHeader(): void {
