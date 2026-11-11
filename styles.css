@@ -790,15 +790,6 @@
     color-mix(in srgb, var(--interactive-accent) 50%, transparent);
 }
 
-/* Ensure paragraphs containing date lines don't inherit date styling */
-.markdown-preview-view
-  p:not(.todoseq-scheduled-line):not(.todoseq-deadline-line):not(
-    .todoseq-closed-line
-  ):not(.todoseq-started-line) {
-  font-size: var(--font-text-size);
-  color: var(--text-normal);
-}
-
 /* Completed task text styling */
 :is(.markdown-preview-view, .cm-editor) .todoseq-completed-task-text {
   text-decoration: line-through;

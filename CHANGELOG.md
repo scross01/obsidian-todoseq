@@ -1,5 +1,9 @@
 # Change Log
 
+## Unreleased
+
+- Fixed reading mode forcing every paragraph to the default text colour and size, which overrode colours set by themes and other plugins — for example trait and action names rendered by Fantasy Statblocks.
+
 ## 0.22.0
 
 - Plain search terms now also match a task's description: searching `format` finds both a task whose line says "check the document format" and one whose DESCRIPTION: line mentions "format". Use `content:` to search the task line alone.
