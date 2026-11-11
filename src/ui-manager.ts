@@ -38,7 +38,10 @@ export class UIManager {
         this.plugin.settings,
         () => this.plugin.vaultScanner?.getParser() ?? null,
       ),
-      dateAutocompleteExtension(this.plugin.settings),
+      dateAutocompleteExtension(
+        this.plugin.settings,
+        () => this.plugin.keywordManager,
+      ),
     ]);
     this.plugin.taskFormatters.set('editor-extension', extension);
   }

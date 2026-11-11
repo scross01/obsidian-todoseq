@@ -97,7 +97,10 @@ export function findDateLine(
  * @param keywordManager - KeywordManager for dynamic keyword detection
  * @returns true if the line appears to be a task
  */
-function isTaskLine(line: string, keywordManager: KeywordManager): boolean {
+export function isTaskLine(
+  line: string,
+  keywordManager: KeywordManager,
+): boolean {
   // Check for checkbox pattern: - [ ] or - [x]
   if (/^[\s]*- \[[ x]\]/i.test(line)) {
     return true;
@@ -107,8 +110,10 @@ function isTaskLine(line: string, keywordManager: KeywordManager): boolean {
   for (let i = 0; i < allKeywords.length; i++) {
     const keyword = allKeywords[i];
     const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Accept the same prefixes the parser allows: indentation, blockquote
+    // markers and an optional bullet marker before the keyword.
     const taskPattern = new RegExp(
-      `^[\\s]*${escaped}\\b|^>+\\s+${escaped}\\b`,
+      `^(?:\\s*>\\s*)*\\s*(?:[-*+]\\s+)?${escaped}\\b`,
       'i',
     );
     if (taskPattern.test(line)) {

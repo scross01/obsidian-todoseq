@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed date autocomplete only recognising a few hardcoded task states: configured and built-in states now get the date shortcut, while ordinary prose that merely contains a keyword does not.
 - Fixed "copy/move to today" being offered when the Daily Notes plugin was disabled but then failing: command availability and the actual transfer now agree, and Periodic Notes can provide the daily note.
 - Fixed tasks in enabled Org notes and code files staying stale after the file was edited, created, deleted or renamed. Renaming a tracked file to an unsupported extension now also clears its old tasks, while attachments stay ignored.
 - Fixed the Task List briefly showing stale tasks when a vault scan overlapped a live edit, and stopped renamed archived notes from bringing their archived tasks back into the list. Moving a task under a new heading now also updates `heading:` search results immediately.

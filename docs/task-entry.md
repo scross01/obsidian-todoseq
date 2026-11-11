@@ -603,6 +603,10 @@ When you mark a task with a repeating date as completed (default completed state
 
 Tasks with repeating dates display a repeat icon in the task list to indicate they will advance when completed.
 
+### Inserting dates from the editor
+
+Typing `SCHEDULED:` or `DEADLINE:` at the start of a line — optionally indented or after a list marker — directly below a task inserts today's date and selects it so you can type over it. The line above must be a real task line (any configured state keyword, built-in or custom) or another date line for that task; ordinary prose that merely contains a word like `TODO` does not trigger it. This shortcut also requires task keyword formatting to be enabled in settings.
+
 ### Warning Periods (Advance Notice / Delayed Notice)
 
 TODOseq supports org-mode compatible warning periods for SCHEDULED and DEADLINE dates. Warning periods control when a task becomes visible in the task list.

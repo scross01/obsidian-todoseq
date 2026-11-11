@@ -1,12 +1,20 @@
 import { EditorView, keymap } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { TodoTrackerSettings } from '../../settings/settings-types';
+import { KeywordManager } from '../../utils/keyword-manager';
+import { isTaskLine } from '../../utils/task-line-utils';
 
 /**
  * Editor extension for automatic date insertion after SCHEDULED: and DEADLINE: keywords
  */
 export class DateAutocompleteExtension {
-  constructor(private settings: TodoTrackerSettings) {}
+  constructor(
+    private settings: TodoTrackerSettings,
+    // A getter, not an instance: settings edits replace the KeywordManager and
+    // date insertion must follow the current task vocabulary without reload.
+    private getKeywordManager: () => KeywordManager = () =>
+      new KeywordManager(settings),
+  ) {}
 
   /**
    * Create the editor extension for date autocomplete
@@ -106,16 +114,9 @@ export class DateAutocompleteExtension {
         continue;
       }
 
-      // Check if previous line is a task line (contains task keywords)
-      const taskKeywords = ['TODO', 'DOING', 'DONE', 'CANCELLED', 'CANCELED'];
-      const isTaskLine = taskKeywords.some(
-        (keyword) =>
-          prevLineText.startsWith(keyword) ||
-          prevLineText.includes(` ${keyword} `) ||
-          prevLineText.includes(`\t${keyword} `),
-      );
-
-      if (isTaskLine) {
+      // Check if previous line is a task line using the same grammar and
+      // keyword vocabulary as parsing (configured states included).
+      if (isTaskLine(prevLineText, this.getKeywordManager())) {
         return true;
       }
 
@@ -183,7 +184,8 @@ export class DateAutocompleteExtension {
  */
 export function dateAutocompleteExtension(
   settings: TodoTrackerSettings,
+  getKeywordManager?: () => KeywordManager,
 ): Extension {
-  const extension = new DateAutocompleteExtension(settings);
+  const extension = new DateAutocompleteExtension(settings, getKeywordManager);
   return extension.createExtension();
 }
