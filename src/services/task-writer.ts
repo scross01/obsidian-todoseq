@@ -806,8 +806,9 @@ export class TaskWriter {
             : TaskWriter.buildDateLineContent(
                 options.newScheduledDate,
                 options.newScheduledRepeat ?? task.scheduledDateRepeat,
-                options.newScheduledWarningPeriod ??
-                  task.scheduledWarningPeriod,
+                options.newScheduledWarningPeriod !== undefined
+                  ? options.newScheduledWarningPeriod
+                  : task.scheduledWarningPeriod,
               ),
         );
       }
@@ -820,7 +821,9 @@ export class TaskWriter {
             : TaskWriter.buildDateLineContent(
                 options.newDeadlineDate,
                 options.newDeadlineRepeat ?? task.deadlineDateRepeat,
-                options.newDeadlineWarningPeriod ?? task.deadlineWarningPeriod,
+                options.newDeadlineWarningPeriod !== undefined
+                  ? options.newDeadlineWarningPeriod
+                  : task.deadlineWarningPeriod,
               ),
         );
       }
@@ -1935,8 +1938,9 @@ export class TaskWriter {
               : TaskWriter.buildDateLineContent(
                   options.newScheduledDate,
                   options.newScheduledRepeat ?? task.scheduledDateRepeat,
-                  options.newScheduledWarningPeriod ??
-                    task.scheduledWarningPeriod,
+                  options.newScheduledWarningPeriod !== undefined
+                    ? options.newScheduledWarningPeriod
+                    : task.scheduledWarningPeriod,
                 );
           const delta = this.updateDateLineInEditor(
             editor,
@@ -1956,8 +1960,9 @@ export class TaskWriter {
               : TaskWriter.buildDateLineContent(
                   options.newDeadlineDate,
                   options.newDeadlineRepeat ?? task.deadlineDateRepeat,
-                  options.newDeadlineWarningPeriod ??
-                    task.deadlineWarningPeriod,
+                  options.newDeadlineWarningPeriod !== undefined
+                    ? options.newDeadlineWarningPeriod
+                    : task.deadlineWarningPeriod,
                 );
           const delta = this.updateDateLineInEditor(
             editor,
@@ -2004,8 +2009,9 @@ export class TaskWriter {
               const dateStr = TaskWriter.buildDateLineContent(
                 options.newScheduledDate,
                 options.newScheduledRepeat ?? task.scheduledDateRepeat,
-                options.newScheduledWarningPeriod ??
-                  task.scheduledWarningPeriod,
+                options.newScheduledWarningPeriod !== undefined
+                  ? options.newScheduledWarningPeriod
+                  : task.scheduledWarningPeriod,
               );
               const result = this.updateOrInsertDateLine(
                 lines,
@@ -2032,7 +2038,9 @@ export class TaskWriter {
               const dateStr = TaskWriter.buildDateLineContent(
                 options.newDeadlineDate,
                 options.newDeadlineRepeat ?? task.deadlineDateRepeat,
-                options.newDeadlineWarningPeriod ?? task.deadlineWarningPeriod,
+                options.newDeadlineWarningPeriod !== undefined
+                  ? options.newDeadlineWarningPeriod
+                  : task.deadlineWarningPeriod,
               );
               const result = this.updateOrInsertDateLine(
                 lines,

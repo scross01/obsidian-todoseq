@@ -140,6 +140,57 @@ test.describe('Basic state cycle with DEADLINE + repeat', () => {
   });
 });
 
+test.describe('Mixed dates and first-only warnings', () => {
+  test.beforeEach(async () => {
+    await resetVaultState(page);
+  });
+
+  test('rolls only the repeating date and drops a first-only warning', async () => {
+    await openFileInEditor(page, 'recurrence-mixed');
+
+    const initialContent = await readVaultFile(page, 'recurrence-mixed');
+    expect(initialContent).not.toBeNull();
+    const initialScheduled = initialContent!.match(
+      /SCHEDULED: <(\d{4}-\d{2}-\d{2})/,
+    )![1];
+    const oneOffDeadline = initialContent!.match(/DEADLINE: <([^>]+)>/)![1];
+    expect(initialContent).toContain('--2d');
+
+    // TODO → DOING, then DOING → DONE triggers the rollover.
+    await cycleTaskStateByName(page, 'Mixed date task');
+    await expect
+      .poll(
+        async () =>
+          (await readTaskLine(page, 'recurrence-mixed', 'Mixed date task')) ??
+          '',
+        { timeout: 5_000, message: 'Timed out waiting for DOING' },
+      )
+      .toMatch(/\bDOING\b/);
+    await cycleTaskStateByName(page, 'First-only warning task');
+    await cycleTaskStateByName(page, 'Mixed date task');
+
+    await pollDateChanged(
+      page,
+      'recurrence-mixed',
+      'SCHEDULED',
+      initialScheduled,
+      'Timed out waiting for the repeating SCHEDULED date to advance',
+    );
+
+    // The one-off DEADLINE survives the rollover untouched.
+    const after = await readVaultFile(page, 'recurrence-mixed');
+    expect(after).toContain(`DEADLINE: <${oneOffDeadline}>`);
+
+    // The first-only warning period is gone from the written line.
+    await expect
+      .poll(async () => (await readVaultFile(page, 'recurrence-mixed')) ?? '', {
+        timeout: 5_000,
+        message: 'Timed out waiting for the first-only warning to be removed',
+      })
+      .not.toContain('--2d');
+  });
+});
+
 test.describe('DOING → DONE cycle with SCHEDULED + repeat', () => {
   test.beforeEach(async () => {
     await resetVaultState(page);

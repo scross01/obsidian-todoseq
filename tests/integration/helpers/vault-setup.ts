@@ -147,6 +147,21 @@ due: ${dateStr}
 `,
   );
 
+  // Mixed repeating/one-off dates and a first-only warning period. Rolling
+  // the task must keep the non-repeating date and drop --Nd from the file.
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'recurrence-mixed.md'),
+    `# Recurrence Mixed Date Test
+
+- [ ] TODO Mixed date task
+  SCHEDULED: <${todayStr} +1w>
+  DEADLINE: <${todayStr}>
+
+- [ ] DOING First-only warning task
+  DEADLINE: <${todayStr} +1d --2d>
+`,
+  );
+
   // Empty file for external-change testing (will be modified by test)
   fs.writeFileSync(
     path.join(TEST_VAULT_DIR, 'external-change.md'),

@@ -413,7 +413,8 @@ describe('RecurrenceCoordinator', () => {
         task,
         expect.objectContaining({
           newScheduledDate: expect.any(Date),
-          newDeadlineDate: null,
+          // unchanged DEADLINE must stay undefined (null means delete)
+          newDeadlineDate: undefined,
           newScheduledRepeat: repeatWeekly,
           newDeadlineRepeat: null,
           newStateForRecurrence: 'TODO',

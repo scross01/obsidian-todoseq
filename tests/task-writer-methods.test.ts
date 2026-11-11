@@ -3072,7 +3072,9 @@ describe('TaskWriter Instance Methods', () => {
         deadlineWarningPeriod: { value: 3, unit: 'd', isFirstOnly: false },
       });
 
-      setupVaultProcess('DONE Task text\n  DEADLINE: <2026-06-24 Wed +1d -3d>');
+      const getContent = setupVaultProcess(
+        'DONE Task text\n  DEADLINE: <2026-06-24 Wed +1d -3d>',
+      );
 
       const result = await taskWriter.applyRecurrenceUpdate(task, {
         newDeadlineDate: new Date(2026, 5, 25),
@@ -3086,6 +3088,8 @@ describe('TaskWriter Instance Methods', () => {
         unit: 'd',
         isFirstOnly: false,
       });
+      // ...and still present in the written date line.
+      expect(getContent()).toContain('DEADLINE: <2026-06-25 Thu +1d -3d>');
     });
 
     it('should strip first-only warning period (--Nd) when null is passed', async () => {
@@ -3098,7 +3102,7 @@ describe('TaskWriter Instance Methods', () => {
         deadlineWarningPeriod: { value: 3, unit: 'd', isFirstOnly: true },
       });
 
-      setupVaultProcess(
+      const getContent = setupVaultProcess(
         'DONE Task text\n  DEADLINE: <2026-06-24 Wed +1d --3d>',
       );
 
@@ -3109,6 +3113,63 @@ describe('TaskWriter Instance Methods', () => {
       });
 
       expect(result.deadlineWarningPeriod).toBeNull();
+      // The file must agree with the returned snapshot: an explicit null
+      // strips --3d instead of falling back to the task's warning period.
+      expect(getContent()).toContain('DEADLINE: <2026-06-25 Thu +1d>');
+      expect(getContent()).not.toContain('--3d');
+    });
+
+    it('should keep a one-off deadline when only the scheduled date repeats', async () => {
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date(2026, 2, 10),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+        deadlineDate: new Date(2026, 2, 15),
+        deadlineDateRepeat: null,
+      });
+
+      const getContent = setupVaultProcess(
+        'DONE Task text\n  SCHEDULED: <2026-03-10 Tue +1w>\n  DEADLINE: <2026-03-15 Sun>',
+      );
+
+      const result = await taskWriter.applyRecurrenceUpdate(task, {
+        newScheduledDate: new Date(2026, 2, 17),
+        // DEADLINE omitted entirely: undefined means "unchanged".
+        newState: 'TODO',
+      });
+
+      const content = getContent();
+      expect(content).toContain('SCHEDULED: <2026-03-17 Tue +1w>');
+      expect(content).toContain('DEADLINE: <2026-03-15 Sun>');
+      expect(result.deadlineDate).toEqual(new Date(2026, 2, 15));
+    });
+
+    it('should keep a one-off scheduled date when only the deadline repeats', async () => {
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        scheduledDate: new Date(2026, 2, 10),
+        scheduledDateRepeat: null,
+        deadlineDate: new Date(2026, 2, 12),
+        deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+      });
+
+      const getContent = setupVaultProcess(
+        'DONE Task text\n  SCHEDULED: <2026-03-10 Tue>\n  DEADLINE: <2026-03-12 Thu +1w>',
+      );
+
+      const result = await taskWriter.applyRecurrenceUpdate(task, {
+        newDeadlineDate: new Date(2026, 2, 19),
+        newState: 'TODO',
+      });
+
+      const content = getContent();
+      expect(content).toContain('SCHEDULED: <2026-03-10 Tue>');
+      expect(content).toContain('DEADLINE: <2026-03-19 Thu +1w>');
+      expect(result.scheduledDate).toEqual(new Date(2026, 2, 10));
     });
 
     it('should update existing SCHEDULED and DEADLINE lines in place without duplicates', async () => {

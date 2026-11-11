@@ -623,6 +623,8 @@ For first-only warning periods (only affects the first occurrence of a recurring
 SCHEDULED: <2026-06-10 Wed +1w --2d>  # First occurrence delayed 2 days, subsequent weeks on time
 ```
 
+When a recurring task is completed, only the repeating date advances. A one-off date on the same task (for example a repeating `SCHEDULED` with a fixed `DEADLINE`) is left exactly as written. A first-only `--Nd` warning period is removed from the date line when the task rolls to its next occurrence.
+
 #### Behavior by Date Type
 
 | Date Type | Warning Period | Behavior |
