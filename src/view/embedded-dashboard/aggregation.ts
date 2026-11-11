@@ -465,12 +465,26 @@ export class DashboardAggregator {
         counts.set(tag, (counts.get(tag) ?? 0) + 1);
       }
     }
-    return Array.from(counts.entries()).map(([name, count]) => ({
-      key: `tag:${name}`,
-      label: `#${name}`,
-      filter: `tag:${name}`,
-      count,
-    }));
+    const groups: DashboardGroup[] = Array.from(counts.entries()).map(
+      ([name, count]) => ({
+        key: `tag:${name}`,
+        label: `#${name}`,
+        filter: `tag:${name}`,
+        count,
+      }),
+    );
+    const untagged = matched.filter(
+      (task) => (task.tags?.length ?? 0) === 0,
+    ).length;
+    if (untagged > 0) {
+      groups.push({
+        key: 'tag:none',
+        label: 'No tags',
+        filter: 'tag:none',
+        count: untagged,
+      });
+    }
+    return groups;
   }
 
   /**

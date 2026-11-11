@@ -199,6 +199,21 @@ The `state:` filter and state autocomplete suggestions follow the effective keyw
 
 Find tasks on pages marked as projects.
 
+### Tasks Without Tags
+
+Use `tag:none` to find tasks that have no tags at all:
+
+```txt
+tag:none
+```
+
+This is a search sentinel, not a literal `#none` tag, so a task tagged `#none`
+does not match it. Search the literal tag with `tag:#none`; quoting the value
+(`tag:"none"`) is still the sentinel, matching how `priority:none` and
+`scheduled:none` behave. Negation composes as usual, so `-tag:none` finds tasks
+that have at least one tag. The `tag:` autocomplete offers `none` alongside the
+vault's existing tags.
+
 ### State Group Keywords
 
 In addition to matching individual state keywords (e.g., `state:TODO`, `state:DOING`), the `state:` filter supports group keywords that match all tasks belonging to a keyword group. These group keywords are resolved dynamically based on your settings, so any custom keywords you have configured are included automatically.

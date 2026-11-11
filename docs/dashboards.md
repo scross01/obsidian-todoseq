@@ -58,7 +58,9 @@ Lines starting with `#` inside the block are treated as comments.
 - **keyword** — one column per task state actually present in the matched tasks
 - **tag** — one group per tag. Tags can overlap, so column sums may exceed the
   card total; the header total explains this in its tooltip. The `#A`/`#B`/`#C`
-  priority tags are excluded
+  priority tags are excluded. A **No tags** group with the `tag:none` filter
+  counts the matched tasks that carry no tags; it is omitted when every
+  matched task is tagged
 - **scheduled** / **deadline** — five buckets in urgency order: Overdue,
   Due today, Next 7 days, Later, No date. Clicking a bucket opens the Task
   List with the matching date filter

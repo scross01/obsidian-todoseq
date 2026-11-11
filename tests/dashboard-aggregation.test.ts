@@ -283,16 +283,60 @@ describe('DashboardAggregator', () => {
       expect(result.total).toBe(5);
       expect(result.overlapsTotal).toBe(true);
       // count-desc, ties broken by label; #A excluded
-      expect(result.groups.map((g) => g.label)).toEqual(['#home', '#project']);
-      expect(result.groups.map((g) => g.count)).toEqual([2, 2]);
+      expect(result.groups.map((g) => g.label)).toEqual([
+        '#home',
+        '#project',
+        'No tags',
+      ]);
+      expect(result.groups.map((g) => g.count)).toEqual([2, 2, 1]);
       expect(result.groups.map((g) => g.filter)).toEqual([
         'tag:home',
         'tag:project',
+        'tag:none',
       ]);
       // Column sums may exceed the card total for tags (overlap is expected)
       const sum = result.groups.reduce((acc, g) => acc + g.count, 0);
-      expect(sum).toBe(4);
-      expect(sum).not.toBe(result.total);
+      expect(sum).toBe(5);
+    });
+
+    it('emits a No tags group only when matched tasks have no tags', async () => {
+      const aggregator = makeAggregator();
+      const tagged = [
+        makeTask({ path: 'a.md', line: 0, tags: ['alpha'] }),
+        makeTask({ path: 'a.md', line: 1, tags: ['beta'] }),
+      ];
+
+      const noUntagged = await aggregator.aggregate(tagged, {
+        groupBy: 'tag',
+      });
+      expect(noUntagged.groups.some((g) => g.key === 'tag:none')).toBe(false);
+
+      const withUntagged = await aggregator.aggregate(
+        [...tagged, makeTask({ path: 'a.md', line: 2, tags: [] })],
+        { groupBy: 'tag' },
+      );
+      const group = withUntagged.groups.find((g) => g.key === 'tag:none');
+      expect(group).toEqual({
+        key: 'tag:none',
+        label: 'No tags',
+        count: 1,
+        filter: 'tag:none',
+      });
+    });
+
+    it('keeps the No tags filter consistent with its count through the evaluator', async () => {
+      const aggregator = makeAggregator();
+      const tasks = [
+        makeTask({ path: 'a.md', line: 0, tags: ['alpha'] }),
+        makeTask({ path: 'a.md', line: 1, tags: [] }),
+        makeTask({ path: 'a.md', line: 2, tags: [] }),
+      ];
+      const result = await aggregator.aggregate(tasks, { groupBy: 'tag' });
+      const group = result.groups.find((g) => g.key === 'tag:none');
+      const matched = await Promise.all(
+        tasks.map((task) => Search.evaluate('tag:none', task, false)),
+      );
+      expect(matched.filter(Boolean)).toHaveLength(group?.count ?? -1);
     });
 
     it('truncates tags to max-groups with an N-more tail', async () => {

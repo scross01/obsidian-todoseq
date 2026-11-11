@@ -157,6 +157,7 @@ describe('SearchSuggestionDropdown', () => {
       expect(dropdown.currentSuggestions).toContain('work');
       expect(dropdown.currentSuggestions).toContain('urgent');
       expect(dropdown.currentSuggestions).toContain('personal');
+      expect(dropdown.currentSuggestions).toContain('none');
     });
 
     it('shows state suggestions from settings', async () => {

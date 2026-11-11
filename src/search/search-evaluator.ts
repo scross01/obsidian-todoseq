@@ -585,6 +585,13 @@ export class SearchEvaluator {
     caseSensitive: boolean,
     exact?: boolean,
   ): boolean {
+    // `none` is the tag analogue of priority:none / date:none: it means the
+    // task has no tags at all. Put it before the raw-text guard so a tagless
+    // task is not rejected merely because its source line is unavailable.
+    if (value.toLowerCase() === 'none') {
+      return (task.tags?.length ?? 0) === 0;
+    }
+
     if (!task.rawText) return false;
 
     const targetText = caseSensitive

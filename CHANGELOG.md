@@ -2,7 +2,7 @@
 
 ## 0.23.0
 
--
+- Added `tag:none` to find tasks without any tags, with matching dashboard “No tags” grouping and tag autocomplete; `#none` remains a literal tag.
 
 ## 0.22.1
 

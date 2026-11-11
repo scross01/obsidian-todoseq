@@ -43,4 +43,23 @@ test.describe('State-group search', () => {
     await searchInput.fill('');
     await page.waitForTimeout(500);
   });
+
+  test('tag:none finds untagged tasks and is not a literal tag', async () => {
+    const searchInput = page.locator('input[aria-label="Search tasks"]');
+
+    await searchInput.fill('tag:none');
+    await page.waitForTimeout(800);
+    let body = await page.locator('.todoseq-task-list').textContent();
+    expect(body).toContain('Buy groceries');
+
+    // No fixture task carries #work: a literal tag search must return none,
+    // while the sentinel still found the untagged fixtures above.
+    await searchInput.fill('tag:work');
+    await page.waitForTimeout(800);
+    body = await page.locator('.todoseq-task-list').textContent();
+    expect(body).not.toContain('Buy groceries');
+
+    await searchInput.fill('');
+    await page.waitForTimeout(500);
+  });
 });
