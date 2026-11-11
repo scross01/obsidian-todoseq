@@ -247,3 +247,7 @@ The tooltip includes:
 - The date label and formatted date
 - The repeat pattern in descriptive format (if set)
 - The warning period with the effective appearance date
+
+## Relative date labels
+
+Today, Tomorrow, Yesterday and the signed day counts are counted in local calendar days, and the seven-day highlight uses the same count, so labels stay correct across daylight-saving transitions.

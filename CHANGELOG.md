@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fixed the archive dialog losing Tab trapping and focus restoration in pop-out windows.
+- Fixed relative date labels and the seven-day date highlight being a day off around daylight-saving transitions.
 - Fixed search missing tasks when the phrase you typed spans a priority marker or footnote reference, for example `Review[^1] report` for the phrase "Review report".
 - Fixed date autocomplete only recognising a few hardcoded task states: configured and built-in states now get the date shortcut, while ordinary prose that merely contains a keyword does not.
 - Fixed "copy/move to today" being offered when the Daily Notes plugin was disabled but then failing: command availability and the actual transfer now agree, and Periodic Notes can provide the daily note.
