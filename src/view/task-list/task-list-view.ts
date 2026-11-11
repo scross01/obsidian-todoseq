@@ -134,6 +134,9 @@ export class TaskListView extends ItemView {
   // Add generation counter for refreshVisibleList
   private refreshGeneration = 0;
 
+  /** True from onClose until a later onOpen; blocks all late async commits. */
+  private isDisposed = false;
+
   // Reference to the plugin for checking user-initiated updates
   private plugin: TodoTracker;
 
@@ -1796,7 +1799,7 @@ export class TaskListView extends ItemView {
   }
 
   private async loadMoreTasks(): Promise<void> {
-    if (this.isLoadingMore || this.isAllTasksLoaded) return;
+    if (this.isDisposed || this.isLoadingMore || this.isAllTasksLoaded) return;
 
     this.isLoadingMore = true;
     const currentGeneration = this.refreshGeneration;
@@ -1824,18 +1827,23 @@ export class TaskListView extends ItemView {
     await this.renderQueue.enqueue(
       tasksToLoad,
       (task) => {
-        let element = this.taskElementCache.get(task);
-        if (!element) {
-          element = this.buildTaskListItem(task);
-          this.taskElementCache.set(task, element);
+        // Cache keys identify a location, not immutable content: a row that
+        // was detached by an earlier refresh still holds the old text, state
+        // and handlers. Patch it before it is shown again.
+        const cachedElement = this.taskElementCache.get(task);
+        if (cachedElement) {
+          this.updateTaskElementContent(task, cachedElement);
+          return cachedElement;
         }
+        const element = this.buildTaskListItem(task);
+        this.taskElementCache.set(task, element);
         return element;
       },
       list,
     );
 
-    // Abort if another refresh was triggered while chunking lazy load
-    if (this.refreshGeneration !== currentGeneration) {
+    // Abort if another refresh or teardown happened while chunking lazy load
+    if (!this.isCurrentRefresh(currentGeneration)) {
       this.isLoadingMore = false;
       return;
     }
@@ -1855,6 +1863,24 @@ export class TaskListView extends ItemView {
     }
   }
 
+  /** Whether work started for `generation` may still commit its results. */
+  private isCurrentRefresh(generation: number): boolean {
+    return !this.isDisposed && this.refreshGeneration === generation;
+  }
+
+  /**
+   * Reset pagination to a known result set. Every path that replaces the
+   * visible rows calls this, so a scroll callback captured for an earlier
+   * query cannot append its old tasks under the new state.
+   */
+  private resetPagination(total: number, loaded: number): void {
+    this.renderQueue.clear();
+    this.resetLazyLoading();
+    this.totalTaskCount = total;
+    this.loadedTaskCount = loaded;
+    this.isAllTasksLoaded = loaded >= total;
+  }
+
   private resetLazyLoading(): void {
     this.loadedTaskCount = 0;
     this.isAllTasksLoaded = false;
@@ -1867,6 +1893,8 @@ export class TaskListView extends ItemView {
    * @param resetScroll If true, reset to top of list. If false, preserve scroll position.
    */
   async refreshVisibleList(resetScroll = false): Promise<void> {
+    if (this.isDisposed) return;
+
     const currentGeneration = ++this.refreshGeneration;
 
     // Cancel any pending debounced refresh - this call takes precedence
@@ -1885,8 +1913,8 @@ export class TaskListView extends ItemView {
     // Yield to main thread to prevent blocking user typing
     await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-    // Abort if another refresh was triggered while we yielded
-    if (this.refreshGeneration !== currentGeneration) {
+    // Abort if another refresh or teardown happened while we yielded
+    if (!this.isCurrentRefresh(currentGeneration)) {
       return;
     }
 
@@ -1907,21 +1935,25 @@ export class TaskListView extends ItemView {
     let visible = this.transformForView(allTasks, mode, classifications);
     const preSearchCount = visible.length;
 
-    // Apply search filtering
+    // Apply search filtering. Results are computed locally and only committed
+    // once this refresh is confirmed current: a property query can settle
+    // after a newer plain or empty query, and must not overwrite its rows,
+    // count or error.
     const q = this.getSearchQuery().trim();
     if (q.length > 0) {
+      let filtered: Task[];
+      let nextSearchError: string | null = null;
       try {
         // Replace the per-row Promise.all fan-out with the single-pass bulk
         // filter: property engines re-solve once per unique filter, then the
         // whole tree evaluates synchronously over the task set.
-        visible = await Search.filterTasks(
+        filtered = await Search.filterTasks(
           visible,
           q,
           this.isCaseSensitive,
           this.plugin.settings,
           this.plugin.propertySearchEngine ?? undefined,
         );
-        this.searchError = null;
       } catch {
         // If there's an error in parsing, fall back to simple search
         const searchQuery = this.isCaseSensitive ? q : q.toLowerCase();
@@ -1929,7 +1961,7 @@ export class TaskListView extends ItemView {
           ? (text: string) => text
           : (text: string) => text.toLowerCase();
 
-        visible = visible.filter((t) => {
+        filtered = visible.filter((t) => {
           const baseName = t.path.slice(t.path.lastIndexOf('/') + 1);
           return (
             (t.rawText && searchText(t.rawText).includes(searchQuery)) ||
@@ -1940,10 +1972,20 @@ export class TaskListView extends ItemView {
         });
 
         // Store the error for display
-        this.searchError = Search.getError(q) || 'Invalid search query';
+        nextSearchError = Search.getError(q) || 'Invalid search query';
       }
+
+      if (!this.isCurrentRefresh(currentGeneration)) {
+        return;
+      }
+      visible = filtered;
+      this.searchError = nextSearchError;
     } else {
       this.searchError = null;
+    }
+
+    if (!this.isCurrentRefresh(currentGeneration)) {
+      return;
     }
 
     // Update search results info
@@ -2020,6 +2062,10 @@ export class TaskListView extends ItemView {
       }
 
       // Keep toolbar enabled: do not disable or overlay; list remains empty
+      if (visible.length === 0) {
+        this.cachedVisibleTasks = [];
+        this.resetPagination(0, 0);
+      }
       return;
     } else if (visible.length === 0) {
       // Clear all existing tasks from the list first
@@ -2058,6 +2104,9 @@ export class TaskListView extends ItemView {
 
       title.setText(emptyTitle);
       subtitle.setText(emptySubtitle);
+
+      this.cachedVisibleTasks = [];
+      this.resetPagination(0, 0);
 
       // Keep toolbar enabled: do not disable or overlay; list remains empty
       return;
@@ -2134,7 +2183,7 @@ export class TaskListView extends ItemView {
       );
 
       // Abort if another refresh superseded us while building!
-      if (this.refreshGeneration !== currentGeneration) {
+      if (!this.isCurrentRefresh(currentGeneration)) {
         return;
       }
 
@@ -2153,11 +2202,7 @@ export class TaskListView extends ItemView {
       });
 
       // Update lazy loading state
-      this.renderQueue.clear();
-      this.resetLazyLoading();
-      this.totalTaskCount = visible.length;
-      this.isAllTasksLoaded = renderCount >= visible.length;
-      this.loadedTaskCount = renderCount;
+      this.resetPagination(visible.length, renderCount);
 
       // Set up sentinel observer for lazy loading if there are more tasks
       if (!this.isAllTasksLoaded) {
@@ -2176,6 +2221,10 @@ export class TaskListView extends ItemView {
 
   // Obsidian lifecycle methods for view open: keyed, minimal render
   async onOpen() {
+    // The host may reuse this view instance; start a fresh lifetime.
+    this.isDisposed = false;
+    this.refreshGeneration++;
+
     const container = this.contentEl;
     container.empty();
     container.addClass('todoseq-panel');
@@ -2709,6 +2758,11 @@ export class TaskListView extends ItemView {
 
   // Cleanup listeners
   async onClose() {
+    // Invalidate every pending refresh before teardown: late search results
+    // must not touch a closed view's DOM, cache or pagination.
+    this.isDisposed = true;
+    this.refreshGeneration++;
+
     const handler = this._searchKeyHandler;
     if (handler) {
       window.removeEventListener('keydown', handler);

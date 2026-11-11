@@ -321,6 +321,13 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — both wrappers use the live boolean, the core-plugins.json read and stale cache are gone, and disabled providers never reach note creation. Unit 172 suites / 5,531 tests, build and lint green.
 - **File**: [060-daily-note-availability.md](060-daily-note-availability.md)
 
+### Plan 061
+
+- **Title**: Keep task-list search completions, cached rows and pagination consistent
+- **Meta**: priority P2 · effort M · depends on —
+- **Record**: DONE (2026-11-11) — the newest query alone commits rows, count and error; cached rows beyond the first batch are patched before reuse; empty results reset pagination; closing the view invalidates every pending refresh. 179 suites / 5,570 tests, build and lint green; no host spec.
+- **File**: [061-task-list-lazy-state.md](061-task-list-lazy-state.md)
+
 ### Plan 062
 
 - **Title**: Recognize configured task keywords when inserting dates in the editor

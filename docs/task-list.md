@@ -251,3 +251,9 @@ The tooltip includes:
 ## Relative date labels
 
 Today, Tomorrow, Yesterday and the signed day counts are counted in local calendar days, and the seven-day highlight uses the same count, so labels stay correct across daylight-saving transitions.
+
+## Search results and scrolled rows
+
+The list always shows the result of the query currently in the search box. If an earlier, slower search finishes after a newer one, its result is discarded instead of replacing the current rows, result count or error.
+
+Rows revealed by scrolling are refreshed with the task's current text, state, priority and actions, so a task edited since it was last on screen appears with its new content. A query that returns no tasks also resets the scroll bookkeeping, so continued scrolling cannot bring back rows from the previous query.
