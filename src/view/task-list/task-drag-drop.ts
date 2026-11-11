@@ -104,7 +104,7 @@ export class TaskDragDropHandler {
 
   private onDragEnd = (evt: DragEvent): void => {
     const target = (evt.target as HTMLElement)?.closest?.('.todoseq-task-item');
-    if (target instanceof HTMLElement) {
+    if (target?.instanceOf(HTMLElement)) {
       target.removeClass('todoseq-task-dragging');
     }
     this.removeDragoverListener();

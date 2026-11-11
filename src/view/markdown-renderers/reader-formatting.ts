@@ -659,7 +659,7 @@ export class ReaderViewFormatter {
 
       // Try to find a paragraph first (standard case)
       const paragraph = listItem.querySelector('p');
-      if (paragraph instanceof HTMLElement) {
+      if (paragraph?.instanceOf(HTMLElement)) {
         this.processParagraphForTasks(paragraph);
         return;
       }

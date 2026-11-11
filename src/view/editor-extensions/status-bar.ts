@@ -102,8 +102,7 @@ export class StatusBarManager {
     // target and the query target are the same leaf. Applying the query via
     // leaves[0] while revealing by sidebar priority could land the filter on
     // an unfocused main-tab task list that the user never sees.
-    const openInNewTab =
-      evt instanceof MouseEvent && (evt.metaKey || evt.ctrlKey);
+    const openInNewTab = !!evt && (evt.metaKey || evt.ctrlKey);
     this.plugin.uiManager
       .showTasksWithQuery(searchQuery, openInNewTab)
       .catch((error) => {

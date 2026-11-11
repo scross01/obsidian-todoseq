@@ -537,7 +537,7 @@ export class DashboardRenderer {
     const ringWrap = wrap.createDiv({
       cls: 'todoseq-dashboard-donut-ring-wrap',
     });
-    const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
+    const svg = contentRoot.ownerDocument.createElementNS(SVG_NAMESPACE, 'svg');
     svg.setAttribute('class', 'todoseq-dashboard-donut-ring');
     svg.setAttribute('viewBox', `0 0 ${DONUT_SIZE} ${DONUT_SIZE}`);
     svg.setAttribute('role', 'img');
@@ -559,7 +559,10 @@ export class DashboardRenderer {
     visible.forEach((group) => {
       const share = group.count / arcDenominator;
       const arc = Math.max(0, share * DONUT_CIRCUMFERENCE - DONUT_GAP);
-      const circle = document.createElementNS(SVG_NAMESPACE, 'circle');
+      const circle = contentRoot.ownerDocument.createElementNS(
+        SVG_NAMESPACE,
+        'circle',
+      );
       circle.setAttribute('cx', String(DONUT_SIZE / 2));
       circle.setAttribute('cy', String(DONUT_SIZE / 2));
       circle.setAttribute('r', String(DONUT_RADIUS));
@@ -921,7 +924,10 @@ export class DashboardRenderer {
         `circle[data-key="${group.key}"]`,
       );
       if (!circle) {
-        circle = document.createElementNS(SVG_NAMESPACE, 'circle');
+        circle = contentRoot.ownerDocument.createElementNS(
+          SVG_NAMESPACE,
+          'circle',
+        );
         circle.setAttribute('cx', String(DONUT_SIZE / 2));
         circle.setAttribute('cy', String(DONUT_SIZE / 2));
         circle.setAttribute('r', String(DONUT_RADIUS));
