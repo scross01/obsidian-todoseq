@@ -69,3 +69,7 @@ Combining a keyword with custom text e.g. `ARCHIVED (moved)` helps to provide ad
 
 ARCHIVED (moved) Review project timeline
 ```
+
+## What copy, move and migrate guarantee
+
+Transfers are written by the task writer, not by the view. The destination append is atomic, so two transfers into the same note can never overwrite one another, and an open unsaved editor buffer is the source of truth for both files. The source is revalidated immediately before it changes: if the task moved or changed since the list was rendered, the transfer stops with a notice instead of copying the wrong line. A table cell task transfers as a normal task line; moving one clears only that cell, leaving the rest of the row byte-for-byte intact, and removes the row only when nothing else is in it. A failed destination write never removes the source; if the destination succeeds and the source cannot be updated, the notice says the task was copied but not updated.

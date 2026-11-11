@@ -363,6 +363,12 @@ Active implementation plans and everything binding for their execution stay in [
 - **Record**: DONE (2026-11-11) — gate opened: table cell parsing treats an escaped pipe as cell content, and cell writes now replace only the selected span, leaving the rest of the row byte-identical. 176 suites / 5,556 tests, build and lint green; host Playwright characterization not run.
 - **File**: [080-escaped-table-pipes.md](080-escaped-table-pipes.md)
 
+### Plan 055
+
+- **Title**: Route cell-aware task transfers through TaskWriter without overwriting edits
+- **Meta**: priority P1 · effort L · depends on 054, 080
+- **Record**: DONE (2026-11-11) — copy, move and migrate go through one TaskWriter seam with atomic destination appends, source revalidation and cell-local table moves; panel, embedded list and drag-and-drop report typed outcomes. 177 suites / 5,550 tests, build and lint green; no Playwright host spec.
+- **File**: [055-safe-task-transfers.md](055-safe-task-transfers.md)
 
 ## Execution notes
 

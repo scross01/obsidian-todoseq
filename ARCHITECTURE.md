@@ -1543,3 +1543,7 @@ The indicator uses monospace font and appears in both the main task list and emb
 6. **Editor Refresh**: Complex `requestMeasure()` + `dispatch()` + `setTimeout` sequence for decoration updates
 
 This architecture provides a robust, maintainable, and extensible foundation for task management while ensuring optimal performance and user experience through careful design patterns, performance optimizations, and a well-structured component hierarchy.
+
+## Task transfers
+
+Copy, move and migrate are owned by `TaskWriter.transferTask`. It reads the live editor buffer when a file is open, appends to the destination with an atomic vault write, and revalidates the source task identity immediately before changing it. A table cell task transfers as a plain task line; moving one clears only its cell. The panel, embedded list and drag-and-drop handler only resolve the destination and report the typed outcome — they never write task bytes.

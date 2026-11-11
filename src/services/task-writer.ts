@@ -15,9 +15,26 @@ import {
 import { DateParser } from '../parser/date-parser';
 import TodoTracker from '../main';
 import { getStateTransitionManager } from './task-update-coordinator';
+import {
+  getTaskRemovalRange,
+  modifyLinesForMigration,
+  readTaskBlockFromLines,
+} from '../utils/task-sub-bullets';
 
 /** A SCHEDULED/DEADLINE/CLOSED/STARTED date line kind. */
 type DateLineType = 'SCHEDULED' | 'DEADLINE' | 'CLOSED' | 'STARTED';
+
+export type TaskTransferStatus =
+  | 'success'
+  | 'already-there'
+  | 'stale-source'
+  | 'destination-failed'
+  | 'partial';
+
+export interface TaskTransferResult {
+  status: TaskTransferStatus;
+  reason?: string;
+}
 
 export interface DateLineUpdateResult {
   task: Task;
@@ -50,6 +67,240 @@ export class TaskWriter {
 
   private get settings() {
     return this.plugin.settings;
+  }
+
+  /**
+   * Read a file through the live editor buffer when it is open, so unsaved
+   * edits are part of the transfer and never overwritten by a stale read.
+   */
+  private getTransferEditor(file: TFile): Editor | null {
+    const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (md?.file?.path !== file.path) return null;
+    return md.editor ?? null;
+  }
+
+  private async readFileText(file: TFile): Promise<string> {
+    const editor = this.getTransferEditor(file);
+    if (!editor) return this.app.vault.read(file);
+    const lines: string[] = [];
+    for (let i = 0; i < editor.lineCount(); i++) lines.push(editor.getLine(i));
+    return lines.join('\n');
+  }
+
+  /** True when the line still holds the task's state keyword and text. */
+  private lineMatchesTask(line: string | undefined, task: Task): boolean {
+    if (typeof line !== 'string') return false;
+    if (task.isTableTask && task.tableCell) {
+      const cell = parseTableCells(line)[task.tableCell.cellIndex];
+      if (!cell) return false;
+      return (
+        cell.content.includes(task.state) && cell.content.includes(task.text)
+      );
+    }
+    return line.includes(task.state) && line.includes(task.text);
+  }
+
+  private async readSourceBlock(
+    task: Task,
+  ): Promise<{ lines: string[]; text: string } | null> {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) return null;
+    const text = await this.readFileText(file);
+    const lines = text.split('\n');
+    if (!this.lineMatchesTask(lines[task.line], task)) return null;
+    return { lines, text };
+  }
+
+  /** The task as standalone lines: a table cell becomes a plain task line. */
+  private buildTransferBlock(lines: string[], task: Task): string[] {
+    if (task.isTableTask && task.tableCell) {
+      const cell = parseTableCells(lines[task.line] ?? '')[
+        task.tableCell.cellIndex
+      ];
+      if (!cell) return [];
+      const taskLine = cell.content.split(/<br\s*\/?>/i)[0]?.trim();
+      return taskLine ? [taskLine] : [];
+    }
+    return readTaskBlockFromLines(lines, task);
+  }
+
+  private async appendToFile(
+    file: TFile,
+    lines: string[],
+    insertAt?: { line: number; ch: number },
+  ): Promise<boolean> {
+    const editor = this.getTransferEditor(file);
+    if (editor && insertAt) {
+      const currentLine = editor.getLine(insertAt.line) ?? '';
+      const prefix = currentLine === '' ? '' : '\n';
+      editor.replaceRange(prefix + lines.join('\n'), {
+        line: insertAt.line,
+        ch: Math.min(insertAt.ch, currentLine.length),
+      });
+      return true;
+    }
+    if (editor) {
+      const last = editor.lineCount() - 1;
+      const lastLine = editor.getLine(last) ?? '';
+      const separator = editor.getValue().trim() === '' ? '' : '\n\n';
+      editor.replaceRange(separator + lines.join('\n') + '\n', {
+        line: last,
+        ch: lastLine.length,
+      });
+      return true;
+    }
+    // vault.process is an atomic read-modify-write, so concurrent appends to
+    // the same destination cannot overwrite each other.
+    await this.app.vault.process(file, (data) => {
+      const base = data.trimEnd();
+      return (base ? base + '\n\n' : '') + lines.join('\n') + '\n';
+    });
+    return true;
+  }
+
+  private removeFromLines(lines: string[], task: Task): string[] {
+    if (task.isTableTask && task.tableCell) {
+      const updated = replaceTableCellContent(
+        lines[task.line] ?? '',
+        task.tableCell.cellIndex,
+        '',
+      );
+      if (updated === null) return lines;
+      const out = [...lines];
+      if (parseTableCells(updated).every((cell) => cell.content === '')) {
+        out.splice(task.line, 1);
+      } else {
+        out[task.line] = updated;
+      }
+      return out;
+    }
+    const { start, end } = getTaskRemovalRange(lines, task);
+    return [...lines.slice(0, start), ...lines.slice(end + 1)];
+  }
+
+  private migrateInLines(
+    lines: string[],
+    task: Task,
+    migrateState: string,
+  ): string[] {
+    const keyword = task.state || 'TODO';
+    if (task.isTableTask && task.tableCell) {
+      const cell = parseTableCells(lines[task.line] ?? '')[
+        task.tableCell.cellIndex
+      ];
+      if (!cell) return lines;
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const migrated =
+        migrateState === ''
+          ? cell.content.replace(new RegExp(`^\\s*${escaped}\\s*`, 'i'), '')
+          : cell.content.replace(
+              new RegExp(`\\b${escaped}\\b`, 'i'),
+              migrateState,
+            );
+      const updated = replaceTableCellContent(
+        lines[task.line],
+        task.tableCell.cellIndex,
+        migrated,
+      );
+      if (updated === null) return lines;
+      const out = [...lines];
+      out[task.line] = updated;
+      return out;
+    }
+    return modifyLinesForMigration(lines, task.line, keyword, migrateState);
+  }
+
+  /** Revalidate the source and rewrite it, or report that nothing changed. */
+  private async rewriteSource(
+    task: Task,
+    mutate: (lines: string[]) => string[],
+  ): Promise<boolean> {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) return false;
+
+    const editor = this.getTransferEditor(file);
+    if (editor) {
+      const lines: string[] = [];
+      for (let i = 0; i < editor.lineCount(); i++)
+        lines.push(editor.getLine(i));
+      if (!this.lineMatchesTask(lines[task.line], task)) return false;
+      const next = mutate(lines).join('\n');
+      const last = editor.lineCount() - 1;
+      editor.replaceRange(
+        next,
+        { line: 0, ch: 0 },
+        {
+          line: last,
+          ch: (editor.getLine(last) ?? '').length,
+        },
+      );
+      return true;
+    }
+
+    let changed = false;
+    await this.app.vault.process(file, (data) => {
+      const lines = data.split('\n');
+      if (!this.lineMatchesTask(lines[task.line], task)) return data;
+      changed = true;
+      return mutate(lines).join('\n');
+    });
+    return changed;
+  }
+
+  /**
+   * Copy, move or migrate a task into `destination`, writing through the
+   * source-aware seam: the live buffer is the source of truth, destination
+   * appends are atomic, and the source is revalidated before it is changed.
+   */
+  async transferTask(
+    task: Task,
+    destination: TFile,
+    action: 'copy' | 'move' | 'migrate',
+    options?: { insertAt?: { line: number; ch: number } },
+  ): Promise<TaskTransferResult> {
+    if (task.path === destination.path) {
+      return { status: 'already-there' };
+    }
+
+    const source = await this.readSourceBlock(task);
+    if (!source) {
+      return {
+        status: 'stale-source',
+        reason: 'The task is no longer at its recorded location.',
+      };
+    }
+    const block = this.buildTransferBlock(source.lines, task);
+    if (block.length === 0) {
+      return { status: 'stale-source', reason: 'The task could not be read.' };
+    }
+
+    let appended = false;
+    try {
+      appended = await this.appendToFile(destination, block, options?.insertAt);
+    } catch {
+      appended = false;
+    }
+    if (!appended) {
+      return {
+        status: 'destination-failed',
+        reason: 'The destination file could not be written.',
+      };
+    }
+    if (action === 'copy') return { status: 'success' };
+
+    const migrateState = this.settings.migrateToTodayState || '';
+    const changed = await this.rewriteSource(task, (lines) =>
+      action === 'move'
+        ? this.removeFromLines(lines, task)
+        : this.migrateInLines(lines, task, migrateState),
+    );
+    if (!changed) {
+      return {
+        status: 'partial',
+        reason: 'The destination was updated but the source could not be.',
+      };
+    }
+    return { status: 'success' };
   }
 
   private static buildDateLineContent(

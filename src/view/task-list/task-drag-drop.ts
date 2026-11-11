@@ -10,13 +10,7 @@ import {
 import { EditorView } from '@codemirror/view';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
-import {
-  buildRemovalRange,
-  findSubtaskEnd,
-  modifyLinesForMigration,
-  readTaskBlockFromVault,
-  taskHasCheckbox,
-} from '../../utils/task-sub-bullets';
+import { TaskTransferStatus } from '../../services/task-writer';
 
 export interface TaskDragDropCallbacks {
   onGetTask: (path: string, line: number) => Task | undefined;
@@ -289,32 +283,49 @@ export class TaskDragDropHandler {
 
     void this.executeDrop(
       task,
-      editor,
       targetFile,
-      isSourceMode,
       action,
-      dropPos,
+      isSourceMode ? dropPos : undefined,
     );
-    this.showActionNotice(action);
   };
 
   private async executeDrop(
     task: Task,
-    editor: Editor,
     targetFile: TFile,
-    isSourceMode: boolean | undefined,
     action: 'copy' | 'move' | 'migrate',
     dropPos?: { line: number; ch: number } | null,
   ): Promise<void> {
-    const allLines = await readTaskBlockFromVault(this.app, task);
-
-    if (isSourceMode) {
-      this.insertAtPosition(editor, allLines, dropPos);
-    } else {
-      await this.insertAtEnd(targetFile, allLines);
+    const writer = this.plugin.taskEditor;
+    if (!writer) {
+      new Notice('Failed to write task');
+      return;
     }
+    const result = await writer.transferTask(
+      task,
+      targetFile,
+      action,
+      dropPos ? { insertAt: dropPos } : undefined,
+    );
+    if (result.status !== 'success') {
+      new Notice(this.transferFailureNotice(result.status));
+      return;
+    }
+    this.showActionNotice(action);
+  }
 
-    await this.handleSourceModification(task, action);
+  private transferFailureNotice(status: TaskTransferStatus): string {
+    switch (status) {
+      case 'already-there':
+        return 'Task is already in this file';
+      case 'stale-source':
+        return 'Task has changed since it was dragged';
+      case 'destination-failed':
+        return 'Failed to write to the target file';
+      case 'partial':
+        return 'Task copied, but the original could not be updated';
+      default:
+        return 'Failed to transfer task';
+    }
   }
 
   private showActionNotice(action: 'copy' | 'move' | 'migrate'): void {
@@ -382,69 +393,5 @@ export class TaskDragDropHandler {
     if (pos == null) return null;
     const line = editorView.state.doc.lineAt(pos);
     return { line: line.number - 1, ch: line.length };
-  }
-
-  private insertAtPosition(
-    editor: Editor,
-    lines: string[],
-    pos?: { line: number; ch: number } | null,
-  ): void {
-    const cursor = pos ?? editor.getCursor();
-    const currentLine = editor.getLine(cursor.line);
-    const insertPos = { line: cursor.line, ch: currentLine.length };
-    const prefix = currentLine === '' ? '' : '\n';
-    editor.replaceRange(prefix + lines.join('\n'), insertPos);
-  }
-
-  private async insertAtEnd(file: TFile, lines: string[]): Promise<void> {
-    const content = await this.app.vault.read(file);
-    const newContent = content.trimEnd() + '\n\n' + lines.join('\n') + '\n';
-    await this.app.vault.modify(file, newContent);
-  }
-
-  private async handleSourceModification(
-    task: Task,
-    action: 'copy' | 'move' | 'migrate',
-  ): Promise<void> {
-    if (action === 'copy') return;
-
-    try {
-      const sourceFile = this.app.vault.getAbstractFileByPath(task.path);
-      if (!(sourceFile instanceof TFile)) return;
-
-      const sourceContent = await this.app.vault.read(sourceFile);
-      const sourceLines = sourceContent.split('\n');
-
-      if (action === 'move') {
-        const { start, end: dateEnd } = buildRemovalRange(
-          sourceLines,
-          task.line,
-        );
-        const subtaskEnd = findSubtaskEnd(
-          sourceLines,
-          dateEnd,
-          task.indent,
-          taskHasCheckbox(task),
-        );
-        const newLines = [
-          ...sourceLines.slice(0, start),
-          ...sourceLines.slice(subtaskEnd + 1),
-        ];
-        await this.app.vault.modify(sourceFile, newLines.join('\n'));
-      } else if (action === 'migrate') {
-        const migrateState = this.plugin.settings.migrateToTodayState;
-        const taskKeyword = task.state || 'TODO';
-        const modified = modifyLinesForMigration(
-          sourceLines,
-          task.line,
-          taskKeyword,
-          migrateState,
-        );
-        await this.app.vault.modify(sourceFile, modified.join('\n'));
-      }
-    } catch (error) {
-      console.error('[TODOseq] Failed to modify source task:', error);
-      new Notice('Failed to update source task');
-    }
   }
 }

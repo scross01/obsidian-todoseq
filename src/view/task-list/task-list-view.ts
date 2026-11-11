@@ -13,6 +13,7 @@ import {
 } from 'obsidian';
 import { TASK_VIEW_ICON } from '../../main';
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
+import { TaskTransferResult } from '../../services/task-writer';
 import { TaskClassification } from '../../utils/task-sort';
 import { Search } from '../../search/search';
 import {
@@ -56,11 +57,7 @@ import {
   getTodayDailyNote,
   isTaskOnTodayDailyNote,
 } from '../../utils/daily-note-utils';
-import {
-  getTaskRemovalRange,
-  modifyLinesForMigration,
-  readTaskBlockFromVault,
-} from '../../utils/task-sub-bullets';
+import { readTaskBlockFromVault } from '../../utils/task-sub-bullets';
 
 const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
@@ -1629,116 +1626,70 @@ export class TaskListView extends ItemView {
   }
 
   /**
-   * Copy task to today's daily note
-   * @param task The task to copy
+   * Copy, move or migrate a task into today's daily note through TaskWriter.
    */
-  private async copyTaskToToday(task: Task): Promise<void> {
+  private async transferTaskToToday(
+    task: Task,
+    action: 'copy' | 'move' | 'migrate',
+  ): Promise<void> {
     const todayNote = await getTodayDailyNote(this.plugin.app);
     if (!todayNote) {
       new Notice('Failed to get or create today daily note');
       return;
     }
-
     if (isTaskOnTodayDailyNote(task, todayNote)) {
       new Notice('Task is already on today daily note');
       return;
     }
-
-    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
-    const currentContent = await this.plugin.app.vault.read(todayNote);
-    const newContent =
-      currentContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
-    await this.plugin.app.vault.modify(todayNote, newContent);
-
-    new Notice('Task copied to today daily note');
-  }
-
-  /**
-   * Move task to today's daily note
-   * @param task The task to move
-   */
-  private async moveTaskToToday(task: Task): Promise<void> {
-    const todayNote = await getTodayDailyNote(this.plugin.app);
-    if (!todayNote) {
-      new Notice('Failed to get or create today daily note');
+    const writer = this.plugin.taskEditor;
+    if (!writer) {
+      new Notice('Failed to write task');
       return;
     }
-
-    if (isTaskOnTodayDailyNote(task, todayNote)) {
-      new Notice('Task is already on today daily note');
-      return;
-    }
-
-    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
-
-    const todayContent = await this.plugin.app.vault.read(todayNote);
-    const newTodayContent =
-      todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
-    await this.plugin.app.vault.modify(todayNote, newTodayContent);
-
-    const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
-    if (!(sourceFile instanceof TFile)) {
-      new Notice('Failed to find source file');
-      return;
-    }
-
-    const sourceContent = await this.plugin.app.vault.read(sourceFile);
-    const sourceLines = sourceContent.split('\n');
-    const { start, end } = getTaskRemovalRange(sourceLines, task);
-
-    const newSourceLines = [
-      ...sourceLines.slice(0, start),
-      ...sourceLines.slice(end + 1),
-    ];
-    await this.plugin.app.vault.modify(sourceFile, newSourceLines.join('\n'));
-
-    new Notice('Task moved to today daily note');
-  }
-
-  /**
-   * Migrate task to today's daily note
-   * Copies the task to today's daily note and updates the source task
-   * to the migrated state keyword.
-   * @param task The task to migrate
-   */
-  private async migrateTaskToToday(task: Task): Promise<void> {
-    const todayNote = await getTodayDailyNote(this.plugin.app);
-    if (!todayNote) {
-      new Notice('Failed to get or create today daily note');
-      return;
-    }
-
-    if (isTaskOnTodayDailyNote(task, todayNote)) {
-      new Notice('Task is already on today daily note');
-      return;
-    }
-
-    const allLines = await readTaskBlockFromVault(this.plugin.app, task);
-
-    const todayContent = await this.plugin.app.vault.read(todayNote);
-    const newTodayContent =
-      todayContent.trimEnd() + '\n\n' + allLines.join('\n') + '\n';
-    await this.plugin.app.vault.modify(todayNote, newTodayContent);
-
-    const sourceFile = this.plugin.app.vault.getAbstractFileByPath(task.path);
-    if (!(sourceFile instanceof TFile)) {
-      new Notice('Failed to find source file');
-      return;
-    }
-
-    const sourceContent = await this.plugin.app.vault.read(sourceFile);
-    const sourceLines = sourceContent.split('\n');
-    const migrateState = this.plugin.settings.migrateToTodayState;
-    const taskKeyword = task.state || 'TODO';
-    const modified = modifyLinesForMigration(
-      sourceLines,
-      task.line,
-      taskKeyword,
-      migrateState,
+    const result = await writer.transferTask(task, todayNote, action);
+    this.notifyTransfer(
+      result,
+      action === 'copy'
+        ? 'Task copied to today daily note'
+        : action === 'move'
+          ? 'Task moved to today daily note'
+          : 'Task migrated to today daily note',
     );
-    await this.plugin.app.vault.modify(sourceFile, modified.join('\n'));
+  }
 
-    new Notice('Task migrated to today daily note');
+  private notifyTransfer(
+    result: TaskTransferResult,
+    successMessage: string,
+  ): void {
+    switch (result.status) {
+      case 'success':
+        new Notice(successMessage);
+        break;
+      case 'already-there':
+        new Notice('Task is already on today daily note');
+        break;
+      case 'stale-source':
+        new Notice('Task has changed since the panel was refreshed');
+        break;
+      case 'destination-failed':
+        new Notice('Failed to write to today daily note');
+        break;
+      case 'partial':
+        new Notice('Task copied, but the original could not be updated');
+        break;
+    }
+  }
+
+  private async copyTaskToToday(task: Task): Promise<void> {
+    await this.transferTaskToToday(task, 'copy');
+  }
+
+  private async moveTaskToToday(task: Task): Promise<void> {
+    await this.transferTaskToToday(task, 'move');
+  }
+
+  private async migrateTaskToToday(task: Task): Promise<void> {
+    await this.transferTaskToToday(task, 'migrate');
   }
 
   /**
