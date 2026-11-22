@@ -12,6 +12,7 @@ import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { getPriorityLevelName } from '../../utils/task-format';
 import {
   MarkdownPostProcessorContext,
+  Notice,
   TFile,
   setIcon,
   setTooltip,
@@ -220,12 +221,15 @@ export class ReaderViewFormatter {
     element: HTMLElement,
     context: MarkdownPostProcessorContext,
   ): Promise<void> {
-    const taskItems = element.querySelectorAll('.task-list-item');
+    const taskItems = element.querySelectorAll(
+      '.task-list-item, p, li, h1, h2, h3, h4, h5, h6, td',
+    );
     if (taskItems.length === 0) return;
 
     const manager = this.plugin.taskDependencyManager;
     const parser = this.getTaskParser();
     let sourceLines: string[] | null = null;
+    const seen = new Set<number>();
 
     for (const item of taskItems) {
       if (!item.instanceOf(HTMLElement)) continue;
@@ -259,7 +263,8 @@ export class ReaderViewFormatter {
           ? this.findSourceLineForTaskElement(item, sourceLines, parser)
           : -1;
       }
-      if (line < 0) continue;
+      if (line < 0 || seen.has(line)) continue;
+      seen.add(line);
 
       const key = `${context.sourcePath}:${line}`;
       if (!manager.isBlocked(key)) continue;
@@ -279,11 +284,21 @@ export class ReaderViewFormatter {
         attr: {
           'data-task-key': key,
           'aria-label': label,
-          role: 'img',
+          role: 'button',
+          tabindex: '0',
         },
       });
       setIcon(badge, 'lock');
       setTooltip(badge, label);
+      const showDetails = (event: Event): void => {
+        event.preventDefault();
+        event.stopPropagation();
+        new Notice(label, 8000);
+      };
+      badge.addEventListener('click', showDetails);
+      badge.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (event.key === 'Enter' || event.key === ' ') showDetails(event);
+      });
       container.appendChild(badge);
     }
   }
