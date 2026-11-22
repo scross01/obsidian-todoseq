@@ -145,13 +145,20 @@ describe('property search contract', () => {
       createBaseTask({ path, line: 0 }),
     );
 
+    const present = ['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md', 'i.md', 'l.md'];
     const cases: Array<[string, string[]]> = [
+      ['[place]', present],
+      ['[place:]', present],
       ['[place:""]', ['a.md']],
       ['[place:"null"]', ['f.md']],
       ['[place:null]', ['d.md']],
       ['[place:"Other"]', ['i.md']],
       ['["Place":Other]', ['g.md']],
       ['[place:Other]', ['c.md', 'g.md', 'i.md']],
+      ['[place:null] OR ["place":Other]', ['c.md', 'd.md', 'i.md']],
+      ['["place":Other] OR [place:null]', ['c.md', 'd.md', 'i.md']],
+      ['[place:null] OR [place:"null"]', ['d.md', 'f.md']],
+      ['[place:""] OR ["Place":Other]', ['a.md', 'g.md']],
     ];
 
     for (const [query, expected] of cases) {
@@ -177,7 +184,40 @@ describe('property search contract', () => {
         query,
         files: expected,
       });
+
+      const parsed = Search.parse(query);
+      const property = parsed.property;
+      if (parsed.type === 'property_filter' && property) {
+        const direct = Array.from(
+          await engine.searchProperty(property, false),
+        ).sort();
+        expect({ query, files: direct }).toEqual({ query, files: expected });
+
+        const fallback = tasks
+          .filter((task) =>
+            PropertyEvaluator.matchesPropertyFilter(
+              frontmatters[task.path],
+              property,
+              false,
+            ),
+          )
+          .map((task) => task.path)
+          .sort();
+        expect({ query, files: fallback }).toEqual({ query, files: expected });
+      }
     }
+  });
+
+  it('keeps exact and keyExact distinct when global match-case is on', async () => {
+    expect(
+      await search({ key: 'place', value: 'Other', exact: true }, true),
+    ).toEqual(['i.md']);
+    expect(
+      await search(
+        { key: 'Place', value: 'Other', keyExact: true },
+        true,
+      ),
+    ).toEqual(['g.md']);
   });
 
   it('folds unquoted keys and string values in both property paths', async () => {

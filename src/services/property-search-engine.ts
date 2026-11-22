@@ -222,7 +222,8 @@ export class PropertySearchEngine {
     await this.initialize();
     if (!filter.key) return new Set();
 
-    // A quoted key is exact regardless of the global match-case setting.
+    // A quoted key, like a quoted value, is exact regardless of the global
+    // match-case setting.
     const keyCaseSensitive =
       filter.keyExact || filter.exact ? true : caseSensitive;
     const { maps, existence } = this.getEntriesForKey(

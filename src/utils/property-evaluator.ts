@@ -14,7 +14,7 @@ export class PropertyEvaluator {
     descriptor: PropertyQueryDescriptor,
     caseSensitive: boolean,
   ): string[] {
-    if (descriptor.keyExact || caseSensitive) {
+    if (descriptor.keyExact || descriptor.exact || caseSensitive) {
       return Object.prototype.hasOwnProperty.call(frontmatter, descriptor.key)
         ? [descriptor.key]
         : [];

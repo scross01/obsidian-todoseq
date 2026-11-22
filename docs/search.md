@@ -615,7 +615,7 @@ By default, property searches match partially. The search `[type:ject]` would ma
 [type:"Project"]
 ```
 
-Exact matching is case sensitive, while partial matching is case insensitive by default. You can also toggle case sensitivity using the A/a button in the toolbar. A quoted key selects that exact key spelling and bypasses the folded key comparison, so `["Résumé":cafe]` uses the literal `Résumé` key while its unquoted value still matches `Café` partially. Quoted values stay exact and are never folded, even when the global matching is case-insensitive.
+Exact matching is case sensitive, while partial matching is case insensitive by default. You can also toggle case sensitivity using the A/a button in the toolbar. A quoted key selects that exact key spelling and bypasses the folded key comparison, so `["Résumé":cafe]` uses the literal `Résumé` key while its unquoted value still matches `Café` partially. Quoted values stay exact and are never folded, even when the global matching is case-insensitive; like a quoted key, they also select the key spelling exactly, so `[place:"Other"]` does not match a `Place` key.
 
 ### Negation
 

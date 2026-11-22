@@ -1,7 +1,21 @@
 import { Search } from '../src/search/search';
 import { Task } from '../src/types/task';
 import { PropertySearchEngine } from '../src/services/property-search-engine';
+import type {
+  PropertyQueryDescriptor,
+  SearchNode,
+} from '../src/search/search-types';
 import { createBaseTask, createBaseSettings } from './helpers/test-helper';
+
+function propertyFilterNode(
+  descriptor: PropertyQueryDescriptor,
+): SearchNode {
+  return {
+    type: 'property_filter',
+    property: descriptor,
+    exact: descriptor.exact,
+  };
+}
 
 /**
  * Search.filterTasks — the bulk (per-keystroke refresh) facade over the
@@ -288,6 +302,81 @@ describe('Search.filterTasks (bulk per-row-parity path)', () => {
           : `${descriptor.kind}:${descriptor.exact}`,
       );
       expect(kinds.sort()).toEqual(['existence', 'string:true']);
+    });
+
+    it('distinguishes every descriptor field and adversarial identity text', async () => {
+      const base: PropertyQueryDescriptor = {
+        key: 'k',
+        kind: 'string',
+        value: 'v',
+        exact: false,
+        keyExact: false,
+      };
+      const descriptors: PropertyQueryDescriptor[] = [
+        base,
+        { ...base, value: 'v|2' },
+        { ...base, kind: 'null' },
+        { ...base, key: 'k:1' },
+        { ...base, exact: true },
+        { ...base, keyExact: true },
+        { key: 'k\\1', kind: 'string', value: 'v\\2', exact: false, keyExact: false },
+        { key: 'k|1', kind: 'string', value: 'v|2', exact: false, keyExact: false },
+        { key: '😀|k', kind: 'string', value: '🧪:v\\|', exact: true, keyExact: true },
+        { key: 'k', kind: 'string', value: '', exact: true, keyExact: false },
+        // These two collide under a naive `key|value` join.
+        { key: 'a|b', kind: 'string', value: 'c', exact: false, keyExact: false },
+        { key: 'a', kind: 'string', value: 'b|c', exact: false, keyExact: false },
+      ];
+      const localTasks = descriptors.map((_, index) =>
+        createBaseTask({
+          path: `notes/identity-${index}.md`,
+          line: index,
+          rawText: 'TODO identity',
+          text: 'identity',
+        }),
+      );
+      const descriptorKey = (descriptor: PropertyQueryDescriptor) =>
+        JSON.stringify(descriptor);
+      const pathByDescriptor = new Map(
+        descriptors.map((descriptor, index) => [
+          descriptorKey(descriptor),
+          localTasks[index].path,
+        ]),
+      );
+      const searchProperty = jest.fn(
+        async (descriptor: PropertyQueryDescriptor) => {
+          const path = pathByDescriptor.get(descriptorKey(descriptor));
+          if (!path) throw new Error('unknown descriptor');
+          return new Set([path]);
+        },
+      );
+      const engine = { searchProperty } as unknown as PropertySearchEngine;
+      const ast: SearchNode = {
+        type: 'or',
+        children: descriptors.map(propertyFilterNode),
+      };
+      const parseSpy = jest.spyOn(Search, 'parse').mockReturnValue(ast);
+
+      try {
+        const result = await Search.filterTasks(
+          localTasks,
+          'typed identity',
+          false,
+          undefined,
+          engine,
+        );
+        expect(searchProperty).toHaveBeenCalledTimes(descriptors.length);
+        expect(
+          searchProperty.mock.calls
+            .map(([descriptor]) => descriptorKey(descriptor))
+            .sort(),
+        ).toEqual(descriptors.map(descriptorKey).sort());
+        expect(result.map((task) => task.path)).toEqual(
+          localTasks.map((task) => task.path),
+        );
+      } finally {
+        parseSpy.mockRestore();
+      }
     });
 
     it('falls back to metadata evaluation when the engine throws (per-row parity)', async () => {
