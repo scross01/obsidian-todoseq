@@ -13,6 +13,10 @@ The Task List automatically opens in the right sidebar when the TODOseq plugin i
 
 The list follows the vault. Edits, renames and deletions made in Obsidian — or outside it — update the list, and a task's current state is kept even when a background vault scan and a live edit land at the same time. Configured non-Markdown formats (Org notes, code comments) refresh live too; renaming one to an unsupported extension removes its tasks from the list.
 
+### Ribbon
+
+On mobile, TODOseq adds an `Open TODOseq` ribbon icon for opening the Task List. If the ribbon is hidden, turn on **Settings → Interface → Show ribbon**. The [Command Palette](#command-palette) command works whether or not the ribbon is visible.
+
 ### Command Palette
 
 1. Open the command palette with `Ctrl/Cmd + P`

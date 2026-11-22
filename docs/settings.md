@@ -14,6 +14,10 @@ Access TODOseq settings through Obsidian's settings interface:
 3. Find "TODOseq" in the list
 4. Click on "TODOseq" to view and edit settings
 
+### New and existing installs
+
+When you install TODOseq for the first time, it starts with the defaults below, including in a shared or template vault. Review the options on this page and adjust them for the vault. Updating an existing install keeps your current settings.
+
 ## General Settings
 
 ## Editor Integration Settings
