@@ -11,7 +11,13 @@ export type SearchPrefix =
   | 'deadline'
   | 'closed'
   | 'started'
+  | 'blocked'
   | 'property';
+
+/** Derived dependency status shared by search and dashboards. */
+export interface DependencyStatusProvider {
+  getBlockedKeys(): ReadonlySet<string>;
+}
 
 export interface SearchToken {
   type:

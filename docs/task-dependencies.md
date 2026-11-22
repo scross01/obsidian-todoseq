@@ -78,6 +78,12 @@ Cycles are reported as diagnostics, but they do not replace the direct completio
 
 `ARCHIVED_BLOCKER` is inactive history. It does not block completion while the archived task is absent. If the exact ID or file-plus-anchor target reappears in the scanned tasks, TODOseq treats the relationship as active immediately using the target's current state: an incomplete restored target blocks, and a completed one does not. The next reconciliation can move the reference back to `BLOCKER`.
 
+## Searching by blocked status
+
+Use `blocked:true` in the Task List search to find incomplete tasks waiting on a dependency, and `blocked:false` for tasks that are actionable or already complete. The values are lowercase and must be exactly `true` or `false`. Negation and composition work as usual, for example `-blocked:true priority:high` or `state:TODO blocked:false`.
+
+A missing, ambiguous, excluded or temporarily unvalidated reference counts as blocked for an incomplete task. Dashboard cards can group by `blocked`; their two buckets use the same `blocked:true` and `blocked:false` queries.
+
 ## Local properties only
 
 TODOseq reads dependency properties from the task's own drawer. Parent tasks and file-level defaults do not add an `ID`, `BLOCKER`, or `ARCHIVED_BLOCKER` to another task. Task hierarchy alone never blocks a task in this release.

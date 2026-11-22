@@ -10,6 +10,7 @@ import {
 import { TodoseqParameters, TodoseqCodeBlockParser } from './code-block-parser';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { PropertySearchEngine } from '../../services/property-search-engine';
+import { DependencyStatusProvider } from '../../search/search-types';
 
 /**
  * Manages task filtering and sorting for embedded task lists.
@@ -19,6 +20,7 @@ export class EmbeddedTaskListManager {
   private settings: TodoTrackerSettings;
   private keywordManager: KeywordManager;
   private propertySearchEngine: PropertySearchEngine | null;
+  private dependencyStatus: DependencyStatusProvider | null;
   private taskCache: Map<string, { tasks: Task[]; timestamp: number }> =
     new Map();
   private cacheTTL = 5000; // 5 seconds cache TTL
@@ -32,10 +34,12 @@ export class EmbeddedTaskListManager {
     settings: TodoTrackerSettings,
     keywordManager: KeywordManager,
     propertySearchEngine: PropertySearchEngine | null = null,
+    dependencyStatus: DependencyStatusProvider | null = null,
   ) {
     this.settings = settings;
     this.keywordManager = keywordManager;
     this.propertySearchEngine = propertySearchEngine;
+    this.dependencyStatus = dependencyStatus;
   }
 
   /**
@@ -170,6 +174,7 @@ export class EmbeddedTaskListManager {
         false,
         this.settings,
         this.propertySearchEngine ?? undefined,
+        this.dependencyStatus ?? undefined,
       );
     } catch (error) {
       console.error('Error evaluating search query:', error);

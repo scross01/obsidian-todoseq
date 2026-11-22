@@ -126,6 +126,11 @@ export class TaskDependencyManager {
     return this.snapshot;
   }
 
+  getBlockedKeys(): ReadonlySet<string> {
+    this.ensureFresh();
+    return this.snapshot.blocked;
+  }
+
   isBlocked(taskKey: string): boolean {
     this.ensureFresh();
     return this.snapshot.blocked.has(taskKey);

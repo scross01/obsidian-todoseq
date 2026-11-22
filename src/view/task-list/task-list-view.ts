@@ -1009,6 +1009,7 @@ export class TaskListView extends ItemView {
         'deadline',
         'closed',
         'started',
+        'blocked',
       ];
       if (
         validPrefixes.includes(prefixBase) ||
@@ -1957,6 +1958,7 @@ export class TaskListView extends ItemView {
             this.isCaseSensitive,
             this.plugin.settings,
             this.plugin.propertySearchEngine ?? undefined,
+            this.plugin.taskDependencyManager ?? undefined,
           );
         } catch {
           // If there's an error in parsing, fall back to simple search

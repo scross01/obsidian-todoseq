@@ -251,6 +251,10 @@ export class SearchSuggestions {
     return ['A', 'B', 'C', 'high', 'medium', 'low', 'none'];
   }
 
+  static getBlockedOptions(): string[] {
+    return ['true', 'false'];
+  }
+
   /**
    * Get date suggestion options for scheduled and deadline filters
    * @returns Array of date suggestion options

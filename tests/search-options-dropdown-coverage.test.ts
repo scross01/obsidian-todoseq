@@ -102,7 +102,7 @@ describe('SearchOptionsDropdown - Coverage Gap Tests', () => {
     it('returns all options when search term is empty', async () => {
       const dropdown = createDropdown();
       await dropdown.showOptionsDropdown('');
-      expect(dropdown['currentSuggestions'].length).toBe(13);
+      expect(dropdown['currentSuggestions'].length).toBe(14);
     });
 
     it('returns empty array for non-matching search term', async () => {

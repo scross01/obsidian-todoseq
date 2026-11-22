@@ -179,7 +179,7 @@ TODOseq supports filter keywords similar to Obsidian's general vault search for 
 
 ### Invalid Query Handling
 
-Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unknown `priority:` value, or a calendar-invalid date like `scheduled:2026-02-30`) show an error message instead of silently returning no results. Open-ended values — paths, filenames, tags, content, state keywords, quoted phrases — are not validated, because matching nothing is a legitimate outcome for them.
+Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unknown `priority:` or `blocked:` value, or a calendar-invalid date like `scheduled:2026-02-30`) show an error message instead of silently returning no results. Open-ended values — paths, filenames, tags, content, state keywords, quoted phrases — are not validated, because matching nothing is a legitimate outcome for them.
 
 ### Available Prefix Filters
 
@@ -190,6 +190,7 @@ Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unkn
 | `tag:`         | Find tasks containing specific tags       | `tag:urgent`                |
 | `state:`       | Find tasks with specific states or groups | `state:active`              |
 | `priority:`    | Find tasks with specific priorities       | `priority:high`             |
+| `blocked:`     | Find blocked or unblocked tasks           | `blocked:true`              |
 | `content:`     | Find tasks with specific content          | `content:project`           |
 |                | _(the task line only)_                    |                             |
 | `description:` | Find tasks by their DESCRIPTION: line     | `description:meeting notes` |
@@ -582,6 +583,30 @@ priority:none
 ```
 
 Find tasks without priority assignments.
+
+## Blocked Filter
+
+Use `blocked:true` for incomplete tasks that are waiting on a dependency, and `blocked:false` for tasks that are actionable: no dependencies, all dependencies complete, or already completed. The values are lowercase and must be exactly `true` or `false`; uppercase, quoted, empty and other values are rejected.
+
+```txt
+blocked:true
+```
+
+Find tasks waiting on a dependency.
+
+```txt
+state:TODO blocked:false
+```
+
+Find actionable TODO tasks.
+
+```txt
+-blocked:true priority:high
+```
+
+Find high-priority tasks that are not blocked.
+
+Blocked status comes from `BLOCKER` references and is derived, never written to the note. Missing, ambiguous, excluded or temporarily unvalidated dependencies count as blocked while the task is incomplete. Completing a blocker releases its dependents immediately. See [Task Dependencies](/task-dependencies) for the reference rules.
 
 ## Property Search
 

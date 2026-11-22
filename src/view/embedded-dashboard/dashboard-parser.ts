@@ -41,6 +41,7 @@ const GROUP_BY_VALUES: DashboardGroupBy[] = [
   'tag',
   'scheduled',
   'deadline',
+  'blocked',
 ];
 
 const DISPLAY_VALUES: DashboardDisplay[] = [

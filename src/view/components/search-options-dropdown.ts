@@ -101,6 +101,7 @@ export class SearchOptionsDropdown extends BaseDropdown {
       'tag:',
       'state:',
       'priority:',
+      'blocked:',
       'content:',
       'description:',
       'heading:',
@@ -482,6 +483,8 @@ export class SearchOptionsDropdown extends BaseDropdown {
         return 'match task state';
       case 'priority:':
         return 'match task priority';
+      case 'blocked:':
+        return 'match blocked or unblocked tasks';
       case 'content:':
         return 'match task content';
       case 'scheduled:':

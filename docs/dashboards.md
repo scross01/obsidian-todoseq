@@ -34,11 +34,11 @@ opens it in a new tab.
 | Parameter         | Description                                                                                                                                                                                                                                                                  | Default    |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | `search:`         | Any valid search string (see [search](/search)). Tasks that do not match are excluded from the card before grouping                                                                                                                                                          | all tasks  |
-| `group-by:`       | One of `priority`, `state`, `keyword`, `tag`, `scheduled`, or `deadline` (`group:` is an alias)                                                                                                                                                                              | `state`    |
+| `group-by:`       | One of `priority`, `state`, `keyword`, `tag`, `scheduled`, `deadline`, or `blocked` (`group:` is an alias)                                                                                                                                                                   | `state`    |
 | `display:`        | One of `bar`, `column`, `donut`, `tiles`, `heatmap`, or `strip`. `heatmap` requires `group-by: scheduled` or `deadline`. `strip` drops the header and renders the query chip and group pills inline — it cannot be combined with `title:`, `heatmap-window:`, or `collapse:` | `bar`      |
 | `title:`          | Adds a custom title displayed above the card                                                                                                                                                                                                                                 | —          |
 | `show-query:`     | `show`, `hide`, `true`, or `false`. Controls the query chip under the title                                                                                                                                                                                                  | `show`     |
-| `sort:`           | `fixed`, `count-desc`, `count-asc`, or `label`. Priority, state, and date buckets default to `fixed` (urgency order); keyword and tag default to `count-desc`                                                                                                                | —          |
+| `sort:`           | `fixed`, `count-desc`, `count-asc`, or `label`. Priority, state, and date buckets default to `fixed` (urgency order); keyword and tag default to `count-desc`; blocked defaults to `label`                                                                                   | —          |
 | `show-empty:`     | `show`, `hide`, `true`, or `false`. When enabled, groups with zero tasks are shown at `0` instead of being omitted                                                                                                                                                           | `hide`     |
 | `max-groups:`     | A positive integer. Truncates long tag/keyword lists and appends an "N more" footer                                                                                                                                                                                          | `8`        |
 | `color:`          | `semantic` or `mono`. Semantic maps each attribute to its theme color (High red, overdue red, completed green, …); `mono` collapses all fills to accent steps                                                                                                                | `semantic` |
@@ -64,6 +64,10 @@ Lines starting with `#` inside the block are treated as comments.
 - **scheduled** / **deadline** — five buckets in urgency order: Overdue,
   Due today, Next 7 days, Later, No date. Clicking a bucket opens the Task
   List with the matching date filter
+- **blocked** — Blocked and Unblocked, using the task's derived `BLOCKER`
+  status. Clicking either bucket opens the Task List with `blocked:true` or
+  `blocked:false` composed with the card's search. `show-empty` can keep a
+  zero-count bucket visible
 
 ## Display Forms
 

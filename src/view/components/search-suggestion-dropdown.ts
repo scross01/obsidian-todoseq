@@ -93,6 +93,9 @@ export class SearchSuggestionDropdown extends BaseDropdown {
       case 'priority':
         allSuggestions = SearchSuggestions.getPriorityOptions();
         break;
+      case 'blocked':
+        allSuggestions = SearchSuggestions.getBlockedOptions();
+        break;
       case 'scheduled':
         {
           const scheduledSuggestions = SearchSuggestions.getDateSuggestions();

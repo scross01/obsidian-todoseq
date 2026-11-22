@@ -1,9 +1,9 @@
-import { SearchNode } from './search-types';
+import { SearchError, SearchNode } from './search-types';
 import { Task } from '../types/task';
 import { DateUtils } from '../utils/date-utils';
 import { PropertyEvaluator } from '../utils/property-evaluator';
 import { TodoTrackerSettings } from '../settings/settings-types';
-import { getFilename } from '../utils/task-utils';
+import { getFilename, getTaskKey } from '../utils/task-utils';
 import { TAG_PATTERN } from '../utils/patterns';
 import { PropertySearchEngine } from '../services/property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
@@ -25,6 +25,8 @@ export interface SearchBatchContext {
   stateGroupKeywords: Map<string, { exact: Set<string>; lower: Set<string> }>;
   /** Pass-local folded-value and phrase-pattern cache. */
   text: SearchTextCache;
+  /** Immutable dependency snapshot acquired once for this pass. */
+  blockedKeys: ReadonlySet<string> | null;
 }
 
 /**
@@ -257,6 +259,7 @@ export class SearchEvaluator {
   static buildBatchContext(
     node: SearchNode,
     settings?: TodoTrackerSettings,
+    dependencyStatus?: { getBlockedKeys(): ReadonlySet<string> },
   ): SearchBatchContext {
     const stateGroupKeywords = new Map<
       string,
@@ -288,12 +291,20 @@ export class SearchEvaluator {
       walk(node);
     }
 
-    return { stateGroupKeywords, text: new SearchTextCache() };
+    return {
+      stateGroupKeywords,
+      text: new SearchTextCache(),
+      blockedKeys: dependencyStatus?.getBlockedKeys() ?? null,
+    };
   }
 
   /** Minimal context for a direct per-row evaluation without a batch pass. */
   private static createBatchContext(): SearchBatchContext {
-    return { stateGroupKeywords: new Map(), text: new SearchTextCache() };
+    return {
+      stateGroupKeywords: new Map(),
+      text: new SearchTextCache(),
+      blockedKeys: null,
+    };
   }
 
   /**
@@ -586,9 +597,25 @@ export class SearchEvaluator {
         return this.evaluateClosedFilter(value, task, caseSensitive, settings);
       case 'started':
         return this.evaluateStartedFilter(value, task, caseSensitive, settings);
+      case 'blocked':
+        return this.evaluateBlockedFilter(value, task, context);
       default:
         return false;
     }
+  }
+
+  private static evaluateBlockedFilter(
+    value: string,
+    task: Task,
+    context: SearchBatchContext,
+  ): boolean {
+    if (!context.blockedKeys) {
+      throw new SearchError(
+        'Dependency status is unavailable for blocked: queries.',
+      );
+    }
+    const blocked = context.blockedKeys.has(getTaskKey(task));
+    return value === 'true' ? blocked : !blocked;
   }
 
   private static evaluatePathFilter(

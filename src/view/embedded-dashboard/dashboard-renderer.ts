@@ -1158,6 +1158,7 @@ export class DashboardRenderer {
         );
       case 'tag':
       case 'keyword':
+      case 'blocked':
       default:
         if (group.key.endsWith(':none') || group.key === 'more') {
           return 'var(--text-faint)';
