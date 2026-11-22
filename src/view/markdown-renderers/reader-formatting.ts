@@ -47,6 +47,14 @@ export class ReaderViewFormatter {
   // paragraphs in the same render pass.
   private readonly sourceLinesCache: Map<string, string[]> = new Map();
 
+  // Per-source-path first-word index, rebuilt when the task revision changes.
+  // Avoids scanning every vault task for every rendered row.
+  private readerTaskIndex: {
+    path: string;
+    revision: number;
+    byFirstWord: Map<string, Task[]>;
+  } | null = null;
+
   // Double-click detection state
   private lastClickTime = 0;
   private lastClickedElement: HTMLElement | null = null;
@@ -315,10 +323,41 @@ export class ReaderViewFormatter {
     if (!renderedText) return -1;
 
     const section = context.getSectionInfo?.(item);
+    const revision =
+      typeof this.plugin.taskStateManager.getRevision === 'function'
+        ? this.plugin.taskStateManager.getRevision()
+        : this.plugin.taskStateManager.getTasks().length;
+    if (
+      !this.readerTaskIndex ||
+      this.readerTaskIndex.path !== sourcePath ||
+      this.readerTaskIndex.revision !== revision
+    ) {
+      const byFirstWord = new Map<string, Task[]>();
+      for (const task of this.plugin.taskStateManager.getTasks()) {
+        if (task.path !== sourcePath) continue;
+        const first = (task.text ?? '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .split(' ')[0]
+          ?.toLowerCase();
+        if (!first) continue;
+        const list = byFirstWord.get(first) ?? [];
+        list.push(task);
+        byFirstWord.set(first, list);
+      }
+      this.readerTaskIndex = { path: sourcePath, revision, byFirstWord };
+    }
+
+    const candidates = new Set<Task>();
+    for (const word of renderedText.toLowerCase().split(/\s+/)) {
+      for (const task of this.readerTaskIndex.byFirstWord.get(word) ?? []) {
+        candidates.add(task);
+      }
+    }
+
     let best: Task | null = null;
     let bestInSection: Task | null = null;
-    for (const task of this.plugin.taskStateManager.getTasks()) {
-      if (task.path !== sourcePath) continue;
+    for (const task of candidates) {
       const text = (task.text ?? '').replace(/\s+/g, ' ').trim();
       if (!text || !renderedText.includes(text)) continue;
       if (!best || text.length > (best.text ?? '').length) best = task;

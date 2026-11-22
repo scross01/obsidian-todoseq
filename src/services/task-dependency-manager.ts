@@ -677,46 +677,60 @@ export class TaskDependencyManager {
         }
       }
 
-      // Org: the current headline's body only, stopping at the next headline.
-      const nextHeadingLine = (path: string, line: number): number => {
-        for (const candidate of structure.headingLinesByPath.get(path) ?? []) {
-          if (candidate > line) return candidate;
+      // Org: one source-order sweep per file. A checkbox belongs to the
+      // nearest preceding Org headline; the next headline (task or non-task)
+      // closes that entry body. This replaces the old parent × all-tasks scan.
+      const orgPaths = new Set<string>();
+      for (const task of tasks) {
+        if (
+          task.sourceFormat === 'org' ||
+          task.path.toLowerCase().endsWith('.org')
+        ) {
+          orgPaths.add(task.path);
         }
-        return Number.POSITIVE_INFINITY;
-      };
-      for (const parent of tasks) {
-        if (parent.sourceFormat !== 'org' || parent.completed) continue;
-        const parentKey = getTaskKey(parent);
-        const end = nextHeadingLine(parent.path, parent.line);
-        for (const child of tasks) {
+      }
+      for (const [path, entries] of entriesByPath) {
+        if (entries.some((entry) => entry.kind === 'checkbox')) {
+          orgPaths.add(path);
+        }
+      }
+      for (const path of orgPaths) {
+        const items: Array<{ line: number; task?: Task; entry?: StructuralEntry }> =
+          [];
+        for (const task of tasks) {
           if (
-            child.path !== parent.path ||
-            child.line <= parent.line ||
-            child.line >= end ||
-            child.completed ||
-            !CHECKBOX_DETECTION_REGEX.test(child.rawText.trimStart())
+            task.path === path &&
+            (task.sourceFormat === 'org' ||
+              task.path.toLowerCase().endsWith('.org'))
           ) {
+            items.push({ line: task.line, task });
+          }
+        }
+        const taskLines = new Set(items.map((item) => item.line));
+        for (const entry of entriesByPath.get(path) ?? []) {
+          if (
+            (entry.kind === 'heading' || entry.kind === 'checkbox') &&
+            !taskLines.has(entry.line)
+          ) {
+            items.push({ line: entry.line, entry });
+          }
+        }
+        items.sort((a, b) => a.line - b.line);
+
+        let current: Task | null = null;
+        for (const item of items) {
+          if (item.task) {
+            current = item.task;
             continue;
           }
-          add(
-            parentKey,
-            getTaskKey(child),
-            'checkbox',
-            `Blocked by an unchecked checkbox at line ${child.line + 1}.`,
-            child,
-          );
-        }
-        for (const entry of entriesByPath.get(parent.path) ?? []) {
-          if (
-            entry.kind !== 'checkbox' ||
-            entry.checked ||
-            entry.line <= parent.line ||
-            entry.line >= end
-          ) {
+          const entry = item.entry!;
+          if (entry.kind === 'heading') {
+            current = null;
             continue;
           }
+          if (entry.checked || !current || current.completed) continue;
           add(
-            parentKey,
+            getTaskKey(current),
             `${entry.path}:${entry.line}`,
             'checkbox',
             `Blocked by an unchecked checkbox at line ${entry.line + 1}.`,
