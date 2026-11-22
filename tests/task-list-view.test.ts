@@ -835,6 +835,32 @@ describe('TaskListView', () => {
       });
     });
 
+    it('keeps the coordinator when settings rebuild the config', () => {
+      const updateConfig = jest.fn();
+      const coordinator = { updateTaskDependency: jest.fn() };
+      view['taskContextMenu'] = { updateConfig } as any;
+      view['plugin'] = {
+        settings: {
+          weekStartsOn: 'Monday',
+          migrateToTodayState: 'MIGRATED',
+          enforceBlockedTasks: true,
+        },
+        taskEditor: {},
+        taskDependencyManager: {},
+        taskUpdateCoordinator: coordinator,
+      } as any;
+
+      view.updateContextMenuConfig();
+
+      expect(updateConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskUpdateCoordinator: coordinator,
+          taskWriter: {},
+          dependencyManager: {},
+        }),
+      );
+    });
+
     it('should not throw when taskContextMenu is null', () => {
       view['taskContextMenu'] = null;
       expect(() => view.updateContextMenuConfig()).not.toThrow();

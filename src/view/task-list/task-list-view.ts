@@ -2701,6 +2701,10 @@ export class TaskListView extends ItemView {
         enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
         taskWriter: this.plugin.taskEditor,
         dependencyManager: this.plugin.taskDependencyManager,
+        // Settings updates rebuild this object. Omitting the coordinator here
+        // left the dependency menu reporting "not ready" after any settings
+        // change for the rest of the session.
+        taskUpdateCoordinator: this.plugin.taskUpdateCoordinator,
       });
     }
   }

@@ -71,12 +71,28 @@ async function clickTaskMenuAction(
   taskText: string,
   action: string,
 ): Promise<void> {
+  // Scope to this fixture: the Task List is vault-wide, and an earlier test
+  // leaves a DONE "Dependent task" in dependency-dependent.md. Text-only
+  // selection can send the menu action to the wrong note.
   const row = page
-    .locator('.workspace-leaf.mod-active .todoseq-task-item', {
-      hasText: taskText,
-    })
+    .locator(
+      `.workspace-leaf.mod-active .todoseq-task-item[data-path="${CLIPBOARD_FILE}.md"]`,
+      { hasText: taskText },
+    )
     .first();
   await expect(row).toBeVisible({ timeout: 10_000 });
+
+  // Copy ID inserts a drawer above later tasks. Wait for the row to carry the
+  // post-insertion line; a stale line makes the dependency write miss.
+  const source = (await readVaultDiskFile(page, CLIPBOARD_FILE)) ?? '';
+  const currentLine = source
+    .split('\n')
+    .findIndex((line) => line.includes(taskText));
+  expect(currentLine).toBeGreaterThanOrEqual(0);
+  await expect
+    .poll(() => row.getAttribute('data-line'), { timeout: 5_000 })
+    .toBe(String(currentLine));
+
   await row.click({ button: 'right' });
 
   const menu = page.locator('.todoseq-task-context-menu');
@@ -237,7 +253,10 @@ test.describe('task dependencies', () => {
       const app = (window as any).app;
       const file = app.vault.getAbstractFileByPath('dependency-blocker.md');
       if (!file) throw new Error('Blocker file missing');
-      await app.vault.modify(file, '# Dependency Blocker\n\n- [ ] TODO Blocker task ^blocker\n- [ ] TODO Anchor carrier ^missing\n');
+      await app.vault.modify(
+        file,
+        '# Dependency Blocker\n\n- [ ] TODO Blocker task ^blocker\n- [ ] TODO Anchor carrier ^missing\n',
+      );
       await app.commands.executeCommandById('todoseq:rescan-vault');
     });
     await page.waitForTimeout(1000);
@@ -254,9 +273,7 @@ test.describe('task dependencies', () => {
       .locator('.todoseq-task-item')
       .filter({ hasText: 'Dependent task' })
       .first();
-    const dependentCheckbox = dependentRow.locator(
-      'input[type="checkbox"]',
-    );
+    const dependentCheckbox = dependentRow.locator('input[type="checkbox"]');
     await expect(dependentCheckbox).not.toBeChecked();
 
     await dependentCheckbox.click();
@@ -289,41 +306,46 @@ test.describe('task dependencies', () => {
   });
 
   test('copy ID, copy anchor and add-as-blocker use the real clipboard and menu', async () => {
-    await page.evaluate(async ({ path, body }) => {
-      const app = (window as any).app;
-      // A leaf left open from an earlier test can keep a stale buffer; close
-      // it so readVaultFile reads the rewritten fixture rather than old text.
-      for (const leaf of app.workspace.getLeavesOfType('markdown')) {
-        if (leaf.view?.file?.path === path) leaf.detach();
-      }
-      const existing = app.vault.getAbstractFileByPath(path);
-      if (existing) await app.vault.modify(existing, body);
-      else await app.vault.create(path, body);
-      await app.commands.executeCommandById('todoseq:rescan-vault');
-    }, {
-      path: `${CLIPBOARD_FILE}.md`,
-      body: [
-        '# Clipboard Actions',
-        '',
-        '- [ ] TODO Source task',
-        '- [ ] TODO Dependent task',
-        '- [ ] TODO Second dependent',
-        '- [ ] TODO Authored task',
-        '  :PROPERTIES:',
-        '  :ID: authored-id',
-        '  :END:',
-        '',
-      ].join('\n'),
-    });
+    await page.evaluate(
+      async ({ path, body }) => {
+        const app = (window as any).app;
+        // A leaf left open from an earlier test can keep a stale buffer; close
+        // it so readVaultFile reads the rewritten fixture rather than old text.
+        for (const leaf of app.workspace.getLeavesOfType('markdown')) {
+          if (leaf.view?.file?.path === path) leaf.detach();
+        }
+        const existing = app.vault.getAbstractFileByPath(path);
+        if (existing) await app.vault.modify(existing, body);
+        else await app.vault.create(path, body);
+        await app.commands.executeCommandById('todoseq:rescan-vault');
+      },
+      {
+        path: `${CLIPBOARD_FILE}.md`,
+        body: [
+          '# Clipboard Actions',
+          '',
+          '- [ ] TODO Source task',
+          '- [ ] TODO Dependent task',
+          '- [ ] TODO Second dependent',
+          '- [ ] TODO Authored task',
+          '  :PROPERTIES:',
+          '  :ID: authored-id',
+          '  :END:',
+          '',
+        ].join('\n'),
+      },
+    );
     await page.waitForTimeout(700);
     await openTodoseqPanel(page);
     await waitForTaskListVisible(page);
 
     // Copy ID generates and persists a UUID for a task without identity.
     await clickTaskMenuAction(page, 'Source task', 'Copy ID');
-    await expect.poll(() => readClipboard(page), { timeout: 5_000 }).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    await expect
+      .poll(() => readClipboard(page), { timeout: 5_000 })
+      .toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      );
     const generatedId = await readClipboard(page);
     await expect
       .poll(() => readVaultDiskFile(page, CLIPBOARD_FILE), { timeout: 5_000 })
@@ -331,28 +353,28 @@ test.describe('task dependencies', () => {
 
     // Copy ID preserves an authored identifier instead of replacing it.
     await clickTaskMenuAction(page, 'Authored task', 'Copy ID');
-    await expect.poll(() => readClipboard(page), { timeout: 5_000 }).toBe(
-      'authored-id',
-    );
+    await expect
+      .poll(() => readClipboard(page), { timeout: 5_000 })
+      .toBe('authored-id');
     const authoredSource = await readVaultFile(page, CLIPBOARD_FILE);
     expect(authoredSource).toContain(':ID: authored-id');
 
     // Copy anchor persists a file-scoped anchor and copies a wiki link.
     await clickTaskMenuAction(page, 'Source task', 'Copy anchor');
-    await expect.poll(() => readClipboard(page), { timeout: 5_000 }).toMatch(
-      /^\[\[[^\]]*clipboard-actions#\^todoseq-[0-9a-f]+\]\]$/,
-    );
+    await expect
+      .poll(() => readClipboard(page), { timeout: 5_000 })
+      .toMatch(/^\[\[[^\]]*clipboard-actions#\^todoseq-[0-9a-f]+\]\]$/);
     const anchorLink = await readClipboard(page);
     const anchoredSource = await readVaultFile(page, CLIPBOARD_FILE);
-    expect(anchoredSource).toContain(anchorLink.match(/\^todoseq-[0-9a-f]+/)?.[0] ?? '');
+    expect(anchoredSource).toContain(
+      anchorLink.match(/\^todoseq-[0-9a-f]+/)?.[0] ?? '',
+    );
 
     // Reusing the anchor is idempotent: same link, no second anchor.
     await clickTaskMenuAction(page, 'Source task', 'Copy anchor');
     expect(await readClipboard(page)).toBe(anchorLink);
     const reusedSource = await readVaultFile(page, CLIPBOARD_FILE);
-    expect(
-      reusedSource.match(/\^todoseq-[0-9a-f]+/g)?.length ?? 0,
-    ).toBe(1);
+    expect(reusedSource.match(/\^todoseq-[0-9a-f]+/g)?.length ?? 0).toBe(1);
 
     // The anchor must be visible to the dependency snapshot before it can be
     // added as a blocker.
@@ -360,27 +382,49 @@ test.describe('task dependencies', () => {
     await expect
       .poll(
         () =>
-          page.evaluate((anchor) => {
-            const plugin = (window as any).app?.plugins?.plugins?.todoseq;
-            return Boolean(
-              plugin?.taskStateManager
-                ?.getTasks?.()
-                .some((task: any) => task.embedReference === anchor),
-            );
-          }, anchorLink.match(/\^[A-Za-z0-9][\w-]*/)?.[0]),
+          page.evaluate(
+            (anchor) => {
+              const plugin = (window as any).app?.plugins?.plugins?.todoseq;
+              return Boolean(
+                plugin?.taskStateManager
+                  ?.getTasks?.()
+                  .some((task: any) => task.embedReference === anchor),
+              );
+            },
+            anchorLink.match(/\^[A-Za-z0-9][\w-]*/)?.[0],
+          ),
         { timeout: 5_000 },
       )
       .toBe(true);
 
     await writeClipboard(page, anchorLink);
-    await expect.poll(() => readClipboard(page), { timeout: 5_000 }).toBe(
-      anchorLink,
-    );
-    await page.waitForTimeout(300);
-    await clickTaskMenuAction(page, 'Dependent task', 'Add copied link as blocker');
+    // The menu reads navigator.clipboard, not Electron's clipboard object.
+    // Verify the exact path it will use.
     await expect
-      .poll(() => readVaultDiskFile(page, CLIPBOARD_FILE), { timeout: 5_000 })
-      .toContain(`:BLOCKER: ${anchorLink}`);
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()), {
+        timeout: 5_000,
+      })
+      .toBe(anchorLink);
+    await page.waitForTimeout(300);
+    await clickTaskMenuAction(
+      page,
+      'Dependent task',
+      'Add copied link as blocker',
+    );
+    // Surface the menu's refusal notice when the write does not land; a bare
+    // source assertion hides whether resolution, validation or the write failed.
+    await expect
+      .poll(
+        async () => {
+          const source = (await readVaultDiskFile(page, CLIPBOARD_FILE)) ?? '';
+          if (source.includes(`:BLOCKER: ${anchorLink}`)) return 'applied';
+          return (
+            (await page.locator('.notice').last().textContent()) ?? 'no notice'
+          );
+        },
+        { timeout: 5_000 },
+      )
+      .toBe('applied');
 
     // The inserted drawer shifts every later task line; reconcile before
     // acting on the next row so its menu target is not stale.

@@ -15,6 +15,7 @@
 - Optional structural dependencies now respect non-task headings and dedented prose as boundaries, count keywordless checkboxes, keep archived branches out of outer checks, stop Org checkbox checks at the next headline, and refresh immediately when either structural setting changes.
 - Blocked tasks now show their lock in reader views, broken dependency references show a warning in the editor, and new dependency problems are announced once instead of staying silent until you search for them.
 - Copying a task anchor again now reuses the anchor already saved on the task instead of adding a second one.
+- Fixed task-list dependency actions becoming unavailable after changing settings; adding a copied link as a blocker now keeps working.
 
 ## 0.23.0
 
