@@ -154,7 +154,7 @@ A missing, ambiguous, excluded or temporarily unvalidated reference counts as bl
 
 ## Completion enforcement and task actions
 
-Blocked tasks are dimmed with a lock icon in the Task List and embedded task lists. Hovering or focusing the lock explains the blocking reasons. Reader views draw the same lock beside the rendered task, with the blocking reasons in its tooltip and an accessible reason count when there are several. The marker is derived at render time and writes nothing.
+Blocked tasks are dimmed with a lock icon in the Task List and embedded task lists. The lock is a focusable button: hovering or focusing it shows the blocking reasons, and clicking it or pressing Enter/Space opens them in a notice. Reader views draw the same lock beside Markdown, heading, bullet and table tasks, with the blocking reasons in its tooltip and the same keyboard/tap activation. The marker is derived at render time and writes nothing.
 
 Live Preview and source-mode editors add a warning icon only for **source diagnostics**: an unresolved, ambiguous or invalid reference, a dependency cycle or duplicate IDs. Ordinary waiting on an incomplete task is normal blocked state and does not show a warning. Repairing the reference removes the icon on the next decoration refresh.
 
@@ -181,7 +181,7 @@ Moving, copying or migrating a task through TODOseq keeps its block references w
 - **Copy forks identity.** A copied task with an `ID` gets a new UUID and a copied task with a block anchor gets a new anchor. References inside the copied block are remapped to the copy; references elsewhere stay attached to the original. A task with neither identity is copied without one.
 - **Migrate cleans the history entry.** The destination keeps the original `ID` and anchor; the migrated line left behind drops both so it is not a second owner of the same identity.
 
-If a reference cannot be rewritten, the transfer stays in place and the plugin reports how many links failed. Run **Retry failed task reference repairs** from the command palette to retry exactly those links during the current session. A failed block move makes no reference changes at all.
+If a reference cannot be rewritten, the transfer stays in place and the plugin reports how many links failed. The notice includes a **Retry** button, and **Retry failed task reference repairs** in the command palette retries exactly those links during the current session. A failed block move makes no reference changes at all. Moves repair references to every anchored task in the transferred block, including nested rows.
 
 Renaming a note in Obsidian is handled by Obsidian; TODOseq does not chase file renames. Moving text outside TODOseq is best-effort: a stale reference is reported by the existing broken-reference warning after the next scan, and TODOseq never guesses a new target.
 

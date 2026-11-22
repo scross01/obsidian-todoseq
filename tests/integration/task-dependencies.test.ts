@@ -377,5 +377,20 @@ test.describe('task dependencies', () => {
         .locator('.todoseq-task-item', { hasText: 'Second dependent' })
         .locator('.todoseq-task-blocked-icon'),
     ).toHaveCount(1);
+
+    const blockedIcon = page
+      .locator('.todoseq-task-item', { hasText: 'Dependent task' })
+      .locator('.todoseq-task-blocked-icon');
+    await expect(blockedIcon).toHaveAttribute('tabindex', '0');
+    await blockedIcon.evaluate((element) => {
+      (element as HTMLElement).focus();
+      element.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
+    });
+    await expect(page.locator('.notice').last()).toContainText(
+      'Blocked by an incomplete dependency',
+      { timeout: 5_000 },
+    );
   });
 });

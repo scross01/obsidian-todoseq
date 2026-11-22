@@ -3867,6 +3867,18 @@
   vertical-align: middle;
 }
 
+.todoseq-task-blocked-icon,
+.todoseq-reader-blocked-badge {
+  cursor: help;
+  border-radius: 2px;
+}
+
+.todoseq-task-blocked-icon:focus-visible,
+.todoseq-reader-blocked-badge:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
 /* Source diagnostic (broken/ambiguous reference, cycle), not ordinary blocked state. */
 .todoseq-dependency-issue-icon {
   display: inline-flex;

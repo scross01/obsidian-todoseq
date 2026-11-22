@@ -11,6 +11,7 @@ import { EditorView } from '@codemirror/view';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
 import { TaskTransferStatus } from '../../services/task-writer';
+import { showReferenceRepairNotice } from '../components/reference-repair-notice';
 
 export interface TaskDragDropCallbacks {
   onGetTask: (path: string, line: number) => Task | undefined;
@@ -312,9 +313,7 @@ export class TaskDragDropHandler {
           (total, report) => total + report.failed.length,
           0,
         ) ?? 0;
-      new Notice(
-        `Task transferred, but ${failed} reference link(s) could not be updated. Run "Retry failed task reference repairs" from the command palette.`,
-      );
+      showReferenceRepairNotice(writer, failed);
       return;
     }
     if (result.status !== 'success') {

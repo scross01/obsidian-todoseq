@@ -878,6 +878,7 @@ export class PluginLifecycleManager {
         vaultScanner: scanner,
         saveSettings: () => this.plugin.saveSettings(),
         performUndo: () => this.performArchiveUndo(),
+        retryReferenceRepairs: () => this.retryArchiveReferenceRepairs(),
         migrateArchivedDependents: (task) =>
           this.migrateArchivedDependents(task),
         app: this.plugin.app,
@@ -892,6 +893,11 @@ export class PluginLifecycleManager {
    * history. Failures are returned, never thrown: the archive has already
    * happened and must not be rolled back because a dependent line changed.
    */
+  private pendingArchiveReferenceRepairs: Array<{
+    dependent: Task;
+    references: string[];
+  }> = [];
+
   private async migrateArchivedDependents(
     task: Task,
     incoming?: readonly { dependent: Task; references: string[] }[],
@@ -919,6 +925,7 @@ export class PluginLifecycleManager {
 
     let migrated = 0;
     const failures: ArchiveReferenceFailure[] = [];
+    const retry: Array<{ dependent: Task; references: string[] }> = [];
     for (const { task: dependent, references } of byDependent.values()) {
       try {
         const result = await coordinator.updateTaskDependency(
@@ -929,6 +936,7 @@ export class PluginLifecycleManager {
         if (result.status === 'applied') {
           migrated += references.length;
         } else {
+          retry.push({ dependent, references });
           for (const reference of references) {
             failures.push({
               path: dependent.path,
@@ -941,6 +949,7 @@ export class PluginLifecycleManager {
           }
         }
       } catch (error) {
+        retry.push({ dependent, references });
         for (const reference of references) {
           failures.push({
             path: dependent.path,
@@ -950,7 +959,22 @@ export class PluginLifecycleManager {
         }
       }
     }
+    this.pendingArchiveReferenceRepairs = retry;
     return { migrated, failures };
+  }
+
+  /** Retry only dependent references that failed in the last archive run. */
+  async retryArchiveReferenceRepairs(): Promise<void> {
+    const pending = this.pendingArchiveReferenceRepairs;
+    if (pending.length === 0) return;
+    const target = pending[0].dependent;
+    this.pendingArchiveReferenceRepairs = [];
+    const result = await this.migrateArchivedDependents(target, pending);
+    new Notice(
+      result.failures.length === 0
+        ? 'Archive dependent references repaired'
+        : `${result.failures.length} dependent reference(s) still could not be updated`,
+    );
   }
 
   private scheduleDependencyPromotions(): void {
@@ -1095,15 +1119,29 @@ export class PluginLifecycleManager {
       });
 
       const archivedCount = result.archived.length;
+      const failureCount = result.referenceFailures.length;
       if (archivedCount === 0) return;
 
       showArchiveRunNotice(
         `TODOseq auto-archived ${archivedCount} task${
           archivedCount === 1 ? '' : 's'
-        }`,
+        }` +
+          (failureCount > 0
+            ? `, ${failureCount} dependent reference${
+                failureCount === 1 ? '' : 's'
+              } could not be updated`
+            : ''),
         {
-          actionLabel: service.hasUndoableRun() ? 'Undo' : undefined,
-          onAction: () => void this.performArchiveUndo(),
+          actionLabel:
+            failureCount > 0
+              ? 'Retry repairs'
+              : service.hasUndoableRun()
+                ? 'Undo'
+                : undefined,
+          onAction:
+            failureCount > 0
+              ? () => void this.retryArchiveReferenceRepairs()
+              : () => void this.performArchiveUndo(),
           timeoutMs: 10_000,
         },
       );

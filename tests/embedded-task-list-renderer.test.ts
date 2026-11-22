@@ -794,6 +794,7 @@ describe('EmbeddedTaskListRenderer', () => {
         weekStartsOn: 'Monday',
         migrateToTodayState: 'MIGRATED',
         enforceBlockedTasks: true,
+        taskUpdateCoordinator: expect.anything(),
         taskWriter: undefined,
         dependencyManager: undefined,
       });

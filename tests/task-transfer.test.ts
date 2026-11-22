@@ -599,6 +599,45 @@ describe('TaskWriter transfer reference repair', () => {
     expect(h.writer.hasPendingReferenceRepairs()).toBe(false);
   });
 
+  it('repairs references to nested anchors after a move', async () => {
+    const source = [
+      'Intro',
+      '',
+      '- [ ] TODO Parent ^parent',
+      '  - [ ] TODO Child ^child',
+      '',
+    ].join('\n');
+    const dependent = [
+      'TODO Dependent',
+      ':PROPERTIES:',
+      ':BLOCKER: [[notes/source#^parent]] [[notes/source#^child]]',
+      ':END:',
+      '',
+    ].join('\n');
+    const h = harness({
+      [SOURCE]: source,
+      [DEST]: '',
+      'notes/dependent.md': dependent,
+    });
+
+    const result = await h.writer.transferTask(
+      task({
+        line: 2,
+        text: 'Parent',
+        rawText: '- [ ] TODO Parent ^parent',
+      }),
+      h.file(DEST),
+      'move',
+    );
+
+    expect(result.status).toBe('success');
+    expect(h.store.get('notes/dependent.md')).toBe(
+      'TODO Dependent\n:PROPERTIES:\n:BLOCKER: [[notes/today#^parent]] [[notes/today#^child]]\n:END:\n',
+    );
+    expect(h.store.get(DEST)).toContain('Parent ^parent');
+    expect(h.store.get(DEST)).toContain('Child ^child');
+  });
+
   it('leaves an unharmed transfer untouched when nothing references it', async () => {
     const h = harness({ [SOURCE]: ANCHORED_SOURCE, [DEST]: '' });
     const result = await h.writer.transferTask(

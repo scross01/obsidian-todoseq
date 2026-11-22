@@ -887,6 +887,18 @@ export class TaskItemRenderer {
       .join(' ');
     setTooltip(icon, details || 'Blocked by an incomplete dependency');
     icon.setAttribute('aria-label', details || 'Blocked task');
+    const iconEl = icon;
+    iconEl.setAttribute('role', 'button');
+    iconEl.setAttribute('tabindex', '0');
+    const showDetails = (event: Event): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      new Notice(details || 'Blocked by an incomplete dependency', 8000);
+    };
+    iconEl.onclick = showDetails;
+    iconEl.onkeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') showDetails(event);
+    };
   }
 
   /**

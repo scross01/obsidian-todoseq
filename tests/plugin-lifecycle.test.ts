@@ -344,6 +344,42 @@ describe('PluginLifecycleManager', () => {
     });
   });
 
+  describe('archive reference retry', () => {
+    it('retries only the failed dependent and clears the queue', async () => {
+      const updateTaskDependency = jest
+        .fn()
+        .mockResolvedValueOnce({ status: 'failed', reason: 'locked' })
+        .mockResolvedValueOnce({ status: 'applied' });
+      const plugin = (lifecycleManager as unknown as { plugin: any }).plugin;
+      plugin.taskDependencyManager = {
+        getIncomingActiveReferences: jest.fn().mockReturnValue([]),
+      };
+      plugin.taskUpdateCoordinator = { updateTaskDependency };
+      const dependent = { path: 'dependent.md', line: 0 };
+
+      const first = await (
+        lifecycleManager as unknown as {
+          migrateArchivedDependents: (
+            task: unknown,
+            incoming: unknown,
+          ) => Promise<{ failures: unknown[] }>;
+        }
+      ).migrateArchivedDependents({} as never, [
+        { dependent, references: ['blocker'] },
+      ]);
+      expect(first.failures).toHaveLength(1);
+
+      await lifecycleManager.retryArchiveReferenceRepairs();
+      expect(updateTaskDependency).toHaveBeenNthCalledWith(
+        2,
+        dependent,
+        'archive',
+        ['blocker'],
+      );
+      expect(updateTaskDependency).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('onunload', () => {
     it('should detach all task list leaves', async () => {
       const leafMock = { detach: jest.fn() };

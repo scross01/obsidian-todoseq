@@ -14,6 +14,7 @@ import {
 import { TASK_VIEW_ICON } from '../../main';
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { TaskTransferResult } from '../../services/task-writer';
+import { showReferenceRepairNotice } from '../components/reference-repair-notice';
 import { TaskClassification } from '../../utils/task-sort';
 import { Search } from '../../search/search';
 import {
@@ -1715,9 +1716,7 @@ export class TaskListView extends ItemView {
             (total, report) => total + report.failed.length,
             0,
           ) ?? 0;
-        new Notice(
-          `${failed} reference link(s) could not be updated. Run "Retry failed task reference repairs" from the command palette.`,
-        );
+        showReferenceRepairNotice(this.plugin.taskEditor, failed);
         break;
       }
     }

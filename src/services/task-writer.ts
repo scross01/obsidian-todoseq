@@ -1023,6 +1023,7 @@ export class TaskWriter {
       return { status: 'stale-source', reason: 'The task could not be read.' };
     }
 
+    const anchors = action === 'copy' ? [] : this.blockAnchors(block);
     const anchor = this.taskAnchor(task);
     if (action === 'copy') {
       block = await this.prepareCopiedBlock(block, task, destination, anchor);
@@ -1058,20 +1059,34 @@ export class TaskWriter {
       };
     }
 
-    if (!anchor) return { status: 'success' };
-    const edits = await this.collectReferenceEdits(
-      task.path,
-      anchor,
-      destination.path,
-    );
-    if (edits === null) {
-      return {
-        status: 'partial-references',
-        reason:
-          'The task was transferred, but its references could not be scanned.',
-      };
+    if (anchors.length === 0) return { status: 'success' };
+    const edits: TaskReferenceEdit[] = [];
+    for (const blockAnchor of anchors) {
+      const batch = await this.collectReferenceEdits(
+        task.path,
+        blockAnchor,
+        destination.path,
+      );
+      if (batch === null) {
+        return {
+          status: 'partial-references',
+          reason:
+            'The task was transferred, but its references could not be scanned.',
+        };
+      }
+      edits.push(...batch);
     }
     return this.applyReferenceEdits(edits);
+  }
+
+  /** Every block anchor carried by the transferred block, including nested rows. */
+  private blockAnchors(block: readonly string[]): string[] {
+    const anchors = new Set<string>();
+    for (const line of block) {
+      const match = /\^([A-Za-z0-9][\w-]*)\s*$/.exec(line);
+      if (match) anchors.add(match[1]);
+    }
+    return [...anchors];
   }
 
   /** The destination block keeps identity on move/migrate; copy forks it. */

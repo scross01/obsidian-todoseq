@@ -3,6 +3,8 @@
 ## Unreleased
 
 - A blocked task's checkbox now springs back instead of staying checked, and archive runs report blocked tasks as skipped rather than counting them as archived. A completion queued while its blocker was still done is checked once more before writing.
+- Blocked locks are now keyboard and tap accessible in task lists, embedded lists and reader views, including plain, heading, bullet and table reader tasks.
+- Moving a task now repairs links to nested anchored tasks too, and failed reference repairs offer a Retry button instead of requiring the command palette. Archive runs surface failed dependent updates with the same retry action.
 - Archiving a prerequisite now moves each dependent's `BLOCKER` reference into `ARCHIVED_BLOCKER` history, so the dependent is no longer stranded; restoring the prerequisite moves the reference back. Dependents that cannot be updated stay blocked and are reported.
 - Moving a task now updates the `BLOCKER` links, prose links and embeds that pointed at it, while copying gives the copy its own ID and block anchor; migrating leaves the old line without a duplicate identity.
 - Added Org-style `:PROPERTIES:` drawers under Markdown and Org tasks. TODOseq reads `:ID:`, `:BLOCKER:` and `:ARCHIVED_BLOCKER:` while preserving every other property, and copy, move and migrate carry the drawer with the task.

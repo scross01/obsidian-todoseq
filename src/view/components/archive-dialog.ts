@@ -64,6 +64,8 @@ interface ArchiveDialogPlugin {
   saveSettings(): Promise<void>;
   /** Revert the most recent archive run (same flow as the palette command). */
   performUndo(): void | Promise<void>;
+  /** Retry dependent-reference migrations that failed during the run. */
+  retryReferenceRepairs?: () => void | Promise<void>;
   app: App;
 }
 
@@ -970,10 +972,16 @@ export class ArchiveDialog {
                 result.referenceFailures.length === 1 ? '' : 's'
               } could not be updated`
             : ''),
-        {
-          actionLabel: 'Undo',
-          onAction: () => void this.plugin.performUndo(),
-        },
+        result.referenceFailures.length > 0 &&
+          this.plugin.retryReferenceRepairs
+          ? {
+              actionLabel: 'Retry repairs',
+              onAction: () => void this.plugin.retryReferenceRepairs?.(),
+            }
+          : {
+              actionLabel: 'Undo',
+              onAction: () => void this.plugin.performUndo(),
+            },
       );
       // No vault rescan here. The update coordinator already refreshed the
       // state manager (archived tasks were removed). A full rescan would read

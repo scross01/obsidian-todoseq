@@ -1,5 +1,6 @@
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { TaskTransferResult } from '../../services/task-writer';
+import { showReferenceRepairNotice } from '../components/reference-repair-notice';
 import { getStateTransitionManager } from '../../services/task-update-coordinator';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
@@ -148,9 +149,7 @@ export class EmbeddedTaskListRenderer {
             (total, report) => total + report.failed.length,
             0,
           ) ?? 0;
-        new Notice(
-          `${failed} reference link(s) could not be updated. Run "Retry failed task reference repairs" from the command palette.`,
-        );
+        showReferenceRepairNotice(this.plugin.taskEditor, failed);
         break;
       }
     }

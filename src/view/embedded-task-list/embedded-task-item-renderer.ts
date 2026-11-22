@@ -113,6 +113,17 @@ export class EmbeddedTaskItemRenderer {
         .join(' ');
       setTooltip(lock, details || 'Blocked by an incomplete dependency');
       lock.setAttribute('aria-label', details || 'Blocked task');
+      lock.setAttribute('role', 'button');
+      lock.setAttribute('tabindex', '0');
+      const showDetails = (event: Event): void => {
+        event.preventDefault();
+        event.stopPropagation();
+        new Notice(details || 'Blocked by an incomplete dependency', 8000);
+      };
+      lock.onclick = showDetails;
+      lock.onkeydown = (event: KeyboardEvent) => {
+        if (event.key === 'Enter' || event.key === ' ') showDetails(event);
+      };
     }
 
     const wrapMode: 'dynamic' | boolean = params.wrapContent ?? 'dynamic';

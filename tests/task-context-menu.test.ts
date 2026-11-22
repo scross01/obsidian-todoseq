@@ -1501,3 +1501,71 @@ describe('TaskContextMenu', () => {
     });
   });
 });
+
+describe('blocker context-menu routing', () => {
+  it('routes Add copied link as blocker through the update coordinator', async () => {
+    activeDocument.body.innerHTML = '';
+    const app = new App();
+    const target = createBaseTask({
+      path: 'notes/source.md',
+      line: 1,
+      id: 'dep-1',
+      text: 'Dependency',
+    });
+    const task = createBaseTask({
+      path: 'notes/source.md',
+      line: 0,
+      text: 'Dependent',
+      state: 'TODO',
+    });
+    const updateTaskDependency = jest
+      .fn()
+      .mockResolvedValue({ status: 'applied' });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { readText: jest.fn().mockResolvedValue('dep-1') },
+    });
+    const menu = new TaskContextMenu(
+      {
+        onGoToTask: jest.fn(),
+        onCopyTask: jest.fn(),
+        onCopyTaskToToday: jest.fn(),
+        onMoveTaskToToday: jest.fn(),
+        onMigrateTaskToToday: jest.fn(),
+        onPriorityChange: jest.fn(),
+        onScheduledDateChange: jest.fn(),
+        onDeadlineDateChange: jest.fn(),
+      },
+      {
+        weekStartsOn: 'Monday',
+        taskWriter: {} as never,
+        taskUpdateCoordinator: { updateTaskDependency } as never,
+      },
+      app,
+      { getTasks: () => [task, target] } as never,
+    );
+
+    try {
+      await menu.show(task, { x: 100, y: 100 });
+      const row = Array.from(
+        activeDocument.querySelectorAll<HTMLElement>(
+          '.todoseq-context-menu-row',
+        ),
+      ).find(
+        (candidate) =>
+          candidate.querySelector('.todoseq-context-menu-row-label')
+            ?.textContent === 'Add copied link as blocker',
+      );
+      expect(row).toBeDefined();
+      row?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(updateTaskDependency).toHaveBeenCalledWith(task, 'add', [
+        'dep-1',
+      ]);
+    } finally {
+      menu.cleanup();
+    }
+  });
+});
