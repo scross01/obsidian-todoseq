@@ -2,6 +2,7 @@
 
 ## 0.23.0
 
+- Search operators `OR`/`AND` now also match in lowercase (`or`/`and`), matching Obsidian's search grammar; quote them (`"or"`) to search the literal word.
 - Added `tag:none` to find tasks without any tags, with matching dashboard “No tags” grouping and tag autocomplete; `#none` remains a literal tag.
 - Fixed dashboard's **No tags** group treating tasks with emoji or other non-ASCII tags (such as `#🏠`) as untagged.
 - Developer tooling: manual fixture generation now uses the same deterministic corpus as the performance tests, with fixed `s`/`m`/`l` presets and reproducible seed/date inputs; `npm run generate-content` remains as a deprecated alias and rejects arbitrary file/task counts instead of writing unsupported task syntax.

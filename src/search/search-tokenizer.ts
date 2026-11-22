@@ -12,8 +12,8 @@ export class SearchTokenizer {
   // Token patterns in order of precedence
   private static readonly PATTERNS = [
     { type: 'phrase' as const, regex: /"(?:\\.|[^"\\])*"/y },
-    { type: 'or' as const, regex: /\bOR\b/y },
-    { type: 'and' as const, regex: /\bAND\b/y },
+    { type: 'or' as const, regex: /\bOR\b/iy },
+    { type: 'and' as const, regex: /\bAND\b/iy },
     { type: 'range' as const, regex: /\.\./y },
     { type: 'lparen' as const, regex: /\(/y },
     { type: 'rparen' as const, regex: /\)/y },
