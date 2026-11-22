@@ -1,6 +1,7 @@
 import { TFile } from 'obsidian';
 
-export type TaskPropertyKey = 'ID' | 'BLOCKER' | 'ARCHIVED_BLOCKER';
+export type TaskPropertyKey =
+  'ID' | 'BLOCKER' | 'ARCHIVED_BLOCKER' | 'ORDERED' | 'NOBLOCKING';
 
 export type TaskPropertyIssueCode =
   | 'malformed-drawer'
@@ -68,6 +69,8 @@ export interface Task {
   id?: string; // exact case-sensitive task identifier from :ID:
   blockedBy?: string[]; // BLOCKER references, order-preserved and deduped
   archivedBlockers?: string[]; // non-blocking ARCHIVED_BLOCKER history
+  ordered?: boolean; // local ORDERED property, Org-compatible non-nil semantics
+  noblocking?: boolean; // local NOBLOCKING override, Org-compatible non-nil semantics
   propertyIssues?: readonly TaskPropertyIssue[]; // bounded source diagnostics
 }
 

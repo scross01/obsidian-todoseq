@@ -104,6 +104,11 @@ export class PluginLifecycleManager {
         app: this.plugin.app,
         isPathExcluded: (path) =>
           this.plugin.vaultScanner?.isPathExcluded(path) ?? false,
+        getStructuralSettings: () => ({
+          hierarchy:
+            this.plugin.settings.enforceTaskHierarchyDependencies === true,
+          checkbox: this.plugin.settings.enforceCheckboxDependencies === true,
+        }),
       },
     );
 

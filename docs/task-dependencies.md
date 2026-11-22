@@ -16,11 +16,13 @@ TODO Write the research paper
 
 The same drawer works under a plain keyword task, a bullet task, a checkbox task, a heading task, or a quoted task. A property drawer on a table cell or code-comment task is not supported.
 
-TODOseq reads three properties:
+TODOseq reads these properties:
 
 - `ID` gives a task one exact, case-sensitive identifier.
-- `BLOCKER` lists the tasks that must be complete first.
+- `BLOCKER` lists the tasks that must be complete first. Markdown also accepts `previous-sibling`.
 - `ARCHIVED_BLOCKER` keeps inactive references after a prerequisite is archived. It does not block completion.
+- `ORDERED` makes later task siblings wait for this task.
+- `NOBLOCKING` exempts this task from every dependency gate, including explicit, structural and checkbox reasons. A present value other than lowercase `nil` enables it; an empty value enables it.
 
 Property names are case-insensitive. Values and IDs keep their case. Unknown properties are preserved but not interpreted. A drawer can contain blank lines. An unclosed drawer is left alone and does not consume the following task.
 
@@ -78,6 +80,21 @@ Cycles are reported as diagnostics, but they do not replace the direct completio
 
 `ARCHIVED_BLOCKER` is inactive history. It does not block completion while the archived task is absent. If the exact ID or file-plus-anchor target reappears in the scanned tasks, TODOseq treats the relationship as active immediately using the target's current state: an incomplete restored target blocks, and a completed one does not. The next reconciliation can move the reference back to `BLOCKER`.
 
+## Optional structural dependencies
+
+Two independent settings are off by default:
+
+- **Respect parent and ordered task dependencies** blocks an incomplete parent while an indented or heading child is unfinished, and makes a task wait for an `ORDERED` previous sibling. Markdown nesting can come from headings or indentation; plain keyword tasks do not need a list marker or checkbox.
+- **Require checkboxes to be complete** blocks an incomplete parent while an unchecked descendant checkbox exists. In Markdown this covers the bounded task subtree, excluding the parent's own checkbox. In Org it follows the current entry body and stops at the next headline.
+
+Both settings only add reasons; explicit `BLOCKER` references and `previous-sibling` remain active with either setting off. Turning the global **Enforce blocked tasks** setting off changes only whether completion is refused, not the derived blocked state used by search, dashboards and row styling.
+
+`NOBLOCKING` is a local, durable declaration, not a one-time override. It suppresses all reasons for that task but does not change other tasks that reference it; an incomplete `NOBLOCKING` task still blocks its own dependents. Use **Complete anyway** for a single completion override.
+
+## Previous sibling and ORDERED
+
+`BLOCKER: previous-sibling` names the immediately preceding task sibling in the same file and section. It is not an ID and never searches another file. `ORDERED` on a task makes the next task sibling wait until it completes. Both follow the same direct completion rule as IDs: complete the target and the dependent is released.
+
 ## Searching by blocked status
 
 Use `blocked:true` in the Task List search to find incomplete tasks waiting on a dependency, and `blocked:false` for tasks that are actionable or already complete. The values are lowercase and must be exactly `true` or `false`. Negation and composition work as usual, for example `-blocked:true priority:high` or `state:TODO blocked:false`.
@@ -103,4 +120,4 @@ The task context menu can copy an `ID` or a Markdown block anchor:
 
 ## Local properties only
 
-TODOseq reads dependency properties from the task's own drawer. Parent tasks and file-level defaults do not add an `ID`, `BLOCKER`, or `ARCHIVED_BLOCKER` to another task. Task hierarchy alone never blocks a task in this release.
+TODOseq reads dependency properties from the task's own drawer. Parent tasks and file-level defaults do not add an `ID`, `BLOCKER`, `ARCHIVED_BLOCKER`, `ORDERED` or `NOBLOCKING` to another task. Implicit hierarchy blocking is opt-in; explicit dependencies are not inherited.

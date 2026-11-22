@@ -676,6 +676,22 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             control: { type: 'toggle', key: 'enforceBlockedTasks' },
           },
           {
+            name: 'Respect parent and ordered task dependencies',
+            desc: 'When enabled, an unfinished child blocks its parent and an ORDERED task constrains later siblings. Explicit BLOCKER references are always active.',
+            control: {
+              type: 'toggle',
+              key: 'enforceTaskHierarchyDependencies',
+            },
+          },
+          {
+            name: 'Require checkboxes to be complete',
+            desc: 'When enabled, unchecked descendant checkboxes block an incomplete parent. This is independent of parent/ORDERED dependencies.',
+            control: {
+              type: 'toggle',
+              key: 'enforceCheckboxDependencies',
+            },
+          },
+          {
             name: 'Track started date',
             desc: 'Add started: timestamp when tasks enter an active state. Manual state changes never remove it.',
             control: { type: 'toggle', key: 'trackStartedDate' },

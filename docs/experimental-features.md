@@ -83,7 +83,9 @@ TODOseq recognizes standard Org-mode task syntax:
   :END:
 ```
 
-TODOseq reads `ID`, `BLOCKER` and `ARCHIVED_BLOCKER`; other properties are preserved in the file and left uninterpreted. Org files use IDs for dependency references. See [Task Dependencies](task-dependencies.md) for syntax and Markdown block-link support.
+TODOseq reads `ID`, `BLOCKER`, `ARCHIVED_BLOCKER`, `ORDERED` and `NOBLOCKING`; other properties are preserved in the file and left uninterpreted. Org files use IDs for dependency references, with local `BLOCKER: previous-sibling` as an explicit relation. See [Task Dependencies](task-dependencies.md) for syntax, Markdown block-link support and the optional hierarchy/checkbox settings.
+
+Org checkbox dependencies stay entry-local and stop at the next headline. Markdown checkbox dependencies cover the bounded task subtree instead, so the same visual nesting can produce different reasons across the two formats. This difference is intentional and both checkbox settings are off by default.
 
 ### Supported Keywords
 

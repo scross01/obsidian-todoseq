@@ -6,6 +6,7 @@
 - Tasks can now derive a blocked state from `BLOCKER` IDs and file-qualified block links. Completed prerequisites release dependents immediately, broken or ambiguous references keep them blocked, and archived references become active again if their exact target is restored.
 - Added `blocked:true` and `blocked:false` search filters and dashboard grouping, so you can find waiting work or exclude it from a query.
 - Blocked tasks now show a lock and dimmed text in task lists, and completing them is refused until their dependencies are done. Use Complete anyway when you need to override it; the task menu can also copy a task ID or block anchor and add a copied link as a blocker.
+- Added optional parent, `ORDERED` and checkbox dependency rules, plus local `NOBLOCKING` and `BLOCKER: previous-sibling` support for Org-style workflows.
 
 ## 0.23.0
 

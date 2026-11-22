@@ -503,6 +503,8 @@ export class TaskWriter {
     delete updated.id;
     delete updated.blockedBy;
     delete updated.archivedBlockers;
+    delete updated.ordered;
+    delete updated.noblocking;
     delete updated.propertyIssues;
     if (parsed?.properties) updated.properties = parsed.properties;
     if (parsed?.id !== undefined) updated.id = parsed.id;
@@ -510,6 +512,9 @@ export class TaskWriter {
     if (parsed?.archivedBlockers !== undefined) {
       updated.archivedBlockers = parsed.archivedBlockers;
     }
+    if (parsed?.ordered !== undefined) updated.ordered = parsed.ordered;
+    if (parsed?.noblocking !== undefined)
+      updated.noblocking = parsed.noblocking;
     if (parsed?.propertyIssues?.length) {
       updated.propertyIssues = parsed.propertyIssues;
     }

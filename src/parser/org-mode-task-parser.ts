@@ -446,6 +446,8 @@ export class OrgModeTaskParser implements ITaskParser {
     if (parsed.archivedBlockers !== undefined) {
       task.archivedBlockers = parsed.archivedBlockers;
     }
+    if (parsed.ordered !== undefined) task.ordered = parsed.ordered;
+    if (parsed.noblocking !== undefined) task.noblocking = parsed.noblocking;
     if (parsed.propertyIssues?.length) {
       task.propertyIssues = parsed.propertyIssues;
     }

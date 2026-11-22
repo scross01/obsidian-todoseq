@@ -14,6 +14,8 @@ export const SUPPORTED_TASK_PROPERTY_KEYS = [
   'ID',
   'BLOCKER',
   'ARCHIVED_BLOCKER',
+  'ORDERED',
+  'NOBLOCKING',
 ] as const;
 
 export type SupportedTaskProperty = TaskPropertyKey;
@@ -50,6 +52,8 @@ export interface ParsedTaskProperties {
   id?: string;
   blockedBy?: string[];
   archivedBlockers?: string[];
+  ordered?: boolean;
+  noblocking?: boolean;
   propertyIssues?: TaskPropertyIssue[];
 }
 
@@ -438,6 +442,8 @@ export function extractTaskProperties(
   let archivedBlockers: string[] | undefined;
   let blockedValue: string | undefined;
   let archivedValue: string | undefined;
+  let ordered: boolean | undefined;
+  let noblocking: boolean | undefined;
 
   const baseEntries = new Map<SupportedTaskProperty, TaskPropertyEntry[]>();
   const appendEntries = new Map<SupportedTaskProperty, TaskPropertyEntry[]>();
@@ -540,6 +546,20 @@ export function extractTaskProperties(
     properties.ARCHIVED_BLOCKER = '';
   }
 
+  const readSwitch = (key: 'ORDERED' | 'NOBLOCKING'): boolean | undefined => {
+    const entries = [
+      ...(baseEntries.get(key) ?? []).slice(0, 1),
+      ...(appendEntries.get(key) ?? []),
+    ];
+    if (entries.length === 0) return undefined;
+    const canonical = entries[entries.length - 1];
+    properties[key] = canonical.value;
+    return canonical.value.trim().toLowerCase() !== 'nil';
+  };
+
+  ordered = readSwitch('ORDERED');
+  noblocking = readSwitch('NOBLOCKING');
+
   void blockedValue;
   void archivedValue;
 
@@ -548,6 +568,8 @@ export function extractTaskProperties(
     ...(id !== undefined ? { id } : {}),
     ...(blockedBy !== undefined ? { blockedBy } : {}),
     ...(archivedBlockers !== undefined ? { archivedBlockers } : {}),
+    ...(ordered !== undefined ? { ordered } : {}),
+    ...(noblocking !== undefined ? { noblocking } : {}),
     ...(issues.length > 0 ? { propertyIssues: issues } : {}),
   };
 }

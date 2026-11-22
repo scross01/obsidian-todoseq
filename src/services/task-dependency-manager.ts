@@ -11,12 +11,18 @@ import {
   type DependencyReference,
 } from '../utils/task-properties';
 import { getTaskKey } from '../utils/task-utils';
+import { buildTaskStructure } from '../utils/task-structure';
+import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { taskComparator } from '../utils/task-sort';
 import { TaskStateManager } from './task-state-manager';
 
 export interface TaskDependencyManagerOptions {
   app?: App;
   isPathExcluded?: (path: string) => boolean;
+  getStructuralSettings?: () => {
+    hierarchy: boolean;
+    checkbox: boolean;
+  };
 }
 
 interface ResolvedReference {
@@ -138,6 +144,7 @@ export class TaskDependencyManager {
 
   getBlockingReasons(taskKey: string): readonly DependencyReason[] {
     this.ensureFresh();
+    if (this.tasksByKey.get(taskKey)?.noblocking) return [];
     return (
       this.snapshot.reasonsByKey
         .get(taskKey)
@@ -222,6 +229,15 @@ export class TaskDependencyManager {
     const issues: DependencyIssue[] = [];
     const reasonsByKey = new Map<string, DependencyReason[]>();
     const blocked = new Set<string>();
+    const structure = buildTaskStructure(tasks);
+    const structuralReasons = this.buildStructuralReasons(
+      tasks,
+      structure,
+      this.options.getStructuralSettings?.() ?? {
+        hierarchy: false,
+        checkbox: false,
+      },
+    );
 
     for (const [id, owners] of idIndex) {
       if (owners.length < 2) continue;
@@ -248,7 +264,9 @@ export class TaskDependencyManager {
 
     for (const task of tasks) {
       const key = getTaskKey(task);
-      const reasons: DependencyReason[] = [];
+      const reasons: DependencyReason[] = [
+        ...(structuralReasons.get(key) ?? []),
+      ];
       const refs = task.blockedBy ?? [];
       const archived = new Set(task.archivedBlockers ?? []);
 
@@ -276,23 +294,29 @@ export class TaskDependencyManager {
         );
 
         if (parsed.kind === 'previous-sibling') {
-          reasons.push(
-            this.reason(
-              task,
-              'unsupported-relation',
-              'previous-sibling is not available in this version.',
-              raw,
-              false,
-            ),
-          );
-          issues.push(
-            this.issue(
-              task,
-              'unsupported-relation',
-              `Unsupported previous-sibling relation.`,
-              raw,
-            ),
-          );
+          const targetKey = structure.previousSiblingByKey.get(key);
+          const target = targetKey ? this.tasksByKey.get(targetKey) : null;
+          if (!target) {
+            const message = 'previous-sibling has no previous task sibling.';
+            reasons.push(
+              this.reason(task, 'missing-reference', message, raw, true),
+            );
+            issues.push(this.issue(task, 'missing-reference', message, raw));
+          } else {
+            this.addEdge(key, targetKey!);
+            if (!target.completed) {
+              reasons.push(
+                this.reason(
+                  task,
+                  'incomplete-blocker',
+                  `Blocked by previous sibling ${target.text || target.id || ''}.`,
+                  raw,
+                  true,
+                  target,
+                ),
+              );
+            }
+          }
           continue;
         }
 
@@ -438,7 +462,11 @@ export class TaskDependencyManager {
         }
       }
 
-      if (!task.completed && reasons.some((reason) => reason.blocking)) {
+      if (
+        !task.completed &&
+        !task.noblocking &&
+        reasons.some((reason) => reason.blocking)
+      ) {
         blocked.add(key);
       }
       if (reasons.length > 0) reasonsByKey.set(key, reasons);
@@ -468,6 +496,84 @@ export class TaskDependencyManager {
   clearCache(): void {
     this.lastRevision = -1;
     this.snapshotValidationEpoch = -1;
+  }
+
+  private buildStructuralReasons(
+    tasks: readonly Task[],
+    structure: ReturnType<typeof buildTaskStructure>,
+    settings: { hierarchy: boolean; checkbox: boolean },
+  ): Map<string, DependencyReason[]> {
+    const result = new Map<string, DependencyReason[]>();
+    if (!settings.hierarchy && !settings.checkbox) return result;
+
+    const seen = new Set<string>();
+    const add = (
+      parentKey: string,
+      child: Task,
+      code: 'structural' | 'checkbox',
+      message: string,
+    ): void => {
+      const parent = this.tasksByKey.get(parentKey);
+      if (!parent) return;
+      const fingerprint = `${parentKey}:${code}:${getTaskKey(child)}`;
+      if (seen.has(fingerprint)) return;
+      seen.add(fingerprint);
+      const list = result.get(parentKey) ?? [];
+      list.push(this.reason(parent, code, message, undefined, true, child));
+      result.set(parentKey, list);
+    };
+
+    for (const child of tasks) {
+      if (child.completed) continue;
+      const isCheckbox = CHECKBOX_DETECTION_REGEX.test(
+        child.rawText.trimStart(),
+      );
+      let parentKey = structure.parentByKey.get(getTaskKey(child));
+      while (parentKey) {
+        if (settings.hierarchy) {
+          add(
+            parentKey,
+            child,
+            'structural',
+            `Blocked by unfinished child ${child.text || child.id || ''}.`,
+          );
+        }
+        if (settings.checkbox && isCheckbox) {
+          add(
+            parentKey,
+            child,
+            'checkbox',
+            `Blocked by an unchecked checkbox at line ${child.line + 1}.`,
+          );
+        }
+        parentKey = structure.parentByKey.get(parentKey);
+      }
+
+      if (settings.hierarchy) {
+        const previousKey = structure.previousSiblingByKey.get(
+          getTaskKey(child),
+        );
+        const previous = previousKey
+          ? this.tasksByKey.get(previousKey)
+          : undefined;
+        if (previous?.ordered && !previous.completed) {
+          const list = result.get(getTaskKey(child)) ?? [];
+          list.push(
+            this.reason(
+              child,
+              'structural',
+              `Ordered after ${previous.text || previous.id || 'its previous sibling'}.`,
+              'ORDERED',
+              true,
+              previous,
+            ),
+          );
+          result.set(getTaskKey(child), list);
+        }
+      }
+    }
+
+    return result;
   }
 
   private resolveReference(
@@ -593,7 +699,7 @@ export class TaskDependencyManager {
     source: Task,
     code: DependencyReason['code'],
     message: string,
-    reference: string,
+    reference: string | undefined,
     blocking: boolean,
     target?: Task,
   ): DependencyReason {

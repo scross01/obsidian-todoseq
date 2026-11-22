@@ -110,6 +110,8 @@ export interface TodoTrackerSettings {
   // Task completion settings
   trackClosedDate: boolean; // when true, adds CLOSED: timestamp when tasks are marked as completed
   enforceBlockedTasks: boolean; // refuse plugin completion while a task has incomplete dependencies
+  enforceTaskHierarchyDependencies: boolean; // opt-in unfinished child and ORDERED gates
+  enforceCheckboxDependencies: boolean; // opt-in unchecked descendant checkbox gate
   trackStartedDate: boolean; // when true, adds STARTED: timestamp when tasks first enter active state
   startedDateMode: 'first' | 'last'; // 'first' = first-ever-start (written once); 'last' = re-stamp on each fresh entry into an active state
   // Auto-archive settings
@@ -185,6 +187,8 @@ export const DefaultSettings: TodoTrackerSettings = {
   stateTransitions: DefaultStateTransitionSettings,
   trackClosedDate: false, // Disabled by default
   enforceBlockedTasks: true, // Hard block by default; Complete anyway remains available
+  enforceTaskHierarchyDependencies: false, // Opt-in structural gate
+  enforceCheckboxDependencies: false, // Opt-in checkbox gate
   trackStartedDate: false, // Disabled by default
   startedDateMode: 'first', // Preserve first-ever-start semantics by default
   taskArchive: DefaultTaskArchiveSettings, // Auto-archive defaults (opt-in, 90 days)

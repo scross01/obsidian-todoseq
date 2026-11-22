@@ -404,6 +404,18 @@ FIXME Handle edge cases
 
 Use **Complete anyway** in the task context menu, or the **Complete blocked task** command, to bypass the gate for a deliberate override. Turning the setting off disables the gate without changing derived blocked status in search, dashboards or row styling. Manual edits, sync and external file changes are outside this gate; notes remain the source of truth.
 
+### Respect parent and ordered task dependencies
+
+**Setting**: "Respect parent and ordered task dependencies" (toggle, default off)
+
+**Description**: Adds opt-in structural reasons. An unfinished nested task blocks an incomplete parent, and a task following an `ORDERED` sibling waits for it. Markdown hierarchy can use headings or indentation; plain keyword tasks do not need list markers or checkboxes. Explicit `BLOCKER` references and `previous-sibling` remain independent of this setting.
+
+### Require checkboxes to be complete
+
+**Setting**: "Require checkboxes to be complete" (toggle, default off)
+
+**Description**: Adds unchecked descendant checkboxes as blocking reasons, independently of parent/ORDERED rules. Markdown checks the bounded task subtree and excludes the parent's own checkbox; Org checks the current entry body and stops at the next headline. `NOBLOCKING` on the task suppresses these reasons locally.
+
 ### Track closed date
 
 **Setting**: "Track closed date" (toggle)
