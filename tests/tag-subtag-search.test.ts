@@ -390,6 +390,23 @@ describe('Tag Search with Subtags and Exact Matching', () => {
         );
       });
 
+      it('does not treat emoji tags as untagged', async () => {
+        const emojiTagged = createBaseTask({
+          path: 'notes/emoji-tag.md',
+          line: 1,
+          rawText: 'TODO [#B] #🏠 Check the hot tub',
+          text: 'Check the hot tub',
+          tags: ['🏠'],
+        });
+
+        expect(await Search.evaluate('tag:none', emojiTagged, false)).toBe(
+          false,
+        );
+        expect(await Search.evaluate('-tag:none', emojiTagged, false)).toBe(
+          true,
+        );
+      });
+
       it('does not crash on a task with no raw text', async () => {
         const blank = createBaseTask({
           path: 'notes/blank.md',

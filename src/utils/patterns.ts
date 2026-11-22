@@ -223,6 +223,32 @@ export const QUOTE_LINE_REGEX = /^>\s*(.*)$/;
 export const TAG_PATTERN = /(?<![\w/:?#[\]])#([^\s)\]}>]+)/gu;
 export const TAG_PATTERN_SOURCE = TAG_PATTERN.source;
 
+/** Priority tokens share tag syntax but are not content tags. */
+const PRIORITY_TAG_NAMES = new Set(['A', 'B', 'C']);
+
+/** Compiled once; reset before each use because it is global. */
+const TAG_EXTRACTION_REGEX = new RegExp(TAG_PATTERN_SOURCE, 'gu');
+
+/**
+ * Extract content tags (without the leading #) from task text.
+ *
+ * Uses TAG_PATTERN so emoji and multibyte tags are recognised the same way
+ * here as they are in rendering, search and suggestions. The `#A`/`#B`/`#C`
+ * priority tokens are excluded.
+ */
+export function extractTagsFromText(text: string): string[] {
+  const tags: string[] = [];
+  TAG_EXTRACTION_REGEX.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = TAG_EXTRACTION_REGEX.exec(text)) !== null) {
+    const tag = match[1];
+    if (!PRIORITY_TAG_NAMES.has(tag)) {
+      tags.push(tag);
+    }
+  }
+  return tags;
+}
+
 // ============================================================================
 // Task Keyword Patterns
 // ============================================================================

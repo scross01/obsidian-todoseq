@@ -36,6 +36,7 @@ import {
   CHECKBOX_REGEX,
   CHECKBOX_DETECTION_REGEX,
   PRIORITY_TOKEN_REGEX,
+  extractTagsFromText,
   SINGLE_LINE_COMMENT_REGEX,
   stripMarkdownPrefixes,
   HEADING_PREFIX_SOURCE,
@@ -2024,13 +2025,7 @@ export class TaskParser implements ITaskParser {
    * @returns Array of tag strings (without #)
    */
   private extractTags(taskText: string): string[] {
-    // Match #tag patterns, but not #A, #B, #C (priorities)
-    const tagRegex = /#(?!A|B|C)(\w+)/g;
-    const matches = taskText.match(tagRegex);
-    if (!matches) return [];
-
-    // Remove the # prefix from each tag
-    return matches.map((tag) => tag.substring(1));
+    return extractTagsFromText(taskText);
   }
 
   /**

@@ -3,6 +3,7 @@
 ## 0.23.0
 
 - Added `tag:none` to find tasks without any tags, with matching dashboard “No tags” grouping and tag autocomplete; `#none` remains a literal tag.
+- Fixed `tag:none` and the dashboard's **No tags** group treating tasks with emoji or other non-ASCII tags (such as `#🏠`) as untagged.
 
 ## 0.22.1
 

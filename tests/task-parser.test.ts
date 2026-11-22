@@ -322,6 +322,26 @@ TODO task text
       expect(tasks[0].text).toBe('#tag my first task');
       expect(tasks[1].state).toBe('TODO');
       expect(tasks[1].text).toBe('my second task #tag');
+      expect(tasks[0].tags).toEqual(['tag']);
+      expect(tasks[1].tags).toEqual(['tag']);
+    });
+
+    test('should extract emoji and multibyte tags', () => {
+      const lines = `
+      TODO [#B] #🏠 Check the hot tub
+      TODO #中文标签 task with multibyte tag
+      `;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].tags).toEqual(['🏠']);
+      expect(tasks[1].tags).toEqual(['中文标签']);
+    });
+
+    test('should not drop tags that begin with a priority letter', () => {
+      const tasks = parser.parseFile('TODO #Apple buy fruit', 'test.md');
+
+      expect(tasks[0].tags).toEqual(['Apple']);
     });
   });
 

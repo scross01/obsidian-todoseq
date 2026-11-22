@@ -1,6 +1,7 @@
 import { Task } from '../types/task';
 import { App } from 'obsidian';
 import { DateUtils } from './date-utils';
+import { extractTagsFromText } from './patterns';
 
 /**
  * Urgency coefficients interface matching the urgency.ini configuration
@@ -252,10 +253,7 @@ function countTags(task: Task): number {
   }
 
   // Fall back to parsing tags from text (shouldn't happen with new implementation)
-  // Match #tag patterns, but not #A, #B, #C (priorities)
-  const tagRegex = /#(?!A|B|C)(\w+)/g;
-  const matches = task.text.match(tagRegex);
-  return matches ? matches.length : 0;
+  return extractTagsFromText(task.text).length;
 }
 
 /**

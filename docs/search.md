@@ -214,6 +214,9 @@ does not match it. Search the literal tag with `tag:#none`; quoting the value
 that have at least one tag. The `tag:` autocomplete offers `none` alongside the
 vault's existing tags.
 
+Tags may contain multibyte characters and emoji, so `#🏠` and `#中文标签` count
+as tags here and in the dashboard's tag groups.
+
 ### State Group Keywords
 
 In addition to matching individual state keywords (e.g., `state:TODO`, `state:DOING`), the `state:` filter supports group keywords that match all tasks belonging to a keyword group. These group keywords are resolved dynamically based on your settings, so any custom keywords you have configured are included automatically.
