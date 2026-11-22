@@ -168,6 +168,24 @@ describe('TaskWriter transfers', () => {
     expect(h.store.get(SOURCE)).toBe(SOURCE_TEXT);
   });
 
+  it('reuses a persisted ID when the task snapshot is stale', async () => {
+    const source = [
+      'TODO Water the plants',
+      ':PROPERTIES:',
+      ':ID: water-1',
+      ':END:',
+      '',
+    ].join('\n');
+    const h = harness({ [SOURCE]: source });
+
+    const first = await h.writer.ensureTaskId(task({ line: 0, id: undefined }));
+    const second = await h.writer.ensureTaskId(task({ line: 0, id: undefined }));
+
+    expect(first.identity).toBe('water-1');
+    expect(second.identity).toBe('water-1');
+    expect(h.store.get(SOURCE)).toBe(source);
+  });
+
   it('reuses a persisted anchor when the task snapshot is stale', async () => {
     const anchored = 'Intro\n\n- [ ] TODO Water the plants ^todoseq-existing\n';
     const h = harness({ [SOURCE]: anchored });

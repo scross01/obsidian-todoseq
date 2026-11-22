@@ -626,6 +626,25 @@ export class TaskWriter {
         identity: task.id,
       };
     }
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file instanceof TFile) {
+      const lines = (await this.readFileText(file)).split('\n');
+      const drawer = this.findPropertiesDrawer(lines, task);
+      const persisted = drawer
+        ? extractTaskProperties(drawer, this.propertyFormat(task)).id
+        : undefined;
+      if (persisted) {
+        return {
+          status: 'success',
+          task: this.applyPropertySnapshot(
+            task,
+            this.parsedProperties(lines, task),
+          ),
+          lineDelta: 0,
+          identity: persisted,
+        };
+      }
+    }
     const identity = this.generateUuid();
     const result = await this.updateOrInsertPropertiesDrawer(task, [
       { key: 'ID', value: identity },
@@ -1073,58 +1092,69 @@ export class TaskWriter {
     anchor: string | null,
   ): Promise<string[]> {
     let lines = [...block];
-    const oldId = this.blockId(lines);
-    let newId: string | null = null;
-    if (oldId) {
-      newId = this.generateUuid();
-      lines = lines.map((line) =>
-        line.replace(/^(\s*:ID:\s*).*$/i, `$1${newId}`),
-      );
+    const idMap = new Map<string, string>();
+    for (let i = 0; i < lines.length; i++) {
+      const match = /^(\s*:ID:\s*)(.*)$/i.exec(lines[i] ?? '');
+      const oldId = match?.[2]?.trim();
+      if (!match || !oldId) continue;
+      const next = idMap.get(oldId) ?? this.generateUuid();
+      idMap.set(oldId, next);
+      lines[i] = `${match[1]}${next}`;
     }
 
-    if (!anchor) return lines;
-
-    const newAnchor = await this.uniqueAnchor(destination, anchor);
-    const escapedAnchor = this.escapeRegExp(anchor);
-    lines[0] = lines[0].replace(
-      new RegExp(`\\^${escapedAnchor}(?=\\s|$)`),
-      `^${newAnchor}`,
-    );
+    const anchorMap = new Map<string, string>();
+    const usedAnchors = new Set<string>();
+    for (let i = 0; i < lines.length; i++) {
+      const match = /\^([A-Za-z0-9][\w-]*)\s*$/.exec(lines[i] ?? '');
+      const oldAnchor = match?.[1];
+      if (!oldAnchor) continue;
+      let next = anchorMap.get(oldAnchor);
+      if (!next) {
+        next = await this.uniqueAnchor(destination, oldAnchor);
+        while (usedAnchors.has(next)) {
+          next = await this.uniqueAnchor(destination, oldAnchor);
+        }
+        usedAnchors.add(next);
+        anchorMap.set(oldAnchor, next);
+      }
+      lines[i] = lines[i].replace(`^${oldAnchor}`, `^${next}`);
+    }
 
     const destinationTarget = destination.path
       .replace(/\.md$/i, '')
       .replace(/^\/+/, '');
     lines = lines.map((line) => {
-      if (!line.includes('[[')) return line;
-      let rewritten = line;
-      for (const token of findWikiLinks(line)) {
-        if (!token.anchor || token.anchor.slice(1) !== anchor) continue;
-        if (!this.linkTargetsTask(token.target, task.path)) continue;
-        rewritten = rewritten.replace(
-          token.raw,
-          buildWikiLink(
-            token.embed,
-            destinationTarget,
-            `^${newAnchor}`,
-            token.alias,
-          ),
-        );
+      if (line.includes('[[')) {
+        for (const token of findWikiLinks(line)) {
+          if (!token.anchor) continue;
+          const next = anchorMap.get(token.anchor.slice(1));
+          if (!next || !this.linkTargetsTask(token.target, task.path)) continue;
+          line = line.replace(
+            token.raw,
+            buildWikiLink(
+              token.embed,
+              destinationTarget,
+              `^${next}`,
+              token.alias,
+            ),
+          );
+        }
       }
-      return rewritten;
+      if (/^\s*:?(BLOCKER|ARCHIVED_BLOCKER)\+?:/i.test(line)) {
+        for (const [oldId, newId] of idMap) {
+          line = line.replace(
+            new RegExp(
+              `(^|[:\\s])${this.escapeRegExp(oldId)}(?=\\s|$)`,
+              'g',
+            ),
+            `$1${newId}`,
+          );
+        }
+      }
+      return line;
     });
 
-    if (oldId && newId) {
-      const idPattern = new RegExp(
-        `(^|[:\\s])${this.escapeRegExp(oldId)}(?=\\s|$)`,
-        'g',
-      );
-      lines = lines.map((line) =>
-        /^\s*:?(BLOCKER|ARCHIVED_BLOCKER)\+?:/i.test(line)
-          ? line.replace(idPattern, `$1${newId}`)
-          : line,
-      );
-    }
-
+    void anchor;
     return lines;
   }
 
