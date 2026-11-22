@@ -2,11 +2,17 @@
 
 ## Unreleased
 
+- A blocked task's checkbox now springs back instead of staying checked, and archive runs report blocked tasks as skipped rather than counting them as archived. A completion queued while its blocker was still done is checked once more before writing.
+- Archiving a prerequisite now moves each dependent's `BLOCKER` reference into `ARCHIVED_BLOCKER` history, so the dependent is no longer stranded; restoring the prerequisite moves the reference back. Dependents that cannot be updated stay blocked and are reported.
+- Moving a task now updates the `BLOCKER` links, prose links and embeds that pointed at it, while copying gives the copy its own ID and block anchor; migrating leaves the old line without a duplicate identity.
 - Added Org-style `:PROPERTIES:` drawers under Markdown and Org tasks. TODOseq reads `:ID:`, `:BLOCKER:` and `:ARCHIVED_BLOCKER:` while preserving every other property, and copy, move and migrate carry the drawer with the task.
 - Tasks can now derive a blocked state from `BLOCKER` IDs and file-qualified block links. Completed prerequisites release dependents immediately, broken or ambiguous references keep them blocked, and archived references become active again if their exact target is restored.
 - Added `blocked:true` and `blocked:false` search filters and dashboard grouping, so you can find waiting work or exclude it from a query.
 - Blocked tasks now show a lock and dimmed text in task lists, and completing them is refused until their dependencies are done. Use Complete anyway when you need to override it; the task menu can also copy a task ID or block anchor and add a copied link as a blocker.
 - Added optional parent, `ORDERED` and checkbox dependency rules, plus local `NOBLOCKING` and `BLOCKER: previous-sibling` support for Org-style workflows.
+- Optional structural dependencies now respect non-task headings and dedented prose as boundaries, count keywordless checkboxes, keep archived branches out of outer checks, stop Org checkbox checks at the next headline, and refresh immediately when either structural setting changes.
+- Blocked tasks now show their lock in reader views, broken dependency references show a warning in the editor, and new dependency problems are announced once instead of staying silent until you search for them.
+- Copying a task anchor again now reuses the anchor already saved on the task instead of adding a second one.
 
 ## 0.23.0
 

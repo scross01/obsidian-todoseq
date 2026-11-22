@@ -141,6 +141,17 @@ export class EmbeddedTaskListRenderer {
       case 'partial':
         new Notice('Task copied, but the original could not be updated');
         break;
+      case 'partial-references': {
+        const failed =
+          result.referenceRepairs?.reduce(
+            (total, report) => total + report.failed.length,
+            0,
+          ) ?? 0;
+        new Notice(
+          `${failed} reference link(s) could not be updated. Run "Retry failed task reference repairs" from the command palette.`,
+        );
+        break;
+      }
     }
   }
 

@@ -3,6 +3,7 @@
  */
 
 import {
+  DependencyIssueWidget,
   PriorityWidget,
   TaskKeywordDecorator,
 } from '../src/view/editor-extensions/task-formatting';
@@ -61,6 +62,57 @@ describe('PriorityWidget', () => {
   it('ignoreEvent returns false', () => {
     const widget = new (PriorityWidget as any)('C', 'low');
     expect(widget.ignoreEvent()).toBe(false);
+  });
+});
+
+describe('DependencyIssueWidget', () => {
+  beforeAll(() => {
+    installObsidianDomMocks();
+  });
+
+  it('renders an accessible warning with the issue count', () => {
+    const widget = new DependencyIssueWidget(
+      [
+        {
+          code: 'missing-reference',
+          fingerprint: 'missing:a',
+          message: 'Dependency missing.',
+          sourceKey: 'test.md:0',
+        },
+        {
+          code: 'cycle',
+          fingerprint: 'cycle:b',
+          message: 'Cycle detected.',
+          sourceKey: 'test.md:0',
+        },
+      ],
+      'test.md:0',
+    );
+
+    const el = widget.toDOM();
+    expect(el.classList.contains('todoseq-dependency-issue-icon')).toBe(true);
+    expect(el.getAttribute('data-icon')).toBe('alert-triangle');
+    expect(el.getAttribute('title')).toBe('Dependency missing. (+1 more)');
+    expect(el.getAttribute('aria-label')).toContain('Dependency problem:');
+  });
+
+  it('compares by task key and issue fingerprints', () => {
+    const issue = {
+      code: 'missing-reference' as const,
+      fingerprint: 'missing:a',
+      message: 'Dependency missing.',
+      sourceKey: 'test.md:0',
+    };
+    expect(
+      new DependencyIssueWidget([issue], 'test.md:0').eq(
+        new DependencyIssueWidget([issue], 'test.md:0'),
+      ),
+    ).toBe(true);
+    expect(
+      new DependencyIssueWidget([issue], 'test.md:0').eq(
+        new DependencyIssueWidget([issue], 'test.md:1'),
+      ),
+    ).toBe(false);
   });
 });
 

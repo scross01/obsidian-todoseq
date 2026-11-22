@@ -200,7 +200,7 @@ describe('queued recovery', () => {
     const first = coordinator.updateTaskState(task, 'DONE', 'task-list');
     const second = coordinator.updateTaskPriority(task, 'high', 'task-list');
 
-    await expect(first).resolves.toBeUndefined();
+    await expect(first).resolves.toEqual({ status: 'failed' });
     await second;
 
     // The newer request owned the file, so the older failure supplied a

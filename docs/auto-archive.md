@@ -50,7 +50,7 @@ Open the dialog with **TODOseq: Archive completed tasks** in the Command Palette
 - **Include visible** / **Exclude visible** bulk-toggle the rows in the list
 - The list shows up to 200 rows ("+N more not shown"); bulk buttons apply to the visible rows only, so they never silently touch tasks you cannot see
 
-**Apply** — the button states the exact scope: _Archive 30 tasks_ (everything matches), _Archive 12 of 30 tasks_ (you excluded some), or _Nothing to archive_ (no matches). Each task is re-checked against the current file content right before writing; lines that changed since the preview are skipped and reported.
+**Apply** — the button states the exact scope: _Archive 30 tasks_ (everything matches), _Archive 12 of 30 tasks_ (you excluded some), or _Nothing to archive_ (no matches). Each task is re-checked against the current file content right before writing; lines that changed since the preview are skipped and reported. With **Enforce blocked tasks** on, a completed task that is still blocked by a dependency is also skipped and reported as blocked: archiving writes an archived keyword, so the run does not force its way past the gate. Skipped tasks keep their current keyword and are not added to the Undo list.
 
 ## Automatic Runs
 

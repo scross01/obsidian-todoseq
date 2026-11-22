@@ -56,9 +56,17 @@ export interface ArchivedTaskRecord {
   taskSnapshot: import('../types/task').Task;
 }
 
+export interface ArchiveReferenceFailure {
+  path: string;
+  reference: string;
+  reason?: string;
+}
+
 export interface ArchiveRunResult {
   archived: ArchivedTaskRecord[];
   skipped: { path: string; line: number; reason: ApplySkipReason }[];
+  /** Dependents whose active reference could not be moved to history. */
+  referenceFailures: ArchiveReferenceFailure[];
 }
 
 export interface UndoOutcome {
@@ -70,7 +78,7 @@ export interface UndoOutcome {
  * Reasons a match could not be archived. Narrow rather than `string` so that
  * adding a reason without adding it here is a type error, not a silent drift.
  */
-export type ApplySkipReason = 'stale' | 'apply-failed';
+export type ApplySkipReason = 'stale' | 'apply-failed' | 'blocked';
 
 /**
  * Reasons a journal record could not be undone. Every `skipped.push` in
@@ -96,8 +104,23 @@ export interface ApplyArchiveDeps {
     line: number,
     cellIndex?: number,
   ) => (ArchiveMatchInput & { rawText: string }) | null;
-  /** Perform the write. Production wiring: TaskUpdateCoordinator.updateTaskState(task, target, 'task-list'). */
-  apply: (task: import('../types/task').Task, target: string) => Promise<void>;
+  /**
+   * Perform the write. Production wiring: TaskUpdateCoordinator.updateTaskState(task, target, 'task-list').
+   * A refusal is a skip, never an archived record: the file did not change.
+   */
+  apply: (
+    task: import('../types/task').Task,
+    target: string,
+  ) => Promise<import('./task-update-coordinator').TaskUpdateOutcome | void>;
+  /**
+   * Move dependents' active references into history after the target is
+   * archived. Called only for a write that actually happened; a failure here
+   * never rolls back the archive.
+   */
+  migrateDependents?: (task: import('../types/task').Task) => Promise<{
+    migrated: number;
+    failures: ArchiveReferenceFailure[];
+  }>;
 }
 
 export interface UndoDeps {
@@ -297,6 +320,7 @@ export class ArchiveService {
     const archived: ArchivedTaskRecord[] = [];
     const skipped: { path: string; line: number; reason: ApplySkipReason }[] =
       [];
+    const referenceFailures: ArchiveReferenceFailure[] = [];
     try {
       for (const match of matches) {
         const current = deps.getTask(
@@ -314,7 +338,17 @@ export class ArchiveService {
         }
         const fullTask = current as import('../types/task').Task;
         try {
-          await deps.apply(fullTask, match.target);
+          const outcome = await deps.apply(fullTask, match.target);
+          if (outcome?.status === 'refused') {
+            // The blocked-completion gate refused before writing, so this
+            // candidate never became archived and has no journal record.
+            skipped.push({
+              path: match.path,
+              line: match.line,
+              reason: 'blocked',
+            });
+            continue;
+          }
         } catch (error) {
           console.debug(
             'TODOseq: archive apply failed for',
@@ -329,6 +363,22 @@ export class ArchiveService {
           });
           continue;
         }
+        if (deps.migrateDependents) {
+          try {
+            const migration = await deps.migrateDependents(fullTask);
+            referenceFailures.push(...migration.failures);
+          } catch (error) {
+            referenceFailures.push({
+              path: match.path,
+              reference: match.state,
+              reason:
+                error instanceof Error
+                  ? error.message
+                  : 'Dependent migration failed.',
+            });
+          }
+        }
+
         archived.push({
           path: match.path,
           line: match.line,
@@ -345,7 +395,7 @@ export class ArchiveService {
       this.activeRuns -= 1;
     }
     this.lastRun = archived;
-    return { archived, skipped };
+    return { archived, skipped, referenceFailures };
   }
 
   /**

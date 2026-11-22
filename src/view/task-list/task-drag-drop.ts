@@ -306,6 +306,17 @@ export class TaskDragDropHandler {
       action,
       dropPos ? { insertAt: dropPos } : undefined,
     );
+    if (result.status === 'partial-references') {
+      const failed =
+        result.referenceRepairs?.reduce(
+          (total, report) => total + report.failed.length,
+          0,
+        ) ?? 0;
+      new Notice(
+        `Task transferred, but ${failed} reference link(s) could not be updated. Run "Retry failed task reference repairs" from the command palette.`,
+      );
+      return;
+    }
     if (result.status !== 'success') {
       new Notice(this.transferFailureNotice(result.status));
       return;

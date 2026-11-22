@@ -78,7 +78,9 @@ Cycles are reported as diagnostics, but they do not replace the direct completio
 
 ## Archived references
 
-`ARCHIVED_BLOCKER` is inactive history. It does not block completion while the archived task is absent. If the exact ID or file-plus-anchor target reappears in the scanned tasks, TODOseq treats the relationship as active immediately using the target's current state: an incomplete restored target blocks, and a completed one does not. The next reconciliation can move the reference back to `BLOCKER`.
+`ARCHIVED_BLOCKER` is inactive history. It does not block completion while the archived task is absent. If the exact ID or file-plus-anchor target reappears in the scanned tasks, TODOseq treats the relationship as active immediately using the target's current state: an incomplete restored target blocks, and a completed one does not.
+
+Archiving a task that others depend on moves their active `BLOCKER` references into `ARCHIVED_BLOCKER` automatically, so archiving a prerequisite does not strand its dependents as permanently blocked. Restoring the prerequisite moves those references back to `BLOCKER`. Each dependent is re-read before it is changed; if its note no longer matches, the reference is left alone, the dependent is reported, and the next restore or dependency change retries it. All of this is session-scoped bookkeeping — the only durable change is the property text in your notes.
 
 ## Optional structural dependencies
 
@@ -89,11 +91,60 @@ Two independent settings are off by default:
 
 Both settings only add reasons; explicit `BLOCKER` references and `previous-sibling` remain active with either setting off. Turning the global **Enforce blocked tasks** setting off changes only whether completion is refused, not the derived blocked state used by search, dashboards and row styling.
 
+### Markdown boundaries
+
+A heading without a task keyword is a hard boundary. It does not pass ancestry or sibling continuity to the tasks below it:
+
+```markdown
+# TODO Launch
+
+## Research
+
+TODO Gather evidence
+```
+
+`Gather evidence` does not block `Launch`, and `ORDERED` or `previous-sibling` does not reach across the `Research` heading. A task heading is different: `## TODO Research` under `# TODO Launch` is a child. Explicit IDs and file-qualified block links still cross either boundary.
+
+For indented task groups, blank lines preserve the group, and a prose line at the parent's indent or shallower closes it. Later indentation alone does not reconnect:
+
+```markdown
+TODO Parent
+
+TODO Child
+```
+
+`Child` is nested above. Below, `Later task` is not:
+
+```markdown
+TODO Parent
+A separate paragraph.
+TODO Later task
+```
+
+Deeper prose and task metadata or drawers do not close the group. A heading section's ownership is not ended by ordinary prose; only another heading ends it.
+
+A checkbox row without a task keyword is a structural checkbox, not a task. It can block a bounded ancestor when **Require checkboxes to be complete** is on, appears in the reason details with its source line, and is never collected as a task or shown in search.
+
+An archived task and its branch are outside an outer task's structural obligations. An active task nested inside that branch still has its own local children, checkboxes and explicit references, but its incompleteness does not leak back to an outer ancestor.
+
+### Org checkbox scope
+
+Org checkbox checks stay inside the current headline's body and stop at the next headline, including a child or non-task headline, matching Org's own entry scope:
+
+```org
+* TODO Parent
+  - [X] Entry checkbox complete
+** TODO Child
+   - [ ] Child entry checkbox incomplete
+```
+
+`Parent` is not checkbox-blocked by the child entry's checkbox; `Child` is blocked by its own. The same shape in Markdown is recursive: an unchecked checkbox under a nested task does block the ancestor. Checked `[X]` counts as complete; partial `[-]` and unchecked `[ ]` do not.
+
 `NOBLOCKING` is a local, durable declaration, not a one-time override. It suppresses all reasons for that task but does not change other tasks that reference it; an incomplete `NOBLOCKING` task still blocks its own dependents. Use **Complete anyway** for a single completion override.
 
 ## Previous sibling and ORDERED
 
-`BLOCKER: previous-sibling` names the immediately preceding task sibling in the same file and section. It is not an ID and never searches another file. `ORDERED` on a task makes the next task sibling wait until it completes. Both follow the same direct completion rule as IDs: complete the target and the dependent is released.
+`BLOCKER: previous-sibling` names the immediately preceding task sibling in the same file and section. It is not an ID and never searches another file. `ORDERED` on a task makes every later task sibling in the same file and section wait until it completes. Both follow the same direct completion rule as IDs: complete the target and the dependent is released.
 
 ## Searching by blocked status
 
@@ -103,9 +154,13 @@ A missing, ambiguous, excluded or temporarily unvalidated reference counts as bl
 
 ## Completion enforcement and task actions
 
-Blocked tasks are dimmed with a lock icon in the Task List and embedded task lists. Hovering or focusing the lock explains the blocking reasons. The same marker appears in supported Markdown task declarations and reader views.
+Blocked tasks are dimmed with a lock icon in the Task List and embedded task lists. Hovering or focusing the lock explains the blocking reasons. Reader views draw the same lock beside the rendered task, with the blocking reasons in its tooltip and an accessible reason count when there are several. The marker is derived at render time and writes nothing.
 
-When **Enforce blocked tasks** is on (the default), completing a blocked task from a TODOseq checkbox, keyword menu, command or context menu is refused with a notice naming the reasons. Nothing is written and the task stays in its original state. Use **Complete anyway** in the task context menu or the **Complete blocked task** command when you deliberately need to override it. Disabling enforcement in [Settings](/settings) allows normal completion while blocked status remains visible in search, dashboards and row styling.
+Live Preview and source-mode editors add a warning icon only for **source diagnostics**: an unresolved, ambiguous or invalid reference, a dependency cycle or duplicate IDs. Ordinary waiting on an incomplete task is normal blocked state and does not show a warning. Repairing the reference removes the icon on the next decoration refresh.
+
+Diagnostics are announced once per changed set, after indexing finishes. A rescan or optimistic update that republishes the same set does not repeat the notice; an empty set stays silent and a later relapse notifies again. The notice names the first issue and counts the rest, while full details go to the developer console. All of these markers are session-local: nothing is persisted to the vault.
+
+When **Enforce blocked tasks** is on (the default), completing a blocked task from a TODOseq checkbox, keyword menu, command or context menu is refused with a notice naming the reasons. Nothing is written and the task stays in its original state. A refused checkbox springs back immediately, and a queued completion is checked again just before the write, so a blocker that reopens in the meantime is still caught. Use **Complete anyway** in the task context menu or the **Complete blocked task** command when you deliberately need to override it. Disabling enforcement in [Settings](/settings) allows normal completion while blocked status remains visible in search, dashboards and row styling.
 
 This gate covers plugin completion actions only. Editing the note text manually, syncing a file or changing it outside Obsidian remains authoritative and is picked up on the next scan.
 
@@ -117,6 +172,18 @@ The task context menu can copy an `ID` or a Markdown block anchor:
 - **Copy anchor** is available for Markdown task lines. It reuses the task's block anchor or appends a new one, then copies a file-qualified link such as `[[Projects/Plan#^todoseq-a1b2c3d4]]`. Org, code-comment and table tasks are not supported.
 
 **Add copied link as blocker** reads one ID or file-qualified block link from the clipboard, resolves it to exactly one collected task, and appends it to the current task's `BLOCKER` list. Ambiguous or invalid clipboard content is rejected without writing.
+
+## Moving and copying tasks
+
+Moving, copying or migrating a task through TODOseq keeps its block references working:
+
+- **Move and migrate keep identity.** The task keeps its `ID` and block anchor at the destination, and every reference TODOseq can find is updated: `BLOCKER` and `ARCHIVED_BLOCKER` links, ordinary `[[Note#^anchor]]` links and `![[Note#^anchor]]` embeds, including in notes with no tasks.
+- **Copy forks identity.** A copied task with an `ID` gets a new UUID and a copied task with a block anchor gets a new anchor. References inside the copied block are remapped to the copy; references elsewhere stay attached to the original. A task with neither identity is copied without one.
+- **Migrate cleans the history entry.** The destination keeps the original `ID` and anchor; the migrated line left behind drops both so it is not a second owner of the same identity.
+
+If a reference cannot be rewritten, the transfer stays in place and the plugin reports how many links failed. Run **Retry failed task reference repairs** from the command palette to retry exactly those links during the current session. A failed block move makes no reference changes at all.
+
+Renaming a note in Obsidian is handled by Obsidian; TODOseq does not chase file renames. Moving text outside TODOseq is best-effort: a stale reference is reported by the existing broken-reference warning after the next scan, and TODOseq never guesses a new target.
 
 ## Local properties only
 

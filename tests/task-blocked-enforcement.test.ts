@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
 import { Notice } from 'obsidian';
+import { Task } from '../src/types/task';
 import { TaskDependencyManager } from '../src/services/task-dependency-manager';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { TaskUpdateCoordinator } from '../src/services/task-update-coordinator';
@@ -75,8 +76,16 @@ describe('blocked completion enforcement', () => {
 
   it('refuses completion before optimism or a write', async () => {
     const { blocked, coordinator, state, writer } = createFixture();
-    await coordinator.updateTaskState(blocked, 'DONE', 'task-list');
+    const outcome = await coordinator.updateTaskState(
+      blocked,
+      'DONE',
+      'task-list',
+    );
 
+    expect(outcome.status).toBe('refused');
+    expect(
+      outcome.status === 'refused' ? outcome.reasons[0].code : null,
+    ).toBe('incomplete-blocker');
     expect(writer.updateTaskState).not.toHaveBeenCalled();
     expect(state.findTaskByPathAndLine('blocked.md', 0)?.state).toBe('TODO');
     expect(Notice).toHaveBeenCalledWith(
@@ -88,7 +97,7 @@ describe('blocked completion enforcement', () => {
 
   it('allows the explicit force path', async () => {
     const { blocked, coordinator, state, writer } = createFixture();
-    await coordinator.updateTask({
+    const outcome = await coordinator.updateTask({
       task: blocked,
       type: 'state',
       source: 'task-list',
@@ -96,6 +105,7 @@ describe('blocked completion enforcement', () => {
       forceCompletion: true,
     });
 
+    expect(outcome.status).toBe('applied');
     expect(writer.updateTaskState).toHaveBeenCalled();
     expect(state.findTaskByPathAndLine('blocked.md', 0)?.state).toBe('DONE');
     coordinator.destroy();
@@ -114,6 +124,58 @@ describe('blocked completion enforcement', () => {
     const { blocked, coordinator, writer } = createFixture();
     await coordinator.updateTaskState(blocked, 'DOING', 'task-list');
     expect(writer.updateTaskState).toHaveBeenCalled();
+    coordinator.destroy();
+  });
+
+  it('rechecks a queued completion before persistence', async () => {
+    const { blocked, coordinator, state, writer } = createFixture();
+    const sibling = createBaseTask({
+      path: 'blocked.md',
+      line: 1,
+      id: 'sibling',
+      text: 'Sibling',
+      state: 'TODO',
+    });
+    state.addTask(sibling);
+    state.updateTaskByPathAndLine('blocker.md', 0, {
+      state: 'DONE',
+      completed: true,
+    });
+    state.notifySubscribers();
+
+    let releaseFirst = (): void => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let call = 0;
+    writer.updateTaskState.mockImplementation(
+      async (task: Task, newState: string) => {
+        call += 1;
+        if (call === 1) await firstGate;
+        return { ...task, state: newState, completed: false };
+      },
+    );
+
+    const first = coordinator.updateTaskState(sibling, 'DOING', 'task-list');
+    const completion = coordinator.updateTaskState(blocked, 'DONE', 'task-list');
+
+    // Reopen the blocker while the completion waits behind the file write.
+    state.updateTaskByPathAndLine('blocker.md', 0, {
+      state: 'TODO',
+      completed: false,
+    });
+    state.notifySubscribers();
+    releaseFirst();
+
+    const outcome = await completion;
+    await first;
+
+    expect(outcome.status).toBe('refused');
+    expect(writer.updateTaskState).toHaveBeenCalledTimes(1);
+    expect(Notice).toHaveBeenCalledWith(
+      expect.stringContaining('Blocked task cannot be completed'),
+      8000,
+    );
     coordinator.destroy();
   });
 

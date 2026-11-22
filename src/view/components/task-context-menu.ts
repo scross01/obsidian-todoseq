@@ -39,7 +39,9 @@ export type TaskContextMenuCallbacks = {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ) => void | Promise<void>;
-  onCompleteAnyway?: (task: Task) => void | Promise<void>;
+  onCompleteAnyway?: (
+    task: Task,
+  ) => void | Promise<import('../../services/task-update-coordinator').TaskUpdateOutcome | void>;
 };
 
 /**

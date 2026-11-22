@@ -14,6 +14,7 @@
  * This design ensures consistent behavior on both desktop and mobile.
  */
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
+import type { DependencyReason } from '../types/task-dependency';
 import { KeywordManager } from '../utils/keyword-manager';
 import { getTaskKey } from '../utils/task-utils';
 import TodoTracker from '../main';
@@ -59,6 +60,17 @@ export type UpdateType =
  */
 export type UpdateSource =
   'editor' | 'reader' | 'task-list' | 'embedded' | 'archive-undo';
+
+/**
+ * Typed result of a task update. Callers must be able to distinguish a write
+ * that happened from one the blocked-completion gate refused, so a visible
+ * control never keeps a state the file does not have.
+ */
+export type TaskUpdateOutcome =
+  | { status: 'applied' }
+  | { status: 'refused'; reasons: readonly DependencyReason[] }
+  | { status: 'failed' }
+  | { status: 'not-found' };
 
 /**
  * Context object for a task update operation.
@@ -128,6 +140,8 @@ interface ProcessingContext {
   newDeadlineWarningPeriod?: WarningPeriodInfo | null;
   /** New state for recurrence (for 'recurrence' type updates) */
   newStateForRecurrence?: string;
+  /** Explicit user override for the blocked-completion gate. */
+  forceCompletion?: boolean;
   filePath: string;
   fileLine: number;
   /**
@@ -152,7 +166,7 @@ interface ProcessingContext {
  */
 interface PendingUpdate {
   /** The promise for the update operation */
-  promise: Promise<void>;
+  promise: Promise<TaskUpdateOutcome>;
   /** Timestamp when the update was queued */
   timestamp: number;
 }
@@ -291,8 +305,9 @@ export class TaskUpdateCoordinator {
    * @param context - Update context containing task and change details
    * @returns Promise resolving when async phase is complete (for testing)
    */
-  async updateTask(context: UpdateContext): Promise<void> {
-    if (this.refuseBlockedCompletion(context)) return;
+  async updateTask(context: UpdateContext): Promise<TaskUpdateOutcome> {
+    const refusal = this.refuseBlockedCompletion(context);
+    if (refusal) return refusal;
     const procContext = this.buildProcessingContext(context);
     procContext.fileRequestGeneration = this.nextFileGeneration(
       procContext.filePath,
@@ -315,7 +330,9 @@ export class TaskUpdateCoordinator {
    * Refuse before any generation, journal or optimistic mutation when the
    * current authoritative dependency snapshot blocks completion.
    */
-  private refuseBlockedCompletion(context: UpdateContext): boolean {
+  private refuseBlockedCompletion(
+    context: UpdateContext,
+  ): Extract<TaskUpdateOutcome, { status: 'refused' }> | null {
     if (
       !this.isCompletionRequest(context) ||
       context.forceCompletion ||
@@ -323,21 +340,82 @@ export class TaskUpdateCoordinator {
       this.plugin.settings?.enforceBlockedTasks === false ||
       !this.taskDependencyManager
     ) {
-      return false;
+      return null;
     }
 
     const key = getTaskKey(context.task);
-    if (!this.taskDependencyManager.isBlocked(key)) return false;
+    if (!this.taskDependencyManager.isBlocked(key)) return null;
 
     const reasons = this.taskDependencyManager.getBlockingReasons(key);
+    this.announceRefusal(reasons);
+    console.debug(
+      `[TaskUpdateCoordinator] Refused completion for ${key}: ${reasons
+        .map((reason) => reason.message)
+        .join(' ')}`,
+    );
+    return { status: 'refused', reasons };
+  }
+
+  /** Shared refusal notice so the entry check and the pre-write recheck agree. */
+  private announceRefusal(reasons: readonly DependencyReason[]): void {
     const detail = reasons.length
       ? reasons.map((reason) => reason.message).join(' ')
       : 'Resolve its BLOCKER references first.';
     new Notice(`Blocked task cannot be completed. ${detail}`, 8000);
-    console.debug(
-      `[TaskUpdateCoordinator] Refused completion for ${key}: ${detail}`,
+  }
+
+  /**
+   * Completion requests that must still be blocked before persistence. The
+   * optimistic update marks the task complete in the state manager, so this
+   * asks for its blocking reasons rather than the derived blocked set.
+   */
+  private recheckBlockedCompletion(
+    context: ProcessingContext,
+  ): Extract<TaskUpdateOutcome, { status: 'refused' }> | null {
+    if (
+      context.type !== 'state' ||
+      !context.newState ||
+      context.forceCompletion ||
+      context.source === 'archive-undo' ||
+      context.originalSourceState?.completed !== false ||
+      this.plugin.settings?.enforceBlockedTasks === false ||
+      !this.taskDependencyManager ||
+      !this.keywordManager.isCompleted(context.newState)
+    ) {
+      return null;
+    }
+
+    const reasons = this.taskDependencyManager.getBlockingReasons(
+      getTaskKey(context.task),
     );
-    return true;
+    if (reasons.length === 0) return null;
+    return { status: 'refused', reasons };
+  }
+
+  /** Restore persisted truth after a refusal that followed the sync phase. */
+  private async recoverPersistedTasks(
+    context: ProcessingContext,
+    generation: number,
+  ): Promise<void> {
+    const vault = this.plugin.app.vault as {
+      getAbstractFileByPath?: (path: string) => unknown;
+    };
+    const file = vault.getAbstractFileByPath?.(context.filePath);
+    const scanner = this.plugin.vaultScanner;
+    const isLatest =
+      this.fileWriteGenerations.get(context.filePath) === generation;
+    if (scanner?.reconcileFileAfterFailedWrite) {
+      const recovered = await scanner.reconcileFileAfterFailedWrite(
+        context.filePath,
+        file instanceof TFile ? file : null,
+        isLatest,
+      );
+      if (recovered) {
+        this.recoveredFileTasks.set(context.filePath, recovered);
+      }
+    } else if (file instanceof TFile) {
+      await scanner?.processIncrementalChange(file);
+    }
   }
 
   /**
@@ -347,7 +425,7 @@ export class TaskUpdateCoordinator {
     task: Task,
     newState: string,
     source: UpdateSource = 'editor',
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'state',
@@ -364,7 +442,7 @@ export class TaskUpdateCoordinator {
     date: Date | null,
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'scheduled-date',
@@ -383,7 +461,7 @@ export class TaskUpdateCoordinator {
     date: Date | null,
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'deadline-date',
@@ -401,7 +479,7 @@ export class TaskUpdateCoordinator {
     task: Task,
     newPriority: 'high' | 'med' | 'low' | null,
     source: UpdateSource = 'task-list',
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'priority',
@@ -425,7 +503,7 @@ export class TaskUpdateCoordinator {
       newDeadlineWarningPeriod?: WarningPeriodInfo | null;
       newStateForRecurrence?: string;
     },
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'recurrence',
@@ -445,7 +523,7 @@ export class TaskUpdateCoordinator {
     newState: string,
     source: UpdateSource = 'editor',
     cellIndex?: number,
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     let task = this.taskStateManager.findTaskByPathAndLine(
       taskPath,
       taskLine,
@@ -460,7 +538,7 @@ export class TaskUpdateCoordinator {
       console.debug(
         `[TaskUpdateCoordinator] Task not found at path=${taskPath}, line=${taskLine}`,
       );
-      return;
+      return { status: 'not-found' };
     }
 
     return this.updateTask({
@@ -558,6 +636,7 @@ export class TaskUpdateCoordinator {
       source: context.source,
       newState,
       originalNewState,
+      forceCompletion: context.forceCompletion,
       // Capture BEFORE performSyncPhase's optimisticUpdate replaces the
       // stored task — the file write still needs the pre-transition values.
       originalSourceState:
@@ -618,11 +697,13 @@ export class TaskUpdateCoordinator {
   /**
    * ASYNC PHASE: Queue for background execution.
    */
-  private async queueAsyncPhase(context: ProcessingContext): Promise<void> {
+  private async queueAsyncPhase(
+    context: ProcessingContext,
+  ): Promise<TaskUpdateOutcome> {
     const taskKey = getTaskKey(context.task);
     const existingUpdate = this.pendingTaskUpdates.get(taskKey);
 
-    const asyncWork = async (): Promise<void> => {
+    const asyncWork = async (): Promise<TaskUpdateOutcome> => {
       if (existingUpdate) {
         try {
           await existingUpdate.promise;
@@ -637,7 +718,7 @@ export class TaskUpdateCoordinator {
           );
         }
       }
-      await this.performAsyncPhase(context);
+      return this.performAsyncPhase(context);
     };
 
     const promise = asyncWork();
@@ -647,7 +728,7 @@ export class TaskUpdateCoordinator {
     });
 
     try {
-      await promise;
+      return await promise;
     } finally {
       this.pendingTaskUpdates.delete(taskKey);
     }
@@ -692,13 +773,15 @@ export class TaskUpdateCoordinator {
   /**
    * ASYNC PHASE: Perform file write, recurrence, and state finalization.
    */
-  private async performAsyncPhase(context: ProcessingContext): Promise<void> {
+  private async performAsyncPhase(
+    context: ProcessingContext,
+  ): Promise<TaskUpdateOutcome> {
     const existingQueue = this.fileUpdateQueues.get(context.filePath);
     const generation =
       context.fileRequestGeneration ??
       this.nextFileGeneration(context.filePath);
 
-    const doAsyncWork = async (): Promise<void> => {
+    const doAsyncWork = async (): Promise<TaskUpdateOutcome> => {
       const taskEditor = this.plugin.taskEditor;
       if (!taskEditor) {
         throw new Error('TaskEditor is not initialized');
@@ -727,6 +810,16 @@ export class TaskUpdateCoordinator {
         };
       }
 
+      const refusal = this.recheckBlockedCompletion(context);
+      if (refusal) {
+        // The request was unblocked when it was made, so the sync phase has
+        // already flipped the visible state. Restore persisted truth and let
+        // the caller's control roll back without a note write.
+        await this.recoverPersistedTasks(context, generation);
+        this.announceRefusal(refusal.reasons);
+        return refusal;
+      }
+
       let updatedTask: Task;
       try {
         this.plugin.vaultScanner?.addSkipIncrementalChange(context.filePath);
@@ -740,27 +833,10 @@ export class TaskUpdateCoordinator {
           `[TODOseq] File write failed for ${context.type} at line ${context.fileLine}:`,
           error,
         );
-        const file = this.plugin.app.vault.getAbstractFileByPath(
-          context.filePath,
-        );
-        const scanner = this.plugin.vaultScanner;
-        const isLatest =
-          this.fileWriteGenerations.get(context.filePath) === generation;
-        if (scanner?.reconcileFileAfterFailedWrite) {
-          // Recover persisted truth even though the failed write's skip marker
-          // is still live. Publish only when no newer request owns the file.
-          const recovered = await scanner.reconcileFileAfterFailedWrite(
-            context.filePath,
-            file instanceof TFile ? file : null,
-            isLatest,
-          );
-          if (recovered) {
-            this.recoveredFileTasks.set(context.filePath, recovered);
-          }
-        } else if (file instanceof TFile) {
-          await scanner?.processIncrementalChange(file);
-        }
-        return;
+        // Recover persisted truth even though the failed write's skip marker
+        // is still live. Publish only when no newer request owns the file.
+        await this.recoverPersistedTasks(context, generation);
+        return { status: 'failed' };
       }
 
       const lineDelta = (updatedTask as Task & { lineDelta?: number })
@@ -785,6 +861,7 @@ export class TaskUpdateCoordinator {
           this.performDirectEditorCheckboxUpdate(updatedTask, context.newState);
         }
       }
+      return { status: 'applied' };
     };
 
     // Run doAsyncWork regardless of whether the previous file update
@@ -809,7 +886,7 @@ export class TaskUpdateCoordinator {
     });
 
     try {
-      await queuePromise;
+      return await queuePromise;
     } finally {
       if (
         this.fileUpdateQueues.get(context.filePath)?.promise === queuePromise

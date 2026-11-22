@@ -36,6 +36,12 @@ import {
   type ParsedTaskProperties,
   type TaskPropertiesDrawer,
 } from '../utils/task-properties';
+import { buildWikiLink, findWikiLinks } from '../utils/task-link';
+import {
+  TaskReferenceEdit,
+  TaskReferenceRepairReport,
+  TaskReferenceService,
+} from './task-reference-service';
 
 /** A SCHEDULED/DEADLINE/CLOSED/STARTED date line kind. */
 type DateLineType = 'SCHEDULED' | 'DEADLINE' | 'CLOSED' | 'STARTED';
@@ -45,11 +51,14 @@ export type TaskTransferStatus =
   | 'already-there'
   | 'stale-source'
   | 'destination-failed'
-  | 'partial';
+  | 'partial'
+  | 'partial-references';
 
 export interface TaskTransferResult {
   status: TaskTransferStatus;
   reason?: string;
+  /** Per-note outcome when references were repaired after the transfer. */
+  referenceRepairs?: TaskReferenceRepairReport[];
 }
 
 export interface DateLineUpdateResult {
@@ -106,10 +115,17 @@ export class TaskWriter {
    * Prefer Editor API for the active file to preserve cursor/selection/folds and UX.
    * Prefer Vault.process for background edits to perform atomic writes.
    */
+  /** Failed repairs kept session-only so the user can retry just those. */
+  private pendingReferenceEdits: TaskReferenceEdit[] = [];
+
   constructor(
     private readonly plugin: TodoTracker,
     private keywordManager: KeywordManager,
   ) {}
+
+  private get referenceService(): TaskReferenceService {
+    return new TaskReferenceService(this.app);
+  }
 
   /**
    * Apply a smart-date conversion as one editor transaction.
@@ -636,16 +652,23 @@ export class TaskWriter {
       };
     }
 
-    const existing = task.embedReference?.replace(/^\^/, '');
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) {
+      return { status: 'failed', task: null, lineDelta: 0 };
+    }
+
+    // The task snapshot can predate an identity written by an earlier action.
+    // Re-read the line so Copy anchor reuses the persisted anchor instead of
+    // generating a second one.
+    const currentLine = (await this.readFileText(file)).split('\n')[
+      task.line
+    ];
+    const persisted = currentLine?.match(/(?:^|\s)\^([A-Za-z0-9-]+)\s*$/)?.[1];
+    const existing = task.embedReference?.replace(/^\^/, '') || persisted;
     const anchor = existing || `todoseq-${this.randomHex(8)}`;
     const link = this.buildBlockLink(task.path, anchor);
     if (existing) {
       return { status: 'success', task, lineDelta: 0, identity: anchor, link };
-    }
-
-    const file = this.app.vault.getAbstractFileByPath(task.path);
-    if (!(file instanceof TFile)) {
-      return { status: 'failed', task: null, lineDelta: 0 };
     }
 
     const editor = this.getTransferEditor(file);
@@ -794,6 +817,88 @@ export class TaskWriter {
     );
   }
 
+  /**
+   * Move references between the active `BLOCKER` list and `ARCHIVED_BLOCKER`
+   * history, preserving every other drawer entry and append syntax. Idempotent
+   * per reference so a retried archive or promotion cannot duplicate or lose
+   * one. Used by archive migration and the restored-target promotion pass.
+   */
+  async migrateBlockerHistory(
+    task: Task,
+    direction: 'to-history' | 'to-active',
+    references: readonly string[],
+  ): Promise<TaskPropertyWriteResult> {
+    if (references.length === 0) {
+      return { status: 'success', task, lineDelta: 0 };
+    }
+    if (!supportsTaskMetadata(task) || task.isTableTask) {
+      return {
+        status: 'unsupported',
+        task: null,
+        lineDelta: 0,
+        reason: 'Task properties are not supported for this task source.',
+      };
+    }
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) {
+      return { status: 'failed', task: null, lineDelta: 0 };
+    }
+    const lines = (await this.readFileText(file)).split('\n');
+    const drawer = this.findPropertiesDrawer(lines, task);
+    if (drawer?.issues.some((issue) => issue.code === 'malformed-drawer')) {
+      return {
+        status: 'ambiguous',
+        task: null,
+        lineDelta: 0,
+        reason: 'Fix the malformed properties drawer before changing dependencies.',
+      };
+    }
+
+    const format = this.propertyFormat(task);
+    const parsed = drawer ? extractTaskProperties(drawer, format) : {};
+    const active = [...(parsed.blockedBy ?? [])];
+    const history = [...(parsed.archivedBlockers ?? [])];
+    const remove = (list: string[], reference: string): void => {
+      for (let i = list.length - 1; i >= 0; i--) {
+        if (list[i] === reference) list.splice(i, 1);
+      }
+    };
+
+    for (const reference of references) {
+      if (direction === 'to-history') {
+        remove(active, reference);
+        if (!history.includes(reference)) history.push(reference);
+      } else {
+        remove(history, reference);
+        if (!active.includes(reference)) active.push(reference);
+      }
+    }
+
+    const unchanged = (next: string[], current: readonly string[]): boolean =>
+      next.length === current.length &&
+      next.every((value, index) => value === current[index]);
+    if (
+      unchanged(active, parsed.blockedBy ?? []) &&
+      unchanged(history, parsed.archivedBlockers ?? [])
+    ) {
+      return {
+        status: 'success',
+        task: this.applyPropertySnapshot(task, parsed),
+        lineDelta: 0,
+      };
+    }
+
+    return this.writeDrawerMutation(task, (sourceLines) =>
+      this.applyDrawerUpdates(sourceLines, task, [
+        { key: 'BLOCKER', value: active.length ? active.join(' ') : null },
+        {
+          key: 'ARCHIVED_BLOCKER',
+          value: history.length ? history.join(' ') : null,
+        },
+      ]),
+    );
+  }
+
   /** Insert or replace supported drawer keys as one serialized write. */
   async updateOrInsertPropertiesDrawer(
     task: Task,
@@ -894,9 +999,14 @@ export class TaskWriter {
         reason: 'The task is no longer at its recorded location.',
       };
     }
-    const block = this.buildTransferBlock(source.lines, task);
+    let block = this.buildTransferBlock(source.lines, task);
     if (block.length === 0) {
       return { status: 'stale-source', reason: 'The task could not be read.' };
+    }
+
+    const anchor = this.taskAnchor(task);
+    if (action === 'copy') {
+      block = await this.prepareCopiedBlock(block, task, destination, anchor);
     }
 
     let appended = false;
@@ -914,18 +1024,269 @@ export class TaskWriter {
     if (action === 'copy') return { status: 'success' };
 
     const migrateState = this.settings.migrateToTodayState || '';
-    const changed = await this.rewriteSource(task, (lines) =>
-      action === 'move'
-        ? this.removeFromLines(lines, task)
-        : this.migrateInLines(lines, task, migrateState),
-    );
+    const changed = await this.rewriteSource(task, (lines) => {
+      if (action === 'move') return this.removeFromLines(lines, task);
+      return this.removeRetainedIdentity(
+        this.migrateInLines(lines, task, migrateState),
+        task,
+        anchor,
+      );
+    });
     if (!changed) {
       return {
         status: 'partial',
         reason: 'The destination was updated but the source could not be.',
       };
     }
-    return { status: 'success' };
+
+    if (!anchor) return { status: 'success' };
+    const edits = await this.collectReferenceEdits(
+      task.path,
+      anchor,
+      destination.path,
+    );
+    if (edits === null) {
+      return {
+        status: 'partial-references',
+        reason:
+          'The task was transferred, but its references could not be scanned.',
+      };
+    }
+    return this.applyReferenceEdits(edits);
+  }
+
+  /** The destination block keeps identity on move/migrate; copy forks it. */
+  private taskAnchor(task: Task): string | null {
+    const reference = task.embedReference?.replace(/^\^/, '').trim();
+    return reference ? reference : null;
+  }
+
+  /**
+   * A copied block gets fresh identity where it had any: a new UUID, a new
+   * block anchor, and remapped internal references. A task without identity
+   * stays without identity — a transfer never mints one on its own.
+   */
+  private async prepareCopiedBlock(
+    block: string[],
+    task: Task,
+    destination: TFile,
+    anchor: string | null,
+  ): Promise<string[]> {
+    let lines = [...block];
+    const oldId = this.blockId(lines);
+    let newId: string | null = null;
+    if (oldId) {
+      newId = this.generateUuid();
+      lines = lines.map((line) =>
+        line.replace(/^(\s*:ID:\s*).*$/i, `$1${newId}`),
+      );
+    }
+
+    if (!anchor) return lines;
+
+    const newAnchor = await this.uniqueAnchor(destination, anchor);
+    const escapedAnchor = this.escapeRegExp(anchor);
+    lines[0] = lines[0].replace(
+      new RegExp(`\\^${escapedAnchor}(?=\\s|$)`),
+      `^${newAnchor}`,
+    );
+
+    const destinationTarget = destination.path
+      .replace(/\.md$/i, '')
+      .replace(/^\/+/, '');
+    lines = lines.map((line) => {
+      if (!line.includes('[[')) return line;
+      let rewritten = line;
+      for (const token of findWikiLinks(line)) {
+        if (!token.anchor || token.anchor.slice(1) !== anchor) continue;
+        if (!this.linkTargetsTask(token.target, task.path)) continue;
+        rewritten = rewritten.replace(
+          token.raw,
+          buildWikiLink(
+            token.embed,
+            destinationTarget,
+            `^${newAnchor}`,
+            token.alias,
+          ),
+        );
+      }
+      return rewritten;
+    });
+
+    if (oldId && newId) {
+      const idPattern = new RegExp(
+        `(^|[:\\s])${this.escapeRegExp(oldId)}(?=\\s|$)`,
+        'g',
+      );
+      lines = lines.map((line) =>
+        /^\s*:?(BLOCKER|ARCHIVED_BLOCKER)\+?:/i.test(line)
+          ? line.replace(idPattern, `$1${newId}`)
+          : line,
+      );
+    }
+
+    return lines;
+  }
+
+  private blockId(lines: readonly string[]): string | null {
+    for (const line of lines) {
+      const match = /^\s*:ID:\s*(.*)$/i.exec(line);
+      if (match) {
+        const value = match[1].trim();
+        return value === '' ? null : value;
+      }
+    }
+    return null;
+  }
+
+  private async uniqueAnchor(
+    destination: TFile,
+    oldAnchor: string,
+  ): Promise<string> {
+    let existing = '';
+    try {
+      existing = await this.readFileText(destination);
+    } catch {
+      existing = '';
+    }
+    const used = new Set<string>([oldAnchor]);
+    for (const match of existing.matchAll(/\^([A-Za-z0-9][\w-]*)/g)) {
+      used.add(match[1]);
+    }
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const candidate = `todoseq-${this.randomHex(8)}`;
+      if (!used.has(candidate)) return candidate;
+    }
+    return `todoseq-${this.randomHex(16)}`;
+  }
+
+  private linkTargetsTask(linkTarget: string, taskPath: string): boolean {
+    const normalize = (path: string): string =>
+      path
+        .replace(/\\/g, '/')
+        .replace(/^\.?\//, '')
+        .replace(/\.md$/i, '');
+    const target = normalize(linkTarget);
+    const source = normalize(taskPath);
+    if (target === source) return true;
+    const basename = source.split('/').pop() ?? source;
+    return target === basename || source.endsWith(`/${target}`);
+  }
+
+  /**
+   * Migrate keeps identity at the destination, so the retained source history
+   * entry must stop owning the ID and anchor. Other properties stay.
+   */
+  private removeRetainedIdentity(
+    lines: string[],
+    task: Task,
+    anchor: string | null,
+  ): string[] {
+    const out = [...lines];
+    if (anchor) {
+      const line = out[task.line];
+      if (typeof line === 'string') {
+        out[task.line] = line.replace(
+          new RegExp(`\\s*\\^${this.escapeRegExp(anchor)}(?=\\s*$)`),
+          '',
+        );
+      }
+    }
+
+    const drawer = this.findPropertiesDrawer(out, task);
+    if (!drawer || !drawer.closed) return out;
+    const idEntries = drawer.entries.filter(
+      (entry) => entry.canonicalKey === 'ID',
+    );
+    if (idEntries.length === 0) return out;
+
+    const remove = new Set(idEntries.map((entry) => entry.line));
+    if (drawer.entries.length === idEntries.length) {
+      return [
+        ...out.slice(0, drawer.startLine),
+        ...out.slice(drawer.endLine + 1),
+      ];
+    }
+    return out.filter((_, index) => !remove.has(index));
+  }
+
+  private async collectReferenceEdits(
+    sourcePath: string,
+    anchor: string,
+    destinationPath: string,
+  ): Promise<TaskReferenceEdit[] | null> {
+    try {
+      return await this.referenceService.collectAnchorReferences({
+        sourcePath,
+        anchor,
+        destinationPath,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  private async applyReferenceEdits(
+    edits: TaskReferenceEdit[],
+  ): Promise<TaskTransferResult> {
+    if (edits.length === 0) return { status: 'success' };
+
+    const { reports, failedEdits } = await this.referenceService.apply(edits);
+    if (failedEdits.length === 0) {
+      return { status: 'success', referenceRepairs: reports };
+    }
+
+    this.rememberReferenceRetries(failedEdits);
+    return {
+      status: 'partial-references',
+      reason: `${failedEdits.length} reference link(s) could not be updated.`,
+      referenceRepairs: reports,
+    };
+  }
+
+  private rememberReferenceRetries(edits: readonly TaskReferenceEdit[]): void {
+    const seen = new Set(
+      this.pendingReferenceEdits.map(
+        (edit) => `${edit.path}\u0000${edit.line}\u0000${edit.reference}`,
+      ),
+    );
+    for (const edit of edits) {
+      const key = `${edit.path}\u0000${edit.line}\u0000${edit.reference}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      this.pendingReferenceEdits.push(edit);
+    }
+    if (this.pendingReferenceEdits.length > 200) {
+      this.pendingReferenceEdits.splice(
+        0,
+        this.pendingReferenceEdits.length - 200,
+      );
+    }
+  }
+
+  /** True while a reference repair from this session still has to be retried. */
+  hasPendingReferenceRepairs(): boolean {
+    return this.pendingReferenceEdits.length > 0;
+  }
+
+  getPendingReferenceRepairs(): readonly TaskReferenceEdit[] {
+    return [...this.pendingReferenceEdits];
+  }
+
+  /** Retry exactly the references that failed, never a fresh vault pass. */
+  async retryPendingReferenceRepairs(): Promise<
+    TaskReferenceRepairReport[]
+  > {
+    if (this.pendingReferenceEdits.length === 0) return [];
+    const edits = this.pendingReferenceEdits;
+    this.pendingReferenceEdits = [];
+    const { reports, failedEdits } = await this.referenceService.apply(edits);
+    this.pendingReferenceEdits = failedEdits;
+    return reports;
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private static buildDateLineContent(

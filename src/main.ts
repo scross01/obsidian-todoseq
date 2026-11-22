@@ -369,6 +369,10 @@ export default class TodoTracker extends Plugin {
       this.app;
 
     await this.saveData(settingsToSave);
+
+    // Structural settings are read live by the dependency manager; drop its
+    // derived snapshot so a toggle is reflected without a rescan or restart.
+    this.taskDependencyManager?.clearCache();
   }
 
   // Update task formatting in all views

@@ -17,6 +17,8 @@ import { KeywordManager } from '../utils/keyword-manager';
 import { ChangeTracker } from './change-tracker';
 import { EventEmitter } from '../utils/event-emitter';
 import { yieldToEventLoop } from '../utils/event-loop';
+import { collectStructuralEntries } from '../utils/task-structure-entries';
+import type { StructuralEntry } from '../types/task-structure';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -54,6 +56,12 @@ export class VaultScanner
    * scan's older snapshots overwriting newer per-file publications.
    */
   private activeScanDirtyPaths: Set<string> | null = null;
+  /** Memory-only structural publication, keyed by path. */
+  private structuralEntriesByPath = new Map<
+    string,
+    readonly StructuralEntry[]
+  >();
+  private structureRevision = 0;
 
   constructor(
     private plugin: TodoTracker,
@@ -105,6 +113,30 @@ export class VaultScanner
     return this.keywordManager;
   }
 
+  /** Monotonic revision for published structural entries. */
+  getStructureRevision(): number {
+    return this.structureRevision;
+  }
+
+  getStructuralEntries(): ReadonlyMap<
+    string,
+    readonly StructuralEntry[]
+  > {
+    return this.structuralEntriesByPath;
+  }
+
+  private publishStructure(
+    path: string,
+    entries: readonly StructuralEntry[],
+  ): void {
+    this.structuralEntriesByPath.set(path, entries);
+    this.structureRevision++;
+  }
+
+  private removeStructure(path: string): void {
+    if (this.structuralEntriesByPath.delete(path)) this.structureRevision++;
+  }
+
   /**
    * Load urgency coefficients from urgency.ini file
    */
@@ -127,6 +159,8 @@ export class VaultScanner
     }
     this._isScanning = true;
     this.activeScanDirtyPaths = new Set<string>();
+    this.structuralEntriesByPath.clear();
+    this.structureRevision++;
 
     const startTime = performance.now();
 
@@ -352,14 +386,27 @@ export class VaultScanner
 
       if (!parser) {
         // No parser registered for this extension, return empty
+        this.removeStructure(file.path);
         return [];
       }
 
       // Fast-path rejection: if the file text doesn't contain any task keywords natively,
       // skip expensive line-by-line regex parsing completely.
       if (!parser.hasAnyKeyword(content)) {
+        this.removeStructure(file.path);
         return [];
       }
+
+      const format = file.extension.toLowerCase() === 'org' ? 'org' : 'markdown';
+      this.publishStructure(
+        file.path,
+        collectStructuralEntries(
+          content,
+          file.path,
+          format,
+          this.keywordManager,
+        ),
+      );
 
       // Parse tasks using the matched parser
       const fileTasks = parser.parseFile(content, file.path, file);
@@ -735,6 +782,7 @@ export class VaultScanner
   async processFileDelete(file: TFile): Promise<void> {
     try {
       this.activeScanDirtyPaths?.add(file.path);
+      this.removeStructure(file.path);
       const currentTasks = this.taskStateManager.getTasks();
       const updatedTasks = currentTasks.filter(
         (task) => task.path !== file.path,
@@ -760,6 +808,7 @@ export class VaultScanner
       const newPath = file.path;
       this.activeScanDirtyPaths?.add(oldPath);
       this.activeScanDirtyPaths?.add(newPath);
+      this.removeStructure(oldPath);
 
       let renamedTasks: Task[] = [];
       if (!this.isExcluded(newPath)) {

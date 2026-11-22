@@ -3861,3 +3861,22 @@
   width: var(--icon-xs);
   height: var(--icon-xs);
 }
+
+/* Reader badge: the same lock anatomy as Task List rows, inline in the note. */
+.todoseq-reader-blocked-badge {
+  vertical-align: middle;
+}
+
+/* Source diagnostic (broken/ambiguous reference, cycle), not ordinary blocked state. */
+.todoseq-dependency-issue-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-warning);
+  margin-inline-start: var(--size-2-2);
+  cursor: help;
+}
+
+.todoseq-dependency-issue-icon svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}

@@ -37,6 +37,7 @@ export class UIManager {
       taskKeywordPlugin(
         this.plugin.settings,
         () => this.plugin.vaultScanner?.getParser() ?? null,
+        () => this.plugin.taskDependencyManager,
       ),
       dateAutocompleteExtension(
         this.plugin.settings,

@@ -10,7 +10,9 @@ import { RangeSetBuilder } from '@codemirror/state';
 import { TodoTrackerSettings } from '../../settings/settings-types';
 import { TaskParser } from '../../parser/task-parser';
 import { getPriorityLevelName } from '../../utils/task-format';
-import { setTooltip } from 'obsidian';
+import { editorInfoField, setIcon, setTooltip } from 'obsidian';
+import type { DependencyIssue } from '../../types/task-dependency';
+import type { TaskDependencyManager } from '../../services/task-dependency-manager';
 import {
   CODE_BLOCK_REGEX,
   COMMENT_BLOCK_REGEX,
@@ -91,6 +93,46 @@ export class PriorityWidget extends WidgetType {
   }
 }
 
+export class DependencyIssueWidget extends WidgetType {
+  constructor(
+    readonly issues: readonly DependencyIssue[],
+    readonly taskKey: string,
+  ) {
+    super();
+  }
+
+  eq(other: DependencyIssueWidget): boolean {
+    return (
+      this.taskKey === other.taskKey &&
+      this.issues.map((issue) => issue.fingerprint).join('|') ===
+        other.issues.map((issue) => issue.fingerprint).join('|')
+    );
+  }
+
+  toDOM(): HTMLElement {
+    const first = this.issues[0]?.message ?? 'Dependency problem';
+    const label =
+      this.issues.length > 1
+        ? `${first} (+${this.issues.length - 1} more)`
+        : first;
+    const el = createSpan({
+      cls: 'todoseq-dependency-issue-icon',
+      attr: {
+        'data-task-key': this.taskKey,
+        'aria-label': `Dependency problem: ${label}`,
+        role: 'img',
+      },
+    });
+    setIcon(el, 'alert-triangle');
+    setTooltip(el, label);
+    return el;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
 export class TaskKeywordDecorator {
   private decorations: DecorationSet;
   private parser: TaskParser;
@@ -123,10 +165,43 @@ export class TaskKeywordDecorator {
     private view: EditorView,
     settings: TodoTrackerSettings,
     parser: TaskParser,
+    private getDependencyManager: () => TaskDependencyManager | null = () =>
+      null,
   ) {
     this.settings = settings;
     this.parser = parser;
     this.decorations = this.createDecorations();
+  }
+
+  /**
+   * Source diagnostics for this file, grouped by zero-based line. Ordinary
+   * blocked state is deliberately excluded: it is not an error.
+   */
+  private getIssuesByLine(): Map<number, DependencyIssue[]> {
+    const result = new Map<number, DependencyIssue[]>();
+    const manager = this.getDependencyManager();
+    if (!manager) return result;
+
+    let path: string | null = null;
+    try {
+      const info = this.view.state.field?.(editorInfoField, false);
+      path = info?.file?.path ?? null;
+    } catch {
+      path = null;
+    }
+    if (!path) return result;
+
+    const prefix = `${path}:`;
+    for (const issue of manager.getIssues()) {
+      if (!issue.sourceKey?.startsWith(prefix)) continue;
+      const line = issue.sourceKey.slice(prefix.length);
+      if (!/^\d+$/.test(line)) continue;
+      const key = Number(line);
+      const list = result.get(key) ?? [];
+      list.push(issue);
+      result.set(key, list);
+    }
+    return result;
   }
 
   /**
@@ -187,6 +262,7 @@ export class TaskKeywordDecorator {
   private createDecorations(): DecorationSet {
     const builder = new RangeSetBuilder<Decoration>();
     const doc = this.view.state.doc;
+    const issuesByLine = this.getIssuesByLine();
 
     try {
       // Reset state tracking
@@ -597,6 +673,24 @@ export class TaskKeywordDecorator {
 
         // Check if this line contains SCHEDULED: or DEADLINE: and follows a task line
         this.checkAndDecorateDateLine(lineNumber, lineText, line, builder);
+
+        // Source diagnostics are errors, unlike ordinary blocked state.
+        if (match && (match[4] || (isHeadingTask && match[2]))) {
+          const issues = issuesByLine.get(lineNumber - 1);
+          if (issues?.length) {
+            builder.add(
+              line.to,
+              line.to,
+              Decoration.widget({
+                widget: new DependencyIssueWidget(
+                  issues,
+                  issues[0].sourceKey ?? `line:${lineNumber}`,
+                ),
+                side: 1,
+              }),
+            );
+          }
+        }
       }
 
       return builder.finish();
@@ -1092,12 +1186,14 @@ export class TaskKeywordDecorator {
 export const taskKeywordPlugin = (
   settings: TodoTrackerSettings,
   getParser: () => TaskParser | null,
+  getDependencyManager: () => TaskDependencyManager | null = () => null,
 ) => {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
       private settings: TodoTrackerSettings;
       private getParser: () => TaskParser | null;
+      private getDependencyManager: () => TaskDependencyManager | null;
       private settingsDetector: SettingsChangeDetector;
       private wasLivePreviewMode: boolean | null = null;
       private tableCellStylingTimer: number | null = null;
@@ -1106,6 +1202,7 @@ export const taskKeywordPlugin = (
       constructor(view: EditorView) {
         this.settings = settings;
         this.getParser = getParser;
+        this.getDependencyManager = getDependencyManager;
         this.settingsDetector = createSettingsChangeDetector(settings);
         // Initialize the mode state
         this.wasLivePreviewMode = this.isLivePreviewMode(view);
@@ -1152,6 +1249,7 @@ export const taskKeywordPlugin = (
             view,
             this.settings,
             parser,
+            this.getDependencyManager,
           );
           this.decorations = decorator.getDecorations();
         }

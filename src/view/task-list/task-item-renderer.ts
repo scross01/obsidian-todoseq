@@ -23,6 +23,7 @@ import type { TaskStateTransitionManager } from '../../services/task-state-trans
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { BaseDialog } from '../components/base-dialog';
 import type { TaskDependencyManager } from '../../services/task-dependency-manager';
+import type { TaskUpdateOutcome } from '../../services/task-update-coordinator';
 
 interface LinkPattern {
   type: 'wiki' | 'md' | 'url' | 'tag';
@@ -39,7 +40,7 @@ const LINK_PATTERNS: LinkPattern[] = [
 export type TaskStateChangeCallback = (
   task: Task,
   newState: string,
-) => Promise<void>;
+) => Promise<TaskUpdateOutcome | void>;
 
 export type TaskLocationOpenCallback = (task: Task) => void | Promise<void>;
 
@@ -129,28 +130,9 @@ export class TaskItemRenderer {
 
     checkbox.addClass('task-list-item-checkbox');
 
-    const settings = this.keywordManager.getSettings();
-
-    // Determine data-task character and checked state based on settings
-    let dataTaskChar: string;
-    if (settings.useExtendedCheckboxStyles) {
-      // Theme handles styling via :checked + data-task selectors
-      dataTaskChar = this.keywordManager.getCheckboxState(task.state, settings);
-      checkbox.checked = dataTaskChar !== ' ';
-    } else {
-      // Default behavior: use standard checkbox states
-      // For active keywords, use '/' so CSS can apply active styling
-      if (this.keywordManager.isActive(task.state)) {
-        dataTaskChar = '/';
-      } else if (this.keywordManager.isCompleted(task.state)) {
-        dataTaskChar = 'x';
-      } else {
-        dataTaskChar = ' ';
-      }
-      checkbox.checked = task.completed;
-    }
-
-    checkbox.setAttribute('data-task', dataTaskChar);
+    const presentation = this.getCheckboxPresentation(task);
+    checkbox.checked = presentation.checked;
+    checkbox.setAttribute('data-task', presentation.char);
 
     checkbox.addEventListener('change', () => {
       void (async () => {
@@ -182,11 +164,35 @@ export class TaskItemRenderer {
           return;
         }
 
-        await this.onStateChange(currentTask, targetState);
+        const outcome = await this.onStateChange(currentTask, targetState);
+        if (outcome?.status === 'refused') {
+          // The gate wrote nothing; the browser already toggled the control.
+          const presentation = this.getCheckboxPresentation(currentTask);
+          checkbox.checked = presentation.checked;
+          checkbox.setAttribute('data-task', presentation.char);
+        }
       })();
     });
 
     return checkbox;
+  }
+
+  /** Checkbox character and checked state for a task, used for render and rollback. */
+  private getCheckboxPresentation(task: Task): {
+    char: string;
+    checked: boolean;
+  } {
+    const settings = this.keywordManager.getSettings();
+    if (settings.useExtendedCheckboxStyles) {
+      const char = this.keywordManager.getCheckboxState(task.state, settings);
+      return { char, checked: char !== ' ' };
+    }
+    const char = this.keywordManager.isActive(task.state)
+      ? '/'
+      : this.keywordManager.isCompleted(task.state)
+        ? 'x'
+        : ' ';
+    return { char, checked: task.completed };
   }
 
   /**

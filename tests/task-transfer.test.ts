@@ -34,6 +34,9 @@ function harness(files: Record<string, string>): Harness {
       getAbstractFileByPath: (path: string) =>
         store.has(path) ? new MemoryFile(path) : null,
       read: async (file: TFile) => store.get(file.path) ?? '',
+      cachedRead: async (file: TFile) => store.get(file.path) ?? '',
+      getFiles: () =>
+        [...store.keys()].map((path) => new MemoryFile(path)),
       process: async (file: TFile, fn: (data: string) => string) => {
         const next = fn(store.get(file.path) ?? '');
         store.set(file.path, next);
@@ -73,6 +76,85 @@ function task(overrides: Partial<Task> = {}): Task {
   });
 }
 
+describe('TaskWriter blocker history migration', () => {
+  const taggedSource = [
+    'Intro',
+    '',
+    'TODO Water the plants',
+    ':PROPERTIES:',
+    ':ID: water-1',
+    ':BLOCKER: data-02',
+    ':END:',
+    '',
+  ].join('\n');
+
+  it('moves an active reference to history and keeps other properties', async () => {
+    const h = harness({ [SOURCE]: taggedSource, [DEST]: '' });
+    const result = await h.writer.migrateBlockerHistory(
+      task({
+        line: 2,
+        state: 'TODO',
+        rawText: 'TODO Water the plants',
+        id: 'water-1',
+        blockedBy: ['data-02'],
+      }),
+      'to-history',
+      ['data-02'],
+    );
+
+    expect(result.status).toBe('success');
+    expect(h.store.get(SOURCE)).toBe(
+      [
+        'Intro',
+        '',
+        'TODO Water the plants',
+        ':PROPERTIES:',
+        ':ID: water-1',
+        ':ARCHIVED_BLOCKER: data-02',
+        ':END:',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('is idempotent when the reference is already history', async () => {
+    const h = harness({ [SOURCE]: taggedSource, [DEST]: '' });
+    const dependent = task({
+      line: 2,
+      state: 'TODO',
+      rawText: 'TODO Water the plants',
+      blockedBy: ['data-02'],
+    });
+    await h.writer.migrateBlockerHistory(dependent, 'to-history', ['data-02']);
+    const once = h.store.get(SOURCE);
+    const second = await h.writer.migrateBlockerHistory(dependent, 'to-history', [
+      'data-02',
+    ]);
+
+    expect(second.status).toBe('success');
+    expect(h.store.get(SOURCE)).toBe(once);
+  });
+
+  it('promotes history back to the active list', async () => {
+    const source = taggedSource.replace(':BLOCKER:', ':ARCHIVED_BLOCKER:');
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+    const result = await h.writer.migrateBlockerHistory(
+      task({
+        line: 2,
+        state: 'TODO',
+        rawText: 'TODO Water the plants',
+        archivedBlockers: ['data-02'],
+      }),
+      'to-active',
+      ['data-02'],
+    );
+
+    expect(result.status).toBe('success');
+    expect(h.store.get(SOURCE)).toContain(':BLOCKER: data-02');
+    expect(h.store.get(SOURCE)).not.toContain('ARCHIVED_BLOCKER');
+  });
+});
+
 describe('TaskWriter transfers', () => {
   it('copies the block and leaves the source untouched', async () => {
     const h = harness({ [SOURCE]: SOURCE_TEXT, [DEST]: 'Existing\n' });
@@ -84,6 +166,17 @@ describe('TaskWriter transfers', () => {
     expect(result.status).toBe('success');
     expect(h.store.get(DEST)).toBe('Existing\n\n- [ ] TODO Water the plants\n');
     expect(h.store.get(SOURCE)).toBe(SOURCE_TEXT);
+  });
+
+  it('reuses a persisted anchor when the task snapshot is stale', async () => {
+    const anchored = 'Intro\n\n- [ ] TODO Water the plants ^todoseq-existing\n';
+    const h = harness({ [SOURCE]: anchored });
+
+    const result = await h.writer.ensureBlockAnchor(task({ line: 2 }));
+
+    expect(result.status).toBe('success');
+    expect(result.link).toBe('[[notes/source#^todoseq-existing]]');
+    expect(h.store.get(SOURCE)).toBe(anchored);
   });
 
   it('keeps both payloads when two copies race for the destination', async () => {
@@ -182,9 +275,11 @@ describe('TaskWriter transfers', () => {
       'copy',
     );
     expect(result.status).toBe('success');
-    expect(h.store.get(DEST)).toContain(
-      ':PROPERTIES:\n:ID: water-1\n:BLOCKER: data-02\n:END:\nSCHEDULED:',
-    );
+    const destination = h.store.get(DEST) ?? '';
+    expect(destination).toContain(':BLOCKER: data-02');
+    expect(destination).toMatch(/:ID: [0-9a-f-]{36}/);
+    expect(destination).not.toContain(':ID: water-1');
+    expect(destination).toContain(':END:\nSCHEDULED:');
   });
 
   it('moves the whole drawer and leaves no metadata behind', async () => {
@@ -228,10 +323,10 @@ describe('TaskWriter transfers', () => {
       h.file(DEST),
       'migrate',
     );
-    expect(h.store.get(SOURCE)).toContain(
-      ':PROPERTIES:\n:ID: water-1\n:END:\nSTARTED:',
-    );
+    expect(h.store.get(SOURCE)).not.toContain(':ID:');
+    expect(h.store.get(SOURCE)).toContain('STARTED:');
     expect(h.store.get(SOURCE)).not.toContain('SCHEDULED:');
+    expect(h.store.get(DEST)).toContain(':ID: water-1');
   });
 
   it('moves a table task by clearing only its cell', async () => {
@@ -265,5 +360,235 @@ describe('TaskWriter transfers', () => {
     );
     expect(result.status).toBe('success');
     expect(h.store.get(SOURCE)).toBe('');
+  });
+});
+
+describe('TaskWriter transfer reference repair', () => {
+  const ANCHORED_SOURCE = [
+    'Intro',
+    '',
+    '- [ ] TODO Water the plants ^water',
+    ':PROPERTIES:',
+    ':ID: water-1',
+    ':END:',
+    '',
+  ].join('\n');
+
+  const anchoredTask = (overrides: Partial<Task> = {}): Task =>
+    task({
+      line: 2,
+      rawText: '- [ ] TODO Water the plants ^water',
+      embedReference: '^water',
+      id: 'water-1',
+      ...overrides,
+    });
+
+  it('repairs a dependent BLOCKER in another file after a move', async () => {
+    const dependent = [
+      'TODO Child',
+      ':PROPERTIES:',
+      ':BLOCKER: [[notes/source#^water]]',
+      ':END:',
+      '',
+    ].join('\n');
+    const h = harness({
+      [SOURCE]: ANCHORED_SOURCE,
+      [DEST]: '',
+      'notes/dependent.md': dependent,
+    });
+
+    const result = await h.writer.transferTask(
+      anchoredTask(),
+      h.file(DEST),
+      'move',
+    );
+
+    expect(result.status).toBe('success');
+    expect(result.referenceRepairs?.[0].applied).toBe(1);
+    expect(h.store.get('notes/dependent.md')).toContain(
+      '[[notes/today#^water]]',
+    );
+    expect(h.store.get(DEST)).toContain('Water the plants ^water');
+  });
+
+  it('repairs prose links and embeds in a note with no tasks', async () => {
+    const prose = 'See [[notes/source#^water]] and ![[notes/source#^water]].';
+    const h = harness({
+      [SOURCE]: ANCHORED_SOURCE,
+      [DEST]: '',
+      'notes/prose.md': prose,
+    });
+
+    const result = await h.writer.transferTask(
+      anchoredTask(),
+      h.file(DEST),
+      'move',
+    );
+
+    expect(result.status).toBe('success');
+    expect(result.referenceRepairs?.[0].applied).toBe(2);
+    expect(h.store.get('notes/prose.md')).toBe(
+      'See [[notes/today#^water]] and ![[notes/today#^water]].',
+    );
+  });
+
+  it('repairs a reference in the moved task\'s own file', async () => {
+    const child = [
+      'TODO Child',
+      ':PROPERTIES:',
+      ':BLOCKER: [[notes/source#^water]]',
+      ':END:',
+      '',
+    ].join('\n');
+    const h = harness({
+      [SOURCE]: ANCHORED_SOURCE + child,
+      [DEST]: '',
+    });
+
+    await h.writer.transferTask(anchoredTask(), h.file(DEST), 'move');
+
+    expect(h.store.get(SOURCE)).toContain('[[notes/today#^water]]');
+    expect(h.store.get(SOURCE)).not.toContain('Water the plants');
+  });
+
+  it('forks identity on copy and remaps only internal references', async () => {
+    const source = [
+      'Intro',
+      '',
+      '- [ ] TODO Water the plants ^water',
+      ':PROPERTIES:',
+      ':ID: water-1',
+      ':BLOCKER: [[notes/source#^water]]',
+      ':END:',
+      '',
+    ].join('\n');
+    const external = [
+      'TODO Other',
+      ':PROPERTIES:',
+      ':BLOCKER: [[notes/source#^water]]',
+      ':END:',
+      '',
+    ].join('\n');
+    const h = harness({
+      [SOURCE]: source,
+      [DEST]: '',
+      'notes/external.md': external,
+    });
+
+    const result = await h.writer.transferTask(
+      anchoredTask(),
+      h.file(DEST),
+      'copy',
+    );
+
+    expect(result.status).toBe('success');
+    const destination = h.store.get(DEST) ?? '';
+    const copiedAnchor = /\^todoseq-[a-z0-9]+/.exec(destination)?.[0];
+    expect(copiedAnchor).toBeDefined();
+    expect(destination).toContain(`Water the plants ${copiedAnchor}`);
+    expect(destination).not.toContain(':ID: water-1');
+    expect(destination).toContain(
+      `:BLOCKER: [[notes/today#${copiedAnchor}]]`,
+    );
+    expect(h.store.get('notes/external.md')).toContain(
+      '[[notes/source#^water]]',
+    );
+    expect(h.store.get(SOURCE)).toContain(':ID: water-1');
+  });
+
+  it('gives separate copies distinct anchors', async () => {
+    const h = harness({
+      [SOURCE]: ANCHORED_SOURCE,
+      'notes/a.md': '',
+      'notes/b.md': '',
+    });
+    await h.writer.transferTask(anchoredTask(), h.file('notes/a.md'), 'copy');
+    await h.writer.transferTask(anchoredTask(), h.file('notes/b.md'), 'copy');
+    const first = /\^todoseq-[a-z0-9]+/.exec(h.store.get('notes/a.md') ?? '')?.[0];
+    const second =
+      /\^todoseq-[a-z0-9]+/.exec(h.store.get('notes/b.md') ?? '')?.[0];
+    expect(first).toBeDefined();
+    expect(second).toBeDefined();
+    expect(first).not.toBe(second);
+  });
+
+  it('migrates identity to the destination and off the retained source', async () => {
+    const dependent = [
+      'TODO Child',
+      ':PROPERTIES:',
+      ':BLOCKER: [[notes/source#^water]]',
+      ':END:',
+      '',
+    ].join('\n');
+    const h = harness({
+      [SOURCE]: ANCHORED_SOURCE,
+      [DEST]: '',
+      'notes/dependent.md': dependent,
+    });
+
+    const result = await h.writer.transferTask(
+      anchoredTask(),
+      h.file(DEST),
+      'migrate',
+    );
+
+    expect(result.status).toBe('success');
+    const source = h.store.get(SOURCE) ?? '';
+    expect(source).toContain('- [ ] DONE Water the plants');
+    expect(source).not.toContain('^water');
+    expect(source).not.toContain(':ID:');
+    expect(h.store.get(DEST)).toContain(':ID: water-1');
+    expect(h.store.get(DEST)).toContain('Water the plants ^water');
+    expect(h.store.get('notes/dependent.md')).toContain(
+      '[[notes/today#^water]]',
+    );
+  });
+
+  it('reports a failed repair and retries only that link', async () => {
+    const h = harness({
+      [SOURCE]: ANCHORED_SOURCE,
+      [DEST]: '',
+      'notes/a.md': 'A [[notes/source#^water]]',
+      'notes/broken.md': 'B [[notes/source#^water]]',
+    });
+    const app = (h.writer as unknown as { plugin: { app: App } }).plugin.app;
+    const originalProcess = app.vault.process;
+    app.vault.process = async (file: TFile, fn: (data: string) => string) => {
+      if (file.path === 'notes/broken.md') throw new Error('locked');
+      return originalProcess(file, fn);
+    };
+
+    try {
+      const result = await h.writer.transferTask(
+        anchoredTask(),
+        h.file(DEST),
+        'move',
+      );
+      expect(result.status).toBe('partial-references');
+      expect(h.store.get(DEST)).toContain('Water the plants');
+      expect(h.store.get(SOURCE)).not.toContain('Water the plants');
+      expect(h.store.get('notes/a.md')).toContain('[[notes/today#^water]]');
+      expect(h.writer.hasPendingReferenceRepairs()).toBe(true);
+    } finally {
+      app.vault.process = originalProcess;
+    }
+
+    const reports = await h.writer.retryPendingReferenceRepairs();
+    expect(reports[0].applied).toBe(1);
+    expect(h.store.get('notes/broken.md')).toBe(
+      'B [[notes/today#^water]]',
+    );
+    expect(h.writer.hasPendingReferenceRepairs()).toBe(false);
+  });
+
+  it('leaves an unharmed transfer untouched when nothing references it', async () => {
+    const h = harness({ [SOURCE]: ANCHORED_SOURCE, [DEST]: '' });
+    const result = await h.writer.transferTask(
+      anchoredTask(),
+      h.file(DEST),
+      'move',
+    );
+    expect(result.status).toBe('success');
+    expect(result.referenceRepairs).toBeUndefined();
   });
 });

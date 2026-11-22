@@ -9,7 +9,8 @@ import {
 } from '../src/view/components/task-context-menu';
 import { createBaseTask } from './helpers/test-helper';
 import { Task } from '../src/types/task';
-import { App } from 'obsidian';
+import { App, Notice } from 'obsidian';
+import type { TaskWriter } from '../src/services/task-writer';
 import { DateUtils } from '../src/utils/date-utils';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
@@ -1171,6 +1172,66 @@ describe('TaskContextMenu', () => {
 
       expect(callbacks.onGoToTask).toHaveBeenCalledWith(task);
     });
+  });
+
+  describe('Copy anchor availability', () => {
+    const unsupported: Array<{ name: string; overrides: Partial<Task> }> = [
+      {
+        name: 'table cells',
+        overrides: {
+          path: 'notes/table.md',
+          isTableTask: true,
+          tableCell: { cellIndex: 1 },
+        },
+      },
+      {
+        name: 'Org files',
+        overrides: { path: 'notes/tree.org', sourceFormat: 'org' },
+      },
+      {
+        name: 'code comments',
+        overrides: { path: 'src/tasks.ts', sourceFormat: 'code-comment' },
+      },
+    ];
+
+    it.each(unsupported)(
+      'explains why Copy anchor is unavailable for $name',
+      async ({ overrides }) => {
+        const ensureBlockAnchor = jest.fn();
+        const writer = { ensureBlockAnchor } as unknown as TaskWriter;
+        const writerMenu = new TaskContextMenu(
+          callbacks,
+          { ...config, taskWriter: writer },
+          app,
+        );
+        const notice = Notice as unknown as jest.Mock;
+        notice.mockClear();
+
+        try {
+          await writerMenu.show(createBaseTask(overrides), { x: 100, y: 100 });
+          const rows = Array.from(
+            activeDocument.querySelectorAll<HTMLElement>(
+              '.todoseq-context-menu-row',
+            ),
+          );
+          const row = rows.find(
+            (candidate) =>
+              candidate.querySelector('.todoseq-context-menu-row-label')
+                ?.textContent === 'Copy anchor (Markdown only)',
+          );
+
+          expect(row).toBeDefined();
+          row?.click();
+
+          expect(ensureBlockAnchor).not.toHaveBeenCalled();
+          expect(notice).toHaveBeenCalledWith(
+            'Block anchors are available for Markdown tasks only',
+          );
+        } finally {
+          writerMenu.cleanup();
+        }
+      },
+    );
   });
 
   describe('TaskStateManager integration', () => {

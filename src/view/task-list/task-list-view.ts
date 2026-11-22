@@ -40,6 +40,7 @@ import type { TaskStateTransitionManager } from '../../services/task-state-trans
 import {
   getStateTransitionManager,
   TaskUpdateCoordinator,
+  type TaskUpdateOutcome,
 } from '../../services/task-update-coordinator';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TaskElementCache } from './task-element-cache';
@@ -1571,7 +1572,10 @@ export class TaskListView extends ItemView {
   }
 
   // Cycle state via NEXT_STATE - delegates to taskUpdateCoordinator
-  private async updateTaskState(task: Task, nextState: string): Promise<void> {
+  private async updateTaskState(
+    task: Task,
+    nextState: string,
+  ): Promise<TaskUpdateOutcome | void> {
     if (!this.taskUpdateCoordinator) {
       console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
@@ -1579,8 +1583,9 @@ export class TaskListView extends ItemView {
 
     try {
       // Use unified updateTaskState method - handles fresh lookup, optimistic update,
-      // file write, recurrence, line adjustment, and UI refresh
-      await this.taskUpdateCoordinator.updateTaskState(
+      // file write, recurrence, line adjustment, and UI refresh. The outcome is
+      // returned so the row's checkbox can restore itself after a refusal.
+      return await this.taskUpdateCoordinator.updateTaskState(
         task,
         nextState,
         'task-list',
@@ -1703,6 +1708,17 @@ export class TaskListView extends ItemView {
       case 'partial':
         new Notice('Task copied, but the original could not be updated');
         break;
+      case 'partial-references': {
+        const failed =
+          result.referenceRepairs?.reduce(
+            (total, report) => total + report.failed.length,
+            0,
+          ) ?? 0;
+        new Notice(
+          `${failed} reference link(s) could not be updated. Run "Retry failed task reference repairs" from the command palette.`,
+        );
+        break;
+      }
     }
   }
 

@@ -30,7 +30,9 @@ interface ArchiveDialogPlugin {
       task: Task,
       newState: string,
       source?: string,
-    ): Promise<void>;
+    ): Promise<
+      import('../../services/task-update-coordinator').TaskUpdateOutcome
+    >;
   };
   archiveService: {
     evaluateArchiveCriteria(
@@ -46,6 +48,10 @@ interface ArchiveDialogPlugin {
   };
   keywordManager: KeywordManager;
   vaultScanner: { getKeywordManager(): KeywordManager } | null;
+  migrateArchivedDependents?: (task: Task) => Promise<{
+    migrated: number;
+    failures: { path: string; reference: string; reason?: string }[];
+  }>;
   saveSettings(): Promise<void>;
   /** Revert the most recent archive run (same flow as the palette command). */
   performUndo(): void | Promise<void>;
@@ -923,17 +929,27 @@ export class ArchiveDialog {
             target,
             'task-list',
           ),
+        migrateDependents: this.plugin.migrateArchivedDependents
+          ? (task) => this.plugin.migrateArchivedDependents!(task)
+          : undefined,
       });
 
       const archivedCount = result.archived.length;
       const skippedCount = result.skipped.length;
+      const blockedCount = result.skipped.filter(
+        (skip) => skip.reason === 'blocked',
+      ).length;
+      const staleCount = skippedCount - blockedCount;
       this.close();
       showArchiveRunNotice(
         `TODOseq archived ${archivedCount} task${
           archivedCount === 1 ? '' : 's'
         }` +
-          (skippedCount > 0
-            ? `, skipped ${skippedCount} (changed since preview)`
+          (blockedCount > 0
+            ? `, skipped ${blockedCount} blocked by dependencies`
+            : '') +
+          (staleCount > 0
+            ? `, skipped ${staleCount} (changed since preview)`
             : ''),
         {
           actionLabel: 'Undo',

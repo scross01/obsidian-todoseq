@@ -28,6 +28,7 @@ import {
 import { DateUtils } from '../../utils/date-utils';
 import { formatRepeatDescription } from '../../utils/date-repeater';
 import { getPriorityLevelName } from '../../utils/task-format';
+import type { TaskUpdateOutcome } from '../../services/task-update-coordinator';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
 import { BaseDialog } from '../components/base-dialog';
@@ -587,7 +588,21 @@ export class EmbeddedTaskItemRenderer {
             return;
           }
 
-          await this.updateTaskState(currentTask, newState);
+          const outcome = await this.updateTaskState(currentTask, newState);
+          if (outcome?.status === 'refused') {
+            const revertedChar = this.plugin.keywordManager.getCheckboxState(
+              currentTask.state,
+              this.plugin.keywordManager.getSettings(),
+            );
+            checkbox.checked = currentTask.completed;
+            checkbox.setAttribute('data-task', revertedChar);
+            li.setAttribute('data-task', revertedChar);
+            li.classList.toggle(
+              'todoseq-embedded-task-completed',
+              revertedChar === 'x' || revertedChar === '-',
+            );
+            return;
+          }
 
           const newCheckboxChar = this.plugin.keywordManager.getCheckboxState(
             newState,
@@ -794,10 +809,13 @@ export class EmbeddedTaskItemRenderer {
     }
   }
 
-  private async updateTaskState(task: Task, newState: string): Promise<void> {
+  private async updateTaskState(
+    task: Task,
+    newState: string,
+  ): Promise<TaskUpdateOutcome | void> {
     try {
       if (this.plugin.taskUpdateCoordinator) {
-        await this.plugin.taskUpdateCoordinator.updateTaskByPath(
+        return await this.plugin.taskUpdateCoordinator.updateTaskByPath(
           task.path,
           task.line,
           newState,

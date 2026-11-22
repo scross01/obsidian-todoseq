@@ -10,9 +10,17 @@ import {
 } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { getPriorityLevelName } from '../../utils/task-format';
-import { MarkdownPostProcessorContext, TFile, setTooltip } from 'obsidian';
+import {
+  MarkdownPostProcessorContext,
+  TFile,
+  setIcon,
+  setTooltip,
+} from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
-import { getStateTransitionManager } from '../../services/task-update-coordinator';
+import {
+  getStateTransitionManager,
+  type TaskUpdateOutcome,
+} from '../../services/task-update-coordinator';
 import { getTableCellIndex } from '../../utils/task-line-utils';
 
 /**
@@ -175,6 +183,9 @@ export class ReaderViewFormatter {
       // rendered DOM such that the heading task and the metadata paragraph
       // are in separate post-processor invocations (close+reopen path).
       try {
+        // Mark rendered tasks that are blocked in the current derived graph.
+        await this.processBlockedBadges(element, context);
+
         await this.processDateLines(element, context);
 
         // Process DESCRIPTION lines. Same chunked-render caveat as above.
@@ -198,6 +209,143 @@ export class ReaderViewFormatter {
       // Attach keyword click handlers for task state toggling and context menu
       this.attachKeywordClickHandlers(element, context);
     });
+  }
+
+  /**
+   * Add or remove the blocked badge on rendered task rows. Uses the
+   * post-processor's cached source lines only as a fallback when Obsidian did
+   * not stamp `data-line` on the list item.
+   */
+  private async processBlockedBadges(
+    element: HTMLElement,
+    context: MarkdownPostProcessorContext,
+  ): Promise<void> {
+    const taskItems = element.querySelectorAll('.task-list-item');
+    if (taskItems.length === 0) return;
+
+    const manager = this.plugin.taskDependencyManager;
+    const parser = this.getTaskParser();
+    let sourceLines: string[] | null = null;
+
+    for (const item of taskItems) {
+      if (!item.instanceOf(HTMLElement)) continue;
+      if (item.closest('.todoseq-embedded-task-list-container')) continue;
+
+      // Re-rendering must converge on one badge per row, and a row that is no
+      // longer blocked must lose the old one.
+      item
+        .querySelectorAll('.todoseq-reader-blocked-badge')
+        .forEach((badge) => badge.remove());
+
+      if (!manager) continue;
+
+      // Reading mode's data-line is chunk-relative, not a source line, so the
+      // parsed snapshot is the authoritative match. Rendered link text also
+      // differs from [[file#^anchor]] source, hence matching task text.
+      let line = this.findTaskLineForElement(
+        item,
+        context.sourcePath,
+        context,
+      );
+      if (line < 0) {
+        const lineAttr = item.getAttribute('data-line');
+        line = lineAttr !== null ? parseInt(lineAttr, 10) : NaN;
+      }
+      if (!Number.isFinite(line) || line < 0) {
+        if (!sourceLines) {
+          sourceLines = await this.getSourceLinesCached(context);
+        }
+        line = sourceLines
+          ? this.findSourceLineForTaskElement(item, sourceLines, parser)
+          : -1;
+      }
+      if (line < 0) continue;
+
+      const key = `${context.sourcePath}:${line}`;
+      if (!manager.isBlocked(key)) continue;
+
+      const reasons = manager.getBlockingReasons(key);
+      const details = reasons.map((reason) => reason.message).join(' ');
+      const label = reasons.length
+        ? reasons.length > 1
+          ? `Blocked by ${reasons.length} reasons: ${details}`
+          : `Blocked: ${details}`
+        : 'Blocked by an incomplete dependency';
+
+      const container =
+        item.querySelector<HTMLElement>('.todoseq-task') ?? item;
+      const badge = createSpan({
+        cls: 'todoseq-task-blocked-icon todoseq-reader-blocked-badge',
+        attr: {
+          'data-task-key': key,
+          'aria-label': label,
+          role: 'img',
+        },
+      });
+      setIcon(badge, 'lock');
+      setTooltip(badge, label);
+      container.appendChild(badge);
+    }
+  }
+
+  /** Match a rendered row to the parsed task snapshot, longest text first. */
+  private findTaskLineForElement(
+    item: HTMLElement,
+    sourcePath: string,
+    context: MarkdownPostProcessorContext,
+  ): number {
+    const renderedText = (item.textContent ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!renderedText) return -1;
+
+    const section = context.getSectionInfo?.(item);
+    let best: Task | null = null;
+    let bestInSection: Task | null = null;
+    for (const task of this.plugin.taskStateManager.getTasks()) {
+      if (task.path !== sourcePath) continue;
+      const text = (task.text ?? '').replace(/\s+/g, ' ').trim();
+      if (!text || !renderedText.includes(text)) continue;
+      if (!best || text.length > (best.text ?? '').length) best = task;
+      if (
+        section &&
+        task.line >= section.lineStart &&
+        task.line <= section.lineEnd &&
+        (!bestInSection || text.length > (bestInSection.text ?? '').length)
+      ) {
+        bestInSection = task;
+      }
+    }
+    return (bestInSection ?? best)?.line ?? -1;
+  }
+
+  /** Match a rendered task row to its source line when `data-line` is absent. */
+  private findSourceLineForTaskElement(
+    item: HTMLElement,
+    lines: string[],
+    parser: TaskParser | null,
+  ): number {
+    if (!parser) return -1;
+    const renderedText = (item.textContent ?? '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/\s*CLOSED:.*$/im, '')
+      .replace(/\s*SCHEDULED:.*$/im, '')
+      .replace(/\s*DEADLINE:.*$/im, '')
+      .replace(/\s*STARTED:.*$/im, '')
+      .trim();
+    if (!renderedText) return -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!parser.testRegex.test(line)) continue;
+      const normalized = line
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\s*\^[a-zA-Z0-9-]+$/, '');
+      if (normalized.endsWith(renderedText)) return i;
+    }
+    return -1;
   }
 
   /** Mark a rendered properties drawer as metadata without changing text. */
@@ -261,6 +409,7 @@ export class ReaderViewFormatter {
   ): Promise<void> {
     const checkbox = event.target as HTMLInputElement;
     const isChecked = checkbox.checked;
+    const priorDataTask = checkbox.getAttribute('data-task');
     // Find the task list item containing this checkbox
     const taskListItem = checkbox.closest('.task-list-item');
     if (!taskListItem) {
@@ -359,8 +508,9 @@ export class ReaderViewFormatter {
 
     // Use unified updateTaskByPath method - handles fresh lookup, optimistic update,
     // file write, recurrence, line adjustment, and UI refresh
+    let outcome: TaskUpdateOutcome | null = null;
     if (this.plugin.taskUpdateCoordinator) {
-      await this.plugin.taskUpdateCoordinator.updateTaskByPath(
+      outcome = await this.plugin.taskUpdateCoordinator.updateTaskByPath(
         taskToUpdate.path,
         taskToUpdate.line,
         newState,
@@ -374,6 +524,18 @@ export class ReaderViewFormatter {
         newState,
         true,
       );
+      outcome = { status: 'applied' };
+    }
+
+    // A refusal writes nothing, so the rendered control must spring back.
+    if (outcome && outcome.status !== 'applied') {
+      checkbox.checked = !isChecked;
+      if (priorDataTask !== null) {
+        checkbox.setAttribute('data-task', priorDataTask);
+      } else {
+        checkbox.removeAttribute('data-task');
+      }
+      return;
     }
 
     // Refresh the reader view to show changes (like CLOSED date line added/removed)

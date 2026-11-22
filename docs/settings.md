@@ -408,13 +408,13 @@ Use **Complete anyway** in the task context menu, or the **Complete blocked task
 
 **Setting**: "Respect parent and ordered task dependencies" (toggle, default off)
 
-**Description**: Adds opt-in structural reasons. An unfinished nested task blocks an incomplete parent, and a task following an `ORDERED` sibling waits for it. Markdown hierarchy can use headings or indentation; plain keyword tasks do not need list markers or checkboxes. Explicit `BLOCKER` references and `previous-sibling` remain independent of this setting.
+**Description**: Adds opt-in structural reasons. An unfinished nested task blocks an incomplete parent, and every later task in an `ORDERED` task's group waits for it. Markdown hierarchy can use headings or indentation; plain keyword tasks do not need list markers or checkboxes. A non-task heading is a hard boundary, blank lines preserve an indented group, and dedented prose closes it. Explicit `BLOCKER` references and `previous-sibling` remain independent of this setting. Changing the toggle refreshes blocked status immediately without rewriting notes or restarting.
 
 ### Require checkboxes to be complete
 
 **Setting**: "Require checkboxes to be complete" (toggle, default off)
 
-**Description**: Adds unchecked descendant checkboxes as blocking reasons, independently of parent/ORDERED rules. Markdown checks the bounded task subtree and excludes the parent's own checkbox; Org checks the current entry body and stops at the next headline. `NOBLOCKING` on the task suppresses these reasons locally.
+**Description**: Adds unchecked descendant checkboxes as blocking reasons, independently of parent/ORDERED rules. Markdown checks the bounded task subtree, including keywordless checkbox rows, and excludes the parent's own checkbox; Org checks the current entry body and stops at the next headline. Archived branches are outside an outer task's checks. `NOBLOCKING` on the task suppresses these reasons locally. Changing the toggle refreshes blocked status immediately without rewriting notes.
 
 ### Track closed date
 

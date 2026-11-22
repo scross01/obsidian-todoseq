@@ -447,6 +447,66 @@ describe('ArchiveService.applyArchives', () => {
     return { service, coordinator, store, deps };
   }
 
+  it('migrates dependents only after a successful archive and reports failures', async () => {
+    const { service, store, deps } = setup();
+    const archivedTask = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE prerequisite',
+    });
+    store.set(`${archivedTask.path}:${archivedTask.line}`, archivedTask);
+    const matches = service.evaluateArchiveCriteria(
+      [archivedTask],
+      makeConfig(),
+      REFERENCE,
+    );
+    const migrateDependents = jest
+      .fn()
+      .mockResolvedValue({
+        migrated: 1,
+        failures: [
+          { path: 'dependent.md', reference: 'prerequisite', reason: 'stale' },
+        ],
+      });
+
+    const result = await service.applyArchives(matches, {
+      ...deps,
+      migrateDependents,
+    });
+
+    expect(migrateDependents).toHaveBeenCalledTimes(1);
+    expect(result.archived).toHaveLength(1);
+    expect(result.referenceFailures).toEqual([
+      { path: 'dependent.md', reference: 'prerequisite', reason: 'stale' },
+    ]);
+  });
+
+  it('counts a refused archive as blocked and journals nothing', async () => {
+    const { service, store } = setup();
+    const blockedTask = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+      rawText: '- [x] DONE still blocked',
+    });
+    store.set(`${blockedTask.path}:${blockedTask.line}`, blockedTask);
+    const matches = service.evaluateArchiveCriteria(
+      [blockedTask],
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const result = await service.applyArchives(matches, {
+      getTask: (path, line) => store.get(`${path}:${line}`) ?? null,
+      apply: async () => ({ status: 'refused', reasons: [] }),
+    });
+
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      { path: blockedTask.path, line: blockedTask.line, reason: 'blocked' },
+    ]);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
   it('applies to all matches and journals one record per apply', async () => {
     const { service, coordinator, store, deps } = setup();
     const tasks = [

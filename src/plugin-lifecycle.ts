@@ -22,8 +22,14 @@ import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { TaskDependencyManager } from './services/task-dependency-manager';
+import { TaskDependencyWarningService } from './services/task-dependency-warning-service';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
-import { ArchiveService, shouldAutoArchive } from './services/archive-service';
+import {
+  ArchiveService,
+  shouldAutoArchive,
+  type ArchiveReferenceFailure,
+} from './services/archive-service';
+import { Task } from './types/task';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
 import { DashboardCodeBlockProcessor } from './view/embedded-dashboard/dashboard-code-block-processor';
 import {
@@ -36,6 +42,13 @@ const TODOSEQ_HOT_RELOAD_FLAG = '__todoseq_wasUnloaded';
 
 export class PluginLifecycleManager {
   private eventCoordinator: EventCoordinator | null = null;
+  /** Debounced promotion pass after a dependency revision. */
+  private promotionTimer: number | null = null;
+  private promotionUnsubscribe: (() => void) | null = null;
+  /** Coalesces dependency-driven UI refreshes per published snapshot. */
+  private dependencyRefreshTimer: number | null = null;
+  private dependencyWarningService: TaskDependencyWarningService | null =
+    null;
 
   constructor(private plugin: TodoTracker) {}
 
@@ -109,8 +122,24 @@ export class PluginLifecycleManager {
             this.plugin.settings.enforceTaskHierarchyDependencies === true,
           checkbox: this.plugin.settings.enforceCheckboxDependencies === true,
         }),
+        getStructureEntries: () =>
+          this.plugin.vaultScanner?.getStructuralEntries?.() ?? new Map(),
+        getStructureRevision: () =>
+          this.plugin.vaultScanner?.getStructureRevision?.() ?? 0,
+        onSnapshot: () => this.scheduleDependencySurfaceRefresh(),
       },
     );
+    this.dependencyWarningService = new TaskDependencyWarningService(
+      this.plugin.taskDependencyManager,
+    );
+
+    // Restored archived references become active again in the derived graph.
+    // The source property is repaired after the revision settles, never during
+    // indexing, so a scan cannot trigger a storm of drawer writes.
+    this.promotionUnsubscribe?.();
+    this.promotionUnsubscribe = this.plugin.taskStateManager.subscribe(() => {
+      this.scheduleDependencyPromotions();
+    });
 
     // Initialize property search engine after vault scanner (it polls vault
     // scanner status during init, so the scanner must exist first).
@@ -235,6 +264,31 @@ export class PluginLifecycleManager {
       icon: 'refresh-cw',
       callback: async () => {
         await this.plugin.vaultScanner?.scanVault();
+      },
+    });
+
+    // Retry exactly the reference links a transfer could not rewrite.
+    this.plugin.addCommand({
+      id: 'retry-task-reference-repair',
+      name: 'Retry failed task reference repairs',
+      icon: 'link',
+      checkCallback: (checking: boolean) => {
+        const writer = this.plugin.taskEditor;
+        if (!writer?.hasPendingReferenceRepairs()) return false;
+        if (!checking) {
+          void writer.retryPendingReferenceRepairs().then((reports) => {
+            const failed = reports.reduce(
+              (total, report) => total + report.failed.length,
+              0,
+            );
+            new Notice(
+              failed === 0
+                ? 'Task reference links repaired'
+                : `${failed} reference link(s) still could not be updated`,
+            );
+          });
+        }
+        return true;
       },
     });
 
@@ -586,6 +640,8 @@ export class PluginLifecycleManager {
       this.plugin.taskDependencyManager?.setValidationReady(true);
       // Use setTimeout to ensure tasks are fully set in TaskStateManager before refreshing
       window.setTimeout(() => {
+        // Surface changed diagnostics once the authoritative publication exists.
+        this.dependencyWarningService?.check();
         // Explicitly refresh the TaskListView to ensure it updates
         this.plugin.uiManager.refreshOpenTaskListViews().catch((error) => {
           new Notice('Failed to refresh task list');
@@ -692,6 +748,13 @@ export class PluginLifecycleManager {
    * Obsidian lifecycle method called when the plugin is unloaded
    */
   async onunload() {
+    if (this.promotionTimer !== null) {
+      window.clearTimeout(this.promotionTimer);
+      this.promotionTimer = null;
+    }
+    this.promotionUnsubscribe?.();
+    this.promotionUnsubscribe = null;
+
     // Set window flag to indicate this was a hot reload (not a fresh startup)
     // This survives the reload because hot reload reuses the same JS context.
     // Checked in onLayoutReady to recreate the task list on reload.
@@ -718,6 +781,12 @@ export class PluginLifecycleManager {
 
     // Stop plugin-owned update timers and pending delayed recurrence work
     // synchronously, before the first await in teardown.
+    if (this.dependencyRefreshTimer !== null) {
+      window.clearTimeout(this.dependencyRefreshTimer);
+      this.dependencyRefreshTimer = null;
+    }
+    this.dependencyWarningService?.reset();
+    this.dependencyWarningService = null;
     this.plugin.taskDependencyManager?.destroy();
     this.plugin.taskDependencyManager = null;
     if (this.plugin.taskUpdateCoordinator) {
@@ -809,11 +878,195 @@ export class PluginLifecycleManager {
         vaultScanner: scanner,
         saveSettings: () => this.plugin.saveSettings(),
         performUndo: () => this.performArchiveUndo(),
+        migrateArchivedDependents: (task) =>
+          this.migrateArchivedDependents(task),
         app: this.plugin.app,
       },
       scanner.getKeywordManager(),
     );
     dialog.open();
+  }
+
+  /**
+   * Move one archived task's incoming active references into ARCHIVED_BLOCKER
+   * history. Failures are returned, never thrown: the archive has already
+   * happened and must not be rolled back because a dependent line changed.
+   */
+  private async migrateArchivedDependents(
+    task: Task,
+  ): Promise<{ migrated: number; failures: ArchiveReferenceFailure[] }> {
+    const manager = this.plugin.taskDependencyManager;
+    const writer = this.plugin.taskEditor;
+    const stateManager = this.plugin.taskStateManager;
+    if (!manager || !writer) return { migrated: 0, failures: [] };
+
+    const targetKey = getTaskKey(task);
+    const byDependent = new Map<
+      string,
+      { task: Task; references: string[] }
+    >();
+    for (const dependent of manager.getDependents(targetKey)) {
+      const references = [
+        ...new Set(
+          manager
+            .getReasons(getTaskKey(dependent))
+            .filter(
+              (reason) =>
+                reason.targetKey === targetKey && !!reason.reference,
+            )
+            .map((reason) => reason.reference as string),
+        ),
+      ];
+      if (references.length > 0) {
+        byDependent.set(getTaskKey(dependent), { task: dependent, references });
+      }
+    }
+
+    let migrated = 0;
+    const failures: ArchiveReferenceFailure[] = [];
+    for (const { task: dependent, references } of byDependent.values()) {
+      try {
+        const result = await writer.migrateBlockerHistory(
+          dependent,
+          'to-history',
+          references,
+        );
+        if (result.status === 'success' && result.task) {
+          migrated += references.length;
+          stateManager.updateTaskByPathAndLine(
+            dependent.path,
+            dependent.line,
+            {
+              blockedBy: result.task.blockedBy ?? [],
+              archivedBlockers: result.task.archivedBlockers ?? [],
+            },
+            dependent.tableCell?.cellIndex,
+          );
+        } else {
+          for (const reference of references) {
+            failures.push({
+              path: dependent.path,
+              reference,
+              reason: result.reason ?? result.status,
+            });
+          }
+        }
+      } catch (error) {
+        for (const reference of references) {
+          failures.push({
+            path: dependent.path,
+            reference,
+            reason: error instanceof Error ? error.message : 'write failed',
+          });
+        }
+      }
+    }
+    if (migrated > 0) stateManager.notifySubscribers();
+    return { migrated, failures };
+  }
+
+  private scheduleDependencyPromotions(): void {
+    if (this.promotionTimer !== null) return;
+    this.promotionTimer = window.setTimeout(() => {
+      this.promotionTimer = null;
+      void this.promoteArchivedReferences();
+    }, 250);
+  }
+
+  /**
+   * Coalesce UI refresh work after a dependency snapshot publication. A
+   * blocker completed in another file changes derived state without changing
+   * the visible files, so rows, embeds, reader badges and diagnostics must be
+   * refreshed from the publication rather than from a file event.
+   */
+  private scheduleDependencySurfaceRefresh(): void {
+    if (!this.plugin.taskDependencyManager) return;
+    if (this.dependencyRefreshTimer !== null) return;
+
+    this.dependencyRefreshTimer = window.setTimeout(() => {
+      this.dependencyRefreshTimer = null;
+      if (!this.plugin.taskDependencyManager) return;
+
+      this.dependencyWarningService?.check();
+      this.plugin.uiManager
+        ?.refreshOpenTaskListViews?.()
+        .catch((error: unknown) => {
+          console.debug('[TODOseq] Failed to refresh task list:', error);
+        });
+      this.plugin.embeddedTaskListProcessor?.refreshAllEmbeddedTaskLists?.();
+      this.plugin.dashboardProcessor?.refreshAllDashboards?.();
+      this.plugin.refreshVisibleEditorDecorations?.();
+      this.plugin.refreshReaderViewFormatter?.();
+    }, 25);
+  }
+
+  /**
+   * Move a restored target's history references back to BLOCKER. Idempotent:
+   * the next pass sees no promotions once the source properties are updated.
+   */
+  async promoteArchivedReferences(): Promise<void> {
+    const manager = this.plugin.taskDependencyManager;
+    const writer = this.plugin.taskEditor;
+    const stateManager = this.plugin.taskStateManager;
+    if (!manager || !writer || !manager.isValidationReady()) return;
+
+    const promotions = manager.getArchivedReferencePromotions();
+    if (promotions.length === 0) return;
+
+    const byDependent = new Map<
+      string,
+      { task: Task; references: string[] }
+    >();
+    for (const promotion of promotions) {
+      const dependent = stateManager
+        .getTasks()
+        .find((task) => getTaskKey(task) === promotion.dependentKey);
+      if (!dependent) continue;
+      const entry = byDependent.get(promotion.dependentKey) ?? {
+        task: dependent,
+        references: [],
+      };
+      if (!entry.references.includes(promotion.reference)) {
+        entry.references.push(promotion.reference);
+      }
+      byDependent.set(promotion.dependentKey, entry);
+    }
+
+    let changed = false;
+    for (const { task, references } of byDependent.values()) {
+      try {
+        const result = await writer.migrateBlockerHistory(
+          task,
+          'to-active',
+          references,
+        );
+        if (result.status === 'success' && result.task) {
+          changed = true;
+          stateManager.updateTaskByPathAndLine(
+            task.path,
+            task.line,
+            {
+              blockedBy: result.task.blockedBy ?? [],
+              archivedBlockers: result.task.archivedBlockers ?? [],
+            },
+            task.tableCell?.cellIndex,
+          );
+        } else {
+          console.debug(
+            'TODOseq: archived reference promotion skipped for',
+            task.path,
+            result.reason ?? result.status,
+          );
+        }
+      } catch (error) {
+        console.debug(
+          'TODOseq: archived reference promotion failed for',
+          task.path,
+          error,
+        );
+      }
+    }
+    if (changed) stateManager.notifySubscribers();
   }
 
   /**
@@ -855,6 +1108,7 @@ export class PluginLifecycleManager {
           taskStateManager.findTaskByPathAndLine(path, line, cellIndex),
         apply: (task, target) =>
           coordinator.updateTaskState(task, target, 'task-list'),
+        migrateDependents: (task) => this.migrateArchivedDependents(task),
       });
 
       const archivedCount = result.archived.length;

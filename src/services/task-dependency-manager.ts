@@ -12,6 +12,7 @@ import {
 } from '../utils/task-properties';
 import { getTaskKey } from '../utils/task-utils';
 import { buildTaskStructure } from '../utils/task-structure';
+import type { StructuralEntry } from '../types/task-structure';
 import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { taskComparator } from '../utils/task-sort';
 import { TaskStateManager } from './task-state-manager';
@@ -23,6 +24,14 @@ export interface TaskDependencyManagerOptions {
     hierarchy: boolean;
     checkbox: boolean;
   };
+  /** Published structural entries beside the task snapshot. */
+  getStructureEntries?: () => ReadonlyMap<
+    string,
+    readonly StructuralEntry[]
+  >;
+  getStructureRevision?: () => number;
+  /** Published after each successful rebuild, before the next read. */
+  onSnapshot?: (snapshot: DependencySnapshot) => void;
 }
 
 interface ResolvedReference {
@@ -60,6 +69,7 @@ export class TaskDependencyManager {
     blockedKeys: [],
   };
   private lastRevision = -1;
+  private structureRevision = -1;
   private validationReady = true;
   private validationEpoch = 0;
   private snapshotValidationEpoch = -1;
@@ -101,6 +111,7 @@ export class TaskDependencyManager {
     this.validationReady = true;
     this.validationEpoch++;
     this.snapshotValidationEpoch = -1;
+    this.structureRevision = -1;
   }
 
   /**
@@ -187,8 +198,10 @@ export class TaskDependencyManager {
 
   private ensureFresh(): void {
     const revision = this.stateManager.getRevision();
+    const structureRevision = this.options.getStructureRevision?.() ?? 0;
     if (
       revision === this.lastRevision &&
+      structureRevision === this.structureRevision &&
       this.validationEpoch === this.snapshotValidationEpoch
     ) {
       return;
@@ -200,6 +213,7 @@ export class TaskDependencyManager {
   rebuild(tasks: Task[], revision = this.stateManager.getRevision()): void {
     this.rebuildCount++;
     this.lastRevision = revision;
+    this.structureRevision = this.options.getStructureRevision?.() ?? 0;
     this.snapshotValidationEpoch = this.validationEpoch;
     this.cachedTasks = [...tasks];
     this.tasksByKey = new Map(tasks.map((task) => [getTaskKey(task), task]));
@@ -229,7 +243,8 @@ export class TaskDependencyManager {
     const issues: DependencyIssue[] = [];
     const reasonsByKey = new Map<string, DependencyReason[]>();
     const blocked = new Set<string>();
-    const structure = buildTaskStructure(tasks);
+    const entriesByPath = this.options.getStructureEntries?.() ?? new Map();
+    const structure = buildTaskStructure(tasks, entriesByPath);
     const structuralReasons = this.buildStructuralReasons(
       tasks,
       structure,
@@ -237,6 +252,7 @@ export class TaskDependencyManager {
         hierarchy: false,
         checkbox: false,
       },
+      entriesByPath,
     );
 
     for (const [id, owners] of idIndex) {
@@ -491,17 +507,28 @@ export class TaskDependencyManager {
       issues: this.stableIssues(issues),
       blockedKeys: Array.from(blocked).sort(),
     };
+
+    try {
+      this.options.onSnapshot?.(this.snapshot);
+    } catch (error) {
+      console.debug(
+        '[TaskDependencyManager] Snapshot listener failed:',
+        error,
+      );
+    }
   }
 
   clearCache(): void {
     this.lastRevision = -1;
     this.snapshotValidationEpoch = -1;
+    this.structureRevision = -1;
   }
 
   private buildStructuralReasons(
     tasks: readonly Task[],
     structure: ReturnType<typeof buildTaskStructure>,
     settings: { hierarchy: boolean; checkbox: boolean },
+    entriesByPath: ReadonlyMap<string, readonly StructuralEntry[]>,
   ): Map<string, DependencyReason[]> {
     const result = new Map<string, DependencyReason[]>();
     if (!settings.hierarchy && !settings.checkbox) return result;
@@ -509,66 +536,149 @@ export class TaskDependencyManager {
     const seen = new Set<string>();
     const add = (
       parentKey: string,
-      child: Task,
+      childIdentity: string,
       code: 'structural' | 'checkbox',
       message: string,
+      target?: Task,
     ): void => {
       const parent = this.tasksByKey.get(parentKey);
       if (!parent) return;
-      const fingerprint = `${parentKey}:${code}:${getTaskKey(child)}`;
+      const fingerprint = `${parentKey}:${code}:${childIdentity}`;
       if (seen.has(fingerprint)) return;
       seen.add(fingerprint);
       const list = result.get(parentKey) ?? [];
-      list.push(this.reason(parent, code, message, undefined, true, child));
+      list.push(this.reason(parent, code, message, undefined, true, target));
       result.set(parentKey, list);
     };
 
-    for (const child of tasks) {
-      if (child.completed) continue;
-      const isCheckbox = CHECKBOX_DETECTION_REGEX.test(
-        child.rawText.trimStart(),
-      );
-      let parentKey = structure.parentByKey.get(getTaskKey(child));
-      while (parentKey) {
-        if (settings.hierarchy) {
+    if (settings.hierarchy) {
+      for (const child of tasks) {
+        if (child.completed) continue;
+        const key = getTaskKey(child);
+        let parentKey = structure.parentByKey.get(key);
+        while (parentKey) {
           add(
             parentKey,
-            child,
+            key,
             'structural',
             `Blocked by unfinished child ${child.text || child.id || ''}.`,
+            child,
           );
+          parentKey = structure.parentByKey.get(parentKey);
         }
-        if (settings.checkbox && isCheckbox) {
+
+        // ORDERED constrains every later sibling in the bounded group. The
+        // nearest unfinished ordered predecessor is the actionable reason.
+        const group = structure.groupByKey.get(key);
+        const bucket = structure.parentByKey.get(key) ?? '';
+        const siblings =
+          (group ? structure.siblingsByGroup.get(group) : undefined) ??
+          structure.siblingsByParent.get(bucket) ??
+          [];
+        const index = siblings.indexOf(key);
+        for (let i = index - 1; i >= 0; i--) {
+          const prior = this.tasksByKey.get(siblings[i]);
+          if (prior?.ordered && !prior.completed) {
+            const list = result.get(key) ?? [];
+            list.push(
+              this.reason(
+                child,
+                'structural',
+                `Ordered after ${prior.text || prior.id || 'an earlier sibling'}.`,
+                'ORDERED',
+                true,
+                prior,
+              ),
+            );
+            result.set(key, list);
+            break;
+          }
+        }
+      }
+    }
+
+    if (settings.checkbox) {
+      // Markdown: unchecked descendant checkboxes, including keywordless rows.
+      for (const child of tasks) {
+        if (child.completed || child.sourceFormat === 'org') continue;
+        if (!CHECKBOX_DETECTION_REGEX.test(child.rawText.trimStart())) {
+          continue;
+        }
+        const key = getTaskKey(child);
+        let parentKey = structure.parentByKey.get(key);
+        while (parentKey) {
           add(
             parentKey,
-            child,
+            key,
             'checkbox',
             `Blocked by an unchecked checkbox at line ${child.line + 1}.`,
+            child,
           );
+          parentKey = structure.parentByKey.get(parentKey);
         }
-        parentKey = structure.parentByKey.get(parentKey);
       }
 
-      if (settings.hierarchy) {
-        const previousKey = structure.previousSiblingByKey.get(
-          getTaskKey(child),
-        );
-        const previous = previousKey
-          ? this.tasksByKey.get(previousKey)
-          : undefined;
-        if (previous?.ordered && !previous.completed) {
-          const list = result.get(getTaskKey(child)) ?? [];
-          list.push(
-            this.reason(
-              child,
-              'structural',
-              `Ordered after ${previous.text || previous.id || 'its previous sibling'}.`,
-              'ORDERED',
-              true,
-              previous,
-            ),
+      for (const [parentKey, entries] of structure.checkboxEntriesByParentKey) {
+        if (!parentKey) continue;
+        for (const entry of entries) {
+          if (entry.path.toLowerCase().endsWith('.org')) continue;
+          let owner: string | undefined = parentKey;
+          while (owner) {
+            add(
+              owner,
+              `${entry.path}:${entry.line}`,
+              'checkbox',
+              `Blocked by an unchecked checkbox at line ${entry.line + 1}.`,
+            );
+            owner = structure.parentByKey.get(owner);
+          }
+        }
+      }
+
+      // Org: the current headline's body only, stopping at the next headline.
+      const nextHeadingLine = (path: string, line: number): number => {
+        for (const candidate of structure.headingLinesByPath.get(path) ?? []) {
+          if (candidate > line) return candidate;
+        }
+        return Number.POSITIVE_INFINITY;
+      };
+      for (const parent of tasks) {
+        if (parent.sourceFormat !== 'org' || parent.completed) continue;
+        const parentKey = getTaskKey(parent);
+        const end = nextHeadingLine(parent.path, parent.line);
+        for (const child of tasks) {
+          if (
+            child.path !== parent.path ||
+            child.line <= parent.line ||
+            child.line >= end ||
+            child.completed ||
+            !CHECKBOX_DETECTION_REGEX.test(child.rawText.trimStart())
+          ) {
+            continue;
+          }
+          add(
+            parentKey,
+            getTaskKey(child),
+            'checkbox',
+            `Blocked by an unchecked checkbox at line ${child.line + 1}.`,
+            child,
           );
-          result.set(getTaskKey(child), list);
+        }
+        for (const entry of entriesByPath.get(parent.path) ?? []) {
+          if (
+            entry.kind !== 'checkbox' ||
+            entry.checked ||
+            entry.line <= parent.line ||
+            entry.line >= end
+          ) {
+            continue;
+          }
+          add(
+            parentKey,
+            `${entry.path}:${entry.line}`,
+            'checkbox',
+            `Blocked by an unchecked checkbox at line ${entry.line + 1}.`,
+          );
         }
       }
     }
