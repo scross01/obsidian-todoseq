@@ -4,6 +4,7 @@ import { TodoTrackerSettings } from '../settings/settings-types';
 import { TaskListViewMode } from '../view/task-list/task-list-view';
 import { TAG_PATTERN } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
+import { foldSearchText } from './search-text';
 
 /**
  * Utility class for collecting and filtering search suggestions
@@ -454,9 +455,9 @@ export class SearchSuggestions {
   static filterSuggestions(query: string, suggestions: string[]): string[] {
     if (!query) return suggestions;
 
-    const searchText = query.toLowerCase();
+    const searchText = foldSearchText(query);
     return suggestions.filter((suggestion) =>
-      suggestion.toLowerCase().includes(searchText),
+      foldSearchText(suggestion).includes(searchText),
     );
   }
 }

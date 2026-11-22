@@ -2,6 +2,8 @@
 
 ## 0.23.0
 
+- Task searches and suggestions now find accented words and spellings such as `café`, `Łódź` and `Straße` when you type `cafe`, `lodz` or `strasse`; quoted phrases, tags, states and property values follow the same rule.
+- Fixed quoted property filters matching the wrong tasks in task lists and dashboards, including empty strings, the word `null`, and quoted key names.
 - Search operators `OR`/`AND` now also match in lowercase (`or`/`and`), matching Obsidian's search grammar; quote them (`"or"`) to search the literal word.
 - Added `tag:none` to find tasks without any tags, with matching dashboard “No tags” grouping and tag autocomplete; `#none` remains a literal tag.
 - Fixed dashboard's **No tags** group treating tasks with emoji or other non-ASCII tags (such as `#🏠`) as untagged.

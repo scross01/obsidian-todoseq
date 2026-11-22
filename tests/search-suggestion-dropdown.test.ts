@@ -359,6 +359,16 @@ describe('SearchSuggestionDropdown', () => {
   });
 
   describe('handleSelection', () => {
+    it('inserts the original accented suggestion unchanged', () => {
+      mockInput.value = 'path:lodz';
+      mockInput.selectionStart = 9;
+      mockInput.selectionEnd = 9;
+
+      dropdown.handleSelection('Łódź');
+
+      expect(mockInput.value).toBe('path:Łódź');
+    });
+
     it('replaces prefix value after colon', () => {
       mockInput.value = 'path:old value';
       mockInput.selectionStart = 8;

@@ -24,6 +24,8 @@ import {
   createDate,
 } from './helpers/test-helper';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
+import { TFile } from 'obsidian';
+import { PropertySearchEngine } from '../src/services/property-search-engine';
 
 /** Local-midnight date `offset` days from today (timezone-independent). */
 function dayOffset(offset: number): Date {
@@ -428,6 +430,87 @@ describe('DashboardAggregator', () => {
         );
         const evalCount = matched.filter(Boolean).length;
         expect(evalCount).toBe(group.count);
+      }
+    });
+
+    it('passes a parsed exact-empty descriptor through the window adapter', async () => {
+      // The window vocabulary is date-only today, so inject a property filter
+      // for the first window and assert its real descriptor reaches the engine
+      // (a reconstructed query string would lose the quoted empty intent).
+      const frontmatters: Record<string, Record<string, unknown>> = {
+        'a.md': { place: '' },
+        'b.md': { place: 'Café' },
+        'c.md': { place: null },
+      };
+      const files = Object.fromEntries(
+        Object.keys(frontmatters).map((path) => [
+          path,
+          new TFile(path, path.replace('.md', ''), 'md'),
+        ]),
+      );
+      const app = {
+        vault: {
+          getAbstractFileByPath: (path: string) => files[path] ?? null,
+          getMarkdownFiles: () => Object.values(files),
+        },
+        metadataCache: {
+          getFileCache: (file: TFile) => ({
+            frontmatter: frontmatters[file.path] ?? {},
+          }),
+        },
+      };
+      const engine = new PropertySearchEngine(app as never, {
+        taskStateManager: {
+          getTasks: () =>
+            Object.keys(frontmatters).map((path) => ({ path, line: 0 })),
+        } as never,
+        refreshAllTaskListViews: jest.fn(),
+        vaultScanner: {
+          isScanning: () => false,
+          isObsidianInitializing: () => false,
+        } as never,
+      });
+      await engine.initialize();
+      const searchProperty = jest.spyOn(engine, 'searchProperty');
+      const aggregator = new DashboardAggregator(
+        createBaseSettings(),
+        createTestKeywordManager(),
+        engine,
+      );
+      const tasks = Object.keys(frontmatters).map((path) =>
+        makeTask({ path, line: 0, scheduledDate: dayOffset(-2) }),
+      );
+      const injected = Search.parse('[place:""]');
+      const originalParse = Search.parse;
+      const parseSpy = jest
+        .spyOn(Search, 'parse')
+        .mockImplementation((query: string) =>
+          query === 'scheduled:overdue' ? injected : originalParse(query),
+        );
+
+      try {
+        const result = await aggregator.aggregate(tasks, {
+          groupBy: 'scheduled',
+        });
+
+        expect(searchProperty).toHaveBeenCalledWith(
+          {
+            key: 'place',
+            kind: 'string',
+            value: '',
+            exact: true,
+            keyExact: false,
+          },
+          true,
+        );
+        // Only the empty-string file is in the first window; the other two
+        // dated tasks fall through to Later.
+        expect(result.groups.find((g) => g.label === 'Overdue')?.count).toBe(1);
+        expect(result.groups.find((g) => g.label === 'Later')?.count).toBe(2);
+      } finally {
+        parseSpy.mockRestore();
+        searchProperty.mockRestore();
+        engine.destroy();
       }
     });
 

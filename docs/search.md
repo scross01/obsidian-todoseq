@@ -13,6 +13,43 @@ The search field is located in the Task List toolbar and provides live filtering
 
 Results follow live edits. Moving a task under a different heading or renaming its note updates `heading:` matches without a manual rescan.
 
+### Accents and Language-Specific Letters
+
+By default, search ignores accents and a few Latin letters that have no plain
+ASCII spelling, on **both** the query and the task text. `cafe` finds `café`,
+`lodz` finds `Łódź`, and `strasse` finds `Straße`. The same works in reverse:
+typing `café` finds a task that says `cafe`.
+
+| You can type | It also matches    |
+| ------------ | ------------------ |
+| `o`          | `ó`, `ö`, `ø`, `ǿ` |
+| `l`          | `ł`                |
+| `d`          | `đ`, `ð`           |
+| `h`          | `ħ`                |
+| `i`          | `ı`, `İ`           |
+| `ss`         | `ß`, `ẞ`           |
+| `ae`         | `æ`                |
+| `oe`         | `œ`                |
+| `th`         | `þ`                |
+
+Composed and decomposed spellings compare alike: `café` typed with one
+pre-composed character matches `cafe` plus a combining accent. The folding
+applies to unprefixed tasks and phrases, `content:`, `description:`, `heading:`,
+`file:`, `path:` segments, tag text, literal `state:` values, unquoted property
+keys and string values, and the autocomplete list. Matching remains
+case-insensitive as before; the A/a toolbar toggle turns **all** of this off and
+restores exact original spelling and case. Quoted property values are always
+exact and are not folded.
+
+This first release covers Latin accents and the letters listed above. It does
+not remove Greek, Cyrillic or Arabic marks, does not strip kana voicing marks,
+and does not transliterate between scripts; those characters still compare
+exactly apart from Unicode canonical equivalence. It is not a fuzzy search.
+
+Folding can make two previously distinct spellings match the same query. That is
+intended, and each task, tag, state or property key keeps its original spelling
+in the results and in the note.
+
 Searching without a prefix looks in the task line _and_ its description, so a task can match on either:
 
 ```txt
@@ -55,6 +92,16 @@ Use double quotes to search for exact phrases:
 ```
 
 This will only match tasks containing the exact sequence "write documentation".
+The phrase must be a complete word sequence: `"star"` matches `star` but not
+`starfish`. Boundaries are Unicode-aware, so `"東京"` matches an isolated `東京`
+but not `東京都`, and `"C++"` matches only isolated `C++` — punctuation is
+literal. Prefix values remain substrings: `content:"東京"` still finds
+`東京都`.
+
+In the default mode the phrase is folded like any other search text. In strict
+mode it keeps original spelling and case. Because the boundary rule is not
+ASCII-based, strict mode now distinguishes `"café"` from `cafés` instead of
+treating the accented letter as a word separator.
 
 ### OR Logic
 
@@ -542,7 +589,7 @@ You can search for tasks based on page properties (frontmatter/YAML metadata). T
 
 ### Basic Property Search
 
-To search for tasks on pages with a specific property, use brackets with the property name and value separated by a colon. For example, to find all tasks on pages marked as a "Project", you would use `[type:Project]`. The property name and value are separated by a colon within the brackets. You can use quotes around either the property name or value for exact matching. Without quotes, the search will match partially (case insensitive by default).
+To search for tasks on pages with a specific property, use brackets with the property name and value separated by a colon. For example, to find all tasks on pages marked as a "Project", you would use `[type:Project]`. The property name and value are separated by a colon within the brackets. You can use quotes around either the property name or value for exact matching. Without quotes, the search matches partially and folds accents and the Latin letters listed under [Accents and Language-Specific Letters](#accents-and-language-specific-letters); every spelling of the key that folds to the query is included.
 
 ```txt
 [type:Project]
@@ -568,7 +615,7 @@ By default, property searches match partially. The search `[type:ject]` would ma
 [type:"Project"]
 ```
 
-Exact matching is case sensitive, while partial matching is case insensitive by default. You can also toggle case sensitivity using the A/a button in the toolbar.
+Exact matching is case sensitive, while partial matching is case insensitive by default. You can also toggle case sensitivity using the A/a button in the toolbar. A quoted key selects that exact key spelling and bypasses the folded key comparison, so `["Résumé":cafe]` uses the literal `Résumé` key while its unquoted value still matches `Café` partially. Quoted values stay exact and are never folded, even when the global matching is case-insensitive.
 
 ### Negation
 
@@ -582,13 +629,17 @@ This is particularly useful when you want to focus on work-related tasks and exc
 
 ### Null Values
 
-You can search for properties that exist but have no value using `[type:null]` or `[type:]`. This is different from searching for pages where the property doesn't exist at all. Null value matching is useful for finding pages where a property has been initialized but not yet filled in.
+Use `[type:null]` for an actual null value, `[type:"null"]` for the literal
+text `null`, and `[type:""]` for an exact empty string. These are three
+different filters. `[type]` and `[type:]` are presence checks and include empty
+strings, empty arrays and null, but exclude pages without the key.
 
 ```txt
 [type:null]
 ```
 
-This will match pages where the `type` property exists but has no value assigned to it.
+This matches pages where the `type` property is null. It does not match a page
+whose value is the text `null` or an empty string.
 
 ### OR Operator
 
@@ -788,10 +839,11 @@ Pressing Escape or clicking the clear button exits the saved search view, just l
 ### Search Matching Rules
 
 1. **Case Sensitivity**: Off by default, toggle with A/a button
-2. **Whitespace**: Multiple spaces are treated as single space
-3. **Punctuation**: Most punctuation is treated as literal characters
-4. **Order**: Search terms can appear in any order in results
-5. **Proximity**: Terms don't need to be adjacent unless using quotes
+2. **Accents**: Ignored in the default mode, including the Latin letter mappings above; the A/a toggle restores exact spelling
+3. **Whitespace**: Multiple spaces are treated as single space
+4. **Punctuation**: Most punctuation is treated as literal characters
+5. **Order**: Search terms can appear in any order in results
+6. **Proximity**: Terms don't need to be adjacent unless using quotes
 
 ## Property changes and collection views
 
@@ -801,7 +853,14 @@ Editing only a note's properties changes what property filters match without cha
 
 Property filters use one matching contract for the fast index and the metadata fallback. An unquoted value matches partially and ignores case, across every spelling of the key, so `[type:ject]` finds `Project` and `[type:Project]` also finds `project` and `Project backlog`. Quoting a value makes it exact and case-sensitive, and ignores whitespace before the quote: `[type: "Project"]` matches only the exact value `Project`.
 
-`[type]` and `[type:]` ask whether the key exists. They include keys whose value is empty, an empty array or null, and exclude notes without the key. `[type:null]` matches an actual null value, while `[type:""]` matches an exact empty string; the two are no longer conflated. Numeric and boolean values stay typed, so `[size:1]` does not match `12`.
+`[type]` and `[type:]` ask whether the key exists. They include keys whose value is empty, an empty array or null, and exclude notes without the key. `[type:null]` matches an actual null value, `[type:"null"]` matches that literal text, and `[type:""]` matches an exact empty string; the three are not conflated. Numeric and boolean values stay typed, so `[size:1]` does not match `12`.
+
+Unquoted values fold accents on both sides, so `[place:lodz]` finds `Łódź`,
+while `[place:"lodz"]` does not. Unquoted keys fold too: `[résumé:cafe]`
+searches the `résumé` and `resume` keys and finds the value `Café`. Quoting the
+key (`["résumé":cafe]`) restricts the search to that spelling. The fast index
+and the metadata fallback use this same contract, in the Task List, embedded
+task lists and dashboard cards.
 
 ## Combining filters and errors
 

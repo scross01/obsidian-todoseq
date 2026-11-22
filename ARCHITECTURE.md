@@ -663,7 +663,8 @@ graph TB
 - **Responsibility**: Task matching and filtering based on query AST
 - **Key Patterns**: Visitor pattern, filter chain execution, property search integration
 - **Interface**: Task evaluation, result filtering, `evaluatePropertyFilter()`
-- **Default search domain**: an unprefixed term or phrase (`evaluateTerm`/`evaluatePhrase`, via `getSearchableFields`) matches the full original task line (`rawText`), the task's `DESCRIPTION:` line, the file path, or the filename. Use `content:` for the task line alone, `description:` for the description alone, and `heading:` for the enclosing heading. `text` is deliberately _not_ indexed: it is `rawText` with the keyword/priority/reference markers stripped, hence a contiguous substring that can never match something `rawText` does not.
+- **Default search domain**: an unprefixed term or phrase (`evaluateTerm`/`evaluatePhrase`, via `getSearchableFields`) matches the full original task line (`rawText`), the task's `DESCRIPTION:` line, the file path, or the filename. It also matches `text` when it differs from `rawText`: the parser strips the keyword, priority token and footnote/embed references, so displayed text such as `Review report` (from `Review[^1] report`) is not a contiguous substring of the raw line. Use `content:` for the displayed task text alone, `description:` for the description alone, and `heading:` for the enclosing heading. `parentHeading` is excluded from default matching and reached only through `heading:`.
+- **Text matching**: default mode folds both sides through `SearchTextCache` (`src/search/search-text.ts`) — lowercase, NFD, removal of marks whose preceding base is Latin, the ø/ł/đ/ð/ħ/ı/ß/æ/œ/þ table, then NFC. Only pass-local non-ASCII values are memoized; ASCII takes a lowercase fast path. Strict mode (the A/a toggle) skips folding and compares original text. Phrase leaves use escaped literal text with Unicode outer boundaries (`[\p{L}\p{N}\p{M}\p{Pc}]` on each side), not `\b` or the `i` flag; prefix values keep their substring behavior. Tags are extracted from the original line before folding, and `state:` group aliases are resolved from the original value before any literal comparison.
 - **Note**: evaluation assumes parse-time validation has run — `DateUtils.parseDateValue` fails closed on invalid dates so the evaluator's remaining `false` fallbacks are last-resort, not primary behavior
 
 **SearchTokenizer** (`src/search/search-tokenizer.ts`)
@@ -1152,7 +1153,7 @@ graph LR
 
 - **Responsibility**: Utility class for evaluating property values in search queries, centralizing date parsing, comparison, and evaluation logic
 - **Key Patterns**: Static utility methods, date parsing, comparison operators
-- **Interface**: `parsePropertyValueAsDate()`, `parseDateForComparison()`, `compareDate()`, `evaluateDateComparison()`
+- **Interface**: `matchingKeys()`, `matchesPropertyValue()`, `matchesPropertyFilter()`, `parsePropertyValueAsDate()`, `parseDateForComparison()`, `compareDate()`, `evaluateDateComparison()`
 - **Date Formats**: YYYY-MM-DD, YYYY-MM, YYYY, relative dates (today, tomorrow, overdue), date ranges
 - **Used by**: SearchEvaluator, PropertySearchEngine
 
@@ -1583,6 +1584,10 @@ The tokenizer treats adjacency as conjunction at `AND` binding power (80), above
 
 `TaskParser.extractSubtasks` records an inclusive `subtaskSpan` on a task when it counts checkbox children, in addition to the counts. `TaskStateManager` uses that parser-owned span plus checkbox and indentation qualification for both keyword-task and checkbox-only optimistic updates; it does not infer ancestry from indentation alone or invent it for snapshots without a span. `adjustLineIndices` shifts or removes span endpoints when metadata lines are inserted or deleted. Reparsing replaces the span along with the counts, so a later scan restores source truth.
 
-## Batch state-group search
+## Property filter resolution
 
-`Search.filterTasks` builds a per-pass batch context for the state-group aliases the query uses (`state:active`, `state:waiting`, and so on). It resolves each group once through `KeywordManager` and passes exact/lowercase keyword sets down through `filterTasksByNode`, `evaluateSync`, and `evaluateStateFilter`; rows only do set membership. Per-row `Search.evaluate` keeps the existing per-call resolution, and the context is rebuilt on every batch so settings edits and custom keywords are picked up immediately. `collectEngineResolutions` remains the separate batch seam for property-engine filters.
+A parsed `property_filter` node owns a lossless `PropertyQueryDescriptor` (`key`, `kind`, `value`, `exact`, `keyExact`). The bulk path transports that descriptor to the engine from both `Search.filterTasks` and the dashboard window adapters; it does not rebuild it from a display string, which cannot distinguish `[type:""]` from `[type]` or `[type:"null"]` from `[type:null]`. Resolution identity is built by one helper from every descriptor field plus the effective case mode, encoded as length-prefixed parts, so separators and quoting cannot collide. Duplicate nodes resolve once per batch; distinct intent resolves separately. The legacy string adapter remains only for older string callers.
+
+## Batch search context
+
+`Search.filterTasks` builds one per-pass context. State-group aliases (`state:active`, `state:waiting`, and so on) resolve once through `KeywordManager` into exact/lowercase sets, passed down through `filterTasksByNode`, `evaluateSync`, and `evaluateStateFilter`; rows only do set membership. The same context owns the `SearchTextCache` used for folded values and phrase patterns, so repeated query leaves, shared paths and repeated tags are folded once per pass. Per-row `Search.evaluate` creates a minimal context per call, and every batch rebuilds its context, so settings edits, custom keywords, renames and text edits are visible on the next pass without invalidation. `collectEngineResolutions` remains the separate batch seam for property-engine filters.

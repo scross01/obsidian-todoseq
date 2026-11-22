@@ -528,13 +528,17 @@ export class DashboardAggregator {
             engineFiles.set(
               resolution.key,
               await SearchEvaluator.resolveEngineFiles(
-                resolution.query,
+                resolution.descriptor,
                 resolution.effectiveCaseSensitive,
                 this.propertySearchEngine,
               ),
             );
           }
         }
+        const batchContext = SearchEvaluator.buildBatchContext(
+          ast,
+          this.settings,
+        );
         evaluate = (task: Task) => {
           try {
             return SearchEvaluator.evaluateSync(
@@ -543,6 +547,7 @@ export class DashboardAggregator {
               false,
               this.settings,
               engineFiles,
+              batchContext,
             );
           } catch (error) {
             // Per-row contract of Search.evaluate: a SearchError during

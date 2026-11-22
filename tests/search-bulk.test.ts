@@ -221,6 +221,75 @@ describe('Search.filterTasks (bulk per-row-parity path)', () => {
       }
     });
 
+    it('passes the lossless descriptor for quoted empty, literal null and quoted keys', async () => {
+      // A reconstructed query string cannot express these distinctions. The
+      // engine must receive the parsed descriptor, exactly as per-row does.
+      const searchProperty = jest.fn(async () => new Set<string>());
+      const engine = { searchProperty } as unknown as PropertySearchEngine;
+
+      await Search.filterTasks(
+        tasks,
+        '[type:""] OR [type:"null"] OR ["Ty pe":Project]',
+        false,
+        undefined,
+        engine,
+      );
+
+      expect(searchProperty).toHaveBeenCalledTimes(3);
+      expect(searchProperty).toHaveBeenCalledWith(
+        {
+          key: 'type',
+          kind: 'string',
+          value: '',
+          exact: true,
+          keyExact: false,
+        },
+        true,
+      );
+      expect(searchProperty).toHaveBeenCalledWith(
+        {
+          key: 'type',
+          kind: 'string',
+          value: 'null',
+          exact: true,
+          keyExact: false,
+        },
+        true,
+      );
+      expect(searchProperty).toHaveBeenCalledWith(
+        {
+          key: 'Ty pe',
+          kind: 'string',
+          value: 'Project',
+          exact: false,
+          keyExact: true,
+        },
+        false,
+      );
+    });
+
+    it('resolves distinct intent separately and identical nodes once', async () => {
+      const searchProperty = jest.fn(async () => new Set<string>());
+      const engine = { searchProperty } as unknown as PropertySearchEngine;
+
+      // Same display text, different intent: presence vs exact empty string.
+      await Search.filterTasks(
+        tasks,
+        '[place] OR [place:""] OR [place:""]',
+        false,
+        undefined,
+        engine,
+      );
+
+      expect(searchProperty).toHaveBeenCalledTimes(2);
+      const kinds = searchProperty.mock.calls.map(([descriptor]) =>
+        descriptor.kind === 'existence'
+          ? 'existence'
+          : `${descriptor.kind}:${descriptor.exact}`,
+      );
+      expect(kinds.sort()).toEqual(['existence', 'string:true']);
+    });
+
     it('falls back to metadata evaluation when the engine throws (per-row parity)', async () => {
       const mockEngine = {
         searchProperties: jest.fn(async () => {

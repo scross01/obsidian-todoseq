@@ -94,7 +94,7 @@ export class Search {
           engineFiles.set(
             resolution.key,
             await SearchEvaluator.resolveEngineFiles(
-              resolution.query,
+              resolution.descriptor,
               resolution.effectiveCaseSensitive,
               propertySearchEngine,
             ),
