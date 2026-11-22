@@ -43,7 +43,6 @@ git commit -F .git-commit-msg-tmp.txt
 rm .git-commit-msg-tmp.txt
 ```
 
-Trailers: `🤖 Generated with Codebuff` and `Co-Authored-By: Codebuff <noreply@codebuff.com>`.
 Do not `git push` unless the user asks.
 
 ## Build & Test
