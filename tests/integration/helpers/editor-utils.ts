@@ -50,6 +50,17 @@ export async function readEditorContent(page: Page): Promise<string> {
 
 /** Read vault file content. Prefers the live editor buffer over disk
  *  because source-mode writes lag disk until Obsidian's autosave. */
+export async function readVaultDiskFile(
+  page: Page,
+  basename: string,
+): Promise<string | null> {
+  return page.evaluate(async (name: string) => {
+    const app = (window as any).app;
+    const file = app.vault.getFiles().find((f: any) => f.basename === name);
+    return file ? await app.vault.read(file) : null;
+  }, basename);
+}
+
 export async function readVaultFile(
   page: Page,
   basename: string,

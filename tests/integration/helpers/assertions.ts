@@ -41,6 +41,17 @@ export async function runCommandById(
 export async function openTodoseqPanel(page: Page): Promise<void> {
   await runCommandById(page, 'todoseq:show-task-list');
   await waitForTaskListVisible(page);
+  // show-task-list reveals the view but leaves a previously active editor
+  // focused. Activate the Task List leaf so row interactions and header
+  // assertions target the visible panel, not a stale background leaf.
+  await page.evaluate(() => {
+    const app = (window as any).app;
+    const leaf = app?.workspace?.getLeavesOfType?.('todoseq-view')?.[0];
+    if (leaf && app.workspace.setActiveLeaf) {
+      app.workspace.setActiveLeaf(leaf, { focus: true });
+    }
+  });
+  await page.waitForTimeout(300);
 }
 
 /**

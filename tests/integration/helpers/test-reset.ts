@@ -16,6 +16,13 @@ import { closeAllModals } from './assertions';
 export async function resetVaultState(page: Page): Promise<void> {
   // Close any lingering modals first — prevents overlay interception.
   await closeAllModals(page);
+  // Context menus and notices are not modals and survive closeAllModals.
+  // A stale menu can receive the next right-click action in another test.
+  await page.evaluate(() => {
+    document
+      .querySelectorAll('.todoseq-task-context-menu, .notice')
+      .forEach((element) => element.remove());
+  });
 
   resetMutableState();
 

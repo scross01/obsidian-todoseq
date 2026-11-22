@@ -241,6 +241,14 @@ export class ReaderViewFormatter {
 
     for (const item of taskItems) {
       if (!item.instanceOf(HTMLElement)) continue;
+      // A task-list item contains its paragraph; processing both removes the
+      // badge the first pass just added. Keep the list item as the owner.
+      if (
+        item.closest('.task-list-item') &&
+        !item.matches('.task-list-item')
+      ) {
+        continue;
+      }
       if (item.closest('.todoseq-embedded-task-list-container')) continue;
 
       // Re-rendering must converge on one badge per row, and a row that is no

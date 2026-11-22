@@ -2,7 +2,11 @@ import { test, expect } from '@playwright/test';
 import { Page } from 'playwright';
 import { getPage } from './helpers/session';
 import { resetVaultState } from './helpers/test-reset';
-import { openFileInEditor, readVaultFile } from './helpers/editor-utils';
+import {
+  openFileInEditor,
+  readVaultDiskFile,
+  readVaultFile,
+} from './helpers/editor-utils';
 import {
   openTodoseqPanel,
   runCommandById,
@@ -68,7 +72,9 @@ async function clickTaskMenuAction(
   action: string,
 ): Promise<void> {
   const row = page
-    .locator('.todoseq-task-item', { hasText: taskText })
+    .locator('.workspace-leaf.mod-active .todoseq-task-item', {
+      hasText: taskText,
+    })
     .first();
   await expect(row).toBeVisible({ timeout: 10_000 });
   await row.click({ button: 'right' });
@@ -285,6 +291,11 @@ test.describe('task dependencies', () => {
   test('copy ID, copy anchor and add-as-blocker use the real clipboard and menu', async () => {
     await page.evaluate(async ({ path, body }) => {
       const app = (window as any).app;
+      // A leaf left open from an earlier test can keep a stale buffer; close
+      // it so readVaultFile reads the rewritten fixture rather than old text.
+      for (const leaf of app.workspace.getLeavesOfType('markdown')) {
+        if (leaf.view?.file?.path === path) leaf.detach();
+      }
       const existing = app.vault.getAbstractFileByPath(path);
       if (existing) await app.vault.modify(existing, body);
       else await app.vault.create(path, body);
@@ -315,7 +326,7 @@ test.describe('task dependencies', () => {
     );
     const generatedId = await readClipboard(page);
     await expect
-      .poll(() => readVaultFile(page, CLIPBOARD_FILE), { timeout: 5_000 })
+      .poll(() => readVaultDiskFile(page, CLIPBOARD_FILE), { timeout: 5_000 })
       .toContain(`:ID: ${generatedId}`);
 
     // Copy ID preserves an authored identifier instead of replacing it.
@@ -346,13 +357,35 @@ test.describe('task dependencies', () => {
     // The anchor must be visible to the dependency snapshot before it can be
     // added as a blocker.
     await runCommandById(page, 'todoseq:rescan-vault');
-    await page.waitForTimeout(800);
+    await expect
+      .poll(
+        () =>
+          page.evaluate((anchor) => {
+            const plugin = (window as any).app?.plugins?.plugins?.todoseq;
+            return Boolean(
+              plugin?.taskStateManager
+                ?.getTasks?.()
+                .some((task: any) => task.embedReference === anchor),
+            );
+          }, anchorLink.match(/\^[A-Za-z0-9][\w-]*/)?.[0]),
+        { timeout: 5_000 },
+      )
+      .toBe(true);
 
     await writeClipboard(page, anchorLink);
+    await expect.poll(() => readClipboard(page), { timeout: 5_000 }).toBe(
+      anchorLink,
+    );
+    await page.waitForTimeout(300);
     await clickTaskMenuAction(page, 'Dependent task', 'Add copied link as blocker');
     await expect
-      .poll(() => readVaultFile(page, CLIPBOARD_FILE), { timeout: 5_000 })
+      .poll(() => readVaultDiskFile(page, CLIPBOARD_FILE), { timeout: 5_000 })
       .toContain(`:BLOCKER: ${anchorLink}`);
+
+    // The inserted drawer shifts every later task line; reconcile before
+    // acting on the next row so its menu target is not stale.
+    await runCommandById(page, 'todoseq:rescan-vault');
+    await page.waitForTimeout(500);
 
     // An existing ID can be added the same way.
     await writeClipboard(page, 'authored-id');
@@ -362,24 +395,30 @@ test.describe('task dependencies', () => {
       'Add copied link as blocker',
     );
     await expect
-      .poll(() => readVaultFile(page, CLIPBOARD_FILE), { timeout: 5_000 })
+      .poll(() => readVaultDiskFile(page, CLIPBOARD_FILE), { timeout: 5_000 })
       .toContain(':BLOCKER: authored-id');
 
     await runCommandById(page, 'todoseq:rescan-vault');
     await page.waitForTimeout(800);
     await expect(
       page
-        .locator('.todoseq-task-item', { hasText: 'Dependent task' })
+        .locator('.workspace-leaf.mod-active .todoseq-task-item', {
+          hasText: 'Dependent task',
+        })
         .locator('.todoseq-task-blocked-icon'),
     ).toHaveCount(1);
     await expect(
       page
-        .locator('.todoseq-task-item', { hasText: 'Second dependent' })
+        .locator('.workspace-leaf.mod-active .todoseq-task-item', {
+          hasText: 'Second dependent',
+        })
         .locator('.todoseq-task-blocked-icon'),
     ).toHaveCount(1);
 
     const blockedIcon = page
-      .locator('.todoseq-task-item', { hasText: 'Dependent task' })
+      .locator('.workspace-leaf.mod-active .todoseq-task-item', {
+        hasText: 'Dependent task',
+      })
       .locator('.todoseq-task-blocked-icon');
     await expect(blockedIcon).toHaveAttribute('tabindex', '0');
     await blockedIcon.evaluate((element) => {
@@ -389,7 +428,7 @@ test.describe('task dependencies', () => {
       );
     });
     await expect(page.locator('.notice').last()).toContainText(
-      'Blocked by an incomplete dependency',
+      /Blocked by Source task/,
       { timeout: 5_000 },
     );
   });
