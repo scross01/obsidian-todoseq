@@ -1,5 +1,10 @@
 import { App, TFile, MarkdownView, EditorPosition, Editor } from 'obsidian';
-import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
+import {
+  Task,
+  DateRepeatInfo,
+  WarningPeriodInfo,
+  TaskPropertyKey,
+} from '../types/task';
 import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
 import { KeywordManager } from '../utils/keyword-manager';
 import { DateUtils } from '../utils/date-utils';
@@ -18,10 +23,19 @@ import type { EditorView } from '@codemirror/view';
 import TodoTracker from '../main';
 import { getStateTransitionManager } from './task-update-coordinator';
 import {
+  classifyTaskMetadataLine,
   getTaskRemovalRange,
   modifyLinesForMigration,
   readTaskBlockFromLines,
 } from '../utils/task-sub-bullets';
+import {
+  extractTaskProperties,
+  isPropertiesDrawerStart,
+  parseDependencyValue,
+  readTaskPropertiesDrawer,
+  type ParsedTaskProperties,
+  type TaskPropertiesDrawer,
+} from '../utils/task-properties';
 
 /** A SCHEDULED/DEADLINE/CLOSED/STARTED date line kind. */
 type DateLineType = 'SCHEDULED' | 'DEADLINE' | 'CLOSED' | 'STARTED';
@@ -41,6 +55,21 @@ export interface TaskTransferResult {
 export interface DateLineUpdateResult {
   task: Task;
   lineDelta: number;
+}
+
+export type TaskPropertyWriteStatus =
+  'success' | 'unsupported' | 'ambiguous' | 'failed';
+
+export interface TaskPropertyWriteResult {
+  status: TaskPropertyWriteStatus;
+  task: Task | null;
+  lineDelta: number;
+  reason?: string;
+}
+
+export interface TaskPropertyUpdate {
+  key: TaskPropertyKey;
+  value: string | null;
 }
 
 /** A fully formatted metadata line produced by smart-date recognition. */
@@ -296,6 +325,382 @@ export class TaskWriter {
       return out;
     }
     return modifyLinesForMigration(lines, task.line, keyword, migrateState);
+  }
+
+  private propertyFormat(task: Task): 'markdown' | 'org' {
+    return task.sourceFormat === 'org' ? 'org' : 'markdown';
+  }
+
+  /** Find the task's own bounded drawer without walking into a child task. */
+  private findPropertiesDrawer(
+    lines: string[],
+    task: Task,
+  ): TaskPropertiesDrawer | null {
+    const format = this.propertyFormat(task);
+    const max = Math.min(lines.length, task.line + 60);
+    for (let i = task.line + 1; i < max; i++) {
+      const line = lines[i];
+      if (isPropertiesDrawerStart(line, format)) {
+        return readTaskPropertiesDrawer(lines, i, format, {
+          allowAnyIndent: true,
+        });
+      }
+      if (line.trim() === '') continue;
+      if (format === 'org' && /^\*/.test(line)) break;
+      if (/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(line)) {
+        continue;
+      }
+      break;
+    }
+    return null;
+  }
+
+  private drawerLinePrefix(
+    lines: string[],
+    drawer: TaskPropertiesDrawer,
+  ): string {
+    const start = lines[drawer.startLine] ?? '';
+    const end = start.length - start.trimStart().length;
+    return start.slice(0, end);
+  }
+
+  private drawerPropertyLine(
+    prefix: string,
+    update: TaskPropertyUpdate,
+  ): string {
+    return update.value === null || update.value === ''
+      ? `${prefix}:${update.key}:`
+      : `${prefix}:${update.key}: ${update.value}`;
+  }
+
+  private applyDrawerUpdates(
+    lines: string[],
+    task: Task,
+    updates: readonly TaskPropertyUpdate[],
+  ): string[] {
+    const drawer = this.findPropertiesDrawer(lines, task);
+
+    if (!drawer) {
+      const values = updates.filter(
+        (update) => update.value !== null && update.value !== '',
+      );
+      if (values.length === 0) return lines;
+      const prefix = getDateLineIndent(task);
+      const index = this.calcDrawerInsertIndex(lines, task);
+      const block = [
+        `${prefix}:PROPERTIES:`,
+        ...values.map((update) => this.drawerPropertyLine(prefix, update)),
+        `${prefix}:END:`,
+      ];
+      const out = [...lines];
+      out.splice(index, 0, ...block);
+      return out;
+    }
+
+    const remove = new Set<number>();
+    const replace = new Map<number, string>();
+    const inserts: string[] = [];
+    const prefix = this.drawerLinePrefix(lines, drawer);
+
+    for (const update of updates) {
+      const entries = drawer.entries.filter(
+        (entry) => entry.canonicalKey === update.key,
+      );
+      if (entries.length === 0) {
+        if (update.value !== null && update.value !== '') {
+          const line = this.drawerPropertyLine(prefix, update);
+          if (!inserts.includes(line)) inserts.push(line);
+        }
+        continue;
+      }
+
+      if (update.value === null || update.value === '') {
+        for (const entry of entries) remove.add(entry.line);
+      } else {
+        const first = entries[0];
+        const original = lines[first.line] ?? '';
+        replace.set(
+          first.line,
+          `${original.slice(0, first.valueStart)}${update.value}`,
+        );
+        for (const entry of entries.slice(1)) remove.add(entry.line);
+      }
+    }
+
+    const removedEntries = drawer.entries.filter((entry) =>
+      remove.has(entry.line),
+    ).length;
+    const remainingEntries =
+      drawer.entries.length - removedEntries + inserts.length;
+    if (remainingEntries === 0) {
+      return [
+        ...lines.slice(0, drawer.startLine),
+        ...lines.slice(drawer.endLine + 1),
+      ];
+    }
+
+    const out: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (i === drawer.endLine) out.push(...inserts);
+      if (remove.has(i)) continue;
+      out.push(replace.get(i) ?? lines[i]);
+    }
+    if (drawer.endLine >= lines.length) out.push(...inserts);
+    return out;
+  }
+
+  private calcDrawerInsertIndex(lines: string[], task: Task): number {
+    let lastDate = task.line;
+    let description = -1;
+    const taskIndent = task.indent;
+    for (let i = task.line + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.trim() === '') break;
+      if (this.propertyFormat(task) === 'org' && /^\*/.test(line)) break;
+      const trimmed = line.trimStart();
+      if (/^(SCHEDULED|DEADLINE|CLOSED|STARTED):/.test(trimmed)) {
+        lastDate = i;
+        continue;
+      }
+      if (trimmed.startsWith('DESCRIPTION:')) {
+        description = i;
+        continue;
+      }
+      if (classifyTaskMetadataLine(line, taskIndent)) {
+        lastDate = i;
+        continue;
+      }
+      break;
+    }
+    return lastDate > task.line
+      ? lastDate + 1
+      : description >= 0
+        ? description
+        : task.line + 1;
+  }
+
+  private parsedProperties(
+    lines: string[],
+    task: Task,
+  ): ParsedTaskProperties | null {
+    const drawer = this.findPropertiesDrawer(lines, task);
+    return drawer
+      ? extractTaskProperties(drawer, this.propertyFormat(task))
+      : null;
+  }
+
+  private applyPropertySnapshot(
+    task: Task,
+    parsed: ParsedTaskProperties | null,
+  ): Task {
+    const updated: Task = { ...task };
+    delete updated.properties;
+    delete updated.id;
+    delete updated.blockedBy;
+    delete updated.archivedBlockers;
+    delete updated.propertyIssues;
+    if (parsed?.properties) updated.properties = parsed.properties;
+    if (parsed?.id !== undefined) updated.id = parsed.id;
+    if (parsed?.blockedBy !== undefined) updated.blockedBy = parsed.blockedBy;
+    if (parsed?.archivedBlockers !== undefined) {
+      updated.archivedBlockers = parsed.archivedBlockers;
+    }
+    if (parsed?.propertyIssues?.length) {
+      updated.propertyIssues = parsed.propertyIssues;
+    }
+    return updated;
+  }
+
+  private async writeDrawerMutation(
+    task: Task,
+    mutate: (lines: string[]) => string[],
+  ): Promise<TaskPropertyWriteResult> {
+    if (!supportsTaskMetadata(task) || task.isTableTask) {
+      return {
+        status: 'unsupported',
+        task: null,
+        lineDelta: 0,
+        reason: 'Task properties are not supported for this task source.',
+      };
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) {
+      return {
+        status: 'failed',
+        task: null,
+        lineDelta: 0,
+        reason: 'The task file could not be found.',
+      };
+    }
+
+    const editor = this.getTransferEditor(file);
+    let before: string[] = [];
+    let after: string[] = [];
+    let changed = false;
+
+    if (editor) {
+      before = Array.from({ length: editor.lineCount() }, (_, i) =>
+        editor.getLine(i),
+      );
+      if (!this.lineMatchesTask(before[task.line], task)) {
+        return { status: 'failed', task: null, lineDelta: 0 };
+      }
+      after = mutate(before);
+      changed = after.join('\n') !== before.join('\n');
+      if (changed) {
+        const last = editor.lineCount() - 1;
+        editor.replaceRange(
+          after.join('\n'),
+          { line: 0, ch: 0 },
+          {
+            line: last,
+            ch: (editor.getLine(last) ?? '').length,
+          },
+        );
+      }
+    } else {
+      await this.app.vault.process(file, (data) => {
+        before = data.split('\n');
+        if (!this.lineMatchesTask(before[task.line], task)) return data;
+        after = mutate(before);
+        changed = after.join('\n') !== data;
+        return changed ? after.join('\n') : data;
+      });
+    }
+
+    if (!changed) {
+      return {
+        status: 'success',
+        task: this.applyPropertySnapshot(
+          task,
+          this.parsedProperties(before, task),
+        ),
+        lineDelta: 0,
+      };
+    }
+
+    return {
+      status: 'success',
+      task: this.applyPropertySnapshot(
+        task,
+        this.parsedProperties(after, task),
+      ),
+      lineDelta: after.length - before.length,
+    };
+  }
+
+  /** Set the active BLOCKER list, preserving unknown drawer entries. */
+  async setTaskDependency(
+    task: Task,
+    reference: string,
+    add: boolean,
+  ): Promise<TaskPropertyWriteResult> {
+    const format = this.propertyFormat(task);
+    const ref = reference.trim();
+    if (!ref) {
+      return {
+        status: 'failed',
+        task: null,
+        lineDelta: 0,
+        reason: 'A dependency reference is required.',
+      };
+    }
+    const parsedRef = parseDependencyValue(ref, format);
+    if (parsedRef.references.length !== 1 || parsedRef.issues.length > 0) {
+      return {
+        status: 'failed',
+        task: null,
+        lineDelta: 0,
+        reason: 'The dependency reference is not valid.',
+      };
+    }
+    const normalized = parsedRef.references[0];
+
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) {
+      return { status: 'failed', task: null, lineDelta: 0 };
+    }
+    const lines = await this.readFileText(file).then((text) =>
+      text.split('\n'),
+    );
+    const drawer = this.findPropertiesDrawer(lines, task);
+    if (drawer?.issues.some((issue) => issue.code === 'malformed-drawer')) {
+      return {
+        status: 'ambiguous',
+        task: null,
+        lineDelta: 0,
+        reason: 'Fix the malformed properties drawer before editing it.',
+      };
+    }
+    const current = drawer
+      ? (extractTaskProperties(drawer, format).blockedBy ?? [])
+      : [];
+    const next = add
+      ? current.includes(normalized)
+        ? current
+        : [...current, normalized]
+      : current.filter((item) => item !== normalized);
+    if (
+      next.length === current.length &&
+      next.every((item, i) => item === current[i])
+    ) {
+      return {
+        status: 'success',
+        task: this.applyPropertySnapshot(
+          task,
+          this.parsedProperties(lines, task),
+        ),
+        lineDelta: 0,
+      };
+    }
+
+    return this.writeDrawerMutation(task, (sourceLines) =>
+      this.applyDrawerUpdates(sourceLines, task, [
+        { key: 'BLOCKER', value: next.length ? next.join(' ') : null },
+      ]),
+    );
+  }
+
+  /** Insert or replace supported drawer keys as one serialized write. */
+  async updateOrInsertPropertiesDrawer(
+    task: Task,
+    entries: readonly TaskPropertyUpdate[],
+  ): Promise<TaskPropertyWriteResult> {
+    return this.writeDrawerMutation(task, (lines) =>
+      this.applyDrawerUpdates(lines, task, entries),
+    );
+  }
+
+  /** Remove a whole drawer or only the named supported keys. */
+  async removePropertiesDrawer(
+    task: Task,
+    keys?: readonly TaskPropertyKey[],
+  ): Promise<TaskPropertyWriteResult> {
+    if (!keys) {
+      const file = this.app.vault.getAbstractFileByPath(task.path);
+      if (!(file instanceof TFile)) {
+        return { status: 'failed', task: null, lineDelta: 0 };
+      }
+      const lines = await this.readFileText(file).then((text) =>
+        text.split('\n'),
+      );
+      const drawer = this.findPropertiesDrawer(lines, task);
+      if (!drawer) {
+        return { status: 'success', task, lineDelta: 0 };
+      }
+      return this.writeDrawerMutation(task, (sourceLines) => [
+        ...sourceLines.slice(0, drawer.startLine),
+        ...sourceLines.slice(drawer.endLine + 1),
+      ]);
+    }
+    return this.writeDrawerMutation(task, (lines) =>
+      this.applyDrawerUpdates(
+        lines,
+        task,
+        keys.map((key) => ({ key, value: null })),
+      ),
+    );
   }
 
   /** Revalidate the source and rewrite it, or report that nothing changed. */

@@ -1,5 +1,25 @@
 import { TFile } from 'obsidian';
 
+export type TaskPropertyKey = 'ID' | 'BLOCKER' | 'ARCHIVED_BLOCKER';
+
+export type TaskPropertyIssueCode =
+  | 'malformed-drawer'
+  | 'duplicate-drawer'
+  | 'duplicate-key'
+  | 'invalid-id'
+  | 'invalid-reference';
+
+export interface TaskPropertyIssue {
+  code: TaskPropertyIssueCode;
+  key?: TaskPropertyKey;
+  /** Absolute zero-based source line. */
+  line: number;
+  start?: number;
+  end?: number;
+  message: string;
+  reference?: string;
+}
+
 export interface Task {
   path: string; // path to the page in the vault
   line: number; // line number of the task in the page
@@ -44,6 +64,11 @@ export interface Task {
   isTableTask?: boolean; // true if task was parsed from a markdown table cell
   sourceFormat?: 'markdown' | 'org' | 'code-comment'; // parser provenance; undefined means markdown for legacy snapshots
   tableCell?: { cellIndex: number }; // position info for table cell tasks
+  properties?: Partial<Record<TaskPropertyKey, string>>; // supported drawer values, raw authored form
+  id?: string; // exact case-sensitive task identifier from :ID:
+  blockedBy?: string[]; // BLOCKER references, order-preserved and deduped
+  archivedBlockers?: string[]; // non-blocking ARCHIVED_BLOCKER history
+  propertyIssues?: readonly TaskPropertyIssue[]; // bounded source diagnostics
 }
 
 export type KeywordGroup =

@@ -701,6 +701,17 @@
   display: inline;
 }
 
+/* Task properties drawers - quiet metadata using theme variables only */
+:is(.cm-editor, .markdown-preview-view) .todoseq-properties-line {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+:is(.cm-editor, .markdown-preview-view) .todoseq-properties-key {
+  font-weight: var(--font-normal);
+  color: var(--text-faint);
+}
+
 /* Description line - editor and reader preview */
 :is(.cm-editor, .markdown-preview-view) .todoseq-task-description {
   font-size: 0.9rem;

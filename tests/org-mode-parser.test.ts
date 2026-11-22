@@ -420,6 +420,87 @@ SOMETHING: value
     });
   });
 
+  describe('typed properties drawer support', () => {
+    it('attaches ID, BLOCKER append values, history and unknown preservation', () => {
+      const content = `* TODO Write paper
+:PROPERTIES:
+:ID: paper-01
+:BLOCKER: data-02 literature-03
+:BLOCKER+: approval-04
+:ARCHIVED_BLOCKER: old-01
+:TRIGGER: do-not-run
+:END:`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0]).toMatchObject({
+        id: 'paper-01',
+        blockedBy: ['data-02', 'literature-03', 'approval-04'],
+        archivedBlockers: ['old-01'],
+      });
+      expect(tasks[0].properties).toEqual({
+        ID: 'paper-01',
+        BLOCKER: 'data-02 literature-03 approval-04',
+        ARCHIVED_BLOCKER: 'old-01',
+      });
+    });
+
+    it('continues scanning planning lines after the drawer', () => {
+      const content = `* TODO Task
+:PROPERTIES:
+:ID: task-1
+:END:
+SCHEDULED: <2026-03-05>
+DEADLINE: <2026-03-10>`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].scheduledDate).not.toBeNull();
+      expect(tasks[0].deadlineDate).not.toBeNull();
+    });
+
+    it('does not attach a late drawer or absorb the next headline', () => {
+      const content = `* TODO Task
+Body text
+:PROPERTIES:
+:ID: late
+:END:
+* TODO Next
+:PROPERTIES:
+:ID: next-1
+:END:`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].id).toBeUndefined();
+      expect(tasks[1].id).toBe('next-1');
+    });
+
+    it('stops an unclosed drawer before the next headline', () => {
+      const content = `* TODO Task
+:PROPERTIES:
+:ID: task-1
+* TODO Next
+:PROPERTIES:
+:ID: next-1
+:END:`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].id).toBe('task-1');
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({ code: 'malformed-drawer' }),
+      ]);
+      expect(tasks[1].id).toBe('next-1');
+    });
+
+    it('supports combined planning lines without treating them as dates', () => {
+      const content = `* TODO Task
+:PROPERTIES:
+:ID: task-1
+:END:
+SCHEDULED: <2026-03-05> DEADLINE: <2026-03-10>`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].id).toBe('task-1');
+      expect(tasks[0].scheduledDate).not.toBeNull();
+      expect(tasks[0].deadlineDate).not.toBeNull();
+    });
+  });
+
   describe('early termination when both dates found', () => {
     it('should stop scanning after both scheduled and deadline are found', () => {
       const content = `* TODO Task

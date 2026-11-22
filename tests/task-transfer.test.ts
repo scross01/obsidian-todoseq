@@ -163,6 +163,77 @@ describe('TaskWriter transfers', () => {
     expect(h.store.get(DEST)).toContain('- [ ] TODO Water the plants');
   });
 
+  it('carries a properties drawer with a copied task', async () => {
+    const source = [
+      'Intro',
+      '',
+      'TODO Water the plants',
+      ':PROPERTIES:',
+      ':ID: water-1',
+      ':BLOCKER: data-02',
+      ':END:',
+      'SCHEDULED: <2026-05-10 Sun>',
+      '',
+    ].join('\n');
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+    const result = await h.writer.transferTask(
+      task({ line: 2, state: 'TODO', rawText: 'TODO Water the plants' }),
+      h.file(DEST),
+      'copy',
+    );
+    expect(result.status).toBe('success');
+    expect(h.store.get(DEST)).toContain(
+      ':PROPERTIES:\n:ID: water-1\n:BLOCKER: data-02\n:END:\nSCHEDULED:',
+    );
+  });
+
+  it('moves the whole drawer and leaves no metadata behind', async () => {
+    const source = [
+      'Intro',
+      '',
+      'TODO Water the plants',
+      ':PROPERTIES:',
+      ':ID: water-1',
+      ':END:',
+      'DESCRIPTION: keep',
+      '',
+    ].join('\n');
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+    await h.writer.transferTask(
+      task({ line: 2, state: 'TODO', rawText: 'TODO Water the plants' }),
+      h.file(DEST),
+      'move',
+    );
+    expect(h.store.get(SOURCE)).toBe('Intro\n\n');
+    expect(h.store.get(DEST)).toContain(
+      ':ID: water-1\n:END:\nDESCRIPTION: keep',
+    );
+  });
+
+  it('migrates while retaining the drawer and history lines', async () => {
+    const source = [
+      'Intro',
+      '',
+      'TODO Water the plants',
+      ':PROPERTIES:',
+      ':ID: water-1',
+      ':END:',
+      'SCHEDULED: <2026-05-10 Sun>',
+      'STARTED: [2026-05-09 Sat]',
+      '',
+    ].join('\n');
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+    await h.writer.transferTask(
+      task({ line: 2, state: 'TODO', rawText: 'TODO Water the plants' }),
+      h.file(DEST),
+      'migrate',
+    );
+    expect(h.store.get(SOURCE)).toContain(
+      ':PROPERTIES:\n:ID: water-1\n:END:\nSTARTED:',
+    );
+    expect(h.store.get(SOURCE)).not.toContain('SCHEDULED:');
+  });
+
   it('moves a table task by clearing only its cell', async () => {
     const row = '| a\\|b | TODO Water the plants | keep |';
     const h = harness({ [SOURCE]: row + '\n', [DEST]: '' });

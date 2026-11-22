@@ -1,5 +1,9 @@
 # Change Log
 
+## Unreleased
+
+- Added Org-style `:PROPERTIES:` drawers under Markdown and Org tasks. TODOseq reads `:ID:`, `:BLOCKER:` and `:ARCHIVED_BLOCKER:` while preserving every other property, and copy, move and migrate carry the drawer with the task.
+
 ## 0.23.0
 
 - Task searches and suggestions now find accented words and spellings such as `café`, `Łódź` and `Straße` when you type `cafe`, `lodz` or `strasse`; quoted phrases, tags, states and property values follow the same rule.

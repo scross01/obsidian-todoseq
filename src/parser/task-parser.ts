@@ -1,4 +1,9 @@
-import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
+import {
+  Task,
+  DateRepeatInfo,
+  WarningPeriodInfo,
+  type TaskPropertyIssue,
+} from '../types/task';
 import { LanguageRegistry, LanguageDefinition } from './language-registry';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
@@ -17,6 +22,12 @@ import {
   isSeparatorCell,
   getCellTaskLine,
 } from '../utils/task-line-utils';
+import {
+  extractTaskProperties,
+  isPropertiesDrawerStart,
+  readTaskPropertiesDrawer,
+  type ParsedTaskProperties,
+} from '../utils/task-properties';
 import {
   BULLET_LIST_PATTERN_SOURCE,
   NUMBERED_LIST_PATTERN_SOURCE,
@@ -815,6 +826,7 @@ export class TaskParser implements ITaskParser {
     scheduledWarningPeriod: WarningPeriodInfo | null;
     deadlineWarningPeriod: WarningPeriodInfo | null;
     description: string | null;
+    propertyInfo: ParsedTaskProperties | null;
   } {
     let scheduledDate: Date | null = null;
     let scheduledDateRepeat: DateRepeatInfo | null = null;
@@ -825,6 +837,7 @@ export class TaskParser implements ITaskParser {
     let scheduledWarningPeriod: WarningPeriodInfo | null = null;
     let deadlineWarningPeriod: WarningPeriodInfo | null = null;
     let description: string | null = null;
+    let propertyInfo: ParsedTaskProperties | null = null;
 
     let scheduledFound = false;
     let deadlineFound = false;
@@ -838,6 +851,43 @@ export class TaskParser implements ITaskParser {
       const nextLineTrimmed = nextLine.trim();
       if (nextLineTrimmed === '') {
         continue; // Skip empty lines
+      }
+
+      if (isPropertiesDrawerStart(nextLine, 'markdown', indent)) {
+        const drawer = readTaskPropertiesDrawer(lines, i, 'markdown', {
+          taskIndent: indent,
+          isBoundary: (line) =>
+            this.testRegex.test(line) ||
+            this.headingRegex.test(line) ||
+            CHECKBOX_DETECTION_REGEX.test(line),
+        });
+        if (drawer) {
+          if (propertyInfo) {
+            const existingProperties: ParsedTaskProperties = propertyInfo;
+            const issues: TaskPropertyIssue[] = [
+              ...(existingProperties.propertyIssues ?? []),
+              {
+                code: 'duplicate-drawer',
+                line: i,
+                message: 'A second properties drawer is ignored.',
+              },
+            ];
+            propertyInfo = { ...existingProperties, propertyIssues: issues };
+            console.debug(
+              `Duplicate properties drawer at line ${i + 1}; first drawer wins.`,
+            );
+          } else {
+            propertyInfo = extractTaskProperties(drawer, 'markdown');
+            if (!drawer.closed) {
+              console.debug(
+                `Unclosed properties drawer at line ${drawer.startLine + 1}.`,
+              );
+            }
+          }
+          i = drawer.endLine;
+          if (!drawer.closed) break;
+          continue;
+        }
       }
 
       const dateLineType = this.getDateLineType(nextLine, indent);
@@ -919,6 +969,7 @@ export class TaskParser implements ITaskParser {
       scheduledWarningPeriod,
       deadlineWarningPeriod,
       description,
+      propertyInfo,
     };
   }
 
@@ -1063,6 +1114,20 @@ export class TaskParser implements ITaskParser {
       // Stop at empty lines - this breaks the subtask chain
       if (trimmedContent === '') {
         break;
+      }
+
+      if (isPropertiesDrawerStart(nextLine, 'markdown', indent)) {
+        const drawer = readTaskPropertiesDrawer(lines, i, 'markdown', {
+          taskIndent: indent,
+          isBoundary: (line) =>
+            this.testRegex.test(line) ||
+            this.headingRegex.test(line) ||
+            CHECKBOX_DETECTION_REGEX.test(line),
+        });
+        if (drawer) {
+          i = drawer.endLine;
+          continue;
+        }
       }
 
       // Check if this line contains a task keyword but is still a valid subtask
@@ -1726,6 +1791,7 @@ export class TaskParser implements ITaskParser {
       deadlineDateRepeat,
       scheduledWarningPeriod,
       deadlineWarningPeriod,
+      propertyInfo,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
@@ -1736,6 +1802,7 @@ export class TaskParser implements ITaskParser {
     task.startedDate = startedDate;
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
+    this.applyParsedProperties(task, propertyInfo);
 
     // Extract subtasks from lines following date lines
     // Footnote tasks don't have checkboxes
@@ -1863,6 +1930,7 @@ export class TaskParser implements ITaskParser {
       deadlineDateRepeat,
       scheduledWarningPeriod,
       deadlineWarningPeriod,
+      propertyInfo,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
@@ -1873,6 +1941,7 @@ export class TaskParser implements ITaskParser {
     task.startedDate = startedDate;
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
+    this.applyParsedProperties(task, propertyInfo);
 
     // Extract subtasks from lines following date lines
     // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
@@ -1991,6 +2060,7 @@ export class TaskParser implements ITaskParser {
       scheduledWarningPeriod,
       deadlineWarningPeriod,
       description,
+      propertyInfo,
     } = this.extractTaskDates(lines, index + 1, indent);
 
     task.scheduledDate = scheduledDate;
@@ -2002,6 +2072,7 @@ export class TaskParser implements ITaskParser {
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
     task.description = description ?? undefined;
+    this.applyParsedProperties(task, propertyInfo);
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
@@ -2136,6 +2207,7 @@ export class TaskParser implements ITaskParser {
       scheduledWarningPeriod,
       deadlineWarningPeriod,
       description,
+      propertyInfo,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
@@ -2147,6 +2219,7 @@ export class TaskParser implements ITaskParser {
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
     task.description = description ?? undefined;
+    this.applyParsedProperties(task, propertyInfo);
 
     // Extract subtasks from lines following date lines
     // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
@@ -2177,6 +2250,22 @@ export class TaskParser implements ITaskParser {
     }
 
     return task;
+  }
+
+  private applyParsedProperties(
+    task: Task,
+    parsed: ParsedTaskProperties | null,
+  ): void {
+    if (!parsed) return;
+    if (parsed.properties) task.properties = parsed.properties;
+    if (parsed.id !== undefined) task.id = parsed.id;
+    if (parsed.blockedBy !== undefined) task.blockedBy = parsed.blockedBy;
+    if (parsed.archivedBlockers !== undefined) {
+      task.archivedBlockers = parsed.archivedBlockers;
+    }
+    if (parsed.propertyIssues?.length) {
+      task.propertyIssues = parsed.propertyIssues;
+    }
   }
 
   private detectLanguage(lang: string): void {

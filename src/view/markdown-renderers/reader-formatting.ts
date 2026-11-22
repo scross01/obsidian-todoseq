@@ -179,6 +179,9 @@ export class ReaderViewFormatter {
 
         // Process DESCRIPTION lines. Same chunked-render caveat as above.
         await this.processDescriptionLines(element, context);
+
+        // Style task property drawers as quiet metadata.
+        this.processPropertiesLines(element);
       } catch (error) {
         // Don't let a failed async source-file read tear down the rest of
         // the post-processor — checkbox / keyword handlers must still
@@ -194,6 +197,21 @@ export class ReaderViewFormatter {
 
       // Attach keyword click handlers for task state toggling and context menu
       this.attachKeywordClickHandlers(element, context);
+    });
+  }
+
+  /** Mark a rendered properties drawer as metadata without changing text. */
+  private processPropertiesLines(element: HTMLElement): void {
+    const blocks = element.querySelectorAll<HTMLElement>('p, li');
+    blocks.forEach((block) => {
+      const text = block.textContent?.trim() ?? '';
+      if (
+        text === ':PROPERTIES:' ||
+        text === ':END:' ||
+        /^:[^:\s]+:(?:\s|$)/.test(text)
+      ) {
+        block.classList.add('todoseq-properties-line');
+      }
     });
   }
 

@@ -704,16 +704,58 @@ export class TaskKeywordDecorator {
     // Check if this line is immediately after the task line (with possible empty lines in between)
     const linesSinceTask = lineNumber - this.previousTaskLine;
 
-    // Only consider lines that are close to the task line (within 5 lines)
-    if (linesSinceTask > 5) {
+    // Only consider lines that are close to the task line. Drawers can add
+    // several metadata lines, so keep the window bounded but large enough.
+    if (linesSinceTask > 60) {
       // Too far from task line, reset tracking
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
       return;
     }
 
-    // Check if this line contains SCHEDULED:, DEADLINE:, CLOSED:, STARTED:, or DESCRIPTION:
+    // Check if this line is part of a properties drawer. The drawer stays
+    // within the task's metadata span and must not terminate task tracking.
     const trimmedLine = lineText.trim();
+    const propertyMatch = /^:([^:\s]+):(.*)$/.exec(trimmedLine);
+    const isDrawerBoundary =
+      trimmedLine === ':PROPERTIES:' || trimmedLine === ':END:';
+    if ((isDrawerBoundary || propertyMatch) && this.previousTaskIndent) {
+      const lineIndent = lineText.substring(
+        0,
+        lineText.length - trimmedLine.length,
+      );
+      if (
+        lineIndent === this.previousTaskIndent ||
+        lineIndent.startsWith(this.previousTaskIndent)
+      ) {
+        builder.add(
+          line.from,
+          line.to,
+          Decoration.mark({
+            class: 'todoseq-properties-line',
+            attributes: {
+              'data-properties-line': isDrawerBoundary ? 'boundary' : 'entry',
+              'aria-label': 'task properties',
+              role: 'note',
+            },
+          }),
+        );
+        if (propertyMatch) {
+          const keyStart =
+            line.from +
+            (lineText.length - trimmedLine.length) +
+            trimmedLine.indexOf(':');
+          const keyEnd = keyStart + propertyMatch[0].indexOf(':', 1) + 1;
+          builder.add(
+            keyStart,
+            keyEnd,
+            Decoration.mark({ class: 'todoseq-properties-key' }),
+          );
+        }
+        return;
+      }
+    }
+
     let dateLineType: 'scheduled' | 'deadline' | 'closed' | 'started' | null =
       null;
     let isDescriptionLine = false;

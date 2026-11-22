@@ -1596,6 +1596,146 @@ describe('table task parsing', () => {
     });
   });
 
+  describe('properties drawers', () => {
+    const drawerParser = TaskParser.create(
+      createTestKeywordManager(createBaseSettings()),
+      null,
+      undefined,
+    );
+
+    const parse = (content: string): Task[] =>
+      drawerParser.parseFile(content, 'test.md');
+
+    it('attaches ID, BLOCKER, append and archived history to plain tasks', () => {
+      const tasks = parse(`TODO Write paper
+:PROPERTIES:
+:ID: paper-01
+:BLOCKER: data-02 literature-03
+:BLOCKER+: approval-04
+:ARCHIVED_BLOCKER: old-01
+:Unknown: preserved
+:END:`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'paper-01',
+        blockedBy: ['data-02', 'literature-03', 'approval-04'],
+        archivedBlockers: ['old-01'],
+        properties: {
+          ID: 'paper-01',
+          BLOCKER: 'data-02 literature-03 approval-04',
+          ARCHIVED_BLOCKER: 'old-01',
+        },
+      });
+      expect(tasks[0].propertyIssues).toBeUndefined();
+    });
+
+    it('supports heading, bullet, checkbox and quoted task drawers', () => {
+      const tasks = parse(`# TODO Heading
+:PROPERTIES:
+:ID: heading-1
+:END:
+- TODO Bullet
+  :PROPERTIES:
+  :ID: bullet-1
+  :END:
+- [ ] TODO Checkbox
+  :PROPERTIES:
+  :ID: check-1
+  :END:
+> TODO Quoted
+> :PROPERTIES:
+> :ID: quote-1
+> :END:`);
+      expect(tasks.map((task) => task.id)).toEqual([
+        'heading-1',
+        'bullet-1',
+        'check-1',
+        'quote-1',
+      ]);
+    });
+
+    it('keeps the drawer out of subtask counts and child parentage', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: parent-1
+:END:
+  - [ ] Child
+`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'parent-1',
+        subtaskCount: 1,
+        subtaskCompletedCount: 0,
+      });
+    });
+
+    it('does not let an unclosed drawer consume a following task', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: parent-1
+TODO Child`);
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].id).toBe('parent-1');
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({ code: 'malformed-drawer' }),
+      ]);
+      expect(tasks[1].text).toBe('Child');
+      expect(tasks[1].id).toBeUndefined();
+    });
+
+    it('ignores a second drawer but reports it', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: first
+:END:
+:PROPERTIES:
+:ID: second
+:END:`);
+      expect(tasks[0].id).toBe('first');
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({ code: 'duplicate-drawer', line: 4 }),
+      ]);
+    });
+
+    it('reports malformed Markdown dependency links without splitting them', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:BLOCKER: good [[Broken link
+:END:`);
+      expect(tasks[0].blockedBy).toEqual(['good']);
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({
+          code: 'invalid-reference',
+          reference: '[[Broken link',
+        }),
+      ]);
+    });
+
+    it('parses dates and DESCRIPTION around a drawer', () => {
+      const tasks = parse(`TODO Parent
+SCHEDULED: <2026-05-10 Sun>
+:PROPERTIES:
+:ID: parent-1
+:END:
+DESCRIPTION: After the drawer
+CLOSED: [2026-05-09 Sat]`);
+      expect(tasks[0].scheduledDate).not.toBeNull();
+      expect(tasks[0].closedDate).not.toBeNull();
+      expect(tasks[0].description).toBe('After the drawer');
+    });
+
+    it('does not leak drawer lines from table cells into a following task', () => {
+      const tasks = parse(`| TODO Cell |
+:PROPERTIES:
+:ID: table-trap
+:END:
+TODO Next`);
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].id).toBeUndefined();
+      expect(tasks[1].id).toBeUndefined();
+    });
+  });
+
   describe('configured active keyword segments (keyword-groups example)', () => {
     // STARTED configured as an ACTIVE keyword (the documented keyword-
     // groups example) must never make a <br>STARTED: date segment parse

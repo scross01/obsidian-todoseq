@@ -73,6 +73,18 @@ TODOseq recognizes standard Org-mode task syntax:
   CLOSED: [2026-02-10 Mon]
 ```
 
+**Property Drawers:**
+
+```org
+* TODO Write the research paper
+  :PROPERTIES:
+  :ID: paper-01
+  :BLOCKER: data-02
+  :END:
+```
+
+TODOseq reads `ID`, `BLOCKER` and `ARCHIVED_BLOCKER`; other properties are preserved in the file and left uninterpreted. Org files use IDs for dependency references. See [Task Dependencies](task-dependencies.md) for syntax and Markdown block-link support.
+
 ### Supported Keywords
 
 All default TODOseq keywords are recognized in Org-mode files:

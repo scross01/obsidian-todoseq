@@ -24,6 +24,16 @@ export function getIndentLength(indent: string): number {
   return length;
 }
 
+/** Return the closing :END: index for a drawer starting at i, if bounded. */
+function propertiesDrawerEnd(lines: string[], i: number): number {
+  if (lines[i]?.trim() !== ':PROPERTIES:') return -1;
+  for (let j = i + 1; j < lines.length; j++) {
+    if (lines[j].trim() === ':END:') return j;
+    if (/^\*+\s/.test(lines[j])) return -1;
+  }
+  return -1;
+}
+
 /**
  * Find a date line of specified type after a task line.
  * Uses regex-based detection consistent with parser's getDateLineType logic.
@@ -52,6 +62,12 @@ export function findDateLine(
   for (let i = startIndex; i < maxLines; i++) {
     const line = lines[i];
     const trimmedLine = line.trimStart();
+
+    const drawerEnd = propertiesDrawerEnd(lines, i);
+    if (drawerEnd >= 0) {
+      i = drawerEnd;
+      continue;
+    }
 
     if (lineStartsWithKeyword(line, keyword, taskIndent)) {
       return i;
@@ -215,6 +231,12 @@ function findKeywordLine(
   for (let i = startIndex; i < maxLines; i++) {
     const line = lines[i];
     const trimmedLine = line.trimStart();
+
+    const drawerEnd = propertiesDrawerEnd(lines, i);
+    if (drawerEnd >= 0) {
+      i = drawerEnd;
+      continue;
+    }
 
     if (lineStartsWithKeyword(line, keyword, taskIndent)) {
       return i;
