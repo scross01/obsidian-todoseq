@@ -1730,6 +1730,7 @@ export class EditorController {
         enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
         taskWriter: this.plugin.taskEditor,
         dependencyManager: this.plugin.taskDependencyManager,
+        taskUpdateCoordinator: this.plugin.taskUpdateCoordinator,
       },
       this.plugin.app,
       this.plugin.taskStateManager,

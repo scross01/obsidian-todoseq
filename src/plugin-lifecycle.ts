@@ -896,9 +896,8 @@ export class PluginLifecycleManager {
     task: Task,
   ): Promise<{ migrated: number; failures: ArchiveReferenceFailure[] }> {
     const manager = this.plugin.taskDependencyManager;
-    const writer = this.plugin.taskEditor;
-    const stateManager = this.plugin.taskStateManager;
-    if (!manager || !writer) return { migrated: 0, failures: [] };
+    const coordinator = this.plugin.taskUpdateCoordinator;
+    if (!manager || !coordinator) return { migrated: 0, failures: [] };
 
     const targetKey = getTaskKey(task);
     const byDependent = new Map<
@@ -926,28 +925,22 @@ export class PluginLifecycleManager {
     const failures: ArchiveReferenceFailure[] = [];
     for (const { task: dependent, references } of byDependent.values()) {
       try {
-        const result = await writer.migrateBlockerHistory(
+        const result = await coordinator.updateTaskDependency(
           dependent,
-          'to-history',
+          'archive',
           references,
         );
-        if (result.status === 'success' && result.task) {
+        if (result.status === 'applied') {
           migrated += references.length;
-          stateManager.updateTaskByPathAndLine(
-            dependent.path,
-            dependent.line,
-            {
-              blockedBy: result.task.blockedBy ?? [],
-              archivedBlockers: result.task.archivedBlockers ?? [],
-            },
-            dependent.tableCell?.cellIndex,
-          );
         } else {
           for (const reference of references) {
             failures.push({
               path: dependent.path,
               reference,
-              reason: result.reason ?? result.status,
+              reason:
+                result.status === 'failed' && result.reason
+                  ? result.reason
+                  : result.status,
             });
           }
         }
@@ -961,7 +954,6 @@ export class PluginLifecycleManager {
         }
       }
     }
-    if (migrated > 0) stateManager.notifySubscribers();
     return { migrated, failures };
   }
 
@@ -1006,9 +998,9 @@ export class PluginLifecycleManager {
    */
   async promoteArchivedReferences(): Promise<void> {
     const manager = this.plugin.taskDependencyManager;
-    const writer = this.plugin.taskEditor;
+    const coordinator = this.plugin.taskUpdateCoordinator;
     const stateManager = this.plugin.taskStateManager;
-    if (!manager || !writer || !manager.isValidationReady()) return;
+    if (!manager || !coordinator || !manager.isValidationReady()) return;
 
     const promotions = manager.getArchivedReferencePromotions();
     if (promotions.length === 0) return;
@@ -1035,27 +1027,18 @@ export class PluginLifecycleManager {
     let changed = false;
     for (const { task, references } of byDependent.values()) {
       try {
-        const result = await writer.migrateBlockerHistory(
+        const result = await coordinator.updateTaskDependency(
           task,
-          'to-active',
+          'promote',
           references,
         );
-        if (result.status === 'success' && result.task) {
+        if (result.status === 'applied') {
           changed = true;
-          stateManager.updateTaskByPathAndLine(
-            task.path,
-            task.line,
-            {
-              blockedBy: result.task.blockedBy ?? [],
-              archivedBlockers: result.task.archivedBlockers ?? [],
-            },
-            task.tableCell?.cellIndex,
-          );
         } else {
           console.debug(
             'TODOseq: archived reference promotion skipped for',
             task.path,
-            result.reason ?? result.status,
+            result.status === 'failed' ? result.reason : result.status,
           );
         }
       } catch (error) {

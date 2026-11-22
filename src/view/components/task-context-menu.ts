@@ -9,6 +9,7 @@ import { TaskStateManager } from '../../services/task-state-manager';
 import { BaseDialog } from './base-dialog';
 import type { TaskWriter } from '../../services/task-writer';
 import type { TaskDependencyManager } from '../../services/task-dependency-manager';
+import type { TaskUpdateCoordinator } from '../../services/task-update-coordinator';
 import {
   parseDependencyReference,
   parseDependencyValue,
@@ -53,6 +54,7 @@ export interface TaskContextMenuConfig {
   enforceBlockedTasks?: boolean;
   taskWriter?: TaskWriter | null;
   dependencyManager?: TaskDependencyManager | null;
+  taskUpdateCoordinator?: TaskUpdateCoordinator | null;
 }
 
 /**
@@ -327,7 +329,7 @@ export class TaskContextMenu extends BaseDialog {
       );
       this.focusableItems.push(
         this.createMenuRow('Add copied link as blocker', 'git-branch', () => {
-          void this.addBlockerFromClipboard(writer, task);
+          void this.addBlockerFromClipboard(task);
         }),
       );
     }
@@ -372,10 +374,12 @@ export class TaskContextMenu extends BaseDialog {
     this.hide();
   }
 
-  private async addBlockerFromClipboard(
-    writer: TaskWriter,
-    task: Task,
-  ): Promise<void> {
+  private async addBlockerFromClipboard(task: Task): Promise<void> {
+    const coordinator = this.config.taskUpdateCoordinator;
+    if (!coordinator) {
+      new Notice('Dependency updates are not ready yet');
+      return;
+    }
     let text = '';
     try {
       text = (await navigator.clipboard.readText()).trim();
@@ -409,9 +413,15 @@ export class TaskContextMenu extends BaseDialog {
       new Notice('Dependency does not resolve to exactly one task');
       return;
     }
-    const result = await writer.setTaskDependency(task, reference, true);
-    if (result.status !== 'success') {
-      new Notice(result.reason ?? 'Failed to add the blocker');
+    const result = await coordinator.updateTaskDependency(task, 'add', [
+      reference,
+    ]);
+    if (result.status !== 'applied') {
+      new Notice(
+        result.status === 'failed' && result.reason
+          ? result.reason
+          : 'Failed to add the blocker',
+      );
       return;
     }
     new Notice('Blocker added');

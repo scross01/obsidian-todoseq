@@ -17,16 +17,11 @@ describe('archived reference promotion', () => {
       blockedBy: ['prerequisite'],
       archivedBlockers: [],
     };
-    const writer = {
-      migrateBlockerHistory: jest.fn().mockResolvedValue({
-        status: 'success',
-        task: migrated,
-        lineDelta: 0,
-      }),
+    const coordinator = {
+      updateTaskDependency: jest.fn().mockResolvedValue({ status: 'applied' }),
     };
     const stateManager = {
       getTasks: () => [dependent],
-      updateTaskByPathAndLine: jest.fn(),
       notifySubscribers: jest.fn(),
     };
     const manager = {
@@ -42,22 +37,16 @@ describe('archived reference promotion', () => {
     };
     const lifecycle = new PluginLifecycleManager({
       taskDependencyManager: manager,
-      taskEditor: writer,
+      taskUpdateCoordinator: coordinator,
       taskStateManager: stateManager,
     } as never);
 
     await lifecycle.promoteArchivedReferences();
 
-    expect(writer.migrateBlockerHistory).toHaveBeenCalledWith(
+    expect(coordinator.updateTaskDependency).toHaveBeenCalledWith(
       dependent,
-      'to-active',
+      'promote',
       ['prerequisite'],
-    );
-    expect(stateManager.updateTaskByPathAndLine).toHaveBeenCalledWith(
-      'dependent.md',
-      1,
-      { blockedBy: ['prerequisite'], archivedBlockers: [] },
-      undefined,
     );
     expect(stateManager.notifySubscribers).toHaveBeenCalled();
   });
@@ -69,7 +58,7 @@ describe('archived reference promotion', () => {
     };
     const lifecycle = new PluginLifecycleManager({
       taskDependencyManager: manager,
-      taskEditor: { migrateBlockerHistory: jest.fn() },
+      taskUpdateCoordinator: { updateTaskDependency: jest.fn() },
       taskStateManager: {
         getTasks: () => [],
         updateTaskByPathAndLine: jest.fn(),

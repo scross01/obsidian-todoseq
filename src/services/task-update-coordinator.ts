@@ -43,7 +43,11 @@ export type UpdateType =
   | 'deadline-date'
   | 'priority'
   | 'closed-date'
-  | 'recurrence';
+  | 'recurrence'
+  | 'dependency-reference';
+
+/** Dependency-property mutation routed through the per-file write queue. */
+export type DependencyReferenceAction = 'add' | 'remove' | 'archive' | 'promote';
 
 /**
  * Source of the update (for debugging/tracking)
@@ -59,7 +63,19 @@ export type UpdateType =
  * forward to its next occurrence instead of restoring the journaled line.
  */
 export type UpdateSource =
-  'editor' | 'reader' | 'task-list' | 'embedded' | 'archive-undo';
+  | 'editor'
+  | 'reader'
+  | 'task-list'
+  | 'embedded'
+  | 'archive-undo'
+  | 'dependency';
+
+class DependencyReferenceWriteError extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+    this.name = 'DependencyReferenceWriteError';
+  }
+}
 
 /**
  * Typed result of a task update. Callers must be able to distinguish a write
@@ -69,7 +85,7 @@ export type UpdateSource =
 export type TaskUpdateOutcome =
   | { status: 'applied' }
   | { status: 'refused'; reasons: readonly DependencyReason[] }
-  | { status: 'failed' }
+  | { status: 'failed'; reason?: string }
   | { status: 'not-found' };
 
 /**
@@ -107,6 +123,9 @@ export interface UpdateContext {
   newDeadlineWarningPeriod?: WarningPeriodInfo | null;
   /** New state for recurrence (for 'recurrence' type updates) */
   newStateForRecurrence?: string;
+  /** Dependency-property mutation for 'dependency-reference' updates. */
+  dependencyAction?: DependencyReferenceAction;
+  dependencyReferences?: readonly string[];
   /** Explicit user override for the blocked-completion gate. */
   forceCompletion?: boolean;
 }
@@ -140,6 +159,9 @@ interface ProcessingContext {
   newDeadlineWarningPeriod?: WarningPeriodInfo | null;
   /** New state for recurrence (for 'recurrence' type updates) */
   newStateForRecurrence?: string;
+  /** Dependency-property mutation for 'dependency-reference' updates. */
+  dependencyAction?: DependencyReferenceAction;
+  dependencyReferences?: readonly string[];
   /** Explicit user override for the blocked-completion gate. */
   forceCompletion?: boolean;
   filePath: string;
@@ -513,6 +535,25 @@ export class TaskUpdateCoordinator {
   }
 
   /**
+   * Mutate dependency properties through the same per-file queue as state and
+   * date writes. The writer remains the only low-level content writer.
+   */
+  async updateTaskDependency(
+    task: Task,
+    action: DependencyReferenceAction,
+    references: readonly string[],
+    source: UpdateSource = 'dependency',
+  ): Promise<TaskUpdateOutcome> {
+    return this.updateTask({
+      task,
+      type: 'dependency-reference',
+      source,
+      dependencyAction: action,
+      dependencyReferences: references,
+    });
+  }
+
+  /**
    * Convenience method: Update task state by path and line.
    * If the task is not found (e.g., was archived), re-parse it from the file
    * if the new state is non-archived.
@@ -658,6 +699,8 @@ export class TaskUpdateCoordinator {
       newScheduledWarningPeriod: context.newScheduledWarningPeriod,
       newDeadlineWarningPeriod: context.newDeadlineWarningPeriod,
       newStateForRecurrence: context.newStateForRecurrence,
+      dependencyAction: context.dependencyAction,
+      dependencyReferences: context.dependencyReferences,
       filePath: context.task.path,
       fileLine: context.task.line,
     };
@@ -836,7 +879,9 @@ export class TaskUpdateCoordinator {
         // Recover persisted truth even though the failed write's skip marker
         // is still live. Publish only when no newer request owns the file.
         await this.recoverPersistedTasks(context, generation);
-        return { status: 'failed' };
+        return error instanceof DependencyReferenceWriteError
+          ? { status: 'failed', reason: error.message }
+          : { status: 'failed' };
       }
 
       const lineDelta = (updatedTask as Task & { lineDelta?: number })
@@ -941,6 +986,34 @@ export class TaskUpdateCoordinator {
 
       case 'closed-date':
         return task;
+
+      case 'dependency-reference': {
+        const action = context.dependencyAction;
+        const references = context.dependencyReferences ?? [];
+        if (!action || references.length === 0) {
+          throw new DependencyReferenceWriteError(
+            'A dependency action and reference are required.',
+          );
+        }
+        const result =
+          action === 'add' || action === 'remove'
+            ? await taskEditor.setTaskDependency(
+                task,
+                references[0],
+                action === 'add',
+              )
+            : await taskEditor.migrateBlockerHistory(
+                task,
+                action === 'archive' ? 'to-history' : 'to-active',
+                references,
+              );
+        if (result.status !== 'success' || !result.task) {
+          throw new DependencyReferenceWriteError(
+            result.reason ?? `Dependency ${action} failed.`,
+          );
+        }
+        return result.task;
+      }
 
       case 'recurrence': {
         // Use atomic update to apply all recurrence changes in a single
@@ -1077,6 +1150,19 @@ export class TaskUpdateCoordinator {
           deadlineDateRepeat: updatedTask.deadlineDateRepeat,
           scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
           deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
+          urgency,
+        });
+        break;
+
+      case 'dependency-reference':
+        // Property-only writes must preserve keyword, dates and recurrence.
+        finalizeUpdate({
+          rawText: updatedTask.rawText,
+          id: updatedTask.id,
+          properties: updatedTask.properties,
+          blockedBy: updatedTask.blockedBy,
+          archivedBlockers: updatedTask.archivedBlockers,
+          propertyIssues: updatedTask.propertyIssues,
           urgency,
         });
         break;

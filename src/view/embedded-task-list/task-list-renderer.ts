@@ -61,6 +61,7 @@ export class EmbeddedTaskListRenderer {
         enforceBlockedTasks: plugin.settings.enforceBlockedTasks,
         taskWriter: plugin.taskEditor,
         dependencyManager: plugin.taskDependencyManager,
+        taskUpdateCoordinator: plugin.taskUpdateCoordinator,
       },
       plugin.app,
       this.plugin.taskStateManager,
@@ -953,6 +954,7 @@ export class EmbeddedTaskListRenderer {
         enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
         taskWriter: this.plugin.taskEditor,
         dependencyManager: this.plugin.taskDependencyManager,
+        taskUpdateCoordinator: this.plugin.taskUpdateCoordinator,
       });
     }
   }
