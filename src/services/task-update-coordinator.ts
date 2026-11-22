@@ -19,11 +19,12 @@ import { getTaskKey } from '../utils/task-utils';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 import { TaskWriter } from './task-writer';
-import { TFile, MarkdownView } from 'obsidian';
+import { TFile, MarkdownView, Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { ChangeTracker } from './change-tracker';
 import { RecurrenceCoordinator } from './recurrence-coordinator';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
+import { TaskDependencyManager } from './task-dependency-manager';
 import {
   calculateTaskUrgency,
   getDefaultCoefficients,
@@ -94,6 +95,8 @@ export interface UpdateContext {
   newDeadlineWarningPeriod?: WarningPeriodInfo | null;
   /** New state for recurrence (for 'recurrence' type updates) */
   newStateForRecurrence?: string;
+  /** Explicit user override for the blocked-completion gate. */
+  forceCompletion?: boolean;
 }
 
 /**
@@ -196,6 +199,7 @@ export class TaskUpdateCoordinator {
     private taskStateManager: TaskStateManager,
     private keywordManager: KeywordManager,
     private changeTracker: ChangeTracker,
+    private taskDependencyManager: TaskDependencyManager | null = null,
   ) {
     this.recurrenceCoordinator = new RecurrenceCoordinator(
       this.plugin,
@@ -227,6 +231,12 @@ export class TaskUpdateCoordinator {
   /**
    * Update the keyword manager (called when settings change).
    */
+  setTaskDependencyManager(
+    dependencyManager: TaskDependencyManager | null,
+  ): void {
+    this.taskDependencyManager = dependencyManager;
+  }
+
   setKeywordManager(keywordManager: KeywordManager): void {
     this.keywordManager = keywordManager;
     this.recurrenceCoordinator.setKeywordManager(keywordManager);
@@ -282,12 +292,52 @@ export class TaskUpdateCoordinator {
    * @returns Promise resolving when async phase is complete (for testing)
    */
   async updateTask(context: UpdateContext): Promise<void> {
+    if (this.refuseBlockedCompletion(context)) return;
     const procContext = this.buildProcessingContext(context);
     procContext.fileRequestGeneration = this.nextFileGeneration(
       procContext.filePath,
     );
     this.performSyncPhase(procContext);
     return this.queueAsyncPhase(procContext);
+  }
+
+  /** True when this request would move an incomplete task to completion. */
+  private isCompletionRequest(context: UpdateContext): boolean {
+    return (
+      context.type === 'state' &&
+      !!context.newState &&
+      !context.task.completed &&
+      this.keywordManager.isCompleted(context.newState)
+    );
+  }
+
+  /**
+   * Refuse before any generation, journal or optimistic mutation when the
+   * current authoritative dependency snapshot blocks completion.
+   */
+  private refuseBlockedCompletion(context: UpdateContext): boolean {
+    if (
+      !this.isCompletionRequest(context) ||
+      context.forceCompletion ||
+      context.source === 'archive-undo' ||
+      this.plugin.settings?.enforceBlockedTasks === false ||
+      !this.taskDependencyManager
+    ) {
+      return false;
+    }
+
+    const key = getTaskKey(context.task);
+    if (!this.taskDependencyManager.isBlocked(key)) return false;
+
+    const reasons = this.taskDependencyManager.getBlockingReasons(key);
+    const detail = reasons.length
+      ? reasons.map((reason) => reason.message).join(' ')
+      : 'Resolve its BLOCKER references first.';
+    new Notice(`Blocked task cannot be completed. ${detail}`, 8000);
+    console.debug(
+      `[TaskUpdateCoordinator] Refused completion for ${key}: ${detail}`,
+    );
+    return true;
   }
 
   /**

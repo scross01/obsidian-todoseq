@@ -94,6 +94,26 @@ export class EmbeddedTaskItemRenderer {
       `Toggle task: ${task.text || task.state}`,
     );
 
+    const dependencyManager = this.plugin.taskDependencyManager;
+    const key = `${task.path}:${task.line}${
+      task.isTableTask && task.tableCell ? `:${task.tableCell.cellIndex}` : ''
+    }`;
+    if (
+      dependencyManager &&
+      !task.completed &&
+      dependencyManager.isBlocked(key)
+    ) {
+      li.classList.add('todoseq-task-blocked');
+      const lock = li.createSpan({ cls: 'todoseq-task-blocked-icon' });
+      setIcon(lock, 'lock');
+      const details = dependencyManager
+        .getBlockingReasons(key)
+        .map((reason) => reason.message)
+        .join(' ');
+      setTooltip(lock, details || 'Blocked by an incomplete dependency');
+      lock.setAttribute('aria-label', details || 'Blocked task');
+    }
+
     const wrapMode: 'dynamic' | boolean = params.wrapContent ?? 'dynamic';
     const isTrueWrapMode = wrapMode === true;
     const isDynamicMode = wrapMode === 'dynamic';

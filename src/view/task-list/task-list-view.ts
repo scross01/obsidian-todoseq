@@ -222,6 +222,9 @@ export class TaskListView extends ItemView {
       {
         weekStartsOn: plugin.settings.weekStartsOn,
         migrateToTodayState: plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: plugin.settings.enforceBlockedTasks,
+        taskWriter: plugin.taskEditor,
+        dependencyManager: plugin.taskDependencyManager,
       },
       plugin.app,
       this.taskStateManager,
@@ -235,6 +238,7 @@ export class TaskListView extends ItemView {
       (task) => this.openTaskLocationForRenderer(task),
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
       () => this.plugin?.taskStateManager ?? null,
+      () => this.plugin?.taskDependencyManager ?? null,
     );
     this.taskListFilter = new TaskListFilter(plugin, this.keywordManager);
     this.renderQueue = new ChunkedRenderQueue();
@@ -1430,6 +1434,24 @@ export class TaskListView extends ItemView {
           repeat ?? null,
           warningPeriod ?? null,
         ),
+      onCompleteAnyway: (task: Task) => {
+        const current =
+          this.taskStateManager.findTaskByPathAndLine(
+            task.path,
+            task.line,
+            task.tableCell?.cellIndex,
+          ) ?? task;
+        const target = this.stateManager.getNextCompletedOrArchivedState(
+          current.state,
+        );
+        return this.taskUpdateCoordinator?.updateTask({
+          task: current,
+          type: 'state',
+          source: 'task-list',
+          newState: target,
+          forceCompletion: true,
+        });
+      },
     };
   }
 
@@ -2660,6 +2682,9 @@ export class TaskListView extends ItemView {
       this.taskContextMenu.updateConfig({
         weekStartsOn: this.plugin.settings.weekStartsOn,
         migrateToTodayState: this.plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
+        taskWriter: this.plugin.taskEditor,
+        dependencyManager: this.plugin.taskDependencyManager,
       });
     }
   }
@@ -2700,6 +2725,7 @@ export class TaskListView extends ItemView {
       (task) => this.openTaskLocationForRenderer(task),
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
       () => this.plugin?.taskStateManager ?? null,
+      () => this.plugin?.taskDependencyManager ?? null,
     );
 
     // Recreate context menu with updated task state manager reference
@@ -2747,6 +2773,9 @@ export class TaskListView extends ItemView {
       {
         weekStartsOn: this.plugin.settings.weekStartsOn,
         migrateToTodayState: this.plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
+        taskWriter: this.plugin.taskEditor,
+        dependencyManager: this.plugin.taskDependencyManager,
       },
       this.plugin.app,
       this.taskStateManager,

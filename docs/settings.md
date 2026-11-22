@@ -396,6 +396,16 @@ FIXME Handle edge cases
 
 ### Track Closed Date
 
+### Enforce blocked tasks
+
+**Setting**: "Enforce blocked tasks" (toggle)
+
+**Description**: When on (the default), completing a task from any plugin surface is refused while a `BLOCKER` dependency is incomplete, missing, ambiguous or excluded. The notice names the blocking reasons.
+
+Use **Complete anyway** in the task context menu, or the **Complete blocked task** command, to bypass the gate for a deliberate override. Turning the setting off disables the gate without changing derived blocked status in search, dashboards or row styling. Manual edits, sync and external file changes are outside this gate; notes remain the source of truth.
+
+### Track closed date
+
 **Setting**: "Track closed date" (toggle)
 
 **Description**: Enable or disable automatic CLOSED date tracking for completed tasks.

@@ -3840,3 +3840,24 @@
 .is-phone .todoseq-dashboard-clickable {
   min-height: 24px;
 }
+
+/* Derived dependency state */
+.todoseq-task-blocked .todoseq-task-text-wrapper,
+.todoseq-task-blocked .todoseq-embedded-task-text,
+.todoseq-task-blocked .todo-text {
+  opacity: 0.62;
+}
+
+.todoseq-task-blocked-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  margin-inline-start: var(--size-2-2);
+  flex: 0 0 auto;
+  cursor: help;
+}
+
+.todoseq-task-blocked-icon svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}

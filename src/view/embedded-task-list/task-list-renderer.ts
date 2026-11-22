@@ -1,5 +1,6 @@
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { TaskTransferResult } from '../../services/task-writer';
+import { getStateTransitionManager } from '../../services/task-update-coordinator';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import { setIcon, Notice } from 'obsidian';
@@ -41,10 +42,25 @@ export class EmbeddedTaskListRenderer {
           this.handleScheduledDateChange(task, date, repeat, warningPeriod),
         onDeadlineDateChange: (task, date, repeat, warningPeriod) =>
           this.handleDeadlineDateChange(task, date, repeat, warningPeriod),
+        onCompleteAnyway: (task) =>
+          this.plugin.taskUpdateCoordinator?.updateTask({
+            task,
+            type: 'state',
+            source: 'embedded',
+            newState: getStateTransitionManager(
+              this.plugin.taskUpdateCoordinator,
+              this.plugin.keywordManager,
+              this.plugin.settings?.stateTransitions,
+            ).getNextCompletedOrArchivedState(task.state),
+            forceCompletion: true,
+          }),
       },
       {
         weekStartsOn: plugin.settings.weekStartsOn,
         migrateToTodayState: plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: plugin.settings.enforceBlockedTasks,
+        taskWriter: plugin.taskEditor,
+        dependencyManager: plugin.taskDependencyManager,
       },
       plugin.app,
       this.plugin.taskStateManager,
@@ -923,6 +939,9 @@ export class EmbeddedTaskListRenderer {
       this.taskContextMenu.updateConfig({
         weekStartsOn: this.plugin.settings.weekStartsOn,
         migrateToTodayState: this.plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
+        taskWriter: this.plugin.taskEditor,
+        dependencyManager: this.plugin.taskDependencyManager,
       });
     }
   }

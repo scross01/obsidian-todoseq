@@ -671,6 +671,11 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             control: { type: 'toggle', key: 'trackClosedDate' },
           },
           {
+            name: 'Enforce blocked tasks',
+            desc: 'Refuse completing a task while a BLOCKER dependency is incomplete or unresolved. "Complete anyway" remains available from the task menu and command.',
+            control: { type: 'toggle', key: 'enforceBlockedTasks' },
+          },
+          {
             name: 'Track started date',
             desc: 'Add started: timestamp when tasks enter an active state. Manual state changes never remove it.',
             control: { type: 'toggle', key: 'trackStartedDate' },

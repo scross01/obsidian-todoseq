@@ -16,6 +16,7 @@ import { CodeCommentTaskParser } from './parser/code-comment-task-parser';
 import { ParserRegistry } from './parser/parser-registry';
 import { TASK_VIEW_ICON } from './main';
 import { Editor, MarkdownView, Platform, Notice } from 'obsidian';
+import { getTaskKey } from './utils/task-utils';
 import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
 import { PropertySearchEngine } from './services/property-search-engine';
@@ -135,6 +136,7 @@ export class PluginLifecycleManager {
       this.plugin.taskStateManager,
       this.plugin.keywordManager,
       this.plugin.changeTracker,
+      this.plugin.taskDependencyManager,
     );
 
     // Initialize archive service (Auto-Archive engine) — reads the shared
@@ -246,6 +248,43 @@ export class PluginLifecycleManager {
           editor,
           view,
         );
+      },
+    });
+
+    // Explicit escape hatch for maintenance overrides. Complete anyway from
+    // the task menu and this command are the only bypasses.
+    this.plugin.addCommand({
+      id: 'complete-blocked-task',
+      name: 'Complete blocked task',
+      icon: 'unlock',
+      editorCheckCallback: (
+        checking: boolean,
+        editor: Editor,
+        view: MarkdownView,
+      ) => {
+        const task = this.plugin.taskStateManager.findTaskByPathAndLine(
+          view.file?.path ?? '',
+          editor.getCursor().line,
+        );
+        const manager = this.plugin.taskDependencyManager;
+        if (!task || task.completed || !manager?.isBlocked(getTaskKey(task))) {
+          return false;
+        }
+        if (checking) return true;
+        const coordinator = this.plugin.taskUpdateCoordinator;
+        if (!coordinator) return false;
+        const target =
+          coordinator.stateTransitionManager.getNextCompletedOrArchivedState(
+            task.state,
+          );
+        void coordinator.updateTask({
+          task,
+          type: 'state',
+          source: 'editor',
+          newState: target,
+          forceCompletion: true,
+        });
+        return true;
       },
     });
 

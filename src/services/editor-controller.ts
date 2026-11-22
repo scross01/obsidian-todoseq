@@ -1685,6 +1685,21 @@ export class EditorController {
               });
           }
         },
+        onCompleteAnyway: (task: Task) => {
+          const coordinator = this.plugin.taskUpdateCoordinator;
+          if (!coordinator) return;
+          const target =
+            coordinator.stateTransitionManager.getNextCompletedOrArchivedState(
+              task.state,
+            );
+          return coordinator.updateTask({
+            task,
+            type: 'state',
+            source: 'editor',
+            newState: target,
+            forceCompletion: true,
+          });
+        },
         onDeadlineDateChange: (
           task: Task,
           date: Date | null,
@@ -1712,6 +1727,9 @@ export class EditorController {
       {
         weekStartsOn: this.plugin.settings.weekStartsOn,
         migrateToTodayState: this.plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
+        taskWriter: this.plugin.taskEditor,
+        dependencyManager: this.plugin.taskDependencyManager,
       },
       this.plugin.app,
       this.plugin.taskStateManager,

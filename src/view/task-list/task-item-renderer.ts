@@ -22,6 +22,7 @@ import { KeywordManager } from '../../utils/keyword-manager';
 import type { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { BaseDialog } from '../components/base-dialog';
+import type { TaskDependencyManager } from '../../services/task-dependency-manager';
 
 interface LinkPattern {
   type: 'wiki' | 'md' | 'url' | 'tag';
@@ -70,6 +71,7 @@ export class TaskItemRenderer {
   private onStateChange: TaskStateChangeCallback;
   private onLocationOpen: TaskLocationOpenCallback;
   private onContextMenu: TaskContextMenuCallback | null;
+  private getDependencyManager: () => TaskDependencyManager | null;
 
   constructor(
     getKeywordManager: () => KeywordManager,
@@ -85,8 +87,10 @@ export class TaskItemRenderer {
         cellIndex?: number,
       ) => Task | null;
     } | null = () => null,
+    getDependencyManager: () => TaskDependencyManager | null = () => null,
   ) {
     this.getKeywordManager = getKeywordManager;
+    this.getDependencyManager = getDependencyManager;
     this.getStateManager = getStateManager;
     this.getMenuBuilder = getMenuBuilder;
     this.getTaskStateManager = getTaskStateManager;
@@ -581,6 +585,7 @@ export class TaskItemRenderer {
       fileInfo.appendText(`${displayName}:${task.line + 1}`);
     }
     setTooltip(fileInfo, task.path);
+    this.applyBlockedIndicator(li, task);
 
     // Click to open source (avoid checkbox and keyword)
     li.addEventListener('click', (evt) => {
@@ -846,6 +851,36 @@ export class TaskItemRenderer {
 
     // 6. Update LI classes for task state
     this.applyStateClasses(element, task);
+    this.applyBlockedIndicator(element, task);
+  }
+
+  private applyBlockedIndicator(element: HTMLElement, task: Task): void {
+    const manager = this.getDependencyManager();
+    const key = `${task.path}:${task.line}${
+      task.isTableTask && task.tableCell ? `:${task.tableCell.cellIndex}` : ''
+    }`;
+    const blocked = !!manager && !task.completed && manager.isBlocked(key);
+    element.classList.toggle('todoseq-task-blocked', blocked);
+
+    const existing = element.querySelector('.todoseq-task-blocked-icon');
+    if (!blocked) {
+      existing?.remove();
+      return;
+    }
+
+    const icon = existing?.instanceOf(HTMLElement)
+      ? existing
+      : (element
+          .querySelector('.todo-main-content')
+          ?.createSpan({ cls: 'todoseq-task-blocked-icon' }) ?? null);
+    if (!icon) return;
+    setIcon(icon, 'lock');
+    const details = manager
+      .getBlockingReasons(key)
+      .map((reason) => reason.message)
+      .join(' ');
+    setTooltip(icon, details || 'Blocked by an incomplete dependency');
+    icon.setAttribute('aria-label', details || 'Blocked task');
   }
 
   /**

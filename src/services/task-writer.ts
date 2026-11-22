@@ -72,6 +72,11 @@ export interface TaskPropertyUpdate {
   value: string | null;
 }
 
+export interface TaskIdentityWriteResult extends TaskPropertyWriteResult {
+  identity?: string;
+  link?: string;
+}
+
 /** A fully formatted metadata line produced by smart-date recognition. */
 export interface SmartDateLine {
   type: DateLineType;
@@ -588,6 +593,128 @@ export class TaskWriter {
       ),
       lineDelta: after.length - before.length,
     };
+  }
+
+  /** Copy ID action: reuse an authored ID, otherwise persist one UUID. */
+  async ensureTaskId(task: Task): Promise<TaskIdentityWriteResult> {
+    if (task.id) {
+      return {
+        status: 'success',
+        task,
+        lineDelta: 0,
+        identity: task.id,
+      };
+    }
+    const identity = this.generateUuid();
+    const result = await this.updateOrInsertPropertiesDrawer(task, [
+      { key: 'ID', value: identity },
+    ]);
+    return {
+      ...result,
+      identity: result.status === 'success' ? identity : undefined,
+    };
+  }
+
+  /** Copy anchor action: reuse or persist a Markdown block anchor. */
+  async ensureBlockAnchor(task: Task): Promise<TaskIdentityWriteResult> {
+    if (
+      task.isTableTask ||
+      task.path.toLowerCase().endsWith('.org') ||
+      task.sourceFormat === 'org' ||
+      task.sourceFormat === 'code-comment'
+    ) {
+      return {
+        status: 'unsupported',
+        task: null,
+        lineDelta: 0,
+        reason: 'Block anchors are available for Markdown task lines only.',
+      };
+    }
+
+    const existing = task.embedReference?.replace(/^\^/, '');
+    const anchor = existing || `todoseq-${this.randomHex(8)}`;
+    const link = this.buildBlockLink(task.path, anchor);
+    if (existing) {
+      return { status: 'success', task, lineDelta: 0, identity: anchor, link };
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (!(file instanceof TFile)) {
+      return { status: 'failed', task: null, lineDelta: 0 };
+    }
+
+    const editor = this.getTransferEditor(file);
+    let before: string[] = [];
+    let after: string[] = [];
+    if (editor) {
+      before = Array.from({ length: editor.lineCount() }, (_, i) =>
+        editor.getLine(i),
+      );
+      if (!this.lineMatchesTask(before[task.line], task)) {
+        return { status: 'failed', task: null, lineDelta: 0 };
+      }
+      const line = before[task.line];
+      const suffix = line.endsWith(' ') ? '' : ' ';
+      after = [...before];
+      after[task.line] = `${line}${suffix}^${anchor}`;
+      const last = editor.lineCount() - 1;
+      editor.replaceRange(
+        after.join('\n'),
+        { line: 0, ch: 0 },
+        { line: last, ch: (editor.getLine(last) ?? '').length },
+      );
+    } else {
+      await this.app.vault.process(file, (data) => {
+        before = data.split('\n');
+        if (!this.lineMatchesTask(before[task.line], task)) return data;
+        after = [...before];
+        const line = before[task.line];
+        after[task.line] = `${line}${line.endsWith(' ') ? '' : ' '}^${anchor}`;
+        return after.join('\n');
+      });
+    }
+
+    if (!after.length) return { status: 'failed', task: null, lineDelta: 0 };
+    return {
+      status: 'success',
+      task: {
+        ...task,
+        rawText: after[task.line],
+        embedReference: `^${anchor}`,
+      },
+      lineDelta: after.length - before.length,
+      identity: anchor,
+      link,
+    };
+  }
+
+  private buildBlockLink(path: string, anchor: string): string {
+    const withoutExtension = path.replace(/\.md$/i, '').replace(/^\/+/, '');
+    return `[[${withoutExtension}#^${anchor}]]`;
+  }
+
+  private generateUuid(): string {
+    const cryptoApi = window.crypto as Crypto | undefined;
+    if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
+      return cryptoApi.randomUUID();
+    }
+    const hex = this.randomHex(32);
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+  }
+
+  private randomHex(length: number): string {
+    const bytes = new Uint8Array(Math.ceil(length / 2));
+    const cryptoApi = window.crypto as Crypto | undefined;
+    if (cryptoApi && typeof cryptoApi.getRandomValues === 'function') {
+      cryptoApi.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = Math.floor(Math.random() * 256);
+      }
+    }
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, length);
   }
 
   /** Set the active BLOCKER list, preserving unknown drawer entries. */

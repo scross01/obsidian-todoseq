@@ -84,6 +84,23 @@ Use `blocked:true` in the Task List search to find incomplete tasks waiting on a
 
 A missing, ambiguous, excluded or temporarily unvalidated reference counts as blocked for an incomplete task. Dashboard cards can group by `blocked`; their two buckets use the same `blocked:true` and `blocked:false` queries.
 
+## Completion enforcement and task actions
+
+Blocked tasks are dimmed with a lock icon in the Task List and embedded task lists. Hovering or focusing the lock explains the blocking reasons. The same marker appears in supported Markdown task declarations and reader views.
+
+When **Enforce blocked tasks** is on (the default), completing a blocked task from a TODOseq checkbox, keyword menu, command or context menu is refused with a notice naming the reasons. Nothing is written and the task stays in its original state. Use **Complete anyway** in the task context menu or the **Complete blocked task** command when you deliberately need to override it. Disabling enforcement in [Settings](/settings) allows normal completion while blocked status remains visible in search, dashboards and row styling.
+
+This gate covers plugin completion actions only. Editing the note text manually, syncing a file or changing it outside Obsidian remains authoritative and is picked up on the next scan.
+
+### Copying identities
+
+The task context menu can copy an `ID` or a Markdown block anchor:
+
+- **Copy ID** reuses the task's authored ID. If it has none, TODOseq writes a UUID to the task's property drawer and then copies it. Scanning or capturing a task never creates an ID by itself.
+- **Copy anchor** is available for Markdown task lines. It reuses the task's block anchor or appends a new one, then copies a file-qualified link such as `[[Projects/Plan#^todoseq-a1b2c3d4]]`. Org, code-comment and table tasks are not supported.
+
+**Add copied link as blocker** reads one ID or file-qualified block link from the clipboard, resolves it to exactly one collected task, and appends it to the current task's `BLOCKER` list. Ambiguous or invalid clipboard content is rejected without writing.
+
 ## Local properties only
 
 TODOseq reads dependency properties from the task's own drawer. Parent tasks and file-level defaults do not add an `ID`, `BLOCKER`, or `ARCHIVED_BLOCKER` to another task. Task hierarchy alone never blocks a task in this release.
