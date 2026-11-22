@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.23.0
+
+-
+
 ## 0.22.1
 
 - Fixed completing an unrelated plain task incrementing a preceding task's subtask count; optimistic progress now follows the checkbox children the parser actually counted and stays in agreement with a rescan.
