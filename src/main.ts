@@ -25,6 +25,7 @@ import { EventCoordinator } from './services/event-coordinator';
 import { ChangeTracker } from './services/change-tracker';
 import { SmartDateProcessor } from './services/smart-date-processor';
 import { ArchiveService } from './services/archive-service';
+import { TaskDependencyManager } from './services/task-dependency-manager';
 
 export const TASK_VIEW_ICON = 'list-todo';
 
@@ -43,6 +44,7 @@ export default class TodoTracker extends Plugin {
   // Centralized task update coordinator (created by PluginLifecycleManager)
   public taskUpdateCoordinator: TaskUpdateCoordinator | null = null;
   public archiveService: ArchiveService | null = null;
+  public taskDependencyManager: TaskDependencyManager | null = null;
 
   // Managers for different functional areas
   public editorController: EditorController;

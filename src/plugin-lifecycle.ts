@@ -20,6 +20,7 @@ import { parseUrgencyCoefficients } from './utils/task-urgency';
 import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting';
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
+import { TaskDependencyManager } from './services/task-dependency-manager';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import { ArchiveService, shouldAutoArchive } from './services/archive-service';
 import { TodoseqCodeBlockProcessor } from './view/embedded-task-list/code-block-processor';
@@ -91,6 +92,18 @@ export class PluginLifecycleManager {
       this.plugin.keywordManager,
       parserRegistry,
       this.plugin.changeTracker,
+    );
+
+    // Dependency state is derived from the central task snapshot. The scanner
+    // supplies its exclusion policy so excluded link targets cannot silently
+    // resolve as missing files.
+    this.plugin.taskDependencyManager = new TaskDependencyManager(
+      this.plugin.taskStateManager,
+      {
+        app: this.plugin.app,
+        isPathExcluded: (path) =>
+          this.plugin.vaultScanner?.isPathExcluded(path) ?? false,
+      },
     );
 
     // Initialize property search engine after vault scanner (it polls vault
@@ -511,6 +524,10 @@ export class PluginLifecycleManager {
     // Note: TaskListView now subscribes directly to TaskStateManager,
     // but we still refresh UI components that need updates
     this.plugin.vaultScanner.on('scan-started', () => {
+      // A scan invalidates the current dependency snapshot. Incomplete tasks
+      // that name dependencies report "Checking dependencies…" until the
+      // authoritative publication completes.
+      this.plugin.taskDependencyManager?.setValidationReady(false);
       // Refresh all task list views to show "Scanning vault..." message
       // This updates views that have no tasks yet to indicate scan is in progress
       this.plugin.uiManager.refreshOpenTaskListViews().catch((error) => {
@@ -522,6 +539,7 @@ export class PluginLifecycleManager {
     });
 
     this.plugin.vaultScanner.on('scan-completed', () => {
+      this.plugin.taskDependencyManager?.setValidationReady(true);
       // Use setTimeout to ensure tasks are fully set in TaskStateManager before refreshing
       window.setTimeout(() => {
         // Explicitly refresh the TaskListView to ensure it updates
@@ -546,6 +564,9 @@ export class PluginLifecycleManager {
     });
 
     this.plugin.vaultScanner.on('scan-error', (error) => {
+      // Do not leave dependency validation stuck in "checking" after a
+      // definitive scan failure; the retained snapshot remains authoritative.
+      this.plugin.taskDependencyManager?.setValidationReady(true);
       console.error('TODOseq: VaultScanner scan error:', error);
     });
 
@@ -653,6 +674,8 @@ export class PluginLifecycleManager {
 
     // Stop plugin-owned update timers and pending delayed recurrence work
     // synchronously, before the first await in teardown.
+    this.plugin.taskDependencyManager?.destroy();
+    this.plugin.taskDependencyManager = null;
     if (this.plugin.taskUpdateCoordinator) {
       this.plugin.taskUpdateCoordinator.destroy();
       this.plugin.taskUpdateCoordinator = null;

@@ -278,6 +278,11 @@ export class VaultScanner
     return false;
   }
 
+  /** Public dependency-graph seam for the scanner's exclusion policy. */
+  isPathExcluded(filePath: string): boolean {
+    return this.isExcluded(filePath);
+  }
+
   /**
    * Check if a file path should be excluded based on Obsidian's userIgnoreFilters
    *

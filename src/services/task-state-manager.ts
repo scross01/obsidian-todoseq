@@ -14,6 +14,7 @@ export class TaskStateManager {
   private isNotifying = false;
   private pendingNotification = false;
   private keywordManager: KeywordManager;
+  private _revision = 0;
 
   constructor(keywordManager: KeywordManager) {
     this.keywordManager = keywordManager;
@@ -25,6 +26,12 @@ export class TaskStateManager {
 
   setKeywordManager(keywordManager: KeywordManager): void {
     this.keywordManager = keywordManager;
+    this._revision++;
+  }
+
+  /** Monotonic revision for derived consumers. */
+  getRevision(): number {
+    return this._revision;
   }
 
   /**
@@ -46,6 +53,7 @@ export class TaskStateManager {
    */
   setTasks(tasks: Task[]): void {
     this._tasks = tasks;
+    this._revision++;
     this.notifySubscribers();
   }
 
@@ -67,6 +75,7 @@ export class TaskStateManager {
    */
   updateTasks(updater: (tasks: Task[]) => Task[]): void {
     this._tasks = updater(this._tasks);
+    this._revision++;
     this.notifySubscribers();
   }
 
@@ -76,6 +85,7 @@ export class TaskStateManager {
    */
   addTask(task: Task): void {
     this._tasks.push(task);
+    this._revision++;
     this.notifySubscribers();
   }
 
@@ -85,6 +95,7 @@ export class TaskStateManager {
    */
   removeTasks(predicate: (task: Task) => boolean): void {
     this._tasks = this._tasks.filter((task) => !predicate(task));
+    this._revision++;
     this.notifySubscribers();
   }
 
@@ -125,6 +136,7 @@ export class TaskStateManager {
     }
 
     if (adjusted) {
+      this._revision++;
       this.notifySubscribers();
     }
   }
@@ -216,6 +228,7 @@ export class TaskStateManager {
       ...('text' in updates ? { textDisplay: undefined } : {}),
       _lastUpdateTime: Date.now(),
     };
+    this._revision++;
 
     // Update parent subtask counts if completion status changed
     if (wasCompleted !== isCompleted) {
@@ -278,6 +291,7 @@ export class TaskStateManager {
     }
 
     // Notify subscribers of the change
+    this._revision++;
     this.notifySubscribers();
 
     return newLine;
@@ -304,6 +318,7 @@ export class TaskStateManager {
    */
   clearTasks(): void {
     this._tasks = [];
+    this._revision++;
     this.notifySubscribers();
   }
 
@@ -544,6 +559,7 @@ export class TaskStateManager {
     }
 
     if (shouldNotify && parentTasks.length > 0) {
+      this._revision++;
       this.notifySubscribers();
     }
   }

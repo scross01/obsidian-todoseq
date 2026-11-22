@@ -1,0 +1,696 @@
+import type { App } from 'obsidian';
+import { Task } from '../types/task';
+import {
+  ArchivedReferencePromotion,
+  DependencyIssue,
+  DependencyReason,
+  DependencySnapshot,
+} from '../types/task-dependency';
+import {
+  parseDependencyReference,
+  type DependencyReference,
+} from '../utils/task-properties';
+import { getTaskKey } from '../utils/task-utils';
+import { taskComparator } from '../utils/task-sort';
+import { TaskStateManager } from './task-state-manager';
+
+export interface TaskDependencyManagerOptions {
+  app?: App;
+  isPathExcluded?: (path: string) => boolean;
+}
+
+interface ResolvedReference {
+  raw: string;
+  target: Task | null;
+  code?:
+    | 'missing-reference'
+    | 'ambiguous-reference'
+    | 'invalid-reference'
+    | 'excluded-target';
+  message?: string;
+}
+
+interface BuildEdge {
+  sourceKey: string;
+  targetKey: string;
+}
+
+/**
+ * Derived dependency graph over the full collected task set.
+ *
+ * The manager holds no persistent index. Every read validates the state
+ * manager's monotonic revision and rebuilds synchronously when it changed, so
+ * completion gating cannot consume a stale snapshot merely because a render
+ * was debounced.
+ */
+export class TaskDependencyManager {
+  private unsubscribe: (() => void) | null = null;
+  private snapshot: DependencySnapshot = {
+    revision: -1,
+    ready: false,
+    blocked: new Set<string>(),
+    reasonsByKey: new Map(),
+    issues: [],
+    blockedKeys: [],
+  };
+  private lastRevision = -1;
+  private validationReady = true;
+  private validationEpoch = 0;
+  private snapshotValidationEpoch = -1;
+  private rebuildCount = 0;
+  private cachedTasks: Task[] = [];
+  private tasksByKey = new Map<string, Task>();
+  private edges: BuildEdge[] = [];
+  private edgeKeys = new Set<string>();
+  private dependents = new Map<string, Set<string>>();
+  private promotions: ArchivedReferencePromotion[] = [];
+
+  constructor(
+    private readonly stateManager: TaskStateManager,
+    private readonly options: TaskDependencyManagerOptions = {},
+  ) {
+    this.unsubscribe = this.stateManager.subscribe(() => {
+      this.lastRevision = -1;
+    });
+    this.ensureFresh();
+  }
+
+  destroy(): void {
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.snapshot = {
+      revision: -1,
+      ready: false,
+      blocked: new Set(),
+      reasonsByKey: new Map(),
+      issues: [],
+      blockedKeys: [],
+    };
+    this.cachedTasks = [];
+    this.tasksByKey.clear();
+    this.edges = [];
+    this.edgeKeys.clear();
+    this.dependents.clear();
+    this.promotions = [];
+    this.validationReady = true;
+    this.validationEpoch++;
+    this.snapshotValidationEpoch = -1;
+  }
+
+  /**
+   * Scanner lifecycle signal. During indexing, an incomplete task that names
+   * dependencies is conservatively blocked as checking rather than reported
+   * as missing or silently treated as unblocked.
+   */
+  setValidationReady(ready: boolean): void {
+    if (this.validationReady === ready) return;
+    this.validationReady = ready;
+    this.validationEpoch++;
+  }
+
+  isValidationReady(): boolean {
+    return this.validationReady;
+  }
+
+  getRebuildCount(): number {
+    return this.rebuildCount;
+  }
+
+  getRevision(): number {
+    this.ensureFresh();
+    return this.snapshot.revision;
+  }
+
+  getSnapshot(): DependencySnapshot {
+    this.ensureFresh();
+    return this.snapshot;
+  }
+
+  isBlocked(taskKey: string): boolean {
+    this.ensureFresh();
+    return this.snapshot.blocked.has(taskKey);
+  }
+
+  getBlockingReasons(taskKey: string): readonly DependencyReason[] {
+    this.ensureFresh();
+    return (
+      this.snapshot.reasonsByKey
+        .get(taskKey)
+        ?.filter((reason) => reason.blocking) ?? []
+    );
+  }
+
+  getReasons(taskKey: string): readonly DependencyReason[] {
+    this.ensureFresh();
+    return this.snapshot.reasonsByKey.get(taskKey) ?? [];
+  }
+
+  getBlockers(taskKey: string): Task[] {
+    this.ensureFresh();
+    return this.edges
+      .filter((edge) => edge.sourceKey === taskKey)
+      .map((edge) => this.tasksByKey.get(edge.targetKey))
+      .filter((task): task is Task => !!task && !task.completed)
+      .sort(taskComparator);
+  }
+
+  getDependents(taskKey: string): Task[] {
+    this.ensureFresh();
+    const keys = this.dependents.get(taskKey) ?? new Set<string>();
+    return Array.from(keys)
+      .map((key) => this.tasksByKey.get(key))
+      .filter((task): task is Task => !!task)
+      .sort(taskComparator);
+  }
+
+  getIssues(): readonly DependencyIssue[] {
+    this.ensureFresh();
+    return this.snapshot.issues;
+  }
+
+  getArchivedReferencePromotions(): ArchivedReferencePromotion[] {
+    this.ensureFresh();
+    return [...this.promotions];
+  }
+
+  private ensureFresh(): void {
+    const revision = this.stateManager.getRevision();
+    if (
+      revision === this.lastRevision &&
+      this.validationEpoch === this.snapshotValidationEpoch
+    ) {
+      return;
+    }
+    this.rebuild(this.stateManager.getTasks(), revision);
+  }
+
+  /** Visible for tests: build an immutable snapshot from a task array. */
+  rebuild(tasks: Task[], revision = this.stateManager.getRevision()): void {
+    this.rebuildCount++;
+    this.lastRevision = revision;
+    this.snapshotValidationEpoch = this.validationEpoch;
+    this.cachedTasks = [...tasks];
+    this.tasksByKey = new Map(tasks.map((task) => [getTaskKey(task), task]));
+    this.edges = [];
+    this.edgeKeys.clear();
+    this.dependents.clear();
+    this.promotions = [];
+
+    const idIndex = new Map<string, Task[]>();
+    const anchorIndex = new Map<string, Task[]>();
+    const pathSet = new Set(tasks.map((task) => task.path));
+
+    for (const task of tasks) {
+      if (task.id) {
+        const list = idIndex.get(task.id) ?? [];
+        list.push(task);
+        idIndex.set(task.id, list);
+      }
+      if (task.embedReference?.startsWith('^')) {
+        const key = `${task.path}#${task.embedReference.slice(1)}`;
+        const list = anchorIndex.get(key) ?? [];
+        list.push(task);
+        anchorIndex.set(key, list);
+      }
+    }
+
+    const issues: DependencyIssue[] = [];
+    const reasonsByKey = new Map<string, DependencyReason[]>();
+    const blocked = new Set<string>();
+
+    for (const [id, owners] of idIndex) {
+      if (owners.length < 2) continue;
+      issues.push({
+        code: 'ambiguous-reference',
+        fingerprint: `duplicate-id:${id}`,
+        message: `Several tasks declare the same ID.`,
+        reference: id,
+        sourceKey: getTaskKey(owners[1]),
+      });
+    }
+
+    for (const task of tasks) {
+      for (const propertyIssue of task.propertyIssues ?? []) {
+        issues.push({
+          code: 'invalid-reference',
+          fingerprint: `property:${getTaskKey(task)}:${propertyIssue.code}:${propertyIssue.line}:${propertyIssue.reference ?? propertyIssue.key ?? ''}`,
+          message: propertyIssue.message,
+          sourceKey: getTaskKey(task),
+          reference: propertyIssue.reference,
+        });
+      }
+    }
+
+    for (const task of tasks) {
+      const key = getTaskKey(task);
+      const reasons: DependencyReason[] = [];
+      const refs = task.blockedBy ?? [];
+      const archived = new Set(task.archivedBlockers ?? []);
+
+      if (!this.validationReady) {
+        if (!task.completed && refs.length > 0) {
+          reasons.push(
+            this.reason(
+              task,
+              'pending-validation',
+              'Checking dependencies…',
+              refs[0],
+              true,
+            ),
+          );
+          blocked.add(key);
+          reasonsByKey.set(key, reasons);
+        }
+        continue;
+      }
+
+      for (const raw of refs) {
+        const parsed = parseDependencyReference(
+          raw,
+          task.sourceFormat === 'org' ? 'org' : 'markdown',
+        );
+
+        if (parsed.kind === 'previous-sibling') {
+          reasons.push(
+            this.reason(
+              task,
+              'unsupported-relation',
+              'previous-sibling is not available in this version.',
+              raw,
+              false,
+            ),
+          );
+          issues.push(
+            this.issue(
+              task,
+              'unsupported-relation',
+              `Unsupported previous-sibling relation.`,
+              raw,
+            ),
+          );
+          continue;
+        }
+
+        if (parsed.kind === 'invalid') {
+          reasons.push(
+            this.reason(task, 'invalid-reference', parsed.reason, raw, true),
+          );
+          issues.push(
+            this.issue(task, 'invalid-reference', parsed.reason, raw),
+          );
+          continue;
+        }
+
+        const resolved = this.resolveReference(
+          task,
+          parsed,
+          idIndex,
+          anchorIndex,
+          pathSet,
+        );
+        if (resolved.target) {
+          this.addEdge(key, getTaskKey(resolved.target));
+          if (!resolved.target.completed) {
+            reasons.push(
+              this.reason(
+                task,
+                'incomplete-blocker',
+                `Blocked by ${resolved.target.text || resolved.target.id || 'an incomplete task'}.`,
+                raw,
+                true,
+                resolved.target,
+              ),
+            );
+          }
+          if (
+            resolved.target.scheduledDateRepeat ||
+            resolved.target.deadlineDateRepeat
+          ) {
+            reasons.push(
+              this.reason(
+                task,
+                'repeating-blocker',
+                'This task repeats; dependents will be blocked again when it reopens.',
+                raw,
+                false,
+                resolved.target,
+              ),
+            );
+          }
+        } else {
+          const code = resolved.code ?? 'missing-reference';
+          reasons.push(
+            this.reason(
+              task,
+              code,
+              resolved.message ?? 'Dependency could not be resolved.',
+              raw,
+              true,
+            ),
+          );
+          issues.push(
+            this.issue(
+              task,
+              code,
+              resolved.message ?? 'Dependency could not be resolved.',
+              raw,
+            ),
+          );
+        }
+      }
+
+      if (archived.size > 0 && refs.some((ref) => archived.has(ref))) {
+        issues.push(
+          this.issue(
+            task,
+            'ambiguous-reference',
+            'A reference appears in both active and archived dependency lists.',
+            refs.find((ref) => archived.has(ref)),
+          ),
+        );
+      }
+
+      // Archived history is inactive until its exact target reappears in the
+      // permitted index. A unique reappearance is treated as active memory
+      // state immediately, while 089 owns moving the source property back.
+      for (const raw of archived) {
+        if (refs.includes(raw)) continue;
+        const parsed = parseDependencyReference(
+          raw,
+          task.sourceFormat === 'org' ? 'org' : 'markdown',
+        );
+        if (parsed.kind === 'invalid' || parsed.kind === 'previous-sibling') {
+          issues.push(
+            this.issue(
+              task,
+              'invalid-reference',
+              'Archived dependency history is not a valid active reference.',
+              raw,
+            ),
+          );
+          continue;
+        }
+        const resolved = this.resolveReference(
+          task,
+          parsed,
+          idIndex,
+          anchorIndex,
+          pathSet,
+        );
+        if (!resolved.target) {
+          if (resolved.code === 'ambiguous-reference') {
+            issues.push(
+              this.issue(
+                task,
+                resolved.code,
+                resolved.message ?? 'Archived dependency is ambiguous.',
+                raw,
+              ),
+            );
+          }
+          continue;
+        }
+
+        const targetKey = getTaskKey(resolved.target);
+        this.addEdge(key, targetKey);
+        this.promotions.push({
+          dependentKey: key,
+          reference: raw,
+          targetKey,
+          revision,
+        });
+        if (!task.completed && !resolved.target.completed) {
+          reasons.push(
+            this.reason(
+              task,
+              'incomplete-blocker',
+              `Restored blocker ${resolved.target.text || raw} is incomplete.`,
+              raw,
+              true,
+              resolved.target,
+            ),
+          );
+        }
+      }
+
+      if (!task.completed && reasons.some((reason) => reason.blocking)) {
+        blocked.add(key);
+      }
+      if (reasons.length > 0) reasonsByKey.set(key, reasons);
+    }
+
+    for (const cycle of this.findCycles(tasks)) {
+      const keys = cycle.sort();
+      issues.push({
+        code: 'cycle',
+        fingerprint: `cycle:${keys.join('|')}`,
+        message: 'Task dependency cycle detected.',
+        sourceKey: keys[0],
+        targetKey: keys[1],
+      });
+    }
+
+    this.snapshot = {
+      revision,
+      ready: this.validationReady,
+      blocked,
+      reasonsByKey,
+      issues: this.stableIssues(issues),
+      blockedKeys: Array.from(blocked).sort(),
+    };
+  }
+
+  clearCache(): void {
+    this.lastRevision = -1;
+    this.snapshotValidationEpoch = -1;
+  }
+
+  private resolveReference(
+    source: Task,
+    reference: Exclude<DependencyReference, { kind: 'invalid' }>,
+    idIndex: Map<string, Task[]>,
+    anchorIndex: Map<string, Task[]>,
+    pathSet: Set<string>,
+  ): ResolvedReference {
+    if (reference.kind === 'previous-sibling') {
+      return {
+        raw: reference.raw,
+        target: null,
+        code: 'invalid-reference',
+        message: 'previous-sibling is not resolvable in this version.',
+      };
+    }
+
+    if (reference.kind === 'id') {
+      const targets = idIndex.get(reference.id);
+      if (!targets || targets.length === 0) {
+        return {
+          raw: reference.raw,
+          target: null,
+          code: 'missing-reference',
+          message: `Dependency ID unavailable: ${reference.id} not found in scanned tasks.`,
+        };
+      }
+      if (targets.length > 1) {
+        return {
+          raw: reference.raw,
+          target: null,
+          code: 'ambiguous-reference',
+          message: `Dependency ID ${reference.id} is declared by multiple tasks.`,
+        };
+      }
+      return { raw: reference.raw, target: targets[0] };
+    }
+
+    const resolvedPath = this.resolveLinkPath(
+      reference.path,
+      source.path,
+      pathSet,
+    );
+    if (this.options.isPathExcluded?.(resolvedPath)) {
+      return {
+        raw: reference.raw,
+        target: null,
+        code: 'excluded-target',
+        message: 'Dependency unavailable: target excluded from scanning.',
+      };
+    }
+
+    const fileKnown =
+      pathSet.has(resolvedPath) ||
+      !!this.options.app?.vault.getAbstractFileByPath(resolvedPath);
+    if (!fileKnown) {
+      return {
+        raw: reference.raw,
+        target: null,
+        code: 'missing-reference',
+        message: `Dependency link target not found: ${resolvedPath}.`,
+      };
+    }
+
+    const targets = anchorIndex.get(`${resolvedPath}#${reference.anchor}`);
+    if (!targets || targets.length === 0) {
+      return {
+        raw: reference.raw,
+        target: null,
+        code: 'missing-reference',
+        message: `Dependency block ^${reference.anchor} was not found in ${resolvedPath}.`,
+      };
+    }
+    if (targets.length > 1) {
+      return {
+        raw: reference.raw,
+        target: null,
+        code: 'ambiguous-reference',
+        message: `Dependency block ^${reference.anchor} is ambiguous in ${resolvedPath}.`,
+      };
+    }
+    return { raw: reference.raw, target: targets[0] };
+  }
+
+  private resolveLinkPath(
+    linkPath: string,
+    sourcePath: string,
+    pathSet: Set<string>,
+  ): string {
+    const metadataCache = this.options.app?.metadataCache as
+      | {
+          getFirstLinkpathDest?: (
+            linkpath: string,
+            sourcePath: string,
+          ) => { path: string } | null;
+        }
+      | undefined;
+    const resolved = metadataCache?.getFirstLinkpathDest?.(
+      linkPath,
+      sourcePath,
+    );
+    if (resolved?.path) return resolved.path;
+
+    const normalized = linkPath.replace(/^\/+/, '');
+    if (pathSet.has(normalized)) return normalized;
+    if (pathSet.has(`${normalized}.md`)) return `${normalized}.md`;
+    return normalized.includes('.') ? normalized : `${normalized}.md`;
+  }
+
+  private addEdge(sourceKey: string, targetKey: string): void {
+    const edgeKey = `${sourceKey}\u0000${targetKey}`;
+    if (!this.edgeKeys.has(edgeKey)) {
+      this.edgeKeys.add(edgeKey);
+      this.edges.push({ sourceKey, targetKey });
+    }
+    const set = this.dependents.get(targetKey) ?? new Set<string>();
+    set.add(sourceKey);
+    this.dependents.set(targetKey, set);
+  }
+
+  private reason(
+    source: Task,
+    code: DependencyReason['code'],
+    message: string,
+    reference: string,
+    blocking: boolean,
+    target?: Task,
+  ): DependencyReason {
+    return {
+      code,
+      message,
+      sourceKey: getTaskKey(source),
+      sourcePath: source.path,
+      sourceLine: source.line,
+      reference,
+      targetKey: target ? getTaskKey(target) : undefined,
+      targetLabel: target?.text,
+      blocking,
+    };
+  }
+
+  private issue(
+    source: Task,
+    code: DependencyIssue['code'],
+    message: string,
+    reference?: string,
+  ): DependencyIssue {
+    const key = getTaskKey(source);
+    return {
+      code,
+      fingerprint: `${code}:${key}:${reference ?? ''}`,
+      message,
+      sourceKey: key,
+      reference,
+    };
+  }
+
+  private stableIssues(issues: DependencyIssue[]): DependencyIssue[] {
+    const seen = new Set<string>();
+    return issues.filter((issue) => {
+      if (seen.has(issue.fingerprint)) return false;
+      seen.add(issue.fingerprint);
+      return true;
+    });
+  }
+
+  /** Iterative Kosaraju pass; no recursion on large vaults. */
+  private findCycles(tasks: Task[]): string[][] {
+    const keys = tasks.map(getTaskKey);
+    const forward = new Map<string, string[]>();
+    const reverse = new Map<string, string[]>();
+    for (const key of keys) {
+      forward.set(key, []);
+      reverse.set(key, []);
+    }
+    for (const edge of this.edges) {
+      forward.get(edge.sourceKey)?.push(edge.targetKey);
+      reverse.get(edge.targetKey)?.push(edge.sourceKey);
+    }
+
+    const visited = new Set<string>();
+    const finish: string[] = [];
+    for (const start of keys) {
+      if (visited.has(start)) continue;
+      const stack: Array<{ key: string; index: number }> = [
+        { key: start, index: 0 },
+      ];
+      visited.add(start);
+      while (stack.length > 0) {
+        const frame = stack[stack.length - 1];
+        const next = forward.get(frame.key)?.[frame.index];
+        if (next !== undefined) {
+          frame.index++;
+          if (!visited.has(next)) {
+            visited.add(next);
+            stack.push({ key: next, index: 0 });
+          }
+        } else {
+          finish.push(frame.key);
+          stack.pop();
+        }
+      }
+    }
+
+    const assigned = new Set<string>();
+    const cycles: string[][] = [];
+    for (let i = finish.length - 1; i >= 0; i--) {
+      const start = finish[i];
+      if (assigned.has(start)) continue;
+      const component: string[] = [];
+      const stack = [start];
+      assigned.add(start);
+      while (stack.length > 0) {
+        const key = stack.pop()!;
+        component.push(key);
+        for (const previous of reverse.get(key) ?? []) {
+          if (!assigned.has(previous)) {
+            assigned.add(previous);
+            stack.push(previous);
+          }
+        }
+      }
+      const selfLoop =
+        component.length === 1 &&
+        (forward.get(component[0]) ?? []).includes(component[0]);
+      if (component.length > 1 || selfLoop) cycles.push(component);
+    }
+    return cycles;
+  }
+}
