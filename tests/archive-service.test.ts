@@ -481,6 +481,31 @@ describe('ArchiveService.applyArchives', () => {
     ]);
   });
 
+  it('does not journal a failed apply outcome', async () => {
+    const { service, store } = setup();
+    const failedTask = makeTask({
+      state: 'DONE',
+      closedDate: daysBefore(REFERENCE, 100),
+    });
+    store.set(`${failedTask.path}:${failedTask.line}`, failedTask);
+    const matches = service.evaluateArchiveCriteria(
+      [failedTask],
+      makeConfig(),
+      REFERENCE,
+    );
+
+    const result = await service.applyArchives(matches, {
+      getTask: (path, line) => store.get(`${path}:${line}`) ?? null,
+      apply: async () => ({ status: 'failed' }),
+    });
+
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      { path: failedTask.path, line: failedTask.line, reason: 'apply-failed' },
+    ]);
+    expect(service.hasUndoableRun()).toBe(false);
+  });
+
   it('counts a refused archive as blocked and journals nothing', async () => {
     const { service, store } = setup();
     const blockedTask = makeTask({

@@ -186,6 +186,48 @@ export class TaskDependencyManager {
       .sort(taskComparator);
   }
 
+  /**
+   * Incoming active BLOCKER references for a task, captured while the target
+   * is still in the current snapshot. Unlike getReasons(), this does not
+   * require the target to be incomplete: completed prerequisites are exactly
+   * the tasks that get archived.
+   */
+  getIncomingActiveReferences(
+    target: Task,
+  ): { dependent: Task; references: string[] }[] {
+    this.ensureFresh();
+    const targetKey = getTaskKey(target);
+    const targetPath = target.path.replace(/\\/g, '/');
+    const targetAnchor = target.embedReference?.replace(/^\^/, '');
+    const pathSet = new Set(this.cachedTasks.map((task) => task.path));
+    const result: { dependent: Task; references: string[] }[] = [];
+
+    for (const dependent of this.cachedTasks) {
+      if (getTaskKey(dependent) === targetKey) continue;
+      const references: string[] = [];
+      for (const raw of dependent.blockedBy ?? []) {
+        const parsed = parseDependencyReference(
+          raw,
+          dependent.sourceFormat === 'org' ? 'org' : 'markdown',
+        );
+        if (parsed.kind === 'id') {
+          if (target.id && parsed.id === target.id) references.push(raw);
+          continue;
+        }
+        if (parsed.kind !== 'markdown-anchor' || !targetAnchor) continue;
+        if (parsed.anchor !== targetAnchor) continue;
+        const resolvedPath = this.resolveLinkPath(
+          parsed.path,
+          dependent.path,
+          pathSet,
+        );
+        if (resolvedPath === targetPath) references.push(raw);
+      }
+      if (references.length > 0) result.push({ dependent, references });
+    }
+    return result;
+  }
+
   getIssues(): readonly DependencyIssue[] {
     this.ensureFresh();
     return this.snapshot.issues;

@@ -93,6 +93,11 @@ export type UndoSkipReason =
   | 'read-failed';
 
 /** Dependencies applyArchives/undoLastRun need, supplied by the wiring layer. */
+export interface ArchiveIncomingReference {
+  dependent: import('../types/task').Task;
+  references: string[];
+}
+
 export interface ApplyArchiveDeps {
   /**
    * Resolve the CURRENT task state for a match (or null if it no longer
@@ -117,7 +122,13 @@ export interface ApplyArchiveDeps {
    * archived. Called only for a write that actually happened; a failure here
    * never rolls back the archive.
    */
-  migrateDependents?: (task: import('../types/task').Task) => Promise<{
+  getIncomingReferences?: (
+    task: import('../types/task').Task,
+  ) => readonly ArchiveIncomingReference[] | Promise<readonly ArchiveIncomingReference[]>;
+  migrateDependents?: (
+    task: import('../types/task').Task,
+    incoming: readonly ArchiveIncomingReference[],
+  ) => Promise<{
     migrated: number;
     failures: ArchiveReferenceFailure[];
   }>;
@@ -337,6 +348,17 @@ export class ArchiveService {
           continue;
         }
         const fullTask = current as import('../types/task').Task;
+        let incoming: readonly ArchiveIncomingReference[] = [];
+        try {
+          incoming = (await deps.getIncomingReferences?.(fullTask)) ?? [];
+        } catch (error) {
+          console.debug(
+            'TODOseq: incoming reference inventory failed for',
+            match.path,
+            match.line,
+            error,
+          );
+        }
         try {
           const outcome = await deps.apply(fullTask, match.target);
           if (outcome?.status === 'refused') {
@@ -346,6 +368,17 @@ export class ArchiveService {
               path: match.path,
               line: match.line,
               reason: 'blocked',
+            });
+            continue;
+          }
+          if (
+            outcome?.status === 'failed' ||
+            outcome?.status === 'not-found'
+          ) {
+            skipped.push({
+              path: match.path,
+              line: match.line,
+              reason: 'apply-failed',
             });
             continue;
           }
@@ -365,7 +398,7 @@ export class ArchiveService {
         }
         if (deps.migrateDependents) {
           try {
-            const migration = await deps.migrateDependents(fullTask);
+            const migration = await deps.migrateDependents(fullTask, incoming);
             referenceFailures.push(...migration.failures);
           } catch (error) {
             referenceFailures.push({

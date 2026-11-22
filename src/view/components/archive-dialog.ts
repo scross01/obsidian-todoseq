@@ -48,7 +48,16 @@ interface ArchiveDialogPlugin {
   };
   keywordManager: KeywordManager;
   vaultScanner: { getKeywordManager(): KeywordManager } | null;
-  migrateArchivedDependents?: (task: Task) => Promise<{
+  taskDependencyManager?: {
+    getIncomingActiveReferences(task: Task): {
+      dependent: Task;
+      references: string[];
+    }[];
+  } | null;
+  migrateArchivedDependents?: (
+    task: Task,
+    incoming: readonly { dependent: Task; references: string[] }[],
+  ) => Promise<{
     migrated: number;
     failures: { path: string; reference: string; reason?: string }[];
   }>;
@@ -929,8 +938,13 @@ export class ArchiveDialog {
             target,
             'task-list',
           ),
+        getIncomingReferences: (task) =>
+          this.plugin.taskDependencyManager?.getIncomingActiveReferences(
+            task,
+          ) ?? [],
         migrateDependents: this.plugin.migrateArchivedDependents
-          ? (task) => this.plugin.migrateArchivedDependents!(task)
+          ? (task, incoming) =>
+              this.plugin.migrateArchivedDependents!(task, incoming)
           : undefined,
       });
 
@@ -950,6 +964,11 @@ export class ArchiveDialog {
             : '') +
           (staleCount > 0
             ? `, skipped ${staleCount} (changed since preview)`
+            : '') +
+          (result.referenceFailures.length > 0
+            ? `, ${result.referenceFailures.length} dependent reference${
+                result.referenceFailures.length === 1 ? '' : 's'
+              } could not be updated`
             : ''),
         {
           actionLabel: 'Undo',

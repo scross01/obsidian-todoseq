@@ -894,30 +894,26 @@ export class PluginLifecycleManager {
    */
   private async migrateArchivedDependents(
     task: Task,
+    incoming?: readonly { dependent: Task; references: string[] }[],
   ): Promise<{ migrated: number; failures: ArchiveReferenceFailure[] }> {
     const manager = this.plugin.taskDependencyManager;
     const coordinator = this.plugin.taskUpdateCoordinator;
     if (!manager || !coordinator) return { migrated: 0, failures: [] };
 
-    const targetKey = getTaskKey(task);
+    // The caller must inventory active references before the archive write:
+    // a completed prerequisite has no blocking reason, and once archived it
+    // is no longer in the index.
+    const referencesByDependent = incoming ?? manager.getIncomingActiveReferences(task);
     const byDependent = new Map<
       string,
       { task: Task; references: string[] }
     >();
-    for (const dependent of manager.getDependents(targetKey)) {
-      const references = [
-        ...new Set(
-          manager
-            .getReasons(getTaskKey(dependent))
-            .filter(
-              (reason) =>
-                reason.targetKey === targetKey && !!reason.reference,
-            )
-            .map((reason) => reason.reference as string),
-        ),
-      ];
+    for (const { dependent, references } of referencesByDependent) {
       if (references.length > 0) {
-        byDependent.set(getTaskKey(dependent), { task: dependent, references });
+        byDependent.set(getTaskKey(dependent), {
+          task: dependent,
+          references: [...new Set(references)],
+        });
       }
     }
 
@@ -1091,7 +1087,11 @@ export class PluginLifecycleManager {
           taskStateManager.findTaskByPathAndLine(path, line, cellIndex),
         apply: (task, target) =>
           coordinator.updateTaskState(task, target, 'task-list'),
-        migrateDependents: (task) => this.migrateArchivedDependents(task),
+        getIncomingReferences: (task) =>
+          this.plugin.taskDependencyManager?.getIncomingActiveReferences(task) ??
+          [],
+        migrateDependents: (task, incoming) =>
+          this.migrateArchivedDependents(task, incoming),
       });
 
       const archivedCount = result.archived.length;
