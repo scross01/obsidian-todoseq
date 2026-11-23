@@ -84,6 +84,12 @@ describe('blocked: search integration', () => {
     ]) {
       expect(Search.getError(query)).not.toBeNull();
     }
+    expect(Search.getError('blocked:yes')).toContain(
+      'blocked: accepts only true or false',
+    );
+    expect(Search.getError('blocked:"true"')).toContain(
+      'blocked: accepts only unquoted true or false',
+    );
     expect(Search.getError('blocked:true')).toBeNull();
   });
 

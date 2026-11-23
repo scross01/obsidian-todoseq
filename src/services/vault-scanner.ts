@@ -118,10 +118,7 @@ export class VaultScanner
     return this.structureRevision;
   }
 
-  getStructuralEntries(): ReadonlyMap<
-    string,
-    readonly StructuralEntry[]
-  > {
+  getStructuralEntries(): ReadonlyMap<string, readonly StructuralEntry[]> {
     return this.structuralEntriesByPath;
   }
 
@@ -397,7 +394,8 @@ export class VaultScanner
         return [];
       }
 
-      const format = file.extension.toLowerCase() === 'org' ? 'org' : 'markdown';
+      const format =
+        file.extension.toLowerCase() === 'org' ? 'org' : 'markdown';
       this.publishStructure(
         file.path,
         collectStructuralEntries(
@@ -737,7 +735,40 @@ export class VaultScanner
     );
   }
 
-  // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate, subtaskCount, subtaskCompletedCount)
+  private static stringListsEqual(
+    a: readonly string[] | undefined,
+    b: readonly string[] | undefined,
+  ): boolean {
+    if (a === b) return true;
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Dependency and property data lives beside the task line, so a drawer-only
+   * edit leaves rawText unchanged. Compare it explicitly or a BLOCKER added or
+   * removed in the drawer is discarded as an unchanged file.
+   */
+  private static taskPropertiesEqual(a: Task, b: Task): boolean {
+    return (
+      a.id === b.id &&
+      a.ordered === b.ordered &&
+      a.noblocking === b.noblocking &&
+      a.embedReference === b.embedReference &&
+      VaultScanner.stringListsEqual(a.blockedBy, b.blockedBy) &&
+      VaultScanner.stringListsEqual(a.archivedBlockers, b.archivedBlockers) &&
+      JSON.stringify(a.properties ?? null) ===
+        JSON.stringify(b.properties ?? null) &&
+      JSON.stringify(a.propertyIssues ?? null) ===
+        JSON.stringify(b.propertyIssues ?? null)
+    );
+  }
+
+  // Compare two task arrays for equality, including metadata that lives outside
+  // the task line such as dates, properties and dependency references.
   private tasksIdentical(before: Task[], after: Task[]): boolean {
     if (before.length !== after.length) {
       return false;
@@ -770,7 +801,8 @@ export class VaultScanner
           a.deadlineWarningPeriod,
         ) ||
         b.subtaskCount !== a.subtaskCount ||
-        b.subtaskCompletedCount !== a.subtaskCompletedCount
+        b.subtaskCompletedCount !== a.subtaskCompletedCount ||
+        !VaultScanner.taskPropertiesEqual(b, a)
       ) {
         return false;
       }

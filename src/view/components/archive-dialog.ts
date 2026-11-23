@@ -956,24 +956,39 @@ export class ArchiveDialog {
         (skip) => skip.reason === 'blocked',
       ).length;
       const staleCount = skippedCount - blockedCount;
-      this.close();
-      showArchiveRunNotice(
+      const skipped: string[] = [];
+      if (blockedCount > 0) {
+        skipped.push(
+          `${blockedCount} task${
+            blockedCount === 1 ? '' : 's'
+          } blocked by dependencies`,
+        );
+      }
+      if (staleCount > 0) {
+        skipped.push(
+          `${staleCount} task${
+            staleCount === 1 ? '' : 's'
+          } changed since preview`,
+        );
+      }
+      const failureCount = result.referenceFailures.length;
+      const summary = [
         `TODOseq archived ${archivedCount} task${
           archivedCount === 1 ? '' : 's'
-        }` +
-          (blockedCount > 0
-            ? `, skipped ${blockedCount} blocked by dependencies`
-            : '') +
-          (staleCount > 0
-            ? `, skipped ${staleCount} (changed since preview)`
-            : '') +
-          (result.referenceFailures.length > 0
-            ? `, ${result.referenceFailures.length} dependent reference${
-                result.referenceFailures.length === 1 ? '' : 's'
-              } could not be updated`
-            : ''),
-        result.referenceFailures.length > 0 &&
-          this.plugin.retryReferenceRepairs
+        }.`,
+        skipped.length > 0 ? `Skipped ${skipped.join(' and ')}.` : '',
+        failureCount > 0
+          ? `${failureCount} dependent reference${
+              failureCount === 1 ? '' : 's'
+            } could not be updated.`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      this.close();
+      showArchiveRunNotice(
+        summary,
+        failureCount > 0 && this.plugin.retryReferenceRepairs
           ? {
               actionLabel: 'Retry repairs',
               onAction: () => void this.plugin.retryReferenceRepairs?.(),

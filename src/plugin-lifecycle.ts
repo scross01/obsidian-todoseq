@@ -47,8 +47,9 @@ export class PluginLifecycleManager {
   private promotionUnsubscribe: (() => void) | null = null;
   /** Coalesces dependency-driven UI refreshes per published snapshot. */
   private dependencyRefreshTimer: number | null = null;
-  private dependencyWarningService: TaskDependencyWarningService | null =
-    null;
+  /** Bridges task-state publications to the debounced dependency refresh. */
+  private taskStateUnsubscribe: (() => void) | null = null;
+  private dependencyWarningService: TaskDependencyWarningService | null = null;
 
   constructor(private plugin: TodoTracker) {}
 
@@ -132,6 +133,15 @@ export class PluginLifecycleManager {
     this.dependencyWarningService = new TaskDependencyWarningService(
       this.plugin.taskDependencyManager,
     );
+
+    // The dependency graph rebuilds lazily on read. A document edit publishes
+    // its tasks after the editor has already rebuilt decorations, so bridge
+    // that publication to the debounced surface refresh. Otherwise a newly
+    // added BLOCKER keeps its old marker until the next edit.
+    this.taskStateUnsubscribe?.();
+    this.taskStateUnsubscribe = this.plugin.taskStateManager.subscribe(() => {
+      this.scheduleDependencySurfaceRefresh();
+    });
 
     // Restored archived references become active again in the derived graph.
     // The source property is repaired after the revision settles, never during
@@ -754,6 +764,8 @@ export class PluginLifecycleManager {
     }
     this.promotionUnsubscribe?.();
     this.promotionUnsubscribe = null;
+    this.taskStateUnsubscribe?.();
+    this.taskStateUnsubscribe = null;
 
     // Set window flag to indicate this was a hot reload (not a fresh startup)
     // This survives the reload because hot reload reuses the same JS context.
@@ -909,11 +921,9 @@ export class PluginLifecycleManager {
     // The caller must inventory active references before the archive write:
     // a completed prerequisite has no blocking reason, and once archived it
     // is no longer in the index.
-    const referencesByDependent = incoming ?? manager.getIncomingActiveReferences(task);
-    const byDependent = new Map<
-      string,
-      { task: Task; references: string[] }
-    >();
+    const referencesByDependent =
+      incoming ?? manager.getIncomingActiveReferences(task);
+    const byDependent = new Map<string, { task: Task; references: string[] }>();
     for (const { dependent, references } of referencesByDependent) {
       if (references.length > 0) {
         byDependent.set(getTaskKey(dependent), {
@@ -996,8 +1006,19 @@ export class PluginLifecycleManager {
     if (this.dependencyRefreshTimer !== null) return;
 
     this.dependencyRefreshTimer = window.setTimeout(() => {
-      this.dependencyRefreshTimer = null;
-      if (!this.plugin.taskDependencyManager) return;
+      const manager = this.plugin.taskDependencyManager;
+      if (!manager) {
+        this.dependencyRefreshTimer = null;
+        return;
+      }
+
+      try {
+        // Pump the lazy graph while the timer is still marked pending, so its
+        // snapshot callback cannot queue an identical second refresh pass.
+        manager.getSnapshot();
+      } finally {
+        this.dependencyRefreshTimer = null;
+      }
 
       this.dependencyWarningService?.check();
       this.plugin.uiManager
@@ -1025,10 +1046,7 @@ export class PluginLifecycleManager {
     const promotions = manager.getArchivedReferencePromotions();
     if (promotions.length === 0) return;
 
-    const byDependent = new Map<
-      string,
-      { task: Task; references: string[] }
-    >();
+    const byDependent = new Map<string, { task: Task; references: string[] }>();
     for (const promotion of promotions) {
       const dependent = stateManager
         .getTasks()
@@ -1112,8 +1130,9 @@ export class PluginLifecycleManager {
         apply: (task, target) =>
           coordinator.updateTaskState(task, target, 'task-list'),
         getIncomingReferences: (task) =>
-          this.plugin.taskDependencyManager?.getIncomingActiveReferences(task) ??
-          [],
+          this.plugin.taskDependencyManager?.getIncomingActiveReferences(
+            task,
+          ) ?? [],
         migrateDependents: (task, incoming) =>
           this.migrateArchivedDependents(task, incoming),
       });
@@ -1122,15 +1141,16 @@ export class PluginLifecycleManager {
       const failureCount = result.referenceFailures.length;
       if (archivedCount === 0) return;
 
+      const failureSentence =
+        failureCount > 0
+          ? ` ${failureCount} dependent reference${
+              failureCount === 1 ? '' : 's'
+            } could not be updated.`
+          : '';
       showArchiveRunNotice(
         `TODOseq auto-archived ${archivedCount} task${
           archivedCount === 1 ? '' : 's'
-        }` +
-          (failureCount > 0
-            ? `, ${failureCount} dependent reference${
-                failureCount === 1 ? '' : 's'
-              } could not be updated`
-            : ''),
+        }.${failureSentence}`,
         {
           actionLabel:
             failureCount > 0

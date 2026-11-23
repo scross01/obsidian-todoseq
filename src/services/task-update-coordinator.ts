@@ -385,7 +385,7 @@ export class TaskUpdateCoordinator {
       ? reasons.map((reason) => reason.message).join(' ')
       : 'Resolve its BLOCKER references first.';
     new Notice(
-      `Blocked task cannot be completed. ${detail} Use Complete anyway in the task menu or the Complete blocked task command.`,
+      `Can't complete this task yet. ${detail} To override, use Complete anyway in the task menu or run the Complete blocked task command.`,
       8000,
     );
   }

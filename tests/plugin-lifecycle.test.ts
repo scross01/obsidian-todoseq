@@ -306,6 +306,74 @@ describe('PluginLifecycleManager', () => {
       expect(pluginMock.taskUpdateCoordinator).not.toBeNull();
     });
 
+    it('schedules a dependency refresh when the task state publishes', async () => {
+      await lifecycleManager.onload();
+      const schedule = jest.spyOn(
+        lifecycleManager as unknown as {
+          scheduleDependencySurfaceRefresh: () => void;
+        },
+        'scheduleDependencySurfaceRefresh',
+      );
+      schedule.mockImplementation(() => undefined);
+
+      try {
+        const subscribe = pluginMock.taskStateManager as {
+          subscribe: jest.Mock;
+        };
+        subscribe.subscribe.mock.calls.forEach((call) => {
+          (call[0] as () => void)();
+        });
+
+        expect(schedule).toHaveBeenCalledTimes(1);
+      } finally {
+        schedule.mockRestore();
+      }
+    });
+
+    it('pumps the dependency snapshot before refreshing surfaces', () => {
+      const manager = { getSnapshot: jest.fn() };
+      pluginMock.taskDependencyManager = manager;
+      const refreshEditor = pluginMock.refreshVisibleEditorDecorations as {
+        mockClear: () => void;
+        mock: {
+          calls: unknown[][];
+          invocationCallOrder: number[];
+        };
+      };
+      refreshEditor.mockClear();
+      const pendingTimers: Array<{ callback: () => void; delay?: number }> = [];
+      const setTimeoutSpy = jest
+        .spyOn(window, 'setTimeout')
+        .mockImplementation(((
+          ...args: Parameters<typeof window.setTimeout>
+        ) => {
+          const [callback, delay] = args;
+          if (typeof callback === 'function') {
+            pendingTimers.push({ callback, delay });
+          }
+          return pendingTimers.length;
+        }) as typeof window.setTimeout);
+
+      try {
+        (
+          lifecycleManager as unknown as {
+            scheduleDependencySurfaceRefresh: () => void;
+          }
+        ).scheduleDependencySurfaceRefresh();
+        const refresh = pendingTimers.find((timer) => timer.delay === 25);
+        expect(refresh).toBeDefined();
+        refresh!.callback();
+      } finally {
+        setTimeoutSpy.mockRestore();
+      }
+
+      expect(manager.getSnapshot).toHaveBeenCalledTimes(1);
+      expect(refreshEditor.mock.calls).toHaveLength(1);
+      expect(manager.getSnapshot.mock.invocationCallOrder[0]).toBeLessThan(
+        refreshEditor.mock.invocationCallOrder[0],
+      );
+    });
+
     it('should initialize embedded task list processor', async () => {
       await lifecycleManager.onload();
       expect(pluginMock.embeddedTaskListProcessor).not.toBeNull();

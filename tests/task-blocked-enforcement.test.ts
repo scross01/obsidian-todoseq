@@ -89,11 +89,13 @@ describe('blocked completion enforcement', () => {
     expect(writer.updateTaskState).not.toHaveBeenCalled();
     expect(state.findTaskByPathAndLine('blocked.md', 0)?.state).toBe('TODO');
     expect(Notice).toHaveBeenCalledWith(
-      expect.stringContaining('Blocked task cannot be completed'),
+      expect.stringContaining("Can't complete this task yet"),
       8000,
     );
     expect(Notice).toHaveBeenLastCalledWith(
-      expect.stringMatching(/Complete anyway[\s\S]*Complete blocked task/),
+      expect.stringMatching(
+        /To override[\s\S]*Complete anyway[\s\S]*Complete blocked task/,
+      ),
       8000,
     );
     coordinator.destroy();
@@ -181,7 +183,7 @@ describe('blocked completion enforcement', () => {
     expect(outcome.status).toBe('refused');
     expect(writer.updateTaskState).toHaveBeenCalledTimes(1);
     expect(Notice).toHaveBeenCalledWith(
-      expect.stringContaining('Blocked task cannot be completed'),
+      expect.stringContaining("Can't complete this task yet"),
       8000,
     );
     coordinator.destroy();

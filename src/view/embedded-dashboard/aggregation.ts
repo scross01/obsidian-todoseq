@@ -411,7 +411,7 @@ export class DashboardAggregator {
   private resolveBlockedGroups(matched: Task[]): DashboardGroup[] {
     if (!this.dependencyStatus) {
       throw new SearchError(
-        'Dependency status is unavailable for blocked: queries.',
+        "Blocked status isn't available yet. Wait for the vault scan to finish, then try again.",
       );
     }
     const blockedKeys = this.dependencyStatus.getBlockedKeys();

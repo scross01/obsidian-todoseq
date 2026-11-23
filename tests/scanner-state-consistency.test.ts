@@ -173,6 +173,23 @@ describe('scanner state consistency', () => {
 
       expect(listener).not.toHaveBeenCalled();
     });
+
+    it('publishes property-only dependency changes', async () => {
+      const file = addFile('a.md', 'TODO task');
+      await scanner.scanVault();
+      expect(taskStateManager.getTasks()[0].blockedBy).toBeUndefined();
+
+      content.set(
+        'a.md',
+        ['TODO task', ':PROPERTIES:', ':BLOCKER: blocker', ':END:'].join('\n'),
+      );
+      await scanner.processIncrementalChange(file);
+      expect(taskStateManager.getTasks()[0].blockedBy).toEqual(['blocker']);
+
+      content.set('a.md', 'TODO task');
+      await scanner.processIncrementalChange(file);
+      expect(taskStateManager.getTasks()[0].blockedBy).toBeUndefined();
+    });
   });
 
   describe('full-scan publication', () => {

@@ -176,7 +176,9 @@ describe('reader blocked badge', () => {
     expect(badges[0].getAttribute('title')).toContain(
       'Blocked by TODO Blocker.',
     );
-    expect(badges[0].getAttribute('aria-label')).toContain('Blocked:');
+    expect(badges[0].getAttribute('aria-label')).toBe(
+      'Blocked by TODO Blocker.',
+    );
     expect(
       root.querySelectorAll('li[data-line="1"] .todoseq-reader-blocked-badge'),
     ).toHaveLength(0);
@@ -202,7 +204,7 @@ describe('reader blocked badge', () => {
     );
   });
 
-  it('carries the reason count for multiple reasons', async () => {
+  it('lists every blocking reason without repeating the prefix', async () => {
     const { formatter, manager } = createReaderHarness();
     manager.getBlockingReasons.mockReturnValue([
       {
@@ -229,7 +231,9 @@ describe('reader blocked badge', () => {
     ).processDependencyMarkers(root, { sourcePath: 'blocked.md' });
 
     const badge = root.querySelector('.todoseq-reader-blocked-badge');
-    expect(badge?.getAttribute('aria-label')).toContain('2 reasons');
+    expect(badge?.getAttribute('aria-label')).toBe(
+      'Blocked by TODO One. Blocked by unfinished child Child.',
+    );
   });
 
   it('replaces the lock with a warning for a source diagnostic', async () => {

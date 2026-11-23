@@ -611,7 +611,7 @@ export class SearchEvaluator {
   ): boolean {
     if (!context.blockedKeys) {
       throw new SearchError(
-        'Dependency status is unavailable for blocked: queries.',
+        "Blocked status isn't available yet. Wait for the vault scan to finish, then try again.",
       );
     }
     const blocked = context.blockedKeys.has(getTaskKey(task));

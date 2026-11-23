@@ -672,12 +672,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           },
           {
             name: 'Enforce blocked tasks',
-            desc: 'Refuse completing a task while a BLOCKER dependency is incomplete or unresolved. "Complete anyway" remains available from the task menu and command.',
+            desc: 'Block completion while a BLOCKER dependency is incomplete or unresolved. To override, use Complete anyway in the task menu or the Complete blocked task command.',
             control: { type: 'toggle', key: 'enforceBlockedTasks' },
           },
           {
             name: 'Respect parent and ordered task dependencies',
-            desc: 'When enabled, an unfinished child blocks its parent and an ORDERED task constrains later siblings. Explicit BLOCKER references are always active.',
+            desc: 'When enabled, an incomplete child task blocks its parent, and an ORDERED task blocks later siblings. Explicit BLOCKER references always apply.',
             control: {
               type: 'toggle',
               key: 'enforceTaskHierarchyDependencies',
@@ -685,7 +685,7 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
           },
           {
             name: 'Require checkboxes to be complete',
-            desc: 'When enabled, unchecked descendant checkboxes block an incomplete parent. This is independent of parent/ORDERED dependencies.',
+            desc: 'When enabled, unchecked descendant checkboxes block an incomplete parent. This is independent of parent and ORDERED dependencies.',
             control: {
               type: 'toggle',
               key: 'enforceCheckboxDependencies',

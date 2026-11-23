@@ -307,7 +307,8 @@ export class TaskDependencyManager {
       issues.push({
         code: 'ambiguous-reference',
         fingerprint: `duplicate-id:${id}`,
-        message: `Several tasks declare the same ID.`,
+        message:
+          'Several tasks use the same ID, so references to it are ambiguous. Give each task a unique ID.',
         reference: id,
         sourceKey: getTaskKey(owners[1]),
       });
@@ -360,7 +361,8 @@ export class TaskDependencyManager {
           const targetKey = structure.previousSiblingByKey.get(key);
           const target = targetKey ? this.tasksByKey.get(targetKey) : null;
           if (!target) {
-            const message = 'previous-sibling has no previous task sibling.';
+            const message =
+              'No earlier task exists in this section. Add one above this task or remove its previous-sibling dependency.';
             reasons.push(
               this.reason(task, 'missing-reference', message, raw, true),
             );
@@ -372,7 +374,9 @@ export class TaskDependencyManager {
                 this.reason(
                   task,
                   'incomplete-blocker',
-                  `Blocked by previous sibling ${target.text || target.id || ''}.`,
+                  `Blocked by the previous task, ${
+                    target.text || target.id || 'an incomplete task'
+                  }.`,
                   raw,
                   true,
                   target,
@@ -435,7 +439,8 @@ export class TaskDependencyManager {
             this.reason(
               task,
               code,
-              resolved.message ?? 'Dependency could not be resolved.',
+              resolved.message ??
+                'The dependency could not be found. Check the reference or remove it.',
               raw,
               true,
             ),
@@ -444,7 +449,8 @@ export class TaskDependencyManager {
             this.issue(
               task,
               code,
-              resolved.message ?? 'Dependency could not be resolved.',
+              resolved.message ??
+                'The dependency could not be found. Check the reference or remove it.',
               raw,
             ),
           );
@@ -456,7 +462,7 @@ export class TaskDependencyManager {
           this.issue(
             task,
             'ambiguous-reference',
-            'A reference appears in both active and archived dependency lists.',
+            'This dependency appears in both BLOCKER and ARCHIVED_BLOCKER. Remove it from one list.',
             refs.find((ref) => archived.has(ref)),
           ),
         );
@@ -476,7 +482,7 @@ export class TaskDependencyManager {
             this.issue(
               task,
               'invalid-reference',
-              'Archived dependency history is not a valid active reference.',
+              'ARCHIVED_BLOCKER cannot store this reference. Remove it or replace it with a saved task ID or file-qualified block link.',
               raw,
             ),
           );
@@ -495,7 +501,8 @@ export class TaskDependencyManager {
               this.issue(
                 task,
                 resolved.code,
-                resolved.message ?? 'Archived dependency is ambiguous.',
+                resolved.message ??
+                  'The archived dependency matches more than one task. Remove it or use a unique ID or block link.',
                 raw,
               ),
             );
@@ -516,7 +523,9 @@ export class TaskDependencyManager {
             this.reason(
               task,
               'incomplete-blocker',
-              `Restored blocker ${resolved.target.text || raw} is incomplete.`,
+              `Blocked by ${
+                resolved.target.text || raw
+              }, restored from archived history and still incomplete.`,
               raw,
               true,
               resolved.target,
@@ -540,7 +549,8 @@ export class TaskDependencyManager {
       issues.push({
         code: 'cycle',
         fingerprint: `cycle:${keys.join('|')}`,
-        message: 'Task dependency cycle detected.',
+        message:
+          'Dependency cycle detected. These tasks depend on each other, so remove one dependency to unblock them.',
         sourceKey: keys[0],
         targetKey: keys[1],
       });
@@ -615,7 +625,9 @@ export class TaskDependencyManager {
             parentKey,
             key,
             'structural',
-            `Blocked by unfinished child ${child.text || child.id || ''}.`,
+            `Blocked by incomplete child task ${
+              child.text || child.id || 'an incomplete task'
+            }.`,
             child,
           );
           parentKey = structure.parentByKey.get(parentKey);
@@ -638,7 +650,9 @@ export class TaskDependencyManager {
               this.reason(
                 child,
                 'structural',
-                `Ordered after ${prior.text || prior.id || 'an earlier sibling'}.`,
+                `Blocked by the earlier ORDERED task ${
+                  prior.text || prior.id || 'in this list'
+                }, which must be completed first.`,
                 'ORDERED',
                 true,
                 prior,

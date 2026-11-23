@@ -365,11 +365,7 @@ export class ReaderViewFormatter {
 
       const reasons = manager.getBlockingReasons(key);
       const details = reasons.map((reason) => reason.message).join(' ');
-      const label = reasons.length
-        ? reasons.length > 1
-          ? `Blocked by ${reasons.length} reasons: ${details}`
-          : `Blocked: ${details}`
-        : 'Blocked by an incomplete dependency';
+      const label = details || 'Blocked by an incomplete dependency';
 
       const badge = createSpan({
         cls: 'todoseq-task-blocked-icon todoseq-reader-blocked-badge',
