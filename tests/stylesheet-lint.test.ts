@@ -97,4 +97,44 @@ describe('stylesheet lint', () => {
       );
     });
   });
+
+  describe('readable text tokens', () => {
+    it('uses the text-safe accent for keyword ink', () => {
+      const readableAccent =
+        /color:\s*color-mix\(\s*in srgb,\s*var\(--text-accent,\s*var\(--interactive-accent\)\)\s*80%,\s*var\(--text-normal\)/s;
+      expect(selectors).toMatch(
+        new RegExp(
+          `\\.todoseq-keyword-formatted\\s*\\{[^}]*${readableAccent.source}`,
+          's',
+        ),
+      );
+      expect(selectors).toMatch(
+        new RegExp(
+          `\\.todoseq-panel \\.todo-task-keyword\\s*\\{[^}]*${readableAccent.source}`,
+          's',
+        ),
+      );
+    });
+
+    it('does not paint completed text with the faint token', () => {
+      expect(selectors).not.toMatch(
+        /\.todoseq-panel \.todoseq-task-text\.completed\s*\{[^}]*color:\s*var\(--text-faint/s,
+      );
+      expect(selectors).not.toMatch(
+        /\.todoseq-panel \.todoseq-task-item\.completed \.todo-task-keyword\s*\{[^}]*color:\s*var\(--text-faint/s,
+      );
+    });
+
+    it('does not stack opacity on completed text', () => {
+      expect(selectors).not.toMatch(
+        /\.todoseq-completed-task-text\s*\{[^}]*opacity:/s,
+      );
+      expect(selectors).not.toMatch(
+        /\.todoseq-completed-keyword\s*\{[^}]*opacity:/s,
+      );
+      expect(selectors).not.toMatch(
+        /\.todoseq-embedded-task-item\.todoseq-embedded-task-completed\s*\{[^}]*opacity:/s,
+      );
+    });
+  });
 });

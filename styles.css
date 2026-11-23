@@ -170,11 +170,11 @@
   font-size: 0.9em;
 }
 .todoseq-panel .todoseq-task-text.completed {
-  color: var(--text-faint);
+  color: var(--text-muted);
   text-decoration: line-through;
 }
 
-/* Completed rows recede: keyword drops to faint and their meta (file info,
+/* Completed rows recede: keyword drops to muted and their meta (file info,
    date rows) drops a further step so completed clusters sit visually behind
    open work.
 
@@ -186,7 +186,7 @@
    continuously as tasks stream in. A `:has()` ban, and the reason, is pinned
    by tests/stylesheet-lint.test.ts. */
 .todoseq-panel .todoseq-task-item.completed .todo-task-keyword {
-  color: var(--text-faint);
+  color: var(--text-muted);
 }
 .todoseq-panel .todoseq-task-item.completed .todoseq-task-file-info,
 .todoseq-panel .todoseq-task-item.completed .todoseq-task-date-container {
@@ -195,7 +195,11 @@
 
 /* Keyword toggle (TODO/DOING/DONE) */
 .todoseq-panel .todo-task-keyword {
-  color: var(--interactive-accent);
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 80%,
+    var(--text-normal)
+  );
   cursor: pointer;
   /* Bold, matching the weight the keyword carries in task capture (source
      entries). A lighter weight read as a different typeface and broke the
@@ -649,7 +653,11 @@
 /* Task keyword formatting in editor and reading view */
 .todoseq-keyword-formatted {
   font-weight: var(--font-bold);
-  color: var(--interactive-accent);
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 80%,
+    var(--text-normal)
+  );
   font-size: 0.9rem; /* reduce size slightly */
   border-radius: 2px; /* Subtle rounding */
   cursor: pointer; /* Show hand/finger cursor like a link */
@@ -803,15 +811,15 @@
 
 /* Completed task text styling */
 :is(.markdown-preview-view, .cm-editor) .todoseq-completed-task-text {
+  color: var(--text-muted);
   text-decoration: line-through;
-  opacity: 0.8;
 }
 
 /* Completed task keyword styling - applies strikethrough to the keyword itself */
 /* Works for both built-in (DONE, CANCELLED, CANCELED) and custom completed keywords */
 :is(.markdown-preview-view, .cm-editor) .todoseq-completed-keyword {
+  color: var(--text-muted);
   text-decoration: line-through;
-  opacity: 0.8;
 }
 
 /* Archived task styling - muted/dimmed appearance without strikethrough */
@@ -1547,11 +1555,8 @@
 }
 
 /* Completed task styling - target completed (x) and canceled (-) states */
-.todoseq-embedded-task-item.todoseq-embedded-task-completed {
-  opacity: 0.6;
-}
-
 .todoseq-embedded-task-completed .todoseq-embedded-task-text {
+  color: var(--text-muted);
   text-decoration: line-through;
 }
 

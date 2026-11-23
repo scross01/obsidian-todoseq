@@ -38,26 +38,27 @@ Palette character: **whatever the user's theme is.** TODOseq does not define a b
 
 ### Authority tokens (use these; do not hardcode hex)
 
-| Role                       | Obsidian variable                                                                   | Plugin use                                                    |
-| -------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Body text                  | `--text-normal`                                                                     | Task text, titles                                             |
-| Secondary text             | `--text-muted`                                                                      | File paths, dates, completed text, meta                       |
-| Interactive accent         | `--interactive-accent` (fallback `#7f6df2`)                                         | Keywords, medium priority, focus rings, active accents        |
-| On-accent text             | `--text-on-accent`                                                                  | Filled accent badges                                          |
-| Link                       | `--link-color`                                                                      | In-text task links                                            |
-| Hover / active / selection | `--background-modifier-hover` / `--active` / `--selection`                          | Row hover, pressed states                                     |
-| Borders                    | `--background-modifier-border`                                                      | Separators, dashed empty states                               |
-| Focus border               | `--background-modifier-border-focus`                                                | Keyboard focus outlines                                       |
-| Surfaces                   | `--background-primary` / `--background-secondary`                                   | Panel, drag overlay, embedded list well                       |
-| Semantic                   | `--color-red`, `--color-orange`, `--color-green`, `--error-color`, `--text-warning` | Overdue / today / soon dates, priority A, settings validation |
-| Tags                       | `--tag-background`, `--tag-color`, `--tag-radius`, …                                | Task tags inherit full Obsidian tag chip styling              |
+| Role                       | Obsidian variable                                                                   | Plugin use                                                     |
+| -------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Body text                  | `--text-normal`                                                                     | Task text, titles                                              |
+| Secondary text             | `--text-muted`                                                                      | File paths, dates, completed text, meta                        |
+| Accent text                | `--text-accent` (fallback `--interactive-accent`)                                   | Keywords (blended 80/20 toward body text), accent-colored text |
+| Interactive accent         | `--interactive-accent` (fallback `#7f6df2`)                                         | Focus rings, hover washes, checkbox tints, active surfaces     |
+| On-accent text             | `--text-on-accent`                                                                  | Filled accent badges                                           |
+| Link                       | `--link-color`                                                                      | In-text task links                                             |
+| Hover / active / selection | `--background-modifier-hover` / `--active` / `--selection`                          | Row hover, pressed states                                      |
+| Borders                    | `--background-modifier-border`                                                      | Separators, dashed empty states                                |
+| Focus border               | `--background-modifier-border-focus`                                                | Keyboard focus outlines                                        |
+| Surfaces                   | `--background-primary` / `--background-secondary`                                   | Panel, drag overlay, embedded list well                        |
+| Semantic                   | `--color-red`, `--color-orange`, `--color-green`, `--error-color`, `--text-warning` | Overdue / today / soon dates, priority A, settings validation  |
+| Tags                       | `--tag-background`, `--tag-color`, `--tag-radius`, …                                | Task tags inherit full Obsidian tag chip styling               |
 
 ### TODOseq semantic mapping (theme-native)
 
-- **State keywords** (editor, reader): bold, `--interactive-accent`; hover underline + `--background-modifier-hover`. Same bold weight in the Task List panel at `0.9em` — the panel deliberately echoes the capture font so list entries feel like the same task (accent color unchanged).
+- **State keywords** (editor, reader): bold, text-safe accent (`--text-accent`, fallback `--interactive-accent`, blended 80/20 toward `--text-normal`); hover underline + `--background-modifier-hover`. Same bold weight in the Task List panel at `0.9em` — the panel deliberately echoes the capture font so list entries feel like the same task (same text-safe accent ink).
 - **Priority A / B / C badges:** A `--color-red`, B `--interactive-accent`, C muted border + `--text-muted`
 - **Date rails:** 3px left border + low-alpha `color-mix` fill — overdue red, today orange, soon green, closed muted
-- **Completed tasks:** `--text-muted` + line-through; archived slightly dimmer
+- **Completed tasks:** `--text-muted` + line-through; the strike is the recede cue, never opacity. Archived slightly dimmer.
 - **Active-task checkbox tint:** `color-mix` of `--interactive-accent` (~33%)
 
 ### Named Rules
@@ -143,8 +144,8 @@ Search is a first-class Operate surface and must **feel like Obsidian search**, 
 
 ### Editor & reader formatting
 
-- Keywords: bold + `--interactive-accent`; source mode stays simpler (no size jump)
-- Completed / archived: strike + muted opacity; archived slightly dimmer without inventing a new gray
+- Keywords: bold + text-safe accent (`--text-accent` blended 80/20 toward `--text-normal`, fallback `--interactive-accent`); source mode stays simpler (no size jump)
+- Completed: `--text-muted` + strike on both text and keyword, never opacity; archived slightly dimmer without inventing a new gray
 - Date lines (`SCHEDULED` / `DEADLINE` / `CLOSED` / `STARTED`): muted, ~0.9rem, keyword vs value weight split
 - Smart-date highlight: low-alpha accent fill + thin outline — a temporary cursor cue, not a brand marker
 - Never recolor note prose beyond task-related tokens

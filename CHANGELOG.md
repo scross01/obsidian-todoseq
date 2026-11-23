@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keywords and completed tasks now use the theme's readable text colors, so they stay legible in both light and dark themes without changing the task state.
 - The blocked-completion notice now points to the Complete anyway override, and dependency problem notices name the task's file and line. The blocked marker has a larger click target, and the blocked dashboard bucket uses a warning colour.
 - Blocked tasks now show the lock immediately before the keyword in every view, with no dimmed row. Broken dependency references show the warning triangle in the Task List and embedded lists too.
 - Fixed Copy anchor placing a task's block anchor where Obsidian could not resolve it when the task had a schedule, deadline, description or property drawer. The anchor now goes at the end of the task's metadata block, existing task-line anchors are moved there by Copy anchor, and anchors on date, description and `:END:` lines are recognised when scanning.
