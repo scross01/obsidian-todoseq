@@ -461,10 +461,13 @@ describe('DashboardRenderer', () => {
         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
           d.getDate(),
         ).padStart(2, '0')}`;
+      // Start on the Monday of the previous week so the grid always contains
+      // at least one past day: the production window starts on this week's
+      // Monday, which is today when today is a Monday.
       const windowStart = new Date(
         today.getFullYear(),
         today.getMonth(),
-        today.getDate() - ((today.getDay() + 6) % 7),
+        today.getDate() - (((today.getDay() + 6) % 7) + 7),
       );
       const days = Array.from({ length: 26 * 7 }, (_, i) => {
         const day = new Date(
@@ -474,7 +477,7 @@ describe('DashboardRenderer', () => {
         );
         return { date: key(day), count: 0 };
       });
-      const todayIdx = (today.getDay() + 6) % 7;
+      const todayIdx = ((today.getDay() + 6) % 7) + 7;
       days[todayIdx] = { date: key(today), count: 2 };
       days[todayIdx + 1] = {
         date: key(
@@ -482,18 +485,12 @@ describe('DashboardRenderer', () => {
         ),
         count: 4,
       };
-      if (todayIdx >= 1) {
-        days[todayIdx - 1] = {
-          date: key(
-            new Date(
-              today.getFullYear(),
-              today.getMonth(),
-              today.getDate() - 1,
-            ),
-          ),
-          count: 9, // past day: aggregation keeps this at 0 in production
-        };
-      }
+      days[todayIdx - 1] = {
+        date: key(
+          new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1),
+        ),
+        count: 9, // past day: aggregation keeps this at 0 in production
+      };
       return result({
         total: 160,
         groups: [],
@@ -539,6 +536,20 @@ describe('DashboardRenderer', () => {
         '.todoseq-dashboard-heatmap-cell.past',
       );
       expect(pastCells?.length).toBeGreaterThan(0);
+      const today = new Date();
+      const yesterday = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate() - 1,
+      );
+      const yesterdayKey = `${yesterday.getFullYear()}-${String(
+        yesterday.getMonth() + 1,
+      ).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+      expect(
+        grid?.querySelector(
+          `.todoseq-dashboard-heatmap-cell.past[data-date="${yesterdayKey}"]`,
+        ),
+      ).not.toBeNull();
       pastCells?.forEach((cell) => {
         expect(cell.getAttribute('role')).toBeNull();
       });

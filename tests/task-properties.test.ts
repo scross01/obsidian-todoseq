@@ -1,11 +1,36 @@
 import {
   extractTaskProperties,
+  isPropertiesDrawerEnd,
   isPropertiesDrawerStart,
   parseDependencyReference,
   parsePropertyLine,
   readTaskPropertiesDrawer,
   tokenizeDependencyValue,
 } from '../src/utils/task-properties';
+
+describe('isPropertiesDrawerEnd', () => {
+  test('accepts a Markdown :END: with a trailing block anchor', () => {
+    expect(isPropertiesDrawerEnd(':END:', 'markdown')).toBe(true);
+    expect(isPropertiesDrawerEnd('  :END: ^todoseq-abc123', 'markdown')).toBe(
+      true,
+    );
+    expect(
+      isPropertiesDrawerEnd('  :END: ^todoseq-abc123   ', 'markdown'),
+    ).toBe(true);
+  });
+
+  test('keeps Org :END: exact-match', () => {
+    expect(isPropertiesDrawerEnd(':END:', 'org')).toBe(true);
+    expect(isPropertiesDrawerEnd('  :END: ^todoseq-abc123', 'org')).toBe(false);
+  });
+
+  test('rejects trailing content that is not a block anchor', () => {
+    expect(isPropertiesDrawerEnd(':END: extra', 'markdown')).toBe(false);
+    expect(isPropertiesDrawerEnd(':END:^anchor', 'markdown')).toBe(false);
+    expect(isPropertiesDrawerEnd(':END: ^anchor]', 'markdown')).toBe(false);
+    expect(isPropertiesDrawerEnd(':END: [^1]', 'markdown')).toBe(false);
+  });
+});
 
 describe('parsePropertyLine', () => {
   test('parses mixed-case, punctuation keys, empty values and append markers', () => {
@@ -71,6 +96,24 @@ describe('readTaskPropertiesDrawer', () => {
     expect(extractTaskProperties(drawer!, 'markdown')).toMatchObject({
       id: 'task-1',
       blockedBy: ['task-2', 'task-3'],
+    });
+  });
+
+  test('closes on an anchored :END: and keeps the correct endLine', () => {
+    const lines = [
+      'TODO Task',
+      ':PROPERTIES:',
+      ':ID: task-1',
+      ':END: ^todoseq-abc123',
+      'TODO Next',
+    ];
+    const drawer = readTaskPropertiesDrawer(lines, 1, 'markdown', {
+      taskIndent: '',
+    });
+    expect(drawer).toMatchObject({ startLine: 1, endLine: 3, closed: true });
+    expect(drawer?.issues).toEqual([]);
+    expect(extractTaskProperties(drawer!, 'markdown')).toMatchObject({
+      id: 'task-1',
     });
   });
 

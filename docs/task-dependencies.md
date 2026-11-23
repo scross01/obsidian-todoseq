@@ -24,9 +24,15 @@ TODOseq reads these properties:
 - `ORDERED` makes later task siblings wait for this task.
 - `NOBLOCKING` exempts this task from every dependency gate, including explicit, structural and checkbox reasons. A present value other than lowercase `nil` enables it; an empty value enables it.
 
-Property names are case-insensitive. Values and IDs keep their case. Unknown properties are preserved but not interpreted. A drawer can contain blank lines. An unclosed drawer is left alone and does not consume the following task.
-
 In the editor and reading view the drawer is shown as quiet metadata: the lines are muted and the property keys are faint, using your theme's colours. Nothing is hidden, and the drawer remains ordinary note text that other tools can read.
+
+### Org property syntax
+
+TODOseq uses Org's property-drawer conventions. Property names are case-insensitive; values and IDs keep their case. Unknown properties are preserved but not interpreted. A drawer can contain blank lines, and an unclosed drawer is left alone without consuming the following task.
+
+`BLOCKER` and its `previous-sibling` value follow the [org-depend contrib](https://orgmode.org/worg/org-contrib/org-depend.html) convention rather than being core Org dependency keys. The `+` suffix is Org's general [property append syntax](https://orgmode.org/manual/Property-Syntax.html), not a dependency-specific keyword: `:BLOCKER+: literature-03` adds a second entry to `BLOCKER`, and is not a separate `BLOCKER+` property. Org defines multiple entries per property only when the extra keys use `+`; multiple plain entries are ambiguous, so TODOseq uses the first plain entry and reports a duplicate-property diagnostic.
+
+Dependencies are read from the task's own drawer only. Parent tasks and file-level defaults do not pass them down; see [Local properties only](#local-properties-only).
 
 ### Appending references
 
@@ -40,6 +46,8 @@ TODO Write the research paper
 :BLOCKER+: literature-03
 :END:
 ```
+
+The example above describes the same blockers as `:BLOCKER: data-02 literature-03`: the first form has one entry with two references, while the second has a base entry and an appended entry. The `+` form is useful when adding a reference without rewriting the existing line.
 
 References are separated by whitespace, deduplicated, and kept in source order. Commas are not separators.
 
@@ -171,7 +179,19 @@ This gate covers plugin completion actions only. Editing the note text manually,
 The task context menu can copy an `ID` or a Markdown block anchor:
 
 - **Copy ID** reuses the task's authored ID. If it has none, TODOseq writes a UUID to the task's property drawer and then copies it. Scanning or capturing a task never creates an ID by itself.
-- **Copy anchor** is available for Markdown task lines. It reuses the task's block anchor or appends a new one, then copies a file-qualified link such as `[[Projects/Plan#^todoseq-a1b2c3d4]]`. Org, code-comment and table tasks are not supported.
+- **Copy anchor** is available for Markdown task lines. It reuses the task's block anchor or creates one, then copies a file-qualified link such as `[[Projects/Plan#^todoseq-a1b2c3d4]]`. The anchor goes on the last line of the task's recognised metadata block, because Obsidian only resolves a block reference at the end of that block:
+
+  ```markdown
+  TODO Test another
+  SCHEDULED: <2026-11-23 Mon>
+  :PROPERTIES:
+  :EXTRA: testing
+  :END: ^todoseq-a1b2c3d4
+  ```
+
+  A task with no metadata carries the anchor on its own line. A trailing anchor is ignored by date, `DESCRIPTION:` and property parsing, so the metadata still reads normally. The anchor also keeps Obsidian's own faint block-anchor styling: TODOseq's muted date, description and drawer styling stops before it, and an anchored `:END:` still closes the drawer. Only the recognised metadata block is anchored: a blank line ends it, and an indented continuation paragraph is not covered. Org, code-comment and table tasks are not supported.
+
+  Older notes may still have the anchor on the task line. TODOseq reads that anchor as before, and running **Copy anchor** moves it to the end of the block while keeping the same identifier and copied link. Repeated **Copy anchor** reuses the anchor without writing again. Scanning never rewrites notes, so an existing task-line anchor stays where it is until you run **Copy anchor**; references to it remain unresolvable in Obsidian until then.
 
 **Add copied link as blocker** reads one ID or file-qualified block link from the clipboard, resolves it to exactly one collected task, and appends it to the current task's `BLOCKER` list. Ambiguous or invalid clipboard content is rejected without writing.
 

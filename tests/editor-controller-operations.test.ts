@@ -5,6 +5,7 @@ import {
   createBaseSettings,
   createTestKeywordManager,
   createBaseTask,
+  emulateEditorReplaceRange,
 } from './helpers/test-helper';
 import { isDailyNotesPluginEnabledSync } from '../src/utils/daily-note-utils';
 
@@ -625,6 +626,65 @@ describe('Editor Controller - Operations (copy, move, migrate, context menu)', (
       );
 
       expect(result).toBe(true);
+    });
+  });
+
+  describe('anchor preservation in editor metadata inserts', () => {
+    const makeEditableLines = (
+      initial: string[],
+    ): { lines: string[]; editor: any } => {
+      const lines = [...initial];
+      const editor = {
+        lineCount: () => lines.length,
+        getLine: (index: number) => lines[index] ?? '',
+        replaceRange: (text: string, from: any, to: any) =>
+          emulateEditorReplaceRange(lines, text, from, to),
+        getCursor: () => ({ line: 0, ch: 0 }),
+        setCursor: jest.fn(),
+        setSelection: jest.fn(),
+      };
+      return { lines, editor };
+    };
+
+    it('moves a task-line anchor onto a newly inserted date line', () => {
+      const { lines, editor } = makeEditableLines([
+        '- [ ] TODO Test task ^legacy',
+      ]);
+
+      const result = editorController['handleAddDateAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+        'SCHEDULED',
+      );
+
+      expect(result).toBe(true);
+      expect(lines[0]).toBe('- [ ] TODO Test task');
+      expect(lines[1]).toMatch(
+        /^ {2}SCHEDULED: <\d{4}-\d{2}-\d{2}> \^legacy$/,
+      );
+    });
+
+    it('moves a task-line anchor below an inserted DESCRIPTION line', () => {
+      const { lines, editor } = makeEditableLines([
+        '- [ ] TODO Test task ^legacy',
+      ]);
+
+      const result = editorController['handleAddDescriptionAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(lines[0]).toBe('- [ ] TODO Test task');
+      expect(lines[1]).toBe('  DESCRIPTION: ^legacy');
+      expect(editor.setCursor).toHaveBeenLastCalledWith({
+        line: 1,
+        ch: '  DESCRIPTION: '.length,
+      });
     });
   });
 

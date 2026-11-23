@@ -28,6 +28,8 @@ import {
   readTaskPropertiesDrawer,
   type ParsedTaskProperties,
 } from '../utils/task-properties';
+import { splitTrailingBlockAnchor } from '../utils/block-anchor';
+import { findTaskBlockAnchor } from '../utils/task-block-anchor';
 import {
   BULLET_LIST_PATTERN_SOURCE,
   NUMBERED_LIST_PATTERN_SOURCE,
@@ -475,17 +477,27 @@ export class TaskParser implements ITaskParser {
     embedReference?: string;
     cleanedText: string;
   } {
-    let cleanedText = taskText;
-    let embedReference: string | undefined;
+    // Use the shared block-anchor grammar so a task-line anchor and a
+    // block-end anchor accept exactly the same suffixes.
+    const { text, anchor } = splitTrailingBlockAnchor(taskText);
+    return {
+      embedReference: anchor ? `^${anchor}` : undefined,
+      cleanedText: anchor ? text.trim() : taskText,
+    };
+  }
 
-    // Extract Obsidian embed references like ^abc123 (only at end of text)
-    const embedMatch = taskText.match(/(\s*\^[^\s]+)$/);
-    if (embedMatch) {
-      embedReference = embedMatch[1].trim();
-      cleanedText = taskText.slice(0, embedMatch.index).trim();
-    }
-
-    return { embedReference, cleanedText };
+  /**
+   * Adopt a block-end anchor when the task line carries none. Markdown only:
+   * table and Org tasks keep their existing identity behaviour.
+   */
+  private applyBlockEndAnchor(
+    task: Task,
+    lines: string[],
+    index: number,
+  ): void {
+    if (task.embedReference || task.isTableTask) return;
+    const found = findTaskBlockAnchor(lines, index, task.indent ?? '');
+    if (found) task.embedReference = `^${found.anchor}`;
   }
 
   /**
@@ -768,6 +780,10 @@ export class TaskParser implements ITaskParser {
       .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
       .trim();
 
+    // A trailing block anchor is identity, not date content. Strip it before
+    // normalising CLOSED brackets so `CLOSED: [date] ^anchor` still parses.
+    content = splitTrailingBlockAnchor(content).text;
+
     // CLOSED dates use [...] format, convert to <...> for DateParser compatibility
     // (org-mode uses <...> for active dates and [...] for inactive/closed dates)
     if (content.startsWith('[') && content.endsWith(']')) {
@@ -794,6 +810,10 @@ export class TaskParser implements ITaskParser {
       .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
       .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
       .trim();
+
+    // A trailing block anchor is identity, not date content. Strip it before
+    // normalising CLOSED brackets so `CLOSED: [date] ^anchor` still parses.
+    content = splitTrailingBlockAnchor(content).text;
 
     // CLOSED dates use [...] format, convert to <...> for DateParser compatibility
     // (org-mode uses <...> for active dates and [...] for inactive/closed dates)
@@ -986,7 +1006,10 @@ export class TaskParser implements ITaskParser {
     }
     const trimmed = contentLine.trimStart();
     if (!trimmed.startsWith('DESCRIPTION:')) return null;
-    return trimmed.substring('DESCRIPTION:'.length).trim();
+    const value = trimmed.substring('DESCRIPTION:'.length).trim();
+    // The suffix is identity: an anchor-only description is empty, not the
+    // anchor.
+    return splitTrailingBlockAnchor(value).text.trim();
   }
 
   /**
@@ -1803,6 +1826,7 @@ export class TaskParser implements ITaskParser {
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
     this.applyParsedProperties(task, propertyInfo);
+    this.applyBlockEndAnchor(task, lines, index);
 
     // Extract subtasks from lines following date lines
     // Footnote tasks don't have checkboxes
@@ -2073,6 +2097,7 @@ export class TaskParser implements ITaskParser {
     task.deadlineWarningPeriod = deadlineWarningPeriod;
     task.description = description ?? undefined;
     this.applyParsedProperties(task, propertyInfo);
+    this.applyBlockEndAnchor(task, lines, index);
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
@@ -2220,6 +2245,7 @@ export class TaskParser implements ITaskParser {
     task.deadlineWarningPeriod = deadlineWarningPeriod;
     task.description = description ?? undefined;
     this.applyParsedProperties(task, propertyInfo);
+    this.applyBlockEndAnchor(task, lines, index);
 
     // Extract subtasks from lines following date lines
     // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect

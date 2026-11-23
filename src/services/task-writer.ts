@@ -6,6 +6,14 @@ import {
   TaskPropertyKey,
 } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
+import {
+  appendBlockAnchor,
+  splitTrailingBlockAnchor,
+} from '../utils/block-anchor';
+import {
+  findTaskBlockAnchor,
+  findTaskBlockEndLine,
+} from '../utils/task-block-anchor';
 import { KeywordManager } from '../utils/keyword-manager';
 import { DateUtils } from '../utils/date-utils';
 import { buildWarningPeriodString } from '../utils/date-repeater';
@@ -156,6 +164,7 @@ export class TaskWriter {
     const block = request.dateLines
       .map((line) => `${indent}${line.type}: ${line.dateText}`)
       .join('\n');
+    const existingAnchor = splitTrailingBlockAnchor(taskLine.text).anchor;
 
     const changes: { from: number; to: number; insert: string }[] = [
       { from: taskLine.from, to: taskLine.to, insert: request.updatedTaskText },
@@ -187,6 +196,16 @@ export class TaskWriter {
       view.dispatch({ changes, selection: { anchor, head: anchor } });
     } else {
       view.dispatch({ changes });
+    }
+
+    // Date insertion moves the block end, so a captured anchor is re-homed
+    // after the transaction instead of being stranded above the new line.
+    if (existingAnchor && mdView.editor) {
+      this.relocateBlockAnchorInEditor(
+        mdView.editor,
+        { ...task, line: request.lineNumber - 1 },
+        existingAnchor,
+      );
     }
 
     return true;
@@ -236,6 +255,124 @@ export class TaskWriter {
       );
     }
     return line.includes(task.state) && line.includes(task.text);
+  }
+
+  /**
+   * The anchor only when the task snapshot genuinely ends with it. A
+   * block-end anchor is owned by another line, so a task-line rewrite must
+   * not append it there.
+   */
+  private static taskLineAnchor(task: Task): string | undefined {
+    const reference = task.embedReference;
+    if (!reference) return undefined;
+    let text = task.rawText.trimEnd();
+    const footnote = task.footnoteReference;
+    if (footnote && text.endsWith(footnote)) {
+      text = text.slice(0, -footnote.length);
+    }
+    return splitTrailingBlockAnchor(text).anchor ===
+      reference.replace(/^\^/, '')
+      ? reference
+      : undefined;
+  }
+
+  /** The live block anchor owned by a Markdown task, if any. */
+  private blockAnchorOf(lines: string[], task: Task): string | null {
+    if (
+      task.isTableTask ||
+      task.sourceFormat === 'org' ||
+      task.sourceFormat === 'code-comment'
+    ) {
+      return null;
+    }
+    return (
+      findTaskBlockAnchor(lines, task.line, getTaskIndent(task))?.anchor ?? null
+    );
+  }
+
+  /**
+   * Move a captured anchor to the resulting block end after a metadata
+   * mutation. The suffix is identity: never duplicated, never dropped.
+   */
+  private relocateBlockAnchor(
+    lines: string[],
+    taskLine: number,
+    taskIndent: string,
+    anchor: string | null,
+  ): void {
+    if (!anchor) return;
+    const end = findTaskBlockEndLine(lines, taskLine, taskIndent);
+    for (let i = taskLine; i <= end && i < lines.length; i++) {
+      const split = splitTrailingBlockAnchor(lines[i] ?? '');
+      if (split.anchor === anchor) {
+        lines[i] = split.text;
+        break;
+      }
+    }
+    const newEnd = findTaskBlockEndLine(lines, taskLine, taskIndent);
+    lines[newEnd] = appendBlockAnchor(lines[newEnd] ?? '', anchor);
+  }
+
+  /** Read the live editor buffer as lines. */
+  private editorLines(editor: Editor): string[] {
+    return Array.from({ length: editor.lineCount() }, (_, i) =>
+      editor.getLine(i),
+    );
+  }
+
+  private editorBlockAnchor(editor: Editor, task: Task): string | null {
+    if (
+      task.isTableTask ||
+      task.sourceFormat === 'org' ||
+      task.sourceFormat === 'code-comment'
+    ) {
+      return null;
+    }
+    return (
+      findTaskBlockAnchor(
+        this.editorLines(editor),
+        task.line,
+        getTaskIndent(task),
+      )?.anchor ?? null
+    );
+  }
+
+  /** Editor variant of relocateBlockAnchor; rewrites only the touched lines. */
+  private relocateBlockAnchorInEditor(
+    editor: Editor,
+    task: Task,
+    anchor: string | null,
+  ): void {
+    if (!anchor) return;
+    const indent = getTaskIndent(task);
+    const replaceLine = (index: number, text: string): void => {
+      editor.replaceRange(
+        text,
+        { line: index, ch: 0 },
+        { line: index, ch: editor.getLine(index).length },
+      );
+    };
+    const end = findTaskBlockEndLine(
+      this.editorLines(editor),
+      task.line,
+      indent,
+    );
+    for (let i = task.line; i <= end; i++) {
+      const split = splitTrailingBlockAnchor(editor.getLine(i) ?? '');
+      if (split.anchor === anchor) {
+        replaceLine(i, split.text);
+        break;
+      }
+    }
+    const newEnd = findTaskBlockEndLine(
+      this.editorLines(editor),
+      task.line,
+      indent,
+    );
+    replaceLine(
+      newEnd,
+      appendBlockAnchor(editor.getLine(newEnd) ?? '', anchor),
+    );
   }
 
   private async readSourceBlock(
@@ -399,6 +536,7 @@ export class TaskWriter {
     task: Task,
     updates: readonly TaskPropertyUpdate[],
   ): string[] {
+    const anchor = this.blockAnchorOf(lines, task);
     const drawer = this.findPropertiesDrawer(lines, task);
 
     if (!drawer) {
@@ -415,6 +553,7 @@ export class TaskWriter {
       ];
       const out = [...lines];
       out.splice(index, 0, ...block);
+      this.relocateBlockAnchor(out, task.line, getTaskIndent(task), anchor);
       return out;
     }
 
@@ -454,10 +593,12 @@ export class TaskWriter {
     const remainingEntries =
       drawer.entries.length - removedEntries + inserts.length;
     if (remainingEntries === 0) {
-      return [
+      const out = [
         ...lines.slice(0, drawer.startLine),
         ...lines.slice(drawer.endLine + 1),
       ];
+      this.relocateBlockAnchor(out, task.line, getTaskIndent(task), anchor);
+      return out;
     }
 
     const out: string[] = [];
@@ -467,6 +608,7 @@ export class TaskWriter {
       out.push(replace.get(i) ?? lines[i]);
     }
     if (drawer.endLine >= lines.length) out.push(...inserts);
+    this.relocateBlockAnchor(out, task.line, getTaskIndent(task), anchor);
     return out;
   }
 
@@ -676,34 +818,41 @@ export class TaskWriter {
       return { status: 'failed', task: null, lineDelta: 0 };
     }
 
-    // The task snapshot can predate an identity written by an earlier action.
-    // Re-read the line so Copy anchor reuses the persisted anchor instead of
-    // generating a second one.
-    const currentLine = (await this.readFileText(file)).split('\n')[
-      task.line
-    ];
-    const persisted = currentLine?.match(/(?:^|\s)\^([A-Za-z0-9-]+)\s*$/)?.[1];
-    const existing = task.embedReference?.replace(/^\^/, '') || persisted;
-    const anchor = existing || `todoseq-${this.randomHex(8)}`;
-    const link = this.buildBlockLink(task.path, anchor);
-    if (existing) {
-      return { status: 'success', task, lineDelta: 0, identity: anchor, link };
+    // Live lines are the authority: a stale snapshot must not mint a second
+    // anchor, and only the final line of the recognised block may carry it.
+    const indent = getTaskIndent(task);
+    const before = (await this.readFileText(file)).split('\n');
+    if (!this.lineMatchesTask(before[task.line], task)) {
+      return { status: 'failed', task: null, lineDelta: 0 };
     }
 
+    const existing = findTaskBlockAnchor(before, task.line, indent);
+    const endLine = findTaskBlockEndLine(before, task.line, indent);
+    const anchor = existing?.anchor ?? `todoseq-${this.randomHex(8)}`;
+    const link = this.buildBlockLink(task.path, anchor);
+
+    // Already terminal (including a lone task-line anchor with no metadata):
+    // repeated Copy anchor is idempotent and writes nothing.
+    if (existing && existing.line === endLine) {
+      return {
+        status: 'success',
+        task: { ...task, embedReference: `^${anchor}` },
+        lineDelta: 0,
+        identity: anchor,
+        link,
+      };
+    }
+
+    const after = [...before];
+    if (existing) {
+      after[existing.line] = splitTrailingBlockAnchor(
+        after[existing.line],
+      ).text;
+    }
+    after[endLine] = appendBlockAnchor(after[endLine] ?? '', anchor);
+
     const editor = this.getTransferEditor(file);
-    let before: string[] = [];
-    let after: string[] = [];
     if (editor) {
-      before = Array.from({ length: editor.lineCount() }, (_, i) =>
-        editor.getLine(i),
-      );
-      if (!this.lineMatchesTask(before[task.line], task)) {
-        return { status: 'failed', task: null, lineDelta: 0 };
-      }
-      const line = before[task.line];
-      const suffix = line.endsWith(' ') ? '' : ' ';
-      after = [...before];
-      after[task.line] = `${line}${suffix}^${anchor}`;
       const last = editor.lineCount() - 1;
       editor.replaceRange(
         after.join('\n'),
@@ -712,11 +861,8 @@ export class TaskWriter {
       );
     } else {
       await this.app.vault.process(file, (data) => {
-        before = data.split('\n');
-        if (!this.lineMatchesTask(before[task.line], task)) return data;
-        after = [...before];
-        const line = before[task.line];
-        after[task.line] = `${line}${line.endsWith(' ') ? '' : ' '}^${anchor}`;
+        const live = data.split('\n');
+        if (!this.lineMatchesTask(live[task.line], task)) return data;
         return after.join('\n');
       });
     }
@@ -869,7 +1015,8 @@ export class TaskWriter {
         status: 'ambiguous',
         task: null,
         lineDelta: 0,
-        reason: 'Fix the malformed properties drawer before changing dependencies.',
+        reason:
+          'Fix the malformed properties drawer before changing dependencies.',
       };
     }
 
@@ -1083,8 +1230,8 @@ export class TaskWriter {
   private blockAnchors(block: readonly string[]): string[] {
     const anchors = new Set<string>();
     for (const line of block) {
-      const match = /\^([A-Za-z0-9][\w-]*)\s*$/.exec(line);
-      if (match) anchors.add(match[1]);
+      const anchor = splitTrailingBlockAnchor(line).anchor;
+      if (anchor) anchors.add(anchor);
     }
     return [...anchors];
   }
@@ -1120,8 +1267,8 @@ export class TaskWriter {
     const anchorMap = new Map<string, string>();
     const usedAnchors = new Set<string>();
     for (let i = 0; i < lines.length; i++) {
-      const match = /\^([A-Za-z0-9][\w-]*)\s*$/.exec(lines[i] ?? '');
-      const oldAnchor = match?.[1];
+      const split = splitTrailingBlockAnchor(lines[i] ?? '');
+      const oldAnchor = split.anchor;
       if (!oldAnchor) continue;
       let next = anchorMap.get(oldAnchor);
       if (!next) {
@@ -1132,7 +1279,7 @@ export class TaskWriter {
         usedAnchors.add(next);
         anchorMap.set(oldAnchor, next);
       }
-      lines[i] = lines[i].replace(`^${oldAnchor}`, `^${next}`);
+      lines[i] = appendBlockAnchor(split.text, next);
     }
 
     const destinationTarget = destination.path
@@ -1158,10 +1305,7 @@ export class TaskWriter {
       if (/^\s*:?(BLOCKER|ARCHIVED_BLOCKER)\+?:/i.test(line)) {
         for (const [oldId, newId] of idMap) {
           line = line.replace(
-            new RegExp(
-              `(^|[:\\s])${this.escapeRegExp(oldId)}(?=\\s|$)`,
-              'g',
-            ),
+            new RegExp(`(^|[:\\s])${this.escapeRegExp(oldId)}(?=\\s|$)`, 'g'),
             `$1${newId}`,
           );
         }
@@ -1229,12 +1373,16 @@ export class TaskWriter {
   ): string[] {
     const out = [...lines];
     if (anchor) {
-      const line = out[task.line];
-      if (typeof line === 'string') {
-        out[task.line] = line.replace(
-          new RegExp(`\\s*\\^${this.escapeRegExp(anchor)}(?=\\s*$)`),
-          '',
-        );
+      // The anchor may sit on the task line or on the block end (`:END:`),
+      // so find the line that owns it rather than assuming task.line.
+      const indent = getTaskIndent(task);
+      const end = findTaskBlockEndLine(out, task.line, indent);
+      for (let i = task.line; i <= end && i < out.length; i++) {
+        const split = splitTrailingBlockAnchor(out[i] ?? '');
+        if (split.anchor === anchor) {
+          out[i] = split.text;
+          break;
+        }
       }
     }
 
@@ -1319,9 +1467,7 @@ export class TaskWriter {
   }
 
   /** Retry exactly the references that failed, never a fresh vault pass. */
-  async retryPendingReferenceRepairs(): Promise<
-    TaskReferenceRepairReport[]
-  > {
+  async retryPendingReferenceRepairs(): Promise<TaskReferenceRepairReport[]> {
     if (this.pendingReferenceEdits.length === 0) return [];
     const edits = this.pendingReferenceEdits;
     this.pendingReferenceEdits = [];
@@ -1459,8 +1605,10 @@ export class TaskWriter {
       }
     }
 
-    // Add embed reference if it exists
-    if (task.embedReference) {
+    // Add a task-line embed reference only when it genuinely ends this line.
+    // A block-end anchor belongs to a metadata line and must not move here.
+    const lineAnchor = TaskWriter.taskLineAnchor(task);
+    if (lineAnchor) {
       // Extract the original spacing from the raw text
       // Find where the task text (plus any footnote reference) ends and the embed reference begins
       const textToSearch = task.text + (task.footnoteReference || '');
@@ -1468,9 +1616,9 @@ export class TaskWriter {
         task.rawText.indexOf(textToSearch) + textToSearch.length;
       const originalSpacing = task.rawText.substring(
         textEndIndex,
-        task.rawText.indexOf(task.embedReference, textEndIndex),
+        task.rawText.indexOf(lineAnchor, textEndIndex),
       );
-      newLine += originalSpacing + task.embedReference;
+      newLine += originalSpacing + lineAnchor;
     }
 
     // Add footnote reference if it exists
@@ -2243,9 +2391,10 @@ export class TaskWriter {
     // Preserve embed and footnote references if they exist
     // Embed reference comes before the text, footnote reference comes after the text
     const footnoteMarker = task.footnoteMarker || '';
-    const embedReference = task.embedReference || '';
+    const lineAnchor = TaskWriter.taskLineAnchor(task);
+    const anchorPart = lineAnchor ? ` ${lineAnchor}` : '';
     const footnoteReference = task.footnoteReference || '';
-    const newTaskLine = `${indent}${footnoteMarker}${listMarkerWithSpace}${state} ${priorityToken}${embedReference}${text}${footnoteReference}`;
+    const newTaskLine = `${indent}${footnoteMarker}${listMarkerWithSpace}${state} ${priorityToken}${text}${anchorPart}${footnoteReference}`;
 
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (!file || !(file instanceof TFile)) {
@@ -2332,9 +2481,10 @@ export class TaskWriter {
     // Preserve embed and footnote references if they exist
     // Embed reference comes before the text, footnote reference comes after the text
     const footnoteMarker = task.footnoteMarker || '';
-    const embedReference = task.embedReference || '';
+    const lineAnchor = TaskWriter.taskLineAnchor(task);
+    const anchorPart = lineAnchor ? ` ${lineAnchor}` : '';
     const footnoteReference = task.footnoteReference || '';
-    const newTaskLine = `${indent}${footnoteMarker}${listMarkerWithSpace}${state}${embedReference}${text}${footnoteReference}`;
+    const newTaskLine = `${indent}${footnoteMarker}${listMarkerWithSpace}${state}${text}${anchorPart}${footnoteReference}`;
 
     await this.writeLineToFile(task, newTaskLine);
 
@@ -2813,7 +2963,7 @@ export class TaskWriter {
     if (!match) {
       return null;
     }
-    let content = match[1].trim();
+    let content = splitTrailingBlockAnchor(match[1].trim()).text;
     if (content.startsWith('[') && content.endsWith(']')) {
       content = `<${content.slice(1, -1)}>`;
     }
@@ -2840,6 +2990,7 @@ export class TaskWriter {
   } {
     const kwManager = this.keywordManager;
     const taskIndent = getTaskIndent(task);
+    const anchor = this.blockAnchorOf(lines, task);
     const existingIdx = findDateLine(
       lines,
       taskLineIndex + 1,
@@ -2857,6 +3008,7 @@ export class TaskWriter {
         const prefixMatch = existingLine.match(/^(\s*(?:>\s*)?)STARTED:.*$/);
         const prefix = prefixMatch ? prefixMatch[1] : taskIndent;
         lines[existingIdx] = `${prefix}STARTED: ${dateStr}`;
+        this.relocateBlockAnchor(lines, taskLineIndex, taskIndent, anchor);
         return {
           lines,
           lineDelta: 0,
@@ -2886,6 +3038,7 @@ export class TaskWriter {
     );
     const indent = this.getEffectiveDateLineIndent(lines, -1, task);
     lines.splice(insertIdx, 0, `${indent}STARTED: ${dateStr}`);
+    this.relocateBlockAnchor(lines, taskLineIndex, taskIndent, anchor);
     return {
       lines,
       lineDelta: 1,
@@ -2927,6 +3080,7 @@ export class TaskWriter {
 
         // Get the proper indent including quote prefix, bullet, or checkbox marker
         const taskIndent = getTaskIndent(task);
+        const anchor = this.editorBlockAnchor(editor, task);
 
         // Search for existing CLOSED line
         // Always search regardless of task.closedDate because:
@@ -2973,6 +3127,7 @@ export class TaskWriter {
           );
           lineDelta = 1; // New line inserted
         }
+        this.relocateBlockAnchorInEditor(editor, task, anchor);
       } else {
         // Vault API path
         await this.app.vault.process(file, (data) => {
@@ -3123,6 +3278,7 @@ export class TaskWriter {
     dateType: DateLineType,
   ): number {
     const taskIndent = getTaskIndent(task);
+    const anchor = this.editorBlockAnchor(editor, task);
     const lineIndex = findDateLine(
       Array.from({ length: editor.lineCount() }, (_, i) => editor.getLine(i)),
       task.line + 1,
@@ -3144,6 +3300,7 @@ export class TaskWriter {
     const nextLineFrom: EditorPosition = { line: lineIndex, ch: 0 };
     const nextLineTo: EditorPosition = { line: lineIndex + 1, ch: 0 };
     editor.replaceRange('', nextLineFrom, nextLineTo);
+    this.relocateBlockAnchorInEditor(editor, task, anchor);
     return -1;
   }
 
@@ -3481,9 +3638,8 @@ export class TaskWriter {
     dateStr: string | null,
     taskIndent: string,
   ): number {
-    const lines = Array.from({ length: editor.lineCount() }, (_, i) =>
-      editor.getLine(i),
-    );
+    const lines = this.editorLines(editor);
+    const anchor = this.editorBlockAnchor(editor, task);
     const existingIdx = findDateLine(
       lines,
       task.line + 1,
@@ -3499,6 +3655,7 @@ export class TaskWriter {
           { line: existingIdx, ch: 0 },
           { line: existingIdx + 1, ch: 0 },
         );
+        this.relocateBlockAnchorInEditor(editor, task, anchor);
         return -1;
       }
       return 0;
@@ -3511,6 +3668,7 @@ export class TaskWriter {
         { line: existingIdx, ch: 0 },
         { line: existingIdx, ch: editor.getLine(existingIdx).length },
       );
+      this.relocateBlockAnchorInEditor(editor, task, anchor);
       return 0;
     }
 
@@ -3527,6 +3685,7 @@ export class TaskWriter {
       `${indent}${dateType}: ${dateStr}`,
       lines,
     );
+    this.relocateBlockAnchorInEditor(editor, task, anchor);
     return 1;
   }
 
@@ -3734,6 +3893,7 @@ export class TaskWriter {
   ): { lines: string[]; lineDelta: number } {
     const kwManager = this.keywordManager;
     const taskIndent = getTaskIndent(task);
+    const anchor = this.blockAnchorOf(lines, task);
     const existingIdx = findDateLine(
       lines,
       taskLineIndex + 1,
@@ -3745,6 +3905,7 @@ export class TaskWriter {
     if (existingIdx >= 0) {
       const indent = this.getEffectiveDateLineIndent(lines, existingIdx, task);
       lines[existingIdx] = `${indent}${dateType}: ${dateStr}`;
+      this.relocateBlockAnchor(lines, taskLineIndex, taskIndent, anchor);
       return { lines, lineDelta: 0 };
     }
 
@@ -3756,6 +3917,7 @@ export class TaskWriter {
     );
     const indent = this.getEffectiveDateLineIndent(lines, -1, task);
     lines.splice(insertIdx, 0, `${indent}${dateType}: ${dateStr}`);
+    this.relocateBlockAnchor(lines, taskLineIndex, taskIndent, anchor);
     return { lines, lineDelta: 1 };
   }
 
@@ -3771,6 +3933,7 @@ export class TaskWriter {
   ): { lines: string[]; lineDelta: number } {
     const kwManager = this.keywordManager;
     const taskIndent = getTaskIndent(task);
+    const anchor = this.blockAnchorOf(lines, task);
     const existingIdx = findDateLine(
       lines,
       taskLineIndex + 1,
@@ -3781,6 +3944,7 @@ export class TaskWriter {
 
     if (existingIdx >= 0) {
       lines.splice(existingIdx, 1);
+      this.relocateBlockAnchor(lines, taskLineIndex, taskIndent, anchor);
       return { lines, lineDelta: -1 };
     }
 

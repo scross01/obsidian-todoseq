@@ -24,6 +24,14 @@ import {
   isTableRow,
   getCellTaskLine,
 } from '../utils/task-line-utils';
+import {
+  appendBlockAnchor,
+  splitTrailingBlockAnchor,
+} from '../utils/block-anchor';
+import {
+  findTaskBlockAnchor,
+  findTaskBlockEndLine,
+} from '../utils/task-block-anchor';
 import { TaskContextMenu } from '../view/components/task-context-menu';
 import {
   DatePicker,
@@ -767,11 +775,24 @@ export class EditorController {
 
     if (checking) return true;
 
+    // Inserting DESCRIPTION directly below the task line would otherwise
+    // leave a task-line anchor stranded above the new metadata.
+    const taskLineSplit = splitTrailingBlockAnchor(line);
+    const taskLineAnchor = taskLineSplit.anchor;
+
     // Parse task to get indent
     const task = parser.parseLineAsTask(line, lineNumber, '');
     const taskIndent = task
       ? getTaskIndent(task)
       : (line.match(/^(\s*)/)?.[1] ?? '');
+
+    if (taskLineAnchor) {
+      editor.replaceRange(
+        taskLineSplit.text,
+        { line: lineNumber, ch: 0 },
+        { line: lineNumber, ch: line.length },
+      );
+    }
 
     // Build lines array to search for existing DESCRIPTION: (stop early if possible)
     const totalLines = Math.min(lineNumber + 10, editor.lineCount());
@@ -786,7 +807,8 @@ export class EditorController {
       // DESCRIPTION: already exists — move cursor to end of description text
       const descLine = editor.getLine(existingIdx);
       const descContent = descLine.replace(/^[\s>]*DESCRIPTION:\s*/, '');
-      const descEnd = descLine.indexOf(descContent) + descContent.length;
+      const descText = splitTrailingBlockAnchor(descContent).text;
+      const descEnd = descLine.indexOf(descContent) + descText.length;
       editor.setCursor({ line: existingIdx, ch: descEnd });
       return true;
     }
@@ -803,8 +825,23 @@ export class EditorController {
       { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
     );
 
-    // Position cursor after "DESCRIPTION: " for immediate typing
-    editor.setCursor({ line: insertLine, ch: descLine.length });
+    if (task) {
+      this.relocateBlockAnchor(editor, task, taskLineAnchor);
+    }
+
+    // Position the cursor inside the description, before any suffix the
+    // relocation placed on this line.
+    const inserted = editor.getLine(insertLine) ?? '';
+    const anchorIndex = taskLineAnchor
+      ? inserted.indexOf(`^${taskLineAnchor}`)
+      : -1;
+    editor.setCursor({
+      line: insertLine,
+      ch:
+        anchorIndex >= 0
+          ? anchorIndex
+          : Math.min(descLine.length, inserted.length),
+    });
     return true;
   }
 
@@ -1053,6 +1090,71 @@ export class EditorController {
     return dateLineIndex >= 0 ? dateLineIndex : null;
   }
 
+  /** Read the live editor buffer as lines. */
+  private editorLines(editor: Editor): string[] {
+    return Array.from({ length: editor.lineCount() }, (_, i) =>
+      editor.getLine(i),
+    );
+  }
+
+  private blockAnchorOfEditor(editor: Editor, task: Task): string | null {
+    if (
+      task.isTableTask ||
+      task.sourceFormat === 'org' ||
+      task.sourceFormat === 'code-comment'
+    ) {
+      return null;
+    }
+    return (
+      findTaskBlockAnchor(
+        this.editorLines(editor),
+        task.line,
+        getTaskIndent(task),
+      )?.anchor ?? null
+    );
+  }
+
+  /**
+   * Move a captured block anchor to the resulting block end. Metadata writes
+   * in this controller bypass TaskWriter, so preservation happens here.
+   */
+  private relocateBlockAnchor(
+    editor: Editor,
+    task: Task,
+    anchor: string | null,
+  ): void {
+    if (!anchor) return;
+    const indent = getTaskIndent(task);
+    const replaceLine = (index: number, text: string): void => {
+      editor.replaceRange(
+        text,
+        { line: index, ch: 0 },
+        { line: index, ch: editor.getLine(index).length },
+      );
+    };
+    const end = findTaskBlockEndLine(
+      this.editorLines(editor),
+      task.line,
+      indent,
+    );
+    for (let i = task.line; i <= end; i++) {
+      const split = splitTrailingBlockAnchor(editor.getLine(i) ?? '');
+      if (split.anchor === anchor) {
+        replaceLine(i, split.text);
+        break;
+      }
+    }
+    const newEnd = findTaskBlockEndLine(
+      this.editorLines(editor),
+      task.line,
+      indent,
+    );
+    replaceLine(
+      newEnd,
+      appendBlockAnchor(editor.getLine(newEnd) ?? '', anchor),
+    );
+  }
+
   /**
    * Insert a new date line at the appropriate position
    * @param editor - The editor instance
@@ -1080,6 +1182,7 @@ export class EditorController {
       ? getTaskIndent(task)
       : (taskLine.match(/^(\s*)/)?.[1] ?? '');
     const dateLineIndent = task ? getDateLineIndent(task) : taskIndent;
+    const taskLineAnchor = task ? this.blockAnchorOfEditor(editor, task) : null;
 
     // Create the date line with the correct indent (2 spaces more than task indent)
     const dateLine = `${dateLineIndent}${dateType}: <${currentDate}>`;
@@ -1140,7 +1243,6 @@ export class EditorController {
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
-      this.moveCursorToDateLine(editor, insertLine);
     } else if (isInsertingBeforeDateLine) {
       // Inserting before an existing date line (e.g., adding scheduled before deadline)
       // Add newline before but no newline after (since there's already a date line after)
@@ -1150,7 +1252,6 @@ export class EditorController {
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
-      this.moveCursorToDateLine(editor, insertLine);
     } else {
       // Insert with newline before (no newline after - existing content follows naturally)
       editor.replaceRange(
@@ -1158,8 +1259,12 @@ export class EditorController {
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
-      this.moveCursorToDateLine(editor, insertLine);
     }
+
+    if (task) {
+      this.relocateBlockAnchor(editor, task, taskLineAnchor);
+    }
+    this.moveCursorToDateLine(editor, insertLine);
   }
 
   /**

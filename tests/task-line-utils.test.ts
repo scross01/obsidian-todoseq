@@ -728,6 +728,30 @@ describe('task-line-utils', () => {
     });
   });
 
+  describe('findDateLine with an anchored drawer end', () => {
+    it('skips a drawer closed by :END: with a block anchor', () => {
+      const lines = [
+        '- [ ] TODO task',
+        '  :PROPERTIES:',
+        '  :ID: task-1',
+        '  :END: ^todoseq-abc123',
+        '  SCHEDULED: <2026-11-23 Mon>',
+      ];
+      expect(findDateLine(lines, 1, 'SCHEDULED', '', keywordManager)).toBe(4);
+    });
+
+    it('skips an anchored drawer when looking for DESCRIPTION', () => {
+      const lines = [
+        '- [ ] TODO task',
+        '  :PROPERTIES:',
+        '  :ID: task-1',
+        '  :END: ^todoseq-abc123',
+        '  DESCRIPTION: details',
+      ];
+      expect(findDescriptionLine(lines, 1, '')).toBe(4);
+    });
+  });
+
   describe('getDateLineIndent', () => {
     it('should return empty string for H1 heading tasks', () => {
       const task = {

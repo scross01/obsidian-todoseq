@@ -665,6 +665,42 @@ describe('TaskKeywordDecorator date-line decorations (E4 audit)', () => {
     expect(added).toHaveLength(2);
     expect(added[0].deco.spec.class).toBe('todoseq-started-line');
   });
+
+  it('leaves a trailing block anchor out of the date-line span', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+    const lineText = 'SCHEDULED: <2026-11-24 Tue> ^abc123';
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      lineText,
+      { from: 100, to: 100 + lineText.length },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[0].deco.spec.class).toBe('todoseq-scheduled-line');
+    expect(added[0].from).toBe(100);
+    expect(added[0].to).toBe(100 + 'SCHEDULED: <2026-11-24 Tue>'.length);
+    expect(added[1].to).toBe(100 + 'SCHEDULED:'.length);
+  });
+
+  it('leaves a trailing block anchor out of the description span', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+    const lineText = 'DESCRIPTION: Some text ^abc123';
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      lineText,
+      { from: 0, to: lineText.length },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[0].deco.spec.class).toBe('todoseq-task-description');
+    expect(added[0].to).toBe('DESCRIPTION: Some text'.length);
+  });
 });
 
 describe('TaskKeywordDecorator property-drawer decorations', () => {
@@ -808,6 +844,60 @@ describe('TaskKeywordDecorator property-drawer decorations', () => {
     ]);
     expect(added[2].from).toBe(17);
     expect(added[2].to).toBe(21);
+  });
+
+  it('treats an anchored :END: as the drawer boundary', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      ':PROPERTIES:',
+      { from: 0, to: 12 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      2,
+      ':END: ^abc123',
+      { from: 13, to: 26 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      3,
+      ':ID: stray',
+      { from: 27, to: 37 },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[1].deco.spec.class).toBe('todoseq-properties-line');
+    expect(added[1].deco.spec.attributes['data-properties-line']).toBe(
+      'boundary',
+    );
+    expect(added[1].to).toBe(13 + ':END:'.length);
+    expect(decorator['inPropertiesDrawer']).toBe(false);
+  });
+
+  it('leaves a trailing block anchor out of a drawer entry span', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+    const lineText = ':ID: paper-01 ^abc123';
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      ':PROPERTIES:',
+      { from: 0, to: 12 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      2,
+      lineText,
+      { from: 13, to: 13 + lineText.length },
+      builder,
+    );
+
+    expect(added[1].deco.spec.class).toBe('todoseq-properties-line');
+    expect(added[1].to).toBe(13 + ':ID: paper-01'.length);
   });
 
   it('decorates a quoted drawer and its key', () => {

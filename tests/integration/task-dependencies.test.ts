@@ -364,6 +364,10 @@ test.describe('task dependencies', () => {
           '  :PROPERTIES:',
           '  :ID: authored-id',
           '  :END:',
+          '- [ ] TODO Drawer anchor task',
+          '  :PROPERTIES:',
+          '  :ID: drawer-task-id',
+          '  :END:',
           '',
         ].join('\n'),
       },
@@ -508,5 +512,65 @@ test.describe('task dependencies', () => {
       /Blocked by Source task/,
       { timeout: 5_000 },
     );
+
+    // Copy anchor on a task with a properties drawer writes after :END:.
+    await clickTaskMenuAction(page, 'Drawer anchor task', 'Copy anchor');
+    await expect
+      .poll(() => readClipboard(page), { timeout: 5_000 })
+      .toMatch(/^\[\[[^\]]*clipboard-actions#\^todoseq-[0-9a-f]+\]\]$/);
+    const drawerAnchorLink = await readClipboard(page);
+    const drawerAnchor =
+      drawerAnchorLink.match(/\^todoseq-[0-9a-f]+/)?.[0] ?? '';
+    await expect
+      .poll(
+        async () =>
+          (await readVaultDiskFile(page, CLIPBOARD_FILE))?.includes(
+            `:END: ${drawerAnchor}`,
+          ),
+        { timeout: 5_000 },
+      )
+      .toBe(true);
+
+    // Obsidian's own block cache must resolve the generated placement.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            ({ name, anchor }) => {
+              const app = (window as any).app;
+              const file = app.vault
+                .getFiles()
+                .find((candidate: any) => candidate.basename === name);
+              const cache = file ? app.metadataCache.getFileCache(file) : null;
+              return Boolean(cache?.blocks?.[anchor.slice(1)]);
+            },
+            { name: CLIPBOARD_FILE, anchor: drawerAnchor },
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(true);
+
+    // Scanning reads that same block-end anchor for dependency resolution.
+    await runCommandById(page, 'todoseq:rescan-vault');
+    await expect
+      .poll(
+        () =>
+          page.evaluate((anchor) => {
+            const plugin = (window as any).app?.plugins?.plugins?.todoseq;
+            return Boolean(
+              plugin?.taskStateManager
+                ?.getTasks?.()
+                .some((task: any) => task.embedReference === anchor),
+            );
+          }, drawerAnchor),
+        { timeout: 5_000 },
+      )
+      .toBe(true);
+
+    // Repeating Copy anchor is idempotent on a drawer block.
+    await clickTaskMenuAction(page, 'Drawer anchor task', 'Copy anchor');
+    expect(await readClipboard(page)).toBe(drawerAnchorLink);
+    const drawerSource = (await readVaultDiskFile(page, CLIPBOARD_FILE)) ?? '';
+    expect(drawerSource.split(drawerAnchor).length - 1).toBe(1);
   });
 });

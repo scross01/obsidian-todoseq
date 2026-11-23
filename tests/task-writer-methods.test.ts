@@ -1212,6 +1212,45 @@ describe('TaskWriter Instance Methods', () => {
       expect(result.rawText).toContain('[^1]');
     });
 
+    it('should keep a legacy task-line anchor after the text when setting priority', async () => {
+      const task: Task = createBaseTask({
+        rawText: 'TODO Task text ^123',
+        text: 'Task text',
+        embedReference: '^123',
+        priority: null,
+      });
+
+      const result = await taskWriter.updateTaskPriority(task, 'high');
+
+      expect(result.rawText).toBe('TODO [#A] Task text ^123');
+    });
+
+    it('should keep a legacy task-line anchor after the text when removing priority', async () => {
+      const task: Task = createBaseTask({
+        rawText: 'TODO [#B] Task text ^123',
+        text: 'Task text',
+        embedReference: '^123',
+        priority: 'med',
+      });
+
+      const result = await taskWriter.removeTaskPriority(task);
+
+      expect(result.rawText).toBe('TODO Task text ^123');
+    });
+
+    it('should not move a block-end anchor onto the task line when setting priority', async () => {
+      const task: Task = createBaseTask({
+        rawText: 'TODO Task text',
+        text: 'Task text',
+        embedReference: '^block',
+        priority: null,
+      });
+
+      const result = await taskWriter.updateTaskPriority(task, 'high');
+
+      expect(result.rawText).toBe('TODO [#A] Task text');
+    });
+
     it('should handle tasks with leading whitespace and priority', async () => {
       const task: Task = createBaseTask({
         rawText: '  TODO [#B] Task text',

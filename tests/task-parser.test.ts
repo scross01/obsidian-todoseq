@@ -1773,3 +1773,90 @@ TODO Next`);
     });
   });
 });
+
+describe('Block-end anchors', () => {
+  const parser = TaskParser.create(
+    createTestKeywordManager(createBaseSettings()),
+    null,
+    undefined,
+    createBaseSettings(),
+  );
+  const parse = (content: string): Task[] =>
+    parser.parseFile(content, 'test.md');
+
+  it('reads an anchor at the end of a SCHEDULED line and cleans the date', () => {
+    const tasks = parse(
+      'TODO test\nSCHEDULED: <2026-11-23 Mon> ^todoseq-abc123',
+    );
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].text).toBe('test');
+    expect(tasks[0].scheduledDate).not.toBeNull();
+    expect(tasks[0].embedReference).toBe('^todoseq-abc123');
+  });
+
+  it('reads an anchor after :END: and still attaches properties', () => {
+    const tasks = parse(
+      'TODO test another\nSCHEDULED: <2026-11-23 Mon>\n:PROPERTIES:\n:ID: probe-1\n:END: ^todoseq-abc123',
+    );
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].scheduledDate).not.toBeNull();
+    expect(tasks[0].id).toBe('probe-1');
+    expect(tasks[0].propertyIssues).toBeUndefined();
+    expect(tasks[0].embedReference).toBe('^todoseq-abc123');
+  });
+
+  it('reads an anchor at the end of DESCRIPTION and cleans the description', () => {
+    const tasks = parse('TODO test\nDESCRIPTION: some text ^descrend');
+    expect(tasks[0].description).toBe('some text');
+    expect(tasks[0].embedReference).toBe('^descrend');
+  });
+
+  it('treats an anchor-only DESCRIPTION as empty', () => {
+    const tasks = parse('TODO test\nDESCRIPTION: ^descanchor');
+    expect(tasks[0].description).toBeUndefined();
+    expect(tasks[0].embedReference).toBe('^descanchor');
+  });
+
+  it('parses CLOSED brackets with a trailing anchor', () => {
+    const tasks = parse('TODO test\nCLOSED: [2026-11-23 Mon] ^closedend');
+    expect(tasks[0].closedDate).not.toBeNull();
+    expect(tasks[0].closedDate?.getMonth()).toBe(10);
+    expect(tasks[0].closedDate?.getDate()).toBe(23);
+    expect(tasks[0].embedReference).toBe('^closedend');
+  });
+
+  it('prefers a task-line anchor over a block-end anchor', () => {
+    const tasks = parse(
+      'TODO test ^taskline\nSCHEDULED: <2026-11-23 Mon> ^blockend',
+    );
+    expect(tasks[0].text).toBe('test');
+    expect(tasks[0].embedReference).toBe('^taskline');
+  });
+
+  it('uses the shared anchor grammar on the task line', () => {
+    expect(parse('TODO task foo^bar')[0].embedReference).toBeUndefined();
+    expect(parse('TODO task ^anchor]')[0].embedReference).toBeUndefined();
+    expect(parse('TODO task ^')[0].embedReference).toBeUndefined();
+    expect(parse('TODO task [^1]')[0].embedReference).toBeUndefined();
+    expect(parse('TODO task [^1]')[0].footnoteReference).toBe('[^1]');
+  });
+
+  it('keeps metadata after a blank line associated but anchors the task line', () => {
+    const tasks = parse(
+      'TODO test ^taskline\n\nSCHEDULED: <2026-11-23 Mon> ^blockend',
+    );
+    expect(tasks[0].scheduledDate).not.toBeNull();
+    expect(tasks[0].embedReference).toBe('^taskline');
+  });
+
+  it('does not swallow the following task after an anchored drawer', () => {
+    const tasks = parse(
+      'TODO first\n:PROPERTIES:\n:ID: first-1\n:END: ^firstend\nTODO second',
+    );
+    expect(tasks).toHaveLength(2);
+    expect(tasks[0].id).toBe('first-1');
+    expect(tasks[0].embedReference).toBe('^firstend');
+    expect(tasks[1].text).toBe('second');
+    expect(tasks[1].embedReference).toBeUndefined();
+  });
+});

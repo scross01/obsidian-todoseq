@@ -157,4 +157,36 @@ describe('TaskWriter - editor-path date-line insert at end of document', () => {
     expect(lines[1]).toMatch(/^SCHEDULED: <2026-01-20/);
     expect(lines[2]).toBe('DEADLINE: <2026-01-21 Wed>');
   });
+
+  test('updating an anchored SCHEDULED line keeps the suffix', async () => {
+    lines = ['TODO Task text', 'SCHEDULED: <2026-01-20 Tue> ^water'];
+
+    await taskWriter.updateTaskScheduledDate(makeTask(), new Date(2026, 0, 22));
+
+    expect(lines[1]).toMatch(/^SCHEDULED: <2026-01-22 .*> \^water$/);
+  });
+
+  test('adding a DEADLINE moves a task-line anchor to the new final line', async () => {
+    lines = ['TODO Task text ^legacy', 'SCHEDULED: <2026-01-20 Tue>'];
+
+    await taskWriter.updateTaskDeadlineDate(
+      makeTask({
+        rawText: 'TODO Task text ^legacy',
+        embedReference: '^legacy',
+      }),
+      new Date(2026, 0, 21),
+    );
+
+    expect(lines[0]).toBe('TODO Task text');
+    expect(lines[2]).toMatch(/^DEADLINE: <2026-01-21 .*> \^legacy$/);
+  });
+
+  test('removing the anchored date line moves the anchor to the task line', async () => {
+    lines = ['TODO Task text', 'SCHEDULED: <2026-01-20 Tue> ^water'];
+
+    await taskWriter.removeTaskScheduledDate(makeTask());
+
+    expect(lines[0]).toBe('TODO Task text ^water');
+    expect(lines.join('\n')).not.toContain('SCHEDULED');
+  });
 });

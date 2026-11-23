@@ -36,6 +36,10 @@ import {
   isSeparatorCell,
   getCellTaskLine,
 } from '../../utils/task-line-utils';
+import {
+  isDrawerEndLine,
+  splitTrailingBlockAnchor,
+} from '../../utils/block-anchor';
 
 /**
  * Cached regex for priority tokens with global flag.
@@ -841,6 +845,19 @@ export class TaskKeywordDecorator {
   }
 
   /**
+   * End offset for a metadata line's TODOseq span. A trailing Obsidian block
+   * anchor is excluded so Obsidian's native `.cm-blockid` styling applies to
+   * `^anchor` alone instead of the whole-line metadata class.
+   */
+  private metadataLineEnd(
+    line: { from: number; to: number },
+    lineText: string,
+  ): number {
+    const { text } = splitTrailingBlockAnchor(lineText);
+    return Math.min(line.to, line.from + text.length);
+  }
+
+  /**
    * Style one line of a properties drawer as quiet metadata. Entry lines also
    * get a faint key mark; the `:PROPERTIES:` / `:END:` boundaries do not.
    */
@@ -852,7 +869,7 @@ export class TaskKeywordDecorator {
   ): void {
     builder.add(
       line.from,
-      line.to,
+      this.metadataLineEnd(line, lineText),
       Decoration.mark({
         class: 'todoseq-properties-line',
         attributes: {
@@ -933,7 +950,7 @@ export class TaskKeywordDecorator {
       if (!trimmedLine) {
         return;
       }
-      if (quoteStripped === ':END:' && indentMatches) {
+      if (isDrawerEndLine(quoteStripped, 'markdown') && indentMatches) {
         this.inPropertiesDrawer = false;
         this.decoratePropertiesLine(line, lineText, builder, false);
         return;
@@ -990,7 +1007,7 @@ export class TaskKeywordDecorator {
       ) {
         // Apply full-line decoration
         const lineStartPos = line.from;
-        const lineEndPos = line.to;
+        const lineEndPos = this.metadataLineEnd(line, lineText);
 
         // Determine CSS classes based on line type
         const lineClass =
@@ -1068,7 +1085,7 @@ export class TaskKeywordDecorator {
       ) {
         // Apply full-line decoration for DESCRIPTION: line
         const lineStartPos = line.from;
-        const lineEndPos = line.to;
+        const lineEndPos = this.metadataLineEnd(line, lineText);
 
         builder.add(
           lineStartPos,
@@ -1585,6 +1602,33 @@ export const taskKeywordPlugin = (
       }
 
       /**
+       * Split text into the styled body and a trailing ` ^anchor` suffix.
+       */
+      private splitTrailingAnchor(text: string): {
+        body: string;
+        suffix: string;
+      } {
+        const { text: body } = splitTrailingBlockAnchor(text);
+        return body === text
+          ? { body: text, suffix: '' }
+          : { body, suffix: text.slice(body.length) };
+      }
+
+      /**
+       * Move a trailing block anchor at the end of a span's last text node out
+       * of the span; returns the removed suffix.
+       */
+      private detachTrailingAnchorText(span: HTMLElement): string {
+        const last = span.lastChild;
+        if (!last || last.nodeType !== Node.TEXT_NODE) return '';
+        const text = last.textContent ?? '';
+        const { body, suffix } = this.splitTrailingAnchor(text);
+        if (!suffix) return '';
+        (last as Text).textContent = body;
+        return suffix;
+      }
+
+      /**
        * Wrap date lines in table cells to match reader view structure.
        * Creates: <span class="todoseq-{type}-line"><span class="todoseq-{type}-keyword">KEYWORD:</span> date text</span>
        * The outer span styles the entire line (muted, smaller font).
@@ -1654,8 +1698,16 @@ export const taskKeywordPlugin = (
               nextSibling = next;
             }
 
+            const anchorSuffix = this.detachTrailingAnchorText(lineSpan);
+
             // Replace the original keyword text node with the assembled line span
             parent.replaceChild(lineSpan, node);
+            if (anchorSuffix) {
+              parent.insertBefore(
+                window.activeDocument.createTextNode(anchorSuffix),
+                lineSpan.nextSibling,
+              );
+            }
             break; // restart walker for next keyword since DOM changed
           }
         }
@@ -1759,15 +1811,24 @@ export const taskKeywordPlugin = (
             text: 'DESCRIPTION:',
           });
 
-          // Add text after DESCRIPTION:
-          if (afterText) {
+          // Keep a trailing block anchor outside the description span so it
+          // keeps Obsidian's native anchor styling.
+          const { body: afterBody, suffix: anchorSuffix } =
+            this.splitTrailingAnchor(afterText);
+          if (afterBody) {
             descContainer.appendChild(
-              window.activeDocument.createTextNode(afterText),
+              window.activeDocument.createTextNode(afterBody),
             );
           }
 
           parent.insertBefore(descContainer, node);
           parent.removeChild(node);
+          if (anchorSuffix) {
+            parent.insertBefore(
+              window.activeDocument.createTextNode(anchorSuffix),
+              descContainer.nextSibling,
+            );
+          }
           break;
         }
       }

@@ -3,6 +3,7 @@ import type {
   TaskPropertyIssueCode,
   TaskPropertyKey,
 } from '../types/task';
+import { isDrawerEndLine } from './block-anchor';
 import { getIndentLength } from './task-line-utils';
 
 /**
@@ -141,7 +142,7 @@ export function isPropertiesDrawerEnd(
   line: string,
   format: 'markdown' | 'org',
 ): boolean {
-  return splitMetadataLine(line, format).body.trim() === ':END:';
+  return isDrawerEndLine(splitMetadataLine(line, format).body, format);
 }
 
 /**

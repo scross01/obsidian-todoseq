@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed Copy anchor placing a task's block anchor where Obsidian could not resolve it when the task had a schedule, deadline, description or property drawer. The anchor now goes at the end of the task's metadata block, existing task-line anchors are moved there by Copy anchor, and anchors on date, description and `:END:` lines are recognised when scanning.
+- Fixed an anchor on a date, description or property-drawer line picking up TODOseq's muted metadata styling instead of Obsidian's own anchor style; an anchored `:END:` now also closes the drawer styling.
 - Property drawers under tasks now appear as quiet metadata in the editor and reading view, including on top-level tasks; previously the drawer lines were left unstyled.
 - A blocked task's checkbox now springs back instead of staying checked, and archive runs report blocked tasks as skipped rather than counting them as archived. A completion queued while its blocker was still done is checked once more before writing.
 - Blocked locks are now keyboard and tap accessible in task lists, embedded lists and reader views, including plain, heading, bullet and table reader tasks.

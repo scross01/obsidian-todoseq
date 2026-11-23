@@ -4,6 +4,7 @@
  */
 
 import { Task } from '../types/task';
+import { isDrawerEndLine } from './block-anchor';
 import { KeywordManager } from './keyword-manager';
 
 /**
@@ -28,7 +29,10 @@ export function getIndentLength(indent: string): number {
 function propertiesDrawerEnd(lines: string[], i: number): number {
   if (lines[i]?.trim() !== ':PROPERTIES:') return -1;
   for (let j = i + 1; j < lines.length; j++) {
-    if (lines[j].trim() === ':END:') return j;
+    // The Markdown anchored form is accepted here too: this helper only
+    // locates the drawer to skip it during date/description discovery, and a
+    // newline-terminated `:END: ^anchor` would otherwise look unclosed.
+    if (isDrawerEndLine(lines[j], 'markdown')) return j;
     if (/^\*+\s/.test(lines[j])) return -1;
   }
   return -1;

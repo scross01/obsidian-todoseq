@@ -35,8 +35,7 @@ function harness(files: Record<string, string>): Harness {
         store.has(path) ? new MemoryFile(path) : null,
       read: async (file: TFile) => store.get(file.path) ?? '',
       cachedRead: async (file: TFile) => store.get(file.path) ?? '',
-      getFiles: () =>
-        [...store.keys()].map((path) => new MemoryFile(path)),
+      getFiles: () => [...store.keys()].map((path) => new MemoryFile(path)),
       process: async (file: TFile, fn: (data: string) => string) => {
         const next = fn(store.get(file.path) ?? '');
         store.set(file.path, next);
@@ -127,9 +126,11 @@ describe('TaskWriter blocker history migration', () => {
     });
     await h.writer.migrateBlockerHistory(dependent, 'to-history', ['data-02']);
     const once = h.store.get(SOURCE);
-    const second = await h.writer.migrateBlockerHistory(dependent, 'to-history', [
-      'data-02',
-    ]);
+    const second = await h.writer.migrateBlockerHistory(
+      dependent,
+      'to-history',
+      ['data-02'],
+    );
 
     expect(second.status).toBe('success');
     expect(h.store.get(SOURCE)).toBe(once);
@@ -179,7 +180,9 @@ describe('TaskWriter transfers', () => {
     const h = harness({ [SOURCE]: source });
 
     const first = await h.writer.ensureTaskId(task({ line: 0, id: undefined }));
-    const second = await h.writer.ensureTaskId(task({ line: 0, id: undefined }));
+    const second = await h.writer.ensureTaskId(
+      task({ line: 0, id: undefined }),
+    );
 
     expect(first.identity).toBe('water-1');
     expect(second.identity).toBe('water-1');
@@ -450,7 +453,7 @@ describe('TaskWriter transfer reference repair', () => {
     );
   });
 
-  it('repairs a reference in the moved task\'s own file', async () => {
+  it("repairs a reference in the moved task's own file", async () => {
     const child = [
       'TODO Child',
       ':PROPERTIES:',
@@ -505,9 +508,7 @@ describe('TaskWriter transfer reference repair', () => {
     expect(copiedAnchor).toBeDefined();
     expect(destination).toContain(`Water the plants ${copiedAnchor}`);
     expect(destination).not.toContain(':ID: water-1');
-    expect(destination).toContain(
-      `:BLOCKER: [[notes/today#${copiedAnchor}]]`,
-    );
+    expect(destination).toContain(`:BLOCKER: [[notes/today#${copiedAnchor}]]`);
     expect(h.store.get('notes/external.md')).toContain(
       '[[notes/source#^water]]',
     );
@@ -522,9 +523,12 @@ describe('TaskWriter transfer reference repair', () => {
     });
     await h.writer.transferTask(anchoredTask(), h.file('notes/a.md'), 'copy');
     await h.writer.transferTask(anchoredTask(), h.file('notes/b.md'), 'copy');
-    const first = /\^todoseq-[a-z0-9]+/.exec(h.store.get('notes/a.md') ?? '')?.[0];
-    const second =
-      /\^todoseq-[a-z0-9]+/.exec(h.store.get('notes/b.md') ?? '')?.[0];
+    const first = /\^todoseq-[a-z0-9]+/.exec(
+      h.store.get('notes/a.md') ?? '',
+    )?.[0];
+    const second = /\^todoseq-[a-z0-9]+/.exec(
+      h.store.get('notes/b.md') ?? '',
+    )?.[0];
     expect(first).toBeDefined();
     expect(second).toBeDefined();
     expect(first).not.toBe(second);
@@ -593,9 +597,7 @@ describe('TaskWriter transfer reference repair', () => {
 
     const reports = await h.writer.retryPendingReferenceRepairs();
     expect(reports[0].applied).toBe(1);
-    expect(h.store.get('notes/broken.md')).toBe(
-      'B [[notes/today#^water]]',
-    );
+    expect(h.store.get('notes/broken.md')).toBe('B [[notes/today#^water]]');
     expect(h.writer.hasPendingReferenceRepairs()).toBe(false);
   });
 
@@ -647,5 +649,310 @@ describe('TaskWriter transfer reference repair', () => {
     );
     expect(result.status).toBe('success');
     expect(result.referenceRepairs).toBeUndefined();
+  });
+});
+
+describe('Copy anchor placement', () => {
+  const anchorTask = (
+    line: number,
+    rawText: string,
+    overrides: Partial<Task> = {},
+  ): Task =>
+    task({
+      line,
+      rawText,
+      text: 'Water the plants',
+      state: 'TODO',
+      ...overrides,
+    });
+
+  it('puts a new anchor on the task line when it has no metadata', async () => {
+    const source = '- [ ] TODO Water the plants\n';
+    const h = harness({ [SOURCE]: source });
+
+    const result = await h.writer.ensureBlockAnchor(
+      anchorTask(0, '- [ ] TODO Water the plants'),
+    );
+
+    expect(result.status).toBe('success');
+    expect(result.identity).toMatch(/^todoseq-[0-9a-f]{8}$/);
+    expect(h.store.get(SOURCE)).toBe(
+      `- [ ] TODO Water the plants ^${result.identity}\n`,
+    );
+  });
+
+  it('puts a new anchor on the final metadata line', async () => {
+    const source =
+      '- [ ] TODO Water the plants\n  SCHEDULED: <2026-11-23 Mon>\n';
+    const h = harness({ [SOURCE]: source });
+
+    const result = await h.writer.ensureBlockAnchor(
+      anchorTask(0, '- [ ] TODO Water the plants'),
+    );
+
+    expect(result.status).toBe('success');
+    expect(h.store.get(SOURCE)).toBe(
+      `- [ ] TODO Water the plants\n  SCHEDULED: <2026-11-23 Mon> ^${result.identity}\n`,
+    );
+  });
+
+  it('puts a new anchor after :END:', async () => {
+    const source = [
+      '- [ ] TODO Water the plants',
+      ':PROPERTIES:',
+      ':ID: water-1',
+      ':END:',
+      '',
+    ].join('\n');
+    const h = harness({ [SOURCE]: source });
+
+    const result = await h.writer.ensureBlockAnchor(
+      anchorTask(0, '- [ ] TODO Water the plants'),
+    );
+
+    expect(result.status).toBe('success');
+    expect(h.store.get(SOURCE)).toBe(
+      [
+        '- [ ] TODO Water the plants',
+        ':PROPERTIES:',
+        ':ID: water-1',
+        `:END: ^${result.identity}`,
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('relocates a legacy task-line anchor once and keeps the same link', async () => {
+    const source =
+      '- [ ] TODO Water the plants ^water\n  SCHEDULED: <2026-11-23 Mon>\n';
+    const h = harness({ [SOURCE]: source });
+
+    const first = await h.writer.ensureBlockAnchor(
+      anchorTask(0, '- [ ] TODO Water the plants ^water', {
+        embedReference: '^water',
+      }),
+    );
+    expect(first.status).toBe('success');
+    expect(first.link).toBe('[[notes/source#^water]]');
+    expect(h.store.get(SOURCE)).toBe(
+      '- [ ] TODO Water the plants\n  SCHEDULED: <2026-11-23 Mon> ^water\n',
+    );
+
+    const second = await h.writer.ensureBlockAnchor(
+      anchorTask(0, '- [ ] TODO Water the plants', {
+        embedReference: '^water',
+      }),
+    );
+    expect(second.link).toBe(first.link);
+    expect(h.store.get(SOURCE)).toBe(
+      '- [ ] TODO Water the plants\n  SCHEDULED: <2026-11-23 Mon> ^water\n',
+    );
+  });
+
+  it('reuses a block-end anchor from a stale snapshot without writing', async () => {
+    const source =
+      '- [ ] TODO Water the plants\n  SCHEDULED: <2026-11-23 Mon> ^water\n';
+    const h = harness({ [SOURCE]: source });
+
+    const result = await h.writer.ensureBlockAnchor(
+      anchorTask(0, '- [ ] TODO Water the plants'),
+    );
+
+    expect(result.status).toBe('success');
+    expect(result.link).toBe('[[notes/source#^water]]');
+    expect(h.store.get(SOURCE)).toBe(source);
+  });
+
+  it('keeps a task-line anchor when metadata is separated by a blank line', async () => {
+    const source =
+      '- [ ] TODO Water the plants\n\n  SCHEDULED: <2026-11-23 Mon>\n';
+    const h = harness({ [SOURCE]: source });
+
+    const result = await h.writer.ensureBlockAnchor(
+      anchorTask(0, '- [ ] TODO Water the plants'),
+    );
+
+    expect(result.status).toBe('success');
+    expect(h.store.get(SOURCE)).toBe(
+      `- [ ] TODO Water the plants ^${result.identity}\n\n  SCHEDULED: <2026-11-23 Mon>\n`,
+    );
+  });
+
+  it('does not put the anchor on an indented continuation paragraph', async () => {
+    const source = '- [ ] TODO Water the plants\n  Continuation prose.\n';
+    const h = harness({ [SOURCE]: source });
+
+    const result = await h.writer.ensureBlockAnchor(
+      anchorTask(0, '- [ ] TODO Water the plants'),
+    );
+
+    expect(result.status).toBe('success');
+    expect(h.store.get(SOURCE)).toBe(
+      `- [ ] TODO Water the plants ^${result.identity}\n  Continuation prose.\n`,
+    );
+  });
+
+  it('is byte-idempotent and returns one anchor for repeated calls', async () => {
+    const source = '- [ ] TODO Water the plants\n';
+    const h = harness({ [SOURCE]: source });
+    const t = anchorTask(0, '- [ ] TODO Water the plants');
+
+    const first = await h.writer.ensureBlockAnchor(t);
+    const once = h.store.get(SOURCE);
+    const second = await h.writer.ensureBlockAnchor(t);
+
+    expect(second.link).toBe(first.link);
+    expect(h.store.get(SOURCE)).toBe(once);
+    expect(once?.match(/\^todoseq-[0-9a-f]{8}/g)).toHaveLength(1);
+  });
+});
+
+describe('Anchor preservation through writes', () => {
+  it('leaves a block-end anchor on its metadata line after a state change', async () => {
+    const source =
+      'TODO Water the plants\nSCHEDULED: <2026-11-23 Mon> ^water\n';
+    const h = harness({ [SOURCE]: source });
+
+    await h.writer.applyLineUpdate(
+      task({
+        line: 0,
+        rawText: 'TODO Water the plants',
+        text: 'Water the plants',
+        state: 'TODO',
+        embedReference: '^water',
+      }),
+      'DONE',
+      true,
+      true,
+    );
+
+    expect(h.store.get(SOURCE)).toBe(
+      'DONE Water the plants\nSCHEDULED: <2026-11-23 Mon> ^water\n',
+    );
+  });
+
+  it('moves a block-end anchor to :END: when a drawer is added', async () => {
+    const source =
+      'TODO Water the plants\nSCHEDULED: <2026-11-23 Mon> ^water\n';
+    const h = harness({ [SOURCE]: source });
+
+    await h.writer.ensureTaskId(
+      task({
+        line: 0,
+        rawText: 'TODO Water the plants',
+        text: 'Water the plants',
+        state: 'TODO',
+        embedReference: '^water',
+        id: undefined,
+      }),
+    );
+
+    const out = h.store.get(SOURCE) ?? '';
+    expect(out).toContain(':PROPERTIES:');
+    expect(out).toMatch(/:END: \^water\n$/);
+  });
+
+  it('relocates an anchor to the task line when its date line is removed', async () => {
+    const source =
+      'TODO Water the plants\nSCHEDULED: <2026-11-23 Mon> ^water\n';
+    const h = harness({ [SOURCE]: source });
+
+    await h.writer.removeTaskScheduledDate(
+      task({
+        line: 0,
+        rawText: 'TODO Water the plants',
+        text: 'Water the plants',
+        state: 'TODO',
+        embedReference: '^water',
+      }),
+    );
+
+    expect(h.store.get(SOURCE)).toBe('TODO Water the plants ^water\n');
+  });
+
+  it('keeps the anchor on the rolled date line', async () => {
+    const source =
+      'TODO Water the plants\nSCHEDULED: <2026-11-23 Mon> ^water\n';
+    const h = harness({ [SOURCE]: source });
+
+    await h.writer.applyRecurrenceUpdate(
+      task({
+        line: 0,
+        rawText: 'TODO Water the plants',
+        text: 'Water the plants',
+        state: 'TODO',
+        embedReference: '^water',
+        scheduledDate: new Date(2026, 10, 23),
+      }),
+      { newScheduledDate: new Date(2026, 10, 24) },
+    );
+
+    const out = h.store.get(SOURCE) ?? '';
+    expect(out).toContain('SCHEDULED: <2026-11-24');
+    expect(out).toMatch(/\^water\n$/);
+  });
+});
+
+describe('Transfer identity with an anchored drawer end', () => {
+  const source = [
+    'Intro',
+    '',
+    '- [ ] TODO Water the plants',
+    ':PROPERTIES:',
+    ':ID: water-1',
+    ':END: ^water',
+    '',
+  ].join('\n');
+
+  const blockTask = (): Task =>
+    task({ line: 2, embedReference: '^water', id: 'water-1' });
+
+  it('copies with a fresh ID and anchor, leaving the source untouched', async () => {
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+
+    const result = await h.writer.transferTask(
+      blockTask(),
+      h.file(DEST),
+      'copy',
+    );
+
+    expect(result.status).toBe('success');
+    const destination = h.store.get(DEST) ?? '';
+    expect(destination).toMatch(/:ID: [0-9a-f-]{36}/);
+    expect(destination).toMatch(/:END: \^todoseq-[0-9a-f]{8}/);
+    expect(destination).not.toContain(':ID: water-1');
+    expect(h.store.get(SOURCE)).toBe(source);
+  });
+
+  it('moves the anchored drawer without changing its identity', async () => {
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+
+    const result = await h.writer.transferTask(
+      blockTask(),
+      h.file(DEST),
+      'move',
+    );
+
+    expect(result.status).toBe('success');
+    expect(h.store.get(DEST)).toContain(':END: ^water');
+    expect(h.store.get(DEST)).toContain(':ID: water-1');
+    expect(h.store.get(SOURCE)).toBe('Intro\n\n');
+  });
+
+  it('migrates identity out of the retained source', async () => {
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+
+    const result = await h.writer.transferTask(
+      blockTask(),
+      h.file(DEST),
+      'migrate',
+    );
+
+    expect(result.status).toBe('success');
+    expect(h.store.get(DEST)).toContain(':END: ^water');
+    const retained = h.store.get(SOURCE) ?? '';
+    expect(retained).not.toContain('^water');
+    expect(retained).not.toContain(':ID: water-1');
+    expect(retained).not.toContain(':PROPERTIES:');
   });
 });
