@@ -405,4 +405,28 @@ describe('TaskDependencyManager', () => {
     expect(engine.isBlocked('chain.md:9999')).toBe(true);
     expect(engine.getSnapshot().revision).toBeGreaterThanOrEqual(0);
   });
+
+  it('indexes issues by task key for O(1) row reads', () => {
+    const { engine } = managerFor([
+      task({ path: 'a.md', line: 0, id: 'a', blockedBy: ['missing'] }),
+      task({ path: 'b.md', line: 0, id: 'b', blockedBy: ['also-missing'] }),
+    ]);
+    expect(engine.getIssuesForTask('a.md:0')).toEqual([
+      expect.objectContaining({ code: 'missing-reference' }),
+    ]);
+    expect(engine.getIssuesForTask('b.md:0')).toEqual([
+      expect.objectContaining({ code: 'missing-reference' }),
+    ]);
+    expect(engine.getIssuesForTask('unknown.md:0')).toEqual([]);
+  });
+
+  it('drops stale keyed issues when the graph rebuilds', () => {
+    const { engine, state } = managerFor([
+      task({ path: 'a.md', line: 0, id: 'a', blockedBy: ['missing'] }),
+    ]);
+    expect(engine.getIssuesForTask('a.md:0')).toHaveLength(1);
+
+    state.setTasks([task({ path: 'a.md', line: 0, id: 'a' })]);
+    expect(engine.getIssuesForTask('a.md:0')).toEqual([]);
+  });
 });

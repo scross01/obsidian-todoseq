@@ -15,6 +15,17 @@ import {
 
 const BLOCKER = 'dependency-blocker.md';
 const DEPENDENT = 'dependency-dependent.md';
+const EMBEDDED = 'dependency-embedded.md';
+
+/** Reading-view note that embeds the blocked file, for marker order there. */
+const EMBEDDED_BODY = [
+  '# Dependency Embedded',
+  '',
+  '```todoseq',
+  'search: file:"dependency-dependent"',
+  '```',
+  '',
+].join('\n');
 
 const BLOCKER_BODY = [
   '# Dependency Blocker',
@@ -240,6 +251,18 @@ test.describe('task dependencies', () => {
       'aria-label',
       /Blocked by Blocker task/,
     );
+    expect(
+      await dependentRow.evaluate((row) => {
+        const lock = row.querySelector('.todoseq-reader-blocked-badge');
+        const keyword = row.querySelector('.todoseq-keyword-formatted');
+        return Boolean(
+          lock &&
+          keyword &&
+          lock.compareDocumentPosition(keyword) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      }),
+    ).toBe(true);
 
     // A broken reference is a diagnostic, so the reading view shows the
     // warning instead of the lock.
@@ -271,6 +294,80 @@ test.describe('task dependencies', () => {
       'aria-label',
       /Blocked by Blocker task/,
     );
+    expect(
+      await page
+        .locator('.workspace-leaf.mod-active .cm-line', {
+          hasText: 'Dependent task',
+        })
+        .first()
+        .evaluate((line) => {
+          const lock = line.querySelector('.todoseq-editor-blocked-badge');
+          const keyword = line.querySelector('.todoseq-keyword-formatted');
+          return Boolean(
+            lock &&
+            keyword &&
+            lock.compareDocumentPosition(keyword) &
+              Node.DOCUMENT_POSITION_FOLLOWING,
+          );
+        }),
+    ).toBe(true);
+
+    // The embedded list keeps the marker immediately after the checkbox.
+    await page.evaluate(
+      async ({ path, body }) => {
+        const app = (window as any).app;
+        const existing = app.vault.getAbstractFileByPath(path);
+        if (existing) await app.vault.modify(existing, body);
+        else await app.vault.create(path, body);
+        await app.commands.executeCommandById('todoseq:rescan-vault');
+      },
+      { path: EMBEDDED, body: EMBEDDED_BODY },
+    );
+    await openInReadingMode('dependency-embedded');
+    const embeddedRow = page
+      .locator('.workspace-leaf.mod-active .todoseq-embedded-task-item', {
+        hasText: 'Dependent task',
+      })
+      .first();
+    await expect(embeddedRow.locator('.todoseq-task-blocked-icon')).toHaveCount(
+      1,
+    );
+    expect(
+      await embeddedRow.evaluate((row) => {
+        const lock = row.querySelector('.todoseq-task-blocked-icon');
+        const state = row.querySelector('.todoseq-embedded-task-state');
+        return Boolean(
+          lock &&
+          state &&
+          lock.compareDocumentPosition(state) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      }),
+    ).toBe(true);
+
+    // The Task List marker sits before the keyword, and the row is not dimmed.
+    await runCommandById(page, 'todoseq:show-task-list');
+    const listRow = page
+      .locator('.todoseq-task-item', { hasText: 'Dependent task' })
+      .first();
+    await expect(listRow.locator('.todoseq-task-blocked-icon')).toHaveCount(1);
+    expect(
+      await listRow.evaluate((row) => {
+        const lock = row.querySelector('.todoseq-task-blocked-icon');
+        const keyword = row.querySelector('.todo-task-keyword');
+        return Boolean(
+          lock &&
+          keyword &&
+          lock.compareDocumentPosition(keyword) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      }),
+    ).toBe(true);
+    expect(
+      await listRow
+        .locator('.todoseq-task-text-wrapper')
+        .evaluate((element) => getComputedStyle(element).opacity),
+    ).toBe('1');
 
     // Repair the missing anchor in the blocker note, then rescan.
     await page.evaluate(async () => {

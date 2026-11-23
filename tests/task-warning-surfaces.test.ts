@@ -53,6 +53,7 @@ function createWarningManager(
       blocked: new Set(),
       reasonsByKey: new Map(),
       issues,
+      issuesByKey: new Map(),
       blockedKeys: [],
     })),
   } as unknown as TaskDependencyManager;
@@ -64,6 +65,7 @@ function createReaderHarness() {
   let blocked = true;
   const manager = {
     getIssues: jest.fn((): DependencyIssue[] => []),
+    getIssuesForTask: jest.fn((): DependencyIssue[] => []),
     isBlocked: jest.fn((key: string) => blocked && key === 'blocked.md:0'),
     getBlockingReasons: jest.fn(() => [
       {
@@ -159,6 +161,18 @@ describe('reader blocked badge', () => {
     const badges = root.querySelectorAll('.todoseq-reader-blocked-badge');
     expect(badges).toHaveLength(1);
     expect(badges[0].getAttribute('data-icon')).toBe('lock');
+    const keyword = root.querySelector(
+      'li[data-line="0"] .todoseq-keyword-formatted',
+    )!;
+    const checkbox = root.querySelector('li[data-line="0"] input')!;
+    expect(
+      badges[0].compareDocumentPosition(keyword) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      checkbox.compareDocumentPosition(badges[0]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(badges[0].getAttribute('title')).toContain(
       'Blocked by TODO Blocker.',
     );
@@ -240,6 +254,40 @@ describe('reader blocked badge', () => {
     );
   });
 
+  it('keeps the badge before a property drawer that follows the task', async () => {
+    const { formatter } = createReaderHarness();
+    const root = renderRows();
+    const row = root.querySelector('li[data-line="0"]')!;
+    const drawer = document.createElement('div');
+    drawer.className = 'properties';
+    row.querySelector('.todoseq-task')!.appendChild(drawer);
+
+    await (
+      formatter as unknown as { processDependencyMarkers: ProcessMarkers }
+    ).processDependencyMarkers(root, { sourcePath: 'blocked.md' });
+
+    const badge = root.querySelector('.todoseq-reader-blocked-badge')!;
+    expect(
+      badge.compareDocumentPosition(drawer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('finds a table task diagnostic through its cell-qualified key', async () => {
+    const { formatter, manager } = createReaderHarness();
+    manager.getIssues.mockReturnValue([
+      createIssue('missing:cell', 'Cell dependency missing.', 'blocked.md:0:2'),
+    ]);
+    const root = renderRows();
+
+    await (
+      formatter as unknown as { processDependencyMarkers: ProcessMarkers }
+    ).processDependencyMarkers(root, { sourcePath: 'blocked.md' });
+
+    const warning = root.querySelector('.todoseq-reader-issue-badge');
+    expect(warning).not.toBeNull();
+    expect(warning?.getAttribute('title')).toBe('Cell dependency missing.');
+  });
+
   it('ignores diagnostics for other files and pending validation', async () => {
     const { formatter, manager } = createReaderHarness();
     manager.getIssues.mockReturnValue([
@@ -305,6 +353,7 @@ describe('dependency warning notice', () => {
       blocked: new Set(),
       reasonsByKey: new Map(),
       issues: [issue],
+      issuesByKey: new Map(),
       blockedKeys: [],
     }));
 

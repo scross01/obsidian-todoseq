@@ -33,6 +33,7 @@ import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
 import { BaseDialog } from '../components/base-dialog';
 import { getStateTransitionManager } from '../../services/task-update-coordinator';
+import { resolveDependencyMarker } from '../components/dependency-marker';
 
 export class EmbeddedTaskItemRenderer {
   constructor(
@@ -95,35 +96,44 @@ export class EmbeddedTaskItemRenderer {
       `Toggle task: ${task.text || task.state}`,
     );
 
-    const dependencyManager = this.plugin.taskDependencyManager;
+    const dependencyManager = this.plugin.taskDependencyManager ?? null;
     const key = `${task.path}:${task.line}${
       task.isTableTask && task.tableCell ? `:${task.tableCell.cellIndex}` : ''
     }`;
-    if (
-      dependencyManager &&
-      !task.completed &&
-      dependencyManager.isBlocked(key)
-    ) {
+    const marker = task.completed
+      ? null
+      : resolveDependencyMarker(dependencyManager, key);
+    if (marker) {
+      // Immediately after the checkbox, before the text container: the same
+      // order the row already used for its lock, now extended to diagnostics.
       li.classList.add('todoseq-task-blocked');
-      const lock = li.createSpan({ cls: 'todoseq-task-blocked-icon' });
-      setIcon(lock, 'lock');
-      const details = dependencyManager
-        .getBlockingReasons(key)
-        .map((reason) => reason.message)
-        .join(' ');
-      setTooltip(lock, details || 'Blocked by an incomplete dependency');
-      lock.setAttribute('aria-label', details || 'Blocked task');
-      lock.setAttribute('role', 'button');
-      lock.setAttribute('tabindex', '0');
-      const showDetails = (event: Event): void => {
-        event.preventDefault();
-        event.stopPropagation();
-        new Notice(details || 'Blocked by an incomplete dependency', 8000);
-      };
-      lock.onclick = showDetails;
-      lock.onkeydown = (event: KeyboardEvent) => {
-        if (event.key === 'Enter' || event.key === ' ') showDetails(event);
-      };
+      const icon = li.createSpan({
+        cls:
+          marker.kind === 'blocked'
+            ? 'todoseq-task-blocked-icon'
+            : 'todoseq-dependency-issue-icon',
+      });
+      if (marker.kind === 'issue') {
+        setIcon(icon, 'alert-triangle');
+        setTooltip(icon, marker.label);
+        icon.setAttribute('aria-label', marker.label);
+        icon.setAttribute('role', 'img');
+      } else {
+        setIcon(icon, 'lock');
+        setTooltip(icon, marker.label);
+        icon.setAttribute('aria-label', marker.label);
+        icon.setAttribute('role', 'button');
+        icon.setAttribute('tabindex', '0');
+        const showDetails = (event: Event): void => {
+          event.preventDefault();
+          event.stopPropagation();
+          new Notice(marker.details || marker.label, 8000);
+        };
+        icon.onclick = showDetails;
+        icon.onkeydown = (event: KeyboardEvent) => {
+          if (event.key === 'Enter' || event.key === ' ') showDetails(event);
+        };
+      }
     }
 
     const wrapMode: 'dynamic' | boolean = params.wrapContent ?? 'dynamic';

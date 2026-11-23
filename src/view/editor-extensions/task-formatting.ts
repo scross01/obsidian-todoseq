@@ -540,6 +540,44 @@ export class TaskKeywordDecorator {
           const startPos = line.from + keywordStart;
           const endPos = line.from + keywordEnd;
 
+          // A status glyph belongs to the keyword, so it is drawn immediately
+          // before the keyword mark. A point decoration must also be added
+          // before a mark that starts at the same offset, or RangeSetBuilder
+          // rejects the range as unsorted; that is why this sits here rather
+          // than at the end of the line (which would also land after a drawer).
+          const sourceLine = lineNumber - 1;
+          const lineIssues = issuesByLine.get(sourceLine);
+          const taskKey = path ? `${path}:${sourceLine}` : null;
+          if (lineIssues?.length) {
+            builder.add(
+              startPos,
+              startPos,
+              Decoration.widget({
+                widget: new DependencyIssueWidget(
+                  lineIssues,
+                  lineIssues[0].sourceKey ?? `line:${lineNumber}`,
+                ),
+                side: -1,
+              }),
+            );
+          } else if (manager && taskKey && manager.isBlocked(taskKey)) {
+            const details = manager
+              .getBlockingReasons(taskKey)
+              .map((reason) => reason.message)
+              .join(' ');
+            builder.add(
+              startPos,
+              startPos,
+              Decoration.widget({
+                widget: new BlockedLockWidget(
+                  details || 'Blocked by an incomplete dependency',
+                  taskKey,
+                ),
+                side: -1,
+              }),
+            );
+          }
+
           // All keywords use the same styling - no group-based CSS classes
           let cssClasses = 'todoseq-keyword-formatted';
 
@@ -717,44 +755,6 @@ export class TaskKeywordDecorator {
 
         // Check if this line contains SCHEDULED: or DEADLINE: and follows a task line
         this.checkAndDecorateDateLine(lineNumber, lineText, line, builder);
-
-        // One status marker per task line. A source diagnostic is the
-        // actionable cause of the blocked state, so it replaces the lock.
-        if (match && (match[4] || (isHeadingTask && match[2]))) {
-          const sourceLine = lineNumber - 1;
-          const issues = issuesByLine.get(sourceLine);
-          const taskKey = path ? `${path}:${sourceLine}` : null;
-
-          if (issues?.length) {
-            builder.add(
-              line.to,
-              line.to,
-              Decoration.widget({
-                widget: new DependencyIssueWidget(
-                  issues,
-                  issues[0].sourceKey ?? `line:${lineNumber}`,
-                ),
-                side: 1,
-              }),
-            );
-          } else if (manager && taskKey && manager.isBlocked(taskKey)) {
-            const details = manager
-              .getBlockingReasons(taskKey)
-              .map((reason) => reason.message)
-              .join(' ');
-            builder.add(
-              line.to,
-              line.to,
-              Decoration.widget({
-                widget: new BlockedLockWidget(
-                  details || 'Blocked by an incomplete dependency',
-                  taskKey,
-                ),
-                side: 1,
-              }),
-            );
-          }
-        }
       }
 
       return builder.finish();

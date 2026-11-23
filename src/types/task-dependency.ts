@@ -41,6 +41,8 @@ export interface DependencySnapshot {
   blocked: ReadonlySet<string>;
   reasonsByKey: ReadonlyMap<string, readonly DependencyReason[]>;
   issues: readonly DependencyIssue[];
+  /** Issues for one task key, built with the snapshot for O(1) row reads. */
+  issuesByKey: ReadonlyMap<string, readonly DependencyIssue[]>;
   blockedKeys: readonly string[];
 }
 

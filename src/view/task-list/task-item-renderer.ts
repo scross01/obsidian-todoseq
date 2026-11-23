@@ -24,6 +24,7 @@ import { StateMenuBuilder } from '../components/state-menu-builder';
 import { BaseDialog } from '../components/base-dialog';
 import type { TaskDependencyManager } from '../../services/task-dependency-manager';
 import type { TaskUpdateOutcome } from '../../services/task-update-coordinator';
+import { resolveDependencyMarker } from '../components/dependency-marker';
 
 interface LinkPattern {
   type: 'wiki' | 'md' | 'url' | 'tag';
@@ -591,7 +592,7 @@ export class TaskItemRenderer {
       fileInfo.appendText(`${displayName}:${task.line + 1}`);
     }
     setTooltip(fileInfo, task.path);
-    this.applyBlockedIndicator(li, task);
+    this.applyDependencyMarker(li, task);
 
     // Click to open source (avoid checkbox and keyword)
     li.addEventListener('click', (evt) => {
@@ -857,46 +858,79 @@ export class TaskItemRenderer {
 
     // 6. Update LI classes for task state
     this.applyStateClasses(element, task);
-    this.applyBlockedIndicator(element, task);
+    this.applyDependencyMarker(element, task);
   }
 
-  private applyBlockedIndicator(element: HTMLElement, task: Task): void {
+  /**
+   * One status glyph per row, placed after the checkbox and before the keyword
+   * on every surface. The row class stays even though it no longer dims, so
+   * themes and tests keep a stable semantic hook.
+   */
+  private applyDependencyMarker(element: HTMLElement, task: Task): void {
     const manager = this.getDependencyManager();
     const key = `${task.path}:${task.line}${
       task.isTableTask && task.tableCell ? `:${task.tableCell.cellIndex}` : ''
     }`;
-    const blocked = !!manager && !task.completed && manager.isBlocked(key);
-    element.classList.toggle('todoseq-task-blocked', blocked);
+    const marker = task.completed
+      ? null
+      : resolveDependencyMarker(manager, key);
+    element.classList.toggle('todoseq-task-blocked', marker !== null);
 
-    const existing = element.querySelector('.todoseq-task-blocked-icon');
-    if (!blocked) {
+    const existing = element.querySelector<HTMLElement>(
+      '.todoseq-task-blocked-icon, .todoseq-dependency-issue-icon',
+    );
+    if (!marker) {
       existing?.remove();
       return;
     }
 
-    const icon = existing?.instanceOf(HTMLElement)
-      ? existing
-      : (element
-          .querySelector('.todo-main-content')
-          ?.createSpan({ cls: 'todoseq-task-blocked-icon' }) ?? null);
-    if (!icon) return;
+    const markerClass =
+      marker.kind === 'blocked'
+        ? 'todoseq-task-blocked-icon'
+        : 'todoseq-dependency-issue-icon';
+    // A diagnostic outranks the lock, so a kind change replaces the node
+    // rather than leaving two glyphs or stale button handlers behind.
+    let icon = existing?.classList.contains(markerClass) ? existing : null;
+    if (existing && !icon) existing.remove();
+    if (!icon) icon = createSpan({ cls: markerClass });
+
+    const wrapper = element.querySelector<HTMLElement>(
+      '.todoseq-task-text-wrapper',
+    );
+    const anchor =
+      wrapper?.querySelector<HTMLElement>('.todoseq-task-text') ?? null;
+    if (wrapper) {
+      if (icon.parentElement !== wrapper) wrapper.insertBefore(icon, anchor);
+    } else if (icon.parentElement !== element) {
+      (element.querySelector('.todo-main-content') ?? element).appendChild(
+        icon,
+      );
+    }
+
+    icon.onclick = null;
+    icon.onkeydown = null;
+
+    if (marker.kind === 'issue') {
+      setIcon(icon, 'alert-triangle');
+      icon.removeAttribute('tabindex');
+      icon.setAttribute('role', 'img');
+      icon.setAttribute('aria-label', marker.label);
+      setTooltip(icon, marker.label);
+      return;
+    }
+
     setIcon(icon, 'lock');
-    const details = manager
-      .getBlockingReasons(key)
-      .map((reason) => reason.message)
-      .join(' ');
-    setTooltip(icon, details || 'Blocked by an incomplete dependency');
-    icon.setAttribute('aria-label', details || 'Blocked task');
-    const iconEl = icon;
-    iconEl.setAttribute('role', 'button');
-    iconEl.setAttribute('tabindex', '0');
+    setTooltip(icon, marker.label);
+    icon.setAttribute('aria-label', marker.label);
+    icon.setAttribute('role', 'button');
+    icon.setAttribute('tabindex', '0');
     const showDetails = (event: Event): void => {
       event.preventDefault();
       event.stopPropagation();
-      new Notice(details || 'Blocked by an incomplete dependency', 8000);
+      new Notice(marker.details || marker.label, 8000);
     };
-    iconEl.onclick = showDetails;
-    iconEl.onkeydown = (event: KeyboardEvent) => {
+    icon.onclick = showDetails;
+    icon.onkeydown = (event: KeyboardEvent) => {
       if (event.key === 'Enter' || event.key === ' ') showDetails(event);
     };
   }

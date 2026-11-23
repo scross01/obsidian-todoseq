@@ -24,6 +24,7 @@ import {
   type TaskUpdateOutcome,
 } from '../../services/task-update-coordinator';
 import { getTableCellIndex } from '../../utils/task-line-utils';
+import { resolveDependencyMarker } from '../components/dependency-marker';
 
 /** One text-node piece of a rendered source line inside a block. */
 interface RenderedPropertyLinePart {
@@ -268,8 +269,10 @@ export class ReaderViewFormatter {
           continue;
         }
         const linePart = issue.sourceKey.slice(prefix.length);
-        if (!/^\d+$/.test(linePart)) continue;
-        const line = Number(linePart);
+        // Table tasks append `:cellIndex`; they still belong to the source line.
+        const lineMatch = /^(\d+)(?::\d+)?$/.exec(linePart);
+        if (!lineMatch) continue;
+        const line = Number(lineMatch[1]);
         const list = issuesByLine.get(line) ?? [];
         list.push(issue);
         issuesByLine.set(line, list);
@@ -317,7 +320,27 @@ export class ReaderViewFormatter {
       const key = `${context.sourcePath}:${line}`;
       const container =
         item.querySelector<HTMLElement>('.todoseq-task') ?? item;
-      const issues = issuesByLine.get(line);
+      const keyedIssues = manager
+        .getIssuesForTask(key)
+        .filter((issue) => issue.code !== 'pending-validation');
+      const issues =
+        keyedIssues.length > 0 ? keyedIssues : issuesByLine.get(line);
+
+      // The marker belongs beside the keyword, not at the end of the list
+      // item: appending would put it after a property drawer's `:END:`.
+      const insertMarker = (marker: HTMLElement): void => {
+        const keyword = container.querySelector('.todoseq-keyword-formatted');
+        if (keyword) {
+          container.insertBefore(marker, keyword);
+          return;
+        }
+        const checkbox = container.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+          checkbox.after(marker);
+          return;
+        }
+        container.prepend(marker);
+      };
 
       if (issues?.length) {
         const first = issues[0].message;
@@ -333,11 +356,12 @@ export class ReaderViewFormatter {
         });
         setIcon(warning, 'alert-triangle');
         setTooltip(warning, detail);
-        container.appendChild(warning);
+        insertMarker(warning);
         continue;
       }
 
-      if (!manager.isBlocked(key)) continue;
+      const marker = resolveDependencyMarker(manager, key);
+      if (!marker || marker.kind !== 'blocked') continue;
 
       const reasons = manager.getBlockingReasons(key);
       const details = reasons.map((reason) => reason.message).join(' ');
@@ -367,7 +391,7 @@ export class ReaderViewFormatter {
       badge.addEventListener('keydown', (event: KeyboardEvent) => {
         if (event.key === 'Enter' || event.key === ' ') showDetails(event);
       });
-      container.appendChild(badge);
+      insertMarker(badge);
     }
   }
 

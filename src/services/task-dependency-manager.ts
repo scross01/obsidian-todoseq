@@ -25,10 +25,7 @@ export interface TaskDependencyManagerOptions {
     checkbox: boolean;
   };
   /** Published structural entries beside the task snapshot. */
-  getStructureEntries?: () => ReadonlyMap<
-    string,
-    readonly StructuralEntry[]
-  >;
+  getStructureEntries?: () => ReadonlyMap<string, readonly StructuralEntry[]>;
   getStructureRevision?: () => number;
   /** Published after each successful rebuild, before the next read. */
   onSnapshot?: (snapshot: DependencySnapshot) => void;
@@ -66,6 +63,7 @@ export class TaskDependencyManager {
     blocked: new Set<string>(),
     reasonsByKey: new Map(),
     issues: [],
+    issuesByKey: new Map(),
     blockedKeys: [],
   };
   private lastRevision = -1;
@@ -100,6 +98,7 @@ export class TaskDependencyManager {
       blocked: new Set(),
       reasonsByKey: new Map(),
       issues: [],
+      issuesByKey: new Map(),
       blockedKeys: [],
     };
     this.cachedTasks = [];
@@ -231,6 +230,12 @@ export class TaskDependencyManager {
   getIssues(): readonly DependencyIssue[] {
     this.ensureFresh();
     return this.snapshot.issues;
+  }
+
+  /** Issues raised by one task, read from the snapshot's key index. */
+  getIssuesForTask(taskKey: string): readonly DependencyIssue[] {
+    this.ensureFresh();
+    return this.snapshot.issuesByKey.get(taskKey) ?? [];
   }
 
   getArchivedReferencePromotions(): ArchivedReferencePromotion[] {
@@ -541,22 +546,29 @@ export class TaskDependencyManager {
       });
     }
 
+    const stableIssues = this.stableIssues(issues);
+    const issuesByKey = new Map<string, DependencyIssue[]>();
+    for (const issue of stableIssues) {
+      if (!issue.sourceKey) continue;
+      const list = issuesByKey.get(issue.sourceKey);
+      if (list) list.push(issue);
+      else issuesByKey.set(issue.sourceKey, [issue]);
+    }
+
     this.snapshot = {
       revision,
       ready: this.validationReady,
       blocked,
       reasonsByKey,
-      issues: this.stableIssues(issues),
+      issues: stableIssues,
+      issuesByKey,
       blockedKeys: Array.from(blocked).sort(),
     };
 
     try {
       this.options.onSnapshot?.(this.snapshot);
     } catch (error) {
-      console.debug(
-        '[TaskDependencyManager] Snapshot listener failed:',
-        error,
-      );
+      console.debug('[TaskDependencyManager] Snapshot listener failed:', error);
     }
   }
 
@@ -695,8 +707,11 @@ export class TaskDependencyManager {
         }
       }
       for (const path of orgPaths) {
-        const items: Array<{ line: number; task?: Task; entry?: StructuralEntry }> =
-          [];
+        const items: Array<{
+          line: number;
+          task?: Task;
+          entry?: StructuralEntry;
+        }> = [];
         for (const task of tasks) {
           if (
             task.path === path &&

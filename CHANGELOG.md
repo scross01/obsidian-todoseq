@@ -2,19 +2,20 @@
 
 ## Unreleased
 
+- Blocked tasks now show the lock immediately before the keyword in every view, with no dimmed row. Broken dependency references show the warning triangle in the Task List and embedded lists too.
 - Fixed Copy anchor placing a task's block anchor where Obsidian could not resolve it when the task had a schedule, deadline, description or property drawer. The anchor now goes at the end of the task's metadata block, existing task-line anchors are moved there by Copy anchor, and anchors on date, description and `:END:` lines are recognised when scanning.
 - Fixed an anchor on a date, description or property-drawer line picking up TODOseq's muted metadata styling instead of Obsidian's own anchor style; an anchored `:END:` now also closes the drawer styling.
 - Property drawers under tasks now appear as quiet metadata in the editor and reading view, including on top-level tasks; previously the drawer lines were left unstyled.
 - A blocked task's checkbox now springs back instead of staying checked, and archive runs report blocked tasks as skipped rather than counting them as archived. A completion queued while its blocker was still done is checked once more before writing.
 - Blocked locks are now keyboard and tap accessible in task lists, embedded lists and reader views, including plain, heading, bullet and table reader tasks.
-- Blocked-task locks now appear in the editor as well as the reading view, and dependency warnings now appear in the reading view as well as the editor. Both markers align at the end of the task line, and a source diagnostic replaces the lock instead of stacking beside it.
+- Blocked-task locks now appear in the editor as well as the reading view, and dependency warnings now appear in the reading view as well as the editor. Both markers sit immediately before the keyword, and a source diagnostic replaces the lock instead of stacking beside it.
 - Moving a task now repairs links to nested anchored tasks too, and failed reference repairs offer a Retry button instead of requiring the command palette. Archive runs surface failed dependent updates with the same retry action.
 - Archiving a prerequisite now moves each dependent's `BLOCKER` reference into `ARCHIVED_BLOCKER` history, so the dependent is no longer stranded; restoring the prerequisite moves the reference back. Dependents that cannot be updated stay blocked and are reported.
 - Moving a task now updates the `BLOCKER` links, prose links and embeds that pointed at it, while copying gives the copy its own ID and block anchor; migrating leaves the old line without a duplicate identity.
 - Added Org-style `:PROPERTIES:` drawers under Markdown and Org tasks. TODOseq reads `:ID:`, `:BLOCKER:` and `:ARCHIVED_BLOCKER:` while preserving every other property, and copy, move and migrate carry the drawer with the task.
 - Tasks can now derive a blocked state from `BLOCKER` IDs and file-qualified block links. Completed prerequisites release dependents immediately, broken or ambiguous references keep them blocked, and archived references become active again if their exact target is restored.
 - Added `blocked:true` and `blocked:false` search filters and dashboard grouping, so you can find waiting work or exclude it from a query.
-- Blocked tasks now show a lock and dimmed text in task lists, and completing them is refused until their dependencies are done. Use Complete anyway when you need to override it; the task menu can also copy a task ID or block anchor and add a copied link as a blocker.
+- Blocked tasks now show a lock in task lists, and completing them is refused until their dependencies are done. Use Complete anyway when you need to override it; the task menu can also copy a task ID or block anchor and add a copied link as a blocker.
 - Added optional parent, `ORDERED` and checkbox dependency rules, plus local `NOBLOCKING` and `BLOCKER: previous-sibling` support for Org-style workflows.
 - Optional structural dependencies now respect non-task headings and dedented prose as boundaries, count keywordless checkboxes, keep archived branches out of outer checks, stop Org checkbox checks at the next headline, and refresh immediately when either structural setting changes.
 - Blocked tasks now show their lock in reader views, broken dependency references show a warning in the editor, and new dependency problems are announced once instead of staying silent until you search for them.

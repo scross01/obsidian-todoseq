@@ -3841,26 +3841,24 @@
   min-height: 24px;
 }
 
-/* Derived dependency state */
-.todoseq-task-blocked .todoseq-task-text-wrapper,
-.todoseq-task-blocked .todoseq-embedded-task-text,
-.todoseq-task-blocked .todo-text {
-  opacity: 0.62;
-}
-
-/* One status glyph at the end of a task line. The lock marks ordinary blocked
-   state; the warning marks a source diagnostic that outranks it. Both share
-   the same optical alignment and hover surface so they read as one system. */
+/* One status glyph before the keyword on every task surface. The lock marks
+   ordinary blocked state; the warning marks a source diagnostic that outranks
+   it. Both share the same optical alignment and hover surface so they read as
+   one system, and the row keeps normal text contrast (no dimming). The box is
+   exactly the glyph's size, so it starts flush after the checkbox with no
+   hidden left padding, and a small end margin supplies the gap to the keyword.
+   The fractional negative baseline seats the glyph optically on the keyword's
+   baseline instead of floating above it or dropping below it. */
 .todoseq-task-blocked-icon,
 .todoseq-dependency-issue-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  inline-size: 1.25em;
-  block-size: 1.25em;
-  margin-inline-start: 0.15em;
-  vertical-align: -0.2em;
+  inline-size: var(--icon-xs);
+  block-size: var(--icon-xs);
+  margin-inline-end: 0.2em;
+  vertical-align: -0.0625em;
   border-radius: var(--radius-s);
   color: var(--text-muted);
   cursor: help;
