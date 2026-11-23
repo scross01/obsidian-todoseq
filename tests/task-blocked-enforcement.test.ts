@@ -83,13 +83,17 @@ describe('blocked completion enforcement', () => {
     );
 
     expect(outcome.status).toBe('refused');
-    expect(
-      outcome.status === 'refused' ? outcome.reasons[0].code : null,
-    ).toBe('incomplete-blocker');
+    expect(outcome.status === 'refused' ? outcome.reasons[0].code : null).toBe(
+      'incomplete-blocker',
+    );
     expect(writer.updateTaskState).not.toHaveBeenCalled();
     expect(state.findTaskByPathAndLine('blocked.md', 0)?.state).toBe('TODO');
     expect(Notice).toHaveBeenCalledWith(
       expect.stringContaining('Blocked task cannot be completed'),
+      8000,
+    );
+    expect(Notice).toHaveBeenLastCalledWith(
+      expect.stringMatching(/Complete anyway[\s\S]*Complete blocked task/),
       8000,
     );
     coordinator.destroy();
@@ -157,7 +161,11 @@ describe('blocked completion enforcement', () => {
     );
 
     const first = coordinator.updateTaskState(sibling, 'DOING', 'task-list');
-    const completion = coordinator.updateTaskState(blocked, 'DONE', 'task-list');
+    const completion = coordinator.updateTaskState(
+      blocked,
+      'DONE',
+      'task-list',
+    );
 
     // Reopen the blocker while the completion waits behind the file write.
     state.updateTaskByPathAndLine('blocker.md', 0, {

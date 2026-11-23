@@ -6,6 +6,7 @@
 import {
   DashboardRenderer,
   DashboardCallbacks,
+  blockedGroupColor,
 } from '../src/view/embedded-dashboard/dashboard-renderer';
 import { DashboardCodeBlockProcessor } from '../src/view/embedded-dashboard/dashboard-code-block-processor';
 import TodoTracker from '../src/main';
@@ -68,6 +69,43 @@ function params(
 function noopCallbacks(): DashboardCallbacks {
   return { onOpenQuery: jest.fn() };
 }
+
+describe('blockedGroupColor', () => {
+  it('gives the blocked bucket the warning hue', () => {
+    expect(blockedGroupColor('blocked:true')).toContain('--color-orange');
+  });
+
+  it('keeps the unblocked bucket secondary', () => {
+    expect(blockedGroupColor('blocked:false')).toContain('--text-muted');
+  });
+});
+
+describe('blocked dashboard colors', () => {
+  it('keeps the more tail faint when grouping by blocked state', () => {
+    const renderer = new DashboardRenderer(createBaseSettings());
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    renderer.renderCard(
+      host,
+      result({
+        total: 6,
+        groups: [
+          group('blocked:true', 'Blocked', 4, 'blocked:true'),
+          group('more', '2 more', 2, ''),
+        ],
+      }),
+      params({ groupBy: 'blocked', display: 'bar', maxGroups: 1 }),
+      noopCallbacks(),
+    );
+
+    const tail = host.querySelector<HTMLElement>(
+      '.todoseq-dashboard-bar-row[data-key="more"]',
+    );
+    expect(tail?.style.getPropertyValue('--todoseq-bar-color')).toBe(
+      'var(--text-faint)',
+    );
+  });
+});
 
 describe('DashboardRenderer', () => {
   let renderer: DashboardRenderer;

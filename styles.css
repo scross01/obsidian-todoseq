@@ -3229,7 +3229,7 @@
   border-radius: var(--radius-s);
   background-color: var(--background-modifier-selection);
   font-family: var(--font-monospace);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3871,6 +3871,24 @@
 .todoseq-dependency-issue-icon svg {
   inline-size: var(--icon-xs);
   block-size: var(--icon-xs);
+}
+
+/* The lock opens a notice. Expand only its pointer target with a pseudo-element,
+   so the 14px glyph keeps the keyword alignment and the dense row keeps its
+   height; the warning triangle stays a non-interactive image. */
+.todoseq-task-blocked-icon {
+  position: relative;
+  cursor: pointer;
+}
+
+.todoseq-task-blocked-icon::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  transform: translate(-50%, -50%);
 }
 
 .todoseq-dependency-issue-icon {

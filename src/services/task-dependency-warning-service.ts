@@ -65,8 +65,27 @@ export class TaskDependencyWarningService {
 
   private formatNotice(issues: readonly DependencyIssue[]): string {
     const first = issues[0]?.message ?? 'Dependency problem detected.';
-    return issues.length > 1
-      ? `${first} (+${issues.length - 1} more)`
-      : first;
+    const base =
+      issues.length > 1 ? `${first} (+${issues.length - 1} more)` : first;
+    const source = this.formatSource(issues[0]?.sourceKey);
+    return source ? `${base} (${source})` : base;
+  }
+
+  private formatSource(sourceKey: string | undefined): string {
+    if (!sourceKey) return '';
+    const parts = sourceKey.split(':');
+    if (parts.length < 2) return sourceKey;
+
+    // Table tasks append a cell index: `path:line:cell`. Treat two trailing
+    // integers as line+cell so the line, not the cell, is incremented.
+    const last = parts[parts.length - 1] ?? '';
+    const secondLast = parts[parts.length - 2] ?? '';
+    const hasCell =
+      parts.length >= 3 && /^\d+$/.test(last) && /^\d+$/.test(secondLast);
+    const lineIndex = hasCell ? parts.length - 2 : parts.length - 1;
+    const line = Number(parts[lineIndex]);
+    if (!Number.isFinite(line)) return sourceKey;
+    const path = parts.slice(0, lineIndex).join(':');
+    return `${path}:${line + 1}`;
   }
 }

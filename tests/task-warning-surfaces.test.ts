@@ -323,7 +323,7 @@ describe('dependency warning notice', () => {
     expect(service.check()).toBe(true);
     expect(service.check()).toBe(false);
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledWith('Dependency missing.');
+    expect(notify).toHaveBeenCalledWith('Dependency missing. (blocked.md:1)');
     expect(debug).toHaveBeenCalled();
   });
 
@@ -337,7 +337,9 @@ describe('dependency warning notice', () => {
 
     service.check();
 
-    expect(notify).toHaveBeenCalledWith('Dependency missing. (+1 more)');
+    expect(notify).toHaveBeenCalledWith(
+      'Dependency missing. (+1 more) (blocked.md:1)',
+    );
   });
 
   it('stays silent for an empty set and notifies again on relapse', () => {
@@ -380,5 +382,45 @@ describe('dependency warning notice', () => {
       false,
     );
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('names the source file and one-based line', () => {
+    const manager = createWarningManager([
+      createIssue('missing:a', 'Dependency missing.', 'blocked.md:4'),
+    ]);
+    const notify = jest.fn();
+
+    new TaskDependencyWarningService(manager, notify).check();
+
+    expect(notify).toHaveBeenCalledWith('Dependency missing. (blocked.md:5)');
+  });
+
+  it('names the line, not the cell, for a table task', () => {
+    const manager = createWarningManager([
+      createIssue('missing:a', 'Dependency missing.', 'board.md:4:2'),
+    ]);
+    const notify = jest.fn();
+
+    new TaskDependencyWarningService(manager, notify).check();
+
+    expect(notify).toHaveBeenCalledWith('Dependency missing. (board.md:5)');
+    expect(notify).not.toHaveBeenCalledWith(
+      expect.stringContaining('board.md:4:3'),
+    );
+  });
+
+  it('leaves the message unchanged when the issue has no source', () => {
+    const manager = createWarningManager([
+      {
+        ...createIssue('missing:a', 'Dependency missing.'),
+        sourceKey: undefined,
+      },
+    ]);
+    const notify = jest.fn();
+
+    new TaskDependencyWarningService(manager, notify).check();
+
+    expect(notify).toHaveBeenCalledWith('Dependency missing.');
+    expect(notify).not.toHaveBeenCalledWith(expect.stringContaining('()'));
   });
 });

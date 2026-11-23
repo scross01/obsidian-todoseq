@@ -47,7 +47,8 @@ export type UpdateType =
   | 'dependency-reference';
 
 /** Dependency-property mutation routed through the per-file write queue. */
-export type DependencyReferenceAction = 'add' | 'remove' | 'archive' | 'promote';
+export type DependencyReferenceAction =
+  'add' | 'remove' | 'archive' | 'promote';
 
 /**
  * Source of the update (for debugging/tracking)
@@ -383,7 +384,10 @@ export class TaskUpdateCoordinator {
     const detail = reasons.length
       ? reasons.map((reason) => reason.message).join(' ')
       : 'Resolve its BLOCKER references first.';
-    new Notice(`Blocked task cannot be completed. ${detail}`, 8000);
+    new Notice(
+      `Blocked task cannot be completed. ${detail} Use Complete anyway in the task menu or the Complete blocked task command.`,
+      8000,
+    );
   }
 
   /**
