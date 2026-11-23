@@ -241,12 +241,36 @@ test.describe('task dependencies', () => {
       /Blocked by Blocker task/,
     );
 
+    // A broken reference is a diagnostic, so the reading view shows the
+    // warning instead of the lock.
+    const brokenRow = page
+      .locator('.workspace-leaf.mod-active li.task-list-item')
+      .filter({ hasText: 'Broken task' })
+      .first();
+    const readerIssue = brokenRow.locator('.todoseq-reader-issue-badge');
+    await expect(readerIssue).toHaveCount(1);
+    await expect(readerIssue).toHaveAttribute('aria-label', /not found/);
+    await expect(
+      brokenRow.locator('.todoseq-reader-blocked-badge'),
+    ).toHaveCount(0);
+
     await openFileInEditor(page, 'dependency-dependent');
     const issue = page.locator(
-      '.workspace-leaf.mod-active .todoseq-dependency-issue-icon',
+      '.workspace-leaf.mod-active .todoseq-editor-issue-badge',
     );
     await expect(issue).toHaveCount(1);
     await expect(issue).toHaveAttribute('aria-label', /not found/);
+
+    // The editor draws the ordinary blocked lock too, but not on the row whose
+    // marker is already the diagnostic.
+    const editorLock = page.locator(
+      '.workspace-leaf.mod-active .todoseq-editor-blocked-badge',
+    );
+    await expect(editorLock).toHaveCount(1);
+    await expect(editorLock).toHaveAttribute(
+      'aria-label',
+      /Blocked by Blocker task/,
+    );
 
     // Repair the missing anchor in the blocker note, then rescan.
     await page.evaluate(async () => {
@@ -263,6 +287,15 @@ test.describe('task dependencies', () => {
 
     await openFileInEditor(page, 'dependency-dependent');
     await expect(issue).toHaveCount(0);
+    await expect(editorLock).toHaveCount(2);
+
+    await openInReadingMode('dependency-dependent');
+    await expect(
+      page.locator('.workspace-leaf.mod-active .todoseq-reader-issue-badge'),
+    ).toHaveCount(0);
+    await expect(
+      page.locator('.workspace-leaf.mod-active .todoseq-reader-blocked-badge'),
+    ).toHaveCount(2);
   });
 
   test('refused checkbox, completion and blocked search use the real control', async () => {

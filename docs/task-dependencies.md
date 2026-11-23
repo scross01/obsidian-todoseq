@@ -26,6 +26,8 @@ TODOseq reads these properties:
 
 Property names are case-insensitive. Values and IDs keep their case. Unknown properties are preserved but not interpreted. A drawer can contain blank lines. An unclosed drawer is left alone and does not consume the following task.
 
+In the editor and reading view the drawer is shown as quiet metadata: the lines are muted and the property keys are faint, using your theme's colours. Nothing is hidden, and the drawer remains ordinary note text that other tools can read.
+
 ### Appending references
 
 `BLOCKER+` and `ARCHIVED_BLOCKER+` add more references to the property:
@@ -154,9 +156,9 @@ A missing, ambiguous, excluded or temporarily unvalidated reference counts as bl
 
 ## Completion enforcement and task actions
 
-Blocked tasks are dimmed with a lock icon in the Task List and embedded task lists. The lock is a focusable button: hovering or focusing it shows the blocking reasons, and clicking it or pressing Enter/Space opens them in a notice. Reader views draw the same lock beside Markdown, heading, bullet and table tasks, with the blocking reasons in its tooltip and the same keyboard/tap activation. The marker is derived at render time and writes nothing.
+Blocked tasks are dimmed with a lock icon in the Task List and embedded task lists. The lock is a focusable button: hovering or focusing it shows the blocking reasons, and clicking it or pressing Enter/Space opens them in a notice. Reader views draw the same lock beside Markdown, heading, bullet and table tasks; Live Preview and source-mode editors draw it on plain, heading and bullet task lines. The reading view's lock opens the reasons, while the editor marker shows them in its tooltip. The marker is derived at render time and writes nothing.
 
-Live Preview and source-mode editors add a warning icon only for **source diagnostics**: an unresolved, ambiguous or invalid reference, a dependency cycle or duplicate IDs. Ordinary waiting on an incomplete task is normal blocked state and does not show a warning. Repairing the reference removes the icon on the next decoration refresh.
+A **source diagnostic** — an unresolved, ambiguous or invalid reference, a dependency cycle or duplicate IDs — replaces the lock with a warning triangle in both the reading view and the editor. Its tooltip carries the first diagnostic and any remaining count, and repairing the reference removes it on the next render or decoration refresh. Ordinary waiting on an incomplete task is normal blocked state and shows only the lock; a task never carries both markers.
 
 Diagnostics are announced once per changed set, after indexing finishes. A rescan or optimistic update that republishes the same set does not repeat the notice; an empty set stays silent and a later relapse notifies again. The notice names the first issue and counts the rest, while full details go to the developer console. All of these markers are session-local: nothing is persisted to the vault.
 

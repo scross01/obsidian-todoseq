@@ -3848,47 +3848,48 @@
   opacity: 0.62;
 }
 
-.todoseq-task-blocked-icon {
-  display: inline-flex;
-  align-items: center;
-  color: var(--text-muted);
-  margin-inline-start: var(--size-2-2);
-  flex: 0 0 auto;
-  cursor: help;
-}
-
-.todoseq-task-blocked-icon svg {
-  width: var(--icon-xs);
-  height: var(--icon-xs);
-}
-
-/* Reader badge: the same lock anatomy as Task List rows, inline in the note. */
-.todoseq-reader-blocked-badge {
-  vertical-align: middle;
-}
-
+/* One status glyph at the end of a task line. The lock marks ordinary blocked
+   state; the warning marks a source diagnostic that outranks it. Both share
+   the same optical alignment and hover surface so they read as one system. */
 .todoseq-task-blocked-icon,
-.todoseq-reader-blocked-badge {
-  cursor: help;
-  border-radius: 2px;
-}
-
-.todoseq-task-blocked-icon:focus-visible,
-.todoseq-reader-blocked-badge:focus-visible {
-  outline: 2px solid var(--interactive-accent);
-  outline-offset: 2px;
-}
-
-/* Source diagnostic (broken/ambiguous reference, cycle), not ordinary blocked state. */
 .todoseq-dependency-issue-icon {
   display: inline-flex;
   align-items: center;
-  color: var(--text-warning);
-  margin-inline-start: var(--size-2-2);
+  justify-content: center;
+  flex: 0 0 auto;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  margin-inline-start: 0.15em;
+  vertical-align: -0.2em;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
   cursor: help;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
+.todoseq-task-blocked-icon svg,
 .todoseq-dependency-issue-icon svg {
-  width: var(--icon-xs);
-  height: var(--icon-xs);
+  inline-size: var(--icon-xs);
+  block-size: var(--icon-xs);
+}
+
+.todoseq-dependency-issue-icon {
+  color: var(--text-warning);
+}
+
+.todoseq-task-blocked-icon:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.todoseq-dependency-issue-icon:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todoseq-task-blocked-icon:focus-visible,
+.todoseq-dependency-issue-icon:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
 }

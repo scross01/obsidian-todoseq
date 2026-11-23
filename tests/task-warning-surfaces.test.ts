@@ -9,7 +9,10 @@
 import { ReaderViewFormatter } from '../src/view/markdown-renderers/reader-formatting';
 import { TaskDependencyWarningService } from '../src/services/task-dependency-warning-service';
 import type { TaskDependencyManager } from '../src/services/task-dependency-manager';
-import type { DependencyIssue, DependencySnapshot } from '../src/types/task-dependency';
+import type {
+  DependencyIssue,
+  DependencySnapshot,
+} from '../src/types/task-dependency';
 import {
   createBaseSettings,
   createBaseTask,
@@ -17,7 +20,7 @@ import {
 } from './helpers/test-helper';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
-type ProcessBadges = (
+type ProcessMarkers = (
   element: HTMLElement,
   context: { sourcePath: string },
 ) => Promise<void>;
@@ -44,16 +47,14 @@ function createWarningManager(
   const validationReady = options.validationReady ?? true;
   return {
     isValidationReady: jest.fn(() => validationReady),
-    getSnapshot: jest.fn(
-      (): DependencySnapshot => ({
-        revision: 1,
-        ready,
-        blocked: new Set(),
-        reasonsByKey: new Map(),
-        issues,
-        blockedKeys: [],
-      }),
-    ),
+    getSnapshot: jest.fn((): DependencySnapshot => ({
+      revision: 1,
+      ready,
+      blocked: new Set(),
+      reasonsByKey: new Map(),
+      issues,
+      blockedKeys: [],
+    })),
   } as unknown as TaskDependencyManager;
 }
 
@@ -62,9 +63,8 @@ function createReaderHarness() {
   const keywordManager = createTestKeywordManager(settings);
   let blocked = true;
   const manager = {
-    isBlocked: jest.fn(
-      (key: string) => blocked && key === 'blocked.md:0',
-    ),
+    getIssues: jest.fn((): DependencyIssue[] => []),
+    isBlocked: jest.fn((key: string) => blocked && key === 'blocked.md:0'),
     getBlockingReasons: jest.fn(() => [
       {
         code: 'incomplete-blocker',
@@ -152,15 +152,16 @@ describe('reader blocked badge', () => {
     const { formatter } = createReaderHarness();
     const root = renderRows();
 
-    await (formatter as unknown as { processBlockedBadges: ProcessBadges }).processBlockedBadges(
-      root,
-      { sourcePath: 'blocked.md' },
-    );
+    await (
+      formatter as unknown as { processDependencyMarkers: ProcessMarkers }
+    ).processDependencyMarkers(root, { sourcePath: 'blocked.md' });
 
     const badges = root.querySelectorAll('.todoseq-reader-blocked-badge');
     expect(badges).toHaveLength(1);
     expect(badges[0].getAttribute('data-icon')).toBe('lock');
-    expect(badges[0].getAttribute('title')).toContain('Blocked by TODO Blocker.');
+    expect(badges[0].getAttribute('title')).toContain(
+      'Blocked by TODO Blocker.',
+    );
     expect(badges[0].getAttribute('aria-label')).toContain('Blocked:');
     expect(
       root.querySelectorAll('li[data-line="1"] .todoseq-reader-blocked-badge'),
@@ -171,8 +172,8 @@ describe('reader blocked badge', () => {
     const { formatter, setBlocked } = createReaderHarness();
     const root = renderRows();
     const process = (
-      formatter as unknown as { processBlockedBadges: ProcessBadges }
-    ).processBlockedBadges.bind(formatter);
+      formatter as unknown as { processDependencyMarkers: ProcessMarkers }
+    ).processDependencyMarkers.bind(formatter);
 
     await process(root, { sourcePath: 'blocked.md' });
     await process(root, { sourcePath: 'blocked.md' });
@@ -209,13 +210,57 @@ describe('reader blocked badge', () => {
     ]);
     const root = renderRows();
 
-    await (formatter as unknown as { processBlockedBadges: ProcessBadges }).processBlockedBadges(
-      root,
-      { sourcePath: 'blocked.md' },
-    );
+    await (
+      formatter as unknown as { processDependencyMarkers: ProcessMarkers }
+    ).processDependencyMarkers(root, { sourcePath: 'blocked.md' });
 
     const badge = root.querySelector('.todoseq-reader-blocked-badge');
     expect(badge?.getAttribute('aria-label')).toContain('2 reasons');
+  });
+
+  it('replaces the lock with a warning for a source diagnostic', async () => {
+    const { formatter, manager } = createReaderHarness();
+    manager.getIssues.mockReturnValue([
+      createIssue('missing:a', 'Dependency missing.', 'blocked.md:0'),
+    ]);
+    const root = renderRows();
+
+    await (
+      formatter as unknown as { processDependencyMarkers: ProcessMarkers }
+    ).processDependencyMarkers(root, { sourcePath: 'blocked.md' });
+
+    const warning = root.querySelector('.todoseq-reader-issue-badge');
+    expect(warning?.getAttribute('data-icon')).toBe('alert-triangle');
+    expect(warning?.getAttribute('title')).toBe('Dependency missing.');
+    expect(warning?.getAttribute('aria-label')).toContain(
+      'Dependency problem:',
+    );
+    expect(root.querySelectorAll('.todoseq-reader-blocked-badge')).toHaveLength(
+      0,
+    );
+  });
+
+  it('ignores diagnostics for other files and pending validation', async () => {
+    const { formatter, manager } = createReaderHarness();
+    manager.getIssues.mockReturnValue([
+      createIssue('missing:other', 'Other file.', 'other.md:0'),
+      {
+        ...createIssue('pending', 'Checking dependencies.', 'blocked.md:0'),
+        code: 'pending-validation',
+      },
+    ]);
+    const root = renderRows();
+
+    await (
+      formatter as unknown as { processDependencyMarkers: ProcessMarkers }
+    ).processDependencyMarkers(root, { sourcePath: 'blocked.md' });
+
+    expect(root.querySelectorAll('.todoseq-reader-issue-badge')).toHaveLength(
+      0,
+    );
+    expect(root.querySelectorAll('.todoseq-reader-blocked-badge')).toHaveLength(
+      1,
+    );
   });
 });
 
@@ -244,9 +289,7 @@ describe('dependency warning notice', () => {
 
     service.check();
 
-    expect(notify).toHaveBeenCalledWith(
-      'Dependency missing. (+1 more)',
-    );
+    expect(notify).toHaveBeenCalledWith('Dependency missing. (+1 more)');
   });
 
   it('stays silent for an empty set and notifies again on relapse', () => {
@@ -256,16 +299,14 @@ describe('dependency warning notice', () => {
     const service = new TaskDependencyWarningService(manager, notify);
 
     expect(service.check()).toBe(false);
-    manager.getSnapshot = jest.fn(
-      (): DependencySnapshot => ({
-        revision: 2,
-        ready: true,
-        blocked: new Set(),
-        reasonsByKey: new Map(),
-        issues: [issue],
-        blockedKeys: [],
-      }),
-    );
+    manager.getSnapshot = jest.fn((): DependencySnapshot => ({
+      revision: 2,
+      ready: true,
+      blocked: new Set(),
+      reasonsByKey: new Map(),
+      issues: [issue],
+      blockedKeys: [],
+    }));
 
     expect(service.check()).toBe(true);
     expect(notify).toHaveBeenCalledTimes(1);
@@ -283,12 +324,12 @@ describe('dependency warning notice', () => {
     );
     const notify = jest.fn();
 
-    expect(
-      new TaskDependencyWarningService(indexing, notify).check(),
-    ).toBe(false);
-    expect(
-      new TaskDependencyWarningService(notReady, notify).check(),
-    ).toBe(false);
+    expect(new TaskDependencyWarningService(indexing, notify).check()).toBe(
+      false,
+    );
+    expect(new TaskDependencyWarningService(notReady, notify).check()).toBe(
+      false,
+    );
     expect(notify).not.toHaveBeenCalled();
   });
 });

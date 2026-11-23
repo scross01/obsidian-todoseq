@@ -2334,6 +2334,120 @@ describe('ReaderViewFormatter', () => {
     });
   });
 
+  describe('processPropertiesLines', () => {
+    const run = async (container: HTMLElement): Promise<void> => {
+      const processPropertiesLines = (
+        formatter as unknown as {
+          processPropertiesLines: (
+            el: HTMLElement,
+            ctx?: MarkdownPostProcessorContextLike,
+          ) => Promise<void>;
+        }
+      ).processPropertiesLines;
+      await processPropertiesLines.call(formatter, container);
+    };
+
+    /** Build a paragraph whose source lines are separated by <br>. */
+    const buildBlock = (
+      parent: HTMLElement,
+      lines: string[],
+      tag = 'p',
+    ): HTMLElement => {
+      const block = activeDocument.createElement(tag);
+      lines.forEach((line, index) => {
+        if (index > 0) block.append(activeDocument.createElement('br'));
+        block.append(line);
+      });
+      parent.append(block);
+      return block;
+    };
+
+    test('styles a drawer rendered with <br> line breaks', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':BLOCKER: data-02',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      // Start/end boundaries, plus a key and value span for each entry.
+      expect(drawer.querySelectorAll('.todoseq-properties-line')).toHaveLength(
+        6,
+      );
+      expect(drawer.querySelector('.todoseq-properties-key')?.textContent).toBe(
+        ':ID:',
+      );
+      expect(drawer.textContent).toBe(
+        ':PROPERTIES::ID: paper-01:BLOCKER: data-02:END:',
+      );
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('leaves the task line unstyled when it shares a paragraph', async () => {
+      const container = activeDocument.createElement('div');
+      const paragraph = buildBlock(container, [
+        'TODO something',
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(
+        paragraph.querySelector('.todoseq-properties-line'),
+      ).not.toBeNull();
+      const taskText = paragraph.firstChild as Text;
+      expect(taskText.textContent).toBe('TODO something');
+      expect(
+        taskText.parentElement?.closest('.todoseq-properties-line'),
+      ).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('does not style a naked key line', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      const keyLine = activeDocument.createElement('p');
+      keyLine.textContent = ':ID: paper-01';
+      container.append(task, keyLine);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(keyLine.querySelector('.todoseq-properties-line')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('does not style a drawer without a task owner', async () => {
+      const container = activeDocument.createElement('div');
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(drawer.querySelector('.todoseq-properties-line')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+  });
+
   // ---------------------------------------------------------------------
   // Source-file fallback for preceding-task detection
   //

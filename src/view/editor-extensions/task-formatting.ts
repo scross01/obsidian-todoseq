@@ -116,7 +116,7 @@ export class DependencyIssueWidget extends WidgetType {
         ? `${first} (+${this.issues.length - 1} more)`
         : first;
     const el = createSpan({
-      cls: 'todoseq-dependency-issue-icon',
+      cls: 'todoseq-dependency-issue-icon todoseq-editor-issue-badge',
       attr: {
         'data-task-key': this.taskKey,
         'aria-label': `Dependency problem: ${label}`,
@@ -125,6 +125,37 @@ export class DependencyIssueWidget extends WidgetType {
     });
     setIcon(el, 'alert-triangle');
     setTooltip(el, label);
+    return el;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+export class BlockedLockWidget extends WidgetType {
+  constructor(
+    readonly label: string,
+    readonly taskKey: string,
+  ) {
+    super();
+  }
+
+  eq(other: BlockedLockWidget): boolean {
+    return this.taskKey === other.taskKey && this.label === other.label;
+  }
+
+  toDOM(): HTMLElement {
+    const el = createSpan({
+      cls: 'todoseq-task-blocked-icon todoseq-editor-blocked-badge',
+      attr: {
+        'data-task-key': this.taskKey,
+        'aria-label': this.label,
+        role: 'img',
+      },
+    });
+    setIcon(el, 'lock');
+    setTooltip(el, this.label);
     return el;
   }
 
@@ -152,6 +183,8 @@ export class TaskKeywordDecorator {
   // Track task lines to detect SCHEDULED/DEADLINE lines that follow them
   private previousTaskLine: number | null = null;
   private previousTaskIndent = '';
+  /** True between a task's `:PROPERTIES:` line and its `:END:` line. */
+  private inPropertiesDrawer = false;
 
   // Proximity buffer for cursor detection (in characters)
   // Set to 0 for exact token overlap detection (no buffer)
@@ -173,6 +206,15 @@ export class TaskKeywordDecorator {
     this.decorations = this.createDecorations();
   }
 
+  private getEditorPath(): string | null {
+    try {
+      const info = this.view.state.field?.(editorInfoField, false);
+      return info?.file?.path ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Source diagnostics for this file, grouped by zero-based line. Ordinary
    * blocked state is deliberately excluded: it is not an error.
@@ -182,13 +224,7 @@ export class TaskKeywordDecorator {
     const manager = this.getDependencyManager();
     if (!manager) return result;
 
-    let path: string | null = null;
-    try {
-      const info = this.view.state.field?.(editorInfoField, false);
-      path = info?.file?.path ?? null;
-    } catch {
-      path = null;
-    }
+    const path = this.getEditorPath();
     if (!path) return result;
 
     const prefix = `${path}:`;
@@ -263,6 +299,8 @@ export class TaskKeywordDecorator {
     const builder = new RangeSetBuilder<Decoration>();
     const doc = this.view.state.doc;
     const issuesByLine = this.getIssuesByLine();
+    const path = this.getEditorPath();
+    const manager = this.getDependencyManager();
 
     try {
       // Reset state tracking
@@ -276,6 +314,7 @@ export class TaskKeywordDecorator {
       this.inFootnote = false;
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
+      this.inPropertiesDrawer = false;
 
       // Iterate through all lines in the document
       for (let lineNumber = 1; lineNumber <= doc.lines; lineNumber++) {
@@ -461,6 +500,7 @@ export class TaskKeywordDecorator {
             0,
             lineText.length - lineText.trimStart().length,
           );
+          this.inPropertiesDrawer = false;
 
           // For code blocks with language comment support, we need to find the actual keyword position
           // considering comment prefixes
@@ -674,9 +714,13 @@ export class TaskKeywordDecorator {
         // Check if this line contains SCHEDULED: or DEADLINE: and follows a task line
         this.checkAndDecorateDateLine(lineNumber, lineText, line, builder);
 
-        // Source diagnostics are errors, unlike ordinary blocked state.
+        // One status marker per task line. A source diagnostic is the
+        // actionable cause of the blocked state, so it replaces the lock.
         if (match && (match[4] || (isHeadingTask && match[2]))) {
-          const issues = issuesByLine.get(lineNumber - 1);
+          const sourceLine = lineNumber - 1;
+          const issues = issuesByLine.get(sourceLine);
+          const taskKey = path ? `${path}:${sourceLine}` : null;
+
           if (issues?.length) {
             builder.add(
               line.to,
@@ -685,6 +729,22 @@ export class TaskKeywordDecorator {
                 widget: new DependencyIssueWidget(
                   issues,
                   issues[0].sourceKey ?? `line:${lineNumber}`,
+                ),
+                side: 1,
+              }),
+            );
+          } else if (manager && taskKey && manager.isBlocked(taskKey)) {
+            const details = manager
+              .getBlockingReasons(taskKey)
+              .map((reason) => reason.message)
+              .join(' ');
+            builder.add(
+              line.to,
+              line.to,
+              Decoration.widget({
+                widget: new BlockedLockWidget(
+                  details || 'Blocked by an incomplete dependency',
+                  taskKey,
                 ),
                 side: 1,
               }),
@@ -781,6 +841,46 @@ export class TaskKeywordDecorator {
   }
 
   /**
+   * Style one line of a properties drawer as quiet metadata. Entry lines also
+   * get a faint key mark; the `:PROPERTIES:` / `:END:` boundaries do not.
+   */
+  private decoratePropertiesLine(
+    line: { from: number; to: number },
+    lineText: string,
+    builder: RangeSetBuilder<Decoration>,
+    entry: boolean,
+  ): void {
+    builder.add(
+      line.from,
+      line.to,
+      Decoration.mark({
+        class: 'todoseq-properties-line',
+        attributes: {
+          'data-properties-line': entry ? 'entry' : 'boundary',
+          'aria-label': 'task properties',
+          role: 'note',
+        },
+      }),
+    );
+    if (!entry) return;
+
+    const content = lineText.trimStart();
+    const quote = /^(?:>\s*)+/.exec(content);
+    const contentStart =
+      line.from +
+      (lineText.length - content.length) +
+      (quote ? quote[0].length : 0);
+    const propertyText = quote ? content.slice(quote[0].length) : content;
+    const keyEnd = propertyText.indexOf(':', 1);
+    if (!propertyText.startsWith(':') || keyEnd < 0) return;
+    builder.add(
+      contentStart,
+      contentStart + keyEnd + 1,
+      Decoration.mark({ class: 'todoseq-properties-key' }),
+    );
+  }
+
+  /**
    * Check if a line contains SCHEDULED:, DEADLINE:, CLOSED:, or STARTED: and apply appropriate decorations
    * if it follows a task line at the same indent level
    */
@@ -804,50 +904,46 @@ export class TaskKeywordDecorator {
       // Too far from task line, reset tracking
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
+      this.inPropertiesDrawer = false;
       return;
     }
 
-    // Check if this line is part of a properties drawer. The drawer stays
-    // within the task's metadata span and must not terminate task tracking.
+    // Check if this line belongs to a bounded `:PROPERTIES:` drawer under the
+    // task. The drawer stays within the task's metadata span, a blank line
+    // inside it does not end tracking, and a naked `:KEY:` line outside it
+    // stays prose — matching the parser. Empty task indents (top-level tasks)
+    // are valid owners.
     const trimmedLine = lineText.trim();
-    const propertyMatch = /^:([^:\s]+):(.*)$/.exec(trimmedLine);
-    const isDrawerBoundary =
-      trimmedLine === ':PROPERTIES:' || trimmedLine === ':END:';
-    if ((isDrawerBoundary || propertyMatch) && this.previousTaskIndent) {
-      const lineIndent = lineText.substring(
-        0,
-        lineText.length - trimmedLine.length,
-      );
-      if (
-        lineIndent === this.previousTaskIndent ||
-        lineIndent.startsWith(this.previousTaskIndent)
-      ) {
-        builder.add(
-          line.from,
-          line.to,
-          Decoration.mark({
-            class: 'todoseq-properties-line',
-            attributes: {
-              'data-properties-line': isDrawerBoundary ? 'boundary' : 'entry',
-              'aria-label': 'task properties',
-              role: 'note',
-            },
-          }),
-        );
-        if (propertyMatch) {
-          const keyStart =
-            line.from +
-            (lineText.length - trimmedLine.length) +
-            trimmedLine.indexOf(':');
-          const keyEnd = keyStart + propertyMatch[0].indexOf(':', 1) + 1;
-          builder.add(
-            keyStart,
-            keyEnd,
-            Decoration.mark({ class: 'todoseq-properties-key' }),
-          );
-        }
+    const lineIndent = lineText.substring(
+      0,
+      lineText.length - trimmedLine.length,
+    );
+    const indentMatches =
+      lineIndent === this.previousTaskIndent ||
+      lineIndent.startsWith(this.previousTaskIndent);
+
+    const quoteStripped = trimmedLine.replace(/^(?:>\s*)+/, '');
+    if (quoteStripped === ':PROPERTIES:' && indentMatches) {
+      this.inPropertiesDrawer = true;
+      this.decoratePropertiesLine(line, lineText, builder, false);
+      return;
+    }
+
+    if (this.inPropertiesDrawer) {
+      if (!trimmedLine) {
         return;
       }
+      if (quoteStripped === ':END:' && indentMatches) {
+        this.inPropertiesDrawer = false;
+        this.decoratePropertiesLine(line, lineText, builder, false);
+        return;
+      }
+      if (indentMatches && /^:[^:\s]+:/.test(quoteStripped)) {
+        this.decoratePropertiesLine(line, lineText, builder, true);
+        return;
+      }
+      // Unclosed drawer: stop styling it and let the line follow normal rules.
+      this.inPropertiesDrawer = false;
     }
 
     let dateLineType: 'scheduled' | 'deadline' | 'closed' | 'started' | null =
@@ -1013,6 +1109,7 @@ export class TaskKeywordDecorator {
       // Non-empty line that's not a date line, reset tracking
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
+      this.inPropertiesDrawer = false;
     }
   }
 

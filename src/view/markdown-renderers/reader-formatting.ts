@@ -1,5 +1,6 @@
 import TodoTracker from '../../main';
 import { Task } from '../../types/task';
+import type { DependencyIssue } from '../../types/task-dependency';
 import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
 import { stripMarkdownForDisplay } from '../../utils/task-utils';
@@ -23,6 +24,21 @@ import {
   type TaskUpdateOutcome,
 } from '../../services/task-update-coordinator';
 import { getTableCellIndex } from '../../utils/task-line-utils';
+
+/** One text-node piece of a rendered source line inside a block. */
+interface RenderedPropertyLinePart {
+  node: Text;
+  /** Offset of this piece within the text node. */
+  nodeStart: number;
+  /** Offset of this piece within the rendered line. */
+  offset: number;
+  text: string;
+}
+
+interface RenderedPropertyLine {
+  text: string;
+  parts: RenderedPropertyLinePart[];
+}
 
 /**
  * Cached regex for priority tokens with global flag.
@@ -193,7 +209,7 @@ export class ReaderViewFormatter {
       // are in separate post-processor invocations (close+reopen path).
       try {
         // Mark rendered tasks that are blocked in the current derived graph.
-        await this.processBlockedBadges(element, context);
+        await this.processDependencyMarkers(element, context);
 
         await this.processDateLines(element, context);
 
@@ -201,7 +217,7 @@ export class ReaderViewFormatter {
         await this.processDescriptionLines(element, context);
 
         // Style task property drawers as quiet metadata.
-        this.processPropertiesLines(element);
+        await this.processPropertiesLines(element, context);
       } catch (error) {
         // Don't let a failed async source-file read tear down the rest of
         // the post-processor — checkbox / keyword handlers must still
@@ -221,11 +237,13 @@ export class ReaderViewFormatter {
   }
 
   /**
-   * Add or remove the blocked badge on rendered task rows. Uses the
-   * post-processor's cached source lines only as a fallback when Obsidian did
-   * not stamp `data-line` on the list item.
+   * Draw one dependency marker per rendered task row: the lock for ordinary
+   * blocked state, or the warning triangle for a source diagnostic, which
+   * outranks the blocked state it causes. Uses the post-processor's cached
+   * source lines only as a fallback when Obsidian did not stamp `data-line` on
+   * the list item.
    */
-  private async processBlockedBadges(
+  private async processDependencyMarkers(
     element: HTMLElement,
     context: MarkdownPostProcessorContext,
   ): Promise<void> {
@@ -239,14 +257,30 @@ export class ReaderViewFormatter {
     let sourceLines: string[] | null = null;
     const seen = new Set<number>();
 
+    const issuesByLine = new Map<number, DependencyIssue[]>();
+    const prefix = `${context.sourcePath}:`;
+    if (manager) {
+      for (const issue of manager.getIssues()) {
+        if (
+          issue.code === 'pending-validation' ||
+          !issue.sourceKey?.startsWith(prefix)
+        ) {
+          continue;
+        }
+        const linePart = issue.sourceKey.slice(prefix.length);
+        if (!/^\d+$/.test(linePart)) continue;
+        const line = Number(linePart);
+        const list = issuesByLine.get(line) ?? [];
+        list.push(issue);
+        issuesByLine.set(line, list);
+      }
+    }
+
     for (const item of taskItems) {
       if (!item.instanceOf(HTMLElement)) continue;
       // A task-list item contains its paragraph; processing both removes the
       // badge the first pass just added. Keep the list item as the owner.
-      if (
-        item.closest('.task-list-item') &&
-        !item.matches('.task-list-item')
-      ) {
+      if (item.closest('.task-list-item') && !item.matches('.task-list-item')) {
         continue;
       }
       if (item.closest('.todoseq-embedded-task-list-container')) continue;
@@ -254,7 +288,9 @@ export class ReaderViewFormatter {
       // Re-rendering must converge on one badge per row, and a row that is no
       // longer blocked must lose the old one.
       item
-        .querySelectorAll('.todoseq-reader-blocked-badge')
+        .querySelectorAll(
+          '.todoseq-reader-blocked-badge, .todoseq-reader-issue-badge',
+        )
         .forEach((badge) => badge.remove());
 
       if (!manager) continue;
@@ -262,11 +298,7 @@ export class ReaderViewFormatter {
       // Reading mode's data-line is chunk-relative, not a source line, so the
       // parsed snapshot is the authoritative match. Rendered link text also
       // differs from [[file#^anchor]] source, hence matching task text.
-      let line = this.findTaskLineForElement(
-        item,
-        context.sourcePath,
-        context,
-      );
+      let line = this.findTaskLineForElement(item, context.sourcePath, context);
       if (line < 0) {
         const lineAttr = item.getAttribute('data-line');
         line = lineAttr !== null ? parseInt(lineAttr, 10) : NaN;
@@ -283,6 +315,28 @@ export class ReaderViewFormatter {
       seen.add(line);
 
       const key = `${context.sourcePath}:${line}`;
+      const container =
+        item.querySelector<HTMLElement>('.todoseq-task') ?? item;
+      const issues = issuesByLine.get(line);
+
+      if (issues?.length) {
+        const first = issues[0].message;
+        const detail =
+          issues.length > 1 ? `${first} (+${issues.length - 1} more)` : first;
+        const warning = createSpan({
+          cls: 'todoseq-dependency-issue-icon todoseq-reader-issue-badge',
+          attr: {
+            'data-task-key': key,
+            'aria-label': `Dependency problem: ${detail}`,
+            role: 'img',
+          },
+        });
+        setIcon(warning, 'alert-triangle');
+        setTooltip(warning, detail);
+        container.appendChild(warning);
+        continue;
+      }
+
       if (!manager.isBlocked(key)) continue;
 
       const reasons = manager.getBlockingReasons(key);
@@ -293,8 +347,6 @@ export class ReaderViewFormatter {
           : `Blocked: ${details}`
         : 'Blocked by an incomplete dependency';
 
-      const container =
-        item.querySelector<HTMLElement>('.todoseq-task') ?? item;
       const badge = createSpan({
         cls: 'todoseq-task-blocked-icon todoseq-reader-blocked-badge',
         attr: {
@@ -325,9 +377,7 @@ export class ReaderViewFormatter {
     sourcePath: string,
     context: MarkdownPostProcessorContext,
   ): number {
-    const renderedText = (item.textContent ?? '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const renderedText = (item.textContent ?? '').replace(/\s+/g, ' ').trim();
     if (!renderedText) return -1;
 
     const section = context.getSectionInfo?.(item);
@@ -410,19 +460,214 @@ export class ReaderViewFormatter {
     return -1;
   }
 
-  /** Mark a rendered properties drawer as metadata without changing text. */
-  private processPropertiesLines(element: HTMLElement): void {
-    const blocks = element.querySelectorAll<HTMLElement>('p, li');
-    blocks.forEach((block) => {
-      const text = block.textContent?.trim() ?? '';
-      if (
-        text === ':PROPERTIES:' ||
-        text === ':END:' ||
-        /^:[^:\s]+:(?:\s|$)/.test(text)
-      ) {
-        block.classList.add('todoseq-properties-line');
+  /**
+   * Style bounded task property drawers as quiet metadata.
+   *
+   * Reader mode can place several source lines in one paragraph separated by
+   * `<br>`, so a block's flat text never equals a drawer line. The drawer is
+   * split back into rendered lines instead. Only lines inside a complete
+   * `:PROPERTIES:` … `:END:` pair owned by a task are styled; a naked `:KEY:`
+   * line stays prose, matching the parser.
+   */
+  private async processPropertiesLines(
+    element: HTMLElement,
+    context?: MarkdownPostProcessorContext,
+  ): Promise<void> {
+    const parser = this.getTaskParser();
+    if (!parser || !element.textContent?.includes(':PROPERTIES:')) return;
+
+    const blocks = Array.from(
+      element.querySelectorAll<HTMLElement>('p, li, td'),
+    );
+    let inDrawer = false;
+    let sawTaskLine = false;
+    const segments: Array<{
+      node: Text;
+      from: number;
+      to: number;
+      cls: string;
+      entry: boolean;
+    }> = [];
+
+    for (const block of blocks) {
+      // Outer containers are covered when their nested block is processed.
+      const hasNestedDrawer = Array.from(
+        block.querySelectorAll<HTMLElement>('p, li, td'),
+      ).some((nested) => nested.textContent?.includes(':PROPERTIES:'));
+      if (hasNestedDrawer) continue;
+      if (block.querySelector('.todoseq-properties-line')) continue;
+
+      for (const line of this.collectRenderedLines(block)) {
+        const text = line.text.trim();
+        const addRange = (
+          start: number,
+          end: number,
+          cls: string,
+          entry: boolean,
+        ): void => {
+          for (const part of line.parts) {
+            const from = Math.max(start, part.offset);
+            const to = Math.min(end, part.offset + part.text.length);
+            if (from >= to) continue;
+            segments.push({
+              node: part.node,
+              from: part.nodeStart + from - part.offset,
+              to: part.nodeStart + to - part.offset,
+              cls,
+              entry,
+            });
+          }
+        };
+
+        if (!inDrawer) {
+          if (parser.testRegex.test(text)) {
+            sawTaskLine = true;
+            continue;
+          }
+          if (text !== ':PROPERTIES:') continue;
+
+          const ownedByTask =
+            sawTaskLine ||
+            (await this.hasPrecedingTaskAsync(
+              block as HTMLParagraphElement,
+              context,
+            ));
+          if (!ownedByTask) continue;
+          inDrawer = true;
+          addRange(0, line.text.length, 'todoseq-properties-line', false);
+          continue;
+        }
+
+        if (!text) continue;
+        if (text === ':END:') {
+          inDrawer = false;
+          addRange(0, line.text.length, 'todoseq-properties-line', false);
+          continue;
+        }
+
+        const quote = /^(?:>\s*)+/.exec(text);
+        const stripped = quote ? text.slice(quote[0].length) : text;
+        const keyEnd = stripped.indexOf(':', 1);
+        if (keyEnd < 0 || !stripped.startsWith(':')) {
+          inDrawer = false;
+          continue;
+        }
+        const keyStart =
+          line.text.length -
+          line.text.trimStart().length +
+          (quote ? quote[0].length : 0);
+        addRange(
+          keyStart,
+          keyStart + keyEnd + 1,
+          'todoseq-properties-line todoseq-properties-key',
+          true,
+        );
+        addRange(
+          keyStart + keyEnd + 1,
+          line.text.length,
+          'todoseq-properties-line',
+          true,
+        );
       }
-    });
+    }
+
+    // Apply right-to-left so earlier offsets in a shared text node stay valid.
+    segments
+      .sort((a, b) => b.from - a.from)
+      .forEach((segment) => {
+        this.wrapTextRange(
+          segment.node,
+          segment.from,
+          segment.to,
+          segment.cls,
+          {
+            'data-properties-line': segment.entry ? 'entry' : 'boundary',
+            'aria-label': 'task properties',
+            role: 'note',
+          },
+        );
+      });
+  }
+
+  /**
+   * Split a block into rendered lines, treating `<br>` and newlines as line
+   * breaks, and keep each line's text-node spans so it can be styled.
+   */
+  private collectRenderedLines(block: HTMLElement): RenderedPropertyLine[] {
+    const lines: RenderedPropertyLine[] = [];
+    let current: RenderedPropertyLine = { text: '', parts: [] };
+    const flush = (): void => {
+      lines.push(current);
+      current = { text: '', parts: [] };
+    };
+
+    const walk = (parent: Node): void => {
+      parent.childNodes.forEach((child) => {
+        if (child.nodeType === Node.TEXT_NODE) {
+          const nodeText = child.textContent ?? '';
+          const pieces = nodeText.split('\n');
+          let nodeStart = 0;
+          pieces.forEach((piece, index) => {
+            if (index > 0) flush();
+            if (piece) {
+              current.parts.push({
+                node: child as Text,
+                nodeStart,
+                offset: current.text.length,
+                text: piece,
+              });
+              current.text += piece;
+            }
+            nodeStart += piece.length + (index < pieces.length - 1 ? 1 : 0);
+          });
+        } else if (child.nodeName === 'BR') {
+          flush();
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          walk(child);
+        }
+      });
+    };
+
+    walk(block);
+    flush();
+    return lines;
+  }
+
+  /** Wrap a character range of one text node in a classed span. */
+  private wrapTextRange(
+    node: Text,
+    from: number,
+    to: number,
+    cls: string,
+    attrs: Record<string, string>,
+  ): void {
+    const text = node.textContent ?? '';
+    const parent = node.parentNode;
+    if (!parent) return;
+
+    if (from <= 0 && to >= text.length) {
+      const span = createSpan({ cls, attr: attrs });
+      span.textContent = text;
+      parent.replaceChild(span, node);
+      return;
+    }
+
+    const before = text.slice(0, from);
+    const middle = text.slice(from, to);
+    const after = text.slice(to);
+    if (!middle) return;
+
+    const span = createSpan({ cls, attr: attrs });
+    span.textContent = middle;
+    if (after) {
+      parent.insertBefore(
+        node.ownerDocument.createTextNode(after),
+        node.nextSibling,
+      );
+    }
+    parent.insertBefore(span, node.nextSibling);
+    if (before) node.textContent = before;
+    else parent.removeChild(node);
   }
 
   /**
