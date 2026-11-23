@@ -1,4 +1,5 @@
 import type { TaskDependencyManager } from '../../services/task-dependency-manager';
+import { getIssueKindLabel } from './task-issues';
 
 export type DependencyMarkerKind = 'issue' | 'blocked';
 
@@ -25,10 +26,16 @@ export function resolveDependencyMarker(
     .getIssuesForTask(taskKey)
     .filter((issue) => issue.code !== 'pending-validation');
   if (issues.length > 0) {
-    const first = issues[0].message;
+    const first = issues[0];
     const details =
-      issues.length > 1 ? `${first} (+${issues.length - 1} more)` : first;
-    return { kind: 'issue', label: `Dependency problem: ${details}`, details };
+      issues.length > 1
+        ? `${first.message} (+${issues.length - 1} more)`
+        : first.message;
+    return {
+      kind: 'issue',
+      label: `${getIssueKindLabel(first)}: ${details}`,
+      details,
+    };
   }
 
   if (!manager.isBlocked(taskKey)) return null;

@@ -7,12 +7,7 @@
  */
 
 import { ReaderViewFormatter } from '../src/view/markdown-renderers/reader-formatting';
-import { TaskDependencyWarningService } from '../src/services/task-dependency-warning-service';
-import type { TaskDependencyManager } from '../src/services/task-dependency-manager';
-import type {
-  DependencyIssue,
-  DependencySnapshot,
-} from '../src/types/task-dependency';
+import type { DependencyIssue } from '../src/types/task-dependency';
 import {
   createBaseSettings,
   createBaseTask,
@@ -29,6 +24,7 @@ function createIssue(
   fingerprint: string,
   message: string,
   sourceKey = 'blocked.md:0',
+  options: Partial<DependencyIssue> = {},
 ): DependencyIssue {
   return {
     code: 'missing-reference',
@@ -36,27 +32,8 @@ function createIssue(
     message,
     sourceKey,
     reference: '^missing',
+    ...options,
   };
-}
-
-function createWarningManager(
-  issues: DependencyIssue[],
-  options: { ready?: boolean; validationReady?: boolean } = {},
-): TaskDependencyManager {
-  const ready = options.ready ?? true;
-  const validationReady = options.validationReady ?? true;
-  return {
-    isValidationReady: jest.fn(() => validationReady),
-    getSnapshot: jest.fn((): DependencySnapshot => ({
-      revision: 1,
-      ready,
-      blocked: new Set(),
-      reasonsByKey: new Map(),
-      issues,
-      issuesByKey: new Map(),
-      blockedKeys: [],
-    })),
-  } as unknown as TaskDependencyManager;
 }
 
 function createReaderHarness() {
@@ -258,6 +235,26 @@ describe('reader blocked badge', () => {
     );
   });
 
+  it('labels a property diagnostic without prefixing the tooltip', async () => {
+    const { formatter, manager } = createReaderHarness();
+    manager.getIssues.mockReturnValue([
+      createIssue('duplicate-id', 'ID is declared twice.', 'blocked.md:0', {
+        kind: 'property',
+      }),
+    ]);
+    const root = renderRows();
+
+    await (
+      formatter as unknown as { processDependencyMarkers: ProcessMarkers }
+    ).processDependencyMarkers(root, { sourcePath: 'blocked.md' });
+
+    const warning = root.querySelector('.todoseq-reader-issue-badge');
+    expect(warning?.getAttribute('aria-label')).toBe(
+      'Property problem: ID is declared twice.',
+    );
+    expect(warning?.getAttribute('title')).toBe('ID is declared twice.');
+  });
+
   it('keeps the badge before a property drawer that follows the task', async () => {
     const { formatter } = createReaderHarness();
     const root = renderRows();
@@ -313,118 +310,5 @@ describe('reader blocked badge', () => {
     expect(root.querySelectorAll('.todoseq-reader-blocked-badge')).toHaveLength(
       1,
     );
-  });
-});
-
-describe('dependency warning notice', () => {
-  it('notifies once for the same non-empty issue set', () => {
-    const issues = [createIssue('missing:a', 'Dependency missing.')];
-    const manager = createWarningManager(issues);
-    const notify = jest.fn();
-    const debug = jest.fn();
-    const service = new TaskDependencyWarningService(manager, notify, debug);
-
-    expect(service.check()).toBe(true);
-    expect(service.check()).toBe(false);
-    expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledWith('Dependency missing. (blocked.md:1)');
-    expect(debug).toHaveBeenCalled();
-  });
-
-  it('notifies for a changed set and caps the text', () => {
-    const manager = createWarningManager([
-      createIssue('missing:a', 'Dependency missing.'),
-      createIssue('cycle:b', 'Task dependency cycle detected.'),
-    ]);
-    const notify = jest.fn();
-    const service = new TaskDependencyWarningService(manager, notify);
-
-    service.check();
-
-    expect(notify).toHaveBeenCalledWith(
-      'Dependency missing. (+1 more) (blocked.md:1)',
-    );
-  });
-
-  it('stays silent for an empty set and notifies again on relapse', () => {
-    const issue = createIssue('missing:a', 'Dependency missing.');
-    const manager = createWarningManager([]);
-    const notify = jest.fn();
-    const service = new TaskDependencyWarningService(manager, notify);
-
-    expect(service.check()).toBe(false);
-    manager.getSnapshot = jest.fn((): DependencySnapshot => ({
-      revision: 2,
-      ready: true,
-      blocked: new Set(),
-      reasonsByKey: new Map(),
-      issues: [issue],
-      issuesByKey: new Map(),
-      blockedKeys: [],
-    }));
-
-    expect(service.check()).toBe(true);
-    expect(notify).toHaveBeenCalledTimes(1);
-    expect(service.check()).toBe(false);
-  });
-
-  it('never notifies during indexing or while the snapshot is not ready', () => {
-    const indexing = createWarningManager(
-      [createIssue('missing:a', 'Dependency missing.')],
-      { validationReady: false },
-    );
-    const notReady = createWarningManager(
-      [createIssue('missing:a', 'Dependency missing.')],
-      { ready: false },
-    );
-    const notify = jest.fn();
-
-    expect(new TaskDependencyWarningService(indexing, notify).check()).toBe(
-      false,
-    );
-    expect(new TaskDependencyWarningService(notReady, notify).check()).toBe(
-      false,
-    );
-    expect(notify).not.toHaveBeenCalled();
-  });
-
-  it('names the source file and one-based line', () => {
-    const manager = createWarningManager([
-      createIssue('missing:a', 'Dependency missing.', 'blocked.md:4'),
-    ]);
-    const notify = jest.fn();
-
-    new TaskDependencyWarningService(manager, notify).check();
-
-    expect(notify).toHaveBeenCalledWith('Dependency missing. (blocked.md:5)');
-  });
-
-  it('names the line, not the cell, for a table task', () => {
-    const manager = createWarningManager([
-      createIssue('missing:a', 'Dependency missing.', 'board.md:4:2'),
-    ]);
-    const notify = jest.fn();
-
-    new TaskDependencyWarningService(manager, notify).check();
-
-    expect(notify).toHaveBeenCalledWith('Dependency missing. (board.md:5)');
-    expect(notify).not.toHaveBeenCalledWith(
-      expect.stringContaining('board.md:4:3'),
-    );
-  });
-
-  it('leaves the message unchanged when the issue has no source', () => {
-    const manager = createWarningManager([
-      {
-        ...createIssue('missing:a', 'Dependency missing.'),
-        sourceKey: undefined,
-      },
-    ]);
-    const notify = jest.fn();
-
-    new TaskDependencyWarningService(manager, notify).check();
-
-    expect(notify).toHaveBeenCalledWith('Dependency missing.');
-    expect(notify).not.toHaveBeenCalledWith(expect.stringContaining('()'));
   });
 });

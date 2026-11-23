@@ -28,6 +28,8 @@ export interface DependencyReason {
 
 export interface DependencyIssue {
   code: DependencyReasonCode;
+  /** Where the diagnostic came from; undefined means dependency graph. */
+  kind?: 'property' | 'dependency';
   fingerprint: string;
   message: string;
   sourceKey?: string;

@@ -58,6 +58,32 @@ describe('resolveDependencyMarker', () => {
     );
   });
 
+  it('uses the property label for a property issue', () => {
+    const marker = resolveDependencyMarker(
+      managerFor({
+        issues: [issue('ID is declared twice.', { kind: 'property' })],
+      }),
+      'a.md:0',
+    );
+    expect(marker).toEqual(
+      expect.objectContaining({
+        kind: 'issue',
+        label: 'Property problem: ID is declared twice.',
+        details: 'ID is declared twice.',
+      }),
+    );
+  });
+
+  it('uses the dependency label for an explicit dependency issue', () => {
+    const marker = resolveDependencyMarker(
+      managerFor({
+        issues: [issue('Cycle detected.', { kind: 'dependency' })],
+      }),
+      'a.md:0',
+    );
+    expect(marker?.label).toBe('Dependency problem: Cycle detected.');
+  });
+
   it('counts remaining issues in the label and details', () => {
     const marker = resolveDependencyMarker(
       managerFor({

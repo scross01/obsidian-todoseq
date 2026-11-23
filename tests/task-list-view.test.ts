@@ -16,6 +16,8 @@ import {
 import { Task } from '../src/types/task';
 import { createSavedSearch } from '../src/services/saved-search-manager';
 import { Search } from '../src/search/search';
+import type { DependencyIssue } from '../src/types/task-dependency';
+import { Notice } from 'obsidian';
 
 // Mock obsidian
 jest.mock('obsidian', () => ({
@@ -47,6 +49,7 @@ jest.mock('obsidian', () => ({
   Platform: { isMobile: false, isMacOS: false },
   MarkdownView: jest.fn(),
   setIcon: jest.fn(),
+  setTooltip: jest.fn(),
   Notice: jest.fn(),
   Menu: jest.fn().mockImplementation(() => ({
     addItem: jest.fn().mockReturnThis(),
@@ -864,6 +867,136 @@ describe('TaskListView', () => {
     it('should not throw when taskContextMenu is null', () => {
       view['taskContextMenu'] = null;
       expect(() => view.updateContextMenuConfig()).not.toThrow();
+    });
+  });
+
+  describe('task issues surface', () => {
+    function issue(overrides: Partial<DependencyIssue> = {}): DependencyIssue {
+      return {
+        code: 'missing-reference',
+        fingerprint: 'issue',
+        message: 'Dependency missing.',
+        sourceKey: 'test1.md:0',
+        ...overrides,
+      };
+    }
+
+    function managerWith(
+      issues: DependencyIssue[],
+      options: { validationReady?: boolean; ready?: boolean } = {},
+    ): Record<string, unknown> {
+      return {
+        getIssues: jest.fn(() => issues),
+        isValidationReady: jest.fn(() => options.validationReady ?? true),
+        getSnapshot: jest.fn(() => ({ ready: options.ready ?? true })),
+      };
+    }
+
+    function mountSurface(manager: Record<string, unknown>): void {
+      pluginMock.taskDependencyManager = manager;
+      if (!view.contentEl.isConnected) {
+        activeDocument.body.appendChild(view.contentEl);
+      }
+      view.contentEl.empty();
+      view['buildToolbar'](view.contentEl);
+      view['refreshIssuesSurface'](view.contentEl);
+    }
+
+    afterEach(() => {
+      view.contentEl.remove();
+    });
+
+    function getIndicator(): HTMLElement {
+      return view.contentEl.querySelector<HTMLElement>(
+        '.todoseq-issues-indicator',
+      )!;
+    }
+
+    function getPanel(): HTMLElement {
+      return view.contentEl.querySelector<HTMLElement>(
+        '.todoseq-issues-panel',
+      )!;
+    }
+
+    it('shows a quiet count and opens a source-linked panel', () => {
+      const property = issue({
+        kind: 'property',
+        fingerprint: 'property',
+        message: 'ID is declared twice.',
+      });
+      const dependency = issue({
+        fingerprint: 'dependency',
+        message: 'Dependency missing.',
+        sourceKey: 'test1.md:0',
+      });
+      mountSurface(managerWith([property, dependency]));
+
+      const indicator = getIndicator();
+      expect(indicator.hasClass('todoseq-hidden')).toBe(false);
+      expect(indicator.textContent).toContain('Issues');
+      expect(
+        indicator.querySelector('.todoseq-issues-count')?.textContent,
+      ).toBe('2');
+      expect(indicator.getAttribute('aria-label')).toBe('Show 2 issues');
+
+      indicator.click();
+
+      const panel = getPanel();
+      expect(panel.hasClass('todoseq-hidden')).toBe(false);
+      expect(panel.querySelector('.todoseq-issues-title')?.textContent).toBe(
+        'Task issues',
+      );
+      expect(panel.querySelector('.todoseq-issues-close')).not.toBeNull();
+
+      const rows = Array.from(
+        panel.querySelectorAll<HTMLElement>('.todoseq-issue-row'),
+      );
+      expect(rows).toHaveLength(2);
+      expect(rows[0].textContent).toContain('Property problem');
+      expect(rows[0].textContent).toContain('ID is declared twice.');
+      expect(rows[1].textContent).toContain('Dependency problem');
+      expect(rows[0].getAttribute('aria-label')).toContain(
+        'ID is declared twice.',
+      );
+      expect(rows[0].getAttribute('aria-label')).toContain('test1.md:1');
+
+      const close = panel.querySelector<HTMLElement>('.todoseq-issues-close')!;
+      close.click();
+      expect(panel.hasClass('todoseq-hidden')).toBe(true);
+      expect(document.activeElement).toBe(indicator);
+      expect(Notice).not.toHaveBeenCalled();
+    });
+
+    it('shows an explanatory empty state and keeps the indicator hidden', async () => {
+      mountSurface(managerWith([]));
+      expect(getIndicator().hasClass('todoseq-hidden')).toBe(true);
+
+      await view.showTaskIssues();
+
+      expect(getPanel().textContent).toContain('No task issues.');
+      expect(getPanel().textContent).toContain('Invalid properties');
+      expect(Notice).not.toHaveBeenCalled();
+    });
+
+    it('shows the checking state while validation is not ready', async () => {
+      mountSurface(managerWith([], { validationReady: false }));
+
+      await view.showTaskIssues();
+
+      expect(getPanel().textContent).toContain('Checking task diagnostics…');
+    });
+
+    it('restores focus when an open panel is refreshed', async () => {
+      mountSurface(managerWith([issue()]));
+      getIndicator().click();
+      const close = getPanel().querySelector<HTMLElement>(
+        '.todoseq-issues-close',
+      )!;
+      close.focus();
+
+      view['refreshIssuesSurface'](view.contentEl);
+
+      expect(document.activeElement).toBe(getPanel());
     });
   });
 

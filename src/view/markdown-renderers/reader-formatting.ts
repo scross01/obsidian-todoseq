@@ -25,6 +25,7 @@ import {
 } from '../../services/task-update-coordinator';
 import { getTableCellIndex } from '../../utils/task-line-utils';
 import { resolveDependencyMarker } from '../components/dependency-marker';
+import { getIssueKindLabel } from '../components/task-issues';
 
 /** One text-node piece of a rendered source line inside a block. */
 interface RenderedPropertyLinePart {
@@ -350,7 +351,7 @@ export class ReaderViewFormatter {
           cls: 'todoseq-dependency-issue-icon todoseq-reader-issue-badge',
           attr: {
             'data-task-key': key,
-            'aria-label': `Dependency problem: ${detail}`,
+            'aria-label': `${getIssueKindLabel(issues[0] ?? {})}: ${detail}`,
             role: 'img',
           },
         });

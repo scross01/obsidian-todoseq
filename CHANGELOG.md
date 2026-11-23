@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Task property and dependency problems no longer interrupt editing with repeated notices. They remain visible on the affected task and in a new issue count in the Task List, which opens the full list.
 - Keywords and completed tasks now use the theme's readable text colors, so they stay legible in both light and dark themes without changing the task state.
 - Blocked-task messages now state the problem and next step once, and blocked: searches explain invalid values or when blocked status is still loading.
 - Blocked and dependency-warning markers now update when a `BLOCKER` property is added or removed, including property-only edits, without waiting for another edit.

@@ -318,6 +318,7 @@ export class TaskDependencyManager {
       for (const propertyIssue of task.propertyIssues ?? []) {
         issues.push({
           code: 'invalid-reference',
+          kind: 'property',
           fingerprint: `property:${getTaskKey(task)}:${propertyIssue.code}:${propertyIssue.line}:${propertyIssue.reference ?? propertyIssue.key ?? ''}`,
           message: propertyIssue.message,
           sourceKey: getTaskKey(task),

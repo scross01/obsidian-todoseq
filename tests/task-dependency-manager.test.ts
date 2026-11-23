@@ -326,6 +326,7 @@ describe('TaskDependencyManager', () => {
       expect.arrayContaining([
         expect.objectContaining({
           code: 'invalid-reference',
+          kind: 'property',
           message: 'ID is declared twice.',
         }),
       ]),

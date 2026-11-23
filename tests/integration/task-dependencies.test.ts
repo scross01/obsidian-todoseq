@@ -670,4 +670,61 @@ test.describe('task dependencies', () => {
     const drawerSource = (await readVaultDiskFile(page, CLIPBOARD_FILE)) ?? '';
     expect(drawerSource.split(drawerAnchor).length - 1).toBe(1);
   });
+
+  test('property edits update the issue count without a diagnostic notice', async () => {
+    await writeDependencyFixture(dependentBody());
+    await openFileInEditor(page, 'dependency-dependent');
+
+    const noticesBefore = await page.locator('.notice').allTextContents();
+
+    await page.evaluate(async () => {
+      const app = (window as any).app;
+      const editor = app.workspace.activeLeaf?.view?.editor;
+      if (!editor) throw new Error('No active editor');
+      const lines = (editor.getValue() as string).split('\n');
+      const line = lines.findIndex((candidate: string) =>
+        candidate.includes(':BLOCKER:'),
+      );
+      if (line < 0) throw new Error('BLOCKER line not found');
+
+      for (const value of [
+        '[[dependency-blocker#^missing',
+        '[[dependency-blocker#^missing]',
+        '[[dependency-blocker#^missing]]',
+      ]) {
+        editor.setLine(line, `  :BLOCKER: ${value}`);
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    });
+
+    await page.waitForTimeout(800);
+    const noticesAfter = await page.locator('.notice').allTextContents();
+    const newNotices = noticesAfter.filter(
+      (text) => !noticesBefore.includes(text),
+    );
+    expect(newNotices.join('\n')).not.toMatch(
+      /Dependency problem|Property problem|not found/i,
+    );
+
+    await openTodoseqPanel(page);
+    const indicator = page.locator(
+      '.workspace-leaf.mod-active .todoseq-issues-indicator',
+    );
+    await expect(indicator).toBeVisible({ timeout: 10_000 });
+    await expect(indicator).toContainText('Issues');
+    await expect(indicator.locator('.todoseq-issues-count')).toHaveText('1');
+
+    await indicator.click();
+    const panel = page.locator(
+      '.workspace-leaf.mod-active .todoseq-issues-panel',
+    );
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('.todoseq-issue-row')).toHaveCount(1);
+    await expect(panel.locator('.todoseq-issue-row').first()).toContainText(
+      'Dependency problem',
+    );
+
+    await panel.locator('.todoseq-issues-close').click();
+    await expect(panel).toBeHidden();
+  });
 });

@@ -22,7 +22,6 @@ import { ReaderViewFormatter } from './view/markdown-renderers/reader-formatting
 import { PropertySearchEngine } from './services/property-search-engine';
 import { EventCoordinator } from './services/event-coordinator';
 import { TaskDependencyManager } from './services/task-dependency-manager';
-import { TaskDependencyWarningService } from './services/task-dependency-warning-service';
 import { TaskUpdateCoordinator } from './services/task-update-coordinator';
 import {
   ArchiveService,
@@ -49,7 +48,6 @@ export class PluginLifecycleManager {
   private dependencyRefreshTimer: number | null = null;
   /** Bridges task-state publications to the debounced dependency refresh. */
   private taskStateUnsubscribe: (() => void) | null = null;
-  private dependencyWarningService: TaskDependencyWarningService | null = null;
 
   constructor(private plugin: TodoTracker) {}
 
@@ -130,10 +128,6 @@ export class PluginLifecycleManager {
         onSnapshot: () => this.scheduleDependencySurfaceRefresh(),
       },
     );
-    this.dependencyWarningService = new TaskDependencyWarningService(
-      this.plugin.taskDependencyManager,
-    );
-
     // The dependency graph rebuilds lazily on read. A document edit publishes
     // its tasks after the editor has already rebuilt decorations, so bridge
     // that publication to the debounced surface refresh. Otherwise a newly
@@ -257,6 +251,27 @@ export class PluginLifecycleManager {
       name: 'Show task list',
       icon: 'list-todo',
       callback: () => this.plugin.uiManager.showTasks(),
+    });
+
+    // Add command to open the Task List and reveal its issue panel.
+    this.plugin.addCommand({
+      id: 'show-task-issues',
+      name: 'Show task issues',
+      icon: 'alert-triangle',
+      callback: () => {
+        void this.plugin.uiManager.showTasks().then(() => {
+          const leaves = this.plugin.app.workspace.getLeavesOfType(
+            TaskListView.viewType,
+          );
+          const view = leaves
+            .map((leaf) => leaf.view)
+            .find(
+              (candidate): candidate is TaskListView =>
+                candidate instanceof TaskListView,
+            );
+          if (view) void view.showTaskIssues();
+        });
+      },
     });
 
     // Add command to show tasks in a new tab
@@ -650,8 +665,6 @@ export class PluginLifecycleManager {
       this.plugin.taskDependencyManager?.setValidationReady(true);
       // Use setTimeout to ensure tasks are fully set in TaskStateManager before refreshing
       window.setTimeout(() => {
-        // Surface changed diagnostics once the authoritative publication exists.
-        this.dependencyWarningService?.check();
         // Explicitly refresh the TaskListView to ensure it updates
         this.plugin.uiManager.refreshOpenTaskListViews().catch((error) => {
           new Notice('Failed to refresh task list');
@@ -797,8 +810,6 @@ export class PluginLifecycleManager {
       window.clearTimeout(this.dependencyRefreshTimer);
       this.dependencyRefreshTimer = null;
     }
-    this.dependencyWarningService?.reset();
-    this.dependencyWarningService = null;
     this.plugin.taskDependencyManager?.destroy();
     this.plugin.taskDependencyManager = null;
     if (this.plugin.taskUpdateCoordinator) {
@@ -1020,7 +1031,6 @@ export class PluginLifecycleManager {
         this.dependencyRefreshTimer = null;
       }
 
-      this.dependencyWarningService?.check();
       this.plugin.uiManager
         ?.refreshOpenTaskListViews?.()
         .catch((error: unknown) => {

@@ -13,6 +13,7 @@ import { getPriorityLevelName } from '../../utils/task-format';
 import { editorInfoField, setIcon, setTooltip } from 'obsidian';
 import type { DependencyIssue } from '../../types/task-dependency';
 import type { TaskDependencyManager } from '../../services/task-dependency-manager';
+import { getIssueKindLabel } from '../components/task-issues';
 import {
   CODE_BLOCK_REGEX,
   COMMENT_BLOCK_REGEX,
@@ -114,7 +115,8 @@ export class DependencyIssueWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const first = this.issues[0]?.message ?? 'Dependency problem';
+    const firstIssue = this.issues[0];
+    const first = firstIssue?.message ?? 'Dependency problem';
     const label =
       this.issues.length > 1
         ? `${first} (+${this.issues.length - 1} more)`
@@ -123,7 +125,7 @@ export class DependencyIssueWidget extends WidgetType {
       cls: 'todoseq-dependency-issue-icon todoseq-editor-issue-badge',
       attr: {
         'data-task-key': this.taskKey,
-        'aria-label': `Dependency problem: ${label}`,
+        'aria-label': `${getIssueKindLabel(firstIssue ?? {})}: ${label}`,
         role: 'img',
       },
     });
