@@ -24,13 +24,10 @@ import {
   isTableRow,
   getCellTaskLine,
 } from '../utils/task-line-utils';
-import {
-  appendBlockAnchor,
-  splitTrailingBlockAnchor,
-} from '../utils/block-anchor';
+import { splitTrailingBlockAnchor } from '../utils/block-anchor';
 import {
   findTaskBlockAnchor,
-  findTaskBlockEndLine,
+  relocateBlockAnchorInEditor,
 } from '../utils/task-block-anchor';
 import { TaskContextMenu } from '../view/components/task-context-menu';
 import {
@@ -826,7 +823,12 @@ export class EditorController {
     );
 
     if (task) {
-      this.relocateBlockAnchor(editor, task, taskLineAnchor);
+      relocateBlockAnchorInEditor(
+        editor,
+        task.line,
+        getTaskIndent(task),
+        taskLineAnchor,
+      );
     }
 
     // Position the cursor inside the description, before any suffix the
@@ -1115,47 +1117,6 @@ export class EditorController {
   }
 
   /**
-   * Move a captured block anchor to the resulting block end. Metadata writes
-   * in this controller bypass TaskWriter, so preservation happens here.
-   */
-  private relocateBlockAnchor(
-    editor: Editor,
-    task: Task,
-    anchor: string | null,
-  ): void {
-    if (!anchor) return;
-    const indent = getTaskIndent(task);
-    const replaceLine = (index: number, text: string): void => {
-      editor.replaceRange(
-        text,
-        { line: index, ch: 0 },
-        { line: index, ch: editor.getLine(index).length },
-      );
-    };
-    const end = findTaskBlockEndLine(
-      this.editorLines(editor),
-      task.line,
-      indent,
-    );
-    for (let i = task.line; i <= end; i++) {
-      const split = splitTrailingBlockAnchor(editor.getLine(i) ?? '');
-      if (split.anchor === anchor) {
-        replaceLine(i, split.text);
-        break;
-      }
-    }
-    const newEnd = findTaskBlockEndLine(
-      this.editorLines(editor),
-      task.line,
-      indent,
-    );
-    replaceLine(
-      newEnd,
-      appendBlockAnchor(editor.getLine(newEnd) ?? '', anchor),
-    );
-  }
-
-  /**
    * Insert a new date line at the appropriate position
    * @param editor - The editor instance
    * @param taskLineNumber - The task line number
@@ -1262,7 +1223,12 @@ export class EditorController {
     }
 
     if (task) {
-      this.relocateBlockAnchor(editor, task, taskLineAnchor);
+      relocateBlockAnchorInEditor(
+        editor,
+        task.line,
+        getTaskIndent(task),
+        taskLineAnchor,
+      );
     }
     this.moveCursorToDateLine(editor, insertLine);
   }

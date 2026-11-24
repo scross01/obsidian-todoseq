@@ -27,6 +27,11 @@ export interface TaskReferenceRepairOutcome {
   failedEdits: TaskReferenceEdit[];
 }
 
+export interface TaskReferenceScanResult {
+  edits: TaskReferenceEdit[];
+  unreadable: string[];
+}
+
 function normalizePath(path: string): string {
   return path
     .replace(/\\/g, '/')
@@ -47,12 +52,19 @@ export class TaskReferenceService {
 
   async collectAnchorReferences(options: {
     sourcePath: string;
-    anchor: string;
+    anchors: readonly string[];
     destinationPath: string;
-  }): Promise<TaskReferenceEdit[]> {
+  }): Promise<TaskReferenceScanResult> {
     const destinationTarget = normalizePath(options.destinationPath);
+    const anchorSet = new Set(
+      options.anchors.map((anchor) => anchor.replace(/^\^/, '')),
+    );
     const edits: TaskReferenceEdit[] = [];
+    const unreadable: string[] = [];
+    if (anchorSet.size === 0) return { edits, unreadable };
 
+    // One vault pass covers every anchor in the transferred block, including
+    // nested task anchors, instead of re-reading the vault once per anchor.
     for (const file of this.listTextFiles()) {
       // The two notes a transfer just changed must be read fresh: the cache can
       // still describe the pre-transfer file while our own write settles.
@@ -60,16 +72,18 @@ export class TaskReferenceService {
         file.path === options.sourcePath ||
         file.path === options.destinationPath;
       const text = await this.readText(file, fresh);
+      if (text === null) {
+        unreadable.push(file.path);
+        continue;
+      }
       if (!text.includes('[[')) continue;
       const lines = text.split('\n');
       for (let line = 0; line < lines.length; line++) {
         if (!lines[line].includes('[[')) continue;
         for (const token of findWikiLinks(lines[line])) {
           if (!token.anchor || !token.anchor.startsWith('^')) continue;
-          if (token.anchor.slice(1) !== options.anchor) continue;
-          if (
-            !this.resolvesTo(token.target, file.path, options.sourcePath)
-          ) {
+          if (!anchorSet.has(token.anchor.slice(1))) continue;
+          if (!this.resolvesTo(token.target, file.path, options.sourcePath)) {
             continue;
           }
           const replacement = buildWikiLink(
@@ -89,7 +103,7 @@ export class TaskReferenceService {
       }
     }
 
-    return edits;
+    return { edits, unreadable };
   }
 
   /**
@@ -220,7 +234,7 @@ export class TaskReferenceService {
     return view.editor ?? null;
   }
 
-  private async readText(file: TFile, fresh = false): Promise<string> {
+  private async readText(file: TFile, fresh = false): Promise<string | null> {
     try {
       const editor = this.getEditor(file);
       if (editor) {
@@ -235,7 +249,7 @@ export class TaskReferenceService {
         ? this.app.vault.cachedRead(file)
         : this.app.vault.read(file));
     } catch {
-      return '';
+      return null;
     }
   }
 
@@ -252,10 +266,7 @@ export class TaskReferenceService {
           ) => { path: string } | null;
         }
       | undefined;
-    const resolved = cache?.getFirstLinkpathDest?.(
-      linkTarget,
-      linkSourcePath,
-    );
+    const resolved = cache?.getFirstLinkpathDest?.(linkTarget, linkSourcePath);
     if (resolved?.path) return resolved.path === expectedPath;
 
     const target = normalizePath(linkTarget);

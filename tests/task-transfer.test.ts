@@ -350,6 +350,47 @@ describe('TaskWriter transfers', () => {
     expect(h.store.get(DEST)).toContain(':ID: water-1');
   });
 
+  it('migrates nested task identity out of the retained source', async () => {
+    const source = [
+      'Intro',
+      '',
+      '- [ ] TODO Parent ^parent',
+      '  :PROPERTIES:',
+      '  :ID: parent-1',
+      '  :END:',
+      '  - [ ] TODO Child ^child',
+      '    :PROPERTIES:',
+      '    :ID: child-1',
+      '    :END:',
+      '',
+    ].join('\n');
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+
+    const result = await h.writer.transferTask(
+      task({
+        line: 2,
+        text: 'Parent',
+        rawText: '- [ ] TODO Parent ^parent',
+      }),
+      h.file(DEST),
+      'migrate',
+    );
+
+    expect(result.status).toBe('success');
+    const retained = h.store.get(SOURCE) ?? '';
+    expect(retained).toContain('- [ ] DONE Parent');
+    expect(retained).toContain('  - [ ] TODO Child');
+    expect(retained).not.toContain('^parent');
+    expect(retained).not.toContain('^child');
+    expect(retained).not.toContain('parent-1');
+    expect(retained).not.toContain('child-1');
+    const destination = h.store.get(DEST) ?? '';
+    expect(destination).toContain('Parent ^parent');
+    expect(destination).toContain('Child ^child');
+    expect(destination).toContain('parent-1');
+    expect(destination).toContain('child-1');
+  });
+
   it('moves a table task by clearing only its cell', async () => {
     const row = '| a\\|b | TODO Water the plants | keep |';
     const h = harness({ [SOURCE]: row + '\n', [DEST]: '' });

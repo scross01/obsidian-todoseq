@@ -13,6 +13,7 @@ import {
 import {
   findTaskBlockAnchor,
   findTaskBlockEndLine,
+  relocateBlockAnchorInEditor as relocateAnchorInEditor,
 } from '../utils/task-block-anchor';
 import { KeywordManager } from '../utils/keyword-manager';
 import { DateUtils } from '../utils/date-utils';
@@ -48,6 +49,7 @@ import { buildWikiLink, findWikiLinks } from '../utils/task-link';
 import {
   TaskReferenceEdit,
   TaskReferenceRepairReport,
+  TaskReferenceScanResult,
   TaskReferenceService,
 } from './task-reference-service';
 
@@ -338,41 +340,12 @@ export class TaskWriter {
   }
 
   /** Editor variant of relocateBlockAnchor; rewrites only the touched lines. */
-  private relocateBlockAnchorInEditor(
+  relocateBlockAnchorInEditor(
     editor: Editor,
     task: Task,
     anchor: string | null,
   ): void {
-    if (!anchor) return;
-    const indent = getTaskIndent(task);
-    const replaceLine = (index: number, text: string): void => {
-      editor.replaceRange(
-        text,
-        { line: index, ch: 0 },
-        { line: index, ch: editor.getLine(index).length },
-      );
-    };
-    const end = findTaskBlockEndLine(
-      this.editorLines(editor),
-      task.line,
-      indent,
-    );
-    for (let i = task.line; i <= end; i++) {
-      const split = splitTrailingBlockAnchor(editor.getLine(i) ?? '');
-      if (split.anchor === anchor) {
-        replaceLine(i, split.text);
-        break;
-      }
-    }
-    const newEnd = findTaskBlockEndLine(
-      this.editorLines(editor),
-      task.line,
-      indent,
-    );
-    replaceLine(
-      newEnd,
-      appendBlockAnchor(editor.getLine(newEnd) ?? '', anchor),
-    );
+    relocateAnchorInEditor(editor, task.line, getTaskIndent(task), anchor);
   }
 
   private async readSourceBlock(
@@ -1200,7 +1173,8 @@ export class TaskWriter {
       return this.removeRetainedIdentity(
         this.migrateInLines(lines, task, migrateState),
         task,
-        anchor,
+        anchors,
+        block.length,
       );
     });
     if (!changed) {
@@ -1211,23 +1185,27 @@ export class TaskWriter {
     }
 
     if (anchors.length === 0) return { status: 'success' };
-    const edits: TaskReferenceEdit[] = [];
-    for (const blockAnchor of anchors) {
-      const batch = await this.collectReferenceEdits(
-        task.path,
-        blockAnchor,
-        destination.path,
-      );
-      if (batch === null) {
-        return {
-          status: 'partial-references',
-          reason:
-            'The task was transferred, but its references could not be scanned.',
-        };
-      }
-      edits.push(...batch);
+    const scan = await this.collectReferenceEdits(
+      task.path,
+      anchors,
+      destination.path,
+    );
+    if (scan === null) {
+      return {
+        status: 'partial-references',
+        reason:
+          'The task was transferred, but its references could not be scanned.',
+      };
     }
-    return this.applyReferenceEdits(edits);
+    const outcome = await this.applyReferenceEdits(scan.edits);
+    if (scan.unreadable.length === 0) return outcome;
+    return {
+      status: 'partial-references',
+      reason: `${outcome.reason ? outcome.reason + ' ' : ''}References in ${scan.unreadable.join(
+        ', ',
+      )} could not be scanned.`,
+      referenceRepairs: outcome.referenceRepairs,
+    };
   }
 
   /** Every block anchor carried by the transferred block, including nested rows. */
@@ -1373,49 +1351,62 @@ export class TaskWriter {
   private removeRetainedIdentity(
     lines: string[],
     task: Task,
-    anchor: string | null,
+    anchors: readonly string[],
+    blockLength: number,
   ): string[] {
     const out = [...lines];
-    if (anchor) {
-      // The anchor may sit on the task line or on the block end (`:END:`),
-      // so find the line that owns it rather than assuming task.line.
-      const indent = getTaskIndent(task);
-      const end = findTaskBlockEndLine(out, task.line, indent);
-      for (let i = task.line; i <= end && i < out.length; i++) {
-        const split = splitTrailingBlockAnchor(out[i] ?? '');
-        if (split.anchor === anchor) {
-          out[i] = split.text;
-          break;
-        }
+    // The transferred block can contain nested task rows, which the parent's
+    // bounded metadata walk intentionally stops before. Use the block length
+    // so nested identities are stripped too.
+    const end = Math.min(out.length - 1, task.line + blockLength - 1);
+    const anchorSet = new Set(anchors);
+    for (let i = task.line; i <= end && i < out.length; i++) {
+      const split = splitTrailingBlockAnchor(out[i] ?? '');
+      if (split.anchor && anchorSet.has(split.anchor)) {
+        out[i] = split.text;
       }
     }
 
-    const drawer = this.findPropertiesDrawer(out, task);
-    if (!drawer || !drawer.closed) return out;
-    const idEntries = drawer.entries.filter(
-      (entry) => entry.canonicalKey === 'ID',
-    );
-    if (idEntries.length === 0) return out;
-
-    const remove = new Set(idEntries.map((entry) => entry.line));
-    if (drawer.entries.length === idEntries.length) {
-      return [
-        ...out.slice(0, drawer.startLine),
-        ...out.slice(drawer.endLine + 1),
-      ];
+    // Every ID in the transferred block moved with it, including nested task
+    // drawers. Remove them together so a retained child cannot keep a stale
+    // duplicate identity.
+    const remove = new Set<number>();
+    const format = this.propertyFormat(task);
+    for (let i = task.line; i <= end && i < out.length; i++) {
+      if (!isPropertiesDrawerStart(out[i] ?? '', format)) continue;
+      let drawerEnd = -1;
+      for (let j = i + 1; j <= end && j < out.length; j++) {
+        if (/^\s*:END:\s*$/.test(out[j] ?? '')) {
+          drawerEnd = j;
+          break;
+        }
+      }
+      if (drawerEnd < 0) continue;
+      const ids: number[] = [];
+      let hasOtherEntries = false;
+      for (let j = i + 1; j < drawerEnd; j++) {
+        if (/^\s*:ID:\s*/i.test(out[j] ?? '')) ids.push(j);
+        else if ((out[j] ?? '').trim() !== '') hasOtherEntries = true;
+      }
+      for (const line of ids) remove.add(line);
+      if (!hasOtherEntries) {
+        remove.add(i);
+        remove.add(drawerEnd);
+      }
+      i = drawerEnd;
     }
     return out.filter((_, index) => !remove.has(index));
   }
 
   private async collectReferenceEdits(
     sourcePath: string,
-    anchor: string,
+    anchors: readonly string[],
     destinationPath: string,
-  ): Promise<TaskReferenceEdit[] | null> {
+  ): Promise<TaskReferenceScanResult | null> {
     try {
       return await this.referenceService.collectAnchorReferences({
         sourcePath,
-        anchor,
+        anchors,
         destinationPath,
       });
     } catch {

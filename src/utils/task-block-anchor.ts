@@ -7,7 +7,8 @@
  * Org, table and code-comment tasks before calling these helpers.
  */
 
-import { splitTrailingBlockAnchor } from './block-anchor';
+import { Editor } from 'obsidian';
+import { appendBlockAnchor, splitTrailingBlockAnchor } from './block-anchor';
 import { buildRemovalRange } from './task-sub-bullets';
 
 /**
@@ -28,6 +29,43 @@ export function findTaskBlockEndLine(
  * end. The task-line anchor wins for legacy notes. An anchor on an
  * intermediate metadata line is ordinary text.
  */
+function editorLines(editor: Editor): string[] {
+  return Array.from({ length: editor.lineCount() }, (_, i) =>
+    editor.getLine(i),
+  );
+}
+
+/** Re-home a captured anchor on the editor's resulting block end. */
+export function relocateBlockAnchorInEditor(
+  editor: Editor,
+  taskLine: number,
+  taskIndent: string,
+  anchor: string | null,
+): void {
+  if (!anchor) return;
+  const replaceLine = (index: number, text: string): void => {
+    editor.replaceRange(
+      text,
+      { line: index, ch: 0 },
+      { line: index, ch: editor.getLine(index).length },
+    );
+  };
+  const end = findTaskBlockEndLine(editorLines(editor), taskLine, taskIndent);
+  for (let i = taskLine; i <= end; i++) {
+    const split = splitTrailingBlockAnchor(editor.getLine(i) ?? '');
+    if (split.anchor === anchor) {
+      replaceLine(i, split.text);
+      break;
+    }
+  }
+  const newEnd = findTaskBlockEndLine(
+    editorLines(editor),
+    taskLine,
+    taskIndent,
+  );
+  replaceLine(newEnd, appendBlockAnchor(editor.getLine(newEnd) ?? '', anchor));
+}
+
 export function findTaskBlockAnchor(
   lines: string[],
   taskLine: number,

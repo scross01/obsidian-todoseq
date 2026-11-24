@@ -13,15 +13,21 @@ class MemoryFile extends TFile {
   }
 }
 
-function harness(files: Record<string, string>) {
+function harness(files: Record<string, string>, unreadable: string[] = []) {
   const store = new Map(Object.entries(files));
   const app = {
     vault: {
       getAbstractFileByPath: (path: string) =>
         store.has(path) ? new MemoryFile(path) : null,
       getFiles: () => [...store.keys()].map((path) => new MemoryFile(path)),
-      read: async (file: TFile) => store.get(file.path) ?? '',
-      cachedRead: async (file: TFile) => store.get(file.path) ?? '',
+      read: async (file: TFile) => {
+        if (unreadable.includes(file.path)) throw new Error('unreadable');
+        return store.get(file.path) ?? '';
+      },
+      cachedRead: async (file: TFile) => {
+        if (unreadable.includes(file.path)) throw new Error('unreadable');
+        return store.get(file.path) ?? '';
+      },
       process: async (file: TFile, fn: (data: string) => string) => {
         const next = fn(store.get(file.path) ?? '');
         store.set(file.path, next);
@@ -72,17 +78,38 @@ describe('TaskReferenceService', () => {
       ].join('\n'),
     });
 
-    const edits = await h.service.collectAnchorReferences({
+    const scan = await h.service.collectAnchorReferences({
       sourcePath: 'notes/source.md',
-      anchor: 'water',
+      anchors: ['water'],
       destinationPath: 'notes/today.md',
     });
 
-    expect(edits).toHaveLength(2);
-    expect(edits[0].path).toBe('a.md');
-    expect(edits[0].line).toBe(0);
-    expect(edits[0].replacement).toBe('[[notes/today#^water]]');
-    expect(edits[1].replacement).toBe('[[notes/today#^water|Local]]');
+    expect(scan.edits).toHaveLength(2);
+    expect(scan.edits[0].path).toBe('a.md');
+    expect(scan.edits[0].line).toBe(0);
+    expect(scan.edits[0].replacement).toBe('[[notes/today#^water]]');
+    expect(scan.edits[1].replacement).toBe('[[notes/today#^water|Local]]');
+    expect(scan.unreadable).toEqual([]);
+  });
+
+  it('collects every block anchor in one pass and reports unreadable notes', async () => {
+    const h = harness(
+      {
+        'notes/source.md': 'TODO Moved ^water\nTODO Child ^child\n',
+        'a.md': '[[notes/source#^water]] [[notes/source#^child]]',
+        'notes/broken.md': '[[notes/source#^water]]',
+      },
+      ['notes/broken.md'],
+    );
+
+    const scan = await h.service.collectAnchorReferences({
+      sourcePath: 'notes/source.md',
+      anchors: ['water', 'child'],
+      destinationPath: 'notes/today.md',
+    });
+
+    expect(scan.edits).toHaveLength(2);
+    expect(scan.unreadable).toEqual(['notes/broken.md']);
   });
 
   it('rewrites only a line that still contains the recorded token', async () => {
