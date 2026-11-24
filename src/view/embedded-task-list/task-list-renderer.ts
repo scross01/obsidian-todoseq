@@ -149,7 +149,11 @@ export class EmbeddedTaskListRenderer {
             (total, report) => total + report.failed.length,
             0,
           ) ?? 0;
-        showReferenceRepairNotice(this.plugin.taskEditor, failed);
+        showReferenceRepairNotice(
+          this.plugin.taskEditor,
+          failed,
+          result.unreadablePaths,
+        );
         break;
       }
     }

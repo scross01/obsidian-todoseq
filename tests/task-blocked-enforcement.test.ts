@@ -213,6 +213,23 @@ describe('blocked completion enforcement', () => {
       'DONE',
       'task-list',
     );
+
+    // An unrelated scanner publication must not copy the optimistic
+    // prerequisite completion into committed dependency truth.
+    state.setTasksForPaths(
+      [
+        ...state.getTasks(),
+        createBaseTask({
+          path: 'unrelated.md',
+          line: 0,
+          id: 'unrelated',
+          text: 'Unrelated',
+          state: 'DOING',
+        }),
+      ],
+      ['unrelated.md'],
+    );
+
     const dependent = await coordinator.updateTaskState(
       blocked,
       'DONE',
@@ -324,6 +341,107 @@ describe('blocked completion enforcement', () => {
     await expect(completion).resolves.toMatchObject({ status: 'refused' });
     await first;
     expect(writer.updateTaskState).toHaveBeenCalledTimes(1);
+    coordinator.destroy();
+  });
+
+  it('refuses a repeated completion from an optimistic completed row', async () => {
+    const { blocked, blocker, coordinator, state, writer } = createFixture();
+    state.setTasks([{ ...blocker, state: 'DONE', completed: true }, blocked]);
+    const sibling = createBaseTask({
+      path: 'blocked.md',
+      line: 1,
+      id: 'sibling',
+      text: 'Sibling',
+      state: 'TODO',
+    });
+    state.addTask(sibling);
+
+    let releaseFirst = (): void => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let call = 0;
+    writer.updateTaskState.mockImplementation(
+      async (task: Task, newState: string) => {
+        call += 1;
+        if (call === 1) await firstGate;
+        return {
+          ...task,
+          state: newState,
+          completed: newState === 'DONE',
+        };
+      },
+    );
+
+    const first = coordinator.updateTaskState(sibling, 'DOING', 'task-list');
+    const completion = coordinator.updateTaskState(
+      blocked,
+      'DONE',
+      'task-list',
+    );
+    const projected = state.findTaskByPathAndLine('blocked.md', 0);
+    expect(projected?.state).toBe('DONE');
+
+    state.updateTaskByPathAndLine('blocker.md', 0, {
+      state: 'TODO',
+      completed: false,
+    });
+    state.notifySubscribers();
+
+    const repeated = await coordinator.updateTaskState(
+      projected!,
+      'DONE',
+      'task-list',
+    );
+    releaseFirst();
+
+    await expect(completion).resolves.toMatchObject({ status: 'refused' });
+    await first;
+    expect(repeated.status).toBe('refused');
+    expect(writer.updateTaskState).toHaveBeenCalledTimes(1);
+    coordinator.destroy();
+  });
+
+  it('allows a repeated completion of a committed completed task', async () => {
+    const { blocked, blocker, coordinator, state, writer } = createFixture();
+    const completed = { ...blocked, state: 'DONE', completed: true };
+    state.setTasks([
+      { ...blocker, state: 'TODO', completed: false },
+      completed,
+    ]);
+
+    const outcome = await coordinator.updateTaskState(
+      completed,
+      'DONE',
+      'task-list',
+    );
+
+    expect(outcome.status).toBe('applied');
+    expect(writer.updateTaskState).toHaveBeenCalledTimes(1);
+    coordinator.destroy();
+  });
+
+  it('allows the explicit override from a projected completed row', async () => {
+    const { blocked, blocker, coordinator, state, writer } = createFixture();
+    state.setTasks([{ ...blocker, state: 'DONE', completed: true }, blocked]);
+    await coordinator.updateTaskState(blocked, 'DONE', 'task-list');
+    const projected = state.findTaskByPathAndLine('blocked.md', 0)!;
+    state.updateTaskByPathAndLine('blocker.md', 0, {
+      state: 'TODO',
+      completed: false,
+    });
+    state.notifySubscribers();
+
+    const outcome = await coordinator.updateTask({
+      task: projected,
+      type: 'state',
+      source: 'task-list',
+      newState: 'DONE',
+      forceCompletion: true,
+    });
+
+    expect(outcome.status).toBe('applied');
+    expect(writer.updateTaskState).toHaveBeenCalledTimes(2);
     coordinator.destroy();
   });
 

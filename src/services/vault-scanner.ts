@@ -197,7 +197,10 @@ export class VaultScanner
         if (newTasks.length > 0 && !hasEmittedInitialBatch) {
           const initialTasks = this.reconcileWithCurrentState(newTasks);
           initialTasks.sort(taskComparator);
-          this.taskStateManager.setTasks(initialTasks);
+          this.taskStateManager.setTasksFromScan(
+            initialTasks,
+            this.activeScanDirtyPaths ?? [],
+          );
           // UI elements will now mount instantly while the rest of the vault continues
           // to scan invisibly in the background.
           hasEmittedInitialBatch = true;
@@ -230,7 +233,10 @@ export class VaultScanner
       // before publication: a path whose newer state was published while
       // this pass was reading must win over the scan's older snapshot.
       const reconciledTasks = this.reconcileWithCurrentState(newTasks);
-      this.taskStateManager.setTasks(reconciledTasks);
+      this.taskStateManager.setTasksFromScan(
+        reconciledTasks,
+        this.activeScanDirtyPaths ?? [],
+      );
 
       // Emit events for backward compatibility
       this.emit('tasks-changed', reconciledTasks);
@@ -538,7 +544,7 @@ export class VaultScanner
       const updatedTasks = this.taskStateManager
         .getTasks()
         .filter((task) => task.path !== filePath);
-      this.taskStateManager.setTasks(updatedTasks);
+      this.taskStateManager.setTasksForPaths(updatedTasks, [filePath]);
       this.emit('tasks-changed', updatedTasks);
       return [];
     }
@@ -556,7 +562,7 @@ export class VaultScanner
         );
         updatedTasks.push(...nonArchivedTasks);
         updatedTasks.sort(taskComparator);
-        this.taskStateManager.setTasks(updatedTasks);
+        this.taskStateManager.setTasksForPaths(updatedTasks, [filePath]);
         this.emit('tasks-changed', updatedTasks);
       }
 
@@ -630,9 +636,17 @@ export class VaultScanner
       const fileTasksBefore = currentTasks.filter(
         (task) => task.path === file.path,
       );
+      const committedBefore = this.taskStateManager
+        .getCommittedTasks()
+        .filter((task) => task.path === file.path);
 
-      // Skip update if tasks haven't actually changed (identity comparison by path, line, rawText)
-      if (this.tasksIdentical(fileTasksBefore, nonArchivedTasks)) {
+      // Skip only when both the UI projection and committed truth already
+      // match the scan. A persisted write may match the optimistic UI while
+      // committed dependency state still needs to advance.
+      if (
+        this.tasksIdentical(fileTasksBefore, nonArchivedTasks) &&
+        this.tasksIdentical(committedBefore, nonArchivedTasks)
+      ) {
         return;
       }
 
@@ -644,7 +658,7 @@ export class VaultScanner
       updatedTasks.sort(taskComparator);
 
       // Update and emit after all checks
-      this.taskStateManager.setTasks(updatedTasks);
+      this.taskStateManager.setTasksForPaths(updatedTasks, [file.path]);
       this.emit('tasks-changed', updatedTasks);
     } catch (err) {
       console.error('VaultScanner processIncrementalChange error', err);
@@ -821,7 +835,7 @@ export class VaultScanner
       );
 
       updatedTasks.sort(taskComparator);
-      this.taskStateManager.setTasks(updatedTasks);
+      this.taskStateManager.setTasksForPaths(updatedTasks, [file.path]);
       this.emit('tasks-changed', updatedTasks);
     } catch (err) {
       console.error('VaultScanner processFileDelete error', err);
@@ -857,7 +871,7 @@ export class VaultScanner
       updatedTasks.push(...renamedTasks);
 
       updatedTasks.sort(taskComparator);
-      this.taskStateManager.setTasks(updatedTasks);
+      this.taskStateManager.setTasksForPaths(updatedTasks, [oldPath, newPath]);
       this.emit('tasks-changed', updatedTasks);
     } catch (err) {
       console.error('VaultScanner processFileRename error', err);

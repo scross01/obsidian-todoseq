@@ -688,7 +688,9 @@ export class SearchEvaluator {
     if (!task.rawText) return false;
 
     // Extract from the original line, then fold each tag for comparison.
-    const matches = task.rawText.match(TAG_PATTERN) || [];
+    const matches = [...task.rawText.matchAll(TAG_PATTERN)].map(
+      (match) => match[0],
+    );
     const fold = (text: string) =>
       caseSensitive ? text : context.text.fold(text);
 

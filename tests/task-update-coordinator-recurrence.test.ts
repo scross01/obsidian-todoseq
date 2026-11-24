@@ -49,6 +49,8 @@ const mockPlugin = {
     removeTaskScheduledDate: jest.fn(),
     updateTaskDeadlineDate: jest.fn(),
     removeTaskDeadlineDate: jest.fn(),
+    updateTaskPriority: jest.fn(),
+    removeTaskPriority: jest.fn(),
     applyRecurrenceUpdate: jest.fn(),
   },
   taskStateManager: null as any,
@@ -163,6 +165,10 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
       },
     );
 
+    mockPlugin.taskEditor.updateTaskPriority.mockImplementation(
+      async (task, newPriority) => ({ ...task, priority: newPriority }),
+    );
+
     mockPlugin.taskEditor.applyRecurrenceUpdate.mockImplementation(
       async (task, options) => {
         const result = { ...task };
@@ -192,6 +198,123 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         return result;
       },
     );
+  });
+
+  describe('state transition recurrence scheduling', () => {
+    it('schedules once when another write takes the file generation', async () => {
+      const recurring: Task = {
+        ...createBaseTask({ state: 'TODO' }),
+        path: 'test.md',
+        line: 0,
+        id: 'recurring',
+        text: 'Recurring task',
+        rawText: 'TODO Recurring task',
+        scheduledDate: new Date(2026, 2, 10),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+      };
+      const sibling: Task = {
+        ...createBaseTask({ state: 'TODO' }),
+        path: 'test.md',
+        line: 1,
+        id: 'sibling',
+        text: 'Sibling task',
+        rawText: 'TODO Sibling task',
+      };
+      taskStateManager.setTasks([recurring, sibling]);
+      expect(recurring.scheduledDate).toBeInstanceOf(Date);
+      expect(
+        taskStateManager.findTaskByPathAndLine('test.md', 0)?.scheduledDate,
+      ).toBeInstanceOf(Date);
+
+      let releaseCompletion = (): void => {};
+      const completionGate = new Promise<void>((resolve) => {
+        releaseCompletion = resolve;
+      });
+      mockPlugin.taskEditor.updateTaskState.mockImplementation(
+        async (task, newState) => {
+          await completionGate;
+          return {
+            ...task,
+            state: newState,
+            completed: false,
+          };
+        },
+      );
+      const schedule = jest
+        .spyOn(
+          (taskUpdateCoordinator as any).recurrenceCoordinator,
+          'scheduleRecurrence',
+        )
+        .mockImplementation(() => {});
+
+      const handleRecurrence = jest.spyOn(
+        taskUpdateCoordinator as any,
+        'handleRecurrence',
+      );
+
+      const completion = taskUpdateCoordinator.updateTaskState(
+        recurring,
+        'DONE',
+        'task-list',
+      );
+      const siblingEdit = taskUpdateCoordinator.updateTaskPriority(
+        sibling,
+        'high',
+        'task-list',
+      );
+      expect(
+        taskStateManager.findTaskByPathAndLine('test.md', 0)?.scheduledDate,
+      ).toBeInstanceOf(Date);
+
+      releaseCompletion();
+      await expect(completion).resolves.toEqual({ status: 'applied' });
+      await siblingEdit;
+
+      expect(
+        mockPlugin.taskEditor.updateTaskState.mock.calls[0][0],
+      ).toMatchObject({
+        scheduledDate: expect.any(Date),
+        scheduledDateRepeat: expect.anything(),
+      });
+      expect(handleRecurrence).toHaveBeenCalledTimes(1);
+      expect(handleRecurrence.mock.calls[0][0]).toMatchObject({
+        scheduledDate: expect.any(Date),
+        scheduledDateRepeat: expect.anything(),
+      });
+      jest.advanceTimersByTime(200);
+
+      expect(schedule).toHaveBeenCalledTimes(1);
+      expect(mockPlugin.taskEditor.updateTaskPriority).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not schedule recurrence when the write fails', async () => {
+      const recurring: Task = {
+        ...createBaseTask({ state: 'TODO' }),
+        path: 'test.md',
+        line: 0,
+        id: 'recurring-failure',
+        text: 'Recurring task',
+        scheduledDate: new Date(2026, 2, 10),
+        scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
+      };
+      taskStateManager.setTasks([recurring]);
+      mockPlugin.taskEditor.updateTaskState.mockRejectedValueOnce(
+        new Error('write failed'),
+      );
+      const schedule = jest
+        .spyOn(
+          (taskUpdateCoordinator as any).recurrenceCoordinator,
+          'scheduleRecurrence',
+        )
+        .mockImplementation(() => {});
+
+      await expect(
+        taskUpdateCoordinator.updateTaskState(recurring, 'DONE', 'task-list'),
+      ).resolves.toEqual({ status: 'failed' });
+      jest.advanceTimersByTime(200);
+
+      expect(schedule).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateTaskRecurrence', () => {

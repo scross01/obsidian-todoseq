@@ -69,6 +69,8 @@ export interface TaskTransferResult {
   reason?: string;
   /** Per-note outcome when references were repaired after the transfer. */
   referenceRepairs?: TaskReferenceRepairReport[];
+  /** Notes discovery could not read; no edit exists for these paths yet. */
+  unreadablePaths?: string[];
 }
 
 export interface DateLineUpdateResult {
@@ -337,6 +339,34 @@ export class TaskWriter {
         getTaskIndent(task),
       )?.anchor ?? null
     );
+  }
+
+  /**
+   * Insert or update a date line from the live editor, returning the actual
+   * date row so the caller can place the cursor without re-deriving layout.
+   */
+  insertDateLineFromEditor(
+    editor: Editor,
+    task: Task,
+    dateType: 'SCHEDULED' | 'DEADLINE',
+    dateStr: string,
+  ): { line: number; lineDelta: number } {
+    const taskIndent = getTaskIndent(task);
+    const lineDelta = this.updateDateLineInEditor(
+      editor,
+      task,
+      dateType,
+      dateStr,
+      taskIndent,
+    );
+    const line = findDateLine(
+      this.editorLines(editor),
+      task.line + 1,
+      dateType,
+      taskIndent,
+      this.keywordManager,
+    );
+    return { line: line >= 0 ? line : task.line + 1, lineDelta };
   }
 
   /** Editor variant of relocateBlockAnchor; rewrites only the touched lines. */
@@ -1148,6 +1178,7 @@ export class TaskWriter {
     }
 
     const anchors = action === 'copy' ? [] : this.blockAnchors(block);
+    const transferredIds = action === 'copy' ? [] : this.blockIds(block);
     const anchor = this.taskAnchor(task);
     if (action === 'copy') {
       block = await this.prepareCopiedBlock(block, task, destination, anchor);
@@ -1174,7 +1205,7 @@ export class TaskWriter {
         this.migrateInLines(lines, task, migrateState),
         task,
         anchors,
-        block.length,
+        transferredIds,
       );
     });
     if (!changed) {
@@ -1205,6 +1236,7 @@ export class TaskWriter {
         ', ',
       )} could not be scanned.`,
       referenceRepairs: outcome.referenceRepairs,
+      unreadablePaths: [...scan.unreadable],
     };
   }
 
@@ -1352,13 +1384,12 @@ export class TaskWriter {
     lines: string[],
     task: Task,
     anchors: readonly string[],
-    blockLength: number,
+    transferredIds: readonly string[],
   ): string[] {
     const out = [...lines];
-    // The transferred block can contain nested task rows, which the parent's
-    // bounded metadata walk intentionally stops before. Use the block length
-    // so nested identities are stripped too.
-    const end = Math.min(out.length - 1, task.line + blockLength - 1);
+    // Dates are removed before cleanup, so the original block length can run
+    // past the retained block. The task's own bounded range stays valid.
+    const end = Math.min(out.length - 1, getTaskRemovalRange(out, task).end);
     const anchorSet = new Set(anchors);
     for (let i = task.line; i <= end && i < out.length; i++) {
       const split = splitTrailingBlockAnchor(out[i] ?? '');
@@ -1367,35 +1398,50 @@ export class TaskWriter {
       }
     }
 
-    // Every ID in the transferred block moved with it, including nested task
-    // drawers. Remove them together so a retained child cannot keep a stale
-    // duplicate identity.
+    // Every transferred ID moved with the block. Match the live drawer through
+    // the shared parser (quotes, indent, unknown properties) and remove only
+    // identities that actually reached the destination.
     const remove = new Set<number>();
+    const movedIds = new Set(transferredIds);
     const format = this.propertyFormat(task);
     for (let i = task.line; i <= end && i < out.length; i++) {
       if (!isPropertiesDrawerStart(out[i] ?? '', format)) continue;
-      let drawerEnd = -1;
-      for (let j = i + 1; j <= end && j < out.length; j++) {
-        if (/^\s*:END:\s*$/.test(out[j] ?? '')) {
-          drawerEnd = j;
-          break;
-        }
+      const drawer = readTaskPropertiesDrawer(out, i, format, {
+        allowAnyIndent: true,
+      });
+      if (!drawer?.closed || drawer.endLine > end) continue;
+
+      const idEntries = drawer.entries.filter(
+        (entry) => entry.canonicalKey === 'ID' && movedIds.has(entry.value),
+      );
+      for (const entry of idEntries) remove.add(entry.line);
+      const hasOtherEntries = drawer.entries.some(
+        (entry) => entry.canonicalKey !== 'ID',
+      );
+      if (idEntries.length > 0 && !hasOtherEntries) {
+        remove.add(drawer.startLine);
+        remove.add(drawer.endLine);
       }
-      if (drawerEnd < 0) continue;
-      const ids: number[] = [];
-      let hasOtherEntries = false;
-      for (let j = i + 1; j < drawerEnd; j++) {
-        if (/^\s*:ID:\s*/i.test(out[j] ?? '')) ids.push(j);
-        else if ((out[j] ?? '').trim() !== '') hasOtherEntries = true;
-      }
-      for (const line of ids) remove.add(line);
-      if (!hasOtherEntries) {
-        remove.add(i);
-        remove.add(drawerEnd);
-      }
-      i = drawerEnd;
+      i = drawer.endLine;
     }
     return out.filter((_, index) => !remove.has(index));
+  }
+
+  /** IDs carried by a transferred block, parsed with the drawer grammar. */
+  private blockIds(block: readonly string[]): string[] {
+    const ids = new Set<string>();
+    for (let i = 0; i < block.length; i++) {
+      if (!isPropertiesDrawerStart(block[i] ?? '', 'markdown')) continue;
+      const drawer = readTaskPropertiesDrawer([...block], i, 'markdown', {
+        allowAnyIndent: true,
+      });
+      if (!drawer?.closed) continue;
+      for (const entry of drawer.entries) {
+        if (entry.canonicalKey === 'ID' && entry.value) ids.add(entry.value);
+      }
+      i = drawer.endLine;
+    }
+    return [...ids];
   }
 
   private async collectReferenceEdits(

@@ -180,6 +180,34 @@ describe('Editor Controller - Date Line Handling', () => {
     });
   });
 
+  describe('writer routing', () => {
+    it('delegates date insertion to TaskWriter when available', () => {
+      const insertDateLineFromEditor = jest.fn(() => ({
+        line: 1,
+        lineDelta: 1,
+      }));
+      mockPlugin.taskEditor = { insertDateLineFromEditor };
+      mockEditor = {
+        getLine: (lineNumber: number) =>
+          ['TODO Test task', 'TODO Next task'][lineNumber] ?? '',
+        lineCount: () => 2,
+        setCursor: jest.fn(),
+        setSelection: jest.fn(),
+        replaceRange: jest.fn(),
+      };
+
+      editorController['insertDateLine'](mockEditor as any, 0, 'SCHEDULED');
+
+      expect(insertDateLineFromEditor).toHaveBeenCalledWith(
+        mockEditor,
+        expect.objectContaining({ line: 0, state: 'TODO' }),
+        'SCHEDULED',
+        expect.stringMatching(/^<\d{4}-\d{2}-\d{2}>$/),
+      );
+      expect(mockEditor.replaceRange).not.toHaveBeenCalled();
+    });
+  });
+
   describe('handleAddDateAtLine', () => {
     it('should return false when vault scanner is not available', () => {
       mockPlugin.getVaultScanner = () => null;

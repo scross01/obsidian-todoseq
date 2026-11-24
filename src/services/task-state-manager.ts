@@ -72,6 +72,38 @@ export class TaskStateManager {
   }
 
   /**
+   * Publish scanner rows for specific paths without copying optimistic rows
+   * from unrelated paths into committed truth.
+   */
+  setTasksForPaths(tasks: Task[], paths: Iterable<string>): void {
+    const replacedPaths = new Set(paths);
+    this._tasks = tasks;
+    this._committedTasks = [
+      ...this._committedTasks.filter((task) => !replacedPaths.has(task.path)),
+      ...tasks.filter((task) => replacedPaths.has(task.path)),
+    ];
+    this._revision++;
+    this._committedRevision++;
+    this.notifySubscribers();
+  }
+
+  /**
+   * Publish a scanner result while retaining committed rows for paths whose
+   * writes were in flight during the scan.
+   */
+  setTasksFromScan(tasks: Task[], preservedPaths: Iterable<string>): void {
+    const preserved = new Set(preservedPaths);
+    this._tasks = tasks;
+    this._committedTasks = [
+      ...this._committedTasks.filter((task) => preserved.has(task.path)),
+      ...tasks.filter((task) => !preserved.has(task.path)),
+    ];
+    this._revision++;
+    this._committedRevision++;
+    this.notifySubscribers();
+  }
+
+  /**
    * Get the current tasks array (shallow copy).
    * The returned array is a copy to prevent external mutations.
    * Task objects within the array are still mutable by design for performance.

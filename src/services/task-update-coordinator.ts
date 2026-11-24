@@ -339,12 +339,44 @@ export class TaskUpdateCoordinator {
     return this.queueAsyncPhase(procContext);
   }
 
+  /**
+   * Resolve the persisted row that a request targets. Optimistic projections
+   * change completed/rawText, so identity is matched by id, table cell and
+   * stable task text rather than trusting the projected source state.
+   */
+  private resolveCommittedTask(task: Task): Task | null {
+    const candidates = this.taskStateManager
+      .getCommittedTasks()
+      .filter(
+        (candidate) =>
+          candidate.path === task.path &&
+          (candidate.tableCell?.cellIndex ?? null) ===
+            (task.tableCell?.cellIndex ?? null),
+      );
+
+    if (task.id) {
+      const byId = candidates.find((candidate) => candidate.id === task.id);
+      if (byId) return byId;
+    }
+
+    const exact = candidates.find((candidate) => candidate.line === task.line);
+    if (exact && (!task.id || !exact.id || task.id === exact.id)) {
+      return exact;
+    }
+
+    const byText = candidates.filter(
+      (candidate) => candidate.text === task.text,
+    );
+    return byText.length === 1 ? byText[0] : null;
+  }
+
   /** True when this request would move an incomplete task to completion. */
   private isCompletionRequest(context: UpdateContext): boolean {
+    const sourceTask = this.resolveCommittedTask(context.task) ?? context.task;
     return (
       context.type === 'state' &&
       !!context.newState &&
-      !context.task.completed &&
+      !sourceTask.completed &&
       this.keywordManager.isCompleted(context.newState)
     );
   }
@@ -366,7 +398,8 @@ export class TaskUpdateCoordinator {
       return null;
     }
 
-    const key = getTaskKey(context.task);
+    const sourceTask = this.resolveCommittedTask(context.task) ?? context.task;
+    const key = getTaskKey(sourceTask);
     if (!this.taskDependencyManager.isBlocked(key)) return null;
 
     const reasons = this.taskDependencyManager.getBlockingReasons(key);
@@ -412,8 +445,9 @@ export class TaskUpdateCoordinator {
       return null;
     }
 
+    const sourceTask = this.resolveCommittedTask(task) ?? task;
     const reasons = this.taskDependencyManager.getBlockingReasons(
-      getTaskKey(task),
+      getTaskKey(sourceTask),
     );
     if (reasons.length === 0) return null;
     return { status: 'refused', reasons };
@@ -650,6 +684,7 @@ export class TaskUpdateCoordinator {
     let newState = context.newState ?? '';
     // Preserve the original requested state for recurrence checking
     const originalNewState = context.newState ?? '';
+    const sourceTask = this.resolveCommittedTask(context.task) ?? context.task;
 
     if (
       context.type === 'state' &&
@@ -688,9 +723,9 @@ export class TaskUpdateCoordinator {
       originalSourceState:
         context.type === 'state' || context.type === 'recurrence'
           ? {
-              state: context.task.state,
-              completed: context.task.completed,
-              closedDate: context.task.closedDate,
+              state: sourceTask.state,
+              completed: sourceTask.completed,
+              closedDate: sourceTask.closedDate,
             }
           : undefined,
       newDate: context.newDate,
@@ -906,12 +941,14 @@ export class TaskUpdateCoordinator {
         this.fileWriteGenerations.get(context.filePath) === generation;
       this.finalizeTaskState(updatedTask, context, publishUi);
 
-      if (publishUi && context.type === 'state') {
+      if (context.type === 'state') {
+        // Recurrence is tied to this successful transition, not to whether a
+        // newer request has already taken over UI publication for the file.
         this.handleRecurrence(updatedTask, context);
 
         // Update editor checkbox visual state after markdown has been updated
         // Only for editor updates to prevent Obsidian's re-render from overriding checkbox state
-        if (context.source === 'editor') {
+        if (publishUi && context.source === 'editor') {
           this.performDirectEditorCheckboxUpdate(updatedTask, context.newState);
         }
       }

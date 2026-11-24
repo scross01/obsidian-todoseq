@@ -148,6 +148,22 @@ describe('TaskWriter - editor-path date-line insert at end of document', () => {
     expect(lines[1]).toBe('SCHEDULED: <2026-01-20 Tue>');
   });
 
+  test('public editor entry point returns the actual inserted date row', () => {
+    lines = ['TODO Task text', 'DEADLINE: <2026-01-21 Wed>'];
+
+    const result = taskWriter.insertDateLineFromEditor(
+      mockEditor,
+      makeTask(),
+      'SCHEDULED',
+      '<2026-01-20 Tue>',
+    );
+
+    expect(result.line).toBe(1);
+    expect(result.lineDelta).toBe(1);
+    expect(lines[1]).toMatch(/^SCHEDULED: <2026-01-20/);
+    expect(lines[2]).toBe('DEADLINE: <2026-01-21 Wed>');
+  });
+
   test('sanity: mid-document insert keeps the classic placement (SCHEDULED before an existing DEADLINE)', async () => {
     lines = ['TODO Task text', 'DEADLINE: <2026-01-21 Wed>'];
 

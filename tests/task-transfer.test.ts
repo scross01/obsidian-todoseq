@@ -398,6 +398,44 @@ describe('TaskWriter transfers', () => {
     expect(destination).toContain('child-1');
   });
 
+  it('reads quoted retained drawers with the task property grammar', async () => {
+    const source = [
+      'Intro',
+      '',
+      '- [ ] TODO Parent ^parent',
+      '> :PROPERTIES:',
+      '> :ID: parent-1',
+      '> :KEEP: retained',
+      '> :END:',
+      '  - [ ] TODO Child ^child',
+      '    :PROPERTIES:',
+      '    :ID: child-1',
+      '    :END:',
+      '- [ ] TODO Neighbor ^neighbor',
+      '',
+    ].join('\n');
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+
+    const result = await h.writer.transferTask(
+      task({
+        line: 2,
+        text: 'Parent',
+        rawText: '- [ ] TODO Parent ^parent',
+      }),
+      h.file(DEST),
+      'migrate',
+    );
+
+    expect(result.status).toBe('success');
+    const retained = h.store.get(SOURCE) ?? '';
+    expect(retained).toContain('- [ ] DONE Parent');
+    expect(retained).not.toContain('parent-1');
+    expect(retained).not.toContain('child-1');
+    expect(retained).toContain(':KEEP: retained');
+    expect(retained).toContain('- [ ] TODO Neighbor ^neighbor');
+    expect(h.store.get(DEST)).toContain(':ID: parent-1');
+  });
+
   it('moves a table task by clearing only its cell', async () => {
     const row = '| a\\|b | TODO Water the plants | keep |';
     const h = harness({ [SOURCE]: row + '\n', [DEST]: '' });
@@ -676,6 +714,7 @@ describe('TaskWriter transfer reference repair', () => {
 
       expect(result.status).toBe('partial-references');
       expect(result.reason).toContain('notes/unreadable.md');
+      expect(result.unreadablePaths).toEqual(['notes/unreadable.md']);
       expect(h.store.get('notes/a.md')).toBe('A [[notes/today#^water]]');
       expect(h.store.get('notes/locked.md')).toBe('B [[notes/source#^water]]');
       expect(h.writer.hasPendingReferenceRepairs()).toBe(true);

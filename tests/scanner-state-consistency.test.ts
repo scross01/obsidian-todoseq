@@ -163,6 +163,51 @@ describe('scanner state consistency', () => {
       expect(tasks.find((t) => t.path === 'a.md')?.state).toBe('DONE');
     });
 
+    it('does not copy an optimistic projection when publishing another file', async () => {
+      addFile('a.md', 'TODO a');
+      const fileB = addFile('b.md', 'TODO b');
+      await scanner.scanVault();
+
+      const taskA = taskStateManager
+        .getTasks()
+        .find((task) => task.path === 'a.md');
+      expect(taskA).toBeDefined();
+      taskStateManager.optimisticUpdate(taskA!, 'DONE');
+
+      content.set('b.md', 'DOING b');
+      await scanner.processIncrementalChange(fileB);
+
+      expect(
+        taskStateManager.getTasks().find((task) => task.path === 'a.md')?.state,
+      ).toBe('DONE');
+      expect(
+        taskStateManager
+          .getCommittedTasks()
+          .find((task) => task.path === 'a.md')?.state,
+      ).toBe('TODO');
+      expect(
+        taskStateManager
+          .getCommittedTasks()
+          .find((task) => task.path === 'b.md')?.state,
+      ).toBe('DOING');
+    });
+
+    it('advances committed truth when persistence matches the projection', async () => {
+      const file = addFile('a.md', 'TODO a');
+      await scanner.scanVault();
+      const task = taskStateManager.getTasks()[0];
+      taskStateManager.optimisticUpdate(task, 'DONE');
+
+      content.set('a.md', 'DONE a');
+      await scanner.processIncrementalChange(file);
+
+      expect(
+        taskStateManager
+          .getCommittedTasks()
+          .find((candidate) => candidate.path === 'a.md')?.state,
+      ).toBe('DONE');
+    });
+
     it('does not publish an unchanged file', async () => {
       const file = addFile('a.md', 'TODO a');
       await scanner.scanVault();
@@ -221,6 +266,36 @@ describe('scanner state consistency', () => {
       ).toBe('TODO');
     });
 
+    it('preserves committed truth for a path written during the scan', async () => {
+      addFile('a.md', 'TODO a');
+      addFile('b.md', 'TODO b');
+      await scanner.scanVault();
+      const taskA = taskStateManager
+        .getTasks()
+        .find((task) => task.path === 'a.md');
+      const pendingA = deferred<string>();
+      cachedReadHook = (file) =>
+        file.path === 'a.md' ? pendingA.promise : undefined;
+
+      const scan = scanner.scanVault();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(taskA).toBeDefined();
+      scanner.addSkipIncrementalChange('a.md');
+      taskStateManager.optimisticUpdate(taskA!, 'DONE');
+
+      pendingA.resolve('TODO a');
+      await scan;
+
+      expect(
+        taskStateManager.getTasks().find((task) => task.path === 'a.md')?.state,
+      ).toBe('DONE');
+      expect(
+        taskStateManager
+          .getCommittedTasks()
+          .find((task) => task.path === 'a.md')?.state,
+      ).toBe('TODO');
+    });
+
     it('does not resurrect a path deleted during the scan', async () => {
       const fileA = addFile('a.md', 'TODO a');
       addFile('b.md', 'TODO b');
@@ -240,6 +315,20 @@ describe('scanner state consistency', () => {
       expect(taskStateManager.getTasks().some((t) => t.path === 'a.md')).toBe(
         false,
       );
+    });
+
+    it('commits a per-file deletion', async () => {
+      const fileA = addFile('a.md', 'TODO a');
+      addFile('b.md', 'TODO b');
+      await scanner.scanVault();
+
+      await scanner.processFileDelete(fileA);
+
+      expect(
+        taskStateManager
+          .getCommittedTasks()
+          .some((task) => task.path === 'a.md'),
+      ).toBe(false);
     });
 
     it('keeps a file created after enumeration when it is published', async () => {

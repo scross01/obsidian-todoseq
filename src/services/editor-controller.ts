@@ -1145,6 +1145,18 @@ export class EditorController {
     const dateLineIndent = task ? getDateLineIndent(task) : taskIndent;
     const taskLineAnchor = task ? this.blockAnchorOfEditor(editor, task) : null;
 
+    const writer = this.plugin.taskEditor;
+    if (task && writer?.insertDateLineFromEditor) {
+      const result = writer.insertDateLineFromEditor(
+        editor,
+        task,
+        dateType,
+        `<${currentDate}>`,
+      );
+      this.moveCursorToDateLine(editor, result.line);
+      return;
+    }
+
     // Create the date line with the correct indent (2 spaces more than task indent)
     const dateLine = `${dateLineIndent}${dateType}: <${currentDate}>`;
 

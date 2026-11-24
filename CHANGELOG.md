@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Completing a task now stays blocked until its prerequisite is actually saved, even if another file finishes scanning or the completion is requested again from a row that already looks complete.
+- Recurring tasks now roll forward after a successful completion even when another edit to the same note is queued. Migrated quoted property drawers no longer leave duplicate IDs behind, and transfer notices distinguish notes that could not be scanned from links that failed to update.
+- Adding a scheduled or deadline date from the editor now uses the same date-writing path as other task updates, so ordering, indentation and block anchors stay consistent.
 - Task property and dependency problems no longer interrupt editing with repeated notices. They remain visible on the affected task and in a new issue count in the Task List, which opens the full list.
 - Keywords and completed tasks now use the theme's readable text colors, so they stay legible in both light and dark themes without changing the task state.
 - Blocked-task messages now state the problem and next step once, and blocked: searches explain invalid values or when blocked status is still loading.

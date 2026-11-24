@@ -10,16 +10,26 @@ import type { TaskWriter } from '../../services/task-writer';
 export function showReferenceRepairNotice(
   writer: TaskWriter | null,
   failed: number,
+  unreadablePaths: readonly string[] = [],
 ): void {
   const notice = new Notice('', 0);
   const row = notice.messageEl.createDiv({
     cls: 'todoseq-notice-actions',
   });
+  const messages: string[] = [];
+  if (failed > 0) {
+    messages.push(`${failed} reference link(s) could not be updated.`);
+  }
+  if (unreadablePaths.length > 0) {
+    messages.push(
+      `${unreadablePaths.join(', ')} could not be scanned for references.`,
+    );
+  }
   row.createSpan({
     cls: 'todoseq-notice-message',
-    text: `${failed} reference link(s) could not be updated.`,
+    text: messages.join(' '),
   });
-  if (!writer) return;
+  if (!writer || failed === 0) return;
 
   const button = row.createEl('button', {
     cls: 'todoseq-notice-action-btn',
@@ -34,10 +44,10 @@ export function showReferenceRepairNotice(
         (total, report) => total + report.failed.length,
         0,
       );
-      if (remaining === 0) {
+      if (remaining === 0 && unreadablePaths.length === 0) {
         new Notice('Task reference links repaired');
       } else {
-        showReferenceRepairNotice(writer, remaining);
+        showReferenceRepairNotice(writer, remaining, unreadablePaths);
       }
     })();
   });
