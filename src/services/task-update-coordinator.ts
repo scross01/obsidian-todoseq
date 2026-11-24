@@ -397,22 +397,23 @@ export class TaskUpdateCoordinator {
    */
   private recheckBlockedCompletion(
     context: ProcessingContext,
+    task: Task,
   ): Extract<TaskUpdateOutcome, { status: 'refused' }> | null {
     if (
       context.type !== 'state' ||
-      !context.newState ||
+      !context.originalNewState ||
       context.forceCompletion ||
       context.source === 'archive-undo' ||
       context.originalSourceState?.completed !== false ||
       this.plugin.settings?.enforceBlockedTasks === false ||
       !this.taskDependencyManager ||
-      !this.keywordManager.isCompleted(context.newState)
+      !this.keywordManager.isCompleted(context.originalNewState)
     ) {
       return null;
     }
 
     const reasons = this.taskDependencyManager.getBlockingReasons(
-      getTaskKey(context.task),
+      getTaskKey(task),
     );
     if (reasons.length === 0) return null;
     return { status: 'refused', reasons };
@@ -730,7 +731,9 @@ export class TaskUpdateCoordinator {
       this.taskStateManager.optimisticUpdate(context.task, newState);
 
       if (this.keywordManager.isArchived(newState)) {
-        this.removeTaskFromStateManager(context.task);
+        // The archived row is hidden immediately, but dependency truth waits
+        // for the write to succeed.
+        this.removeTaskFromStateManager(context.task, false);
       }
     }
 
@@ -857,7 +860,7 @@ export class TaskUpdateCoordinator {
         };
       }
 
-      const refusal = this.recheckBlockedCompletion(context);
+      const refusal = this.recheckBlockedCompletion(context, currentTask);
       if (refusal) {
         // The request was unblocked when it was made, so the sync phase has
         // already flipped the visible state. Restore persisted truth and let
@@ -899,9 +902,11 @@ export class TaskUpdateCoordinator {
       }
 
       this.recoveredFileTasks.delete(context.filePath);
-      this.finalizeTaskState(updatedTask, context);
+      const publishUi =
+        this.fileWriteGenerations.get(context.filePath) === generation;
+      this.finalizeTaskState(updatedTask, context, publishUi);
 
-      if (context.type === 'state') {
+      if (publishUi && context.type === 'state') {
         this.handleRecurrence(updatedTask, context);
 
         // Update editor checkbox visual state after markdown has been updated
@@ -1054,6 +1059,7 @@ export class TaskUpdateCoordinator {
   private finalizeTaskState(
     updatedTask: Task,
     context: ProcessingContext,
+    publishUi = true,
   ): void {
     const isStateUpdate =
       context.type === 'state' || context.type === 'recurrence';
@@ -1061,7 +1067,11 @@ export class TaskUpdateCoordinator {
       context.type === 'state' ? context.newState : updatedTask.state;
 
     if (isStateUpdate && this.keywordManager.isArchived(newState)) {
-      this.removeTaskFromStateManager(updatedTask);
+      if (publishUi) {
+        this.removeTaskFromStateManager(updatedTask);
+      } else {
+        this.removeCommittedTask(updatedTask);
+      }
       return;
     }
 
@@ -1073,6 +1083,16 @@ export class TaskUpdateCoordinator {
     // in the sync phase, but finalize must be able to re-add too (e.g. the
     // async phase resolved a different line via rawText). Push when missing.
     const finalizeUpdate = (updates: Partial<Task>): void => {
+      if (!publishUi) {
+        this.taskStateManager.commitTaskByPathAndLine(
+          updatedTask.path,
+          updatedTask.line,
+          updates,
+          cellIndex,
+          updatedTask,
+        );
+        return;
+      }
       const existing = this.taskStateManager.findTaskByPathAndLine(
         updatedTask.path,
         updatedTask.line,
@@ -1366,8 +1386,21 @@ export class TaskUpdateCoordinator {
    * Remove a task from the state manager and notify subscribers.
    * Used when a task transitions to an archived state.
    */
-  private removeTaskFromStateManager(task: Task): void {
+  private removeTaskFromStateManager(task: Task, commit = true): void {
     this.taskStateManager.removeTasks(
+      (t) =>
+        t.path === task.path &&
+        t.line === task.line &&
+        (task.tableCell?.cellIndex === undefined
+          ? true
+          : t.tableCell?.cellIndex === task.tableCell.cellIndex),
+      commit,
+    );
+  }
+
+  /** Advance only dependency truth after a superseded archived write. */
+  private removeCommittedTask(task: Task): void {
+    this.taskStateManager.removeCommittedTasks(
       (t) =>
         t.path === task.path &&
         t.line === task.line &&

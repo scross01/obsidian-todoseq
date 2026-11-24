@@ -84,7 +84,11 @@ export class TaskDependencyManager {
     private readonly options: TaskDependencyManagerOptions = {},
   ) {
     this.unsubscribe = this.stateManager.subscribe(() => {
-      this.lastRevision = -1;
+      // Optimistic UI updates notify subscribers but leave the committed
+      // dependency snapshot unchanged. Only invalidate for persisted changes.
+      if (this.stateManager.getCommittedRevision() !== this.snapshot.revision) {
+        this.lastRevision = -1;
+      }
     });
     this.ensureFresh();
   }
@@ -244,7 +248,7 @@ export class TaskDependencyManager {
   }
 
   private ensureFresh(): void {
-    const revision = this.stateManager.getRevision();
+    const revision = this.stateManager.getCommittedRevision();
     const structureRevision = this.options.getStructureRevision?.() ?? 0;
     if (
       revision === this.lastRevision &&
@@ -253,11 +257,14 @@ export class TaskDependencyManager {
     ) {
       return;
     }
-    this.rebuild(this.stateManager.getTasks(), revision);
+    this.rebuild(this.stateManager.getCommittedTasks(), revision);
   }
 
   /** Visible for tests: build an immutable snapshot from a task array. */
-  rebuild(tasks: Task[], revision = this.stateManager.getRevision()): void {
+  rebuild(
+    tasks: Task[],
+    revision = this.stateManager.getCommittedRevision(),
+  ): void {
     this.rebuildCount++;
     this.lastRevision = revision;
     this.structureRevision = this.options.getStructureRevision?.() ?? 0;

@@ -10,11 +10,17 @@ import { CHECKBOX_DETECTION_REGEX } from '../utils/patterns';
  */
 export class TaskStateManager {
   private _tasks: Task[] = [];
+  /**
+   * Persisted task truth for dependency evaluation. UI updates may move ahead
+   * of this snapshot; it advances only when a write, scan or recovery commits.
+   */
+  private _committedTasks: Task[] = [];
   private subscribers = new Set<(tasks: Task[]) => void | Promise<void>>();
   private isNotifying = false;
   private pendingNotification = false;
   private keywordManager: KeywordManager;
   private _revision = 0;
+  private _committedRevision = 0;
 
   constructor(keywordManager: KeywordManager) {
     this.keywordManager = keywordManager;
@@ -27,11 +33,17 @@ export class TaskStateManager {
   setKeywordManager(keywordManager: KeywordManager): void {
     this.keywordManager = keywordManager;
     this._revision++;
+    this._committedRevision++;
   }
 
   /** Monotonic revision for derived consumers. */
   getRevision(): number {
     return this._revision;
+  }
+
+  /** Monotonic revision of the persisted task snapshot. */
+  getCommittedRevision(): number {
+    return this._committedRevision;
   }
 
   /**
@@ -53,7 +65,9 @@ export class TaskStateManager {
    */
   setTasks(tasks: Task[]): void {
     this._tasks = tasks;
+    this._committedTasks = [...tasks];
     this._revision++;
+    this._committedRevision++;
     this.notifySubscribers();
   }
 
@@ -70,12 +84,22 @@ export class TaskStateManager {
   }
 
   /**
+   * Get the persisted tasks used for dependency authorization.
+   * Unlike getTasks(), this deliberately excludes optimistic projections.
+   */
+  getCommittedTasks(): Task[] {
+    return [...this._committedTasks];
+  }
+
+  /**
    * Update tasks with a transformation function.
    * @param updater Function that receives current tasks and returns new tasks
    */
   updateTasks(updater: (tasks: Task[]) => Task[]): void {
     this._tasks = updater(this._tasks);
+    this._committedTasks = [...this._tasks];
     this._revision++;
+    this._committedRevision++;
     this.notifySubscribers();
   }
 
@@ -85,7 +109,9 @@ export class TaskStateManager {
    */
   addTask(task: Task): void {
     this._tasks.push(task);
+    this._committedTasks.push(task);
     this._revision++;
+    this._committedRevision++;
     this.notifySubscribers();
   }
 
@@ -93,10 +119,24 @@ export class TaskStateManager {
    * Remove tasks matching a predicate.
    * @param predicate Function that returns true for tasks to remove
    */
-  removeTasks(predicate: (task: Task) => boolean): void {
+  removeTasks(predicate: (task: Task) => boolean, commit = true): void {
     this._tasks = this._tasks.filter((task) => !predicate(task));
+    if (commit) {
+      this._committedTasks = this._committedTasks.filter(
+        (task) => !predicate(task),
+      );
+      this._committedRevision++;
+    }
     this._revision++;
     this.notifySubscribers();
+  }
+
+  /** Advance only the committed snapshot after a persisted removal. */
+  removeCommittedTasks(predicate: (task: Task) => boolean): void {
+    this._committedTasks = this._committedTasks.filter(
+      (task) => !predicate(task),
+    );
+    this._committedRevision++;
   }
 
   /**
@@ -110,10 +150,13 @@ export class TaskStateManager {
   adjustLineIndices(path: string, fromLine: number, delta: number): void {
     if (delta === 0) return;
 
-    let adjusted = false;
-    for (const task of this._tasks) {
-      if (task.path !== path) continue;
+    const adjustedObjects = new Set<Task>();
+    const adjust = (task: Task): boolean => {
+      if (adjustedObjects.has(task)) return false;
+      adjustedObjects.add(task);
+      if (task.path !== path) return false;
 
+      let adjusted = false;
       if (task.line >= fromLine) {
         task.line += delta;
         adjusted = true;
@@ -133,10 +176,20 @@ export class TaskStateManager {
           task.subtaskSpan = undefined;
         }
       }
+      return adjusted;
+    };
+
+    let adjusted = false;
+    for (const task of this._tasks) {
+      adjusted = adjust(task) || adjusted;
+    }
+    for (const task of this._committedTasks) {
+      adjusted = adjust(task) || adjusted;
     }
 
     if (adjusted) {
       this._revision++;
+      this._committedRevision++;
       this.notifySubscribers();
     }
   }
@@ -152,16 +205,25 @@ export class TaskStateManager {
     line: number,
     cellIndex?: number,
   ): Task | null {
-    const foundTask =
-      this._tasks.find(
+    return this.findTaskIn(this._tasks, path, line, cellIndex);
+  }
+
+  private findTaskIn(
+    tasks: readonly Task[],
+    path: string,
+    line: number,
+    cellIndex?: number,
+  ): Task | null {
+    return (
+      tasks.find(
         (t) =>
           t.path === path &&
           t.line === line &&
           (cellIndex === undefined
             ? true
             : t.tableCell?.cellIndex === cellIndex),
-      ) || null;
-    return foundTask;
+      ) || null
+    );
   }
 
   /**
@@ -207,7 +269,7 @@ export class TaskStateManager {
     updates: Partial<Task>,
     cellIndex?: number,
   ): boolean {
-    const existingTask = this.findTaskByPathAndLine(path, line, cellIndex);
+    const existingTask = this.findTaskIn(this._tasks, path, line, cellIndex);
     if (!existingTask) {
       return false;
     }
@@ -222,23 +284,106 @@ export class TaskStateManager {
     const isCompleted =
       updates.completed !== undefined ? updates.completed : wasCompleted;
 
-    this._tasks[index] = {
+    const updatedTask: Task = {
       ...existingTask,
       ...updates,
       ...('text' in updates ? { textDisplay: undefined } : {}),
       _lastUpdateTime: Date.now(),
     };
+    this._tasks[index] = updatedTask;
     this._revision++;
 
-    // Update parent subtask counts if completion status changed
     if (wasCompleted !== isCompleted) {
       this.updateParentSubtaskCountsForTask(
         existingTask,
         wasCompleted,
         isCompleted,
+        this._tasks,
       );
     }
 
+    // The committed snapshot advances with persisted updates. If the task was
+    // optimistically re-added after an archive, it may not be present yet.
+    const committedTask = this.findTaskIn(
+      this._committedTasks,
+      path,
+      line,
+      cellIndex,
+    );
+    if (committedTask) {
+      const committedIndex = this._committedTasks.indexOf(committedTask);
+      const committedWasCompleted = committedTask.completed;
+      const committedIsCompleted =
+        updates.completed !== undefined
+          ? updates.completed
+          : committedWasCompleted;
+      this._committedTasks[committedIndex] = {
+        ...committedTask,
+        ...updates,
+        ...('text' in updates ? { textDisplay: undefined } : {}),
+        _lastUpdateTime: Date.now(),
+      };
+      if (committedWasCompleted !== committedIsCompleted) {
+        this.updateParentSubtaskCountsForTask(
+          committedTask,
+          committedWasCompleted,
+          committedIsCompleted,
+          this._committedTasks,
+        );
+      }
+    } else {
+      this._committedTasks.push(updatedTask);
+    }
+    this._committedRevision++;
+
+    return true;
+  }
+
+  /**
+   * Advance only the committed dependency snapshot from a persisted write.
+   * Used when a newer request already owns the visible projection for the file.
+   */
+  commitTaskByPathAndLine(
+    path: string,
+    line: number,
+    updates: Partial<Task>,
+    cellIndex?: number,
+    fallbackTask?: Task,
+  ): boolean {
+    const existing = this.findTaskIn(
+      this._committedTasks,
+      path,
+      line,
+      cellIndex,
+    );
+    const task = existing ?? fallbackTask;
+    if (!task) return false;
+
+    const index = this._committedTasks.indexOf(task);
+    const wasCompleted = task.completed;
+    const isCompleted =
+      updates.completed !== undefined ? updates.completed : wasCompleted;
+    const updatedTask: Task = {
+      ...task,
+      ...updates,
+      ...('text' in updates ? { textDisplay: undefined } : {}),
+      _lastUpdateTime: Date.now(),
+    };
+
+    if (index === -1) {
+      this._committedTasks.push(updatedTask);
+    } else {
+      this._committedTasks[index] = updatedTask;
+    }
+    if (wasCompleted !== isCompleted) {
+      this.updateParentSubtaskCountsForTask(
+        task,
+        wasCompleted,
+        isCompleted,
+        this._committedTasks,
+      );
+    }
+    this._committedRevision++;
     return true;
   }
 
@@ -268,20 +413,30 @@ export class TaskStateManager {
     // Update using path+line lookup for safety. When the task is not in the
     // manager (e.g. it was removed on archive because archived tasks are not
     // collected, and this call is the undo/re-add), re-add it so views and
-    // the archive dialog see it again.
+    // the archive dialog see it again. The committed snapshot is deliberately
+    // untouched until the matching write succeeds.
     const existing = this.findTaskByPathAndLine(
       task.path,
       task.line,
       task.tableCell?.cellIndex,
     );
     if (existing) {
-      // Note: updateTaskByPathAndLine already handles parent subtask count updates
-      this.updateTaskByPathAndLine(
-        task.path,
-        task.line,
-        updates,
-        task.tableCell?.cellIndex,
-      );
+      const index = this._tasks.indexOf(existing);
+      const wasCompleted = existing.completed;
+      const updatedTask: Task = {
+        ...existing,
+        ...updates,
+        _lastUpdateTime: Date.now(),
+      };
+      this._tasks[index] = updatedTask;
+      if (wasCompleted !== isCompleted) {
+        this.updateParentSubtaskCountsForTask(
+          existing,
+          wasCompleted,
+          isCompleted,
+          this._tasks,
+        );
+      }
     } else {
       this._tasks.push({
         ...task,
@@ -290,7 +445,8 @@ export class TaskStateManager {
       });
     }
 
-    // Notify subscribers of the change
+    // Notify subscribers of the UI change without advancing the committed
+    // dependency snapshot.
     this._revision++;
     this.notifySubscribers();
 
@@ -318,7 +474,9 @@ export class TaskStateManager {
    */
   clearTasks(): void {
     this._tasks = [];
+    this._committedTasks = [];
     this._revision++;
+    this._committedRevision++;
     this.notifySubscribers();
   }
 
@@ -405,9 +563,13 @@ export class TaskStateManager {
    * @returns Array of parent tasks (ordered from immediate to root)
    */
   private findParentTasks(task: Task): Task[] {
+    return this.findParentTasksIn(this._tasks, task);
+  }
+
+  private findParentTasksIn(tasks: readonly Task[], task: Task): Task[] {
     if (!CHECKBOX_DETECTION_REGEX.test(task.rawText.trimStart())) return [];
 
-    return this._tasks
+    return tasks
       .filter(
         (candidate) =>
           candidate.path === task.path &&
@@ -428,8 +590,9 @@ export class TaskStateManager {
     parentTask: Task,
     wasCompleted: boolean,
     isCompleted: boolean,
+    tasks: Task[] = this._tasks,
   ): void {
-    const index = this._tasks.indexOf(parentTask);
+    const index = tasks.indexOf(parentTask);
     if (index === -1) return;
 
     const updatedTask = { ...parentTask };
@@ -446,7 +609,7 @@ export class TaskStateManager {
       updatedTask.subtaskCompletedCount += 1;
     }
 
-    this._tasks[index] = updatedTask;
+    tasks[index] = updatedTask;
   }
 
   /**
@@ -460,10 +623,11 @@ export class TaskStateManager {
     task: Task,
     wasCompleted: boolean,
     isCompleted: boolean,
+    tasks: Task[] = this._tasks,
   ): void {
-    const parentTasks = this.findParentTasks(task);
+    const parentTasks = this.findParentTasksIn(tasks, task);
     for (const parent of parentTasks) {
-      this.updateParentSubtaskCounts(parent, wasCompleted, isCompleted);
+      this.updateParentSubtaskCounts(parent, wasCompleted, isCompleted, tasks);
     }
   }
 

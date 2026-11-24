@@ -66,7 +66,7 @@ function createFixture(enforceBlockedTasks = true) {
     { isExpectedChange: () => false } as never,
     dependencyManager,
   );
-  return { blocked, coordinator, dependencyManager, state, writer };
+  return { blocked, blocker, coordinator, dependencyManager, state, writer };
 }
 
 describe('blocked completion enforcement', () => {
@@ -186,6 +186,205 @@ describe('blocked completion enforcement', () => {
       expect.stringContaining("Can't complete this task yet"),
       8000,
     );
+    coordinator.destroy();
+  });
+
+  it('does not treat a pending prerequisite completion as committed', async () => {
+    const { blocked, blocker, coordinator, state, writer } = createFixture();
+    let releaseFirst = (): void => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let call = 0;
+    writer.updateTaskState.mockImplementation(
+      async (task: Task, newState: string) => {
+        call += 1;
+        if (call === 1) await firstGate;
+        return {
+          ...task,
+          state: newState,
+          completed: newState === 'DONE',
+        };
+      },
+    );
+
+    const prerequisite = coordinator.updateTaskState(
+      blocker,
+      'DONE',
+      'task-list',
+    );
+    const dependent = await coordinator.updateTaskState(
+      blocked,
+      'DONE',
+      'task-list',
+    );
+
+    expect(dependent.status).toBe('refused');
+    expect(writer.updateTaskState).toHaveBeenCalledTimes(1);
+
+    releaseFirst();
+    await expect(prerequisite).resolves.toEqual({ status: 'applied' });
+
+    await expect(
+      coordinator.updateTaskState(blocked, 'DONE', 'task-list'),
+    ).resolves.toEqual({ status: 'applied' });
+    expect(writer.updateTaskState).toHaveBeenCalledTimes(2);
+    expect(state.findTaskByPathAndLine('blocked.md', 0)?.state).toBe('DONE');
+    coordinator.destroy();
+  });
+
+  it('does not let an older write erase a newer queued projection', async () => {
+    const { blocker, coordinator, state, writer } = createFixture();
+    let releaseFirst = (): void => {};
+    let releaseSecond = (): void => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const secondGate = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+    let call = 0;
+    writer.updateTaskState.mockImplementation(
+      async (task: Task, newState: string) => {
+        call += 1;
+        if (call === 1) await firstGate;
+        if (call === 2) await secondGate;
+        return {
+          ...task,
+          state: newState,
+          completed: newState === 'DONE',
+        };
+      },
+    );
+
+    const first = coordinator.updateTaskState(blocker, 'DONE', 'task-list');
+    const second = coordinator.updateTaskState(blocker, 'TODO', 'task-list');
+
+    releaseFirst();
+    await first;
+    expect(state.findTaskByPathAndLine('blocker.md', 0)?.state).toBe('TODO');
+
+    releaseSecond();
+    await second;
+    expect(state.findTaskByPathAndLine('blocker.md', 0)?.state).toBe('TODO');
+    coordinator.destroy();
+  });
+
+  it('rechecks a recurring completion whose blocker reopens while queued', async () => {
+    const { blocked, blocker, coordinator, state, writer } = createFixture();
+    const recurring = createBaseTask({
+      ...blocked,
+      scheduledDate: new Date(2026, 0, 2),
+      scheduledDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+    });
+    const sibling = createBaseTask({
+      path: 'blocked.md',
+      line: 1,
+      id: 'sibling',
+      text: 'Sibling',
+      state: 'TODO',
+    });
+    state.setTasks([
+      { ...blocker, state: 'DONE', completed: true },
+      recurring,
+      sibling,
+    ]);
+
+    let releaseFirst = (): void => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let call = 0;
+    writer.updateTaskState.mockImplementation(
+      async (task: Task, newState: string) => {
+        call += 1;
+        if (call === 1) await firstGate;
+        return {
+          ...task,
+          state: newState,
+          completed: newState === 'DONE',
+        };
+      },
+    );
+
+    const first = coordinator.updateTaskState(sibling, 'DOING', 'task-list');
+    const completion = coordinator.updateTaskState(
+      recurring,
+      'DONE',
+      'task-list',
+    );
+
+    state.updateTaskByPathAndLine('blocker.md', 0, {
+      state: 'TODO',
+      completed: false,
+    });
+    state.notifySubscribers();
+    releaseFirst();
+
+    await expect(completion).resolves.toMatchObject({ status: 'refused' });
+    await first;
+    expect(writer.updateTaskState).toHaveBeenCalledTimes(1);
+    coordinator.destroy();
+  });
+
+  it('rechecks the resolved row after a task shifts lines while queued', async () => {
+    const { blocked, blocker, coordinator, state, writer } = createFixture();
+    const decoy = createBaseTask({
+      path: 'blocked.md',
+      line: 2,
+      id: 'decoy',
+      text: 'Decoy',
+      state: 'TODO',
+    });
+    const requested = { ...blocked, rawText: 'TODO Blocked' };
+    state.setTasks([
+      { ...blocker, state: 'DONE', completed: true },
+      requested,
+      decoy,
+    ]);
+
+    let releaseFirst = (): void => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let call = 0;
+    writer.updateTaskState.mockImplementation(
+      async (task: Task, newState: string) => {
+        call += 1;
+        if (call === 1) await firstGate;
+        return { ...task, state: newState, completed: false };
+      },
+    );
+
+    const first = coordinator.updateTaskState(decoy, 'DOING', 'task-list');
+    const completion = coordinator.updateTaskState(
+      requested,
+      'DONE',
+      'task-list',
+    );
+
+    // The requested row moves down, and an unblocked task takes its old key.
+    state.adjustLineIndices('blocked.md', 1, 1);
+    state.addTask(
+      createBaseTask({
+        path: 'blocked.md',
+        line: 1,
+        id: 'replacement',
+        text: 'Replacement',
+        rawText: 'TODO Replacement',
+        state: 'TODO',
+      }),
+    );
+    state.updateTaskByPathAndLine('blocker.md', 0, {
+      state: 'TODO',
+      completed: false,
+    });
+    state.notifySubscribers();
+    releaseFirst();
+
+    await expect(completion).resolves.toMatchObject({ status: 'refused' });
+    await first;
+    expect(writer.updateTaskState).toHaveBeenCalledTimes(1);
     coordinator.destroy();
   });
 

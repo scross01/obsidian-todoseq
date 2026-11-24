@@ -42,7 +42,9 @@ jest.mock('../src/main', () => ({
     keywordManager = {};
     taskStateManager = {
       getTasks: jest.fn().mockReturnValue([]),
+      getCommittedTasks: jest.fn().mockReturnValue([]),
       getRevision: jest.fn().mockReturnValue(0),
+      getCommittedRevision: jest.fn().mockReturnValue(0),
       subscribe: jest.fn().mockReturnValue(jest.fn()),
     };
     changeTracker = {};
@@ -230,7 +232,9 @@ describe('PluginLifecycleManager', () => {
       keywordManager: {},
       taskStateManager: {
         getTasks: jest.fn().mockReturnValue([]),
+        getCommittedTasks: jest.fn().mockReturnValue([]),
         getRevision: jest.fn().mockReturnValue(0),
+        getCommittedRevision: jest.fn().mockReturnValue(0),
         subscribe: jest.fn().mockReturnValue(jest.fn()),
       },
       changeTracker: {},
