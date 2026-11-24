@@ -26,6 +26,7 @@
   "languageCommentSupport": false,
   "weekStartsOn": "Monday",
   "formatTaskKeywords": true,
+  "hideTaskPropertiesInReadingView": true,
   "additionalFileExtensions": [],
   "detectOrgModeFiles": false,
   "scanCodeFiles": false,
@@ -37,7 +38,11 @@
     "transitionStatements": []
   },
   "trackClosedDate": false,
+  "enforceBlockedTasks": true,
+  "enforceTaskHierarchyDependencies": false,
+  "enforceCheckboxDependencies": false,
   "trackStartedDate": false,
+  "startedDateMode": "first",
   "taskArchive": {
     "autoArchiveEnabled": false,
     "criterionMode": "days",
@@ -79,5 +84,5 @@
     }
   ],
   "_hasShownFirstInstallView": true,
-  "settingsVersion": 6
+  "settingsVersion": 7
 }
