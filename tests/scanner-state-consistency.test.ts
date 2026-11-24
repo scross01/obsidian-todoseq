@@ -296,6 +296,37 @@ describe('scanner state consistency', () => {
       ).toBe('TODO');
     });
 
+    it('preserves committed truth for a write in flight before the scan starts', async () => {
+      addFile('a.md', 'TODO a');
+      addFile('b.md', 'TODO b');
+      await scanner.scanVault();
+      const taskA = taskStateManager
+        .getTasks()
+        .find((task) => task.path === 'a.md');
+      const pendingA = deferred<string>();
+
+      scanner.addSkipIncrementalChange('a.md');
+      cachedReadHook = (file) =>
+        file.path === 'a.md' ? pendingA.promise : undefined;
+
+      const scan = scanner.scanVault();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      taskStateManager.optimisticUpdate(taskA!, 'DONE');
+      scanner.completeFileWrite('a.md');
+
+      pendingA.resolve('TODO a');
+      await scan;
+
+      expect(
+        taskStateManager.getTasks().find((task) => task.path === 'a.md')?.state,
+      ).toBe('DONE');
+      expect(
+        taskStateManager
+          .getCommittedTasks()
+          .find((task) => task.path === 'a.md')?.state,
+      ).toBe('TODO');
+    });
+
     it('does not resurrect a path deleted during the scan', async () => {
       const fileA = addFile('a.md', 'TODO a');
       addFile('b.md', 'TODO b');

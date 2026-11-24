@@ -359,10 +359,14 @@ export class TaskUpdateCoordinator {
       if (byId) return byId;
     }
 
-    const exact = candidates.find((candidate) => candidate.line === task.line);
-    if (exact && (!task.id || !exact.id || task.id === exact.id)) {
-      return exact;
-    }
+    const exact = candidates.find(
+      (candidate) =>
+        candidate.line === task.line &&
+        (task.id
+          ? candidate.id === task.id
+          : !candidate.id && candidate.text === task.text),
+    );
+    if (exact) return exact;
 
     const byText = candidates.filter(
       (candidate) => candidate.text === task.text,
@@ -987,6 +991,7 @@ export class TaskUpdateCoordinator {
       if (this.fileWriteGenerations.get(context.filePath) === generation) {
         this.fileWriteGenerations.delete(context.filePath);
       }
+      this.plugin.vaultScanner?.completeFileWrite?.(context.filePath);
     }
   }
 

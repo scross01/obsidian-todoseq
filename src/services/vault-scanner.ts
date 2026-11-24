@@ -56,6 +56,8 @@ export class VaultScanner
    * scan's older snapshots overwriting newer per-file publications.
    */
   private activeScanDirtyPaths: Set<string> | null = null;
+  /** Plugin writes currently between addSkip and completion. */
+  private inFlightWritePaths = new Set<string>();
   /** Memory-only structural publication, keyed by path. */
   private structuralEntriesByPath = new Map<
     string,
@@ -155,7 +157,9 @@ export class VaultScanner
       return;
     }
     this._isScanning = true;
-    this.activeScanDirtyPaths = new Set<string>();
+    // A write may already be in flight when the scan starts. Keep those paths
+    // dirty for this pass so the scan cannot publish the pre-write snapshot.
+    this.activeScanDirtyPaths = new Set(this.inFlightWritePaths);
     this.structuralEntriesByPath.clear();
     this.structureRevision++;
 
@@ -678,9 +682,15 @@ export class VaultScanner
    */
   addSkipIncrementalChange(filePath: string): void {
     this.skipIncrementalChanges.set(filePath, Date.now());
+    this.inFlightWritePaths.add(filePath);
     // A plugin write during a full scan is invisible to that scan's reads,
     // so the scan must publish the current central state for this path.
     this.activeScanDirtyPaths?.add(filePath);
+  }
+
+  /** Mark a plugin write complete so the next scan can read its result. */
+  completeFileWrite(filePath: string): void {
+    this.inFlightWritePaths.delete(filePath);
   }
 
   /**

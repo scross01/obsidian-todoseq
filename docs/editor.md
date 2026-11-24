@@ -92,6 +92,8 @@ TODOseq provides multiple ways to add scheduled and deadline dates to your tasks
 
 When adding a `SCHEDULED:` or `DEADLINE:` date after a task, the editor will autocomplete after the keyword with the required date format, e.g. `<2026-01-01>`, with the date auto-filled to the current date and selected for easy replacement or editing.
 
+Adding either date from the editor uses the same writing path as other task updates. The new line keeps the task's indentation and quote prefix, stays in the normal date-line order, and leaves an existing block anchor on the task block.
+
 ![Date Autocomplete Example](./assets/todoseq-editor-date-autocomplete.png){.ts-img-wide .ts-img-dark}
 ![Date Autocomplete Example](./assets/todoseq-editor-date-autocomplete-light.png){.ts-img-wide .ts-img-light}
 

@@ -402,6 +402,34 @@ describe('blocked completion enforcement', () => {
     coordinator.destroy();
   });
 
+  it('does not authorize against a different row at the same line', () => {
+    const { blocked, blocker, coordinator, state } = createFixture();
+    const other = createBaseTask({
+      path: 'blocked.md',
+      line: 0,
+      id: 'other',
+      text: 'Other',
+      rawText: 'TODO Other',
+      state: 'TODO',
+    });
+    state.setTasks([{ ...blocker, state: 'DONE', completed: true }, other]);
+
+    const resolved = (
+      coordinator as unknown as {
+        resolveCommittedTask(task: Task): Task | null;
+      }
+    ).resolveCommittedTask({
+      ...blocked,
+      id: 'missing',
+      text: 'Blocked',
+      state: 'DONE',
+      completed: true,
+    });
+
+    expect(resolved).toBeNull();
+    coordinator.destroy();
+  });
+
   it('allows a repeated completion of a committed completed task', async () => {
     const { blocked, blocker, coordinator, state, writer } = createFixture();
     const completed = { ...blocked, state: 'DONE', completed: true };

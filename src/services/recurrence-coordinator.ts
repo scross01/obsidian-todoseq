@@ -302,6 +302,54 @@ export class RecurrenceCoordinator {
     };
   }
 
+  /** A completed recurring row may differ only by its checkbox state. */
+  private lineMatchesCapturedTask(line: string, task: Task): boolean {
+    if (line === task.rawText) return true;
+    const normalizeCheckbox = (value: string): string =>
+      value.replace(/\[[ xX]\]/g, '[ ]');
+    return normalizeCheckbox(line) === normalizeCheckbox(task.rawText);
+  }
+
+  /** Resolve the live row by identity, then by stable text, before line. */
+  private resolveCurrentTask(task: Task): Task | null {
+    const candidates = (this.taskStateManager.getTasks() ?? []).filter(
+      (candidate) =>
+        candidate.path === task.path &&
+        (candidate.tableCell?.cellIndex ?? null) ===
+          (task.tableCell?.cellIndex ?? null),
+    );
+
+    if (task.id) {
+      const byId = candidates.find((candidate) => candidate.id === task.id);
+      if (byId) return byId;
+    }
+
+    const anchor = task.embedReference?.replace(/^\^/, '').trim() ?? '';
+    if (anchor) {
+      const byAnchor = candidates.find(
+        (candidate) =>
+          (candidate.embedReference?.replace(/^\^/, '').trim() ?? '') ===
+          anchor,
+      );
+      if (byAnchor) return byAnchor;
+    }
+
+    const atLine = this.taskStateManager.findTaskByPathAndLine(
+      task.path,
+      task.line,
+      task.tableCell?.cellIndex,
+    );
+    if (atLine) {
+      const sameIdentity = task.id || atLine.id ? task.id === atLine.id : true;
+      if (sameIdentity) return atLine;
+    }
+
+    const byText = candidates.filter(
+      (candidate) => candidate.text === task.text,
+    );
+    return byText.length === 1 ? byText[0] : null;
+  }
+
   /**
    * Perform recurrence update: advance dates and reset to inactive state.
    *
@@ -328,13 +376,6 @@ export class RecurrenceCoordinator {
       const content = await this.getFileContent(task.path);
       const lines = content.split('\n');
 
-      if (task.line >= lines.length) {
-        return {
-          success: false,
-          error: 'Task line out of bounds',
-        };
-      }
-
       // Get parser from vault scanner
       const vaultScanner = (
         this.app as unknown as {
@@ -356,15 +397,15 @@ export class RecurrenceCoordinator {
         };
       }
 
-      // Rapid cycling inside the 50 ms recurrence window can stale the closure snapshot.
-      // Re-resolve when rawText diverges, keeping trigger's date/repeat fields.
-      const storedTask = this.taskStateManager.findTaskByPathAndLine(
-        task.path,
-        task.line,
-        task.tableCell?.cellIndex,
-      );
+      // Rapid cycling inside the 50 ms recurrence window can stale the closure
+      // snapshot, and a queued same-file edit can move the row. Resolve by
+      // identity or content before writing, keeping the trigger's date fields.
+      const storedTask = this.resolveCurrentTask(task);
       let taskForUpdate: Task = task;
-      if (storedTask && storedTask.rawText !== task.rawText) {
+      if (
+        storedTask &&
+        (storedTask.line !== task.line || storedTask.rawText !== task.rawText)
+      ) {
         // Trigger's date/repeat fields anchor the recurrence math; stored-task
         // content (rawText, state, tags, etc.) overlays on top so the
         // write-back reflects what the file actually shows now.
@@ -381,6 +422,25 @@ export class RecurrenceCoordinator {
           dailyNoteDate: task.dailyNoteDate,
           // Defend against a parser defect leaving text undefined.
           text: storedTask.text ?? task.text,
+        };
+      }
+
+      if (taskForUpdate.line >= lines.length) {
+        return {
+          success: false,
+          error: 'Task line out of bounds',
+        };
+      }
+
+      if (
+        !storedTask &&
+        !this.lineMatchesCapturedTask(lines[task.line] ?? '', task)
+      ) {
+        // Without an identity match, never write at a line that now holds a
+        // different row. Failing here is safer than advancing a sibling.
+        return {
+          success: false,
+          error: 'Task moved before recurrence update',
         };
       }
 

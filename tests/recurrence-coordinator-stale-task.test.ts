@@ -66,7 +66,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     mockTaskStateManager = {
       findTaskByPathAndLine: jest.fn(),
       updateTask: jest.fn(),
-      getTasks: jest.fn(),
+      getTasks: jest.fn(() => []),
       setTasks: jest.fn(),
     } as unknown as TaskStateManager;
     coordinator = new RecurrenceCoordinator(
@@ -154,6 +154,31 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     expect(passedTask.rawText).toBe(storedTask.rawText);
     expect(passedTask.text).toBe(storedTask.text);
     expect(passedTask.state).toBe(storedTask.state);
+  });
+
+  it('uses a moved identity instead of the captured line', async () => {
+    const staleTask = { ...createBaseTask(), id: 'recurring' };
+    const movedTask: Task = {
+      ...staleTask,
+      line: 3,
+      rawText: '- [ ] TODO my task',
+      state: 'TODO',
+      completed: false,
+    };
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([movedTask]);
+    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
+      null,
+    );
+    (mockApp.vault.read as jest.Mock).mockResolvedValue(
+      'one\ntwo\nthree\n- [ ] TODO my task\n  SCHEDULED: <2026-06-24 Wed +1d>',
+    );
+
+    await coordinator.performRecurrenceUpdate(staleTask);
+
+    const [passedTask] =
+      mockUpdateCoordinator.updateTaskRecurrence.mock.calls[0];
+    expect(passedTask.line).toBe(3);
+    expect(passedTask.rawText).toBe(movedTask.rawText);
   });
 
   it('keeps original date/repeat fields when re-resolving', async () => {
@@ -302,9 +327,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     expect(passedTask.deadlineDate).toBe(staleTask.deadlineDate);
   });
 
-  it('keeps original task when findTaskByPathAndLine returns null even if file changed', async () => {
-    // Fast-path for "task no longer in state manager": use the closure
-    // snapshot. This matches existing behavior; pins it.
+  it('refuses a stale line when no identity resolves', async () => {
     const staleTask = createBaseTask();
     (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
       null,
@@ -313,10 +336,9 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
       '- [ ] ARCHIVED my task\n  DEADLINE: <2026-06-24 Wed +1d>',
     );
 
-    await coordinator.performRecurrenceUpdate(staleTask);
+    const result = await coordinator.performRecurrenceUpdate(staleTask);
 
-    const [passedTask] =
-      mockUpdateCoordinator.updateTaskRecurrence.mock.calls[0];
-    expect(passedTask).toBe(staleTask);
+    expect(result.success).toBe(false);
+    expect(mockUpdateCoordinator.updateTaskRecurrence).not.toHaveBeenCalled();
   });
 });
