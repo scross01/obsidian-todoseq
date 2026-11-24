@@ -939,7 +939,16 @@ export class TaskDependencyManager {
 
   /** Iterative Kosaraju pass; no recursion on large vaults. */
   private findCycles(tasks: Task[]): string[][] {
-    const keys = tasks.map(getTaskKey);
+    if (this.edges.length === 0) return [];
+
+    const nodeKeys = new Set<string>();
+    for (const edge of this.edges) {
+      nodeKeys.add(edge.sourceKey);
+      nodeKeys.add(edge.targetKey);
+    }
+
+    const keys = tasks.map(getTaskKey).filter((key) => nodeKeys.has(key));
+
     const forward = new Map<string, string[]>();
     const reverse = new Map<string, string[]>();
     for (const key of keys) {

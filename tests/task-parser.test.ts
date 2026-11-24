@@ -1683,6 +1683,41 @@ TODO Child`);
       expect(tasks[1].id).toBeUndefined();
     });
 
+    it('still counts an indented child after an unclosed drawer', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: parent-1
+  - [ ] Child`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].subtaskCount).toBe(1);
+    });
+
+    it('counts children after an indented drawer', () => {
+      const tasks = parse(`  - TODO Parent
+    :PROPERTIES:
+    :ID: parent-1
+    :END:
+    - [ ] Child`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'parent-1',
+        subtaskCount: 1,
+      });
+    });
+
+    it('counts children after a quoted drawer', () => {
+      const tasks = parse(`> TODO Parent
+> :PROPERTIES:
+> :ID: parent-1
+> :END:
+>   - [ ] Child`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'parent-1',
+        subtaskCount: 1,
+      });
+    });
+
     it('ignores a second drawer but reports it', () => {
       const tasks = parse(`TODO Parent
 :PROPERTIES:
@@ -1694,6 +1729,25 @@ TODO Child`);
       expect(tasks[0].id).toBe('first');
       expect(tasks[0].propertyIssues).toEqual([
         expect.objectContaining({ code: 'duplicate-drawer', line: 4 }),
+      ]);
+    });
+
+    it('still counts children after a second drawer', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: first
+:END:
+:PROPERTIES:
+:ID: second
+:END:
+  - [ ] Child`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'first',
+        subtaskCount: 1,
+      });
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({ code: 'duplicate-drawer' }),
       ]);
     });
 

@@ -24,6 +24,7 @@ import {
 } from '../utils/task-line-utils';
 import {
   extractTaskProperties,
+  findPropertiesDrawerEnd,
   isPropertiesDrawerStart,
   readTaskPropertiesDrawer,
   type ParsedTaskProperties,
@@ -1139,18 +1140,16 @@ export class TaskParser implements ITaskParser {
         break;
       }
 
-      if (isPropertiesDrawerStart(nextLine, 'markdown', indent)) {
-        const drawer = readTaskPropertiesDrawer(lines, i, 'markdown', {
-          taskIndent: indent,
-          isBoundary: (line) =>
-            this.testRegex.test(line) ||
-            this.headingRegex.test(line) ||
-            CHECKBOX_DETECTION_REGEX.test(line),
-        });
-        if (drawer) {
-          i = drawer.endLine;
-          continue;
-        }
+      const drawer = findPropertiesDrawerEnd(lines, i, 'markdown', {
+        taskIndent: indent,
+        isBoundary: (line) =>
+          this.testRegex.test(line) ||
+          this.headingRegex.test(line) ||
+          CHECKBOX_DETECTION_REGEX.test(line),
+      });
+      if (drawer) {
+        i = drawer.endLine;
+        continue;
       }
 
       // Check if this line contains a task keyword but is still a valid subtask

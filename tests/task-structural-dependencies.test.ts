@@ -84,7 +84,7 @@ describe('opt-in structural dependencies', () => {
     ]);
     expect(engine.isBlocked('tree.md:1')).toBe(true);
     expect(engine.getBlockingReasons('tree.md:1')[0].message).toContain(
-      'Ordered after First',
+      'Blocked by the earlier ORDERED task First',
     );
   });
 
@@ -103,7 +103,7 @@ describe('opt-in structural dependencies', () => {
 
     expect(engine.isBlocked('tree.md:2')).toBe(true);
     expect(engine.getBlockingReasons('tree.md:2')[0].message).toContain(
-      'Ordered after First',
+      'Blocked by the earlier ORDERED task First',
     );
   });
 
@@ -170,10 +170,7 @@ describe('opt-in structural dependencies', () => {
       ],
       { hierarchy: true, checkbox: false },
       new Map([
-        [
-          'tree.md',
-          [entry({ line: 1, headingLevel: 2, text: 'Research' })],
-        ],
+        ['tree.md', [entry({ line: 1, headingLevel: 2, text: 'Research' })]],
       ]),
     );
     expect(engine.isBlocked('tree.md:0')).toBe(false);
@@ -301,7 +298,12 @@ describe('opt-in structural dependencies', () => {
         [
           'tree.org',
           [
-            entry({ path: 'tree.org', line: 0, headingLevel: 1, text: 'TODO Parent' }),
+            entry({
+              path: 'tree.org',
+              line: 0,
+              headingLevel: 1,
+              text: 'TODO Parent',
+            }),
             entry({
               path: 'tree.org',
               kind: 'checkbox',
@@ -310,7 +312,12 @@ describe('opt-in structural dependencies', () => {
               indentLength: 2,
               checked: true,
             }),
-            entry({ path: 'tree.org', line: 2, headingLevel: 2, text: 'TODO Child' }),
+            entry({
+              path: 'tree.org',
+              line: 2,
+              headingLevel: 2,
+              text: 'TODO Child',
+            }),
             entry({
               path: 'tree.org',
               kind: 'checkbox',

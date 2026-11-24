@@ -1,5 +1,6 @@
 import {
   extractTaskProperties,
+  findPropertiesDrawerEnd,
   isPropertiesDrawerEnd,
   isPropertiesDrawerStart,
   parseDependencyReference,
@@ -158,6 +159,145 @@ describe('readTaskPropertiesDrawer', () => {
     });
     expect(extractTaskProperties(drawer!, 'markdown').id).toBe('quoted');
   });
+});
+
+describe('findPropertiesDrawerEnd', () => {
+  const cases: Array<{
+    name: string;
+    lines: string[];
+    startIndex: number;
+    format: 'markdown' | 'org';
+    options?: {
+      taskIndent?: string;
+      allowAnyIndent?: boolean;
+      isBoundary?: (line: string) => boolean;
+    };
+  }> = [
+    {
+      name: 'closed drawer',
+      lines: ['TODO Task', ':PROPERTIES:', ':ID: one', ':END:', 'TODO Next'],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '' },
+    },
+    {
+      name: 'unclosed drawer before a child task',
+      lines: ['TODO Parent', ':PROPERTIES:', ':ID: one', '  - [ ] Child'],
+      startIndex: 1,
+      format: 'markdown',
+      options: {
+        taskIndent: '',
+        isBoundary: (line) => line.includes('[ ]'),
+      },
+    },
+    {
+      name: 'anchored end',
+      lines: [
+        'TODO Task',
+        ':PROPERTIES:',
+        ':ID: one',
+        ':END: ^anchor',
+        'TODO Next',
+      ],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '' },
+    },
+    {
+      name: 'quoted drawer',
+      lines: ['> TODO Task', '> :PROPERTIES:', '> :ID: one', '> :END:'],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '> ' },
+    },
+    {
+      name: 'indented drawer',
+      lines: ['  - TODO Task', '    :PROPERTIES:', '    :ID: one', '    :END:'],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '  ' },
+    },
+    {
+      name: 'blank line',
+      lines: ['TODO Task', ':PROPERTIES:', ':ID: one', '', ':END:'],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '' },
+    },
+    {
+      name: 'unknown key',
+      lines: ['TODO Task', ':PROPERTIES:', ':Unknown: keep', ':END:'],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '' },
+    },
+    {
+      name: 'malformed content',
+      lines: [
+        'TODO Task',
+        ':PROPERTIES:',
+        ':ID: one',
+        'not a property',
+        ':END:',
+      ],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '' },
+    },
+    {
+      name: 'boundary line with a colon',
+      lines: ['TODO Task', ':PROPERTIES:', ':ID: one', 'TODO: Child'],
+      startIndex: 1,
+      format: 'markdown',
+      options: {
+        taskIndent: '',
+        isBoundary: (line) => line.startsWith('TODO:'),
+      },
+    },
+    {
+      name: 'preserved content then EOF',
+      lines: ['TODO Task', ':PROPERTIES:', ':ID: one', 'note: value'],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '' },
+    },
+    {
+      name: 'quoted blank is malformed',
+      lines: ['> TODO Task', '> :PROPERTIES:', '> :ID: one', '> ', '> :END:'],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '> ' },
+    },
+    {
+      name: 'org drawer',
+      lines: ['* TODO Task', ':PROPERTIES:', ':ID: one', ':END:'],
+      startIndex: 1,
+      format: 'org',
+    },
+    {
+      name: 'not a drawer start',
+      lines: ['TODO Task', ':not-a-drawer:', ':END:'],
+      startIndex: 1,
+      format: 'markdown',
+      options: { taskIndent: '' },
+    },
+  ];
+
+  test.each(cases)(
+    'matches readTaskPropertiesDrawer for $name',
+    ({ lines, startIndex, format, options }) => {
+      const full = readTaskPropertiesDrawer(lines, startIndex, format, options);
+      const light = findPropertiesDrawerEnd(lines, startIndex, format, options);
+      if (!full) {
+        expect(light).toBeNull();
+        return;
+      }
+      expect(light).toMatchObject({
+        endLine: full.endLine,
+        closed: full.closed,
+      });
+    },
+  );
 });
 
 describe('dependency reference lexing', () => {

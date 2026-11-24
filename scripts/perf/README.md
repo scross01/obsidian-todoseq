@@ -66,6 +66,24 @@ Scenarios (`scripts/perf/scenarios.ts`):
 Artifact: `output/perf/node-<size>.json` (local-only, untracked) with the
 git SHA, node version, platform, and every scenario's numbers.
 
+### Blocking-density scenarios
+
+The same node suite also runs `scripts/perf/blocking.bench.ts`, which
+compares three property-drawer densities over the generated vault:
+`baseline` (no drawers), `occasional` (every tenth eligible task) and
+`heavy` (every eligible task, plus blockers and unknown properties). It
+measures `blocking-parse-<density>` and
+`blocking-dependency-<density>` for each density. The suite is
+report-only and has no thresholds.
+
+```bash
+PERF_SIZE=m PERF_ITERATIONS=30 npm run perf:node
+PERF_SIZE=l PERF_ITERATIONS=15 npm run perf:node
+```
+
+Artifact: `output/perf/blocking-<size>.json`, alongside the ordinary
+`node-<size>.json` result.
+
 ## Tier 2 — in-Obsidian profiling (`npm run perf:obsidian`)
 
 Drives a real Obsidian instance (Electron, real vault I/O, real DOM)

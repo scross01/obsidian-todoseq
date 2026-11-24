@@ -171,6 +171,15 @@ describe('TaskDependencyManager', () => {
     expect(engine.isBlocked('Source.md:0')).toBe(true);
   });
 
+  it('flags a self-loop as a cycle', () => {
+    const { engine } = managerFor([
+      task({ path: 'a.md', line: 0, id: 'a', blockedBy: ['a'] }),
+    ]);
+    expect(engine.getIssues()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'cycle' })]),
+    );
+  });
+
   it('flags cycles but keeps direct completion checks authoritative', () => {
     const { engine, state } = managerFor([
       task({ path: 'a.md', line: 0, id: 'a', blockedBy: ['b'] }),

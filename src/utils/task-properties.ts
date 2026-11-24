@@ -48,6 +48,11 @@ export interface TaskPropertiesDrawer {
   issues: TaskPropertyIssue[];
 }
 
+export interface PropertiesDrawerBounds {
+  endLine: number;
+  closed: boolean;
+}
+
 export interface ParsedTaskProperties {
   properties?: Partial<Record<SupportedTaskProperty, string>>;
   id?: string;
@@ -145,6 +150,47 @@ export function isPropertiesDrawerEnd(
   return isDrawerEndLine(splitMetadataLine(line, format).body, format);
 }
 
+function parsePropertyBody(
+  body: string,
+  quotePrefix: string,
+  line: string,
+  lineIndex: number,
+): TaskPropertyEntry | null {
+  const match = PROPERTY_LINE.exec(body);
+  if (!match) return null;
+
+  const indent = match[1] ?? '';
+  const authoredKey = match[2] ?? '';
+  const value = match[3] ?? '';
+  const append = authoredKey.endsWith('+');
+  const keyWithoutMarker = append ? authoredKey.slice(0, -1) : authoredKey;
+  if (keyWithoutMarker.length === 0) return null;
+
+  const normalizedKey = keyWithoutMarker.toUpperCase();
+  const canonicalKey = SUPPORTED_TASK_PROPERTY_KEYS.includes(
+    normalizedKey as SupportedTaskProperty,
+  )
+    ? (normalizedKey as SupportedTaskProperty)
+    : null;
+
+  const valueStart = quotePrefix.length + match[0].length - value.length;
+
+  return {
+    key: authoredKey,
+    canonicalKey,
+    baseKey: normalizedKey,
+    append,
+    value: value.trim(),
+    line: lineIndex,
+    startIndex: 0,
+    endIndex: line.length,
+    valueStart: Math.min(valueStart, line.length),
+    valueEnd: line.length,
+    quotePrefix,
+    indent,
+  };
+}
+
 /**
  * Parse one Org property line. A naked `:KEY:` outside a drawer is ordinary
  * prose, so callers only invoke this inside a recognized drawer.
@@ -155,38 +201,59 @@ export function parsePropertyLine(
   format: 'markdown' | 'org',
 ): TaskPropertyEntry | null {
   const parts = splitMetadataLine(line, format);
-  const match = PROPERTY_LINE.exec(parts.body);
-  if (!match) return null;
+  return parsePropertyBody(parts.body, parts.quotePrefix, line, lineIndex);
+}
 
-  const indent = match[1] ?? '';
-  const authoredKey = match[2] ?? '';
-  const value = match[3] ?? '';
-  const append = authoredKey.endsWith('+');
-  const keyWithoutMarker = append ? authoredKey.slice(0, -1) : authoredKey;
-  if (keyWithoutMarker.length === 0) return null;
+/**
+ * Lightweight bounds scan for callers that only need to skip a drawer.
+ *
+ * This deliberately does not allocate entries or issues. Its boundary rules
+ * mirror readTaskPropertiesDrawer; keep the two in sync.
+ */
+export function findPropertiesDrawerEnd(
+  lines: string[],
+  startIndex: number,
+  format: 'markdown' | 'org',
+  options?: {
+    taskIndent?: string;
+    allowAnyIndent?: boolean;
+    isBoundary?: (line: string) => boolean;
+  },
+): PropertiesDrawerBounds | null {
+  if (startIndex < 0 || startIndex >= lines.length) return null;
 
-  const canonicalKey = SUPPORTED_TASK_PROPERTY_KEYS.includes(
-    keyWithoutMarker.toUpperCase() as SupportedTaskProperty,
-  )
-    ? (keyWithoutMarker.toUpperCase() as SupportedTaskProperty)
-    : null;
+  const taskIndent = options?.allowAnyIndent ? undefined : options?.taskIndent;
+  if (!isPropertiesDrawerStart(lines[startIndex], format, taskIndent)) {
+    return null;
+  }
 
-  const valueStart = parts.quotePrefix.length + match[0].length - value.length;
+  let lastConsumed = startIndex;
+  for (let i = startIndex + 1; i < lines.length; i++) {
+    const line = lines[i];
+    const parts = splitMetadataLine(line, format);
+    if (isDrawerEndLine(parts.body, format)) {
+      return { endLine: i, closed: true };
+    }
 
-  return {
-    key: authoredKey,
-    canonicalKey,
-    baseKey: keyWithoutMarker.toUpperCase(),
-    append,
-    value: value.trim(),
-    line: lineIndex,
-    startIndex: 0,
-    endIndex: line.length,
-    valueStart: Math.min(valueStart, line.length),
-    valueEnd: line.length,
-    quotePrefix: parts.quotePrefix,
-    indent,
-  };
+    if (line.trim() === '') {
+      lastConsumed = i;
+      continue;
+    }
+
+    if (PROPERTY_LINE.test(parts.body)) {
+      lastConsumed = i;
+      continue;
+    }
+
+    if (!options?.isBoundary?.(line) && line.includes(':')) {
+      lastConsumed = i;
+      continue;
+    }
+
+    return { endLine: lastConsumed, closed: false };
+  }
+
+  return { endLine: lastConsumed, closed: false };
 }
 
 /**
@@ -204,19 +271,10 @@ export function readTaskPropertiesDrawer(
     isBoundary?: (line: string) => boolean;
   },
 ): TaskPropertiesDrawer | null {
-  if (
-    startIndex < 0 ||
-    startIndex >= lines.length ||
-    !isPropertiesDrawerStart(lines[startIndex], format)
-  ) {
-    return null;
-  }
+  if (startIndex < 0 || startIndex >= lines.length) return null;
 
-  if (
-    !options?.allowAnyIndent &&
-    options?.taskIndent !== undefined &&
-    !isPropertiesDrawerStart(lines[startIndex], format, options.taskIndent)
-  ) {
+  const taskIndent = options?.allowAnyIndent ? undefined : options?.taskIndent;
+  if (!isPropertiesDrawerStart(lines[startIndex], format, taskIndent)) {
     return null;
   }
 
@@ -226,7 +284,8 @@ export function readTaskPropertiesDrawer(
 
   for (let i = startIndex + 1; i < lines.length; i++) {
     const line = lines[i];
-    if (isPropertiesDrawerEnd(line, format)) {
+    const parts = splitMetadataLine(line, format);
+    if (isDrawerEndLine(parts.body, format)) {
       return {
         startLine: startIndex,
         endLine: i,
@@ -241,7 +300,7 @@ export function readTaskPropertiesDrawer(
       continue;
     }
 
-    const entry = parsePropertyLine(line, i, format);
+    const entry = parsePropertyBody(parts.body, parts.quotePrefix, line, i);
     if (entry) {
       entries.push(entry);
       lastConsumed = i;
