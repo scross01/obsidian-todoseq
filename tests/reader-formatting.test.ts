@@ -2489,6 +2489,10 @@ describe('ReaderViewFormatter', () => {
       expect(setIcon).toHaveBeenCalledWith(toggle, 'right-triangle');
       const header = drawer.querySelector('.todoseq-properties-line');
       expect(header?.textContent).toBe(':PROPERTIES:');
+      expect(header?.parentElement?.tagName).toBe('P');
+      expect(
+        header?.parentElement?.classList.contains('todoseq-properties-host'),
+      ).toBe(true);
       expect(header?.previousElementSibling).toBe(toggle);
       const bodies = getBodies(drawer);
       expect(bodies.length).toBeGreaterThan(0);

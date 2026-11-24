@@ -777,6 +777,11 @@ export class ReaderViewFormatter {
       button.toggleClass('is-collapsed', !next);
     });
 
+    const host = header.parentElement;
+    if (host?.matches('p, li, td')) {
+      host.classList.add('todoseq-properties-host');
+    }
+
     header.before(button);
   }
 

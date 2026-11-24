@@ -851,7 +851,9 @@
   vertical-align: middle;
 }
 
-.markdown-preview-view :is(p, li, td):hover > .todoseq-properties-toggle,
+.markdown-preview-view
+  .todoseq-properties-host:hover
+  > .todoseq-properties-toggle,
 .markdown-preview-view .todoseq-properties-toggle:hover,
 .markdown-preview-view .todoseq-properties-toggle:focus-visible,
 .markdown-preview-view .todoseq-properties-toggle[aria-expanded='false'] {
