@@ -85,6 +85,8 @@ TODOseq recognizes standard Org-mode task syntax:
 
 TODOseq reads `ID`, `BLOCKER`, `ARCHIVED_BLOCKER`, `ORDERED` and `NOBLOCKING`; other properties are preserved in the file and left uninterpreted. Org files use IDs for dependency references, with local `BLOCKER: previous-sibling` as an explicit relation. See [Task Dependencies](task-dependencies.md) for syntax, Markdown block-link support and the optional hierarchy/checkbox settings. The same drawer syntax in a Markdown note also supports [Obsidian's native editor folding](task-dependencies.md#declaring-properties).
 
+Closed property drawers can also be collapsed in Reading view. Every task-owned property block, including empty and unclosed blocks, can be hidden with the **Hide task properties in Reading view** setting without changing the note.
+
 Org checkbox dependencies stay entry-local and stop at the next headline. Markdown checkbox dependencies cover the bounded task subtree instead, so the same visual nesting can produce different reasons across the two formats. This difference is intentional and both checkbox settings are off by default.
 
 ### Supported Keywords

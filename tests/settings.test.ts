@@ -778,6 +778,13 @@ describe('TodoTrackerSettingTab', () => {
         name: 'Format task keywords',
         control: { type: 'toggle', key: 'formatTaskKeywords' },
       });
+      expect(defs[1]).toMatchObject({
+        name: 'Hide task properties in Reading view',
+        control: {
+          type: 'toggle',
+          key: 'hideTaskPropertiesInReadingView',
+        },
+      });
 
       const groups = defs.filter((d): d is GroupDef => {
         return 'type' in d && d.type === 'group';
@@ -847,6 +854,25 @@ describe('TodoTrackerSettingTab', () => {
       expect(
         pluginMock.updateTaskFormatting as jest.Mock,
       ).toHaveBeenCalledTimes(1);
+    });
+
+    it('setControlValue for the Reading-view hide setting refreshes readers without rerendering', async () => {
+      const settings = pluginMock.settings as unknown as {
+        hideTaskPropertiesInReadingView: boolean;
+      };
+      const updateSpy = jest.spyOn(settingTab, 'update');
+
+      await (settingTab as any).setControlValue(
+        'hideTaskPropertiesInReadingView',
+        true,
+      );
+
+      expect(settings.hideTaskPropertiesInReadingView).toBe(true);
+      expect(pluginMock.saveSettings as jest.Mock).toHaveBeenCalledTimes(1);
+      expect(
+        pluginMock.refreshReaderViewFormatter as jest.Mock,
+      ).toHaveBeenCalledTimes(1);
+      expect(updateSpy).not.toHaveBeenCalled();
     });
 
     it('setControlValue for includeCodeBlocks disables language comment support and rescans', async () => {

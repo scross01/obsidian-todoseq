@@ -826,6 +826,62 @@
   color: var(--text-faint);
 }
 
+.markdown-preview-view [data-properties-hidden] {
+  display: none;
+}
+
+/* Icon-only drawer toggle, matching Obsidian's heading fold indicator:
+   10px right-triangle in a 22px left gutter, revealed on hover. */
+.markdown-preview-view .todoseq-properties-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  margin-inline-start: -22px;
+  padding: 0 6px;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--collapse-icon-color, var(--nav-collapse-icon-color));
+  cursor: var(--cursor);
+  opacity: 0;
+  vertical-align: middle;
+}
+
+.markdown-preview-view :is(p, li, td):hover > .todoseq-properties-toggle,
+.markdown-preview-view .todoseq-properties-toggle:hover,
+.markdown-preview-view .todoseq-properties-toggle:focus-visible,
+.markdown-preview-view .todoseq-properties-toggle[aria-expanded='false'] {
+  opacity: 1;
+}
+
+.markdown-preview-view .todoseq-properties-toggle:focus-visible {
+  outline: 2px solid var(--interactive-accent, #7f6df2);
+  outline-offset: 2px;
+}
+
+.markdown-preview-view .todoseq-properties-toggle svg.svg-icon {
+  color: var(--collapse-icon-color, var(--nav-collapse-icon-color));
+}
+
+.markdown-preview-view .todoseq-properties-toggle.is-collapsed svg.svg-icon {
+  color: var(--collapse-icon-color-collapsed);
+}
+
+/* Touch devices have no hover to reveal the control. */
+@media (hover: none) {
+  .markdown-preview-view .todoseq-properties-toggle {
+    opacity: 1;
+  }
+}
+
+.markdown-preview-view .todoseq-properties-body[hidden] {
+  display: none;
+}
+
 /* Description line - editor and reader preview */
 :is(.cm-editor, .markdown-preview-view) .todoseq-task-description {
   font-size: 0.9rem;

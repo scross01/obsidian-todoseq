@@ -8,6 +8,8 @@ const FILE = 'property-drawer-styling';
 const EDGE_FILE = 'property-drawer-fold-edges';
 
 const BODY = [
+  '## Native heading',
+  '',
   'Property drawer styling fixture.',
   '',
   'TODO Plain task',
@@ -20,6 +22,10 @@ const BODY = [
   '  :PROPERTIES:',
   '  :ID: indented-01',
   '  :END:',
+  '',
+  'TODO Empty drawer task',
+  ':PROPERTIES:',
+  ':END:',
   '',
 ].join('\n');
 
@@ -46,6 +52,16 @@ async function writeMarkdown(path: string, body: string): Promise<void> {
 /** Write the main styling fixture and rescan. */
 async function writeFixture(): Promise<void> {
   await writeMarkdown(`${FILE}.md`, BODY);
+}
+
+/** Read a markdown fixture through the vault API. */
+async function readMarkdown(path: string): Promise<string> {
+  return page.evaluate(async (filePath) => {
+    const app = (window as any).app;
+    const file = app.vault.getAbstractFileByPath(filePath);
+    if (!file) throw new Error(`File not found: ${filePath}`);
+    return await app.vault.read(file);
+  }, `${path}.md`);
 }
 
 /** Fold or unfold the drawer whose header is at `lineIndex`. */
@@ -209,14 +225,16 @@ test('a closed task property drawer folds with the native editor control', async
         root?.querySelectorAll('.cm-foldPlaceholder').length ?? 0,
       headerVisible: lines.some((text) => text.includes(':PROPERTIES:')),
       entryVisible: lines.some((text) => text.includes(':ID: plain-01')),
-      topLevelEndVisible: lines.some((text) => text === ':END:'),
+      topLevelEndCount: lines.filter((text) => text === ':END:').length,
     };
   });
 
   expect(folded.placeholderCount).toBeGreaterThanOrEqual(1);
   expect(folded.headerVisible).toBe(true);
   expect(folded.entryVisible).toBe(false);
-  expect(folded.topLevelEndVisible).toBe(false);
+  // The fixture has a second top-level task with an empty drawer; only the
+  // folded drawer's `:END:` should disappear.
+  expect(folded.topLevelEndCount).toBe(1);
 
   await page
     .locator('.workspace-leaf.mod-active .cm-foldPlaceholder')
@@ -241,11 +259,11 @@ test('a closed task property drawer folds with the native editor control', async
     );
     return {
       entryVisible: lines.some((text) => text.includes(':ID: plain-01')),
-      topLevelEndVisible: lines.some((text) => text === ':END:'),
+      topLevelEndCount: lines.filter((text) => text === ':END:').length,
     };
   });
   expect(unfolded.entryVisible).toBe(true);
-  expect(unfolded.topLevelEndVisible).toBe(true);
+  expect(unfolded.topLevelEndCount).toBe(2);
 
   const after = await page.evaluate(async (path) => {
     const app = (window as any).app;
@@ -362,6 +380,164 @@ test('a 70-entry drawer stays unfolded beyond the bounded scan', async () => {
   );
   expect(state.lines.some((text) => text.includes(':EXTRA_69:'))).toBe(true);
   expect(state.lines.some((text) => text.trim() === ':END:')).toBe(true);
+});
+
+test('a task property drawer collapses and expands in the reading view without writing', async () => {
+  await writeFixture();
+  await openInReadingMode();
+
+  const view = page.locator(
+    '.workspace-leaf.mod-active .markdown-preview-view',
+  );
+  const toggles = view.locator('.todoseq-properties-toggle');
+  await expect(toggles).toHaveCount(2);
+
+  const toggle = toggles.first();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).toHaveAttribute(
+    'aria-label',
+    'Collapse task properties',
+  );
+  await expect(toggle).toHaveClass(/collapse-icon/);
+  await expect(toggle).not.toHaveClass(/is-collapsed/);
+  await expect(
+    view
+      .locator('.todoseq-properties-line')
+      .filter({ hasText: ':PROPERTIES:' })
+      .first(),
+  ).toBeVisible();
+
+  const style = await toggle.evaluate((element) => {
+    const button = getComputedStyle(element);
+    const icon = element.querySelector('svg.svg-icon');
+    const svg = icon ? getComputedStyle(icon) : null;
+    const heading = document.querySelector(
+      '.workspace-leaf.mod-active .markdown-preview-view .heading-collapse-indicator',
+    );
+    const native = heading ? getComputedStyle(heading) : null;
+    const nativeIcon = heading?.querySelector('svg.svg-icon');
+    const nativeSvg = nativeIcon ? getComputedStyle(nativeIcon) : null;
+    return {
+      backgroundColor: button.backgroundColor,
+      drawer: {
+        width: button.width,
+        padding: button.padding,
+        marginInlineStart: button.marginInlineStart,
+        iconWidth: svg?.width ?? '',
+        iconHeight: svg?.height ?? '',
+        iconStrokeWidth: svg?.strokeWidth ?? '',
+      },
+      native: {
+        width: native?.width ?? '',
+        padding: native?.padding ?? '',
+        marginInlineStart: native?.marginInlineStart ?? '',
+        iconWidth: nativeSvg?.width ?? '',
+        iconHeight: nativeSvg?.height ?? '',
+        iconStrokeWidth: nativeSvg?.strokeWidth ?? '',
+      },
+    };
+  });
+  expect(style.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  expect(style.drawer).toEqual(style.native);
+
+  const drawerId = await toggle.getAttribute('data-properties-drawer');
+  expect(drawerId).not.toBeNull();
+  const body = view
+    .locator(`[data-properties-body="${drawerId}"]`)
+    .filter({ hasText: 'plain-01' })
+    .first();
+  await expect(body).toBeVisible();
+
+  const before = await readMarkdown(FILE);
+  await toggle.click();
+
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toHaveClass(/is-collapsed/);
+  await expect(body).toBeHidden();
+  await expect(toggle).toBeVisible();
+  expect(await readMarkdown(FILE)).toBe(before);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).not.toHaveClass(/is-collapsed/);
+  await expect(body).toBeVisible();
+});
+
+test('the hide setting removes every task property block from reading view only', async () => {
+  await writeFixture();
+  await openInReadingMode();
+
+  const view = page.locator(
+    '.workspace-leaf.mod-active .markdown-preview-view',
+  );
+  await expect(view.locator('.todoseq-properties-toggle')).toHaveCount(2);
+  const before = await readMarkdown(FILE);
+
+  try {
+    await page.evaluate(async () => {
+      const plugin = (window as any).app.plugins.plugins.todoseq;
+      plugin.settings.hideTaskPropertiesInReadingView = true;
+      await plugin.saveSettings();
+      plugin.refreshReaderViewFormatter();
+    });
+
+    await expect(view.locator('.todoseq-properties-toggle')).toHaveCount(0);
+    const hidden = await view
+      .locator('[data-properties-hidden]')
+      .evaluateAll((elements) =>
+        elements.map((element) => ({
+          text: element.textContent ?? '',
+          display: getComputedStyle(element).display,
+        })),
+      );
+    expect(hidden.length).toBeGreaterThan(0);
+    expect(hidden.every((element) => element.display === 'none')).toBe(true);
+    const hiddenText = hidden.map((element) => element.text).join(' ');
+    expect(hiddenText).toContain(':PROPERTIES:');
+    expect(hiddenText).toContain('plain-01');
+    expect(hiddenText).toContain('indented-01');
+    expect(hiddenText).toContain(':END:');
+    expect(await readMarkdown(FILE)).toBe(before);
+
+    await openFileInEditor(page, FILE);
+    await page.waitForSelector(
+      '.workspace-leaf.mod-active .cm-editor .todoseq-properties-line',
+    );
+    const editorShowsDrawer = await page.evaluate(() => {
+      const root = document.querySelector(
+        '.workspace-leaf.mod-active .cm-editor',
+      );
+      return Array.from(
+        root?.querySelectorAll('.todoseq-properties-line') ?? [],
+      ).some((line) => line.textContent?.includes(':ID: plain-01'));
+    });
+    expect(editorShowsDrawer).toBe(true);
+
+    await openInReadingMode();
+    await page.evaluate(async () => {
+      const plugin = (window as any).app.plugins.plugins.todoseq;
+      plugin.settings.hideTaskPropertiesInReadingView = false;
+      await plugin.saveSettings();
+      plugin.refreshReaderViewFormatter();
+    });
+
+    await expect(view.locator('.todoseq-properties-toggle')).toHaveCount(2);
+    const toggle = view.locator('.todoseq-properties-toggle').first();
+    const drawerId = await toggle.getAttribute('data-properties-drawer');
+    await expect(
+      view
+        .locator(`[data-properties-body="${drawerId}"]`)
+        .filter({ hasText: 'plain-01' })
+        .first(),
+    ).toBeVisible();
+  } finally {
+    await page.evaluate(async () => {
+      const plugin = (window as any).app.plugins.plugins.todoseq;
+      plugin.settings.hideTaskPropertiesInReadingView = false;
+      await plugin.saveSettings();
+      plugin.refreshReaderViewFormatter();
+    });
+  }
 });
 
 test('drawer lines are decorated metadata in the reading view', async () => {

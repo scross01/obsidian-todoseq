@@ -95,6 +95,7 @@ export interface TodoTrackerSettings {
   languageCommentSupport: boolean; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
+  hideTaskPropertiesInReadingView: boolean; // hide task-owned property blocks in Reading view
   additionalFileExtensions: string[]; // additional file extensions to scan for tasks (e.g., ['.org', '.txt']) - hidden from UI, managed by detectOrgModeFiles
   detectOrgModeFiles: boolean; // experimental: when enabled, adds .org to additionalFileExtensions and registers org-mode parser
   scanCodeFiles: boolean; // experimental: when enabled, scans code files for TODO-style comments
@@ -180,6 +181,7 @@ export const DefaultSettings: TodoTrackerSettings = {
   languageCommentSupport: false,
   weekStartsOn: 'Monday', // Default to Monday as requested
   formatTaskKeywords: true, // Default to enabled
+  hideTaskPropertiesInReadingView: false, // Reading view shows drawers by default
   additionalFileExtensions: [], // No additional extensions by default - managed by detectOrgModeFiles
   detectOrgModeFiles: false, // Experimental feature - disabled by default
   scanCodeFiles: false, // Experimental feature - disabled by default

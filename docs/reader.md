@@ -27,6 +27,12 @@ Jump to a specific state without cycling through intermediate ones. Right-click 
 
 When tasks include checkboxes, clicking the checkbox toggles between checked and unchecked states. The task keyword automatically synchronizes with the checkbox—checking a box marks the task as DONE, unchecking returns it to TODO.
 
+## Property Drawers
+
+Task property drawers are shown as quiet metadata. A closed drawer with at least one property has a collapse arrow in the left margin before `:PROPERTIES:`; select the arrow to collapse the entries and `:END:`, and select it again to expand them. Empty and unclosed blocks have no chevron; the disclosure requires a completed drawer with at least one property.
+
+If you do not want task-owned property metadata in Reading view at all, enable **Hide task properties in Reading view** in TODOseq settings. This hides every task-owned property block, including empty, unclosed and otherwise-expanded blocks. The setting is Reading-view-only; it does not change the editor. The drawer stays in the note, and disabling the setting restores the default rendering.
+
 ## Code Blocks in Reader View
 
 TODOseq intentionally does not apply task styling to code blocks in Reader view. Code blocks maintain their original formatting without keyword highlighting or interactive elements. This preserves the readability of your code examples and prevents task keywords in code from being mistaken for actual tasks.

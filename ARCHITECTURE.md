@@ -1291,6 +1291,8 @@ Structural rebuilds use one source-order sweep per file for Org checkbox ownersh
 
 `src/view/editor-extensions/property-drawer-fold.ts` registers a CodeMirror fold service for task-owned drawers. `src/utils/property-drawer-fold.ts` performs a bounded 60-line owner and drawer read, accepts only closed drawers with at least one property, and returns a range starting after the `:PROPERTIES:` line so the header remains visible while the entries and `:END:` fold. Fold state is editor-owned and is never written to the note or plugin data.
 
+`ReaderViewFormatter` turns a closed, non-empty, task-owned drawer into an in-place Reading-view disclosure. A separate icon-only button using Obsidian's native `collapse-icon` and `right-triangle` indicator is inserted before the `:PROPERTIES:` header; the header span remains visible, the button carries `aria-expanded`, and the entry and close spans plus their line breaks carry a drawer-scoped body attribute. The toggle only changes DOM `hidden` state. When the default-off `hideTaskPropertiesInReadingView` setting is enabled, every recognized task-owned block is marked hidden and no button is created, including empty, unclosed and otherwise-expanded blocks. This path also works when `formatTaskKeywords` is off. No editor path reads the setting, so the editor fold remains independent. Drawer state is never written to the note; enabling the setting saves only the preference through the normal settings path. Standalone and unsupported blocks remain unchanged.
+
 ## Data Models and Type System
 
 ### Core Task Interface

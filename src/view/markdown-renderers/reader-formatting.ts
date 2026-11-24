@@ -40,6 +40,18 @@ interface RenderedPropertyLinePart {
 interface RenderedPropertyLine {
   text: string;
   parts: RenderedPropertyLinePart[];
+  /** The <br> that introduced this line, or null for the first/newline split. */
+  breakBefore: HTMLBRElement | null;
+}
+
+type PropertyLineRole = 'start' | 'entry' | 'end';
+
+interface PendingPropertyDrawer {
+  id: string;
+  closed: boolean;
+  entryCount: number;
+  startBreak: HTMLBRElement | null;
+  bodyBreaks: HTMLBRElement[];
 }
 
 /**
@@ -188,7 +200,9 @@ export class ReaderViewFormatter {
    */
   registerPostProcessor(): void {
     this.plugin.registerMarkdownPostProcessor(async (element, context) => {
-      if (!this.plugin.settings.formatTaskKeywords) {
+      const { formatTaskKeywords, hideTaskPropertiesInReadingView } =
+        this.plugin.settings;
+      if (!formatTaskKeywords && !hideTaskPropertiesInReadingView) {
         return;
       }
 
@@ -198,6 +212,15 @@ export class ReaderViewFormatter {
 
       // Check if we need to update the parser (e.g., if settings changed)
       this.ensureParserUpToDate();
+
+      if (!formatTaskKeywords) {
+        try {
+          await this.processPropertiesLines(element, context);
+        } catch (error) {
+          console.debug('[TODOseq] Property hide pass failed:', error);
+        }
+        return;
+      }
 
       // Process task keywords in the rendered content
       this.processTaskKeywords(element);
@@ -497,17 +520,26 @@ export class ReaderViewFormatter {
     const parser = this.getTaskParser();
     if (!parser || !element.textContent?.includes(':PROPERTIES:')) return;
 
+    const shouldFormat = this.plugin.settings.formatTaskKeywords;
+    const shouldHide = this.plugin.settings.hideTaskPropertiesInReadingView;
+    if (!shouldFormat && !shouldHide) return;
+
     const blocks = Array.from(
       element.querySelectorAll<HTMLElement>('p, li, td'),
     );
     let inDrawer = false;
     let sawTaskLine = false;
+    let nextDrawerId = 0;
+    const drawers: PendingPropertyDrawer[] = [];
+    let activeDrawer: PendingPropertyDrawer | null = null;
     const segments: Array<{
       node: Text;
       from: number;
       to: number;
       cls: string;
       entry: boolean;
+      role: PropertyLineRole;
+      drawerId: string | null;
     }> = [];
 
     for (const block of blocks) {
@@ -525,6 +557,8 @@ export class ReaderViewFormatter {
           end: number,
           cls: string,
           entry: boolean,
+          role: PropertyLineRole,
+          drawerId: string | null,
         ): void => {
           for (const part of line.parts) {
             const from = Math.max(start, part.offset);
@@ -536,6 +570,8 @@ export class ReaderViewFormatter {
               to: part.nodeStart + to - part.offset,
               cls,
               entry,
+              role,
+              drawerId,
             });
           }
         };
@@ -555,14 +591,48 @@ export class ReaderViewFormatter {
             ));
           if (!ownedByTask) continue;
           inDrawer = true;
-          addRange(0, line.text.length, 'todoseq-properties-line', false);
+          const drawer: PendingPropertyDrawer = {
+            id: String(nextDrawerId++),
+            closed: false,
+            entryCount: 0,
+            startBreak: line.breakBefore,
+            bodyBreaks: [],
+          };
+          drawers.push(drawer);
+          activeDrawer = drawer;
+          addRange(
+            0,
+            line.text.length,
+            'todoseq-properties-line',
+            false,
+            'start',
+            drawer.id,
+          );
           continue;
         }
 
-        if (!text) continue;
+        if (!text) {
+          if (activeDrawer && line.breakBefore) {
+            activeDrawer.bodyBreaks.push(line.breakBefore);
+          }
+          continue;
+        }
         if (text === ':END:') {
+          const drawer = activeDrawer;
+          if (drawer) {
+            drawer.closed = true;
+            if (line.breakBefore) drawer.bodyBreaks.push(line.breakBefore);
+          }
           inDrawer = false;
-          addRange(0, line.text.length, 'todoseq-properties-line', false);
+          activeDrawer = null;
+          addRange(
+            0,
+            line.text.length,
+            'todoseq-properties-line',
+            false,
+            'end',
+            drawer?.id ?? null,
+          );
           continue;
         }
 
@@ -571,7 +641,13 @@ export class ReaderViewFormatter {
         const keyEnd = stripped.indexOf(':', 1);
         if (keyEnd < 0 || !stripped.startsWith(':')) {
           inDrawer = false;
+          activeDrawer = null;
           continue;
+        }
+        const drawerId = activeDrawer?.id ?? null;
+        if (activeDrawer) {
+          activeDrawer.entryCount++;
+          if (line.breakBefore) activeDrawer.bodyBreaks.push(line.breakBefore);
         }
         const keyStart =
           line.text.length -
@@ -582,13 +658,44 @@ export class ReaderViewFormatter {
           keyStart + keyEnd + 1,
           'todoseq-properties-line todoseq-properties-key',
           true,
+          'entry',
+          drawerId,
         );
         addRange(
           keyStart + keyEnd + 1,
           line.text.length,
           'todoseq-properties-line',
           true,
+          'entry',
+          drawerId,
         );
+      }
+    }
+
+    const collapsibleDrawers = drawers.filter(
+      (drawer) => drawer.closed && drawer.entryCount > 0,
+    );
+    const collapsibleIds = new Set(
+      collapsibleDrawers.map((drawer) => drawer.id),
+    );
+    const hiddenDrawers = shouldHide ? drawers : [];
+    const hiddenIds = new Set(hiddenDrawers.map((drawer) => drawer.id));
+    const disclosureDrawers = shouldHide ? [] : collapsibleDrawers;
+
+    for (const drawer of drawers) {
+      const isHidden = hiddenIds.has(drawer.id);
+      const isCollapsible = collapsibleIds.has(drawer.id);
+      if (!isHidden && !isCollapsible) continue;
+
+      for (const br of drawer.bodyBreaks) {
+        if (isHidden) {
+          br.dataset.propertiesHidden = drawer.id;
+        } else {
+          br.dataset.propertiesBody = drawer.id;
+        }
+      }
+      if (isHidden && drawer.startBreak) {
+        drawer.startBreak.dataset.propertiesHidden = drawer.id;
       }
     }
 
@@ -596,18 +703,81 @@ export class ReaderViewFormatter {
     segments
       .sort((a, b) => b.from - a.from)
       .forEach((segment) => {
-        this.wrapTextRange(
-          segment.node,
-          segment.from,
-          segment.to,
-          segment.cls,
-          {
-            'data-properties-line': segment.entry ? 'entry' : 'boundary',
-            'aria-label': 'task properties',
-            role: 'note',
-          },
-        );
+        const isHidden =
+          segment.drawerId !== null && hiddenIds.has(segment.drawerId);
+        const isCollapsible =
+          segment.drawerId !== null && collapsibleIds.has(segment.drawerId);
+        if (!shouldFormat && !isHidden) return;
+
+        const attrs: Record<string, string> = {
+          'data-properties-line': segment.entry ? 'entry' : 'boundary',
+          'aria-label': 'task properties',
+          role: 'note',
+        };
+        let cls = segment.cls;
+        if (isHidden && segment.drawerId) {
+          attrs['data-properties-hidden'] = segment.drawerId;
+        } else if (isCollapsible && segment.drawerId) {
+          attrs['data-properties-role'] = segment.role;
+          if (segment.role === 'start') {
+            attrs['data-properties-drawer'] = segment.drawerId;
+          }
+          if (segment.entry || segment.role === 'end') {
+            attrs['data-properties-body'] = segment.drawerId;
+            cls = `${cls} todoseq-properties-body`;
+          }
+        }
+
+        this.wrapTextRange(segment.node, segment.from, segment.to, cls, attrs);
       });
+
+    for (const drawer of disclosureDrawers) {
+      this.addPropertiesDisclosure(element, drawer.id);
+    }
+  }
+
+  /** Add an accessible, native-style disclosure control before the drawer header. */
+  private addPropertiesDisclosure(root: HTMLElement, drawerId: string): void {
+    const header = root.querySelector<HTMLElement>(
+      `[data-properties-drawer="${drawerId}"][data-properties-role="start"]`,
+    );
+    if (!header) return;
+
+    const button = createEl('button', {
+      cls: 'todoseq-properties-toggle collapse-icon',
+      attr: {
+        type: 'button',
+        'aria-expanded': 'true',
+        'aria-label': 'Collapse task properties',
+        'data-properties-drawer': drawerId,
+      },
+    });
+    setIcon(button, 'right-triangle');
+
+    const body = Array.from(
+      root.querySelectorAll<HTMLElement>(
+        `[data-properties-body="${drawerId}"]`,
+      ),
+    );
+
+    button.addEventListener('click', (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const expanded = button.getAttribute('aria-expanded') !== 'false';
+      const next = !expanded;
+
+      body.forEach((element) => {
+        element.hidden = !next;
+      });
+      button.setAttribute('aria-expanded', String(next));
+      button.setAttribute(
+        'aria-label',
+        next ? 'Collapse task properties' : 'Expand task properties',
+      );
+      button.toggleClass('is-collapsed', !next);
+    });
+
+    header.before(button);
   }
 
   /**
@@ -616,10 +786,14 @@ export class ReaderViewFormatter {
    */
   private collectRenderedLines(block: HTMLElement): RenderedPropertyLine[] {
     const lines: RenderedPropertyLine[] = [];
-    let current: RenderedPropertyLine = { text: '', parts: [] };
-    const flush = (): void => {
+    let current: RenderedPropertyLine = {
+      text: '',
+      parts: [],
+      breakBefore: null,
+    };
+    const flush = (breakBefore: HTMLBRElement | null = null): void => {
       lines.push(current);
-      current = { text: '', parts: [] };
+      current = { text: '', parts: [], breakBefore };
     };
 
     const walk = (parent: Node): void => {
@@ -629,7 +803,7 @@ export class ReaderViewFormatter {
           const pieces = nodeText.split('\n');
           let nodeStart = 0;
           pieces.forEach((piece, index) => {
-            if (index > 0) flush();
+            if (index > 0) flush(null);
             if (piece) {
               current.parts.push({
                 node: child as Text,
@@ -642,7 +816,7 @@ export class ReaderViewFormatter {
             nodeStart += piece.length + (index < pieces.length - 1 ? 1 : 0);
           });
         } else if (child.nodeName === 'BR') {
-          flush();
+          flush(child as HTMLBRElement);
         } else if (child.nodeType === Node.ELEMENT_NODE) {
           walk(child);
         }

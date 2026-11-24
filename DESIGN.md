@@ -148,7 +148,7 @@ Search is a first-class Operate surface and must **feel like Obsidian search**, 
 - Completed: `--text-muted` + strike on both text and keyword, never opacity; archived slightly dimmer without inventing a new gray
 - Date lines (`SCHEDULED` / `DEADLINE` / `CLOSED` / `STARTED`): muted, ~0.9rem, keyword vs value weight split
 - Smart-date highlight: low-alpha accent fill + thin outline — a temporary cursor cue, not a brand marker
-- Property drawers stay quiet metadata. In the editor, a closed drawer with entries uses Obsidian's native fold gutter and ellipsis; keep the `:PROPERTIES:` header visible, add no custom disclosure chrome, and leave Reading view to its own rendering. The editor fold and Reading view are independent.
+- Property drawers stay quiet metadata. In the editor, a closed drawer with entries uses Obsidian's native fold gutter and ellipsis; keep the `:PROPERTIES:` header visible, add no custom disclosure chrome. Reading view uses an in-place disclosure with Obsidian's native collapse indicator — the same 10px `right-triangle` in a 22px left gutter used by heading folds — plus `aria-expanded`; keep the `:PROPERTIES:` header visible, hide entries and `:END:` while collapsed, and use theme variables only. A default-off, Reading-view-only **Hide task properties in Reading view** setting can remove every task-owned property block, including empty and unclosed blocks, entirely. The editor's native fold and ellipsis remain a separate, unaffected affordance.
 - Never recolor note prose beyond task-related tokens
 
 ### Embedded task lists

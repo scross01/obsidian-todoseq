@@ -86,6 +86,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     (value: unknown) => Promise<void> | void
   > = {
     formatTaskKeywords: () => this.plugin.updateTaskFormatting(),
+    hideTaskPropertiesInReadingView: () =>
+      this.plugin.refreshReaderViewFormatter(),
     includeCalloutBlocks: () => this.rescanAndRefresh(),
     includeCommentBlocks: () => this.rescanAndRefresh(),
     includeCodeBlocks: (value) => {
@@ -275,6 +277,14 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         name: 'Format task keywords',
         desc: 'Highlight task keywords (todo, doing, etc.) in bold with accent color in the editor.',
         control: { type: 'toggle', key: 'formatTaskKeywords' },
+      },
+      {
+        name: 'Hide task properties in Reading view',
+        desc: 'When enabled, task property drawers are hidden in Reading view. The note and its properties are unchanged.',
+        control: {
+          type: 'toggle',
+          key: 'hideTaskPropertiesInReadingView',
+        },
       },
       {
         type: 'group',

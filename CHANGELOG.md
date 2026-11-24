@@ -12,6 +12,7 @@
 - Fixed an anchor on a date, description or property-drawer line picking up TODOseq's muted metadata styling instead of Obsidian's own anchor style; an anchored `:END:` now also closes the drawer styling.
 - Property drawers under tasks now appear as quiet metadata in the editor and reading view, including on top-level tasks; previously the drawer lines were left unstyled.
 - Closed task property drawers can now be folded in the editor with Obsidian's native fold control, leaving the `:PROPERTIES:` line visible and tucking the entries and `:END:` behind the usual ellipsis.
+- Task property drawers can now be collapsed in Reading view. A new Reading-view-only **Hide task properties in Reading view** setting hides all task-owned property blocks, including empty ones, and is off by default.
 - A blocked task's checkbox now springs back instead of staying checked, and archive runs report blocked tasks as skipped rather than counting them as archived. A completion queued while its blocker was still done is checked once more before writing.
 - Blocked locks are now keyboard and tap accessible in task lists, embedded lists and reader views, including plain, heading, bullet and table reader tasks.
 - Blocked-task locks now appear in the editor as well as the reading view, and dependency warnings now appear in the reading view as well as the editor. Both markers sit immediately before the keyword, and a source diagnostic replaces the lock instead of stacking beside it.

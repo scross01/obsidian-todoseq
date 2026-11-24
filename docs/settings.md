@@ -34,6 +34,18 @@ When you install TODOseq for the first time, it starts with the defaults below, 
 
 Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font. All task states use your Obsidian theme's accent color. See [Editor Integration](editor.md) and [Reader View](reader.md) documentation for full details.
 
+## Reader View Settings
+
+### Hide Task Properties in Reading View
+
+**Setting**: "Hide task properties in Reading view" toggle
+
+**Description**: Hides every task-owned property block in Reading view, including empty, unclosed and otherwise-expanded blocks. The properties remain in the note and can still be read by other tools. When this is off, closed drawers with at least one property can be collapsed with the Reading-view disclosure.
+
+**Scope**: Reading view only. The editor is unchanged.
+
+**Default**: Off
+
 ## Task Recognition Settings
 
 ### Task Keywords
