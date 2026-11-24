@@ -1289,6 +1289,8 @@ Structural rebuilds use one source-order sweep per file for Org checkbox ownersh
 
 `src/utils/task-properties.ts` is the single bounded reader for Org-style `:PROPERTIES:` drawers. It returns ordered lexical entries with source spans, classifies only `ID`, `BLOCKER` and `ARCHIVED_BLOCKER`, and emits typed `TaskPropertyIssue` diagnostics for malformed drawers, duplicate keys, invalid IDs and invalid references. The Markdown and Org parsers attach the extracted values to `Task`; unknown properties remain source data and are never modeled. `TaskWriter` uses the same scanner to mutate supported keys through its existing editor/vault serialization, while copy, move and migrate retain the entire bounded drawer as part of the task block. Dependency references share one format-aware lexer: whitespace-separated exact IDs, plus file-qualified `[[note#^anchor]]` tokens in Markdown; `previous-sibling` is a reserved relation token rather than an ID. Property inheritance and trigger execution are not part of this layer.
 
+`src/view/editor-extensions/property-drawer-fold.ts` registers a CodeMirror fold service for task-owned drawers. `src/utils/property-drawer-fold.ts` performs a bounded 60-line owner and drawer read, accepts only closed drawers with at least one property, and returns a range starting after the `:PROPERTIES:` line so the header remains visible while the entries and `:END:` fold. Fold state is editor-owned and is never written to the note or plugin data.
+
 ## Data Models and Type System
 
 ### Core Task Interface

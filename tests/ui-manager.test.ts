@@ -41,6 +41,10 @@ jest.mock('../src/view/editor-extensions/date-autocomplete', () => ({
   dateAutocompleteExtension: jest.fn().mockReturnValue([]),
 }));
 
+jest.mock('../src/view/editor-extensions/property-drawer-fold', () => ({
+  propertyDrawerFoldExtension: jest.fn().mockReturnValue([]),
+}));
+
 jest.mock('../src/view/task-list/task-list-view', () => {
   const TaskListView = jest.fn().mockImplementation(function () {
     this.getViewType = jest.fn().mockReturnValue('todoseq-view');
@@ -288,6 +292,29 @@ describe('UIManager', () => {
       const element = activeDocument.createElement('span');
       const result = uiManager.getEditorViewFromElement(element);
       expect(result).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Editor decoration registration
+  // ---------------------------------------------------------------------------
+  describe('setupEditorDecorations', () => {
+    it('registers the property drawer fold extension', () => {
+      uiManager.setupEditorDecorations();
+
+      const foldModule = jest.requireMock(
+        '../src/view/editor-extensions/property-drawer-fold',
+      ) as { propertyDrawerFoldExtension: jest.Mock };
+      const registerEditorExtension =
+        pluginMock.registerEditorExtension as jest.Mock;
+      const registered = registerEditorExtension.mock
+        .calls[0]?.[0] as unknown[];
+      const foldExtension =
+        foldModule.propertyDrawerFoldExtension.mock.results[0]?.value;
+
+      expect(foldModule.propertyDrawerFoldExtension).toHaveBeenCalledTimes(1);
+      expect(registered).toHaveLength(3);
+      expect(registered).toContain(foldExtension);
     });
   });
 

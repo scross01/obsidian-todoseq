@@ -24,7 +24,9 @@ TODOseq reads these properties:
 - `ORDERED` makes later task siblings wait for this task.
 - `NOBLOCKING` exempts this task from every dependency gate, including explicit, structural and checkbox reasons. A present value other than lowercase `nil` enables it; an empty value enables it.
 
-In the editor and reading view the drawer is shown as quiet metadata: the lines are muted and the property keys are faint, using your theme's colours. Nothing is hidden, and the drawer remains ordinary note text that other tools can read.
+In the editor and reading view the drawer is shown as quiet metadata: the lines are muted and the property keys are faint, using your theme's colours.
+
+In the editor, a closed drawer with at least one property can be folded from Obsidian's fold gutter: the `:PROPERTIES:` line stays visible while the entries and `:END:` collapse behind the native ellipsis. Click the ellipsis or use Obsidian's unfold control to restore them. The drawer must fit within 60 lines including `:PROPERTIES:` and `:END:`; longer drawers stay unfolded. An empty or unclosed drawer is not foldable. Folding is view-only and never changes the note, so the drawer remains ordinary note text that other tools can read. Reading view has its own property-drawer rendering and is unaffected by the editor fold.
 
 ### Org property syntax
 

@@ -47,6 +47,10 @@ jest.mock('@codemirror/view', () => ({
   EditorView: jest.fn(),
 }));
 
+jest.mock('@codemirror/language', () => ({
+  foldService: { of: jest.fn().mockReturnValue([]) },
+}));
+
 jest.mock('../src/view/editor-extensions/task-formatting', () => ({
   taskKeywordPlugin: jest.fn().mockReturnValue([]),
 }));

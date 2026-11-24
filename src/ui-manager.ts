@@ -3,6 +3,7 @@ import { EditorView } from '@codemirror/view';
 import TodoTracker from './main';
 import { taskKeywordPlugin } from './view/editor-extensions/task-formatting';
 import { dateAutocompleteExtension } from './view/editor-extensions/date-autocomplete';
+import { propertyDrawerFoldExtension } from './view/editor-extensions/property-drawer-fold';
 import { parseTableCells, getTableCellIndex } from './utils/task-line-utils';
 import { TaskListView } from './view/task-list/task-list-view';
 import { getStateTransitionManager } from './services/task-update-coordinator';
@@ -43,6 +44,12 @@ export class UIManager {
         this.plugin.settings,
         () => this.plugin.keywordManager,
       ),
+      propertyDrawerFoldExtension(() => {
+        const parser = this.plugin.vaultScanner?.getParser() ?? null;
+        if (!parser) return null;
+        return (line) =>
+          parser.testRegex.test(line) || parser.isHeadingTaskLine(line);
+      }),
     ]);
     this.plugin.taskFormatters.set('editor-extension', extension);
   }
